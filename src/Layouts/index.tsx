@@ -49,6 +49,7 @@ import {
   resolveCallIdForAttendApi,
   shouldDismissIncomingModalForAnsweredElsewhere,
 } from "../utils/incomingCallMatching";
+import { ACCOUNT_BILLING_TABS } from "@components/billings/shared/accountBillingTabs";
 
 interface LayoutProps {
   children: ReactNode;
@@ -1770,14 +1771,7 @@ font-weight:600;
                           )}
                           
                           {session?.user?.permissions?.some((permission) =>
-                            ([
-                              PERMISSIONS.VIEW_ACCOUNT_OVERVIEW_BILLING,
-                              PERMISSIONS.VIEW_BILLING_HISTORY_BILLING,
-                              PERMISSIONS.VIEW_PAYMENT_METHODS_BILLING,
-                              PERMISSIONS.VIEW_INVOICES_BILLING,
-                       
-                              PERMISSIONS.VIEW_ORDER_INVOICES_BILLING
-                            ] as string[]).includes(permission)
+                            ACCOUNT_BILLING_TABS.some((tab) => tab.permission === permission)
                           ) && (
                      
                         <button type="button" className="user-dropdown-item" onClick={() => router.push('/billing/account-billing')}>
