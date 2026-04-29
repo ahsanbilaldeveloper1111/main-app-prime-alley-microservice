@@ -224,6 +224,12 @@ const CallRecordings: NextPage & {
   );
   const canDownloadRecordings = session?.user?.permissions?.includes(
     PERMISSIONS.DOWNLOAD_RECORDING_CALL_RECORDINGS,
+  const userPermissions = session?.user?.permissions ?? [];
+  const canViewCallRecordings =
+    userPermissions.includes(PERMISSIONS.VIEW_CALL_RECORDINGS) ||
+    userPermissions.includes(PERMISSIONS.LIST_CALL_RECORDINGS);
+  const canExportCallRecordings = userPermissions.includes(
+    PERMISSIONS.EXPORT_CALL_RECORDINGS,
   );
   const audioPlayerRef = useRef<AudioPlayerRef>(null);
   const [showPageLoader, setShowPageLoader] = useState(false);
@@ -745,12 +751,8 @@ const CallRecordings: NextPage & {
         setPaginationInfo((prev) => ({ ...prev, currentPage: 1 }));
         fetchCallLogsOriginal(1, paginationInfo.perPage, searchValue.trim());
       },
-      showFiltersButton: session?.user?.permissions?.includes(
-        PERMISSIONS.VIEW_CALL_RECORDINGS,
-      ),
-      showExportButton: session?.user?.permissions?.includes(
-        "export-call-recordings",
-      ),
+      showFiltersButton: canViewCallRecordings,
+      showExportButton: canExportCallRecordings,
       onExportClick: () => handleExport("excel", appliedFilters),
       showFilterPills: true,
       showMoreFiltersButton: false,
@@ -855,6 +857,8 @@ const CallRecordings: NextPage & {
       ),
     };
   }, [
+    canExportCallRecordings,
+    canViewCallRecordings,
     searchValue,
     paginationInfo.perPage,
     fetchCallLogsOriginal,
@@ -1382,51 +1386,53 @@ const CallRecordings: NextPage & {
           </Row>
         )}
 
-        <GenericTable<RecordingRow>
-          data={tableData}
-          columns={tableColumns}
-          actions={recordingActions}
-          actionsLabel="Action"
-          loading={tableLoading}
-          emptyMessage="No call recordings found."
-          loadingMessage="Loading call recordings..."
-          showToolbar={true}
-          toolbar={tableToolbar}
-          showToolbarActions={false}
-          statsCards={statsCardsData}
-          metricsGridMinWidth="180px"
-          pagination={{
-            currentPage: paginationInfo.currentPage,
-            rowsPerPage: paginationInfo.perPage,
-            totalRows: paginationInfo.totalRows,
-            pageSizeOptions: [10, 15, 25, 50, 100],
-          }}
-          onPaginationChange={(page, rowsPerPage) => {
-            setPaginationInfo((prev) => ({
-              ...prev,
-              currentPage: page,
-              perPage: rowsPerPage,
-            }));
-            fetchCallLogsOriginal(page, rowsPerPage, searchValue.trim());
-          }}
-          sortable={true}
-          hover={true}
-          striped={false}
-          customizableColumns={true}
-          defaultSelectedColumns={[
-            "DateTime",
-            "Time",
-            "AgentExtension",
-            "Username",
-            "Department",
-            "RemotePartyNumber",
-            "Direction",
-            "Duration",
-            "actions",
-          ]}
-          columnStorageKey="call-recordings-columns"
-          uniqueKey="Id"
-        />
+        {canViewCallRecordings && (
+          <GenericTable<RecordingRow>
+            data={tableData}
+            columns={tableColumns}
+            actions={recordingActions}
+            actionsLabel="Action"
+            loading={tableLoading}
+            emptyMessage="No call recordings found."
+            loadingMessage="Loading call recordings..."
+            showToolbar={true}
+            toolbar={tableToolbar}
+            showToolbarActions={false}
+            statsCards={statsCardsData}
+            metricsGridMinWidth="180px"
+            pagination={{
+              currentPage: paginationInfo.currentPage,
+              rowsPerPage: paginationInfo.perPage,
+              totalRows: paginationInfo.totalRows,
+              pageSizeOptions: [10, 15, 25, 50, 100],
+            }}
+            onPaginationChange={(page, rowsPerPage) => {
+              setPaginationInfo((prev) => ({
+                ...prev,
+                currentPage: page,
+                perPage: rowsPerPage,
+              }));
+              fetchCallLogsOriginal(page, rowsPerPage, searchValue.trim());
+            }}
+            sortable={true}
+            hover={true}
+            striped={false}
+            customizableColumns={true}
+            defaultSelectedColumns={[
+              "DateTime",
+              "Time",
+              "AgentExtension",
+              "Username",
+              "Department",
+              "RemotePartyNumber",
+              "Direction",
+              "Duration",
+              "actions",
+            ]}
+            columnStorageKey="call-recordings-columns"
+            uniqueKey="Id"
+          />
+        )}
       </div>
 
       {/* Media Player Modal */}

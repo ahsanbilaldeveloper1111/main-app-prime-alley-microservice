@@ -72,3 +72,4 @@ export function renderFaqCountCell(props: any) {
     </div>
   );
 }
+export default createFaqEditDeleteActionCell

@@ -10,10 +10,10 @@ import '@assets/scss/common.scss';
 import ConfirmModal from '@pages/partial/ConfirmModal';
 import SuccessfulModal from '@pages/partial/SuccessfulModal';
 import { Tag, Plus } from 'lucide-react';
-import { FaqFormSidebar } from '../shared/faqFormSidebar';
-import { FaqLabeledSelect, FaqLabeledTextInput, FaqLabeledTextarea } from '../shared/faqFormFields';
-import { createFaqEditDeleteActionCell, renderFaqDescriptionCell, renderFaqModuleCell, renderFaqCountCell } from '../shared/faqTableCells';
-import { useLoadWhenOpen } from '../shared/useLoadWhenOpen';
+import { FaqFormSidebar } from '@components/faqFormSidebar';
+import { FaqLabeledSelect, FaqLabeledTextInput, FaqLabeledTextarea } from '@components/faqFormFields';
+import { createFaqEditDeleteActionCell, renderFaqDescriptionCell, renderFaqModuleCell, renderFaqCountCell } from '@components/faqTableCells';
+import { useLoadWhenOpen } from '@components/useLoadWhenOpen';
 
 // ===== FAQ Topics Page =====
 // Uses shared FAQ components to eliminate duplication with other FAQ modules/items pages

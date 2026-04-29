@@ -2,6 +2,10 @@ import React, { useEffect, useState } from "react";
 import GenericFilter from './GenericFilter';
 import { createGsmListFiltersConfig } from './filterConfigs';
 import { useSession } from "next-auth/react";
+import { HEADER_CONSTANTS } from "@constants/headerConstants";
+import { hasCallLogsExportPermission } from "@utils/callPermissionUtils";
+
+const { PERMISSIONS } = HEADER_CONSTANTS;
 
 interface GsmListFilterProps {
   onFiltersChange?: (filters: Record<string, any>) => void;
@@ -20,10 +24,10 @@ export default function GsmListFilter({ onFiltersChange, onExport }: GsmListFilt
   useEffect(() => {
     if (status === 'authenticated') {
       // Only show export if onExport prop is provided and user has permission
-      if (onExport && session?.user?.permissions?.includes('export-call-logs')) {
+      if (onExport && hasCallLogsExportPermission(session?.user?.permissions)) {
         setShowExport(true);
       }
-      if (session?.user?.permissions?.includes('filters-call-logs')) {
+      if (session?.user?.permissions?.includes(PERMISSIONS.VIEW_CALL_LOGS_FILTERS)) {
         setShowFilters(true);
       }
     }

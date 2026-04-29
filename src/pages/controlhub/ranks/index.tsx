@@ -2,14 +2,13 @@ import '@assets/scss/datatable-style.scss';
 import React, { ReactElement, useState, useCallback, useMemo, useEffect } from 'react';
 import Layout from '@layout/index';
 import BreadcrumbItem from '@common/BreadcrumbItem';
-import GenericListPage from '@components/GenericListPage';
+import GenericTable, { TableAction, TableColumn } from '@components/GenericTable';
 import { ListRoles, updateRole,deleteRole,addRole,BulkDeleteRoles, getUserTypes, getModules, getPermissionsByModule, updateSeverityLevel, cloneRank } from '@utils/roles';
-import { Column } from '@components/CustomDataTable';
 import { Button, Row, Col, Form, OverlayTrigger, Tooltip, Modal } from 'react-bootstrap';
 import { toast } from 'react-toastify';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/router';
-import Select, { SingleValue } from 'react-select';
+import Select, { MultiValue } from 'react-select';
 import SelectCheckBox, { SelectCheckBoxOption } from '@components/SelectCheckBox';
 import { getParentUsers, assignRankBulk } from '@utils/users';
 import { Copy, Users } from 'lucide-react';
@@ -20,7 +19,6 @@ import FormModal from '@pages/partial/FormModal'
 import ConfirmModal from '@pages/partial/ConfirmModal'
 
 import { FiEdit, FiTrash2, FiEye } from 'react-icons/fi';
-import DatatableActionButton from '@components/DatatableActionButton';
 import { HEADER_CONSTANTS } from '@constants/headerConstants';
 
 // Helper function to get badge colors based on severity level
@@ -42,6 +40,15 @@ const getSeverityBadgeColors = (severityLevel: string): { bg: string; text: stri
     }
 };
 
+interface RankRow {
+    id: number;
+    name: string;
+    user_type_id?: number;
+    user_type?: { id?: number; name?: string };
+    severity_counts?: Record<string, number>;
+    user_assigned_count?: number;
+}
+
 const Ranks = () => {
     const { data: session } = useSession();
     const router = useRouter();
@@ -49,10 +56,15 @@ const Ranks = () => {
     // We don't need the redirect effect anymore since we're showing the message on page
 
     const [refreshKey, setRefreshKey] = useState<number>(0);
-    const [currentFilters, setCurrentFilters] = useState({});
+    const [currentFilters] = useState({});
     const [selectedRows, setSelectedRows] = useState<any[]>([]);
+    const [tableData, setTableData] = useState<RankRow[]>([]);
+    const [isTableLoading, setIsTableLoading] = useState(false);
+    const [currentPage, setCurrentPage] = useState(1);
+    const [rowsPerPage, setRowsPerPage] = useState(15);
+    const [totalRows, setTotalRows] = useState(0);
+    const [searchValue, setSearchValue] = useState('');
     const [rowSelectionEnabled, setRowSelectionEnabled] = useState<boolean>(false);
-    const [clearSelectedRows, setClearSelectedRows] = useState<boolean>(false);
 
     useEffect(() => {
         if(session?.user?.permissions?.includes('bulk-delete-ranks')){
@@ -62,14 +74,17 @@ const Ranks = () => {
 
     const handleSelectionChange = (selectedRows: any[]) => {
         setSelectedRows(selectedRows);
-        setClearSelectedRows(false);
     };
 
-    const columns = useMemo((): Column[] => {
+    const columns = useMemo((): TableColumn<RankRow>[] => {
         return [
-            { key: 'Name', name: 'name', selector: (row: any) => row.name, sortable: true },
-            { key: 'User Type', name: 'User Type', selector: (row: any) => row.user_type, sortable: true,
-                cell: (props: any) => (
+            { key: 'name', label: 'Name', accessor: (row) => row.name, sortable: true },
+            {
+                key: 'user_type',
+                label: 'User Type',
+                accessor: (row) => row.user_type?.name || '',
+                sortable: true,
+                render: (props) => (
                     <div>
                         {props?.user_type?.name && (
                         <span className="status-badge info">
@@ -80,8 +95,20 @@ const Ranks = () => {
                 )
              },
 
-            { key: 'Severity Level', name: 'Severity Level', selector: (row: any) => row.severity_level, sortable: true,
-                cell: (props: any) => {
+            {
+                key: 'severity_level',
+                label: 'Severity Level',
+                accessor: (row) => {
+                    const v = (row as unknown as Record<string, unknown>).severity_level;
+                    if (typeof v === 'string') return v;
+                    if (typeof v === 'number') return String(v);
+                    if (v && typeof v === 'object' && 'name' in v && typeof (v as { name: unknown }).name === 'string') {
+                        return (v as { name: string }).name;
+                    }
+                    return '';
+                },
+                sortable: true,
+                render: (props) => {
                     const severityCounts = props.severity_counts || {};
                     const severityLevels = ['Low', 'Medium', 'High', 'Critical'];
                     
@@ -144,9 +171,25 @@ const Ranks = () => {
             },
 
             ...(session?.user?.is_admin === "1" ? [
-                { key: 'Company', name: 'Created By', selector: (row: any) => row.company, sortable: true },
-                { key: 'Assigned Users', name: 'Assigned Users', selector: (row: any) => row.user_assigned_count, sortable: true,
-                    cell: (props: any) => (
+                {
+                    key: 'company',
+                    label: 'Created By',
+                    accessor: (row: RankRow) => {
+                        const c = (row as unknown as Record<string, unknown>).company;
+                        if (typeof c === 'string') return c;
+                        if (c && typeof c === 'object' && 'name' in c && typeof (c as { name: unknown }).name === 'string') {
+                            return (c as { name: string }).name;
+                        }
+                        return '';
+                    },
+                    sortable: true,
+                },
+                {
+                    key: 'user_assigned_count',
+                    label: 'Assigned Users',
+                    accessor: (row: RankRow) => row.user_assigned_count || 0,
+                    sortable: true,
+                    render: (props: RankRow) => (
                         <div>
                             <span className="status-badge primary">
                                 {props.user_assigned_count}
@@ -154,97 +197,33 @@ const Ranks = () => {
                         </div>
                     )
                  }
-            ] : []),
-
-
-            ...(session?.user?.permissions?.includes('delete-ranks') || session?.user?.permissions?.includes('edit-ranks') || session?.user?.permissions?.includes('view-permissions-ranks') || session?.user?.permissions?.includes('assign-permissions-ranks') ? [
-                {
-                    key: 'Action',
-                    name: 'ACTION',
-                    selector: (row: any) => row.id,
-                    sortable: false,
-                    cell: (props: any) => (
-                        <DatatableActionButton
-                            actions={[
-                                ...(session?.user?.permissions?.includes('edit-ranks') ? [{
-                                    label: 'Edit',
-                                    icon: <FiEdit className="me-2" />,
-                                    onClick: () => handleEditRank(props),
-                                    className: 'action-edit'
-                                }] : []),
-                                ...(session?.user?.permissions?.includes('add-ranks') ? [{
-                                    label: 'Clone Rank',
-                                    icon: <Copy className="me-2" size={16} />,
-                                    onClick: () => {
-                                        handleCloneRank(props);
-                                    },
-                                    className: 'action-clone'
-                                }] : []),
-                                ...(session?.user?.permissions?.includes('view-permissions-ranks') ? [{
-                                    label: 'View Permissions',
-                                    icon: <FiEye className="me-2" />,
-                                    onClick: () => {
-                                        window.location.href = `/controlhub/ranks/permissions/${props.id}`;
-                                    },
-                                    className: 'action-view'
-                                }] : []),
-                                ...(session?.user?.permissions?.includes('assign-permissions-ranks') ? [{
-                                    label: 'Assign Permissions',
-                                    icon: <FiEdit className="me-2" />,
-                                    onClick: () => {
-                                        window.location.href = `/controlhub/ranks/permissions/edit/${props.id}`;
-                                    },
-                                    className: 'action-assign'
-                                }] : []),
-                                ...(session?.user?.permissions?.includes('delete-ranks') ? [{
-                                    label: 'Delete',
-                                    icon: <FiTrash2 className="me-2" />,
-                                    onClick: () => handleDeleteRank(props),
-                                    className: 'text-danger'
-                                }] : []),
-
-                                ...(session?.user?.is_admin == "1" ? [{
-                                    label: 'View Users',
-                                    icon: <FiEye className="me-2" />,
-                                    onClick: () => {
-                                        router.push({
-                                            pathname: '/controlhub/users',
-                                            query: { role_id: props.id }
-                                        });
-                                    },
-                                    className: 'action-view'
-                                }] : []),
-
-
-                            ]}
-                        />
-                    )
-                }
             ] : [])
         ];
-    }, [rowSelectionEnabled, session?.user?.is_admin, session?.user?.permissions]);
+    }, [session?.user?.is_admin]);
 
     const fetchRoles = useCallback(
-        async (page = 1, perPage = 15, search = "") => {
+        async (page = 1, perPage = 15, search = '') => {
             return await ListRoles({ page, perPage, search, filters: currentFilters });
         },
-        [currentFilters]
+        [currentFilters],
     );
 
-    const handleFiltersChange = (filters: any) => {
-        //console.log('Filters changed:', filters);
-        setCurrentFilters(filters);
-    };
-
-    const handleExport = async (exportType: string, filters: Record<string, any>) => {
-       
+    const loadRoles = useCallback(async () => {
+        setIsTableLoading(true);
         try {
-            await ListRoles({ page: 1, perPage: 15, search: "", filters, isExport: true, exportType });
-        } catch (error) {
-            console.error('Export error:', error);
-            toast.error('Export failed. Please try again.');
+            const response = await fetchRoles(currentPage, rowsPerPage, searchValue);
+            setTableData(response?.data ?? response?.dataList ?? []);
+            setTotalRows(response?.total ?? 0);
+        } catch {
+            toast.error('Failed to load ranks');
+        } finally {
+            setIsTableLoading(false);
         }
-    };
+    }, [currentPage, rowsPerPage, searchValue, fetchRoles]);
+
+    useEffect(() => {
+        loadRoles();
+    }, [loadRoles, refreshKey]);
 
     const [selectedRank, setSelectedRank] = useState<any>(null);
     const [selectedRankName, setSelectedRankName] = useState<any>(null);
@@ -272,7 +251,7 @@ const Ranks = () => {
         }
     }, [userTypes.length]);
 
-    const handleEditRank = async (props: any) => {
+    const handleEditRank = async (props: RankRow) => {
         setSelectedRank(props.id);
         setSelectedRankName(props.name);
         // Set user_type_id if available in props
@@ -282,7 +261,6 @@ const Ranks = () => {
     };
 
     const handleSubmitEditRank = async () => {
-        //console.log('Submit edit rank:', selectedRank, selectedRankName);
         const response = await updateRole(selectedRank, selectedRankName, selectedRankUserTypeId);
         if(response){
             setSelectedRank(null);
@@ -304,14 +282,14 @@ const Ranks = () => {
     const [showDeleteRankModal, setShowDeleteRankModal] = useState<boolean>(false);
     const [showBulkDeleteModal, setShowBulkDeleteModal] = useState<boolean>(false);
 
-    const handleDeleteRank = (props: any) => {
+    const handleDeleteRank = (props: RankRow) => {
         setSelectedRank(props.id);
         setSelectedRankName(props.name);
         setShowDeleteRankModal(true);
     };
 
-    const handleCloneRank = (props: any) => {
-        setCloneRankId(props.id);
+    const handleCloneRank = (props: RankRow) => {
+        setCloneRankId(String(props.id));
         setCloneRankName(`${props.name} (Copy)`);
         setShowCloneRankModal(true);
     };
@@ -340,7 +318,7 @@ const Ranks = () => {
         }
     };
 
-    const handleSubmitDeleteRank = async (confirmationText: string) => {
+    const handleSubmitDeleteRank = async () => {
         const response = await deleteRole(selectedRank);
         if(response){
             setSelectedRank(null);
@@ -358,7 +336,7 @@ const Ranks = () => {
 
     const [deleteRankResponse, setDeleteRankResponse] = useState<any>(null);
     const [showBulkDeleteSummaryModal, setShowBulkDeleteSummaryModal] = useState<boolean>(false);
-    const handleBulkDelete = async (confirmationText: string) => {
+    const handleBulkDelete = async () => {
         try {
             const selectedIds = selectedRows.map((row: any) => row.id);
             const response = await BulkDeleteRoles(selectedIds);
@@ -367,22 +345,13 @@ const Ranks = () => {
                 setDeleteRankResponse(response);
                 setShowBulkDeleteSummaryModal(true);
                 setShowBulkDeleteModal(false);
-                // setSuccessModalTitle('Ranks Deleted');
-                // setSuccessModalDescription('The ranks have been deleted successfully');
-                // setTimeout(() => {
-                //   setShowSuccessfulModal(true);
-                //   console.log('Modal state updated:', true);
-                // }, 100);
-                // Reset selection and refresh table
                 setSelectedRows([]);
 
-                setClearSelectedRows(true);
                 setRefreshKey(prev => prev + 1);
             }else{
                 toast.error('Failed to delete ranks');
             }
 
-            // Reset state
             setSelectedRows([]);
             setShowBulkDeleteModal(false);
             setRefreshKey(prev => prev + 1); // Trigger refresh
@@ -395,10 +364,6 @@ const Ranks = () => {
     const [showSuccessfulModal, setShowSuccessfulModal] = useState(false)
     const [successModalTitle, setSuccessModalTitle] = useState('')
     const [successModalDescription, setSuccessModalDescription] = useState('')
-    const handleCloseSuccessfulModal = () => {
-        setShowSuccessfulModal(false)
-    }
-
     const [showCreateRankModal, setShowCreateRankModal] = useState<boolean>(false);
     const [newRankName, setNewRankName] = useState<string>("");
     const [newRankUserTypeId, setNewRankUserTypeId] = useState<number | null>(null);
@@ -428,12 +393,11 @@ const Ranks = () => {
         setIsLoadingRanksForBulk(true);
         try {
             const response = await ListRoles({ page: 1, perPage: 1000, search: "", filters: {} });
-            if (response && response.dataList && Array.isArray(response.dataList)) {
+            if (response?.dataList && Array.isArray(response.dataList)) {
                 setAllRanksForBulk(response.dataList);
             }
         } catch (error) {
             console.error('Error fetching ranks:', error);
-           // toast.error('Failed to load ranks');
         } finally {
             setIsLoadingRanksForBulk(false);
         }
@@ -491,7 +455,6 @@ const Ranks = () => {
             }
         } catch (error) {
             console.error('Error assigning ranks:', error);
-           // toast.error('Failed to assign ranks');
         } finally {
             setIsSubmittingBulkAssignment(false);
         }
@@ -596,6 +559,90 @@ const Ranks = () => {
         }
     };
 
+    let permissionHintText = 'Select a permission to update its severity level';
+    if (isLoadingPermissions) {
+        permissionHintText = 'Loading permissions...';
+    } else if (selectedModuleId == null) {
+        permissionHintText = 'Please select a module first';
+    } else if (permissions.length === 0) {
+        permissionHintText = 'No permissions available for this module';
+    }
+
+    const tableActions = useMemo<TableAction<RankRow>[]>(() => {
+        const actions: TableAction<RankRow>[] = [];
+
+        if (session?.user?.permissions?.includes('edit-ranks')) {
+            actions.push({
+                label: 'Edit',
+                icon: <FiEdit size={16} />,
+                variant: 'light',
+                className: 'btn-action-style-2 p-1 text-primary',
+                onClick: (row: RankRow) => handleEditRank(row),
+            });
+        }
+
+        if (session?.user?.permissions?.includes('add-ranks')) {
+            actions.push({
+                label: 'Clone Rank',
+                icon: <Copy size={16} />,
+                variant: 'light',
+                className: 'btn-action-style-2 p-1 text-info',
+                onClick: (row: RankRow) => handleCloneRank(row),
+            });
+        }
+
+        if (session?.user?.permissions?.includes('view-permissions-ranks')) {
+            actions.push({
+                label: 'View Permissions',
+                icon: <FiEye size={16} />,
+                variant: 'light',
+                className: 'btn-action-style-2 p-1 text-success',
+                onClick: (row: RankRow) => {
+                    globalThis.location.href = `/controlhub/ranks/permissions/${row.id}`;
+                },
+            });
+        }
+
+        if (session?.user?.permissions?.includes('assign-permissions-ranks')) {
+            actions.push({
+                label: 'Assign Permissions',
+                icon: <FiEdit size={16} />,
+                variant: 'light',
+                className: 'btn-action-style-2 p-1 text-warning',
+                onClick: (row: RankRow) => {
+                    globalThis.location.href = `/controlhub/ranks/permissions/edit/${row.id}`;
+                },
+            });
+        }
+
+        if (session?.user?.permissions?.includes('delete-ranks')) {
+            actions.push({
+                label: 'Delete',
+                icon: <FiTrash2 size={16} />,
+                variant: 'light',
+                className: 'btn-action-style-2 p-1 text-danger',
+                onClick: (row: RankRow) => handleDeleteRank(row),
+            });
+        }
+
+        if (session?.user?.is_admin === '1') {
+            actions.push({
+                label: 'View Users',
+                icon: <FiEye size={16} />,
+                variant: 'light',
+                className: 'btn-action-style-2 p-1 text-secondary',
+                onClick: (row: RankRow) => {
+                    router.push({
+                        pathname: '/controlhub/users',
+                        query: { role_id: row.id },
+                    });
+                },
+            });
+        }
+
+        return actions;
+    }, [router, session?.user?.is_admin, session?.user?.permissions]);
+
     return (
         <React.Fragment>
             <BreadcrumbItem mainTitle="Controlhub" mainLink="/controlhub/ranks" subTitle={HEADER_CONSTANTS.SUBMENU_LABELS.RANKS} />
@@ -614,16 +661,8 @@ const Ranks = () => {
                     <Col md={8} className="d-flex justify-content-end">
                       
                     <div className="action-buttons">
-                    {/* <div className="search-container">
-                            <i className="fas fa-search search-icon"></i>
-                            <input type="text" className="search-bar" placeholder="Search rank..." onChange={(e) => handleFiltersChange({...currentFilters, search: e.target.value})}/>
-                        </div> */}
-                    
-                    {/* <RolesFilters onFiltersChange={handleFiltersChange} onExport={handleExport} /> */}
                     {session?.user?.permissions?.includes('add-ranks') && (
-                        <>
                         <Button variant="primary"  onClick={handleOpenCreateRankModal}>Add Rank</Button>
-                        </>
                     )}
                     {session?.user?.permissions?.includes('bulk-assign-ranks') && (
                         <Button variant="danger"  onClick={handleBulkRankAssignment}>Bulk Rank Assignment</Button>
@@ -659,21 +698,42 @@ const Ranks = () => {
             )}
 
             {session?.user?.permissions?.includes('list-ranks') && (
-                 <GenericListPage
-                 columns={columns}
-                 fetchData={fetchRoles}
-                 title="Ranks"
-                 searchPlaceholder="Search ranks..."
-                 defaultPageSize={15}
-                 filters={currentFilters}
-                 refreshKey={refreshKey}
-                 rowSelection={rowSelectionEnabled}
-                 onSelectionChange={handleSelectionChange}
-                 clearSelectedRows={clearSelectedRows}
-                 keyField="id"
-                 search={true}
-                 tableStyle="table-style-2"
-             />
+                <GenericTable<RankRow>
+                    data={tableData}
+                    columns={columns}
+                    loading={isTableLoading}
+                    actions={tableActions}
+                    showActions={tableActions.length > 0}
+                    actionsLabel="Action"
+                    uniqueKey="id"
+                    selectable={rowSelectionEnabled}
+                    selectedRows={selectedRows}
+                    onSelectionChange={handleSelectionChange}
+                    pagination={{
+                        currentPage,
+                        rowsPerPage,
+                        totalRows,
+                        pageSizeOptions: [15, 25, 50, 100],
+                    }}
+                    onPaginationChange={(page, perPage) => {
+                        setCurrentPage(page);
+                        setRowsPerPage(perPage);
+                    }}
+                    showToolbar
+                    toolbar={{
+                        showSearch: true,
+                        searchValue,
+                        searchPlaceholder: 'Search ranks...',
+                        onSearchChange: (value) => {
+                            setSearchValue(value);
+                            setCurrentPage(1);
+                        },
+                    }}
+                    showToolbarActions={false}
+                    emptyMessage="No ranks found"
+                    hover
+                    size="md"
+                />
             )}
 
            
@@ -731,8 +791,7 @@ const Ranks = () => {
                 title="Clone Rank"
                 desc="Please enter a name for the cloned rank."
                 formHtml={
-                    <>
-                        <div className="form-group mb-3">
+                    <div className="form-group mb-3">
                             <label htmlFor="cloneRankName" className="form-label">New Rank Name</label>
                             <input 
                                 className="form-control" 
@@ -744,7 +803,6 @@ const Ranks = () => {
                             />
                             <p className="text-muted mt-2 small">Enter a name for the cloned rank. The new rank will have the same permissions and settings as the original.</p>
                         </div>
-                    </>
                 }
                 submitButtonText="Clone Rank"
                 cancelButtonText="Cancel"
@@ -761,6 +819,7 @@ const Ranks = () => {
 <ConfirmModal
         show={showDeleteRankModal}
         onHide={() => setShowDeleteRankModal(false)}
+        onCancel={() => setShowDeleteRankModal(false)}
         title="Delete Rank"
         description="Are you sure you want to delete this rank?"
         targetName={selectedRankName || ""}
@@ -818,6 +877,7 @@ const Ranks = () => {
             <ConfirmModal
                 show={showBulkDeleteModal}
                 onHide={() => setShowBulkDeleteModal(false)}
+                onCancel={() => setShowBulkDeleteModal(false)}
                 title="Bulk Delete Ranks"
                 description={`Are you sure you want to delete the following ranks?`}
                 targetName={``}
@@ -836,17 +896,15 @@ const Ranks = () => {
                 title="Bulk Delete Summary"
                 desc="Please find the details below to bulk delete the ranks."
                 formHtml={
-                    <>
-                        <div className="d">
-                        {deleteRankResponse && deleteRankResponse.map((item: any) => (
+                    <div className="d">
+                        {deleteRankResponse?.map((item: any) => (
                         <div className="form-group alert alert-primary" key={item.id}>
                            Rank: {item.name}
                            <br />
                            Message: {item.message}
                         </div>
                     ))}
-                        </div>
-                    </>
+                    </div>
                 }
                 submitButtonText="Close"
                 cancelButtonText="Cancel"
@@ -907,10 +965,7 @@ const Ranks = () => {
                                 ))}
                             </Form.Select>
                             <p className="text-muted mt-2 small">
-                                {isLoadingPermissions ? 'Loading permissions...' : 
-                                 !selectedModuleId ? 'Please select a module first' :
-                                 permissions.length === 0 ? 'No permissions available for this module' :
-                                 'Select a permission to update its severity level'}
+                                {permissionHintText}
                             </p>
                         </div>
                         <div className="form-group mb-3">
@@ -983,11 +1038,13 @@ const Ranks = () => {
                         <SelectCheckBox
                             options={userOptionsForBulk}
                             value={selectedUsersForBulk}
-                            onChange={(opts) => setSelectedUsersForBulk(opts as SelectCheckBoxOption[])}
+                            onChange={(opts: MultiValue<SelectCheckBoxOption>) =>
+                                setSelectedUsersForBulk((opts ?? []) as SelectCheckBoxOption[])
+                            }
                             placeholder="Select users to assign rank..."
                             isLoading={isLoadingUsersForBulk}
                             inputValue={userSearchInput}
-                            onInputChange={(newValue, action) => {
+                            onInputChange={(newValue: string, action: { action: string }) => {
                                 if (action.action !== 'input-blur' && action.action !== 'menu-close') {
                                     setUserSearchInput(newValue);
                                 }
@@ -1011,7 +1068,9 @@ const Ranks = () => {
                     >
                         {isSubmittingBulkAssignment ? (
                             <>
-                                <div className="spinner-border spinner-border-sm me-1" role="status" />
+                                <output className="spinner-border spinner-border-sm me-1" aria-live="polite">
+                                    <span className="visually-hidden">Assigning...</span>
+                                </output>
                                 Assigning...
                             </>
                         ) : (
