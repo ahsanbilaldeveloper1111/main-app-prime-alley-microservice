@@ -1836,7 +1836,7 @@ const GenericTable = <T extends Record<string, any>>({
                         toolbar.toolbarSettingsPath ??
                         "/main-settings/smart-crm";
                       if (globalThis.window === undefined) {
-                        void router.push(path);
+                         router.push(path);
                         return;
                       }
                       const win = globalThis.open(
