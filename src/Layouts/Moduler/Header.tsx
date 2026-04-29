@@ -867,21 +867,21 @@ const Header = ({ themeMode }: HeaderProps) => {
             items: [
                 {
                     key: 'dashboard-call-logs',
-                    permission: 'dashboard-call-logs',
+                    permission: PERMISSIONS.VIEW_CALL_DASHBOARD,
                     icon: ICONS.GAUGE,
                     label: SUBMENU_LABELS.CALL_LOGS_DASHBOARD,
                     href: '/call-logs/dashboard'
                 },
                 {
                     key: 'view-call-logs',
-                    permission: 'view-call-logs',
+                    permission: PERMISSIONS.VIEW_CALL_LOGS,
                     icon: ICONS.GAUGE,
                     label: SUBMENU_LABELS.CALL_LOGS_LIST,
                     href: '/call-logs'
                 },
                 {
                     key: 'view-call-recordings',
-                    permission: 'view-call-recordings',
+                    permission: PERMISSIONS.VIEW_CALL_RECORDINGS,
                     icon: ICONS.GAUGE,
                     label: MENU_LABELS.CALL_RECORDINGS,
                     href: '/call-recordings'
@@ -1166,7 +1166,7 @@ const Header = ({ themeMode }: HeaderProps) => {
                  
              
 
-                 {session?.user?.permissions?.includes('call-reports-by-statistics-reports') && (
+                 {session?.user?.permissions?.includes(PERMISSIONS.CALL_REPORTS_BY_STATISTICS_REPORTS) && (
                     
                                     <>
                                     <li className="pc-item">
@@ -1192,7 +1192,7 @@ const Header = ({ themeMode }: HeaderProps) => {
                                     </>
                  )}
 
- {session?.user?.permissions?.includes('call-reports-by-call-incoming-reports') && (
+{session?.user?.permissions?.includes(PERMISSIONS.CALL_REPORTS_BY_CALL_INCOMING_REPORTS) && (
                                         
                                         <>
                                         <li className="pc-item">
@@ -1218,7 +1218,7 @@ const Header = ({ themeMode }: HeaderProps) => {
 
 )}
 
-{/* {session?.user?.permissions?.includes('call-reports-by-trend-reports') && ( */}
+{/* {session?.user?.permissions?.includes(PERMISSIONS.CALL_REPORTS_BY_TREND_REPORTS) && ( */}
                                         
                                         <>
                                         {/* <li className="pc-item">

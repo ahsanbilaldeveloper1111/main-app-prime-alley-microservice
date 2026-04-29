@@ -1,7 +1,7 @@
 import React from 'react';
 import { Info } from 'lucide-react';
 import Select from 'react-select';
-import { faqFormFieldStyles } from './faqSidebarStyles';
+import { faqFormFieldStyles } from '@components/faqSidebarStyles';
 
 // ===== FaqLabeledTextInput =====
 interface FaqLabeledTextInputProps {
@@ -179,3 +179,4 @@ export const FaqLabeledSelect: React.FC<FaqLabeledSelectProps> = ({
     )}
   </div>
 );
+export default FaqLabeledTextInput

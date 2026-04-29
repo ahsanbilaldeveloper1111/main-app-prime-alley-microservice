@@ -60,6 +60,9 @@ import {
   renderApplyResetFilterActions,
   useStagedFiltersActions,
 } from "@utils/communicationsStagedFilters";
+import { HEADER_CONSTANTS } from "@constants/headerConstants";
+
+const { PERMISSIONS } = HEADER_CONSTANTS;
 
 /** Row shape from call-logs API (data / dataList items) */
 interface CallLogRow {
@@ -138,6 +141,11 @@ interface Summary {
 
 const CallLogs = () => {
   const { data: session } = useSession();
+  const userPermissions = session?.user?.permissions ?? [];
+  const canViewCallLogs =
+    userPermissions.includes(PERMISSIONS.VIEW_CALL_LOGS) ||
+    userPermissions.includes(PERMISSIONS.LIST_CALL_LOGS);
+  const canExportCallLogs = userPermissions.includes(PERMISSIONS.EXPORT_CALL_LOGS);
   const [showPageLoader, setShowPageLoader] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
 
@@ -499,8 +507,7 @@ const CallLogs = () => {
         fetchCallLogs(1, tablePagination.rowsPerPage, searchValue.trim());
       },
       showFiltersButton: true,
-      showExportButton:
-        session?.user?.permissions?.includes("export-call-logs"),
+      showExportButton: canExportCallLogs,
       onExportClick: () => handleExport(),
       showFilterPills: true,
       showMoreFiltersButton: false,
@@ -623,6 +630,7 @@ const CallLogs = () => {
       ),
     };
   }, [
+    canExportCallLogs,
     searchValue,
     tablePagination.rowsPerPage,
     fetchCallLogs,
@@ -630,7 +638,6 @@ const CallLogs = () => {
     hierarchyDataExtensions,
     extensionOptionsSelectedFirst,
     hierarchyDataDepartments,
-    session?.user?.permissions,
     isExporting,
     stageFilters,
     handleExport,
@@ -712,7 +719,7 @@ const CallLogs = () => {
           </div>
         )}
 
-      {session?.user?.permissions?.includes("list-call-logs") && (
+      {canViewCallLogs && (
         <GenericTable<CallLogRow>
           data={callLogData}
           columns={tableColumns}

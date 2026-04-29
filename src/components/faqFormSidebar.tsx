@@ -105,3 +105,4 @@ export const FaqFormSidebar: React.FC<FaqFormSidebarProps> = ({
     </>
   );
 };
+export default FaqFormSidebar
