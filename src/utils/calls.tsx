@@ -125,10 +125,11 @@ function downloadCsvRows(rows: Record<string, unknown>[]): string {
 }
 
 export const ListCallLogs = async (
-  params: PaginationParams = {},
+  params: PaginationParams | undefined,
   endpoint: string,
 ) => {
   try {
+    const safeParams = params ?? {};
     const {
       page = 1,
       perPage = 15,
@@ -139,7 +140,7 @@ export const ListCallLogs = async (
       exportType = "",
       reportType = "",
       moduleSlug = "",
-    } = params;
+    } = safeParams;
 
     // Create base query parameters
     const queryParams = new URLSearchParams({
@@ -283,10 +284,11 @@ export const DownloadCallRecording = async (
 };
 
 export const DownloadStreamingExport = async (
-  params: PaginationParams = {},
+  params: PaginationParams | undefined,
   endpoint: string,
   reportType: string,
 ) => {
+  const safeParams = params ?? {};
   const {
     page = 1,
     perPage = 15,
@@ -296,7 +298,7 @@ export const DownloadStreamingExport = async (
     isExport = true,
     exportType = "excel",
     moduleSlug = "",
-  } = params;
+  } = safeParams;
 
   try {
     const normalizedExportType = exportType === "excel" ? "xlsx" : exportType;
@@ -419,13 +421,8 @@ export const DownloadCallsExport = async (params: any, endpoint: string) => {
     // Flatten filters and add each key-value pair as separate query parameters
     Object.entries(params).forEach(([key, value]) => {
       if (value !== undefined && value !== null && value !== "") {
-        // Handle arrays by converting them to JSON strings for proper format (matching ListCallLogs)
-        if (Array.isArray(value)) {
-          const jsonString = JSON.stringify(value);
-          queryParams.append(key, jsonString);
-        }
-        // Handle objects by converting them to JSON strings
-        else if (typeof value === "object") {
+        // Handle arrays/objects by converting them to JSON strings.
+        if (Array.isArray(value) || typeof value === "object") {
           const jsonString = JSON.stringify(value);
           queryParams.append(key, jsonString);
         } else {
