@@ -2,23 +2,23 @@ import "@assets/scss/datatable-style.scss";
 import React, { ReactElement, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
-import { Form } from "react-bootstrap";
-
 import "@assets/scss/billing.scss";
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
 import { GetPayments } from "@utils/accounting";
-import { getMinifiedCompanies } from "@utils/crm";
-import { BILLING_CUSTOMER_PORTAL_TABS_DROPDOWN_ITEMS } from "@utils/billingProductsTabs";
+import { getBillingCustomerPortalTabsDropdownItems } from "@utils/billingProductsTabs";
 import { billingCustomerRoutes } from "@utils/billingCustomerRoutes";
 import moment from "moment";
 import { GlobalDateFormat } from "@utils/Helper";
+import { usePermissions } from "@utils/permissionUtils";
 
 import GenericTable, { TableColumn, FilterPill } from "@components/GenericTable";
 import { GENERIC_TABLE_PAGE_SIZE_OPTIONS } from "@constants/genericTable";
 import GenericFilterSidebar, { FilterField } from "@components/GenericFilterSidebar";
 import { useCrmToolbarConfig } from "@hooks/useCrmToolbarConfig";
 import { useEnsureCustomerForCrmCompany } from "@hooks/billing/useEnsureCustomerForCrmCompany";
+import { useMinifiedCompaniesForSelect } from "@hooks/billing/useMinifiedCompaniesForSelect";
+import { BillingCustomerCompanySelect } from "@components/billings/customer/BillingCustomerCompanySelect";
 import ColumnEditorModal from "@components/ColumnEditorModal";
 
 const BILLING_TRANSACTIONS_COLUMN_STORAGE_KEY = "billing-transactions-table-columns";
@@ -64,22 +64,9 @@ function loadTransactionTableColumnsFromStorage(): string[] {
 }
 
 const ProductDetails = () => {
-  const [companyOptions, setCompanyOptions] = useState<{ id: string | number; name?: string }[]>([]);
+  const { hasPermission } = usePermissions();
+  const { companyOptions } = useMinifiedCompaniesForSelect();
   const [selectedCompanyId, setSelectedCompanyId] = useState<string | number>("");
-
-
-  useEffect(() => {
-    const fetchCompanyOptions = async () => {
-      try {
-        const result = await getMinifiedCompanies({ send_all: "true" });
-        setCompanyOptions(result ?? []);
-      } catch (e) {
-        console.error("Error fetching company options:", e);
-      }
-    };
-    fetchCompanyOptions();
-  }, []);
-    
 
   const [transactionSearch, setTransactionSearch] = useState("");
   const [totalAllTransactions, setTotalAllTransactions] = useState(0);
@@ -354,6 +341,11 @@ const ProductDetails = () => {
     },
   ], [currentFilters, applyStatusFilter]);
 
+  const tabsDropdownItems = useMemo(
+    () => getBillingCustomerPortalTabsDropdownItems((permission) => hasPermission(permission)),
+    [hasPermission],
+  );
+
   const transactionsToolbarConfig = useCrmToolbarConfig({
     entity: "transactions" as any,
     searchValue: transactionSearch,
@@ -389,6 +381,10 @@ const ProductDetails = () => {
     onImportClick: () => {},
     currentTableView: "table",
     onTableViewChange: () => {},
+    showTableViewDropdown: false,
+    showSearch: false,
+    showExportButton: false,
+    showSaveButton: false,
     extensions: [],
     onPaginationReset: () =>
       setPagination((prev) => ({ ...prev, currentPage: 1 })),
@@ -438,21 +434,11 @@ const ProductDetails = () => {
 
           {/* Company selector above the table */}
           <div className="mb-3 d-flex align-items-center gap-2">
-            <Form.Select
-              size="sm"
-              style={{ width: "220px" }}
-              value={String(selectedCompanyId)}
-              onChange={(e) =>
-                setSelectedCompanyId(e.target.value === "" ? "" : e.target.value)
-              }
-            >
-              <option value="">All companies</option>
-              {companyOptions.map((c: { id: string | number; name?: string }) => (
-                <option key={c.id} value={c.id}>
-                  {c.name ?? c.id}
-                </option>
-              ))}
-            </Form.Select>
+            <BillingCustomerCompanySelect
+              value={selectedCompanyId}
+              onChange={(next) => setSelectedCompanyId(next)}
+              companies={companyOptions}
+            />
           </div>
 
       <GenericTable
@@ -482,7 +468,7 @@ const ProductDetails = () => {
         showToolbar={true}
         toolbar={{
           ...transactionsToolbarConfig,
-          tabsDropdownItems: BILLING_CUSTOMER_PORTAL_TABS_DROPDOWN_ITEMS,
+          tabsDropdownItems,
           showFilterPills: false,
           filterPills: transactionFilterPills,
           showMoreFiltersButton: false,

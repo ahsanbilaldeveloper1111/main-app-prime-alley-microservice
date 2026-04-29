@@ -84,7 +84,7 @@ import { useCrmQuotesListPageUploadHandlers } from "@crm/billing-quotes/useCrmQu
 import { CrmQuotesListPageDeleteConfirmationBlock } from "@crm/billing-quotes/CrmQuotesListPageDeleteConfirmationBlock";
 import { CrmQuotesListPageProspectSidebar } from "@crm/billing-quotes/CrmQuotesListPageProspectSidebar";
 import { CrmQuotesListPageQuotesFilterSidebar } from "@crm/billing-quotes/CrmQuotesListPageQuotesFilterSidebar";
-import { BILLING_CUSTOMER_PORTAL_TABS_DROPDOWN_ITEMS } from "@utils/billingProductsTabs";
+import { getBillingCustomerPortalTabsDropdownItems } from "@utils/billingProductsTabs";
 import { billingCustomerRoutes } from "@utils/billingCustomerRoutes";
 import { HEADER_CONSTANTS } from "@constants/headerConstants";
 
@@ -643,6 +643,14 @@ function CrmQuotesListPageContent({ variant }: Readonly<CrmQuotesListPageProps>)
     },
   });
 
+  const billingTabsDropdownItems = useMemo(
+    () =>
+      getBillingCustomerPortalTabsDropdownItems(
+        (permission) => session?.user?.permissions?.includes(permission) === true,
+      ),
+    [session?.user?.permissions],
+  );
+
   if (
     !session?.user?.permissions?.includes(PERMISSIONS.VIEW_CRM_DATA_MANAGEMENT)
   ) {
@@ -903,7 +911,7 @@ function CrmQuotesListPageContent({ variant }: Readonly<CrmQuotesListPageProps>)
                       quotesFilterPills,
                     },
                   ),
-                  tabsDropdownItems: BILLING_CUSTOMER_PORTAL_TABS_DROPDOWN_ITEMS,
+                  tabsDropdownItems: billingTabsDropdownItems,
                   showFilterPills: true,
                   showMoreFiltersButton: false,
                   showAdvancedFilters: false,

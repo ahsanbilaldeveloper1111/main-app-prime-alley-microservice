@@ -396,10 +396,6 @@ const ManageCategories = () => {
     setSortState({ column, direction });
   }, []);
 
-  const handleToolbarSearch = useCallback(() => {
-    setPagination((prev) => ({ ...prev, currentPage: 1 }));
-  }, []);
-
   const categoryStatusPills = useMemo<FilterPill[]>(
     () => [
       {
@@ -433,11 +429,7 @@ const ManageCategories = () => {
 
   const categoriesToolbarConfig = useMemo<ToolbarConfig>(
     () => ({
-      showSearch: true,
-      searchValue: search,
-      searchPlaceholder: "Search categories by name",
-      onSearchChange: handleSearchChange,
-      onSearch: handleToolbarSearch,
+      showSearch: false,
       showFilterPills: true,
       showMoreFiltersButton: false,
       filterPills: categoryStatusPills,
@@ -455,14 +447,7 @@ const ManageCategories = () => {
         </div>
       ) : undefined,
     }),
-    [
-      search,
-      handleSearchChange,
-      handleToolbarSearch,
-      openAddCategoryModal,
-      categoryStatusPills,
-      canManageProductCategories,
-    ],
+    [openAddCategoryModal, categoryStatusPills, canManageProductCategories],
   );
 
   if (!canViewBillingProducts) {
@@ -477,9 +462,12 @@ const ManageCategories = () => {
         subTitle="Manage Categories"
       />
 
-      <PageHeader 
+      <PageHeader
         title="Manage Categories"
-        showSearch={false}
+        showSearch
+        searchPlaceholder="Search categories by name"
+        searchValue={search}
+        onSearchChange={handleSearchChange}
       />
 
       <div>

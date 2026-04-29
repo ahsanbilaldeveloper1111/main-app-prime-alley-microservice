@@ -23,6 +23,7 @@ import PageHeader from "@components/PageHeader";
 import { GetPaymentMethods,setDefaultPaymentMethod,deletePaymentMethod,addPaymentMethod } from "@utils/accounting";
 import { toast } from "react-toastify";
 import ConfirmModal from "@pages/partial/ConfirmModal";
+import { getErrorMessage } from "@utils/errors";
 
 import { loadStripe } from "@stripe/stripe-js";
 import {
@@ -32,6 +33,22 @@ import {
   useElements,
 } from "@stripe/react-stripe-js";
 
+interface StripePaymentMethodRow {
+  id: string | number;
+  is_default?: boolean;
+  isDefault?: boolean;
+  card?: {
+    brand?: string;
+    last4?: string;
+    exp_month?: string | number;
+    exp_year?: string | number;
+  };
+  billing_details?: { name?: string };
+}
+
+function isDefaultPaymentMethod(method: StripePaymentMethodRow): boolean {
+  return Boolean(method.is_default ?? method.isDefault);
+}
 
 // Stripe Payment Element Form Component
 const AddCardForm: React.FC<{
@@ -94,8 +111,8 @@ const AddCardForm: React.FC<{
       toast.success('Payment method added successfully');
       setIsProcessing(false);
       onSuccess();
-    } catch (error: any) {
-      setError(error.message || 'Failed to add payment method');
+    } catch (error: unknown) {
+      setError(getErrorMessage(error, "Failed to add payment method"));
       setIsProcessing(false);
     }
   };
@@ -204,19 +221,28 @@ const AddCardForm: React.FC<{
 };
 
 const PaymentMethods = () => {
-  const { data:session, status } = useSession();
-
+  const { data: session } = useSession();
 
   const [showAddCardModal, setShowAddCardModal] = useState(false);
   const [stripePublishableKey, setStripePublishableKey] = useState<string>("");
-  
-    const [paymentMethods, setPaymentMethods] = useState<any[]>([]);
 
-    const fetchPaymentMethods = async () => {
-      const response = await GetPaymentMethods() as any;
-      setPaymentMethods(response?.payment_methods || []);
-      console.log('response', paymentMethods);
-    };
+  const [paymentMethods, setPaymentMethods] = useState<StripePaymentMethodRow[]>([]);
+
+  const fetchPaymentMethods = async () => {
+    const response = await GetPaymentMethods();
+    if (
+      response &&
+      typeof response === "object" &&
+      "payment_methods" in response &&
+      Array.isArray((response as { payment_methods: unknown }).payment_methods)
+    ) {
+      setPaymentMethods(
+        (response as { payment_methods: StripePaymentMethodRow[] }).payment_methods,
+      );
+      return;
+    }
+    setPaymentMethods([]);
+  };
 
     // Load Stripe publishable key
     const loadStripePublishableKey = async () => {
@@ -235,22 +261,22 @@ const PaymentMethods = () => {
 
     
 
-    const handleSetDefault = (id: string) => {
-      setDefaultPaymentMethod(id);
+    const handleSetDefault = (id: string | number) => {
+      setDefaultPaymentMethod(String(id));
       fetchPaymentMethods();
     };
 
     const [deletePaymentMethodId, setDeletePaymentMethodId] = useState<string | null>(null);
     const [deletePaymentMethodConfirm, setDeletePaymentMethodConfirm] = useState(false);
 
-    const handleDeleteCard = (id: string) => {
-      setDeletePaymentMethodId(id);
+    const handleDeleteCard = (id: string | number) => {
+      setDeletePaymentMethodId(String(id));
       setDeletePaymentMethodConfirm(true);
     };
   
   const handleConfirmDelete = async () => {
     if (deletePaymentMethodId) {
-      await deletePaymentMethod(deletePaymentMethodId);
+      await deletePaymentMethod(String(deletePaymentMethodId));
       fetchPaymentMethods();
       setDeletePaymentMethodConfirm(false);
       setDeletePaymentMethodId(null);
@@ -298,7 +324,11 @@ const PaymentMethods = () => {
                           <small className="text-muted">•••• {method.card?.last4}</small>
                         </div>
                       </div>
-                      {method.isDefault && <Badge bg="success" className="bg-opacity-10 text-dark"><Check size={12} /> Default</Badge>}
+                      {isDefaultPaymentMethod(method) ? (
+                        <Badge bg="success" className="bg-opacity-10 text-dark">
+                          <Check size={12} /> Default
+                        </Badge>
+                      ) : null}
                     </div>
                     <div className="mb-3">
                       <small className="text-muted d-block">Cardholder</small>
@@ -309,7 +339,11 @@ const PaymentMethods = () => {
                       <span className="fw-semibold">{method.card?.exp_month}/{method.card?.exp_year}</span>
                     </div>
                     <div className="d-flex gap-2">
-                      {!method.is_default ? (
+                      {isDefaultPaymentMethod(method) ? (
+                        <Button variant="outline-secondary" size="sm" className="w-100" disabled>
+                          Default Payment
+                        </Button>
+                      ) : (
                         <>
                           {session?.user?.permissions?.includes('mark-payment-method-default-billing') && (
                             <Button variant="outline-primary" size="sm" className="flex-grow-1" onClick={() => handleSetDefault(method.id)}>Set Default</Button>
@@ -318,8 +352,6 @@ const PaymentMethods = () => {
                             <Button variant="outline-secondary" size="sm" onClick={() => handleDeleteCard(method.id)}><Trash2 size={14} /></Button>
                           )}
                         </>
-                      ) : (
-                        <Button variant="outline-secondary" size="sm" className="w-100" disabled>Default Payment</Button>
                       )}
                     </div>
                   </Card.Body>

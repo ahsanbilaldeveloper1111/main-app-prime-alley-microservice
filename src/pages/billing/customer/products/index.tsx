@@ -69,7 +69,7 @@ type BillingProductRow = ProductData & Record<string, unknown>;
 
 import { useCrmToolbarConfig } from "@hooks/useCrmToolbarConfig";
 import ColumnEditorModal from "@components/ColumnEditorModal";
-import { BILLING_CUSTOMER_PORTAL_TABS_DROPDOWN_ITEMS } from "@utils/billingProductsTabs";
+import { getBillingCustomerPortalTabsDropdownItems } from "@utils/billingProductsTabs";
 import { billingCustomerRoutes } from "@utils/billingCustomerRoutes";
 
 const VALID_FILTERS = new Set(["all"]);
@@ -388,6 +388,10 @@ const BillingManagement = () => {
   const canCreateBillingProduct = hasPermission(PERMISSIONS.CREATE_PRODUCTS_BILLING);
   const canUpdateBillingProduct = hasPermission(PERMISSIONS.UPDATE_PRODUCTS_BILLING);
   const canDeleteBillingProduct = hasPermission(PERMISSIONS.DELETE_PRODUCTS_BILLING);
+  const tabsDropdownItems = useMemo(
+    () => getBillingCustomerPortalTabsDropdownItems((permission) => hasPermission(permission)),
+    [hasPermission],
+  );
   const router = useRouter();
   const [refreshKey, setRefreshKey] = useState(0);
   const [currentFilters, setCurrentFilters] = useState<Record<string, any>>({});
@@ -586,7 +590,7 @@ const BillingManagement = () => {
     return m;
   }, [productCategories]);
 
-  // Keep toolbar search and filter fetch in sync (same pattern as billing subscriptions).
+  // Keep `prospectsSearch` (filters sidebar / board) and fetch `currentFilters.search` in sync.
   useEffect(() => {
     setCurrentFilters((prev) => ({ ...prev, search: prospectsSearch || undefined }));
     setPagination((prev) => ({ ...prev, currentPage: 1 }));
@@ -1269,6 +1273,10 @@ const BillingManagement = () => {
     onImportClick: () => {},
     currentTableView: prospectsViewMode,
     onTableViewChange: setProspectsViewMode,
+    showTableViewDropdown: false,
+    showSearch: false,
+    showExportButton: false,
+    showSaveButton: false,
     extensions: [],
     onPaginationReset: () =>
       setPagination((prev) => ({ ...prev, currentPage: 1 })),
@@ -1584,12 +1592,11 @@ const BillingManagement = () => {
                 showToolbar={true}
                 toolbar={{
                   ...productsToolbarConfig,
-                  tabsDropdownItems: BILLING_CUSTOMER_PORTAL_TABS_DROPDOWN_ITEMS,
+                  tabsDropdownItems,
                   showFiltersButton: false,
                   showFilterPills: true,
                   showViewSwitcher: false,
                   filterPills: productsFilterPills,
-                  showExportButton: false,
                   showMoreFiltersButton: true,
                   onAdvancedFiltersClick: handleOpenFiltersSidebar,
                 }}

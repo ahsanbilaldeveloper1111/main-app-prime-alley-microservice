@@ -10,7 +10,6 @@ import React, {
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 
-import { Form } from "react-bootstrap";
 import { usePermissions } from "@utils/permissionUtils";
 import { HEADER_CONSTANTS } from "@constants/headerConstants";
 
@@ -22,7 +21,6 @@ import "@assets/scss/tabs.scss";
 import { deleteCustomerProductPricing, getCustomerProductPricingList } from "@utils/accounts";
 import CreateSubscriptionModal from "@components/CreateSubscriptionModal";
 import type { CustomerProductPricingDataItem } from "@utils/accounts";
-import { getMinifiedCompanies } from "@utils/crm";
 import moment from "moment";
 import {
   formatDateTimeGlobal,
@@ -34,7 +32,7 @@ import { FiEdit, FiTrash2 } from "react-icons/fi";
 import { toast } from "react-toastify";
 import { getErrorMessage } from "@utils/errors";
 import { toDateInputValue } from "@utils/dateInputValue";
-import { BILLING_CUSTOMER_PORTAL_TABS_DROPDOWN_ITEMS } from "@utils/billingProductsTabs";
+import { getBillingCustomerPortalTabsDropdownItems } from "@utils/billingProductsTabs";
 import { billingCustomerRoutes } from "@utils/billingCustomerRoutes";
 
 import GenericTable, { TableColumn, FilterPill } from "@components/GenericTable";
@@ -43,6 +41,8 @@ import GenericFilterSidebar, { FilterField } from "@components/GenericFilterSide
 import GenericSidebar from "@components/GenericSidebarNew";
 import { useCrmToolbarConfig } from "@hooks/useCrmToolbarConfig";
 import { useEnsureCustomerForCrmCompany } from "@hooks/billing/useEnsureCustomerForCrmCompany";
+import { useMinifiedCompaniesForSelect } from "@hooks/billing/useMinifiedCompaniesForSelect";
+import { BillingCustomerCompanySelect } from "@components/billings/customer/BillingCustomerCompanySelect";
 import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
 import ColumnEditorModal from "@components/ColumnEditorModal";
 
@@ -203,7 +203,9 @@ const ProductDetails = () => {
   const canUpdateSubscription = hasPermission(PERMISSIONS.UPDATE_SUBSCRIPTIONS_BILLING);
   const canDeleteSubscription = hasPermission(PERMISSIONS.DELETE_SUBSCRIPTIONS_BILLING);
 
-  const [companyOptions, setCompanyOptions] = useState<{ id: string | number; name?: string }[]>([]);
+  const { companyOptions } = useMinifiedCompaniesForSelect(
+    "billing_subscriptions_load_companies_failed",
+  );
   const [selectedCompanyId, setSelectedCompanyId] = useState<string | number>("");
   const [refreshKey, setRefreshKey] = useState(0);
   // we resolve customer id in background; no UI needed for this state currently
@@ -224,20 +226,6 @@ const ProductDetails = () => {
     CustomerProductPricingDataItem[] | undefined
   >(undefined);
 
-
-  useEffect(() => {
-    const fetchCompanyOptions = async () => {
-      try {
-        const result = await getMinifiedCompanies({ send_all: "true" });
-        setCompanyOptions(result ?? []);
-      } catch (e) {
-        toast.error(`Failed to load companies: ${getErrorMessage(e)}`, {
-          toastId: "billing_subscriptions_load_companies_failed",
-        });
-      }
-    };
-    fetchCompanyOptions();
-  }, []);
 
   const onAccountingCustomerCreated = useCallback(() => {
     setRefreshKey((k) => k + 1);
@@ -854,10 +842,19 @@ const ProductDetails = () => {
     onImportClick: () => {},
     currentTableView: "table",
     onTableViewChange: () => {},
+    showTableViewDropdown: false,
+    showSearch: false,
+    showExportButton: false,
+    showSaveButton: false,
     extensions: [],
     onPaginationReset: () => setPagination((prev) => ({ ...prev, currentPage: 1 })),
     rightActions: renderAddSubscriptionButton(),
   });
+
+  const tabsDropdownItems = useMemo(
+    () => getBillingCustomerPortalTabsDropdownItems((permission) => hasPermission(permission)),
+    [hasPermission],
+  );
 
   const filterFields: FilterField[] = useMemo(
     () => [
@@ -926,25 +923,12 @@ const ProductDetails = () => {
           {/* Company selector above the table */}
           <div className="mb-3">
             <div className="d-flex align-items-center gap-2">
-              <Form.Select
-                size="sm"
-                style={{ width: "220px" }}
-                value={String(selectedCompanyId)}
-                onChange={(e) =>
-                  setSelectedCompanyId(
-                    e.target.value === "" ? "" : e.target.value,
-                  )
-                }
-              >
-                <option value="">Select company</option>
-                {companyOptions.map(
-                  (c: { id: string | number; name?: string }) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name ?? c.id}
-                    </option>
-                  ),
-                )}
-              </Form.Select>
+              <BillingCustomerCompanySelect
+                value={selectedCompanyId}
+                onChange={(next) => setSelectedCompanyId(next)}
+                companies={companyOptions}
+                emptyOptionLabel="Select company"
+              />
             </div>
           </div>
 
@@ -982,7 +966,7 @@ const ProductDetails = () => {
         showToolbar={true}
         toolbar={{
           ...subscriptionsToolbarConfig,
-          tabsDropdownItems: BILLING_CUSTOMER_PORTAL_TABS_DROPDOWN_ITEMS,
+          tabsDropdownItems,
           showFilterPills: true,
           filterPills: subscriptionFilterPills,
           showMoreFiltersButton: false,

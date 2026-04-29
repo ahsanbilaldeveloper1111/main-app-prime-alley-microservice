@@ -48,8 +48,9 @@ import {
   GetAnalyticsByMonth,
   GetCompanyDetails,
 } from "@utils/accounting";
-import { getMinifiedCompanies } from "@utils/crm";
 import { useEnsureCustomerForCrmCompany } from "@hooks/billing/useEnsureCustomerForCrmCompany";
+import { useMinifiedCompaniesForSelect } from "@hooks/billing/useMinifiedCompaniesForSelect";
+import { BillingCustomerCompanySelect } from "@components/billings/customer/BillingCustomerCompanySelect";
 import { billingCustomerRoutes } from "@utils/billingCustomerRoutes";
 
 type SpendingRow = {
@@ -216,7 +217,9 @@ const CustomerDashboard = () => {
   const [selectedPeriod, setSelectedPeriod] =
     useState<string>("Last 3 months");
   const [summaryCards, setSummaryCards] = useState<StatsCardData[]>([]);
-  const [companies, setCompanies] = useState<any[]>([]);
+  const { companyOptions } = useMinifiedCompaniesForSelect(
+    "billing_dashboard_load_companies_failed",
+  );
   const [selectedCompanyId, setSelectedCompanyId] = useState<
     string | number
   >("");
@@ -232,16 +235,6 @@ const CustomerDashboard = () => {
     onCreated: onAccountingCustomerCreated,
     errorToastId: "billing_dashboard_ensure_customer_failed",
   });
-
-  useEffect(() => {
-    const fetchCompanies = async () => {
-      const result = await getMinifiedCompanies({
-        send_all: "true",
-      });
-      setCompanies(result ?? ([] as any));
-    };
-    fetchCompanies();
-  }, []);
 
   const loadDashboardCounters = async (params: {
     crm_company_id?: string | number;
@@ -466,21 +459,11 @@ const CustomerDashboard = () => {
             </nav>
           </div>
           <div className="mb-3 mb-md-0">
-            <Form.Select
-              size="sm"
-              style={{ width: "220px" }}
+            <BillingCustomerCompanySelect
               value={selectedCompanyId}
-              onChange={(e) =>
-                setSelectedCompanyId(e.target.value === "" ? "" : e.target.value)
-              }
-            >
-              <option value="">All companies</option>
-              {companies.map((c: { id: string | number; name?: string }) => (
-                <option key={c.id} value={c.id}>
-                  {c.name ?? c.id}
-                </option>
-              ))}
-            </Form.Select>
+              onChange={(next) => setSelectedCompanyId(next)}
+              companies={companyOptions}
+            />
           </div>
         </div>
 

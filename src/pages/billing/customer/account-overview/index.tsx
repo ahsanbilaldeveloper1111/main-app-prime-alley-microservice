@@ -2,6 +2,7 @@ import "@assets/scss/datatable-style.scss";
 import React, {
   ReactElement,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useCallback,
   useState,
@@ -26,7 +27,8 @@ import {
   useEnsureCustomerForCrmCompany,
 } from "@hooks/billing/useEnsureCustomerForCrmCompany";
 import { billingCustomerRoutes } from "@utils/billingCustomerRoutes";
-import { getMinifiedCompanies } from "@utils/crm";
+import { useMinifiedCompaniesForSelect } from "@hooks/billing/useMinifiedCompaniesForSelect";
+import { BillingCustomerCompanySelect } from "@components/billings/customer/BillingCustomerCompanySelect";
 import ThemeSelect from "@components/ThemeSelect";
 import { toast } from "react-toastify";
 import router from "next/router";
@@ -134,7 +136,9 @@ const AccountOverview = () => {
   });
 
   const [companyDetails, setCompanyDetails] = useState<any>(null);
-  const [companies, setCompanies] = useState<any[]>([]);
+  const { companyOptions } = useMinifiedCompaniesForSelect(
+    "billing_overview_load_companies_failed",
+  );
   const [selectedCompanyId, setSelectedCompanyId] = useState<string | number>("");
   const [selectedCompanyName, setSelectedCompanyName] = useState<string>('');
   const [customerData, setCustomerData] = useState<any>(null);
@@ -294,25 +298,24 @@ const AccountOverview = () => {
     [selectedCompanyId, isCurrencyLocked, customerCurrency]
   );
 
-  useEffect(() => {
-    const fetchCompanies = async () => {
-      try {
-        const result = await getMinifiedCompanies({ send_all: "true" });
-        const list = result ?? [];
-        setCompanies(list);
-        if (list.length > 0 && list[0]?.id != null) {
-          setSelectedCompanyId(list[0].id);
-          setSelectedCompanyName(list[0].name);
-        }
-      } catch (error) {
-        toast.error(`Failed to load companies: ${getErrorMessage(error)}`, {
-          toastId: "billing_overview_load_companies_failed",
-        });
-        setCompanies([]);
+  useLayoutEffect(() => {
+    if (companyOptions.length === 0) return;
+    setSelectedCompanyId((prev) => {
+      const hasSelection = !(prev === "" || prev == null);
+      if (hasSelection) {
+        return prev;
       }
-    };
-    fetchCompanies();
-  }, []);
+      const firstId = companyOptions[0]?.id;
+      return firstId ?? prev;
+    });
+  }, [companyOptions]);
+
+  useLayoutEffect(() => {
+    if (!selectedCompanyId) return;
+    const label =
+      getCompanyByCrmId(String(selectedCompanyId), companyOptions) ?? "";
+    setSelectedCompanyName(label);
+  }, [selectedCompanyId, companyOptions]);
 
   const [paymentMethods, setPaymentMethods] = useState<any[]>([]);
   const getPaymentMethods = useCallback(async () => {
@@ -602,21 +605,21 @@ const AccountOverview = () => {
         <div className="mb-3 mb-md-0 d-flex align-items-center gap-2">
 
           
-          <Form.Select
-            size="sm"
-            style={{ width: '220px' }}
-            value={selectedCompanyId}
-            onChange={(e) => {
-              setSelectedCompanyId(e.target.value === '' ? '' : e.target.value);
-              setSelectedCompanyName(getCompanyByCrmId(e.target.value, companies) ?? '');
-            }}
-          >
-            {companies.map((c: { id: string | number; name?: string }) => (
-              <option key={c.id} value={c.id}>
-                {c.name ?? c.id}
-              </option>
-            ))}
-          </Form.Select>
+          {companyOptions.length > 0 ? (
+            <BillingCustomerCompanySelect
+              showEmptyOption={false}
+              value={selectedCompanyId}
+              onChange={(next) => {
+                setSelectedCompanyId(next === "" ? "" : next);
+                setSelectedCompanyName(
+                  getCompanyByCrmId(String(next), companyOptions) ?? "",
+                );
+              }}
+              companies={companyOptions}
+            />
+          ) : (
+            <span className="text-muted small">Loading companies…</span>
+          )}
 
           {selectedCompanyId ? (
             <Form.Select

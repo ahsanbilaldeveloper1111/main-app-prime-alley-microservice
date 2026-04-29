@@ -37,10 +37,11 @@ import {
   PostInvoiceStripeHostedCheckout,
   PostInvoiceStripePaymentLink,
 } from "@utils/accounting";
-import { getMinifiedCompanies } from "@utils/crm";
 import { useEnsureCustomerForCrmCompany } from "@hooks/billing/useEnsureCustomerForCrmCompany";
+import { useMinifiedCompaniesForSelect } from "@hooks/billing/useMinifiedCompaniesForSelect";
+import { BillingCustomerCompanySelect } from "@components/billings/customer/BillingCustomerCompanySelect";
 import { formatNumber } from "@utils/Helper";
-import { BILLING_CUSTOMER_PORTAL_TABS_DROPDOWN_ITEMS } from "@utils/billingProductsTabs";
+import { getBillingCustomerPortalTabsDropdownItems } from "@utils/billingProductsTabs";
 import { billingCustomerRoutes } from "@utils/billingCustomerRoutes";
 
 import { Button, Form, Modal, Spinner } from "react-bootstrap";
@@ -719,6 +720,10 @@ const InvoiceList = () => {
   const canCreateInvoice = hasPermission(PERMISSIONS.CREATE_INVOICES_BILLING);
   const canUpdateInvoice = hasPermission(PERMISSIONS.UPDATE_INVOICES_BILLING);
   const canDeleteInvoice = hasPermission(PERMISSIONS.DELETE_INVOICES_BILLING);
+  const tabsDropdownItems = useMemo(
+    () => getBillingCustomerPortalTabsDropdownItems((permission) => hasPermission(permission)),
+    [hasPermission],
+  );
   const [refreshKey, setRefreshKey] = useState(0);
   const [currentFilters, setCurrentFilters] = useState<InvoiceFilters>({});
   const [pendingFilters, setPendingFilters] = useState<InvoiceFilters>({});
@@ -732,7 +737,7 @@ const InvoiceList = () => {
     setSelectedInvoiceTableColumns(loadInvoiceTableColumnsFromStorage());
   }, []);
 
-  const [companyOptions, setCompanyOptions] = useState<{ id: string | number; name?: string }[]>([]);
+  const { companyOptions } = useMinifiedCompaniesForSelect("billing_companies_load_failed");
   const [selectedCompanyId, setSelectedCompanyId] = useState<string>("");
 
   const onAccountingCustomerCreated = useCallback(() => {
@@ -1162,22 +1167,6 @@ const InvoiceList = () => {
     ]
   );
 
-  useEffect(() => {
-    const fetchCompanyOptions = async () => {
-      try {
-        const result = await getMinifiedCompanies({ send_all: "true" });
-        setCompanyOptions(result ?? []);
-      } catch (error) {
-        const message = getErrorMessage(error);
-        toast.error(`Failed to load companies: ${message}`, {
-          toastId: "billing_companies_load_failed",
-        });
-      }
-    };
-
-    fetchCompanyOptions();
-  }, []);
-
   const memoizedFilters = useMemo(() => currentFilters, [currentFilters]);
   const [summary, setSummary] = useState<InvoiceSummary | null>(null);
 
@@ -1192,7 +1181,6 @@ const InvoiceList = () => {
   const [selectedInvoiceSidebar, setSelectedInvoiceSidebar] = useState<InvoiceData | null>(null);
   const [showInvoiceSidebar, setShowInvoiceSidebar] = useState(false);
   const invoiceRequestIdRef = useRef(0);
-  const [invoiceSearch, setInvoiceSearch] = useState("");
   const [totalAllInvoices, setTotalAllInvoices] = useState(0);
   const canPayInvoices =
     session?.user?.permissions?.includes(PERMISSIONS.PAY_INVOICES_BILLING) === true;
@@ -1403,7 +1391,7 @@ const InvoiceList = () => {
   const invoicesToolbarConfig: ToolbarConfig = {
     showTabs: true,
     tabsDropdownLabel: "Invoices",
-    tabsDropdownItems: BILLING_CUSTOMER_PORTAL_TABS_DROPDOWN_ITEMS,
+    tabsDropdownItems,
     tabs: [
       {
         id: "all",
@@ -1416,20 +1404,9 @@ const InvoiceList = () => {
     onTabChange: () => {},
     onTabRemove: () => {},
 
-    showSearch: true,
-    searchValue: invoiceSearch,
-    searchPlaceholder: "Search invoices...",
-    onSearchChange: setInvoiceSearch,
-    onSearch: () => {
-      setCurrentFilters((prev) => ({
-        ...prev,
-        search: invoiceSearch || undefined,
-      }));
-      setPagination((prev) => ({ ...prev, currentPage: 1 }));
-      setRefreshKey((prev) => prev + 1);
-    },
+    showSearch: false,
 
-    showTableViewDropdown: true,
+    showTableViewDropdown: false,
     currentTableView: "table",
     onTableViewChange: () => {},
 
@@ -1449,6 +1426,8 @@ const InvoiceList = () => {
     onExportClick: () => {},
 
     rightActions: renderCreateInvoiceButton(),
+
+    toolbarSettingsPath: billingCustomerRoutes.mainSettingsBilling(),
   };
 
 
@@ -1468,19 +1447,11 @@ const InvoiceList = () => {
         <div style={{ flex: 1, overflowY: "auto", overflowX: "hidden" }}>
           <div className="container-fluid">
             <div className="mb-3 d-flex align-items-center gap-2">
-              <Form.Select
-                size="sm"
-                style={{ width: '220px' }}
-                value={String(selectedCompanyId)}
-                onChange={(e) => setSelectedCompanyId(e.target.value === '' ? '' : e.target.value)}
-              >
-                <option value="">All companies</option>
-                {companyOptions.map((c: { id: string | number; name?: string }) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name ?? c.id}
-                  </option>
-                ))}
-              </Form.Select>
+              <BillingCustomerCompanySelect
+                value={selectedCompanyId}
+                onChange={(next) => setSelectedCompanyId(String(next))}
+                companies={companyOptions}
+              />
             </div>
 
       <GenericTable<InvoiceData>

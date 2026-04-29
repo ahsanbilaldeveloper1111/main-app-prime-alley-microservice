@@ -4,6 +4,19 @@
  */
 export const BILLING_CUSTOMER_PORTAL_BASE_PATH = "/billing/customer" as const;
 
+/** Linear-time trim of `/` at both ends (avoids regex backtracking per Sonar S5852). */
+function trimPathSlashes(segment: string): string {
+  let start = 0;
+  let end = segment.length;
+  while (start < end && segment[start] === "/") {
+    start += 1;
+  }
+  while (end > start && segment[end - 1] === "/") {
+    end -= 1;
+  }
+  return segment.slice(start, end);
+}
+
 /**
  * Build a URL under `/billing/customer/...`.
  *
@@ -15,7 +28,7 @@ export function billingCustomerHref(
 ): string {
   const parts = pathSegments
     .filter((s) => s !== undefined && s !== null && String(s).length > 0)
-    .map((s) => String(s).replaceAll(/^\/+|\/+$/g, ""))
+    .map((s) => trimPathSlashes(String(s)))
     .filter((p) => p.length > 0);
   if (parts.length === 0) {
     return BILLING_CUSTOMER_PORTAL_BASE_PATH;
@@ -42,6 +55,8 @@ export const billingCustomerRoutes = {
   transactions: () => billingCustomerHref("transactions"),
   paymentHistory: () => billingCustomerHref("payment-history"),
   paymentMethods: () => billingCustomerHref("payment-methods"),
+  /** Main Settings → Billing (redirects to default billing sub-tab, e.g. payment methods). */
+  mainSettingsBilling: () => "/main-settings/billing" as const,
 } as const;
 
 /** Tenant “Account & Billing” hub (separate from customer portal). */

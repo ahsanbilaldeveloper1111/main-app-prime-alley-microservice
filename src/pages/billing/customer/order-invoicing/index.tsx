@@ -33,9 +33,10 @@ import {
   getLead,
   getDealAttachments,
   downloadDealAttachment,
-  getMinifiedCompanies,
 } from "@utils/crm";
 import { useEnsureCustomerForCrmCompany } from "@hooks/billing/useEnsureCustomerForCrmCompany";
+import { useMinifiedCompaniesForSelect } from "@hooks/billing/useMinifiedCompaniesForSelect";
+import { BillingCustomerCompanySelect } from "@components/billings/customer/BillingCustomerCompanySelect";
 import { GetHierarchyData } from "@utils/users";
 import { Button, Row, Col, Badge, Form, Card, Modal } from "react-bootstrap";
 import Select, { type SingleValue } from "react-select";
@@ -171,7 +172,7 @@ const CrmOrders = () => {
   const [loading, setLoading] = useState(false);
   const [totalOrders, setTotalOrders] = useState(0);
   const [summaryTiles, setSummaryTiles] = useState<any>(null);
-  const [companies, setCompanies] = useState<{ id: string | number; name?: string }[]>([]);
+  const { companyOptions } = useMinifiedCompaniesForSelect();
   const [selectedCompanyId, setSelectedCompanyId] = useState<string | number>(
     "",
   );
@@ -262,18 +263,6 @@ const CrmOrders = () => {
     fetchStages();
     fetchLostReasons();
     fetchExtensions(ModuleSlug.CRM_ORDERS);
-  }, []);
-
-  useEffect(() => {
-    const fetchCompanies = async () => {
-      try {
-        const result = await getMinifiedCompanies({ send_all: "true" });
-        setCompanies(result ?? []);
-      } catch (e) {
-        console.error("Error fetching companies:", e);
-      }
-    };
-    fetchCompanies();
   }, []);
 
   // Fetch orders when filters or search change
@@ -1033,21 +1022,11 @@ const CrmOrders = () => {
             </nav>
           </div>
           <div className="d-flex flex-wrap gap-2 align-items-center">
-            <Form.Select
-              size="sm"
-              style={{ width: "220px" }}
-              value={String(selectedCompanyId)}
-              onChange={(e) =>
-                setSelectedCompanyId(e.target.value === "" ? "" : e.target.value)
-              }
-            >
-              <option value="">All companies</option>
-              {companies.map((c: { id: string | number; name?: string }) => (
-                <option key={c.id} value={c.id}>
-                  {c.name ?? c.id}
-                </option>
-              ))}
-            </Form.Select>
+            <BillingCustomerCompanySelect
+              value={selectedCompanyId}
+              onChange={(next) => setSelectedCompanyId(next)}
+              companies={companyOptions}
+            />
             <Button
               variant={showFilterBar ? "secondary" : "outline-secondary"}
               onClick={() => setShowFilterBar(!showFilterBar)}
