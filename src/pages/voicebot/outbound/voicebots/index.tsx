@@ -204,7 +204,30 @@ const VoicebotsPage = () => {
   const botId = (row: VoicebotRow) => String(row.bot_id ?? row.id ?? "");
 
   const columns: TableColumn<VoicebotRow>[] = [
-    { key: "name", label: "Name", sortable: true },
+    {
+      key: "name",
+      label: "Name",
+      sortable: true,
+      width: "280px",
+      render: (row) => {
+        const name = String(row.name ?? "—");
+        return (
+          <span
+            title={name}
+            style={{
+              display: "block",
+              width: "100%",
+              maxWidth: "280px",
+              whiteSpace: "nowrap",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+            }}
+          >
+            {name}
+          </span>
+        );
+      },
+    },
     {
       key: "trunk_id",
       label: "Trunk",

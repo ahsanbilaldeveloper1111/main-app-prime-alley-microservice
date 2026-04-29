@@ -1,10 +1,12 @@
 import React, {
   useState,
   useEffect,
+  useLayoutEffect,
   useRef,
   useMemo,
   useCallback,
 } from "react";
+import { createPortal } from "react-dom";
 import {
   X,
   ChevronDown,
@@ -864,6 +866,13 @@ export interface GenericSidebarProps {
 
   // Additional Props
   width?: string;
+  /**
+   * When true, the panel fills its parent (e.g. a flex row beside a table) without the
+   * fixed global header offset (`marginTop: 43px` / `calc(100vh - 43px)` heights).
+   */
+  dockInParent?: boolean;
+  /** When true, the fixed title strip (h2 + close) is hidden; close moves beside Actions when `onClose` is set. */
+  hideTopHeadingBar?: boolean;
   recordLink?: {
     label: string;
     onClick: () => void;
@@ -5900,7 +5909,6 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
   isOpen,
   onClose,
   title,
-  subtitle,
   company,
   avatar,
   email,
@@ -5910,6 +5918,8 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
   crmSummary,
   sections = [],
   width = "470px",
+  dockInParent = false,
+  hideTopHeadingBar = false,
   recordLink,
   actionsDropdown,
   permissionMessage,
@@ -6164,6 +6174,10 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
     left: 0,
   });
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const actionsDropdownButtonRef = useRef<HTMLButtonElement>(null);
+  const actionsDropdownMenuPortalRef = useRef<HTMLDivElement>(null);
+  const [actionsMenuFixedStyle, setActionsMenuFixedStyle] =
+    useState<React.CSSProperties | null>(null);
   const sectionDropdownRefs = useRef<{ [key: string]: HTMLDivElement | null }>(
     {},
   );
@@ -6186,18 +6200,53 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
     setCollapsedSections(collapsed);
   }, [isOpen, recordType, recordId]);
 
-  // Close dropdown when clicking outside
+  const syncActionsMenuPosition = useCallback(() => {
+    const btn = actionsDropdownButtonRef.current;
+    if (!btn) return;
+    const r = btn.getBoundingClientRect();
+    setActionsMenuFixedStyle({
+      position: "fixed",
+      top: r.bottom + 4,
+      left: r.right,
+      transform: "translateX(-100%)",
+      backgroundColor: "#ffffff",
+      border: "1px solid #e2e8f0",
+      borderRadius: "5px",
+      boxShadow: "0 4px 12px rgba(0, 0, 0, 0.15)",
+      minWidth: "180px",
+      zIndex: 10050,
+      overflow: "hidden",
+    });
+  }, []);
+
+  useLayoutEffect(() => {
+    if (!showActionsDropdown) {
+      setActionsMenuFixedStyle(null);
+      return;
+    }
+    syncActionsMenuPosition();
+    window.addEventListener("resize", syncActionsMenuPosition);
+    window.addEventListener("scroll", syncActionsMenuPosition, true);
+    return () => {
+      window.removeEventListener("resize", syncActionsMenuPosition);
+      window.removeEventListener("scroll", syncActionsMenuPosition, true);
+    };
+  }, [showActionsDropdown, syncActionsMenuPosition]);
+
+  // Close dropdown when clicking outside (menu is portaled, so check both refs)
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       const targetNode = event.target as Node;
 
-      if (
-        dropdownRef.current &&
-        !dropdownRef.current.contains(targetNode)
-      ) {
-        setShowActionsDropdown(false);
-        setOpenActionsSubMenuIndex(null);
-        setActionsSubMenuSearch("");
+      if (showActionsDropdown) {
+        const inTrigger = dropdownRef.current?.contains(targetNode);
+        const inMenu =
+          actionsDropdownMenuPortalRef.current?.contains(targetNode);
+        if (!inTrigger && !inMenu) {
+          setShowActionsDropdown(false);
+          setOpenActionsSubMenuIndex(null);
+          setActionsSubMenuSearch("");
+        }
       }
 
       const entries = Object.entries(sectionDropdownRefs.current);
@@ -6211,7 +6260,77 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
 
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
+  }, [showActionsDropdown]);
+
+  const dockedOuterStyle = useMemo<React.CSSProperties>(
+    () =>
+      dockInParent
+        ? {
+            width,
+            backgroundColor: "#f0f0f0",
+            display: "flex",
+            flexDirection: "column",
+            flex: 1,
+            minHeight: 0,
+            alignSelf: "stretch",
+            height: "100%",
+            maxHeight: "100%",
+            overflow: "hidden",
+            animation: "slideInRight 0.3s ease-out",
+            flexShrink: 0,
+            marginTop: 0,
+            position: "relative",
+          }
+        : {
+            width,
+            backgroundColor: "#f0f0f0",
+            display: "flex",
+            flexDirection: "column",
+            height: "calc(100vh - 43px)",
+            maxHeight: "calc(100vh - 43px)",
+            overflow: "hidden",
+            animation: "slideInRight 0.3s ease-out",
+            flexShrink: 0,
+            marginTop: "43px",
+            position: "relative",
+          },
+    [dockInParent, width],
+  );
+
+  /** Column under the title bar: fixed contact/actions row + scrollable body (dropdowns are not clipped). */
+  const dockedBodyColumnStyle = useMemo<React.CSSProperties>(
+    () => ({
+      flex: 1,
+      minHeight: 0,
+      display: "flex",
+      flexDirection: "column",
+      overflow: "hidden",
+    }),
+    [],
+  );
+
+  const dockedScrollBodyStyle = useMemo<React.CSSProperties>(
+    () =>
+      dockInParent
+        ? {
+            flex: 1,
+            minHeight: 0,
+            overflowY: "auto",
+            backgroundColor: "#f0f0f0",
+            borderBottom: "1px solid #cccccc",
+            borderRadius: "0 0 10px 10px",
+          }
+        : {
+            flex: 1,
+            minHeight: 0,
+            overflowY: "auto",
+            backgroundColor: "#f0f0f0",
+            maxHeight: "calc(100vh - 217px)",
+            borderBottom: "1px solid #cccccc",
+            borderRadius: "0 0 10px 10px",
+          },
+    [dockInParent],
+  );
 
   if (!isOpen) return null;
 
@@ -8057,92 +8176,79 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
         onActionSelect={handleMoreActionSelect}
       />
 
-      <div className="generic-sidebar-new-container"
-        style={{
-          width,
-          backgroundColor: "#f0f0f0",
-          display: "flex",
-          flexDirection: "column",
-          height: "calc(100vh - 43px)",
-          maxHeight: "calc(100vh - 43px)",
-          overflow: "hidden",
-          animation: "slideInRight 0.3s ease-out",
-          flexShrink: 0,
-          marginTop: "43px",
-          position: "relative",
-        }}
+      <div
+        className="generic-sidebar-new-container"
+        style={dockedOuterStyle}
       >
-        {/* Fixed Top Bar - Title and Close (Non-scrollable) */}
-        <div
-          style={{
-            padding: "20px 24px",
-            border: "1px solid #cccccc",
-            backgroundColor: "#ffffff",
-            flexShrink: 0,
-            borderRadius: "10px 10px 0 0",
-          }}
-        >
+        {!hideTopHeadingBar && (
           <div
             style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
+              padding: "20px 24px",
+              border: "1px solid #cccccc",
+              backgroundColor: "#ffffff",
+              flexShrink: 0,
+              borderRadius: "10px 10px 0 0",
             }}
           >
-            <h2
+            <div
               style={{
-                fontSize: "20px",
-                fontWeight: "500",
-                color: "#141414",
-                margin: 0,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
               }}
             >
-              {title}
-            </h2>
-
-            {onClose && (
-              <button
-                onClick={onClose}
+              <h2
                 style={{
-                  background: "transparent",
-                  border: "none",
-                  padding: "4px",
-                  cursor: "pointer",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  color: "#718096",
-                  transition: "all 0.2s",
-                  borderRadius: "4px",
+                  fontSize: "20px",
+                  fontWeight: "500",
+                  color: "#141414",
+                  margin: 0,
                 }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.color = "#2d3748";
-                  e.currentTarget.style.backgroundColor = "#f7fafc";
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.color = "#718096";
-                  e.currentTarget.style.backgroundColor = "transparent";
-                }}
-                aria-label="Close"
               >
-                <X size={20} />
-              </button>
-            )}
-          </div>
-        </div>
+                {title}
+              </h2>
 
-        {/* Scrollable Content Area */}
-        <div
-          className="sidebar-scrollbar"
-          style={{
-            flex: 1,
-            overflowY: "auto",
-            backgroundColor: "#f0f0f0",
-            maxHeight: "calc(100vh - 217px)",
-            borderBottom: "1px solid #cccccc",
-            borderRadius: "0 0 10px 10px",
-          }}
-        >
+              {onClose && (
+                <button
+                  onClick={onClose}
+                  style={{
+                    background: "transparent",
+                    border: "none",
+                    padding: "4px",
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    color: "#718096",
+                    transition: "all 0.2s",
+                    borderRadius: "4px",
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.color = "#2d3748";
+                    e.currentTarget.style.backgroundColor = "#f7fafc";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.color = "#718096";
+                    e.currentTarget.style.backgroundColor = "transparent";
+                  }}
+                  aria-label="Close"
+                >
+                  <X size={20} />
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+
+        <div style={dockedBodyColumnStyle}>
+          {/* z-index keeps header Actions menu above the scroll sibling (later siblings paint on top by default). */}
+          <div
+            style={{
+              flexShrink: 0,
+              position: "relative",
+              zIndex: 5,
+            }}
+          >
           {/* Contact & Actions Section */}
           <div
             style={{
@@ -8152,7 +8258,14 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
               borderLeft: "1px solid #cccccc",
               borderRight: "1px solid #cccccc",
               borderBottom: "1px solid #cccccc",
-              borderRadius: "0 0 10px 10px",
+              ...(hideTopHeadingBar
+                ? {
+                    borderTop: "1px solid #cccccc",
+                    borderRadius: "10px",
+                  }
+                : {
+                    borderRadius: "0 0 10px 10px",
+                  }),
             }}
           >
             {/* Record Link and Actions */}
@@ -8189,9 +8302,19 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
                 </a>
               )}
 
+              {(actionsDropdown || (hideTopHeadingBar && onClose)) && (
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "8px",
+                  marginLeft: "auto",
+                }}
+              >
               {actionsDropdown && (
                 <div style={{ position: "relative" }} ref={dropdownRef}>
                   <button
+                    ref={actionsDropdownButtonRef}
                     onClick={() => {
                       const next = !showActionsDropdown;
                       setShowActionsDropdown(next);
@@ -8224,22 +8347,14 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
                     <ChevronDown size={14} />
                   </button>
 
-                  {showActionsDropdown && (
-                    <div
-                      style={{
-                        position: "absolute",
-                        top: "100%",
-                        right: 0,
-                        marginTop: "4px",
-                        backgroundColor: "#ffffff",
-                        border: "1px solid #e2e8f0",
-                        borderRadius: "5px",
-                        boxShadow: "0 4px 12px rgba(0, 0, 0, 0.15)",
-                        minWidth: "180px",
-                        zIndex: 1000,
-                        overflow: "hidden",
-                      }}
-                    >
+                  {showActionsDropdown &&
+                    typeof document !== "undefined" &&
+                    actionsMenuFixedStyle &&
+                    createPortal(
+                      <div
+                        ref={actionsDropdownMenuPortalRef}
+                        style={actionsMenuFixedStyle}
+                      >
                       {actionsDropdown.items.map((item, index) => {
                         const hasSubItems =
                           "subItems" in item && !!item.subItems?.length;
@@ -8397,9 +8512,42 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
                           </div>
                         );
                       })}
-                    </div>
-                  )}
+                      </div>,
+                      document.body,
+                    )}
                 </div>
+              )}
+              {hideTopHeadingBar && onClose && (
+                <button
+                  type="button"
+                  onClick={onClose}
+                  style={{
+                    background: "transparent",
+                    border: "none",
+                    padding: "4px",
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    color: "#718096",
+                    transition: "all 0.2s",
+                    borderRadius: "4px",
+                    flexShrink: 0,
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.color = "#2d3748";
+                    e.currentTarget.style.backgroundColor = "#f7fafc";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.color = "#718096";
+                    e.currentTarget.style.backgroundColor = "transparent";
+                  }}
+                  aria-label="Close"
+                >
+                  <X size={20} />
+                </button>
+              )}
+              </div>
               )}
             </div>
 
@@ -8662,7 +8810,12 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
               })}
             </div>
           </div>
+          </div>
 
+          <div
+            className="sidebar-scrollbar"
+            style={{ ...dockedScrollBodyStyle, position: "relative", zIndex: 1 }}
+          >
           {/* Record summary (from API crm_summary) */}
           {recordSummary && (
             <div
@@ -8917,6 +9070,7 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
 
           {/* Sections */}
           {processedSections.map((section) => renderSection(section))}
+        </div>
         </div>
       </div>
 
