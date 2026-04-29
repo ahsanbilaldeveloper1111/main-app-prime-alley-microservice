@@ -781,12 +781,9 @@ const TaskDetailOffcanvas: React.FC<TaskDetailOffcanvasProps> = ({
   getStatusVariant,
   getPriorityVariant
 }) => {
-  const { hasPermission, hasAnyPermission } = usePermissions();
+  const { hasPermission } = usePermissions();
   const canEditPlannerTask = hasPermission(PERMISSIONS.EDIT_TASKS_WORK_PLANNER);
-  const canDeletePlannerTask = hasAnyPermission([
-    PERMISSIONS.DELETE_TASKS_WORK_PLANNER,
-    PERMISSIONS.EDIT_TASKS_WORK_PLANNER,
-  ]);
+  const canDeletePlannerTask = hasPermission(PERMISSIONS.DELETE_TASKS_WORK_PLANNER);
 
   const [showAllActivitiesModal, setShowAllActivitiesModal] = useState(false);
   const [allActivities, setAllActivities] = useState<TaskActivityItem[]>([]);

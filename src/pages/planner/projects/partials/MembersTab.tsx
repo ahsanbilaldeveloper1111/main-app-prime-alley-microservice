@@ -58,32 +58,19 @@ const MembersTab: React.FC<MembersTabProps> = ({
   hierarchyDataExtensions,
   canManageProject,
 }) => {
-  const { hasAnyPermission } = usePermissions();
+  const { hasPermission } = usePermissions();
   const canViewProjectMembers =
     canManageProject &&
-    hasAnyPermission([
-      PERMISSIONS.VIEW_PROJECT_MEMBERS_WORK_PLANNER,
-      PERMISSIONS.UPDATE_PROJECTS_WORK_PLANNER,
-      PERMISSIONS.VIEW_PROJECTS_WORK_PLANNER,
-    ]);
+    hasPermission(PERMISSIONS.VIEW_PROJECT_MEMBERS_WORK_PLANNER);
   const canCreateProjectMembers =
     canManageProject &&
-    hasAnyPermission([
-      PERMISSIONS.CREATE_PROJECT_MEMBERS_WORK_PLANNER,
-      PERMISSIONS.UPDATE_PROJECTS_WORK_PLANNER,
-    ]);
+    hasPermission(PERMISSIONS.CREATE_PROJECT_MEMBERS_WORK_PLANNER);
   const canUpdateProjectMembers =
     canManageProject &&
-    hasAnyPermission([
-      PERMISSIONS.UPDATE_PROJECT_MEMBERS_WORK_PLANNER,
-      PERMISSIONS.UPDATE_PROJECTS_WORK_PLANNER,
-    ]);
+    hasPermission(PERMISSIONS.UPDATE_PROJECT_MEMBERS_WORK_PLANNER);
   const canDeleteProjectMembers =
     canManageProject &&
-    hasAnyPermission([
-      PERMISSIONS.DELETE_PROJECT_MEMBERS_WORK_PLANNER,
-      PERMISSIONS.UPDATE_PROJECTS_WORK_PLANNER,
-    ]);
+    hasPermission(PERMISSIONS.DELETE_PROJECT_MEMBERS_WORK_PLANNER);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);

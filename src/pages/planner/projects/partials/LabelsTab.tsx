@@ -45,7 +45,14 @@ const LabelsTab: React.FC<LabelsTabProps> = ({
   styles: _styles,
   canManageProject,
 }) => {
-  const { hasPermission } = usePermissions();
+  const { hasPermission, hasAnyPermission } = usePermissions();
+  const canViewLabels =
+    canManageProject &&
+    hasAnyPermission([
+      PERMISSIONS.CREATE_LABELS_WORK_PLANNER,
+      PERMISSIONS.UPDATE_LABELS_WORK_PLANNER,
+      PERMISSIONS.DELETE_LABELS_WORK_PLANNER,
+    ]);
   const canCreateLabel =
     canManageProject && hasPermission(PERMISSIONS.CREATE_LABELS_WORK_PLANNER);
   const canUpdateLabel =
@@ -468,6 +475,10 @@ const LabelsTab: React.FC<LabelsTabProps> = ({
   }, [searchValue, colorFilter]);
 
   // ── Render ────────────────────────────────────────────────────────────────
+  if (!canViewLabels) {
+    return null;
+  }
+
   return (
     <>
       {/* Labels Table with GenericTable */}

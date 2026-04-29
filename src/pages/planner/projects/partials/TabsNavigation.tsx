@@ -3,9 +3,14 @@ import React from 'react';
 interface TabsNavigationProps {
   activeTab: string;
   onTabChange: (tab: string) => void;
+  tabs?: string[];
 }
 
-const TabsNavigation: React.FC<TabsNavigationProps> = ({ activeTab, onTabChange }) => {
+const TabsNavigation: React.FC<TabsNavigationProps> = ({
+  activeTab,
+  onTabChange,
+  tabs = ['Overview', 'Board', 'List', 'Members', 'Statuses', 'Labels'],
+}) => {
   const styles = {
     tabsContainer: { backgroundColor: '#fff', borderBottom: '1px solid #E5E9F2' },
     tabsInner: { margin: '0 auto', padding: '0 1.5rem', display: 'flex', gap: '2rem' },
@@ -15,7 +20,7 @@ const TabsNavigation: React.FC<TabsNavigationProps> = ({ activeTab, onTabChange 
   return (
     <div style={styles.tabsContainer}>
       <div style={styles.tabsInner}>
-        {['Overview', 'Board', 'List', 'Members', 'Statuses', 'Labels'].map((tab) => (
+        {tabs.map((tab) => (
           <button
             key={tab}
             onClick={() => onTabChange(tab.toLowerCase())}
@@ -29,7 +34,17 @@ const TabsNavigation: React.FC<TabsNavigationProps> = ({ activeTab, onTabChange 
                 e.currentTarget.style.color = '#4680FF';
               }
             }}
+            onFocus={(e) => {
+              if (activeTab !== tab.toLowerCase()) {
+                e.currentTarget.style.color = '#4680FF';
+              }
+            }}
             onMouseOut={(e) => {
+              if (activeTab !== tab.toLowerCase()) {
+                e.currentTarget.style.color = '#6B7280';
+              }
+            }}
+            onBlur={(e) => {
               if (activeTab !== tab.toLowerCase()) {
                 e.currentTarget.style.color = '#6B7280';
               }

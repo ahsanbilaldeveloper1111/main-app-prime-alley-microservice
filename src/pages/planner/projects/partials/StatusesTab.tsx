@@ -462,6 +462,7 @@ const StatusesTab: React.FC<StatusesTabProps> = ({
   canManageProject,
 }) => {
   const { hasPermission } = usePermissions();
+  const canViewStatuses = hasPermission(PERMISSIONS.VIEW_STATUSES_WORK_PLANNER);
   const canCreateStatus =
     canManageProject && hasPermission(PERMISSIONS.CREATE_STATUSES_WORK_PLANNER);
   const canUpdateStatus =
@@ -920,6 +921,10 @@ const StatusesTab: React.FC<StatusesTabProps> = ({
   ];
 
   // ── Render ────────────────────────────────────────────────────────────────
+  if (!canViewStatuses) {
+    return null;
+  }
+
   return (
     <>
       {/* Custom styles for StatusesTab to reduce column width */}

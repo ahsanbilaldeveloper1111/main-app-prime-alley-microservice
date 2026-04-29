@@ -920,7 +920,7 @@ const TaskDetailPage = () => {
   }, [task?.project]);
 
   const { data: session } = useSession();
-  const { hasPermission, hasAnyPermission } = usePermissions();
+  const { hasPermission } = usePermissions();
   const sessionUserPhoneOrExtension = useMemo(
     () => getSessionPhoneOrExtension(session),
     [session],
@@ -930,12 +930,8 @@ const TaskDetailPage = () => {
     [hasPermission],
   );
   const sessionCanDeletePlannerTask = useMemo(
-    () =>
-      hasAnyPermission([
-        PERMISSIONS.DELETE_TASKS_WORK_PLANNER,
-        PERMISSIONS.EDIT_TASKS_WORK_PLANNER,
-      ]),
-    [hasAnyPermission],
+    () => hasPermission(PERMISSIONS.DELETE_TASKS_WORK_PLANNER),
+    [hasPermission],
   );
 
   const fetchTask = useCallback(async () => {
