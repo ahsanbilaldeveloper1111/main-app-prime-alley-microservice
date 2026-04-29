@@ -1,6 +1,6 @@
 import React from "react";
 import { useRouter } from "next/router";
-import { CreateInvoicePageContent } from "@pages/billing/create-invoice";
+import { CreateInvoicePageContent } from "@pages/billing/customer/create-invoice";
 
 export default function EditInvoicePage() {
   const router = useRouter();

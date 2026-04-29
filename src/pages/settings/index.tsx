@@ -67,7 +67,7 @@ import GsmSync from "@pages/gsm/sync";
 import CompanyPO from "@pages/gsm/company/po";
 
 // Import Billing components
-import PaymentMethods from "@pages/billing/payment-methods";
+import PaymentMethods from "@pages/billing/customer/payment-methods";
 
 // Import NetOps components
 import Devices from "@pages/pulse/devices";

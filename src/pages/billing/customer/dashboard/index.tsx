@@ -50,6 +50,7 @@ import {
 } from "@utils/accounting";
 import { getMinifiedCompanies } from "@utils/crm";
 import { useEnsureCustomerForCrmCompany } from "@hooks/billing/useEnsureCustomerForCrmCompany";
+import { billingCustomerRoutes } from "@utils/billingCustomerRoutes";
 
 type SpendingRow = {
   month: string;
@@ -285,7 +286,7 @@ const CustomerDashboard = () => {
         iconBgColor: "rgba(251, 191, 36, 0.1)",
         link: {
           text: "Pay Now",
-          onClick: () => router.push("/billing/invoices"),
+          onClick: () => router.push(billingCustomerRoutes.invoices()),
         },
       },
       {

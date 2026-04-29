@@ -33,6 +33,7 @@ import {
   type ProductCategoryData,
   updateProductCategory,
 } from "@utils/accounts";
+import { billingCustomerRoutes } from "@utils/billingCustomerRoutes";
 import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
 import PageHeader from "@components/PageHeader";
 import { GENERIC_TABLE_PAGE_SIZE_OPTIONS } from "@constants/genericTable";
@@ -471,8 +472,8 @@ const ManageCategories = () => {
   return (
     <React.Fragment>
       <BreadcrumbItem
-        mainTitle="Categories"
-        mainLink="/billing/products/manage-categories"
+        mainTitle="Products"
+        mainLink={billingCustomerRoutes.products()}
         subTitle="Manage Categories"
       />
 

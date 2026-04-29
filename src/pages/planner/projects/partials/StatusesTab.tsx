@@ -921,7 +921,7 @@ const StatusesTab: React.FC<StatusesTabProps> = ({
   ];
 
   // ── Render ────────────────────────────────────────────────────────────────
-  if (!canViewStatuses) {
+  if (![canViewStatuses, canCreateStatus, canUpdateStatus, canDeleteStatus, canReorderStatuses].some(Boolean)) {
     return null;
   }
 
