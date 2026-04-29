@@ -1,4 +1,5 @@
-import "@assets/scss/datatable-style.scss";
+import "@components/billings/customer/billingCustomerDatatableCommonTabsStyles";
+import { BillingCustomerPortalTableShell } from "@components/billings/customer/BillingCustomerPortalTableShell";
 import React, {
   ReactElement,
   useState,
@@ -60,8 +61,6 @@ import {
   type ProductData,
 } from "@utils/accounts";
 
-import "@assets/scss/common.scss";
-import "@assets/scss/tabs.scss";
 import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
 
 /** Row from `getProducts` / list-products — not CRM `getCrmData`. */
@@ -1510,14 +1509,7 @@ const BillingManagement = () => {
         subTitle="Products"
       />
       {/* Main flex container for content and sidebar */}
-      <div
-        style={{
-          display: "flex",
-          gap: "0",
-          height: "calc(100vh)",
-          overflow: "hidden",
-        }}
-      >
+      <BillingCustomerPortalTableShell>
         {/* Main content area */}
         <div className="prospects-scrollable-content" style={{ flex: 1 }}>
           
@@ -1856,7 +1848,7 @@ const BillingManagement = () => {
             setRefreshKey((k) => k + 1);
           }}
         />
-      </div>{" "}
+      </BillingCustomerPortalTableShell>
       {/* End flex container */}
      
       {/* Column Editor Modal */}

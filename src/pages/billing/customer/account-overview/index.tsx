@@ -1,4 +1,4 @@
-import "@assets/scss/datatable-style.scss";
+import "@components/billings/customer/billingCustomerDatatablePortalStyles";
 import React, {
   ReactElement,
   useEffect,
@@ -13,10 +13,6 @@ import { Card, Row, Col, Button, Badge, Form, Modal } from 'react-bootstrap';
 import { Clock, DollarSign, Edit, FileText, Wallet, Users, Mail, Phone, User, Package, Check, TrendingUp, X, Eye, Send } from 'lucide-react';
 import { formatNumber, getCompanyByCrmId } from "@utils/Helper";
 
-import "@assets/scss/billing.scss";
-
-import "@assets/scss/common.scss";
-import "@assets/scss/tabs.scss";
 import countries from "world-countries";
 
 import { GetPaymentMethods,UpdateCompanyDetails,GetDashboardCounters,GetPayments, GetCurrencies } from "@utils/accounting";

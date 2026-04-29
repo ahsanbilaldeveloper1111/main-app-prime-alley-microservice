@@ -1,10 +1,8 @@
-import "@assets/scss/datatable-style.scss";
+import "@components/billings/customer/billingCustomerDatatablePortalStyles";
+import { BillingCustomerPortalTableShell } from "@components/billings/customer/BillingCustomerPortalTableShell";
 import React, { ReactElement, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
-import "@assets/scss/billing.scss";
-import "@assets/scss/common.scss";
-import "@assets/scss/tabs.scss";
 import { GetPayments } from "@utils/accounting";
 import { getBillingCustomerPortalTabsDropdownItems } from "@utils/billingProductsTabs";
 import { billingCustomerRoutes } from "@utils/billingCustomerRoutes";
@@ -428,7 +426,7 @@ const ProductDetails = () => {
       />
 
       {/* Main flex container for content and sidebar — same pattern as prospects.tsx */}
-      <div style={{ display: "flex", gap: "0", height: "calc(100vh)", overflow: "hidden" }}>
+      <BillingCustomerPortalTableShell>
         {/* Main content area */}
         <div style={{ flex: 1, overflowY: "auto", overflowX: "hidden" }}>
 
@@ -514,7 +512,7 @@ const ProductDetails = () => {
         }}
       />
         </div>{/* End main content area */}
-      </div>
+      </BillingCustomerPortalTableShell>
     </React.Fragment>
   );
 };

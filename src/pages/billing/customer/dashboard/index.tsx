@@ -1,4 +1,4 @@
-import "@assets/scss/datatable-style.scss";
+import "@components/billings/customer/billingCustomerDatatablePortalStyles";
 import React, {
   ReactElement,
   useCallback,
@@ -34,11 +34,6 @@ const formatWithOneDecimal = (
   });
 const formatInteger = (value: number | string | undefined | null): string =>
   (Number(value) || 0).toLocaleString("en-US", { maximumFractionDigits: 0 });
-
-import "@assets/scss/billing.scss";
-
-import "@assets/scss/common.scss";
-import "@assets/scss/tabs.scss";
 
 import {
   GetDashboardCounters,

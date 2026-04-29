@@ -101,6 +101,7 @@ import {
   orderApprovalBadgeVariant,
   paymentStatusBadgeVariant,
 } from "@components/billings/order-invoicing";
+import { normalizeGetOrdersListResponse } from "@crm/orders/normalizeGetOrdersListResponse";
 import { HEADER_CONSTANTS } from "@constants/headerConstants";
 
 const ignoredHistoryKeys = new Set<string>(["order_stage_id"]);
@@ -277,16 +278,11 @@ const CrmOrders = () => {
           selectedCompanyId,
         );
 
-        const response: any = await getOrders(params);
-        console.log("Raw response from getOrders:", response);
-
-        const ordersArray: any[] = response?.dataList || [];
-        const pagination: any = response?.meta || {};
-        const summary: any = response?.summary_tiles || null;
-
-        setOrdersData(Array.isArray(ordersArray) ? ordersArray : []);
-        setTotalOrders(pagination?.total || 0);
-        setSummaryTiles(summary);
+        const response: unknown = await getOrders(params);
+        const normalized = normalizeGetOrdersListResponse(response);
+        setOrdersData(normalized.ordersData as any[]);
+        setTotalOrders(normalized.totalOrders);
+        setSummaryTiles(normalized.summaryTiles);
 
         return response;
       } finally {

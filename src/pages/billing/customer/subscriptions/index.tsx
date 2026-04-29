@@ -1,4 +1,5 @@
-import "@assets/scss/datatable-style.scss";
+import "@components/billings/customer/billingCustomerDatatablePortalStyles";
+import { BillingCustomerPortalTableShell } from "@components/billings/customer/BillingCustomerPortalTableShell";
 import React, {
   ReactElement,
   useEffect,
@@ -15,9 +16,6 @@ import { HEADER_CONSTANTS } from "@constants/headerConstants";
 
 const { PERMISSIONS } = HEADER_CONSTANTS;
 
-import "@assets/scss/billing.scss";
-import "@assets/scss/common.scss";
-import "@assets/scss/tabs.scss";
 import { deleteCustomerProductPricing, getCustomerProductPricingList } from "@utils/accounts";
 import CreateSubscriptionModal from "@components/CreateSubscriptionModal";
 import type { CustomerProductPricingDataItem } from "@utils/accounts";
@@ -916,7 +914,7 @@ const ProductDetails = () => {
       />
 
       {/* Main flex container for content and sidebar — same pattern as prospects.tsx */}
-      <div style={{ display: "flex", gap: "0", height: "calc(100vh)", overflow: "hidden" }}>
+      <BillingCustomerPortalTableShell>
         {/* Main content area */}
         <div style={{ flex: 1, overflowY: "auto", overflowX: "hidden" }}>
 
@@ -1102,7 +1100,7 @@ const ProductDetails = () => {
       />
         </div>
         )}
-      </div>
+      </BillingCustomerPortalTableShell>
 
       {showCreateSubscriptionModal && (
         <CreateSubscriptionModal

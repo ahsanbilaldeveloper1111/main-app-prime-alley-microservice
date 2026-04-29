@@ -1,4 +1,4 @@
-import "@assets/scss/datatable-style.scss";
+import "@components/billings/customer/billingCustomerDatatableCommonTabsStyles";
 import React, {
   ReactElement,
   useCallback,
@@ -17,8 +17,6 @@ import {
 } from "react-bootstrap";
 import { Edit, PlusCircle, Trash2 } from "lucide-react";
 
-import "@assets/scss/common.scss";
-import "@assets/scss/tabs.scss";
 import GenericTable, {
   type FilterPill,
   type TableAction,

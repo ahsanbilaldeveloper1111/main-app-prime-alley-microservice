@@ -1,6 +1,5 @@
-import "@assets/scss/datatable-style.scss";
-import "@assets/scss/common.scss";
-import "@assets/scss/tabs.scss";
+import "@components/billings/customer/billingCustomerDatatableCommonTabsStyles";
+import { BillingCustomerPortalTableShell } from "@components/billings/customer/BillingCustomerPortalTableShell";
 
 import React, {
   type Dispatch,
@@ -1442,7 +1441,7 @@ const InvoiceList = () => {
       />
 
       {/* Main flex container — table + sidebar side-by-side */}
-      <div style={{ display: "flex", gap: "0", height: "calc(100vh)", overflow: "hidden" }}>
+      <BillingCustomerPortalTableShell>
         {/* Main content area */}
         <div style={{ flex: 1, overflowY: "auto", overflowX: "hidden" }}>
           <div className="container-fluid">
@@ -1634,7 +1633,7 @@ const InvoiceList = () => {
         ]}
         />
         )}
-      </div>
+      </BillingCustomerPortalTableShell>
       {/* End flex container */}
 
       <GenericFilterSidebar

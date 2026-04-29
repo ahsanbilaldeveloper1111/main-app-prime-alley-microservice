@@ -1,7 +1,4 @@
-import "@assets/scss/datatable-style.scss";
-import "@assets/scss/billing.scss";
-import "@assets/scss/common.scss";
-import "@assets/scss/tabs.scss";
+import "@components/billings/customer/billingCustomerDatatablePortalStyles";
 import React, {
   ReactElement,
   useCallback,
