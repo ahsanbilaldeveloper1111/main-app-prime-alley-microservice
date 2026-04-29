@@ -219,6 +219,12 @@ const CallRecordings: NextPage & {
   getLayout?: (page: React.ReactElement) => React.ReactNode;
 } = () => {
   const { data: session } = useSession();
+  const canPlayRecordings = session?.user?.permissions?.includes(
+    PERMISSIONS.PLAY_RECORDING_CALL_RECORDINGS,
+  );
+  const canDownloadRecordings = session?.user?.permissions?.includes(
+    PERMISSIONS.DOWNLOAD_RECORDING_CALL_RECORDINGS,
+  );
   const userPermissions = session?.user?.permissions ?? [];
   const canViewCallRecordings =
     userPermissions.includes(PERMISSIONS.VIEW_CALL_RECORDINGS) ||
@@ -265,6 +271,23 @@ const CallRecordings: NextPage & {
     hierarchyDataDepartments,
     hierarchyDataUsers,
   } = useHierarchyData(ModuleSlug.CALL_RECORDINGS);
+  const selectedExtensionIds = useMemo<string[]>(
+    () =>
+      Array.isArray(currentFilters.extension_number)
+        ? (currentFilters.extension_number as string[]).map(String)
+        : [],
+    [currentFilters.extension_number],
+  );
+  const extensionOptionsSelectedFirst = useMemo(
+    () =>
+      [...hierarchyDataExtensions].sort((a: any, b: any) => {
+        const aSelected = selectedExtensionIds.includes(String(a.id));
+        const bSelected = selectedExtensionIds.includes(String(b.id));
+        if (aSelected === bSelected) return 0;
+        return aSelected ? -1 : 1;
+      }),
+    [hierarchyDataExtensions, selectedExtensionIds],
+  );
   const [callDurationBarChartModal, setCallDurationBarChartModal] =
     useState(false);
   const [currentChartData, setCurrentChartData] = useState<{
@@ -652,15 +675,20 @@ const CallRecordings: NextPage & {
 
   const usernameDropdownOptions = useMemo(
     () =>
-      hierarchyDataUsers.map((u: any) => {
-        const userId = String(u.id);
-        return {
-          label: String(u.name ?? u.id),
-          value: userId,
-          selected: selectedUsernameIds.includes(userId),
-          onClick: () => toggleUsernameSelection(userId),
-        };
-      }),
+      hierarchyDataUsers
+        .map((u: any) => {
+          const userId = String(u.id);
+          return {
+            label: String(u.name ?? u.id),
+            value: userId,
+            selected: selectedUsernameIds.includes(userId),
+            onClick: () => toggleUsernameSelection(userId),
+          };
+        })
+        .sort((a, b) => {
+          if (a.selected === b.selected) return 0;
+          return a.selected ? -1 : 1;
+        }),
     [hierarchyDataUsers, selectedUsernameIds, toggleUsernameSelection],
   );
 
@@ -732,7 +760,7 @@ const CallRecordings: NextPage & {
       filterPills: [
         buildCallDirectionFilterPill(currentFilters, stageFilters),
         buildExtensionMultiSelectFilterPill(
-          hierarchyDataExtensions as any[],
+          extensionOptionsSelectedFirst,
           currentFilters,
           stageFilters,
         ),
@@ -838,6 +866,7 @@ const CallRecordings: NextPage & {
     currentFilters,
     setCurrentFilters,
     hierarchyDataExtensions,
+    extensionOptionsSelectedFirst,
     hierarchyDataDepartments,
     hierarchyDataUsers,
     selectedUsernameIds,
@@ -1135,51 +1164,61 @@ const CallRecordings: NextPage & {
       render: (row) => {
         const isDownloading = downloadingRecordings.has(row.Id ?? "");
         const progress = downloadProgress[row.Id ?? ""] || 0;
-        return (
-          <div className="d-flex gap-3 action-box">
+        const canRenderDownload = canDownloadRecordings;
+        const showDownloadProgress = canRenderDownload && isDownloading;
+        let downloadControl: React.ReactNode = null;
+        if (showDownloadProgress) {
+          downloadControl = (
+            <CircularProgressCircle
+              progress={progress}
+              size="small"
+              color="#28a745"
+              backgroundColor="#e9ecef"
+              textColor="#495057"
+              showPercentage={false}
+              className="circular-progress-inline"
+            />
+          );
+        } else if (canRenderDownload) {
+          downloadControl = (
             <button
               type="button"
               className="btn btn-link p-0 text-info border-0"
-              onClick={() => handlePlayRecording(row)}
-              aria-label="Play"
-              title="Play"
+              onClick={() => handleDownload(row)}
+              aria-label="Download"
+              title="Download"
             >
               <i
                 data-tooltip-id="my-tooltip"
-                data-tooltip-content="Play"
-                className="ph-duotone ph-play"
+                data-tooltip-content="Download"
+                className="ph-duotone ph-arrow-line-down"
                 style={{ fontSize: "1rem" }}
                 aria-hidden="true"
               />
             </button>
-            <div style={{ display: "inline-flex", alignItems: "center" }}>
-              {isDownloading ? (
-                <CircularProgressCircle
-                  progress={progress}
-                  size="small"
-                  color="#28a745"
-                  backgroundColor="#e9ecef"
-                  textColor="#495057"
-                  showPercentage={false}
-                  className="circular-progress-inline"
+          );
+        }
+        return (
+          <div className="d-flex gap-3 action-box">
+            {canPlayRecordings && (
+              <button
+                type="button"
+                className="btn btn-link p-0 text-info border-0"
+                onClick={() => handlePlayRecording(row)}
+                aria-label="Play"
+                title="Play"
+              >
+                <i
+                  data-tooltip-id="my-tooltip"
+                  data-tooltip-content="Play"
+                  className="ph-duotone ph-play"
+                  style={{ fontSize: "1rem" }}
+                  aria-hidden="true"
                 />
-              ) : (
-                <button
-                  type="button"
-                  className="btn btn-link p-0 text-info border-0"
-                  onClick={() => handleDownload(row)}
-                  aria-label="Download"
-                  title="Download"
-                >
-                  <i
-                    data-tooltip-id="my-tooltip"
-                    data-tooltip-content="Download"
-                    className="ph-duotone ph-arrow-line-down"
-                    style={{ fontSize: "1rem" }}
-                    aria-hidden="true"
-                  />
-                </button>
-              )}
+              </button>
+            )}
+            <div style={{ display: "inline-flex", alignItems: "center" }}>
+              {downloadControl}
             </div>
             {session?.user?.permissions?.includes(
               "transcriptions-analysis-aiml",

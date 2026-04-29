@@ -58,10 +58,10 @@ export const routePermissions: RoutePermission[] = [
             { path: '/billing', permissions: [PERMISSIONS.ACCOUNTS_SERVICES] },
             { path: '/tickets', permissions: [PERMISSIONS.TICKETS_SERVICES] },
             { path: '/help-center', permissions: [PERMISSIONS.MANAGE_HELP_CENTER] },
-            { path: '/ai-chat', permissions: [PERMISSIONS.AI_ML_SERVICES] },
+            { path: '/ai-chat', permissions: [PERMISSIONS.VIEW_AI_CHAT_AI_CHAT] },
         ]
     },
-    
+    { path: '/chat', permissions: [PERMISSIONS.VIEW_AI_CHAT_AI_CHAT] },
     
     {path:'/chat/ai-bot-faqs',permissions: [PERMISSIONS.MANAGE_AI_BOT_FAQS]},
     {path:'/chat/ai-faqs/tenant',permissions: [PERMISSIONS.MANAGE_TENANT_PROFILE_AI_CHAT]},

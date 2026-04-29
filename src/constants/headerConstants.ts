@@ -378,6 +378,7 @@ export const HEADER_CONSTANTS = {
     CREATE_INBOUND_BOTS_INBOUND: "create-inbound-bots-inbound",
     EDIT_INBOUND_BOTS_INBOUND: "edit-inbound-bots-inbound",
     DELETE_INBOUND_BOTS_INBOUND: "delete-inbound-bots-inbound",
+    INBOUND_BOT_VERSIONING_INBOUND: "inbound-bot-versioning-inbound",
     VIEW_INBOUND_CONVERSATIONS_INBOUND: "view-Inbound-conversations-inbound",
     VIEW_OUTBOUND_CAMPAIGNS_OUTBOUND: "view-outbound-campaign-outbound",
     CREATE_OUTBOUND_CAMPAIGNS_OUTBOUND: "create-outbound-campaign-outbound",
@@ -395,6 +396,9 @@ export const HEADER_CONSTANTS = {
     VIEW_OUTBOUND_REPORT_OUTBOUND: "view-outbound-report-outbound",
     VIEW_OUTBOUND_ANALYTICS_OUTBOUND: "view-outbound-analytics-outbound",
     VIEW_OUTBOUND_DASHBOARD_OUTBOUND: "view-outbound-dashboard-outbound",
+    OUTBOUND_DISPATCH_CAMPAIGN_OUTBOUND: "outbound-dispatch-campaign-outbound",
+    OUTBOUND_VIEW_CAMPAIGN_STATUS_OUTBOUND:
+      "outbound-view-campaign-status-outbound",
 
     //Virtual Agents permissions end
 
@@ -501,6 +505,8 @@ export const HEADER_CONSTANTS = {
     LIST_CALL_RECORDINGS: "list-call-recordings",
     EXPORT_CALL_RECORDINGS: "export-call-recordings",
     VIEW_CALL_RECORDINGS_FILTERS: "filters-call-recordings",
+    PLAY_RECORDING_CALL_RECORDINGS: "play-recording-call-recordings",
+    DOWNLOAD_RECORDING_CALL_RECORDINGS: "download-recording-call-recordings",
     VIEW_CALL_REPORTS: "view-call-reports",
     CALL_REPORTS_BY_STATISTICS_REPORTS: "call-reports-by-statistics-reports",
     CALL_REPORTS_BY_CALL_INCOMING_REPORTS:
@@ -535,6 +541,7 @@ export const HEADER_CONSTANTS = {
     MANAGE_TENANT_PROFILE_AI_CHAT: "view-tenant-profile-ai-chat",
     MANAGE_GLOBAL_FAQS_AI_CHAT: "manage-global-faqs-ai-chat",
     MANAGE_AI_BOT_FAQS: "manage-ai-bot-faqs-ai-chat-ai-chat",
+    VIEW_AI_CHAT_AI_CHAT: "view-ai-chat-ai-chat",
     //AI chat permissions end
 
     TRANSCRIPTION_ANALYSIS_AIML: "transcriptions-analysis-aiml",
@@ -603,7 +610,6 @@ export const HEADER_CONSTANTS = {
     VIEW_QUOTES_BILLING: "view-quotes-billing",
     PAY_INVOICES_BILLING: "pay-invoices-billing",
     LIST_CRM_ORDERS_BILLING: "list-crm-orders",
-    EDIT_CRM_ORDERS_BILLING: "edit-crm-orders",
     DELETE_CRM_ORDERS_BILLING: "delete-crm-orders",
 
     CUSTOMER_ACCOUNTS_SERVICES: "accounts-services",

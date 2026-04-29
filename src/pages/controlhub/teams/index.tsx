@@ -1,527 +1,472 @@
 import '@assets/scss/datatable-style.scss';
-import React, { ReactElement, useState, useCallback, useMemo, useRef } from 'react';
+import React, { ReactElement, useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import Layout from '@layout/index';
 import BreadcrumbItem from '@common/BreadcrumbItem';
-import GenericListPage from '@components/GenericListPage';
-import {ListTeams, updateTeam, deleteTeam, addTeam, assignUsersToTeam, removeUsersFromTeam, removeOwnersFromTeam, getTeamUsers, removeModulesFromTeam, getTeamModules, updateTeamModules } from '@utils/teams';
-import { Column } from '@components/CustomDataTable';
+import {
+    updateTeam,
+    deleteTeam,
+    addTeam,
+    assignUsersToTeam,
+    removeUsersFromTeam,
+    removeOwnersFromTeam,
+    getTeamUsers,
+    removeModulesFromTeam,
+    getTeamModules,
+    updateTeamModules,
+    ListTeams,
+} from '@utils/teams';
 import { Button, Form, Modal, Row, Col, Card } from 'react-bootstrap';
 import { useSession } from 'next-auth/react';
 import '@assets/scss/common.scss';
-import FormModal from "@pages/partial/FormModal";
+import FormModal from '@pages/partial/FormModal';
 import SuccessfulModal from '@pages/partial/SuccessfulModal';
 import ConfirmModal from '@pages/partial/ConfirmModal';
 import { Edit, Info, Trash2, Users, UserPlus, UserMinus, Package } from 'lucide-react';
-import AsyncSelect from 'react-select/async';
-import Select, { MultiValue } from 'react-select';
+import { MultiValue } from 'react-select';
 import { getParentUsers } from '@utils/users';
 import { getModules } from '@utils/roles';
 import { toast } from 'react-toastify';
 import { HEADER_CONSTANTS } from '@constants/headerConstants';
 import SelectCheckBox, { SelectCheckBoxOption } from '@components/SelectCheckBox';
+import GenericTable, { TableColumn, TableAction } from '@components/GenericTable';
 
+// ─── Types ────────────────────────────────────────────────────────────────────
 
+interface TeamRow {
+    id: number;
+    name: string;
+    module_names?: string[];
+    owner_count: number;
+    assigned_user_count: number;
+}
+
+interface TeamUser {
+    id: number;
+    name: string;
+    phone?: string;
+    email?: string;
+}
+
+interface TeamModule {
+    id?: number;
+    module_id?: number;
+    name?: string;
+    description?: string;
+}
+
+interface AllUser {
+    id: number;
+    name: string;
+    username?: string;
+    email?: string;
+    phone?: string;
+}
+
+interface TeamsApiResponse {
+    data: TeamRow[];
+    total: number;
+    current_page: number;
+    per_page: number;
+}
+
+interface TeamUsersResponse {
+    team_member?: TeamUser[];
+    team_owners?: TeamUser[];
+}
+
+// ─── Helper functions ─────────────────────────────────────────────────────────
+
+function buildUserOption(user: AllUser): SelectCheckBoxOption {
+    return {
+        value: user.id,
+        label: `${user.name || 'Unknown'} (${user.phone || user.email || 'N/A'})`,
+    };
+}
+
+function resolveOptionByIdStr(idStr: string, allUsers: AllUser[]): SelectCheckBoxOption {
+    const user = allUsers.find((u) => u.id.toString() === idStr);
+    return user ? buildUserOption(user) : { value: Number(idStr), label: idStr };
+}
+
+function getModuleId(module: TeamModule): number | undefined {
+    return module.id ?? module.module_id;
+}
+
+function buildAvailableUserOptions(
+    allUsers: AllUser[],
+    teamUsers: TeamUser[],
+    teamOwners: TeamUser[],
+    excludeSelectedIds: Set<number>,
+): SelectCheckBoxOption[] {
+    const assignedIds = new Set([...teamUsers.map((u) => u.id), ...teamOwners.map((u) => u.id)]);
+    return allUsers
+        .filter((u) => !assignedIds.has(u.id))
+        .filter((u) => !excludeSelectedIds.has(u.id))
+        .map(buildUserOption);
+}
+
+// ─── Sub-components ───────────────────────────────────────────────────────────
+
+interface ModuleCellProps {
+    readonly moduleNames?: readonly string[];
+}
+
+function ModuleCell({ moduleNames }: Readonly<ModuleCellProps>) {
+    const hasModules = moduleNames && moduleNames.length > 0;
+    if (hasModules) {
+        return (
+            <div className="d-flex flex-wrap gap-1">
+                {moduleNames.map((moduleName) => (
+                    <span key={moduleName} className="status-badge primary">
+                        {moduleName}
+                    </span>
+                ))}
+            </div>
+        );
+    }
+    return <span className="status-badge info">Modules not assigned</span>;
+}
+
+interface CountBadgeCellProps {
+    readonly count: number;
+}
+
+function CountBadgeCell({ count }: Readonly<CountBadgeCellProps>) {
+    return <span className="status-badge primary">{count}</span>;
+}
+
+interface TeamMembersTableProps {
+    readonly members: readonly TeamUser[];
+    readonly isLoading: boolean;
+    readonly selectedIds: readonly number[];
+    readonly emptyLabel: string;
+    readonly onSelectAll: () => void;
+    readonly onSelectOne: (id: number) => void;
+    readonly isAllSelected: boolean;
+}
+
+function TeamMembersTable({
+    members,
+    isLoading,
+    selectedIds,
+    emptyLabel,
+    onSelectAll,
+    onSelectOne,
+    isAllSelected,
+}: Readonly<TeamMembersTableProps>) {
+    if (isLoading) {
+        return (
+            <div className="text-center py-3">
+                <small className="text-muted">Loading...</small>
+            </div>
+        );
+    }
+
+    const hasMembers = members.length > 0;
+    if (!hasMembers) {
+        return (
+            <div className="text-center py-3 border rounded">
+                <small className="text-muted">{emptyLabel}</small>
+            </div>
+        );
+    }
+
+    return (
+        <Card>
+            <Card.Body className="p-0">
+                <table className="table table-hover table-sm mb-0 w-100">
+                    <thead className="table-light">
+                        <tr>
+                            <th style={{ width: '40px' }}>
+                                <input
+                                    type="checkbox"
+                                    checked={isAllSelected}
+                                    onChange={onSelectAll}
+                                    title="Select All"
+                                />
+                            </th>
+                            <th>Name</th>
+                            <th>Extension</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {members.map((member) => (
+                            <tr key={member.id}>
+                                <td>
+                                    <input
+                                        type="checkbox"
+                                        checked={selectedIds.includes(member.id)}
+                                        onChange={() => onSelectOne(member.id)}
+                                    />
+                                </td>
+                                <td>{member.name || 'N/A'}</td>
+                                <td title={member.phone || 'N/A'}>{member.phone || 'N/A'}</td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </Card.Body>
+        </Card>
+    );
+}
+
+// ─── Main Component ───────────────────────────────────────────────────────────
 
 const Teams = () => {
     const { data: session } = useSession();
-   
-    const columns: Column[] = [
-        { key: 'Name', name: 'Name', selector: (row: any) => row.name, sortable: true },
 
-        { key: 'Assigned Modules', name: 'Assigned Modules', selector: (row: any) => row.module_names?.join(', ') || '', sortable: true,
-            cell: (props: any) => (
-                <div>
-                    {props?.module_names && props.module_names.length > 0 ? (
-                        <div className="d-flex flex-wrap gap-1">
-                            {props.module_names.map((moduleName: string, index: number) => (
-                                <span key={`${moduleName}-${index}`} className="status-badge primary">
-                                    {moduleName}
-                                </span>
-                            ))}
-                        </div>
-                    ) : (
-                        <span className="status-badge info">Modules not assigned</span>
-                    )}
-                </div>
-            )
-        },
-        { key: 'owner_count', name: 'Assigned Owners', selector: (row: any) => row.owner_count, sortable: true,
-            cell: (props: any) => (
-                <div>
-                    <span className="status-badge primary">
-                        {props?.owner_count}
-                    </span>
-                </div>
-            )
-        },
-        { key: 'assigned_user_count', name: 'Assigned Users', selector: (row: any) => row.assigned_user_count, sortable: true,
-            cell: (props: any) => (
-                <div>
-                    <span className="status-badge primary">
-                        {props.assigned_user_count}
-                    </span>
-                </div>
-            )
-         },
-       
+    // ── Pagination & search state ──
+    const [currentPage, setCurrentPage] = useState(1);
+    const [rowsPerPage, setRowsPerPage] = useState(15);
+    const [searchValue, setSearchValue] = useState('');
+    const [totalRows, setTotalRows] = useState(0);
+    const [tableData, setTableData] = useState<TeamRow[]>([]);
+    const [isTableLoading, setIsTableLoading] = useState(false);
+    const [refreshKey, setRefreshKey] = useState(0);
 
-        ...(session?.user?.permissions?.includes('edit-teams') || session?.user?.permissions?.includes('delete-teams') || session?.user?.permissions?.includes('assign-users-to-teams') || session?.user?.permissions?.includes('assign-modules-to-teams') ? [
-            {
-                key: 'Action',
-                name: 'Actions',
-                selector: (row: any) => row.id,
-                sortable: false,
-                cell: (props: any) => (
-                    <div className="d-flex gap-2">
-                        {session?.user?.permissions?.includes('edit-teams') && (
-                            <Button variant="light" className="btn-action-style-2 p-1 text-primary" title="Edit" onClick={() => handleEditTeam(props)}>
-                                <Edit size={16} />
-                            </Button>
-                        )}
-                        {(session?.user?.permissions?.includes('edit-teams') || session?.user?.permissions?.includes('remove-teams-groups')) && (
-                            <Button variant="light" className="btn-action-style-2 p-1 text-success" title="Assign Users" onClick={() => handleAssignUsers(props)}>
-                                <UserPlus size={16} />
-                            </Button>
-                        )}
-                       
-                        {session?.user?.permissions?.includes('edit-teams') && (
-                            <Button variant="light" className="btn-action-style-2 p-1 text-warning" title="Assign Modules" onClick={() => handleAssignModules(props)}>
-                                <Package size={16} />
-                            </Button>
-                        )}
-                        {session?.user?.permissions?.includes('delete-teams') && (
-                            <Button variant="light" className="btn-action-style-2 p-1 text-danger" title="Delete" onClick={() => handleDeleteTeam(props)}>
-                                <Trash2 size={16} />
-                            </Button>
-                        )}
-                    </div>
-                )
-            }
-        ] : [])
-    ];
+    // ── Success modal ──
+    const [showSuccessfulModal, setShowSuccessfulModal] = useState(false);
+    const [successModalTitle, setSuccessModalTitle] = useState('');
+    const [successModalDescription, setSuccessModalDescription] = useState('');
 
-    const [refreshKey, setRefreshKey] = useState<number>(0);
-    const [currentFilters] = useState({});
+    // ── Selected team: use 0 as "none" to avoid number | null throughout ──
+    const [selectedTeamId, setSelectedTeamId] = useState<number>(0);
+    const [selectedTeamName, setSelectedTeamName] = useState<string>('');
 
-    // Memoize filters to prevent unnecessary re-renders when object reference changes but values are the same
+    // ── Edit team modal ──
+    const [showEditTeamModal, setShowEditTeamModal] = useState(false);
+    const [isLoadingUpdateTeam, setIsLoadingUpdateTeam] = useState(false);
+
+    // ── Delete team modal ──
+    const [showDeleteTeamModal, setShowDeleteTeamModal] = useState(false);
+    const [isLoadingDeleteTeam, setIsLoadingDeleteTeam] = useState(false);
+
+    // ── Create team modal ──
+    const [showCreateTeamModal, setShowCreateTeamModal] = useState(false);
+    const [newTeamName, setNewTeamName] = useState('');
+    const [isLoadingCreateTeam, setIsLoadingCreateTeam] = useState(false);
+
+    // ── Assign users modal ──
+    const [showAssignUsersModal, setShowAssignUsersModal] = useState(false);
+    const [teamUsers, setTeamUsers] = useState<TeamUser[]>([]);
+    const [teamOwners, setTeamOwners] = useState<TeamUser[]>([]);
+    const [selectedUsersToAssign, setSelectedUsersToAssign] = useState<string[]>([]);
+    const [selectedOwnersToAssign, setSelectedOwnersToAssign] = useState<string[]>([]);
+    const [selectedUsersToRemove, setSelectedUsersToRemove] = useState<number[]>([]);
+    const [selectedOwnersToRemove, setSelectedOwnersToRemove] = useState<number[]>([]);
+    const [showRemoveUsersConfirmModal, setShowRemoveUsersConfirmModal] = useState(false);
+    const [showRemoveOwnersConfirmModal, setShowRemoveOwnersConfirmModal] = useState(false);
+    const [allUsers, setAllUsers] = useState<AllUser[]>([]);
+    const [isLoadingUsers, setIsLoadingUsers] = useState(false);
+    const [isLoadingTeamUsers, setIsLoadingTeamUsers] = useState(false);
+    const [isLoadingAssignUsers, setIsLoadingAssignUsers] = useState(false);
+    const [isLoadingRemoveUsers, setIsLoadingRemoveUsers] = useState(false);
+    const [ownerSearchInput, setOwnerSearchInput] = useState('');
+    const [userSearchInput, setUserSearchInput] = useState('');
+
+    // ── Assign modules modal ──
+    const [showAssignModulesModal, setShowAssignModulesModal] = useState(false);
+    const [teamModules, setTeamModules] = useState<TeamModule[]>([]);
+    const [selectedModulesToAssign, setSelectedModulesToAssign] = useState<number[]>([]);
+    const [allModules, setAllModules] = useState<any[]>([]);
+    const [isLoadingModules, setIsLoadingModules] = useState(false);
+    const [isLoadingTeamModules, setIsLoadingTeamModules] = useState(false);
+    const [isLoadingAssignModules, setIsLoadingAssignModules] = useState(false);
+    const [isLoadingRemoveModule, setIsLoadingRemoveModule] = useState(false);
+
+    // ── Stable empty-filters ref (no filters on this page) ──
     const prevFiltersStringRef = useRef<string>('');
-    const prevFiltersRef = useRef<any>({});
-    
-    const memoizedFilters = useMemo(() => {
-        const filtersString = JSON.stringify(currentFilters || {});
-        // Only update if the stringified filters actually changed
-        if (filtersString !== prevFiltersStringRef.current) {
-            prevFiltersStringRef.current = filtersString;
-            prevFiltersRef.current = currentFilters || {};
-            return currentFilters || {};
+    const prevFiltersRef = useRef<Record<string, unknown>>({});
+    const currentFilters = useMemo<Record<string, unknown>>(() => {
+        const str = JSON.stringify({});
+        if (str !== prevFiltersStringRef.current) {
+            prevFiltersStringRef.current = str;
+            prevFiltersRef.current = {};
         }
-        // Return the previous reference to maintain stability
         return prevFiltersRef.current;
-    }, [currentFilters]);
+    }, []);
 
-    const fetchTeams = useCallback(
-        async (page = 1, perPage = 15, search = "") => {
-            return await ListTeams({ page, perPage, search, filters: memoizedFilters });
+    // ── Data fetching ──
+    const loadTeams = useCallback(
+        async (page: number, perPage: number, search: string) => {
+            setIsTableLoading(true);
+            try {
+                const response = (await ListTeams({
+                    page,
+                    perPage,
+                    search,
+                    filters: currentFilters,
+                })) as TeamsApiResponse;
+                setTableData(response?.data ?? []);
+                setTotalRows(response?.total ?? 0);
+            } catch {
+                toast.error('Failed to load teams');
+            } finally {
+                setIsTableLoading(false);
+            }
         },
-        [memoizedFilters]
+        [currentFilters],
     );
 
+    useEffect(() => {
+        loadTeams(currentPage, rowsPerPage, searchValue);
+    }, [currentPage, rowsPerPage, searchValue, refreshKey, loadTeams]);
 
-    
-    const [showSuccessfulModal, setShowSuccessfulModal] = useState(false)
-    const [successModalTitle, setSuccessModalTitle] = useState('')
-    const [successModalDescription, setSuccessModalDescription] = useState('')
-    
-    const [selectedTeam, setSelectedTeam] = useState<any>(null);
-    const [selectedTeamName, setSelectedTeamName] = useState<any>(null);
-    const [showEditTeamModal, setShowEditTeamModal] = useState<boolean>(false);
-    const [isLoadingUpdateTeam, setIsLoadingUpdateTeam] = useState<boolean>(false);
+    const triggerRefresh = useCallback(() => setRefreshKey((prev) => prev + 1), []);
 
-    const handleEditTeam = (props: any) => {
-        setSelectedTeam(props.id);
-        setSelectedTeamName(props.name);
+    const showSuccess = useCallback((title: string, description: string) => {
+        setSuccessModalTitle(title);
+        setSuccessModalDescription(description);
+        setTimeout(() => setShowSuccessfulModal(true), 100);
+    }, []);
+
+    // ── Edit team ──
+    const handleEditTeam = useCallback((row: TeamRow) => {
+        setSelectedTeamId(row.id);
+        setSelectedTeamName(row.name);
         setShowEditTeamModal(true);
-    };
+    }, []);
 
     const handleSubmitEditTeam = async () => {
         setIsLoadingUpdateTeam(true);
         try {
-            const response = await updateTeam(selectedTeam, selectedTeamName);
-            if(response){
-                setSelectedTeam(null);
-                setSelectedTeamName(null);
+            const response = await updateTeam(selectedTeamId, selectedTeamName);
+            if (response) {
+                setSelectedTeamId(0);
+                setSelectedTeamName('');
                 setShowEditTeamModal(false);
-                setSuccessModalTitle('Team Updated')
-                setSuccessModalDescription('Team has been updated successfully');
-                setTimeout(() => {
-                    setShowSuccessfulModal(true);
-                }, 100);
-                setRefreshKey(prev => prev + 1); // Trigger refresh
+                showSuccess('Team Updated', 'Team has been updated successfully');
+                triggerRefresh();
             }
-        } catch (error) {
-            console.error('Error updating team:', error);
+        } catch {
             toast.error('Failed to update team');
         } finally {
             setIsLoadingUpdateTeam(false);
         }
     };
 
-    const [showDeleteTeamModal, setShowDeleteTeamModal] = useState<boolean>(false);
-    const [isLoadingDeleteTeam, setIsLoadingDeleteTeam] = useState<boolean>(false);
-    
-    const handleDeleteTeam = (props: any) => {
-        setSelectedTeam(props.id);
-        setSelectedTeamName(props.name);
+    // ── Delete team ──
+    const handleDeleteTeam = useCallback((row: TeamRow) => {
+        setSelectedTeamId(row.id);
+        setSelectedTeamName(row.name);
         setShowDeleteTeamModal(true);
-    };
+    }, []);
 
     const handleSubmitDeleteTeam = async () => {
         setIsLoadingDeleteTeam(true);
         try {
-            const response = await deleteTeam(selectedTeam);
-            if(response){
-                setSelectedTeam(null);
-                setSelectedTeamName(null);
+            const response = await deleteTeam(selectedTeamId);
+            if (response) {
+                setSelectedTeamId(0);
+                setSelectedTeamName('');
                 setShowDeleteTeamModal(false);
-                setSuccessModalTitle('Team Deleted')
-                setSuccessModalDescription('Team has been deleted successfully');
-                setTimeout(() => {
-                    setShowSuccessfulModal(true);
-                }, 100);
-                setRefreshKey(prev => prev + 1); 
+                showSuccess('Team Deleted', 'Team has been deleted successfully');
+                triggerRefresh();
             }
-        } catch (error) {
-            console.error('Error deleting team:', error);
+        } catch {
             toast.error('Failed to delete team');
         } finally {
             setIsLoadingDeleteTeam(false);
         }
     };
 
-    const [showCreateTeamModal, setShowCreateTeamModal] = useState<boolean>(false);
-    const [newTeamName, setNewTeamName] = useState<string>("");
-    const [isLoadingCreateTeam, setIsLoadingCreateTeam] = useState<boolean>(false);
-
+    // ── Create team ──
     const handleSubmitCreateTeam = async () => {
         setIsLoadingCreateTeam(true);
         try {
             const response = await addTeam(newTeamName);
-            if(response){
-                setNewTeamName("");
+            if (response) {
+                setNewTeamName('');
                 setShowCreateTeamModal(false);
-                
-                setSuccessModalTitle('Team Created')
-                setSuccessModalDescription('New Team has been added successfully');
-                setTimeout(() => {
-                    setShowSuccessfulModal(true);
-                }, 100);
-
-                setRefreshKey(prev => prev + 1); 
+                showSuccess('Team Created', 'New Team has been added successfully');
+                triggerRefresh();
             }
-        } catch (error) {
-            console.error('Error creating team:', error);
+        } catch {
             toast.error('Failed to create team');
         } finally {
             setIsLoadingCreateTeam(false);
         }
     };
 
-    // User Assignment State
-    const [showAssignUsersModal, setShowAssignUsersModal] = useState<boolean>(false);
-    const [teamUsers, setTeamUsers] = useState<any[]>([]);
-    const [teamOwners, setTeamOwners] = useState<any[]>([]);
-    const [selectedUsersToAssign, setSelectedUsersToAssign] = useState<string[]>([]);
-    const [selectedOwnersToAssign, setSelectedOwnersToAssign] = useState<string[]>([]);
-    const [selectedUsersToRemove, setSelectedUsersToRemove] = useState<number[]>([]);
-    const [selectedOwnersToRemove, setSelectedOwnersToRemove] = useState<number[]>([]);
-    const [showRemoveUsersConfirmModal, setShowRemoveUsersConfirmModal] = useState<boolean>(false);
-    const [showRemoveOwnersConfirmModal, setShowRemoveOwnersConfirmModal] = useState<boolean>(false);
-    const [allUsers, setAllUsers] = useState<any[]>([]);
-    const [isLoadingUsers, setIsLoadingUsers] = useState<boolean>(false);
-    const [isLoadingTeamUsers, setIsLoadingTeamUsers] = useState<boolean>(false);
-    const [isLoadingAssignUsers, setIsLoadingAssignUsers] = useState<boolean>(false);
-    const [isLoadingRemoveUsers, setIsLoadingRemoveUsers] = useState<boolean>(false);
-    const [ownerSearchInput, setOwnerSearchInput] = useState<string>('');
-    const [userSearchInput, setUserSearchInput] = useState<string>('');
+    // ── Users fetching ──
+    const fetchAllUsers = useCallback(async (): Promise<AllUser[]> => {
+        const alreadyLoaded = allUsers.length > 0 && !isLoadingUsers;
+        if (alreadyLoaded) return allUsers;
+        setIsLoadingUsers(true);
+        try {
+            const response = await getParentUsers();
+            if (Array.isArray(response)) {
+                const users = response as AllUser[];
+                setAllUsers(users);
+                return users;
+            }
+            return [];
+        } catch {
+            return [];
+        } finally {
+            setIsLoadingUsers(false);
+        }
+    }, [allUsers, isLoadingUsers]);
 
-    const handleAssignUsers = async (props: any) => {
-        setSelectedTeam(props.id);
-        setSelectedTeamName(props.name);
-        setShowAssignUsersModal(true);
-        setSelectedUsersToAssign([]);
-        setSelectedOwnersToAssign([]);
-        setOwnerSearchInput('');
-        setUserSearchInput('');
-        // Load all users when modal opens to ensure value mapping works
-        await fetchAllUsers();
-        await fetchTeamUsers(props.id);
-    };
-
-    const fetchTeamUsers = async (teamId: number) => {
+    const fetchTeamUsers = useCallback(async (teamId: number) => {
         setIsLoadingTeamUsers(true);
         try {
-            const response = await getTeamUsers(teamId);
-            // Handle new API response structure
-            if (response && typeof response === 'object' && !Array.isArray(response)) {
-                setTeamUsers(response.team_member || []);
-                setTeamOwners(response.team_owners || []);
-            } else if (Array.isArray(response)) {
-                // Fallback for old response format
-                setTeamUsers(response || []);
+            const response = (await getTeamUsers(teamId)) as TeamUsersResponse | TeamUser[];
+            if (Array.isArray(response)) {
+                setTeamUsers(response);
                 setTeamOwners([]);
+            } else if (response && typeof response === 'object') {
+                setTeamUsers(response.team_member ?? []);
+                setTeamOwners(response.team_owners ?? []);
             } else {
                 setTeamUsers([]);
                 setTeamOwners([]);
             }
-        } catch (error) {
-            console.error('Error fetching team users:', error);
+        } catch {
             setTeamUsers([]);
             setTeamOwners([]);
         } finally {
             setIsLoadingTeamUsers(false);
         }
-    };
+    }, []);
 
-    const fetchAllUsers = async (): Promise<any[]> => {
-        if (allUsers.length > 0 && !isLoadingUsers) return allUsers; // Already loaded
-        setIsLoadingUsers(true);
-        try {
-            const response = await getParentUsers();
-            if (response && Array.isArray(response)) {
-                setAllUsers(response);
-                return response;
-            }
-            return [];
-        } catch (error) {
-            console.error('Error fetching users:', error);
-            return [];
-        } finally {
-            setIsLoadingUsers(false);
-        }
-    };
-
-    const loadUserOptions = (inputValue: string): Promise<Array<{ value: number; label: string }>> => {
-        const trimmed = (inputValue || '').trim();
-        if (trimmed.length < 2) {
-            return Promise.resolve([]);
-        }
-        
-        // Ensure users are loaded
-        const ensureData = allUsers.length === 0 && !isLoadingUsers
-            ? fetchAllUsers()
-            : Promise.resolve(allUsers);
-        
-        return ensureData.then((users) => {
-            // Use the returned users or fallback to state
-            const usersToSearch = users && users.length > 0 ? users : allUsers;
-            
-            if (usersToSearch.length === 0) {
-                return [];
-            }
-            
-            const lower = trimmed.toLowerCase();
-            const assignedUserIds = new Set([...teamUsers.map(u => u.id), ...teamOwners.map(u => u.id)]);
-            const selectedOwnerIds = new Set(selectedOwnersToAssign.map(id => Number.parseInt(id, 10)));
-            const selectedUserIds = new Set(selectedUsersToAssign.map(id => Number.parseInt(id, 10)));
-            
-            const options = usersToSearch
-                .filter((user) => !assignedUserIds.has(user.id))
-                .filter((user) => !selectedOwnerIds.has(user.id))
-                .filter((user) => !selectedUserIds.has(user.id))
-                .filter((user) => {
-                    const nameMatch = user.name && user.name.toLowerCase().includes(lower);
-                    const usernameMatch = user.username && user.username.toLowerCase().includes(lower);
-                    const emailMatch = user.email && user.email.toLowerCase().includes(lower);
-                    return nameMatch || usernameMatch || emailMatch;
-                })
-                .slice(0, 200)
-                .map((user) => ({ 
-                    value: user.id, 
-                    label: `${user.name || 'Unknown'} (${user.username || user.email || 'N/A'})` 
-                }));
-            return options;
-        });
-    };
-
-    const loadOwnerOptions = (inputValue: string): Promise<Array<{ value: number; label: string }>> => {
-        const trimmed = (inputValue || '').trim();
-        
-        // Ensure users are loaded
-        const ensureData = allUsers.length === 0 && !isLoadingUsers
-            ? fetchAllUsers()
-            : Promise.resolve(allUsers);
-        
-        return ensureData.then((users) => {
-            // Use the returned users or fallback to state
-            const usersToSearch = users && users.length > 0 ? users : allUsers;
-            
-            if (usersToSearch.length === 0) {
-                return [];
-            }
-            
-            const assignedUserIds = new Set([...teamUsers.map(u => u.id), ...teamOwners.map(u => u.id)]);
-            const selectedUserIds = new Set(selectedUsersToAssign.map(id => Number.parseInt(id, 10)));
-            const selectedOwnerIds = new Set(selectedOwnersToAssign.map(id => Number.parseInt(id, 10)));
-            
-            let filteredUsers = usersToSearch
-                .filter((user) => !assignedUserIds.has(user.id))
-                .filter((user) => !selectedUserIds.has(user.id))
-                .filter((user) => !selectedOwnerIds.has(user.id));
-            
-            // If there's a search input, filter by it
-            if (trimmed.length > 0) {
-                const lower = trimmed.toLowerCase();
-                filteredUsers = filteredUsers.filter((user) => {
-                    const nameMatch = user.name && user.name.toLowerCase().includes(lower);
-                    const usernameMatch = user.username && user.username.toLowerCase().includes(lower);
-                    const emailMatch = user.email && user.email.toLowerCase().includes(lower);
-                    return nameMatch || usernameMatch || emailMatch;
-                });
-            }
-            
-            const options = filteredUsers
-                .slice(0, 200)
-                .map((user) => ({ 
-                    value: user.id, 
-                    label: `${user.name || 'Unknown'} (${user.username || user.email || 'N/A'})` 
-                }));
-            return options;
-        });
-    };
-
-    const handleUserSelectionChange = (selectedOptions: MultiValue<SelectCheckBoxOption>) => {
-        const values = (selectedOptions || []).map((opt) => opt.value.toString());
-        setSelectedUsersToAssign(values);
-    };
-
-    const handleOwnerSelectionChange = (selectedOptions: MultiValue<SelectCheckBoxOption>) => {
-        const values = (selectedOptions || []).map((opt) => opt.value.toString());
-        setSelectedOwnersToAssign(values);
-    };
+    // ── Assign users ──
+    const handleAssignUsers = useCallback(
+        async (row: TeamRow) => {
+            setSelectedTeamId(row.id);
+            setSelectedTeamName(row.name);
+            setSelectedUsersToAssign([]);
+            setSelectedOwnersToAssign([]);
+            setOwnerSearchInput('');
+            setUserSearchInput('');
+            setShowAssignUsersModal(true);
+            await fetchAllUsers();
+            await fetchTeamUsers(row.id);
+        },
+        [fetchAllUsers, fetchTeamUsers],
+    );
 
     const handleSubmitAssignUsers = async () => {
-        if (selectedUsersToAssign.length === 0 && selectedOwnersToAssign.length === 0) {
+        const hasNoSelection = selectedUsersToAssign.length === 0 && selectedOwnersToAssign.length === 0;
+        if (hasNoSelection) {
             toast.error('Please select at least one user or owner to assign');
             return;
         }
-
         setIsLoadingAssignUsers(true);
         try {
-            const userIds = selectedUsersToAssign.map(id => Number.parseInt(id, 10));
-            const ownerIds = selectedOwnersToAssign.length > 0 
-                ? selectedOwnersToAssign.map(id => Number.parseInt(id, 10))
-                : undefined;
-            const response = await assignUsersToTeam(selectedTeam, userIds, ownerIds);
-            
+            const userIds = selectedUsersToAssign.map(Number);
+            const ownerIds = selectedOwnersToAssign.length > 0 ? selectedOwnersToAssign.map(Number) : undefined;
+            const response = await assignUsersToTeam(selectedTeamId, userIds, ownerIds);
             if (response) {
                 setSelectedUsersToAssign([]);
                 setSelectedOwnersToAssign([]);
-                await fetchTeamUsers(selectedTeam);
-                
-                // Close the assign users modal
-                //handleCloseAssignUsersModal();
-                
-                setRefreshKey(prev => prev + 1);
+                await fetchTeamUsers(selectedTeamId);
+                triggerRefresh();
             }
-        } catch (error) {
-            console.error('Error assigning users:', error);
+        } catch {
             toast.error('Failed to assign users');
         } finally {
             setIsLoadingAssignUsers(false);
-        }
-    };
-
-    const handleRemoveUser = async (userId: number) => {
-        setIsLoadingRemoveUsers(true);
-        try {
-            // Check if user is an owner
-            const isOwner = teamOwners.some(owner => owner.id === userId);
-            
-            const response = isOwner 
-                ? await removeOwnersFromTeam(selectedTeam, [userId])
-                : await removeUsersFromTeam(selectedTeam, [userId]);
-                
-            if (response) {
-                await fetchTeamUsers(selectedTeam);
-                setRefreshKey(prev => prev + 1);
-            }
-        } catch (error) {
-            console.error('Error removing user:', error);
-            toast.error('Failed to remove user');
-        } finally {
-            setIsLoadingRemoveUsers(false);
-        }
-    };
-
-    const handleSelectUserToRemove = (userId: number, isOwner: boolean) => {
-        if (isOwner) {
-            setSelectedOwnersToRemove(prev => 
-                prev.includes(userId) 
-                    ? prev.filter(id => id !== userId)
-                    : [...prev, userId]
-            );
-        } else {
-            setSelectedUsersToRemove(prev => 
-                prev.includes(userId) 
-                    ? prev.filter(id => id !== userId)
-                    : [...prev, userId]
-            );
-        }
-    };
-
-    const handleSelectAllUsersToRemove = (isOwner: boolean) => {
-        if (isOwner) {
-            const allOwnerIds = teamOwners.map(owner => owner.id);
-            setSelectedOwnersToRemove(prev => 
-                prev.length === allOwnerIds.length ? [] : allOwnerIds
-            );
-        } else {
-            const allUserIds = teamUsers.map(user => user.id);
-            setSelectedUsersToRemove(prev => 
-                prev.length === allUserIds.length ? [] : allUserIds
-            );
-        }
-    };
-
-    const handleConfirmRemoveUsers = async () => {
-        if (selectedUsersToRemove.length === 0 && selectedOwnersToRemove.length === 0) {
-            toast.error('Please select at least one user or owner to remove');
-            return;
-        }
-
-        setIsLoadingRemoveUsers(true);
-        try {
-            let success = true;
-
-            // Remove owners
-            if (selectedOwnersToRemove.length > 0) {
-                const response = await removeOwnersFromTeam(selectedTeam, selectedOwnersToRemove);
-                if (!response) {
-                    success = false;
-                }
-            }
-
-            // Remove users
-            if (selectedUsersToRemove.length > 0) {
-                const response = await removeUsersFromTeam(selectedTeam, selectedUsersToRemove);
-                if (!response) {
-                    success = false;
-                }
-            }
-
-            if (success) {
-                setSelectedUsersToRemove([]);
-                setSelectedOwnersToRemove([]);
-                setShowRemoveUsersConfirmModal(false);
-                setShowRemoveOwnersConfirmModal(false);
-                await fetchTeamUsers(selectedTeam);
-                setRefreshKey(prev => prev + 1);
-            }
-        } catch (error) {
-            console.error('Error removing users:', error);
-            toast.error('Failed to remove users');
-        } finally {
-            setIsLoadingRemoveUsers(false);
         }
     };
 
@@ -533,108 +478,140 @@ const Teams = () => {
         setSelectedOwnersToRemove([]);
         setTeamUsers([]);
         setTeamOwners([]);
-        setSelectedTeam(null);
-        setSelectedTeamName(null);
+        setSelectedTeamId(0);
+        setSelectedTeamName('');
         setOwnerSearchInput('');
         setUserSearchInput('');
     };
 
-    // Module Assignment State
-    const [showAssignModulesModal, setShowAssignModulesModal] = useState<boolean>(false);
-    const [teamModules, setTeamModules] = useState<any[]>([]);
-    const [selectedModulesToAssign, setSelectedModulesToAssign] = useState<number[]>([]);
-    const [allModules, setAllModules] = useState<any[]>([]);
-    const [isLoadingModules, setIsLoadingModules] = useState<boolean>(false);
-    const [isLoadingTeamModules, setIsLoadingTeamModules] = useState<boolean>(false);
-    const [isLoadingAssignModules, setIsLoadingAssignModules] = useState<boolean>(false);
-    const [isLoadingRemoveModule, setIsLoadingRemoveModule] = useState<boolean>(false);
-
-    const handleAssignModules = async (props: any) => {
-        setSelectedTeam(props.id);
-        setSelectedTeamName(props.name);
-        setShowAssignModulesModal(true);
-        setSelectedModulesToAssign([]);
-        await fetchAllModules();
-        await fetchTeamModules(props.id);
+    // ── Remove users / owners ──
+    const handleToggleOwnerRemove = (userId: number) => {
+        setSelectedOwnersToRemove((prev) =>
+            prev.includes(userId) ? prev.filter((id) => id !== userId) : [...prev, userId],
+        );
     };
 
-    const fetchTeamModules = async (teamId: number) => {
-        setIsLoadingTeamModules(true);
+    const handleToggleMemberRemove = (userId: number) => {
+        setSelectedUsersToRemove((prev) =>
+            prev.includes(userId) ? prev.filter((id) => id !== userId) : [...prev, userId],
+        );
+    };
+
+    const handleSelectAllOwnersToRemove = () => {
+        const allOwnerIds = teamOwners.map((o) => o.id);
+        setSelectedOwnersToRemove((prev) => (prev.length === allOwnerIds.length ? [] : allOwnerIds));
+    };
+
+    const handleSelectAllMembersToRemove = () => {
+        const allUserIds = teamUsers.map((u) => u.id);
+        setSelectedUsersToRemove((prev) => (prev.length === allUserIds.length ? [] : allUserIds));
+    };
+
+    const handleConfirmRemoveUsers = async () => {
+        const hasNoSelection = selectedUsersToRemove.length === 0 && selectedOwnersToRemove.length === 0;
+        if (hasNoSelection) {
+            toast.error('Please select at least one user or owner to remove');
+            return;
+        }
+        setIsLoadingRemoveUsers(true);
         try {
-            const modules = await getTeamModules(teamId);
-            setTeamModules(modules || []);
-            // Pre-select currently assigned modules
-            if (modules && modules.length > 0) {
-                const moduleIds = modules.map((m: any) => m.id || m.module_id).filter((id: any) => id);
-                setSelectedModulesToAssign(moduleIds);
+            let success = true;
+            if (selectedOwnersToRemove.length > 0) {
+                const res = await removeOwnersFromTeam(selectedTeamId, selectedOwnersToRemove);
+                if (!res) success = false;
             }
-            return modules || [];
-        } catch (error) {
-            console.error('Error fetching team modules:', error);
-            setTeamModules([]);
-            return [];
+            if (selectedUsersToRemove.length > 0) {
+                const res = await removeUsersFromTeam(selectedTeamId, selectedUsersToRemove);
+                if (!res) success = false;
+            }
+            if (success) {
+                setSelectedUsersToRemove([]);
+                setSelectedOwnersToRemove([]);
+                setShowRemoveUsersConfirmModal(false);
+                setShowRemoveOwnersConfirmModal(false);
+                await fetchTeamUsers(selectedTeamId);
+                triggerRefresh();
+            }
+        } catch {
+            toast.error('Failed to remove users');
         } finally {
-            setIsLoadingTeamModules(false);
+            setIsLoadingRemoveUsers(false);
         }
     };
 
-    const fetchAllModules = async () => {
-        if (allModules.length > 0) return; // Already loaded
+    // ── Modules ──
+    const fetchAllModules = useCallback(async () => {
+        const alreadyLoaded = allModules.length > 0;
+        if (alreadyLoaded) return;
         setIsLoadingModules(true);
         try {
             const modules = await getModules();
-            if (modules && Array.isArray(modules)) {
-                setAllModules(modules);
-            }
-        } catch (error) {
-            console.error('Error fetching modules:', error);
+            if (Array.isArray(modules)) setAllModules(modules);
+        } catch {
+            // silent — background prefetch
         } finally {
             setIsLoadingModules(false);
         }
-    };
+    }, [allModules]);
 
-    const handleModuleSelectionChange = (selectedOptions: MultiValue<SelectCheckBoxOption>) => {
-        const values = (selectedOptions || []).map((opt) => opt.value as number);
-        setSelectedModulesToAssign(values);
-    };
+    const fetchTeamModules = useCallback(async (teamId: number) => {
+        setIsLoadingTeamModules(true);
+        try {
+            const modules = (await getTeamModules(teamId)) as TeamModule[];
+            setTeamModules(modules ?? []);
+            if (modules?.length > 0) {
+                const ids = modules
+                    .map(getModuleId)
+                    .filter((id): id is number => id !== undefined);
+                setSelectedModulesToAssign(ids);
+            }
+        } catch {
+            setTeamModules([]);
+        } finally {
+            setIsLoadingTeamModules(false);
+        }
+    }, []);
+
+    const handleAssignModules = useCallback(
+        async (row: TeamRow) => {
+            setSelectedTeamId(row.id);
+            setSelectedTeamName(row.name);
+            setSelectedModulesToAssign([]);
+            setShowAssignModulesModal(true);
+            await fetchAllModules();
+            await fetchTeamModules(row.id);
+        },
+        [fetchAllModules, fetchTeamModules],
+    );
 
     const handleSubmitAssignModules = async () => {
         if (selectedModulesToAssign.length === 0) {
             toast.error('Please select at least one module to assign');
             return;
         }
-
         setIsLoadingAssignModules(true);
         try {
             const selectedCount = selectedModulesToAssign.length;
-            const response = await updateTeamModules(selectedTeam, selectedModulesToAssign);
-            
+            const response = await updateTeamModules(selectedTeamId, selectedModulesToAssign);
             if (response) {
-                // Clear selected modules immediately after successful submission
                 setSelectedModulesToAssign([]);
-                // Fetch updated team modules but don't re-populate selectedModulesToAssign since we're closing
                 setIsLoadingTeamModules(true);
                 try {
-                    const modules = await getTeamModules(selectedTeam);
-                    setTeamModules(modules || []);
-                } catch (error) {
-                    console.error('Error fetching team modules:', error);
+                    const modules = (await getTeamModules(selectedTeamId)) as TeamModule[];
+                    setTeamModules(modules ?? []);
+                } catch {
                     setTeamModules([]);
                 } finally {
                     setIsLoadingTeamModules(false);
                 }
-                
-                setSuccessModalTitle('Modules Updated')
-                setSuccessModalDescription(`${selectedCount} module(s) have been assigned to the team successfully`);
-                // Close the assign modules modal
                 handleCloseAssignModulesModal();
-                setTimeout(() => {
-                    setShowSuccessfulModal(true);
-                }, 100);
-                setRefreshKey(prev => prev + 1);
+                showSuccess(
+                    'Modules Updated',
+                    `${selectedCount} module(s) have been assigned to the team successfully`,
+                );
+                triggerRefresh();
             }
-        } catch (error) {
-            console.error('Error assigning modules:', error);
+        } catch {
             toast.error('Failed to assign modules');
         } finally {
             setIsLoadingAssignModules(false);
@@ -644,18 +621,13 @@ const Teams = () => {
     const handleRemoveModule = async (moduleId: number) => {
         setIsLoadingRemoveModule(true);
         try {
-            const response = await removeModulesFromTeam(selectedTeam, [moduleId]);
+            const response = await removeModulesFromTeam(selectedTeamId, [moduleId]);
             if (response) {
-                await fetchTeamModules(selectedTeam);
-                setSuccessModalTitle('Module Removed')
-                setSuccessModalDescription('Module has been removed from the team successfully');
-                setTimeout(() => {
-                    setShowSuccessfulModal(true);
-                }, 100);
-                setRefreshKey(prev => prev + 1);
+                await fetchTeamModules(selectedTeamId);
+                showSuccess('Module Removed', 'Module has been removed from the team successfully');
+                triggerRefresh();
             }
-        } catch (error) {
-            console.error('Error removing module:', error);
+        } catch {
             toast.error('Failed to remove module');
         } finally {
             setIsLoadingRemoveModule(false);
@@ -666,103 +638,279 @@ const Teams = () => {
         setShowAssignModulesModal(false);
         setSelectedModulesToAssign([]);
         setTeamModules([]);
-        setSelectedTeam(null);
-        setSelectedTeamName(null);
+        setSelectedTeamId(0);
+        setSelectedTeamName('');
     };
 
-    // Prepare module options for Select component
-    const moduleOptions = useMemo(() => {
-        return allModules.map(module => ({
-            value: module.id,
-            label: module.name || `Module ${module.id}`
-        }));
-    }, [allModules]);
+    // ── Memoised options ──
+    const moduleOptions = useMemo(
+        () =>
+            allModules.map((m) => ({
+                value: m.id as number,
+                label: (m.name as string) || `Module ${m.id}`,
+            })),
+        [allModules],
+    );
 
-    // Prepare owner options for Select component - shows all available owners
-    const ownerOptions = useMemo(() => {
-        if (allUsers.length === 0) return [];
-        
-        const assignedUserIds = new Set([...teamUsers.map(u => u.id), ...teamOwners.map(u => u.id)]);
-        const selectedUserIds = new Set(selectedUsersToAssign.map(id => Number.parseInt(id, 10)));
-        
-        // Don't filter out selectedOwnerIds - keep them visible so user can see what's selected
-        return allUsers
-            .filter((user) => !assignedUserIds.has(user.id))
-            .filter((user) => !selectedUserIds.has(user.id)) // Only exclude if selected as regular user
-            .map((user) => ({ 
-                value: user.id, 
-                label: `${user.name || 'Unknown'} (${user.phone || user.email || 'N/A'})` 
-            }));
-    }, [allUsers, teamUsers, teamOwners, selectedUsersToAssign]);
+    const selectedOwnerIdSet = useMemo(
+        () => new Set(selectedOwnersToAssign.map(Number)),
+        [selectedOwnersToAssign],
+    );
 
-    // Prepare user options for Select component - shows all available users
-    const userOptions = useMemo(() => {
-        if (allUsers.length === 0) return [];
-        
-        const assignedUserIds = new Set([...teamUsers.map(u => u.id), ...teamOwners.map(u => u.id)]);
-        const selectedOwnerIds = new Set(selectedOwnersToAssign.map(id => Number.parseInt(id, 10)));
-        
-        // Don't filter out selectedUserIds - keep them visible so user can see what's selected
-        return allUsers
-            .filter((user) => !assignedUserIds.has(user.id))
-            .filter((user) => !selectedOwnerIds.has(user.id)) // Only exclude if selected as owner
-            .map((user) => ({ 
-                value: user.id, 
-                label: `${user.name || 'Unknown'} (${user.phone || user.email || 'N/A'})` 
-            }));
-    }, [allUsers, teamUsers, teamOwners, selectedOwnersToAssign]);
+    const selectedUserIdSet = useMemo(
+        () => new Set(selectedUsersToAssign.map(Number)),
+        [selectedUsersToAssign],
+    );
+
+    const ownerOptions = useMemo(
+        () => buildAvailableUserOptions(allUsers, teamUsers, teamOwners, selectedUserIdSet),
+        [allUsers, teamUsers, teamOwners, selectedUserIdSet],
+    );
+
+    const userOptions = useMemo(
+        () => buildAvailableUserOptions(allUsers, teamUsers, teamOwners, selectedOwnerIdSet),
+        [allUsers, teamUsers, teamOwners, selectedOwnerIdSet],
+    );
+
+    // ── Permissions ──
+    const perms = session?.user?.permissions ?? [];
+    const canEdit = perms.includes('edit-teams');
+    const canDelete = perms.includes('delete-teams');
+    const canAssignUsers = perms.includes('edit-teams') || perms.includes('remove-teams-groups');
+    const canAssignModules = perms.includes('edit-teams');
+    const canAdd = perms.includes('add-teams');
+    const hasAnyAction = canEdit || canDelete || canAssignUsers || canAssignModules;
+
+    // ── GenericTable columns ──
+    const columns = useMemo<TableColumn<TeamRow>[]>(
+        () => [
+            {
+                key: 'name',
+                label: 'Name',
+                sortable: true,
+                type: 'text',
+                accessor: (row) => row.name,
+            },
+            {
+                key: 'module_names',
+                label: 'Assigned Modules',
+                sortable: true,
+                accessor: (row) => row.module_names?.join(', ') || '',
+                render: (row) => <ModuleCell moduleNames={row.module_names} />,
+            },
+            {
+                key: 'owner_count',
+                label: 'Assigned Owners',
+                sortable: true,
+                accessor: (row) => row.owner_count,
+                render: (row) => <CountBadgeCell count={row.owner_count} />,
+            },
+            {
+                key: 'assigned_user_count',
+                label: 'Assigned Users',
+                sortable: true,
+                accessor: (row) => row.assigned_user_count,
+                render: (row) => <CountBadgeCell count={row.assigned_user_count} />,
+            },
+        ],
+        [],
+    );
+
+    // ── GenericTable actions ──
+    const actions = useMemo<TableAction<TeamRow>[]>(() => {
+        const list: TableAction<TeamRow>[] = [];
+
+        if (canEdit) {
+            list.push({
+                label: 'Edit',
+                icon: <Edit size={16} />,
+                variant: 'light',
+                className: 'btn-action-style-2 p-1 text-primary',
+                onClick: handleEditTeam,
+            });
+        }
+
+        if (canAssignUsers) {
+            list.push({
+                label: 'Assign Users',
+                icon: <UserPlus size={16} />,
+                variant: 'light',
+                className: 'btn-action-style-2 p-1 text-success',
+                onClick: handleAssignUsers,
+            });
+        }
+
+        if (canAssignModules) {
+            list.push({
+                label: 'Assign Modules',
+                icon: <Package size={16} />,
+                variant: 'light',
+                className: 'btn-action-style-2 p-1 text-warning',
+                onClick: handleAssignModules,
+            });
+        }
+
+        if (canDelete) {
+            list.push({
+                label: 'Delete',
+                icon: <Trash2 size={16} />,
+                variant: 'light',
+                className: 'btn-action-style-2 p-1 text-danger',
+                onClick: handleDeleteTeam,
+            });
+        }
+
+        return list;
+    }, [
+        canEdit,
+        canDelete,
+        canAssignUsers,
+        canAssignModules,
+        handleEditTeam,
+        handleAssignUsers,
+        handleAssignModules,
+        handleDeleteTeam,
+    ]);
+
+    // ── Handlers ──
+    const handlePaginationChange = (page: number, perPage: number) => {
+        setCurrentPage(page);
+        setRowsPerPage(perPage);
+    };
+
+    const handleSearchChange = (value: string) => {
+        setSearchValue(value);
+        setCurrentPage(1);
+    };
+
+    let assignedModulesContent: ReactElement;
+    if (isLoadingTeamModules) {
+        assignedModulesContent = (
+            <div className="text-center py-3">
+                <small className="text-muted">Loading modules...</small>
+            </div>
+        );
+    } else if (teamModules.length > 0) {
+        assignedModulesContent = (
+            <Card>
+                <Card.Body className="p-0">
+                    <div className="table-responsive p-0">
+                        <table className="table table-hover table-sm mb-0">
+                            <thead className="table-light">
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Description</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {teamModules.map((module) => {
+                                    const moduleId = getModuleId(module);
+                                    return (
+                                        <tr key={moduleId}>
+                                            <td>{module.name || 'N/A'}</td>
+                                            <td>{module.description || 'N/A'}</td>
+                                            <td>
+                                                <Button
+                                                    variant="outline-danger"
+                                                    size="sm"
+                                                    onClick={() => {
+                                                        if (moduleId !== undefined) {
+                                                            handleRemoveModule(moduleId);
+                                                        }
+                                                    }}
+                                                    title="Remove Module"
+                                                    className="p-1"
+                                                    disabled={isLoadingRemoveModule || isLoadingAssignModules}
+                                                >
+                                                    {isLoadingRemoveModule ? (
+                                                        <output
+                                                            className="spinner-border spinner-border-sm"
+                                                            aria-live="polite"
+                                                        >
+                                                            <span className="visually-hidden">
+                                                                Removing module...
+                                                            </span>
+                                                        </output>
+                                                    ) : (
+                                                        <Trash2 size={14} />
+                                                    )}
+                                                </Button>
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
+                    </div>
+                </Card.Body>
+            </Card>
+        );
+    } else {
+        assignedModulesContent = (
+            <div className="text-center py-3 border rounded">
+                <small className="text-muted">No modules assigned to this team yet.</small>
+            </div>
+        );
+    }
 
     return (
         <React.Fragment>
-            <BreadcrumbItem mainTitle="Controlhub" mainLink="/controlhub/teams" subTitle={HEADER_CONSTANTS.SUBMENU_LABELS.TEAMS} />
-            
+            <BreadcrumbItem
+                mainTitle="Controlhub"
+                mainLink="/controlhub/teams"
+                subTitle={HEADER_CONSTANTS.SUBMENU_LABELS.TEAMS}
+            />
 
             <Row className="mb-3">
-            <Col md={12}>
-                <div className="page-header-title style-2">
-                <Row className="d-flex justify-content-between align-items-center">
-                    <Col md={4}>
-                      
-                      {/* <h2 className="mb-0">{HEADER_CONSTANTS.SUBMENU_LABELS.TEAMS}</h2> */}
-                    </Col>
-
-
-                    <Col md={8} className="d-flex justify-content-end">
-                      
-                    <div className="action-buttons">
-                    
-                    {session?.user?.permissions?.includes('add-teams') && (
-                        <Button variant="primary"   onClick={() => setShowCreateTeamModal(true)}>Add Team</Button>
-                    )}
+                <Col md={12}>
+                    <div className="page-header-title style-2">
+                        <Row className="d-flex justify-content-between align-items-center">
+                            <Col md={4} />
+                            <Col md={8} className="d-flex justify-content-end">
+                                <div className="action-buttons">
+                                    {canAdd && (
+                                        <Button variant="primary" onClick={() => setShowCreateTeamModal(true)}>
+                                            Add Team
+                                        </Button>
+                                    )}
+                                </div>
+                            </Col>
+                        </Row>
                     </div>
-
-
-
-                    </Col>
-                  </Row>
-               
-                
-                </div>
-            </Col>
+                </Col>
             </Row>
 
+            {/* Main data table */}
+            <GenericTable<TeamRow>
+                data={tableData}
+                columns={columns}
+                loading={isTableLoading}
+                actions={actions}
+                showActions={hasAnyAction}
+                actionsLabel="Actions"
+                uniqueKey="id"
+                pagination={{
+                    currentPage,
+                    rowsPerPage,
+                    totalRows,
+                    pageSizeOptions: [15, 25, 50, 100],
+                }}
+                onPaginationChange={handlePaginationChange}
+                showToolbar
+                toolbar={{
+                    showSearch: true,
+                    searchValue,
+                    searchPlaceholder: 'Search teams...',
+                    onSearchChange: handleSearchChange,
+                }}
+                showToolbarActions={false}
+                emptyMessage="No teams found"
+                hover
+                size="md"
+            />
 
-
-
-            {/* {session?.user?.permissions?.includes('list-teams') && ( */}
-                 <GenericListPage
-                 columns={columns}
-                 fetchData={fetchTeams}
-                 title="Teams"
-                 searchPlaceholder="Search teams..."
-                 defaultPageSize={15}
-                 filters={memoizedFilters}
-                 refreshKey={refreshKey}
-                 search={true}
-                 tableStyle="table-style-2"
-             />
-            {/* )} */}
-
+            {/* ── Edit Team Modal ── */}
             <FormModal
                 show={showEditTeamModal}
                 onHide={() => setShowEditTeamModal(false)}
@@ -770,22 +918,31 @@ const Teams = () => {
                 titleIcon={<Users size={20} className="text-primary" />}
                 desc="Please fill in the details below to edit the team."
                 formHtml={
-                    <>
                     <div className="form-group mb-3">
-                        <label htmlFor="editTeamName" className="fw-semibold d-flex align-items-center gap-2 form-label">Team Name <span className="text-danger">*</span>
-                        <span className="text-muted ms-2" title="Enter the name of the team you want to edit">
-                            <Info size={14} />
-                        </span>
+                        <label
+                            htmlFor="editTeamName"
+                            className="fw-semibold d-flex align-items-center gap-2 form-label"
+                        >
+                            Team Name <span className="text-danger">*</span>
+                            <span className="text-muted ms-2" title="Enter the name of the team you want to edit">
+                                <Info size={14} />
+                            </span>
                         </label>
-                        <input className="form-control" type="text" value={selectedTeamName} onChange={(e) => setSelectedTeamName(e.target.value)} disabled={isLoadingUpdateTeam} />
+                        <input
+                            id="editTeamName"
+                            className="form-control"
+                            type="text"
+                            value={selectedTeamName}
+                            onChange={(e) => setSelectedTeamName(e.target.value)}
+                            disabled={isLoadingUpdateTeam}
+                        />
                         <Form.Text className="text-muted d-flex align-items-center gap-1 form-text">
                             <Info size={12} />
                             <span style={{ fontSize: '0.813rem' }}>
-                                Change the name of an existing team to better reflect its purpose or purpose in the system
+                                Change the name of an existing team to better reflect its purpose in the system.
                             </span>
                         </Form.Text>
                     </div>
-                    </>
                 }
                 submitButtonText="Update Team"
                 isSubmitDisabled={!selectedTeamName || isLoadingUpdateTeam}
@@ -795,59 +952,67 @@ const Teams = () => {
                 isSubmitting={isLoadingUpdateTeam}
             />
 
-
+            {/* ── Delete Team Modal ── */}
             <ConfirmModal
                 show={showDeleteTeamModal}
                 onHide={() => setShowDeleteTeamModal(false)}
                 title="Delete Team"
-                description={`Are you sure you want to delete the following team?`}
-                targetName={`${selectedTeamName}`}
+                description="Are you sure you want to delete the following team?"
+                targetName={selectedTeamName}
                 onConfirm={handleSubmitDeleteTeam}
                 confirmButtonText="Delete"
                 confirmButtonVariant="danger"
-                requireTextConfirmation={true}
+                requireTextConfirmation
                 requiredConfirmationText="delete"
                 loading={isLoadingDeleteTeam}
             />
 
-<FormModal
-                        show={showCreateTeamModal}
-                        onHide={()=>setShowCreateTeamModal(false)}
-                        title="New Team"
-                        titleIcon={<Users size={20} className="text-primary" />}
-                        desc="Please fill in the details below to create a new team."
-                        formHtml={
-                            <>
-                            <div className="form-group mb-3">
-                                <label htmlFor="newTeamName" className="fw-semibold d-flex align-items-center gap-2 form-label">Team Name <span className="text-danger">*</span>
-                                <span className="text-muted ms-2" title="Enter the name of the team you want to create">
-                                    <Info size={14} />
-                                </span>
-                                </label>
-                                <input type="text" className="form-control" id="newTeamName"  value={newTeamName} onChange={(e) => setNewTeamName(e.target.value)} placeholder="Team Name" disabled={isLoadingCreateTeam} />
-                                <Form.Text className="text-muted d-flex align-items-center gap-1 form-text">
-                                    <Info size={12} />
-                                    <span style={{ fontSize: '0.813rem' }}>
-                                        Enter the name of the team you want to create. This will be used to identify the team in the system.
-                                    </span>
-                                </Form.Text>
-                            </div>
-                            </>
-                        }
-                        submitButtonText="Add Team"
-                        isSubmitDisabled={!newTeamName || isLoadingCreateTeam}
-                        cancelButtonText="Cancel"
-                        onSubmit={handleSubmitCreateTeam}
-                        onCancel={()=>setShowCreateTeamModal(false)}
-                        isSubmitting={isLoadingCreateTeam}
-                    />
+            {/* ── Create Team Modal ── */}
+            <FormModal
+                show={showCreateTeamModal}
+                onHide={() => setShowCreateTeamModal(false)}
+                title="New Team"
+                titleIcon={<Users size={20} className="text-primary" />}
+                desc="Please fill in the details below to create a new team."
+                formHtml={
+                    <div className="form-group mb-3">
+                        <label
+                            htmlFor="newTeamName"
+                            className="fw-semibold d-flex align-items-center gap-2 form-label"
+                        >
+                            Team Name <span className="text-danger">*</span>
+                            <span className="text-muted ms-2" title="Enter the name of the team you want to create">
+                                <Info size={14} />
+                            </span>
+                        </label>
+                        <input
+                            type="text"
+                            className="form-control"
+                            id="newTeamName"
+                            value={newTeamName}
+                            onChange={(e) => setNewTeamName(e.target.value)}
+                            placeholder="Team Name"
+                            disabled={isLoadingCreateTeam}
+                        />
+                        <Form.Text className="text-muted d-flex align-items-center gap-1 form-text">
+                            <Info size={12} />
+                            <span style={{ fontSize: '0.813rem' }}>
+                                Enter the name of the team you want to create. This will be used to identify the team in
+                                the system.
+                            </span>
+                        </Form.Text>
+                    </div>
+                }
+                submitButtonText="Add Team"
+                isSubmitDisabled={!newTeamName || isLoadingCreateTeam}
+                cancelButtonText="Cancel"
+                onSubmit={handleSubmitCreateTeam}
+                onCancel={() => setShowCreateTeamModal(false)}
+                isSubmitting={isLoadingCreateTeam}
+            />
 
-            {/* Assign Users Modal */}
-            <Modal
-                show={showAssignUsersModal}
-                onHide={handleCloseAssignUsersModal}
-                size="xl"
-            >
+            {/* ── Assign Users Modal ── */}
+            <Modal show={showAssignUsersModal} onHide={handleCloseAssignUsersModal} size="xl">
                 <Modal.Header closeButton>
                     <Modal.Title className="d-flex align-items-center gap-2">
                         <Users size={20} className="text-primary" />
@@ -855,252 +1020,173 @@ const Teams = () => {
                     </Modal.Title>
                 </Modal.Header>
                 <Modal.Body>
-
-
-
                     <Row>
+                        {/* Owners column */}
                         <Col md={6}>
-                        <div className="form-group mb-4">
-                        <label htmlFor="assignOwners" className="fw-semibold d-flex align-items-center gap-2 form-label">
-                            Select Owners to Assign
-                            <span className="text-muted ms-2" title="Search and select owners to assign to this team">
-                                <Info size={14} />
-                            </span>
-                        </label>
-                        <SelectCheckBox
-                            options={ownerOptions}
-                            onChange={handleOwnerSelectionChange}
-                            value={selectedOwnersToAssign.map((idStr) => {
-                                const u = allUsers.find((u) => u.id.toString() === idStr);
-                                return u ? { 
-                                    value: u.id, 
-                                    label: `${u.name || 'Unknown'} (${u.phone || u.email || 'N/A'})` 
-                                } : { value: Number(idStr), label: idStr };
-                            })}
-                            noOptionsMessage="No owners found"
-                            placeholder="Select owners to assign..."
-                            isLoading={isLoadingUsers}
-                            inputValue={ownerSearchInput}
-                            onInputChange={(newValue, action) => {
-                                if (action.action !== 'input-blur' && action.action !== 'menu-close') {
-                                    setOwnerSearchInput(newValue);
-                                }
-                            }}
-                        />
-                        <Form.Text className="text-muted d-flex align-items-center gap-1 form-text">
-                            <Info size={12} />
-                            <span style={{ fontSize: '0.813rem' }}>
-                                Click the dropdown to see all available owners. You can search to filter the list. Users already assigned to this team or selected as regular users will not appear in the list.
-                            </span>
-                        </Form.Text>
-                    </div>
-
-                    {/* Team Owners Section */}
-                    <div className="mb-4">
-                        <div className="d-flex justify-content-between align-items-center mb-3">
-                            <h6 className="mb-0 d-flex align-items-center gap-2">
-                                <Users size={18} className="text-warning" />
-                                Team Owners ({teamOwners.length})
-                            </h6>
-                            {selectedOwnersToRemove.length > 0 && (
-                                <Button
-                                    variant="outline-danger"
-                                    size="sm"
-                                    onClick={() => setShowRemoveOwnersConfirmModal(true)}
+                            <div className="form-group mb-4">
+                                <label
+                                    htmlFor="assignOwners"
+                                    className="fw-semibold d-flex align-items-center gap-2 form-label"
                                 >
-                                    <UserMinus size={14} className="me-1" />
-                                    Remove Selected ({selectedOwnersToRemove.length})
-                                </Button>
-                            )}
-                        </div>
-                        {isLoadingTeamUsers ? (
-                            <div className="text-center py-3">
-                                <small className="text-muted">Loading owners...</small>
+                                    Select Owners to Assign{' '}
+                                    <span
+                                        className="text-muted ms-2"
+                                        title="Search and select owners to assign to this team"
+                                    >
+                                        <Info size={14} />
+                                    </span>
+                                </label>
+                                <SelectCheckBox
+                                    options={ownerOptions}
+                                    onChange={(opts: MultiValue<SelectCheckBoxOption>) => {
+                                        setSelectedOwnersToAssign((opts ?? []).map((o) => o.value.toString()));
+                                    }}
+                                    value={selectedOwnersToAssign.map((id) => resolveOptionByIdStr(id, allUsers))}
+                                    noOptionsMessage="No owners found"
+                                    placeholder="Select owners to assign..."
+                                    isLoading={isLoadingUsers}
+                                    inputValue={ownerSearchInput}
+                                    onInputChange={(val, action) => {
+                                        const isBlurOrClose =
+                                            action.action === 'input-blur' || action.action === 'menu-close';
+                                        if (!isBlurOrClose) setOwnerSearchInput(val);
+                                    }}
+                                />
+                                <Form.Text className="text-muted d-flex align-items-center gap-1 form-text">
+                                    <Info size={12} />
+                                    <span style={{ fontSize: '0.813rem' }}>
+                                        Click the dropdown to see all available owners. Users already assigned or
+                                        selected as regular users will not appear.
+                                    </span>
+                                </Form.Text>
                             </div>
-                        ) : teamOwners.length > 0 ? (
-                            <Card>
-                                <Card.Body className="p-0">
-                                    
-                                        <table className="table table-hover table-justify-content-center table-sm mb-0 w-100">
-                                            <thead className="table-light">
-                                                <tr>
-                                                    <th style={{ width: '40px' }}>
-                                                        <input
-                                                            type="checkbox"
-                                                            checked={teamOwners.length > 0 && selectedOwnersToRemove.length === teamOwners.length}
-                                                            onChange={() => handleSelectAllUsersToRemove(true)}
-                                                            title="Select All Owners"
-                                                        />
-                                                    </th>
-                                                    <th>Name</th>
-                                                    <th>Extension</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                {teamOwners.map((owner) => (
-                                                    <tr key={owner.id}>
-                                                        <td>
-                                                            <input
-                                                                type="checkbox"
-                                                                checked={selectedOwnersToRemove.includes(owner.id)}
-                                                                onChange={() => handleSelectUserToRemove(owner.id, true)}
-                                                            />
-                                                        </td>
-                                                        <td>
-                                                            <div>
-                                                                {owner.name || 'N/A'}
-                                                            </div>
-                                                        </td>
-                                                        <td>
-                                                            <div title={owner.phone || 'N/A'}>
-                                                                {owner.phone || 'N/A'}
-                                                            </div>
-                                                        </td>
-                                                    </tr>
-                                                ))}
-                                            </tbody>
-                                        </table>
-                                    
-                                </Card.Body>
-                            </Card>
-                        ) : (
-                            <div className="text-center py-3 border rounded">
-                                <small className="text-muted">No owners assigned to this team yet.</small>
+
+                            <div className="mb-4">
+                                <div className="d-flex justify-content-between align-items-center mb-3">
+                                    <h6 className="mb-0 d-flex align-items-center gap-2">
+                                        <Users size={18} className="text-warning" />
+                                        Team Owners ({teamOwners.length})
+                                    </h6>
+                                    {selectedOwnersToRemove.length > 0 && (
+                                        <Button
+                                            variant="outline-danger"
+                                            size="sm"
+                                            onClick={() => setShowRemoveOwnersConfirmModal(true)}
+                                        >
+                                            <UserMinus size={14} className="me-1" />
+                                            Remove Selected ({selectedOwnersToRemove.length})
+                                        </Button>
+                                    )}
+                                </div>
+                                <TeamMembersTable
+                                    members={teamOwners}
+                                    isLoading={isLoadingTeamUsers}
+                                    selectedIds={selectedOwnersToRemove}
+                                    emptyLabel="No owners assigned to this team yet."
+                                    isAllSelected={
+                                        teamOwners.length > 0 &&
+                                        selectedOwnersToRemove.length === teamOwners.length
+                                    }
+                                    onSelectAll={handleSelectAllOwnersToRemove}
+                                    onSelectOne={handleToggleOwnerRemove}
+                                />
                             </div>
-                        )}
-                    </div>
                         </Col>
-                        <Col md={6}>
-                        <div className="form-group mb-4">
-                        <label htmlFor="assignUsers" className="fw-semibold d-flex align-items-center gap-2 form-label">
-                            Select Users to Assign
-                            <span className="text-muted ms-2" title="Search and select users to assign to this team">
-                                <Info size={14} />
-                            </span>
-                        </label>
-                        <SelectCheckBox
-                            options={userOptions}
-                            onChange={handleUserSelectionChange}
-                            value={selectedUsersToAssign.map((idStr) => {
-                                const u = allUsers.find((u) => u.id.toString() === idStr);
-                                return u ? { 
-                                    value: u.id, 
-                                    label: `${u.name || 'Unknown'} (${u.phone || u.email || 'N/A'})` 
-                                } : { value: Number(idStr), label: idStr };
-                            })}
-                            noOptionsMessage="No users found"
-                            placeholder="Select users to assign..."
-                            isLoading={isLoadingUsers}
-                            inputValue={userSearchInput}
-                            onInputChange={(newValue, action) => {
-                                if (action.action !== 'input-blur' && action.action !== 'menu-close') {
-                                    setUserSearchInput(newValue);
-                                }
-                            }}
-                        />
-                        <Form.Text className="text-muted d-flex align-items-center gap-1 form-text">
-                            <Info size={12} />
-                            <span style={{ fontSize: '0.813rem' }}>
-                                Click the dropdown to see all available users. You can search to filter the list. Users already assigned to this team or selected as owners will not appear in the list.
-                            </span>
-                        </Form.Text>
-                    </div>
 
-                    {/* Team Members Section */}
-                    <div className="mb-3">
-                        <div className="d-flex justify-content-between align-items-center mb-3">
-                            <h6 className="mb-0 d-flex align-items-center gap-2">
-                                <Users size={18} />
-                                Team Members ({teamUsers.length})
-                            </h6>
-                            {selectedUsersToRemove.length > 0 && (
-                                <Button
-                                    variant="outline-danger"
-                                    size="sm"
-                                    onClick={() => setShowRemoveUsersConfirmModal(true)}
+                        {/* Members column */}
+                        <Col md={6}>
+                            <div className="form-group mb-4">
+                                <label
+                                    htmlFor="assignUsers"
+                                    className="fw-semibold d-flex align-items-center gap-2 form-label"
                                 >
-                                    <UserMinus size={14} className="me-1" />
-                                    Remove Selected ({selectedUsersToRemove.length})
-                                </Button>
-                            )}
-                        </div>
-                        {isLoadingTeamUsers ? (
-                            <div className="text-center py-3">
-                                <small className="text-muted">Loading members...</small>
+                                    Select Users to Assign{' '}
+                                    <span
+                                        className="text-muted ms-2"
+                                        title="Search and select users to assign to this team"
+                                    >
+                                        <Info size={14} />
+                                    </span>
+                                </label>
+                                <SelectCheckBox
+                                    options={userOptions}
+                                    onChange={(opts: MultiValue<SelectCheckBoxOption>) => {
+                                        setSelectedUsersToAssign((opts ?? []).map((o) => o.value.toString()));
+                                    }}
+                                    value={selectedUsersToAssign.map((id) => resolveOptionByIdStr(id, allUsers))}
+                                    noOptionsMessage="No users found"
+                                    placeholder="Select users to assign..."
+                                    isLoading={isLoadingUsers}
+                                    inputValue={userSearchInput}
+                                    onInputChange={(val, action) => {
+                                        const isBlurOrClose =
+                                            action.action === 'input-blur' || action.action === 'menu-close';
+                                        if (!isBlurOrClose) setUserSearchInput(val);
+                                    }}
+                                />
+                                <Form.Text className="text-muted d-flex align-items-center gap-1 form-text">
+                                    <Info size={12} />
+                                    <span style={{ fontSize: '0.813rem' }}>
+                                        Click the dropdown to see all available users. Users already assigned or
+                                        selected as owners will not appear.
+                                    </span>
+                                </Form.Text>
                             </div>
-                        ) : teamUsers.length > 0 ? (
-                            <Card>
-                                <Card.Body className="p-0">
-                                    
-                                        <table className="table table-hover table-sm mb-0 w-100 justify-content-center">
-                                            <thead className="table-light">
-                                                <tr>
-                                                    <th style={{ width: '40px' }}>
-                                                        <input
-                                                            type="checkbox"
-                                                            checked={teamUsers.length > 0 && selectedUsersToRemove.length === teamUsers.length}
-                                                            onChange={() => handleSelectAllUsersToRemove(false)}
-                                                            title="Select All Members"
-                                                        />
-                                                    </th>
-                                                    <th>Name</th>
-                                                    <th>Extension</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                {teamUsers.map((user) => (
-                                                    <tr key={user.id}>
-                                                        <td>
-                                                            <input
-                                                                type="checkbox"
-                                                                checked={selectedUsersToRemove.includes(user.id)}
-                                                                onChange={() => handleSelectUserToRemove(user.id, false)}
-                                                            />
-                                                        </td>
-                                                        <td>
-                                                            <div>
-                                                                {user.name || 'N/A'}
-                                                            </div>
-                                                        </td>
-                                                        <td>
-                                                            <div title={user.phone || 'N/A'}>
-                                                                {user.phone || 'N/A'}
-                                                            </div>
-                                                        </td>
-                                                    </tr>
-                                                ))}
-                                            </tbody>
-                                        </table>
-                                    
-                                </Card.Body>
-                            </Card>
-                        ) : (
-                            <div className="text-center py-3 border rounded">
-                                <small className="text-muted">No members assigned to this team yet.</small>
+
+                            <div className="mb-3">
+                                <div className="d-flex justify-content-between align-items-center mb-3">
+                                    <h6 className="mb-0 d-flex align-items-center gap-2">
+                                        <Users size={18} />
+                                        Team Members ({teamUsers.length})
+                                    </h6>
+                                    {selectedUsersToRemove.length > 0 && (
+                                        <Button
+                                            variant="outline-danger"
+                                            size="sm"
+                                            onClick={() => setShowRemoveUsersConfirmModal(true)}
+                                        >
+                                            <UserMinus size={14} className="me-1" />
+                                            Remove Selected ({selectedUsersToRemove.length})
+                                        </Button>
+                                    )}
+                                </div>
+                                <TeamMembersTable
+                                    members={teamUsers}
+                                    isLoading={isLoadingTeamUsers}
+                                    selectedIds={selectedUsersToRemove}
+                                    emptyLabel="No members assigned to this team yet."
+                                    isAllSelected={
+                                        teamUsers.length > 0 && selectedUsersToRemove.length === teamUsers.length
+                                    }
+                                    onSelectAll={handleSelectAllMembersToRemove}
+                                    onSelectOne={handleToggleMemberRemove}
+                                />
                             </div>
-                        )}
-                    </div>
                         </Col>
                     </Row>
-
-                    
-
-                    
-
-                    
                 </Modal.Body>
                 <Modal.Footer>
-                    <Button variant="secondary" onClick={handleCloseAssignUsersModal} disabled={isLoadingAssignUsers || isLoadingRemoveUsers}>
+                    <Button
+                        variant="secondary"
+                        onClick={handleCloseAssignUsersModal}
+                        disabled={isLoadingAssignUsers || isLoadingRemoveUsers}
+                    >
                         Close
                     </Button>
-                    <Button 
-                        variant="primary" 
+                    <Button
+                        variant="primary"
                         onClick={handleSubmitAssignUsers}
-                        disabled={(selectedUsersToAssign.length === 0 && selectedOwnersToAssign.length === 0) || isLoadingAssignUsers || isLoadingRemoveUsers}
+                        disabled={
+                            (selectedUsersToAssign.length === 0 && selectedOwnersToAssign.length === 0) ||
+                            isLoadingAssignUsers ||
+                            isLoadingRemoveUsers
+                        }
                     >
                         {isLoadingAssignUsers ? (
                             <>
-                                <div className="spinner-border spinner-border-sm me-1" role="status" />
+                                <output className="spinner-border spinner-border-sm me-1" aria-live="polite">
+                                    <span className="visually-hidden">Assigning users...</span>
+                                </output>
                                 Assigning...
                             </>
                         ) : (
@@ -1113,12 +1199,8 @@ const Teams = () => {
                 </Modal.Footer>
             </Modal>
 
-            {/* Assign Modules Modal */}
-            <Modal
-                show={showAssignModulesModal}
-                onHide={handleCloseAssignModulesModal}
-                size="lg"
-            >
+            {/* ── Assign Modules Modal ── */}
+            <Modal show={showAssignModulesModal} onHide={handleCloseAssignModulesModal} size="lg">
                 <Modal.Header closeButton>
                     <Modal.Title className="d-flex align-items-center gap-2">
                         <Package size={20} className="text-warning" />
@@ -1127,30 +1209,40 @@ const Teams = () => {
                 </Modal.Header>
                 <Modal.Body>
                     <div className="mb-3">
-                        <h6 className="mb-2">Team: <strong>{selectedTeamName}</strong></h6>
+                        <h6 className="mb-2">
+                            Team: <strong>{selectedTeamName}</strong>
+                        </h6>
                     </div>
 
                     <div className="form-group mb-4">
-                        <label htmlFor="assignModules" className="fw-semibold d-flex align-items-center gap-2 form-label">
-                            Select Modules to Assign
-                            <span className="text-muted ms-2" title="Search and select modules to assign to this team">
+                        <label
+                            htmlFor="assignModules"
+                            className="fw-semibold d-flex align-items-center gap-2 form-label"
+                        >
+                            Select Modules to Assign{' '}
+                            <span
+                                className="text-muted ms-2"
+                                title="Search and select modules to assign to this team"
+                            >
                                 <Info size={14} />
                             </span>
                         </label>
                         <SelectCheckBox
                             options={moduleOptions}
                             value={selectedModulesToAssign.map((id) => {
-                                const option = moduleOptions.find(opt => opt.value === id);
-                                return option || { value: id, label: `Module ${id}` };
+                                const opt = moduleOptions.find((o) => o.value === id);
+                                return opt ?? { value: id, label: `Module ${id}` };
                             })}
-                            onChange={handleModuleSelectionChange}
+                            onChange={(opts: MultiValue<SelectCheckBoxOption>) => {
+                                setSelectedModulesToAssign((opts ?? []).map((o) => o.value as number));
+                            }}
                             placeholder="Select modules..."
                             isLoading={isLoadingModules}
                         />
                         <Form.Text className="text-muted d-flex align-items-center gap-1 form-text">
                             <Info size={12} />
                             <span style={{ fontSize: '0.813rem' }}>
-                                Select one or more modules to assign to this team. You can search and select multiple modules.
+                                Select one or more modules to assign to this team.
                             </span>
                         </Form.Text>
                     </div>
@@ -1160,77 +1252,29 @@ const Teams = () => {
                             <Package size={18} />
                             Currently Assigned Modules ({teamModules.length})
                         </h6>
-                        {isLoadingTeamModules ? (
-                            <div className="text-center py-3">
-                                <small className="text-muted">Loading modules...</small>
-                            </div>
-                        ) : teamModules.length > 0 ? (
-                            <Card>
-                                <Card.Body className="p-0">
-                                    <div className="table-responsive p-0">
-                                        <table className="table table-hover table-sm mb-0">
-                                            <thead className="table-light">
-                                                <tr>
-                                                    <th>Name</th>
-                                                    <th>Description</th>
-                                                    <th>Action</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                {teamModules.map((module) => (
-                                                    <tr key={module.id || module.module_id}>
-                                                        <td>
-                                                            <div>
-                                                                {module.name || 'N/A'}
-                                                            </div>
-                                                        </td>
-                                                        <td>
-                                                            <div>
-                                                                {module.description || 'N/A'}
-                                                            </div>
-                                                        </td>
-                                                        <td>
-                                                            <Button
-                                                                variant="outline-danger"
-                                                                size="sm"
-                                                                onClick={() => handleRemoveModule(module.id || module.module_id)}
-                                                                title="Remove Module"
-                                                                className="p-1"
-                                                                disabled={isLoadingRemoveModule || isLoadingAssignModules}
-                                                            >
-                                                                {isLoadingRemoveModule ? (
-                                                                    <div className="spinner-border spinner-border-sm" role="status" />
-                                                                ) : (
-                                                                    <Trash2 size={14} />
-                                                                )}
-                                                            </Button>
-                                                        </td>
-                                                    </tr>
-                                                ))}
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                </Card.Body>
-                            </Card>
-                        ) : (
-                            <div className="text-center py-3 border rounded">
-                                <small className="text-muted">No modules assigned to this team yet.</small>
-                            </div>
-                        )}
+                        {assignedModulesContent}
                     </div>
                 </Modal.Body>
                 <Modal.Footer>
-                    <Button variant="secondary" onClick={handleCloseAssignModulesModal} disabled={isLoadingAssignModules || isLoadingRemoveModule}>
+                    <Button
+                        variant="secondary"
+                        onClick={handleCloseAssignModulesModal}
+                        disabled={isLoadingAssignModules || isLoadingRemoveModule}
+                    >
                         Close
                     </Button>
-                    <Button 
-                        variant="primary" 
+                    <Button
+                        variant="primary"
                         onClick={handleSubmitAssignModules}
-                        disabled={selectedModulesToAssign.length === 0 || isLoadingAssignModules || isLoadingRemoveModule}
+                        disabled={
+                            selectedModulesToAssign.length === 0 || isLoadingAssignModules || isLoadingRemoveModule
+                        }
                     >
                         {isLoadingAssignModules ? (
                             <>
-                                <div className="spinner-border spinner-border-sm me-1" role="status" />
+                                <output className="spinner-border spinner-border-sm me-1" aria-live="polite">
+                                    <span className="visually-hidden">Updating modules...</span>
+                                </output>
                                 Updating...
                             </>
                         ) : (
@@ -1242,15 +1286,15 @@ const Teams = () => {
                     </Button>
                 </Modal.Footer>
             </Modal>
-           
-        <SuccessfulModal
-          show={showSuccessfulModal}
-          onHide={() => setShowSuccessfulModal(false)}
-          title={successModalTitle}
-          description={successModalDescription}
-        />
 
-            {/* Remove Owners Confirmation Modal */}
+            <SuccessfulModal
+                show={showSuccessfulModal}
+                onHide={() => setShowSuccessfulModal(false)}
+                title={successModalTitle}
+                description={successModalDescription}
+            />
+
+            {/* ── Remove Owners Confirmation Modal ── */}
             <ConfirmModal
                 show={showRemoveOwnersConfirmModal}
                 onHide={() => {
@@ -1259,20 +1303,20 @@ const Teams = () => {
                 }}
                 title="Remove Owners"
                 description={`Are you sure you want to remove ${selectedOwnersToRemove.length} owner(s) from this team?`}
-                targetName={selectedOwnersToRemove.length === 1 
-                    ? teamOwners.find(o => o.id === selectedOwnersToRemove[0])?.name || 'this owner'
-                    : `${selectedOwnersToRemove.length} owners`}
-                onConfirm={async (confirmationText: string) => {
-                    await handleConfirmRemoveUsers();
-                }}
+                targetName={
+                    selectedOwnersToRemove.length === 1
+                        ? teamOwners.find((o) => o.id === selectedOwnersToRemove[0])?.name ?? 'this owner'
+                        : `${selectedOwnersToRemove.length} owners`
+                }
+                onConfirm={handleConfirmRemoveUsers}
                 confirmButtonText="Remove Owners"
                 confirmButtonVariant="danger"
-                requireTextConfirmation={true}
+                requireTextConfirmation
                 requiredConfirmationText="remove"
                 loading={isLoadingRemoveUsers}
             />
 
-            {/* Remove Users Confirmation Modal */}
+            {/* ── Remove Users Confirmation Modal ── */}
             <ConfirmModal
                 show={showRemoveUsersConfirmModal}
                 onHide={() => {
@@ -1281,15 +1325,15 @@ const Teams = () => {
                 }}
                 title="Remove Members"
                 description={`Are you sure you want to remove ${selectedUsersToRemove.length} member(s) from this team?`}
-                targetName={selectedUsersToRemove.length === 1 
-                    ? teamUsers.find(u => u.id === selectedUsersToRemove[0])?.name || 'this member'
-                    : `${selectedUsersToRemove.length} members`}
-                onConfirm={async (confirmationText: string) => {
-                    await handleConfirmRemoveUsers();
-                }}
+                targetName={
+                    selectedUsersToRemove.length === 1
+                        ? teamUsers.find((u) => u.id === selectedUsersToRemove[0])?.name ?? 'this member'
+                        : `${selectedUsersToRemove.length} members`
+                }
+                onConfirm={handleConfirmRemoveUsers}
                 confirmButtonText="Remove Members"
                 confirmButtonVariant="danger"
-                requireTextConfirmation={true}
+                requireTextConfirmation
                 requiredConfirmationText="remove"
                 loading={isLoadingRemoveUsers}
             />
@@ -1297,8 +1341,6 @@ const Teams = () => {
     );
 };
 
-Teams.getLayout = (page: ReactElement) => {
-    return <Layout>{page}</Layout>;
-};
+Teams.getLayout = (page: ReactElement) => <Layout>{page}</Layout>;
 
 export default Teams;
