@@ -1455,34 +1455,44 @@ const VoicebotInboundBotsCreate = () => {
                           </Form.Group>
                         </div>
                         <div>
-                          <Form.Group className="mb-3">
-                            <Form.Check
-                              type="switch"
-                              id="allow-interruptions"
-                              label="Allow Interruptions"
-                              checked={!!cfg.allow_interruptions}
-                              onChange={(e) =>
-                                updateConfig(
-                                  "allow_interruptions",
-                                  e.target.checked,
-                                )
-                              }
-                            />
-                          </Form.Group>
-                          <Form.Group className="mb-3">
-                            <Form.Check
-                              type="switch"
-                              id="noise-cancellation"
-                              label="Noise Cancellation"
-                              checked={!!cfg.noise_cancellation}
-                              onChange={(e) =>
-                                updateConfig(
-                                  "noise_cancellation",
-                                  e.target.checked,
-                                )
-                              }
-                            />
-                          </Form.Group>
+                          <div
+                            className="mb-3"
+                            style={{
+                              display: "grid",
+                              gridTemplateColumns: "1fr 1fr",
+                              gap: "12px",
+                              alignItems: "center",
+                            }}
+                          >
+                            <Form.Group className="mb-0">
+                              <Form.Check
+                                type="switch"
+                                id="allow-interruptions"
+                                label="Allow Interruptions"
+                                checked={!!cfg.allow_interruptions}
+                                onChange={(e) =>
+                                  updateConfig(
+                                    "allow_interruptions",
+                                    e.target.checked,
+                                  )
+                                }
+                              />
+                            </Form.Group>
+                            <Form.Group className="mb-0">
+                              <Form.Check
+                                type="switch"
+                                id="noise-cancellation"
+                                label="Noise Cancellation"
+                                checked={!!cfg.noise_cancellation}
+                                onChange={(e) =>
+                                  updateConfig(
+                                    "noise_cancellation",
+                                    e.target.checked,
+                                  )
+                                }
+                              />
+                            </Form.Group>
+                          </div>
                           <Form.Group className="mb-3">
                             <Form.Label style={labelStyle}>
                               Min Endpointing Delay

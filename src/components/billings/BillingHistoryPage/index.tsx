@@ -16,10 +16,10 @@ import InvoiceViewModal, { type InvoiceViewData } from "@components/billings/Inv
 import { BILLING_FONT, BILLING_LINK } from "@components/billings/shared/styles";
 import { LinkButton } from "@components/shared/LinkButton";
 import { useInvoicePaymentModal } from "@components/billings/InvoicePaymentModal";
-import { getMinifiedCompanies } from "@utils/crm";
 import { toast } from "react-toastify";
 import { getErrorMessage } from "@utils/errors";
 import { useEnsureCustomerForCrmCompany } from "@hooks/billing/useEnsureCustomerForCrmCompany";
+import { useMinifiedCompaniesSendAll } from "@hooks/billing/useMinifiedCompaniesSendAll";
 
 const font = BILLING_FONT;
 const { PERMISSIONS } = HEADER_CONSTANTS;
@@ -962,9 +962,14 @@ export default function BillingHistoryPage({
   const [showViewInvoiceModal, setShowViewInvoiceModal] = useState(false);
   const [selectedInvoiceForView, setSelectedInvoiceForView] = useState<InvoiceViewData | null>(null);
   const [isInvoiceLoading, setIsInvoiceLoading] = useState(false);
-  const [companyOptions, setCompanyOptions] = useState<{ id: string | number; name?: string }[]>(
-    [],
-  );
+  const companyOptions = useMinifiedCompaniesSendAll({
+    enabled: customerCompanyPicker,
+    onError: (e) => {
+      toast.error(`Failed to load companies: ${getErrorMessage(e)}`, {
+        toastId: "billing_history_load_companies_failed",
+      });
+    },
+  });
   const [selectedCompanyId, setSelectedCompanyId] = useState<string | number>("");
   const [ensureCustomerRefreshKey, setEnsureCustomerRefreshKey] = useState(0);
 
@@ -982,26 +987,6 @@ export default function BillingHistoryPage({
     const found = companyOptions.find((c) => String(c.id) === String(selectedCompanyId));
     return found?.name?.trim() || String(selectedCompanyId);
   }, [companyOptions, selectedCompanyId]);
-
-  useEffect(() => {
-    if (!customerCompanyPicker) return;
-    let cancelled = false;
-    (async () => {
-      try {
-        const result = await getMinifiedCompanies({ send_all: "true" });
-        if (!cancelled) setCompanyOptions(result ?? []);
-      } catch (e) {
-        if (!cancelled) {
-          toast.error(`Failed to load companies: ${getErrorMessage(e)}`, {
-            toastId: "billing_history_load_companies_failed",
-          });
-        }
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [customerCompanyPicker]);
 
   const closeViewInvoiceModal = useCallback(() => {
     setShowViewInvoiceModal(false);
