@@ -160,6 +160,16 @@ const CreateSipTrunkPage = () => {
       return null;
     }
 
+    if (!sip_address) {
+      toast.error("SIP address is required");
+      return null;
+    }
+
+    if (caller_ids.length === 0) {
+      toast.error("At least one caller ID is required");
+      return null;
+    }
+
     return {
       company_id,
       name: trimmedName,
@@ -246,8 +256,8 @@ const CreateSipTrunkPage = () => {
           </div>
           <h2 className="mb-0 mt-2">Create SIP trunk</h2>
           <p className="text-muted small mb-0 mt-1">
-            Required: company and display name. SIP address and caller IDs are optional; leave the
-            address blank to allow any origin.
+            All fields are required: company, display name, SIP address, and at least one caller ID
+            (E.164).
           </p>
         </Col>
       </Row>
@@ -258,11 +268,7 @@ const CreateSipTrunkPage = () => {
             className="bg-white rounded-3 p-4 p-lg-5 shadow-sm w-100"
             style={{ border: "1px solid #e5e7eb" }}
           >
-            <Form
-              onSubmit={handleSubmit}
-              noValidate
-              autoComplete="off"
-            >
+            <Form onSubmit={handleSubmit} autoComplete="off">
                 <Row className="g-3 g-md-4">
                   <Col md={6}>
                     {isAdmin ? (
@@ -301,7 +307,7 @@ const CreateSipTrunkPage = () => {
                       </Form.Group>
                     ) : (
                       <Form.Group className="mb-0">
-                        <Form.Label style={labelStyle}>Company</Form.Label>
+                        <Form.Label style={labelStyle}>Company *</Form.Label>
                         <div
                           className="small text-body border rounded"
                           style={{
@@ -334,8 +340,7 @@ const CreateSipTrunkPage = () => {
                   <Col xs={12}>
                     <Form.Group className="mb-0">
                       <Form.Label style={labelStyle} htmlFor="inbound-sip-trunk-sip-address">
-                        SIP address{" "}
-                        <span className="text-muted fw-normal">(optional)</span>
+                        SIP address *
                       </Form.Label>
                       {/*
                         Uncontrolled: `value={...}` + paste can leave React state stale; the next
@@ -348,27 +353,26 @@ const CreateSipTrunkPage = () => {
                         className="form-control"
                         name="inbound_sip_trunk_sip_address"
                         defaultValue=""
-                        placeholder="sip:host:port (leave empty for any origin)"
+                        placeholder="sip:host:port"
                         style={inputStyle}
+                        required
                         autoComplete="off"
                         autoCorrect="off"
                         spellCheck={false}
                         enterKeyHint="next"
                       />
                       <Form.Text className="text-muted small">
-                        <code>sip:host:port</code> format. Empty string sends the default and allows
-                        any origin.
+                        Use <code>sip:host:port</code> format.
                       </Form.Text>
                     </Form.Group>
                   </Col>
                   <Col xs={12}>
                     <Form.Group className="mb-0">
                       <Form.Label style={labelStyle}>
-                        Caller IDs{" "}
-                        <span className="text-muted fw-normal">(optional, E.164)</span>
+                        Caller IDs * <span className="text-muted fw-normal">(E.164)</span>
                       </Form.Label>
                       <span className="d-block text-muted small mb-1">
-                        One per line or comma-separated. Leave empty to send an empty list.
+                        One per line or comma-separated. At least one number is required.
                       </span>
                       <Form.Control
                         as="textarea"
@@ -378,6 +382,7 @@ const CreateSipTrunkPage = () => {
                         onChange={(e) => setFormField("callerIdsText", e.target.value)}
                         placeholder="+14155551001&#10;+14155551002"
                         style={textareaStyle}
+                        required
                         autoComplete="off"
                         spellCheck={false}
                       />
@@ -388,7 +393,13 @@ const CreateSipTrunkPage = () => {
                 <div className="d-flex flex-wrap gap-2 mt-4 pt-2 border-top border-light">
                   <Button
                     type="submit"
-                    disabled={submitting || (isAdmin && loadingCompanies)}
+                    disabled={
+                      submitting ||
+                      (isAdmin && loadingCompanies) ||
+                      !form.name.trim() ||
+                      !form.callerIdsText.trim() ||
+                      (isAdmin && !form.companyListValue)
+                    }
                     className="border-0"
                     style={primaryButtonStyle}
                   >

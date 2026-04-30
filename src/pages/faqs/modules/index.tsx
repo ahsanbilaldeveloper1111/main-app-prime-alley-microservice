@@ -2,14 +2,24 @@ import '@assets/scss/datatable-style.scss';
 import React, { ReactElement, useState, useCallback, useMemo, useEffect } from 'react';
 import Layout from '@layout/index';
 import BreadcrumbItem from '@common/BreadcrumbItem';
-import GenericListPage from '@components/GenericListPage';
 import { ListFAQModules, createFAQModule, updateFAQModule, deleteFAQModule } from '@utils/faqs';
-import { Column } from '@components/CustomDataTable';
 import { Button, Form, InputGroup, Modal } from 'react-bootstrap';
 import '@assets/scss/common.scss';
 import ConfirmModal from '@pages/partial/ConfirmModal';
 import SuccessfulModal from '@pages/partial/SuccessfulModal';
 import { Edit, Info, Trash2, Layers, Plus, Search, X } from 'lucide-react';
+import GenericTable, { TableColumn, TableAction } from '@components/GenericTable';
+
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+
+interface FAQModule {
+    id: string | number;
+    name: string;
+    icon: string;
+    description: string;
+}
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -280,44 +290,7 @@ const FAQModuleSidebar: React.FC<FAQModuleSidebarProps> = ({
 };
 
 // ---------------------------------------------------------------------------
-// Table cell renderers (extracted to keep useMemo lean)
-// ---------------------------------------------------------------------------
-
-function renderIconCell(props: any) {
-    return (
-        <div>
-            <i className="material-icons-two-tone" style={{ fontSize: '24px' }}>{props.icon}</i>
-        </div>
-    );
-}
-
-function renderDescriptionCell(props: any) {
-    return (
-        <div style={{ maxWidth: '200px', whiteSpace: 'normal' }}>
-            <span className={props.description ? '' : 'text-muted'}>
-                {props.description || 'No description'}
-            </span>
-        </div>
-    );
-}
-
-function buildModuleActionCell(onEdit: (props: any) => void, onDelete: (props: any) => void) {
-    return function ModuleActionCell(props: any) {
-        return (
-            <div className="d-flex gap-2">
-                <Button variant="light" className="btn-action-style-2 p-1 text-primary" title="Edit" onClick={() => onEdit(props)}>
-                    <Edit size={16} />
-                </Button>
-                <Button variant="light" className="btn-action-style-2 p-1 text-danger" title="Delete" onClick={() => onDelete(props)}>
-                    <Trash2 size={16} />
-                </Button>
-            </div>
-        );
-    };
-}
-
-// ---------------------------------------------------------------------------
-// Icon picker content (extracted to reduce JSX complexity in main component)
+// Icon picker content
 // ---------------------------------------------------------------------------
 
 interface IconPickerBodyProps {
@@ -394,7 +367,13 @@ const IconPickerBody: React.FC<IconPickerBodyProps> = ({
 // ---------------------------------------------------------------------------
 
 const FAQModules = () => {
-    const [refreshKey, setRefreshKey] = useState<number>(0);
+    // Table state
+    const [data, setData] = useState<FAQModule[]>([]);
+    const [loading, setLoading] = useState<boolean>(false);
+    const [currentPage, setCurrentPage] = useState<number>(1);
+    const [rowsPerPage, setRowsPerPage] = useState<number>(15);
+    const [totalRows, setTotalRows] = useState<number>(0);
+    const [searchValue, setSearchValue] = useState<string>('');
 
     // Create state
     const [showCreateSidebar, setShowCreateSidebar] = useState<boolean>(false);
@@ -423,8 +402,6 @@ const FAQModules = () => {
     const [iconSearchQuery, setIconSearchQuery] = useState<string>('');
     const [allIcons, setAllIcons] = useState<string[]>([]);
 
-    const triggerRefresh = useCallback(() => setRefreshKey((prev) => prev + 1), []);
-
     // ---- Icon loading ----
     useEffect(() => {
         const loadIcons = async () => {
@@ -448,6 +425,40 @@ const FAQModules = () => {
         if (!iconSearchQuery) return allIcons;
         return allIcons.filter((icon) => icon.toLowerCase().includes(iconSearchQuery.toLowerCase()));
     }, [allIcons, iconSearchQuery]);
+
+    // ---- Data fetching ----
+    const fetchModules = useCallback(async (page: number, perPage: number, search: string) => {
+        setLoading(true);
+        try {
+            const response = await ListFAQModules({ page, perPage, search, filters: {} });
+            if (response) {
+                setData(response.data || []);
+                setTotalRows(response.total || 0);
+            }
+        } finally {
+            setLoading(false);
+        }
+    }, []);
+
+    useEffect(() => {
+        fetchModules(currentPage, rowsPerPage, searchValue);
+    }, [fetchModules, currentPage, rowsPerPage, searchValue]);
+
+    const triggerRefresh = useCallback(() => {
+        fetchModules(currentPage, rowsPerPage, searchValue);
+    }, [fetchModules, currentPage, rowsPerPage, searchValue]);
+
+    // ---- Pagination ----
+    const handlePaginationChange = useCallback((page: number, perPage: number) => {
+        setCurrentPage(page);
+        setRowsPerPage(perPage);
+    }, []);
+
+    // ---- Search ----
+    const handleSearchChange = useCallback((value: string) => {
+        setSearchValue(value);
+        setCurrentPage(1);
+    }, []);
 
     // ---- Icon picker handlers ----
     const openIconPicker = useCallback((mode: 'create' | 'edit') => {
@@ -496,11 +507,11 @@ const FAQModules = () => {
     const openCreateIconPicker = useCallback(() => openIconPicker('create'), [openIconPicker]);
 
     // ---- Edit handlers ----
-    const handleEditModule = useCallback((props: any) => {
-        setSelectedModule(props.id);
-        setSelectedModuleName(props.name);
-        setSelectedModuleDescription(props.description || '');
-        setSelectedModuleIcon(props.icon || '');
+    const handleEditModule = useCallback((row: FAQModule) => {
+        setSelectedModule(row.id);
+        setSelectedModuleName(row.name);
+        setSelectedModuleDescription(row.description || '');
+        setSelectedModuleIcon(row.icon || '');
         setShowEditSidebar(true);
     }, []);
 
@@ -526,9 +537,9 @@ const FAQModules = () => {
     const openEditIconPicker = useCallback(() => openIconPicker('edit'), [openIconPicker]);
 
     // ---- Delete handlers ----
-    const handleDeleteModule = useCallback((props: any) => {
-        setSelectedModule(props.id);
-        setSelectedModuleName(props.name);
+    const handleDeleteModule = useCallback((row: FAQModule) => {
+        setSelectedModule(row.id);
+        setSelectedModuleName(row.name);
         setShowDeleteModuleModal(true);
     }, []);
 
@@ -551,25 +562,57 @@ const FAQModules = () => {
         }
     }, [selectedModule, triggerRefresh]);
 
-    // ---- Data fetching ----
-    const fetchModules = useCallback(
-        async (page = 1, perPage = 15, search = '') =>
-            ListFAQModules({ page, perPage, search, filters: {} }),
-        [],
-    );
-
     // ---- Columns ----
-    const ActionCell = useMemo(
-        () => buildModuleActionCell(handleEditModule, handleDeleteModule),
-        [handleEditModule, handleDeleteModule],
-    );
+    const columns: TableColumn<FAQModule>[] = useMemo(() => [
+        {
+            key: 'name',
+            label: 'Name',
+            sortable: true,
+            render: (row) => (
+                <span style={{ fontWeight: 500 }}>{row.name}</span>
+            ),
+        },
+        {
+            key: 'icon',
+            label: 'Icon',
+            sortable: true,
+            render: (row) => (
+                <div>
+                    <i className="material-icons-two-tone" style={{ fontSize: '24px' }}>{row.icon}</i>
+                </div>
+            ),
+        },
+        {
+            key: 'description',
+            label: 'Description',
+            sortable: false,
+            render: (row) => (
+                <div style={{ maxWidth: '200px', whiteSpace: 'normal' }}>
+                    <span className={row.description ? '' : 'text-muted'}>
+                        {row.description || 'No description'}
+                    </span>
+                </div>
+            ),
+        },
+    ], []);
 
-    const columns: Column[] = useMemo(() => [
-        { key: 'name', name: 'Name', selector: (row: any) => row.name, sortable: true },
-        { key: 'icon', name: 'Icon', selector: (row: any) => row.icon, sortable: true, cell: renderIconCell },
-        { key: 'description', name: 'Description', selector: (row: any) => row.description || 'N/A', sortable: false, cell: renderDescriptionCell },
-        { key: 'Action', name: 'Actions', selector: (row: any) => row.id, sortable: false, cell: ActionCell },
-    ], [ActionCell]);
+    // ---- Actions ----
+    const actions: TableAction<FAQModule>[] = useMemo(() => [
+        {
+            label: 'Edit',
+            icon: <Edit size={16} />,
+            variant: 'light',
+            className: 'btn-action-style-2 p-1 text-primary',
+            onClick: handleEditModule,
+        },
+        {
+            label: 'Delete',
+            icon: <Trash2 size={16} />,
+            variant: 'light',
+            className: 'btn-action-style-2 p-1 text-danger',
+            onClick: handleDeleteModule,
+        },
+    ], [handleEditModule, handleDeleteModule]);
 
     return (
         <React.Fragment>
@@ -584,16 +627,32 @@ const FAQModules = () => {
                 </div>
             </div>
 
-            <GenericListPage
+            <GenericTable<FAQModule>
+                data={data}
                 columns={columns}
-                fetchData={fetchModules}
-                title="FAQ Modules"
-                searchPlaceholder="Search modules..."
-                defaultPageSize={15}
-                filters={{}}
-                refreshKey={refreshKey}
-                search={true}
-                tableStyle="table-style-2"
+                loading={loading}
+                actions={actions}
+                showActions={true}
+                actionsLabel="Actions"
+                pagination={{
+                    currentPage,
+                    rowsPerPage,
+                    totalRows,
+                    pageSizeOptions: [15, 25, 50, 100],
+                }}
+                onPaginationChange={handlePaginationChange}
+                sortable={true}
+                hover={true}
+                emptyMessage="No FAQ modules found."
+                showToolbar={true}
+                toolbar={{
+                    showSearch: true,
+                    searchValue,
+                    searchPlaceholder: 'Search modules...',
+                    onSearchChange: handleSearchChange,
+                }}
+                showToolbarActions={false}
+                uniqueKey="id"
             />
 
             {/* Create Module Sidebar */}
@@ -650,7 +709,7 @@ const FAQModules = () => {
                 description={successModalDescription}
             />
 
-            {/* Icon Picker Modal — kept as modal intentionally (grid picker UX) */}
+            {/* Icon Picker Modal */}
             <Modal show={showIconPicker} onHide={closeIconPicker} size="lg" centered>
                 <Modal.Header closeButton>
                     <Modal.Title className="d-flex align-items-center gap-2">

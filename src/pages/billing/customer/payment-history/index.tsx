@@ -1,4 +1,3 @@
-import "@components/billings/customer/billingCustomerDatatablePortalStyles";
 import React, {
   ReactElement,
   useCallback,
@@ -8,21 +7,57 @@ import React, {
   useState,
 } from "react";
 import Layout from "@layout/index";
-import { formatNumber, ModuleSlug } from "@utils/Helper";
-import { Button, Card } from "react-bootstrap";
-import { CheckCircle, Receipt, Ban, AlertCircle, Layers, FileText, Calendar, Filter } from "lucide-react";
+import { Button, Card, Form } from "react-bootstrap";
+import {
+  CheckCircle,
+  Receipt,
+  Ban,
+  AlertCircle,
+  Layers,
+  FileText,
+  Calendar,
+  Filter,
+} from "lucide-react";
+
+import "@assets/scss/billing.scss";
+import "@assets/scss/common.scss";
+import "@assets/scss/tabs.scss";
+import "@assets/scss/datatable-style.scss";
 
 import { GetPayments } from "@utils/accounting";
+import { useSession } from "next-auth/react";
 import moment from "moment";
 import FormModal from "@pages/partial/FormModal";
 
 import GenericTable, { TableColumn } from "@components/GenericTable";
 import { GENERIC_TABLE_PAGE_SIZE_OPTIONS } from "@constants/genericTable";
 import GenericSidebar from "@components/GenericSidebar";
-import GenericFilterSidebar, { FilterField } from "@components/GenericFilterSidebar";
+import { ModuleSlug, formatNumber } from "@utils/Helper";
+import GenericFilterSidebar, {
+  FilterField,
+} from "@components/GenericFilterSidebar";
 import { useEnsureCustomerForCrmCompany } from "@hooks/billing/useEnsureCustomerForCrmCompany";
-import { useMinifiedCompaniesForSelect } from "@hooks/billing/useMinifiedCompaniesForSelect";
-import { BillingCustomerCompanySelect } from "@components/billings/customer/BillingCustomerCompanySelect";
+import { useMinifiedCompaniesSendAll } from "@hooks/billing/useMinifiedCompaniesSendAll";
+
+interface PaymentInvoiceItem {
+  id: number | string;
+  quantity?: number | string;
+  unit_price?: string | number;
+  line_total?: string | number;
+  product?: { name?: string };
+}
+
+interface PaymentInvoice {
+  invoice_number?: string;
+  invoice_date?: string;
+  due_date?: string;
+  reseller?: { name?: string };
+  company?: { name?: string; reseller?: { name?: string } };
+  items?: PaymentInvoiceItem[];
+  subtotal?: string | number;
+  tax_amount?: string | number;
+  total_amount?: string | number;
+}
 
 interface PaymentRow {
   id: number;
@@ -31,14 +66,31 @@ interface PaymentRow {
   payment_method?: string;
   status?: string;
   payment_date?: string;
-  invoice?: any;
-  [key: string]: any;
+  invoice?: PaymentInvoice;
+}
+
+function getStatusBadgeVariant(
+  status: string,
+): "success" | "danger" | "warning" {
+  if (status === "completed") return "success";
+  if (status === "cancelled" || status === "failed") return "danger";
+  return "warning";
+}
+
+function getCompanySelectValue(
+  selectedCompanyId: string | number | undefined,
+): string {
+  return selectedCompanyId == null ? "" : String(selectedCompanyId);
 }
 
 const BillingHistory = () => {
+  useSession();
+
   const [refreshKey, setRefreshKey] = useState(0);
-  const { companyOptions } = useMinifiedCompaniesForSelect();
-  const [selectedCompanyId, setSelectedCompanyId] = useState<string | number>("");
+  const companies = useMinifiedCompaniesSendAll();
+  const [selectedCompanyId, setSelectedCompanyId] = useState<
+    string | number | undefined
+  >(undefined);
 
   const onAccountingCustomerCreated = useCallback(() => {
     setRefreshKey((k) => k + 1);
@@ -64,7 +116,6 @@ const BillingHistory = () => {
   const [activeStatusTab, setActiveStatusTab] = useState<string | null>(null);
   const [showFilterTabs, setShowFilterTabs] = useState(false);
   const [showFiltersSidebar, setShowFiltersSidebar] = useState(false);
-
   const [paymentList, setPaymentList] = useState<PaymentRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [totalRecords, setTotalRecords] = useState(0);
@@ -73,9 +124,11 @@ const BillingHistory = () => {
     rowsPerPage: 15,
     totalRows: 0,
   });
-  const [selectedPaymentSidebar, setSelectedPaymentSidebar] = useState<PaymentRow | null>(null);
+  const [selectedPaymentSidebar, setSelectedPaymentSidebar] =
+    useState<PaymentRow | null>(null);
   const [showPaymentSidebar, setShowPaymentSidebar] = useState(false);
-  const [selectedPaymentView, setSelectedPaymentView] = useState<PaymentRow | null>(null);
+  const [selectedPaymentView, setSelectedPaymentView] =
+    useState<PaymentRow | null>(null);
   const [showViewPaymentModal, setShowViewPaymentModal] = useState(false);
 
   const requestIdRef = useRef(0);
@@ -86,7 +139,7 @@ const BillingHistory = () => {
     const currentRequestId = requestIdRef.current;
     setLoading(true);
     try {
-      const response = await GetPayments({
+      const response = (await GetPayments({
         page: pagination.currentPage,
         per_page: pagination.rowsPerPage,
         search: memoizedFilters.search || "",
@@ -94,7 +147,7 @@ const BillingHistory = () => {
         // date_from: memoizedFilters.payment_date_from,
         // date_to: memoizedFilters.payment_date_to,
         ...(selectedCompanyId ? { crm_company_id: selectedCompanyId } : {}),
-      }) as any;
+      })) as any;
       if (currentRequestId !== requestIdRef.current) return;
       const list = response?.dataList ?? response?.data ?? [];
       const total = response?.meta?.total ?? response?.recordsTotal ?? 0;
@@ -110,7 +163,13 @@ const BillingHistory = () => {
     } finally {
       if (requestIdRef.current === currentRequestId) setLoading(false);
     }
-  }, [pagination.currentPage, pagination.rowsPerPage, memoizedFilters, refreshKey, selectedCompanyId]);
+  }, [
+    pagination.currentPage,
+    pagination.rowsPerPage,
+    memoizedFilters,
+    refreshKey,
+    selectedCompanyId,
+  ]);
 
   useEffect(() => {
     loadPayments();
@@ -133,15 +192,14 @@ const BillingHistory = () => {
     setShowFiltersSidebar(false);
   }, []);
 
-  const getStatusBadgeVariant = (status: string) => {
-    if (status === "completed") return "success";
-    if (status === "cancelled" || status === "failed") return "danger";
-    return "warning";
-  };
-
   const tableColumns: TableColumn<PaymentRow>[] = useMemo(
     () => [
-      { key: "id", label: "Payment ID", sortable: true, render: (row) => <span>#{row?.id}</span> },
+      {
+        key: "id",
+        label: "Payment ID",
+        sortable: true,
+        render: (row) => <span>#{row?.id}</span>,
+      },
       {
         key: "invoice",
         label: "Invoice",
@@ -162,7 +220,8 @@ const BillingHistory = () => {
         key: "payment_method",
         label: "Payment Method",
         sortable: true,
-        accessor: (row) => (row?.payment_method ? String(row.payment_method).toUpperCase() : "-"),
+        accessor: (row) =>
+          row?.payment_method ? String(row.payment_method).toUpperCase() : "-",
       },
       {
         key: "status",
@@ -170,17 +229,21 @@ const BillingHistory = () => {
         sortable: true,
         type: "badge",
         accessor: (row) => row?.status ?? "",
-        badge: { getVariant: (row) => getStatusBadgeVariant(row?.status || "") as any },
+        badge: {
+          getVariant: (row) => getStatusBadgeVariant(row?.status || ""),
+        },
       },
       {
         key: "payment_date",
         label: "Date",
         sortable: true,
         accessor: (row) =>
-          row?.payment_date ? moment(row.payment_date).format("DD-MMM-YYYY") : "-",
+          row?.payment_date
+            ? moment(row.payment_date).format("DD-MMM-YYYY")
+            : "-",
       },
     ],
-    []
+    [],
   );
 
   const paymentFilterFields: FilterField[] = useMemo(
@@ -191,7 +254,10 @@ const BillingHistory = () => {
         type: "text",
         value: pendingFilters.search ?? "",
         onChange: (value) =>
-          setPendingFilters((prev) => ({ ...prev, search: value || undefined })),
+          setPendingFilters((prev) => ({
+            ...prev,
+            search: value || undefined,
+          })),
         placeholder: "Search by invoice number or payment ID...",
       },
       {
@@ -200,7 +266,10 @@ const BillingHistory = () => {
         type: "dropdown",
         value: pendingFilters.status ?? "",
         onChange: (value) =>
-          setPendingFilters((prev) => ({ ...prev, status: value || undefined })),
+          setPendingFilters((prev) => ({
+            ...prev,
+            status: value || undefined,
+          })),
         options: [
           { value: "", label: "All Status" },
           { value: "completed", label: "Completed" },
@@ -230,7 +299,7 @@ const BillingHistory = () => {
       pendingFilters.status,
       pendingFilters.payment_date_from,
       pendingFilters.payment_date_to,
-    ]
+    ],
   );
 
   return (
@@ -244,18 +313,33 @@ const BillingHistory = () => {
                   Accounting
                 </a>
               </li>
-              <li className="breadcrumb-item active fw-bold" aria-current="page">
+              <li
+                className="breadcrumb-item active fw-bold"
+                aria-current="page"
+              >
                 Payment History
               </li>
             </ol>
           </nav>
         </div>
         <div className="d-flex flex-wrap gap-2 align-items-center">
-          <BillingCustomerCompanySelect
-            value={selectedCompanyId}
-            onChange={(next) => setSelectedCompanyId(next)}
-            companies={companyOptions}
-          />
+          <Form.Select
+            size="sm"
+            style={{ width: "220px" }}
+            value={getCompanySelectValue(selectedCompanyId)}
+            onChange={(e) =>
+              setSelectedCompanyId(
+                e.target.value === "" ? undefined : e.target.value,
+              )
+            }
+          >
+            <option value="">All companies</option>
+            {companies.map((c: { id: string | number; name?: string }) => (
+              <option key={c.id} value={c.id}>
+                {c.name ?? c.id}
+              </option>
+            ))}
+          </Form.Select>
           <Button
             variant="outline-secondary"
             onClick={handleOpenFiltersSidebar}
@@ -274,61 +358,73 @@ const BillingHistory = () => {
       </div>
 
       {/* Filter Tabs & Search */}
-       
-        {showFilterTabs && (
-      <Card className="filter-bar-card">
-        <Card.Body className="filter-bar-body">
-          <div className="filter-bar-tabs">
-            <Button
-              variant={activeStatusTab === null ? "primary" : "outline-secondary"}
-              className="filter-bar-tab"
-              onClick={() => {
-                setActiveStatusTab(null);
-                setCurrentFilters({});
-                setRefreshKey((prev) => prev + 1);
-              }}
-            >
-              <Receipt size={16} />
-              All
-            </Button>
-            <Button
-              variant={activeStatusTab === "completed" ? "primary" : "outline-secondary"}
-              className="filter-bar-tab"
-              onClick={() => {
-                setActiveStatusTab("completed");
-                setCurrentFilters({ status: "completed" });
-                setRefreshKey((prev) => prev + 1);
-              }}
-            >
-              <CheckCircle size={16} />
-              Completed
-            </Button>
-            <Button
-              variant={activeStatusTab === "cancelled" ? "primary" : "outline-secondary"}
-              className="filter-bar-tab"
-              onClick={() => {
-                setActiveStatusTab("cancelled");
-                setCurrentFilters({ status: "cancelled" });
-                setRefreshKey((prev) => prev + 1);
-              }}
-            >
-              <Ban size={16} />
-              Cancelled
-            </Button>
-            <Button
-              variant={activeStatusTab === "failed" ? "primary" : "outline-secondary"}
-              className="filter-bar-tab"
-              onClick={() => {
-                setActiveStatusTab("failed");
-                setCurrentFilters({ status: "failed" });
-                setRefreshKey((prev) => prev + 1);
-              }}
-            >
-              <AlertCircle size={16} />
-              Failed
-            </Button>
-          </div>
-          {/* <div className="filter-bar-actions">
+
+      {showFilterTabs && (
+        <Card className="filter-bar-card">
+          <Card.Body className="filter-bar-body">
+            <div className="filter-bar-tabs">
+              <Button
+                variant={
+                  activeStatusTab === null ? "primary" : "outline-secondary"
+                }
+                className="filter-bar-tab"
+                onClick={() => {
+                  setActiveStatusTab(null);
+                  setCurrentFilters({});
+                  setRefreshKey((prev) => prev + 1);
+                }}
+              >
+                <Receipt size={16} />
+                All
+              </Button>
+              <Button
+                variant={
+                  activeStatusTab === "completed"
+                    ? "primary"
+                    : "outline-secondary"
+                }
+                className="filter-bar-tab"
+                onClick={() => {
+                  setActiveStatusTab("completed");
+                  setCurrentFilters({ status: "completed" });
+                  setRefreshKey((prev) => prev + 1);
+                }}
+              >
+                <CheckCircle size={16} />
+                Completed
+              </Button>
+              <Button
+                variant={
+                  activeStatusTab === "cancelled"
+                    ? "primary"
+                    : "outline-secondary"
+                }
+                className="filter-bar-tab"
+                onClick={() => {
+                  setActiveStatusTab("cancelled");
+                  setCurrentFilters({ status: "cancelled" });
+                  setRefreshKey((prev) => prev + 1);
+                }}
+              >
+                <Ban size={16} />
+                Cancelled
+              </Button>
+              <Button
+                variant={
+                  activeStatusTab === "failed" ? "primary" : "outline-secondary"
+                }
+                className="filter-bar-tab"
+                onClick={() => {
+                  setActiveStatusTab("failed");
+                  setCurrentFilters({ status: "failed" });
+                  setRefreshKey((prev) => prev + 1);
+                }}
+              >
+                <AlertCircle size={16} />
+                Failed
+              </Button>
+            </div>
+            {/* <div className="filter-bar-actions">
             <Form.Control
               type="search"
               placeholder="Search Invoices..."
@@ -337,15 +433,22 @@ const BillingHistory = () => {
               }
             />
           </div> */}
-        </Card.Body>
-      </Card>
+          </Card.Body>
+        </Card>
       )}
 
       <GenericTable<PaymentRow>
         data={paymentList}
         columns={tableColumns}
         customizableColumns={true}
-        defaultSelectedColumns={["id", "invoice", "amount", "payment_method", "status", "payment_date"]}
+        defaultSelectedColumns={[
+          "id",
+          "invoice",
+          "amount",
+          "payment_method",
+          "status",
+          "payment_date",
+        ]}
         columnStorageKey="customerBillingHistorySelectedColumns"
         pagination={{
           currentPage: pagination.currentPage,
@@ -354,7 +457,11 @@ const BillingHistory = () => {
           pageSizeOptions: GENERIC_TABLE_PAGE_SIZE_OPTIONS,
         }}
         onPaginationChange={(page, rowsPerPage) => {
-          setPagination((prev) => ({ ...prev, currentPage: page, rowsPerPage }));
+          setPagination((prev) => ({
+            ...prev,
+            currentPage: page,
+            rowsPerPage,
+          }));
         }}
         sortable={true}
         loading={loading}
@@ -393,9 +500,21 @@ const BillingHistory = () => {
         isOpen={showPaymentSidebar}
         onClose={closePaymentSidebar}
         moduleSlug={ModuleSlug.BILLING}
-        title={selectedPaymentSidebar ? `Payment #${selectedPaymentSidebar.id}` : "Payment Details"}
-        subtitle={selectedPaymentSidebar?.invoice?.invoice_number ? `Invoice #${selectedPaymentSidebar.invoice.invoice_number}` : ""}
-        metadata={selectedPaymentSidebar?.payment_date ? moment(selectedPaymentSidebar.payment_date).format("DD-MMM-YYYY") : undefined}
+        title={
+          selectedPaymentSidebar
+            ? `Payment #${selectedPaymentSidebar.id}`
+            : "Payment Details"
+        }
+        subtitle={
+          selectedPaymentSidebar?.invoice?.invoice_number
+            ? `Invoice #${selectedPaymentSidebar.invoice.invoice_number}`
+            : ""
+        }
+        metadata={
+          selectedPaymentSidebar?.payment_date
+            ? moment(selectedPaymentSidebar.payment_date).format("DD-MMM-YYYY")
+            : undefined
+        }
         width="400px"
         sections={[
           {
@@ -403,8 +522,16 @@ const BillingHistory = () => {
             title: "Payment Information",
             icon: FileText,
             fields: [
-              { label: "Payment ID", value: selectedPaymentSidebar ? `#${selectedPaymentSidebar.id}` : "N/A" },
-              { label: "Invoice", value: selectedPaymentSidebar?.invoice?.invoice_number ?? "N/A" },
+              {
+                label: "Payment ID",
+                value: selectedPaymentSidebar
+                  ? `#${selectedPaymentSidebar.id}`
+                  : "N/A",
+              },
+              {
+                label: "Invoice",
+                value: selectedPaymentSidebar?.invoice?.invoice_number ?? "N/A",
+              },
               {
                 label: "Amount",
                 value: selectedPaymentSidebar
@@ -413,13 +540,17 @@ const BillingHistory = () => {
               },
               {
                 label: "Payment Method",
-                value: selectedPaymentSidebar?.payment_method ? String(selectedPaymentSidebar.payment_method).toUpperCase() : "N/A",
+                value: selectedPaymentSidebar?.payment_method
+                  ? String(selectedPaymentSidebar.payment_method).toUpperCase()
+                  : "N/A",
               },
               {
                 label: "Status",
                 value: selectedPaymentSidebar?.status ?? "N/A",
                 type: "badge",
-                badgeVariant: selectedPaymentSidebar ? getStatusBadgeVariant(selectedPaymentSidebar.status || "") : "secondary",
+                badgeVariant: selectedPaymentSidebar
+                  ? getStatusBadgeVariant(selectedPaymentSidebar.status || "")
+                  : "secondary",
               },
               {
                 label: "Date",
@@ -434,8 +565,17 @@ const BillingHistory = () => {
             title: "From / Bill To",
             icon: FileText,
             fields: [
-              { label: "From", value: selectedPaymentSidebar?.invoice?.reseller?.name ?? selectedPaymentSidebar?.invoice?.company?.reseller?.name ?? "N/A" },
-              { label: "Bill To", value: selectedPaymentSidebar?.invoice?.company?.name ?? "N/A" },
+              {
+                label: "From",
+                value:
+                  selectedPaymentSidebar?.invoice?.reseller?.name ??
+                  selectedPaymentSidebar?.invoice?.company?.reseller?.name ??
+                  "N/A",
+              },
+              {
+                label: "Bill To",
+                value: selectedPaymentSidebar?.invoice?.company?.name ?? "N/A",
+              },
             ],
           },
         ]}
@@ -455,116 +595,152 @@ const BillingHistory = () => {
         ]}
       />
 
-             <FormModal
-              show={showViewPaymentModal}
-              size="lg"
-              onHide={() => setShowViewPaymentModal(false)}
-              title="Invoice Details "
-              desc={`Invoice: ${selectedPaymentView?.invoice?.invoice_number}`}
-              onSubmit={() => setShowViewPaymentModal(false)}
-              submitButtonText="Close"
-              cancelButtonText="Cancel"
-              onCancel={() => setShowViewPaymentModal(false)}
-              formHtml={
-                <>
-                <div className="mb-4 pb-4 border-bottom">
-                <div className="row">
-                  <div className="col-md-6">
-                    <h6 className="text-muted mb-2">From</h6>
-                    <h6 className="mb-1">{selectedPaymentView?.invoice?.reseller?.name}</h6>
-                    {/* <img alt="logo" className="img-fluid" src={CompanyLogo2.src} /> */}
-                    <p className="text-muted mb-0 small">123 Business Street
-                      <br/>London, UK SW1A 1AA</p>
-                  </div>
-                  <div className="col-md-6">
-                    <h6 className="text-muted mb-2">Bill To</h6>
-                    <h6 className="mb-1">{selectedPaymentView?.invoice?.company?.name}</h6>
-                    <p className="text-muted mb-0 small">123 Business Street
-                      <br />London, SW1A 1AA</p>
-                  </div>
+      <FormModal
+        show={showViewPaymentModal}
+        size="lg"
+        onHide={() => setShowViewPaymentModal(false)}
+        title="Invoice Details "
+        desc={`Invoice: ${selectedPaymentView?.invoice?.invoice_number}`}
+        onSubmit={() => setShowViewPaymentModal(false)}
+        submitButtonText="Close"
+        cancelButtonText="Cancel"
+        onCancel={() => setShowViewPaymentModal(false)}
+        formHtml={
+          <>
+            <div className="mb-4 pb-4 border-bottom">
+              <div className="row">
+                <div className="col-md-6">
+                  <h6 className="text-muted mb-2">From</h6>
+                  <h6 className="mb-1">
+                    {selectedPaymentView?.invoice?.reseller?.name}
+                  </h6>
+                  {/* <img alt="logo" className="img-fluid" src={CompanyLogo2.src} /> */}
+                  <p className="text-muted mb-0 small">
+                    123 Business Street
+                    <br />
+                    London, UK SW1A 1AA
+                  </p>
+                </div>
+                <div className="col-md-6">
+                  <h6 className="text-muted mb-2">Bill To</h6>
+                  <h6 className="mb-1">
+                    {selectedPaymentView?.invoice?.company?.name}
+                  </h6>
+                  <p className="text-muted mb-0 small">
+                    123 Business Street
+                    <br />
+                    London, SW1A 1AA
+                  </p>
                 </div>
               </div>
-              <div className="mb-4 pb-4 border-bottom">
-                <div className="row">
-                  <div className="col-md-3 col-6">
-                    <p className="text-muted mb-1 small">Invoice Date</p>
-                    <p className="fw-semibold mb-0">{moment(selectedPaymentView?.invoice?.invoice_date).format('DD-MMM-YYYY')}</p>
-                  </div>
-                  <div className="col-md-3 col-6">
-                    <p className="text-muted mb-1 small">Due Date</p>
-                    <p className="fw-semibold mb-0">{moment(selectedPaymentView?.invoice?.due_date).format('DD-MMM-YYYY')}</p>
-                  </div>
-                  <div className="col-md-3 col-6">
-                    <p className="text-muted mb-1 small">Payment Method</p>
-                    <p className="fw-semibold mb-0">{selectedPaymentView?.payment_method}</p>
-                  </div>
-                  <div className="col-md-3 col-6">
-                    <p className="text-muted mb-1 small">Invoice ID</p>
-                    <p className="fw-semibold mb-0">{selectedPaymentView?.invoice?.invoice_number}</p>
-                  </div>
+            </div>
+            <div className="mb-4 pb-4 border-bottom">
+              <div className="row">
+                <div className="col-md-3 col-6">
+                  <p className="text-muted mb-1 small">Invoice Date</p>
+                  <p className="fw-semibold mb-0">
+                    {selectedPaymentView?.invoice?.invoice_date
+                      ? moment(selectedPaymentView.invoice.invoice_date).format(
+                          "DD-MMM-YYYY",
+                        )
+                      : "—"}
+                  </p>
+                </div>
+                <div className="col-md-3 col-6">
+                  <p className="text-muted mb-1 small">Due Date</p>
+                  <p className="fw-semibold mb-0">
+                    {selectedPaymentView?.invoice?.due_date
+                      ? moment(selectedPaymentView.invoice.due_date).format(
+                          "DD-MMM-YYYY",
+                        )
+                      : "—"}
+                  </p>
+                </div>
+                <div className="col-md-3 col-6">
+                  <p className="text-muted mb-1 small">Payment Method</p>
+                  <p className="fw-semibold mb-0">
+                    {selectedPaymentView?.payment_method}
+                  </p>
+                </div>
+                <div className="col-md-3 col-6">
+                  <p className="text-muted mb-1 small">Invoice ID</p>
+                  <p className="fw-semibold mb-0">
+                    {selectedPaymentView?.invoice?.invoice_number}
+                  </p>
                 </div>
               </div>
-              <div className="mb-4">
-                <h6 className="text-muted mb-3">Items</h6>
-                <div className="table-responsive">
-                  <table className="table">
-                    <thead className="bg-light">
-                      <tr>
-                        <th>Description</th>
-                        <th className="text-center">Quantity</th>
-                        <th className="text-end">Unit Price</th>
-                        <th className="text-end">Total</th>
+            </div>
+            <div className="mb-4">
+              <h6 className="text-muted mb-3">Items</h6>
+              <div className="table-responsive">
+                <table className="table">
+                  <thead className="bg-light">
+                    <tr>
+                      <th>Description</th>
+                      <th className="text-center">Quantity</th>
+                      <th className="text-end">Unit Price</th>
+                      <th className="text-end">Total</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {selectedPaymentView?.invoice?.items?.map((item) => (
+                      <tr key={item.id}>
+                        <td>{item?.product?.name}</td>
+                        <td className="text-center">{item.quantity}</td>
+                        <td className="text-end fw-semibold">
+                          {selectedPaymentView?.currency_code}{" "}
+                          {formatNumber(item.unit_price)}
+                        </td>
+                        <td className="text-end fw-semibold">
+                          {selectedPaymentView?.currency_code}{" "}
+                          {formatNumber(item.line_total)}
+                        </td>
                       </tr>
-                    </thead>
-                    <tbody>
-                      {selectedPaymentView?.invoice?.items?.map((item: any) => (
-                        <tr key={item.id}>
-                          <td>{item?.product?.name}</td>
-                          <td className="text-center">{item.quantity}</td>
-                          <td className="text-end fw-semibold">{selectedPaymentView?.currency_code} {formatNumber(item.unit_price)}</td>
-                          <td className="text-end fw-semibold">{selectedPaymentView?.currency_code} {formatNumber(item.line_total)}</td>
-                        </tr>
-                      ))}
-                      
-                    </tbody>
-                  </table>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            <div className="bg-light rounded p-3">
+              <div className="mb-2 row">
+                <div className="col-6">
+                  <p className="mb-0 text-muted">Subtotal:</p>
+                </div>
+                <div className="text-end col-6">
+                  <p className="mb-0 fw-semibold">
+                    {selectedPaymentView?.currency_code}{" "}
+                    {formatNumber(selectedPaymentView?.invoice?.subtotal)}
+                  </p>
                 </div>
               </div>
-              <div className="bg-light rounded p-3">
-                <div className="mb-2 row">
-                  <div className="col-6">
-                    <p className="mb-0 text-muted">Subtotal:</p>
-                  </div>
-                  <div className="text-end col-6">
-                    <p className="mb-0 fw-semibold">{selectedPaymentView?.currency_code} {formatNumber(selectedPaymentView?.invoice?.subtotal)}</p>
-                  </div>
+              <div className="mb-2 row">
+                <div className="col-6">
+                  <p className="mb-0 text-muted">Tax:</p>
                 </div>
-                <div className="mb-2 row">
-                  <div className="col-6">
-                    <p className="mb-0 text-muted">Tax:</p>
-                  </div>
-                  <div className="text-end col-6">
-                    <p className="mb-0 fw-semibold">{selectedPaymentView?.currency_code} {formatNumber(selectedPaymentView?.invoice?.tax_amount)}</p>
-                  </div>
-                </div>
-                <hr />
-                <div className="row">
-                  <div className="col-6">
-                    <p className="mb-0 fw-bold">Total:</p>
-                  </div>
-                  <div className="text-end col-6">
-                    <p className="mb-0 fw-bold text-primary fs-5">{selectedPaymentView?.currency_code} {formatNumber(selectedPaymentView?.invoice?.total_amount)}</p>
-                  </div>
+                <div className="text-end col-6">
+                  <p className="mb-0 fw-semibold">
+                    {selectedPaymentView?.currency_code}{" "}
+                    {formatNumber(selectedPaymentView?.invoice?.tax_amount)}
+                  </p>
                 </div>
               </div>
-                </>
-              }
-              ShowSubmitButton={false}
-              />
-
-            
-      
-
+              <hr />
+              <div className="row">
+                <div className="col-6">
+                  <p className="mb-0 fw-bold">Total:</p>
+                </div>
+                <div className="text-end col-6">
+                  <p className="mb-0 fw-bold text-primary fs-5">
+                    {selectedPaymentView?.currency_code}{" "}
+                    {formatNumber(selectedPaymentView?.invoice?.total_amount)}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </>
+        }
+        ShowSubmitButton={false}
+      />
     </React.Fragment>
   );
 };
