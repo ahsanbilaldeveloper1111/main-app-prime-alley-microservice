@@ -44,7 +44,7 @@ import {
   mapEstimationChartItems,
   resolveBusinessTypeStateFromDeal,
   sortEstimatesByCreatedAtDesc,
-} from "./editDealFetchHelpers";
+} from "@utils/crm/editDealFetchHelpers";
 
 const EditDeal = () => {
   const normalizeTemplateDataKey = (key: string): string => {
