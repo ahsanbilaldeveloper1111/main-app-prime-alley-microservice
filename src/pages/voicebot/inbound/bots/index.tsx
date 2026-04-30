@@ -220,6 +220,53 @@ const defaultConfig: BotConfiguration = {
   phone_number: "",
 };
 
+function buildConfigValue<T>(
+  value: T | undefined,
+  defaultValue: T,
+  parse: (input: string) => T = (s: string) => s as any,
+): T {
+  return typeof value === typeof "undefined" || value === null
+    ? defaultValue
+    : parse(String(value)) || defaultValue;
+}
+
+function buildConfigurationPayload(
+  c: BotConfiguration = defaultConfig,
+): BotConfiguration {
+  return {
+    instructions: c.instructions?.trim() ?? "",
+    knowledge_base: c.knowledge_base?.trim() ?? "",
+    voice_name: c.voice_name ?? "alloy",
+    voice_model: c.voice_model ?? "gpt-4o-mini-tts",
+    voice_speed: buildConfigValue(c.voice_speed, 1, Number.parseFloat),
+    voice_instructions: c.voice_instructions?.trim() ?? "",
+    llm_model: c.llm_model ?? "gpt-4o-mini",
+    temperature: buildConfigValue(c.temperature, 0.7, Number.parseFloat),
+    max_tokens: buildConfigValue(c.max_tokens, 1000, (s) =>
+      Number.parseInt(s, 10),
+    ),
+    greeting_message: c.greeting_message?.trim() ?? "",
+    transfer_enabled: Boolean(c.transfer_enabled),
+    transfer_number: c.transfer_number?.trim() ?? "",
+    transfer_trunk_id: c.transfer_trunk_id?.trim() ?? "",
+    max_duration: buildConfigValue(c.max_duration, 1800, (s) =>
+      Number.parseInt(s, 10),
+    ),
+    idle_timeout: buildConfigValue(c.idle_timeout, 300, (s) =>
+      Number.parseInt(s, 10),
+    ),
+    sip_trunk_id: c.sip_trunk_id?.trim() ?? "",
+    phone_number: c.phone_number?.trim() ?? "",
+    allow_interruptions: Boolean(c.allow_interruptions),
+    min_endpointing_delay: buildConfigValue(
+      c.min_endpointing_delay,
+      0.05,
+      Number.parseFloat,
+    ),
+    noise_cancellation: Boolean(c.noise_cancellation),
+  };
+}
+
 function getFirstValidationError(form: CreateBotPayload): string | null {
   if (!form.company_id) return "Please select a company";
   if (!form.name?.trim()) return "Bot Name is required";
@@ -255,32 +302,7 @@ function buildUpdatePayload(form: CreateBotPayload): UpdateBotPayload {
     name: form.name?.trim() ?? "",
     description: form.description?.trim() ?? "",
     status: form.status ?? "draft",
-    configuration: {
-      instructions: c.instructions?.trim() ?? "",
-      knowledge_base: c.knowledge_base?.trim() ?? "",
-      voice_name: c.voice_name ?? "alloy",
-      voice_model: c.voice_model ?? "gpt-4o-mini-tts",
-      voice_speed: num(c.voice_speed, 1, Number.parseFloat),
-      voice_instructions: c.voice_instructions?.trim() ?? "",
-      llm_model: c.llm_model ?? "gpt-4o-mini",
-      temperature: num(c.temperature, 0.7, Number.parseFloat),
-      max_tokens: num(c.max_tokens, 1000, (s) => Number.parseInt(s, 10)),
-      greeting_message: c.greeting_message?.trim() ?? "",
-      transfer_enabled: Boolean(c.transfer_enabled),
-      transfer_number: c.transfer_number?.trim() ?? "",
-      transfer_trunk_id: c.transfer_trunk_id?.trim() ?? "",
-      max_duration: num(c.max_duration, 1800, (s) => Number.parseInt(s, 10)),
-      idle_timeout: num(c.idle_timeout, 300, (s) => Number.parseInt(s, 10)),
-      sip_trunk_id: c.sip_trunk_id?.trim() ?? "",
-      phone_number: c.phone_number?.trim() ?? "",
-      allow_interruptions: Boolean(c.allow_interruptions),
-      min_endpointing_delay: num(
-        c.min_endpointing_delay,
-        0.05,
-        Number.parseFloat,
-      ),
-      noise_cancellation: Boolean(c.noise_cancellation),
-    },
+    configuration: buildConfigurationPayload(c),
   };
 }
 
@@ -308,11 +330,7 @@ function listFromSipTrunksResponse(res: unknown): unknown[] {
   return Array.isArray(inner) ? inner : [];
 }
 
-function callerIdsFromSipTrunkItem(item: Record<string, unknown>): string[] {
-  const raw = item.caller_ids ?? item.callerIds;
-  if (raw == null) {
-    return [];
-  }
+function normalizeCallerIds(raw: unknown): string[] {
   if (Array.isArray(raw)) {
     return raw
       .map((x) =>
@@ -328,6 +346,10 @@ function callerIdsFromSipTrunkItem(item: Record<string, unknown>): string[] {
       .filter((s) => s.length > 0);
   }
   return [];
+}
+
+function callerIdsFromSipTrunkItem(item: Record<string, unknown>): string[] {
+  return normalizeCallerIds(item.caller_ids ?? item.callerIds);
 }
 
 function sipTrunkRowIdFromItem(item: Record<string, unknown>): string {
