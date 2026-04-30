@@ -48,6 +48,16 @@ export function CrmProspectsContactsAddContactsButton({
   setDeleteModalMode,
   setShowDeleteModal,
 }: CrmProspectsContactsAddContactsButtonProps) {
+  const userPermissions = session?.user?.permissions ?? [];
+  const canCreate = userPermissions.includes(
+    PERMISSIONS.CREATE_CRM_DATA_MANAGEMENT,
+  );
+  const canBulkDelete =
+    userPermissions.includes(PERMISSIONS.DELETE_CRM_DATA_MANAGEMENT) &&
+    selectedItems.length > 0;
+
+  if (!canCreate && !canBulkDelete) return null;
+
   return (
     <div
       style={{
@@ -60,40 +70,38 @@ export function CrmProspectsContactsAddContactsButton({
       }}
       ref={addContactsRef}
     >
-      {session?.user?.permissions?.includes(
-        PERMISSIONS.DELETE_CRM_DATA_MANAGEMENT,
-      ) &&
-        selectedItems.length > 0 && (
-          <button
-            type="button"
-            onClick={() => {
-              setDeleteModalMode("bulk");
-              setShowDeleteModal(true);
-            }}
-            style={{
-              padding: "9px 13px",
-              backgroundColor: "#dc3545",
-              color: "#ffffff",
-              border: "none",
-              borderRadius: "4px",
-              fontSize: "12px",
-              fontWeight: "500",
-              cursor: "pointer",
-              display: "flex",
-              alignItems: "center",
-              gap: "6px",
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = "#c82333";
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = "#dc3545";
-            }}
-          >
-            <Trash2 size={16} />
-            Delete ({selectedItems.length})
-          </button>
-        )}
+      {canBulkDelete && (
+        <button
+          type="button"
+          onClick={() => {
+            setDeleteModalMode("bulk");
+            setShowDeleteModal(true);
+          }}
+          style={{
+            padding: "9px 13px",
+            backgroundColor: "#dc3545",
+            color: "#ffffff",
+            border: "none",
+            borderRadius: "4px",
+            fontSize: "12px",
+            fontWeight: "500",
+            cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            gap: "6px",
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.backgroundColor = "#c82333";
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.backgroundColor = "#dc3545";
+          }}
+        >
+          <Trash2 size={16} />
+          Delete ({selectedItems.length})
+        </button>
+      )}
+      {canCreate && (
       <div style={{ width: "146px" }}>
         <button
           onClick={() => setShowAddContactsDropdown(!showAddContactsDropdown)}
@@ -197,6 +205,7 @@ export function CrmProspectsContactsAddContactsButton({
           </div>
         )}
       </div>
+      )}
     </div>
   );
 }

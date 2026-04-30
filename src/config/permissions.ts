@@ -966,6 +966,16 @@ export const SEARCH_EXCLUDED_ROUTES: string[] = [
     'worforce/sub-categories',
     '/workforce/locations',
 
+    // Smart CRM settings pages – reachable via /main-settings/smart-crm
+    // (kept as standalone routes for direct deep-linking, but hidden from
+    // global search to avoid duplicate entries).
+    '/crm/campaigns',
+    '/crm/stages',
+    '/crm/products',
+    '/crm/deal-templates',
+    '/crm/industries',
+    '/crm/business-types',
+
     '/coming-soon',
     '/plan-upgrade',
     '/live-calls-test',

@@ -1292,7 +1292,7 @@ const UsersTeamsPage: React.FC<ControlledTabsProps> = ({ activeTab: routeActiveT
 // ─── Smart CRM (from settings: Campaigns, Industries, Products, Stages, etc.) ───
 const smartCrmTabs: Tab[] = [
   { id: 'stages', label: 'Stages', permission: PERMISSIONS.VIEW_CRM_STAGES },
-  { id: 'product-groups', label: 'Product Groups',permission: PERMISSIONS.VIEW_CRM_INDUSTRIES },
+  { id: 'industries', label: 'Industries', permission: PERMISSIONS.VIEW_CRM_INDUSTRIES },
   { id: 'products', label: 'Products', permission: PERMISSIONS.VIEW_CRM_PRODUCTS },
   { id: 'deal-templates', label: 'Deal Templates', permission: PERMISSIONS.VIEW_CRM_DEAL_TEMPLATES },
   { id: 'business-types', label: 'Business Types', permission: PERMISSIONS.VIEW_CRM_BUSINESS_TYPES },
@@ -1316,7 +1316,7 @@ const SmartCrmPage: React.FC<ControlledTabsProps> = ({ activeTab: routeActiveTab
 
   const tabContentMap: Record<string, React.ReactNode> = {
     stages: <Stages />,
-    'product-groups': <Industries />,
+    industries: <Industries />,
     products: <Products />,
     'deal-templates': <DealTemplates />,
     'business-types': <BusinessTypes />,

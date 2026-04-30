@@ -296,15 +296,19 @@ const BusinessTypes = () => {
       onSearch: handleToolbarSearch,
       rightActions: (
         <div className="d-flex gap-2">
-          <Button
-            variant="primary"
-            size="sm"
-            onClick={() => handleOpenModal()}
-            className="d-flex align-items-center gap-2"
-          >
-            <PlusCircle size={16} aria-hidden />
-            Add Business Type
-          </Button>
+          {session?.user?.permissions?.includes(
+            PERMISSIONS.CREATE_CRM_BUSINESS_TYPES,
+          ) && (
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={() => handleOpenModal()}
+              className="d-flex align-items-center gap-2"
+            >
+              <PlusCircle size={16} aria-hidden />
+              Add Business Type
+            </Button>
+          )}
         </div>
       ),
     }),

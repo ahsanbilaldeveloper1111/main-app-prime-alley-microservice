@@ -40,7 +40,6 @@ import { useRouter } from "next/router";
 
 import {
   createLead,
-  createLeadFollowUp,
   getLead,
   updateLead,
   getStages,
@@ -64,6 +63,11 @@ import {
 } from "@utils/crm";
 import { GetHierarchyData } from "@utils/users";
 import { ModuleSlug } from "@utils/Helper";
+import {
+  buildCreateLeadPayload,
+  createLeadInitialFormState,
+  maybeCreateLeadFollowUp,
+} from "./createLeadModalSubmitHelpers";
 
 interface CreateLeadModalProps {
   show: boolean;
@@ -860,169 +864,81 @@ const CreateLeadModal: React.FC<CreateLeadModalProps> = ({
     }));
   };
 
+  const resetFormForAnotherLead = () => {
+    setFormData(createLeadInitialFormState(formData.type));
+    setFormStep(0);
+    setTemplateFieldsData({});
+    setEstimationItems([]);
+    setBusinessTypeId(null);
+    setBusinessTypeOther("");
+    setShowOtherBusinessType(false);
+    setSelectedIndustryId(null);
+    setItemFormData({
+      product_id: null,
+      product_service: "",
+      description: "",
+      qty: 1,
+      unit_price: 0,
+      industry_id: null,
+    });
+  };
+
+  const handleCreateLeadFlow = async (
+    payload: Record<string, unknown>,
+  ): Promise<void> => {
+    const created = await createLead(payload);
+    await maybeCreateLeadFollowUp({
+      createdLead: created,
+      followUpDate: String(formData.follow_up_date ?? ""),
+      ownerExtensionFromForm:
+        formData.user_extension == null ? "" : String(formData.user_extension),
+      sessionExtension: String((session?.user as any)?.extension ?? ""),
+    });
+
+    if (showSuccessToast) toast.success("Lead created successfully!");
+    if (onSuccess) onSuccess();
+
+    if (createAndAddAnotherRef.current) {
+      createAndAddAnotherRef.current = false;
+      resetFormForAnotherLead();
+    } else {
+      onHide();
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Use same validation as Edit Lead modal (step-by-step checks)
-    if (!validateStep0() || !validateStep1() || !validateStep2() || !validateStep3()) {
+    // Same step-by-step validation used by the Edit Lead modal.
+    if (
+      !validateStep0() ||
+      !validateStep1() ||
+      !validateStep2() ||
+      !validateStep3()
+    ) {
       return;
     }
 
     setLoading(true);
 
     try {
-      // Format payload according to API structure (user_extension must be string for API)
-      const payload: any = {
-        name: formData.name,
-        user_extension: formData.user_extension != null ? String(formData.user_extension) : "",
-        stage_id: String(formData.stage_id),
-        ...(formData.campaign_id && {
-          campaign_id: String(formData.campaign_id),
-        }),
-        ...(formData.crm_data_id && {
-          crm_data_id: String(formData.crm_data_id),
-        }),
-        ...(formData.source && { source: formData.source }),
-        ...(formData.description && { description: formData.description }),
-        ...(formData.company_name && { company_name: formData.company_name }),
-        ...(formData.company_domain && { company_domain: formData.company_domain }),
-        ...(formData.industry && { industry: formData.industry }),
-        ...(businessTypeId && { business_type_id: String(businessTypeId) }),
-        ...(businessTypeOther && { business_type_other: businessTypeOther }),
-        ...(formData.company_country && {
-          company_country: formData.company_country,
-        }),
-        ...(formData.company_province && {
-          company_province: formData.company_province,
-        }),
-        ...(formData.company_city && { company_city: formData.company_city }),
-        ...(formData.company_location_other && {
-          company_location_other: formData.company_location_other,
-        }),
-        ...(formData.company_size && { company_size: formData.company_size }),
-        ...(formData.contact_person_title && {
-          contact_person_title: formData.contact_person_title,
-        }),
-        ...(formData.contact_person_name && {
-          contact_person_name: formData.contact_person_name,
-        }),
-        ...(formData.contact_phone_country_code && {
-          contact_phone_country_code: formData.contact_phone_country_code,
-        }),
-        ...(formData.contact_phone && {
-          contact_phone: formData.contact_phone,
-        }),
-        ...(formData.lead_potential && {
-          lead_potential: formData.lead_potential,
-        }),
-        ...(formData.follow_up_date && {
-          follow_up_date: formData.follow_up_date,
-        }),
-        ...(formData.other_information &&
-          Object.keys(formData.other_information).length > 0 && {
-            other_information: formData.other_information,
-          }),
-        ...(formData.campaign_field_values &&
-          Object.keys(formData.campaign_field_values).length > 0 && {
-            campaign_field_values: formData.campaign_field_values,
-          }),
-        ...(templateFieldsData &&
-          Object.keys(templateFieldsData).length > 0 && {
-            template_fields_data: templateFieldsData,
-          }),
-        ...(estimationItems.length > 0 && {
-          estimation_items: estimationItems,
-        }),
-        ...(formData.contact_persons.length > 0 && {
-          contact_persons: formData.contact_persons,
-        }),
-      };
+      const payload = buildCreateLeadPayload({
+        formData,
+        businessTypeId,
+        businessTypeOther,
+        templateFieldsData,
+        estimationItems,
+      });
 
       if (editLeadId) {
         await updateLead(editLeadId, payload);
         if (showSuccessToast) toast.success("Lead updated successfully!");
         if (onSuccess) onSuccess();
         onHide();
-      } else {
-        const created = await createLead(payload);
-        const followUpDate = String(formData.follow_up_date ?? "").trim();
-        if (followUpDate) {
-          const createdId = Number((created as any)?.id);
-          const ownerExtensionFromForm =
-            formData.user_extension == null ? "" : String(formData.user_extension);
-          const ownerExtension =
-            ownerExtensionFromForm || String((session?.user as any)?.extension ?? "");
-
-          if (Number.isFinite(createdId) && createdId > 0 && ownerExtension) {
-            try {
-              await createLeadFollowUp(createdId, {
-                follow_up_date: followUpDate,
-                follow_up_status: "Pending",
-                communication_channel: "Phone Call",
-                notes: "",
-                user_extension: ownerExtension,
-              });
-            } catch {
-              // createLeadFollowUp surfaces its own toast; do not block lead creation
-            }
-          }
-        }
-        if (showSuccessToast) toast.success("Lead created successfully!");
-        if (onSuccess) onSuccess();
-        if (createAndAddAnotherRef.current) {
-        createAndAddAnotherRef.current = false;
-        // Reset form for another lead (keep type and fetched data)
-        setFormData({
-          name: "",
-          user_extension: null,
-          type: formData.type,
-          description: "",
-          source: "",
-          company_name: "",
-          company_domain: "",
-          company_contact: "",
-          company_description: "",
-          industry: "",
-          business_type: "",
-          company_country: "",
-          company_province: "",
-          company_city: "",
-          company_location_other: "",
-          company_size: "",
-          contact_person_title: "",
-          contact_person_name: "",
-          contact_phone_country_code: "",
-          contact_phone: "",
-          stage_id: undefined,
-          campaign_id: undefined,
-          crm_data_id: undefined,
-          lead_potential: "",
-          follow_up_date: "",
-          other_information: {},
-          campaign_field_values: {},
-          contact_persons: [
-            { title: "Mr.", name: "", phone_country_code: "", phone: "", email: "" },
-          ],
-        });
-        setFormStep(0);
-        setTemplateFieldsData({});
-        setEstimationItems([]);
-        setBusinessTypeId(null);
-        setBusinessTypeOther("");
-        setShowOtherBusinessType(false);
-        setSelectedIndustryId(null);
-        setItemFormData({
-          product_id: null,
-          product_service: "",
-          description: "",
-          qty: 1,
-          unit_price: 0,
-          industry_id: null,
-        });
-        } else {
-          onHide();
-        }
+        return;
       }
+
+      await handleCreateLeadFlow(payload);
     } catch (error) {
       toast.error(editLeadId ? "Failed to update lead" : "Failed to create lead");
       console.error("Create lead error:", error);

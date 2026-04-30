@@ -709,6 +709,8 @@ export const HEADER_CONSTANTS = {
 
     VIEW_CRM_DEAL_TEMPLATES: "view-crm-deal-templates",
     CREATE_CRM_DEAL_TEMPLATES: "add-crm-deal-templates",
+    EDIT_CRM_DEAL_TEMPLATES: "edit-crm-deal-templates",
+    DELETE_CRM_DEAL_TEMPLATES: "delete-crm-deal-templates",
     VIEW_CRM_INDUSTRIES: "view-crm-industry",
     CREATE_CRM_INDUSTRY: "add-crm-industry",
     EDIT_CRM_INDUSTRY: "edit-crm-industry",

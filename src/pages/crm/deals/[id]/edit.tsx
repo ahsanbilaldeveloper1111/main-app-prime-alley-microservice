@@ -37,6 +37,14 @@ import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
 import { ModuleSlug, ValidationType, checkRequiredFields } from '@utils/Helper';
 import { convertCurrency, formatCurrency } from '@utils/currency';
+import {
+  buildEditDealFormStateFromDeal,
+  buildEstimateOverridesPatch,
+  buildHydratedTemplateFieldValues,
+  mapEstimationChartItems,
+  resolveBusinessTypeStateFromDeal,
+  sortEstimatesByCreatedAtDesc,
+} from "./editDealFetchHelpers";
 
 const EditDeal = () => {
   const normalizeTemplateDataKey = (key: string): string => {
@@ -305,170 +313,89 @@ const EditDeal = () => {
   };
 
   useEffect(() => {
+    const applyBusinessTypeFromDeal = (deal: any) => {
+      const { businessTypeId: bId, businessTypeOther: bOther, showOther } =
+        resolveBusinessTypeStateFromDeal(deal);
+      setBusinessTypeId(bId);
+      setBusinessTypeOther(bOther);
+      setShowOtherBusinessType(showOther);
+    };
+
+    const tryLoadSourceLead = async (ticketId: number | null | undefined) => {
+      if (!ticketId) return;
+      try {
+        const leadData: any = await getLead(Number(ticketId));
+        setSourceLead(leadData);
+      } catch (error) {
+        // Lead is optional – log and move on; toast is intentionally suppressed.
+        console.error("Failed to fetch lead:", error);
+      }
+    };
+
+    const applyDealTemplate = async (deal: any) => {
+      const stored: Record<string, any> = {
+        ...deal.deal_template_field_values,
+        ...deal.template_data,
+      };
+      const fromDeal = deal.deal_template;
+      const resolved =
+        fromDeal ?? (await getRelevantDealTemplate({ deal_id: Number(id) }));
+
+      if (!resolved) {
+        setDealTemplate(null);
+        setInitialTemplateFieldValues({});
+        setTemplateFieldsData({});
+        return;
+      }
+      setDealTemplate(resolved);
+      const hydrated = buildHydratedTemplateFieldValues(
+        resolved,
+        stored,
+        normalizeTemplateDataKey,
+      );
+      setInitialTemplateFieldValues(hydrated);
+      setTemplateFieldsData(hydrated);
+    };
+
+    const applyEstimationItems = (deal: any, sortedEstimates: any[]) => {
+      if (sortedEstimates.length > 0) {
+        const latest = sortedEstimates[0];
+        const overrides = buildEstimateOverridesPatch(latest);
+        if (Object.keys(overrides).length > 0) {
+          setFormData((prev) => ({ ...prev, ...overrides }));
+        }
+        setEstimationItems(
+          mapEstimationChartItems(latest.estimation_chart, deal.currency),
+        );
+        return;
+      }
+      const dealChart = deal.estimation_chart;
+      if (Array.isArray(dealChart) && dealChart.length > 0) {
+        setEstimationItems(mapEstimationChartItems(dealChart, deal.currency));
+      }
+    };
+
     const fetchDealData = async () => {
       if (!router.isReady || !id || isInitialLoad.current === false) return;
-      
+
       try {
         setFetching(true);
         const deal = await getDeal(Number(id));
-        
-        // Format dates for input fields
-        const formatDate = (dateString: string | null) => {
-          if (!dateString) return "";
-          return dateString.split('T')[0];
-        };
 
-        setFormData({
-          name: deal.name || "",
-          ticket_id: deal.ticket_id ? Number(deal.ticket_id) : null,
-          stage_id: deal.stage_id ? Number(deal.stage_id) : undefined,
-          assigned_to: deal.assigned_to || null,
-          expected_close_date: formatDate(deal.expected_close_date),
-          company_name: deal.company_name || "",
-          industry_ids: (deal as any).industry_ids && Array.isArray((deal as any).industry_ids) 
-            ? (deal as any).industry_ids.map((id: any) => Number(id)).filter((id: number) => !Number.isNaN(id))
-            : (deal as any).industries && Array.isArray((deal as any).industries)
-            ? (deal as any).industries.map((ind: any) => typeof ind === 'object' ? Number(ind.id) : Number(ind)).filter((id: number) => !Number.isNaN(id))
-            : [],
-          decision_maker_title: deal.decision_maker_title || "",
-          decision_maker_name: deal.decision_maker_name || (deal as any).main_decision_maker?.name || "",
-          decision_maker_phone_country_code: deal.decision_maker_phone_country_code || (deal as any).main_decision_maker?.phone_country_code || "",
-          decision_maker_phone: deal.decision_maker_phone || (deal as any).main_decision_maker?.phone || "",
-          decision_maker_email: (deal as any).main_decision_maker?.email || "",
-          deal_type: deal.deal_type || "",
-          contract_length: deal.contract_length || "",
-          contract_length_custom: deal.contract_length_custom || "",
-          billing_model: deal.billing_model || "",
-          payment_terms: deal.payment_terms || "",
-          payment_terms_custom: deal.payment_terms_custom || "",
-          risk_level: deal.risk_level || "",
-          competitors: deal.competitors || "",
-          quotation_sent: deal.quotation_sent || false,
-          contract_sent: deal.contract_sent || false,
-          contract_received: deal.contract_received || false,
-          follow_up_date: formatDate(deal.follow_up_date),
-          currency: deal.currency || "AED",
-          tax_percentage: (deal as any).tax_percentage?.toString() || "0",
-          standard_discount_percentage: (deal as any).standard_discount_percentage?.toString() || "0",
-          special_discount_percentage: (deal as any).special_discount_percentage?.toString() || "0",
-        });
+        setFormData(buildEditDealFormStateFromDeal(deal) as any);
+        applyBusinessTypeFromDeal(deal);
+        await tryLoadSourceLead(deal.ticket_id);
+        await applyDealTemplate(deal);
 
-        // Set business type state - check for business_type_id or business_type_other
-        const dealAny = deal as any;
-        if (dealAny.business_type_id) {
-          setBusinessTypeId(Number(dealAny.business_type_id));
-          setBusinessTypeOther("");
-          setShowOtherBusinessType(false);
-        } else if (dealAny.business_type_other) {
-          setBusinessTypeId(null);
-          setBusinessTypeOther(dealAny.business_type_other);
-          setShowOtherBusinessType(true);
-        } else {
-          setBusinessTypeId(null);
-          setBusinessTypeOther("");
-          setShowOtherBusinessType(false);
-        }
-
-        // Fetch lead data if ticket_id exists (ticket_id contains the lead_id)
-        if (deal.ticket_id) {
-          try {
-            const leadData: any = await getLead(Number(deal.ticket_id));
-            setSourceLead(leadData);
-          } catch (error) {
-            console.error("Failed to fetch lead:", error);
-            // Don't show error toast as lead is optional
-          }
-        }
-
-        // Extract deal_template from deal response (or resolve relevant default/campaign template).
-        const dealTemplateFieldValues = (deal as any).deal_template_field_values || {};
-        const dealTemplateDataValues = (deal as any).template_data || {};
-        const mergedTemplateValues: Record<string, any> = {
-          ...dealTemplateFieldValues,
-          ...dealTemplateDataValues,
-        };
-
-        const dealTemplateData = (deal as any).deal_template;
-        const resolvedTemplate =
-          dealTemplateData ?? (await getRelevantDealTemplate({ deal_id: Number(id) }));
-
-        if (resolvedTemplate) {
-          setDealTemplate(resolvedTemplate);
-          const hydratedTemplateValues: Record<string, any> = {
-            template_name: resolvedTemplate.name || "",
-          };
-          (resolvedTemplate.fields || []).forEach((field: DealTemplateField) => {
-            const normalizedFieldKey = normalizeTemplateDataKey(field.field_name);
-            hydratedTemplateValues[field.field_name] =
-              mergedTemplateValues[field.field_name] ??
-              mergedTemplateValues[normalizedFieldKey] ??
-              "";
-          });
-          setInitialTemplateFieldValues(hydratedTemplateValues);
-          setTemplateFieldsData(hydratedTemplateValues);
-        } else {
-          setDealTemplate(null);
-          setInitialTemplateFieldValues({});
-          setTemplateFieldsData({});
-        }
-
-        // Set additional data
-        // Sort estimates by created_at date (newest first) to ensure latest revision is always first
-        const sortedEstimates = deal.estimates && deal.estimates.length > 0
-          ? [...deal.estimates].sort((a: any, b: any) => {
-              const dateA = new Date(a.created_at).getTime();
-              const dateB = new Date(b.created_at).getTime();
-              return dateB - dateA; // Sort descending (newest first)
-            })
-          : [];
+        const sortedEstimates = sortEstimatesByCreatedAtDesc(deal.estimates);
         setEstimates(sortedEstimates);
         setAttachments((deal as any).attachments || []);
         setHistories((deal as any).histories || []);
         setNegotiationBar(deal.negotiation_bar || 0);
         setProbability(deal.probability || 0);
 
-        // Load estimation chart from the most recent estimate or deal
-        if (sortedEstimates.length > 0) {
-          // Get the latest estimate (first in sorted array)
-          const latestEstimate = sortedEstimates[0];
-          
-          // Load tax and discount percentages from the latest estimate
-          if (latestEstimate.tax_percentage) {
-            setFormData(prev => ({ ...prev, tax_percentage: latestEstimate.tax_percentage.toString() }));
-          }
-          if (latestEstimate.standard_discount_percentage) {
-            setFormData(prev => ({ ...prev, standard_discount_percentage: latestEstimate.standard_discount_percentage.toString() }));
-          }
-          if (latestEstimate.special_discount_percentage) {
-            setFormData(prev => ({ ...prev, special_discount_percentage: latestEstimate.special_discount_percentage.toString() }));
-          }
-          
-          if (latestEstimate.estimation_chart && latestEstimate.estimation_chart.length > 0) {
-            setEstimationItems(latestEstimate.estimation_chart.map((item: any) => ({
-              product_id: item.product_id || 0,
-              product_service: item.product_service || "",
-              description: item.description || "",
-              qty: item.qty || 1,
-              unit_price: item.unit_price || 0,
-              original_currency: item.original_currency || deal.currency || "AED",
-              original_price: item.original_price || item.unit_price || 0,
-            })));
-          } else {
-            // If latest estimate has no items, clear estimation items
-            setEstimationItems([]);
-          }
-        } else if (deal.estimation_chart && Array.isArray(deal.estimation_chart) && deal.estimation_chart.length > 0) {
-          setEstimationItems(deal.estimation_chart.map((item: any) => ({
-            product_id: item.product_id || 0,
-            product_service: item.product_service || "",
-            description: item.description || "",
-            qty: item.qty || 1,
-            unit_price: item.unit_price || 0,
-            original_currency: item.original_currency || deal.currency || "AED",
-            original_price: item.original_price || item.unit_price || 0,
-          })));
-        }
-        
+        applyEstimationItems(deal, sortedEstimates);
+
         isInitialLoad.current = false;
       } catch (error) {
         console.error("Failed to fetch deal:", error);
@@ -684,9 +611,9 @@ const EditDeal = () => {
             original_currency: item.original_currency || formData.currency,
             original_price: item.original_price || item.unit_price,
           })),
-          standard_discount_percentage: parseFloat(formData.standard_discount_percentage || "0"),
-          special_discount_percentage: parseFloat(formData.special_discount_percentage || "0"),
-          tax_percentage: parseFloat(formData.tax_percentage || "0"),
+          standard_discount_percentage: Number.parseFloat(formData.standard_discount_percentage || "0"),
+          special_discount_percentage: Number.parseFloat(formData.special_discount_percentage || "0"),
+          tax_percentage: Number.parseFloat(formData.tax_percentage || "0"),
           currency: formData.currency,
         };
 
@@ -918,7 +845,7 @@ const EditDeal = () => {
                                       if (productCurrency === newDealCurrency) {
                                         return {
                                           ...item,
-                                          unit_price: parseFloat(product.price) || item.unit_price,
+                                          unit_price: Number.parseFloat(product.price) || item.unit_price,
                                         };
                                       }
                                       
@@ -1375,7 +1302,7 @@ const EditDeal = () => {
                       <Form.Group className="mb-3">
                         <Form.Label>Standard Discount (%)</Form.Label>
                         <Form.Select
-                          value={(formData.standard_discount_percentage && parseFloat(formData.standard_discount_percentage))}
+                          value={(formData.standard_discount_percentage && Number.parseFloat(formData.standard_discount_percentage))}
                           onChange={(e) => setFormData({ ...formData, standard_discount_percentage: e.target.value })}
                         >
                           <option value="0">0%</option>
@@ -1389,7 +1316,7 @@ const EditDeal = () => {
                       <Form.Group className="mb-3">
                         <Form.Label>Special Discount (%)</Form.Label>
                         <Form.Select
-                          value={(formData.special_discount_percentage && parseFloat(formData.special_discount_percentage))}
+                          value={(formData.special_discount_percentage && Number.parseFloat(formData.special_discount_percentage))}
                           onChange={(e) => setFormData({ ...formData, special_discount_percentage: e.target.value })}
                         >
                           <option value="0">0%</option>
@@ -1580,7 +1507,7 @@ const EditDeal = () => {
                                   )}
                                   <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
                                     <div style={{ fontWeight: 500 }}>
-                                      {formData.currency || 'AED'} {parseFloat(String(item.unit_price || '0')).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                      {formData.currency || 'AED'} {Number.parseFloat(String(item.unit_price || '0')).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                     </div>
                                     {showConversionInfo && (
                                       <div className="small text-muted" style={{ fontSize: '0.75rem', marginTop: '2px' }}>
@@ -1644,11 +1571,11 @@ const EditDeal = () => {
                           {estimationItems.length > 0 && (() => {
                             const grandTotal = estimationItems.reduce((sum, item) => sum + (item.qty * item.unit_price), 0);
                             
-                            const totalDiscountPercentage = parseFloat(formData.standard_discount_percentage || "0") + parseFloat(formData.special_discount_percentage || "0");
+                            const totalDiscountPercentage = Number.parseFloat(formData.standard_discount_percentage || "0") + Number.parseFloat(formData.special_discount_percentage || "0");
                             
                             const totalDiscount = (grandTotal * totalDiscountPercentage) / 100;
                             const subtotalAfterDiscount = grandTotal - totalDiscount;
-                            const taxAmount = (subtotalAfterDiscount * parseFloat(formData.tax_percentage || "0")) / 100;
+                            const taxAmount = (subtotalAfterDiscount * Number.parseFloat(formData.tax_percentage || "0")) / 100;
                             const netValue = subtotalAfterDiscount + taxAmount;
                             return (
                               <tfoot>
@@ -1664,7 +1591,7 @@ const EditDeal = () => {
                                   <tr>
                                     <td colSpan={estimationItems.some((item) => item.description) ? 7 : 6} style={{ textAlign: 'right', paddingRight: '20px' }}>
                                       <span style={{ color: '#6c757d' }}>
-                                        Discount ({parseFloat(formData.standard_discount_percentage || "0") + parseFloat(formData.special_discount_percentage || "0")}%):
+                                        Discount ({Number.parseFloat(formData.standard_discount_percentage || "0") + Number.parseFloat(formData.special_discount_percentage || "0")}%):
                                       </span>
                                     </td>
                                     <td style={{ textAlign: 'right', color: '#dc3545', whiteSpace: 'nowrap' }}>
@@ -1672,7 +1599,7 @@ const EditDeal = () => {
                                     </td>
                                   </tr>
                                 )}
-                                {parseFloat(formData.tax_percentage || "0") > 0 && (
+                                {Number.parseFloat(formData.tax_percentage || "0") > 0 && (
                                   <tr>
                                     <td colSpan={estimationItems.some((item) => item.description) ? 7 : 6} style={{ textAlign: 'right', paddingRight: '20px' }}>
                                       <strong>Tax ({formData.tax_percentage}%):</strong>
@@ -1728,7 +1655,7 @@ const EditDeal = () => {
                   qty: itemFormData.qty,
                   unit_price: itemFormData.unit_price,
                   original_currency: selectedProduct?.currency || formData.currency,
-                  original_price: parseFloat(selectedProduct?.price || "0") || itemFormData.unit_price,
+                  original_price: Number.parseFloat(selectedProduct?.price || "0") || itemFormData.unit_price,
                 };
 
                 if (editingItemIndex !== null) {
@@ -1830,7 +1757,7 @@ const EditDeal = () => {
                           onChange={async (selectedOption: any) => {
                             const product = products.find(p => p.id === selectedOption?.value);
                             if (product) {
-                              const originalPrice = parseFloat(product.price) || 0;
+                              const originalPrice = Number.parseFloat(product.price) || 0;
                               const productCurrency = product.currency.toUpperCase();
                               const dealCurrency = formData.currency.toUpperCase();
                               
@@ -1865,7 +1792,7 @@ const EditDeal = () => {
                           options={products.map(product => {
                             const productCurrency = product.currency.toUpperCase();
                             const dealCurrency = formData.currency.toUpperCase();
-                            const originalPrice = parseFloat(product.price) || 0;
+                            const originalPrice = Number.parseFloat(product.price) || 0;
                             
                             // Show both currencies if they differ
                             if (productCurrency !== dealCurrency) {
@@ -1929,7 +1856,7 @@ const EditDeal = () => {
                           step="0.01"
                           placeholder="Enter unit price"
                           value={itemFormData.unit_price}
-                          onChange={(e) => setItemFormData({ ...itemFormData, unit_price: parseFloat(e.target.value) || 0 })}
+                          onChange={(e) => setItemFormData({ ...itemFormData, unit_price: Number.parseFloat(e.target.value) || 0 })}
                           required
                           disabled={convertingPrice}
                         />
@@ -1938,7 +1865,7 @@ const EditDeal = () => {
                           if (selectedProduct) {
                             const productCurrency = selectedProduct.currency.toUpperCase();
                             const dealCurrency = formData.currency.toUpperCase();
-                            const originalPrice = parseFloat(selectedProduct.price) || 0;
+                            const originalPrice = Number.parseFloat(selectedProduct.price) || 0;
                             
                             if (productCurrency !== dealCurrency && itemFormData.unit_price !== originalPrice) {
                               return (
@@ -1998,7 +1925,7 @@ const EditDeal = () => {
                         qty: itemFormData.qty,
                         unit_price: itemFormData.unit_price,
                         original_currency: selectedProduct?.currency || formData.currency,
-                        original_price: parseFloat(selectedProduct?.price || "0") || itemFormData.unit_price,
+                        original_price: Number.parseFloat(selectedProduct?.price || "0") || itemFormData.unit_price,
                       };
 
                       if (editingItemIndex !== null) {
@@ -2052,8 +1979,8 @@ const EditDeal = () => {
                         </thead>
                         <tbody>
                           {estimates.map((estimate: any, index: number) => {
-                            const grandTotal = parseFloat(estimate.grand_total || "0");
-                            const netValue = parseFloat(estimate.net_value || "0");
+                            const grandTotal = Number.parseFloat(estimate.grand_total || "0");
+                            const netValue = Number.parseFloat(estimate.net_value || "0");
                             const itemCount = estimate.estimation_chart?.length || 0;
                             
                             return (

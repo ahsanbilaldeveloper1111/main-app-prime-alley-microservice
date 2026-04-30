@@ -3818,128 +3818,47 @@ export function CrmDealsListScreenView({
     const base = buildDealsListStatsCards(dealsMetrics, isApprovalsList);
     const today = moment().format("YYYY-MM-DD");
 
-    return base.map((card) => {
-      if (isApprovalsList) {
-        if (card.title === "All deals submitted") {
-          return {
-            ...card,
-            onClick: () =>
-              applyDealsWidgetFiltersPatch({ ...clearDealsWidgetFiltersPatch }),
-          };
-        }
-        if (card.title === "Pending Approval") {
-          return {
-            ...card,
-            onClick: () =>
-              applyDealsWidgetFiltersPatch({
-                ...clearDealsWidgetFiltersPatch,
-                approval_status: "pending",
-              }),
-          };
-        }
-        if (card.title === "Approved Deals") {
-          return {
-            ...card,
-            onClick: () =>
-              applyDealsWidgetFiltersPatch({
-                ...clearDealsWidgetFiltersPatch,
-                approval_status: "approved",
-              }),
-          };
-        }
-        if (card.title === "Rejected Deals") {
-          return {
-            ...card,
-            onClick: () =>
-              applyDealsWidgetFiltersPatch({
-                ...clearDealsWidgetFiltersPatch,
-                approval_status: "rejected",
-              }),
-          };
-        }
-        if (card.title === "High-Value (Pending)") {
-          return {
-            ...card,
-            onClick: () =>
-              applyDealsWidgetFiltersPatch({
-                ...clearDealsWidgetFiltersPatch,
-                approval_status: "pending",
-                high_value: true,
-              }),
-          };
-        }
-        if (card.title === "Recently Reviewed") {
-          return {
-            ...card,
-            onClick: () =>
-              applyDealsWidgetFiltersPatch({
-                ...clearDealsWidgetFiltersPatch,
-                reviewed_last_24h: true,
-              }),
-          };
-        }
-        return card;
-      }
+    // Maps each card title to the partial filter patch the widget should
+    // apply. Empty object means "clear all filters" only.
+    const approvalsCardPatches: Record<string, Record<string, unknown>> = {
+      "All deals submitted": {},
+      "Pending Approval": { approval_status: "pending" },
+      "Approved Deals": { approval_status: "approved" },
+      "Rejected Deals": { approval_status: "rejected" },
+      "High-Value (Pending)": {
+        approval_status: "pending",
+        high_value: true,
+      },
+      "Recently Reviewed": { reviewed_last_24h: true },
+    };
 
-      if (card.title === "All Deals") {
-        return {
-          ...card,
-          onClick: () =>
-            applyDealsWidgetFiltersPatch({ ...clearDealsWidgetFiltersPatch }),
-        };
-      }
-      if (card.title === "High-Value Deals") {
-        return {
-          ...card,
-          onClick: () =>
-            applyDealsWidgetFiltersPatch({
-              ...clearDealsWidgetFiltersPatch,
-              high_value: true,
-            }),
-        };
-      }
-      if (card.title === "At-Risk Deals") {
-        return {
-          ...card,
-          onClick: () =>
-            applyDealsWidgetFiltersPatch({
-              ...clearDealsWidgetFiltersPatch,
-              at_risk: true,
-            }),
-        };
-      }
-      if (card.title === "Deals Won") {
-        return {
-          ...card,
-          onClick: () =>
-            applyDealsWidgetFiltersPatch({
-              ...clearDealsWidgetFiltersPatch,
-              is_won: true,
-            }),
-        };
-      }
-      if (card.title === "Today's Follow-ups") {
-        return {
-          ...card,
-          onClick: () =>
-            applyDealsWidgetFiltersPatch({
-              ...clearDealsWidgetFiltersPatch,
-              follow_up_date_from: today,
-              follow_up_date_to: today,
-            }),
-        };
-      }
-      if (card.title === "Overdue") {
-        return {
-          ...card,
-          onClick: () =>
-            applyDealsWidgetFiltersPatch({
-              ...clearDealsWidgetFiltersPatch,
-              overdue: true,
-            }),
-        };
-      }
-      return card;
+    const dealsCardPatches: Record<string, Record<string, unknown>> = {
+      "All Deals": {},
+      "High-Value Deals": { high_value: true },
+      "At-Risk Deals": { at_risk: true },
+      "Deals Won": { is_won: true },
+      "Today's Follow-ups": {
+        follow_up_date_from: today,
+        follow_up_date_to: today,
+      },
+      Overdue: { overdue: true },
+    };
+
+    const cardPatches = isApprovalsList
+      ? approvalsCardPatches
+      : dealsCardPatches;
+
+    return base.map((card) => {
+      const patch = cardPatches[card.title];
+      if (patch === undefined) return card;
+      return {
+        ...card,
+        onClick: () =>
+          applyDealsWidgetFiltersPatch({
+            ...clearDealsWidgetFiltersPatch,
+            ...patch,
+          }),
+      };
     });
   }, [
     dealsMetrics,

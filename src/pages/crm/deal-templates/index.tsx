@@ -469,27 +469,40 @@ const DealTemplatesPage = () => {
             >
               <Eye size={14} />
             </Button>
-            <Button
-              variant="outline-primary"
-              size="sm"
-              onClick={() => handleOpenModal(template)}
-              aria-label={"Edit deal template " + (template.name ?? "")}
-            >
-              <Edit size={14} />
-            </Button>
-            <Button
-              variant="outline-danger"
-              size="sm"
-              onClick={() => handlePromptDelete(template)}
-              aria-label={"Delete deal template " + (template.name ?? "")}
-            >
-              <Trash2 size={14} />
-            </Button>
+            {session?.user?.permissions?.includes(
+              PERMISSIONS.EDIT_CRM_DEAL_TEMPLATES,
+            ) && (
+              <Button
+                variant="outline-primary"
+                size="sm"
+                onClick={() => handleOpenModal(template)}
+                aria-label={"Edit deal template " + (template.name ?? "")}
+              >
+                <Edit size={14} />
+              </Button>
+            )}
+            {session?.user?.permissions?.includes(
+              PERMISSIONS.DELETE_CRM_DEAL_TEMPLATES,
+            ) && (
+              <Button
+                variant="outline-danger"
+                size="sm"
+                onClick={() => handlePromptDelete(template)}
+                aria-label={"Delete deal template " + (template.name ?? "")}
+              >
+                <Trash2 size={14} />
+              </Button>
+            )}
           </div>
         ),
       },
     ],
-    [handleView, handleOpenModal, handlePromptDelete],
+    [
+      handleView,
+      handleOpenModal,
+      handlePromptDelete,
+      session?.user?.permissions,
+    ],
   );
 
   const templatesToolbarConfig = useMemo<ToolbarConfig>(

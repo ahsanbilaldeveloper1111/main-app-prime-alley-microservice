@@ -569,9 +569,9 @@ const CreateDeal = () => {
               original_currency: item.original_currency || formData.currency,
               original_price: item.original_price || item.unit_price,
             })),
-            standard_discount_percentage: parseFloat(formData.standard_discount_percentage || "0"),
-            special_discount_percentage: parseFloat(formData.special_discount_percentage || "0"),
-            tax_percentage: parseFloat(formData.tax_percentage || "0"),
+            standard_discount_percentage: Number.parseFloat(formData.standard_discount_percentage || "0"),
+            special_discount_percentage: Number.parseFloat(formData.special_discount_percentage || "0"),
+            tax_percentage: Number.parseFloat(formData.tax_percentage || "0"),
             currency: formData.currency,
           };
 
@@ -814,7 +814,7 @@ const CreateDeal = () => {
                                       if (productCurrency === newDealCurrency) {
                                         return {
                                           ...item,
-                                          unit_price: parseFloat(product.price) || item.unit_price,
+                                          unit_price: Number.parseFloat(product.price) || item.unit_price,
                                         };
                                       }
                                       
@@ -1198,7 +1198,7 @@ const CreateDeal = () => {
                       <Form.Group className="mb-3">
                         <Form.Label>Standard Discount (%)</Form.Label>
                         <Form.Select
-                          value={(formData.standard_discount_percentage && parseFloat(formData.standard_discount_percentage))}
+                          value={(formData.standard_discount_percentage && Number.parseFloat(formData.standard_discount_percentage))}
                           onChange={(e) => setFormData({ ...formData, standard_discount_percentage: e.target.value })}
                         >
                           <option value="0">0%</option>
@@ -1212,7 +1212,7 @@ const CreateDeal = () => {
                       <Form.Group className="mb-3">
                         <Form.Label>Special Discount (%)</Form.Label>
                         <Form.Select
-                          value={(formData.special_discount_percentage && parseFloat(formData.special_discount_percentage))}
+                          value={(formData.special_discount_percentage && Number.parseFloat(formData.special_discount_percentage))}
                           onChange={(e) => setFormData({ ...formData, special_discount_percentage: e.target.value })}
                         >
                           <option value="0">0%</option>
@@ -1395,7 +1395,7 @@ const CreateDeal = () => {
                                   )}
                                   <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
                                     <div style={{ fontWeight: 500 }}>
-                                      {formData.currency || 'AED'} {parseFloat(String(item.unit_price || '0')).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                      {formData.currency || 'AED'} {Number.parseFloat(String(item.unit_price || '0')).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                     </div>
                                     {showConversionInfo && (
                                       <div className="small text-muted" style={{ fontSize: '0.75rem', marginTop: '2px' }}>
@@ -1457,10 +1457,10 @@ const CreateDeal = () => {
                           </tbody>
                           {estimationItems.length > 0 && (() => {
                             const grandTotal = estimationItems.reduce((sum, item) => sum + (item.qty * item.unit_price), 0);
-                            const totalDiscountPercentage = parseFloat(formData.standard_discount_percentage || "0") + parseFloat(formData.special_discount_percentage || "0");
+                            const totalDiscountPercentage = Number.parseFloat(formData.standard_discount_percentage || "0") + Number.parseFloat(formData.special_discount_percentage || "0");
                             const totalDiscount = (grandTotal * totalDiscountPercentage) / 100;
                             const subtotalAfterDiscount = grandTotal - totalDiscount;
-                            const taxAmount = (subtotalAfterDiscount * parseFloat(formData.tax_percentage || "0")) / 100;
+                            const taxAmount = (subtotalAfterDiscount * Number.parseFloat(formData.tax_percentage || "0")) / 100;
                             const netValue = subtotalAfterDiscount + taxAmount;
                             return (
                               <tfoot>
@@ -1476,7 +1476,7 @@ const CreateDeal = () => {
                                   <tr>
                                     <td colSpan={estimationItems.some((item) => item.description) ? 7 : 6} style={{ textAlign: 'right', paddingRight: '20px' }}>
                                       <span style={{ color: '#6c757d' }}>
-                                        Discount ({parseFloat(formData.standard_discount_percentage || "0") + parseFloat(formData.special_discount_percentage || "0")}%):
+                                        Discount ({Number.parseFloat(formData.standard_discount_percentage || "0") + Number.parseFloat(formData.special_discount_percentage || "0")}%):
                                       </span>
                                     </td>
                                     <td style={{ textAlign: 'right', color: '#dc3545', whiteSpace: 'nowrap' }}>
@@ -1484,7 +1484,7 @@ const CreateDeal = () => {
                                     </td>
                                   </tr>
                                 )}
-                                {parseFloat(formData.tax_percentage || "0") > 0 && (
+                                {Number.parseFloat(formData.tax_percentage || "0") > 0 && (
                                   <tr>
                                     <td colSpan={estimationItems.some((item) => item.description) ? 7 : 6} style={{ textAlign: 'right', paddingRight: '20px' }}>
                                       <strong>Tax ({formData.tax_percentage}%):</strong>
@@ -1540,7 +1540,7 @@ const CreateDeal = () => {
                   qty: itemFormData.qty,
                   unit_price: itemFormData.unit_price,
                   original_currency: selectedProduct?.currency || formData.currency,
-                  original_price: parseFloat(selectedProduct?.price || "0") || itemFormData.unit_price,
+                  original_price: Number.parseFloat(selectedProduct?.price || "0") || itemFormData.unit_price,
                 };
 
                 if (editingItemIndex !== null) {
@@ -1641,7 +1641,7 @@ const CreateDeal = () => {
                           onChange={async (selectedOption: any) => {
                             const product = products.find(p => p.id === selectedOption?.value);
                             if (product) {
-                              const originalPrice = parseFloat(product.price) || 0;
+                              const originalPrice = Number.parseFloat(product.price) || 0;
                               const productCurrency = product.currency.toUpperCase();
                               const dealCurrency = formData.currency.toUpperCase();
                               
@@ -1676,7 +1676,7 @@ const CreateDeal = () => {
                           options={products.map(product => {
                             const productCurrency = product.currency.toUpperCase();
                             const dealCurrency = formData.currency.toUpperCase();
-                            const originalPrice = parseFloat(product.price) || 0;
+                            const originalPrice = Number.parseFloat(product.price) || 0;
                             
                             // Show both currencies if they differ
                             if (productCurrency !== dealCurrency) {
@@ -1742,7 +1742,7 @@ const CreateDeal = () => {
                           step="0.01"
                           placeholder="Enter unit price"
                           value={itemFormData.unit_price}
-                          onChange={(e) => setItemFormData({ ...itemFormData, unit_price: parseFloat(e.target.value) || 0 })}
+                          onChange={(e) => setItemFormData({ ...itemFormData, unit_price: Number.parseFloat(e.target.value) || 0 })}
                           required
                           disabled={convertingPrice}
                         />
@@ -1751,7 +1751,7 @@ const CreateDeal = () => {
                           if (selectedProduct) {
                             const productCurrency = selectedProduct.currency.toUpperCase();
                             const dealCurrency = formData.currency.toUpperCase();
-                            const originalPrice = parseFloat(selectedProduct.price) || 0;
+                            const originalPrice = Number.parseFloat(selectedProduct.price) || 0;
                             
                             if (productCurrency !== dealCurrency && itemFormData.unit_price !== originalPrice) {
                               return (
@@ -1811,7 +1811,7 @@ const CreateDeal = () => {
                         qty: itemFormData.qty,
                         unit_price: itemFormData.unit_price,
                         original_currency: selectedProduct?.currency || formData.currency,
-                        original_price: parseFloat(selectedProduct?.price || "0") || itemFormData.unit_price,
+                        original_price: Number.parseFloat(selectedProduct?.price || "0") || itemFormData.unit_price,
                       };
 
                       if (editingItemIndex !== null) {
