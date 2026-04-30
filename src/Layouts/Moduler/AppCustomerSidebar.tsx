@@ -1005,13 +1005,6 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
           url: '/workforce/sub-categories',
           permission: PERMISSIONS.VIEW_REQUEST_CATEGORIES_STAFF_MANAGEMENT
         },
-        {
-          id: 'workforce-locations',
-          title: 'Locations',
-          icon: <MapPin size={16} />,
-          url: '/workforce/locations',
-          permission: PERMISSIONS.VIEW_LOCATIONS_STAFF_MANAGEMENT
-        },
       ].filter(item => !item.permission || hasPermission(item.permission))
     }, 
     //workforce services end

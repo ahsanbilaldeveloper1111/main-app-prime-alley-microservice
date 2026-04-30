@@ -363,7 +363,6 @@ export const routePermissions: RoutePermission[] = [
 
             
             {path:'/attendance',permissions: [PERMISSIONS.VIEW_ATTENDENCE_STAFF_MANAGEMENT]},
-            {path:'/locations',permissions: [PERMISSIONS.VIEW_LOCATIONS_STAFF_MANAGEMENT]}
         ]
     },
     //workforce services ends
