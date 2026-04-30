@@ -106,7 +106,20 @@ const DeleteConfirmationModal: React.FC<DeleteConfirmationModalProps> = ({
         <div className="text-center">
           <AlertCircle size={48} className="text-danger mb-3" />
           <p className="mb-0">
-            Are you sure you want to delete <strong>{itemName || `this ${itemType}`}</strong>?
+            Are you sure you want to delete{" "}
+            <strong
+              title={itemName || `this ${itemType}`}
+              style={{
+                display: "inline-block",
+                maxWidth: "100%",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+                verticalAlign: "bottom",
+              }}
+            >
+              {itemName || `this ${itemType}`}
+            </strong>{"?"}
           </p>
           <p className="text-muted small mb-3">This action cannot be undone.</p>
           

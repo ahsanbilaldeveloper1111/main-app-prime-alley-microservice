@@ -8,6 +8,8 @@ import React, {
   type ComponentProps,
 } from "react";
 import { useSession } from "next-auth/react";
+import { usePermissions } from "@utils/permissionUtils";
+import { HEADER_CONSTANTS } from "@constants/headerConstants";
 import {
   canManageProjectFromMembers,
   getSessionPhoneOrExtension,
@@ -32,6 +34,8 @@ import { Plus, LayoutGrid } from "lucide-react";
 import { toast } from "react-toastify";
 import CreateTaskSidebar from "@components/CreatePlannerTaskSidebar";
 
+const { PERMISSIONS } = HEADER_CONSTANTS;
+
 type PlannerSidebarEditTask = NonNullable<
   ComponentProps<typeof CreateTaskSidebar>["task"]
 >;
@@ -50,10 +54,13 @@ const WorkPlannerProjectsDetails = () => {
   const { hierarchyDataExtensions, loading: hierarchyLoading } = useHierarchyData(ModuleSlug.WORK_PLANNER);
 
   const { data: session } = useSession();
+  const { hasPermission } = usePermissions();
   const sessionUserPhoneOrExtension = useMemo(
     () => getSessionPhoneOrExtension(session),
     [session],
   );
+  const canCreateTaskByPermission = hasPermission(PERMISSIONS.CREATE_TASKS_WORK_PLANNER);
+  const canEditTaskByPermission = hasPermission(PERMISSIONS.EDIT_TASKS_WORK_PLANNER);
   const canCreateTaskByMemberRole = useMemo(
     () => canManageProjectFromMembers(project, sessionUserPhoneOrExtension),
     [project, sessionUserPhoneOrExtension],
@@ -91,7 +98,7 @@ const WorkPlannerProjectsDetails = () => {
   };
 
   const handleCreateTaskClick = () => {
-    if (!project || hierarchyLoading || !canCreateTaskByMemberRole) return;
+    if (!project || hierarchyLoading || !canCreateTaskByMemberRole || !canCreateTaskByPermission) return;
     setSidebarEditTask(null);
     setShowCreateTaskSidebar(true);
   };
@@ -110,7 +117,7 @@ const WorkPlannerProjectsDetails = () => {
 
   const handleBoardTaskClick = async (task: { id?: string | number }) => {
     if (task?.id == null) return;
-    if (!canCreateTaskByMemberRole) {
+    if (!canCreateTaskByMemberRole || !canEditTaskByPermission) {
       await router.push(`/planner/tasks/${task.id}`);
       return;
     }
@@ -204,7 +211,7 @@ const WorkPlannerProjectsDetails = () => {
         showSearch={false}
         buttons={
           <>
-            {canCreateTaskByMemberRole && (
+            {canCreateTaskByMemberRole && canCreateTaskByPermission && (
               <Button
                 variant="primary"
                 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginRight: '0.5rem' }}

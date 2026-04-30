@@ -28,6 +28,7 @@ import {
 import { useMainAppLookups } from "@hooks/useMainAppLookups";
 import { Pencil, Trash2, List, Plus, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, GripVertical } from "lucide-react";
 import Select from "@components/AppSelect";
+import { HEADER_CONSTANTS } from "@constants/headerConstants";
 
 const FIELD_TYPES: { value: UserRequestCategoryFieldType; label: string }[] = [
   { value: "text", label: "Text" },
@@ -51,6 +52,7 @@ const CONDITION_OPS: { value: "eq" | "neq" | "in" | "contains"; label: string }[
 ];
 
 const OPTION_TYPES: UserRequestCategoryFieldType[] = ["select", "multiselect", "radio", "checkbox"];
+const { PERMISSIONS } = HEADER_CONSTANTS;
 
 function slugifyForKey(label: string): string {
   const s = String(label ?? "")
@@ -466,7 +468,7 @@ const RequestSubCategories = () => {
         showSearch={false}
         buttons={
           <>
-          {session?.user?.permissions?.includes('manage-request-categories-staff-management') && (
+          {session?.user?.permissions?.includes(PERMISSIONS.MANAGE_REQUEST_CATEGORIES_STAFF_MANAGEMENT) && (
           <Button variant="primary" onClick={openCreateCategory}>
             <Plus size={18} className="me-1" />
             Add Category
@@ -499,20 +501,26 @@ const RequestSubCategories = () => {
                 </tr>
               </thead>
               <tbody>
-                {loading ? (
-                  <tr>
-                    <td colSpan={5} style={{ padding: "24px", fontSize: "14px", color: "#6b7280" }}>
-                      Loading…
-                    </td>
-                  </tr>
-                ) : categories.length === 0 ? (
-                  <tr>
-                    <td colSpan={5} style={{ padding: "24px", fontSize: "14px", color: "#6b7280" }}>
-                      No request categories yet. Create one to get started.
-                    </td>
-                  </tr>
-                ) : (
-                  categories.map((cat, index) => (
+                {(() => {
+                  if (loading) {
+                    return (
+                      <tr>
+                        <td colSpan={5} style={{ padding: "24px", fontSize: "14px", color: "#6b7280" }}>
+                          Loading…
+                        </td>
+                      </tr>
+                    );
+                  }
+                  if (categories.length === 0) {
+                    return (
+                      <tr>
+                        <td colSpan={5} style={{ padding: "24px", fontSize: "14px", color: "#6b7280" }}>
+                          No request categories yet. Create one to get started.
+                        </td>
+                      </tr>
+                    );
+                  }
+                  return categories.map((cat, index) => (
                     <tr
                       key={cat.id}
                       style={{
@@ -553,7 +561,7 @@ const RequestSubCategories = () => {
                         </span>
                       </td>
                       <td style={{ padding: "16px" }}>
-                        {session?.user?.permissions?.includes('manage-request-categories-staff-management') && (
+                        {session?.user?.permissions?.includes(PERMISSIONS.MANAGE_REQUEST_CATEGORIES_STAFF_MANAGEMENT) && (
                        <>
                        <button
                           type="button"
@@ -614,8 +622,8 @@ const RequestSubCategories = () => {
                         )}
                       </td>
                     </tr>
-                  ))
-                )}
+                  ));
+                })()}
               </tbody>
             </table>
           </div>

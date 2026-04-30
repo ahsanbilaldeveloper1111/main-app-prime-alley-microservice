@@ -58,10 +58,10 @@ export const routePermissions: RoutePermission[] = [
             { path: '/billing', permissions: [PERMISSIONS.ACCOUNTS_SERVICES] },
             { path: '/tickets', permissions: [PERMISSIONS.TICKETS_SERVICES] },
             { path: '/help-center', permissions: [PERMISSIONS.MANAGE_HELP_CENTER] },
-            { path: '/ai-chat', permissions: [PERMISSIONS.AI_ML_SERVICES] },
+            { path: '/ai-chat', permissions: [PERMISSIONS.VIEW_AI_CHAT_AI_CHAT] },
         ]
     },
-    
+    { path: '/chat', permissions: [PERMISSIONS.VIEW_AI_CHAT_AI_CHAT] },
     
     {path:'/chat/ai-bot-faqs',permissions: [PERMISSIONS.MANAGE_AI_BOT_FAQS]},
     {path:'/chat/ai-faqs/tenant',permissions: [PERMISSIONS.MANAGE_TENANT_PROFILE_AI_CHAT]},
@@ -75,10 +75,6 @@ export const routePermissions: RoutePermission[] = [
     { path: '/audit-logs', permissions: [PERMISSIONS.AUDIT_LOGS_SERVICES] },
    
     {path:'/crm/quotes',permissions: [PERMISSIONS.VIEW_CRM_QUOTES]},
-    {path:'/billing/quotes',permissions: [PERMISSIONS.VIEW_QUOTES_BILLING]},
-    { path: '/billing/products', permissions: [PERMISSIONS.VIEW_PRODUCTS_BILLING] },
-    { path: '/billing/products/manage-categories', permissions: [PERMISSIONS.VIEW_PRODUCTS_BILLING] },
-    { path: '/billing/transactions', permissions: [PERMISSIONS.VIEW_BILLING_HISTORY_BILLING] },
 
 
 
@@ -260,26 +256,47 @@ export const routePermissions: RoutePermission[] = [
     //billing services start
     {
         path: '/billing',
-        permissions: [PERMISSIONS.ACCOUNTS_SERVICES],
+        permissions: [PERMISSIONS.CUSTOMER_ACCOUNTS_SERVICES],
 
         children: [
-            { path: '/dashboard',permissions: [PERMISSIONS.VIEW_CUSTOMER_DASHBOARD_BILLING]},
-            { path: '/account-overview',permissions: [PERMISSIONS.VIEW_ACCOUNT_OVERVIEW_BILLING]},
             { path: '/account-billing',permissions: [PERMISSIONS.ACCOUNTS_SERVICES]},
-            { path: '/subscriptions',permissions: [PERMISSIONS.VIEW_PRODUCT_DETAILS_BILLING]},
-            { path: '/payment-history',permissions: [PERMISSIONS.VIEW_BILLING_HISTORY_BILLING]},
-            { path: '/payment-methods',permissions: [PERMISSIONS.VIEW_PAYMENT_METHODS_BILLING]},
-            { path: '/invoices', permissions: [PERMISSIONS.VIEW_INVOICES_BILLING] },
-            { path: '/invoices/create', permissions: [PERMISSIONS.VIEW_INVOICES_BILLING] },
-            { path: '/invoices/edit/:invoiceId', permissions: [PERMISSIONS.VIEW_INVOICES_BILLING] },
-            { path: '/order-invoicing', permissions: [PERMISSIONS.VIEW_ORDER_INVOICES_BILLING] },
-            { path: '/create-invoice', permissions: [PERMISSIONS.VIEW_INVOICES_BILLING] },
-            { path: '/payments', permissions: [PERMISSIONS.VIEW_BILLING_HISTORY_BILLING] },
+            { path: '/account-billing/:tab',permissions: [PERMISSIONS.ACCOUNTS_SERVICES]},
+       
+            {
+                path: '/customer',
+                permissions: [PERMISSIONS.CUSTOMER_ACCOUNTS_SERVICES],
+        
+                children: [
+                    { path: '/dashboard',permissions: [PERMISSIONS.VIEW_CUSTOMER_DASHBOARD_BILLING]},
+                    { path: '/account-overview',permissions: [PERMISSIONS.VIEW_CUSTOMER_ACCOUNT_OVERVIEW_BILLING]},
+                    { path: '/products',permissions: [PERMISSIONS.VIEW_CUSTOMER_PRODUCTS_BILLING]},
+                    { path: '/products/create',permissions: [PERMISSIONS.CREATE_CUSTOMER_PRODUCTS_BILLING]},
+                    { path: '/products/edit/:productId',permissions: [PERMISSIONS.UPDATE_CUSTOMER_PRODUCTS_BILLING]},
+                    { path: '/products/delete/:productId',permissions: [PERMISSIONS.DELETE_CUSTOMER_PRODUCTS_BILLING]},
+                    { path: '/quotes',permissions: [PERMISSIONS.VIEW_CUSTOMER_QUOTES_BILLING]},
+                    { path: '/subscriptions',permissions: [PERMISSIONS.VIEW_CUSTOMER_SUBSCRIPTION_BILLING]},
+                    { path: '/subscriptions/create',permissions: [PERMISSIONS.CREATE_CUSTOMER_SUBSCRIPTION_BILLING]},
+                    { path: '/subscriptions/edit/:subscriptionId',permissions: [PERMISSIONS.UPDATE_CUSTOMER_SUBSCRIPTION_BILLING]},
+                    { path: '/subscriptions/delete/:subscriptionId',permissions: [PERMISSIONS.DELETE_CUSTOMER_SUBSCRIPTION_BILLING]},
+                    { path: '/payment-history',permissions: [PERMISSIONS.VIEW_CUSTOMER_BILLING_HISTORY_BILLING]},
+                    { path: '/payment-methods',permissions: [PERMISSIONS.VIEW_PAYMENT_METHODS_BILLING]},
+                    { path: '/invoices', permissions: [PERMISSIONS.VIEW_CUSTOMER_INVOICES_BILLING] },
+                    { path: '/invoices/create', permissions: [PERMISSIONS.CREATE_CUSTOMER_INVOICES_BILLING] },
+                    { path: '/invoices/edit/:invoiceId', permissions: [PERMISSIONS.UPDATE_CUSTOMER_INVOICES_BILLING] },
+                    { path: '/invoices/delete/:invoiceId', permissions: [PERMISSIONS.DELETE_CUSTOMER_INVOICES_BILLING] },
+                    { path: '/order-invoicing', permissions: [PERMISSIONS.VIEW_CUSTOMER_ORDERS_BILLING] },
+                    { path: '/create-invoice', permissions: [PERMISSIONS.CREATE_CUSTOMER_INVOICES_BILLING] },
+                    { path: '/payments', permissions: [PERMISSIONS.VIEW_CUSTOMER_PAYMENTS_BILLING] },
+                    { path: '/transactions', permissions: [PERMISSIONS.VIEW_CUSTOMER_BILLING_HISTORY_BILLING] },
+                   
+                ]
+                
+            }
            
         ]
         
     },
-    //finance services end
+        //finance services end
 
 
     //virtual agents services start
@@ -346,7 +363,6 @@ export const routePermissions: RoutePermission[] = [
 
             
             {path:'/attendance',permissions: [PERMISSIONS.VIEW_ATTENDENCE_STAFF_MANAGEMENT]},
-            {path:'/locations',permissions: [PERMISSIONS.VIEW_LOCATIONS_STAFF_MANAGEMENT]}
         ]
     },
     //workforce services ends
@@ -941,6 +957,7 @@ function hasBraceParam(path: string): boolean {
  * Exact match or path starting with an entry (e.g. '/help-center/knowledge-base') is excluded.
  */
 export const SEARCH_EXCLUDED_ROUTES: string[] = [
+   
     '/help-center/knowledge-base/[id]',
     '/help-center/my-tickets/[id]',
     '/planner/tasks/:id',

@@ -33,7 +33,11 @@ import {
   getAutoTimezone,
   formatMinutesAndSeconds,
 } from "@utils/Helper";
+import { HEADER_CONSTANTS } from "@constants/headerConstants";
+import { canViewCallLogsFromSession } from "@utils/callPermissionUtils";
 import "@assets/scss/common.scss";
+
+const { PERMISSIONS } = HEADER_CONSTANTS;
 
 type ChartDataType = "calls" | "time" | "cost" | "custom";
 
@@ -478,7 +482,7 @@ const CallStatsCountry = () => {
   // Ensure initial fetch happens when session is ready
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
-    if (session?.user?.permissions?.includes("list-call-logs")) {
+    if (canViewCallLogsFromSession(session)) {
       initialFetchDone.current = true;
       fetchCallLogs(1, rowsPerPage, "");
     }
@@ -1191,7 +1195,7 @@ const CallStatsCountry = () => {
       />
 
       {/* GenericTable with filter pills and stats cards — at top */}
-      {session?.user?.permissions?.includes("list-call-logs") && (
+      {canViewCallLogsFromSession(session) && (
         <GenericTable
           data={tableData}
           columns={columns}

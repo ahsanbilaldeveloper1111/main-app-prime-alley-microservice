@@ -15,6 +15,10 @@ import {
 import AllActivitiesBrowserModal from "./AllActivitiesBrowserModal";
 import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
 import { useAllActivitiesBrowserModal } from "@planner/useAllActivitiesBrowserModal";
+import { usePermissions } from "@utils/permissionUtils";
+import { HEADER_CONSTANTS } from "@constants/headerConstants";
+
+const { PERMISSIONS } = HEADER_CONSTANTS;
 import type { ActivityLogExtension } from "@planner/activityLogExtension";
 import {
   formatActivityDate,
@@ -112,6 +116,7 @@ interface TaskCommentCardProps {
   onSaveEdit: () => Promise<void>;
   onStartEdit: () => void;
   onRequestDelete: () => void;
+  allowMutate: boolean;
 }
 
 const TaskCommentCard: React.FC<TaskCommentCardProps> = ({
@@ -125,6 +130,7 @@ const TaskCommentCard: React.FC<TaskCommentCardProps> = ({
   onSaveEdit,
   onStartEdit,
   onRequestDelete,
+  allowMutate,
 }) => {
   const extNumber = comment.extension_number || comment.user?.extension_number || "";
   const { name: extensionName, initials: extensionInitials } = getExtensionDisplay(
@@ -211,6 +217,7 @@ const TaskCommentCard: React.FC<TaskCommentCardProps> = ({
               </div>
               <div style={{ fontSize: "0.75rem", color: "#94a3b8" }}>{commentDate}</div>
             </div>
+            {allowMutate ? (
             <div style={{ display: "flex", gap: "0.25rem" }}>
               <Button
                 variant="link"
@@ -235,6 +242,7 @@ const TaskCommentCard: React.FC<TaskCommentCardProps> = ({
                 <Trash2 size={14} />
               </Button>
             </div>
+            ) : null}
           </div>
           <div
             style={{
@@ -260,6 +268,7 @@ interface TaskDocumentsTabBodyProps {
   onPickFiles: () => void;
   onDownload: (doc: TaskDocumentRecord) => void;
   onRequestDeleteDocument: (doc: TaskDocumentRecord) => void;
+  allowMutate: boolean;
 }
 
 const TaskDocumentsTabBody: React.FC<TaskDocumentsTabBodyProps> = ({
@@ -271,6 +280,7 @@ const TaskDocumentsTabBody: React.FC<TaskDocumentsTabBodyProps> = ({
   onPickFiles,
   onDownload,
   onRequestDeleteDocument,
+  allowMutate,
 }) => {
   if (loadingDocuments) {
     return (
@@ -295,6 +305,7 @@ const TaskDocumentsTabBody: React.FC<TaskDocumentsTabBodyProps> = ({
         <span style={{ fontSize: "0.875rem", color: "#64748b" }}>
           {taskDocuments.length} document{documentPluralSuffix(taskDocuments.length)}
         </span>
+        {allowMutate ? (
         <div className="d-flex align-items-center gap-2">
           <input
             ref={documentInputRef}
@@ -324,6 +335,7 @@ const TaskDocumentsTabBody: React.FC<TaskDocumentsTabBodyProps> = ({
             Upload
           </Button>
         </div>
+        ) : null}
       </div>
       {taskDocuments.length === 0 ? (
         <div
@@ -388,6 +400,7 @@ const TaskDocumentsTabBody: React.FC<TaskDocumentsTabBodyProps> = ({
                   >
                     <Download size={15} />
                   </Button>
+                  {allowMutate ? (
                   <Button
                     variant="link"
                     size="sm"
@@ -398,6 +411,7 @@ const TaskDocumentsTabBody: React.FC<TaskDocumentsTabBodyProps> = ({
                   >
                     <Trash2 size={15} />
                   </Button>
+                  ) : null}
                 </div>
               </li>
             );
@@ -413,6 +427,9 @@ const TaskSecondaryTabs: React.FC<TaskSecondaryTabsProps> = ({
   extensions = [],
   visible = true,
 }) => {
+  const { hasPermission } = usePermissions();
+  const canEditPlannerTask = hasPermission(PERMISSIONS.EDIT_TASKS_WORK_PLANNER);
+
   const [activeTab, setActiveTab] = useState<TaskSecondaryTabId>("activity");
   const [taskActivities, setTaskActivities] = useState<any[]>([]);
   const [loadingActivities, setLoadingActivities] = useState(false);
@@ -512,6 +529,7 @@ const TaskSecondaryTabs: React.FC<TaskSecondaryTabsProps> = ({
   };
 
   const handleUploadDocument = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!canEditPlannerTask) return;
     const files = e.target.files;
     if (!files?.length || resolvedId == null) return;
     try {
@@ -547,7 +565,7 @@ const TaskSecondaryTabs: React.FC<TaskSecondaryTabsProps> = ({
   };
 
   const handleConfirmPendingDelete = async () => {
-    if (pendingDelete == null || resolvedId == null) return;
+    if (!canEditPlannerTask || pendingDelete == null || resolvedId == null) return;
     setDeleteInProgress(true);
     try {
       if (pendingDelete.type === "comment") {
@@ -697,7 +715,7 @@ const TaskSecondaryTabs: React.FC<TaskSecondaryTabsProps> = ({
                           }}
                           onChangeEditText={setEditingCommentText}
                           onSaveEdit={async () => {
-                            if (resolvedId == null || !editingCommentText.trim()) {
+                            if (!canEditPlannerTask || resolvedId == null || !editingCommentText.trim()) {
                               return;
                             }
                             try {
@@ -724,11 +742,13 @@ const TaskSecondaryTabs: React.FC<TaskSecondaryTabsProps> = ({
                           onRequestDelete={() => {
                             setPendingDelete({ type: "comment", comment });
                           }}
+                          allowMutate={canEditPlannerTask}
                         />
                       ))
                     )}
                   </div>
 
+                  {canEditPlannerTask ? (
                   <div
                     style={{
                       borderTop: "1px solid #e2e8f0",
@@ -773,6 +793,7 @@ const TaskSecondaryTabs: React.FC<TaskSecondaryTabsProps> = ({
                       </div>
                     </Form.Group>
                   </div>
+                  ) : null}
                 </>
               )}
             </div>
@@ -798,6 +819,7 @@ const TaskSecondaryTabs: React.FC<TaskSecondaryTabsProps> = ({
                   handleDownloadDocument(doc).catch(() => undefined);
                 }}
                 onRequestDeleteDocument={(doc) => setPendingDelete({ type: "document", doc })}
+                allowMutate={canEditPlannerTask}
               />
             </div>
           )}

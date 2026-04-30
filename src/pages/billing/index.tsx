@@ -6,7 +6,7 @@ import BreadcrumbItem from "@common/BreadcrumbItem";
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
 import PageHeader from "@components/PageHeader";
-import CustomerDashboard from "./dashboard";
+import CustomerDashboard from "./customer/dashboard";
 import { useSession } from "next-auth/react";
 import { HEADER_CONSTANTS } from "@constants/headerConstants";
 

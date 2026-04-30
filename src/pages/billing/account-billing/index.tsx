@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useState, startTransition, ReactElement } from "react";
+import { useEffect, useMemo, useState, startTransition, ReactElement, useCallback } from "react";
 import { useRouter } from "next/router";
+import { useSession } from "next-auth/react";
 import Layout from "@layout/index";
 import OverviewPage from "@components/billings/Overview";
 import SubscriptionsPage from "@components/billings/SubscriptionPage";
@@ -10,7 +11,7 @@ import DocumentsPage from "@components/billings/DocumentPage";
 import PaymentMethodsPage from "@components/billings/PaymentMethodsPage";
 import CompanyInfoPage from "@components/billings/CompanyInfoPage";
 import {
-  ACCOUNT_BILLING_TABS,
+  getAllowedAccountBillingTabs,
   tabLabelFromQuery,
   tabSlugFromLabel,
   type AccountBillingTab,
@@ -28,7 +29,7 @@ const TAB_PAGES: Record<AccountBillingTab, TabPageComponent> = {
   "Billing History": BillingHistoryPage,
   "Company Info": CompanyInfoPage,
   Transactions: TransactionsPage,
-  Documents: DocumentsPage,
+  Documents: DocumentsPage,           
   "Payment Methods": PaymentMethodsPage,
 };
 
@@ -111,6 +112,7 @@ function handleRouteChange(promise: Promise<boolean>, label: string) {
 
 const AccountBilling = () => {
   const router = useRouter();
+  const { data: session } = useSession();
   const [activeTab, setActiveTab] = useState<AccountBillingTab>("Overview");
   /** Keep visited tab panels mounted so switching tabs does not remount/refetch and flicker. */
   const [mountedTabs, setMountedTabs] = useState<Set<AccountBillingTab>>(
@@ -121,6 +123,57 @@ const AccountBilling = () => {
     const { tab: _tab, ...rest } = router.query;
     return rest;
   }, [router.query]);
+  const replaceWithTabSlug = useCallback(
+    (tab: AccountBillingTab, reason: string) => {
+      const slug = tabSlugFromLabel(tab);
+      handleRouteChange(
+        router.replace(
+          { pathname: ACCOUNT_BILLING_TAB_PATHNAME, query: { ...queryWithoutTab, tab: slug } },
+          `${ACCOUNT_BILLING_BASE_PATH}/${slug}`,
+          { shallow: true },
+        ),
+        reason,
+      );
+    },
+    [queryWithoutTab, router],
+  );
+
+  const normalizeAccountBillingRoute = useCallback(
+    (tab: AccountBillingTab) => {
+      if (router.pathname === ACCOUNT_BILLING_BASE_PATH) {
+        if (tab === "Overview") {
+          handleRouteChange(
+            router.replace(
+              { pathname: ACCOUNT_BILLING_BASE_PATH, query: queryWithoutTab },
+              undefined,
+              { shallow: true },
+            ),
+            "replace overview",
+          );
+          return;
+        }
+        replaceWithTabSlug(tab, `replace tab ${tabSlugFromLabel(tab)}`);
+        return;
+      }
+      if (router.pathname === ACCOUNT_BILLING_TAB_PATHNAME && tab === "Overview") {
+        handleRouteChange(
+          router.replace(
+            { pathname: ACCOUNT_BILLING_BASE_PATH, query: queryWithoutTab },
+            undefined,
+            { shallow: true },
+          ),
+          "replace canonical overview",
+        );
+      }
+    },
+    [queryWithoutTab, replaceWithTabSlug, router],
+  );
+
+  const allowedTabs = useMemo(() => {
+    const userPermissions = session?.user?.permissions ?? [];
+    return getAllowedAccountBillingTabs(userPermissions);
+  }, [session?.user?.permissions]);
+  const firstAllowedTab = allowedTabs[0]?.label ?? "Overview";
 
   const selectTab = (tab: AccountBillingTab) => {
     startTransition(() => {
@@ -150,51 +203,45 @@ const AccountBilling = () => {
 
   useEffect(() => {
     if (!router.isReady) return;
+    if (allowedTabs.length === 0) return;
 
     const tabParam = router.query.tab;
     const requestedTab = Array.isArray(tabParam) ? tabParam[0] : tabParam;
     if (!requestedTab) {
-      if (activeTab !== "Overview") setActiveTab("Overview");
+      if (activeTab !== firstAllowedTab) setActiveTab(firstAllowedTab);
       return;
     }
 
     const nextTab = tabLabelFromQuery(requestedTab);
     if (!nextTab) return;
+    const isAllowed = allowedTabs.some((tab) => tab.label === nextTab);
+    if (!isAllowed) {
+      if (activeTab !== firstAllowedTab) setActiveTab(firstAllowedTab);
+      replaceWithTabSlug(firstAllowedTab, "replace unauthorized tab");
+      return;
+    }
     if (nextTab !== activeTab) setActiveTab(nextTab);
-
-    // Normalize legacy query-param URLs to friendly path URLs.
-    if (router.pathname === ACCOUNT_BILLING_BASE_PATH) {
-      if (nextTab === "Overview") {
-        handleRouteChange(
-          router.replace({ pathname: ACCOUNT_BILLING_BASE_PATH, query: queryWithoutTab }, undefined, { shallow: true }),
-          "replace overview",
-        );
-        return;
-      }
-
-      const slug = tabSlugFromLabel(nextTab);
-      handleRouteChange(
-        router.replace(
-          { pathname: ACCOUNT_BILLING_TAB_PATHNAME, query: { ...queryWithoutTab, tab: slug } },
-          `${ACCOUNT_BILLING_BASE_PATH}/${slug}`,
-          { shallow: true },
-        ),
-        `replace tab ${slug}`,
-      );
-    }
-
-    // If someone lands on /account-billing/overview, keep the canonical URL clean.
-    if (router.pathname === ACCOUNT_BILLING_TAB_PATHNAME && nextTab === "Overview") {
-      handleRouteChange(
-        router.replace({ pathname: ACCOUNT_BILLING_BASE_PATH, query: queryWithoutTab }, undefined, { shallow: true }),
-        "replace canonical overview",
-      );
-    }
-  }, [activeTab, queryWithoutTab, router.isReady, router.pathname, router.query.tab]);
+    normalizeAccountBillingRoute(nextTab);
+  }, [
+    activeTab,
+    allowedTabs,
+    firstAllowedTab,
+    normalizeAccountBillingRoute,
+    replaceWithTabSlug,
+    router,
+    router.isReady,
+    router.query.tab,
+  ]);
 
   useEffect(() => {
     setMountedTabs((prev) => (prev.has(activeTab) ? prev : new Set(prev).add(activeTab)));
   }, [activeTab]);
+
+  useEffect(() => {
+    if (!router.isReady) return;
+    if (allowedTabs.length > 0) return;
+    handleRouteChange(router.replace("/access-denied"), "replace no allowed account-billing tabs");
+  }, [allowedTabs.length, router, router.isReady]);
 
   return (
     <div style={styles.body}>
@@ -203,7 +250,7 @@ const AccountBilling = () => {
         <div style={{ ...styles.container, paddingBottom: 0 }}>
           <h1 style={styles.pageHeading}>Account &amp; Billing</h1>
           <div style={styles.tabBar}>
-            {ACCOUNT_BILLING_TABS.map(({ label }) => (
+            {allowedTabs.map(({ label }) => (
               <TabButton key={label} tab={label} activeTab={activeTab} onSelect={selectTab} />
             ))}
           </div>
@@ -212,7 +259,7 @@ const AccountBilling = () => {
 
       {/* Main Content — keep visited panels mounted to avoid blank flash on tab change */}
       <div style={{ ...styles.container, paddingTop: 24 }}>
-        {ACCOUNT_BILLING_TABS.map(({ label }) => {
+        {allowedTabs.map(({ label }) => {
           if (!mountedTabs.has(label)) return null;
           const TabPanel = TAB_PAGES[label];
           return (

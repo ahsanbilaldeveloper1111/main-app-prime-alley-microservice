@@ -213,6 +213,13 @@ export interface UseCrmToolbarConfigOptions {
   /** When false, hides the table/board (or legacy table/grid/list) toolbar dropdown. Defaults to true. */
   showTableViewDropdown?: boolean;
 
+  /** When false, hides the toolbar search field. Default true (CRM). */
+  showSearch?: boolean;
+  /** When false, hides Export in the toolbar. Default true (CRM). */
+  showExportButton?: boolean;
+  /** When false, hides Save in the toolbar. Default true (CRM legacy). */
+  showSaveButton?: boolean;
+
   // Owner/assignee pill – extensions list
   extensions: Array<{ id?: string; extension?: string; display_name?: string; name?: string }>;
 
@@ -323,6 +330,9 @@ export function useCrmToolbarConfig(
     currentTableView,
     onTableViewChange,
     showTableViewDropdown = true,
+    showSearch = true,
+    showExportButton = true,
+    showSaveButton = true,
     extensions,
     onPaginationReset,
     rightActions,
@@ -520,7 +530,7 @@ export function useCrmToolbarConfig(
       onTabAdd,
       onTabRemove,
 
-      showSearch: true,
+      showSearch,
       searchValue,
       searchPlaceholder,
       onSearchChange: (value: string) => {
@@ -557,9 +567,9 @@ export function useCrmToolbarConfig(
       showFiltersButton: true,
       onFiltersClick,
       showSortButton: true,
-      showExportButton: true,
+      showExportButton,
       onExportClick,
-      showSaveButton: true,
+      showSaveButton,
       onSaveClick: () => {},
 
       filterPills,
@@ -582,6 +592,9 @@ export function useCrmToolbarConfig(
       currentTableView,
       onTableViewChange,
       showTableViewDropdown,
+      showSearch,
+      showExportButton,
+      showSaveButton,
       onEditColumnsClick,
       onFiltersClick,
       onExportClick,

@@ -491,6 +491,9 @@ export interface ToolbarConfig {
 
   showImport?: boolean;
   onImportClick?: () => void;
+
+  /** Path opened from the toolbar ⋮ → Settings item (default: Smart CRM settings). */
+  toolbarSettingsPath?: string;
 }
 
 export interface GenericTableProps<T = any> {
@@ -1829,12 +1832,15 @@ const GenericTable = <T extends Record<string, any>>({
                   <Dropdown.Divider />
                   <Dropdown.Item
                     onClick={() => {
+                      const path =
+                        toolbar.toolbarSettingsPath ??
+                        "/main-settings/smart-crm";
                       if (globalThis.window === undefined) {
-                        router.push("/main-settings/smart-crm");
+                         router.push(path);
                         return;
                       }
                       const win = globalThis.open(
-                        "/main-settings/smart-crm",
+                        path,
                         "_blank",
                         "noopener,noreferrer",
                       );

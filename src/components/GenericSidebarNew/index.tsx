@@ -1,10 +1,12 @@
 import React, {
   useState,
   useEffect,
+  useLayoutEffect,
   useRef,
   useMemo,
   useCallback,
 } from "react";
+import { createPortal } from "react-dom";
 import {
   X,
   ChevronDown,
@@ -75,8 +77,10 @@ import {
 import { buildCrmAuditLinesForEntry } from "@utils/crmAuditTrail";
 import { ListCallLogs } from "@utils/calls";
 import { useCti } from "@hooks/useCti";
-import { useCrmActivityModals } from "@hooks/useCrmActivityModals";
-import type { CrmRecordType } from "@hooks/useCrmActivityModals";
+import {
+  useCrmActivityModals,
+  type UseCrmActivityModalsParams,
+} from "@hooks/useCrmActivityModals";
 import DeviceSelectionModal from "@components/DeviceSelectionModal";
 import EmailModal from "@components/EmailModal";
 import MeetingModal from "@components/MeetingModal";
@@ -864,6 +868,13 @@ export interface GenericSidebarProps {
 
   // Additional Props
   width?: string;
+  /**
+   * When true, the panel fills its parent (e.g. a flex row beside a table) without the
+   * fixed global header offset (`marginTop: 43px` / `calc(100vh - 43px)` heights).
+   */
+  dockInParent?: boolean;
+  /** When true, the fixed title strip (h2 + close) is hidden; close moves beside Actions when `onClose` is set. */
+  hideTopHeadingBar?: boolean;
   recordLink?: {
     label: string;
     onClick: () => void;
@@ -2669,7 +2680,7 @@ const TaskModal: React.FC<TaskModalProps> = ({
     if (isOpen && notesRef.current) {
       notesRef.current.innerHTML = notes || "";
     }
-  }, [isOpen]); // eslint-disable-line react-hooks/exhaustive-deps -- only set initial content when modal opens
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -5892,6 +5903,220 @@ const useSidebarCallRecordings = ({
   };
 };
 
+function buildEmailContextPayload(
+  contextPayload?: Record<string, unknown>,
+): { lead?: unknown; deal?: unknown; order?: unknown } | undefined {
+  if (!contextPayload || typeof contextPayload !== "object") return undefined;
+  return {
+    lead: contextPayload.lead,
+    deal: contextPayload.deal,
+    order: contextPayload.order,
+  };
+}
+
+function toActivityRecordTypeForModals(
+  recordType?: SidebarRecordType,
+): CrmEntityType | undefined {
+  if (
+    recordType === "prospect" ||
+    recordType === "lead" ||
+    recordType === "deal" ||
+    recordType === "order"
+  ) {
+    return recordType;
+  }
+  return undefined;
+}
+
+function toActivityRecordIdForModals(recordId?: number): number | undefined {
+  if (recordId == null) return undefined;
+  const parsed = Number(recordId);
+  return Number.isNaN(parsed) ? undefined : parsed;
+}
+
+function splitCommaSeparated(value: unknown): string[] {
+  if (!value || typeof value !== "string") return [];
+  return value
+    .split(",")
+    .map((part) => part.trim())
+    .filter(Boolean);
+}
+
+function buildActivityModalsParamsFromSidebar(args: {
+  activityRecordType: CrmEntityType | undefined;
+  activityRecordId: number | undefined;
+  title: string;
+  emailList: string[];
+  phoneList: string[];
+  refreshSidebarNotes: () => Promise<unknown>;
+}): UseCrmActivityModalsParams {
+  const {
+    activityRecordType,
+    activityRecordId,
+    title,
+    emailList,
+    phoneList,
+    refreshSidebarNotes,
+  } = args;
+
+  if (activityRecordType && activityRecordId != null) {
+    return {
+      recordType: activityRecordType,
+      recordId: activityRecordId,
+      recordName: title,
+      recordEmail: emailList[0] ?? "",
+      recordPhone: phoneList[0] ?? "",
+      onNoteCreated: () => {
+        refreshSidebarNotes().catch(() => {
+          // refreshSidebarNotes handles its own failure state
+        });
+      },
+    };
+  }
+
+  return {
+    recordType: "prospect",
+    recordId: 0,
+    recordName: "",
+    recordEmail: "",
+    recordPhone: "",
+    onNoteCreated: () => {},
+  };
+}
+
+type CtiDialResult = { success?: boolean; error?: string } | undefined;
+
+interface UseCtiCallHandlersArgs {
+  ctiDialNumber: (numberToDial: string) => Promise<CtiDialResult>;
+  getAllUserDevices?: () => any[] | null;
+  makeCall: (params: {
+    callingAddress: string;
+    calledAddress: string;
+    callingDeviceType: string;
+    callingDeviceName: string;
+  }) => Promise<CtiDialResult>;
+  ctiUserAddress?: string;
+  onCall?: (phoneNumber: string) => void;
+  setShowCallModal: React.Dispatch<React.SetStateAction<boolean>>;
+}
+
+function handleCtiCallResult(result: CtiDialResult, onSuccess: () => void): void {
+  if (result?.success) {
+    onSuccess();
+    return;
+  }
+  if (result?.error) toast.error(result.error);
+}
+
+async function invokeCtiDialWithToast(
+  dialFn: () => Promise<CtiDialResult>,
+  onSuccess: () => void,
+): Promise<void> {
+  try {
+    handleCtiCallResult(await dialFn(), onSuccess);
+  } catch {
+    toast.error("Failed to make call");
+  }
+}
+
+function useCtiCallHandlers({
+  ctiDialNumber,
+  getAllUserDevices,
+  makeCall,
+  ctiUserAddress,
+  onCall,
+  setShowCallModal,
+}: UseCtiCallHandlersArgs) {
+  const [showDeviceSelectionModal, setShowDeviceSelectionModal] =
+    useState(false);
+  const [availableDevices, setAvailableDevices] = useState<any[]>([]);
+  const [pendingDialedNumber, setPendingDialedNumber] = useState("");
+  const resetDeviceSelection = useCallback(() => {
+    setShowDeviceSelectionModal(false);
+    setAvailableDevices([]);
+    setPendingDialedNumber("");
+  }, []);
+
+  const completeSuccessfulDial = useCallback(
+    (dialedNumber: string) => {
+      setShowCallModal(false);
+      onCall?.(dialedNumber);
+    },
+    [onCall, setShowCallModal],
+  );
+
+  const handleCall = useCallback(
+    async (phoneNumber: string) => {
+      const numberToDial = (phoneNumber || "").trim();
+      if (!numberToDial) {
+        toast.error("No phone number available to call");
+        return;
+      }
+
+      const userDevices = getAllUserDevices?.();
+      if (userDevices && userDevices.length > 1) {
+        setAvailableDevices(userDevices);
+        setPendingDialedNumber(numberToDial);
+        setShowDeviceSelectionModal(true);
+        setShowCallModal(false);
+        return;
+      }
+
+      await invokeCtiDialWithToast(
+        () => ctiDialNumber(numberToDial),
+        () => completeSuccessfulDial(numberToDial),
+      );
+    },
+    [
+      ctiDialNumber,
+      completeSuccessfulDial,
+      getAllUserDevices,
+      setShowCallModal,
+    ],
+  );
+
+  const handleDeviceSelect = useCallback(
+    async (device: { deviceType: string; deviceName: string }) => {
+      const numberToDial = pendingDialedNumber;
+      resetDeviceSelection();
+
+      const callerInfo = {
+        callingAddress: ctiUserAddress,
+        callingDeviceName: device.deviceName,
+        callingDeviceType: device.deviceType,
+        selectedAt: new Date().toISOString(),
+      };
+      localStorage.setItem("cti_caller_info", JSON.stringify(callerInfo));
+
+      await invokeCtiDialWithToast(
+        () =>
+          makeCall({
+            callingAddress: ctiUserAddress ?? "",
+            calledAddress: numberToDial,
+            callingDeviceType: device.deviceType,
+            callingDeviceName: device.deviceName,
+          }),
+        () => completeSuccessfulDial(numberToDial),
+      );
+    },
+    [
+      pendingDialedNumber,
+      resetDeviceSelection,
+      ctiUserAddress,
+      makeCall,
+      completeSuccessfulDial,
+    ],
+  );
+
+  return {
+    showDeviceSelectionModal,
+    availableDevices,
+    resetDeviceSelection,
+    handleCall,
+    handleDeviceSelect,
+  };
+}
+
 // ============================================================================
 // MAIN COMPONENT
 // ============================================================================
@@ -5900,7 +6125,6 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
   isOpen,
   onClose,
   title,
-  subtitle,
   company,
   avatar,
   email,
@@ -5910,6 +6134,8 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
   crmSummary,
   sections = [],
   width = "470px",
+  dockInParent = false,
+  hideTopHeadingBar = false,
   recordLink,
   actionsDropdown,
   permissionMessage,
@@ -5940,17 +6166,7 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
   onLogMeeting,
 }) => {
   const router = useRouter();
-  const emailContextPayload =
-    contextPayload && typeof contextPayload === "object"
-      ? {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          lead: contextPayload.lead,
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          deal: contextPayload.deal,
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          order: contextPayload.order,
-        }
-      : undefined;
+  const emailContextPayload = buildEmailContextPayload(contextPayload);
   const { data: session } = useSession();
   const {
     dialNumber: ctiDialNumber,
@@ -5958,10 +6174,6 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
     makeCall,
     userAddress: ctiUserAddress,
   } = useCti();
-  const [showDeviceSelectionModal, setShowDeviceSelectionModal] =
-    useState(false);
-  const [availableDevices, setAvailableDevices] = useState<any[]>([]);
-  const [pendingDialedNumber, setPendingDialedNumber] = useState("");
   const { extension, tenantId } = getCrmSessionUserContext(session, {
     tenantMissingFallback: "empty",
   });
@@ -5999,101 +6211,16 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
     },
   };
 
-  const handleCall = useCallback(
-    async (phoneNumber: string) => {
-      const numberToDial = (phoneNumber || "").trim();
-      if (!numberToDial) {
-        toast.error("No phone number available to call");
-        return;
-      }
-      const userDevices = getAllUserDevices?.();
-      if (userDevices && userDevices.length > 1) {
-        setAvailableDevices(userDevices);
-        setPendingDialedNumber(numberToDial);
-        setShowDeviceSelectionModal(true);
-        setShowCallModal(false);
-        return;
-      }
-      try {
-        const result = await ctiDialNumber(numberToDial);
-        if (result?.success) {
-          setShowCallModal(false);
-          onCall?.(numberToDial);
-        } else if (result?.error) {
-          toast.error(result.error);
-        }
-      } catch {
-        toast.error("Failed to make call");
-      } finally {
-        // call finished
-      }
-    },
-    [ctiDialNumber, getAllUserDevices, onCall],
-  );
-  const handleDeviceSelect = useCallback(
-    async (device: { deviceType: string; deviceName: string }) => {
-      const numberToDial = pendingDialedNumber;
-      setShowDeviceSelectionModal(false);
-      setAvailableDevices([]);
-      setPendingDialedNumber("");
-      const callerInfo = {
-        callingAddress: ctiUserAddress,
-        callingDeviceName: device.deviceName,
-        callingDeviceType: device.deviceType,
-        selectedAt: new Date().toISOString(),
-      };
-      localStorage.setItem("cti_caller_info", JSON.stringify(callerInfo));
-      try {
-        const result = await makeCall({
-          callingAddress: ctiUserAddress ?? "",
-          calledAddress: numberToDial,
-          callingDeviceType: device.deviceType,
-          callingDeviceName: device.deviceName,
-        });
-        if (result?.success) {
-          setShowCallModal(false);
-          onCall?.(numberToDial);
-        } else if (result?.error) {
-          toast.error(result.error);
-        }
-      } catch {
-        toast.error("Failed to make call");
-      } finally {
-        // call finished
-      }
-    },
-    [pendingDialedNumber, ctiUserAddress, makeCall, onCall],
-  );
-
   // Parse comma-separated email/phone into arrays for multiple contact support
-  const emailList = useMemo(() => {
-    if (!email || typeof email !== "string") return [];
-    return email
-      .split(",")
-      .map((e) => e.trim())
-      .filter(Boolean);
-  }, [email]);
-  const phoneList = useMemo(() => {
-    if (!phone || typeof phone !== "string") return [];
-    return phone
-      .split(",")
-      .map((p) => p.trim())
-      .filter(Boolean);
-  }, [phone]);
+  const emailList = useMemo(() => splitCommaSeparated(email), [email]);
+  const phoneList = useMemo(() => splitCommaSeparated(phone), [phone]);
   const hasEmail = emailList.length > 0;
   const hasPhone = phoneList.length > 0;
 
   // Shared CRM activity modals (same as detail pages) – used when we have a concrete CRM record
   const activityRecordTypeForModals =
-    recordType && ["prospect", "lead", "deal", "order"].includes(recordType)
-      ? (recordType as CrmEntityType)
-      : undefined;
-  const activityRecordIdForModals =
-    activityRecordTypeForModals &&
-    recordId != null &&
-    !Number.isNaN(Number(recordId))
-      ? Number(recordId)
-      : undefined;
+    toActivityRecordTypeForModals(recordType);
+  const activityRecordIdForModals = toActivityRecordIdForModals(recordId);
 
   const {
     sidebarNotesList,
@@ -6112,31 +6239,14 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
     phone,
   });
 
-  const activityModalsParams =
-    activityRecordTypeForModals && activityRecordIdForModals != null
-      ? {
-          recordType: activityRecordTypeForModals,
-          recordId: activityRecordIdForModals,
-          recordName: title,
-          recordEmail: emailList[0] ?? "",
-          recordPhone: phoneList[0] ?? "",
-          // When a note is created via the shared activity modals,
-          // refresh the sidebar notes list for this record so the
-          // "Notes" section in GenericSidebar updates immediately.
-          onNoteCreated: () => {
-            refreshSidebarNotes().catch(() => {
-              // refreshSidebarNotes handles its own failure state
-            });
-          },
-        }
-      : {
-          recordType: "prospect" as CrmRecordType,
-          recordId: 0,
-          recordName: "",
-          recordEmail: "",
-          recordPhone: "",
-          onNoteCreated: () => {},
-        };
+  const activityModalsParams = buildActivityModalsParamsFromSidebar({
+    activityRecordType: activityRecordTypeForModals,
+    activityRecordId: activityRecordIdForModals,
+    title,
+    emailList,
+    phoneList,
+    refreshSidebarNotes,
+  });
 
   const activityModals = useCrmActivityModals(activityModalsParams);
 
@@ -6159,11 +6269,29 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
   const [showMoreModal, setShowMoreModal] = useState(false);
   const [showWhatsAppModal, setShowWhatsAppModal] = useState(false);
   const [showSmsModal, setShowSmsModal] = useState(false);
+  const {
+    showDeviceSelectionModal,
+    availableDevices,
+    resetDeviceSelection,
+    handleCall,
+    handleDeviceSelect,
+  } = useCtiCallHandlers({
+    ctiDialNumber,
+    getAllUserDevices,
+    makeCall,
+    ctiUserAddress,
+    onCall,
+    setShowCallModal,
+  });
   const [moreModalPosition, setMoreModalPosition] = useState({
     top: 0,
     left: 0,
   });
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const actionsDropdownButtonRef = useRef<HTMLButtonElement>(null);
+  const actionsDropdownMenuPortalRef = useRef<HTMLDivElement>(null);
+  const [actionsMenuFixedStyle, setActionsMenuFixedStyle] =
+    useState<React.CSSProperties | null>(null);
   const sectionDropdownRefs = useRef<{ [key: string]: HTMLDivElement | null }>(
     {},
   );
@@ -6186,18 +6314,53 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
     setCollapsedSections(collapsed);
   }, [isOpen, recordType, recordId]);
 
-  // Close dropdown when clicking outside
+  const syncActionsMenuPosition = useCallback(() => {
+    const btn = actionsDropdownButtonRef.current;
+    if (!btn) return;
+    const r = btn.getBoundingClientRect();
+    setActionsMenuFixedStyle({
+      position: "fixed",
+      top: r.bottom + 4,
+      left: r.right,
+      transform: "translateX(-100%)",
+      backgroundColor: "#ffffff",
+      border: "1px solid #e2e8f0",
+      borderRadius: "5px",
+      boxShadow: "0 4px 12px rgba(0, 0, 0, 0.15)",
+      minWidth: "180px",
+      zIndex: 10050,
+      overflow: "hidden",
+    });
+  }, []);
+
+  useLayoutEffect(() => {
+    if (!showActionsDropdown) {
+      setActionsMenuFixedStyle(null);
+      return;
+    }
+    syncActionsMenuPosition();
+    window.addEventListener("resize", syncActionsMenuPosition);
+    window.addEventListener("scroll", syncActionsMenuPosition, true);
+    return () => {
+      window.removeEventListener("resize", syncActionsMenuPosition);
+      window.removeEventListener("scroll", syncActionsMenuPosition, true);
+    };
+  }, [showActionsDropdown, syncActionsMenuPosition]);
+
+  // Close dropdown when clicking outside (menu is portaled, so check both refs)
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       const targetNode = event.target as Node;
 
-      if (
-        dropdownRef.current &&
-        !dropdownRef.current.contains(targetNode)
-      ) {
-        setShowActionsDropdown(false);
-        setOpenActionsSubMenuIndex(null);
-        setActionsSubMenuSearch("");
+      if (showActionsDropdown) {
+        const inTrigger = dropdownRef.current?.contains(targetNode);
+        const inMenu =
+          actionsDropdownMenuPortalRef.current?.contains(targetNode);
+        if (!inTrigger && !inMenu) {
+          setShowActionsDropdown(false);
+          setOpenActionsSubMenuIndex(null);
+          setActionsSubMenuSearch("");
+        }
       }
 
       const entries = Object.entries(sectionDropdownRefs.current);
@@ -6211,7 +6374,77 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
 
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
+  }, [showActionsDropdown]);
+
+  const dockedOuterStyle = useMemo<React.CSSProperties>(
+    () =>
+      dockInParent
+        ? {
+            width,
+            backgroundColor: "#f0f0f0",
+            display: "flex",
+            flexDirection: "column",
+            flex: 1,
+            minHeight: 0,
+            alignSelf: "stretch",
+            height: "100%",
+            maxHeight: "100%",
+            overflow: "hidden",
+            animation: "slideInRight 0.3s ease-out",
+            flexShrink: 0,
+            marginTop: 0,
+            position: "relative",
+          }
+        : {
+            width,
+            backgroundColor: "#f0f0f0",
+            display: "flex",
+            flexDirection: "column",
+            height: "calc(100vh - 43px)",
+            maxHeight: "calc(100vh - 43px)",
+            overflow: "hidden",
+            animation: "slideInRight 0.3s ease-out",
+            flexShrink: 0,
+            marginTop: "43px",
+            position: "relative",
+          },
+    [dockInParent, width],
+  );
+
+  /** Column under the title bar: fixed contact/actions row + scrollable body (dropdowns are not clipped). */
+  const dockedBodyColumnStyle = useMemo<React.CSSProperties>(
+    () => ({
+      flex: 1,
+      minHeight: 0,
+      display: "flex",
+      flexDirection: "column",
+      overflow: "hidden",
+    }),
+    [],
+  );
+
+  const dockedScrollBodyStyle = useMemo<React.CSSProperties>(
+    () =>
+      dockInParent
+        ? {
+            flex: 1,
+            minHeight: 0,
+            overflowY: "auto",
+            backgroundColor: "#f0f0f0",
+            borderBottom: "1px solid #cccccc",
+            borderRadius: "0 0 10px 10px",
+          }
+        : {
+            flex: 1,
+            minHeight: 0,
+            overflowY: "auto",
+            backgroundColor: "#f0f0f0",
+            maxHeight: "calc(100vh - 217px)",
+            borderBottom: "1px solid #cccccc",
+            borderRadius: "0 0 10px 10px",
+          },
+    [dockInParent],
+  );
 
   if (!isOpen) return null;
 
@@ -8012,11 +8245,7 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
 
       <DeviceSelectionModal
         show={showDeviceSelectionModal}
-        onHide={() => {
-          setShowDeviceSelectionModal(false);
-          setAvailableDevices([]);
-          setPendingDialedNumber("");
-        }}
+        onHide={resetDeviceSelection}
         devices={availableDevices}
         onSelectDevice={handleDeviceSelect}
         extensionNumber={ctiUserAddress ?? ""}
@@ -8057,92 +8286,79 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
         onActionSelect={handleMoreActionSelect}
       />
 
-      <div className="generic-sidebar-new-container"
-        style={{
-          width,
-          backgroundColor: "#f0f0f0",
-          display: "flex",
-          flexDirection: "column",
-          height: "calc(100vh - 43px)",
-          maxHeight: "calc(100vh - 43px)",
-          overflow: "hidden",
-          animation: "slideInRight 0.3s ease-out",
-          flexShrink: 0,
-          marginTop: "43px",
-          position: "relative",
-        }}
+      <div
+        className="generic-sidebar-new-container"
+        style={dockedOuterStyle}
       >
-        {/* Fixed Top Bar - Title and Close (Non-scrollable) */}
-        <div
-          style={{
-            padding: "20px 24px",
-            border: "1px solid #cccccc",
-            backgroundColor: "#ffffff",
-            flexShrink: 0,
-            borderRadius: "10px 10px 0 0",
-          }}
-        >
+        {!hideTopHeadingBar && (
           <div
             style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
+              padding: "20px 24px",
+              border: "1px solid #cccccc",
+              backgroundColor: "#ffffff",
+              flexShrink: 0,
+              borderRadius: "10px 10px 0 0",
             }}
           >
-            <h2
+            <div
               style={{
-                fontSize: "20px",
-                fontWeight: "500",
-                color: "#141414",
-                margin: 0,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
               }}
             >
-              {title}
-            </h2>
-
-            {onClose && (
-              <button
-                onClick={onClose}
+              <h2
                 style={{
-                  background: "transparent",
-                  border: "none",
-                  padding: "4px",
-                  cursor: "pointer",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  color: "#718096",
-                  transition: "all 0.2s",
-                  borderRadius: "4px",
+                  fontSize: "20px",
+                  fontWeight: "500",
+                  color: "#141414",
+                  margin: 0,
                 }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.color = "#2d3748";
-                  e.currentTarget.style.backgroundColor = "#f7fafc";
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.color = "#718096";
-                  e.currentTarget.style.backgroundColor = "transparent";
-                }}
-                aria-label="Close"
               >
-                <X size={20} />
-              </button>
-            )}
-          </div>
-        </div>
+                {title}
+              </h2>
 
-        {/* Scrollable Content Area */}
-        <div
-          className="sidebar-scrollbar"
-          style={{
-            flex: 1,
-            overflowY: "auto",
-            backgroundColor: "#f0f0f0",
-            maxHeight: "calc(100vh - 217px)",
-            borderBottom: "1px solid #cccccc",
-            borderRadius: "0 0 10px 10px",
-          }}
-        >
+              {onClose && (
+                <button
+                  onClick={onClose}
+                  style={{
+                    background: "transparent",
+                    border: "none",
+                    padding: "4px",
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    color: "#718096",
+                    transition: "all 0.2s",
+                    borderRadius: "4px",
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.color = "#2d3748";
+                    e.currentTarget.style.backgroundColor = "#f7fafc";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.color = "#718096";
+                    e.currentTarget.style.backgroundColor = "transparent";
+                  }}
+                  aria-label="Close"
+                >
+                  <X size={20} />
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+
+        <div style={dockedBodyColumnStyle}>
+          {/* z-index keeps header Actions menu above the scroll sibling (later siblings paint on top by default). */}
+          <div
+            style={{
+              flexShrink: 0,
+              position: "relative",
+              zIndex: 5,
+            }}
+          >
           {/* Contact & Actions Section */}
           <div
             style={{
@@ -8152,7 +8368,14 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
               borderLeft: "1px solid #cccccc",
               borderRight: "1px solid #cccccc",
               borderBottom: "1px solid #cccccc",
-              borderRadius: "0 0 10px 10px",
+              ...(hideTopHeadingBar
+                ? {
+                    borderTop: "1px solid #cccccc",
+                    borderRadius: "10px",
+                  }
+                : {
+                    borderRadius: "0 0 10px 10px",
+                  }),
             }}
           >
             {/* Record Link and Actions */}
@@ -8189,9 +8412,19 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
                 </a>
               )}
 
+              {(actionsDropdown || (hideTopHeadingBar && onClose)) && (
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "8px",
+                  marginLeft: "auto",
+                }}
+              >
               {actionsDropdown && (
                 <div style={{ position: "relative" }} ref={dropdownRef}>
                   <button
+                    ref={actionsDropdownButtonRef}
                     onClick={() => {
                       const next = !showActionsDropdown;
                       setShowActionsDropdown(next);
@@ -8224,22 +8457,14 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
                     <ChevronDown size={14} />
                   </button>
 
-                  {showActionsDropdown && (
-                    <div
-                      style={{
-                        position: "absolute",
-                        top: "100%",
-                        right: 0,
-                        marginTop: "4px",
-                        backgroundColor: "#ffffff",
-                        border: "1px solid #e2e8f0",
-                        borderRadius: "5px",
-                        boxShadow: "0 4px 12px rgba(0, 0, 0, 0.15)",
-                        minWidth: "180px",
-                        zIndex: 1000,
-                        overflow: "hidden",
-                      }}
-                    >
+                  {showActionsDropdown &&
+                    typeof document !== "undefined" &&
+                    actionsMenuFixedStyle &&
+                    createPortal(
+                      <div
+                        ref={actionsDropdownMenuPortalRef}
+                        style={actionsMenuFixedStyle}
+                      >
                       {actionsDropdown.items.map((item, index) => {
                         const hasSubItems =
                           "subItems" in item && !!item.subItems?.length;
@@ -8397,9 +8622,42 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
                           </div>
                         );
                       })}
-                    </div>
-                  )}
+                      </div>,
+                      document.body,
+                    )}
                 </div>
+              )}
+              {hideTopHeadingBar && onClose && (
+                <button
+                  type="button"
+                  onClick={onClose}
+                  style={{
+                    background: "transparent",
+                    border: "none",
+                    padding: "4px",
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    color: "#718096",
+                    transition: "all 0.2s",
+                    borderRadius: "4px",
+                    flexShrink: 0,
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.color = "#2d3748";
+                    e.currentTarget.style.backgroundColor = "#f7fafc";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.color = "#718096";
+                    e.currentTarget.style.backgroundColor = "transparent";
+                  }}
+                  aria-label="Close"
+                >
+                  <X size={20} />
+                </button>
+              )}
+              </div>
               )}
             </div>
 
@@ -8662,7 +8920,12 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
               })}
             </div>
           </div>
+          </div>
 
+          <div
+            className="sidebar-scrollbar"
+            style={{ ...dockedScrollBodyStyle, position: "relative", zIndex: 1 }}
+          >
           {/* Record summary (from API crm_summary) */}
           {recordSummary && (
             <div
@@ -8917,6 +9180,7 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
 
           {/* Sections */}
           {processedSections.map((section) => renderSection(section))}
+        </div>
         </div>
       </div>
 

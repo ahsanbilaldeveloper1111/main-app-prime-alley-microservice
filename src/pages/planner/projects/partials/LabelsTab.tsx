@@ -7,6 +7,10 @@ import { Plus, Trash2, Edit, Tag } from 'lucide-react';
 import { createProjectLabel, updateProjectLabel, deleteProjectLabel } from '@utils/tasks';
 import GenericTable, { TableColumn, TableAction, ToolbarConfig, FilterPill } from '@components/GenericTable';
 import type { StatsCardData } from '@components/GenericStatsCards';
+import { usePermissions } from '@utils/permissionUtils';
+import { HEADER_CONSTANTS } from '@constants/headerConstants';
+
+const { PERMISSIONS } = HEADER_CONSTANTS;
 
 interface LabelsTabProps {
   selectedProject: any;
@@ -41,7 +45,20 @@ const LabelsTab: React.FC<LabelsTabProps> = ({
   styles: _styles,
   canManageProject,
 }) => {
-  const isAllow = canManageProject;
+  const { hasPermission, hasAnyPermission } = usePermissions();
+  const canViewLabels =
+    canManageProject &&
+    hasAnyPermission([
+      PERMISSIONS.CREATE_LABELS_WORK_PLANNER,
+      PERMISSIONS.UPDATE_LABELS_WORK_PLANNER,
+      PERMISSIONS.DELETE_LABELS_WORK_PLANNER,
+    ]);
+  const canCreateLabel =
+    canManageProject && hasPermission(PERMISSIONS.CREATE_LABELS_WORK_PLANNER);
+  const canUpdateLabel =
+    canManageProject && hasPermission(PERMISSIONS.UPDATE_LABELS_WORK_PLANNER);
+  const canDeleteLabel =
+    canManageProject && hasPermission(PERMISSIONS.DELETE_LABELS_WORK_PLANNER);
 
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -63,7 +80,7 @@ const LabelsTab: React.FC<LabelsTabProps> = ({
 
   // ── CRUD handlers ─────────────────────────────────────────────────────────
   const handleAddLabel = async () => {
-    if (!canManageProject || !selectedProject?.id || !formData.name) return;
+    if (!canCreateLabel || !selectedProject?.id || !formData.name) return;
     
     try {
       setProcessing(true);
@@ -82,7 +99,7 @@ const LabelsTab: React.FC<LabelsTabProps> = ({
   };
 
   const handleUpdateLabel = async () => {
-    if (!canManageProject || !selectedProject?.id || !selectedLabel || !formData.name) return;
+    if (!canUpdateLabel || !selectedProject?.id || !selectedLabel || !formData.name) return;
     
     try {
       setProcessing(true);
@@ -102,7 +119,7 @@ const LabelsTab: React.FC<LabelsTabProps> = ({
   };
 
   const handleDeleteLabel = async () => {
-    if (!canManageProject || !selectedProject?.id || !selectedLabel) return;
+    if (!canDeleteLabel || !selectedProject?.id || !selectedLabel) return;
     
     try {
       setProcessing(true);
@@ -194,26 +211,34 @@ const LabelsTab: React.FC<LabelsTabProps> = ({
   ];
 
   // ── GenericTable actions ──────────────────────────────────────────────────
-  const actions: TableAction[] = isAllow ? [
-    {
-      label: 'Edit Label',
-      icon: <Edit size={16} />,
-      variant: 'link',
-      className: 'text-secondary p-1',
-      onClick: (row: any) => {
-        openEditModal(row);
-      },
-    },
-    {
-      label: 'Delete Label',
-      icon: <Trash2 size={16} />,
-      variant: 'link',
-      className: 'text-danger p-1',
-      onClick: (row: any) => {
-        openDeleteModal(row);
-      },
-    },
-  ] : [];
+  const actions: TableAction[] = [
+    ...(canUpdateLabel
+      ? [
+          {
+            label: 'Edit Label',
+            icon: <Edit size={16} />,
+            variant: 'link' as const,
+            className: 'text-secondary p-1',
+            onClick: (row: any) => {
+              openEditModal(row);
+            },
+          },
+        ]
+      : []),
+    ...(canDeleteLabel
+      ? [
+          {
+            label: 'Delete Label',
+            icon: <Trash2 size={16} />,
+            variant: 'link' as const,
+            className: 'text-danger p-1',
+            onClick: (row: any) => {
+              openDeleteModal(row);
+            },
+          },
+        ]
+      : []),
+  ];
 
   // ── Filtered and Paginated Data ───────────────────────────────────────────
   const filteredLabels = useMemo(() => {
@@ -324,7 +349,7 @@ const LabelsTab: React.FC<LabelsTabProps> = ({
         gap: "8px",
       }}
     >
-      {isAllow && selectedItems.length > 0 && (
+      {canDeleteLabel && selectedItems.length > 0 && (
         <button
           type="button"
           onClick={() => {
@@ -359,7 +384,7 @@ const LabelsTab: React.FC<LabelsTabProps> = ({
           Delete ({selectedItems.length})
         </button>
       )}
-      {isAllow && (
+      {canCreateLabel && (
         <button
           onClick={() => setShowAddModal(true)}
           style={{
@@ -421,27 +446,27 @@ const LabelsTab: React.FC<LabelsTabProps> = ({
     },
     
     rightActions: renderAddLabelButton(),
-  }), [searchValue, filterPills, isAllow, selectedItems.length, labels.length]);
+  }), [searchValue, filterPills, canCreateLabel, canDeleteLabel, selectedItems.length, labels.length]);
 
   // ── Row Interaction Handlers ──────────────────────────────────────────────
   const handleFirstColumnClick = useCallback(
     (row: any) => {
-      if (!isAllow) {
+      if (!canUpdateLabel) {
         return;
       }
       openEditModal(row);
     },
-    [isAllow, openEditModal],
+    [canUpdateLabel, openEditModal],
   );
 
   const handleRowDoubleClick = useCallback(
     (row: any) => {
-      if (!isAllow) {
+      if (!canUpdateLabel) {
         return;
       }
       openEditModal(row);
     },
-    [isAllow, openEditModal],
+    [canUpdateLabel, openEditModal],
   );
 
   // Reset to page 1 when filters change
@@ -450,6 +475,10 @@ const LabelsTab: React.FC<LabelsTabProps> = ({
   }, [searchValue, colorFilter]);
 
   // ── Render ────────────────────────────────────────────────────────────────
+  if (!canViewLabels) {
+    return null;
+  }
+
   return (
     <>
       {/* Labels Table with GenericTable */}
@@ -466,11 +495,11 @@ const LabelsTab: React.FC<LabelsTabProps> = ({
           data={paginatedLabels}
           columns={columns.filter((c) => selectedColumns.includes(c.key))}
           actions={actions}
-          showActions={isAllow && actions.length > 0}
+          showActions={(canUpdateLabel || canDeleteLabel) && actions.length > 0}
           actionsLabel="Actions"
           
           // Selection
-          selectable={isAllow}
+          selectable={canDeleteLabel}
           selectedRows={paginatedLabels.filter((item) =>
             selectedItems.includes(item.id)
           )}

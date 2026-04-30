@@ -19,6 +19,7 @@ import {
   type InvoiceItemAPIPayload,
 } from "@utils/accounts";
 import { ensureCustomerExistsForCrmCompany } from "@hooks/billing/useEnsureCustomerForCrmCompany";
+import { billingCustomerRoutes } from "@utils/billingCustomerRoutes";
 
 export interface InvoiceLineItem {
   id: string;
@@ -622,7 +623,7 @@ export function useCreateInvoiceForm(props: CreateInvoiceFormProps) {
       .catch((e: any) => {
         if (cancelled) return;
         toast.error(getErrorMessage(e, "Failed to load invoice"));
-        router.push("/billing/invoices").catch(() => undefined);
+        router.push(billingCustomerRoutes.invoices()).catch(() => undefined);
       })
       .finally(() => {
         if (!cancelled) setLoadingEditInvoice(false);
@@ -678,6 +679,24 @@ export function useCreateInvoiceForm(props: CreateInvoiceFormProps) {
 
   const updateItem = useCallback((lineId: string, patch: Partial<InvoiceLineItem>) => {
     setItems((prev) => prev.map((x) => (x.id === lineId ? { ...x, ...patch } : x)));
+  }, []);
+
+  /**
+   * Manual amount entry for product lines.
+   * Keeps line subtotal (= quantity * unit_price) equal to the typed amount.
+   */
+  const setLineAmount = useCallback((lineId: string, nextAmount: number) => {
+    const safeAmount = Number.isFinite(nextAmount) ? Math.max(0, nextAmount) : 0;
+    setItems((prev) =>
+      prev.map((line) => {
+        if (line.id !== lineId) return line;
+        const qty = Number(line.quantity);
+        if (!Number.isFinite(qty) || qty <= 0) {
+          return { ...line, quantity: 1, unit_price: safeAmount };
+        }
+        return { ...line, unit_price: safeAmount / qty };
+      }),
+    );
   }, []);
 
   const handleDueDateChange = useCallback(
@@ -748,7 +767,7 @@ export function useCreateInvoiceForm(props: CreateInvoiceFormProps) {
         toast.success("Invoice created");
         resetForm();
       }
-      await router.push("/billing/invoices");
+      await router.push(billingCustomerRoutes.invoices());
     } catch (e) {
       toast.error(getErrorMessage(e, isEditMode ? "Failed to update invoice" : "Failed to create invoice"));
     } finally {
@@ -864,6 +883,7 @@ export function useCreateInvoiceForm(props: CreateInvoiceFormProps) {
     cloneItem,
     removeItem,
     updateItem,
+    setLineAmount,
     handleDueDateChange,
     handleCreateInvoice,
     router,

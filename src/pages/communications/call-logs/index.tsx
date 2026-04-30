@@ -60,6 +60,9 @@ import {
   renderApplyResetFilterActions,
   useStagedFiltersActions,
 } from "@utils/communicationsStagedFilters";
+import { HEADER_CONSTANTS } from "@constants/headerConstants";
+
+const { PERMISSIONS } = HEADER_CONSTANTS;
 
 /** Row shape from call-logs API (data / dataList items) */
 interface CallLogRow {
@@ -138,6 +141,11 @@ interface Summary {
 
 const CallLogs = () => {
   const { data: session } = useSession();
+  const userPermissions = session?.user?.permissions ?? [];
+  const canViewCallLogs =
+    userPermissions.includes(PERMISSIONS.VIEW_CALL_LOGS) ||
+    userPermissions.includes(PERMISSIONS.LIST_CALL_LOGS);
+  const canExportCallLogs = userPermissions.includes(PERMISSIONS.EXPORT_CALL_LOGS);
   const [showPageLoader, setShowPageLoader] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
 
@@ -233,6 +241,23 @@ const CallLogs = () => {
 
   const { hierarchyDataExtensions, hierarchyDataDepartments } =
     useHierarchyData(ModuleSlug.CALL_LOGS);
+  const selectedExtensionIds = useMemo<string[]>(
+    () =>
+      Array.isArray(currentFilters.extension_number)
+        ? (currentFilters.extension_number as string[]).map(String)
+        : [],
+    [currentFilters.extension_number],
+  );
+  const extensionOptionsSelectedFirst = useMemo(
+    () =>
+      [...hierarchyDataExtensions].sort((a: any, b: any) => {
+        const aSelected = selectedExtensionIds.includes(String(a.id));
+        const bSelected = selectedExtensionIds.includes(String(b.id));
+        if (aSelected === bSelected) return 0;
+        return aSelected ? -1 : 1;
+      }),
+    [hierarchyDataExtensions, selectedExtensionIds],
+  );
 
   const [totalCalls, setTotalCalls] = useState(0);
   // Stats cards data for StatsCards component
@@ -383,7 +408,7 @@ const CallLogs = () => {
   // Initial load and refetch when filters/refresh change
   useEffect(() => {
     setTablePagination((prev) => ({ ...prev, currentPage: 1 }));
-    fetchCallLogs(1, rowsPerPageRef.current, "");
+    fetchCallLogs(1, rowsPerPageRef.current, searchValue.trim());
   }, [refreshKey, fetchCallLogs]);
 
   const handleFiltersChange = useCallback((filters: any) => {
@@ -482,8 +507,7 @@ const CallLogs = () => {
         fetchCallLogs(1, tablePagination.rowsPerPage, searchValue.trim());
       },
       showFiltersButton: true,
-      showExportButton:
-        session?.user?.permissions?.includes("export-call-logs"),
+      showExportButton: canExportCallLogs,
       onExportClick: () => handleExport(),
       showFilterPills: true,
       showMoreFiltersButton: false,
@@ -560,7 +584,7 @@ const CallLogs = () => {
           ],
         },
         buildExtensionMultiSelectFilterPill(
-          hierarchyDataExtensions as any[],
+          extensionOptionsSelectedFirst,
           currentFilters,
           stageFilters,
         ),
@@ -606,13 +630,14 @@ const CallLogs = () => {
       ),
     };
   }, [
+    canExportCallLogs,
     searchValue,
     tablePagination.rowsPerPage,
     fetchCallLogs,
     currentFilters,
     hierarchyDataExtensions,
+    extensionOptionsSelectedFirst,
     hierarchyDataDepartments,
-    session?.user?.permissions,
     isExporting,
     stageFilters,
     handleExport,
@@ -694,7 +719,7 @@ const CallLogs = () => {
           </div>
         )}
 
-      {session?.user?.permissions?.includes("list-call-logs") && (
+      {canViewCallLogs && (
         <GenericTable<CallLogRow>
           data={callLogData}
           columns={tableColumns}

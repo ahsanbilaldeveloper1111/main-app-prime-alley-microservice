@@ -16,7 +16,11 @@ import PageSummaryGrid from '@components/PageSummaryGrid';
 import '@assets/scss/report-style.scss';
 import moment from 'moment';
 import { formatMinutesAndSeconds, formatCurrency, ModuleSlug, GlobalDateTimeFormat, formatDateTimeToLocal, getAutoTimezone } from '@utils/Helper';
+import { HEADER_CONSTANTS } from '@constants/headerConstants';
+import { canViewCallLogsFromSession } from '@utils/callPermissionUtils';
 import "@assets/scss/common.scss";
+
+const { PERMISSIONS } = HEADER_CONSTANTS;
 
 
 
@@ -273,7 +277,7 @@ const CallStatsDepartment = () => {
 
   // Ensure initial fetch happens when session is ready
   useEffect(() => {
-    if (session && session.user?.permissions?.includes('list-call-logs')) {
+    if (canViewCallLogsFromSession(session)) {
       initialFetchDone.current = true;
     }
   }, [session]);
@@ -364,7 +368,7 @@ const CallStatsDepartment = () => {
         </Col>
       </Row>
 
-      {session?.user?.permissions?.includes('list-call-logs') && (
+      {canViewCallLogsFromSession(session) && (
         <>
             <BarFilters
               leftContent={

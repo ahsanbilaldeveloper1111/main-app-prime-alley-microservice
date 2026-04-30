@@ -40,7 +40,7 @@ import "@assets/scss/common.scss";
 import {
   ListCallLogs,
   DownloadCallRecording,
-  DownloadStreamingExport,
+  ExportCallRecordings,
 } from "@utils/calls";
 import axiosInstance from "@utils/axios";
 import { toast } from "react-toastify";
@@ -177,12 +177,61 @@ interface RecordingRow {
   [key: string]: any;
 }
 
+function buildUsernameFilterPill(
+  currentFilters: Record<string, any>,
+  stageFilters: (nextFilters: Record<string, any>) => void,
+  selectedUsernameIds: string[],
+  areAllUsernamesSelected: boolean,
+  allUsernameIds: string[],
+  usernameDropdownOptions: Array<{
+    label: string;
+    value: string;
+    selected: boolean;
+    onClick: () => void;
+  }>,
+) {
+  return {
+    id: "username",
+    label: "Username",
+    showDropdown: true,
+    searchable: true,
+    multiSelect: true,
+    active: selectedUsernameIds.length > 0,
+    activeLabel:
+      selectedUsernameIds.length > 0
+        ? `${selectedUsernameIds.length} selected`
+        : undefined,
+    onClear: () => stageFilters({ ...currentFilters, username: [] }),
+    onSelectAll: () => {
+      stageFilters({
+        ...currentFilters,
+        username: areAllUsernamesSelected ? [] : allUsernameIds,
+      });
+    },
+    selectAllLabel: areAllUsernamesSelected ? "Deselect all" : "Select all",
+    dropdownOptions: usernameDropdownOptions,
+  };
+}
+
 // ─── Filter menu components (lifted out of CallRecordings to satisfy Sonar) ──
 
 const CallRecordings: NextPage & {
   getLayout?: (page: React.ReactElement) => React.ReactNode;
 } = () => {
   const { data: session } = useSession();
+  const canPlayRecordings = session?.user?.permissions?.includes(
+    PERMISSIONS.PLAY_RECORDING_CALL_RECORDINGS,
+  );
+  const canDownloadRecordings = session?.user?.permissions?.includes(
+    PERMISSIONS.DOWNLOAD_RECORDING_CALL_RECORDINGS,
+  );
+  const userPermissions = session?.user?.permissions ?? [];
+  const canViewCallRecordings =
+    userPermissions.includes(PERMISSIONS.VIEW_CALL_RECORDINGS) ||
+    userPermissions.includes(PERMISSIONS.LIST_CALL_RECORDINGS);
+  const canExportCallRecordings = userPermissions.includes(
+    PERMISSIONS.EXPORT_CALL_RECORDINGS,
+  );
   const audioPlayerRef = useRef<AudioPlayerRef>(null);
   const [showPageLoader, setShowPageLoader] = useState(false);
 
@@ -222,6 +271,23 @@ const CallRecordings: NextPage & {
     hierarchyDataDepartments,
     hierarchyDataUsers,
   } = useHierarchyData(ModuleSlug.CALL_RECORDINGS);
+  const selectedExtensionIds = useMemo<string[]>(
+    () =>
+      Array.isArray(currentFilters.extension_number)
+        ? (currentFilters.extension_number as string[]).map(String)
+        : [],
+    [currentFilters.extension_number],
+  );
+  const extensionOptionsSelectedFirst = useMemo(
+    () =>
+      [...hierarchyDataExtensions].sort((a: any, b: any) => {
+        const aSelected = selectedExtensionIds.includes(String(a.id));
+        const bSelected = selectedExtensionIds.includes(String(b.id));
+        if (aSelected === bSelected) return 0;
+        return aSelected ? -1 : 1;
+      }),
+    [hierarchyDataExtensions, selectedExtensionIds],
+  );
   const [callDurationBarChartModal, setCallDurationBarChartModal] =
     useState(false);
   const [currentChartData, setCurrentChartData] = useState<{
@@ -550,28 +616,91 @@ const CallRecordings: NextPage & {
     setShowPageLoader(true);
     try {
       if (exportType === "excel") {
-        await DownloadStreamingExport(
-          {
-            filters,
-            isExport: true,
-            exportType,
-            moduleSlug: ModuleSlug.CALL_RECORDINGS,
-          },
-          "call-logs/recordings",
-          "recordings",
-        ).finally(() => {
-          setShowPageLoader(false);
-        });
+        await ExportCallRecordings(filters);
       }
     } catch (error) {
       console.error("Export failed:", error);
-      toast.error("Export failed");
+    } finally {
+      setShowPageLoader(false);
     }
   };
 
   const stageFilters = useCallback((nextFilters: Record<string, any>) => {
     setCurrentFilters(nextFilters);
   }, []);
+
+  const selectedUsernameIds = useMemo<string[]>(() => {
+    const raw = currentFilters.username;
+    if (Array.isArray(raw)) {
+      return raw
+        .map((value) => String(value ?? "").trim())
+        .filter((value) => value.length > 0);
+    }
+    const single = String(raw ?? "").trim();
+    return single ? [single] : [];
+  }, [currentFilters.username]);
+
+  const allUsernameIds = useMemo<string[]>(
+    () => hierarchyDataUsers.map((u: any) => String(u.id)),
+    [hierarchyDataUsers],
+  );
+
+  const areAllUsernamesSelected = useMemo(
+    () =>
+      allUsernameIds.length > 0 &&
+      allUsernameIds.every((id) => selectedUsernameIds.includes(id)),
+    [allUsernameIds, selectedUsernameIds],
+  );
+
+  const toggleUsernameSelection = useCallback(
+    (userId: string) => {
+      const isSelected = selectedUsernameIds.includes(userId);
+      const nextUsernames = isSelected
+        ? selectedUsernameIds.filter((id) => id !== userId)
+        : [...selectedUsernameIds, userId];
+      stageFilters({ ...currentFilters, username: nextUsernames });
+    },
+    [selectedUsernameIds, stageFilters, currentFilters],
+  );
+
+  const usernameDropdownOptions = useMemo(
+    () =>
+      hierarchyDataUsers
+        .map((u: any) => {
+          const userId = String(u.id);
+          return {
+            label: String(u.name ?? u.id),
+            value: userId,
+            selected: selectedUsernameIds.includes(userId),
+            onClick: () => toggleUsernameSelection(userId),
+          };
+        })
+        .sort((a, b) => {
+          if (a.selected === b.selected) return 0;
+          return a.selected ? -1 : 1;
+        }),
+    [hierarchyDataUsers, selectedUsernameIds, toggleUsernameSelection],
+  );
+
+  const usernameFilterPill = useMemo(
+    () =>
+      buildUsernameFilterPill(
+        currentFilters,
+        stageFilters,
+        selectedUsernameIds,
+        areAllUsernamesSelected,
+        allUsernameIds,
+        usernameDropdownOptions,
+      ),
+    [
+      currentFilters,
+      stageFilters,
+      selectedUsernameIds,
+      areAllUsernamesSelected,
+      allUsernameIds,
+      usernameDropdownOptions,
+    ],
+  );
 
   const {
     handleApplyFiltersClick,
@@ -613,19 +742,15 @@ const CallRecordings: NextPage & {
         setPaginationInfo((prev) => ({ ...prev, currentPage: 1 }));
         fetchCallLogsOriginal(1, paginationInfo.perPage, searchValue.trim());
       },
-      showFiltersButton: session?.user?.permissions?.includes(
-        PERMISSIONS.VIEW_CALL_RECORDINGS,
-      ),
-      showExportButton: session?.user?.permissions?.includes(
-        "export-call-recordings",
-      ),
+      showFiltersButton: canViewCallRecordings,
+      showExportButton: canExportCallRecordings,
       onExportClick: () => handleExport("excel", appliedFilters),
       showFilterPills: true,
       showMoreFiltersButton: false,
       filterPills: [
         buildCallDirectionFilterPill(currentFilters, stageFilters),
         buildExtensionMultiSelectFilterPill(
-          hierarchyDataExtensions as any[],
+          extensionOptionsSelectedFirst,
           currentFilters,
           stageFilters,
         ),
@@ -634,30 +759,7 @@ const CallRecordings: NextPage & {
           currentFilters,
           stageFilters,
         ),
-        {
-          id: "username",
-          label: "Username",
-          showDropdown: true,
-          searchable: true,
-          active: Boolean(currentFilters.username),
-          activeLabel: currentFilters.username
-            ? (() => {
-                const user = hierarchyDataUsers.find(
-                  (u: any) => String(u.id) === String(currentFilters.username),
-                );
-                return user
-                  ? String((user as any).name ?? (user as any).id)
-                  : String(currentFilters.username);
-              })()
-            : undefined,
-          onClear: () => stageFilters({ ...currentFilters, username: "" }),
-          dropdownOptions: hierarchyDataUsers.map((u: any) => ({
-            label: String(u.name ?? u.id),
-            value: String(u.id),
-            onClick: () =>
-              stageFilters({ ...currentFilters, username: String(u.id) }),
-          })),
-        },
+        usernameFilterPill,
         buildTextDropdownFilterPill(
           "remote_party_number",
           "Remote Party Number",
@@ -746,14 +848,22 @@ const CallRecordings: NextPage & {
       ),
     };
   }, [
+    canExportCallRecordings,
+    canViewCallRecordings,
     searchValue,
     paginationInfo.perPage,
     fetchCallLogsOriginal,
     currentFilters,
     setCurrentFilters,
     hierarchyDataExtensions,
+    extensionOptionsSelectedFirst,
     hierarchyDataDepartments,
     hierarchyDataUsers,
+    selectedUsernameIds,
+    allUsernameIds,
+    areAllUsernamesSelected,
+    usernameDropdownOptions,
+    usernameFilterPill,
     session?.user?.permissions,
     showPageLoader,
     appliedFilters,
@@ -983,7 +1093,7 @@ const CallRecordings: NextPage & {
   // Initial load and refetch when filters/refresh change
   useEffect(() => {
     setPaginationInfo((prev) => ({ ...prev, currentPage: 1 }));
-    fetchCallLogsOriginal(1, rowsPerPageRef.current, "");
+    fetchCallLogsOriginal(1, rowsPerPageRef.current, searchValue.trim());
   }, [refreshKey, fetchCallLogsOriginal]);
 
   // Table columns for GenericTable (defined after handlers so they are in scope)
@@ -1044,51 +1154,61 @@ const CallRecordings: NextPage & {
       render: (row) => {
         const isDownloading = downloadingRecordings.has(row.Id ?? "");
         const progress = downloadProgress[row.Id ?? ""] || 0;
-        return (
-          <div className="d-flex gap-3 action-box">
+        const canRenderDownload = canDownloadRecordings;
+        const showDownloadProgress = canRenderDownload && isDownloading;
+        let downloadControl: React.ReactNode = null;
+        if (showDownloadProgress) {
+          downloadControl = (
+            <CircularProgressCircle
+              progress={progress}
+              size="small"
+              color="#28a745"
+              backgroundColor="#e9ecef"
+              textColor="#495057"
+              showPercentage={false}
+              className="circular-progress-inline"
+            />
+          );
+        } else if (canRenderDownload) {
+          downloadControl = (
             <button
               type="button"
               className="btn btn-link p-0 text-info border-0"
-              onClick={() => handlePlayRecording(row)}
-              aria-label="Play"
-              title="Play"
+              onClick={() => handleDownload(row)}
+              aria-label="Download"
+              title="Download"
             >
               <i
                 data-tooltip-id="my-tooltip"
-                data-tooltip-content="Play"
-                className="ph-duotone ph-play"
+                data-tooltip-content="Download"
+                className="ph-duotone ph-arrow-line-down"
                 style={{ fontSize: "1rem" }}
                 aria-hidden="true"
               />
             </button>
-            <div style={{ display: "inline-flex", alignItems: "center" }}>
-              {isDownloading ? (
-                <CircularProgressCircle
-                  progress={progress}
-                  size="small"
-                  color="#28a745"
-                  backgroundColor="#e9ecef"
-                  textColor="#495057"
-                  showPercentage={false}
-                  className="circular-progress-inline"
+          );
+        }
+        return (
+          <div className="d-flex gap-3 action-box">
+            {canPlayRecordings && (
+              <button
+                type="button"
+                className="btn btn-link p-0 text-info border-0"
+                onClick={() => handlePlayRecording(row)}
+                aria-label="Play"
+                title="Play"
+              >
+                <i
+                  data-tooltip-id="my-tooltip"
+                  data-tooltip-content="Play"
+                  className="ph-duotone ph-play"
+                  style={{ fontSize: "1rem" }}
+                  aria-hidden="true"
                 />
-              ) : (
-                <button
-                  type="button"
-                  className="btn btn-link p-0 text-info border-0"
-                  onClick={() => handleDownload(row)}
-                  aria-label="Download"
-                  title="Download"
-                >
-                  <i
-                    data-tooltip-id="my-tooltip"
-                    data-tooltip-content="Download"
-                    className="ph-duotone ph-arrow-line-down"
-                    style={{ fontSize: "1rem" }}
-                    aria-hidden="true"
-                  />
-                </button>
-              )}
+              </button>
+            )}
+            <div style={{ display: "inline-flex", alignItems: "center" }}>
+              {downloadControl}
             </div>
             {session?.user?.permissions?.includes(
               "transcriptions-analysis-aiml",
@@ -1257,7 +1377,7 @@ const CallRecordings: NextPage & {
           </Row>
         )}
 
-        {session?.user?.permissions?.includes("list-call-recordings") && (
+        {canViewCallRecordings && (
           <GenericTable<RecordingRow>
             data={tableData}
             columns={tableColumns}
@@ -1283,7 +1403,7 @@ const CallRecordings: NextPage & {
                 currentPage: page,
                 perPage: rowsPerPage,
               }));
-              fetchCallLogsOriginal(page, rowsPerPage, "");
+              fetchCallLogsOriginal(page, rowsPerPage, searchValue.trim());
             }}
             sortable={true}
             hover={true}

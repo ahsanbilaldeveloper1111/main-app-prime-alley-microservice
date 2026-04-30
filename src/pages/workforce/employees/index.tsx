@@ -30,10 +30,12 @@ import { Plus, Pencil, Trash2, User, Calendar } from "lucide-react";
 import moment from "moment";
 import { GlobalDateTimeFormat } from "@utils/Helper";
 import { formatPhoneForDisplay } from "@utils/phoneDisplay";
+import { HEADER_CONSTANTS } from "@constants/headerConstants";
 
 const EMPLOYMENT_TYPES = ["Full-Time", "Part-Time", "Contract", "Internship", "Freelance", "Temporary"];
 const CONTRACT_TYPES = ["Permanent", "Temporary", "Freelance", "Fixed-term", "Probation"];
 const EMPLOYEE_STATUS_OPTIONS = ["Active", "Inactive"];
+const { PERMISSIONS } = HEADER_CONSTANTS;
 
 /** Dashboard counters API response shape */
 interface EmployeeDashboardCountersData {
@@ -879,7 +881,7 @@ const Employees = () => {
           </button>
         </div>
       ),
-      rightActions: session?.user?.permissions?.includes("add-employee-staff-management") ? (
+      rightActions: session?.user?.permissions?.includes(PERMISSIONS.ADD_EMPLOYEE_STAFF_MANAGEMENT) ? (
         <button type="button" className="btn btn-dark btn-sm d-flex align-items-center gap-1" onClick={openCreateModal}>
           <Plus size={14} />
           Add Employee
@@ -1089,14 +1091,20 @@ const Employees = () => {
         label: "Edit",
         icon: <Pencil size={16} />,
         onClick: (profile: UserProfile) => openEditModal(profile),
-        show: () => Boolean(session?.user?.permissions?.includes("update-employee-staff-management")),
+        show: () =>
+          Boolean(
+            session?.user?.permissions?.includes(PERMISSIONS.UPDATE_EMPLOYEE_STAFF_MANAGEMENT),
+          ),
         variant: "link",
       },
       {
         label: "Create Journey",
         icon: <Calendar size={16} />,
         onClick: (profile: UserProfile) => openJourneyModal(profile),
-        show: () => Boolean(session?.user?.permissions?.includes("update-employee-staff-management")),
+        show: () =>
+          Boolean(
+            session?.user?.permissions?.includes(PERMISSIONS.UPDATE_EMPLOYEE_STAFF_MANAGEMENT),
+          ),
         disabled: (profile: UserProfile) => (profile as UserProfile & { journey?: { id?: number } }).journey?.id != null,
         disabledTitle: "Journey already started",
         variant: "link",
@@ -1105,7 +1113,10 @@ const Employees = () => {
         label: "Delete",
         icon: <Trash2 size={16} />,
         onClick: (profile: UserProfile) => handleDeleteClick(profile),
-        show: () => Boolean(session?.user?.permissions?.includes("delete-employee-staff-management")),
+        show: () =>
+          Boolean(
+            session?.user?.permissions?.includes(PERMISSIONS.DELETE_EMPLOYEE_STAFF_MANAGEMENT),
+          ),
         variant: "link",
       },
     ],

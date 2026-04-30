@@ -24,6 +24,7 @@ import {
   type UserRequestCategoryField,
   type UserRequest,
 } from "@utils/staffManagement";
+import { getWorkforceTableDatePresetRange } from "@utils/workforceTableDatePresetRange";
 import { useMainAppLookups, type MainAppUserLookup } from "@hooks/useMainAppLookups";
 import { toast } from "react-toastify";
 import { Badge, Modal, Form } from "react-bootstrap";
@@ -55,6 +56,9 @@ import {
   getUserDisplayNameFromLookup,
   type UserRequestIdValue,
 } from "@utils/workforceApprovalRequestsUserLookup";
+import { HEADER_CONSTANTS } from "@constants/headerConstants";
+
+const { PERMISSIONS } = HEADER_CONSTANTS;
 
 const TAB_TO_STATUS: Record<string, string> = {
   Pending: "pending",
@@ -85,35 +89,6 @@ function getAgingLabel(iso: string | null | undefined): string {
   } catch {
     return "—";
   }
-}
-
-function getDateRangeForOption(option: string): { start_date_from: string; start_date_to: string } | null {
-  if (!option?.trim()) return null;
-  const now = new Date();
-  const to = new Date(now);
-  to.setHours(23, 59, 59, 999);
-  const toStr = to.toISOString().slice(0, 10);
-  const from = new Date(now);
-  switch (option.trim()) {
-    case "Today":
-      from.setHours(0, 0, 0, 0);
-      return { start_date_from: toStr, start_date_to: toStr };
-    case "Last 7 days":
-      from.setDate(from.getDate() - 7);
-      break;
-    case "Last 30 days":
-      from.setDate(from.getDate() - 30);
-      break;
-    case "Last 3 months":
-      from.setMonth(from.getMonth() - 3);
-      break;
-    case "All time":
-    default:
-      return null;
-  }
-  from.setHours(0, 0, 0, 0);
-  const fromStr = from.toISOString().slice(0, 10);
-  return { start_date_from: fromStr, start_date_to: toStr };
 }
 
 function parseOpenIdFromQuery(openId: string | string[] | undefined): string | undefined {
@@ -1304,16 +1279,17 @@ function ApprovalActionsSection({
   const isApproved = statusDisplay === "approved";
   const canApprove = Boolean(
     isPending &&
-    permissions?.includes("approve-request-approval-request-staff-management") &&
+    permissions?.includes(PERMISSIONS.APPROVE_REQUEST_APPROVAL_REQUEST_STAFF_MANAGEMENT) &&
     approvalInfo?.can_approve
   );
   const canReject = Boolean(
     isPending &&
-    permissions?.includes("reject-request-approval-request-staff-management") &&
+    permissions?.includes(PERMISSIONS.REJECT_REQUEST_APPROVAL_REQUEST_STAFF_MANAGEMENT) &&
     approvalInfo?.can_reject
   );
   const canRequestChanges = Boolean(
-    isPending && permissions?.includes("request-changes-approval-request-staff-management")
+    isPending &&
+    permissions?.includes(PERMISSIONS.REQUEST_CHANGES_APPROVAL_REQUEST_STAFF_MANAGEMENT)
   );
 
   return (
@@ -1967,10 +1943,10 @@ const ApprovalRequest = () => {
         if (category?.id != null) params.user_request_category_id = category.id;
         const requestedByTrimmed = selectedRequestedByUserId?.trim();
         if (requestedByTrimmed) params.user_ids = [requestedByTrimmed];
-        const dateRange = getDateRangeForOption(selectedDate ?? "");
+        const dateRange = getWorkforceTableDatePresetRange(selectedDate ?? "");
         if (dateRange) {
-          params.created_at_from = dateRange.start_date_from;
-          params.created_at_to = dateRange.start_date_to;
+          params.created_at_from = dateRange.from;
+          params.created_at_to = dateRange.to;
         }
         const { data, pagination: p } = await getUserRequests(params);
         setRequests(data ?? []);
@@ -2198,7 +2174,8 @@ const ApprovalRequest = () => {
         selectedRequestedByUserId);
   const dateOptions = ["Today", "Last 7 days", "Last 30 days", "All time"];
   const totalRequests = requestsPagination?.total ?? 0;
-  const canCreateRequest = session?.user?.permissions?.includes("add-approval-request-staff-management") ?? false;
+  const canCreateRequest =
+    session?.user?.permissions?.includes(PERMISSIONS.ADD_APPROVAL_REQUEST_STAFF_MANAGEMENT) ?? false;
 
   const handleRunSearch = useCallback(() => {
     setCurrentPage(1);
@@ -2424,7 +2401,10 @@ const ApprovalRequest = () => {
                 label: "Edit",
                 icon: Pencil,
                 onClick: () => openEditModal(selectedRequest),
-                disabled: !session?.user?.permissions?.includes("update-approval-request-staff-management"),
+                disabled:
+                  !session?.user?.permissions?.includes(
+                    PERMISSIONS.UPDATE_APPROVAL_REQUEST_STAFF_MANAGEMENT,
+                  ),
               },
               {
                 id: "delete-request",
@@ -2436,7 +2416,9 @@ const ApprovalRequest = () => {
                   closeSidebar();
                 },
                 disabled:
-                  !session?.user?.permissions?.includes("delete-approval-request-staff-management") || deleting,
+                  !session?.user?.permissions?.includes(
+                    PERMISSIONS.DELETE_APPROVAL_REQUEST_STAFF_MANAGEMENT,
+                  ) || deleting,
               },
             ]}
             sections={approvalSidebarSections}

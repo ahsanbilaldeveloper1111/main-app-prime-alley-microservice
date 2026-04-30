@@ -32,12 +32,17 @@ import {
   getSessionPhoneOrExtension,
 } from "@planner/projectMemberRole";
 import {
+  applyPlannerTaskSessionCrud,
   computePlannerTaskRowPermissions,
   plannerTaskRowDeleteDeniedTitle,
   plannerTaskRowEditDeniedTitle,
 } from "@planner/taskRowPermissions";
 import { extensionOrIdToTrimmedString } from "@planner/projectTabsContentUtils";
 import { useSession } from "next-auth/react";
+import { usePermissions } from "@utils/permissionUtils";
+import { HEADER_CONSTANTS } from "@constants/headerConstants";
+
+const { PERMISSIONS } = HEADER_CONSTANTS;
 import { useHierarchyData } from "@components/filters/useHierarchyData";
 import { ModuleSlug } from "@utils/Helper";
 import { useTasksListingPager } from "@hooks/useTasksListingPager";
@@ -223,7 +228,7 @@ const TASK_TYPE_OPTIONS = [
 
 const PRIORITY_OPTIONS = [
   { value: "low", label: "Low" },
-  { value: "normal", label: "Normal" },
+  { value: "normal", label: "Medium" },
   { value: "high", label: "High" },
   { value: "urgent", label: "Urgent" },
 ];
@@ -454,9 +459,22 @@ const TasksListingPage = ({
 }: TasksListingPageProps) => {
     const router = useRouter();
     const { data: session } = useSession();
+    const { hasPermission } = usePermissions();
     const sessionUserPhoneOrExtension = useMemo(
       () => getSessionPhoneOrExtension(session),
       [session],
+    );
+    const sessionCanUpdatePlannerTask = useMemo(
+      () => hasPermission(PERMISSIONS.EDIT_TASKS_WORK_PLANNER),
+      [hasPermission],
+    );
+    const sessionCanDeletePlannerTask = useMemo(
+      () => hasPermission(PERMISSIONS.DELETE_TASKS_WORK_PLANNER),
+      [hasPermission],
+    );
+    const sessionCanCreatePlannerTask = useMemo(
+      () => hasPermission(PERMISSIONS.CREATE_TASKS_WORK_PLANNER),
+      [hasPermission],
     );
     const isProjectScopedEmbed = Boolean(sidebarProject?.id);
     const { hierarchyDataExtensions: hierarchyFromApi } = useHierarchyData(
@@ -846,12 +864,23 @@ const TasksListingPage = ({
 
     const getTaskRowPermissions = useCallback(
       (row: Task) =>
-        computePlannerTaskRowPermissions(
-          row.rawData,
-          resolveProjectForMemberCheck(row),
-          sessionUserPhoneOrExtension,
+        applyPlannerTaskSessionCrud(
+          computePlannerTaskRowPermissions(
+            row.rawData,
+            resolveProjectForMemberCheck(row),
+            sessionUserPhoneOrExtension,
+          ),
+          {
+            canUpdateTask: sessionCanUpdatePlannerTask,
+            canDeleteTask: sessionCanDeletePlannerTask,
+          },
         ),
-      [resolveProjectForMemberCheck, sessionUserPhoneOrExtension],
+      [
+        resolveProjectForMemberCheck,
+        sessionUserPhoneOrExtension,
+        sessionCanUpdatePlannerTask,
+        sessionCanDeletePlannerTask,
+      ],
     );
 
     const canCreateTaskOnEmbeddedPage = useMemo(() => {
@@ -861,6 +890,11 @@ const TasksListingPage = ({
         sessionUserPhoneOrExtension,
       );
     }, [isProjectScopedEmbed, sidebarProject, sessionUserPhoneOrExtension]);
+
+    const showCreateTaskButton = useMemo(
+      () => canCreateTaskOnEmbeddedPage && sessionCanCreatePlannerTask,
+      [canCreateTaskOnEmbeddedPage, sessionCanCreatePlannerTask],
+    );
   
     const openEdit = useCallback(
       (row: Task) => {
@@ -1343,7 +1377,7 @@ const TasksListingPage = ({
             </div>
   
             <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-              {canCreateTaskOnEmbeddedPage && (
+              {showCreateTaskButton && (
                 <button
                   type="button"
                   onClick={() => { setEditingTask(null); setShowCreate(true); }}

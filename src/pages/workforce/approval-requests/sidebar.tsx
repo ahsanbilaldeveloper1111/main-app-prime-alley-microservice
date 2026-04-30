@@ -29,7 +29,9 @@ import {
   type UserRequest,
   type UserRequestAttachment,
 } from "@utils/staffManagement";
+import { HEADER_CONSTANTS } from "@constants/headerConstants";
 
+const { PERMISSIONS } = HEADER_CONSTANTS;
 
 interface ApprovalDetailSidebarProps {
   request: UserRequest;
@@ -579,7 +581,7 @@ const ApprovalDetailSidebar: React.FC<ApprovalDetailSidebarProps> = ({
           Approval Detail
         </h2>
         <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-          {session?.user?.permissions?.includes('update-approval-request-staff-management') && (
+          {session?.user?.permissions?.includes(PERMISSIONS.UPDATE_APPROVAL_REQUEST_STAFF_MANAGEMENT) && (
           <button
             type="button"
             onClick={() => onEditClick?.(request)}
@@ -606,7 +608,7 @@ const ApprovalDetailSidebar: React.FC<ApprovalDetailSidebarProps> = ({
             <Pencil size={20} />
           </button>
           )}
-          {session?.user?.permissions?.includes('delete-approval-request-staff-management') && onDeleteClick && (
+          {session?.user?.permissions?.includes(PERMISSIONS.DELETE_APPROVAL_REQUEST_STAFF_MANAGEMENT) && onDeleteClick && (
             <button
               type="button"
               onClick={() => onDeleteClick?.(request)}
@@ -952,7 +954,7 @@ const ApprovalDetailSidebar: React.FC<ApprovalDetailSidebarProps> = ({
           {isPending ? (
             <>
          
-         {session?.user?.permissions?.includes('approve-request-approval-request-staff-management') && approvalInfo?.can_approve === true && (
+         {session?.user?.permissions?.includes(PERMISSIONS.APPROVE_REQUEST_APPROVAL_REQUEST_STAFF_MANAGEMENT) && approvalInfo?.can_approve === true && (
           <button
             type="button"
             onClick={handleApprove}
@@ -981,7 +983,7 @@ const ApprovalDetailSidebar: React.FC<ApprovalDetailSidebarProps> = ({
           </button>
           )}
 
-          {session?.user?.permissions?.includes('reject-request-approval-request-staff-management') && approvalInfo?.can_reject === true && (
+          {session?.user?.permissions?.includes(PERMISSIONS.REJECT_REQUEST_APPROVAL_REQUEST_STAFF_MANAGEMENT) && approvalInfo?.can_reject === true && (
           <button
             type="button"
             onClick={handleReject}
@@ -1010,7 +1012,7 @@ const ApprovalDetailSidebar: React.FC<ApprovalDetailSidebarProps> = ({
           </button>
           )}
 
-          {session?.user?.permissions?.includes('request-changes-approval-request-staff-management') && (
+          {session?.user?.permissions?.includes(PERMISSIONS.REQUEST_CHANGES_APPROVAL_REQUEST_STAFF_MANAGEMENT) && (
           <button
             type="button"
             onClick={handleRequestChanges}

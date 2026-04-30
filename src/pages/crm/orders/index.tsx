@@ -61,6 +61,8 @@ import {
   formatDateForTable,
   formatCrmPreviewDate,
 } from "@utils/Helper";
+import { buildCrmOrderGridRowFromApiOrder } from "@utils/crmOrdersGridRowFromApiOrder";
+import { computeCrmOrdersAnalyticsFromGridRows } from "@utils/crmOrdersGridAnalyticsFromRows";
 import {
   Target,
   CheckCircle,
@@ -89,8 +91,6 @@ import {
   Building2,
   User,
   Paperclip,
-  Upload,
-  Download as DownloadIcon,
   RotateCcw,
   Info,
   Phone as PhoneIcon,
@@ -114,6 +114,7 @@ import "@assets/scss/tabs.scss";
 import SuccessfulModal from "@pages/partial/SuccessfulModal";
 import FormModal from "../../partial/FormModal";
 import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
+import { WorkPlannerAttachmentsModalBody } from "@utils/workPlannerOrderAttachmentsUi";
 import { useSession } from "next-auth/react";
 import moment from "moment";
 import { useCti } from "@hooks/useCti";
@@ -130,6 +131,7 @@ import {
   buildCrmOrdersListExportParams,
   buildCrmOrdersListGetOrdersParams,
 } from "@crm/orders/buildCrmOrdersListGetOrdersParams";
+import { normalizeGetOrdersListResponse } from "@crm/orders/normalizeGetOrdersListResponse";
 import { useCrmListPreviewPersistence } from "@crm/shared/useCrmListPreviewPersistence";
 import { applyCrmFilterRules, CRM_BASE_FILTER_RULES } from "@crm/shared/crmListFilterHelpers";
 import { HEADER_CONSTANTS } from "@constants/headerConstants";
@@ -498,16 +500,13 @@ const CrmOrders = () => { // NOSONAR
           ownerParamStyle: "user_extension_filter",
         });
 
-        const response: any = await getOrders(params);
-        console.log("Raw response from getOrders:", response);
+        const response: unknown = await getOrders(params);
+        const normalized = normalizeGetOrdersListResponse(response);
+        const summary: any = normalized.summaryTiles;
+        const metricsFromApi: any = normalized.metrics;
 
-        const ordersArray: any[] = response?.dataList || [];
-        const pagination: any = response?.meta || {};
-        const summary: any = response?.summary_tiles || null;
-        const metricsFromApi: any = response?.metrics || null;
-
-        setOrdersData(Array.isArray(ordersArray) ? ordersArray : []);
-        setTotalOrders(pagination?.total || 0);
+        setOrdersData(normalized.ordersData as any[]);
+        setTotalOrders(normalized.totalOrders);
         setSummaryTiles(summary);
         setOrdersMetrics(metricsFromApi);
         setTabTotals((prev) => ({
@@ -531,7 +530,7 @@ const CrmOrders = () => { // NOSONAR
         ) {
           setTabTotals((prev) => ({
             ...prev,
-            [activeTabAtResponse]: pagination?.total || 0,
+            [activeTabAtResponse]: normalized.totalOrders,
           }));
         }
 
@@ -1347,121 +1346,30 @@ const CrmOrders = () => { // NOSONAR
 
   // Transform API order data to UI format
   const transformOrderData = (order: any) => {
-    const companyName =
-      order.company || order.deal?.company_name || order.customer_name || "";
-    return {
-      id: order.id,
-      orderNumber: order.order_number || "",
-      customer: companyName,
-      customerEmail: order.customer_email || "",
-      customerPhone: order.customer_phone || "",
-      deal: order.deal?.name || order.deal_id || "",
-      dealId: order.deal_id || null,
-      stage: order.stage?.name || "No Stage",
-      stageColor: order.stage?.color || "grey",
-      stageId: order.order_stage_id || null,
-      value: order.final_amount || order.total_amount || "0",
-      currency: order.currency || "AED",
-      approvalStatus: order.order_approval_status || null,
-      fulfillmentStatus: order.fulfillment_status || null,
-      paymentStatus: order.payment_status || null,
-      //orderDate: formatDateForTable(order.order_date),
-      orderDate: order.order_date
-        ? moment(order.order_date).format(GlobalDateFormat)
-        : "-",
-      assignedUser:
-        extensions.find(
-          (ext: any) =>
-            ext?.id == order?.assigned_to ||
-            ext?.extension == order?.assigned_to,
-        )?.display_name ||
-        extensions.find(
-          (ext: any) =>
-            ext?.id == order?.assigned_to ||
-            ext?.extension == order?.assigned_to,
-        )?.name ||
-        order.assigned_to ||
-        "",
-      expectedDeliveryDate: formatDateForTable(order.expected_delivery_date),
-      actualDeliveryDate: formatDateForTable(order.actual_delivery_date),
-      owner:
-        extensions.find(
-          (ext: any) =>
-            ext?.id == order?.assigned_to ||
-            ext?.extension == order?.assigned_to,
-        )?.display_name ||
-        extensions.find(
-          (ext: any) =>
-            ext?.id == order?.assigned_to ||
-            ext?.extension == order?.assigned_to,
-        )?.name ||
-        order.assigned_to ||
-        "",
-      created: formatDateForTable(order.created_at),
-      contractType: order.contract_type || "",
-      contractLength: order.contract_length || "",
-      contractStartDate: formatDateForTable(order.contract_start_date),
-      contractEndDate: formatDateForTable(order.contract_end_date),
-      billingModel: order.billing_model || "",
-      billingStatus: order.billing_status || "",
-      paymentTerms: order.payment_terms || "",
-      progressDial: order.progress_dial || 0,
-      pocName: order.poc_name || order.customer_name || "",
-      pocTitle: order.poc_title || "",
-      pocPhone: order.poc_phone || "",
-      company: companyName,
-      industry: order.industry || order.deal?.industry || "",
-      status: order.status || "pending",
-      rawData: order, // Keep original data for actions
-    };
+    const assignedLabel =
+      extensions.find(
+        (ext: any) =>
+          ext?.id == order?.assigned_to ||
+          ext?.extension == order?.assigned_to,
+      )?.display_name ||
+      extensions.find(
+        (ext: any) =>
+          ext?.id == order?.assigned_to ||
+          ext?.extension == order?.assigned_to,
+      )?.name ||
+      order.assigned_to ||
+      "";
+    return buildCrmOrderGridRowFromApiOrder(order, assignedLabel) as any;
   };
 
   // Calculate analytics data
   const analyticsData = useMemo(() => {
     const transformedOrders = ordersData.map(transformOrderData);
-
-    const total = summaryTiles ? totalOrders : transformedOrders.length;
-    const delivered = transformedOrders.filter(
-      (o) =>
-        o.fulfillmentStatus?.toLowerCase().includes("completed") ||
-        o.fulfillmentStatus?.toLowerCase().includes("delivered"),
-    ).length;
-    const inProgress = transformedOrders.filter((o) =>
-      o.fulfillmentStatus?.toLowerCase().includes("progress"),
-    ).length;
-    const pendingApproval = transformedOrders.filter((o) =>
-      o.approvalStatus?.toLowerCase().includes("pending"),
-    ).length;
-
-    // Calculate total value
-    const totalValue = transformedOrders.reduce((sum, o) => {
-      const value = parseFloat(String(o.value).replace(/[^0-9.-]/g, "")) || 0;
-      return sum + value;
-    }, 0);
-
-    // Stage distribution
-    const stageCounts: Record<string, number> = {};
-    transformedOrders.forEach((o) => {
-      const stage = o.stage || "No Stage";
-      stageCounts[stage] = (stageCounts[stage] || 0) + 1;
-    });
-
-    // Status distribution
-    const statusCounts: Record<string, number> = {};
-    transformedOrders.forEach((o) => {
-      const status = o.fulfillmentStatus || "pending";
-      statusCounts[status] = (statusCounts[status] || 0) + 1;
-    });
-
-    return {
-      total,
-      delivered,
-      inProgress,
-      pendingApproval,
-      totalValue,
-      stageCounts,
-      statusCounts,
-    };
+    return computeCrmOrdersAnalyticsFromGridRows(
+      transformedOrders,
+      summaryTiles,
+      totalOrders,
+    );
   }, [ordersData, extensions, summaryTiles, totalOrders]);
 
   // Transform orders data (no client-side filtering - API handles it)
@@ -6503,280 +6411,27 @@ const CrmOrders = () => { // NOSONAR
           </Modal.Header>
 
           <Modal.Body className="p-4">
-            {/* Upload Section */}
-            <div
-              className="mb-4 p-4 border rounded"
-              style={{ background: "#f8f9fa" }}
-            >
-              <div className="d-flex align-items-center justify-content-between mb-3">
-                <div>
-                  <h6 className="mb-1 fw-bold">Upload New Attachments</h6>
-                  <small className="text-muted">
-                    Supported formats: PDF, CSV, Excel, or Image (Max 5MB)
-                  </small>
-                </div>
-              </div>
-              <div className="d-flex gap-2">
-                <Form.Control
-                  ref={(input) => setFileInputRef(input as HTMLInputElement)}
-                  type="file"
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
-                    const files = e.target.files;
-                    if (files && files.length > 0) {
-                      const file = files[0];
-                      handleFileUpload(file);
-                    }
-                  }}
-                  accept=".pdf,.csv,.xls,.xlsx,.xlsm,.png,.jpg,.jpeg,.gif,.webp"
-                  style={{ flex: 1 }}
-                  disabled={uploadingFile}
-                />
-                <Button
-                  variant="primary"
-                  className="d-flex align-items-center gap-2"
-                  disabled={uploadingFile}
-                >
-                  {uploadingFile ? (
-                    <>
-                      <div
-                        className="spinner-border spinner-border-sm"
-                        role="status"
-                      />
-                      Uploading...
-                    </>
-                  ) : (
-                    <>
-                      <Upload size={16} />
-                      Upload
-                    </>
-                  )}
-                </Button>
-              </div>
-            </div>
-
-            {/* Attachments List */}
-            <div>
-              {/* Order Attachments Section */}
-              <h6 className="mb-3 fw-bold d-flex align-items-center gap-2">
-                <FileText size={18} />
-                Order Attachments ({attachments.length})
-              </h6>
-
-              {loadingAttachments ? (
-                <div className="text-center py-5">
-                  <div className="spinner-border text-primary" role="status">
-                    <span className="visually-hidden">Loading...</span>
-                  </div>
-                </div>
-              ) : attachments.length === 0 ? (
-                <div className="text-center py-4 text-muted">
-                  <Paperclip size={48} className="mb-3 opacity-25" />
-                  <div>No order attachments yet</div>
-                  <small>Upload files using the form above</small>
-                </div>
-              ) : (
-                <div className="d-flex flex-column gap-2 mb-4">
-                  {attachments.map((attachment: any) => (
-                    <Card key={attachment.id} className="border shadow-sm">
-                      <Card.Body className="p-3">
-                        <div className="d-flex align-items-center justify-content-between">
-                          <div className="d-flex align-items-center gap-3 flex-grow-1">
-                            {/* File Icon */}
-                            <div
-                              className="rounded d-flex align-items-center justify-content-center"
-                              style={{
-                                width: "45px",
-                                height: "45px",
-                                background: attachment.mime_type?.includes(
-                                  "pdf",
-                                )
-                                  ? "#dc3545"
-                                  : attachment.mime_type?.includes("csv") ||
-                                      attachment.mime_type?.includes("excel") ||
-                                      attachment.mime_type?.includes(
-                                        "spreadsheet",
-                                      )
-                                    ? "#198754"
-                                    : attachment.mime_type?.includes("image")
-                                      ? "#0d6efd"
-                                      : "#6c757d",
-                                color: "white",
-                              }}
-                            >
-                              <FileText size={22} />
-                            </div>
-
-                            {/* File Info */}
-                            <div className="flex-grow-1">
-                              <div
-                                className="fw-semibold"
-                                style={{ fontSize: "14px" }}
-                              >
-                                {attachment.name}
-                              </div>
-                              <div
-                                style={{ fontSize: "12px", color: "#6c757d" }}
-                              >
-                                {formatFileSize(attachment.file_size)} •{" "}
-                                {attachment.created_at
-                                  ? formatDateForTable(attachment.created_at)
-                                  : "N/A"}
-                              </div>
-                            </div>
-                          </div>
-
-                          {/* Actions */}
-                          <div className="d-flex gap-1">
-                            <Button
-                              variant="link"
-                              size="sm"
-                              className="p-2 text-primary"
-                              title="Download"
-                              onClick={() =>
-                                handleDownloadAttachment(attachment.id)
-                              }
-                            >
-                              <DownloadIcon size={18} />
-                            </Button>
-                            <Button
-                              variant="link"
-                              size="sm"
-                              className="p-2 text-danger"
-                              title="Delete"
-                              onClick={() => {
-                                setAttachmentToDelete({
-                                  id: attachment.id,
-                                  name: attachment.name,
-                                });
-                                setShowDeleteAttachmentModal(true);
-                              }}
-                            >
-                              <Trash2 size={18} />
-                            </Button>
-                          </div>
-                        </div>
-                      </Card.Body>
-                    </Card>
-                  ))}
-                </div>
-              )}
-
-              {/* Deal Attachments Section */}
-              {selectedOrderForAttachments?.deal_id && (
-                <>
-                  <h6 className="mb-3 fw-bold d-flex align-items-center gap-2 mt-4">
-                    <FileText size={18} />
-                    Deal Attachments ({dealAttachments.length})
-                    <Badge
-                      bg="secondary"
-                      className="ms-2"
-                      style={{ fontSize: "11px" }}
-                    >
-                      Read-only
-                    </Badge>
-                  </h6>
-
-                  {loadingAttachments ? (
-                    <div className="text-center py-5">
-                      <div
-                        className="spinner-border text-primary"
-                        role="status"
-                      >
-                        <span className="visually-hidden">Loading...</span>
-                      </div>
-                    </div>
-                  ) : dealAttachments.length === 0 ? (
-                    <div className="text-center py-4 text-muted">
-                      <Paperclip size={48} className="mb-3 opacity-25" />
-                      <div>No deal attachments</div>
-                    </div>
-                  ) : (
-                    <div className="d-flex flex-column gap-2">
-                      {dealAttachments.map((attachment: any) => (
-                        <Card
-                          key={`deal-${attachment.id}`}
-                          className="border shadow-sm"
-                          style={{ opacity: 0.9 }}
-                        >
-                          <Card.Body className="p-3">
-                            <div className="d-flex align-items-center justify-content-between">
-                              <div className="d-flex align-items-center gap-3 flex-grow-1">
-                                {/* File Icon */}
-                                <div
-                                  className="rounded d-flex align-items-center justify-content-center"
-                                  style={{
-                                    width: "45px",
-                                    height: "45px",
-                                    background: attachment.mime_type?.includes(
-                                      "pdf",
-                                    )
-                                      ? "#dc3545"
-                                      : attachment.mime_type?.includes("csv") ||
-                                          attachment.mime_type?.includes(
-                                            "excel",
-                                          ) ||
-                                          attachment.mime_type?.includes(
-                                            "spreadsheet",
-                                          )
-                                        ? "#198754"
-                                        : attachment.mime_type?.includes(
-                                              "image",
-                                            )
-                                          ? "#0d6efd"
-                                          : "#6c757d",
-                                    color: "white",
-                                  }}
-                                >
-                                  <FileText size={22} />
-                                </div>
-
-                                {/* File Info */}
-                                <div className="flex-grow-1">
-                                  <div
-                                    className="fw-semibold"
-                                    style={{ fontSize: "14px" }}
-                                  >
-                                    {attachment.name}
-                                  </div>
-                                  <div
-                                    style={{
-                                      fontSize: "12px",
-                                      color: "#6c757d",
-                                    }}
-                                  >
-                                    {formatFileSize(attachment.file_size)} •{" "}
-                                    {attachment.created_at
-                                      ? formatDateForTable(
-                                          attachment.created_at,
-                                        )
-                                      : "N/A"}
-                                  </div>
-                                </div>
-                              </div>
-
-                              {/* Actions - Download only */}
-                              <div className="d-flex gap-1">
-                                <Button
-                                  variant="link"
-                                  size="sm"
-                                  className="p-2 text-primary"
-                                  title="Download"
-                                  onClick={() =>
-                                    handleDownloadDealAttachment(attachment.id)
-                                  }
-                                >
-                                  <DownloadIcon size={18} />
-                                </Button>
-                              </div>
-                            </div>
-                          </Card.Body>
-                        </Card>
-                      ))}
-                    </div>
-                  )}
-                </>
-              )}
-            </div>
+            <WorkPlannerAttachmentsModalBody
+              attachments={attachments}
+              dealAttachments={dealAttachments}
+              loadingAttachments={loadingAttachments}
+              uploadingFile={uploadingFile}
+              fileInputRef={(input) => setFileInputRef(input)}
+              onFileChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                const files = e.target.files;
+                if (files && files.length > 0) {
+                  handleFileUpload(files[0]);
+                }
+              }}
+              formatFileSize={formatFileSize}
+              onDownloadOrderAttachment={handleDownloadAttachment}
+              onDownloadDealAttachment={handleDownloadDealAttachment}
+              onRequestDeleteAttachment={(id, name) => {
+                setAttachmentToDelete({ id, name });
+                setShowDeleteAttachmentModal(true);
+              }}
+              showDealSection={Boolean(selectedOrderForAttachments?.deal_id)}
+            />
           </Modal.Body>
 
           <Modal.Footer className="border-0">

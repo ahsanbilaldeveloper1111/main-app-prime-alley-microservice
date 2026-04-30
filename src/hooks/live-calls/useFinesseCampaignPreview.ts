@@ -1,10 +1,4 @@
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Session } from "next-auth";
 import { toast } from "react-toastify";
 import {
@@ -57,6 +51,9 @@ export function useFinesseCampaignPreview(
   const [wrapUpReasonsLoading, setWrapUpReasonsLoading] = useState(false);
   const [callVariablesConfig, setCallVariablesConfig] = useState<
     CallVariableConfig[]
+  >([]);
+  const [lastSubmittedWrapUpIds, setLastSubmittedWrapUpIds] = useState<
+    string[]
   >([]);
 
   const wrapUpEventDialogIdRef = useRef<string | null>(null);
@@ -149,6 +146,7 @@ export function useFinesseCampaignPreview(
     const dialogId = String(payload.dialogId);
     if (eventType === "CREATED") {
       setPreviewDialogs((prev) => ({ ...prev, [dialogId]: payload }));
+      setLastSubmittedWrapUpIds([]);
     } else if (eventType === "UPDATED") {
       setPreviewDialogs((prev) => {
         const existing = prev[dialogId];
@@ -158,8 +156,7 @@ export function useFinesseCampaignPreview(
             [dialogId]: {
               ...existing,
               ...payload,
-              callVariables:
-                payload.callVariables ?? existing.callVariables,
+              callVariables: payload.callVariables ?? existing.callVariables,
               participants: payload.participants ?? existing.participants,
             },
           };
@@ -169,6 +166,7 @@ export function useFinesseCampaignPreview(
     } else if (eventType === "ENDED") {
       if (wrapUpEventDialogIdRef.current === dialogId)
         wrapUpEventDialogIdRef.current = null;
+      setLastSubmittedWrapUpIds([]);
       setPreviewDialogs((prev) => {
         const next = { ...prev };
         delete next[dialogId];
@@ -403,6 +401,7 @@ export function useFinesseCampaignPreview(
     const dialogId = activePreviewDialog?.dialogId;
     if (username && extension && dialogId && teamId != null) {
       const reasons = Array.isArray(data.wrapUp) ? data.wrapUp : [data.wrapUp];
+      setLastSubmittedWrapUpIds(reasons.map(String));
       const wrapUpItems: string[] = reasons.map((idOrValue) => {
         const option = wrapUpReasons.find((o) => o.value === String(idOrValue));
         return option ? option.label : String(idOrValue ?? "");
@@ -601,6 +600,7 @@ export function useFinesseCampaignPreview(
       onMinimize: handleWrapUpMinimize,
       wrapUpReasons,
       callVariablesConfig,
+      initialSelectedWrapUpIds: lastSubmittedWrapUpIds,
     },
     wrapUpAutoCloseTimerRef,
     resetCallWidgetState,

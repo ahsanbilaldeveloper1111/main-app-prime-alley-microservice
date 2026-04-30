@@ -1,7 +1,10 @@
 import React, { useEffect, useState, useCallback, useMemo, useRef, ReactElement } from 'react';
 import { useSession } from 'next-auth/react';
 import { getSessionPhoneOrExtension } from '@planner/projectMemberRole';
-import { computePlannerTaskRowPermissions } from '@planner/taskRowPermissions';
+import {
+  applyPlannerTaskSessionCrud,
+  computePlannerTaskRowPermissions,
+} from '@planner/taskRowPermissions';
 import { useRouter } from 'next/router';
 import Layout from '@layout/index';
 import BreadcrumbItem from '@common/BreadcrumbItem';
@@ -46,6 +49,10 @@ import { ModuleSlug } from '@utils/Helper';
 import CreateTaskSidebar from '@components/CreatePlannerTaskSidebar';
 import DeleteConfirmationModal from '@pages/partial/DeleteConfirmationModal';
 import { toast } from 'react-toastify';
+import { usePermissions } from '@utils/permissionUtils';
+import { HEADER_CONSTANTS } from '@constants/headerConstants';
+
+const { PERMISSIONS } = HEADER_CONSTANTS;
 
 const WITH_RELATIONS = [
   'project',
@@ -219,6 +226,13 @@ function getPriorityVariant(priority: string) {
     if (p === 'urgent' || p === 'high') return 'danger';
     if (p === 'normal') return 'warning';
     return 'success';
+}
+
+function formatPriorityLabel(priority: string): string {
+  const p = String(priority || "").trim().toLowerCase();
+  if (!p) return "—";
+  if (p === "normal") return "Medium";
+  return p.charAt(0).toUpperCase() + p.slice(1);
 }
 
 function formatActivityDate(dateString: string) {
@@ -906,9 +920,18 @@ const TaskDetailPage = () => {
   }, [task?.project]);
 
   const { data: session } = useSession();
+  const { hasPermission } = usePermissions();
   const sessionUserPhoneOrExtension = useMemo(
     () => getSessionPhoneOrExtension(session),
     [session],
+  );
+  const sessionCanUpdatePlannerTask = useMemo(
+    () => hasPermission(PERMISSIONS.EDIT_TASKS_WORK_PLANNER),
+    [hasPermission],
+  );
+  const sessionCanDeletePlannerTask = useMemo(
+    () => hasPermission(PERMISSIONS.DELETE_TASKS_WORK_PLANNER),
+    [hasPermission],
   );
 
   const fetchTask = useCallback(async () => {
@@ -931,12 +954,23 @@ const TaskDetailPage = () => {
 
   const taskDetailPermissions = useMemo(
     () =>
-      computePlannerTaskRowPermissions(
-        task,
-        task?.project ?? null,
-        sessionUserPhoneOrExtension,
+      applyPlannerTaskSessionCrud(
+        computePlannerTaskRowPermissions(
+          task,
+          task?.project ?? null,
+          sessionUserPhoneOrExtension,
+        ),
+        {
+          canUpdateTask: sessionCanUpdatePlannerTask,
+          canDeleteTask: sessionCanDeletePlannerTask,
+        },
       ),
-    [task, sessionUserPhoneOrExtension],
+    [
+      task,
+      sessionUserPhoneOrExtension,
+      sessionCanUpdatePlannerTask,
+      sessionCanDeletePlannerTask,
+    ],
   );
 
   const handleDelete = async () => {
@@ -1168,7 +1202,7 @@ const TaskDetailPage = () => {
                 <div className="p-3 bg-light rounded border">
                   <div className="small text-muted text-uppercase fw-semibold mb-1">Priority</div>
                   <Badge bg={getPriorityVariant(priorityVal)} className="px-3 py-2 w-100">
-                    {priorityVal}
+                    {formatPriorityLabel(priorityVal)}
                   </Badge>
                 </div>
               </Col>

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   BarChart3,
   CreditCard,
@@ -22,6 +22,7 @@ import TopSection from "./TopSection";
 import { BILLING_FONT, billingSharedStyles } from "@components/billings/shared/styles";
 import { hasDefaultPaymentMethod, normalizePaymentMethods, pickDisplayPaymentMethod } from "@components/billings/shared/paymentMethods";
 import InfoTooltip from "@components/billings/shared/InfoTooltip";
+import { HEADER_CONSTANTS } from "@constants/headerConstants";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
@@ -114,13 +115,12 @@ const styles: Record<string, React.CSSProperties> = {
 };
 
 const commonActions = [
-  { Icon: FileText, label: "View or download invoices", url: "/billing/account-billing/billing-history" },
-  { Icon: Settings, label: "View subscriptions", url: "/billing/account-billing/subscriptions" },
-  { Icon: CreditCard, label: "View Transactions", url: "/billing/account-billing/transactions" },
-  { Icon: BarChart3, label: "View usage & limits", url: "/billing/account-billing/usage-limits" },
-  { Icon: CreditCard, label: "Add a payment method", url: "/billing/account-billing/payment-methods" },
-
-];
+  { Icon: FileText, label: "View or download invoices", url: "/billing/account-billing/billing-history", isStaticSection: false },
+  { Icon: Settings, label: "View subscriptions", url: "/billing/account-billing/subscriptions", isStaticSection: true },
+  { Icon: CreditCard, label: "View Transactions", url: "/billing/account-billing/transactions", isStaticSection: false },
+  { Icon: BarChart3, label: "View usage & limits", url: "/billing/account-billing/usage-limits", isStaticSection: true },
+  { Icon: CreditCard, label: "Add a payment method", url: "/billing/account-billing/payment-methods", isStaticSection: false },
+] as const;
 
 const starterIncludes = [
   "Smart CRM ",
@@ -174,6 +174,18 @@ const OverviewPage = () => {
   const displayPaymentMethod = pickDisplayPaymentMethod(paymentMethodsList);
   const hasDefaultAccount = hasDefaultPaymentMethod(paymentMethodsList);
   const seatsText = usersCount === null ? "—/—" : `${usersCount.toLocaleString()}/${usersCount.toLocaleString()}`;
+  const canViewStaticBillingSections = Boolean(
+    session?.user?.permissions?.includes(
+      HEADER_CONSTANTS.PERMISSIONS.VIEW_STATIC_SECTIONS_BILLING,
+    ),
+  );
+  const visibleCommonActions = useMemo(
+    () =>
+      commonActions.filter(
+        (action) => !action.isStaticSection || canViewStaticBillingSections,
+      ),
+    [canViewStaticBillingSections],
+  );
 
   return (
     <>
@@ -272,7 +284,7 @@ const OverviewPage = () => {
           <div style={styles.cardPadding}>
             <h2 style={styles.sectionHeading}>Common Actions</h2>
             <div style={{ display: "flex", flexDirection: "column" as const, gap: 14 }}>
-              {commonActions.map((action) => (
+              {visibleCommonActions.map((action) => (
                 <div key={action.label} style={{ display: "flex", alignItems: "center", gap: 10 }}>
                   <action.Icon size={16} strokeWidth={2} color="#141414" />
                   <Link href={action.url} style={styles.link}>{action.label}</Link>

@@ -1,6 +1,8 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import { useRouter } from 'next/router';
 import { useSession } from 'next-auth/react';
+import { usePermissions } from '@utils/permissionUtils';
+import { HEADER_CONSTANTS } from '@constants/headerConstants';
 import {
   canManageProjectFromMembers,
   getSessionPhoneOrExtension,
@@ -23,10 +25,19 @@ import { updateTask, getTask } from '@utils/tasks';
 import { toast } from 'react-toastify';
 import CreateTaskSidebar from '@components/CreatePlannerTaskSidebar';
 
+const { PERMISSIONS } = HEADER_CONSTANTS;
+
 const FONT = "'Lexend Deca', Helvetica, Arial, sans-serif";
 const TEAL = "#006162";
 const HEADER_H = 34;
 const ARROW_W = 10;
+
+function formatPriorityLabel(priority: string): string {
+  const p = String(priority || '').trim().toLowerCase();
+  if (!p) return '';
+  if (p === 'normal') return 'Medium';
+  return p.charAt(0).toUpperCase() + p.slice(1);
+}
 
 /** Map key for extension lookups; avoids `String(object)` → `[object Object]`. */
 function extensionNumberToMapKey(value: unknown): string {
@@ -404,14 +415,17 @@ const BoardView: React.FC<BoardViewProps> = ({
 }) => {
   const router = useRouter();
   const { data: session } = useSession();
+  const { hasPermission } = usePermissions();
   const sessionUserPhoneOrExtension = useMemo(
     () => getSessionPhoneOrExtension(session),
     [session],
   );
   /** Admin + member: add/move/edit from board. Viewer: read-only. */
   const canEditTasksOnBoard = useMemo(
-    () => canManageProjectFromMembers(selectedProject, sessionUserPhoneOrExtension),
-    [selectedProject, sessionUserPhoneOrExtension],
+    () =>
+      canManageProjectFromMembers(selectedProject, sessionUserPhoneOrExtension) &&
+      hasPermission(PERMISSIONS.EDIT_TASKS_WORK_PLANNER),
+    [hasPermission, selectedProject, sessionUserPhoneOrExtension],
   );
 
   const [selectedTask, setSelectedTask] = useState<any>(null);
@@ -781,7 +795,10 @@ const BoardView: React.FC<BoardViewProps> = ({
     );
   }
 
-  if (loadingBoardTasks) {
+  const showInitialBoardLoader = loadingBoardTasks && boardTasks.length === 0;
+  const showInlineBoardRefresh = loadingBoardTasks && boardTasks.length > 0;
+
+  if (showInitialBoardLoader) {
     return (
       <div style={{ backgroundColor: 'white', border: 'none', borderRadius: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', padding: '1.5rem', marginBottom: '1.5rem' }}>
         <div style={{ textAlign: 'center', padding: '3rem 2rem' }}>
@@ -831,6 +848,26 @@ const BoardView: React.FC<BoardViewProps> = ({
           <SlidersHorizontal size={18} />
           Filters{boardHasActiveFilters ? ' *' : ''}
         </button>
+        {showInlineBoardRefresh ? (
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.4rem',
+              color: '#6b7280',
+              fontSize: '0.85rem',
+              fontWeight: 500,
+            }}
+            aria-live="polite"
+            aria-busy="true"
+          >
+            <span
+              className="spinner-border spinner-border-sm"
+              aria-hidden="true"
+            />
+            {" "}Updating tasks...
+          </div>
+        ) : null}
       </div>
 
       {showFilterRow && (
@@ -1000,7 +1037,11 @@ const BoardView: React.FC<BoardViewProps> = ({
                   cursor: 'pointer',
                 }}
               >
-                {`Priority: ${boardFilterDraft.priority === 'All Priorities' ? 'All' : boardFilterDraft.priority}`}<ChevronDown size={14} />
+                {`Priority: ${
+                  boardFilterDraft.priority === 'All Priorities'
+                    ? 'All'
+                    : formatPriorityLabel(boardFilterDraft.priority)
+                }`}<ChevronDown size={14} />
               </Dropdown.Toggle>
               <Dropdown.Menu>
                 <Dropdown.Item onClick={() => setBoardFilterDraft((d) => ({ ...d, priority: 'All Priorities' }))}>
@@ -1008,7 +1049,7 @@ const BoardView: React.FC<BoardViewProps> = ({
                 </Dropdown.Item>
                 {getAllBoardPriorities().map((p) => (
                   <Dropdown.Item key={p} onClick={() => setBoardFilterDraft((d) => ({ ...d, priority: p }))}>
-                    {p}
+                    {formatPriorityLabel(p)}
                   </Dropdown.Item>
                 ))}
               </Dropdown.Menu>
@@ -1355,8 +1396,7 @@ const BoardView: React.FC<BoardViewProps> = ({
                                   }}
                                 >
                                   Priority:{' '}
-                                  {task.priority.charAt(0).toUpperCase() +
-                                    task.priority.slice(1)}
+                                  {formatPriorityLabel(task.priority)}
                                 </div>
                               )}
                               {task.due_date && (

@@ -4,38 +4,38 @@ import { X, RefreshCw, Check } from 'lucide-react';
 import Select from 'react-select';
 
 export interface FilterOption {
-  value: any;
-  label: string;
+  readonly value: any;
+  readonly label: string;
 }
 
 export type FilterFieldType = 'text' | 'select' | 'multi-select' | 'date' | 'datetime' | 'dropdown';
 
 export interface FilterField {
-  id: string;
-  label: string;
-  type: FilterFieldType;
-  value: any;
-  onChange: (value: any) => void;
-  placeholder?: string;
-  options?: FilterOption[];
-  isClearable?: boolean;
-  styles?: any;
+  readonly id: string;
+  readonly label: string;
+  readonly type: FilterFieldType;
+  readonly value: any;
+  readonly onChange: (value: any) => void;
+  readonly placeholder?: string;
+  readonly options?: readonly FilterOption[];
+  readonly isClearable?: boolean;
+  readonly styles?: any;
   /** For `type: "date"` / `"datetime"` — passed to the native input */
-  min?: string;
-  max?: string;
+  readonly min?: string;
+  readonly max?: string;
 }
 
 export interface GenericFilterSidebarProps {
-  isOpen: boolean;
-  onClose: () => void;
-  title?: string;
-  subtitle?: string;
-  filters: FilterField[];
-  onApply?: () => void;
-  onReset?: () => void;
-  width?: string;
-  showApplyButton?: boolean;
-  showResetButton?: boolean;
+  readonly isOpen: boolean;
+  readonly onClose: () => void;
+  readonly title?: string;
+  readonly subtitle?: string;
+  readonly filters: readonly FilterField[];
+  readonly onApply?: () => void;
+  readonly onReset?: () => void;
+  readonly width?: string;
+  readonly showApplyButton?: boolean;
+  readonly showResetButton?: boolean;
 }
 
 const GenericFilterSidebar: React.FC<GenericFilterSidebarProps> = ({
@@ -68,7 +68,7 @@ const GenericFilterSidebar: React.FC<GenericFilterSidebarProps> = ({
     }
   };
 
-  const renderFilterField = (filter: FilterField) => {
+  const renderFilterField = (filter: Readonly<FilterField>) => {
     const baseStyles = {
       fontSize: '14px',
       padding: '10px 12px',

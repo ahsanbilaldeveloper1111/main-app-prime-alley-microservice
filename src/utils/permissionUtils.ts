@@ -1,4 +1,7 @@
 import { useSession } from 'next-auth/react';
+import { HEADER_CONSTANTS } from '@constants/headerConstants';
+
+const { PERMISSIONS } = HEADER_CONSTANTS;
 
 export const usePermissions = () => {
   const { data: session } = useSession();
@@ -51,10 +54,10 @@ export const checkRoutePermission = (pathname: string, permissions: string[]): b
     '/gsm/assign': ['view-gsm'],
     '/gsm/ports': ['view-gsm'],
     '/gsm/inbox': ['view-gsm'],
-    '/call-logs/dashboard': ['view-call-logs'],
-    '/call-logs': ['view-call-logs'],
-    '/call-recordings/dashboard': ['view-call-recordings'],
-    '/call-recordings': ['view-call-recordings'],
+    '/call-logs/dashboard': [PERMISSIONS.VIEW_CALL_LOGS],
+    '/call-logs': [PERMISSIONS.VIEW_CALL_LOGS],
+    '/call-recordings/dashboard': [PERMISSIONS.VIEW_CALL_RECORDINGS],
+    '/call-recordings': [PERMISSIONS.VIEW_CALL_RECORDINGS],
     '/ai-ml/dashboard': ['view-ai-ml'],
     '/ai-ml/audio-transcription': ['view-ai-ml'],
     '/ai-ml/translate': ['view-ai-ml'],
@@ -72,4 +75,4 @@ export const checkRoutePermission = (pathname: string, permissions: string[]): b
   
   // Check if user has any of the required permissions
   return requiredPermissions.some(permission => permissions.includes(permission));
-}; 
+};

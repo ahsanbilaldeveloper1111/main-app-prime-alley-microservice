@@ -1,14 +1,26 @@
 import "@assets/scss/datatable-style.scss";
-import React, { ReactElement, useCallback, useEffect, useMemo, useState } from "react";
+import React, {
+  ReactElement,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 import { Col, Form, Row, Spinner } from "react-bootstrap";
 import { useSession } from "next-auth/react";
 import { getAnalyticsDashboard } from "@utils/voicebot/outbound";
 import { OUTBOUND_VOICEBOT_CREATE_COMPANY_ID } from "@utils/voicebot/outboundVoicebotForm";
-import { formatDurationSeconds, formatFixed } from "@utils/voicebot/outbound/formatters";
+import {
+  formatDurationSeconds,
+  formatFixed,
+} from "@utils/voicebot/outbound/formatters";
 import { GetCompanies } from "@utils/users";
-import { normalizeCompaniesResponse, type CompanyOption } from "@utils/companyOptions";
+import {
+  normalizeCompaniesResponse,
+  type CompanyOption,
+} from "@utils/companyOptions";
 
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
@@ -31,7 +43,7 @@ interface DashboardResponse {
 }
 
 const METRIC_CARDS = [
-  { key: "total_campaigns", label: "Total Companies" },
+  { key: "total_campaigns", label: "Total Campaigns" },
   { key: "published_bots", label: "Published Bots" },
   { key: "success_rate", label: "Success Rate" },
   { key: "avg_duration", label: "Avg Duration" },
@@ -41,17 +53,36 @@ const METRIC_CARDS = [
   { key: "total_cost", label: "Total Cost" },
 ] as const;
 
+function getTodayDateInputValue(): string {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
 const OutboundDashboardPage = () => {
   const { data: session } = useSession();
-  const isAdmin = String((session?.user as { is_admin?: string | number } | undefined)?.is_admin ?? "") === "1";
+  const isAdmin =
+    String(
+      (session?.user as { is_admin?: string | number } | undefined)?.is_admin ??
+        "",
+    ) === "1";
   const sessionUser = session?.user as
     | { company_id?: string | null; company_identifier?: string | null }
     | undefined;
   const userCompanyId = String(sessionUser?.company_id ?? "").trim();
-  const userCompanyIdentifier = String(sessionUser?.company_identifier ?? "").trim();
+  const userCompanyIdentifier = String(
+    sessionUser?.company_identifier ?? "",
+  ).trim();
 
   const [companies, setCompanies] = useState<CompanyOption[]>([]);
   const [selectedCompanyId, setSelectedCompanyId] = useState<string>("");
+  const todayDate = useMemo(() => getTodayDateInputValue(), []);
+  const [dateFrom, setDateFrom] = useState<string>(todayDate);
+  const [dateTo, setDateTo] = useState<string>(todayDate);
+  const [appliedDateFrom, setAppliedDateFrom] = useState<string>(todayDate);
+  const [appliedDateTo, setAppliedDateTo] = useState<string>(todayDate);
   const [loading, setLoading] = useState(true);
   const [dashboard, setDashboard] = useState<DashboardData | null>(null);
 
@@ -59,7 +90,11 @@ const OutboundDashboardPage = () => {
     if (isAdmin) {
       return selectedCompanyId.trim() || OUTBOUND_VOICEBOT_CREATE_COMPANY_ID;
     }
-    return userCompanyId || userCompanyIdentifier || OUTBOUND_VOICEBOT_CREATE_COMPANY_ID;
+    return (
+      userCompanyId ||
+      userCompanyIdentifier ||
+      OUTBOUND_VOICEBOT_CREATE_COMPANY_ID
+    );
   }, [isAdmin, selectedCompanyId, userCompanyId, userCompanyIdentifier]);
 
   useEffect(() => {
@@ -85,7 +120,11 @@ const OutboundDashboardPage = () => {
   const fetchDashboard = useCallback(async () => {
     setLoading(true);
     try {
-      const params: Record<string, unknown> = { company_id: effectiveCompanyId };
+      const params: Record<string, unknown> = {
+        company_id: effectiveCompanyId,
+      };
+      if (appliedDateFrom) params.date_from = appliedDateFrom;
+      if (appliedDateTo) params.date_to = appliedDateTo;
       const res = (await getAnalyticsDashboard(params)) as DashboardResponse;
       const data = res?.data;
       setDashboard(data && typeof data === "object" ? data : null);
@@ -94,11 +133,32 @@ const OutboundDashboardPage = () => {
     } finally {
       setLoading(false);
     }
-  }, [effectiveCompanyId]);
+  }, [effectiveCompanyId, appliedDateFrom, appliedDateTo]);
 
   useEffect(() => {
     fetchDashboard();
   }, [fetchDashboard]);
+
+  const hasPendingDateChanges =
+    dateFrom !== appliedDateFrom || dateTo !== appliedDateTo;
+
+  const applyDateFilters = useCallback(() => {
+    setAppliedDateFrom(dateFrom);
+    setAppliedDateTo(dateTo);
+  }, [dateFrom, dateTo]);
+
+  const resetDateFilters = useCallback(() => {
+    setDateFrom(todayDate);
+    setDateTo(todayDate);
+    setAppliedDateFrom(todayDate);
+    setAppliedDateTo(todayDate);
+  }, [todayDate]);
+
+  const preventDateClearing = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Backspace" || e.key === "Delete") {
+      e.preventDefault();
+    }
+  };
 
   const d = dashboard ?? {};
   const totalCampaigns = d.total_campaigns ?? 0;
@@ -121,10 +181,12 @@ const OutboundDashboardPage = () => {
     total_cost: totalCost,
   };
 
-  const statsCardsData: StatsCardData[] = METRIC_CARDS.map(({ key, label }) => ({
-    title: label,
-    value: cardValues[key] ?? "—",
-  }));
+  const statsCardsData: StatsCardData[] = METRIC_CARDS.map(
+    ({ key, label }) => ({
+      title: label,
+      value: cardValues[key] ?? "—",
+    }),
+  );
 
   return (
     <React.Fragment>
@@ -148,8 +210,8 @@ const OutboundDashboardPage = () => {
       <BreadcrumbItem mainTitle="" mainLink="" subTitle="Outbound Dashboard" />
       <PageHeader title="Outbound Dashboard" showSearch={false} />
 
-      {isAdmin && (
-        <Row className="mb-3 align-items-end">
+      <Row className="mb-3 align-items-end">
+        {isAdmin && (
           <Col xs={12} md={4} lg={3}>
             <Form.Group className="mb-0">
               <Form.Label className="small text-muted mb-1">Company</Form.Label>
@@ -167,8 +229,67 @@ const OutboundDashboardPage = () => {
               </Form.Select>
             </Form.Group>
           </Col>
-        </Row>
-      )}
+        )}
+        <Col xs={12} md={4} lg={3}>
+          <Form.Group className="mb-0">
+            <Form.Label className="small text-muted mb-1">Date From</Form.Label>
+            <Form.Control
+              type="date"
+              value={dateFrom}
+              onChange={(e) => {
+                if (!e.target.value) return;
+                setDateFrom(e.target.value);
+              }}
+              onKeyDown={preventDateClearing}
+              onBlur={() => {
+                if (!dateFrom) setDateFrom(todayDate);
+              }}
+              aria-label="Filter dashboard start date"
+              max={dateTo}
+              required
+            />
+          </Form.Group>
+        </Col>
+        <Col xs={12} md={4} lg={3}>
+          <Form.Group className="mb-0">
+            <Form.Label className="small text-muted mb-1">Date To</Form.Label>
+            <Form.Control
+              type="date"
+              value={dateTo}
+              onChange={(e) => {
+                if (!e.target.value) return;
+                setDateTo(e.target.value);
+              }}
+              onKeyDown={preventDateClearing}
+              onBlur={() => {
+                if (!dateTo) setDateTo(todayDate);
+              }}
+              aria-label="Filter dashboard end date"
+              min={dateFrom}
+              required
+            />
+          </Form.Group>
+        </Col>
+        <Col xs={12} md={4} lg={3}>
+          <div className="d-flex gap-2">
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={applyDateFilters}
+              disabled={!hasPendingDateChanges}
+            >
+              Apply
+            </button>
+            <button
+              type="button"
+              className="btn btn-outline-secondary"
+              onClick={resetDateFilters}
+            >
+              Reset
+            </button>
+          </div>
+        </Col>
+      </Row>
 
       {loading && (
         <div className="d-flex justify-content-center py-5">

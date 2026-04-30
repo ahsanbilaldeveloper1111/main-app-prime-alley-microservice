@@ -7,6 +7,10 @@ import { addMember, updateMemberRole, removeMember } from '@utils/tasks';
 import GenericTable, { TableColumn, TableAction, ToolbarConfig, FilterPill } from '@components/GenericTable';
 import type { StatsCardData } from '@components/GenericStatsCards';
 import DeleteConfirmationModal from '@pages/partial/DeleteConfirmationModal';
+import { usePermissions } from '@utils/permissionUtils';
+import { HEADER_CONSTANTS } from '@constants/headerConstants';
+
+const { PERMISSIONS } = HEADER_CONSTANTS;
 
 interface MembersTabProps {
   selectedProject: any;
@@ -54,7 +58,19 @@ const MembersTab: React.FC<MembersTabProps> = ({
   hierarchyDataExtensions,
   canManageProject,
 }) => {
-  const isAllow = canManageProject;
+  const { hasPermission } = usePermissions();
+  const canViewProjectMembers =
+    canManageProject &&
+    hasPermission(PERMISSIONS.VIEW_PROJECT_MEMBERS_WORK_PLANNER);
+  const canCreateProjectMembers =
+    canManageProject &&
+    hasPermission(PERMISSIONS.CREATE_PROJECT_MEMBERS_WORK_PLANNER);
+  const canUpdateProjectMembers =
+    canManageProject &&
+    hasPermission(PERMISSIONS.UPDATE_PROJECT_MEMBERS_WORK_PLANNER);
+  const canDeleteProjectMembers =
+    canManageProject &&
+    hasPermission(PERMISSIONS.DELETE_PROJECT_MEMBERS_WORK_PLANNER);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -191,7 +207,8 @@ const MembersTab: React.FC<MembersTabProps> = ({
   ];
 
   // ── GenericTable actions ──────────────────────────────────────────────────
-  const actions: TableAction[] = isAllow ? [
+  const actions: TableAction[] = [
+    ...(canUpdateProjectMembers ? [
     {
       label: 'Edit Role',
       icon: <Edit size={16} />,
@@ -206,6 +223,8 @@ const MembersTab: React.FC<MembersTabProps> = ({
         setShowEditModal(true);
       },
     },
+    ] : []),
+    ...(canDeleteProjectMembers ? [
     {
       label: 'Remove Member',
       icon: <Trash2 size={16} />,
@@ -216,7 +235,8 @@ const MembersTab: React.FC<MembersTabProps> = ({
         setShowDeleteModal(true);
       },
     },
-  ] : [];
+    ] : []),
+  ];
 
   // ── Modal helpers ─────────────────────────────────────────────────────────
   const extensionOptions = useMemo(() =>
@@ -288,7 +308,7 @@ const MembersTab: React.FC<MembersTabProps> = ({
 
   // ── CRUD handlers ─────────────────────────────────────────────────────────
   const handleAddMember = async () => {
-    if (!canManageProject || !selectedProject?.id || !formData.extension_number) return;
+    if (!canCreateProjectMembers || !selectedProject?.id || !formData.extension_number) return;
     try {
       setProcessing(true);
       await addMember(selectedProject.id, { extension_number: formData.extension_number, role: formData.role } as any);
@@ -303,7 +323,7 @@ const MembersTab: React.FC<MembersTabProps> = ({
   };
 
   const handleUpdateRole = async () => {
-    if (!canManageProject || !selectedProject?.id || !selectedMember || !formData.role) return;
+    if (!canUpdateProjectMembers || !selectedProject?.id || !selectedMember || !formData.role) return;
     try {
       setProcessing(true);
       await updateMemberRole(selectedProject.id, selectedMember.extension_number, { role: formData.role });
@@ -319,7 +339,7 @@ const MembersTab: React.FC<MembersTabProps> = ({
   };
 
   const handleRemoveMember = async () => {
-    if (!canManageProject || !selectedProject?.id || !selectedMember) return;
+    if (!canDeleteProjectMembers || !selectedProject?.id || !selectedMember) return;
     try {
       setProcessing(true);
       await removeMember(selectedProject.id, selectedMember.extension_number);
@@ -482,7 +502,7 @@ const MembersTab: React.FC<MembersTabProps> = ({
         gap: "8px",
       }}
     >
-      {isAllow && selectedItems.length > 0 && (
+      {canDeleteProjectMembers && selectedItems.length > 0 && (
         <button
           type="button"
           onClick={() => {
@@ -512,7 +532,7 @@ const MembersTab: React.FC<MembersTabProps> = ({
           Delete ({selectedItems.length})
         </button>
       )}
-      {isAllow && (
+      {canCreateProjectMembers && (
         <button
           onClick={() => setShowAddModal(true)}
           style={{
@@ -574,12 +594,19 @@ const MembersTab: React.FC<MembersTabProps> = ({
     },
     
     rightActions: renderAddMemberButton(),
-  }), [searchValue, filterPills, isAllow, selectedItems.length, members.length]);
+  }), [
+    searchValue,
+    filterPills,
+    canCreateProjectMembers,
+    canDeleteProjectMembers,
+    selectedItems.length,
+    members.length,
+  ]);
 
   // ── Row Interaction Handlers ──────────────────────────────────────────────
   const handleFirstColumnClick = useCallback(
     (row: any) => {
-      if (!isAllow) {
+      if (!canUpdateProjectMembers) {
         return;
       }
       setSelectedMember(row);
@@ -589,12 +616,12 @@ const MembersTab: React.FC<MembersTabProps> = ({
       });
       setShowEditModal(true);
     },
-    [isAllow],
+    [canUpdateProjectMembers],
   );
 
   const handleRowDoubleClick = useCallback(
     (row: any) => {
-      if (!isAllow) {
+      if (!canUpdateProjectMembers) {
         return;
       }
       setSelectedMember(row);
@@ -604,7 +631,7 @@ const MembersTab: React.FC<MembersTabProps> = ({
       });
       setShowEditModal(true);
     },
-    [isAllow],
+    [canUpdateProjectMembers],
   );
 
   // Reset to page 1 when filters change
@@ -613,6 +640,10 @@ const MembersTab: React.FC<MembersTabProps> = ({
   }, [searchValue, roleFilter]);
 
   // ── Render ────────────────────────────────────────────────────────────────
+  if (!canViewProjectMembers) {
+    return null;
+  }
+
   return (
     <>
       {/* Members Table with GenericTable */}
@@ -629,12 +660,12 @@ const MembersTab: React.FC<MembersTabProps> = ({
           data={paginatedMembers}
           columns={columns.filter((c) => selectedColumns.includes(c.key))}
           actions={actions}
-          showActions={isAllow && actions.length > 0}
+          showActions={actions.length > 0}
           actionsLabel="Actions"
           showToolbarActions={false}
           
           // Selection
-          selectable={isAllow}
+          selectable={canDeleteProjectMembers}
           selectedRows={paginatedMembers.filter((item) =>
             selectedItems.includes(item.id)
           )}

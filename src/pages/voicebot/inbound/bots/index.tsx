@@ -16,7 +16,9 @@ import {
   getBot,
   getBotVersions,
   switchBotVersion,
+  getSipTrunks,
   postBots,
+  putBot,
   deleteBot,
   publishBot,
   unpublishBot,
@@ -24,19 +26,24 @@ import {
   type CreateBotPayload,
   type BotConfiguration,
   type BotVersionItem,
+  type UpdateBotPayload,
 } from "@utils/voicebot/inbound";
-import { safeDisplayString } from "@utils/voicebot/formDisplay";
+import {
+  companyIdFromBotApi,
+  safeDisplayString,
+  toFormString,
+} from "@utils/voicebot/formDisplay";
 import {
   Row,
   Col,
   Button,
   Modal,
+  Offcanvas,
   Form,
   Spinner,
   Accordion,
 } from "react-bootstrap";
 import { toast } from "react-toastify";
-import { useRouter } from "next/router";
 import {
   Plus,
   Pencil,
@@ -60,6 +67,7 @@ import { HEADER_CONSTANTS } from "@constants/headerConstants";
 interface CompanyOption {
   id: string;
   company_id?: string;
+  identifier?: string;
   name: string;
 }
 
@@ -99,32 +107,63 @@ function nestedLeaf(
   return "";
 }
 
+function getNestedValue<T extends string | number | boolean>(
+  root: Record<string, unknown>,
+  nestedKey: string,
+  leafKey: string,
+  defaultValue: T,
+): T {
+  const nested = root[nestedKey];
+  if (nested && typeof nested === "object" && !Array.isArray(nested)) {
+    const value = (nested as Record<string, unknown>)[leafKey];
+    if (value != null) {
+      // Only return the value if it is of type string | number | boolean
+      if (
+        typeof value === "string" ||
+        typeof value === "number" ||
+        typeof value === "boolean"
+      ) {
+        return value as T;
+      }
+    }
+  }
+  return defaultValue;
+}
+
 function llmModelFromBotRow(row: BotRow): string {
-  const c = rawBotConfig(row);
-  const direct = c.llm_model;
-  if (typeof direct === "string") return direct;
-  return nestedLeaf(c, "llm_settings", "llm_model");
+  return getNestedValue(
+    row.configuration ?? {},
+    "llm_settings",
+    "llm_model",
+    "gpt-4o-mini",
+  );
 }
 
 function voiceNameFromBotRow(row: BotRow): string {
-  const c = rawBotConfig(row);
-  const direct = c.voice_name;
-  if (typeof direct === "string") return direct;
-  return nestedLeaf(c, "voice_settings", "voice_name");
+  return getNestedValue(
+    row.configuration ?? {},
+    "voice_settings",
+    "voice_name",
+    "alloy",
+  );
 }
 
 function sipTrunkFromBotRow(row: BotRow): string {
-  const c = rawBotConfig(row);
-  const direct = c.sip_trunk_id;
-  if (typeof direct === "string") return direct;
-  return nestedLeaf(c, "sip_settings", "sip_trunk_id");
+  return getNestedValue(
+    row.configuration ?? {},
+    "sip_settings",
+    "sip_trunk_id",
+    "",
+  );
 }
 
 function phoneFromBotRow(row: BotRow): string {
-  const c = rawBotConfig(row);
-  const direct = c.phone_number;
-  if (typeof direct === "string") return direct;
-  return nestedLeaf(c, "sip_settings", "phone_number");
+  return getNestedValue(
+    row.configuration ?? {},
+    "sip_settings",
+    "phone_number",
+    "",
+  );
 }
 
 function versionFromBotRow(row: BotRow): string {
@@ -147,20 +186,236 @@ const BOT_STATUS_TABS = [
   { id: "archived", label: "Archived" },
 ] as const;
 
+const VOICE_OPTIONS = ["alloy", "echo", "fable", "onyx", "nova", "shimmer"];
+
+const LLM_MODEL_OPTIONS = [
+  "gpt-4o-mini",
+  "gpt-4o",
+  "gpt-4-turbo",
+  "gpt-3.5-turbo",
+];
+
+/** Matches `src/pages/voicebot/inbound/bots/create/index.tsx` defaults. */
 const defaultConfig: BotConfiguration = {
-  instructions: "",
+  instructions:
+    "You are a helpful AI assistant. Answer questions clearly and concisely.",
   knowledge_base: "",
-  voice_name: "onyx",
+  voice_name: "alloy",
   voice_model: "gpt-4o-mini-tts",
   voice_speed: 1,
+  voice_instructions: "",
+  greeting_message: "Hello! I'm here to help you. How can I assist you today?",
   llm_model: "gpt-4o-mini",
   temperature: 0.7,
   max_tokens: 1000,
-  greeting_message: "",
-  transfer_enabled: false,
+  transfer_enabled: true,
+  transfer_number: "",
+  transfer_trunk_id: "",
   max_duration: 1800,
   idle_timeout: 300,
+  allow_interruptions: true,
+  noise_cancellation: true,
+  min_endpointing_delay: 0.05,
+  sip_trunk_id: "",
+  phone_number: "",
 };
+
+function buildConfigValue<T>(
+  value: T | undefined,
+  defaultValue: T,
+  parse: (input: string) => T = (s: string) => s as any,
+): T {
+  return typeof value === typeof "undefined" || value === null
+    ? defaultValue
+    : parse(String(value)) || defaultValue;
+}
+
+function buildConfigurationPayload(
+  c: BotConfiguration = defaultConfig,
+): BotConfiguration {
+  return {
+    instructions: c.instructions?.trim() ?? "",
+    knowledge_base: c.knowledge_base?.trim() ?? "",
+    voice_name: c.voice_name ?? "alloy",
+    voice_model: c.voice_model ?? "gpt-4o-mini-tts",
+    voice_speed: buildConfigValue(c.voice_speed, 1, Number.parseFloat),
+    voice_instructions: c.voice_instructions?.trim() ?? "",
+    llm_model: c.llm_model ?? "gpt-4o-mini",
+    temperature: buildConfigValue(c.temperature, 0.7, Number.parseFloat),
+    max_tokens: buildConfigValue(c.max_tokens, 1000, (s) =>
+      Number.parseInt(s, 10),
+    ),
+    greeting_message: c.greeting_message?.trim() ?? "",
+    transfer_enabled: Boolean(c.transfer_enabled),
+    transfer_number: c.transfer_number?.trim() ?? "",
+    transfer_trunk_id: c.transfer_trunk_id?.trim() ?? "",
+    max_duration: buildConfigValue(c.max_duration, 1800, (s) =>
+      Number.parseInt(s, 10),
+    ),
+    idle_timeout: buildConfigValue(c.idle_timeout, 300, (s) =>
+      Number.parseInt(s, 10),
+    ),
+    sip_trunk_id: c.sip_trunk_id?.trim() ?? "",
+    phone_number: c.phone_number?.trim() ?? "",
+    allow_interruptions: Boolean(c.allow_interruptions),
+    min_endpointing_delay: buildConfigValue(
+      c.min_endpointing_delay,
+      0.05,
+      Number.parseFloat,
+    ),
+    noise_cancellation: Boolean(c.noise_cancellation),
+  };
+}
+
+function getFirstValidationError(form: CreateBotPayload): string | null {
+  if (!form.company_id) return "Please select a company";
+  if (!form.name?.trim()) return "Bot Name is required";
+  if (!form.description?.trim()) return "Description is required";
+  const c = form.configuration;
+  if (!c?.instructions?.trim()) return "Instructions are required";
+  if (!c?.knowledge_base?.trim()) return "Knowledge Base is required";
+  if (!c?.voice_instructions?.trim()) return "Voice Instructions are required";
+  if (c?.transfer_enabled && !c?.transfer_number?.trim()) {
+    return "Transfer Number is required when transfer is enabled";
+  }
+  if (!c?.sip_trunk_id?.trim()) return "SIP Trunk ID is required";
+  if (!c?.phone_number?.trim()) return "Phone Number is required";
+  return null;
+}
+
+function validateFormAndToast(form: CreateBotPayload): boolean {
+  const err = getFirstValidationError(form);
+  if (err) {
+    toast.error(err);
+    return false;
+  }
+  return true;
+}
+
+function buildUpdatePayload(form: CreateBotPayload): UpdateBotPayload {
+  const c = form.configuration ?? defaultConfig;
+  const companyId = String(form.company_id ?? "").trim();
+  return {
+    company_id: companyId,
+    name: form.name?.trim() ?? "",
+    description: form.description?.trim() ?? "",
+    status: form.status ?? "draft",
+    configuration: buildConfigurationPayload(c),
+  };
+}
+
+function buildCreateBotPayload(form: CreateBotPayload): CreateBotPayload {
+  const updatePayload = buildUpdatePayload(form);
+  return {
+    company_id: updatePayload.company_id ?? "",
+    name: updatePayload.name ?? "",
+    description: updatePayload.description ?? "",
+    status: updatePayload.status ?? "draft",
+    configuration: updatePayload.configuration ?? defaultConfig,
+  };
+}
+
+type SipTrunkOption = {
+  sip_trunk_id: string;
+  name: string;
+  caller_ids: string[];
+};
+
+function listFromSipTrunksResponse(res: unknown): unknown[] {
+  if (Array.isArray(res)) return res;
+  const o = res as Record<string, unknown> | null | undefined;
+  const inner = o?.data ?? o?.results;
+  return Array.isArray(inner) ? inner : [];
+}
+
+function normalizeCallerIds(raw: unknown): string[] {
+  if (Array.isArray(raw)) {
+    return raw
+      .map((x) =>
+        typeof x === "string" || typeof x === "number" ? String(x) : "",
+      )
+      .map((s) => s.trim())
+      .filter((s) => s.length > 0);
+  }
+  if (typeof raw === "string" && raw.trim()) {
+    return raw
+      .split(/[,\n]/)
+      .map((s) => s.trim())
+      .filter((s) => s.length > 0);
+  }
+  return [];
+}
+
+function callerIdsFromSipTrunkItem(item: Record<string, unknown>): string[] {
+  return normalizeCallerIds(item.caller_ids ?? item.callerIds);
+}
+
+function sipTrunkRowIdFromItem(item: Record<string, unknown>): string {
+  const candidates = [item.sip_trunk_id, item.id, item.trunk_id];
+  for (const value of candidates) {
+    if (value == null || typeof value === "object") continue;
+    if (typeof value === "string") {
+      const t = value.trim();
+      if (t) return t;
+    }
+    if (
+      typeof value === "number" ||
+      typeof value === "boolean" ||
+      typeof value === "bigint"
+    ) {
+      const s = String(value).trim();
+      if (s) return s;
+    }
+  }
+  return "";
+}
+
+function normalizeSipTrunkRows(list: unknown[]): SipTrunkOption[] {
+  const out: SipTrunkOption[] = [];
+  for (const raw of list) {
+    const item = raw as Record<string, unknown>;
+    const id = sipTrunkRowIdFromItem(item);
+    if (!id) continue;
+    const name = typeof item.name === "string" ? item.name : id;
+    out.push({
+      sip_trunk_id: id,
+      name,
+      caller_ids: callerIdsFromSipTrunkItem(item),
+    });
+  }
+  return out;
+}
+
+function companyIdentifierParamForSipTrunks(
+  companies: CompanyOption[],
+  selectedCompanyValue: string,
+): string {
+  const t = selectedCompanyValue.trim();
+  if (!t) return "";
+  const c = companies.find(
+    (x) => x.id === t || x.identifier === t || x.company_id === t,
+  );
+  if (c?.identifier?.trim()) return c.identifier.trim();
+  return t;
+}
+
+function clearStaleSipTrunkFormSelection(
+  prev: CreateBotPayload,
+  rows: SipTrunkOption[],
+): CreateBotPayload {
+  const current = prev.configuration?.sip_trunk_id?.trim() ?? "";
+  if (!current) return prev;
+  const stillValid = rows.some((row) => row.sip_trunk_id === current);
+  if (stillValid) return prev;
+  return {
+    ...prev,
+    configuration: {
+      ...prev.configuration,
+      sip_trunk_id: "",
+      phone_number: "",
+    },
+  };
+}
 
 function getListFromResponse(res: unknown): unknown[] {
   if (Array.isArray(res)) return res;
@@ -187,6 +442,14 @@ function getCompanyOptions(list: unknown[]): CompanyOption[] {
       name: typeof item.name === "string" ? item.name : "",
     };
     if (idStr !== "") option.company_id = idStr;
+    if (typeof item.identifier === "string" && item.identifier.trim()) {
+      option.identifier = item.identifier.trim();
+    } else if (
+      typeof item.company_identifier === "string" &&
+      item.company_identifier.trim()
+    ) {
+      option.identifier = item.company_identifier.trim();
+    }
     return option;
   });
 }
@@ -224,6 +487,23 @@ function mapVisibleStatusTabsForToolbar(
   );
 }
 
+function extractSettings(config: Record<string, unknown>) {
+  const {
+    voice_settings = {},
+    llm_settings = {},
+    behavior_settings = {},
+    sip_settings = {},
+  } = config;
+
+  // Return as records, you can add additional typing if needed
+  return {
+    voice: voice_settings as Record<string, unknown>,
+    llm: llm_settings as Record<string, unknown>,
+    behavior: behavior_settings as Record<string, unknown>,
+    sip: sip_settings as Record<string, unknown>,
+  };
+}
+
 /** Renders version configuration_snapshot (API shape: instructions, knowledge_base, voice_settings, llm_settings, behavior_settings, sip_settings) */
 const VersionConfigSnapshot = ({
   config,
@@ -232,10 +512,7 @@ const VersionConfigSnapshot = ({
 }) => {
   const v = (o: Record<string, unknown> | undefined, k: string) =>
     safeDisplayString(o?.[k]);
-  const voice = (config.voice_settings ?? {}) as Record<string, unknown>;
-  const llm = (config.llm_settings ?? {}) as Record<string, unknown>;
-  const behavior = (config.behavior_settings ?? {}) as Record<string, unknown>;
-  const sip = (config.sip_settings ?? {}) as Record<string, unknown>;
+  const { voice, llm, behavior, sip } = extractSettings(config);
   return (
     <div className="" style={{ maxHeight: "320px", overflow: "auto" }}>
       <table className="table table-bordered mb-2">
@@ -377,6 +654,7 @@ interface BotTableActionsProps {
   row: BotRow;
   canEdit: boolean;
   canDelete: boolean;
+  canVersion: boolean;
   onView: (id: string) => void;
   onEdit: (id: string) => void;
   onPublish: (id: string) => void;
@@ -419,7 +697,6 @@ function getConfigValue(
   }
   return "—";
 }
-
 
 interface BotHistoryModalBodyProps {
   historyLoading: boolean;
@@ -494,6 +771,7 @@ const BotTableActions = ({
   row,
   canEdit,
   canDelete,
+  canVersion,
   onView,
   onEdit,
   onPublish,
@@ -545,14 +823,16 @@ const BotTableActions = ({
           <Undo2 size={14} />
         </Button>
       )}
-      <Button
-        title="Show history"
-        size="sm"
-        variant="outline-info"
-        onClick={() => onHistory(row)}
-      >
-        <History size={14} />
-      </Button>
+      {canVersion && (
+        <Button
+          title="Show history"
+          size="sm"
+          variant="outline-info"
+          onClick={() => onHistory(row)}
+        >
+          <History size={14} />
+        </Button>
+      )}
       {canDelete && (
         <Button
           title="Delete"
@@ -568,10 +848,16 @@ const BotTableActions = ({
 };
 
 const BotsPage = () => {
-  const router = useRouter();
   const { data: session } = useSession();
   const { PERMISSIONS } = HEADER_CONSTANTS;
   const isAdmin = String(session?.user?.is_admin ?? "") === "1";
+  const sessionUser = session?.user as
+    | { company_id?: string | null; company_identifier?: string | null }
+    | undefined;
+  const userCompanyId = String(sessionUser?.company_id ?? "").trim();
+  const userCompanyIdentifier = String(
+    sessionUser?.company_identifier ?? "",
+  ).trim();
   const permissions = session?.user?.permissions ?? [];
   const canCreateBots = permissions.includes(
     PERMISSIONS.CREATE_INBOUND_BOTS_INBOUND,
@@ -582,12 +868,28 @@ const BotsPage = () => {
   const canDeleteBots = permissions.includes(
     PERMISSIONS.DELETE_INBOUND_BOTS_INBOUND,
   );
+  const canVersionInboundBots = permissions.includes(
+    PERMISSIONS.INBOUND_BOT_VERSIONING_INBOUND,
+  );
   const [data, setData] = useState<BotRow[]>([]);
   const [companies, setCompanies] = useState<CompanyOption[]>([]);
   const [loading, setLoading] = useState(false);
   const [companyFilter, setCompanyFilter] = useState<string>("");
   const [statusFilter, setStatusFilter] = useState<string>("");
   const [showTabSelectorModal, setShowTabSelectorModal] = useState(false);
+  const [showBotFormModal, setShowBotFormModal] = useState(false);
+  const [isEditFormMode, setIsEditFormMode] = useState(false);
+  const [editingBotId, setEditingBotId] = useState<string | null>(null);
+  const [formLoading, setFormLoading] = useState(false);
+  const [form, setForm] = useState<CreateBotPayload>({
+    company_id: "",
+    name: "",
+    description: "",
+    status: "draft",
+    configuration: { ...defaultConfig },
+  });
+  const [sipTrunks, setSipTrunks] = useState<SipTrunkOption[]>([]);
+  const [loadingSipTrunks, setLoadingSipTrunks] = useState(false);
   const [visibleTabIds, setVisibleTabIds] = useState<string[]>([
     "all",
     "published",
@@ -595,11 +897,12 @@ const BotsPage = () => {
   const [tabSelectionDraft, setTabSelectionDraft] = useState<string[]>([
     "published",
   ]);
-  const [showAddModal, setShowAddModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showBotSidebar, setShowBotSidebar] = useState(false);
   const [sidebarBotId, setSidebarBotId] = useState<string | null>(null);
-  const [sidebarBot, setSidebarBot] = useState<Record<string, unknown> | null>(null);
+  const [sidebarBot, setSidebarBot] = useState<Record<string, unknown> | null>(
+    null,
+  );
   const [sidebarLoading, setSidebarLoading] = useState(false);
   const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [historyBotId, setHistoryBotId] = useState<string | null>(null);
@@ -609,14 +912,6 @@ const BotsPage = () => {
   const [rollbackVersion, setRollbackVersion] = useState<number | null>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [selectedRow, setSelectedRow] = useState<BotRow | null>(null);
-  const [formLoading, setFormLoading] = useState(false);
-  const [form, setForm] = useState<CreateBotPayload>({
-    company_id: "",
-    name: "",
-    description: "",
-    status: "draft",
-    configuration: { ...defaultConfig },
-  });
   const hasInitializedVisibleTabs = useRef(false);
   const sidebarRequestSequence = useRef(0);
 
@@ -626,14 +921,16 @@ const BotsPage = () => {
       const list = getListFromResponse(res);
       const opts = getCompanyOptions(list);
       setCompanies(opts);
-      if (opts.length > 0)
-        setForm((f: CreateBotPayload) =>
-          f.company_id ? f : { ...f, company_id: opts[0].id },
+      const admin = String(session?.user?.is_admin ?? "") === "1";
+      if (admin && opts.length > 0) {
+        setForm((prev) =>
+          prev.company_id ? prev : { ...prev, company_id: opts[0].id },
         );
+      }
     } catch {
       setCompanies([]);
     }
-  }, []);
+  }, [session?.user?.is_admin]);
 
   const fetchBots = useCallback(async () => {
     setLoading(true);
@@ -644,7 +941,6 @@ const BotsPage = () => {
       if (companyFilter) params.company_id = companyFilter;
       if (statusFilter) params.status = statusFilter;
       const res = await getBots(params);
-      console.log(res);
       let list = getListFromResponse(res) as BotRow[];
       if (statusFilter) {
         list = list.filter((row) => String(row.status ?? "") === statusFilter);
@@ -670,6 +966,48 @@ const BotsPage = () => {
   useEffect(() => {
     fetchBots();
   }, [fetchBots]);
+
+  useEffect(() => {
+    if (isAdmin) return;
+    if (isEditFormMode) return;
+    const cid = userCompanyId || userCompanyIdentifier;
+    if (cid) setForm((f) => ({ ...f, company_id: cid }));
+  }, [isAdmin, isEditFormMode, userCompanyId, userCompanyIdentifier]);
+
+  const companyIdForSipTrunks = useMemo(
+    () => companyIdentifierParamForSipTrunks(companies, form.company_id),
+    [companies, form.company_id],
+  );
+
+  useEffect(() => {
+    if (!showBotFormModal) return;
+    const paramTrim = companyIdForSipTrunks.trim();
+    if (!paramTrim) {
+      setSipTrunks([]);
+      return;
+    }
+    let cancelled = false;
+    setLoadingSipTrunks(true);
+    getSipTrunks({ company_id: paramTrim })
+      .then((res) => {
+        if (cancelled) return;
+        const rows = normalizeSipTrunkRows(listFromSipTrunksResponse(res));
+        setSipTrunks(rows);
+        setForm((prev) => clearStaleSipTrunkFormSelection(prev, rows));
+      })
+      .catch(() => {
+        if (!cancelled) {
+          toast.error("Failed to load SIP trunks");
+          setSipTrunks([]);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingSipTrunks(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [companyIdForSipTrunks, showBotFormModal]);
 
   useEffect(() => {
     if (hasInitializedVisibleTabs.current) return;
@@ -720,8 +1058,15 @@ const BotsPage = () => {
         collapsible: true,
         defaultExpanded: true,
         fields: [
-          { label: "Name", value: safeDisplayString(sidebarBot.name), copyable: true },
-          { label: "Description", value: safeDisplayString(sidebarBot.description) },
+          {
+            label: "Name",
+            value: safeDisplayString(sidebarBot.name),
+            copyable: true,
+          },
+          {
+            label: "Description",
+            value: safeDisplayString(sidebarBot.description),
+          },
           {
             label: "Status",
             value: status === "published" ? "Published" : "Draft",
@@ -731,12 +1076,16 @@ const BotsPage = () => {
           {
             label: "Company",
             value: safeDisplayString(
-              sidebarBot.company_name ?? sidebarBot.company_id ?? sidebarBot.company,
+              sidebarBot.company_name ??
+                sidebarBot.company_id ??
+                sidebarBot.company,
             ),
           },
           {
             label: "Version",
-            value: safeDisplayString(sidebarBot.current_version ?? sidebarBot.version),
+            value: safeDisplayString(
+              sidebarBot.current_version ?? sidebarBot.version,
+            ),
           },
         ],
       },
@@ -764,16 +1113,33 @@ const BotsPage = () => {
         collapsible: true,
         defaultExpanded: false,
         fields: [
-          { label: "Voice", value: getConfigValue(sidebarBot, "voice_name", "voice_settings") },
-          { label: "Model", value: getConfigValue(sidebarBot, "voice_model", "voice_settings") },
-          { label: "Speed", value: getConfigValue(sidebarBot, "voice_speed", "voice_settings") },
+          {
+            label: "Voice",
+            value: getConfigValue(sidebarBot, "voice_name", "voice_settings"),
+          },
+          {
+            label: "Model",
+            value: getConfigValue(sidebarBot, "voice_model", "voice_settings"),
+          },
+          {
+            label: "Speed",
+            value: getConfigValue(sidebarBot, "voice_speed", "voice_settings"),
+          },
           {
             label: "Instructions",
-            value: getConfigValue(sidebarBot, "voice_instructions", "voice_settings"),
+            value: getConfigValue(
+              sidebarBot,
+              "voice_instructions",
+              "voice_settings",
+            ),
           },
           {
             label: "Greeting",
-            value: getConfigValue(sidebarBot, "greeting_message", "behavior_settings"),
+            value: getConfigValue(
+              sidebarBot,
+              "greeting_message",
+              "behavior_settings",
+            ),
           },
         ],
       },
@@ -784,7 +1150,10 @@ const BotsPage = () => {
         collapsible: true,
         defaultExpanded: false,
         fields: [
-          { label: "Model", value: getConfigValue(sidebarBot, "llm_model", "llm_settings") },
+          {
+            label: "Model",
+            value: getConfigValue(sidebarBot, "llm_model", "llm_settings"),
+          },
           {
             label: "Temperature",
             value: getConfigValue(sidebarBot, "temperature", "llm_settings"),
@@ -804,35 +1173,67 @@ const BotsPage = () => {
         fields: [
           {
             label: "Transfer enabled",
-            value: getConfigValue(sidebarBot, "transfer_enabled", "behavior_settings"),
+            value: getConfigValue(
+              sidebarBot,
+              "transfer_enabled",
+              "behavior_settings",
+            ),
           },
           {
             label: "Transfer number",
-            value: getConfigValue(sidebarBot, "transfer_number", "behavior_settings"),
+            value: getConfigValue(
+              sidebarBot,
+              "transfer_number",
+              "behavior_settings",
+            ),
           },
           {
             label: "Transfer trunk ID",
-            value: getConfigValue(sidebarBot, "transfer_trunk_id", "behavior_settings"),
+            value: getConfigValue(
+              sidebarBot,
+              "transfer_trunk_id",
+              "behavior_settings",
+            ),
           },
           {
             label: "Max duration (s)",
-            value: getConfigValue(sidebarBot, "max_duration", "behavior_settings"),
+            value: getConfigValue(
+              sidebarBot,
+              "max_duration",
+              "behavior_settings",
+            ),
           },
           {
             label: "Idle timeout (s)",
-            value: getConfigValue(sidebarBot, "idle_timeout", "behavior_settings"),
+            value: getConfigValue(
+              sidebarBot,
+              "idle_timeout",
+              "behavior_settings",
+            ),
           },
           {
             label: "Allow interruptions",
-            value: getConfigValue(sidebarBot, "allow_interruptions", "behavior_settings"),
+            value: getConfigValue(
+              sidebarBot,
+              "allow_interruptions",
+              "behavior_settings",
+            ),
           },
           {
             label: "Noise cancellation",
-            value: getConfigValue(sidebarBot, "noise_cancellation", "behavior_settings"),
+            value: getConfigValue(
+              sidebarBot,
+              "noise_cancellation",
+              "behavior_settings",
+            ),
           },
           {
             label: "Min endpointing delay",
-            value: getConfigValue(sidebarBot, "min_endpointing_delay", "behavior_settings"),
+            value: getConfigValue(
+              sidebarBot,
+              "min_endpointing_delay",
+              "behavior_settings",
+            ),
           },
         ],
       },
@@ -925,6 +1326,86 @@ const BotsPage = () => {
         .finally(() => setRollbackVersion(null));
     },
     [fetchBots],
+  );
+
+  const resetFormState = useCallback(() => {
+    setEditingBotId(null);
+    setIsEditFormMode(false);
+    const companyScope = isAdmin
+      ? (companies[0]?.id ?? "")
+      : userCompanyId || userCompanyIdentifier;
+    setForm({
+      company_id: companyScope,
+      name: "",
+      description: "",
+      status: "draft",
+      configuration: { ...defaultConfig },
+    });
+  }, [companies, isAdmin, userCompanyId, userCompanyIdentifier]);
+
+  const openCreateForm = useCallback(() => {
+    resetFormState();
+    setShowBotFormModal(true);
+  }, [resetFormState]);
+
+  const openEditForm = useCallback(async (id: string) => {
+    setFormLoading(true);
+    setShowBotFormModal(true);
+    setIsEditFormMode(true);
+    setEditingBotId(id);
+    try {
+      const details = (await getBot(id)) as Record<string, unknown>;
+      const configuration = {
+        ...defaultConfig,
+        ...(details.configuration as Record<string, unknown>),
+      } as BotConfiguration;
+      setForm({
+        company_id: companyIdFromBotApi(details),
+        name: toFormString(details.name),
+        description: toFormString(details.description),
+        status: toFormString(details.status) || "draft",
+        configuration,
+      });
+    } catch {
+      toast.error("Failed to load bot for editing");
+      setShowBotFormModal(false);
+    } finally {
+      setFormLoading(false);
+    }
+  }, []);
+
+  const handleFormSubmit = useCallback(
+    async (e: React.FormEvent) => {
+      e.preventDefault();
+      if (!validateFormAndToast(form)) return;
+      setFormLoading(true);
+      try {
+        if (isEditFormMode && editingBotId) {
+          await putBot(editingBotId, buildUpdatePayload(form));
+          toast.success("Bot updated");
+        } else {
+          await postBots(buildCreateBotPayload(form));
+          toast.success("Bot created");
+        }
+        setShowBotFormModal(false);
+        resetFormState();
+        fetchBots();
+      } catch (err: unknown) {
+        const msg =
+          (
+            err as {
+              response?: { data?: { detail?: string } };
+              message?: string;
+            }
+          )?.response?.data?.detail ??
+          (err as { message?: string })?.message ??
+          (isEditFormMode ? "Update failed" : "Create failed");
+        toast.error(msg);
+      } finally {
+        setFormLoading(false);
+      }
+    },
+    [form, isEditFormMode, editingBotId, fetchBots, resetFormState],
   );
 
   const botTabCounts = useMemo(() => {
@@ -1035,9 +1516,7 @@ const BotsPage = () => {
         </Form.Select>
         {canCreateBots && (
           <Button
-            onClick={() => {
-              router.push("/voicebot/inbound/bots/create");
-            }}
+            onClick={openCreateForm}
             style={addBotButtonStyle}
             className="bots-add-button"
           >
@@ -1047,7 +1526,14 @@ const BotsPage = () => {
         )}
       </div>
     ),
-    [canCreateBots, isAdmin, companyFilter, companies, router, statusFilter],
+    [
+      canCreateBots,
+      isAdmin,
+      companyFilter,
+      companies,
+      openCreateForm,
+      statusFilter,
+    ],
   );
 
   const tableToolbar = useMemo(
@@ -1084,7 +1570,30 @@ const BotsPage = () => {
   );
 
   const columns: TableColumn<BotRow>[] = [
-    { key: "name", label: "Name", sortable: true },
+    {
+      key: "name",
+      label: "Name",
+      sortable: true,
+      width: "280px",
+      render: (row) => {
+        const name = String(row.name ?? "—");
+        return (
+          <span
+            title={name}
+            style={{
+              display: "block",
+              width: "100%",
+              maxWidth: "280px",
+              whiteSpace: "nowrap",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+            }}
+          >
+            {name}
+          </span>
+        );
+      },
+    },
     {
       key: "company_name",
       label: "Company",
@@ -1145,20 +1654,18 @@ const BotsPage = () => {
           row={row}
           canEdit={canEditBots}
           canDelete={canDeleteBots}
+          canVersion={canVersionInboundBots}
           onView={(id) => {
             const targetRow = data.find((item) => getBotId(item) === id);
             if (targetRow) {
               openBotSidebar(targetRow);
             }
           }}
-          onEdit={(id) =>
-            router.push(
-              `/voicebot/inbound/bots/edit?id=${encodeURIComponent(id)}`,
-            )
-          }
+          onEdit={openEditForm}
           onPublish={handlePublish}
           onUnpublish={handleUnpublish}
           onHistory={(r) => {
+            if (!canVersionInboundBots) return;
             setHistoryBotId(getBotId(r));
             setHistoryBotName(r.name ?? "");
             setShowHistoryModal(true);
@@ -1172,36 +1679,509 @@ const BotsPage = () => {
     },
   ];
 
-  const handleAddSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!form.company_id || !form.name) {
-      toast.error("Company and name are required");
-      return;
+  const cfg = form.configuration ?? defaultConfig;
+
+  const selectedSipTrunk = useMemo(
+    () =>
+      sipTrunks.find(
+        (t) => t.sip_trunk_id === String(cfg.sip_trunk_id ?? "").trim(),
+      ),
+    [sipTrunks, cfg.sip_trunk_id],
+  );
+
+  const phoneNumberOptions = useMemo(() => {
+    const ids = selectedSipTrunk?.caller_ids ?? [];
+    if (!ids.length) return [];
+    const p = String(cfg.phone_number ?? "").trim();
+    if (p && !ids.includes(p)) {
+      return [p, ...ids];
     }
-    setFormLoading(true);
-    try {
-      await postBots(form);
-      toast.success("Bot created");
-      setShowAddModal(false);
-      setForm({
-        company_id: form.company_id,
-        name: "",
-        description: "",
-        status: "draft",
-        configuration: { ...defaultConfig },
+    return ids;
+  }, [selectedSipTrunk, cfg.phone_number]);
+
+  const handleSipTrunkChange = useCallback(
+    (e: React.ChangeEvent<HTMLSelectElement>) => {
+      const trunkId = e.target.value;
+      const trunk = sipTrunks.find((t) => t.sip_trunk_id === trunkId);
+      setForm((f) => {
+        let nextPhone = "";
+        if (trunkId && trunk) {
+          nextPhone =
+            trunk.caller_ids.length > 0 ? (trunk.caller_ids[0] ?? "") : "";
+        }
+        return {
+          ...f,
+          configuration: {
+            ...f.configuration,
+            sip_trunk_id: trunkId,
+            phone_number: nextPhone,
+          },
+        };
       });
-      fetchBots();
-    } catch (err: unknown) {
-      const msg =
-        (err as { response?: { data?: { detail?: string } }; message?: string })
-          ?.response?.data?.detail ??
-        (err as { message?: string })?.message ??
-        "Create failed";
-      toast.error(msg);
-    } finally {
-      setFormLoading(false);
-    }
-  };
+    },
+    [sipTrunks],
+  );
+
+  useEffect(() => {
+    const tid = String(cfg.sip_trunk_id ?? "").trim();
+    if (!tid) return;
+    const trunk = sipTrunks.find((t) => t.sip_trunk_id === tid);
+    if (!trunk?.caller_ids?.length) return;
+    setForm((f) => {
+      if (String(f.configuration?.phone_number ?? "").trim()) return f;
+      return {
+        ...f,
+        configuration: {
+          ...f.configuration,
+          phone_number: trunk.caller_ids[0] ?? "",
+        },
+      };
+    });
+  }, [sipTrunks, cfg.sip_trunk_id, setForm]);
+
+  const hasCompanyForSip = Boolean(form.company_id?.trim());
+  let sipTrunkDefaultOptionLabel = "Select SIP trunk";
+  if (!hasCompanyForSip) {
+    sipTrunkDefaultOptionLabel = "Select a company in Basic Information first";
+  } else if (loadingSipTrunks) {
+    sipTrunkDefaultOptionLabel = "Loading…";
+  }
+
+  const hasSipTrunkSelected = Boolean(cfg.sip_trunk_id?.trim());
+  let phoneNumberFreeTextPlaceholder = "Select a SIP trunk first";
+  if (hasSipTrunkSelected) {
+    phoneNumberFreeTextPlaceholder =
+      "No caller_ids on this trunk; enter a number";
+  }
+  const sipTrunkSelectDisabled = hasCompanyForSip ? loadingSipTrunks : true;
+  const phoneNumberFreeTextDisabled = !hasSipTrunkSelected;
+
+  const formSubmitBlocked = Boolean(getFirstValidationError(form));
+
+  const configForm = (
+    <>
+      <h6 className="mb-3 mt-2">Configuration</h6>
+      <Form.Group className="mb-3">
+        <Form.Label>Instructions *</Form.Label>
+        <Form.Control
+          as="textarea"
+          rows={3}
+          value={cfg.instructions ?? ""}
+          onChange={(e) =>
+            setForm((prev) => ({
+              ...prev,
+              configuration: {
+                ...prev.configuration,
+                instructions: e.target.value,
+              },
+            }))
+          }
+          disabled={formLoading}
+        />
+      </Form.Group>
+      <Form.Group className="mb-3">
+        <Form.Label>Knowledge Base *</Form.Label>
+        <Form.Control
+          as="textarea"
+          rows={3}
+          value={cfg.knowledge_base ?? ""}
+          onChange={(e) =>
+            setForm((prev) => ({
+              ...prev,
+              configuration: {
+                ...prev.configuration,
+                knowledge_base: e.target.value,
+              },
+            }))
+          }
+          disabled={formLoading}
+        />
+      </Form.Group>
+
+      <h6 className="mb-3 mt-2">Voice Settings</h6>
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "1fr 1fr",
+          gap: "16px",
+        }}
+      >
+        <Form.Group className="mb-3">
+          <Form.Label>Voice</Form.Label>
+          <Form.Select
+            value={cfg.voice_name ?? "alloy"}
+            onChange={(e) =>
+              setForm((prev) => ({
+                ...prev,
+                configuration: {
+                  ...prev.configuration,
+                  voice_name: e.target.value,
+                },
+              }))
+            }
+            disabled={formLoading}
+          >
+            {VOICE_OPTIONS.map((v) => (
+              <option key={v} value={v}>
+                {v}
+              </option>
+            ))}
+          </Form.Select>
+        </Form.Group>
+        <Form.Group className="mb-3">
+          <Form.Label>Voice model</Form.Label>
+          <Form.Control value={cfg.voice_model ?? ""} disabled readOnly />
+        </Form.Group>
+      </div>
+      <Form.Group className="mb-3">
+        <Form.Label>
+          Voice speed ({(cfg.voice_speed ?? 1).toFixed(2)})
+        </Form.Label>
+        <Form.Range
+          min={0.5}
+          max={2}
+          step={0.01}
+          value={cfg.voice_speed ?? 1}
+          onChange={(e) =>
+            setForm((prev) => ({
+              ...prev,
+              configuration: {
+                ...prev.configuration,
+                voice_speed: Number.parseFloat(e.target.value),
+              },
+            }))
+          }
+          disabled={formLoading}
+        />
+      </Form.Group>
+      <Form.Group className="mb-3">
+        <Form.Label>Voice Instructions *</Form.Label>
+        <Form.Control
+          value={cfg.voice_instructions ?? ""}
+          onChange={(e) =>
+            setForm((prev) => ({
+              ...prev,
+              configuration: {
+                ...prev.configuration,
+                voice_instructions: e.target.value,
+              },
+            }))
+          }
+          disabled={formLoading}
+        />
+      </Form.Group>
+      <Form.Group className="mb-3">
+        <Form.Label>Greeting message</Form.Label>
+        <Form.Control
+          value={cfg.greeting_message ?? ""}
+          onChange={(e) =>
+            setForm((prev) => ({
+              ...prev,
+              configuration: {
+                ...prev.configuration,
+                greeting_message: e.target.value,
+              },
+            }))
+          }
+          disabled={formLoading}
+        />
+      </Form.Group>
+
+      <h6 className="mb-3 mt-2">LLM Settings</h6>
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "1fr 1fr",
+          gap: "16px",
+        }}
+      >
+        <Form.Group className="mb-3">
+          <Form.Label>LLM model</Form.Label>
+          <Form.Select value={cfg.llm_model ?? "gpt-4o-mini"} disabled>
+            {LLM_MODEL_OPTIONS.map((m) => (
+              <option key={m} value={m}>
+                {m}
+              </option>
+            ))}
+          </Form.Select>
+        </Form.Group>
+        <Form.Group className="mb-3">
+          <Form.Label>
+            Temperature ({(cfg.temperature ?? 0.7).toFixed(2)})
+          </Form.Label>
+          <Form.Range
+            min={0}
+            max={1}
+            step={0.01}
+            value={cfg.temperature ?? 0.7}
+            onChange={(e) =>
+              setForm((prev) => ({
+                ...prev,
+                configuration: {
+                  ...prev.configuration,
+                  temperature: Number.parseFloat(e.target.value),
+                },
+              }))
+            }
+            disabled={formLoading}
+          />
+        </Form.Group>
+      </div>
+      <Form.Group className="mb-3">
+        <Form.Label>Max tokens</Form.Label>
+        <Form.Control
+          type="number"
+          min={100}
+          max={4000}
+          step={100}
+          value={cfg.max_tokens ?? 1000}
+          onChange={(e) =>
+            setForm((prev) => ({
+              ...prev,
+              configuration: {
+                ...prev.configuration,
+                max_tokens: Number.parseInt(e.target.value, 10) || 1000,
+              },
+            }))
+          }
+          disabled={formLoading}
+        />
+      </Form.Group>
+
+      <h6 className="mb-3 mt-2">Behavior Settings</h6>
+      <Form.Group className="mb-3">
+        <Form.Check
+          type="switch"
+          id="transfer-enabled-inbound"
+          label="Enable transfer"
+          checked={Boolean(cfg.transfer_enabled)}
+          onChange={(e) =>
+            setForm((prev) => ({
+              ...prev,
+              configuration: {
+                ...prev.configuration,
+                transfer_enabled: e.target.checked,
+              },
+            }))
+          }
+          disabled={formLoading}
+        />
+      </Form.Group>
+      <Form.Group className="mb-3">
+        <Form.Label>
+          Transfer number
+          {cfg.transfer_enabled ? " *" : ""}
+        </Form.Label>
+        <Form.Control
+          value={cfg.transfer_number ?? ""}
+          onChange={(e) =>
+            setForm((prev) => ({
+              ...prev,
+              configuration: {
+                ...prev.configuration,
+                transfer_number: e.target.value,
+              },
+            }))
+          }
+          disabled={formLoading}
+        />
+      </Form.Group>
+      <Form.Group className="mb-3">
+        <Form.Label>Transfer trunk ID</Form.Label>
+        <Form.Control
+          value={cfg.transfer_trunk_id ?? ""}
+          onChange={(e) =>
+            setForm((prev) => ({
+              ...prev,
+              configuration: {
+                ...prev.configuration,
+                transfer_trunk_id: e.target.value,
+              },
+            }))
+          }
+          disabled={formLoading}
+        />
+      </Form.Group>
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "1fr 1fr",
+          gap: "16px",
+        }}
+      >
+        <Form.Group className="mb-3">
+          <Form.Label>Max duration (seconds)</Form.Label>
+          <Form.Control
+            type="number"
+            min={60}
+            step={60}
+            value={cfg.max_duration ?? 1800}
+            onChange={(e) =>
+              setForm((prev) => ({
+                ...prev,
+                configuration: {
+                  ...prev.configuration,
+                  max_duration: Number.parseInt(e.target.value, 10) || 1800,
+                },
+              }))
+            }
+            disabled={formLoading}
+          />
+        </Form.Group>
+        <Form.Group className="mb-3">
+          <Form.Label>Idle timeout (seconds)</Form.Label>
+          <Form.Control
+            type="number"
+            min={30}
+            step={30}
+            value={cfg.idle_timeout ?? 300}
+            onChange={(e) =>
+              setForm((prev) => ({
+                ...prev,
+                configuration: {
+                  ...prev.configuration,
+                  idle_timeout: Number.parseInt(e.target.value, 10) || 300,
+                },
+              }))
+            }
+            disabled={formLoading}
+          />
+        </Form.Group>
+      </div>
+      <div
+        className="mb-3"
+        style={{
+          display: "grid",
+          gridTemplateColumns: "1fr 1fr",
+          gap: "16px",
+          alignItems: "center",
+        }}
+      >
+        <Form.Group className="mb-0">
+          <Form.Check
+            type="switch"
+            id="allow-interruptions-inbound"
+            label="Allow interruptions"
+            checked={Boolean(cfg.allow_interruptions)}
+            onChange={(e) =>
+              setForm((prev) => ({
+                ...prev,
+                configuration: {
+                  ...prev.configuration,
+                  allow_interruptions: e.target.checked,
+                },
+              }))
+            }
+            disabled={formLoading}
+          />
+        </Form.Group>
+        <Form.Group className="mb-0">
+          <Form.Check
+            type="switch"
+            id="noise-cancellation-inbound"
+            label="Noise cancellation"
+            checked={Boolean(cfg.noise_cancellation)}
+            onChange={(e) =>
+              setForm((prev) => ({
+                ...prev,
+                configuration: {
+                  ...prev.configuration,
+                  noise_cancellation: e.target.checked,
+                },
+              }))
+            }
+            disabled={formLoading}
+          />
+        </Form.Group>
+      </div>
+      <Form.Group className="mb-3">
+        <Form.Label>Min endpointing delay</Form.Label>
+        <Form.Control
+          type="number"
+          min={0}
+          max={1}
+          step={0.01}
+          value={cfg.min_endpointing_delay ?? 0.05}
+          onChange={(e) =>
+            setForm((prev) => ({
+              ...prev,
+              configuration: {
+                ...prev.configuration,
+                min_endpointing_delay:
+                  Number.parseFloat(e.target.value) || 0.05,
+              },
+            }))
+          }
+          disabled={formLoading}
+        />
+      </Form.Group>
+
+      <h6 className="mb-3 mt-2">SIP Settings</h6>
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "1fr 1fr",
+          gap: "16px",
+        }}
+      >
+        <Form.Group className="mb-3">
+          <Form.Label>SIP trunk *</Form.Label>
+          <Form.Select
+            value={cfg.sip_trunk_id ?? ""}
+            onChange={handleSipTrunkChange}
+            disabled={sipTrunkSelectDisabled || formLoading}
+          >
+            <option value="">{sipTrunkDefaultOptionLabel}</option>
+            {sipTrunks.map((t) => (
+              <option key={t.sip_trunk_id} value={t.sip_trunk_id}>
+                {t.name} ({t.sip_trunk_id})
+              </option>
+            ))}
+          </Form.Select>
+        </Form.Group>
+        <Form.Group className="mb-3">
+          <Form.Label>Phone number (caller ID) *</Form.Label>
+          {phoneNumberOptions.length > 0 ? (
+            <Form.Select
+              value={cfg.phone_number ?? ""}
+              onChange={(e) =>
+                setForm((prev) => ({
+                  ...prev,
+                  configuration: {
+                    ...prev.configuration,
+                    phone_number: e.target.value,
+                  },
+                }))
+              }
+              disabled={formLoading}
+            >
+              <option value="">Select caller ID</option>
+              {phoneNumberOptions.map((n) => (
+                <option key={n} value={n}>
+                  {n}
+                </option>
+              ))}
+            </Form.Select>
+          ) : (
+            <Form.Control
+              value={cfg.phone_number ?? ""}
+              onChange={(e) =>
+                setForm((prev) => ({
+                  ...prev,
+                  configuration: {
+                    ...prev.configuration,
+                    phone_number: e.target.value,
+                  },
+                }))
+              }
+              placeholder={phoneNumberFreeTextPlaceholder}
+              disabled={phoneNumberFreeTextDisabled || formLoading}
+            />
+          )}
+        </Form.Group>
+      </div>
+    </>
+  );
 
   const handleDeleteConfirm = async () => {
     if (!selectedRow) return;
@@ -1223,77 +2203,6 @@ const BotsPage = () => {
       setDeleteLoading(false);
     }
   };
-
-  const configForm = (
-    <>
-      <Form.Group className="mb-2">
-        <Form.Label>Instructions</Form.Label>
-        <Form.Control
-          as="textarea"
-          rows={2}
-          value={form.configuration?.instructions ?? ""}
-          onChange={(e) =>
-            setForm({
-              ...form,
-              configuration: {
-                ...form.configuration,
-                instructions: e.target.value,
-              },
-            })
-          }
-          placeholder="Bot system instructions"
-        />
-      </Form.Group>
-      <Form.Group className="mb-2">
-        <Form.Label>Greeting message</Form.Label>
-        <Form.Control
-          value={form.configuration?.greeting_message ?? ""}
-          onChange={(e) =>
-            setForm({
-              ...form,
-              configuration: {
-                ...form.configuration,
-                greeting_message: e.target.value,
-              },
-            })
-          }
-          placeholder="Hello! How can I help?"
-        />
-      </Form.Group>
-      <Form.Group className="mb-2">
-        <Form.Label>Voice name</Form.Label>
-        <Form.Control
-          value={form.configuration?.voice_name ?? ""}
-          onChange={(e) =>
-            setForm({
-              ...form,
-              configuration: {
-                ...form.configuration,
-                voice_name: e.target.value,
-              },
-            })
-          }
-          placeholder="onyx"
-        />
-      </Form.Group>
-      <Form.Group className="mb-2">
-        <Form.Label>LLM model</Form.Label>
-        <Form.Control
-          value={form.configuration?.llm_model ?? ""}
-          onChange={(e) =>
-            setForm({
-              ...form,
-              configuration: {
-                ...form.configuration,
-                llm_model: e.target.value,
-              },
-            })
-          }
-          placeholder="gpt-4o-mini"
-        />
-      </Form.Group>
-    </>
-  );
 
   return (
     <>
@@ -1349,48 +2258,61 @@ const BotsPage = () => {
           />
         </div>
         {showBotSidebar && (
-          <GenericSidebar
-            isOpen={showBotSidebar}
-            onClose={closeBotSidebar}
-            title={safeDisplayString(sidebarBot?.name ?? "Bot Details")}
-            subtitle={safeDisplayString(sidebarBot?.description)}
-            avatar={{
-              initials: safeDisplayString(sidebarBot?.name ?? "B")
-                .slice(0, 2)
-                .toUpperCase(),
-              name: safeDisplayString(sidebarBot?.name ?? "Bot"),
-              gradient: "#0091ae",
+          <div
+            style={{
+              position: "fixed",
+              top: 0,
+              right: 0,
+              height: "100vh",
+              display: "flex",
+              flexDirection: "column",
+              minHeight: 0,
+              zIndex: 1040,
+              boxShadow: "-4px 0 24px rgba(0, 0, 0, 0.12)",
             }}
-            sections={
-              sidebarLoading
-                ? [
-                    {
-                      id: "sidebar-loading",
-                      title: "Loading bot details",
-                      icon: Info,
-                      isLoading: true,
-                      defaultExpanded: true,
-                      collapsible: false,
+          >
+            <GenericSidebar
+              isOpen={showBotSidebar}
+              dockInParent
+              hideTopHeadingBar
+              onClose={closeBotSidebar}
+              title={safeDisplayString(sidebarBot?.name ?? "Bot Details")}
+              avatar={{
+                initials: safeDisplayString(sidebarBot?.name ?? "B")
+                  .slice(0, 2)
+                  .toUpperCase(),
+                name: safeDisplayString(sidebarBot?.name ?? "Bot"),
+                gradient: "#0091ae",
+              }}
+              sections={
+                sidebarLoading
+                  ? [
+                      {
+                        id: "sidebar-loading",
+                        title: "Loading bot details",
+                        icon: Info,
+                        isLoading: true,
+                        defaultExpanded: true,
+                        collapsible: false,
+                      },
+                    ]
+                  : botSidebarSections
+              }
+              width="470px"
+              actionsDropdown={{
+                label: "Actions",
+                items: [
+                  {
+                    label: "Edit Bot",
+                    onClick: () => {
+                      if (!sidebarBotId) return;
+                      openEditForm(sidebarBotId);
                     },
-                  ]
-                : botSidebarSections
-            }
-            width="470px"
-            actionsDropdown={{
-              label: "Actions",
-              items: [
-                {
-                  label: "Edit Bot",
-                  onClick: () => {
-                    if (!sidebarBotId) return;
-                    router.push(
-                      `/voicebot/inbound/bots/edit?id=${encodeURIComponent(sidebarBotId)}`,
-                    );
                   },
-                },
-              ],
-            }}
-          />
+                ],
+              }}
+            />
+          </div>
         )}
       </div>
 
@@ -1431,77 +2353,119 @@ const BotsPage = () => {
         </Modal.Footer>
       </Modal>
 
-      <Modal
-        show={showAddModal}
-        onHide={() => setShowAddModal(false)}
-        centered
-        size="lg"
+      <Offcanvas
+        show={showBotFormModal}
+        onHide={() => {
+          if (formLoading) return;
+          setShowBotFormModal(false);
+          resetFormState();
+        }}
+        placement="end"
+        backdrop
+        scroll
+        style={{ width: "640px", maxWidth: "95vw" }}
       >
-        <Modal.Header closeButton>
-          <Modal.Title>Add Bot</Modal.Title>
-        </Modal.Header>
-        <Form onSubmit={handleAddSubmit}>
-          <Modal.Body>
-            <Form.Group className="mb-2">
-              <Form.Label>Company *</Form.Label>
-              <Form.Select
-                value={form.company_id}
-                onChange={(e) =>
-                  setForm((f: CreateBotPayload) => ({ ...f, company_id: e.target.value }))
-                }
-                required
-              >
-                <option value="">Select company</option>
-                {companies.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
-              </Form.Select>
-            </Form.Group>
-            <Form.Group className="mb-2">
-              <Form.Label>Name *</Form.Label>
-              <Form.Control
-                value={form.name}
-                onChange={(e) =>
-                  setForm((f: CreateBotPayload) => ({ ...f, name: e.target.value }))
-                }
-                required
-                placeholder="Bot name"
-              />
-            </Form.Group>
-            <Form.Group className="mb-2">
-              <Form.Label>Description</Form.Label>
+        <Offcanvas.Header closeButton={!formLoading}>
+          <Offcanvas.Title>
+            {isEditFormMode ? "Edit Bot" : "Add Bot"}
+          </Offcanvas.Title>
+        </Offcanvas.Header>
+        <Form onSubmit={handleFormSubmit}>
+          <Offcanvas.Body
+            style={{
+              overflowY: "auto",
+              maxHeight: "calc(100vh - 110px)",
+            }}
+          >
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: isAdmin ? "1fr 1fr" : "1fr",
+                gap: "16px",
+              }}
+            >
+              {isAdmin && (
+                <Form.Group className="mb-2">
+                  <Form.Label>Company *</Form.Label>
+                  <Form.Select
+                    value={form.company_id}
+                    onChange={(e) =>
+                      setForm((prev) => ({
+                        ...prev,
+                        company_id: e.target.value,
+                        configuration: {
+                          ...prev.configuration,
+                          sip_trunk_id: "",
+                          phone_number: "",
+                        },
+                      }))
+                    }
+                    required
+                    disabled={formLoading}
+                  >
+                    <option value="">Select company</option>
+                    {companies.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name}
+                      </option>
+                    ))}
+                  </Form.Select>
+                </Form.Group>
+              )}
+              <Form.Group className="mb-2">
+                <Form.Label>Bot name *</Form.Label>
+                <Form.Control
+                  value={form.name}
+                  onChange={(e) =>
+                    setForm((prev) => ({ ...prev, name: e.target.value }))
+                  }
+                  required
+                  disabled={formLoading}
+                  placeholder="Bot name"
+                />
+              </Form.Group>
+            </div>
+            <Form.Group className="mb-3">
+              <Form.Label>Description *</Form.Label>
               <Form.Control
                 as="textarea"
-                rows={2}
+                rows={3}
                 value={form.description ?? ""}
                 onChange={(e) =>
-                  setForm((f: CreateBotPayload) => ({ ...f, description: e.target.value }))
+                  setForm((prev) => ({ ...prev, description: e.target.value }))
                 }
+                required
+                disabled={formLoading}
                 placeholder="Description"
               />
             </Form.Group>
             {configForm}
-          </Modal.Body>
-          <Modal.Footer>
-            <Button variant="secondary" onClick={() => setShowAddModal(false)}>
-              Cancel
-            </Button>
-            <Button
-              variant="primary"
-              type="submit"
-              disabled={formLoading || !form.company_id || !form.name}
-            >
-              {formLoading ? (
-                <Spinner animation="border" size="sm" />
-              ) : (
-                "Create"
-              )}
-            </Button>
-          </Modal.Footer>
+            <div className="d-flex justify-content-end gap-2 border-top pt-3 mt-2">
+              <Button
+                variant="outline-secondary"
+                onClick={() => {
+                  if (formLoading) return;
+                  setShowBotFormModal(false);
+                  resetFormState();
+                }}
+                disabled={formLoading}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="primary"
+                type="submit"
+                disabled={formLoading || formSubmitBlocked}
+              >
+                {formLoading ? (
+                  <Spinner animation="border" size="sm" className="me-1" />
+                ) : null}
+                {isEditFormMode ? "Update Bot" : "Create Bot"}
+              </Button>
+            </div>
+          </Offcanvas.Body>
         </Form>
-      </Modal>
+      </Offcanvas>
 
       <Modal
         show={showHistoryModal}
@@ -1516,7 +2480,18 @@ const BotsPage = () => {
         size="lg"
       >
         <Modal.Header closeButton>
-          <Modal.Title>Version history — {historyBotName || "Bot"}</Modal.Title>
+          <Modal.Title
+            title={`Version history — ${historyBotName || "Bot"}`}
+            style={{
+              display: "block",
+              maxWidth: "100%",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+            }}
+          >
+            Version history — {historyBotName || "Bot"}
+          </Modal.Title>
         </Modal.Header>
         <Modal.Body>
           <BotHistoryModalBody
