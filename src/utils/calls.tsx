@@ -1,4 +1,4 @@
-import type { AxiosError } from "axios";
+import type { AxiosError, AxiosResponse } from "axios";
 import { toast } from "react-toastify";
 import axiosInstance from "./axios";
 
@@ -125,6 +125,89 @@ function downloadCsvRows(rows: Record<string, unknown>[]): string {
   return csvUrl;
 }
 
+type BinaryExportFormat = "xlsx" | "pdf";
+
+function acceptHeaderForStreamingExport(format: BinaryExportFormat): string {
+  return format === "xlsx"
+    ? "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel, application/octet-stream, */*"
+    : "application/pdf, application/octet-stream, */*";
+}
+
+async function processBlobExportResponse(
+  response: AxiosResponse<Blob>,
+  options: {
+    binaryFormat: BinaryExportFormat;
+    downloadBaseName: string;
+    successToast: string;
+  },
+): Promise<string | undefined> {
+  if (response.status === 204) {
+    toast.error("No data found for export");
+    return undefined;
+  }
+
+  const contentType = String(response.headers?.["content-type"] ?? "");
+  if (contentType.includes("application/json")) {
+    const text = await response.data.text();
+    const parsed = JSON.parse(text) as ExportJsonPayload;
+    const rows = getRowsFromExportJson(parsed);
+
+    if (!Array.isArray(rows) || rows.length === 0) {
+      const message =
+        parsed?.detail ||
+        parsed?.message ||
+        "No export data found in response.";
+      toast.error(message);
+      throw new Error(message);
+    }
+    const csvUrl = downloadCsvRows(rows);
+    toast.success("CSV file downloaded successfully");
+    return csvUrl;
+  }
+
+  const blobType =
+    options.binaryFormat === "xlsx"
+      ? "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+      : "application/pdf";
+  const blob = new Blob([response.data], { type: blobType });
+  const url = globalThis.URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  const timestamp = buildExportTimestamp();
+  const ext = options.binaryFormat === "xlsx" ? "xlsx" : "pdf";
+  link.setAttribute(
+    "download",
+    `${options.downloadBaseName}_${timestamp}.${ext}`,
+  );
+
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  globalThis.URL.revokeObjectURL(url);
+
+  toast.success(options.successToast);
+  return url;
+}
+
+async function toastAxiosBlobError(
+  error: unknown,
+  fallbackMessage: string,
+): Promise<void> {
+  const ax = error as AxiosError<Blob>;
+  const data = ax.response?.data;
+  if (data instanceof Blob) {
+    try {
+      const text = await data.text();
+      const parsed = JSON.parse(text) as ExportJsonPayload;
+      toast.error(parsed?.detail || parsed?.message || fallbackMessage);
+    } catch {
+      toast.error(fallbackMessage);
+    }
+  } else {
+    toast.error(fallbackMessage);
+  }
+}
+
 export const ListCallLogs = async (
   params: PaginationParams | undefined,
   endpoint: string,
@@ -179,7 +262,7 @@ export const ListCallLogs = async (
           headers: {
             "Accept":
               exportType === "xlsx"
-                ? "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel, application/octet-stream, */*"
+                ? acceptHeaderForStreamingExport("xlsx")
                 : "audio/*, application/octet-stream, */*",
           },
         },
@@ -318,75 +401,24 @@ export const DownloadStreamingExport = async (
 
     appendFiltersToQueryParams(queryParams, filters);
 
-    // Set appropriate headers based on export type
-    const headers = {
-      "Accept":
-        normalizedExportType === "xlsx"
-          ? "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel, application/octet-stream, */*"
-          : "application/pdf, application/octet-stream, */*",
-    };
+    const binaryFormat: BinaryExportFormat =
+      normalizedExportType === "xlsx" ? "xlsx" : "pdf";
 
     const response = await axiosInstance.get(
       `${endpoint}?${queryParams.toString()}`,
       {
         responseType: "blob",
-        headers,
+        headers: {
+          Accept: acceptHeaderForStreamingExport(binaryFormat),
+        },
       },
     );
 
-    if (response.status === 204) {
-      toast.error("No data found for export");
-      return;
-    }
-
-    const contentType = String(response.headers?.["content-type"] ?? "");
-    if (contentType.includes("application/json")) {
-      const text = await response.data.text();
-      const parsed = JSON.parse(text) as ExportJsonPayload;
-      const rows = getRowsFromExportJson(parsed);
-
-      if (!Array.isArray(rows) || rows.length === 0) {
-        const message =
-          parsed?.detail ||
-          parsed?.message ||
-          "No export data found in response.";
-        toast.error(message);
-        throw new Error(message);
-      }
-      const csvUrl = downloadCsvRows(rows);
-
-      toast.success("CSV file downloaded successfully");
-      return csvUrl;
-    }
-
-    // Create blob with appropriate type based on export format
-    const blobType =
-      normalizedExportType === "xlsx"
-        ? "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-        : "application/pdf";
-
-    const blob = new Blob([response.data], { type: blobType });
-    const url = globalThis.URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-
-    // Generate filename with timestamp and appropriate extension
-    const timestamp = buildExportTimestamp();
-    const fileExtension = normalizedExportType === "xlsx" ? "xlsx" : "pdf";
-    link.setAttribute(
-      "download",
-      `call_recordings_${timestamp}.${fileExtension}`,
-    );
-
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    globalThis.URL.revokeObjectURL(url);
-
-    toast.success(
-      `${normalizedExportType.toUpperCase()} file downloaded successfully`,
-    );
-    return url;
+    return await processBlobExportResponse(response, {
+      binaryFormat,
+      downloadBaseName: "call_recordings",
+      successToast: `${normalizedExportType.toUpperCase()} file downloaded successfully`,
+    });
   } catch (error) {
     console.error(`${exportType.toUpperCase()} Download Error:`, error);
     throw error;
@@ -397,80 +429,25 @@ export const DownloadStreamingExport = async (
 export const ExportCallRecordings = async (
   filters: Record<string, unknown>,
 ) => {
-  const headers = {
-    Accept:
-      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel, application/octet-stream, */*",
-  };
-
   try {
     const response = await axiosInstance.post(
       "call-logs/recordings/export",
       filters,
       {
         responseType: "blob",
-        headers,
+        headers: {
+          Accept: acceptHeaderForStreamingExport("xlsx"),
+        },
       },
     );
 
-    if (response.status === 204) {
-      toast.error("No data found for export");
-      return;
-    }
-
-    const contentType = String(response.headers?.["content-type"] ?? "");
-    if (contentType.includes("application/json")) {
-      const text = await response.data.text();
-      const parsed = JSON.parse(text) as ExportJsonPayload;
-      const rows = getRowsFromExportJson(parsed);
-
-      if (!Array.isArray(rows) || rows.length === 0) {
-        const message =
-          parsed?.detail ||
-          parsed?.message ||
-          "No export data found in response.";
-        toast.error(message);
-        throw new Error(message);
-      }
-      const csvUrl = downloadCsvRows(rows);
-
-      toast.success("CSV file downloaded successfully");
-      return csvUrl;
-    }
-
-    const blobType =
-      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
-    const blob = new Blob([response.data], { type: blobType });
-    const url = globalThis.URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    const timestamp = buildExportTimestamp();
-    link.setAttribute("download", `call_recordings_${timestamp}.xlsx`);
-
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    globalThis.URL.revokeObjectURL(url);
-
-    toast.success("XLSX file downloaded successfully");
-    return url;
+    return await processBlobExportResponse(response, {
+      binaryFormat: "xlsx",
+      downloadBaseName: "call_recordings",
+      successToast: "XLSX file downloaded successfully",
+    });
   } catch (error) {
-    const ax = error as AxiosError<Blob>;
-    const data = ax.response?.data;
-    if (data instanceof Blob) {
-      try {
-        const text = await data.text();
-        const parsed = JSON.parse(text) as ExportJsonPayload;
-        const message =
-          parsed?.detail ||
-          parsed?.message ||
-          "Call recordings export failed";
-        toast.error(message);
-      } catch {
-        toast.error("Call recordings export failed");
-      }
-    } else {
-      toast.error("Call recordings export failed");
-    }
+    await toastAxiosBlobError(error, "Call recordings export failed");
     console.error("Call recordings export error:", error);
     throw error;
   }
@@ -518,8 +495,7 @@ export const DownloadCallsExport = async (params: any, endpoint: string) => {
     const queryString = queryParams.toString();
     // Set appropriate headers based on export type
     const headers = {
-      "Accept":
-        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel, application/octet-stream, */*",
+      Accept: acceptHeaderForStreamingExport("xlsx"),
     };
 
     const response = await axiosInstance.get(`${endpoint}?${queryString}`, {
@@ -541,11 +517,7 @@ export const DownloadCallsExport = async (params: any, endpoint: string) => {
     link.href = url;
 
     // Generate filename with timestamp and appropriate extension
-    const timestamp = new Date()
-      .toISOString()
-      .replaceAll(":", "-")
-      .replaceAll(".", "-")
-      .slice(0, -5);
+    const timestamp = buildExportTimestamp();
     const fileExtension = "csv";
     link.setAttribute("download", `calls_export_${timestamp}.${fileExtension}`);
 
