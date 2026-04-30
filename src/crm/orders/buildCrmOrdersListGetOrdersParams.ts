@@ -125,6 +125,7 @@ export function buildCrmOrdersListGetOrdersParams(
   addIfTruthy(params, "fulfillment_status", filters.fulfillment_status);
   addIfTruthy(params, "payment_status", filters.payment_status);
   addIfTruthy(params, "status", filters.status);
+  addIfDefined(params, "high_value", filters.high_value);
   addValueIfPresent(params, "ticket_id", filters.ticket_id);
   addValueIfPresent(params, "deal_id", filters.deal_id);
   addIfTruthy(params, "date_from", filters.date_from);

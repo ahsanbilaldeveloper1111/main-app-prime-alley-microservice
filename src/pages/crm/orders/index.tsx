@@ -155,6 +155,7 @@ const ORDERS_FILTER_RULES = [
   { key: "ticket_id", kind: "present" },
   { key: "deal_id", kind: "present" },
   { key: "status", kind: "truthy" },
+  { key: "high_value", kind: "truthy", trueValue: true },
 ] as const;
 
 function ordersToKanbanColumns(
@@ -1346,10 +1347,12 @@ const CrmOrders = () => { // NOSONAR
 
   // Transform API order data to UI format
   const transformOrderData = (order: any) => {
+    const companyName =
+      order.company || order.deal?.company_name || order.customer_name || "";
     return {
       id: order.id,
       orderNumber: order.order_number || "",
-      customer: order.customer_name || "",
+      customer: companyName,
       customerEmail: order.customer_email || "",
       customerPhone: order.customer_phone || "",
       deal: order.deal?.name || order.deal_id || "",
@@ -1406,7 +1409,7 @@ const CrmOrders = () => { // NOSONAR
       pocName: order.poc_name || order.customer_name || "",
       pocTitle: order.poc_title || "",
       pocPhone: order.poc_phone || "",
-      company: order.company || order.deal?.company_name || "",
+      company: companyName,
       industry: order.industry || order.deal?.industry || "",
       status: order.status || "pending",
       rawData: order, // Keep original data for actions
@@ -1503,6 +1506,28 @@ const CrmOrders = () => { // NOSONAR
     );
   }, [filterCounts]);
 
+  const clearOrdersWidgetFiltersPatch = useMemo(
+    () => ({
+      fulfillment_status: undefined,
+      payment_status: undefined,
+      order_approval_status: undefined,
+      status: undefined,
+      high_value: undefined,
+    }),
+    [],
+  );
+
+  const applyOrdersWidgetFiltersPatch = useCallback(
+    (patch: Record<string, any>) => {
+      if (activeFilter !== "all") {
+        handleFilterChange("all");
+      }
+      handleFiltersChange(patch);
+      setOrdersPagination((prev) => ({ ...prev, currentPage: 1 }));
+    },
+    [activeFilter, handleFilterChange, handleFiltersChange],
+  );
+
   // Define stats cards for GenericTable
   const ordersStatsCards: StatsCardData[] = useMemo(
     () => {
@@ -1518,6 +1543,8 @@ const CrmOrders = () => { // NOSONAR
             text: `${m.total_orders_last_7_days ?? 0} in last 7 days`,
             dotColor: "#6366F1",
           },
+          onClick: () =>
+            applyOrdersWidgetFiltersPatch({ ...clearOrdersWidgetFiltersPatch }),
         },
         {
           title: "High-Value Orders",
@@ -1525,7 +1552,12 @@ const CrmOrders = () => { // NOSONAR
           icon: Calendar,
           iconColor: "#10B981",
           iconBgColor: "#D1FAE5",
-          additionalText: "Client-defined threshold",
+          additionalText: "≥ 5000 AED",
+          onClick: () =>
+            applyOrdersWidgetFiltersPatch({
+              ...clearOrdersWidgetFiltersPatch,
+              high_value: true,
+            }),
         },
         {
           title: "Active Orders",
@@ -1534,6 +1566,11 @@ const CrmOrders = () => { // NOSONAR
           iconColor: "#8B5CF6",
           iconBgColor: "#EDE9FE",
           additionalText: "In progress",
+          onClick: () =>
+            applyOrdersWidgetFiltersPatch({
+              ...clearOrdersWidgetFiltersPatch,
+              fulfillment_status: "in_progress",
+            }),
         },
         {
           title: "Orders under Review",
@@ -1542,6 +1579,11 @@ const CrmOrders = () => { // NOSONAR
           iconColor: "#6366F1",
           iconBgColor: "#EEF2FF",
           additionalText: "Orders paused for review",
+          onClick: () =>
+            applyOrdersWidgetFiltersPatch({
+              ...clearOrdersWidgetFiltersPatch,
+              order_approval_status: "pending",
+            }),
         },
         {
           title: "Completed Orders",
@@ -1553,6 +1595,11 @@ const CrmOrders = () => { // NOSONAR
             text: `${m.completed_orders_last_7_days ?? 0} in last 7 days`,
             dotColor: "#10B981",
           },
+          onClick: () =>
+            applyOrdersWidgetFiltersPatch({
+              ...clearOrdersWidgetFiltersPatch,
+              fulfillment_status: "completed",
+            }),
         },
         {
           title: "Canceled Orders",
@@ -1564,10 +1611,15 @@ const CrmOrders = () => { // NOSONAR
             text: `${m.canceled_orders_last_7_days ?? 0} in last 7 days`,
             dotColor: "#8B5CF6",
           },
+          onClick: () =>
+            applyOrdersWidgetFiltersPatch({
+              ...clearOrdersWidgetFiltersPatch,
+              fulfillment_status: "cancelled",
+            }),
         },
       ];
     },
-    [ordersMetrics],
+    [applyOrdersWidgetFiltersPatch, clearOrdersWidgetFiltersPatch, ordersMetrics],
   );
 
   // Define columns for GenericTable

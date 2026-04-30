@@ -440,9 +440,6 @@ const ConvertLeadToDealModal: React.FC<ConvertLeadToDealModalProps> = ({
         payment_terms_custom: formData.payment_terms_custom || "",
         risk_level: formData.risk_level,
         competitors: formData.competitors || "",
-        quotation_sent: formData.quotation_sent,
-        contract_sent: formData.contract_sent,
-        contract_received: formData.contract_received,
         follow_up_date: formData.follow_up_date || "",
         currency: formData.currency,
         tax_percentage: formData.tax_percentage || "0",
@@ -1093,82 +1090,7 @@ const ConvertLeadToDealModal: React.FC<ConvertLeadToDealModalProps> = ({
                   </>
                   )}
 
-                {/* Negotiation Progress */}
-                <>
-                  <h3 style={sectionHeadingNext}>NEGOTIATION PROGRESS</h3>
-                    <div style={fieldWrap}>
-                      <Form.Check
-                        type="checkbox"
-                        id="quotation_sent"
-                        label={
-                          <span
-                            style={{
-                              fontSize: "14px",
-                              fontWeight: "600",
-                              color: "#141414",
-                            }}
-                          >
-                            Quotation Sent
-                          </span>
-                        }
-                        checked={formData.quotation_sent}
-                        onChange={(e) =>
-                          setFormData({
-                            ...formData,
-                            quotation_sent: e.target.checked,
-                          })
-                        }
-                      />
-                    </div>
-                    <div style={fieldWrap}>
-                      <Form.Check
-                        type="checkbox"
-                        id="contract_sent"
-                        label={
-                          <span
-                            style={{
-                              fontSize: "14px",
-                              fontWeight: "600",
-                              color: "#141414",
-                            }}
-                          >
-                            Contract Sent
-                          </span>
-                        }
-                        checked={formData.contract_sent}
-                        onChange={(e) =>
-                          setFormData({
-                            ...formData,
-                            contract_sent: e.target.checked,
-                          })
-                        }
-                      />
-                    </div>
-                    <div style={fieldWrap}>
-                      <Form.Check
-                        type="checkbox"
-                        id="contract_received"
-                        label={
-                          <span
-                            style={{
-                              fontSize: "14px",
-                              fontWeight: "600",
-                              color: "#141414",
-                            }}
-                          >
-                            Contract Received
-                          </span>
-                        }
-                        checked={formData.contract_received}
-                        onChange={(e) =>
-                          setFormData({
-                            ...formData,
-                            contract_received: e.target.checked,
-                          })
-                        }
-                      />
-                    </div>
-                  </>
+                {/* Negotiation Progress intentionally removed from lead → deal conversion */}
 
                 {/* Estimation Chart – inline grid (match renderCreateDealForm) */}
                 <>

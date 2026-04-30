@@ -11,6 +11,7 @@ import {
   getCampaignById,
   getIndustries,
   getLead,
+  getRelevantDealTemplate,
   getDealTemplates,
   CrmProduct,
   StageData,
@@ -379,22 +380,24 @@ const EditDeal = () => {
           }
         }
 
-        // Extract deal_template from deal response
+        // Extract deal_template from deal response (or resolve relevant default/campaign template).
+        const dealTemplateFieldValues = (deal as any).deal_template_field_values || {};
+        const dealTemplateDataValues = (deal as any).template_data || {};
+        const mergedTemplateValues: Record<string, any> = {
+          ...dealTemplateFieldValues,
+          ...dealTemplateDataValues,
+        };
+
         const dealTemplateData = (deal as any).deal_template;
-        if (dealTemplateData) {
-          setDealTemplate(dealTemplateData);
-          
-          // Load existing template field values from deal (supports both key formats)
-          const dealTemplateFieldValues = (deal as any).deal_template_field_values || {};
-          const dealTemplateDataValues = (deal as any).template_data || {};
-          const mergedTemplateValues: Record<string, any> = {
-            ...dealTemplateFieldValues,
-            ...dealTemplateDataValues,
-          };
+        const resolvedTemplate =
+          dealTemplateData ?? (await getRelevantDealTemplate({ deal_id: Number(id) }));
+
+        if (resolvedTemplate) {
+          setDealTemplate(resolvedTemplate);
           const hydratedTemplateValues: Record<string, any> = {
-            template_name: dealTemplateData.name || "",
+            template_name: resolvedTemplate.name || "",
           };
-          (dealTemplateData.fields || []).forEach((field: DealTemplateField) => {
+          (resolvedTemplate.fields || []).forEach((field: DealTemplateField) => {
             const normalizedFieldKey = normalizeTemplateDataKey(field.field_name);
             hydratedTemplateValues[field.field_name] =
               mergedTemplateValues[field.field_name] ??
@@ -403,6 +406,10 @@ const EditDeal = () => {
           });
           setInitialTemplateFieldValues(hydratedTemplateValues);
           setTemplateFieldsData(hydratedTemplateValues);
+        } else {
+          setDealTemplate(null);
+          setInitialTemplateFieldValues({});
+          setTemplateFieldsData({});
         }
 
         // Set additional data
@@ -539,32 +546,6 @@ const EditDeal = () => {
       }
     }
     return true;
-  };
-
-  const handleTemplateSelectionChange = (templateIdRaw: string) => {
-    if (!templateIdRaw) {
-      setDealTemplate(null);
-      setTemplateFieldsData({});
-      return;
-    }
-
-    const selectedTemplateId = Number(templateIdRaw);
-    const selectedTemplate = availableTemplates.find(
-      (template) => template.id === selectedTemplateId,
-    );
-    if (!selectedTemplate) return;
-
-    setDealTemplate(selectedTemplate);
-    const nextTemplateValues: Record<string, any> = {};
-    nextTemplateValues.template_name = selectedTemplate.name || "";
-    (selectedTemplate.fields || []).forEach((field) => {
-      const normalizedFieldKey = normalizeTemplateDataKey(field.field_name);
-      nextTemplateValues[field.field_name] =
-        initialTemplateFieldValues[field.field_name] ??
-        initialTemplateFieldValues[normalizedFieldKey] ??
-        "";
-    });
-    setTemplateFieldsData(nextTemplateValues);
   };
 
   const validateStep3 = (): boolean => {
@@ -1160,23 +1141,6 @@ const EditDeal = () => {
                       </Badge>
                     )}
                   </div>
-                  <Form.Group className="mb-3">
-                    <Form.Label>Deal Template</Form.Label>
-                    <Form.Select
-                      value={dealTemplate?.id || ""}
-                      onChange={(e) => handleTemplateSelectionChange(e.target.value)}
-                      disabled={loadingTemplateList}
-                    >
-                      <option value="">
-                        {loadingTemplateList ? "Loading templates..." : "Select Deal Template (Optional)"}
-                      </option>
-                      {availableTemplates.map((template) => (
-                        <option key={template.id} value={template.id}>
-                          {template.name}
-                        </option>
-                      ))}
-                    </Form.Select>
-                  </Form.Group>
                   {dealTemplate?.description && (
                     <div className="alert alert-info mb-4">
                       <small>{dealTemplate?.description}</small>
@@ -1424,16 +1388,15 @@ const EditDeal = () => {
                     {extensions?.length > 1 && <Col md={4}>
                       <Form.Group className="mb-3">
                         <Form.Label>Special Discount (%)</Form.Label>
-                        <Form.Control
-                          disabled={extensions?.length <= 1}
-                          type="number"
-                          min="0"
-                          max="100"
-                          step="0.01"
-                          value={formData.special_discount_percentage}
+                        <Form.Select
+                          value={(formData.special_discount_percentage && parseFloat(formData.special_discount_percentage))}
                           onChange={(e) => setFormData({ ...formData, special_discount_percentage: e.target.value })}
-                          placeholder="0"
-                        />
+                        >
+                          <option value="0">0%</option>
+                          <option value="5">5%</option>
+                          <option value="10">10%</option>
+                          <option value="15">15%</option>
+                        </Form.Select>
                       </Form.Group>
                     </Col>}
                   </Row>
@@ -1541,7 +1504,7 @@ const EditDeal = () => {
                         min-width: 140px !important;
                         white-space: nowrap;
                       }
-                      .order-items-table-wrapper tbody tr:hover {
+                      .order-items-table-wrapper tbody tr:hover td {
                         background-color: #f8f9fa;
                       }
                       .order-items-table-wrapper tbody tr:last-child td {

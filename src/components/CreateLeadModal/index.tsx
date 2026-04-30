@@ -40,6 +40,7 @@ import { useRouter } from "next/router";
 
 import {
   createLead,
+  createLeadFollowUp,
   getLead,
   updateLead,
   getStages,
@@ -943,7 +944,29 @@ const CreateLeadModal: React.FC<CreateLeadModalProps> = ({
         if (onSuccess) onSuccess();
         onHide();
       } else {
-        await createLead(payload);
+        const created = await createLead(payload);
+        const followUpDate = String(formData.follow_up_date ?? "").trim();
+        if (followUpDate) {
+          const createdId = Number((created as any)?.id);
+          const ownerExtensionFromForm =
+            formData.user_extension == null ? "" : String(formData.user_extension);
+          const ownerExtension =
+            ownerExtensionFromForm || String((session?.user as any)?.extension ?? "");
+
+          if (Number.isFinite(createdId) && createdId > 0 && ownerExtension) {
+            try {
+              await createLeadFollowUp(createdId, {
+                follow_up_date: followUpDate,
+                follow_up_status: "Pending",
+                communication_channel: "Phone Call",
+                notes: "",
+                user_extension: ownerExtension,
+              });
+            } catch {
+              // createLeadFollowUp surfaces its own toast; do not block lead creation
+            }
+          }
+        }
         if (showSuccessToast) toast.success("Lead created successfully!");
         if (onSuccess) onSuccess();
         if (createAndAddAnotherRef.current) {

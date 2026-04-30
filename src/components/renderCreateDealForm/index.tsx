@@ -10,7 +10,6 @@ import {
   getIndustries,
   getCrmProducts,
   createEstimate,
-  getDealTemplates,
   DealTemplateData,
   DealTemplateField,
   getRelevantDealTemplate,
@@ -495,8 +494,6 @@ export const CreateDealSidebar: React.FC<CreateDealSidebarProps> = ({
   const [showOtherBusinessType, setShowOtherBusinessType] = useState(false);
   const [dealTemplate, setDealTemplate] = useState<DealTemplateData | null>(null);
   const [templateFieldsData, setTemplateFieldsData] = useState<Record<string, string>>({});
-  const [availableTemplates, setAvailableTemplates] = useState<DealTemplateData[]>([]);
-  const [loadingTemplateList, setLoadingTemplateList] = useState(false);
 
   // Revisions (edit mode only)
   const [editEstimates, setEditEstimates] = useState<any[]>([]);
@@ -537,13 +534,11 @@ export const CreateDealSidebar: React.FC<CreateDealSidebarProps> = ({
           hierarchyData,
           businessTypesResponse,
           industriesResponse,
-          dealTemplatesResponse,
         ] = await Promise.all([
           getStages("deal"),
           GetHierarchyData(ModuleSlug.CRM_DEALS),
           getBusinessTypes({ per_page: 1000 }),
           getIndustries({ per_page: 1000 }),
-          getDealTemplates({ per_page: 1000, page: 1 }),
         ]);
         setStages(stagesData || []);
         if (hierarchyData?.extensions) {
@@ -551,14 +546,10 @@ export const CreateDealSidebar: React.FC<CreateDealSidebarProps> = ({
         }
         setBusinessTypes(businessTypesResponse?.data || []);
         setAllIndustries(industriesResponse?.data || []);
-        setAvailableTemplates(dealTemplatesResponse?.data || []);
       } catch (error) {
         console.error("Failed to fetch initial data:", error);
-      } finally {
-        setLoadingTemplateList(false);
       }
     };
-    setLoadingTemplateList(true);
     fetchInitialData();
   }, []);
 
@@ -806,24 +797,6 @@ export const CreateDealSidebar: React.FC<CreateDealSidebarProps> = ({
       }
     }
     return true;
-  };
-
-  const handleTemplateSelectionChange = (templateIdRaw: string) => {
-    if (!templateIdRaw) {
-      setDealTemplate(null);
-      setTemplateFieldsData({});
-      return;
-    }
-
-    const templateId = Number(templateIdRaw);
-    const selected = availableTemplates.find((t) => t.id === templateId);
-    if (!selected) return;
-    setDealTemplate(selected);
-    const nextValues: Record<string, string> = {};
-    (selected.fields || []).forEach((field) => {
-      nextValues[field.field_name] = templateFieldsData[field.field_name] || "";
-    });
-    setTemplateFieldsData(nextValues);
   };
 
   // Line items
@@ -1355,27 +1328,6 @@ export const CreateDealSidebar: React.FC<CreateDealSidebarProps> = ({
               >
                 DEAL CHARACTERISTICS
               </h3>
-
-              {isEditMode && (
-                <div style={fieldWrap}>
-                  {fieldLabel("Deal Template")}
-                  <Form.Select
-                    value={dealTemplate?.id || ""}
-                    onChange={(e) => handleTemplateSelectionChange(e.target.value)}
-                    style={inputStyle}
-                    disabled={loadingTemplateList}
-                  >
-                    <option value="">
-                      {loadingTemplateList ? "Loading templates..." : "Select Deal Template (Optional)"}
-                    </option>
-                    {availableTemplates.map((template) => (
-                      <option key={template.id} value={template.id}>
-                        {template.name}
-                      </option>
-                    ))}
-                  </Form.Select>
-                </div>
-              )}
 
               {dealTemplate && (
                 <Card className="mb-3 border-0 bg-light">

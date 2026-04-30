@@ -60,6 +60,14 @@ export const LEADS_FILTER_RULES = [
   { key: "lead_score_max", kind: "string" },
   { key: "date_from", kind: "truthy" },
   { key: "date_to", kind: "truthy" },
+  // Widget / quick-filter keys (GET /crm/leads supports these for tile drill-downs)
+  { key: "follow_up_date_from", kind: "truthy" },
+  { key: "follow_up_date_to", kind: "truthy" },
+  { key: "meeting_date_from", kind: "truthy" },
+  { key: "meeting_date_to", kind: "truthy" },
+  { key: "overdue", kind: "truthy", trueValue: true },
+  { key: "high_priority", kind: "truthy", trueValue: true },
+  { key: "include_converted", kind: "truthy", trueValue: true },
 ] as const;
 
 export const LEADS_EXPORT_TRUTHY_KEYS = [
@@ -70,6 +78,13 @@ export const LEADS_EXPORT_TRUTHY_KEYS = [
   "search",
   "campaign_id",
   "source",
+  "follow_up_date_from",
+  "follow_up_date_to",
+  "meeting_date_from",
+  "meeting_date_to",
+  "overdue",
+  "high_priority",
+  "include_converted",
 ] as const;
 
 export const LEADS_EXPORT_DEFINED_KEYS = ["include_lost", "include_archived"] as const;

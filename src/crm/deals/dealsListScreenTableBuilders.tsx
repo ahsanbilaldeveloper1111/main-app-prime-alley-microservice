@@ -142,7 +142,7 @@ export function buildDealsListStatsCards(
       icon: Calendar,
       iconColor: "#10B981",
       iconBgColor: "#D1FAE5",
-      additionalText: "Client-defined threshold",
+      additionalText: "≥ 5000 AED",
     },
     {
       title: "At-Risk Deals",

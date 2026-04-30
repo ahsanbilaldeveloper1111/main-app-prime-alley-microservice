@@ -201,6 +201,8 @@ const APPROVAL_FILTER_RULES = [
   ...CRM_BASE_FILTER_RULES,
   { key: "follow_up_date_from", kind: "truthy" },
   { key: "follow_up_date_to", kind: "truthy" },
+  { key: "meeting_date_from", kind: "truthy" },
+  { key: "meeting_date_to", kind: "truthy" },
   { key: "probability_min", kind: "string" },
   { key: "probability_max", kind: "string" },
   { key: "deal_type", kind: "truthy" },
@@ -208,6 +210,11 @@ const APPROVAL_FILTER_RULES = [
   { key: "industry", kind: "truthy" },
   { key: "expected_close_date_from", kind: "truthy" },
   { key: "expected_close_date_to", kind: "truthy" },
+  { key: "is_won", kind: "truthy", trueValue: true },
+  { key: "overdue", kind: "truthy", trueValue: true },
+  { key: "high_value", kind: "truthy", trueValue: true },
+  { key: "at_risk", kind: "truthy", trueValue: true },
+  { key: "reviewed_last_24h", kind: "truthy", trueValue: true },
 ] as const;
 
 const detailSectionTitleStyle: React.CSSProperties = {
@@ -3778,10 +3785,169 @@ export function CrmDealsListScreenView({
     );
   }, [filterCounts]);
 
-  const dealsStatsCards: StatsCardData[] = useMemo(
-    () => buildDealsListStatsCards(dealsMetrics, isApprovalsList),
-    [dealsMetrics, isApprovalsList],
+  const clearDealsWidgetFiltersPatch = useMemo(
+    () => ({
+      follow_up_date_from: undefined,
+      follow_up_date_to: undefined,
+      meeting_date_from: undefined,
+      meeting_date_to: undefined,
+      expected_close_date_from: undefined,
+      expected_close_date_to: undefined,
+      is_won: undefined,
+      overdue: undefined,
+      high_value: undefined,
+      at_risk: undefined,
+      reviewed_last_24h: undefined,
+      approval_status: undefined,
+    }),
+    [],
   );
+
+  const applyDealsWidgetFiltersPatch = useCallback(
+    (patch: Record<string, any>) => {
+      if (activeFilter !== "all") {
+        handleFilterChange("all");
+      }
+      handleFiltersChange(patch);
+      setDealsPagination((prev) => ({ ...prev, currentPage: 1 }));
+    },
+    [activeFilter, handleFilterChange, handleFiltersChange],
+  );
+
+  const dealsStatsCards: StatsCardData[] = useMemo(() => {
+    const base = buildDealsListStatsCards(dealsMetrics, isApprovalsList);
+    const today = moment().format("YYYY-MM-DD");
+
+    return base.map((card) => {
+      if (isApprovalsList) {
+        if (card.title === "All deals submitted") {
+          return {
+            ...card,
+            onClick: () =>
+              applyDealsWidgetFiltersPatch({ ...clearDealsWidgetFiltersPatch }),
+          };
+        }
+        if (card.title === "Pending Approval") {
+          return {
+            ...card,
+            onClick: () =>
+              applyDealsWidgetFiltersPatch({
+                ...clearDealsWidgetFiltersPatch,
+                approval_status: "pending",
+              }),
+          };
+        }
+        if (card.title === "Approved Deals") {
+          return {
+            ...card,
+            onClick: () =>
+              applyDealsWidgetFiltersPatch({
+                ...clearDealsWidgetFiltersPatch,
+                approval_status: "approved",
+              }),
+          };
+        }
+        if (card.title === "Rejected Deals") {
+          return {
+            ...card,
+            onClick: () =>
+              applyDealsWidgetFiltersPatch({
+                ...clearDealsWidgetFiltersPatch,
+                approval_status: "rejected",
+              }),
+          };
+        }
+        if (card.title === "High-Value (Pending)") {
+          return {
+            ...card,
+            onClick: () =>
+              applyDealsWidgetFiltersPatch({
+                ...clearDealsWidgetFiltersPatch,
+                approval_status: "pending",
+                high_value: true,
+              }),
+          };
+        }
+        if (card.title === "Recently Reviewed") {
+          return {
+            ...card,
+            onClick: () =>
+              applyDealsWidgetFiltersPatch({
+                ...clearDealsWidgetFiltersPatch,
+                reviewed_last_24h: true,
+              }),
+          };
+        }
+        return card;
+      }
+
+      if (card.title === "All Deals") {
+        return {
+          ...card,
+          onClick: () =>
+            applyDealsWidgetFiltersPatch({ ...clearDealsWidgetFiltersPatch }),
+        };
+      }
+      if (card.title === "High-Value Deals") {
+        return {
+          ...card,
+          onClick: () =>
+            applyDealsWidgetFiltersPatch({
+              ...clearDealsWidgetFiltersPatch,
+              high_value: true,
+            }),
+        };
+      }
+      if (card.title === "At-Risk Deals") {
+        return {
+          ...card,
+          onClick: () =>
+            applyDealsWidgetFiltersPatch({
+              ...clearDealsWidgetFiltersPatch,
+              at_risk: true,
+            }),
+        };
+      }
+      if (card.title === "Deals Won") {
+        return {
+          ...card,
+          onClick: () =>
+            applyDealsWidgetFiltersPatch({
+              ...clearDealsWidgetFiltersPatch,
+              is_won: true,
+            }),
+        };
+      }
+      if (card.title === "Today's Follow-ups") {
+        return {
+          ...card,
+          onClick: () =>
+            applyDealsWidgetFiltersPatch({
+              ...clearDealsWidgetFiltersPatch,
+              follow_up_date_from: today,
+              follow_up_date_to: today,
+            }),
+        };
+      }
+      if (card.title === "Overdue") {
+        return {
+          ...card,
+          onClick: () =>
+            applyDealsWidgetFiltersPatch({
+              ...clearDealsWidgetFiltersPatch,
+              overdue: true,
+            }),
+        };
+      }
+      return card;
+    });
+  }, [
+    dealsMetrics,
+    isApprovalsList,
+    activeFilter,
+    applyDealsWidgetFiltersPatch,
+    clearDealsWidgetFiltersPatch,
+  ]);
 
   const dealsColumns: TableColumn<any>[] = useMemo(
     () => buildDealsListTableColumns(isApprovalsList),

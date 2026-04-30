@@ -552,6 +552,14 @@ export function useCrmLeadsPageModel() {
         "lead_score_max",
         "date_from",
         "date_to",
+        // Widget / quick-filter keys (tile drill-down)
+        "follow_up_date_from",
+        "follow_up_date_to",
+        "meeting_date_from",
+        "meeting_date_to",
+        "overdue",
+        "high_priority",
+        "include_converted",
       ] as const;
       truthyFilterKeys.forEach((key) => {
         if (filters[key]) {
@@ -733,6 +741,14 @@ export function useCrmLeadsPageModel() {
     delete baseFilters.stage_id;
     delete baseFilters.include_lost;
     delete baseFilters.include_archived;
+    // Exclude widget-only keys so "All" totals stay stable when drilling down from tiles.
+    delete baseFilters.follow_up_date_from;
+    delete baseFilters.follow_up_date_to;
+    delete baseFilters.meeting_date_from;
+    delete baseFilters.meeting_date_to;
+    delete baseFilters.overdue;
+    delete baseFilters.high_priority;
+    delete baseFilters.include_converted;
     return baseFilters;
   }, [currentFilters]);
 
@@ -835,6 +851,74 @@ export function useCrmLeadsPageModel() {
     setCurrentFilters((prev) => applyCrmFilterRules(prev, filters, LEADS_FILTER_RULES));
     setRefreshKey((prev) => prev + 1);
   }, []);
+
+  const clearLeadsWidgetFiltersPatch = useMemo(
+    () => ({
+      follow_up_date_from: undefined,
+      follow_up_date_to: undefined,
+      meeting_date_from: undefined,
+      meeting_date_to: undefined,
+      overdue: undefined,
+      high_priority: undefined,
+      include_converted: undefined,
+    }),
+    [],
+  );
+
+  const applyLeadsWidgetFiltersPatch = useCallback(
+    (patch: Record<string, any>) => {
+      // Drill-down widgets should not force a stage/lost/deleted tab.
+      if (activeFilter !== "all") {
+        handleFilterChange("all");
+      }
+      handleFiltersChange(patch);
+      setLeadsPagination((prev) => ({ ...prev, currentPage: 1 }));
+    },
+    [activeFilter, handleFilterChange, handleFiltersChange],
+  );
+
+  const handleLeadsAllMetricClick = useCallback(() => {
+    applyLeadsWidgetFiltersPatch({ ...clearLeadsWidgetFiltersPatch });
+  }, [applyLeadsWidgetFiltersPatch, clearLeadsWidgetFiltersPatch]);
+
+  const handleLeadsTodaysFollowUpsMetricClick = useCallback(() => {
+    const today = moment().format("YYYY-MM-DD");
+    applyLeadsWidgetFiltersPatch({
+      ...clearLeadsWidgetFiltersPatch,
+      follow_up_date_from: today,
+      follow_up_date_to: today,
+    });
+  }, [applyLeadsWidgetFiltersPatch, clearLeadsWidgetFiltersPatch]);
+
+  const handleLeadsTodaysMeetingsMetricClick = useCallback(() => {
+    const today = moment().format("YYYY-MM-DD");
+    applyLeadsWidgetFiltersPatch({
+      ...clearLeadsWidgetFiltersPatch,
+      meeting_date_from: today,
+      meeting_date_to: today,
+    });
+  }, [applyLeadsWidgetFiltersPatch, clearLeadsWidgetFiltersPatch]);
+
+  const handleLeadsOverdueMetricClick = useCallback(() => {
+    applyLeadsWidgetFiltersPatch({
+      ...clearLeadsWidgetFiltersPatch,
+      overdue: true,
+    });
+  }, [applyLeadsWidgetFiltersPatch, clearLeadsWidgetFiltersPatch]);
+
+  const handleLeadsHighPriorityMetricClick = useCallback(() => {
+    applyLeadsWidgetFiltersPatch({
+      ...clearLeadsWidgetFiltersPatch,
+      high_priority: true,
+    });
+  }, [applyLeadsWidgetFiltersPatch, clearLeadsWidgetFiltersPatch]);
+
+  const handleLeadsConvertedMetricClick = useCallback(() => {
+    applyLeadsWidgetFiltersPatch({
+      ...clearLeadsWidgetFiltersPatch,
+      include_converted: true,
+    });
+  }, [applyLeadsWidgetFiltersPatch, clearLeadsWidgetFiltersPatch]);
 
   // Build API params from filters for export (Leads list API accepted params)
   const buildLeadsExportParams = useCallback(
@@ -2090,10 +2174,12 @@ export function useCrmLeadsPageModel() {
       const todaysMeetings = m.todays_meetings ?? 0;
       const overdueMeetings = m.overdue_meetings ?? 0;
       const overdueMeetingsPlural = overdueMeetings === 1 ? "" : "s";
+      const allLeadsBaseline =
+        tabTotals.all ?? summaryTiles?.total_leads ?? m.total_leads ?? 0;
       return [
         {
           title: "All Leads",
-          value: m.total_leads ?? 0,
+          value: allLeadsBaseline,
           icon: Users,
           iconColor: "#6366F1",
           iconBgColor: "#EEF2FF",
@@ -2101,6 +2187,7 @@ export function useCrmLeadsPageModel() {
             text: `${m.total_leads_last_7_days ?? 0} in last 7 days`,
             dotColor: "#6366F1",
           },
+          onClick: handleLeadsAllMetricClick,
         },
         {
           title: "Today's Follow-ups",
@@ -2112,6 +2199,7 @@ export function useCrmLeadsPageModel() {
             text: `${m.follow_ups_next_hour ?? 0} in next hour`,
             dotColor: "#F59E0B",
           },
+          onClick: handleLeadsTodaysFollowUpsMetricClick,
         },
         {
           title: "Today's Meetings",
@@ -2123,6 +2211,7 @@ export function useCrmLeadsPageModel() {
             text: `${m.meetings_next_hour ?? 0} in next hour`,
             dotColor: "#F59E0B",
           },
+          onClick: handleLeadsTodaysMeetingsMetricClick,
         },
         {
           title: "Overdue",
@@ -2134,6 +2223,7 @@ export function useCrmLeadsPageModel() {
             text: `${m.overdue_follow_ups ?? 0} Follow-ups / ${overdueMeetings} Meeting${overdueMeetingsPlural}`,
             dotColor: "#F97316",
           },
+          onClick: handleLeadsOverdueMetricClick,
         },
         {
           title: "High-Priority Leads",
@@ -2142,6 +2232,7 @@ export function useCrmLeadsPageModel() {
           iconColor: "#10B981",
           iconBgColor: "#D1FAE5",
           additionalText: "Leads with hot potential & high probability",
+          onClick: handleLeadsHighPriorityMetricClick,
         },
         {
           title: "Converted Leads",
@@ -2153,10 +2244,21 @@ export function useCrmLeadsPageModel() {
             text: `${m.converted_leads_last_7_days ?? 0} in last 7 days`,
             dotColor: "#8B5CF6",
           },
+          onClick: handleLeadsConvertedMetricClick,
         },
       ];
     },
-    [leadMetrics],
+    [
+      leadMetrics,
+      handleLeadsAllMetricClick,
+      handleLeadsConvertedMetricClick,
+      handleLeadsHighPriorityMetricClick,
+      handleLeadsOverdueMetricClick,
+      handleLeadsTodaysFollowUpsMetricClick,
+      handleLeadsTodaysMeetingsMetricClick,
+      summaryTiles?.total_leads,
+      tabTotals.all,
+    ],
   );
 
   // Transform leads data (no client-side filtering - API handles it)

@@ -157,6 +157,15 @@ export function mergeDealsSidebarFiltersIntoCurrent(
   mergeBooleanFlagOrDelete(next, filters, "has_meetings");
   mergeUserExtensions(next, filters);
 
+  // Widget / quick-filter flags (not part of the sidebar UI yet)
+  mergeBooleanFlagOrDelete(next, filters, "is_won");
+  mergeBooleanFlagOrDelete(next, filters, "overdue");
+  mergeBooleanFlagOrDelete(next, filters, "high_value");
+  mergeBooleanFlagOrDelete(next, filters, "at_risk");
+  mergeBooleanFlagOrDelete(next, filters, "reviewed_last_24h");
+  mergeTruthyOrDelete(next, filters, "meeting_date_from", false);
+  mergeTruthyOrDelete(next, filters, "meeting_date_to", false);
+
   return next;
 }
 

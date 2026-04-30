@@ -96,6 +96,9 @@ export function applyDealsListApiFilters(
   addIfTruthyParam(params, "follow_up_date_from", filters.follow_up_date_from);
   addIfTruthyParam(params, "follow_up_date_to", filters.follow_up_date_to);
 
+  addIfTruthyParam(params, "meeting_date_from", filters.meeting_date_from);
+  addIfTruthyParam(params, "meeting_date_to", filters.meeting_date_to);
+
   addIfTruthyParam(params, "created_at_from", filters.created_at_from);
   addIfTruthyParam(params, "created_at_to", filters.created_at_to);
   addIfTruthyParam(params, "created_at_month", filters.created_at_month);
@@ -105,6 +108,12 @@ export function applyDealsListApiFilters(
   addIfDefinedParam(params, "has_meetings", filters.has_meetings);
 
   addIfDefinedParam(params, "is_lost", filters.is_lost);
+
+  addIfDefinedParam(params, "is_won", filters.is_won);
+  addIfDefinedParam(params, "overdue", filters.overdue);
+  addIfDefinedParam(params, "high_value", filters.high_value);
+  addIfDefinedParam(params, "at_risk", filters.at_risk);
+  addIfDefinedParam(params, "reviewed_last_24h", filters.reviewed_last_24h);
 
   addIfTruthyParam(params, "approval_status", filters.approval_status);
 

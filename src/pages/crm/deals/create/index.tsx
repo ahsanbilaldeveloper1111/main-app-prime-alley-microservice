@@ -1211,15 +1211,15 @@ const CreateDeal = () => {
                     {extensions?.length > 1 && <Col md={4}>
                       <Form.Group className="mb-3">
                         <Form.Label>Special Discount (%)</Form.Label>
-                        <Form.Control
-                          type="number"
-                          min="0"
-                          max="100"
-                          step="0.01"
-                          value={formData.special_discount_percentage}
+                        <Form.Select
+                          value={(formData.special_discount_percentage && parseFloat(formData.special_discount_percentage))}
                           onChange={(e) => setFormData({ ...formData, special_discount_percentage: e.target.value })}
-                          placeholder="0"
-                        />
+                        >
+                          <option value="0">0%</option>
+                          <option value="5">5%</option>
+                          <option value="10">10%</option>
+                          <option value="15">15%</option>
+                        </Form.Select>
                       </Form.Group>
                     </Col>}
                   </Row>
@@ -1319,7 +1319,7 @@ const CreateDeal = () => {
                         min-width: 140px !important;
                         white-space: nowrap;
                       }
-                      .order-items-table-wrapper tbody tr:hover {
+                      .order-items-table-wrapper tbody tr:hover td {
                         background-color: #f8f9fa;
                       }
                       .order-items-table-wrapper tbody tr:last-child td {

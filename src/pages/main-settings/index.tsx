@@ -1115,7 +1115,7 @@ const AccountDefaultsPage: React.FC<ControlledTabsProps> = ({ activeTab: routeAc
   useEffect(() => {
     const next = resolveAllowedActiveTabId(routeActiveTab, activeTab, allowedTabs)
     if (next !== activeTab) setActiveTab(next)
-  }, [routeActiveTab, activeTab, allowedTabs])
+  }, [routeActiveTab, activeTab, allowedTabs, onTabChange])
 
   const tabContentMap: Record<string, React.ReactNode> = {
     general: <GeneralTabContent />,
@@ -1308,6 +1308,10 @@ const SmartCrmPage: React.FC<ControlledTabsProps> = ({ activeTab: routeActiveTab
   useEffect(() => {
     const next = resolveAllowedActiveTabId(routeActiveTab, activeTab, allowedTabs)
     if (next !== activeTab) setActiveTab(next)
+    // If the URL requests an invalid / disallowed tab, correct the route to the resolved tab.
+    if (next && next !== routeActiveTab) {
+      onTabChange?.(next)
+    }
   }, [routeActiveTab, activeTab, allowedTabs])
 
   const tabContentMap: Record<string, React.ReactNode> = {

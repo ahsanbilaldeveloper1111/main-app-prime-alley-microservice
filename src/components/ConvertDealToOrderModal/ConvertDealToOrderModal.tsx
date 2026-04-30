@@ -103,9 +103,7 @@ const ConvertDealToOrderModal: React.FC<ConvertDealToOrderModalProps> = ({
     company_domain: "",
     customer_phone: "",
     customer_phone_country_code: "",
-    customer_address: "",
     order_date: new Date().toISOString().split("T")[0],
-    expected_delivery_date: "",
     order_stage_id: undefined as number | undefined,
     notes: "",
     tax_percentage: "0",
@@ -113,9 +111,6 @@ const ConvertDealToOrderModal: React.FC<ConvertDealToOrderModalProps> = ({
     special_discount_percentage: "0",
     currency: "AED",
     industry: "",
-    order_approval_status: "",
-    fulfillment_status: "",
-    payment_status: "",
     items: [] as OrderItem[],
   });
 
@@ -206,9 +201,7 @@ const ConvertDealToOrderModal: React.FC<ConvertDealToOrderModalProps> = ({
         company_domain: dealAny.company?.domain || "",
         customer_phone: phoneNumber,
         customer_phone_country_code: phoneCountryCode,
-        customer_address: dealAny.customer_address ?? dealAny.company_address ?? "",
         order_date: new Date().toISOString().split("T")[0],
-        expected_delivery_date: prev.expected_delivery_date || "",
         currency: dealData.currency || "AED",
         industry: dealData.industry || "",
         tax_percentage: latestEstimate?.tax_percentage != null ? String(latestEstimate.tax_percentage) : "0",
@@ -400,9 +393,7 @@ const ConvertDealToOrderModal: React.FC<ConvertDealToOrderModalProps> = ({
       payload.append("company_email", formData.company_email);
       payload.append("company_domain", formData.company_domain || "");
       payload.append("customer_phone", formattedPhone);
-      payload.append("customer_address", formData.customer_address || "");
       payload.append("order_date", formData.order_date);
-      payload.append("expected_delivery_date", formData.expected_delivery_date || "");
       payload.append("order_stage_id", String(formData.order_stage_id));
       payload.append("notes", formData.notes || "");
       payload.append("tax_amount", totals.taxAmount.toFixed(2));
@@ -411,9 +402,6 @@ const ConvertDealToOrderModal: React.FC<ConvertDealToOrderModalProps> = ({
       payload.append("final_amount", totals.netValue.toFixed(2));
       payload.append("currency", formData.currency);
       payload.append("industry", formData.industry || "");
-      payload.append("order_approval_status", formData.order_approval_status || "");
-      payload.append("fulfillment_status", formData.fulfillment_status || "");
-      payload.append("payment_status", formData.payment_status || "");
       payload.append("items", JSON.stringify(itemsPayload));
       payload.append("deal_id", String(dealId));
       if (contractDocument) payload.append("creation_attachment", contractDocument);
@@ -439,9 +427,7 @@ const ConvertDealToOrderModal: React.FC<ConvertDealToOrderModalProps> = ({
       company_domain: "",
       customer_phone: "",
       customer_phone_country_code: "",
-      customer_address: "",
       order_date: new Date().toISOString().split("T")[0],
-      expected_delivery_date: "",
       order_stage_id: undefined,
       notes: "",
       tax_percentage: "0",
@@ -449,9 +435,6 @@ const ConvertDealToOrderModal: React.FC<ConvertDealToOrderModalProps> = ({
       special_discount_percentage: "0",
       currency: "AED",
       industry: "",
-      order_approval_status: "",
-      fulfillment_status: "",
-      payment_status: "",
       items: [],
     });
     setSourceDeal(null);
@@ -556,8 +539,9 @@ const ConvertDealToOrderModal: React.FC<ConvertDealToOrderModalProps> = ({
                 <>
                   <div style={{ ...fieldWrap, padding: "12px", background: "#f0f9ff", borderRadius: "8px", border: "1px solid #bae6fd" }}>
                     <div style={{ fontSize: "13px", color: "#0c4a6e", marginBottom: "8px" }}>
-                      <strong>Deal:</strong> {sourceDeal.name}
-                      {sourceDeal.company_name ? ` • ${sourceDeal.company_name}` : null}
+                      <strong>Company:</strong>{" "}
+                      {sourceDeal.company_name || (sourceDeal as any).company?.name || "—"}
+                      {sourceDeal.name ? ` • Deal: ${sourceDeal.name}` : null}
                       {sourceDeal.id != null ? ` • #${sourceDeal.id}` : null}
                     </div>
                     {sourceDeal.estimates && sourceDeal.estimates.length > 1 && (
@@ -677,39 +661,12 @@ const ConvertDealToOrderModal: React.FC<ConvertDealToOrderModalProps> = ({
                 />
               </div>
               <div style={fieldWrap}>
-                {fieldLabel("Company Address")}
-                <input
-                  type="text"
-                  value={formData.customer_address}
-                  onChange={(e) =>
-                    setFormData({ ...formData, customer_address: e.target.value })
-                  }
-                  style={inputStyle}
-                  onFocus={focusStyle}
-                  onBlur={blurStyle}
-                  placeholder="Enter address"
-                />
-              </div>
-              <div style={fieldWrap}>
                 {fieldLabel("Order Date", true)}
                 <input
                   type="date"
                   value={formData.order_date}
                   onChange={(e) =>
                     setFormData({ ...formData, order_date: e.target.value })
-                  }
-                  style={inputStyle}
-                  onFocus={focusStyle}
-                  onBlur={blurStyle}
-                />
-              </div>
-              <div style={fieldWrap}>
-                {fieldLabel("Expected Delivery Date")}
-                <input
-                  type="date"
-                  value={formData.expected_delivery_date}
-                  onChange={(e) =>
-                    setFormData({ ...formData, expected_delivery_date: e.target.value })
                   }
                   style={inputStyle}
                   onFocus={focusStyle}
@@ -762,54 +719,6 @@ const ConvertDealToOrderModal: React.FC<ConvertDealToOrderModalProps> = ({
                   <option value="Retail">Retail</option>
                   <option value="Office">Office</option>
                   <option value="Mixed-use">Mixed-use</option>
-                </select>
-              </div>
-              <div style={fieldWrap}>
-                {fieldLabel("Order Approval Status")}
-                <select
-                  value={formData.order_approval_status}
-                  onChange={(e) =>
-                    setFormData({ ...formData, order_approval_status: e.target.value })
-                  }
-                  style={inputStyle}
-                >
-                  <option value="">Not Set</option>
-                  <option value="pending">Pending</option>
-                  <option value="approved">Approved</option>
-                  <option value="rejected">Rejected</option>
-                </select>
-              </div>
-              <div style={fieldWrap}>
-                {fieldLabel("Fulfillment Status")}
-                <select
-                  value={formData.fulfillment_status}
-                  onChange={(e) =>
-                    setFormData({ ...formData, fulfillment_status: e.target.value })
-                  }
-                  style={inputStyle}
-                >
-                  <option value="">Not Set</option>
-                  <option value="pending">Pending</option>
-                  <option value="in_progress">In Progress</option>
-                  <option value="completed">Completed</option>
-                  <option value="delivered">Delivered</option>
-                  <option value="cancelled">Cancelled</option>
-                </select>
-              </div>
-              <div style={fieldWrap}>
-                {fieldLabel("Payment Status")}
-                <select
-                  value={formData.payment_status}
-                  onChange={(e) =>
-                    setFormData({ ...formData, payment_status: e.target.value })
-                  }
-                  style={inputStyle}
-                >
-                  <option value="">Not Set</option>
-                  <option value="unpaid">Unpaid</option>
-                  <option value="partial">Partial</option>
-                  <option value="paid">Paid</option>
-                  <option value="refunded">Refunded</option>
                 </select>
               </div>
               <div style={fieldWrap}>

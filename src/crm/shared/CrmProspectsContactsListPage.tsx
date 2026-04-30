@@ -359,6 +359,23 @@ export function CrmProspectsContactsListPage({
     seedNewContactForm,
   });
 
+  // When users drill into "Converted Prospects" via widget click, ensure the active
+  // `has_leads` tab exists so the toolbar shows the correct label.
+  useEffect(() => {
+    if (activeFilter !== "has_leads") return;
+    setCustomTabs((prev) => {
+      if (prev.some((t) => t.id === "has_leads")) return prev;
+      return [
+        ...prev,
+        {
+          id: "has_leads",
+          label: config.stats.convertedCardTitle,
+          removable: true,
+        },
+      ];
+    });
+  }, [activeFilter, config.stats.convertedCardTitle, setCustomTabs]);
+
   const prospectsCalculateEntryCounts = useCallback(async () => {
     return fetchCrmProspectsEntryCountsForFilters(assignmentFilters);
   }, [assignmentFilters]);
@@ -518,15 +535,47 @@ export function CrmProspectsContactsListPage({
     setRefreshKey,
   ]);
 
+  const clearProspectsWidgetFiltersPatch = useMemo(
+    () => ({
+      scheduled_call_from: undefined,
+      scheduled_call_to: undefined,
+      scheduled_call_status: undefined,
+      last_called_at_from: undefined,
+      last_called_at_to: undefined,
+      has_tickets: undefined,
+    }),
+    [],
+  );
+
+  /** Prospects: All prospects metric → All tab + clear widget filters. */
+  const handleProspectAllMetricClick = useCallback(() => {
+    if (config.operationsEntityName !== "prospects") return;
+    handleFilterChange("all");
+    applyTableFiltersPatch({
+      ...clearProspectsWidgetFiltersPatch,
+      has_scheduled_calls: undefined,
+    });
+  }, [
+    applyTableFiltersPatch,
+    clearProspectsWidgetFiltersPatch,
+    config.operationsEntityName,
+    handleFilterChange,
+  ]);
+
   /** Prospects only: Overdue metric switches to Scheduled tab + API overdue filter. */
   const handleProspectOverdueMetricClick = useCallback(() => {
     if (config.operationsEntityName !== "prospects") {
       return;
     }
     handleFilterChange("scheduled");
-    applyTableFiltersPatch({ scheduled_call_status: "overdue" });
+    applyTableFiltersPatch({
+      ...clearProspectsWidgetFiltersPatch,
+      // Backend accepts ISO (scheduleCall uses ISO) so we can filter precisely.
+      scheduled_call_to: new Date().toISOString(),
+    });
   }, [
     applyTableFiltersPatch,
+    clearProspectsWidgetFiltersPatch,
     config.operationsEntityName,
     handleFilterChange,
   ]);
@@ -537,9 +586,13 @@ export function CrmProspectsContactsListPage({
       return;
     }
     handleFilterChange("scheduled");
-    applyTableFiltersPatch({ scheduled_call_status: undefined });
+    applyTableFiltersPatch({
+      ...clearProspectsWidgetFiltersPatch,
+      scheduled_call_from: new Date().toISOString(),
+    });
   }, [
     applyTableFiltersPatch,
+    clearProspectsWidgetFiltersPatch,
     config.operationsEntityName,
     handleFilterChange,
   ]);
@@ -550,9 +603,47 @@ export function CrmProspectsContactsListPage({
       return;
     }
     handleFilterChange("has_leads");
-    applyTableFiltersPatch({ scheduled_call_status: undefined });
+    applyTableFiltersPatch({
+      ...clearProspectsWidgetFiltersPatch,
+      has_scheduled_calls: undefined,
+    });
   }, [
     applyTableFiltersPatch,
+    clearProspectsWidgetFiltersPatch,
+    config.operationsEntityName,
+    handleFilterChange,
+  ]);
+
+  /** Prospects: Recently contacted metric → All tab + last activity filter (last 24h). */
+  const handleProspectRecentlyContactedMetricClick = useCallback(() => {
+    if (config.operationsEntityName !== "prospects") return;
+    const nowIso = new Date().toISOString();
+    const fromIso = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+    handleFilterChange("all");
+    applyTableFiltersPatch({
+      ...clearProspectsWidgetFiltersPatch,
+      has_scheduled_calls: undefined,
+      last_called_at_from: fromIso,
+      last_called_at_to: nowIso,
+    });
+  }, [
+    applyTableFiltersPatch,
+    clearProspectsWidgetFiltersPatch,
+    config.operationsEntityName,
+    handleFilterChange,
+  ]);
+
+  /** Prospects: Not contacted metric → All tab + explicit has_scheduled_calls=false (supported by API). */
+  const handleProspectNotContactedMetricClick = useCallback(() => {
+    if (config.operationsEntityName !== "prospects") return;
+    handleFilterChange("all");
+    applyTableFiltersPatch({
+      ...clearProspectsWidgetFiltersPatch,
+      has_scheduled_calls: false,
+    });
+  }, [
+    applyTableFiltersPatch,
+    clearProspectsWidgetFiltersPatch,
     config.operationsEntityName,
     handleFilterChange,
   ]);
@@ -754,11 +845,14 @@ export function CrmProspectsContactsListPage({
     () => [
       {
         title: config.stats.allCardTitle,
-        value: metrics.total_all_records ?? 0,
+        value: totalAllProspects ?? 0,
         icon: Users,
         iconColor: "#6366F1",
         iconBgColor: "#EEF2FF",
         subtitle: config.stats.subtitleAssignedUnassigned(metrics),
+        ...(config.operationsEntityName === "prospects"
+          ? { onClick: handleProspectAllMetricClick }
+          : {}),
       },
       {
         title: "Upcoming",
@@ -812,6 +906,9 @@ export function CrmProspectsContactsListPage({
           text: "In last 24 hrs",
           dotColor: "#0EA5E9",
         },
+        ...(config.operationsEntityName === "prospects"
+          ? { onClick: handleProspectRecentlyContactedMetricClick }
+          : {}),
       },
       {
         title: "Not Contacted",
@@ -823,15 +920,22 @@ export function CrmProspectsContactsListPage({
           text: "No call attempt has occurred yet.",
           dotColor: "#94A3B8",
         },
+        ...(config.operationsEntityName === "prospects"
+          ? { onClick: handleProspectNotContactedMetricClick }
+          : {}),
       },
     ],
     [
       config.operationsEntityName,
       config.stats,
+      handleProspectAllMetricClick,
       handleProspectOverdueMetricClick,
       handleProspectUpcomingMetricClick,
       handleProspectConvertedMetricClick,
+      handleProspectRecentlyContactedMetricClick,
+      handleProspectNotContactedMetricClick,
       metrics,
+      totalAllProspects,
     ],
   );
 
