@@ -294,8 +294,6 @@ function validateFormAndToast(form: CreateBotPayload): boolean {
 
 function buildUpdatePayload(form: CreateBotPayload): UpdateBotPayload {
   const c = form.configuration ?? defaultConfig;
-  const num = (v: unknown, def: number, parse: (s: string) => number) =>
-    typeof v === "number" && !Number.isNaN(v) ? v : parse(String(v)) || def;
   const companyId = String(form.company_id ?? "").trim();
   return {
     company_id: companyId,
@@ -489,6 +487,23 @@ function mapVisibleStatusTabsForToolbar(
   );
 }
 
+function extractSettings(config: Record<string, unknown>) {
+  const {
+    voice_settings = {},
+    llm_settings = {},
+    behavior_settings = {},
+    sip_settings = {},
+  } = config;
+
+  // Return as records, you can add additional typing if needed
+  return {
+    voice: voice_settings as Record<string, unknown>,
+    llm: llm_settings as Record<string, unknown>,
+    behavior: behavior_settings as Record<string, unknown>,
+    sip: sip_settings as Record<string, unknown>,
+  };
+}
+
 /** Renders version configuration_snapshot (API shape: instructions, knowledge_base, voice_settings, llm_settings, behavior_settings, sip_settings) */
 const VersionConfigSnapshot = ({
   config,
@@ -497,10 +512,7 @@ const VersionConfigSnapshot = ({
 }) => {
   const v = (o: Record<string, unknown> | undefined, k: string) =>
     safeDisplayString(o?.[k]);
-  const voice = (config.voice_settings ?? {}) as Record<string, unknown>;
-  const llm = (config.llm_settings ?? {}) as Record<string, unknown>;
-  const behavior = (config.behavior_settings ?? {}) as Record<string, unknown>;
-  const sip = (config.sip_settings ?? {}) as Record<string, unknown>;
+  const { voice, llm, behavior, sip } = extractSettings(config);
   return (
     <div className="" style={{ maxHeight: "320px", overflow: "auto" }}>
       <table className="table table-bordered mb-2">
