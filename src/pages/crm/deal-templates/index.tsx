@@ -7,9 +7,11 @@ import {
   createDealTemplate,
   updateDealTemplate,
   deleteDealTemplate,
+  getIndustries,
   DealTemplateData,
   CreateDealTemplatePayload,
   UpdateDealTemplatePayload,
+  IndustryData,
 } from "@utils/crm";
 import { reportApiErrorFromCatch } from "@utils/sentryLogger";
 import GenericTable, {
@@ -135,6 +137,7 @@ const DealTemplatesPage = () => {
   const [templates, setTemplates] = useState<DealTemplateData[]>([]);
   const [totalTemplates, setTotalTemplates] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [industries, setIndustries] = useState<IndustryData[]>([]);
   const {
     pagination,
     setPagination,
@@ -197,6 +200,22 @@ const DealTemplatesPage = () => {
   useEffect(() => {
     fetchTemplates();
   }, [fetchTemplates]);
+
+  useEffect(() => {
+    let cancelled = false;
+    getIndustries({ per_page: 1000, page: 1 })
+      .then((res) => {
+        if (cancelled) return;
+        setIndustries(res?.data || []);
+      })
+      .catch((error: unknown) => {
+        consumeHandledApiError(error, "DealTemplates.fetchIndustries");
+        setIndustries([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     setPagination((prev) =>
@@ -346,6 +365,7 @@ const DealTemplatesPage = () => {
 
       if (editingTemplate) {
         const updatePayload: UpdateDealTemplatePayload & { is_default?: string } = {
+          industry_id: formData.industry_id ?? undefined,
           name: formData.name.trim(),
           description: formData.description.trim() || undefined,
           fields: fieldsPayload,
@@ -354,6 +374,7 @@ const DealTemplatesPage = () => {
         await updateDealTemplate(editingTemplate.id, updatePayload);
       } else {
         const createPayload: CreateDealTemplatePayload & { is_default?: string } = {
+          industry_id: formData.industry_id ?? undefined,
           name: formData.name.trim(),
           description: formData.description.trim() || undefined,
           fields: fieldsPayload,
@@ -448,27 +469,40 @@ const DealTemplatesPage = () => {
             >
               <Eye size={14} />
             </Button>
-            <Button
-              variant="outline-primary"
-              size="sm"
-              onClick={() => handleOpenModal(template)}
-              aria-label={"Edit deal template " + (template.name ?? "")}
-            >
-              <Edit size={14} />
-            </Button>
-            <Button
-              variant="outline-danger"
-              size="sm"
-              onClick={() => handlePromptDelete(template)}
-              aria-label={"Delete deal template " + (template.name ?? "")}
-            >
-              <Trash2 size={14} />
-            </Button>
+            {session?.user?.permissions?.includes(
+              PERMISSIONS.EDIT_CRM_DEAL_TEMPLATES,
+            ) && (
+              <Button
+                variant="outline-primary"
+                size="sm"
+                onClick={() => handleOpenModal(template)}
+                aria-label={"Edit deal template " + (template.name ?? "")}
+              >
+                <Edit size={14} />
+              </Button>
+            )}
+            {session?.user?.permissions?.includes(
+              PERMISSIONS.DELETE_CRM_DEAL_TEMPLATES,
+            ) && (
+              <Button
+                variant="outline-danger"
+                size="sm"
+                onClick={() => handlePromptDelete(template)}
+                aria-label={"Delete deal template " + (template.name ?? "")}
+              >
+                <Trash2 size={14} />
+              </Button>
+            )}
           </div>
         ),
       },
     ],
-    [handleView, handleOpenModal, handlePromptDelete],
+    [
+      handleView,
+      handleOpenModal,
+      handlePromptDelete,
+      session?.user?.permissions,
+    ],
   );
 
   const templatesToolbarConfig = useMemo<ToolbarConfig>(
@@ -680,6 +714,35 @@ const DealTemplatesPage = () => {
                       required
                       style={TEMPLATE_FORM_INPUT_STYLE}
                     />
+                  </Form.Group>
+
+                  <Form.Group className="mb-3">
+                    <Form.Label style={TEMPLATE_FORM_LABEL_STYLE}>
+                      Product Group
+                    </Form.Label>
+                    <Form.Select
+                      value={formData.industry_id == null ? "" : String(formData.industry_id)}
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        setFormData((prev) => ({
+                          ...prev,
+                          industry_id: v ? Number(v) : null,
+                        }));
+                      }}
+                      style={TEMPLATE_FORM_INPUT_STYLE}
+                      disabled={industries.length === 0}
+                    >
+                      <option value="">
+                        {industries.length === 0
+                          ? "No product groups found"
+                          : "Select product group (optional)"}
+                      </option>
+                      {industries.map((ind) => (
+                        <option key={ind.id} value={ind.id}>
+                          {ind.name}
+                        </option>
+                      ))}
+                    </Form.Select>
                   </Form.Group>
 
                   <Form.Group className="mb-3">

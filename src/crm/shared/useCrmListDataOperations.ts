@@ -153,11 +153,18 @@ export function useCrmListDataOperations({
       setDataList(response.data || []);
       setTotalRecords(response.pagination.total || 0);
 
-      const isAll =
-        memoizedFilters.has_scheduled_calls !== true &&
-        memoizedFilters.has_tickets !== true;
-      if (isAll) {
-        setTotalAll(response.pagination.total || 0);
+      // Prefer backend-provided "All" count (ignores tab params like has_scheduled_calls/has_tickets).
+      // Fallback: only update when the request is the "All" tab (no tab flags applied).
+      const totalAllFromMetrics = Number(response?.metrics?.total_all_records);
+      if (Number.isFinite(totalAllFromMetrics)) {
+        setTotalAll(totalAllFromMetrics);
+      } else {
+        const isAllTab =
+          memoizedFilters.has_scheduled_calls !== true &&
+          memoizedFilters.has_tickets !== true;
+        if (isAllTab) {
+          setTotalAll(response.pagination.total || 0);
+        }
       }
 
       setMetrics(response.metrics || {});
@@ -171,7 +178,17 @@ export function useCrmListDataOperations({
         setLoading(false);
       }
     }
-  }, [buildCrmDataParams]);
+  }, [
+    buildCrmDataParams,
+    memoizedFilters.has_scheduled_calls,
+    memoizedFilters.has_tickets,
+    requestIdRef,
+    setDataList,
+    setLoading,
+    setMetrics,
+    setTotalAll,
+    setTotalRecords,
+  ]);
 
   useEffect(() => {
     fetchCrmData();

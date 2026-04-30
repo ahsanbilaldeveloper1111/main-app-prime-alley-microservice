@@ -9,10 +9,12 @@ export function buildCrmOrderGridRowFromApiOrder(
   order: any,
   assignedAndOwnerLabel: string,
 ): Record<string, unknown> {
+  const companyName =
+      order.company || order.deal?.company_name || order.customer_name || "";
   return {
     id: order.id,
     orderNumber: order.order_number || "",
-    customer: order.customer_name || "",
+    customer: companyName,
     customerEmail: order.customer_email || "",
     customerPhone: order.customer_phone || "",
     deal: order.deal?.name || order.deal_id || "",

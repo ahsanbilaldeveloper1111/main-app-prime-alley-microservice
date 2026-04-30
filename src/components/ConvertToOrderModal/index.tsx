@@ -83,9 +83,7 @@ const [contractDocumentPreview, setContractDocumentPreview] = useState<string | 
     customer_email: "",
     customer_phone: "",
     customer_phone_country_code: "",
-    customer_address: "",
     order_date: new Date().toISOString().split("T")[0],
-    expected_delivery_date: "",
     order_stage_id: undefined as number | undefined,
     notes: "",
     tax_percentage: "0",
@@ -93,9 +91,6 @@ const [contractDocumentPreview, setContractDocumentPreview] = useState<string | 
     special_discount_percentage: "0",
     currency: "AED",
     industry: "",
-    order_approval_status: "",
-    fulfillment_status: "",
-    payment_status: "",
     items: [] as OrderItem[],
   });
 
@@ -164,7 +159,6 @@ const [contractDocumentPreview, setContractDocumentPreview] = useState<string | 
             customer_email: decisionMaker.email || "",
             customer_phone: phoneNumber,
             customer_phone_country_code: phoneCountryCode,
-            customer_address: "",
             currency: dealData.currency || "AED",
             industry: dealData.industry || "",
             tax_percentage: latestEstimate?.tax_percentage || "0",
@@ -421,9 +415,7 @@ const [contractDocumentPreview, setContractDocumentPreview] = useState<string | 
         formDataPayload.append("customer_name", formData.customer_name);
         formDataPayload.append("customer_email", formData.customer_email);
         formDataPayload.append("customer_phone", formattedPhone);
-        formDataPayload.append("customer_address", formData.customer_address || "");
         formDataPayload.append("order_date", formData.order_date);
-        formDataPayload.append("expected_delivery_date", formData.expected_delivery_date || "");
         formDataPayload.append("order_stage_id", String(formData.order_stage_id));
         formDataPayload.append("notes", formData.notes || "");
         formDataPayload.append("tax_amount", totals.taxAmount.toFixed(2));
@@ -432,9 +424,6 @@ const [contractDocumentPreview, setContractDocumentPreview] = useState<string | 
         formDataPayload.append("final_amount", totals.netValue.toFixed(2));
         formDataPayload.append("currency", formData.currency);
         formDataPayload.append("industry", formData.industry || "");
-        formDataPayload.append("order_approval_status", formData.order_approval_status || "");
-        formDataPayload.append("fulfillment_status", formData.fulfillment_status || "");
-        formDataPayload.append("payment_status", formData.payment_status || "");
         formDataPayload.append("items", JSON.stringify(itemsPayload));
         formDataPayload.append("deal_id", String(dealId));
         if (contractDocument) {
@@ -442,39 +431,7 @@ const [contractDocumentPreview, setContractDocumentPreview] = useState<string | 
         }
 
         // Create the order with FormData (supports file upload)
-        const createdOrder = await createOrder(formDataPayload);
-
-    //   const payload: any = {
-    //     customer_name: formData.customer_name,
-    //     customer_email: formData.customer_email,
-    //     customer_phone: formattedPhone,
-    //     customer_address: formData.customer_address || "",
-    //     order_date: formData.order_date,
-    //     expected_delivery_date: formData.expected_delivery_date || "",
-    //     order_stage_id: String(formData.order_stage_id),
-    //     notes: formData.notes || "",
-    //     tax_amount: totals.taxAmount.toFixed(2),
-    //     discount_amount: totals.totalDiscount.toFixed(2),
-    //     total_amount: totals.grandTotal.toFixed(2),
-    //     final_amount: totals.netValue.toFixed(2),
-    //     currency: formData.currency,
-    //     industry: formData.industry || "",
-    //     order_approval_status: formData.order_approval_status || "",
-    //     fulfillment_status: formData.fulfillment_status || "",
-    //     payment_status: formData.payment_status || "",
-    //     items: formData.items.map((item) => ({
-    //       product_id: String(item.product_id),
-    //       product_name: item.product_name,
-    //       quantity: item.quantity,
-    //       unit_price: item.unit_price,
-    //       total_price: (parseFloat(item.quantity || "0") * item.unit_price).toFixed(2),
-    //       description: item.description || "",
-    //     })),
-    //     deal_id: String(dealId),
-    //   };
-
-    //   await createOrder(payload);
-      //toast.success("Order created successfully!");
+        await createOrder(formDataPayload);
       
       // Reset form
       resetForm();
@@ -493,32 +450,6 @@ const [contractDocumentPreview, setContractDocumentPreview] = useState<string | 
     }
   };
 
-//   const resetForm = () => {
-//     setFormStep(0);
-//     setFormData({
-//       customer_name: "",
-//       customer_email: "",
-//       customer_phone: "",
-//       customer_phone_country_code: "",
-//       customer_address: "",
-//       order_date: new Date().toISOString().split("T")[0],
-//       expected_delivery_date: "",
-//       order_stage_id: undefined,
-//       notes: "",
-//       tax_percentage: "0",
-//       standard_discount_percentage: "0",
-//       special_discount_percentage: "0",
-//       currency: "AED",
-//       industry: "",
-//       order_approval_status: "",
-//       fulfillment_status: "",
-//       payment_status: "",
-//       items: [],
-//     });
-//     setSourceDeal(null);
-//     setSelectedEstimateId(null);
-//   };
-
 const resetForm = () => {
     setFormStep(0);
     setFormData({
@@ -526,9 +457,7 @@ const resetForm = () => {
       customer_email: "",
       customer_phone: "",
       customer_phone_country_code: "",
-      customer_address: "",
       order_date: new Date().toISOString().split("T")[0],
-      expected_delivery_date: "",
       order_stage_id: undefined,
       notes: "",
       tax_percentage: "0",
@@ -536,9 +465,6 @@ const resetForm = () => {
       special_discount_percentage: "0",
       currency: "AED",
       industry: "",
-      order_approval_status: "",
-      fulfillment_status: "",
-      payment_status: "",
       items: [],
     });
     setSourceDeal(null);
@@ -589,8 +515,8 @@ const resetForm = () => {
                     <div className="d-flex align-items-center gap-2 mb-2">
                       <Badge bg="info">Converting from Deal</Badge>
                       <span className="small text-muted">
-                        Deal: <strong>{sourceDeal.name}</strong>
-                        {sourceDeal.company_name && ` • Company: ${sourceDeal.company_name}`}
+                        Company: <strong>{sourceDeal.company_name || (sourceDeal as any).company?.name || "—"}</strong>
+                        {sourceDeal.name && ` • Deal: ${sourceDeal.name}`}
                         {sourceDeal.id && ` • ID: #${sourceDeal.id}`}
                       </span>
                     </div>
@@ -765,19 +691,6 @@ const resetForm = () => {
                         </Col>
                         <Col md={6}>
                           <Form.Group className="mb-3">
-                            <Form.Label>Company Address</Form.Label>
-                            <Form.Control
-                              type="text"
-                              value={formData.customer_address}
-                              onChange={(e) =>
-                                setFormData({ ...formData, customer_address: e.target.value })
-                              }
-                              placeholder="Enter address"
-                            />
-                          </Form.Group>
-                        </Col>
-                        <Col md={6}>
-                          <Form.Group className="mb-3">
                             <Form.Label>
                               Order Date <span className="text-danger">*</span>
                             </Form.Label>
@@ -788,18 +701,6 @@ const resetForm = () => {
                                 setFormData({ ...formData, order_date: e.target.value })
                               }
                               required
-                            />
-                          </Form.Group>
-                        </Col>
-                        <Col md={6}>
-                          <Form.Group className="mb-3">
-                            <Form.Label>Expected Delivery Date</Form.Label>
-                            <Form.Control
-                              type="date"
-                              value={formData.expected_delivery_date}
-                              onChange={(e) =>
-                                setFormData({ ...formData, expected_delivery_date: e.target.value })
-                              }
                             />
                           </Form.Group>
                         </Col>
@@ -906,57 +807,6 @@ const resetForm = () => {
                           </Form.Group>
                         </Col>
                         <Col md={6}>
-                          <Form.Group className="mb-3">
-                            <Form.Label>Order Approval Status</Form.Label>
-                            <Form.Select
-                              value={formData.order_approval_status}
-                              onChange={(e) =>
-                                setFormData({ ...formData, order_approval_status: e.target.value })
-                              }
-                            >
-                              <option value="">Not Set</option>
-                              <option value="pending">Pending</option>
-                              <option value="approved">Approved</option>
-                              <option value="rejected">Rejected</option>
-                            </Form.Select>
-                          </Form.Group>
-                        </Col>
-                        <Col md={6}>
-                          <Form.Group className="mb-3">
-                            <Form.Label>Fulfillment Status</Form.Label>
-                            <Form.Select
-                              value={formData.fulfillment_status}
-                              onChange={(e) =>
-                                setFormData({ ...formData, fulfillment_status: e.target.value })
-                              }
-                            >
-                              <option value="">Not Set</option>
-                              <option value="pending">Pending</option>
-                              <option value="in_progress">In Progress</option>
-                              <option value="completed">Completed</option>
-                              <option value="delivered">Delivered</option>
-                              <option value="cancelled">Cancelled</option>
-                            </Form.Select>
-                          </Form.Group>
-                        </Col>
-                        <Col md={6}>
-                          <Form.Group className="mb-3">
-                            <Form.Label>Payment Status</Form.Label>
-                            <Form.Select
-                              value={formData.payment_status}
-                              onChange={(e) =>
-                                setFormData({ ...formData, payment_status: e.target.value })
-                              }
-                            >
-                              <option value="">Not Set</option>
-                              <option value="unpaid">Unpaid</option>
-                              <option value="partial">Partial</option>
-                              <option value="paid">Paid</option>
-                              <option value="refunded">Refunded</option>
-                            </Form.Select>
-                          </Form.Group>
-                        </Col>
-                        <Col md={12}>
                           <Form.Group className="mb-3">
                             <Form.Label>Notes</Form.Label>
                             <Form.Control
@@ -1440,22 +1290,12 @@ const resetForm = () => {
                           <p>
                             <strong>Phone:</strong> {formData.customer_phone}
                           </p>
-                          {formData.customer_address && (
-                            <p>
-                              <strong>Address:</strong> {formData.customer_address}
-                            </p>
-                          )}
                         </Col>
                         <Col md={6}>
                           <h6 className="fw-bold">Order Details</h6>
                           <p>
                             <strong>Order Date:</strong> {formData.order_date}
                           </p>
-                          {formData.expected_delivery_date && (
-                            <p>
-                              <strong>Expected Delivery:</strong> {formData.expected_delivery_date}
-                            </p>
-                          )}
                           <p>
                             <strong>Stage:</strong>{" "}
                             {stages.find((s) => s.id === formData.order_stage_id)?.name || "N/A"}

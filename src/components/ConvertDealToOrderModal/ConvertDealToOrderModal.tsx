@@ -78,6 +78,162 @@ interface OrderItem {
   original_price?: number;
 }
 
+interface OrderTotals {
+  grandTotal: number;
+  totalDiscount: number;
+  taxAmount: number;
+  netValue: number;
+}
+
+interface OrderTotalsFooterProps {
+  currency: string;
+  taxPercentage: string;
+  totals: OrderTotals;
+}
+
+const formatMoney = (amount: number) =>
+  amount.toLocaleString(undefined, {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+
+interface ContractUploadDropzoneProps {
+  contractDocument: File | null;
+  onClear: () => void;
+}
+
+const FILE_INPUT_ID = "convert-deal-order-file";
+
+const ContractUploadEmptyState: React.FC = () => (
+  <>
+    <Upload size={32} style={{ opacity: 0.5, marginBottom: "8px" }} />
+    <div style={{ fontSize: "14px" }}>
+      Drop contract document here or click to browse
+    </div>
+    <div style={{ fontSize: "12px", color: "#64748b", marginTop: "4px" }}>
+      PDF, DOC, DOCX • Max 5MB
+    </div>
+  </>
+);
+
+const ContractUploadFilledState: React.FC<{
+  file: File;
+  onClear: () => void;
+}> = ({ file, onClear }) => (
+  <>
+    <CheckCircle size={32} className="text-success mb-2" />
+    <div className="text-success fw-semibold">{file.name}</div>
+    <div style={{ fontSize: "12px", color: "#64748b" }}>
+      {(file.size / 1024 / 1024).toFixed(2)} MB
+    </div>
+    <button
+      type="button"
+      onClick={(e) => {
+        e.stopPropagation();
+        onClear();
+      }}
+      style={{
+        marginTop: "8px",
+        padding: "4px 12px",
+        fontSize: "12px",
+        border: "1px solid #dc3545",
+        borderRadius: "4px",
+        background: "#fff",
+        color: "#dc3545",
+        cursor: "pointer",
+      }}
+    >
+      Remove
+    </button>
+  </>
+);
+
+const ContractUploadDropzone: React.FC<ContractUploadDropzoneProps> = ({
+  contractDocument,
+  onClear,
+}) => (
+  <button
+    type="button"
+    onClick={() => document.getElementById(FILE_INPUT_ID)?.click()}
+    style={{
+      width: "100%",
+      border: `2px dashed ${contractDocument ? "#198754" : "#dee2e6"}`,
+      borderRadius: "8px",
+      padding: "24px",
+      textAlign: "center",
+      cursor: "pointer",
+      background: contractDocument ? "#f8fdf9" : "#fafbfc",
+    }}
+  >
+    {contractDocument ? (
+      <ContractUploadFilledState file={contractDocument} onClear={onClear} />
+    ) : (
+      <ContractUploadEmptyState />
+    )}
+  </button>
+);
+
+const SubmitButtonContent: React.FC<{ loading: boolean }> = ({ loading }) => {
+  if (loading) {
+    return (
+      <>
+        <span className="spinner-border spinner-border-sm me-2" />
+        <span>Creating...</span>
+      </>
+    );
+  }
+  return <>Create Order</>;
+};
+
+const OrderTotalsFooter: React.FC<OrderTotalsFooterProps> = ({
+  currency,
+  taxPercentage,
+  totals,
+}) => {
+  const taxPercentValue = Number.parseFloat(taxPercentage || "0");
+
+  return (
+    <tfoot style={{ background: "#f8fafc" }}>
+      <tr>
+        <td colSpan={4} className="text-end">
+          <strong>Subtotal:</strong>
+        </td>
+        <td className="text-end fw-semibold">
+          {currency} {formatMoney(totals.grandTotal)}
+        </td>
+      </tr>
+      {totals.totalDiscount > 0 && (
+        <tr>
+          <td colSpan={4} className="text-end text-muted">
+            Discount
+          </td>
+          <td className="text-end text-danger">
+            - {currency} {formatMoney(totals.totalDiscount)}
+          </td>
+        </tr>
+      )}
+      {taxPercentValue > 0 && (
+        <tr>
+          <td colSpan={4} className="text-end">
+            Tax ({taxPercentage}%)
+          </td>
+          <td className="text-end fw-semibold">
+            {currency} {formatMoney(totals.taxAmount)}
+          </td>
+        </tr>
+      )}
+      <tr style={{ borderTop: "2px solid #e2e8f0" }}>
+        <td colSpan={4} className="text-end">
+          <strong>Total:</strong>
+        </td>
+        <td className="text-end fw-bold text-success">
+          {currency} {formatMoney(totals.netValue)}
+        </td>
+      </tr>
+    </tfoot>
+  );
+};
+
 const ConvertDealToOrderModal: React.FC<ConvertDealToOrderModalProps> = ({
   show,
   onHide,
@@ -103,9 +259,7 @@ const ConvertDealToOrderModal: React.FC<ConvertDealToOrderModalProps> = ({
     company_domain: "",
     customer_phone: "",
     customer_phone_country_code: "",
-    customer_address: "",
     order_date: new Date().toISOString().split("T")[0],
-    expected_delivery_date: "",
     order_stage_id: undefined as number | undefined,
     notes: "",
     tax_percentage: "0",
@@ -113,9 +267,6 @@ const ConvertDealToOrderModal: React.FC<ConvertDealToOrderModalProps> = ({
     special_discount_percentage: "0",
     currency: "AED",
     industry: "",
-    order_approval_status: "",
-    fulfillment_status: "",
-    payment_status: "",
     items: [] as OrderItem[],
   });
 
@@ -206,9 +357,7 @@ const ConvertDealToOrderModal: React.FC<ConvertDealToOrderModalProps> = ({
         company_domain: dealAny.company?.domain || "",
         customer_phone: phoneNumber,
         customer_phone_country_code: phoneCountryCode,
-        customer_address: dealAny.customer_address ?? dealAny.company_address ?? "",
         order_date: new Date().toISOString().split("T")[0],
-        expected_delivery_date: prev.expected_delivery_date || "",
         currency: dealData.currency || "AED",
         industry: dealData.industry || "",
         tax_percentage: latestEstimate?.tax_percentage != null ? String(latestEstimate.tax_percentage) : "0",
@@ -400,9 +549,7 @@ const ConvertDealToOrderModal: React.FC<ConvertDealToOrderModalProps> = ({
       payload.append("company_email", formData.company_email);
       payload.append("company_domain", formData.company_domain || "");
       payload.append("customer_phone", formattedPhone);
-      payload.append("customer_address", formData.customer_address || "");
       payload.append("order_date", formData.order_date);
-      payload.append("expected_delivery_date", formData.expected_delivery_date || "");
       payload.append("order_stage_id", String(formData.order_stage_id));
       payload.append("notes", formData.notes || "");
       payload.append("tax_amount", totals.taxAmount.toFixed(2));
@@ -411,9 +558,6 @@ const ConvertDealToOrderModal: React.FC<ConvertDealToOrderModalProps> = ({
       payload.append("final_amount", totals.netValue.toFixed(2));
       payload.append("currency", formData.currency);
       payload.append("industry", formData.industry || "");
-      payload.append("order_approval_status", formData.order_approval_status || "");
-      payload.append("fulfillment_status", formData.fulfillment_status || "");
-      payload.append("payment_status", formData.payment_status || "");
       payload.append("items", JSON.stringify(itemsPayload));
       payload.append("deal_id", String(dealId));
       if (contractDocument) payload.append("creation_attachment", contractDocument);
@@ -439,9 +583,7 @@ const ConvertDealToOrderModal: React.FC<ConvertDealToOrderModalProps> = ({
       company_domain: "",
       customer_phone: "",
       customer_phone_country_code: "",
-      customer_address: "",
       order_date: new Date().toISOString().split("T")[0],
-      expected_delivery_date: "",
       order_stage_id: undefined,
       notes: "",
       tax_percentage: "0",
@@ -449,9 +591,6 @@ const ConvertDealToOrderModal: React.FC<ConvertDealToOrderModalProps> = ({
       special_discount_percentage: "0",
       currency: "AED",
       industry: "",
-      order_approval_status: "",
-      fulfillment_status: "",
-      payment_status: "",
       items: [],
     });
     setSourceDeal(null);
@@ -466,6 +605,11 @@ const ConvertDealToOrderModal: React.FC<ConvertDealToOrderModalProps> = ({
   };
 
   const totals = calculateTotals();
+  const isSubmitDisabled =
+    loading ||
+    loadingDeal ||
+    !formData.items?.length ||
+    !contractDocument;
 
   if (!show) return null;
 
@@ -553,36 +697,35 @@ const ConvertDealToOrderModal: React.FC<ConvertDealToOrderModalProps> = ({
           ) : (
             <Form onSubmit={handleSubmit}>
               {sourceDeal && (
-                <>
-                  <div style={{ ...fieldWrap, padding: "12px", background: "#f0f9ff", borderRadius: "8px", border: "1px solid #bae6fd" }}>
-                    <div style={{ fontSize: "13px", color: "#0c4a6e", marginBottom: "8px" }}>
-                      <strong>Deal:</strong> {sourceDeal.name}
-                      {sourceDeal.company_name ? ` • ${sourceDeal.company_name}` : null}
-                      {sourceDeal.id != null ? ` • #${sourceDeal.id}` : null}
-                    </div>
-                    {sourceDeal.estimates && sourceDeal.estimates.length > 1 && (
-                      <div style={fieldWrap}>
-                        {fieldLabel("Estimate revision")}
-                        <select
-                          value={selectedEstimateId ?? ""}
-                          onChange={(e) =>
-                            handleEstimateChange(e.target.value ? Number(e.target.value) : null)
-                          }
-                          style={inputStyle}
-                        >
-                          {sourceDeal.estimates.map((estimate: any) => (
-                            <option key={estimate.id} value={estimate.id}>
-                              Version {estimate.version} {estimate.is_final ? "(Final)" : ""} –{" "}
-                              {estimate.currency} {estimate.net_value}
-                              {estimate.created_at &&
-                                ` (${new Date(estimate.created_at).toLocaleDateString()})`}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                    )}
+                <div style={{ ...fieldWrap, padding: "12px", background: "#f0f9ff", borderRadius: "8px", border: "1px solid #bae6fd" }}>
+                  <div style={{ fontSize: "13px", color: "#0c4a6e", marginBottom: "8px" }}>
+                    <strong>Company:</strong>{" "}
+                    {sourceDeal.company_name || (sourceDeal as any).company?.name || "—"}
+                    {sourceDeal.name ? ` • Deal: ${sourceDeal.name}` : null}
+                    {sourceDeal.id != null ? ` • #${sourceDeal.id}` : null}
                   </div>
-                </>
+                  {sourceDeal.estimates && sourceDeal.estimates.length > 1 && (
+                    <div style={fieldWrap}>
+                      {fieldLabel("Estimate revision")}
+                      <select
+                        value={selectedEstimateId ?? ""}
+                        onChange={(e) =>
+                          handleEstimateChange(e.target.value ? Number(e.target.value) : null)
+                        }
+                        style={inputStyle}
+                      >
+                        {sourceDeal.estimates.map((estimate: any) => (
+                          <option key={estimate.id} value={estimate.id}>
+                            Version {estimate.version} {estimate.is_final ? "(Final)" : ""} –{" "}
+                            {estimate.currency} {estimate.net_value}
+                            {estimate.created_at &&
+                              ` (${new Date(estimate.created_at).toLocaleDateString()})`}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+                </div>
               )}
 
               <h3 style={sectionHeading}>ORDER INFORMATION</h3>
@@ -677,39 +820,12 @@ const ConvertDealToOrderModal: React.FC<ConvertDealToOrderModalProps> = ({
                 />
               </div>
               <div style={fieldWrap}>
-                {fieldLabel("Company Address")}
-                <input
-                  type="text"
-                  value={formData.customer_address}
-                  onChange={(e) =>
-                    setFormData({ ...formData, customer_address: e.target.value })
-                  }
-                  style={inputStyle}
-                  onFocus={focusStyle}
-                  onBlur={blurStyle}
-                  placeholder="Enter address"
-                />
-              </div>
-              <div style={fieldWrap}>
                 {fieldLabel("Order Date", true)}
                 <input
                   type="date"
                   value={formData.order_date}
                   onChange={(e) =>
                     setFormData({ ...formData, order_date: e.target.value })
-                  }
-                  style={inputStyle}
-                  onFocus={focusStyle}
-                  onBlur={blurStyle}
-                />
-              </div>
-              <div style={fieldWrap}>
-                {fieldLabel("Expected Delivery Date")}
-                <input
-                  type="date"
-                  value={formData.expected_delivery_date}
-                  onChange={(e) =>
-                    setFormData({ ...formData, expected_delivery_date: e.target.value })
                   }
                   style={inputStyle}
                   onFocus={focusStyle}
@@ -762,54 +878,6 @@ const ConvertDealToOrderModal: React.FC<ConvertDealToOrderModalProps> = ({
                   <option value="Retail">Retail</option>
                   <option value="Office">Office</option>
                   <option value="Mixed-use">Mixed-use</option>
-                </select>
-              </div>
-              <div style={fieldWrap}>
-                {fieldLabel("Order Approval Status")}
-                <select
-                  value={formData.order_approval_status}
-                  onChange={(e) =>
-                    setFormData({ ...formData, order_approval_status: e.target.value })
-                  }
-                  style={inputStyle}
-                >
-                  <option value="">Not Set</option>
-                  <option value="pending">Pending</option>
-                  <option value="approved">Approved</option>
-                  <option value="rejected">Rejected</option>
-                </select>
-              </div>
-              <div style={fieldWrap}>
-                {fieldLabel("Fulfillment Status")}
-                <select
-                  value={formData.fulfillment_status}
-                  onChange={(e) =>
-                    setFormData({ ...formData, fulfillment_status: e.target.value })
-                  }
-                  style={inputStyle}
-                >
-                  <option value="">Not Set</option>
-                  <option value="pending">Pending</option>
-                  <option value="in_progress">In Progress</option>
-                  <option value="completed">Completed</option>
-                  <option value="delivered">Delivered</option>
-                  <option value="cancelled">Cancelled</option>
-                </select>
-              </div>
-              <div style={fieldWrap}>
-                {fieldLabel("Payment Status")}
-                <select
-                  value={formData.payment_status}
-                  onChange={(e) =>
-                    setFormData({ ...formData, payment_status: e.target.value })
-                  }
-                  style={inputStyle}
-                >
-                  <option value="">Not Set</option>
-                  <option value="unpaid">Unpaid</option>
-                  <option value="partial">Partial</option>
-                  <option value="paid">Paid</option>
-                  <option value="refunded">Refunded</option>
                 </select>
               </div>
               <div style={fieldWrap}>
@@ -883,60 +951,11 @@ const ConvertDealToOrderModal: React.FC<ConvertDealToOrderModalProps> = ({
                       })}
                     </tbody>
                     {formData.items.length > 0 && (
-                      <tfoot style={{ background: "#f8fafc" }}>
-                        <tr>
-                          <td colSpan={4} className="text-end">
-                            <strong>Subtotal:</strong>
-                          </td>
-                          <td className="text-end fw-semibold">
-                            {formData.currency}{" "}
-                            {totals.grandTotal.toLocaleString(undefined, {
-                              minimumFractionDigits: 2,
-                              maximumFractionDigits: 2,
-                            })}
-                          </td>
-                        </tr>
-                        {totals.totalDiscount > 0 && (
-                          <tr>
-                            <td colSpan={4} className="text-end text-muted">
-                              Discount
-                            </td>
-                            <td className="text-end text-danger">
-                              - {formData.currency}{" "}
-                              {totals.totalDiscount.toLocaleString(undefined, {
-                                minimumFractionDigits: 2,
-                                maximumFractionDigits: 2,
-                              })}
-                            </td>
-                          </tr>
-                        )}
-                        {parseFloat(formData.tax_percentage || "0") > 0 && (
-                          <tr>
-                            <td colSpan={4} className="text-end">
-                              Tax ({formData.tax_percentage}%)
-                            </td>
-                            <td className="text-end fw-semibold">
-                              {formData.currency}{" "}
-                              {totals.taxAmount.toLocaleString(undefined, {
-                                minimumFractionDigits: 2,
-                                maximumFractionDigits: 2,
-                              })}
-                            </td>
-                          </tr>
-                        )}
-                        <tr style={{ borderTop: "2px solid #e2e8f0" }}>
-                          <td colSpan={4} className="text-end">
-                            <strong>Total:</strong>
-                          </td>
-                          <td className="text-end fw-bold text-success">
-                            {formData.currency}{" "}
-                            {totals.netValue.toLocaleString(undefined, {
-                              minimumFractionDigits: 2,
-                              maximumFractionDigits: 2,
-                            })}
-                          </td>
-                        </tr>
-                      </tfoot>
+                      <OrderTotalsFooter
+                        currency={formData.currency}
+                        taxPercentage={formData.tax_percentage}
+                        totals={totals}
+                      />
                     )}
                   </Table>
                 </div>
@@ -958,61 +977,17 @@ const ConvertDealToOrderModal: React.FC<ConvertDealToOrderModalProps> = ({
 
               <h3 style={sectionHeadingNext}>DOCUMENT UPLOAD <span style={{ color: "#f2545b" }}>*</span></h3>
               <div style={fieldWrap}>
-                <div
-                  onClick={() => document.getElementById("convert-deal-order-file")?.click()}
-                  style={{
-                    border: `2px dashed ${contractDocument ? "#198754" : "#dee2e6"}`,
-                    borderRadius: "8px",
-                    padding: "24px",
-                    textAlign: "center",
-                    cursor: "pointer",
-                    background: contractDocument ? "#f8fdf9" : "#fafbfc",
+                <ContractUploadDropzone
+                  contractDocument={contractDocument}
+                  onClear={() => {
+                    setContractDocument(null);
+                    setContractDocumentPreview(null);
+                    const el = document.getElementById(FILE_INPUT_ID) as HTMLInputElement;
+                    if (el) el.value = "";
                   }}
-                >
-                  {!contractDocument ? (
-                    <>
-                      <Upload size={32} style={{ opacity: 0.5, marginBottom: "8px" }} />
-                      <div style={{ fontSize: "14px" }}>
-                        Drop contract document here or click to browse
-                      </div>
-                      <div style={{ fontSize: "12px", color: "#64748b", marginTop: "4px" }}>
-                        PDF, DOC, DOCX • Max 5MB
-                      </div>
-                    </>
-                  ) : (
-                    <>
-                      <CheckCircle size={32} className="text-success mb-2" />
-                      <div className="text-success fw-semibold">{contractDocument.name}</div>
-                      <div style={{ fontSize: "12px", color: "#64748b" }}>
-                        {(contractDocument.size / 1024 / 1024).toFixed(2)} MB
-                      </div>
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setContractDocument(null);
-                          setContractDocumentPreview(null);
-                          const el = document.getElementById("convert-deal-order-file") as HTMLInputElement;
-                          if (el) el.value = "";
-                        }}
-                        style={{
-                          marginTop: "8px",
-                          padding: "4px 12px",
-                          fontSize: "12px",
-                          border: "1px solid #dc3545",
-                          borderRadius: "4px",
-                          background: "#fff",
-                          color: "#dc3545",
-                          cursor: "pointer",
-                        }}
-                      >
-                        Remove
-                      </button>
-                    </>
-                  )}
-                </div>
+                />
                 <input
-                  id="convert-deal-order-file"
+                  id={FILE_INPUT_ID}
                   type="file"
                   accept=".pdf,.doc,.docx"
                   style={{ display: "none" }}
@@ -1059,16 +1034,9 @@ const ConvertDealToOrderModal: React.FC<ConvertDealToOrderModalProps> = ({
           <Button
             variant="primary"
             onClick={handleSubmit}
-            disabled={loading || loadingDeal || !formData.items?.length || !contractDocument}
+            disabled={isSubmitDisabled}
           >
-            {loading ? (
-              <>
-                <span className="spinner-border spinner-border-sm me-2" />
-                Creating...
-              </>
-            ) : (
-              "Create Order"
-            )}
+            <SubmitButtonContent loading={loading} />
           </Button>
         </div>
       </div>

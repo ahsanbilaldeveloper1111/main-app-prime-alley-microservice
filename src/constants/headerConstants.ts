@@ -683,6 +683,7 @@ export const HEADER_CONSTANTS = {
     VIEW_CRM_ORDERS: "view-crm-orders",
     CREATE_CRM_ORDERS: "add-crm-orders",
     EDIT_CRM_ORDERS_DELIVERY: "edit-delivery-crm-orders",
+    EDIT_CRM_ORDERS_BILLING: "edit-crm-orders",
     DELETE_CRM_ORDERS: "delete-crm-orders",
     VIEW_CRM_TASKS: "view-crm-tasks",
     CREATE_CRM_TASKS: "add-crm-tasks",
@@ -708,6 +709,8 @@ export const HEADER_CONSTANTS = {
 
     VIEW_CRM_DEAL_TEMPLATES: "view-crm-deal-templates",
     CREATE_CRM_DEAL_TEMPLATES: "add-crm-deal-templates",
+    EDIT_CRM_DEAL_TEMPLATES: "edit-crm-deal-templates",
+    DELETE_CRM_DEAL_TEMPLATES: "delete-crm-deal-templates",
     VIEW_CRM_INDUSTRIES: "view-crm-industry",
     CREATE_CRM_INDUSTRY: "add-crm-industry",
     EDIT_CRM_INDUSTRY: "edit-crm-industry",

@@ -12,8 +12,14 @@ export function useCrmListActiveTabFiltersEffect(
     if (activeFilter === "all") {
       setCurrentFilters((prev) => {
         const newFilters = { ...prev };
-        delete newFilters.has_scheduled_calls;
-        delete newFilters.has_tickets;
+        // Preserve explicit false values (e.g. widget-driven filters like "Not Contacted"),
+        // but clear tab-driven true flags when navigating back to "all".
+        if (newFilters.has_scheduled_calls === true) {
+          delete newFilters.has_scheduled_calls;
+        }
+        if (newFilters.has_tickets === true) {
+          delete newFilters.has_tickets;
+        }
         return newFilters;
       });
     } else if (activeFilter === "scheduled") {

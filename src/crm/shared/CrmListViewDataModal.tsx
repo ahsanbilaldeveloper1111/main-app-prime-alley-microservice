@@ -349,7 +349,7 @@ function ContactDetailsSection({
           value={
             selectedDataItem.created_at
               ? moment(selectedDataItem.created_at).format(
-                  "MMMM DD, YYYY [at] hh:mm A",
+                  "MMMM DD, YYYY [at] HH:mm",
                 )
               : "N/A"
           }
@@ -868,7 +868,7 @@ function StatusOverviewPanel({
                 }}
               >
                 {moment(selectedDataItem.scheduled_call_at).format(
-                  "MMM DD, YYYY [at] hh:mm A",
+                  "MMM DD, YYYY [at] HH:mm",
                 )}
               </div>
             </div>
@@ -971,7 +971,7 @@ function ActivityTimelinePanel({
                       {isOutgoing ? "Outgoing Call" : "Incoming Call"}
                     </div>
                     <div style={{ fontSize: "11px", color: "#6b7280" }}>
-                      {moment(recording.DateTime).format("MMM DD, hh:mm A")}
+                      {moment(recording.DateTime).format("MMM DD, HH:mm")}
                     </div>
                   </div>
                 </div>

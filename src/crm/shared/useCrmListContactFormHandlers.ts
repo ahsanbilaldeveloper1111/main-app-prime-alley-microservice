@@ -13,7 +13,6 @@ import {
   type CrmExtensionLikeForOwnerDefault,
   type CrmListContactFormState,
 } from "@utils/crmContactFormFromCrmItem";
-import { datetimeLocalToIsoUtc } from "@utils/datetimeLocalInput";
 import { isValidEmail } from "@utils/Helper";
 export type CrmListContactFormHandlersDeps = {
   session: any;
@@ -145,7 +144,6 @@ export function useCrmListContactFormHandlers(deps: CrmListContactFormHandlersDe
           phone: phoneForPayload,
           user_extension: userExtension,
           campaign_id: contactForm.campaign_id ?? null,
-          scheduled_call_at: datetimeLocalToIsoUtc(contactForm.scheduled_call_at),
           company_domain: contactForm.company_domain?.trim() || undefined,
           source_file: getSourceValue(contactForm),
           data: dataPayload,
@@ -208,7 +206,6 @@ export function useCrmListContactFormHandlers(deps: CrmListContactFormHandlersDe
         campaign_id: contactForm.campaign_id ?? null,
         company_domain: contactForm.company_domain?.trim() || undefined,
         source_file: getSourceValue(contactForm),
-        scheduled_call_at: datetimeLocalToIsoUtc(contactForm.scheduled_call_at),
         data: dataPayload,
       });
       fetchCrmData();

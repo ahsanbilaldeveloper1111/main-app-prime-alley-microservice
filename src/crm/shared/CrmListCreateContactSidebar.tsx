@@ -72,7 +72,7 @@ export function CrmListCreateContactSidebar({
       onCreateAndAddAnother={
         editingContactId ? undefined : () => onCreateSubmit(true)
       }
-      showScheduledCallField={entityLabel !== "Prospect"}
+      showScheduledCallField={false}
     />
   );
 }
