@@ -1,4 +1,4 @@
-import type { DealTemplateData, DealTemplateField } from "@utils/crm";
+import type { DealTemplateData } from "@utils/crm";
 
 /**
  * Helpers extracted from `EditDeal` (`pages/crm/deals/[id]/edit.tsx`) to keep
@@ -177,8 +177,8 @@ export function buildHydratedTemplateFieldValues(
     template_name: template.name || "",
   };
   for (const field of template.fields || []) {
-    const normalizedKey = normalizeKey((field as DealTemplateField).field_name);
-    const fieldName = (field as DealTemplateField).field_name;
+    const fieldName = field.field_name;
+    const normalizedKey = normalizeKey(fieldName);
     hydrated[fieldName] =
       storedValues[fieldName] ?? storedValues[normalizedKey] ?? "";
   }

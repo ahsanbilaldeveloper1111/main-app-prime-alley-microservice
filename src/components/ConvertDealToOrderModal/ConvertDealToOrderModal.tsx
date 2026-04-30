@@ -152,9 +152,11 @@ const ContractUploadDropzone: React.FC<ContractUploadDropzoneProps> = ({
   contractDocument,
   onClear,
 }) => (
-  <div
+  <button
+    type="button"
     onClick={() => document.getElementById(FILE_INPUT_ID)?.click()}
     style={{
+      width: "100%",
       border: `2px dashed ${contractDocument ? "#198754" : "#dee2e6"}`,
       borderRadius: "8px",
       padding: "24px",
@@ -168,7 +170,7 @@ const ContractUploadDropzone: React.FC<ContractUploadDropzoneProps> = ({
     ) : (
       <ContractUploadEmptyState />
     )}
-  </div>
+  </button>
 );
 
 const SubmitButtonContent: React.FC<{ loading: boolean }> = ({ loading }) => {
@@ -176,7 +178,7 @@ const SubmitButtonContent: React.FC<{ loading: boolean }> = ({ loading }) => {
     return (
       <>
         <span className="spinner-border spinner-border-sm me-2" />
-        Creating...
+        <span>Creating...</span>
       </>
     );
   }
