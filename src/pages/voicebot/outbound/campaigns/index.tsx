@@ -1,5 +1,12 @@
 import "@assets/scss/datatable-style.scss";
-import React, { ReactElement, useState, useEffect, useCallback } from "react";
+import React, {
+  ReactElement,
+  useState,
+  useEffect,
+  useLayoutEffect,
+  useCallback,
+  useRef,
+} from "react";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 import GenericTable, { TableColumn } from "@components/GenericTable";
@@ -64,7 +71,126 @@ interface CampaignRow {
   retry_attempts?: number;
   retry_interval_minutes?: number;
   status?: string;
+  /** Populated from SSE stream snapshots (optional). */
+  stream_calls?: unknown[];
   [key: string]: unknown;
+}
+
+/** SSE campaign snapshot shape (array element or wrapped in `data` / `campaigns`). */
+interface CampaignStreamUpdatePayload {
+  campaign_id: number | string;
+  campaign_name?: string;
+  campaign_status?: string;
+  total_numbers?: number;
+  dispatched?: number;
+  in_progress?: number;
+  completed?: number;
+  failed?: number;
+  success_rate?: number;
+  avg_call_duration?: number;
+  total_cost?: number;
+  last_dispatched_at?: string;
+  calls?: unknown[];
+}
+
+function isCampaignStreamUpdateArray(v: unknown): v is CampaignStreamUpdatePayload[] {
+  if (!Array.isArray(v) || v.length === 0) return false;
+  const first = v[0];
+  if (first == null || typeof first !== "object") return false;
+  return "campaign_id" in first;
+}
+
+function tryParseCampaignArray(value: unknown): CampaignStreamUpdatePayload[] | null {
+  if (typeof value === "string") {
+    try {
+      return extractCampaignStreamUpdates(JSON.parse(value) as unknown);
+    } catch {
+      return null;
+    }
+  }
+  return extractCampaignStreamUpdates(value);
+}
+
+/**
+ * SSE campaign rows: either a raw array, or an envelope (e.g. `{ type: "message", data: [...] }`).
+ */
+function extractCampaignStreamUpdates(parsed: unknown): CampaignStreamUpdatePayload[] | null {
+  if (isCampaignStreamUpdateArray(parsed)) return parsed;
+  if (parsed != null && typeof parsed === "object" && !Array.isArray(parsed)) {
+    const o = parsed as Record<string, unknown>;
+    const candidates = [
+      o.data,
+      o.campaigns,
+      o.payload,
+      o.results,
+      o.items,
+      o.body,
+      o.content,
+    ];
+    for (const c of candidates) {
+      if (isCampaignStreamUpdateArray(c)) return c;
+      const fromString = tryParseCampaignArray(c);
+      if (fromString?.length) return fromString;
+    }
+  }
+  return null;
+}
+
+function mergeStreamUpdatesIntoRows(
+  rows: CampaignRow[],
+  updates: CampaignStreamUpdatePayload[],
+  fallbackCompanyId: string,
+): CampaignRow[] {
+  const byId = new Map<string, CampaignStreamUpdatePayload>();
+  for (const u of updates) {
+    byId.set(String(u.campaign_id), u);
+  }
+  const seen = new Set<string>();
+  const merged = rows.map((row) => {
+    const id = String(row.campaign_id ?? row.id ?? "");
+    if (!id) return row;
+    const u = byId.get(id);
+    if (!u) return row;
+    seen.add(id);
+    return {
+      ...row,
+      name: u.campaign_name ?? row.name,
+      status: u.campaign_status ?? row.status,
+      campaign_id: u.campaign_id,
+      total_numbers: u.total_numbers,
+      dispatched: u.dispatched,
+      in_progress: u.in_progress,
+      completed: u.completed,
+      failed: u.failed,
+      success_rate: u.success_rate,
+      avg_call_duration: u.avg_call_duration,
+      total_cost: u.total_cost,
+      last_dispatched_at: u.last_dispatched_at,
+      stream_calls: u.calls,
+    };
+  });
+  for (const u of updates) {
+    const id = String(u.campaign_id);
+    if (seen.has(id)) continue;
+    merged.push({
+      id: u.campaign_id,
+      campaign_id: u.campaign_id,
+      name: u.campaign_name ?? "",
+      status: u.campaign_status,
+      company_id: fallbackCompanyId || undefined,
+      total_numbers: u.total_numbers,
+      dispatched: u.dispatched,
+      in_progress: u.in_progress,
+      completed: u.completed,
+      failed: u.failed,
+      success_rate: u.success_rate,
+      avg_call_duration: u.avg_call_duration,
+      total_cost: u.total_cost,
+      last_dispatched_at: u.last_dispatched_at,
+      stream_calls: u.calls,
+    });
+  }
+  return merged;
 }
 
 function firstNumber(...values: unknown[]): number | undefined {
@@ -118,6 +244,19 @@ function getCampaignStatusBadgeVariant(
   if (status === "completed") return "success";
   if (status === "stopped") return "secondary";
   return "secondary";
+}
+
+/** Table cell: dispatched/total and optional success_rate from SSE snapshot fields. */
+function formatStreamProgressCell(r: CampaignRow): string {
+  const t = firstNumber(r.total_numbers);
+  const d = firstNumber(r.dispatched);
+  const sr = r.success_rate;
+  if (t === undefined && d === undefined) return "—";
+  let s = `${d ?? 0}/${t ?? "—"}`;
+  if (typeof sr === "number" && Number.isFinite(sr)) {
+    s += ` · ${sr.toFixed(1)}%`;
+  }
+  return s;
 }
 
 interface CampaignRowActionsCellProps {
@@ -434,6 +573,11 @@ const CampaignsPage = () => {
   const [rowToRedispatch, setRowToRedispatch] = useState<CampaignRow | null>(
     null,
   );
+  /**
+   * SSE on by default (page load). `done` closes the stream until dispatch (resume/redispatch also
+   * re-arm). Changing company turns it back on. Pause/stop turn it off.
+   */
+  const [campaignsSseArmed, setCampaignsSseArmed] = useState(true);
 
   const fetchCompanies = useCallback(async () => {
     try {
@@ -450,6 +594,10 @@ const CampaignsPage = () => {
   const effectiveCompanyId = isAdmin
     ? companyFilter
     : companyIdentifier || companyFilter;
+
+  useLayoutEffect(() => {
+    setCampaignsSseArmed(true);
+  }, [effectiveCompanyId]);
 
   const fetchCampaigns = useCallback(async () => {
     setLoading(true);
@@ -480,6 +628,37 @@ const CampaignsPage = () => {
     }
   }, [effectiveCompanyId, statusFilter, page, pageSize]);
 
+  const listFetchInFlightRef = useRef(false);
+  const listFetchQueuedRef = useRef(false);
+
+  const fetchCampaignsCoalesced = useCallback(async () => {
+    if (listFetchInFlightRef.current) {
+      listFetchQueuedRef.current = true;
+      return;
+    }
+    listFetchInFlightRef.current = true;
+    listFetchQueuedRef.current = false;
+    try {
+      await fetchCampaigns();
+    } finally {
+      listFetchInFlightRef.current = false;
+      if (listFetchQueuedRef.current) {
+        listFetchQueuedRef.current = false;
+        queueMicrotask(() => {
+          void fetchCampaignsCoalesced();
+        });
+      }
+    }
+  }, [fetchCampaigns]);
+
+  const fetchCampaignsRef = useRef(fetchCampaignsCoalesced);
+  fetchCampaignsRef.current = fetchCampaignsCoalesced;
+
+  /** List load: only when filters/pagination scope change — not on arbitrary re-renders. */
+  useEffect(() => {
+    fetchCampaignsRef.current().catch(() => {});
+  }, [effectiveCompanyId, statusFilter, page, pageSize]);
+
   useEffect(() => {
     fetchCompanies();
   }, [fetchCompanies]);
@@ -490,9 +669,78 @@ const CampaignsPage = () => {
     }
   }, [companyIdentifier]);
 
+  const campaignsSseClosingRef = useRef(false);
+
+  /**
+   * SSE: no list polling. Refetch list only when the server sends `done`, plus the normal
+   * filter/page effect and explicit calls after mutations.
+   */
   useEffect(() => {
-    fetchCampaigns();
-  }, [fetchCampaigns]);
+    if (!effectiveCompanyId || !campaignsSseArmed) return;
+
+    const params = new URLSearchParams({
+      company_id: effectiveCompanyId,
+    });
+    const sseUrl = `/api/campaigns/stream?${params.toString()}`;
+
+    const eventSource = new EventSource(sseUrl);
+
+    eventSource.onerror = () => {
+      eventSource.close();
+      if (campaignsSseClosingRef.current) return;
+      setCampaignsSseArmed(false);
+    };
+
+    eventSource.onmessage = (event: MessageEvent<string>) => {
+      try {
+        const parsed = JSON.parse(event.data) as unknown;
+        if (
+          parsed !== null &&
+          typeof parsed === "object" &&
+          !Array.isArray(parsed)
+        ) {
+          const o = parsed as { type?: string };
+          const msgType = o.type;
+          if (msgType === "ping" || msgType === "connecting") return;
+          if (msgType === "done") {
+            fetchCampaignsRef.current().catch(() => {});
+            setCampaignsSseArmed(false);
+            campaignsSseClosingRef.current = true;
+            eventSource.close();
+            queueMicrotask(() => {
+              campaignsSseClosingRef.current = false;
+            });
+            return;
+          }
+          if (msgType === "message") {
+            const updates = extractCampaignStreamUpdates(parsed);
+            if (updates?.length) {
+              setData((prev) =>
+                mergeStreamUpdatesIntoRows(prev, updates, effectiveCompanyId),
+              );
+            }
+            return;
+          }
+        }
+        const updates = extractCampaignStreamUpdates(parsed);
+        if (updates?.length) {
+          setData((prev) =>
+            mergeStreamUpdatesIntoRows(prev, updates, effectiveCompanyId),
+          );
+        }
+      } catch {
+        /* ignore non-JSON heartbeats */
+      }
+    };
+
+    return () => {
+      campaignsSseClosingRef.current = true;
+      eventSource.close();
+      queueMicrotask(() => {
+        campaignsSseClosingRef.current = false;
+      });
+    };
+  }, [effectiveCompanyId, campaignsSseArmed]);
 
   const campaignId = (row: CampaignRow) =>
     String(row.campaign_id ?? row.id ?? "");
@@ -515,6 +763,7 @@ const CampaignsPage = () => {
       toast.success("Campaign redispatched");
       setShowRedispatchModal(false);
       setRowToRedispatch(null);
+      setCampaignsSseArmed(true);
       fetchCampaigns();
     } catch (err: unknown) {
       const e = err as {
@@ -544,6 +793,11 @@ const CampaignsPage = () => {
         else if (op === "resume") await postCampaignResume(id, payload);
         else if (op === "stop") await postCampaignStop(id, payload);
         toast.success(`Campaign ${op} succeeded`);
+        if (op === "dispatch" || op === "resume") {
+          setCampaignsSseArmed(true);
+        } else if (op === "pause" || op === "stop") {
+          setCampaignsSseArmed(false);
+        }
         fetchCampaigns();
       } catch (err: unknown) {
         const e = err as {
@@ -622,7 +876,7 @@ const CampaignsPage = () => {
       label: "Status",
       sortable: true,
       render: (r) => {
-        const s = String(r.status ?? "—");
+        const s = String(r.status ?? r.campaign_status ?? "—");
         const variant = getCampaignStatusBadgeVariant(s);
         return (
           <Badge className="status-badge text-capitalize" bg={variant}>
@@ -630,6 +884,14 @@ const CampaignsPage = () => {
           </Badge>
         );
       },
+    },
+    {
+      key: "dispatch_progress",
+      label: "Progress",
+      sortable: false,
+      render: (r) => (
+        <span className="text-muted small">{formatStreamProgressCell(r)}</span>
+      ),
     },
     {
       key: "voicebot_name",

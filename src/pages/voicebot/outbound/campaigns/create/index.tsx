@@ -1,5 +1,11 @@
 import "@assets/scss/datatable-style.scss";
-import React, { ReactElement, useState, useEffect, useCallback } from "react";
+import React, {
+  ReactElement,
+  useState,
+  useEffect,
+  useCallback,
+  useMemo,
+} from "react";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 import {
@@ -113,7 +119,10 @@ function buildFormFromCampaignDetail(detail: Record<string, unknown>): CampaignF
   };
 }
 
-function buildCampaignPayload(form: CampaignFormState): CreateCampaignPayload | null {
+function buildCampaignPayload(
+  form: CampaignFormState,
+  companyIdOverride?: string,
+): CreateCampaignPayload | null {
   if (!form.name?.trim()) {
     toast.error("Campaign name is required");
     return null;
@@ -138,7 +147,10 @@ function buildCampaignPayload(form: CampaignFormState): CreateCampaignPayload | 
     return null;
   }
   return {
-    company_id: OUTBOUND_VOICEBOT_CREATE_COMPANY_ID,
+    company_id:
+      companyIdOverride && String(companyIdOverride).trim()
+        ? String(companyIdOverride).trim()
+        : OUTBOUND_VOICEBOT_CREATE_COMPANY_ID,
     voicebot_id: Number(form.voicebot_id),
     name: form.name.trim(),
     description: form.description?.trim() || undefined,
@@ -157,8 +169,9 @@ async function submitCampaignForm(
   isEditMode: boolean,
   editCampaignId: string | undefined,
   router: { push: (url: string) => void },
+  campaignCompanyId?: string,
 ): Promise<void> {
-  const payload = buildCampaignPayload(form);
+  const payload = buildCampaignPayload(form, campaignCompanyId);
   if (!payload) return;
 
   if (isEditMode && editCampaignId) {
@@ -177,6 +190,7 @@ function useLoadCampaignForEdit(
   editCampaignId: string | undefined,
   isEditMode: boolean,
   setForm: React.Dispatch<React.SetStateAction<CampaignFormState>>,
+  scopedCompanyId: string | undefined,
 ): boolean {
   const [loadingCampaign, setLoadingCampaign] = useState(isEditMode);
   useEffect(() => {
@@ -186,7 +200,11 @@ function useLoadCampaignForEdit(
     }
     let cancelled = false;
     setLoadingCampaign(true);
-    getCampaign(editCampaignId)
+    const params =
+      scopedCompanyId && scopedCompanyId.trim()
+        ? { company_id: scopedCompanyId.trim() }
+        : undefined;
+    getCampaign(editCampaignId, params)
       .then((res: Record<string, unknown>) => {
         if (cancelled) return;
         const detail = (res?.data ?? res) as Record<string, unknown>;
@@ -203,7 +221,7 @@ function useLoadCampaignForEdit(
     return () => {
       cancelled = true;
     };
-  }, [isEditMode, editCampaignId, setForm]);
+  }, [isEditMode, editCampaignId, setForm, scopedCompanyId]);
   return loadingCampaign;
 }
 
@@ -510,13 +528,25 @@ const CampaignCreatePage = (props: CampaignFormPageProps) => {
   const router = useRouter();
   const isEditMode = Boolean(editCampaignId);
 
+  const companyIdFromQuery = useMemo(() => {
+    const q = router.query.company_id;
+    if (typeof q === "string" && q.trim()) return q.trim();
+    if (Array.isArray(q) && q[0] && String(q[0]).trim()) return String(q[0]).trim();
+    return undefined;
+  }, [router.query.company_id]);
+
   const [activeTab, setActiveTab] = useState<string>(TAB_KEYS.basic);
   const [voicebots, setVoicebots] = useState<VoicebotOption[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [form, setForm] = useState<CampaignFormState>({ ...defaultForm });
   const csvInputRef = React.useRef<HTMLInputElement>(null);
 
-  const loadingCampaign = useLoadCampaignForEdit(editCampaignId, isEditMode, setForm);
+  const loadingCampaign = useLoadCampaignForEdit(
+    editCampaignId,
+    isEditMode,
+    setForm,
+    companyIdFromQuery,
+  );
   const { isFirstTab, isLastTab, goPrev, goNext } = useTabNavigation(activeTab, setActiveTab);
 
   const handleCsvFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -546,12 +576,16 @@ const CampaignCreatePage = (props: CampaignFormPageProps) => {
 
   const fetchVoicebots = useCallback(async () => {
     try {
-      const res = await getVoicebots({ page: 1, page_size: OUTBOUND_VOICEBOT_LIST_PAGE_SIZE });
+      const res = await getVoicebots({
+        page: 1,
+        page_size: OUTBOUND_VOICEBOT_LIST_PAGE_SIZE,
+        ...(companyIdFromQuery ? { company_id: companyIdFromQuery } : {}),
+      });
       setVoicebots(parseVoicebotsResponse(res));
     } catch {
       setVoicebots([]);
     }
-  }, []);
+  }, [companyIdFromQuery]);
 
   useEffect(() => {
     fetchVoicebots();
@@ -561,7 +595,13 @@ const CampaignCreatePage = (props: CampaignFormPageProps) => {
     e.preventDefault();
     setSubmitting(true);
     try {
-      await submitCampaignForm(form, isEditMode, editCampaignId, router);
+      await submitCampaignForm(
+        form,
+        isEditMode,
+        editCampaignId,
+        router,
+        companyIdFromQuery,
+      );
     } catch (err: unknown) {
       const e = err as { response?: { data?: { detail?: string } }; message?: string };
       toast.error(e?.response?.data?.detail || String(e?.message ?? (isEditMode ? "Update failed" : "Create failed")));

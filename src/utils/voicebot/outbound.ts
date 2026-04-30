@@ -166,28 +166,28 @@ export const getCampaigns = async (params?: ListCampaignsParams) => {
   return response.data;
 };
 
-/** POST /api/campaigns — body always includes `company_id` (`"default"`). */
+/** POST /campaigns — body `company_id` defaults to `"default"` when omitted. */
 export const postCampaigns = async (payload: CreateCampaignPayload | Record<string, unknown>) => {
   const p = payload as Record<string, unknown>;
-  const { company_id: _c, ...rest } = p;
-  const merged = { ...rest, company_id: DEFAULT_COMPANY_ID };
+  const { company_id: cid, ...rest } = p;
+  const merged = { ...rest, company_id: outboundRequestCompanyId(cid) };
   const response = await axiosInstance.post(`${PREFIX_CAMPAIGNS}`, merged);
   return response.data;
 };
 
-/** GET /campaigns/{campaignId} — query `company_id` is always `"default"`. */
+/** GET /campaigns/{campaignId} — `company_id` query defaults to `"default"` when omitted. */
 export const getCampaign = async (campaignId: string, params?: Record<string, unknown>) => {
-  const { company_id: _i, ...rest } = params ?? {};
-  const merged = { ...rest, company_id: DEFAULT_COMPANY_ID };
+  const { company_id: cid, ...rest } = params ?? {};
+  const merged = { ...rest, company_id: outboundRequestCompanyId(cid) };
   const response = await axiosInstance.get(`${PREFIX_CAMPAIGNS}/${campaignId}`, { params: merged });
   return response.data;
 };
 
-/** PUT /api/campaigns/{id} — body always includes `company_id` (`"default"`). */
+/** PUT /campaigns/{id} — body `company_id` defaults to `"default"` when omitted. */
 export const putCampaign = async (campaignId: string, payload: UpdateCampaignPayload | Record<string, unknown>) => {
   const p = payload as Record<string, unknown>;
-  const { company_id: _c, ...rest } = p;
-  const merged = { ...rest, company_id: DEFAULT_COMPANY_ID };
+  const { company_id: cid, ...rest } = p;
+  const merged = { ...rest, company_id: outboundRequestCompanyId(cid) };
   const response = await axiosInstance.put(`${PREFIX_CAMPAIGNS}/${campaignId}`, merged);
   return response.data;
 };
