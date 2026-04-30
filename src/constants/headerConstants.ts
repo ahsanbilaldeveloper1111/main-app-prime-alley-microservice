@@ -592,6 +592,7 @@ export const HEADER_CONSTANTS = {
     VIEW_PRODUCT_DETAILS_BILLING: "products-billing",
     VIEW_BILLING_HISTORY_BILLING: "billing-history-billing",
     VIEW_TRANSACTIONS_BILLING: "view-transactions-billing",
+    VIEW_STATIC_SECTIONS_BILLING: "view-static-sections-billing",
     VIEW_INVOICES_BILLING: "invoices-billing",
     CREATE_INVOICES_BILLING: "create-invoices-billing-billing",
     UPDATE_INVOICES_BILLING: "update-invoices-billing-billing",
