@@ -387,6 +387,7 @@ const ProductDetails = () => {
     onPaginationReset: () =>
       setPagination((prev) => ({ ...prev, currentPage: 1 })),
     rightActions: null,
+  
   });
 
   const filterFields: FilterField[] = useMemo(
@@ -471,6 +472,7 @@ const ProductDetails = () => {
           filterPills: transactionFilterPills,
           showMoreFiltersButton: false,
           showAdvancedFilters: false,
+          toolbarSettingsPath: billingCustomerRoutes.mainSettingsBilling(),
         }}
       />
 

@@ -11,7 +11,7 @@ import DocumentsPage from "@components/billings/DocumentPage";
 import PaymentMethodsPage from "@components/billings/PaymentMethodsPage";
 import CompanyInfoPage from "@components/billings/CompanyInfoPage";
 import {
-  ACCOUNT_BILLING_TABS,
+  getAllowedAccountBillingTabs,
   tabLabelFromQuery,
   tabSlugFromLabel,
   type AccountBillingTab,
@@ -171,9 +171,7 @@ const AccountBilling = () => {
 
   const allowedTabs = useMemo(() => {
     const userPermissions = session?.user?.permissions ?? [];
-    return ACCOUNT_BILLING_TABS.filter((tab) =>
-      userPermissions.includes(tab.permission),
-    );
+    return getAllowedAccountBillingTabs(userPermissions);
   }, [session?.user?.permissions]);
   const firstAllowedTab = allowedTabs[0]?.label ?? "Overview";
 

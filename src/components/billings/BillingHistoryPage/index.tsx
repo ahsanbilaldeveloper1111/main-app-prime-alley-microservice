@@ -954,6 +954,9 @@ export default function BillingHistoryPage({
   const [dateTo, setDateTo] = useState<string>("");
   const [statusFilter, setStatusFilter] = useState<string>("All Statuses");
   const [paymentStatusFilter, setPaymentStatusFilter] = useState<string>("All Payments");
+  const canViewStaticBillingSections = hasPermission(
+    PERMISSIONS.VIEW_STATIC_SECTIONS_BILLING,
+  );
 
   const [invoices, setInvoices] = useState<any[]>([]);
   /** Start true so the first paint shows loading, not an empty state, before `useEffect` fetches. */
@@ -1105,16 +1108,51 @@ export default function BillingHistoryPage({
     ensureCustomerRefreshKey,
   ]);
 
-  const filters = [
-    { label: "Date range", options: ["Last 30 days", "Last 3 months", "Last 6 months", "Last 12 months", "Custom range"] },
-    { label: "Status", options: ["All Statuses", "paid", "partially_paid", "pending", "overdue"] },
-    { label: "Orders", options: ["Order issued", "Order amended", "Order cancelled"] },
-    { label: "Invoices", options: ["Invoice issued", "Invoice credited", "Invoice voided"] },
-    // { label: "Payments", options: ["All Payments", "pending", "completed", "failed"] },
-    { label: "Credits", options: ["Credit applied", "Credit issued", "Credit expired"] },
-    { label: "Refunds", options: ["Refund issued", "Refund pending"] },
-    { label: "Usage & Limits", options: ["Credits used", "Credits added", "Limit changed"] },
-  ];
+  const filters = useMemo(
+    () =>
+      [
+        {
+          label: "Date range",
+          options: ["Last 30 days", "Last 3 months", "Last 6 months", "Last 12 months", "Custom range"],
+          isStaticSection: false,
+        },
+        {
+          label: "Status",
+          options: ["All Statuses", "paid", "partially_paid", "pending", "overdue"],
+          isStaticSection: false,
+        },
+        {
+          label: "Orders",
+          options: ["Order issued", "Order amended", "Order cancelled"],
+          isStaticSection: true,
+        },
+        {
+          label: "Invoices",
+          options: ["Invoice issued", "Invoice credited", "Invoice voided"],
+          isStaticSection: true,
+        },
+        // { label: "Payments", options: ["All Payments", "pending", "completed", "failed"], isStaticSection: false },
+        {
+          label: "Credits",
+          options: ["Credit applied", "Credit issued", "Credit expired"],
+          isStaticSection: true,
+        },
+        {
+          label: "Refunds",
+          options: ["Refund issued", "Refund pending"],
+          isStaticSection: true,
+        },
+        {
+          label: "Usage & Limits",
+          options: ["Credits used", "Credits added", "Limit changed"],
+          isStaticSection: true,
+        },
+      ].filter(
+        (filterItem) =>
+          !filterItem.isStaticSection || canViewStaticBillingSections,
+      ),
+    [canViewStaticBillingSections],
+  );
 
   return (
     <div style={s.page}>
