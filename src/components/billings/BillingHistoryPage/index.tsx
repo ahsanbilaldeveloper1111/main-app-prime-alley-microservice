@@ -1123,12 +1123,12 @@ export default function BillingHistoryPage({
   const filters = [
     { label: "Date range", options: ["Last 30 days", "Last 3 months", "Last 6 months", "Last 12 months", "Custom range"] },
     { label: "Status", options: ["All Statuses", "paid", "partially_paid", "pending", "overdue"] },
-    { label: "Orders", options: ["Order issued", "Order amended", "Order cancelled"] },
-    { label: "Invoices", options: ["Invoice issued", "Invoice credited", "Invoice voided"] },
+    // { label: "Orders", options: ["Order issued", "Order amended", "Order cancelled"] },
+    // { label: "Invoices", options: ["Invoice issued", "Invoice credited", "Invoice voided"] },
     // { label: "Payments", options: ["All Payments", "pending", "completed", "failed"] },
-    { label: "Credits", options: ["Credit applied", "Credit issued", "Credit expired"] },
-    { label: "Refunds", options: ["Refund issued", "Refund pending"] },
-    { label: "Usage & Limits", options: ["Credits used", "Credits added", "Limit changed"] },
+    // { label: "Credits", options: ["Credit applied", "Credit issued", "Credit expired"] },
+    // { label: "Refunds", options: ["Refund issued", "Refund pending"] },
+    // { label: "Usage & Limits", options: ["Credits used", "Credits added", "Limit changed"] },
   ];
 
   return (
