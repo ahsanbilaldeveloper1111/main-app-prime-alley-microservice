@@ -75,10 +75,6 @@ export const routePermissions: RoutePermission[] = [
     { path: '/audit-logs', permissions: [PERMISSIONS.AUDIT_LOGS_SERVICES] },
    
     {path:'/crm/quotes',permissions: [PERMISSIONS.VIEW_CRM_QUOTES]},
-    {path:'/billing/quotes',permissions: [PERMISSIONS.VIEW_QUOTES_BILLING]},
-    { path: '/billing/products', permissions: [PERMISSIONS.VIEW_PRODUCTS_BILLING] },
-    { path: '/billing/products/manage-categories', permissions: [PERMISSIONS.VIEW_PRODUCTS_BILLING] },
-    { path: '/billing/transactions', permissions: [PERMISSIONS.VIEW_BILLING_HISTORY_BILLING] },
 
 
 
@@ -263,19 +259,9 @@ export const routePermissions: RoutePermission[] = [
         permissions: [PERMISSIONS.CUSTOMER_ACCOUNTS_SERVICES],
 
         children: [
-            { path: '/dashboard',permissions: [PERMISSIONS.VIEW_CUSTOMER_DASHBOARD_BILLING]},
-            { path: '/account-overview',permissions: [PERMISSIONS.VIEW_ACCOUNT_OVERVIEW_BILLING]},
             { path: '/account-billing',permissions: [PERMISSIONS.ACCOUNTS_SERVICES]},
             { path: '/account-billing/:tab',permissions: [PERMISSIONS.ACCOUNTS_SERVICES]},
-            { path: '/subscriptions',permissions: [PERMISSIONS.VIEW_PRODUCT_DETAILS_BILLING]},
-            { path: '/payment-history',permissions: [PERMISSIONS.VIEW_BILLING_HISTORY_BILLING]},
-            { path: '/payment-methods',permissions: [PERMISSIONS.VIEW_PAYMENT_METHODS_BILLING]},
-            { path: '/invoices', permissions: [PERMISSIONS.VIEW_INVOICES_BILLING] },
-            { path: '/invoices/create', permissions: [PERMISSIONS.CREATE_INVOICES_BILLING] },
-            { path: '/invoices/edit/:invoiceId', permissions: [PERMISSIONS.UPDATE_INVOICES_BILLING] },
-            { path: '/order-invoicing', permissions: [PERMISSIONS.VIEW_ORDER_INVOICES_BILLING] },
-            { path: '/create-invoice', permissions: [PERMISSIONS.CREATE_INVOICES_BILLING] },
-            { path: '/payments', permissions: [PERMISSIONS.VIEW_BILLING_HISTORY_BILLING] },
+       
             {
                 path: '/customer',
                 permissions: [PERMISSIONS.CUSTOMER_ACCOUNTS_SERVICES],
@@ -972,6 +958,7 @@ function hasBraceParam(path: string): boolean {
  * Exact match or path starting with an entry (e.g. '/help-center/knowledge-base') is excluded.
  */
 export const SEARCH_EXCLUDED_ROUTES: string[] = [
+   
     '/help-center/knowledge-base/[id]',
     '/help-center/my-tickets/[id]',
     '/planner/tasks/:id',
