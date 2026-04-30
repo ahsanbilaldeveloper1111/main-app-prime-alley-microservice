@@ -84,7 +84,8 @@ import { useCrmQuotesListPageUploadHandlers } from "@crm/billing-quotes/useCrmQu
 import { CrmQuotesListPageDeleteConfirmationBlock } from "@crm/billing-quotes/CrmQuotesListPageDeleteConfirmationBlock";
 import { CrmQuotesListPageProspectSidebar } from "@crm/billing-quotes/CrmQuotesListPageProspectSidebar";
 import { CrmQuotesListPageQuotesFilterSidebar } from "@crm/billing-quotes/CrmQuotesListPageQuotesFilterSidebar";
-import { BILLING_PRODUCTS_TABS_DROPDOWN_ITEMS } from "@utils/billingProductsTabs";
+import { getBillingCustomerPortalTabsDropdownItems } from "@utils/billingProductsTabs";
+import { billingCustomerRoutes } from "@utils/billingCustomerRoutes";
 import { HEADER_CONSTANTS } from "@constants/headerConstants";
 
 const { PERMISSIONS } = HEADER_CONSTANTS;
@@ -527,7 +528,11 @@ function CrmQuotesListPageContent({ variant }: Readonly<CrmQuotesListPageProps>)
       <div style={{ width: "146px" }}>
         <button
           onClick={() => {
-            router.push('/billing/create-invoice');
+            router.push(
+              variant === "billing"
+                ? billingCustomerRoutes.createInvoice()
+                : "/crm/quotes/create",
+            );
           }}
           style={CRM_LIST_PRIMARY_BUTTON_STYLE}
           {...PRIMARY_BUTTON_HOVER}
@@ -638,6 +643,14 @@ function CrmQuotesListPageContent({ variant }: Readonly<CrmQuotesListPageProps>)
     },
   });
 
+  const billingTabsDropdownItems = useMemo(
+    () =>
+      getBillingCustomerPortalTabsDropdownItems(
+        (permission) => session?.user?.permissions?.includes(permission) === true,
+      ),
+    [session?.user?.permissions],
+  );
+
   if (
     !session?.user?.permissions?.includes(PERMISSIONS.VIEW_CRM_DATA_MANAGEMENT)
   ) {
@@ -658,7 +671,9 @@ function CrmQuotesListPageContent({ variant }: Readonly<CrmQuotesListPageProps>)
       <BreadcrumbItem
         mainTitle={variant === "billing" ? "Billing" : "CRM"}
         mainLink={
-          variant === "billing" ? "/billing/dashboard" : "/crm/dashboard"
+          variant === "billing"
+            ? billingCustomerRoutes.dashboard()
+            : "/crm/dashboard"
         }
         subTitle="Quotes"
       />
@@ -896,7 +911,7 @@ function CrmQuotesListPageContent({ variant }: Readonly<CrmQuotesListPageProps>)
                       quotesFilterPills,
                     },
                   ),
-                  tabsDropdownItems: BILLING_PRODUCTS_TABS_DROPDOWN_ITEMS,
+                  tabsDropdownItems: billingTabsDropdownItems,
                   showFilterPills: true,
                   showMoreFiltersButton: false,
                   showAdvancedFilters: false,

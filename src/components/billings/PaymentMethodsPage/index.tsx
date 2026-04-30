@@ -4,6 +4,10 @@ import { GetPaymentMethods, setDefaultPaymentMethod, deletePaymentMethod, addPay
 import { toast } from "react-toastify";
 import { loadStripe } from "@stripe/stripe-js";
 import { Elements, CardNumberElement, CardExpiryElement, CardCvcElement, useStripe, useElements } from "@stripe/react-stripe-js";
+import { usePermissions } from "@utils/permissionUtils";
+import { HEADER_CONSTANTS } from "@constants/headerConstants";
+
+const { PERMISSIONS } = HEADER_CONSTANTS;
 
 const font = "Lexend Deca, Helvetica, Arial, sans-serif";
 
@@ -415,10 +419,12 @@ function AddCardFormSidebar({
   onSuccess,
   onCancel,
   companyDetails,
+  canMarkDefault,
 }: Readonly<{
   onSuccess: () => void;
   onCancel: () => void;
   companyDetails?: any;
+  canMarkDefault: boolean;
 }>) {
   const stripe = useStripe();
   const elements = useElements();
@@ -487,7 +493,7 @@ function AddCardFormSidebar({
       }
       const payload: Record<string, any> = {
         stripeToken: token.id,
-        isDefault,
+        isDefault: canMarkDefault ? isDefault : false,
         cardholderName: cardholderName || undefined,
       };
       if (useCompanyAddress && companyDetails) {
@@ -559,6 +565,7 @@ function AddCardFormSidebar({
         Your card information is securely processed by Stripe.
       </p>
 
+      {canMarkDefault && (
       <label style={{ ...s.checkRow, cursor: "pointer" }}>
         <input
           type="checkbox"
@@ -581,6 +588,7 @@ function AddCardFormSidebar({
         </span>
         <span style={s.checkLabel}>Set as default payment method</span>
       </label>
+      )}
 
       {companyDetails && (
         <>
@@ -656,6 +664,8 @@ function AddCardFormSidebar({
 
 // ── Add Payment Sidebar ────────────────────────────────────────────────────────
 function AddPaymentSidebar({ onClose }: Readonly<{ onClose: () => void }>) {
+  const { hasPermission } = usePermissions();
+  const canMarkDefault = hasPermission(PERMISSIONS.MARK_PAYMENT_METHOD_DEFAULT_BILLING);
   const [stripePublishableKey, setStripePublishableKey] = useState<string | null>(null);
   const [companyDetails, setCompanyDetails] = useState<any>(null);
 
@@ -712,7 +722,12 @@ function AddPaymentSidebar({ onClose }: Readonly<{ onClose: () => void }>) {
                 },
               }}
             >
-              <AddCardFormSidebar onSuccess={handleSuccess} onCancel={onClose} companyDetails={companyDetails} />
+              <AddCardFormSidebar
+                onSuccess={handleSuccess}
+                onCancel={onClose}
+                companyDetails={companyDetails}
+                canMarkDefault={canMarkDefault}
+              />
             </Elements>
           ) : (
             <div style={{ color: "#666", fontSize: 14, fontFamily: font }}>
@@ -774,6 +789,10 @@ function DeleteConfirmModal({
 
 // ── Main page ──────────────────────────────────────────────────────────────────
 export default function PaymentMethodsPage() {
+  const { hasPermission } = usePermissions();
+  const canAddPaymentMethod = hasPermission(PERMISSIONS.ADD_PAYMENT_METHOD_BILLING);
+  const canMarkDefaultPaymentMethod = hasPermission(PERMISSIONS.MARK_PAYMENT_METHOD_DEFAULT_BILLING);
+  const canDeletePaymentMethod = hasPermission(PERMISSIONS.DELETE_PAYMENT_METHOD_BILLING);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [actionsOpenId, setActionsOpenId] = useState<string | null>(null);
   const [paymentMethods, setPaymentMethods] = useState<any[]>([]);
@@ -802,6 +821,10 @@ export default function PaymentMethodsPage() {
   }, [fetchPaymentMethods]);
 
   const handleSetDefault = async (id: string) => {
+    if (!canMarkDefaultPaymentMethod) {
+      toast.error("You are not authorized to set default payment method");
+      return;
+    }
     setActionsOpenId(null);
     try {
       await setDefaultPaymentMethod(id);
@@ -814,12 +837,20 @@ export default function PaymentMethodsPage() {
   };
 
   const handleDeleteClick = (id: string) => {
+    if (!canDeletePaymentMethod) {
+      toast.error("You are not authorized to delete payment method");
+      return;
+    }
     setActionsOpenId(null);
     setDeleteConfirmId(id);
   };
 
   const handleConfirmDelete = async () => {
     if (!deleteConfirmId) return;
+    if (!canDeletePaymentMethod) {
+      toast.error("You are not authorized to delete payment method");
+      return;
+    }
     try {
       await deletePaymentMethod(deleteConfirmId);
       toast.success("Payment method deleted");
@@ -902,6 +933,8 @@ export default function PaymentMethodsPage() {
         <td style={s.td}> <div style={{ display: "flex", alignItems: "center", gap: 4 }}> {isDefault(method) ? <Check size={20} color="#006162" /> : <></>} <span style={{ fontSize: 12, fontFamily: font, color: "#141414" }}>{isDefault(method) ? "Default" : ""}</span></div></td>
        
         <td style={{ ...s.td, position: "relative" as const }}>
+          {(canMarkDefaultPaymentMethod || canDeletePaymentMethod) && (
+            <>
           <button
             style={s.actionsBtn}
             onClick={() => setActionsOpenId(actionsOpenId === method?.id ? null : method?.id)}
@@ -935,7 +968,7 @@ export default function PaymentMethodsPage() {
                 minWidth: 180,
                 padding: "6px 0",
               }}>
-                {!isDefault(method) && (
+                {canMarkDefaultPaymentMethod && !isDefault(method) && (
                   <button
                     type="button"
                     onClick={() => handleSetDefault(method.id)}
@@ -954,6 +987,7 @@ export default function PaymentMethodsPage() {
                     Set as default
                   </button>
                 )}
+                {canDeletePaymentMethod && (
                 <button
                   type="button"
                   onClick={() => handleDeleteClick(method.id)}
@@ -971,8 +1005,11 @@ export default function PaymentMethodsPage() {
                 >
                   Delete payment method
                 </button>
+                )}
               </div>
             </>
+          )}
+          </>
           )}
         </td>
       </tr>
@@ -983,9 +1020,11 @@ export default function PaymentMethodsPage() {
     <div style={s.page}>
       <div style={s.topRow}>
         <h1 style={s.pageHeading}>Payment Methods</h1>
-        <button style={s.btnDark} onClick={() => setSidebarOpen(true)}>
-          Add Payment Method
-        </button>
+        {canAddPaymentMethod && (
+          <button style={s.btnDark} onClick={() => setSidebarOpen(true)}>
+            Add Payment Method
+          </button>
+        )}
       </div>
 
       <div style={s.tableWrapper}>

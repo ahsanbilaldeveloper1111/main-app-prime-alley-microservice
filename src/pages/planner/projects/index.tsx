@@ -1275,16 +1275,9 @@ const ExpandableProjectTable: React.FC<ExpandableProjectTableProps> = ({
   actions,
   sessionUserPhoneOrExtension,
 }) => {
-  const { hasPermission, hasAnyPermission } = usePermissions();
+  const { hasPermission } = usePermissions();
   const canPreviewEditTask = hasPermission(PERMISSIONS.EDIT_TASKS_WORK_PLANNER);
-  const sessionCanCreatePlannerTask = useMemo(
-    () =>
-      hasAnyPermission([
-        PERMISSIONS.CREATE_TASKS_WORK_PLANNER,
-        PERMISSIONS.EDIT_TASKS_WORK_PLANNER,
-      ]),
-    [hasAnyPermission],
-  );
+  const sessionCanCreatePlannerTask = hasPermission(PERMISSIONS.CREATE_TASKS_WORK_PLANNER);
   // Track which project rows are expanded
   const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set());
   // Cache of loaded tasks per project { [projectId]: Task[] }
@@ -2758,27 +2751,18 @@ function projectMatchesFilters(project: Project, appliedFilters: AppliedProjectF
 const WorkPlannerProjects = () => {
   const router = useRouter();
   const { data: session } = useSession();
-  const { hasAnyPermission } = usePermissions();
+  const { hasPermission } = usePermissions();
   const sessionUserPhoneOrExtension = useMemo(
     () => getSessionPhoneOrExtension(session),
     [session],
   );
   const sessionPlannerProjectCrud = useMemo(
     () => ({
-      canCreate: hasAnyPermission([
-        PERMISSIONS.CREATE_PROJECTS_WORK_PLANNER,
-        PERMISSIONS.VIEW_PROJECTS_WORK_PLANNER,
-      ]),
-      canUpdate: hasAnyPermission([
-        PERMISSIONS.UPDATE_PROJECTS_WORK_PLANNER,
-        PERMISSIONS.EDIT_TASKS_WORK_PLANNER,
-      ]),
-      canDelete: hasAnyPermission([
-        PERMISSIONS.DELETE_PROJECTS_WORK_PLANNER,
-        PERMISSIONS.EDIT_TASKS_WORK_PLANNER,
-      ]),
+      canCreate: hasPermission(PERMISSIONS.CREATE_PROJECTS_WORK_PLANNER),
+      canUpdate: hasPermission(PERMISSIONS.UPDATE_PROJECTS_WORK_PLANNER),
+      canDelete: hasPermission(PERMISSIONS.DELETE_PROJECTS_WORK_PLANNER),
     }),
-    [hasAnyPermission],
+    [hasPermission],
   );
 
   const [projects, setProjects] = useState<Project[]>([]);
@@ -3266,7 +3250,7 @@ const WorkPlannerProjects = () => {
     showFiltersButton: true,
     showMoreFiltersButton: false,
     onFiltersClick: () => setShowFilterSidebar(true),
-    rightActions: (
+    rightActions: sessionPlannerProjectCrud.canCreate ? (
       <button
         style={{
           cursor: "pointer",
@@ -3292,7 +3276,7 @@ const WorkPlannerProjects = () => {
         <Plus size={18} />
         <span>Create Project</span>
       </button>
-    ),
+    ) : null,
   };
 
   const handleCloseFilterSidebar = () => setShowFilterSidebar(false);

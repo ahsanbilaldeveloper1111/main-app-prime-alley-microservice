@@ -1,6 +1,8 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import { useRouter } from 'next/router';
 import { useSession } from 'next-auth/react';
+import { usePermissions } from '@utils/permissionUtils';
+import { HEADER_CONSTANTS } from '@constants/headerConstants';
 import {
   canManageProjectFromMembers,
   getSessionPhoneOrExtension,
@@ -22,6 +24,8 @@ import { formatDateForTable } from '@utils/Helper';
 import { updateTask, getTask } from '@utils/tasks';
 import { toast } from 'react-toastify';
 import CreateTaskSidebar from '@components/CreatePlannerTaskSidebar';
+
+const { PERMISSIONS } = HEADER_CONSTANTS;
 
 const FONT = "'Lexend Deca', Helvetica, Arial, sans-serif";
 const TEAL = "#006162";
@@ -411,14 +415,17 @@ const BoardView: React.FC<BoardViewProps> = ({
 }) => {
   const router = useRouter();
   const { data: session } = useSession();
+  const { hasPermission } = usePermissions();
   const sessionUserPhoneOrExtension = useMemo(
     () => getSessionPhoneOrExtension(session),
     [session],
   );
   /** Admin + member: add/move/edit from board. Viewer: read-only. */
   const canEditTasksOnBoard = useMemo(
-    () => canManageProjectFromMembers(selectedProject, sessionUserPhoneOrExtension),
-    [selectedProject, sessionUserPhoneOrExtension],
+    () =>
+      canManageProjectFromMembers(selectedProject, sessionUserPhoneOrExtension) &&
+      hasPermission(PERMISSIONS.EDIT_TASKS_WORK_PLANNER),
+    [hasPermission, selectedProject, sessionUserPhoneOrExtension],
   );
 
   const [selectedTask, setSelectedTask] = useState<any>(null);

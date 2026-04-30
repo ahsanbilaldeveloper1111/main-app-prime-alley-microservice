@@ -8,6 +8,8 @@ import React, {
 } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/router';
+import { usePermissions } from '@utils/permissionUtils';
+import { HEADER_CONSTANTS } from '@constants/headerConstants';
 import {
   canAdministerProjectFromMembers,
   canManageProjectFromMembers,
@@ -39,6 +41,7 @@ import StatusesTab from './StatusesTab';
 import LabelsTab from './LabelsTab';
 import OverdueTasksModal from './OverdueTasksModal';
 import type { ActivityLogExtension } from '@planner/activityLogExtension';
+const { PERMISSIONS } = HEADER_CONSTANTS;
 
 interface ProjectTabsContentProps {
   selectedProject: any;
@@ -65,6 +68,7 @@ const ProjectTabsContent = forwardRef<ProjectTabsContentRef, ProjectTabsContentP
 }, ref) => {
   const router = useRouter();
   const { data: session } = useSession();
+  const { hasPermission, hasAnyPermission } = usePermissions();
   const sessionUserPhoneOrExtension = useMemo(
     () => getSessionPhoneOrExtension(session),
     [session],
@@ -78,6 +82,37 @@ const ProjectTabsContent = forwardRef<ProjectTabsContentRef, ProjectTabsContentP
   const canAdministerProject = useMemo(
     () => canAdministerProjectFromMembers(selectedProject, sessionUserPhoneOrExtension),
     [selectedProject, sessionUserPhoneOrExtension],
+  );
+  const canCreateTask = hasPermission(PERMISSIONS.CREATE_TASKS_WORK_PLANNER);
+  const canViewProjectDetails = hasPermission(PERMISSIONS.VIEW_PROJECTS_WORK_PLANNER);
+  const canViewTaskDetails = hasPermission(PERMISSIONS.VIEW_TASKSLIST_WORK_PLANNER);
+  const canViewMembersTab =
+    canAdministerProject && hasPermission(PERMISSIONS.VIEW_PROJECT_MEMBERS_WORK_PLANNER);
+  const canViewStatusesTab = hasPermission(PERMISSIONS.VIEW_STATUSES_WORK_PLANNER);
+  const canViewLabelsTab =
+    canAdministerProject &&
+    hasAnyPermission([
+      PERMISSIONS.CREATE_LABELS_WORK_PLANNER,
+      PERMISSIONS.UPDATE_LABELS_WORK_PLANNER,
+      PERMISSIONS.DELETE_LABELS_WORK_PLANNER,
+    ]);
+  const visibleTabs = useMemo(
+    () =>
+      [
+        ...(canViewProjectDetails ? ['Overview'] : []),
+        ...(canViewTaskDetails ? ['Board', 'List'] : []),
+        ...(canViewMembersTab ? ['Members'] : []),
+        ...(canViewStatusesTab ? ['Statuses'] : []),
+        ...(canViewLabelsTab ? ['Labels'] : []),
+      ] as string[],
+    [
+      canViewLabelsTab,
+      canViewMembersTab,
+      canViewProjectDetails,
+      canViewStatusesTab,
+      canViewTaskDetails,
+      hasAnyPermission,
+    ],
   );
 
   const [activeTab, setActiveTab] = useState('overview');
@@ -144,13 +179,16 @@ const ProjectTabsContent = forwardRef<ProjectTabsContentRef, ProjectTabsContentP
     if (router.isReady) {
       const tabFromUrl = router.query.tab as string;
       if (tabFromUrl) {
-        const validTabs = ['overview', 'board', 'list', 'members', 'statuses', 'labels', 'reports'];
-        if (validTabs.includes(tabFromUrl.toLowerCase())) {
-          setActiveTab(tabFromUrl.toLowerCase());
+        const requestedTab = tabFromUrl.toLowerCase();
+        const validTabs = visibleTabs.map((tab) => tab.toLowerCase());
+        if (validTabs.includes(requestedTab)) {
+          setActiveTab(requestedTab);
+        } else if (validTabs.length > 0) {
+          setActiveTab(validTabs[0]);
         }
       }
     }
-  }, [router.isReady, router.query.tab]);
+  }, [router.isReady, router.query.tab, visibleTabs]);
 
   const handleTabChange = useCallback((tab: string) => {
     setActiveTab(tab);
@@ -248,7 +286,7 @@ const ProjectTabsContent = forwardRef<ProjectTabsContentRef, ProjectTabsContentP
 
   useImperativeHandle(ref, () => ({
     openCreateTaskModal: () => {
-      if (selectedProject && canManageProject) {
+      if (selectedProject && canManageProject && canCreateTask) {
         setShowCreateTaskModal(true);
       }
     },
@@ -259,7 +297,7 @@ const ProjectTabsContent = forwardRef<ProjectTabsContentRef, ProjectTabsContentP
       await fetchProjectData();
       await refreshTaskViewsForActiveTab();
     },
-  }), [selectedProject, canManageProject, handleTabChange, fetchProjectData, refreshTaskViewsForActiveTab]);
+  }), [selectedProject, canManageProject, canCreateTask, handleTabChange, fetchProjectData, refreshTaskViewsForActiveTab]);
 
   const styles = {
     tabsContainer: { backgroundColor: '#fff', borderBottom: '1px solid #E5E9F2' },
@@ -303,6 +341,7 @@ const ProjectTabsContent = forwardRef<ProjectTabsContentRef, ProjectTabsContentP
   const renderProjectTabPanel = (project: NonNullable<typeof selectedProject>) => {
     switch (activeTab) {
       case 'overview':
+        if (!canViewProjectDetails) return null;
         return (
           <OverviewTab
             statusCards={statusCards}
@@ -323,6 +362,7 @@ const ProjectTabsContent = forwardRef<ProjectTabsContentRef, ProjectTabsContentP
           />
         );
       case 'board':
+        if (!canViewTaskDetails) return null;
         return (
           <BoardTab
             selectedProject={project}
@@ -344,7 +384,7 @@ const ProjectTabsContent = forwardRef<ProjectTabsContentRef, ProjectTabsContentP
             showCompletedTasks={showCompletedTasks}
             setShowCompletedTasks={setShowCompletedTasks}
             onCreateTask={(statusId) => {
-              if (!canManageProject) return;
+              if (!canManageProject || !canCreateTask) return;
               setSelectedStatusForTask(statusId);
               setShowCreateTaskModal(true);
             }}
@@ -367,6 +407,7 @@ const ProjectTabsContent = forwardRef<ProjectTabsContentRef, ProjectTabsContentP
           />
         );
       case 'list':
+        if (!canViewTaskDetails) return null;
         return (
           <ListTab
             tasksList={tasksList}
@@ -441,10 +482,13 @@ const ProjectTabsContent = forwardRef<ProjectTabsContentRef, ProjectTabsContentP
       <TabsNavigation
         activeTab={activeTab}
         onTabChange={handleTabChange}
+        tabs={visibleTabs}
       />
 
       <div style={styles.contentContainer}>
-        {selectedProject ? renderProjectTabPanel(selectedProject) : emptyProjectMessage}
+        {selectedProject && visibleTabs.length > 0
+          ? renderProjectTabPanel(selectedProject)
+          : emptyProjectMessage}
       </div>
 
       <OverdueTasksModal

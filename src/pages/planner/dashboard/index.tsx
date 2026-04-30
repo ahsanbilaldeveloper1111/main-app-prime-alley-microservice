@@ -16,11 +16,19 @@ import ProjectTabsContent, { type ProjectTabsContentRef } from '../projects/part
 import { listProjects } from '@utils/tasks';
 import { ModuleSlug } from '@utils/Helper';
 import { useHierarchyData } from "@components/filters/useHierarchyData";
+import { usePermissions } from "@utils/permissionUtils";
+import { HEADER_CONSTANTS } from "@constants/headerConstants";
+
+const { PERMISSIONS } = HEADER_CONSTANTS;
 
 /** List row from `listProjects`; index fields required, rest passed through for project tabs. */
 type DashboardProjectRow = { id: number; name: string } & Record<string, unknown>;
 
 const WorkPlannerProjectsDashboard = () => {
+    const { hasPermission } = usePermissions();
+    const canViewProjects = hasPermission(PERMISSIONS.VIEW_PROJECTS_WORK_PLANNER);
+    const canViewTasks = hasPermission(PERMISSIONS.VIEW_TASKSLIST_WORK_PLANNER);
+    const canCreateTask = hasPermission(PERMISSIONS.CREATE_TASKS_WORK_PLANNER);
     const [selectedProject, setSelectedProject] = useState<DashboardProjectRow | null>(null);
     const [projects, setProjects] = useState<DashboardProjectRow[]>([]);
     const [loadingProjects, setLoadingProjects] = useState(true);
@@ -32,6 +40,12 @@ const WorkPlannerProjectsDashboard = () => {
     
     // Fetch projects list
     useEffect(() => {
+      if (!canViewProjects) {
+        setProjects([]);
+        setSelectedProject(null);
+        setLoadingProjects(false);
+        return;
+      }
       let cancelled = false;
       const fetchDashboardProjects = async () => {
         try {
@@ -62,7 +76,7 @@ const WorkPlannerProjectsDashboard = () => {
       return () => {
         cancelled = true;
       };
-    }, []);
+    }, [canViewProjects]);
 
     const handleProjectSelect = useCallback((project: DashboardProjectRow) => {
       setSelectedProject(project);
@@ -312,6 +326,7 @@ const WorkPlannerProjectsDashboard = () => {
 </div>
             
             <div style={styles.headerRight}>
+              {canCreateTask && (
               <button
                 type="button"
                 style={{
@@ -349,12 +364,14 @@ const WorkPlannerProjectsDashboard = () => {
                     alert("Please select a project first");
                   }
                 }}
-                disabled={!selectedProject || hierarchyLoading}
+                disabled={!selectedProject || hierarchyLoading || !canViewProjects}
               >
                 <Plus size={18} />
                 <span>Create Task</span>
               </button>
+              )}
 
+              {canViewTasks && (
               <button
                 type="button"
                 style={{
@@ -391,11 +408,13 @@ const WorkPlannerProjectsDashboard = () => {
                 <LayoutGrid size={18} />
                 <span>Board View</span>
               </button>
+              )}
             </div>
           </div>
         </div>
         </div>
 
+        {canViewProjects || canViewTasks ? (
         <ProjectTabsContent
           ref={projectTabsContentRef}
           selectedProject={selectedProject}
@@ -403,6 +422,11 @@ const WorkPlannerProjectsDashboard = () => {
           hierarchyLoading={hierarchyLoading}
           onCreateTask={handleCreateTask}
         />
+        ) : (
+          <div style={{ padding: "1.5rem", color: "#6B7280", fontSize: "0.95rem" }}>
+            You have dashboard-only access. Project and task details are not available.
+          </div>
+        )}
       </div>
 
   

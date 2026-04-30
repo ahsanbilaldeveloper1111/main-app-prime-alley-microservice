@@ -1,4 +1,4 @@
-import "@assets/scss/datatable-style.scss";
+import "@components/billings/customer/billingCustomerDatatableCommonTabsStyles";
 import React, {
   ReactElement,
   useCallback,
@@ -17,8 +17,6 @@ import {
 } from "react-bootstrap";
 import { Edit, PlusCircle, Trash2 } from "lucide-react";
 
-import "@assets/scss/common.scss";
-import "@assets/scss/tabs.scss";
 import GenericTable, {
   type FilterPill,
   type TableAction,
@@ -33,6 +31,7 @@ import {
   type ProductCategoryData,
   updateProductCategory,
 } from "@utils/accounts";
+import { billingCustomerRoutes } from "@utils/billingCustomerRoutes";
 import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
 import PageHeader from "@components/PageHeader";
 import { GENERIC_TABLE_PAGE_SIZE_OPTIONS } from "@constants/genericTable";
@@ -395,10 +394,6 @@ const ManageCategories = () => {
     setSortState({ column, direction });
   }, []);
 
-  const handleToolbarSearch = useCallback(() => {
-    setPagination((prev) => ({ ...prev, currentPage: 1 }));
-  }, []);
-
   const categoryStatusPills = useMemo<FilterPill[]>(
     () => [
       {
@@ -432,11 +427,7 @@ const ManageCategories = () => {
 
   const categoriesToolbarConfig = useMemo<ToolbarConfig>(
     () => ({
-      showSearch: true,
-      searchValue: search,
-      searchPlaceholder: "Search categories by name",
-      onSearchChange: handleSearchChange,
-      onSearch: handleToolbarSearch,
+      showSearch: false,
       showFilterPills: true,
       showMoreFiltersButton: false,
       filterPills: categoryStatusPills,
@@ -454,14 +445,7 @@ const ManageCategories = () => {
         </div>
       ) : undefined,
     }),
-    [
-      search,
-      handleSearchChange,
-      handleToolbarSearch,
-      openAddCategoryModal,
-      categoryStatusPills,
-      canManageProductCategories,
-    ],
+    [openAddCategoryModal, categoryStatusPills, canManageProductCategories],
   );
 
   if (!canViewBillingProducts) {
@@ -471,14 +455,17 @@ const ManageCategories = () => {
   return (
     <React.Fragment>
       <BreadcrumbItem
-        mainTitle="Categories"
-        mainLink="/billing/products/manage-categories"
+        mainTitle="Products"
+        mainLink={billingCustomerRoutes.products()}
         subTitle="Manage Categories"
       />
 
-      <PageHeader 
+      <PageHeader
         title="Manage Categories"
-        showSearch={false}
+        showSearch
+        searchPlaceholder="Search categories by name"
+        searchValue={search}
+        onSearchChange={handleSearchChange}
       />
 
       <div>

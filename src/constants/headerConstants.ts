@@ -322,9 +322,6 @@ export const HEADER_CONSTANTS = {
     //Services permissions end
 
     //Work Planner permissions start
-    VIEW_RECURRING_REMINDERS_WORK_PLANNER:
-      "view-recurring-reminders-work-planner",
-    VIEW_DIAL_TODO_WORK_PLANNER: "view-dial-todo-work-planner",
     VIEW_TASKSLIST_WORK_PLANNER: "view-tasks-work-planner",
     VIEW_PROJECTS_WORK_PLANNER: "view-projects-work-planner",
     VIEW_PROJECTS_DASHBOARD_WORK_PLANNER:
@@ -588,7 +585,6 @@ export const HEADER_CONSTANTS = {
     VIEW_LOCATIONS_BILLING: "view-locations-billing",
     VIEW_RESSELLERS_BILLING: "view-resellers-billing",
     VIEW_INVENTORY_BILLING: "view-inventory-billing",
-    VIEW_PRODUCT_PRICING_COMPANIES_BILLING: "manage-pricing-companies-billing",
 
     VIEW_ACCOUNT_OVERVIEW_BILLING: "account-overview-billing",
     VIEW_DOCUMENTS_BILLING: "view-documents-billing",
@@ -685,7 +681,6 @@ export const HEADER_CONSTANTS = {
 
     VIEW_CRM_ORDERS: "view-crm-orders",
     CREATE_CRM_ORDERS: "add-crm-orders",
-    EDIT_CRM_ORDERS_BILLING: "edit-crm-orders",
     EDIT_CRM_ORDERS_DELIVERY: "edit-delivery-crm-orders",
     DELETE_CRM_ORDERS: "delete-crm-orders",
     VIEW_CRM_TASKS: "view-crm-tasks",

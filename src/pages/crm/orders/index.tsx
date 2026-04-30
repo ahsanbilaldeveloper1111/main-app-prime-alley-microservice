@@ -131,6 +131,7 @@ import {
   buildCrmOrdersListExportParams,
   buildCrmOrdersListGetOrdersParams,
 } from "@crm/orders/buildCrmOrdersListGetOrdersParams";
+import { normalizeGetOrdersListResponse } from "@crm/orders/normalizeGetOrdersListResponse";
 import { useCrmListPreviewPersistence } from "@crm/shared/useCrmListPreviewPersistence";
 import { applyCrmFilterRules, CRM_BASE_FILTER_RULES } from "@crm/shared/crmListFilterHelpers";
 import { HEADER_CONSTANTS } from "@constants/headerConstants";
@@ -498,16 +499,13 @@ const CrmOrders = () => { // NOSONAR
           ownerParamStyle: "user_extension_filter",
         });
 
-        const response: any = await getOrders(params);
-        console.log("Raw response from getOrders:", response);
+        const response: unknown = await getOrders(params);
+        const normalized = normalizeGetOrdersListResponse(response);
+        const summary: any = normalized.summaryTiles;
+        const metricsFromApi: any = normalized.metrics;
 
-        const ordersArray: any[] = response?.dataList || [];
-        const pagination: any = response?.meta || {};
-        const summary: any = response?.summary_tiles || null;
-        const metricsFromApi: any = response?.metrics || null;
-
-        setOrdersData(Array.isArray(ordersArray) ? ordersArray : []);
-        setTotalOrders(pagination?.total || 0);
+        setOrdersData(normalized.ordersData as any[]);
+        setTotalOrders(normalized.totalOrders);
         setSummaryTiles(summary);
         setOrdersMetrics(metricsFromApi);
         setTabTotals((prev) => ({
@@ -531,7 +529,7 @@ const CrmOrders = () => { // NOSONAR
         ) {
           setTabTotals((prev) => ({
             ...prev,
-            [activeTabAtResponse]: pagination?.total || 0,
+            [activeTabAtResponse]: normalized.totalOrders,
           }));
         }
 

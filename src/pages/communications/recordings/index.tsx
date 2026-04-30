@@ -224,6 +224,7 @@ const CallRecordings: NextPage & {
   );
   const canDownloadRecordings = session?.user?.permissions?.includes(
     PERMISSIONS.DOWNLOAD_RECORDING_CALL_RECORDINGS,
+  );
   const userPermissions = session?.user?.permissions ?? [];
   const canViewCallRecordings =
     userPermissions.includes(PERMISSIONS.VIEW_CALL_RECORDINGS) ||

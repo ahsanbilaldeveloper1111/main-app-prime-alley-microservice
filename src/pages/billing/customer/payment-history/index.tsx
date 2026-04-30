@@ -640,9 +640,9 @@ const BillingHistory = () => {
                   <p className="text-muted mb-1 small">Invoice Date</p>
                   <p className="fw-semibold mb-0">
                     {selectedPaymentView?.invoice?.invoice_date
-                      ? moment(
-                          selectedPaymentView.invoice.invoice_date,
-                        ).format("DD-MMM-YYYY")
+                      ? moment(selectedPaymentView.invoice.invoice_date).format(
+                          "DD-MMM-YYYY",
+                        )
                       : "—"}
                   </p>
                 </div>

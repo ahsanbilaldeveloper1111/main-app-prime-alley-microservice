@@ -10,6 +10,8 @@ import type { InvoiceData } from "@utils/accounts";
 import { formatNumber, GlobalDateTimeFormat } from "@utils/Helper";
 import moment from "moment";
 import { useSession } from "next-auth/react";
+import { usePermissions } from "@utils/permissionUtils";
+import { HEADER_CONSTANTS } from "@constants/headerConstants";
 import InvoiceViewModal, { type InvoiceViewData } from "@components/billings/InvoiceViewModal";
 import { BILLING_FONT, BILLING_LINK } from "@components/billings/shared/styles";
 import { LinkButton } from "@components/shared/LinkButton";
@@ -20,6 +22,7 @@ import { useEnsureCustomerForCrmCompany } from "@hooks/billing/useEnsureCustomer
 import { useMinifiedCompaniesSendAll } from "@hooks/billing/useMinifiedCompaniesSendAll";
 
 const font = BILLING_FONT;
+const { PERMISSIONS } = HEADER_CONSTANTS;
 
 const toInvoiceViewData = (invoice: InvoiceData): InvoiceViewData => ({
   ...(invoice as unknown as InvoiceViewData),
@@ -943,6 +946,8 @@ export default function BillingHistoryPage({
   customerCompanyPicker = false,
 }: BillingHistoryPageProps) {
   const { data: session } = useSession();
+  const { hasPermission } = usePermissions();
+  const canPayInvoices = hasPermission(PERMISSIONS.PAY_INVOICES_BILLING);
   const [searchQuery, setSearchQuery] = useState("");
   const [dateRangeOption, setDateRangeOption] = useState<string>("");
   const [dateFrom, setDateFrom] = useState<string>("");
@@ -1071,6 +1076,10 @@ export default function BillingHistoryPage({
 
   const handlePayNow = useCallback(
     async (invoiceId: number) => {
+      if (!canPayInvoices) {
+        toast.error("You are not authorized to pay invoices");
+        return;
+      }
       try {
         const invoiceDetails = await getInvoice(invoiceId);
         openInvoicePaymentModal(invoiceDetails);
@@ -1078,7 +1087,7 @@ export default function BillingHistoryPage({
         console.error("BillingHistoryPage pay now error:", err);
       }
     },
-    [openInvoicePaymentModal]
+    [canPayInvoices, openInvoicePaymentModal]
   );
 
   useEffect(() => {
@@ -1277,7 +1286,7 @@ export default function BillingHistoryPage({
                 status={String(invoice.status ?? "")}
                 onView={() => handleViewInvoice(Number(invoice.id))}
                 onDownload={() => handleDownloadInvoice(Number(invoice.id))}
-                onPayNow={() => handlePayNow(Number(invoice.id))}
+                onPayNow={canPayInvoices ? () => handlePayNow(Number(invoice.id)) : undefined}
               />
 
               {Array.isArray(invoice.payments) &&
