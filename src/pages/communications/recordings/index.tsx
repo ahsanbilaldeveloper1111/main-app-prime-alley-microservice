@@ -40,7 +40,7 @@ import "@assets/scss/common.scss";
 import {
   ListCallLogs,
   DownloadCallRecording,
-  DownloadStreamingExport,
+  ExportCallRecordings,
 } from "@utils/calls";
 import axiosInstance from "@utils/axios";
 import { toast } from "react-toastify";
@@ -616,22 +616,12 @@ const CallRecordings: NextPage & {
     setShowPageLoader(true);
     try {
       if (exportType === "excel") {
-        await DownloadStreamingExport(
-          {
-            filters,
-            isExport: true,
-            exportType,
-            moduleSlug: ModuleSlug.CALL_RECORDINGS,
-          },
-          "call-logs/recordings",
-          "recordings",
-        ).finally(() => {
-          setShowPageLoader(false);
-        });
+        await ExportCallRecordings(filters);
       }
     } catch (error) {
       console.error("Export failed:", error);
-      toast.error("Export failed");
+    } finally {
+      setShowPageLoader(false);
     }
   };
 

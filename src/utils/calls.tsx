@@ -1,3 +1,4 @@
+import type { AxiosError } from "axios";
 import { toast } from "react-toastify";
 import axiosInstance from "./axios";
 
@@ -388,6 +389,89 @@ export const DownloadStreamingExport = async (
     return url;
   } catch (error) {
     console.error(`${exportType.toUpperCase()} Download Error:`, error);
+    throw error;
+  }
+};
+
+/** POST export: body matches list filters (see Communications Call Recordings). */
+export const ExportCallRecordings = async (
+  filters: Record<string, unknown>,
+) => {
+  const headers = {
+    Accept:
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel, application/octet-stream, */*",
+  };
+
+  try {
+    const response = await axiosInstance.post(
+      "call-logs/recordings/export",
+      filters,
+      {
+        responseType: "blob",
+        headers,
+      },
+    );
+
+    if (response.status === 204) {
+      toast.error("No data found for export");
+      return;
+    }
+
+    const contentType = String(response.headers?.["content-type"] ?? "");
+    if (contentType.includes("application/json")) {
+      const text = await response.data.text();
+      const parsed = JSON.parse(text) as ExportJsonPayload;
+      const rows = getRowsFromExportJson(parsed);
+
+      if (!Array.isArray(rows) || rows.length === 0) {
+        const message =
+          parsed?.detail ||
+          parsed?.message ||
+          "No export data found in response.";
+        toast.error(message);
+        throw new Error(message);
+      }
+      const csvUrl = downloadCsvRows(rows);
+
+      toast.success("CSV file downloaded successfully");
+      return csvUrl;
+    }
+
+    const blobType =
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+    const blob = new Blob([response.data], { type: blobType });
+    const url = globalThis.URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    const timestamp = buildExportTimestamp();
+    link.setAttribute("download", `call_recordings_${timestamp}.xlsx`);
+
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    globalThis.URL.revokeObjectURL(url);
+
+    toast.success("XLSX file downloaded successfully");
+    return url;
+  } catch (error) {
+    const ax = error as AxiosError<Blob>;
+    const data = ax.response?.data;
+    if (data instanceof Blob) {
+      try {
+        const text = await data.text();
+        const parsed = JSON.parse(text) as ExportJsonPayload;
+        const message =
+          parsed?.detail ||
+          parsed?.message ||
+          "Call recordings export failed";
+        toast.error(message);
+      } catch {
+        toast.error("Call recordings export failed");
+      }
+    } else {
+      toast.error("Call recordings export failed");
+    }
+    console.error("Call recordings export error:", error);
     throw error;
   }
 };
