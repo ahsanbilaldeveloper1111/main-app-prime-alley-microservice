@@ -6,6 +6,10 @@ import type { DealTemplateData } from "@utils/crm";
  *
  * Each helper is a pure data-shaper – they don't read state nor perform IO,
  * so they're trivial to unit test if/when needed.
+ *
+ * NOTE: This module lives under `src/utils/crm` (not under `src/pages`) on
+ * purpose – Next.js's Pages Router treats every file inside `pages/` as a
+ * route and rejects modules without a default React-component export.
  */
 
 const formatDateForInput = (dateString: string | null | undefined): string => {
