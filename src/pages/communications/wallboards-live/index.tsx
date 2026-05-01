@@ -17,7 +17,6 @@ import '@assets/scss/live-calls.scss'
 import { useCti } from '@hooks/useCti'
 import { CtiDevice } from '@components/live-calls/utils/types'
 import SummaryCards from './_partials/SummaryCards'
-import FilterBar from './_partials/FilterBar'
 import PageHeader from './_partials/PageHeader'
 import SectionsRenderer from './_partials/SectionsRenderer'
 import {
@@ -956,15 +955,27 @@ const LiveCallDashboard = () => {
 
       {/* Header */}
       <PageHeader
-        session={session}
-        isFullscreen={isFullscreen}
-        toggleFullscreen={toggleFullscreen}
-        collapsedSections={collapsedSections}
-        expandAll={expandAll}
-        collapseAll={collapseAll}
-        showFilterBar={showFilterBar}
-        toggleFilterBar={() => setShowFilterBar(!showFilterBar)}
-      />
+  session={session}
+  isFullscreen={isFullscreen}
+  toggleFullscreen={toggleFullscreen}
+  collapsedSections={collapsedSections}
+  expandAll={expandAll}
+  collapseAll={collapseAll}
+  showFilterBar={showFilterBar}
+  toggleFilterBar={() => setShowFilterBar(!showFilterBar)}
+ 
+  searchQuery={searchQuery}
+  selectedTeam={selectedTeam}
+  selectedStatus={selectedStatus}
+  sortBy={sortBy}
+  setSearchQuery={setSearchQuery}
+  setSelectedTeam={setSelectedTeam}
+  setSelectedStatus={setSelectedStatus}
+  setSortBy={setSortBy}
+  applyFilters={applyFilters}
+  clearFilters={clearFilters}
+  getUserTeams={getUserTeams}
+/>
 
           {/* Summary Dashboard */}
           <SummaryCards
@@ -979,21 +990,7 @@ const LiveCallDashboard = () => {
           />
 
           {/* Sticky Filter Bar */}
-          {showFilterBar && (
-            <FilterBar
-              searchQuery={searchQuery}
-              selectedTeam={selectedTeam}
-              selectedStatus={selectedStatus}
-              sortBy={sortBy}
-              setSearchQuery={setSearchQuery}
-              setSelectedTeam={setSelectedTeam}
-              setSelectedStatus={setSelectedStatus}
-              setSortBy={setSortBy}
-              applyFilters={applyFilters}
-              clearFilters={clearFilters}
-              getUserTeams={getUserTeams}
-            />
-          )}
+         
 
       {/* CTI Table */}
       <SectionsRenderer
