@@ -998,13 +998,13 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
           url: '/workforce/request-categories',
           permission: PERMISSIONS.VIEW_REQUEST_CATEGORIES_STAFF_MANAGEMENT
         },
-        {
-          id: 'workforce-sub-categories',
-          title: 'Sub Categories',
-          icon: <ListTree size={16} />,
-          url: '/workforce/sub-categories',
-          permission: PERMISSIONS.VIEW_REQUEST_CATEGORIES_STAFF_MANAGEMENT
-        },
+        // {
+        //   id: 'workforce-sub-categories',
+        //   title: 'Sub Categories',
+        //   icon: <ListTree size={16} />,
+        //   url: '/workforce/sub-categories',
+        //   permission: PERMISSIONS.VIEW_REQUEST_CATEGORIES_STAFF_MANAGEMENT
+        // },
       ].filter(item => !item.permission || hasPermission(item.permission))
     }, 
     //workforce services end
