@@ -963,8 +963,6 @@ export const SEARCH_EXCLUDED_ROUTES: string[] = [
     '/planner/tasks/:id',
     '/planner/projects/{id}',
     '/crm-new-dashboard',
-    'worforce/sub-categories',
-    '/workforce/locations',
 
     // Smart CRM settings pages – reachable via /main-settings/smart-crm
     // (kept as standalone routes for direct deep-linking, but hidden from

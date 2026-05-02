@@ -1,30 +1,19 @@
-import "@assets/scss/datatable-style.scss";
-import React, {
-  ReactElement,
-} from "react";
+import type { GetServerSideProps } from "next";
+import type { ReactElement } from "react";
 import Layout from "@layout/index";
-import BreadcrumbItem from "@common/BreadcrumbItem";
-import GenericListPage from "@components/GenericListPage";
 
-import "@assets/scss/common.scss";
-import "@assets/scss/tabs.scss";
-import PageHeader from "@components/PageHeader";
-import EmployeesDashboard from "./dashboard";
+export const getServerSideProps: GetServerSideProps = async () => ({
+  redirect: {
+    destination: "/workforce/dashboard",
+    permanent: false,
+  },
+});
 
-const StaffManagement = () => {
+/** `/workforce` is not a separate screen; the dashboard lives at `/workforce/dashboard`. */
+function WorkforceIndex() {
+  return null;
+}
 
+WorkforceIndex.getLayout = (page: ReactElement) => <Layout>{page}</Layout>;
 
-  return (
-    <React.Fragment>
-      <BreadcrumbItem mainTitle="" mainLink="" subTitle="Staff Management" />
-
-<EmployeesDashboard />
-    </React.Fragment>
-  );
-};
-
-StaffManagement.getLayout = (page: ReactElement) => {
-  return <Layout>{page}</Layout>;
-};
-
-export default StaffManagement;
+export default WorkforceIndex;
