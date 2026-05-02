@@ -2,6 +2,7 @@ import "@assets/scss/datatable-style.scss";
 import parsePhoneNumber from "libphonenumber-js";
 import React, {
   ReactElement,
+  type CSSProperties,
   useState,
   useEffect,
   useCallback,
@@ -108,6 +109,85 @@ function getDncrTone(value: string): StatusChipTone {
   return { color: "#6c757d", backgroundColor: "#e9ecef" };
 }
 
+const DNCR_API_STATUS_LABELS: Record<string, string> = {
+  "": "DNCR API",
+  TRUE: "🚫 TRUE (Blocked in DNCR)",
+  FALSE: "✅ FALSE (Allowed by DNCR)",
+  "Not Checked": "⏭️ Not Checked",
+  INVALID: "⚠️ INVALID (Not Found)",
+  NONE: "⚠️ NONE (Null Status)",
+  NULL: "⚠️ NULL (Null Status)",
+  UNKNOWN: "❌ UNKNOWN (Timeout/Error)",
+  ERROR: "❌ ERROR (API Failed)",
+  "%CACHE-BLOCKED": "🔄 Cache: Blocked",
+  "%CACHE-ALLOWED": "🔄 Cache: Allowed",
+  "%NOT-IN-CACHE": "🚫 Cache: Miss (Fail-closed)",
+};
+
+const CDR_REPETITION_STATUS_CHOICES = [
+  { label: "Allowed", value: "Allowed" },
+  { label: "Blocked Daily", value: "Blocked - Daily" },
+  { label: "Blocked Weekly", value: "Blocked - Weekly" },
+  { label: "Blocked Both", value: "Blocked - Both" },
+  { label: "Not Checked", value: "Not Checked" },
+  {
+    label: "Not Checked - Zero Limits",
+    value: "Not Checked - Zero Limits",
+  },
+] as const;
+
+const CDR_LOCAL_DND_STATUS_CHOICES = [
+  { label: "Allowed", value: "Allowed" },
+  { label: "Blocked", value: "Blocked" },
+  { label: "Not Checked", value: "Not Checked" },
+] as const;
+
+const CDR_TONE_BADGE_STYLE: CSSProperties = {
+  padding: "4px 8px",
+  borderRadius: "6px",
+};
+
+function CdrToneBadge({
+  text,
+  tone,
+}: Readonly<{ text: string; tone: StatusChipTone }>) {
+  return (
+    <span
+      style={{
+        ...CDR_TONE_BADGE_STYLE,
+        color: tone.color,
+        backgroundColor: tone.backgroundColor,
+      }}
+    >
+      {text}
+    </span>
+  );
+}
+
+type CdrFilterChoice = { label: string; value: string };
+
+function buildCdrFilterPillDropdownOptions(
+  allRowLabel: string,
+  choices: readonly CdrFilterChoice[],
+  currentValue: string,
+  setValue: (value: string) => void,
+): NonNullable<FilterPill["dropdownOptions"]> {
+  return [
+    {
+      label: allRowLabel,
+      value: "__all__",
+      selected: currentValue === "",
+      onClick: () => setValue(""),
+    },
+    ...choices.map((c) => ({
+      label: c.label,
+      value: c.value,
+      selected: currentValue === c.value,
+      onClick: () => setValue(c.value),
+    })),
+  ];
+}
+
 // Mapped record type for UI
 interface MappedCDRRecord {
   id: string;
@@ -136,6 +216,27 @@ interface AppliedFilters {
   date_to: string;
 }
 
+function pad2(n: number): string {
+  return String(n).padStart(2, "0");
+}
+
+/** Value for `<input type="datetime-local" />` in the user's local timezone. */
+function toDatetimeLocalInputValue(d: Date): string {
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}T${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+}
+
+function getCdrDefaultDateFromLocal(): string {
+  const start = new Date();
+  start.setHours(0, 0, 0, 0);
+  return toDatetimeLocalInputValue(start);
+}
+
+function getCdrDefaultDateToLocal(): string {
+  const end = new Date();
+  end.setHours(23, 59, 0, 0);
+  return toDatetimeLocalInputValue(end);
+}
+
 function buildCdrQueryParams(
   currentPage: number,
   recordsPerPage: number,
@@ -154,9 +255,115 @@ function buildCdrQueryParams(
   if (filters.call_repetition_status) params.call_repetition_status = filters.call_repetition_status;
   if (filters.local_dnd_status) params.local_dnd_status = filters.local_dnd_status;
   if (filters.dncr_api_status) params.dncr_api_status = filters.dncr_api_status;
-  if (filters.date_from) params.date_from = filters.date_from;
-  if (filters.date_to) params.date_to = filters.date_to;
+  params.date_from = filters.date_from.trim() || getCdrDefaultDateFromLocal();
+  params.date_to = filters.date_to.trim() || getCdrDefaultDateToLocal();
   return params;
+}
+
+function cdrEmptyAggregateStats(totalRecords: number) {
+  return {
+    totalRecords,
+    localDNDNotChecked: 0,
+    localDNDAllowed: 0,
+    localDNDBlocked: 0,
+    repetitionAllowed: 0,
+    repetitionNotAllowed: 0,
+    repetitionNotChecked: 0,
+    dncrApiFalse: 0,
+    dncrApiTrue: 0,
+    dncrApiNotChecked: 0,
+    dncrApiInvalid: 0,
+    dncrApiNone: 0,
+    dncrApiError: 0,
+    allowLocalDNCLTrue: 0,
+    allowLocalDNCLFalse: 0,
+    avgTime: 0,
+    minTime: 0,
+    maxTime: 0,
+    totalTime: 0,
+  };
+}
+
+function cdrAggregatedStatsFromThisMonth(
+  tm: NonNullable<
+    NonNullable<CDRResponse["statistics"]>["this_month"]
+  >,
+) {
+  return {
+    totalRecords: tm.total_calls || 0,
+    localDNDNotChecked: tm.local_dnd?.not_checked || 0,
+    localDNDAllowed: tm.local_dnd?.allowed || 0,
+    localDNDBlocked: tm.local_dnd?.blocked || 0,
+    repetitionAllowed: tm.call_repetition?.allowed || 0,
+    repetitionNotAllowed: tm.call_repetition?.blocked || 0,
+    repetitionNotChecked: tm.call_repetition?.not_checked || 0,
+    dncrApiFalse: tm.dncr_api?.allowed || 0,
+    dncrApiTrue: tm.dncr_api?.blocked || 0,
+    dncrApiNotChecked: tm.dncr_api?.not_checked || 0,
+    dncrApiInvalid: tm.dncr_api?.invalid || 0,
+    dncrApiNone: tm.dncr_api?.none || 0,
+    dncrApiError: tm.dncr_api?.error || 0,
+    allowLocalDNCLTrue: 0,
+    allowLocalDNCLFalse: 0,
+    totalTime: 0,
+    avgTime: tm.performance?.avg_time_ms || 0,
+    minTime: tm.performance?.min_time_ms || 0,
+    maxTime: tm.performance?.max_time_ms || 0,
+  };
+}
+
+function renderCdrTextFilterDropdown(
+  minWidth: string,
+  placeholder: string,
+  value: string,
+  onValueChange: (value: string) => void,
+): React.ReactElement {
+  return (
+    <div style={{ minWidth }}>
+      <Form.Control
+        type="text"
+        placeholder={placeholder}
+        value={value}
+        onChange={(e) => onValueChange(e.target.value)}
+        size="sm"
+      />
+    </div>
+  );
+}
+
+function renderCdrDatetimeFilterDropdown(
+  value: string,
+  onValueChange: (value: string) => void,
+  resolveDefault: () => string,
+): React.ReactElement {
+  return (
+    <div style={{ minWidth: "220px" }}>
+      <Form.Control
+        type="datetime-local"
+        required
+        value={value}
+        onChange={(e) => {
+          const v = e.target.value;
+          onValueChange(v.trim() ? v : resolveDefault());
+        }}
+        size="sm"
+      />
+    </div>
+  );
+}
+
+function createDefaultCdrAppliedFilters(): AppliedFilters {
+  return {
+    search: "",
+    calling_number: "",
+    called_number: "",
+    user_id: "",
+    call_repetition_status: "",
+    local_dnd_status: "",
+    dncr_api_status: "",
+    date_from: getCdrDefaultDateFromLocal(),
+    date_to: getCdrDefaultDateToLocal(),
+  };
 }
 
 // Phone Container Component
@@ -300,34 +507,11 @@ const CDRRecords = () => {
   const [localDndStatusFilter, setLocalDndStatusFilter] = useState('');
   const [dncrApiStatusFilter, setDncrApiStatusFilter] = useState('');
 
-  // Mapping for DNCR API Status values to labels
-  const dncrApiStatusLabels: Record<string, string> = {
-    '': 'DNCR API',
-    'TRUE': '🚫 TRUE (Blocked in DNCR)',
-    'FALSE': '✅ FALSE (Allowed by DNCR)',
-    'Not Checked': '⏭️ Not Checked',
-    'INVALID': '⚠️ INVALID (Not Found)',
-    'NONE': '⚠️ NONE (Null Status)',
-    'NULL': '⚠️ NULL (Null Status)',
-    'UNKNOWN': '❌ UNKNOWN (Timeout/Error)',
-    'ERROR': '❌ ERROR (API Failed)',
-    '%CACHE-BLOCKED': '🔄 Cache: Blocked',
-    '%CACHE-ALLOWED': '🔄 Cache: Allowed',
-    '%NOT-IN-CACHE': '🚫 Cache: Miss (Fail-closed)'
-  };
-  const [dateFromFilter, setDateFromFilter] = useState('');
-  const [dateToFilter, setDateToFilter] = useState('');
-  const [appliedFilters, setAppliedFilters] = useState<AppliedFilters>({
-    search: '',
-    calling_number: '',
-    called_number: '',
-    user_id: '',
-    call_repetition_status: '',
-    local_dnd_status: '',
-    dncr_api_status: '',
-    date_from: '',
-    date_to: ''
-  });
+  const [dateFromFilter, setDateFromFilter] = useState(getCdrDefaultDateFromLocal);
+  const [dateToFilter, setDateToFilter] = useState(getCdrDefaultDateToLocal);
+  const [appliedFilters, setAppliedFilters] = useState<AppliedFilters>(() =>
+    createDefaultCdrAppliedFilters(),
+  );
   
   // API state
   const [loading, setLoading] = useState(false);
@@ -423,118 +607,51 @@ const CDRRecords = () => {
 
   // Calculate stats from API data
   const calculateStats = () => {
-    // Use statistics.this_month data if available (preferred)
     const thisMonthStats = statistics?.this_month;
-
     if (thisMonthStats) {
-      return {
-        totalRecords: thisMonthStats.total_calls || 0,
-        localDNDNotChecked: thisMonthStats.local_dnd?.not_checked || 0,
-        localDNDAllowed: thisMonthStats.local_dnd?.allowed || 0,
-        localDNDBlocked: thisMonthStats.local_dnd?.blocked || 0,
-        repetitionAllowed: thisMonthStats.call_repetition?.allowed || 0,
-        repetitionNotAllowed: thisMonthStats.call_repetition?.blocked || 0,
-        repetitionNotChecked: thisMonthStats.call_repetition?.not_checked || 0,
-        dncrApiFalse: thisMonthStats.dncr_api?.allowed || 0,
-        dncrApiTrue: thisMonthStats.dncr_api?.blocked || 0,
-        dncrApiNotChecked: thisMonthStats.dncr_api?.not_checked || 0,
-        dncrApiInvalid: thisMonthStats.dncr_api?.invalid || 0,
-        dncrApiNone: thisMonthStats.dncr_api?.none || 0,
-        dncrApiError: thisMonthStats.dncr_api?.error || 0,
-        allowLocalDNCLTrue: 0,
-        allowLocalDNCLFalse: 0,
-        totalTime: 0,
-        avgTime: thisMonthStats.performance?.avg_time_ms || 0,
-        minTime: thisMonthStats.performance?.min_time_ms || 0,
-        maxTime: thisMonthStats.performance?.max_time_ms || 0,
-      };
+      return cdrAggregatedStatsFromThisMonth(thisMonthStats);
     }
-
     if (!apiData || apiData.length === 0) {
-      return {
-        totalRecords: metadata?.total_records || 0,
-        localDNDNotChecked: 0,
-        localDNDAllowed: 0,
-        localDNDBlocked: 0,
-        repetitionAllowed: 0,
-        repetitionNotAllowed: 0,
-        repetitionNotChecked: 0,
-        dncrApiFalse: 0,
-        dncrApiTrue: 0,
-        dncrApiNotChecked: 0,
-        dncrApiInvalid: 0,
-        dncrApiNone: 0,
-        dncrApiError: 0,
-        allowLocalDNCLTrue: 0,
-        allowLocalDNCLFalse: 0,
-        avgTime: 0,
-        minTime: 0,
-        maxTime: 0,
-      };
+      return cdrEmptyAggregateStats(metadata?.total_records || 0);
     }
-
-    // Fallback to calculated stats from apiData if statistics not available
     const stats = {
-      totalRecords: metadata?.total_records || apiData.length,
-      localDNDNotChecked: 0,
-      localDNDAllowed: 0,
-      localDNDBlocked: 0,
-      repetitionAllowed: 0,
-      repetitionNotAllowed: 0,
-      repetitionNotChecked: 0,
-      dncrApiFalse: 0,
-      dncrApiTrue: 0,
-      dncrApiNotChecked: 0,
-      dncrApiInvalid: 0,
-      dncrApiNone: 0,
-      dncrApiError: 0,
-      allowLocalDNCLTrue: 0,
-      allowLocalDNCLFalse: 0,
-      totalTime: 0
+      ...cdrEmptyAggregateStats(metadata?.total_records || apiData.length),
     };
-
-    apiData.forEach(record => {
-      // Local DND
-      if (record.LocalDNDStatus?.toLowerCase().includes('not blocked') || record.LocalDNDStatus?.toLowerCase().includes('allowed')) {
+    apiData.forEach((record) => {
+      if (
+        record.LocalDNDStatus?.toLowerCase().includes("not blocked") ||
+        record.LocalDNDStatus?.toLowerCase().includes("allowed")
+      ) {
         stats.localDNDAllowed++;
-      } else if (record.LocalDNDStatus?.toLowerCase().includes('blocked')) {
+      } else if (record.LocalDNDStatus?.toLowerCase().includes("blocked")) {
         stats.localDNDBlocked++;
       } else {
         stats.localDNDNotChecked++;
       }
-
-      // Repetition
-      if (record.CallRepetitionStatus?.toLowerCase().includes('allowed')) {
+      if (record.CallRepetitionStatus?.toLowerCase().includes("allowed")) {
         stats.repetitionAllowed++;
-      } else if (record.CallRepetitionStatus?.toLowerCase().includes('blocked')) {
+      } else if (record.CallRepetitionStatus?.toLowerCase().includes("blocked")) {
         stats.repetitionNotAllowed++;
       } else {
         stats.repetitionNotChecked++;
       }
-
-      // DNCR API
-      if (record.DNCRAPIStatus === 'Blocked') {
+      if (record.DNCRAPIStatus === "Blocked") {
         stats.dncrApiTrue++;
       } else {
         stats.dncrApiFalse++;
       }
-
-      // Allow Local DNCL
-      if (record.AllowLocalDNCLCalls?.toLowerCase() === 'true') {
+      if (record.AllowLocalDNCLCalls?.toLowerCase() === "true") {
         stats.allowLocalDNCLTrue++;
       } else {
         stats.allowLocalDNCLFalse++;
       }
-
-      // Time
       stats.totalTime += record.TotalTimeTakenMs || 0;
     });
-
     return {
       ...stats,
       avgTime: apiData.length > 0 ? stats.totalTime / apiData.length : 0,
       minTime: 0,
-      maxTime: 0
+      maxTime: 0,
     };
   };
 
@@ -588,8 +705,8 @@ const CDRRecords = () => {
       call_repetition_status: repetitionStatusFilter,
       local_dnd_status: localDndStatusFilter,
       dncr_api_status: dncrApiStatusFilter,
-      date_from: dateFromFilter,
-      date_to: dateToFilter
+      date_from: dateFromFilter.trim() || getCdrDefaultDateFromLocal(),
+      date_to: dateToFilter.trim() || getCdrDefaultDateToLocal(),
     });
     setCurrentPage(1); // Reset to first page when filters change
     // fetchCDRData will be called automatically via useEffect when appliedFilters changes
@@ -604,19 +721,9 @@ const CDRRecords = () => {
     setRepetitionStatusFilter('');
     setLocalDndStatusFilter('');
     setDncrApiStatusFilter('');
-    setDateFromFilter('');
-    setDateToFilter('');
-    setAppliedFilters({
-      search: '',
-      calling_number: '',
-      called_number: '',
-      user_id: '',
-      call_repetition_status: '',
-      local_dnd_status: '',
-      dncr_api_status: '',
-      date_from: '',
-      date_to: ''
-    });
+    setDateFromFilter(getCdrDefaultDateFromLocal());
+    setDateToFilter(getCdrDefaultDateToLocal());
+    setAppliedFilters(createDefaultCdrAppliedFilters());
     setCurrentPage(1);
   };
 
@@ -628,116 +735,85 @@ const CDRRecords = () => {
   };
 
   const repetitionFilterOptions = useMemo(
-    () => [
-      { label: 'All Status', value: '__all__', onClick: () => setRepetitionStatusFilter('') },
-      { label: 'Allowed', value: 'Allowed', onClick: () => setRepetitionStatusFilter('Allowed') },
-      { label: 'Blocked Daily', value: 'Blocked - Daily', onClick: () => setRepetitionStatusFilter('Blocked - Daily') },
-      { label: 'Blocked Weekly', value: 'Blocked - Weekly', onClick: () => setRepetitionStatusFilter('Blocked - Weekly') },
-      { label: 'Blocked Both', value: 'Blocked - Both', onClick: () => setRepetitionStatusFilter('Blocked - Both') },
-      { label: 'Not Checked', value: 'Not Checked', onClick: () => setRepetitionStatusFilter('Not Checked') },
-      {
-        label: 'Not Checked - Zero Limits',
-        value: 'Not Checked - Zero Limits',
-        onClick: () => setRepetitionStatusFilter('Not Checked - Zero Limits'),
-      },
-    ],
-    [],
+    () =>
+      buildCdrFilterPillDropdownOptions(
+        "All Status",
+        CDR_REPETITION_STATUS_CHOICES,
+        repetitionStatusFilter,
+        setRepetitionStatusFilter,
+      ),
+    [repetitionStatusFilter],
   );
 
   const localDndFilterOptions = useMemo(
-    () => [
-      { label: 'All Status', value: '__all__', onClick: () => setLocalDndStatusFilter('') },
-      { label: 'Allowed', value: 'Allowed', onClick: () => setLocalDndStatusFilter('Allowed') },
-      { label: 'Blocked', value: 'Blocked', onClick: () => setLocalDndStatusFilter('Blocked') },
-      { label: 'Not Checked', value: 'Not Checked', onClick: () => setLocalDndStatusFilter('Not Checked') },
-    ],
-    [],
+    () =>
+      buildCdrFilterPillDropdownOptions(
+        "All Status",
+        CDR_LOCAL_DND_STATUS_CHOICES,
+        localDndStatusFilter,
+        setLocalDndStatusFilter,
+      ),
+    [localDndStatusFilter],
   );
 
   const dncrApiFilterOptions = useMemo(
-    () => [
-      { label: 'All Statuses', value: '__all__', onClick: () => setDncrApiStatusFilter('') },
-      ...Object.entries(dncrApiStatusLabels)
-        .filter(([key]) => key !== '')
-        .map(([key, label]) => ({
-          label,
-          value: key,
-          onClick: () => setDncrApiStatusFilter(key),
-        })),
-    ],
-    [dncrApiStatusLabels],
+    () =>
+      buildCdrFilterPillDropdownOptions(
+        "All Statuses",
+        Object.entries(DNCR_API_STATUS_LABELS)
+          .filter(([key]) => key !== "")
+          .map(([value, label]) => ({ label, value })),
+        dncrApiStatusFilter,
+        setDncrApiStatusFilter,
+      ),
+    [dncrApiStatusFilter],
   );
 
   const callingDropdownContent = useMemo(
-    () => (
-      <div style={{ minWidth: '220px' }}>
-        <Form.Control
-          type="text"
-          placeholder="Calling Number"
-          value={callingNumberFilter}
-          onChange={(e) => setCallingNumberFilter(e.target.value)}
-          size="sm"
-        />
-      </div>
-    ),
+    () =>
+      renderCdrTextFilterDropdown(
+        "220px",
+        "Calling Number",
+        callingNumberFilter,
+        setCallingNumberFilter,
+      ),
     [callingNumberFilter],
   );
 
   const calledDropdownContent = useMemo(
-    () => (
-      <div style={{ minWidth: '220px' }}>
-        <Form.Control
-          type="text"
-          placeholder="Called Number"
-          value={calledNumberFilter}
-          onChange={(e) => setCalledNumberFilter(e.target.value)}
-          size="sm"
-        />
-      </div>
-    ),
+    () =>
+      renderCdrTextFilterDropdown(
+        "220px",
+        "Called Number",
+        calledNumberFilter,
+        setCalledNumberFilter,
+      ),
     [calledNumberFilter],
   );
 
   const userDropdownContent = useMemo(
-    () => (
-      <div style={{ minWidth: '180px' }}>
-        <Form.Control
-          type="text"
-          placeholder="User ID"
-          value={userIdFilter}
-          onChange={(e) => setUserIdFilter(e.target.value)}
-          size="sm"
-        />
-      </div>
-    ),
+    () =>
+      renderCdrTextFilterDropdown("180px", "User ID", userIdFilter, setUserIdFilter),
     [userIdFilter],
   );
 
   const dateFromDropdownContent = useMemo(
-    () => (
-      <div style={{ minWidth: '220px' }}>
-        <Form.Control
-          type="datetime-local"
-          value={dateFromFilter}
-          onChange={(e) => setDateFromFilter(e.target.value)}
-          size="sm"
-        />
-      </div>
-    ),
+    () =>
+      renderCdrDatetimeFilterDropdown(
+        dateFromFilter,
+        setDateFromFilter,
+        getCdrDefaultDateFromLocal,
+      ),
     [dateFromFilter],
   );
 
   const dateToDropdownContent = useMemo(
-    () => (
-      <div style={{ minWidth: '220px' }}>
-        <Form.Control
-          type="datetime-local"
-          value={dateToFilter}
-          onChange={(e) => setDateToFilter(e.target.value)}
-          size="sm"
-        />
-      </div>
-    ),
+    () =>
+      renderCdrDatetimeFilterDropdown(
+        dateToFilter,
+        setDateToFilter,
+        getCdrDefaultDateToLocal,
+      ),
     [dateToFilter],
   );
 
@@ -755,27 +831,42 @@ const CDRRecords = () => {
       label: string,
       key: keyof typeof appliedFilters,
       options?: {
+        /** Current control value; pill shows active + label from draft or last applied value. */
+        draftValue?: string;
         dropdownContent?: React.ReactNode;
         dropdownOptions?: FilterPill["dropdownOptions"];
         searchable?: boolean;
-        activeLabel?: string;
+        formatActiveLabel?: (value: string) => string;
+        /** When false, pill has no clear control (e.g. required date range). Default true. */
+        clearable?: boolean;
         onClearExtra?: () => void;
       },
     ): FilterPill => {
-      const appliedValue = appliedFilters[key];
-      const clearHandler = appliedValue
-        ? () => {
-            options?.onClearExtra?.();
-            clearAppliedFilter(key);
-          }
+      const appliedRaw = appliedFilters[key];
+      const applied =
+        typeof appliedRaw === "string"
+          ? appliedRaw.trim()
+          : String(appliedRaw ?? "").trim();
+      const draft = (options?.draftValue ?? "").trim();
+      const displayValue = draft || applied;
+      const isActive = Boolean(displayValue);
+      const activeLabel = displayValue
+        ? options?.formatActiveLabel?.(displayValue) ?? displayValue
         : undefined;
+      let clearHandler: (() => void) | undefined;
+      if (options?.clearable !== false && isActive) {
+        clearHandler = () => {
+          options?.onClearExtra?.();
+          clearAppliedFilter(key);
+        };
+      }
       return {
         id,
         label,
         showDropdown: true,
         ...(options?.searchable ? { searchable: true } : {}),
-        active: Boolean(appliedValue),
-        activeLabel: options?.activeLabel ?? (appliedValue || undefined),
+        active: isActive,
+        activeLabel,
         onClear: clearHandler,
         ...(options?.dropdownContent ? { dropdownContent: options.dropdownContent } : {}),
         ...(options?.dropdownOptions ? { dropdownOptions: options.dropdownOptions } : {}),
@@ -787,22 +878,27 @@ const CDRRecords = () => {
   const filterPills = useMemo<FilterPill[]>(
     () => [
       makeFilterPill('cdr-calling', 'Calling #', 'calling_number', {
+        draftValue: callingNumberFilter,
         dropdownContent: callingDropdownContent,
         onClearExtra: () => setCallingNumberFilter(''),
       }),
       makeFilterPill('cdr-called', 'Called #', 'called_number', {
+        draftValue: calledNumberFilter,
         dropdownContent: calledDropdownContent,
         onClearExtra: () => setCalledNumberFilter(''),
       }),
       makeFilterPill('cdr-user', 'User', 'user_id', {
+        draftValue: userIdFilter,
         dropdownContent: userDropdownContent,
         onClearExtra: () => setUserIdFilter(''),
       }),
       makeFilterPill('cdr-repetition', 'Repetition', 'call_repetition_status', {
+        draftValue: repetitionStatusFilter,
         dropdownOptions: repetitionFilterOptions,
         onClearExtra: () => setRepetitionStatusFilter(''),
       }),
       makeFilterPill('cdr-local-dnd', 'Local DND', 'local_dnd_status', {
+        draftValue: localDndStatusFilter,
         dropdownOptions: localDndFilterOptions,
         onClearExtra: () => setLocalDndStatusFilter(''),
       }),
@@ -811,21 +907,22 @@ const CDRRecords = () => {
         'DNCR API',
         'dncr_api_status',
         {
+          draftValue: dncrApiStatusFilter,
           dropdownOptions: dncrApiFilterOptions,
           searchable: true,
-          activeLabel: appliedFilters.dncr_api_status
-            ? dncrApiStatusLabels[appliedFilters.dncr_api_status] || appliedFilters.dncr_api_status
-            : undefined,
+          formatActiveLabel: (v) => DNCR_API_STATUS_LABELS[v] || v,
           onClearExtra: () => setDncrApiStatusFilter(''),
         },
       ),
       makeFilterPill('cdr-date-from', 'Date From', 'date_from', {
+        draftValue: dateFromFilter,
         dropdownContent: dateFromDropdownContent,
-        onClearExtra: () => setDateFromFilter(''),
+        clearable: false,
       }),
       makeFilterPill('cdr-date-to', 'Date To', 'date_to', {
+        draftValue: dateToFilter,
         dropdownContent: dateToDropdownContent,
-        onClearExtra: () => setDateToFilter(''),
+        clearable: false,
       }),
     ],
     [
@@ -839,7 +936,6 @@ const CDRRecords = () => {
       repetitionFilterOptions,
       localDndFilterOptions,
       dncrApiFilterOptions,
-      dncrApiStatusLabels,
     ],
   );
 
@@ -895,63 +991,33 @@ const CDRRecords = () => {
         label: 'LOCAL DND',
         type: 'custom',
         sortable: false,
-        render: (row) => {
-          const tone = getTriStateTone(row.localDND, 'Allowed', 'Not Checked');
-          return (
-            <span
-              style={{
-                color: tone.color,
-                backgroundColor: tone.backgroundColor,
-                padding: '4px 8px',
-                borderRadius: '6px',
-              }}
-            >
-              {row.localDND}
-            </span>
-          );
-        },
+        render: (row) => (
+          <CdrToneBadge
+            text={row.localDND}
+            tone={getTriStateTone(row.localDND, 'Allowed', 'Not Checked')}
+          />
+        ),
       },
       {
         key: 'repetition',
         label: 'REPETITION',
         type: 'custom',
         sortable: false,
-        render: (row) => {
-          const tone = getTriStateTone(row.repetition, 'Allowed', 'Not Checked');
-          return (
-            <span
-              style={{
-                color: tone.color,
-                backgroundColor: tone.backgroundColor,
-                padding: '4px 8px',
-                borderRadius: '6px',
-              }}
-            >
-              {row.repetition}
-            </span>
-          );
-        },
+        render: (row) => (
+          <CdrToneBadge
+            text={row.repetition}
+            tone={getTriStateTone(row.repetition, 'Allowed', 'Not Checked')}
+          />
+        ),
       },
       {
         key: 'dncrApi',
         label: 'DNCR API',
         type: 'custom',
         sortable: false,
-        render: (row) => {
-          const tone = getDncrTone(row.dncrApi);
-          return (
-            <span
-              style={{
-                color: tone.color,
-                backgroundColor: tone.backgroundColor,
-                padding: '4px 8px',
-                borderRadius: '6px',
-              }}
-            >
-              {row.dncrApi}
-            </span>
-          );
-        },
+        render: (row) => (
+          <CdrToneBadge text={row.dncrApi} tone={getDncrTone(row.dncrApi)} />
+        ),
       },
       { key: 'time', label: 'TIME (MS)', type: 'text', sortable: false },
       { key: 'allowLocalDNCL', label: 'ALLOW LOCAL DNCL', type: 'text', sortable: false },
