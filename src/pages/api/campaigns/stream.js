@@ -16,6 +16,15 @@ function normalizeBase(url) {
   return u.endsWith("/") ? u : `${u}/`;
 }
 
+/** Strip trailing `/`; linear in path length (no regex backtracking). */
+function trimTrailingSlashes(pathname) {
+  let s = pathname;
+  while (s.endsWith("/")) {
+    s = s.slice(0, -1);
+  }
+  return s;
+}
+
 /**
  * Path after BACKEND_ROOT: always ensure a single `/api` before `campaigns/stream`.
  * @param {string} baseNormalized
@@ -23,7 +32,7 @@ function normalizeBase(url) {
  */
 function upstreamCampaignsStreamUrl(baseNormalized, companyId) {
   const parsed = new URL(baseNormalized);
-  const pathTrim = parsed.pathname.replace(/\/+$/, "") || "";
+  const pathTrim = trimTrailingSlashes(parsed.pathname) || "";
   const endsWithApi = pathTrim === "/api" || pathTrim.endsWith("/api");
   const relativePath = endsWithApi
     ? "campaigns/stream"
