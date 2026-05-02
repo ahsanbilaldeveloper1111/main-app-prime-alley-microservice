@@ -963,8 +963,6 @@ export const SEARCH_EXCLUDED_ROUTES: string[] = [
     '/planner/tasks/:id',
     '/planner/projects/{id}',
     '/crm-new-dashboard',
-    'worforce/sub-categories',
-    '/workforce/locations',
 
     '/coming-soon',
     '/plan-upgrade',
