@@ -4,7 +4,10 @@ import SectionContainer from './SectionContainer'
 import { SECTION_ORDER } from '@components/live-calls/utils/constants'
 import { getCallSortDurationMs } from '@components/live-calls/utils/helpers'
 import { CtiDevice } from '@components/live-calls/utils/types'
-import { resolveWallboardDisplayCall } from '@components/communications/wallboards-live/wallboardEventParsing'
+import {
+  resolveWallboardDisplayCall,
+  parseWallboardTimestampToMs,
+} from '@components/communications/wallboards-live/wallboardEventParsing'
 
 const SECTION_STATUS_MAP: Record<string, string> = {
   supervision: 'supervision',
@@ -93,11 +96,34 @@ function devicesObjectToList(devices: unknown): CtiDevice[] {
   return Object.values(devices as Record<string, CtiDevice>)
 }
 
+function idleElapsedSortMs(
+  dn: string,
+  idleSinceByDn: Record<string, string>,
+): number {
+  const iso = idleSinceByDn[String(dn)]
+  if (!iso) return 0
+  const start = parseWallboardTimestampToMs(iso)
+  if (start <= 0) return 0
+  return Math.max(0, Date.now() - start)
+}
+
 function compareByCallDuration(
   a: any,
   b: any,
-  sortOrder: string
+  sortOrder: string,
+  idleSinceByDn?: Record<string, string>,
 ): number {
+  if (idleSinceByDn) {
+    const durationA = idleElapsedSortMs(a.dn, idleSinceByDn)
+    const durationB = idleElapsedSortMs(b.dn, idleSinceByDn)
+    if (sortOrder === 'longest') {
+      return durationB - durationA
+    }
+    if (sortOrder === 'shortest') {
+      return durationA - durationB
+    }
+    return 0
+  }
   const durationA = a.call ? getCallSortDurationMs(a.call) : 0
   const durationB = b.call ? getCallSortDurationMs(b.call) : 0
   if (sortOrder === 'longest') {
@@ -109,11 +135,17 @@ function compareByCallDuration(
   return 0
 }
 
-function sortSectionsByDuration(sectionArray: any[], sortOrder: string): any[] {
+function sortSectionsByDuration(
+  sectionArray: any[],
+  sortOrder: string,
+  idleSinceByDn?: Record<string, string>,
+): any[] {
   if (sortOrder === 'none') {
     return sectionArray
   }
-  return [...sectionArray].sort((a, b) => compareByCallDuration(a, b, sortOrder))
+  return [...sectionArray].sort((a, b) =>
+    compareByCallDuration(a, b, sortOrder, idleSinceByDn),
+  )
 }
 
 /** SILENT: hide the supervisor's row from everyone except the supervisor (monitor sees full grid including monitored agent). */
@@ -319,7 +351,7 @@ const SectionsRenderer: React.FC<SectionsRendererProps> = ({
   const sortedSections: SectionBuckets = {
     supervision: sortSectionsByDuration(sections.supervision, sortBy),
     onCall: sortSectionsByDuration(sections.onCall, sortBy),
-    activeIdle: sortSectionsByDuration(sections.activeIdle, sortBy),
+    activeIdle: sortSectionsByDuration(sections.activeIdle, sortBy, idleSinceByDn),
     downOffline: sortSectionsByDuration(sections.downOffline, sortBy),
   }
 

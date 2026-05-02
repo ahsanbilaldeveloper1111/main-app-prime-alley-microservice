@@ -31,6 +31,26 @@ export type FloatingBarCallStateEntry = {
 /** Matches CTI `dnsMap` keys = registered extension DNs (external PSTN is usually absent). */
 export type FloatingBarDnsMap = Record<string, unknown>;
 
+/** Keep in sync with `CtiContext` (`localStatusFromCallStateRecord`). */
+const CTI_TERMINAL_PARTY_STATUSES = new Set([
+  "ENDED",
+  "DISCONNECTED",
+  "DROPPED",
+]);
+
+const CTI_ACTIVE_LIKE_PARTY_STATUSES = new Set([
+  "CONNECTED",
+  "ANSWERED",
+  "RETRIEVED",
+  "RINGING",
+  "ON_HOLD",
+  "HELD",
+]);
+
+function partyStatusRaw(status: string | undefined): string {
+  return status ?? "";
+}
+
 function normalizeAddressForComparison(address?: string): string {
   if (!address) return "";
   const digitsOnly = address.replaceAll(/\D/g, "");
@@ -47,6 +67,52 @@ function addressesEquivalent(
   const na = normalizeAddressForComparison(a);
   const nb = normalizeAddressForComparison(b);
   return na !== "" && na === nb;
+}
+
+/**
+ * True when CTI party list indicates the dialog is over (same rules as active-call map rebuild).
+ * Prevents the floating bar from flipping back to "ringing" on stale RINGING legs after remote hang-up.
+ */
+function floatingBarPartiesIndicateCallEnded(
+  parties: NonNullable<FloatingBarCallStateEntry["parties"]>,
+): boolean {
+  const hasActiveLeg = parties.some((p) =>
+    CTI_ACTIVE_LIKE_PARTY_STATUSES.has(partyStatusRaw(p.callStatus)),
+  );
+  const allTerminal = parties.every((p) =>
+    CTI_TERMINAL_PARTY_STATUSES.has(partyStatusRaw(p.callStatus)),
+  );
+  if (
+    allTerminal ||
+    (!hasActiveLeg &&
+      parties.some((p) =>
+        CTI_TERMINAL_PARTY_STATUSES.has(partyStatusRaw(p.callStatus)),
+      ))
+  ) {
+    return true;
+  }
+  return false;
+}
+
+/** True when every party row involving the user is in a terminal state (handles mixed stale legs). */
+function userParticipatingPartiesAllTerminal(
+  parties: NonNullable<FloatingBarCallStateEntry["parties"]>,
+  userAddress: string | null | undefined,
+): boolean {
+  if (!userAddress) {
+    return false;
+  }
+  const mine = parties.filter(
+    (p) =>
+      addressesEquivalent(p.callingAddress, userAddress) ||
+      addressesEquivalent(p.calledAddress, userAddress),
+  );
+  if (mine.length === 0) {
+    return false;
+  }
+  return mine.every((p) =>
+    CTI_TERMINAL_PARTY_STATUSES.has(partyStatusRaw(p.callStatus)),
+  );
 }
 
 function isDnRegisteredOnFloatingBar(
@@ -255,7 +321,7 @@ function isPartyStatusRingingForCallee(
   party: FloatingBarCallStateParty,
   userAddress: string,
 ): boolean {
-  if (party.calledAddress !== userAddress) {
+  if (!addressesEquivalent(party.calledAddress, userAddress)) {
     return false;
   }
   const raw = party.callStatus ?? "";
@@ -280,13 +346,19 @@ export function isInboundAwaitingUserAnswerForFloatingBar(
   userAddress: string | null | undefined,
   callStateMap: Record<string, FloatingBarCallStateEntry> | undefined,
 ): boolean {
-  if (!userAddress || call.calledAddress !== userAddress) {
+  if (!userAddress || !addressesEquivalent(call.calledAddress, userAddress)) {
     return false;
   }
   const parties = call.callId
     ? callStateMap?.[call.callId]?.parties
     : undefined;
   if (parties?.length) {
+    if (floatingBarPartiesIndicateCallEnded(parties)) {
+      return false;
+    }
+    if (userParticipatingPartiesAllTerminal(parties, userAddress)) {
+      return false;
+    }
     return parties.some((p) => isPartyStatusRingingForCallee(p, userAddress));
   }
   return call.status === "ringing" || call.status === "dialing";
@@ -299,6 +371,17 @@ export function shouldIncludeCallOnFloatingBar(
   callStateMap: Record<string, FloatingBarCallStateEntry> | undefined,
   eventLog: FloatingBarEventLogEntry[] | undefined,
 ): boolean {
+  const parties = call.callId
+    ? callStateMap?.[call.callId]?.parties
+    : undefined;
+  if (parties?.length) {
+    if (floatingBarPartiesIndicateCallEnded(parties)) {
+      return false;
+    }
+    if (userParticipatingPartiesAllTerminal(parties, userAddress)) {
+      return false;
+    }
+  }
   if (
     isInboundAwaitingUserAnswerForFloatingBar(call, userAddress, callStateMap)
   ) {
@@ -306,7 +389,8 @@ export function shouldIncludeCallOnFloatingBar(
   }
   const involvesUser = !!(
     userAddress &&
-    (call.callingAddress === userAddress || call.calledAddress === userAddress)
+    (addressesEquivalent(call.callingAddress, userAddress) ||
+      addressesEquivalent(call.calledAddress, userAddress))
   );
   const hasValidStatus = ["connected", "ringing", "dialing", "onHold"].includes(
     call.status,
@@ -374,6 +458,14 @@ function applyPartyStatusesToCall(
   userAddress: string | null | undefined,
   parties: NonNullable<FloatingBarCallStateEntry["parties"]>,
 ): void {
+  if (floatingBarPartiesIndicateCallEnded(parties)) {
+    call.status = "ended";
+    return;
+  }
+  if (userParticipatingPartiesAllTerminal(parties, userAddress)) {
+    call.status = "ended";
+    return;
+  }
   const connectedParties = parties.filter(
     (p) =>
       p.callStatus === "CONNECTED" ||
@@ -393,7 +485,10 @@ function applyPartyStatusesToCall(
     (!hasRingingParty || hasEquivalentConnectedAndRinging)
   ) {
     call.status = "connected";
-  } else if (hasRingingParty && call.calledAddress === userAddress) {
+  } else if (
+    hasRingingParty &&
+    addressesEquivalent(call.calledAddress, userAddress ?? undefined)
+  ) {
     call.status = "ringing";
   }
 }
@@ -547,8 +642,7 @@ export function pickFloatingBarCall(
   callStateMap: Record<string, FloatingBarCallStateEntry> | undefined,
   eventLog: FloatingBarEventLogEntry[] | undefined,
 ): FloatingBarCtiCall | undefined {
-  const all = Array.from(activeCalls.values());
-  const list = all
+  const list = Array.from(activeCalls.values())
     .filter((c) =>
       shouldIncludeCallOnFloatingBar(c, userAddress, callStateMap, eventLog),
     )

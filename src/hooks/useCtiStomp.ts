@@ -160,7 +160,8 @@ const globalConnectionRefs = {
 export default function useCtiStomp(
   wsPath = "/ws",
   instanceId?: string,
-  screenId?: string
+  screenId?: string,
+  onCallIdsRemovedFromMap?: (callIds: readonly string[]) => void,
 ) {
   // Check if this is the global instance - if so, use singleton connection manager
   const isGlobalInstance =
@@ -204,6 +205,11 @@ export default function useCtiStomp(
     answered: 0,
     incomingEvents: 0,
   });
+
+  const onCallIdsRemovedFromMapRef = useRef<
+    typeof onCallIdsRemovedFromMap | undefined
+  >(undefined);
+  onCallIdsRemovedFromMapRef.current = onCallIdsRemovedFromMap;
 
   // Always call useRef unconditionally (React Hook rules requirement)
   // Then conditionally use either global or local refs
@@ -365,6 +371,7 @@ export default function useCtiStomp(
           evt,
           dnsMap,
           saveCallStatesToStorage as (m: Record<string, any>) => void,
+          (ids) => onCallIdsRemovedFromMapRef.current?.(ids),
         ) as Record<string, CtiCallEvent>,
       );
     },
@@ -380,10 +387,15 @@ export default function useCtiStomp(
       }
 
       setCallStateMap((prev) => {
+        const removedFromMerge: string[] = [];
         const updated = mergeOngoingCallsIntoCallStateMap(
           prev as Record<string, any>,
           callsByDn as Record<string, any>,
+          (id) => removedFromMerge.push(id),
         ) as Record<string, CtiCallEvent>;
+        if (removedFromMerge.length) {
+          onCallIdsRemovedFromMapRef.current?.(removedFromMerge);
+        }
         saveCallStatesToStorage(updated);
         return updated;
       });
@@ -2168,8 +2180,15 @@ export default function useCtiStomp(
       if (!callIds.length) return;
       setCallStateMap((prev) => {
         const next = { ...prev };
+        const actuallyRemoved: string[] = [];
         for (const id of callIds) {
+          if (Object.hasOwn(next, id)) {
+            actuallyRemoved.push(id);
+          }
           delete next[id];
+        }
+        if (actuallyRemoved.length) {
+          onCallIdsRemovedFromMapRef.current?.(actuallyRemoved);
         }
         saveCallStatesToStorage(next);
         return next;

@@ -8,6 +8,23 @@ export type RegisteredDeviceEntry = {
   lastCallEndTime?: string;
 };
 
+/** Parse server timestamps as UTC when no offset is present (matches live wallboard). */
+export function parseWallboardTimestampToMs(
+  isoOrDate: string | null | undefined,
+): number {
+  if (!isoOrDate || typeof isoOrDate !== "string") {
+    return 0;
+  }
+  const s = isoOrDate.trim();
+  if (!s) {
+    return 0;
+  }
+  const hasTz = /[Zz]$|[+-]\d{2}:?\d{2}$/.test(s);
+  const toParse = hasTz ? s : `${s}Z`;
+  const ms = new Date(toParse).getTime();
+  return Number.isFinite(ms) ? ms : 0;
+}
+
 export function isCompleteStateLikeEvent(e: {
   type?: string;
   data?: { type?: string };
@@ -223,10 +240,13 @@ export function getIdleSinceIsoFromCompleteStateForDn(
     }
     const whenMs = parseServerTimeFn(device.when);
     const lastCallEndMs = parseServerTimeFn(device.lastCallEndTime);
-    const idleSinceMs =
-      whenMs && lastCallEndMs
-        ? Math.max(whenMs, lastCallEndMs)
-        : whenMs || lastCallEndMs;
+    // Prefer last call end; `when` is refreshed on dns_states and must not reset idle.
+    let idleSinceMs: number | undefined;
+    if (lastCallEndMs > 0) {
+      idleSinceMs = lastCallEndMs;
+    } else if (whenMs > 0) {
+      idleSinceMs = whenMs;
+    }
     if (idleSinceMs && (latestMs === undefined || idleSinceMs > latestMs)) {
       latestMs = idleSinceMs;
     }
@@ -245,11 +265,15 @@ export function getLatestRegisteredWhenIsoForDn(
   let latestMs: number | undefined;
   for (const [key, value] of Object.entries(registeredDnsStore)) {
     const [storeDn] = key.split("_");
-    if (storeDn === String(dn) && value?.when) {
+    if (storeDn === String(dn) && (value?.when || value?.lastCallEndTime)) {
       const whenMs = parseServerTimeFn(value.when);
       const lastCallEndMs = parseServerTimeFn(value.lastCallEndTime);
-      const idleSinceMs =
-        whenMs && lastCallEndMs ? Math.max(whenMs, lastCallEndMs) : whenMs;
+      let idleSinceMs: number | undefined;
+      if (lastCallEndMs > 0) {
+        idleSinceMs = lastCallEndMs;
+      } else if (whenMs > 0) {
+        idleSinceMs = whenMs;
+      }
       if (idleSinceMs && (latestMs === undefined || idleSinceMs > latestMs)) {
         latestMs = idleSinceMs;
       }

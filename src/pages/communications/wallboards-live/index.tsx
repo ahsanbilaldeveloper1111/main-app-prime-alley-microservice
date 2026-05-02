@@ -30,6 +30,7 @@ import {
   pickBestMonitoringPayloadFromCallStateMap,
   registeredEntriesFromDevices,
   type RegisteredDeviceEntry,
+  parseWallboardTimestampToMs,
 } from '@components/communications/wallboards-live/wallboardEventParsing'
 import {
   categorizeDns as categorizeDnsHelper,
@@ -42,17 +43,6 @@ import {
   handleDeviceSelectionCancel as handleDeviceSelectionCancelHelper,
 } from '@components/live-calls/utils/handlers'
 import { animateCardMove as animateCardMoveHelper } from '@components/live-calls/utils/animationHelpers'
-
-// Parse server timestamp as UTC when no timezone is present (backend often sends UTC without 'Z')
-function parseServerTime(isoOrDate: string | null | undefined): number {
-  if (!isoOrDate || typeof isoOrDate !== 'string') return 0
-  const s = isoOrDate.trim()
-  if (!s) return 0
-  const hasTz = /[Zz]$|[+-]\d{2}:?\d{2}$/.test(s)
-  const toParse = hasTz ? s : s + 'Z'
-  const ms = new Date(toParse).getTime()
-  return Number.isFinite(ms) ? ms : 0
-}
 
 const LiveCallDashboard = () => {
   const { data:session, status } = useSession();
@@ -506,7 +496,7 @@ const LiveCallDashboard = () => {
         prevSectionByDnRef,
         prevIsRegisteredByDnRef,
         nowIso,
-        parseServerTimeFn: parseServerTime,
+        parseServerTimeFn: parseWallboardTimestampToMs,
       })
     )
   }, [categorizedDns, dnsMap, isInitialized, registeredDnsStore])
