@@ -136,6 +136,27 @@ interface AppliedFilters {
   date_to: string;
 }
 
+function pad2(n: number): string {
+  return String(n).padStart(2, "0");
+}
+
+/** Value for `<input type="datetime-local" />` in the user's local timezone. */
+function toDatetimeLocalInputValue(d: Date): string {
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}T${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+}
+
+function getCdrDefaultDateFromLocal(): string {
+  const start = new Date();
+  start.setHours(0, 0, 0, 0);
+  return toDatetimeLocalInputValue(start);
+}
+
+function getCdrDefaultDateToLocal(): string {
+  const end = new Date();
+  end.setHours(23, 59, 0, 0);
+  return toDatetimeLocalInputValue(end);
+}
+
 function buildCdrQueryParams(
   currentPage: number,
   recordsPerPage: number,
@@ -154,8 +175,8 @@ function buildCdrQueryParams(
   if (filters.call_repetition_status) params.call_repetition_status = filters.call_repetition_status;
   if (filters.local_dnd_status) params.local_dnd_status = filters.local_dnd_status;
   if (filters.dncr_api_status) params.dncr_api_status = filters.dncr_api_status;
-  if (filters.date_from) params.date_from = filters.date_from;
-  if (filters.date_to) params.date_to = filters.date_to;
+  params.date_from = filters.date_from.trim() || getCdrDefaultDateFromLocal();
+  params.date_to = filters.date_to.trim() || getCdrDefaultDateToLocal();
   return params;
 }
 
@@ -315,9 +336,9 @@ const CDRRecords = () => {
     '%CACHE-ALLOWED': '🔄 Cache: Allowed',
     '%NOT-IN-CACHE': '🚫 Cache: Miss (Fail-closed)'
   };
-  const [dateFromFilter, setDateFromFilter] = useState('');
-  const [dateToFilter, setDateToFilter] = useState('');
-  const [appliedFilters, setAppliedFilters] = useState<AppliedFilters>({
+  const [dateFromFilter, setDateFromFilter] = useState(getCdrDefaultDateFromLocal);
+  const [dateToFilter, setDateToFilter] = useState(getCdrDefaultDateToLocal);
+  const [appliedFilters, setAppliedFilters] = useState<AppliedFilters>(() => ({
     search: '',
     calling_number: '',
     called_number: '',
@@ -325,9 +346,9 @@ const CDRRecords = () => {
     call_repetition_status: '',
     local_dnd_status: '',
     dncr_api_status: '',
-    date_from: '',
-    date_to: ''
-  });
+    date_from: getCdrDefaultDateFromLocal(),
+    date_to: getCdrDefaultDateToLocal(),
+  }));
   
   // API state
   const [loading, setLoading] = useState(false);
@@ -588,8 +609,8 @@ const CDRRecords = () => {
       call_repetition_status: repetitionStatusFilter,
       local_dnd_status: localDndStatusFilter,
       dncr_api_status: dncrApiStatusFilter,
-      date_from: dateFromFilter,
-      date_to: dateToFilter
+      date_from: dateFromFilter.trim() || getCdrDefaultDateFromLocal(),
+      date_to: dateToFilter.trim() || getCdrDefaultDateToLocal(),
     });
     setCurrentPage(1); // Reset to first page when filters change
     // fetchCDRData will be called automatically via useEffect when appliedFilters changes
@@ -604,8 +625,8 @@ const CDRRecords = () => {
     setRepetitionStatusFilter('');
     setLocalDndStatusFilter('');
     setDncrApiStatusFilter('');
-    setDateFromFilter('');
-    setDateToFilter('');
+    setDateFromFilter(getCdrDefaultDateFromLocal());
+    setDateToFilter(getCdrDefaultDateToLocal());
     setAppliedFilters({
       search: '',
       calling_number: '',
@@ -614,8 +635,8 @@ const CDRRecords = () => {
       call_repetition_status: '',
       local_dnd_status: '',
       dncr_api_status: '',
-      date_from: '',
-      date_to: ''
+      date_from: getCdrDefaultDateFromLocal(),
+      date_to: getCdrDefaultDateToLocal(),
     });
     setCurrentPage(1);
   };
@@ -629,43 +650,100 @@ const CDRRecords = () => {
 
   const repetitionFilterOptions = useMemo(
     () => [
-      { label: 'All Status', value: '__all__', onClick: () => setRepetitionStatusFilter('') },
-      { label: 'Allowed', value: 'Allowed', onClick: () => setRepetitionStatusFilter('Allowed') },
-      { label: 'Blocked Daily', value: 'Blocked - Daily', onClick: () => setRepetitionStatusFilter('Blocked - Daily') },
-      { label: 'Blocked Weekly', value: 'Blocked - Weekly', onClick: () => setRepetitionStatusFilter('Blocked - Weekly') },
-      { label: 'Blocked Both', value: 'Blocked - Both', onClick: () => setRepetitionStatusFilter('Blocked - Both') },
-      { label: 'Not Checked', value: 'Not Checked', onClick: () => setRepetitionStatusFilter('Not Checked') },
+      {
+        label: 'All Status',
+        value: '__all__',
+        selected: repetitionStatusFilter === '',
+        onClick: () => setRepetitionStatusFilter(''),
+      },
+      {
+        label: 'Allowed',
+        value: 'Allowed',
+        selected: repetitionStatusFilter === 'Allowed',
+        onClick: () => setRepetitionStatusFilter('Allowed'),
+      },
+      {
+        label: 'Blocked Daily',
+        value: 'Blocked - Daily',
+        selected: repetitionStatusFilter === 'Blocked - Daily',
+        onClick: () => setRepetitionStatusFilter('Blocked - Daily'),
+      },
+      {
+        label: 'Blocked Weekly',
+        value: 'Blocked - Weekly',
+        selected: repetitionStatusFilter === 'Blocked - Weekly',
+        onClick: () => setRepetitionStatusFilter('Blocked - Weekly'),
+      },
+      {
+        label: 'Blocked Both',
+        value: 'Blocked - Both',
+        selected: repetitionStatusFilter === 'Blocked - Both',
+        onClick: () => setRepetitionStatusFilter('Blocked - Both'),
+      },
+      {
+        label: 'Not Checked',
+        value: 'Not Checked',
+        selected: repetitionStatusFilter === 'Not Checked',
+        onClick: () => setRepetitionStatusFilter('Not Checked'),
+      },
       {
         label: 'Not Checked - Zero Limits',
         value: 'Not Checked - Zero Limits',
+        selected: repetitionStatusFilter === 'Not Checked - Zero Limits',
         onClick: () => setRepetitionStatusFilter('Not Checked - Zero Limits'),
       },
     ],
-    [],
+    [repetitionStatusFilter],
   );
 
   const localDndFilterOptions = useMemo(
     () => [
-      { label: 'All Status', value: '__all__', onClick: () => setLocalDndStatusFilter('') },
-      { label: 'Allowed', value: 'Allowed', onClick: () => setLocalDndStatusFilter('Allowed') },
-      { label: 'Blocked', value: 'Blocked', onClick: () => setLocalDndStatusFilter('Blocked') },
-      { label: 'Not Checked', value: 'Not Checked', onClick: () => setLocalDndStatusFilter('Not Checked') },
+      {
+        label: 'All Status',
+        value: '__all__',
+        selected: localDndStatusFilter === '',
+        onClick: () => setLocalDndStatusFilter(''),
+      },
+      {
+        label: 'Allowed',
+        value: 'Allowed',
+        selected: localDndStatusFilter === 'Allowed',
+        onClick: () => setLocalDndStatusFilter('Allowed'),
+      },
+      {
+        label: 'Blocked',
+        value: 'Blocked',
+        selected: localDndStatusFilter === 'Blocked',
+        onClick: () => setLocalDndStatusFilter('Blocked'),
+      },
+      {
+        label: 'Not Checked',
+        value: 'Not Checked',
+        selected: localDndStatusFilter === 'Not Checked',
+        onClick: () => setLocalDndStatusFilter('Not Checked'),
+      },
     ],
-    [],
+    [localDndStatusFilter],
   );
 
   const dncrApiFilterOptions = useMemo(
     () => [
-      { label: 'All Statuses', value: '__all__', onClick: () => setDncrApiStatusFilter('') },
+      {
+        label: 'All Statuses',
+        value: '__all__',
+        selected: dncrApiStatusFilter === '',
+        onClick: () => setDncrApiStatusFilter(''),
+      },
       ...Object.entries(dncrApiStatusLabels)
         .filter(([key]) => key !== '')
         .map(([key, label]) => ({
           label,
           value: key,
+          selected: dncrApiStatusFilter === key,
           onClick: () => setDncrApiStatusFilter(key),
         })),
     ],
-    [dncrApiStatusLabels],
+    [dncrApiStatusLabels, dncrApiStatusFilter],
   );
 
   const callingDropdownContent = useMemo(
@@ -718,8 +796,12 @@ const CDRRecords = () => {
       <div style={{ minWidth: '220px' }}>
         <Form.Control
           type="datetime-local"
+          required
           value={dateFromFilter}
-          onChange={(e) => setDateFromFilter(e.target.value)}
+          onChange={(e) => {
+            const v = e.target.value;
+            setDateFromFilter(v.trim() ? v : getCdrDefaultDateFromLocal());
+          }}
           size="sm"
         />
       </div>
@@ -732,8 +814,12 @@ const CDRRecords = () => {
       <div style={{ minWidth: '220px' }}>
         <Form.Control
           type="datetime-local"
+          required
           value={dateToFilter}
-          onChange={(e) => setDateToFilter(e.target.value)}
+          onChange={(e) => {
+            const v = e.target.value;
+            setDateToFilter(v.trim() ? v : getCdrDefaultDateToLocal());
+          }}
           size="sm"
         />
       </div>
@@ -755,27 +841,42 @@ const CDRRecords = () => {
       label: string,
       key: keyof typeof appliedFilters,
       options?: {
+        /** Current control value; pill shows active + label from draft or last applied value. */
+        draftValue?: string;
         dropdownContent?: React.ReactNode;
         dropdownOptions?: FilterPill["dropdownOptions"];
         searchable?: boolean;
-        activeLabel?: string;
+        formatActiveLabel?: (value: string) => string;
+        /** When false, pill has no clear control (e.g. required date range). Default true. */
+        clearable?: boolean;
         onClearExtra?: () => void;
       },
     ): FilterPill => {
-      const appliedValue = appliedFilters[key];
-      const clearHandler = appliedValue
-        ? () => {
-            options?.onClearExtra?.();
-            clearAppliedFilter(key);
-          }
+      const appliedRaw = appliedFilters[key];
+      const applied =
+        typeof appliedRaw === "string"
+          ? appliedRaw.trim()
+          : String(appliedRaw ?? "").trim();
+      const draft = (options?.draftValue ?? "").trim();
+      const displayValue = draft || applied;
+      const isActive = Boolean(displayValue);
+      const activeLabel = displayValue
+        ? options?.formatActiveLabel?.(displayValue) ?? displayValue
         : undefined;
+      let clearHandler: (() => void) | undefined;
+      if (options?.clearable !== false && isActive) {
+        clearHandler = () => {
+          options?.onClearExtra?.();
+          clearAppliedFilter(key);
+        };
+      }
       return {
         id,
         label,
         showDropdown: true,
         ...(options?.searchable ? { searchable: true } : {}),
-        active: Boolean(appliedValue),
-        activeLabel: options?.activeLabel ?? (appliedValue || undefined),
+        active: isActive,
+        activeLabel,
         onClear: clearHandler,
         ...(options?.dropdownContent ? { dropdownContent: options.dropdownContent } : {}),
         ...(options?.dropdownOptions ? { dropdownOptions: options.dropdownOptions } : {}),
@@ -787,22 +888,27 @@ const CDRRecords = () => {
   const filterPills = useMemo<FilterPill[]>(
     () => [
       makeFilterPill('cdr-calling', 'Calling #', 'calling_number', {
+        draftValue: callingNumberFilter,
         dropdownContent: callingDropdownContent,
         onClearExtra: () => setCallingNumberFilter(''),
       }),
       makeFilterPill('cdr-called', 'Called #', 'called_number', {
+        draftValue: calledNumberFilter,
         dropdownContent: calledDropdownContent,
         onClearExtra: () => setCalledNumberFilter(''),
       }),
       makeFilterPill('cdr-user', 'User', 'user_id', {
+        draftValue: userIdFilter,
         dropdownContent: userDropdownContent,
         onClearExtra: () => setUserIdFilter(''),
       }),
       makeFilterPill('cdr-repetition', 'Repetition', 'call_repetition_status', {
+        draftValue: repetitionStatusFilter,
         dropdownOptions: repetitionFilterOptions,
         onClearExtra: () => setRepetitionStatusFilter(''),
       }),
       makeFilterPill('cdr-local-dnd', 'Local DND', 'local_dnd_status', {
+        draftValue: localDndStatusFilter,
         dropdownOptions: localDndFilterOptions,
         onClearExtra: () => setLocalDndStatusFilter(''),
       }),
@@ -811,21 +917,23 @@ const CDRRecords = () => {
         'DNCR API',
         'dncr_api_status',
         {
+          draftValue: dncrApiStatusFilter,
           dropdownOptions: dncrApiFilterOptions,
           searchable: true,
-          activeLabel: appliedFilters.dncr_api_status
-            ? dncrApiStatusLabels[appliedFilters.dncr_api_status] || appliedFilters.dncr_api_status
-            : undefined,
+          formatActiveLabel: (v) =>
+            dncrApiStatusLabels[v] || v,
           onClearExtra: () => setDncrApiStatusFilter(''),
         },
       ),
       makeFilterPill('cdr-date-from', 'Date From', 'date_from', {
+        draftValue: dateFromFilter,
         dropdownContent: dateFromDropdownContent,
-        onClearExtra: () => setDateFromFilter(''),
+        clearable: false,
       }),
       makeFilterPill('cdr-date-to', 'Date To', 'date_to', {
+        draftValue: dateToFilter,
         dropdownContent: dateToDropdownContent,
-        onClearExtra: () => setDateToFilter(''),
+        clearable: false,
       }),
     ],
     [
