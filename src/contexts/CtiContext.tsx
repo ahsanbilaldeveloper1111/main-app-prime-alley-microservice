@@ -531,9 +531,40 @@ interface CtiProviderProps {
 }
 
 export const CtiProvider: React.FC<CtiProviderProps> = ({ children }) => {
-  // Use the CTI STOMP hook with a global instance ID
-  const ctiStomp = useCtiStomp('/ws', 'global-cti-instance', 'global');
-  
+  /** Outbound legs returned by dialCall before STOMP populates `callStateMap.parties` (floating bar + cancel). */
+  const [pendingOutboundByCallId, setPendingOutboundByCallId] = useState<
+    Map<string, ActiveCallMapValue>
+  >(new Map());
+
+  const flushPendingForRemovedCallIds = useCallback(
+    (callIds: readonly string[]) => {
+      if (!callIds.length) {
+        return;
+      }
+      setPendingOutboundByCallId((prev) => {
+        if (prev.size === 0) {
+          return prev;
+        }
+        let changed = false;
+        const next = new Map(prev);
+        for (const id of callIds) {
+          if (next.delete(id)) {
+            changed = true;
+          }
+        }
+        return changed ? next : prev;
+      });
+    },
+    [],
+  );
+
+  const ctiStomp = useCtiStomp(
+    '/ws',
+    'global-cti-instance',
+    'global',
+    flushPendingForRemovedCallIds,
+  );
+
   // Cross-tab manager for action forwarding
   const crossTabManagerRef = useRef(getCrossTabCtiManager());
   
@@ -542,10 +573,42 @@ export const CtiProvider: React.FC<CtiProviderProps> = ({ children }) => {
   const activeCallsRef = useRef(activeCalls);
   activeCallsRef.current = activeCalls;
 
-  /** Outbound legs returned by dialCall before STOMP populates `callStateMap.parties` (floating bar + cancel). */
-  const [pendingOutboundByCallId, setPendingOutboundByCallId] = useState<
-    Map<string, ActiveCallMapValue>
-  >(new Map());
+  /** Keys present on previous `callStateMap` render (for clearing stale pending when a call is removed remotely). */
+  const callStateMapKeysRef = useRef<Set<string>>(new Set());
+
+  // Drop pending outbound rows whose call id left callStateMap (e.g. Jabber hang-up) — avoids floating bar stuck on dial-api-only row.
+  useEffect(() => {
+    if (!ctiStomp.isInitialized) {
+      return;
+    }
+    const raw = ctiStomp.callStateMap;
+    const currentKeys = new Set(
+      raw != null && typeof raw === "object"
+        ? Object.keys(raw as Record<string, unknown>)
+        : [],
+    );
+    const prevKeys = callStateMapKeysRef.current;
+    const removedIds = [...prevKeys].filter((id) => !currentKeys.has(id));
+    callStateMapKeysRef.current = currentKeys;
+
+    if (removedIds.length === 0) {
+      return;
+    }
+
+    setPendingOutboundByCallId((prev) => {
+      if (prev.size === 0) {
+        return prev;
+      }
+      let changed = false;
+      const next = new Map(prev);
+      for (const id of removedIds) {
+        if (next.delete(id)) {
+          changed = true;
+        }
+      }
+      return changed ? next : prev;
+    });
+  }, [ctiStomp.isInitialized, ctiStomp.callStateMap]);
 
   // Drop optimistic outbound rows once the websocket snapshot includes the same call id.
   useEffect(() => {
@@ -584,9 +647,11 @@ export const CtiProvider: React.FC<CtiProviderProps> = ({ children }) => {
             ctiStomp.callStateMap as Record<string, unknown>,
           )
         : new Map<string, ActiveCallMapValue>();
-    setActiveCalls(
-      mergePendingOutboundIntoActiveCallsMap(fromState, pendingOutboundByCallId),
+    const merged = mergePendingOutboundIntoActiveCallsMap(
+      fromState,
+      pendingOutboundByCallId,
     );
+    setActiveCalls(merged);
   }, [
     ctiStomp.isInitialized,
     ctiStomp.callStateMap,

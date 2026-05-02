@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react'
+import { parseWallboardTimestampToMs } from '@components/communications/wallboards-live/wallboardEventParsing'
 
 interface IdleTimerProps {
   dn: string
@@ -44,8 +45,11 @@ const IdleTimer: React.FC<IdleTimerProps> = ({ dn: _dn, isActive, startTime }) =
     const startMs = (() => {
       if (!startTime) return Date.now()
       if (startTime instanceof Date) return startTime.getTime()
-      const parsed = new Date(startTime).getTime()
-      return Number.isFinite(parsed) ? parsed : Date.now()
+      if (typeof startTime === 'string') {
+        const ms = parseWallboardTimestampToMs(startTime)
+        return ms > 0 ? ms : Date.now()
+      }
+      return Date.now()
     })()
 
     const tick = () => {

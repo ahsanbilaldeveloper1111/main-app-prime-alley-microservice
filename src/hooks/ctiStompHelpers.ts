@@ -17,6 +17,97 @@ const SAVE_PERSIST_ACTIVE_STATUSES = new Set([
 ]);
 const SAVE_ESTABLISHED_STATUSES = new Set(["CONNECTED", "RETRIEVED"]);
 
+/** Ignore late RINGING / refresh rows that recreate a callId we just removed (see debug tombstone: ~23ms ghost). */
+const TERMINATED_CALL_REBIRTH_GUARD_MS = 4000;
+
+type TerminatedCallRebirthGuard = {
+  expiresAt: number;
+  lastEventTimeMs: number;
+  lastSequence: number;
+};
+
+const terminatedCallRebirthGuards = new Map<string, TerminatedCallRebirthGuard>();
+
+function parseCtiEventTimeMs(source: any): number {
+  if (!source?.eventTime) {
+    return 0;
+  }
+  const t = new Date(source.eventTime).getTime();
+  return Number.isFinite(t) ? t : 0;
+}
+
+function recordTerminatedCallForRebirthGuard(
+  callId: string,
+  terminalEvt: any,
+  snapshot: any,
+): void {
+  const evtMs = parseCtiEventTimeMs(terminalEvt);
+  const snapMs = parseCtiEventTimeMs(snapshot);
+  const lastEventTimeMs = Math.max(evtMs, snapMs);
+  const lastSequence = Math.max(
+    terminalEvt?.sequence ?? 0,
+    snapshot?.sequence ?? 0,
+  );
+  const now = Date.now();
+  const prev = terminatedCallRebirthGuards.get(callId);
+  terminatedCallRebirthGuards.set(callId, {
+    expiresAt: now + TERMINATED_CALL_REBIRTH_GUARD_MS,
+    lastEventTimeMs: Math.max(lastEventTimeMs, prev?.lastEventTimeMs ?? 0),
+    lastSequence: Math.max(lastSequence, prev?.lastSequence ?? 0),
+  });
+}
+
+function pruneExpiredTerminatedCallGuards(): void {
+  const now = Date.now();
+  for (const [id, g] of terminatedCallRebirthGuards) {
+    if (now > g.expiresAt) {
+      terminatedCallRebirthGuards.delete(id);
+    }
+  }
+}
+
+function shouldSuppressTerminatedCallRebirth(callId: string, evt: any): boolean {
+  pruneExpiredTerminatedCallGuards();
+  const rec = terminatedCallRebirthGuards.get(callId);
+  if (!rec || Date.now() > rec.expiresAt) {
+    if (rec) {
+      terminatedCallRebirthGuards.delete(callId);
+    }
+    return false;
+  }
+  const incomingMs = parseCtiEventTimeMs(evt);
+  const incomingSeq = evt?.sequence ?? 0;
+  if (incomingMs > 0 && incomingMs < rec.lastEventTimeMs) {
+    return true;
+  }
+  if (
+    incomingMs > 0 &&
+    incomingMs === rec.lastEventTimeMs &&
+    incomingSeq <= rec.lastSequence
+  ) {
+    return true;
+  }
+  const teardownAt = rec.expiresAt - TERMINATED_CALL_REBIRTH_GUARD_MS;
+  const msSinceTeardown = Date.now() - teardownAt;
+  if (
+    msSinceTeardown < 750 &&
+    evt?.eventType === "RINGING" &&
+    (incomingMs === 0 || incomingMs <= rec.lastEventTimeMs)
+  ) {
+    return true;
+  }
+  return false;
+}
+
+function shouldSuppressOngoingRebirth(callId: string, callData: any): boolean {
+  const synthetic = {
+    eventType: callData.eventType || callData.currentState || "RINGING",
+    eventTime: callData.eventTime,
+    sequence: callData.sequence,
+  };
+  return shouldSuppressTerminatedCallRebirth(callId, synthetic);
+}
+
 export function partyLegHasStartTime(startTime: unknown): boolean {
   if (startTime == null) {
     return false;
@@ -315,6 +406,11 @@ function tryRemoveCallOnEarlyExit(
   saveCallStatesToStorage: (m: Record<string, any>) => void,
 ): Record<string, any> | null {
   if (evt.isTerminating) {
+    recordTerminatedCallForRebirthGuard(
+      callId,
+      evt,
+      updated[callId] || {},
+    );
     const { [callId]: _, ...rest } = updated;
     saveCallStatesToStorage(rest);
     return rest;
@@ -327,6 +423,11 @@ function tryRemoveCallOnEarlyExit(
           p.callStatus === "DROPPED" || p.callStatus === "DISCONNECTED",
       );
     if (allPartiesDroppedEarly || evt.hasActiveParticipants === false) {
+      recordTerminatedCallForRebirthGuard(
+        callId,
+        evt,
+        updated[callId] || {},
+      );
       const { [callId]: _, ...rest } = updated;
       saveCallStatesToStorage(rest);
       return rest;
@@ -485,7 +586,15 @@ export function applyCallEventToCallStateMap(
     }
   >,
   saveCallStatesToStorage: (m: Record<string, any>) => void,
+  notifyCallIdsRemoved?: (callIds: readonly string[]) => void,
 ): Record<string, any> {
+  if (
+    !Object.hasOwn(prev, callId) &&
+    shouldSuppressTerminatedCallRebirth(callId, evt)
+  ) {
+    return prev;
+  }
+
   const updated = { ...prev };
   const base = updated[callId] || {};
 
@@ -498,6 +607,7 @@ export function applyCallEventToCallStateMap(
     saveCallStatesToStorage,
   );
   if (early) {
+    notifyCallIdsRemoved?.([callId]);
     return early;
   }
 
@@ -571,6 +681,8 @@ export function applyCallEventToCallStateMap(
   };
 
   if (shouldTerminate) {
+    notifyCallIdsRemoved?.([callId]);
+    recordTerminatedCallForRebirthGuard(callId, evt, updated[callId]);
     const { [callId]: _removed, ...rest } = updated;
     saveCallStatesToStorage(rest);
     return rest;
@@ -707,6 +819,7 @@ function isCallLike(
 export function mergeOngoingCallsIntoCallStateMap(
   prev: Record<string, any>,
   callsByDn: Record<string, any>,
+  onCallIdRemovedFromMap?: (callId: string) => void,
 ): Record<string, any> {
   const updated = { ...prev };
 
@@ -722,6 +835,12 @@ export function mergeOngoingCallsIntoCallStateMap(
 
     if (!shouldInclude) {
       if (updated[callId]) {
+        recordTerminatedCallForRebirthGuard(
+          callId,
+          { eventTime: callData.eventTime, sequence: callData.sequence },
+          updated[callId],
+        );
+        onCallIdRemovedFromMap?.(callId);
         delete updated[callId];
       }
       return;
@@ -738,8 +857,18 @@ export function mergeOngoingCallsIntoCallStateMap(
 
     if (activeParties.length === 0) {
       if (updated[callId]) {
+        recordTerminatedCallForRebirthGuard(
+          callId,
+          { eventTime: callData.eventTime, sequence: callData.sequence },
+          updated[callId],
+        );
+        onCallIdRemovedFromMap?.(callId);
         delete updated[callId];
       }
+      return;
+    }
+
+    if (!existingCall && shouldSuppressOngoingRebirth(callId, callData)) {
       return;
     }
 
