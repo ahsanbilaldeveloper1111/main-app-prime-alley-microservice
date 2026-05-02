@@ -200,10 +200,8 @@ function useLoadCampaignForEdit(
     }
     let cancelled = false;
     setLoadingCampaign(true);
-    const params =
-      scopedCompanyId && scopedCompanyId.trim()
-        ? { company_id: scopedCompanyId.trim() }
-        : undefined;
+    const companyId = scopedCompanyId?.trim();
+    const params = companyId ? { company_id: companyId } : undefined;
     getCampaign(editCampaignId, params)
       .then((res: Record<string, unknown>) => {
         if (cancelled) return;

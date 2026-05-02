@@ -645,7 +645,7 @@ const CampaignsPage = () => {
       if (listFetchQueuedRef.current) {
         listFetchQueuedRef.current = false;
         queueMicrotask(() => {
-          void fetchCampaignsCoalesced();
+          fetchCampaignsCoalesced().catch(() => {});
         });
       }
     }
@@ -876,7 +876,7 @@ const CampaignsPage = () => {
       label: "Status",
       sortable: true,
       render: (r) => {
-        const s = String(r.status ?? r.campaign_status ?? "—");
+        const s = safeDisplayString(r.status ?? r.campaign_status);
         const variant = getCampaignStatusBadgeVariant(s);
         return (
           <Badge className="status-badge text-capitalize" bg={variant}>
