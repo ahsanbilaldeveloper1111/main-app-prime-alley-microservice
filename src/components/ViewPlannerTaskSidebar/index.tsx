@@ -72,6 +72,17 @@ function formatUnknownForDisplay(value: unknown): string {
   }
 }
 
+function parsePositiveIntUnknown(value: unknown): number | null {
+  if (typeof value === "number" && Number.isFinite(value) && value > 0) {
+    return Math.floor(value);
+  }
+  if (typeof value === "string" && value.trim() !== "") {
+    const n = Number(value.trim());
+    if (Number.isFinite(n) && n > 0) return Math.floor(n);
+  }
+  return null;
+}
+
 function priorityLabel(p: unknown): string {
   const s = formatUnknownForDisplay(p ?? "normal").toLowerCase();
   const map: Record<string, string> = {
@@ -801,6 +812,20 @@ const ViewPlannerTaskSidebar: React.FC<ViewPlannerTaskSidebarProps> = ({
                     <span>Interval: {formatUnknownForDisplay(t.repeat_interval)}</span>
                     {t.repeat_on != null && (
                       <span>Repeat on: {formatUnknownForDisplay(t.repeat_on)}</span>
+                    )}
+                    {typeof t.end_date === "string" && t.end_date.trim() !== "" && (
+                      <span>End date: {formatDisplayDate(t.end_date)}</span>
+                    )}
+                    {parsePositiveIntUnknown(t.occurrences) != null && (
+                      <span>Occurrence cap: {formatUnknownForDisplay(t.occurrences)}</span>
+                    )}
+                    {parsePositiveIntUnknown(t.estimated_duration_minutes) != null && (
+                      <span>
+                        Est. duration: {formatUnknownForDisplay(t.estimated_duration_minutes)} min
+                      </span>
+                    )}
+                    {parsePositiveIntUnknown(t.reminder_minutes) != null && (
+                      <span>Reminder: {formatUnknownForDisplay(t.reminder_minutes)} min before due</span>
                     )}
                   </div>
                 </FieldRow>
