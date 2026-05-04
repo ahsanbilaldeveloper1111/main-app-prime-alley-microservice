@@ -130,6 +130,10 @@ interface CreateTaskSidebarProps {
    * `limited`: non-admin / non-owner — assignees and watchers are read-only; all other fields can be saved from the form.
    */
   taskEditScope?: PlannerTaskEditScope;
+  /**
+   * When opening edit for a todo or regular task, seed the form as recurring so the user can save a conversion in one step.
+   */
+  openAsRecurringConversion?: boolean;
 }
 
 /** Minimal task shape used when editing in the sidebar (API / normalized task). */
@@ -2062,6 +2066,27 @@ function mergeOpenedPlannerSidebarFormData(
   };
 }
 
+function applyOpenAsRecurringConversionToInitialForm(
+  base: CreateTaskFormData,
+  openAsRecurringConversion: boolean,
+  editMode: boolean,
+  editTask: PlannerEditTask | undefined,
+): CreateTaskFormData {
+  if (!openAsRecurringConversion || !editMode || editTask == null) {
+    return base;
+  }
+  const typ = normalizeEditTaskType(editTask);
+  if (typ !== "todo" && typ !== "regular") {
+    return base;
+  }
+  const merged = mergeFormDataWithDueDateClamp(base);
+  return {
+    ...merged,
+    taskType: "recurring",
+    ...seedRecurringFieldsWhenSwitchingToRecurring(merged),
+  };
+}
+
 function emptyPlannerSidebarFormWhenClosed(
   propProject: Project | undefined,
   selectedStatusForTask: number | null,
@@ -2352,6 +2377,7 @@ type PlannerSidebarFormOpenLifecycleParams = Readonly<{
   getInitialFormData: () => CreateTaskFormData;
   setSearchQuery: React.Dispatch<React.SetStateAction<string>>;
   setFormData: React.Dispatch<React.SetStateAction<CreateTaskFormData>>;
+  openAsRecurringConversion: boolean;
 }>;
 
 function usePlannerSidebarFormOpenLifecycle(
@@ -2403,6 +2429,7 @@ function usePlannerSidebarFormOpenLifecycle(
     params.loadingProjects,
     params.selectedStatusForTask,
     params.taskTypeOptions,
+    params.openAsRecurringConversion,
   ]);
 }
 
@@ -2437,6 +2464,7 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
   taskTypeChoices,
   lockProjectSelection = false,
   taskEditScope = "full",
+  openAsRecurringConversion = false,
 }) => {
   const normalizedTaskTypeOptions = useNormalizedPlannerTaskTypeOptions(taskTypeChoices);
   const taskTypeOptions = useMemo(
@@ -2444,8 +2472,8 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
     [isEdit, editTask, normalizedTaskTypeOptions],
   );
 
-  const getInitialFormData = (): CreateTaskFormData =>
-    getSidebarInitialFormData(
+  const getInitialFormData = useCallback((): CreateTaskFormData => {
+    const base = getSidebarInitialFormData(
       isEdit,
       editTask,
       extensions,
@@ -2453,6 +2481,21 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
       propStatuses,
       selectedStatusForTask,
     );
+    return applyOpenAsRecurringConversionToInitialForm(
+      base,
+      openAsRecurringConversion,
+      isEdit,
+      editTask,
+    );
+  }, [
+    isEdit,
+    editTask,
+    extensions,
+    propProject,
+    propStatuses,
+    selectedStatusForTask,
+    openAsRecurringConversion,
+  ]);
 
   const [formData, setFormData] = useState<CreateTaskFormData>(getInitialFormData());
   const [searchQuery, setSearchQuery] = useState("");
@@ -2547,6 +2590,7 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
     getInitialFormData,
     setSearchQuery,
     setFormData,
+    openAsRecurringConversion,
   });
 
   usePlannerSidebarBodyScrollLock(isOpen);
