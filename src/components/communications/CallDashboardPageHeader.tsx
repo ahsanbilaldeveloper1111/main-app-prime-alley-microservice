@@ -70,7 +70,11 @@ const CallDashboardPageHeader: React.FC = () => {
                         size="sm"
                         variant="primary"
                         onClick={() => {
-                          void dispatch(applyCallDashboardDateRangeThunk());
+                          dispatch(applyCallDashboardDateRangeThunk()).catch(
+                            () => {
+                              /* rejected date apply */
+                            },
+                          );
                         }}
                         disabled={loading}
                       >
@@ -80,7 +84,11 @@ const CallDashboardPageHeader: React.FC = () => {
                         type="button"
                         className="btn btn-link p-0 border-0 bg-transparent align-self-center"
                         onClick={() => {
-                          void dispatch(refreshCallDashboardThunk(undefined));
+                          dispatch(refreshCallDashboardThunk(undefined)).catch(
+                            () => {
+                              /* rejected refresh */
+                            },
+                          );
                         }}
                         title="Refresh"
                         aria-label="Refresh"

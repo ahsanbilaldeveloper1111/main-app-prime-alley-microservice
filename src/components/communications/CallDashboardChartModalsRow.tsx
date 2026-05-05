@@ -1,5 +1,4 @@
 import React from 'react';
-import type { ApexOptions } from 'apexcharts';
 import { useAppDispatch, useAppSelector } from '../../toolkit/hooks';
 import {
   setShowCountryChartModal,
@@ -29,24 +28,24 @@ const CallDashboardChartModalsRow: React.FC = () => {
         show={showCountryChartModal}
         title="Calls by Country"
         onHide={() => dispatch(setShowCountryChartModal(false))}
-        chartOptions={CountryChart.options as ApexOptions}
-        chartSeries={CountryChart.series as NonNullable<ApexOptions['series']>}
+        chartOptions={CountryChart.options}
+        chartSeries={CountryChart.series}
       />
 
       <CallChartDetailModal
         show={showDepartmentChartModal}
         title="Calls by Department"
         onHide={() => dispatch(setShowDepartmentChartModal(false))}
-        chartOptions={DepartmentChart.options as ApexOptions}
-        chartSeries={DepartmentChart.series as NonNullable<ApexOptions['series']>}
+        chartOptions={DepartmentChart.options}
+        chartSeries={DepartmentChart.series}
       />
 
       <CallChartDetailModal
         show={showExtensionChartModal}
         title="Calls by Extension"
         onHide={() => dispatch(setShowExtensionChartModal(false))}
-        chartOptions={ExtensionChart.options as ApexOptions}
-        chartSeries={ExtensionChart.series as NonNullable<ApexOptions['series']>}
+        chartOptions={ExtensionChart.options}
+        chartSeries={ExtensionChart.series}
       />
     </>
   );

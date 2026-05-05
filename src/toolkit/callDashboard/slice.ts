@@ -5,15 +5,12 @@ import {
   getInitialCountryChart,
   getInitialDepartmentChart,
   getInitialExtensionChart,
+  type CallDashboardApexBarChart,
 } from "@components/communications/callDashboardChartDefaults";
 import {
   getInitialCallDashboardFilters,
   type CallDashboardFilters,
 } from "./dateRange";
-
-type CountryChartModel = ReturnType<typeof getInitialCountryChart>;
-type DepartmentChartModel = ReturnType<typeof getInitialDepartmentChart>;
-type ExtensionChartModel = ReturnType<typeof getInitialExtensionChart>;
 
 export interface CallDashboardState {
   showPageLoader: boolean;
@@ -32,9 +29,9 @@ export interface CallDashboardState {
   extensionChartData: unknown[];
   pendingDateStart: string;
   pendingDateEnd: string;
-  countryChart: CountryChartModel;
-  departmentChart: DepartmentChartModel;
-  extensionChart: ExtensionChartModel;
+  countryChart: CallDashboardApexBarChart;
+  departmentChart: CallDashboardApexBarChart;
+  extensionChart: CallDashboardApexBarChart;
   trendByCountryData: TrendByCountry[];
   extensionData: Record<string, unknown>[];
 }
@@ -239,7 +236,7 @@ const callDashboardSlice = createSlice({
             dataLabels: { enabled: false },
             tooltip: {},
           },
-        };
+        } as CallDashboardApexBarChart;
       }
 
       const chartCountry = responseData?.chart_data?.country;

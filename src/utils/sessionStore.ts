@@ -42,38 +42,34 @@ declare global {
   var nextAuthJwtPayloadStore: Map<string, JWTPayload> | undefined;
 }
 
-if (!global.nextAuthSessions) {
-  global.nextAuthSessions = new Map();
-}
+globalThis.nextAuthSessions ??= new Map();
 
-if (!global.nextAuthJwtPayloadStore) {
-  global.nextAuthJwtPayloadStore = new Map();
-}
+globalThis.nextAuthJwtPayloadStore ??= new Map();
 
 export const sessionStore = {
   set: (sessionId: string, sessionData: NextAuthSessionData) => {
-    global.nextAuthSessions!.set(sessionId, sessionData);
+    globalThis.nextAuthSessions!.set(sessionId, sessionData);
   },
 
   get: (sessionId: string): NextAuthSessionData | null => {
-    return global.nextAuthSessions!.get(sessionId) || null;
+    return globalThis.nextAuthSessions!.get(sessionId) || null;
   },
 
   delete: (sessionId: string) => {
-    global.nextAuthSessions!.delete(sessionId);
+    globalThis.nextAuthSessions!.delete(sessionId);
   },
 
   /** Clear all TMS sessions (tests / admin tooling only). */
   clear: () => {
-    global.nextAuthSessions!.clear();
+    globalThis.nextAuthSessions!.clear();
   },
 
   // Clean up expired sessions
   cleanup: () => {
     const now = new Date();
-    global.nextAuthSessions!.forEach((sessionData, sessionId) => {
+    globalThis.nextAuthSessions!.forEach((sessionData, sessionId) => {
       if (new Date(sessionData.expires) <= now) {
-        global.nextAuthSessions!.delete(sessionId);
+        globalThis.nextAuthSessions!.delete(sessionId);
       }
     });
   }
@@ -90,32 +86,32 @@ function isLikelySessionIdHex(id: string): boolean {
 export const jwtPayloadStore = {
   set: (sessionId: string, payload: JWTPayload) => {
     const storedAt = Math.floor(Date.now() / 1000);
-    global.nextAuthJwtPayloadStore!.set(sessionId, {
+    globalThis.nextAuthJwtPayloadStore!.set(sessionId, {
       ...payload,
       [JWT_STORED_AT_KEY]: storedAt,
     });
   },
 
   get: (sessionId: string): JWTPayload | null => {
-    return global.nextAuthJwtPayloadStore!.get(sessionId) || null;
+    return globalThis.nextAuthJwtPayloadStore!.get(sessionId) || null;
   },
 
   delete: (sessionId: string) => {
-    global.nextAuthJwtPayloadStore!.delete(sessionId);
+    globalThis.nextAuthJwtPayloadStore!.delete(sessionId);
   },
 
   /** Clear server-side JWT payloads (tests / admin tooling only). */
   clear: () => {
-    global.nextAuthJwtPayloadStore!.clear();
+    globalThis.nextAuthJwtPayloadStore!.clear();
   },
 
   cleanup: () => {
     const nowSec = Math.floor(Date.now() / 1000);
-    global.nextAuthJwtPayloadStore!.forEach((payload, sessionId) => {
+    globalThis.nextAuthJwtPayloadStore!.forEach((payload, sessionId) => {
       const expRaw = payload.exp;
       const expSec = typeof expRaw === "number" ? expRaw : undefined;
       if (typeof expSec === "number" && expSec < nowSec) {
-        global.nextAuthJwtPayloadStore!.delete(sessionId);
+        globalThis.nextAuthJwtPayloadStore!.delete(sessionId);
         return;
       }
       if (typeof expSec !== "number") {
@@ -124,7 +120,7 @@ export const jwtPayloadStore = {
           typeof storedAt === "number" &&
           nowSec - storedAt > JWT_PAYLOAD_FALLBACK_MAX_AGE_SEC
         ) {
-          global.nextAuthJwtPayloadStore!.delete(sessionId);
+          globalThis.nextAuthJwtPayloadStore!.delete(sessionId);
         }
       }
     });

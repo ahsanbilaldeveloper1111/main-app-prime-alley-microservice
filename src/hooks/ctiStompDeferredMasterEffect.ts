@@ -87,20 +87,289 @@ export function subscribeCtiStompDeferredMasterEffect(
   } = deps;
 
   if (!isGlobalInstance || !crossTabManagerRef.current.isCrossTabSupported()) {
-  return;
-}
+    return () => {};
+  }
 
-// Only call connect when user is authenticated; avoid 401 from /cti/connect
-if (!isAuthenticated || !authInitialized) {
-  return;
-}
+  // Only call connect when user is authenticated; avoid 401 from /cti/connect
+  if (!isAuthenticated || !authInitialized) {
+    return () => {};
+  }
 
-let cancelled = false;
+  let cancelled = false;
 let beganDeferredMasterConnection = false;
 let sourceFromSecondaryMasterEffect: EventSource | null = null;
 
 const manager = crossTabManagerRef.current;
 const currentInstanceId = instanceIdRef.current;
+
+const delayMs = (ms: number) =>
+  new Promise<void>((resolve) => setTimeout(resolve, ms));
+
+const resetDeferredConnectFlags = () => {
+  isConnectingRef.current = false;
+  isGettingTokenRef.current = false;
+};
+
+const deferredEsIsConnectingOrOpen = (es: EventSource) =>
+  es.readyState === EventSource.CONNECTING ||
+  es.readyState === EventSource.OPEN;
+
+const skipDeferredMasterIfDuplicateConnection = (
+  instanceId: string,
+): boolean => {
+  const es = eventSourceRef.current;
+  if (!es || !deferredEsIsConnectingOrOpen(es)) {
+    return false;
+  }
+  console.log(
+    `[${instanceId}] Got token but connection already exists (state: ${es.readyState}), skipping...`,
+  );
+  resetDeferredConnectFlags();
+  return true;
+};
+
+const closeDeferredMasterEventSourceRef = (reason: string) => {
+  if (!eventSourceRef.current) {
+    return;
+  }
+  try {
+    eventSourceRef.current.close();
+  } catch (err) {
+    console.warn(`[useCtiStomp] EventSource.close failed (${reason})`, err);
+  }
+  eventSourceRef.current = null;
+};
+
+const closeDeferredMasterActiveDuplicateBeforeNew = async (
+  instanceId: string,
+): Promise<void> => {
+  const es = eventSourceRef.current;
+  if (!es || !deferredEsIsConnectingOrOpen(es)) {
+    return;
+  }
+  console.log(
+    `[${instanceId}] ⚠️ EventSource already exists with state ${es.readyState}, closing before creating new one...`,
+  );
+  try {
+    es.close();
+  } catch (err) {
+    console.warn(
+      "[useCtiStomp] EventSource.close failed (master duplicate guard)",
+      err,
+    );
+  }
+  eventSourceRef.current = null;
+  await delayMs(100);
+};
+
+const startDeferredMasterHealthReconnect = (reconnect: () => void) => {
+  if (healthCheckIntervalRef.current) {
+    clearInterval(healthCheckIntervalRef.current);
+    healthCheckIntervalRef.current = null;
+  }
+  isReconnectingRef.current = true;
+  setIsReconnecting(true);
+  reconnect();
+};
+
+const runDeferredMasterHealthCheckTick = () => {
+  const id = instanceIdRef.current;
+  const mgr = crossTabManagerRef.current;
+  if (isGlobalInstance && mgr.isCrossTabSupported() && !mgr.isMasterTab()) {
+    return;
+  }
+  if (isReconnectingRef.current || isConnectingRef.current) {
+    return;
+  }
+  if (eventSourceRef.current?.readyState !== EventSource.OPEN) {
+    console.log(
+      `[${id}] ⚠️ Health check: Connection is not OPEN, triggering reconnection...`,
+    );
+    const reconnectNow = attemptReconnectionRef.current;
+    if (reconnectNow) {
+      startDeferredMasterHealthReconnect(reconnectNow);
+    }
+    return;
+  }
+  const now = Date.now();
+  const lastMessageTime =
+    lastMessageTimeRef.current || connectionStartTimeRef.current || now;
+  const elapsed = now - lastMessageTime;
+  if (elapsed <= 300000) {
+    return;
+  }
+  console.log(
+    `[${id}] ⚠️ Health check: No CTI event received in ${Math.round(elapsed / 1000)}s (connection is OPEN but no events), triggering reconnection...`,
+  );
+  const reconnectStale = attemptReconnectionRef.current;
+  if (reconnectStale) {
+    startDeferredMasterHealthReconnect(reconnectStale);
+  }
+};
+
+const maybeMasterBroadcastCompleteState = (raw: unknown) => {
+  const mgr = crossTabManagerRef.current;
+  if (isGlobalInstance && mgr.isMasterTab() && mgr.isCrossTabSupported()) {
+    mgr.broadcastCtiEvent({ type: "complete_state", data: raw });
+  }
+};
+
+const handleDeferredMasterCompleteStateMessage = (rawData: unknown) => {
+  const groupFn = groupDevicesByDnAndDeviceNameRef.current;
+  const updateFn = updateSummaryDataRef.current;
+  if (!groupFn || !updateFn) {
+    return;
+  }
+  const grouped = groupFn(rawData as CtiDevice[]);
+  setDnsMap(grouped);
+  updateFn(grouped);
+  setEventLog((prev) => [
+    ...prev,
+    {
+      type: "initial-state",
+      data: grouped,
+      timestamp: new Date().toISOString(),
+    },
+  ]);
+  maybeMasterBroadcastCompleteState(rawData);
+};
+
+const handleDeferredMasterDnsStatesMessage = (s: {
+  dn: string;
+  deviceName: string;
+  [key: string]: unknown;
+}) => {
+  setDnsMap((prev) => {
+    const updated = { ...prev };
+    const { dn, deviceName } = s;
+    if (!updated[dn]) {
+      updated[dn] = { dn, devices: {} };
+    }
+    const existing = updated[dn].devices[deviceName];
+    updated[dn].devices[deviceName] = { ...existing, ...s };
+    if (updateSummaryDataRef.current) {
+      updateSummaryDataRef.current(updated);
+    }
+    return updated;
+  });
+  const mgr = crossTabManagerRef.current;
+  if (isGlobalInstance && mgr.isMasterTab() && mgr.isCrossTabSupported()) {
+    mgr.broadcastCtiEvent({ type: "dns_states", data: s });
+  }
+};
+
+const handleDeferredMasterSseParsedMessage = (data: {
+  type?: string;
+  data?: unknown;
+}) => {
+  if (data.type !== "ping" && data.type !== "test") {
+    lastMessageTimeRef.current = Date.now();
+  }
+  switch (data.type) {
+    case "complete_state":
+      handleDeferredMasterCompleteStateMessage(data.data);
+      break;
+    case "dns_states":
+      handleDeferredMasterDnsStatesMessage(
+        data.data as {
+          dn: string;
+          deviceName: string;
+          [key: string]: unknown;
+        },
+      );
+      break;
+    case "call_events": {
+      if (handleCallEventRef.current) {
+        handleCallEventRef.current(data.data as CtiCallEvent);
+      }
+      const evt = data.data as { eventType?: string } | undefined;
+      if (evt?.eventType === "DROPPED" || evt?.eventType === "DISCONNECTED") {
+        scheduleRefreshAfterCallEndRef.current?.();
+      }
+      break;
+    }
+    case "stomp_connected": {
+      setIsInitialized(true);
+      setError(null);
+      const publishMaster = publishStompMessageRef.current;
+      if (!hasRequestedInitialStateRef.current && publishMaster) {
+        hasRequestedInitialStateRef.current = true;
+        publishMaster("/app/request/initial-state", "");
+        publishMaster("/app/request/ongoing-calls", "");
+      }
+      break;
+    }
+    case "ongoing_calls":
+      handleOngoingCallsRef.current?.(data.data);
+      break;
+    default:
+      break;
+  }
+};
+
+const closeDeferredMasterIfDemoted = (
+  instanceId: string,
+  mgr: CrossTabCtiManager,
+): boolean => {
+  if (!isGlobalInstance || !mgr.isCrossTabSupported() || mgr.isMasterTab()) {
+    return false;
+  }
+  console.log(
+    `[${instanceId}] ⚠️ No longer master tab, closing connection...`,
+  );
+  if (eventSourceRef.current) {
+    try {
+      eventSourceRef.current.close();
+    } catch (err) {
+      console.warn(
+        "[useCtiStomp] EventSource.close failed (master, not master)",
+        err,
+      );
+    }
+    eventSourceRef.current = null;
+  }
+  setIsInitialized(true);
+  setError(null);
+  return true;
+};
+
+const handleDeferredMasterEventSourceClosed = (instanceId: string) => {
+  console.log(`[${instanceId}] ⚠️ SSE connection closed`);
+  setIsInitialized(false);
+  if (isReconnectingRef.current || !attemptReconnectionRef.current) {
+    return;
+  }
+  isReconnectingRef.current = true;
+  setIsReconnecting(true);
+  console.log(
+    `[${instanceId}] 🔄 Connection closed, starting reconnection with retry logic...`,
+  );
+  attemptReconnectionRef.current();
+};
+
+const attachDeferredMasterEventSourceOnError = (es: EventSource) => {
+  es.onerror = () => {
+    const instanceIdLocal = instanceIdRef.current;
+    const mgr = crossTabManagerRef.current;
+    if (closeDeferredMasterIfDemoted(instanceIdLocal, mgr)) {
+      return;
+    }
+    const readyState = es.readyState;
+    if (readyState === EventSource.CLOSED) {
+      handleDeferredMasterEventSourceClosed(instanceIdLocal);
+      return;
+    }
+    if (readyState === EventSource.CONNECTING) {
+      console.log(`[${instanceIdLocal}] 🔄 Connection state: CONNECTING`);
+      return;
+    }
+    if (readyState === EventSource.OPEN) {
+      console.log(
+        `[${instanceIdLocal}] ⚠️ Temporary error on open connection`,
+      );
+    }
+  };
+};
 
 // Check master status
 const isMaster = manager.isMasterTab();
@@ -150,64 +419,37 @@ if (
   getBearerToken()
     .then(async (token) => {
       if (cancelled) {
-        isConnectingRef.current = false;
-        isGettingTokenRef.current = false;
+        resetDeferredConnectFlags();
         return;
       }
       if (!token) {
-        isConnectingRef.current = false;
-        isGettingTokenRef.current = false; // Reset token flag
+        resetDeferredConnectFlags();
         setError("Service unavailable");
         return;
       }
 
-      // Close any existing connection first
-      if (eventSourceRef.current) {
-        try {
-          eventSourceRef.current.close();
-        } catch (err) {
-          console.warn("[useCtiStomp] EventSource.close failed (master pre-connect)", err);
-        }
-        eventSourceRef.current = null;
-      }
-      await new Promise((resolve) => setTimeout(resolve, 500));
+      closeDeferredMasterEventSourceRef("master pre-connect");
+      await delayMs(500);
 
       if (cancelled) {
-        isConnectingRef.current = false;
-        isGettingTokenRef.current = false;
+        resetDeferredConnectFlags();
         return;
       }
 
-      // Double-check we're still master and haven't lost master status
       if (!manager.isMasterTab()) {
-        isConnectingRef.current = false;
-        isGettingTokenRef.current = false; // Reset token flag
+        resetDeferredConnectFlags();
         return;
       }
 
-      // CRITICAL: Double-check connection doesn't already exist after getting token
-      // Another initialization might have started in the meantime
-      if (eventSourceRef.current) {
-        const existingEventSource = eventSourceRef.current as EventSource;
-        const existingState = existingEventSource.readyState;
-        if (existingState === EventSource.CONNECTING || existingState === EventSource.OPEN) {
-          console.log(
-            `[${currentInstanceId}] Got token but connection already exists (state: ${existingState}), skipping...`
-          );
-          isConnectingRef.current = false;
-          isGettingTokenRef.current = false;
-          return;
-        }
+      if (skipDeferredMasterIfDuplicateConnection(currentInstanceId)) {
+        return;
       }
 
       if (cancelled) {
-        isConnectingRef.current = false;
-        isGettingTokenRef.current = false;
+        resetDeferredConnectFlags();
         return;
       }
 
-      // We're still master, proceed with connection
-      // isConnectingRef.current is already set to true before getBearerToken()
       tokenRef.current = token.token;
       userAddressRef.current = token.userAddress;
       setUserAddress(token.userAddress);
@@ -221,55 +463,42 @@ if (
       }
       const sseUrl = `/api/cti-stomp-stream?${params.toString()}`;
 
-      // CRITICAL: Final check before creating EventSource - prevent duplicate connections
-      // This is the last line of defense against race conditions
-      if (eventSourceRef.current) {
-        const existingEventSource = eventSourceRef.current as EventSource;
-        const existingState = existingEventSource.readyState;
-        if (existingState === EventSource.CONNECTING || existingState === EventSource.OPEN) {
-          console.log(`[${currentInstanceId}] ⚠️ EventSource already exists with state ${existingState}, closing before creating new one...`);
-          try {
-            existingEventSource.close();
-          } catch (err) {
-            console.warn("[useCtiStomp] EventSource.close failed (master duplicate guard)", err);
-          }
-          eventSourceRef.current = null;
-          // Wait a bit to ensure it's fully closed
-          await new Promise((resolve) => setTimeout(resolve, 100));
-        }
-      }
+      await closeDeferredMasterActiveDuplicateBeforeNew(currentInstanceId);
 
       if (cancelled) {
-        isConnectingRef.current = false;
-        isGettingTokenRef.current = false;
+        resetDeferredConnectFlags();
         return;
       }
 
-      console.log(`[${currentInstanceId}] Creating SSE connection as master...`);
+      console.log(
+        `[${currentInstanceId}] Creating SSE connection as master...`,
+      );
       const eventSource = new EventSource(sseUrl);
 
       if (cancelled) {
         try {
           eventSource.close();
         } catch (err) {
-          console.warn("[useCtiStomp] EventSource.close failed (deferred master cancelled)", err);
+          console.warn(
+            "[useCtiStomp] EventSource.close failed (deferred master cancelled)",
+            err,
+          );
         }
-        isConnectingRef.current = false;
-        isGettingTokenRef.current = false;
+        resetDeferredConnectFlags();
         return;
       }
 
       sourceFromSecondaryMasterEffect = eventSource;
-
-      // CRITICAL: Immediately store the EventSource to prevent duplicate creation
-      // This must happen synchronously before any other code can run
       eventSourceRef.current = eventSource;
       eventSource.onopen = () => {
         if (cancelled) {
           try {
             eventSource.close();
           } catch (closeErr) {
-            console.warn("[useCtiStomp] EventSource.close failed (deferred master onopen cancel)", closeErr);
+            console.warn(
+              "[useCtiStomp] EventSource.close failed (deferred master onopen cancel)",
+              closeErr,
+            );
           }
           isConnectingRef.current = false;
           return;
@@ -284,219 +513,40 @@ if (
         lastMessageTimeRef.current = Date.now();
         connectionStartTimeRef.current = Date.now();
 
-        // Clear any existing health check interval
         if (healthCheckIntervalRef.current) {
           clearInterval(healthCheckIntervalRef.current);
           healthCheckIntervalRef.current = null;
         }
 
-        // Set up health check to detect dead connections
-        healthCheckIntervalRef.current = setInterval(() => {
-          const currentInstanceId = instanceIdRef.current;
-          const manager = crossTabManagerRef.current;
-
-          // Skip health check if not master (for cross-tab)
-          if (isGlobalInstance && manager.isCrossTabSupported()) {
-            if (!manager.isMasterTab()) {
-              return;
-            }
-          }
-
-          // Skip if already reconnecting or connecting
-          if (isReconnectingRef.current || isConnectingRef.current) {
-            return;
-          }
-
-          if (eventSourceRef.current?.readyState !== EventSource.OPEN) {
-            console.log(`[${currentInstanceId}] ⚠️ Health check: Connection is not OPEN, triggering reconnection...`);
-            const reconnect = attemptReconnectionRef.current;
-            if (reconnect) {
-              if (healthCheckIntervalRef.current) {
-                clearInterval(healthCheckIntervalRef.current);
-                healthCheckIntervalRef.current = null;
-              }
-              isReconnectingRef.current = true;
-              setIsReconnecting(true);
-              reconnect();
-            }
-            return;
-          }
-
-          const now = Date.now();
-          const lastMessageTime = lastMessageTimeRef.current || connectionStartTimeRef.current || now;
-          const timeSinceLastMessage = now - lastMessageTime;
-
-          if (timeSinceLastMessage > 300000) {
-            console.log(
-              `[${currentInstanceId}] ⚠️ Health check: No CTI event received in ${Math.round(timeSinceLastMessage / 1000)}s (connection is OPEN but no events), triggering reconnection...`
-            );
-            const reconnectStale = attemptReconnectionRef.current;
-            if (reconnectStale) {
-              if (healthCheckIntervalRef.current) {
-                clearInterval(healthCheckIntervalRef.current);
-                healthCheckIntervalRef.current = null;
-              }
-              isReconnectingRef.current = true;
-              setIsReconnecting(true);
-              reconnectStale();
-            }
-          }
-        }, 30000); // Check every 30 seconds
+        healthCheckIntervalRef.current = setInterval(
+          runDeferredMasterHealthCheckTick,
+          30000,
+        );
       };
 
       eventSource.onmessage = (event) => {
         try {
-          const data = JSON.parse(event.data);
-
-          // Update last message time for health check - but only for real messages, not pings
-          // This ensures health check can detect when CTI events stop even if SSE pings continue
-          if (data.type !== "ping" && data.type !== "test") {
-            lastMessageTimeRef.current = Date.now();
-          }
-
-          switch (data.type) {
-            case "complete_state":
-              if (
-                groupDevicesByDnAndDeviceNameRef.current &&
-                updateSummaryDataRef.current
-              ) {
-                const grouped = groupDevicesByDnAndDeviceNameRef.current(
-                  data.data
-                );
-                setDnsMap(grouped);
-                updateSummaryDataRef.current(grouped);
-                setEventLog((prev) => [
-                  ...prev,
-                  {
-                    type: "initial-state",
-                    data: grouped,
-                    timestamp: new Date().toISOString(),
-                  },
-                ]);
-                // CRITICAL: Broadcast complete_state to non-master tabs
-                // This ensures non-master tabs receive the initial data for live-calls page
-                if (isGlobalInstance && manager.isMasterTab() && manager.isCrossTabSupported()) {
-                  manager.broadcastCtiEvent({
-                    type: 'complete_state',
-                    data: data.data
-                  });
-                }
-              }
-              break;
-
-            case "dns_states": {
-              const s = data.data;
-              setDnsMap((prev) => {
-                const updated = { ...prev };
-                const { dn, deviceName } = s;
-                if (!updated[dn]) {
-                  updated[dn] = { dn, devices: {} };
-                }
-                const existing = updated[dn].devices[deviceName];
-                updated[dn].devices[deviceName] = { ...existing, ...s };
-                if (updateSummaryDataRef.current) {
-                  updateSummaryDataRef.current(updated);
-                }
-                return updated;
-              });
-
-              if (isGlobalInstance && manager.isMasterTab() && manager.isCrossTabSupported()) {
-                manager.broadcastCtiEvent({
-                  type: "dns_states",
-                  data: s,
-                });
-              }
-              break;
-            }
-
-            case "call_events":
-              if (handleCallEventRef.current) {
-                handleCallEventRef.current(data.data);
-              }
-              if (data.data?.eventType === "DROPPED" || data.data?.eventType === "DISCONNECTED") {
-                scheduleRefreshAfterCallEndRef.current?.();
-              }
-              break;
-
-            case "stomp_connected": {
-              setIsInitialized(true);
-              setError(null);
-              const publishMaster = publishStompMessageRef.current;
-              if (!hasRequestedInitialStateRef.current && publishMaster) {
-                hasRequestedInitialStateRef.current = true;
-                publishMaster("/app/request/initial-state", "");
-                publishMaster("/app/request/ongoing-calls", "");
-              }
-              break;
-            }
-            
-            case "ongoing_calls":
-              if (handleOngoingCallsRef.current) {
-                handleOngoingCallsRef.current(data.data);
-              }
-              break;
-          }
+          const data = JSON.parse(event.data) as {
+            type?: string;
+            data?: unknown;
+          };
+          handleDeferredMasterSseParsedMessage(data);
         } catch (error) {
-          console.warn("[useCtiStomp] Master SSE message parse/handle failed", error);
-        }
-      };
-
-      eventSource.onerror = (error) => {
-        const currentInstanceId = instanceIdRef.current;
-        const readyState = eventSource.readyState;
-        const manager = crossTabManagerRef.current;
-
-        if (isGlobalInstance && manager.isCrossTabSupported()) {
-          const isMaster = manager.isMasterTab();
-          if (!isMaster) {
-            console.log(
-              `[${currentInstanceId}] ⚠️ No longer master tab, closing connection...`
-            );
-            if (eventSourceRef.current) {
-              try {
-                eventSourceRef.current.close();
-              } catch (err) {
-                console.warn("[useCtiStomp] EventSource.close failed (master, not master)", err);
-              }
-              eventSourceRef.current = null;
-            }
-            setIsInitialized(true);
-            setError(null);
-            return;
-          }
-        }
-
-        if (readyState === EventSource.CLOSED) {
-          console.log(`[${currentInstanceId}] ⚠️ SSE connection closed`);
-          setIsInitialized(false);
-
-          if (isReconnectingRef.current || !attemptReconnectionRef.current) {
-            return;
-          }
-          isReconnectingRef.current = true;
-          setIsReconnecting(true);
-          console.log(
-            `[${currentInstanceId}] 🔄 Connection closed, starting reconnection with retry logic...`
-          );
-          attemptReconnectionRef.current();
-        } else if (readyState === EventSource.CONNECTING) {
-          // Don't set error yet, it's still trying to connect
-          console.log(`[${currentInstanceId}] 🔄 Connection state: CONNECTING`);
-        } else if (readyState === EventSource.OPEN) {
-          // Connection is open, this might be a temporary error, don't close
-          console.log(
-            `[${currentInstanceId}] ⚠️ Temporary error on open connection`
+          console.warn(
+            "[useCtiStomp] Master SSE message parse/handle failed",
+            error,
           );
         }
       };
+
+      attachDeferredMasterEventSourceOnError(eventSource);
     })
     .catch((error) => {
       if (cancelled) {
         return;
       }
       console.error(`[${currentInstanceId}] Error getting token:`, error);
-      isConnectingRef.current = false;
-      isGettingTokenRef.current = false;
+      resetDeferredConnectFlags();
       console.error(`[${currentInstanceId}] ❌ Failed to get token`);
     });
 }

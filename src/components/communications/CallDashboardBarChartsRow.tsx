@@ -1,5 +1,4 @@
 import React from 'react';
-import type { ApexOptions } from 'apexcharts';
 import { Row } from 'react-bootstrap';
 import { useAppDispatch, useAppSelector } from '../../toolkit/hooks';
 import {
@@ -32,8 +31,8 @@ const CallDashboardBarChartsRow: React.FC = () => {
         emptyTitle="No Calls by Country Data"
         emptyDescription="Chart data will appear here when available."
         onExpand={() => dispatch(setShowCountryChartModal(true))}
-        chartOptions={CountryChart.options as ApexOptions}
-        chartSeries={CountryChart.series as NonNullable<ApexOptions['series']>}
+        chartOptions={CountryChart.options}
+        chartSeries={CountryChart.series}
       />
       <CallBarChartCard
         show={showDepartmentChart}
@@ -42,8 +41,8 @@ const CallDashboardBarChartsRow: React.FC = () => {
         emptyTitle="No Calls by Department Data"
         emptyDescription="Chart data will appear here when available."
         onExpand={() => dispatch(setShowDepartmentChartModal(true))}
-        chartOptions={DepartmentChart.options as ApexOptions}
-        chartSeries={DepartmentChart.series as NonNullable<ApexOptions['series']>}
+        chartOptions={DepartmentChart.options}
+        chartSeries={DepartmentChart.series}
       />
       <CallBarChartCard
         show={showExtensionChart}
@@ -52,8 +51,8 @@ const CallDashboardBarChartsRow: React.FC = () => {
         emptyTitle="No Calls by Extension Data"
         emptyDescription="Chart data will appear here when available."
         onExpand={() => dispatch(setShowExtensionChartModal(true))}
-        chartOptions={ExtensionChart.options as ApexOptions}
-        chartSeries={ExtensionChart.series as NonNullable<ApexOptions['series']>}
+        chartOptions={ExtensionChart.options}
+        chartSeries={ExtensionChart.series}
       />
     </Row>
   );

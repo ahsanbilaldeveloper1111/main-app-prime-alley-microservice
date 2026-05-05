@@ -99,8 +99,86 @@ interface RecordingRow {
 /** Avoid `String(object)` → `"[object Object]"` for hierarchy/API ids. */
 function hierarchyScalarToString(value: unknown): string {
   if (value === null || value === undefined) return "";
-  if (typeof value === "object") return "";
-  return String(value);
+  switch (typeof value) {
+    case "string":
+    case "number":
+    case "boolean":
+    case "bigint":
+    case "symbol":
+      return String(value);
+    default:
+      return "";
+  }
+}
+
+function isCanceledAxiosError(error: unknown): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    (error as { code?: string }).code === "ERR_CANCELED"
+  );
+}
+
+function applyAudioRecordingGetError(
+  error: unknown,
+  setAudioError: (msg: string | null) => void,
+): void {
+  const err = error as {
+    response?: { status?: number };
+    request?: unknown;
+    message?: string;
+  };
+  if (err.response?.status) {
+    if (err.response.status === 204) {
+      toast.error("Audio file not found");
+    } else {
+      setAudioError(`Error loading audio: ${err.response.status}`);
+    }
+    return;
+  }
+  if (err.request) {
+    setAudioError("No response received from server");
+    return;
+  }
+  setAudioError(`Request error: ${err.message ?? "unknown"}`);
+}
+
+function applyAudioRecordingGetResponse(args: {
+  status: number;
+  data: unknown;
+  requestGeneration: number;
+  generationRef: { current: number };
+  replaceAudioObjectUrl: (next: string | null) => void;
+  setMediaPlayerModal: (open: boolean) => void;
+  setAudioError: (msg: string | null) => void;
+}): void {
+  const {
+    status,
+    data,
+    requestGeneration,
+    generationRef,
+    replaceAudioObjectUrl,
+    setMediaPlayerModal,
+    setAudioError,
+  } = args;
+
+  if (status === 200) {
+    const blob = new Blob([data as BlobPart], { type: "audio/mpeg" });
+    const url = globalThis.URL.createObjectURL(blob);
+    if (requestGeneration !== generationRef.current) {
+      globalThis.URL.revokeObjectURL(url);
+      return;
+    }
+    replaceAudioObjectUrl(url);
+    setMediaPlayerModal(true);
+    return;
+  }
+  if (status === 204) {
+    toast.error("Audio file not found");
+    return;
+  }
+  setAudioError(`Unexpected response status: ${status}`);
 }
 
 function buildUsernameFilterPill(
@@ -401,10 +479,10 @@ const CallRecordingsView: React.FC = () => {
     const raw = currentFilters.username;
     if (Array.isArray(raw)) {
       return raw
-        .map((value) => String(value ?? "").trim())
+        .map((value) => hierarchyScalarToString(value).trim())
         .filter((value) => value.length > 0);
     }
-    const single = String(raw ?? "").trim();
+    const single = hierarchyScalarToString(raw).trim();
     return single ? [single] : [];
   }, [currentFilters.username]);
 
@@ -443,13 +521,7 @@ const CallRecordingsView: React.FC = () => {
         .map((u: unknown) => {
           const row = u as { id?: unknown; name?: unknown };
           const userId = hierarchyScalarToString(row.id);
-          const labelRaw = row.name;
-          const label =
-            labelRaw !== undefined &&
-            labelRaw !== null &&
-            typeof labelRaw !== "object"
-              ? String(labelRaw)
-              : userId;
+          const label = hierarchyScalarToString(row.name) || userId;
           return {
             label,
             value: userId,
@@ -737,6 +809,15 @@ const CallRecordingsView: React.FC = () => {
   const handleAnalysis = async (props: RecordingRow) => {
     try {
       const Id = props.Id;
+      let dateOnly = "";
+      if (
+        typeof props.DateOnly === "string" ||
+        typeof props.DateOnly === "number"
+      ) {
+        dateOnly = String(props.DateOnly);
+      } else if (props?.DateTime) {
+        dateOnly = moment(String(props.DateTime)).format("YYYY-MM-DD");
+      }
       const dataObject = {
         uuid: String(Id ?? ""),
         direction: String(props?.Direction ?? ""),
@@ -744,12 +825,7 @@ const CallRecordingsView: React.FC = () => {
         imagicle: String(props?.imagicle ?? ""),
         duration: String(props?.Duration ?? ""),
         dateTime: String(props?.DateTime ?? ""),
-        dateOnly:
-          typeof props.DateOnly === "string" || typeof props.DateOnly === "number"
-            ? String(props.DateOnly)
-            : props?.DateTime
-              ? moment(String(props.DateTime)).format("YYYY-MM-DD")
-              : "",
+        dateOnly,
         remotePartyNumber: String(props?.RemotePartyNumber ?? ""),
         ownerUsername: String(props?.Username ?? ""),
         localPartyNumber: String(props?.AgentExtension ?? ""),
@@ -795,45 +871,20 @@ const CallRecordingsView: React.FC = () => {
       );
       dispatch(setShowPageLoader(false));
 
-      if (response.status === 200) {
-        const blob = new Blob([response.data], { type: "audio/mpeg" });
-        const url = globalThis.URL.createObjectURL(blob);
-        if (requestGeneration !== audioFetchGenerationRef.current) {
-          globalThis.URL.revokeObjectURL(url);
-          return;
-        }
-        replaceAudioObjectUrl(url);
-        setMediaPlayerModal(true);
-      } else if (response.status === 204) {
-        toast.error("Audio file not found");
-      } else {
-        setAudioError(`Unexpected response status: ${response.status}`);
-      }
+      applyAudioRecordingGetResponse({
+        status: response.status,
+        data: response.data,
+        requestGeneration,
+        generationRef: audioFetchGenerationRef,
+        replaceAudioObjectUrl,
+        setMediaPlayerModal,
+        setAudioError,
+      });
     } catch (error: unknown) {
-      if (
-        typeof error === "object" &&
-        error !== null &&
-        "code" in error &&
-        (error as { code?: string }).code === "ERR_CANCELED"
-      ) {
+      if (isCanceledAxiosError(error)) {
         return;
       }
-      const err = error as {
-        response?: { status?: number };
-        request?: unknown;
-        message?: string;
-      };
-      if (err.response) {
-        if (err.response.status === 204) {
-          toast.error("Audio file not found");
-        } else {
-          setAudioError(`Error loading audio: ${err.response.status}`);
-        }
-      } else if (err.request) {
-        setAudioError("No response received from server");
-      } else {
-        setAudioError(`Request error: ${err.message ?? "unknown"}`);
-      }
+      applyAudioRecordingGetError(error, setAudioError);
     } finally {
       setAudioLoading(false);
     }

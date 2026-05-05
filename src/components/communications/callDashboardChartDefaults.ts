@@ -1,7 +1,13 @@
 /** Initial chart state for Call Dashboard (country / department / extension bar charts). */
 
-export function getInitialCountryChart() {
-  return {
+import type { ApexOptions } from "apexcharts";
+
+export type CallDashboardApexBarChart = {
+  series: NonNullable<ApexOptions["series"]>;
+  options: ApexOptions;
+};
+
+export function getInitialCountryChart(): CallDashboardApexBarChart {  return {
     series: [
       {
         name: '',
@@ -56,12 +62,11 @@ export function getInitialCountryChart() {
   };
 }
 
-export function getInitialDepartmentChart() {
-  return {
-    series: [] as unknown[],
+export function getInitialDepartmentChart(): CallDashboardApexBarChart {  return {
+    series: [{ name: "Call Count", data: [] as number[] }],
     options: {
       chart: {
-        type: 'bar',
+        type: 'bar' as const,
         toolbar: {
           show: false,
         },
@@ -118,9 +123,8 @@ export function getInitialDepartmentChart() {
   };
 }
 
-export function getInitialExtensionChart() {
-  return {
-    series: [] as unknown[],
+export function getInitialExtensionChart(): CallDashboardApexBarChart {  return {
+    series: [{ name: "Call Count", data: [] as number[] }],
     options: {
       chart: {
         type: 'bar' as const,

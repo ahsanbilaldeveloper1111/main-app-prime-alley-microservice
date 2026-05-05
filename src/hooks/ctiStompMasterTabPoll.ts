@@ -7,17 +7,15 @@ let masterTabStatusPollIntervalId: ReturnType<typeof setInterval> | null = null;
 
 export function subscribeMasterTabStatusPoll(onTick: () => void): () => void {
   masterTabStatusPollListeners.add(onTick);
-  if (masterTabStatusPollIntervalId === null) {
-    masterTabStatusPollIntervalId = setInterval(() => {
-      masterTabStatusPollListeners.forEach((listener) => {
-        try {
-          listener();
-        } catch (e) {
-          console.warn("[useCtiStomp] master tab poll listener failed", e);
-        }
-      });
-    }, 2000);
-  }
+  masterTabStatusPollIntervalId ??= setInterval(() => {
+    masterTabStatusPollListeners.forEach((listener) => {
+      try {
+        listener();
+      } catch (e) {
+        console.warn("[useCtiStomp] master tab poll listener failed", e);
+      }
+    });
+  }, 2000);
   return () => {
     masterTabStatusPollListeners.delete(onTick);
     if (

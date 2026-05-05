@@ -10,6 +10,26 @@ export interface DirectionChartModel {
   labels: string[];
 }
 
+/** Safe label text for chart axes: only primitives become strings; objects yield "". */
+function extensionChartLabelToString(value: unknown): string {
+  if (value == null) {
+    return "";
+  }
+  if (typeof value === "string") {
+    return value;
+  }
+  if (typeof value === "number") {
+    return String(value);
+  }
+  if (typeof value === "boolean") {
+    return String(value);
+  }
+  if (typeof value === "bigint") {
+    return String(value);
+  }
+  return "";
+}
+
 export function buildDurationChartFromExtension(
   dataExtension: unknown[],
 ): DurationChartModel | null {
@@ -24,7 +44,7 @@ export function buildDurationChartFromExtension(
   const average_call: number[] = [];
 
   for (const item of dataExtension as Array<Record<string, unknown>>) {
-    label.push(String(item.label ?? ""));
+    label.push(extensionChartLabelToString(item.label));
     const longestCall =
       typeof item.longest_call === "string"
         ? Number.parseFloat(item.longest_call)
@@ -76,7 +96,7 @@ export function buildDirectionChartModel(
   for (const item of dateChart as Array<Record<string, unknown>>) {
     inbound.push(Number(item.inbound) || 0);
     outbound.push(Number(item.outbound) || 0);
-    labels.push(String(item.label ?? ""));
+    labels.push(extensionChartLabelToString(item.label));
   }
 
   return { inbound, outbound, labels };

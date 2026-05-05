@@ -315,7 +315,9 @@ const TextMessagesView: React.FC = () => {
                 className="btn btn-link p-0 text-success border-0"
                 onClick={(e) => {
                   e.stopPropagation();
-                  void handleMarkAsRead(row.id);
+                  handleMarkAsRead(row.id).catch(() => {
+                    /* mark as read failed */
+                  });
                 }}
                 aria-label="Mark as read"
                 title="Mark as read"
@@ -428,7 +430,9 @@ const TextMessagesView: React.FC = () => {
               currentPage: page,
               rowsPerPage,
             }));
-            void fetchGsmInbox(page, rowsPerPage, "");
+            fetchGsmInbox(page, rowsPerPage, "").catch(() => {
+              /* pagination fetch failed */
+            });
           }}
           rowClassName={() => ""}
           onRowClick={(row) => {
@@ -518,7 +522,9 @@ const TextMessagesView: React.FC = () => {
             <Button
               variant="success"
               onClick={() => {
-                void handleMarkAsRead(selectedMessage.id);
+                handleMarkAsRead(selectedMessage.id).catch(() => {
+                  /* mark as read failed */
+                });
                 setShowDetailsModal(false);
               }}
             >

@@ -30,6 +30,20 @@ import {
 
 const { PERMISSIONS } = HEADER_CONSTANTS;
 
+function unknownScalarToString(value: unknown): string {
+  if (value === null || value === undefined) return "";
+  switch (typeof value) {
+    case "string":
+    case "number":
+    case "boolean":
+    case "bigint":
+    case "symbol":
+      return String(value);
+    default:
+      return "";
+  }
+}
+
 const CallLogsTableSection: React.FC = () => {
   const { data: session } = useSession();
   const dispatch = useAppDispatch();
@@ -62,16 +76,24 @@ const CallLogsTableSection: React.FC = () => {
   const selectedExtensionIds = useMemo<string[]>(
     () =>
       Array.isArray(currentFilters.extension_number)
-        ? (currentFilters.extension_number as string[]).map(String)
+        ? (currentFilters.extension_number as unknown[])
+            .map((value) => unknownScalarToString(value).trim())
+            .filter((id) => id.length > 0)
         : [],
     [currentFilters.extension_number],
   );
 
   const extensionOptionsSelectedFirst = useMemo(
     () =>
-      [...hierarchyDataExtensions].sort((a: { id?: unknown }, b: { id?: unknown }) => {
-        const aSelected = selectedExtensionIds.includes(String(a.id));
-        const bSelected = selectedExtensionIds.includes(String(b.id));
+      [...hierarchyDataExtensions].sort((a: unknown, b: unknown) => {
+        const aId = unknownScalarToString(
+          (a as { id?: unknown }).id,
+        ).trim();
+        const bId = unknownScalarToString(
+          (b as { id?: unknown }).id,
+        ).trim();
+        const aSelected = selectedExtensionIds.includes(aId);
+        const bSelected = selectedExtensionIds.includes(bId);
         if (aSelected === bSelected) return 0;
         return aSelected ? -1 : 1;
       }),
@@ -108,7 +130,9 @@ const CallLogsTableSection: React.FC = () => {
   );
 
   useEffect(() => {
-    void dispatch(runCallLogsFetchForCurrentRefreshKeyThunk());
+    dispatch(runCallLogsFetchForCurrentRefreshKeyThunk()).catch(() => {
+      /* refresh-key fetch failed */
+    });
   }, [refreshKey, dispatch]);
 
   const stageFilters = useCallback(
@@ -120,7 +144,9 @@ const CallLogsTableSection: React.FC = () => {
 
   const applyCommitted = useCallback(
     (filters: Record<string, unknown>) => {
-      void dispatch(commitCallLogsFiltersThunk(filters));
+      dispatch(commitCallLogsFiltersThunk(filters)).catch(() => {
+        /* commit filters failed */
+      });
     },
     [dispatch],
   );
@@ -130,7 +156,7 @@ const CallLogsTableSection: React.FC = () => {
     hasUnappliedFilterChanges,
     hasNonDefaultFilters,
   } = useStagedFiltersActions(
-    currentFilters as Record<string, unknown>,
+    currentFilters,
     appliedFilters,
     defaultFiltersCurrent,
     (f) => dispatch(setCallLogsCurrentFilters(f)),
@@ -138,11 +164,15 @@ const CallLogsTableSection: React.FC = () => {
   );
 
   const handleResetFiltersClick = useCallback(() => {
-    void dispatch(resetCallLogsFiltersThunk());
+    dispatch(resetCallLogsFiltersThunk()).catch(() => {
+      /* reset filters failed */
+    });
   }, [dispatch]);
 
   const handleExport = useCallback(() => {
-    void dispatch(exportCallLogsThunk());
+    dispatch(exportCallLogsThunk()).catch(() => {
+      /* export failed */
+    });
   }, [dispatch]);
 
   const tableToolbar = useMemo(
@@ -215,13 +245,15 @@ const CallLogsTableSection: React.FC = () => {
             rowsPerPage,
           }),
         );
-        void dispatch(
+        dispatch(
           fetchCallLogsThunk({
             page,
-            rowsPerPage,
+            perPage: rowsPerPage,
             search: store.getState().callLogsList.searchValue.trim(),
           }),
-        );
+        ).catch(() => {
+          /* pagination fetch failed */
+        });
       }}
       sortable={true}
       hover={true}

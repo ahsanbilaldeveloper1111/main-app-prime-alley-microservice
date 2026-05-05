@@ -273,6 +273,85 @@ function isUserStrictCalleeOnOrient(
 }
 
 /**
+ * Strict-callee branch for {@link canUserResumeHoldOnFloatingBar}.
+ * @returns `false` = deny resume, `true` = allow, `null` = rule does not apply (fall through).
+ */
+function evaluateStrictCalleeHoldResumePolicy(
+  userAddress: string,
+  orient: FloatingBarHoldOrientation | undefined,
+  anyLegHeld: boolean,
+  myLegHeld: boolean,
+  heldByNonEmpty: boolean,
+  heldByOnCall: boolean,
+  heldByAddress: string,
+): boolean | null {
+  if (
+    !orient?.callingAddress ||
+    !orient?.calledAddress ||
+    !isUserStrictCalleeOnOrient(userAddress, orient) ||
+    !anyLegHeld ||
+    myLegHeld
+  ) {
+    return null;
+  }
+
+  const dialerNamedHolder =
+    heldByNonEmpty &&
+    heldByOnCall &&
+    addressesEquivalent(heldByAddress, orient.callingAddress);
+
+  if (dialerNamedHolder) {
+    return false;
+  }
+
+  if (
+    heldByNonEmpty &&
+    heldByOnCall &&
+    addressesEquivalent(userAddress, heldByAddress)
+  ) {
+    return true;
+  }
+
+  return null;
+}
+
+function computeLegHoldFlags(
+  ourParty: FloatingBarCallStateParty,
+  parties: FloatingBarCallStateParty[],
+): { myLegHeld: boolean; anyLegHeld: boolean } {
+  const myStatusUpper = (ourParty.callStatus ?? "").toUpperCase();
+  const myLegHeld =
+    myStatusUpper === "ON_HOLD" || myStatusUpper === "HELD";
+  const anyLegHeld = parties.some((p) => {
+    const s = (p.callStatus ?? "").toUpperCase();
+    return s === "ON_HOLD" || s === "HELD";
+  });
+  return { myLegHeld, anyLegHeld };
+}
+
+function resolveFloatingBarHolderDn(
+  heldByNonEmpty: boolean,
+  heldByOnCall: boolean,
+  heldByAddress: string,
+  parties: FloatingBarCallStateParty[],
+  dnsMap: FloatingBarDnsMap | undefined,
+  orient: FloatingBarHoldOrientation | undefined,
+): string | undefined {
+  if (heldByNonEmpty && heldByOnCall) {
+    return heldByAddress;
+  }
+  const inferred = inferFloatingBarHoldInitiatorFromParties(
+    parties,
+    dnsMap,
+    orient,
+  );
+  if (isAddressParticipantOnFloatingBarParties(inferred, parties)) {
+    return inferred;
+  }
+  return undefined;
+}
+
+/**
  * Whether the signed-in user should see Resume on the floating bar for a held call.
  * Prefer `heldByAddress`; else infer the hold initiator. For a strict callee (only `calledAddress`
  * on orient) with another leg held while ours is not ON_HOLD: deny only when the dialer is named
@@ -310,39 +389,19 @@ export function canUserResumeHoldOnFloatingBar(
         addressesEquivalent(p.calledAddress, heldByAddress),
     );
 
-  const myStatusUpper = (ourParty.callStatus ?? "").toUpperCase();
-  const myLegHeld = myStatusUpper === "ON_HOLD" || myStatusUpper === "HELD";
-  const anyLegHeld = parties.some((p) => {
-    const s = (p.callStatus ?? "").toUpperCase();
-    return s === "ON_HOLD" || s === "HELD";
-  });
+  const { myLegHeld, anyLegHeld } = computeLegHoldFlags(ourParty, parties);
 
-  // Callee (only `calledAddress` on parties[0] / activeCall) while another leg is held but ours is
-  // not ON_HOLD — typical when the dialer held (incl. supervisor → agent). If CTI names the dialer as
-  // holder, never show Resume to the callee. If CTI names us, allow (covers odd CTI where our leg
-  // still looks "connected" after we held). Otherwise fall through — no explicit supervisor/agent
-  // role: monitoring calls are excluded from the bar via shouldIncludeCallOnFloatingBar.
-  if (
-    orient?.callingAddress &&
-    orient?.calledAddress &&
-    isUserStrictCalleeOnOrient(userAddress, orient) &&
-    anyLegHeld &&
-    !myLegHeld
-  ) {
-    const dialerNamedHolder =
-      heldByNonEmpty &&
-      heldByOnCall &&
-      addressesEquivalent(heldByAddress, orient.callingAddress);
-    if (dialerNamedHolder) {
-      return false;
-    }
-    if (
-      heldByNonEmpty &&
-      heldByOnCall &&
-      addressesEquivalent(userAddress, heldByAddress)
-    ) {
-      return true;
-    }
+  const strictCalleeDecision = evaluateStrictCalleeHoldResumePolicy(
+    userAddress,
+    orient,
+    anyLegHeld,
+    myLegHeld,
+    heldByNonEmpty,
+    heldByOnCall,
+    heldByAddress,
+  );
+  if (strictCalleeDecision !== null) {
+    return strictCalleeDecision;
   }
 
   const remoteDecision = resolveRemoteHoldResumeAllowed(
@@ -357,19 +416,14 @@ export function canUserResumeHoldOnFloatingBar(
     return remoteDecision;
   }
 
-  let holderDn: string | undefined;
-  if (heldByNonEmpty && heldByOnCall) {
-    holderDn = heldByAddress;
-  } else {
-    const inferred = inferFloatingBarHoldInitiatorFromParties(
-      parties,
-      dnsMap,
-      orient,
-    );
-    if (isAddressParticipantOnFloatingBarParties(inferred, parties)) {
-      holderDn = inferred;
-    }
-  }
+  const holderDn = resolveFloatingBarHolderDn(
+    heldByNonEmpty,
+    heldByOnCall,
+    heldByAddress,
+    parties,
+    dnsMap,
+    orient,
+  );
 
   if (holderDn) {
     return addressesEquivalent(userAddress, holderDn);

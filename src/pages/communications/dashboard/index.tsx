@@ -22,7 +22,7 @@ const CallDashboard = () => {
   const dispatch = useAppDispatch();
 
   useEffect(() => {
-    void dispatch(loadCallDashboardInitialThunk());
+    dispatch(loadCallDashboardInitialThunk());
   }, [dispatch]);
 
   return (

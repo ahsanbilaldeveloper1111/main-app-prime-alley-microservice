@@ -130,7 +130,7 @@ function cleanupStaleFinesseConnections() {
       console.log(
         '[Finesse WS Stream] Stale pool entry:',
         key,
-        `(${(age / 60000) | 0}m since lastUsed)`,
+        `(${Math.trunc(age / 60000)}m since lastUsed)`,
       );
     }
     teardownPooledConnection(key, 'idle timeout');
