@@ -31,6 +31,30 @@ export interface GsmInboxRow {
   [key: string]: unknown;
 }
 
+function ignoreMarkAsReadRejection(): void {
+  /* network/API failure; toast already shown in handleMarkAsRead */
+}
+
+function gsmInboxCopyClickHandler(
+  row: GsmInboxRow,
+  copyFn: (text: string) => void,
+): (e: React.MouseEvent<HTMLButtonElement>) => void {
+  return (e) => {
+    e.stopPropagation();
+    copyFn(row.text || "");
+  };
+}
+
+function gsmInboxMarkReadClickHandler(
+  rowId: number,
+  markReadFn: (id: number) => Promise<void>,
+): (e: React.MouseEvent<HTMLButtonElement>) => void {
+  return (e) => {
+    e.stopPropagation();
+    markReadFn(rowId).catch(ignoreMarkAsReadRejection);
+  };
+}
+
 const TextMessagesView: React.FC = () => {
   const { data: session } = useSession();
   const [refreshKey, setRefreshKey] = useState<number>(0);
@@ -296,10 +320,7 @@ const TextMessagesView: React.FC = () => {
             <button
               type="button"
               className="btn btn-link p-0 text-secondary border-0"
-              onClick={(e) => {
-                e.stopPropagation();
-                handleCopyMessage(row.text || "");
-              }}
+              onClick={gsmInboxCopyClickHandler(row, handleCopyMessage)}
               aria-label="Copy message"
               title="Copy message"
             >
@@ -313,12 +334,7 @@ const TextMessagesView: React.FC = () => {
               <button
                 type="button"
                 className="btn btn-link p-0 text-success border-0"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleMarkAsRead(row.id).catch(() => {
-                    /* mark as read failed */
-                  });
-                }}
+                onClick={gsmInboxMarkReadClickHandler(row.id, handleMarkAsRead)}
                 aria-label="Mark as read"
                 title="Mark as read"
               >

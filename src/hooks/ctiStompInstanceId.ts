@@ -1,9 +1,10 @@
 let ctiStompInstanceCounter = 0;
+/** Used only when Web Crypto is missing; monotonic + optional performance.now for same-ms IDs. */
+let ctiStompNoCryptoSuffixSeq = 0;
 
 /**
- * Cryptographically strong random suffix for instance IDs.
- * IDs are used for logging and hook instance correlation only, not auth tokens,
- * but we avoid Math.random() so IDs are not predictable from snapshots of prior IDs.
+ * Random suffix for instance IDs using Web Crypto when available.
+ * IDs are for logging / hook correlation only (not auth secrets). Prefer CSPRNG when present.
  */
 function randomInstanceSuffix(): string {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
@@ -14,10 +15,14 @@ function randomInstanceSuffix(): string {
     crypto.getRandomValues(bytes);
     return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
   }
-  // Extremely old environments only; counter + Date.now() still limit collision risk
-  return Math.random().toString(36).slice(2, 11);
+  // No Web Crypto: avoid Math.random() (non-cryptographic / predictable). Full id is still unique
+  // via generateCtiStompInstanceId's counter and Date.now().
+  ctiStompNoCryptoSuffixSeq += 1;
+  if (typeof performance !== "undefined" && typeof performance.now === "function") {
+    return `${ctiStompNoCryptoSuffixSeq}-${performance.now()}`;
+  }
+  return String(ctiStompNoCryptoSuffixSeq);
 }
-
 export function generateCtiStompInstanceId(): string {
   ctiStompInstanceCounter++;
   return `cti-stomp-${ctiStompInstanceCounter}-${Date.now()}-${randomInstanceSuffix()}`;
