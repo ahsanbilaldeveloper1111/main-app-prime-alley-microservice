@@ -83,7 +83,7 @@ import {
   type CampaignRow,
   type ContactHeaderValueOption,
   type ImportStatusShape,
-} from "../campaign-shared/campaignManagerHelpers";
+} from "@utils/communications/campaign-shared/campaignManagerHelpers";
 
 const { PERMISSIONS } = HEADER_CONSTANTS;
 

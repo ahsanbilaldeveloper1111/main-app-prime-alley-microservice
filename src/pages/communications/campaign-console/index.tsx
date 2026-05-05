@@ -88,13 +88,13 @@ import {
   formatFinesseStateDuration,
   getCampaignAgentStateColor,
   mapEffectiveFinesseStateToTopBarReadyToggle,
-} from '../campaign-shared/finesseAgentDisplay';
+} from '@utils/communications/campaign-shared/finesseAgentDisplay';
 import type {
   CampaignConsoleActionMenuPortalState,
   CampaignConsoleDisplayAgent,
   CampaignConsoleTeamApiResponse,
   CampaignConsoleTeamUser,
-} from '../campaign-shared/campaignConsoleTypes';
+} from '@utils/communications/campaign-shared/campaignConsoleTypes';
 
 type TeamUser = CampaignConsoleTeamUser;
 type TeamApiResponse = CampaignConsoleTeamApiResponse;
