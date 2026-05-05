@@ -1,8 +1,10 @@
 "use client";
 
 import React from "react";
+import { Phone, X } from "lucide-react";
 import { Button, Modal, Form } from "react-bootstrap";
 import UserDummyImage from "@assets/images/user-dummy.jpg";
+import { formatLayoutPhoneNumber } from "@layout/components/layoutPhone";
 import type {
   FloatingBarCtiCall,
   FloatingBarDnsMap,
@@ -685,5 +687,96 @@ export function isExtensionBusyOnCalls(
 ): boolean {
   return Array.from(activeCalls.values()).some(
     (call) => call.number === ext && BUSY_CALL_STATUSES.has(call.status),
+  );
+}
+
+export type FloatingBarIncomingCallPanelProps = {
+  callerName: string;
+  callerImageUrl: string;
+  callingAddress: string;
+  onReject: () => void;
+  onAttend: () => void;
+  isDialing: boolean;
+};
+
+/** Incoming call attend/reject — only GlobalFloatingCallBar should mount this (not Layout or dialer page). */
+export function FloatingBarIncomingCallPanel({
+  callerName,
+  callerImageUrl,
+  callingAddress,
+  onReject,
+  onAttend,
+  isDialing,
+}: Readonly<FloatingBarIncomingCallPanelProps>) {
+  return (
+    <div
+      className="bg-white rounded shadow"
+      style={{
+        position: "fixed",
+        top: "60px",
+        right: "20px",
+        zIndex: 1050,
+        maxWidth: "400px",
+        width: "auto",
+        padding: "1rem",
+        boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
+      }}
+    >
+      <div className="d-flex align-items-center gap-3">
+        <div style={{ width: "48px", height: "48px", minWidth: "48px" }}>
+          <img
+            src={callerImageUrl}
+            alt={callerName}
+            className="rounded-circle"
+            style={{
+              width: "100%",
+              height: "100%",
+              objectFit: "cover",
+            }}
+            onError={(e) => {
+              e.currentTarget.src = UserDummyImage.src;
+            }}
+          />
+        </div>
+        <div className="flex-grow-1" style={{ minWidth: 0 }}>
+          <h6 className="mb-1" style={{ fontSize: "14px", fontWeight: 600 }}>
+            {callerName}
+          </h6>
+          <div style={{ fontSize: "13px", color: "#6c757d" }}>
+            {formatLayoutPhoneNumber(callingAddress)}
+          </div>
+          <div
+            style={{
+              fontSize: "12px",
+              color: "#22c55e",
+              marginTop: "4px",
+            }}
+          >
+            Incoming call...
+          </div>
+        </div>
+        <div className="d-flex gap-2 flex-shrink-0">
+          <button
+            type="button"
+            onClick={onReject}
+            className="btn btn-sm btn-outline-danger rounded-circle"
+            style={{ width: "36px", height: "36px", padding: 0 }}
+            aria-label="Reject call"
+          >
+            <X size={18} />
+          </button>
+          <button
+            type="button"
+            onClick={onAttend}
+            disabled={isDialing}
+            className="btn btn-sm btn-success rounded-circle"
+            style={{ width: "36px", height: "36px", padding: 0 }}
+            aria-label="Answer call"
+          >
+            <Phone size={18} />
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }

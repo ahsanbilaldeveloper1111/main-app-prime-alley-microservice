@@ -572,8 +572,13 @@ export const HEADER_CONSTANTS = {
     VIEW_TICKETS_SUBCATEGORIES: "manage-ticket-module-subcategory-tickets",
 
     CHECK_NUMBERS_DNCR: "check-numbers-dncr",
+    BULK_CHECK_NUMBERS_DNCR: "bulk-check-numbers-dncr",
     VIEW_CDR_DNCR: "view-cdr-dncr",
     VIEW_LOCAL_DND_CALL_BLOCK_DNCR: "view-local-dnd-blocks-dncr",
+    ADD_LOCAL_DND_BLOCKS_DNCR: "add-local-dnd-blocks-dncr",
+    BULK_ADD_LOCAL_DND_BLOCKS_DNCR: "bulk-add-local-dnd-blocks-dncr",
+    DELETE_LOCAL_DND_BLOCKS_DNCR: "delete-local-dnd-blocks-dncr",
+    BULK_DELETE_LOCAL_DND_BLOCKS_DNCR: "bulk-delete-local-dnd-blocks-dncr",
 
     VIEW_COMMUNICATIONS_DASHBOARD: "view-call-dashboard",
 

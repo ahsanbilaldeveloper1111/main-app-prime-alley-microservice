@@ -91,33 +91,6 @@ const CallIncomingDepartment = () => {
     const [loading, setLoading] = useState(false);
     const [activeTab, setActiveTab] = useState('calls_chart');
     
-    // Debug session state
-    useEffect(() => {
-        console.log('Session state:', { session, status });
-        if (status === 'authenticated' && session) {
-            console.log('Session authenticated successfully');
-        } else if (status === 'loading') {
-            console.log('Session still loading...');
-        } else if (status === 'unauthenticated') {
-            console.log('User not authenticated');
-        }
-    }, [session, status]);
-    
-    // Debug component mounting
-    useEffect(() => {
-        console.log('CallIncomingDepartment component mounted');
-        console.log('Initial props and state:', { 
-            session, 
-            status, 
-            filtersReady, 
-            dataLoaded, 
-            loading 
-        });
-        return () => {
-            console.log('CallIncomingDepartment component unmounting');
-        };
-    }, []);
-
     // Animation variants for tab transitions
     const tabVariants = {
         hidden: { 

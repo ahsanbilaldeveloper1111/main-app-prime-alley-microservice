@@ -2296,8 +2296,6 @@ export const getCustomer = async (
       validateStatus: (status) =>
         (status >= 200 && status < 300) || status === 404,
     });
-    console.log("getCustomer", response.data);
-
     const raw = response.data;
     const envelope = peelAccountingResponseBody(raw);
     if (

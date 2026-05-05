@@ -373,7 +373,6 @@ const CreateLead = () => {
         try {
           const crmDataId = Number(router.query.crm_data_id);
           const crmDataRecord = await getCrmDataById(crmDataId);
-          console.log("ZE CRM DATA RECORD", crmDataRecord);
           setSelectedCrmData(crmDataRecord);
 
           // Extract prospect name for lead name
@@ -510,7 +509,6 @@ const CreateLead = () => {
         try {
           // Fetch campaign details with fields
           const campaign = await getCampaignById(selectedCrmData.campaign_id);
-          console.log("ZE AUTO-SELECTED CAMPAIGN WITH FIELDS", campaign);
 
           setSelectedCampaign(campaign);
 
@@ -969,7 +967,6 @@ const CreateLead = () => {
     try {
       // Fetch campaign details with fields
       const campaign = await getCampaignById(campaignId);
-      console.log("ZE CAMPAIGN WITH FIELDS", campaign);
 
       // Pre-fill campaign fields with CRM data (excluding dropdown fields)
       const preFilledFields: Record<string, any> = {};

@@ -162,17 +162,15 @@ function extractData<T>(response: NetOpsApiResponse<T>): T {
   
   // Handle successful response with nested data structure
   if (response?.code === 200 && response?.data?.success) {
-    console.log("Extracting from nested data structure:", response.data.data);
     return response.data.data;
   }
 
   // Handle direct data response (fallback)
   if (response?.data) {
-    console.log("Extracting from direct data:", response.data);
     return response.data as T;
   }
 
-  console.error("Failed to extract data from response:", response);
+  console.error("Failed to extract data from NetOps response");
 
   const errorMessage = response?.message || "API request failed";
   reportApiError("netops", errorMessage, {
@@ -187,7 +185,6 @@ function extractData<T>(response: NetOpsApiResponse<T>): T {
 export const getDevices = async (params: Record<string, any> = {}): Promise<Device[]> => {
   try {
     const response = await axiosInstance.get<NetOpsApiResponse<Device[]>>("/netops/devices", { params });
-    console.log("Devices API response:", response.data);
     return extractData<Device[]>(response.data);
   } catch (error: any) {
     console.error("Failed to fetch devices:", error);
@@ -199,7 +196,6 @@ export const getDevices = async (params: Record<string, any> = {}): Promise<Devi
 export const createDevice = async (data: Partial<Device>): Promise<Device> => {
   try {
     const response = await axiosInstance.post<NetOpsApiResponse<Device>>("/netops/devices", data);
-    console.log("Create device response:", response.data);
     return extractData<Device>(response.data);
   } catch (error: any) {
     console.error("Failed to create device:", error);
@@ -211,7 +207,6 @@ export const createDevice = async (data: Partial<Device>): Promise<Device> => {
 export const updateDevice = async (id: string | number, data: Partial<Device>): Promise<Device> => {
   try {
     const response = await axiosInstance.put<NetOpsApiResponse<Device>>(`/netops/devices/${id}`, data);
-    console.log("Update device response:", response.data);
     return extractData<Device>(response.data);
   } catch (error: any) {
     console.error("Failed to update device:", error);
@@ -223,7 +218,6 @@ export const updateDevice = async (id: string | number, data: Partial<Device>): 
 export const deleteDevice = async (id: string | number): Promise<void> => {
   try {
     const response = await axiosInstance.delete<NetOpsApiResponse<void>>(`/netops/devices/${id}`);
-    console.log("Delete device response:", response.data);
     return extractData<void>(response.data);
   } catch (error: any) {
     console.error("Failed to delete device:", error);
@@ -236,7 +230,6 @@ export const deleteDevice = async (id: string | number): Promise<void> => {
 export const getServices = async (params: Record<string, any> = {}): Promise<Service[]> => {
   try {
     const response = await axiosInstance.get<NetOpsApiResponse<Service[]>>("/netops/services", { params });
-    console.log("Services API response:", response.data);
     return extractData<Service[]>(response.data);
   } catch (error: any) {
     console.error("Failed to fetch services:", error);
@@ -248,7 +241,6 @@ export const getServices = async (params: Record<string, any> = {}): Promise<Ser
 export const createService = async (data: Partial<Service>): Promise<Service> => {
   try {
     const response = await axiosInstance.post<NetOpsApiResponse<Service>>("/netops/services", data);
-    console.log("Create service response:", response.data);
     return extractData<Service>(response.data);
   } catch (error: any) {
     console.error("Failed to create service:", error);
@@ -260,7 +252,6 @@ export const createService = async (data: Partial<Service>): Promise<Service> =>
 export const updateService = async (id: string | number, data: Partial<Service>): Promise<Service> => {
   try {
     const response = await axiosInstance.put<NetOpsApiResponse<Service>>(`/netops/services/${id}`, data);
-    console.log("Update service response:", response.data);
     return extractData<Service>(response.data);
   } catch (error: any) {
     console.error("Failed to update service:", error);
@@ -272,7 +263,6 @@ export const updateService = async (id: string | number, data: Partial<Service>)
 export const deleteService = async (id: string | number): Promise<void> => {
   try {
     const response = await axiosInstance.delete<NetOpsApiResponse<void>>(`/netops/services/${id}`);
-    console.log("Delete service response:", response.data);
     return extractData<void>(response.data);
   } catch (error: any) {
     console.error("Failed to delete service:", error);
@@ -285,7 +275,6 @@ export const deleteService = async (id: string | number): Promise<void> => {
 export const getAlerts = async (params: Record<string, any> = {}): Promise<Alert[]> => {
   try {
     const response = await axiosInstance.get<NetOpsApiResponse<Alert[]>>("/netops/alerts", { params });
-    console.log("Alerts API response:", response.data);
     return extractData<Alert[]>(response.data);
   } catch (error: any) {
     console.error("Failed to fetch alerts:", error);
@@ -310,7 +299,6 @@ export const getAlerts = async (params: Record<string, any> = {}): Promise<Alert
 export const getComprehensiveMonitoring = async (params: Record<string, any> = {}): Promise<ComprehensiveMonitoringResponse> => {
   try {
     const response = await axiosInstance.get<NetOpsApiResponse<ComprehensiveMonitoringResponse>>("/netops/monitoring/comprehensive", { params });
-    console.log("Comprehensive monitoring API response:", response.data);
     return extractData<ComprehensiveMonitoringResponse>(response.data);
   } catch (error: any) {
     console.error("Failed to fetch comprehensive monitoring:", error);
@@ -322,7 +310,6 @@ export const getComprehensiveMonitoring = async (params: Record<string, any> = {
 export const getMonitoringDashboard = async (params: Record<string, any> = {}): Promise<MonitoringDashboardResponse> => {
   try {
     const response = await axiosInstance.get<NetOpsApiResponse<MonitoringDashboardResponse>>("/netops/monitoring/dashboard", { params });
-    console.log("Monitoring dashboard API response:", response.data);
     return extractData<MonitoringDashboardResponse>(response.data);
   } catch (error: any) {
     console.error("Failed to fetch monitoring dashboard:", error);
@@ -334,7 +321,6 @@ export const getMonitoringDashboard = async (params: Record<string, any> = {}): 
 export const getDeviceMonitoringStatus = async (deviceId: string | number, params: Record<string, any> = {}): Promise<DeviceMonitoringStatusResponse> => {
   try {
     const response = await axiosInstance.get<NetOpsApiResponse<DeviceMonitoringStatusResponse>>(`/netops/monitoring/devices/${deviceId}/status`, { params });
-    console.log("Device monitoring status API response:", response.data);
     return extractData<DeviceMonitoringStatusResponse>(response.data);
   } catch (error: any) {
     console.error("Failed to fetch device monitoring status:", error);
@@ -526,8 +512,6 @@ export const testAllGetEndpoints = async (): Promise<TestResults> => {
   const results: TestResults = {};
   
   try {
-    console.log("=== Testing NetOps GET Endpoints ===");
-    
     // Test all GET endpoints
     const endpoints = [
       { name: 'devices', fn: () => getDevices() },
@@ -540,14 +524,12 @@ export const testAllGetEndpoints = async (): Promise<TestResults> => {
 
     for (const endpoint of endpoints) {
       try {
-        console.log(`Testing ${endpoint.name}...`);
         const data = await endpoint.fn();
         results[endpoint.name] = {
           success: true,
           data: data,
           error: null
         };
-        console.log(`✅ ${endpoint.name} - Success:`, data);
       } catch (error: any) {
         results[endpoint.name] = {
           success: false,
@@ -560,14 +542,12 @@ export const testAllGetEndpoints = async (): Promise<TestResults> => {
 
     // Test device monitoring status with a sample device ID
     try {
-      console.log("Testing device monitoring status with sample device ID...");
       const deviceMonitoringData = await getDeviceMonitoringStatus(23);
       results['device-monitoring-status'] = {
         success: true,
         data: deviceMonitoringData,
         error: null
       };
-      console.log("✅ device-monitoring-status - Success:", deviceMonitoringData);
     } catch (error: any) {
       results['device-monitoring-status'] = {
         success: false,
@@ -577,7 +557,6 @@ export const testAllGetEndpoints = async (): Promise<TestResults> => {
       console.error("❌ device-monitoring-status - Error:", error.message);
     }
 
-    console.log("=== NetOps API Test Results ===", results);
     return results;
     
   } catch (error: any) {
@@ -590,7 +569,6 @@ export const testAllGetEndpoints = async (): Promise<TestResults> => {
 export const resolveAlert = async (alertId: string | number): Promise<void> => {
   try {
     const response = await axiosInstance.post<NetOpsApiResponse<void>>(`/netops/alerts/${alertId}/resolve`);
-    console.log("Resolve alert response:", response.data);
     return extractData<void>(response.data);
   } catch (error: any) {
     console.error("Failed to resolve alert:", error);
@@ -603,7 +581,6 @@ export const resolveAlert = async (alertId: string | number): Promise<void> => {
 export const getSystemMetricsServers = async (params: Record<string, any> = {}): Promise<ServerMetricsListResponse> => {
   try {
     const response = await axiosInstance.get<NetOpsApiResponse<ServerMetricsListResponse>>("/netops/system-metrics/servers", { params });
-    console.log("System metrics servers API response:", response.data);
     return extractData<ServerMetricsListResponse>(response.data);
   } catch (error: any) {
     console.error("Failed to fetch system metrics servers:", error);
@@ -615,7 +592,6 @@ export const getSystemMetricsServers = async (params: Record<string, any> = {}):
 export const getSystemMetrics = async (server: string | number, params: Record<string, any> = {}): Promise<SystemMetricsResponse> => {
   try {
     const response = await axiosInstance.get<NetOpsApiResponse<SystemMetricsResponse>>("/netops/system-metrics/"+server);
-    console.log("System metrics API response:", response.data);
     return extractData<SystemMetricsResponse>(response.data);
   } catch (error: any) {
     console.error("Failed to fetch system metrics:", error);

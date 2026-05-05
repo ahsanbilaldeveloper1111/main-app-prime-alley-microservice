@@ -52,13 +52,11 @@ const TmsProfile = () => {
       
       try {
         const response = await axiosInstance.get(`tms/getCompany?id=${user.company_id}`);
-        console.log("response getCompanyDetails", response);
         const data= response?.data?.data;
         if(data?.success===true){
           setFacCode(data?.data?.profile?.fac_code);
           setFacCodeMobile(data?.data?.profile?.fac_code_mobile);
         }
-        console.log("data getCompanyDetails", data);
       } catch (error) {
         console.error('Error fetching company details:', error);
       }

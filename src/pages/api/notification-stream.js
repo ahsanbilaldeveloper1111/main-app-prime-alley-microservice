@@ -88,10 +88,6 @@ export default async function handler(req, res) {
     return sendErrorAndEnd(res, 'Missing or invalid token (use token or tokenB64 query param).');
   }
 
-  // Safe debug: verify token shape (JWT usually starts with eyJ)
-  const tokenPreview = rawToken.length > 20 ? `${rawToken.substring(0, 15)}...${rawToken.length}ch` : `${rawToken.length}ch`;
-  console.log('[notification-stream] token: received, raw length=', rawToken.length, 'preview=', tokenPreview, 'startsWith(eyJ)=', rawToken.startsWith('eyJ'));
-
   res.writeHead(200, SSE_HEADERS);
 
   writeSSE(res, { type: 'connecting', message: 'Connecting to notification server...' });
@@ -101,8 +97,6 @@ export default async function handler(req, res) {
   const socketPath = process.env.NOTIFICATION_SOCKET_PATH || '/socket.io';
   const transports = (process.env.NOTIFICATION_SOCKET_TRANSPORTS || 'websocket,polling').split(',').map((t) => t.trim()).filter(Boolean);
 
-  console.log('[notification-stream] connecting to', baseUrl, 'path:', socketPath, 'transports:', transports);
-
   const socket = io(baseUrl, {
     path: socketPath,
     transports: transports.length ? transports : ['websocket', 'polling'],
@@ -111,29 +105,53 @@ export default async function handler(req, res) {
     timeout: CONNECTION_TIMEOUT,
   });
 
+  let cleanedUp = false;
+  let keepAlive = null;
+
+  const safeCleanup = () => {
+    if (cleanedUp) return;
+    cleanedUp = true;
+    clearTimeout(connectionTimeout);
+    if (keepAlive != null) {
+      clearInterval(keepAlive);
+      keepAlive = null;
+    }
+    try {
+      socket.removeAllListeners();
+      socket.disconnect();
+    } catch (e) {
+      console.warn('[notification-stream] cleanup:', e?.message);
+    }
+  };
+
   const connectionTimeout = setTimeout(() => {
     if (!socket.connected) {
       console.warn('[notification-stream] connection timeout');
       writeSSE(res, { type: 'error', message: 'Connection timeout to notification server' });
-      socket.removeAllListeners();
-      socket.disconnect();
+      safeCleanup();
     }
   }, CONNECTION_TIMEOUT);
 
   socket.on('connect', () => {
     clearTimeout(connectionTimeout);
     const channels = buildChannels(extensionId);
-    console.log('[notification-stream] connected, subscribe', channels);
+    if (process.env.NODE_ENV === 'development') {
+      console.log('[notification-stream] connected, subscribe', channels);
+    }
     socket.emit('subscribe', channels);
     writeSSE(res, { type: 'connected', message: 'Connected', socketId: socket.id });
   });
 
   socket.on('connected', (msg) => {
-    console.log('[notification-stream] server connected event', msg?.message ?? msg);
+    if (process.env.NODE_ENV === 'development') {
+      console.log('[notification-stream] server connected event', msg?.message ?? msg);
+    }
   });
 
   socket.on('subscribed', (data) => {
-    console.log('[notification-stream] subscribed', data?.channels ?? data);
+    if (process.env.NODE_ENV === 'development') {
+      console.log('[notification-stream] subscribed', data?.channels ?? data);
+    }
     writeSSE(res, { type: 'subscribed', channels: data?.channels ?? data });
   });
 
@@ -151,32 +169,33 @@ export default async function handler(req, res) {
         ? 'Cannot reach notification server. Check NOTIFICATION_SOCKET_URL and that the socket server is running.'
         : msg,
     });
+    safeCleanup();
   });
 
   socket.on('disconnect', (reason) => {
-    console.log('[notification-stream] disconnect', reason);
+    if (process.env.NODE_ENV === 'development') {
+      console.log('[notification-stream] disconnect', reason);
+    }
     writeSSE(res, { type: 'disconnected', reason });
   });
 
-  const keepAlive = setInterval(() => {
+  keepAlive = setInterval(() => {
     if (!res.destroyed && !res.closed) writeSSE(res, { type: 'ping', timestamp: Date.now() });
-    else clearInterval(keepAlive);
+    else safeCleanup();
   }, KEEP_ALIVE_INTERVAL);
 
-  const cleanup = () => {
-    clearInterval(keepAlive);
-    clearTimeout(connectionTimeout);
-    socket.removeAllListeners();
-    socket.disconnect();
-  };
-
   res.on('close', () => {
-    console.log('[notification-stream] client closed');
-    cleanup();
+    if (process.env.NODE_ENV === 'development') {
+      console.log('[notification-stream] client closed');
+    }
+    safeCleanup();
   });
-  res.on('finish', cleanup);
+  res.on('finish', safeCleanup);
   res.on('error', (err) => {
     console.error('[notification-stream] response error', err?.message);
-    cleanup();
+    safeCleanup();
   });
+
+  req.on('aborted', safeCleanup);
+  req.on('close', safeCleanup);
 }

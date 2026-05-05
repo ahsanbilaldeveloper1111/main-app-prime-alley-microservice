@@ -4,6 +4,8 @@ import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 import { toast } from 'react-toastify';
 import GenericTable, { TableColumn } from "@components/GenericTable";
+import { useSession } from "next-auth/react";
+import { HEADER_CONSTANTS } from "@constants/headerConstants";
 
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
@@ -51,6 +53,8 @@ interface BatchApiResponse {
 
 const MAX_MANUAL_NUMBERS = 10;
 const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024;
+const BULK_DNCR_PERMISSION_TOAST =
+  "You do not have permission for bulk DNCR checks.";
 
 function normalizeDigits(value: string): string {
   return value.replaceAll(/\D/g, "");
@@ -538,6 +542,12 @@ const styles: { [key: string]: React.CSSProperties } = {
     };
     
 const APINumberCheck = () => { // NOSONAR - legacy page kept readable via extracted helpers
+      const { data: session } = useSession();
+      const canBulkCheckDncr =
+        session?.user?.permissions?.includes(
+          HEADER_CONSTANTS.PERMISSIONS.BULK_CHECK_NUMBERS_DNCR,
+        ) ?? false;
+
       const [activeTab, setActiveTab] = useState<'manual' | 'csv'>('manual');
       const [manualInput, setManualInput] = useState<string>('');
       const [csvFile, setCsvFile] = useState<File | null>(null);
@@ -612,6 +622,14 @@ const APINumberCheck = () => { // NOSONAR - legacy page kept readable via extrac
       // Parse CSV file and calculate valid/invalid numbers
       const [csvValidCount, setCsvValidCount] = useState<number>(0);
       const [csvInvalidCount, setCsvInvalidCount] = useState<number>(0);
+
+      useEffect(() => {
+        if (!canBulkCheckDncr && activeTab === "csv") {
+          setActiveTab("manual");
+          setCsvFile(null);
+          setBulkResults(null);
+        }
+      }, [canBulkCheckDncr, activeTab]);
 
       // Read and validate CSV file when it's uploaded
       useEffect(() => {
@@ -713,6 +731,11 @@ const APINumberCheck = () => { // NOSONAR - legacy page kept readable via extrac
 
       // Handle CSV file upload
       const handleFileUpload = (e: ChangeEvent<HTMLInputElement>): void => {
+        if (!canBulkCheckDncr) {
+          toast.error(BULK_DNCR_PERMISSION_TOAST);
+          e.target.value = "";
+          return;
+        }
         const file = e.target.files?.[0];
         if (!file) return;
         if (!isAcceptableCsvFile(file, 'Please select a CSV file')) return;
@@ -725,6 +748,10 @@ const APINumberCheck = () => { // NOSONAR - legacy page kept readable via extrac
     
       const handleDrop = (e: DragEvent<HTMLButtonElement>): void => {
         e.preventDefault();
+        if (!canBulkCheckDncr) {
+          toast.error(BULK_DNCR_PERMISSION_TOAST);
+          return;
+        }
         const file = e.dataTransfer.files[0];
         if (!file) return;
         if (!isAcceptableCsvFile(file, 'Please drop a CSV file')) return;
@@ -733,6 +760,7 @@ const APINumberCheck = () => { // NOSONAR - legacy page kept readable via extrac
       };
 
       const handleDropzoneKeyDown = (e: KeyboardEvent<HTMLButtonElement>): void => {
+        if (!canBulkCheckDncr) return;
         if (e.key !== "Enter" && e.key !== " ") return;
         e.preventDefault();
         csvInputRef.current?.click();
@@ -740,6 +768,10 @@ const APINumberCheck = () => { // NOSONAR - legacy page kept readable via extrac
 
       // Handle bulk CSV upload
       const handleBulkUpload = useCallback(async (): Promise<void> => {
+        if (!canBulkCheckDncr) {
+          toast.error(BULK_DNCR_PERMISSION_TOAST);
+          return;
+        }
         if (!csvFile) {
           toast.error('Please select a CSV file');
           return;
@@ -784,7 +816,7 @@ const APINumberCheck = () => { // NOSONAR - legacy page kept readable via extrac
         } finally {
           setIsUploading(false);
         }
-      }, [csvFile, isAcceptableCsvFile]);
+      }, [canBulkCheckDncr, csvFile, isAcceptableCsvFile]);
     
       const clearManualInput = (): void => {
         setManualInput('');
@@ -958,6 +990,7 @@ const APINumberCheck = () => { // NOSONAR - legacy page kept readable via extrac
                   <Edit3 size={16} style={{ marginRight: '6px' }} />
                   Manual
                 </button>
+                {canBulkCheckDncr && (
                 <button
                   style={activeTab === 'csv' ? styles.tabActive : styles.tab}
                   onClick={() => setActiveTab('csv')}
@@ -965,6 +998,7 @@ const APINumberCheck = () => { // NOSONAR - legacy page kept readable via extrac
                   <Upload size={16} style={{ marginRight: '6px' }} />
                   CSV
                 </button>
+                )}
               </div>
             </div>
 
@@ -1211,7 +1245,8 @@ const APINumberCheck = () => { // NOSONAR - legacy page kept readable via extrac
             </div>
           </div>
 
-          {/* CSV Upload Section */}
+          {/* CSV Upload Section — permission matches bulk CSV tab */}
+          {canBulkCheckDncr && (
           <div>
             <h5 style={{ marginBottom: '12px', color: '#212529', display: 'flex', alignItems: 'center', gap: '8px' }}>
               <Upload size={18} />
@@ -1237,6 +1272,7 @@ const APINumberCheck = () => { // NOSONAR - legacy page kept readable via extrac
               </div>
             </div>
           </div>
+          )}
 
           {/* Validation Rules */}
           <div style={{ backgroundColor: '#fff3cd', padding: '16px', borderRadius: '8px', border: '1px solid #ffc107' }}>

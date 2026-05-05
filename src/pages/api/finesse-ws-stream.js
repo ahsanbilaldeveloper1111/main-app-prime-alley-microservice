@@ -90,23 +90,6 @@ function topicPath(userId, suffix) {
   return `/topic/finesse/user/${userId}/${suffix}`;
 }
 
-function writeToStreams(connectionKey, data) {
-  if (isDev && data?.type !== SSE_TYPE.PING) {
-    console.log('[Finesse WS Stream] Outgoing:', connectionKey, data?.type, data);
-  }
-  const payload = `data: ${JSON.stringify(data)}\n\n`;
-  const streams = sseStreams.get(connectionKey) || [];
-  streams.forEach((res) => {
-    if (res.destroyed || res.closed) return;
-    try {
-      res.write(payload);
-      if (res.flush) res.flush();
-    } catch {
-      // ignore
-    }
-  });
-}
-
 function cleanupSubscriptions(connectionKey) {
   const subs = connectionSubscriptions.get(connectionKey) || [];
   subs.forEach((sub) => {
@@ -118,6 +101,73 @@ function cleanupSubscriptions(connectionKey) {
   });
   connectionSubscriptions.delete(connectionKey);
   subscriptionsSetup.delete(connectionKey);
+}
+
+/** Drop STOMP + subs for a pooled key (sseStreams must be updated by caller when last SSE closes). */
+function teardownPooledConnection(connectionKey, reason = 'teardown') {
+  cleanupSubscriptions(connectionKey);
+  const conn = connectionPool.get(connectionKey);
+  try {
+    if (conn?.client?.connected) conn.client.deactivate();
+  } catch {
+    // ignore
+  }
+  connectionPool.delete(connectionKey);
+  if (isDev) log(`Pooled connection removed (${reason}):`, connectionKey);
+}
+
+// Align with cti-stomp-stream: idle STOMP pool entries are deactivated periodically.
+const CONNECTION_IDLE_MS =
+  process.env.NODE_ENV === 'development' ? 120000 : 9_000_000;
+const POOL_SWEEP_MS = process.env.NODE_ENV === 'development' ? 10000 : 60000;
+
+function cleanupStaleFinesseConnections() {
+  const now = Date.now();
+  connectionPool.forEach((conn, key) => {
+    const age = now - conn.lastUsed;
+    if (age <= CONNECTION_IDLE_MS) return;
+    if (isDev) {
+      console.log(
+        '[Finesse WS Stream] Stale pool entry:',
+        key,
+        `(${Math.trunc(age / 60000)}m since lastUsed)`,
+      );
+    }
+    teardownPooledConnection(key, 'idle timeout');
+  });
+}
+
+setInterval(cleanupStaleFinesseConnections, POOL_SWEEP_MS);
+
+function writeToStreams(connectionKey, data) {
+  if (isDev && data?.type !== SSE_TYPE.PING) {
+    console.log('[Finesse WS Stream] Outgoing:', connectionKey, data?.type);
+  }
+  const payload = `data: ${JSON.stringify(data)}\n\n`;
+  const streams = sseStreams.get(connectionKey);
+  if (!streams?.length) return;
+
+  const alive = [];
+  for (const res of streams) {
+    if (res.destroyed || res.closed) continue;
+    try {
+      res.write(payload);
+      if (res.flush) res.flush();
+      alive.push(res);
+    } catch {
+      // drop broken SSE response
+    }
+  }
+
+  if (alive.length === streams.length) return;
+
+  if (alive.length > 0) {
+    sseStreams.set(connectionKey, alive);
+    return;
+  }
+
+  sseStreams.delete(connectionKey);
+  teardownPooledConnection(connectionKey, 'all sse streams dead');
 }
 
 function looksLikeAuthError(message = '', body = '') {
@@ -297,14 +347,7 @@ export default async function handler(req, res) {
     if (streams.length > 0) return;
 
     sseStreams.delete(connectionKey);
-    cleanupSubscriptions(connectionKey);
-    const conn = connectionPool.get(connectionKey);
-    try {
-      if (conn?.client?.connected) conn.client.deactivate();
-    } catch {
-      // ignore
-    }
-    connectionPool.delete(connectionKey);
+    teardownPooledConnection(connectionKey, 'sse cleanup');
   };
 
   req.on('aborted', cleanup);
@@ -355,21 +398,18 @@ export default async function handler(req, res) {
         const body = frame?.body ?? '';
         if (looksLikeAuthError(message, body)) {
           writeToStreams(connectionKey, { type: SSE_TYPE.AUTH_REQUIRED, message: AUTH_REQUIRED_MESSAGE });
-          try {
-            cleanupSubscriptions(connectionKey);
-            client.deactivate();
-          } catch {
-            // ignore
-          }
-          connectionPool.delete(connectionKey);
+          teardownPooledConnection(connectionKey, 'auth required');
           return;
         }
         writeToStreams(connectionKey, { type: SSE_TYPE.STOMP_ERROR, message, body });
       },
       onWebSocketClose: () => {
-        cleanupSubscriptions(connectionKey);
         const conn = connectionPool.get(connectionKey);
-        if (conn?.client === client) connectionPool.delete(connectionKey);
+        if (conn?.client === client) {
+          teardownPooledConnection(connectionKey, 'websocket close');
+        } else {
+          cleanupSubscriptions(connectionKey);
+        }
         writeToStreams(connectionKey, { type: SSE_TYPE.STOMP_CLOSED });
       },
     });

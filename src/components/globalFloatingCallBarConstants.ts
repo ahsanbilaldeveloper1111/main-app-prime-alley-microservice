@@ -1,0 +1,3 @@
+export const FLOATING_BAR_VIEWPORT_GUTTER_PX = 12;
+
+export const FLOATING_CALL_BAR_POSITION_STORAGE_KEY = "callBarPosition";

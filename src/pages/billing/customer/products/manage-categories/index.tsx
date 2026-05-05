@@ -167,7 +167,6 @@ const ManageCategories = () => {
 
       if (currentRequestId !== requestIdRef.current) return;
 
-      console.log("Product categories response:", response);
       setCategories(Array.isArray(response.data) ? response.data : []);
       setCategoriesTotal(
         typeof response.pagination?.total === "number"
@@ -287,8 +286,7 @@ const ManageCategories = () => {
           description: editCategoryPayload.description ?? "",
           is_active: editCategoryPayload.is_active,
         };
-        const updated = await updateProductCategory(editingCategory.id, payload);
-        console.log("Updated product category:", updated);
+        await updateProductCategory(editingCategory.id, payload);
         setShowEditCategoryModal(false);
         setEditingCategory(null);
         await fetchCategories();
@@ -309,7 +307,6 @@ const ManageCategories = () => {
     setDeletingCategory(true);
     try {
       await deleteProductCategory(categoryToDelete.id);
-      console.log("Deleted product category:", categoryToDelete);
       setShowDeleteModal(false);
       setCategoryToDelete(null);
       await fetchCategories();

@@ -69,7 +69,6 @@ const transformApiResponse = (response: ApiResponse, draw: number = 1): Transfor
       meta: response?.pagination
     };
   } else {
-    console.log('response msg', response?.message);
     return {
       draw,
       recordsTotal: 0,
@@ -216,7 +215,6 @@ export const assignPermissions = async (payload: any) => {
       `tms/updateRankPermissions`,
       payload
     );
-    console.log('response assignPermissions', response);
     return checkResponse(response);
   } catch (error) {
     throw error;
@@ -287,7 +285,6 @@ const checkResponse = (response: any) => {
   if(responseData?.success){
     return responseData?.data;
   }else{
-    console.log('responseData?.message', responseData);
     toast.error(responseData?.message);
     return false;
   }

@@ -74,144 +74,16 @@ import { useFinesseCapabilities } from "@hooks/live-calls/useFinesseCapabilities
 import { useFinesseStomp } from "@hooks/live-calls/useFinesseStomp";
 import { useFinesseCampaignPreview } from "@hooks/live-calls/useFinesseCampaignPreview";
 
-type ContactHeaderValueOption = { value: string; label: string };
-
-const VISUALLY_HIDDEN_INPUT_STYLE: React.CSSProperties = {
-  position: "absolute",
-  width: 1,
-  height: 1,
-  opacity: 0,
-  pointerEvents: "none",
-  margin: 0,
-};
-
-const CONTACT_HEADER_VALUE_OPTIONS: ContactHeaderValueOption[] = [
-  { value: "Phone1", label: "Phone1" },
-  { value: "First Name", label: "First Name" },
-  { value: "Last Name", label: "Last Name" },
-  { value: "Phone2", label: "Phone2" },
-  { value: "Phone3", label: "Phone3" },
-  { value: "Account Number", label: "Account Number" },
-  { value: "Dial Time", label: "Dial Time" },
-  { value: "None", label: "None" },
-];
-
-export interface CampaignRow {
-  id: number;
-  name: string;
-  type: string;
-  dialerType: string;
-  timeFrom: string;
-  timeTo: string;
-  startTime: string;
-  endTime: string;
-  timezone: string;
-  contactsRemaining: number;
-  pendingContacts: number;
-  enabled: boolean;
-}
-
-const extractRemainingContactsCount = (raw: unknown): number | null => {
-  if (raw == null) return null;
-  const data =
-    (raw as { data?: unknown })?.data ??
-    (raw as { responseData?: unknown })?.responseData ??
-    raw;
-  if (Array.isArray(data)) return data.length;
-  if (typeof data !== "object") return null;
-  const d = data as Record<string, unknown>;
-  const numericKeys = [
-    "pendingContacts",
-    "contactsRemaining",
-    "remaining",
-    "remainingContacts",
-    "pendingCount",
-    "pending",
-    "totalPending",
-    "count",
-    "total",
-    "totalElements",
-    "totalContacts",
-  ];
-  for (const key of numericKeys) {
-    const v = d[key];
-    if (typeof v === "number" && Number.isFinite(v)) return v;
-    if (typeof v === "string" && v.trim() !== "" && !Number.isNaN(Number(v))) {
-      return Number(v);
-    }
-  }
-  const arrayKeys = ["contacts", "items", "content", "rows", "results"];
-  for (const key of arrayKeys) {
-    const v = d[key];
-    if (Array.isArray(v)) return v.length;
-  }
-  return null;
-};
-
-const mapApiCampaignToRow = (item: any, index: number): CampaignRow => {
-  const timeFrom = item.startTime ?? item.timeFrom ?? "09:00";
-  const timeTo = item.endTime ?? item.timeTo ?? "17:00";
-  return {
-    id: item.id ?? item.campaignId ?? index + 1,
-    name: item.name ?? item.campaignName ?? "",
-    type: item.type ?? "Agent",
-    dialerType: item.dialerType ?? "Direct Preview",
-    timeFrom,
-    timeTo,
-    startTime: timeFrom,
-    endTime: timeTo,
-    timezone: item.timezone ?? "Server Time Zone-Gulf Standard Time",
-    contactsRemaining: item.contactsRemaining ?? item.contactCount ?? 0,
-    pendingContacts:
-      item.pendingContacts ?? item.contactsRemaining ?? item.contactCount ?? 0,
-    enabled: item.enabled ?? true,
-  };
-};
-
-interface ImportStatusShape {
-  status?: string;
-  result?: string;
-  lastImportTime?: string;
-  importedCount?: number;
-  message?: string;
-  importStatus?: {
-    states?: Array<{
-      result?: string;
-      numContactsImported?: number;
-      message?: string;
-    }>;
-  };
-}
-
-function formatImportStatusDisplay(
-  s: ImportStatusShape | null | undefined,
-): string {
-  if (!s) return "—";
-  const result = s.importStatus?.states?.[0]?.result ?? s.result ?? s.status;
-  const upper = String(result ?? "").toUpperCase();
-  if (upper === "SUCCESS") {
-    const count =
-      s.importStatus?.states?.[0]?.numContactsImported ?? s.importedCount ?? 0;
-    const date = s.lastImportTime
-      ? new Date(s.lastImportTime).toLocaleString(undefined, {
-          month: "short",
-          day: "numeric",
-          year: "numeric",
-          hour: "numeric",
-          minute: "2-digit",
-        })
-      : "";
-    const dateSuffix = date ? ` (${date})` : "";
-    return `Imported ${count} contacts${dateSuffix}.`;
-  }
-  if (upper === "IN_PROGRESS") return "Import in progress…";
-  if (upper === "FAILURE" || upper === "ERROR") {
-    const msg =
-      s.importStatus?.states?.[0]?.message ?? s.message ?? "Unknown error";
-    return `Failed: ${msg}`;
-  }
-  return "—";
-}
+import {
+  CAMPAIGN_MANAGER_CONTACT_HEADER_VALUE_OPTIONS,
+  CAMPAIGN_MANAGER_VISUALLY_HIDDEN_INPUT_STYLE,
+  extractRemainingContactsCount,
+  formatImportStatusDisplay,
+  mapApiCampaignToRow,
+  type CampaignRow,
+  type ContactHeaderValueOption,
+  type ImportStatusShape,
+} from "../campaign-shared/campaignManagerHelpers";
 
 const { PERMISSIONS } = HEADER_CONSTANTS;
 
@@ -2381,7 +2253,7 @@ const LiveCallsCampaignsManagement = () => {
                           }
                           onChange={handleSelectAll}
                           aria-label="Select all campaigns"
-                          style={VISUALLY_HIDDEN_INPUT_STYLE}
+                          style={CAMPAIGN_MANAGER_VISUALLY_HIDDEN_INPUT_STYLE}
                         />
                         {selectedCampaigns.length ===
                           filteredCampaigns.length &&
@@ -2461,7 +2333,7 @@ const LiveCallsCampaignsManagement = () => {
                                 handleSelectCampaign(campaign.id)
                               }
                               aria-label={`Select campaign ${campaign.name}`}
-                              style={VISUALLY_HIDDEN_INPUT_STYLE}
+                              style={CAMPAIGN_MANAGER_VISUALLY_HIDDEN_INPUT_STYLE}
                             />
                             {selectedCampaigns.includes(campaign.id) && (
                               <CheckCircle size={14} color="white" />
@@ -2897,12 +2769,12 @@ const LiveCallsCampaignsManagement = () => {
                               isSearchable={false}
                               isClearable={false}
                               isDisabled={columnsLoading}
-                              options={CONTACT_HEADER_VALUE_OPTIONS}
+                              options={CAMPAIGN_MANAGER_CONTACT_HEADER_VALUE_OPTIONS}
                               value={
-                                CONTACT_HEADER_VALUE_OPTIONS.find(
+                                CAMPAIGN_MANAGER_CONTACT_HEADER_VALUE_OPTIONS.find(
                                   (o) => o.value === column.value,
                                 ) ??
-                                CONTACT_HEADER_VALUE_OPTIONS.find(
+                                CAMPAIGN_MANAGER_CONTACT_HEADER_VALUE_OPTIONS.find(
                                   (o) => o.value === "None",
                                 ) ??
                                 null

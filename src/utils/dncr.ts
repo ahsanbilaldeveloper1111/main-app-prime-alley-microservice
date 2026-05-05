@@ -52,12 +52,6 @@ import axiosInstance from "./axios";
   export const BulkCheckNumber = async (formData: FormData) => {
       try { 
           
-        // Debug logging for FormData
-        console.log('=== BULK CHECK NUMBER DEBUG ===');
-        console.log('FormData entries:', Array.from(formData.entries()));
-        console.log('FormData keys:', Array.from(formData.keys()));
-        console.log('FormData values:', Array.from(formData.values()));
-        
         const response = await axiosInstance.post(
           `dncr/bulkCheckNumbers`,
           formData
@@ -71,12 +65,9 @@ import axiosInstance from "./axios";
         }
         
       } catch (error: any) {
-        console.error('=== BULK CHECK NUMBER ERROR ===');
-        console.error('Error:', error);
+        console.error('Bulk check number failed:', error?.message ?? error);
         if (error.response) {
           console.error('Response status:', error.response.status);
-          console.error('Response data:', error.response.data);
-          console.error('Response headers:', error.response.headers);
         }
         throw error;
       }

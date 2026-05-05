@@ -53,6 +53,7 @@ const cleanupStaleConnections = () => {
         }
       }
       connectionPool.delete(key);
+      clearPerConnectionAuxState(key);
     }
   }
 };
@@ -74,6 +75,12 @@ const reconnectBackoffMs = new Map(); // connectionKey -> ms (starts 1s, caps 10
 
 // Track connections that need a fresh JWT before reconnecting
 const authRequiredConnections = new Set();
+
+/** Clear backoff + auth flags when a connectionKey is fully retired from the pool. */
+const clearPerConnectionAuxState = (connectionKey) => {
+  reconnectBackoffMs.delete(connectionKey);
+  authRequiredConnections.delete(connectionKey);
+};
 
 // Simple auth error detector (mirrors frontend POC patterns)
 const looksLikeAuthError = (message = '', body = '', reason = '') => {
@@ -374,8 +381,8 @@ export default function handler(req, res) {
   // If the token changed for this screen, restart the STOMP connection so CONNECT uses the latest JWT
   if (existingConnection && existingConnection.token && existingConnection.token !== token) {
     console.log(`🔄 Token changed for ${connectionKey}; restarting STOMP connection with fresh JWT`);
-    authRequiredConnections.delete(connectionKey);
     reconnectingConnections.delete(connectionKey);
+    clearPerConnectionAuxState(connectionKey);
     try {
       cleanupSubscriptions(connectionKey);
       if (existingConnection.client && existingConnection.client.connected) {
@@ -445,6 +452,7 @@ export default function handler(req, res) {
         }
         connectionPool.delete(connectionKey);
         reconnectingConnections.delete(connectionKey);
+        clearPerConnectionAuxState(connectionKey);
       }
     };
     
@@ -796,6 +804,7 @@ export default function handler(req, res) {
       }
       connectionPool.delete(connectionKey);
       reconnectingConnections.delete(connectionKey);
+      clearPerConnectionAuxState(connectionKey);
     }
   };
 

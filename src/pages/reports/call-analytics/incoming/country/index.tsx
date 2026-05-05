@@ -5,15 +5,6 @@ import BreadcrumbItem from '@common/BreadcrumbItem';
 import GenericListPage from '@components/GenericListPage';
 import { ListCallLogs, ExportCallLogs, DownloadStreamingExport, DownloadCallsExport } from '@utils/calls';
 
-// Debug: check if API functions are available
-if (typeof window !== 'undefined') {
-    console.log('API functions available:', { 
-        ListCallLogs: typeof ListCallLogs, 
-        ExportCallLogs: typeof ExportCallLogs, 
-        DownloadStreamingExport: typeof DownloadStreamingExport 
-    });
-}
-import { GetHierarchyData } from '@utils/users';
 import { Column } from '@components/CustomDataTable';
 import { Button, Modal, Row, Tab, Tabs, Form } from 'react-bootstrap';
 import { Col } from 'react-bootstrap';
@@ -99,32 +90,6 @@ const CallIncomingCountry = () => {
     const [activeTab, setActiveTab] = useState('calls_chart');
     const [showPageLoader, setShowPageLoader] = useState(false);
     
-    // Debug session state
-    useEffect(() => {
-        console.log('Session state:', { session, status });
-        if (status === 'authenticated' && session) {
-            console.log('Session authenticated successfully');
-        } else if (status === 'loading') {
-            console.log('Session still loading...');
-        } else if (status === 'unauthenticated') {
-            console.log('User not authenticated');
-        }
-    }, [session, status]);
-    
-    // Debug component mounting
-    useEffect(() => {
-        console.log('CallIncomingCountry component mounted');
-        console.log('Initial props and state:', { 
-            session, 
-            status, 
-            filtersReady, 
-            dataLoaded, 
-            loading 
-        });
-        return () => {
-            console.log('CallIncomingCountry component unmounting');
-        };
-    }, []);
 
     // Animation variants for tab transitions
     const tabVariants = {

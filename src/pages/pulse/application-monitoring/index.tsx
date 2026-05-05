@@ -176,7 +176,6 @@ const ApplicationMonitoring = () => {
             setError(null);
             try {
               const response = await getSystemMetrics(serverName);
-              console.log('System Metrics Response:', response);
               // The response is already extracted by extractData, so it should be SystemMetric
               setSystemMetrics(response as any);
             } catch (error: any) {
@@ -497,7 +496,6 @@ const ApplicationMonitoring = () => {
                     setError(null);
                     try {
                       const response = await getSystemMetrics(selectedServer.name);
-                      console.log('System Metrics Response:', response);
                       setSystemMetrics(response as any);
                     } catch (error: any) {
                       console.error('Error fetching system metrics:', error);
@@ -585,7 +583,6 @@ const ApplicationMonitoring = () => {
                         setError(null);
                         try {
                           const response = await getSystemMetrics(server.name);
-                          console.log('System Metrics Response for', server.name, ':', response);
                           setSystemMetrics(response as any);
                         } catch (error: any) {
                           console.error('Error fetching system metrics:', error);

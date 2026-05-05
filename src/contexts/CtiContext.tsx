@@ -83,6 +83,17 @@ function localStatusFromCallStateRecord(callState: {
     if (allTerminal || (!hasActiveLeg && parties.some((p) => CTI_TERMINAL_PARTY_STATUSES.has(p.callStatus ?? '')))) {
       return 'ended';
     }
+    const anyLegHeld = parties.some((p) => {
+      const s = (p.callStatus ?? '').toUpperCase();
+      return s === 'ON_HOLD' || s === 'HELD';
+    });
+    if (anyLegHeld) {
+      return 'onHold';
+    }
+  }
+  const cs = (callState.currentState ?? '').toUpperCase();
+  if (cs === 'HELD' || cs === 'ON_HOLD') {
+    return 'onHold';
   }
   const firstParty = parties?.[0];
   const source = firstParty?.callStatus ?? callState.currentState;
