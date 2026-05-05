@@ -49,8 +49,8 @@ import {
   formatFinesseReasonLabel,
   formatFinesseStateDuration,
   getCampaignAgentStateColor,
-} from "../campaign-shared/finesseAgentDisplay";
-import { CAMPAIGN_AGENT_PAGE_STYLES } from "../campaign-shared/campaignAgentPageStyles";
+} from "@utils/communications/campaign-shared/finesseAgentDisplay";
+import { CAMPAIGN_AGENT_PAGE_STYLES } from "@utils/communications/campaign-shared/campaignAgentPageStyles";
 
 const CampaignAgentPage = () => {
   const { data: session } = useSession();
