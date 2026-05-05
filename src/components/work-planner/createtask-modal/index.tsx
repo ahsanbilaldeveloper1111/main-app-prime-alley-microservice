@@ -1,11 +1,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Modal, Button, Form, Row, Col, Badge } from 'react-bootstrap';
-import { 
-  X, 
-  Calendar, 
+import { Modal, Button, Form, Row, Col } from 'react-bootstrap';
+import {
+  X,
+  Calendar,
   Clock,
-  User, 
-  FileText, 
+  FileText,
   Tag,
   Users,
   Eye,
@@ -15,12 +14,7 @@ import {
   Search,
   Link as LinkIcon,
   FolderOpen,
-  Circle,
-  AlertCircle,
   Check,
-  Ticket,
-  FileSpreadsheet,
-  Phone
 } from 'lucide-react';
 import { toast } from 'react-toastify';
 import { listProjects, createTask, updateTask, listTasks } from '@utils/tasks';
@@ -31,6 +25,17 @@ import {
   parseApiDueTimeToTimeInput,
 } from '@utils/plannerTaskDueTime';
 import RichTextEditor from '../../../pages/help-center/partials/RichTextEditor';
+
+const CREATE_TASK_MODAL_THEME = {
+  accent: "#4f46e5",
+  accentSoft: "rgba(79, 70, 229, 0.1)",
+  surface: "#ffffff",
+  surfaceMuted: "#f1f5f9",
+  border: "#e2e8f0",
+  text: "#0f172a",
+  textMuted: "#64748b",
+  radius: 14,
+} as const;
 
 interface Extension {
   id: string;
@@ -1039,43 +1044,68 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
       centered 
       size="lg"
       className="create-task-modal"
+      contentClassName="create-task-modal-content"
     >
-      <Modal.Header style={{ 
-        borderBottom: '1px solid #e8eef5',
-        paddingBottom: '16px',
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center'
-      }}>
-        <Modal.Title style={{ 
-          fontSize: '18px', 
-          fontWeight: '600',
-          margin: 0,
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px'
-        }}>
-          <ListTodo size={20} color="#4e6fa5" />
+      <Modal.Header
+        closeButton={false}
+        style={{
+          borderBottom: `1px solid ${CREATE_TASK_MODAL_THEME.border}`,
+          padding: "18px 22px 16px",
+          background: `linear-gradient(180deg, ${CREATE_TASK_MODAL_THEME.surfaceMuted} 0%, ${CREATE_TASK_MODAL_THEME.surface} 100%)`,
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+        }}
+      >
+        <Modal.Title
+          style={{
+            fontSize: 19,
+            fontWeight: 700,
+            margin: 0,
+            display: "flex",
+            alignItems: "center",
+            gap: 12,
+            color: CREATE_TASK_MODAL_THEME.text,
+            letterSpacing: "-0.02em",
+          }}
+        >
+          <span
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              width: 42,
+              height: 42,
+              borderRadius: 12,
+              background: CREATE_TASK_MODAL_THEME.accentSoft,
+            }}
+          >
+            <ListTodo size={22} color={CREATE_TASK_MODAL_THEME.accent} strokeWidth={2.25} />
+          </span>
           {createTaskModalTitleText(taskType, isEdit)}
         </Modal.Title>
         <Button
-          variant="link"
+          variant="light"
           onClick={onHide}
-          style={{ 
-            background: 'none',
-            border: 'none',
-            padding: '4px',
-            cursor: 'pointer',
-            color: '#6c757d',
-            display: 'flex',
-            alignItems: 'center'
+          aria-label="Close"
+          style={{
+            background: CREATE_TASK_MODAL_THEME.surfaceMuted,
+            border: `1px solid ${CREATE_TASK_MODAL_THEME.border}`,
+            borderRadius: 10,
+            width: 40,
+            height: 40,
+            padding: 0,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            color: CREATE_TASK_MODAL_THEME.textMuted,
           }}
         >
-          <X size={20} />
+          <X size={20} strokeWidth={2} />
         </Button>
       </Modal.Header>
 
-      <Modal.Body className="py-4">
+      <Modal.Body className="py-4 px-4 create-task-modal-body">
         {/* Title Field - Required */}
         <Form.Group className="mb-3">
           <Form.Label className="fw-semibold mb-2" style={{ fontSize: '14px', color: '#2d3748' }}>
@@ -1782,21 +1812,28 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
         )}
       </Modal.Body>
 
-      <Modal.Footer style={{ 
-        borderTop: '1px solid #e8eef5',
-        paddingTop: '16px',
-        display: 'flex',
-        gap: '8px',
-        justifyContent: 'flex-end'
-      }}>
+      <Modal.Footer
+        style={{
+          borderTop: `1px solid ${CREATE_TASK_MODAL_THEME.border}`,
+          padding: "16px 22px 20px",
+          display: "flex",
+          gap: 10,
+          justifyContent: "flex-end",
+          background: CREATE_TASK_MODAL_THEME.surface,
+          boxShadow: "0 -8px 24px rgba(15, 23, 42, 0.06)",
+        }}
+      >
         <Button 
           variant="light" 
           onClick={onHide}
           style={{
-            padding: '8px 20px',
-            fontSize: '14px',
-            fontWeight: '600',
-            border: '1px solid #e2e8f0'
+            padding: "10px 22px",
+            fontSize: 14,
+            fontWeight: 600,
+            border: `1px solid ${CREATE_TASK_MODAL_THEME.border}`,
+            borderRadius: 10,
+            color: CREATE_TASK_MODAL_THEME.text,
+            background: CREATE_TASK_MODAL_THEME.surface,
           }}
         >
           Cancel
@@ -1809,9 +1846,14 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
             onClick={handleCreateAndOpen}
             disabled={isSubmitting}
             style={{
-              padding: '8px 20px',
-              fontSize: '14px',
-              fontWeight: '600',
+              padding: "10px 20px",
+              fontSize: 14,
+              fontWeight: 600,
+              borderRadius: 10,
+              borderWidth: 2,
+              borderColor: CREATE_TASK_MODAL_THEME.accent,
+              color: CREATE_TASK_MODAL_THEME.accent,
+              background: CREATE_TASK_MODAL_THEME.surface,
             }}
           >
             {createTaskModalCreateAndOpenLabel(isSubmitting, isEdit)}
@@ -1824,11 +1866,16 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
           onClick={handleCreate}
           disabled={isSubmitting}
           style={{
-            padding: '8px 20px',
-            fontSize: '14px',
-            fontWeight: '600',
-            backgroundColor: '#4e6fa5',
-            borderColor: '#4e6fa5'
+            padding: "10px 24px",
+            fontSize: 14,
+            fontWeight: 600,
+            border: "none",
+            borderRadius: 10,
+            backgroundImage: isSubmitting
+              ? "none"
+              : `linear-gradient(135deg, ${CREATE_TASK_MODAL_THEME.accent} 0%, #4338ca 100%)`,
+            backgroundColor: isSubmitting ? "#94a3b8" : undefined,
+            boxShadow: isSubmitting ? "none" : "0 4px 14px rgba(79, 70, 229, 0.35)",
           }}
         >
           {createTaskModalPrimaryLabel(isSubmitting, isEdit)}
@@ -1836,6 +1883,32 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
       </Modal.Footer>
 
       <style>{`
+        .create-task-modal .modal-dialog {
+          max-width: 640px;
+        }
+        .create-task-modal-content {
+          border: none;
+          border-radius: ${CREATE_TASK_MODAL_THEME.radius}px;
+          overflow: hidden;
+          box-shadow: 0 25px 50px -12px rgba(15, 23, 42, 0.22);
+        }
+        .create-task-modal-body {
+          background: ${CREATE_TASK_MODAL_THEME.surfaceMuted};
+          max-height: min(72vh, 720px);
+          overflow-y: auto;
+        }
+        .create-task-modal .form-control,
+        .create-task-modal .form-select {
+          border-radius: 10px !important;
+          border-color: ${CREATE_TASK_MODAL_THEME.border} !important;
+          min-height: 42px;
+          font-size: 15px;
+        }
+        .create-task-modal .form-control:focus,
+        .create-task-modal .form-select:focus {
+          border-color: ${CREATE_TASK_MODAL_THEME.accent} !important;
+          box-shadow: 0 0 0 3px ${CREATE_TASK_MODAL_THEME.accentSoft} !important;
+        }
         .create-task-modal .modal-header .btn-close {
           display: none;
         }

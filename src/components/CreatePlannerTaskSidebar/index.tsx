@@ -36,6 +36,10 @@ import type { PlannerTaskEditScope } from "@planner/taskRowPermissions";
 
 type PlannerTaskType = "todo" | "regular" | "recurring";
 
+type RecurringEndStrategy = "never" | "end_date" | "occurrences";
+
+type CustomFrequencyUnit = "days" | "weeks" | "months" | "years";
+
 const TASK_TYPE_SELECT_LABELS: Record<PlannerTaskType, string> = {
   todo: "Todo",
   regular: "Regular",
@@ -45,6 +49,19 @@ const TASK_TYPE_SELECT_LABELS: Record<PlannerTaskType, string> = {
 const ALL_PLANNER_TASK_TYPES: PlannerTaskType[] = ["todo", "regular", "recurring"];
 
 const TASK_TITLE_MAX_LENGTH = 150;
+
+/** Shared visual tokens for create / edit task sidebar */
+const PLANNER_TASK_SIDEBAR = {
+  accent: "#4f46e5",
+  accentSoft: "rgba(79, 70, 229, 0.12)",
+  surface: "#ffffff",
+  surfaceMuted: "#f1f5f9",
+  border: "#e2e8f0",
+  text: "#0f172a",
+  textMuted: "#64748b",
+  shadow: "0 25px 50px -12px rgba(15, 23, 42, 0.18)",
+  radiusLg: 16,
+} as const;
 
 function clampTaskTitleLength(value: string): string {
   return value.slice(0, TASK_TITLE_MAX_LENGTH);
@@ -113,6 +130,10 @@ interface CreateTaskSidebarProps {
    * `limited`: non-admin / non-owner — assignees and watchers are read-only; all other fields can be saved from the form.
    */
   taskEditScope?: PlannerTaskEditScope;
+  /**
+   * When opening edit for a to-do or regular task, seed the form as recurring so the user can save a conversion in one step.
+   */
+  openAsRecurringConversion?: boolean;
 }
 
 /** Minimal task shape used when editing in the sidebar (API / normalized task). */
@@ -237,6 +258,18 @@ interface CreateTaskFormData {
   dueTime: string;
   /** Recurring tasks only; maps to API `is_active`. */
   recurringIsActive: boolean;
+  recurringEndStrategy: RecurringEndStrategy;
+  /** When `recurringEndStrategy === "end_date"` (YYYY-MM-DD). */
+  recurringEndDate: string;
+  /** When `recurringEndStrategy === "occurrences"`; max materialized child tasks. */
+  recurringOccurrences: number;
+  estimatedDurationMinutes: string;
+  recurringReminderEnabled: boolean;
+  recurringReminderMinutes: number;
+  recurringAutoCreateNextOnComplete: boolean;
+  recurringCreateNextIfPreviousIncomplete: boolean;
+  /** Used when `frequency === "custom"`. */
+  customIntervalUnit: CustomFrequencyUnit;
 }
 
 function mapPriorityStringToId(priority: string | null | undefined): number {
@@ -354,8 +387,109 @@ function clampDueDateToMin(dueDate: string, minStr: string): string {
 }
 
 function mergeFormDataWithDueDateClamp(data: CreateTaskFormData): CreateTaskFormData {
+  if (data.taskType === "recurring") {
+    return data;
+  }
   const min = minDueDateFromTodayAndStart(data.startDate);
   return { ...data, dueDate: clampDueDateToMin(data.dueDate, min) };
+}
+
+function parsePositiveIntFromUnknown(value: unknown): number | null {
+  if (typeof value === "number" && Number.isFinite(value) && value >= 1) {
+    return Math.floor(value);
+  }
+  if (typeof value === "string" && value.trim() !== "") {
+    const n = Number(value.trim());
+    if (Number.isFinite(n) && n >= 1) return Math.floor(n);
+  }
+  return null;
+}
+
+function normalizeCustomIntervalUnitFromApi(raw: unknown): CustomFrequencyUnit {
+  const s = unknownToPrimitiveString(raw).trim().toLowerCase();
+  if (s === "days" || s === "day") return "days";
+  if (s === "weeks" || s === "week") return "weeks";
+  if (s === "months" || s === "month") return "months";
+  if (s === "years" || s === "year") return "years";
+  return "days";
+}
+
+function readFrequencyConfigFromEdit(editTask: PlannerEditTask | undefined): {
+  unit: CustomFrequencyUnit;
+  interval: number;
+} | null {
+  const raw = pickRecurringScalar(editTask, "frequency_config");
+  if (raw == null || typeof raw !== "object" || Array.isArray(raw)) return null;
+  const o = raw as Record<string, unknown>;
+  return {
+    unit: normalizeCustomIntervalUnitFromApi(o.unit),
+    interval: Math.max(1, parsePositiveIntFromUnknown(o.interval) ?? 1),
+  };
+}
+
+function resolveRecurringEndStrategyFromScalars(
+  occurrences: number | null,
+  endDateIso: string,
+): RecurringEndStrategy {
+  if (occurrences != null) return "occurrences";
+  if (endDateIso.trim() !== "") return "end_date";
+  return "never";
+}
+
+function coalesceFiniteNumberFromUnknown(value: unknown): number | null {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
+  }
+  if (typeof value === "string" && value.trim() !== "") {
+    const n = Number(value.trim());
+    if (Number.isFinite(n)) return n;
+  }
+  return null;
+}
+
+function seedRecurringFieldsWhenSwitchingToRecurring(
+  prev: CreateTaskFormData,
+): Pick<
+  CreateTaskFormData,
+  | "startDate"
+  | "dueDate"
+  | "frequency"
+  | "repeatInterval"
+  | "repeatOn"
+  | "dueTime"
+  | "recurringIsActive"
+  | "recurringEndStrategy"
+  | "recurringEndDate"
+  | "recurringOccurrences"
+  | "estimatedDurationMinutes"
+  | "recurringReminderEnabled"
+  | "recurringReminderMinutes"
+  | "recurringAutoCreateNextOnComplete"
+  | "recurringCreateNextIfPreviousIncomplete"
+  | "customIntervalUnit"
+> {
+  const start =
+    prev.startDate.trim() ||
+    prev.dueDate.trim() ||
+    todayLocalIsoDate();
+  return {
+    startDate: start,
+    dueDate: "",
+    frequency: "weekly",
+    repeatInterval: 1,
+    repeatOn: "monday",
+    dueTime: prev.dueTime,
+    recurringIsActive: true,
+    recurringEndStrategy: "never",
+    recurringEndDate: "",
+    recurringOccurrences: 12,
+    estimatedDurationMinutes: "",
+    recurringReminderEnabled: false,
+    recurringReminderMinutes: 30,
+    recurringAutoCreateNextOnComplete: false,
+    recurringCreateNextIfPreviousIncomplete: false,
+    customIntervalUnit: "days",
+  };
 }
 
 function resolveExtensionUserId(extensions: Extension[], extRef: string | undefined): number {
@@ -451,6 +585,36 @@ function normalizeEditTaskType(editTask: PlannerEditTask): PlannerTaskType {
   const tt = unknownToPrimitiveString(asRecord.task_type).trim().toLowerCase();
   if (t === "todo" || tt === "todo") return "regular";
   return "recurring";
+}
+
+/**
+ * Edit mode: recurring templates cannot downgrade to one-off types.
+ * One-off tasks may only move to recurring, not swap between the two one-off kinds.
+ */
+function restrictPlannerTaskTypeOptionsForEdit(
+  editMode: boolean,
+  editTask: PlannerEditTask | undefined,
+  allowedFromProps: readonly PlannerTaskType[],
+): PlannerTaskType[] {
+  if (!editMode || editTask == null) {
+    return [...allowedFromProps];
+  }
+  const origin = normalizeEditTaskType(editTask);
+  if (origin === "recurring") {
+    if (allowedFromProps.includes("recurring")) {
+      return ["recurring"];
+    }
+    return [...allowedFromProps];
+  }
+  if (origin === "todo") {
+    const next = allowedFromProps.filter((t) => t === "todo" || t === "recurring");
+    return next.length > 0 ? [...next] : ["todo"];
+  }
+  if (origin === "regular") {
+    const next = allowedFromProps.filter((t) => t === "regular" || t === "recurring");
+    return next.length > 0 ? [...next] : ["regular"];
+  }
+  return [...allowedFromProps];
 }
 
 /** API expects lowercase full weekday names, e.g. `"tuesday"`. */
@@ -590,6 +754,110 @@ function readRecurringIsActiveFromEditTask(editTask: PlannerEditTask): boolean {
   return true;
 }
 
+function readRecurringReminderStateFromEdit(
+  editTask: PlannerEditTask,
+  isRecurringTemplate: boolean,
+): { enabled: boolean; minutes: number } {
+  const reminderRaw = pickRecurringScalar(editTask, "reminder_minutes");
+  const reminderNum = coalesceFiniteNumberFromUnknown(reminderRaw);
+  const safeReminder =
+    reminderNum != null && Number.isFinite(reminderNum)
+      ? Math.max(0, Math.floor(reminderNum))
+      : 0;
+  const enabled = isRecurringTemplate && safeReminder > 0;
+  return {
+    enabled,
+    minutes: enabled ? Math.max(1, safeReminder) : 30,
+  };
+}
+
+function readEstimatedDurationFormStringFromEdit(
+  editTask: PlannerEditTask,
+  isRecurringTemplate: boolean,
+): string {
+  if (!isRecurringTemplate) return "";
+  const estRaw = pickRecurringScalar(editTask, "estimated_duration_minutes");
+  const estNum = coalesceFiniteNumberFromUnknown(estRaw);
+  if (estNum == null || !Number.isFinite(estNum) || estNum <= 0) return "";
+  return String(Math.floor(estNum));
+}
+
+function readRecurringBooleanFlag(editTask: PlannerEditTask, key: string): boolean {
+  const raw = pickRecurringScalar(editTask, key);
+  return raw === true || raw === 1;
+}
+
+type RecurringTemplateSlice = Pick<
+  CreateTaskFormData,
+  | "frequency"
+  | "repeatInterval"
+  | "repeatOn"
+  | "recurringEndStrategy"
+  | "recurringEndDate"
+  | "recurringOccurrences"
+  | "estimatedDurationMinutes"
+  | "recurringReminderEnabled"
+  | "recurringReminderMinutes"
+  | "recurringAutoCreateNextOnComplete"
+  | "recurringCreateNextIfPreviousIncomplete"
+  | "customIntervalUnit"
+  | "recurringIsActive"
+>;
+
+function readRecurringTemplateFormSlice(editTask: PlannerEditTask): RecurringTemplateSlice {
+  const isRecurringTemplate = normalizeEditTaskType(editTask) === "recurring";
+  const freqRaw = pickRecurringScalar(editTask, "frequency");
+  const freqStr = unknownToPrimitiveString(freqRaw).trim();
+  const frequency = freqStr === "" ? "weekly" : freqStr;
+  const freqConfig = readFrequencyConfigFromEdit(editTask);
+  const customIntervalUnit: CustomFrequencyUnit = freqConfig?.unit ?? "days";
+  const repeatIntervalBase = Math.max(1, Number(pickRecurringScalar(editTask, "repeat_interval")) || 1);
+  const repeatInterval =
+    frequency === "custom" && freqConfig ? freqConfig.interval : repeatIntervalBase;
+  const repeatOn = repeatOnForEditTask(editTask, frequency);
+  const occParsed = parsePositiveIntFromUnknown(pickRecurringScalar(editTask, "occurrences"));
+  const endDateScalar =
+    pickRecurringScalar(editTask, "end_date") ?? pickRecurringScalar(editTask, "due_date");
+  const endDateFormatted = formatDateForInput(
+    typeof endDateScalar === "string" ? endDateScalar : undefined,
+  );
+  const recurringEndStrategy = resolveRecurringEndStrategyFromScalars(
+    occParsed,
+    isRecurringTemplate ? endDateFormatted : "",
+  );
+  const recurringEndDate =
+    isRecurringTemplate && recurringEndStrategy === "end_date" ? endDateFormatted : "";
+  const recurringOccurrences =
+    isRecurringTemplate && recurringEndStrategy === "occurrences" && occParsed != null
+      ? occParsed
+      : 12;
+  const reminderState = readRecurringReminderStateFromEdit(editTask, isRecurringTemplate);
+  const estimatedDurationMinutes = readEstimatedDurationFormStringFromEdit(
+    editTask,
+    isRecurringTemplate,
+  );
+  const recurringAutoCreateNextOnComplete =
+    isRecurringTemplate && readRecurringBooleanFlag(editTask, "recurring_auto_create_next_on_complete");
+  const recurringCreateNextIfPreviousIncomplete =
+    isRecurringTemplate &&
+    readRecurringBooleanFlag(editTask, "recurring_create_next_if_previous_incomplete");
+  return {
+    frequency,
+    repeatInterval,
+    repeatOn,
+    recurringEndStrategy,
+    recurringEndDate,
+    recurringOccurrences,
+    estimatedDurationMinutes,
+    recurringReminderEnabled: reminderState.enabled,
+    recurringReminderMinutes: reminderState.minutes,
+    recurringAutoCreateNextOnComplete,
+    recurringCreateNextIfPreviousIncomplete,
+    customIntervalUnit,
+    recurringIsActive: readRecurringIsActiveFromEditTask(editTask),
+  };
+}
+
 function buildInitialFormFromEdit(
   editTask: PlannerEditTask,
   extensions: Extension[],
@@ -599,26 +867,22 @@ function buildInitialFormFromEdit(
   const assigneeIds = mapAssigneeIdsFromEditTask(editTask, extensions);
   const watcherIds = mapWatcherIdsFromEditTask(editTask, extensions);
   const taskTypeVal = normalizeEditTaskType(editTask);
-  const freqRaw = pickRecurringScalar(editTask, "frequency");
-  const freqStr = unknownToPrimitiveString(freqRaw).trim();
-  const frequency = freqStr === "" ? "weekly" : freqStr;
-  const repeatInterval = Math.max(1, Number(pickRecurringScalar(editTask, "repeat_interval")) || 1);
-  const repeatOn = repeatOnForEditTask(editTask, frequency);
+  const isRecurringTemplate = taskTypeVal === "recurring";
+  const recurringSlice = readRecurringTemplateFormSlice(editTask);
   const dueTimeRaw = pickRecurringScalar(editTask, "due_time");
   const dueTime =
     typeof dueTimeRaw === "string"
       ? parseApiDueTimeToTimeInput(dueTimeRaw)
       : "";
-  const topDue =
+  const startDateRaw =
+    (pickRecurringScalar(editTask, "start_date") as string | undefined) ?? editTask.start_date;
+  const topDueForNonRecurring =
     typeof editTask.due_date === "string" && editTask.due_date.trim() !== ""
       ? editTask.due_date
       : undefined;
-  const endDateRaw =
-    topDue ??
-    pickRecurringScalar(editTask, "end_date") ??
-    pickRecurringScalar(editTask, "due_date");
-  const startDateRaw =
-    (pickRecurringScalar(editTask, "start_date") as string | undefined) ?? editTask.start_date;
+  const dueDateForRegularTodo = formatDateForInput(
+    isRecurringTemplate ? undefined : topDueForNonRecurring,
+  );
   return {
     title: clampTaskTitleLength(String(editTask.title ?? "")),
     description: editTask.description || "",
@@ -628,18 +892,15 @@ function buildInitialFormFromEdit(
     priorityId: mapPriorityStringToId(editTask.priority),
     assigneeIds,
     watcherIds,
-    dueDate: formatDateForInput(typeof endDateRaw === "string" ? endDateRaw : undefined),
+    dueDate: dueDateForRegularTodo,
     startDate: formatDateForInput(startDateRaw),
     labelIds: editTask.label_ids ?? editTask.labels?.map((l) => l.id) ?? [],
     linkedRecordIds: (() => {
       const link = resolveParentTaskLinkFromEditTask(editTask);
       return link ? [link.id] : [];
     })(),
-    frequency,
-    repeatInterval,
-    repeatOn,
+    ...recurringSlice,
     dueTime,
-    recurringIsActive: readRecurringIsActiveFromEditTask(editTask),
   };
 }
 
@@ -667,6 +928,15 @@ function buildInitialFormForCreate(
     repeatOn: taskType === "recurring" ? "monday" : "",
     dueTime: "",
     recurringIsActive: true,
+    recurringEndStrategy: "never",
+    recurringEndDate: "",
+    recurringOccurrences: 12,
+    estimatedDurationMinutes: "",
+    recurringReminderEnabled: false,
+    recurringReminderMinutes: 30,
+    recurringAutoCreateNextOnComplete: false,
+    recurringCreateNextIfPreviousIncomplete: false,
+    customIntervalUnit: "days",
   };
 }
 
@@ -682,6 +952,8 @@ function computeFrequencyChangeState(
     nextRepeatOn = /^\d+$/.test(prev.repeatOn.trim())
       ? prev.repeatOn.trim()
       : "1";
+  } else if (nextFreq === "custom") {
+    nextRepeatOn = "";
   } else {
     nextRepeatOn = "";
   }
@@ -792,16 +1064,13 @@ function mapListStatusesResponseToSidebarStatuses(response: unknown): Status[] {
 }
 
 function getSidebarTitle(taskType: PlannerTaskTypeOrUnset, isEdit: boolean): string {
-  if (taskType === "") {
-    return isEdit ? "Edit Task" : "Create Task";
-  }
-  if (taskType === "todo") {
-    return isEdit ? "Edit Todo" : "Create Todo";
-  }
-  if (taskType === "recurring") {
-    return isEdit ? "Edit Recurring" : "Create Recurring";
-  }
-  return isEdit ? "Edit Task" : "Create Task";
+  const defaultLabel = isEdit ? "Edit Task" : "Create Task";
+  const typeLabelMap: Partial<Record<PlannerTaskType, string>> = {
+    todo: isEdit ? "Edit Todo" : "Create Todo",
+    recurring: isEdit ? "Edit Recurring" : "Create Recurring",
+  };
+  if (taskType === "") return defaultLabel;
+  return typeLabelMap[taskType] ?? defaultLabel;
 }
 
 function linkedRecordsEmptyMessage(hasSearchQuery: boolean): string {
@@ -820,13 +1089,16 @@ function primarySubmitButtonLabel(isSubmitting: boolean, isEdit: boolean): strin
 function LimitedTaskEditBanner({ visible }: { readonly visible: boolean }) {
   if (!visible) return null;
   return (
-    <p
-      className="text-muted small mb-3"
-      style={{ marginTop: -8, fontSize: 13 }}
+    <div
+      className="planner-sidebar-hint mb-3"
+      style={{
+        borderLeft: `4px solid ${PLANNER_TASK_SIDEBAR.accent}`,
+        background: PLANNER_TASK_SIDEBAR.accentSoft,
+      }}
     >
-      <strong>Assignees</strong> and <strong>watchers</strong> cannot be changed for your
-      role; all other fields can be updated.
-    </p>
+      <strong>Assignees</strong> and <strong>watchers</strong> cannot be changed for your role;
+      all other fields can be updated.
+    </div>
   );
 }
 
@@ -873,18 +1145,96 @@ function PlannerSidebarCreateAndOpenButton({
       onClick={onSubmit}
       disabled={isSubmitting}
       style={{
-        padding: "8px 20px",
+        padding: "10px 20px",
         fontSize: 14,
         fontWeight: 600,
-        backgroundColor: "#4f46e5",
-        border: "none",
-        borderRadius: 4,
-        color: "#fff",
+        backgroundColor: PLANNER_TASK_SIDEBAR.surface,
+        border: `2px solid ${PLANNER_TASK_SIDEBAR.accent}`,
+        borderRadius: 10,
+        color: PLANNER_TASK_SIDEBAR.accent,
         cursor: isSubmitting ? "not-allowed" : "pointer",
+        opacity: isSubmitting ? 0.65 : 1,
+        transition: "background 0.15s ease, color 0.15s ease",
       }}
     >
       {isSubmitting ? "Processing..." : "Create & open"}
     </button>
+  );
+}
+
+function PlannerSidebarFooter({
+  isEdit,
+  isSubmitting,
+  onClose,
+  onCreateAndOpen,
+  onCreate,
+  onCreateAndOpenSubmit,
+}: Readonly<{
+  isEdit: boolean;
+  isSubmitting: boolean;
+  onClose?: () => void;
+  onCreateAndOpen?: (data: CreateTaskFormData) => void;
+  onCreate: () => void;
+  onCreateAndOpenSubmit: (e: React.MouseEvent<HTMLButtonElement>) => void;
+}>): React.ReactNode {
+  return (
+    <div
+      className="create-task-sidebar-footer"
+      style={{
+        padding: "16px 24px 20px",
+        display: "flex",
+        gap: 10,
+        justifyContent: "flex-end",
+        flexShrink: 0,
+        alignItems: "center",
+      }}
+    >
+      <button
+        type="button"
+        onClick={onClose}
+        style={{
+          padding: "10px 22px",
+          fontSize: 14,
+          fontWeight: 600,
+          border: `1px solid ${PLANNER_TASK_SIDEBAR.border}`,
+          borderRadius: 10,
+          background: PLANNER_TASK_SIDEBAR.surface,
+          color: PLANNER_TASK_SIDEBAR.text,
+          cursor: "pointer",
+          transition: "background 0.15s ease, border-color 0.15s ease",
+        }}
+      >
+        Cancel
+      </button>
+      <PlannerSidebarCreateAndOpenButton
+        isEdit={isEdit}
+        isSubmitting={isSubmitting}
+        onCreateAndOpen={onCreateAndOpen}
+        onSubmit={onCreateAndOpenSubmit}
+      />
+      <button
+        type="button"
+        onClick={onCreate}
+        disabled={isSubmitting}
+        style={{
+          padding: "10px 24px",
+          fontSize: 14,
+          fontWeight: 600,
+          ...(isSubmitting
+            ? { backgroundColor: "#94a3b8" }
+            : {
+                backgroundImage: `linear-gradient(135deg, ${PLANNER_TASK_SIDEBAR.accent} 0%, #4338ca 100%)`,
+              }),
+          border: "none",
+          borderRadius: 10,
+          color: "#fff",
+          cursor: isSubmitting ? "not-allowed" : "pointer",
+          boxShadow: isSubmitting ? "none" : "0 4px 14px rgba(79, 70, 229, 0.35)",
+        }}
+      >
+        {primarySubmitButtonLabel(isSubmitting, isEdit)}
+      </button>
+    </div>
   );
 }
 
@@ -913,13 +1263,18 @@ function PlannerSidebarRecurringRunAtReadOnlyRow({
             Last run at
           </Form.Label>
           <div
-            className="form-control py-2"
+            className="py-2 px-3"
             style={{
               fontSize: "14px",
-              fontWeight: 300,
-              backgroundColor: "#f8fafc",
-              color: "#374151",
+              fontWeight: 500,
+              backgroundColor: PLANNER_TASK_SIDEBAR.surfaceMuted,
+              color: PLANNER_TASK_SIDEBAR.text,
               cursor: "default",
+              borderRadius: 10,
+              border: `1px solid ${PLANNER_TASK_SIDEBAR.border}`,
+              minHeight: 42,
+              display: "flex",
+              alignItems: "center",
             }}
             aria-readonly="true"
           >
@@ -940,13 +1295,18 @@ function PlannerSidebarRecurringRunAtReadOnlyRow({
             Next run at
           </Form.Label>
           <div
-            className="form-control py-2"
+            className="py-2 px-3"
             style={{
               fontSize: "14px",
-              fontWeight: 300,
-              backgroundColor: "#f8fafc",
-              color: "#374151",
+              fontWeight: 500,
+              backgroundColor: PLANNER_TASK_SIDEBAR.surfaceMuted,
+              color: PLANNER_TASK_SIDEBAR.text,
               cursor: "default",
+              borderRadius: 10,
+              border: `1px solid ${PLANNER_TASK_SIDEBAR.border}`,
+              minHeight: 42,
+              display: "flex",
+              alignItems: "center",
             }}
             aria-readonly="true"
           >
@@ -1304,21 +1664,92 @@ function applyPlannerSidebarParentTaskId(
   }
 }
 
-function applyPlannerSidebarRecurringPayload(
+function applyRecurringRepeatAndFrequencyConfig(
   payload: Record<string, unknown>,
   fd: CreateTaskFormData,
+  isEdit: boolean,
 ): void {
   payload.frequency = fd.frequency;
-  payload.repeat_interval = fd.repeatInterval;
+  payload.repeat_interval = Math.max(1, fd.repeatInterval);
   if (fd.frequency === "weekly" && fd.repeatOn.trim()) {
     payload.repeat_on = fd.repeatOn.trim().toLowerCase();
   } else if (fd.frequency === "monthly" && fd.repeatOn.trim()) {
     payload.repeat_on = fd.repeatOn.trim();
   }
+  if (fd.frequency === "custom") {
+    payload.frequency_config = {
+      unit: fd.customIntervalUnit,
+      interval: Math.max(1, fd.repeatInterval),
+    };
+  } else if (isEdit) {
+    payload.frequency_config = null;
+  }
+}
+
+function applyRecurringDueTimeToPayload(
+  payload: Record<string, unknown>,
+  fd: CreateTaskFormData,
+  isEdit: boolean,
+): void {
   const dueTimeUtc = formatPlannerDueTimeAsUtcIso(fd.startDate, fd.dueTime);
-  if (dueTimeUtc) payload.due_time = dueTimeUtc;
-  payload.end_date = fd.dueDate || null;
+  if (dueTimeUtc) {
+    payload.due_time = dueTimeUtc;
+    return;
+  }
+  if (isEdit) {
+    payload.due_time = null;
+  }
+}
+
+function applyRecurringEndStrategyToPayload(payload: Record<string, unknown>, fd: CreateTaskFormData): void {
+  if (fd.recurringEndStrategy === "end_date") {
+    payload.end_date = fd.recurringEndDate.trim() || null;
+    payload.occurrences = null;
+    return;
+  }
+  if (fd.recurringEndStrategy === "occurrences") {
+    payload.occurrences = Math.max(1, Math.floor(fd.recurringOccurrences));
+    payload.end_date = null;
+    return;
+  }
+  payload.end_date = null;
+  payload.occurrences = null;
+}
+
+function applyRecurringOptionalNumericFields(
+  payload: Record<string, unknown>,
+  fd: CreateTaskFormData,
+  isEdit: boolean,
+): void {
+  const estTrim = fd.estimatedDurationMinutes.trim();
+  if (estTrim !== "") {
+    const est = Math.min(525600, Math.max(0, Math.floor(Number(estTrim))));
+    if (Number.isFinite(est)) {
+      payload.estimated_duration_minutes = est;
+    }
+  } else if (isEdit) {
+    payload.estimated_duration_minutes = null;
+  }
+  payload.reminder_minutes =
+    fd.recurringReminderEnabled && fd.recurringReminderMinutes > 0
+      ? Math.max(1, Math.floor(fd.recurringReminderMinutes))
+      : 0;
+}
+
+function applyPlannerSidebarRecurringPayload(
+  payload: Record<string, unknown>,
+  fd: CreateTaskFormData,
+  isEdit: boolean,
+): void {
+  applyRecurringRepeatAndFrequencyConfig(payload, fd, isEdit);
+  applyRecurringDueTimeToPayload(payload, fd, isEdit);
+  applyRecurringEndStrategyToPayload(payload, fd);
   payload.is_active = fd.recurringIsActive;
+  payload.timezone = getAutoTimezone();
+  applyRecurringOptionalNumericFields(payload, fd, isEdit);
+  payload.recurring_auto_create_next_on_complete = fd.recurringAutoCreateNextOnComplete;
+  payload.recurring_create_next_if_previous_incomplete =
+    fd.recurringCreateNextIfPreviousIncomplete;
 }
 
 function applyPlannerSidebarRegularTodoDueTime(
@@ -1348,7 +1779,6 @@ function buildPlannerSidebarPayloadRecord(
     title: clampTaskTitleLength(fd.title.trim()),
     description: fd.description || "",
     priority: plannerPriorityIdToApiString(fd.priorityId) || undefined,
-    due_date: fd.dueDate || "",
     start_date: fd.startDate || "",
     extension_numbers:
       fd.assigneeIds?.map((id: number) => {
@@ -1369,11 +1799,51 @@ function buildPlannerSidebarPayloadRecord(
   if (fd.statusId) payload.status_id = fd.statusId;
   applyPlannerSidebarParentTaskId(payload, fd, isEdit);
   if (taskTypeEff === "recurring") {
-    applyPlannerSidebarRecurringPayload(payload, fd);
+    applyPlannerSidebarRecurringPayload(payload, fd, isEdit);
   } else if (taskTypeEff === "regular" || taskTypeEff === "todo") {
+    payload.due_date = fd.dueDate || "";
     applyPlannerSidebarRegularTodoDueTime(payload, fd, isEdit);
   }
   return payload;
+}
+
+function validateRecurringEndAndOccurrences(formData: CreateTaskFormData): boolean {
+  if (formData.recurringEndStrategy === "end_date") {
+    if (!formData.recurringEndDate.trim()) {
+      toast.error("Please set an end date or choose a different end condition");
+      return false;
+    }
+    if (formData.startDate.trim() && formData.recurringEndDate < formData.startDate.trim()) {
+      toast.error("Schedule end date cannot be before the start date");
+      return false;
+    }
+    return true;
+  }
+  if (formData.recurringEndStrategy !== "occurrences") {
+    return true;
+  }
+  if (!Number.isFinite(formData.recurringOccurrences) || formData.recurringOccurrences < 1) {
+    toast.error("Occurrences must be at least 1");
+    return false;
+  }
+  return true;
+}
+
+function validateRecurringDurationAndReminder(formData: CreateTaskFormData): boolean {
+  if (formData.recurringReminderEnabled && formData.recurringReminderMinutes < 1) {
+    toast.error("Reminder minutes must be at least 1 when reminders are enabled");
+    return false;
+  }
+  const estTrim = formData.estimatedDurationMinutes.trim();
+  if (estTrim === "") {
+    return true;
+  }
+  const n = Number(estTrim);
+  if (!Number.isFinite(n) || n < 0 || n > 525600) {
+    toast.error("Estimated duration must be between 0 and 525600 minutes");
+    return false;
+  }
+  return true;
 }
 
 function validatePlannerSidebarRecurringSubmit(formData: CreateTaskFormData): boolean {
@@ -1389,7 +1859,14 @@ function validatePlannerSidebarRecurringSubmit(formData: CreateTaskFormData): bo
     toast.error("Please select a day of the week");
     return false;
   }
-  return true;
+  if (formData.frequency === "custom" && formData.repeatInterval < 1) {
+    toast.error("Custom repeat interval must be at least 1");
+    return false;
+  }
+  if (!validateRecurringEndAndOccurrences(formData)) {
+    return false;
+  }
+  return validateRecurringDurationAndReminder(formData);
 }
 
 function validatePlannerSidebarDueTimeRequiresDueDate(
@@ -1410,6 +1887,9 @@ function validatePlannerSidebarDueTimeRequiresDueDate(
 function validatePlannerSidebarDueDateMinBoundary(
   formData: CreateTaskFormData,
 ): boolean {
+  if (formData.taskType === "recurring") {
+    return true;
+  }
   if (!formData.dueDate.trim()) {
     return true;
   }
@@ -1495,7 +1975,6 @@ async function persistPlannerSidebarCreateTask(
       ...(payload as unknown as Parameters<typeof createRecurringTask>[0]),
       status_id: ctx.formData.statusId as number,
       start_date: ctx.formData.startDate,
-      end_date: ctx.formData.dueDate || null,
       type: "recurring",
     };
     if (ctx.formData.projectId != null && ctx.formData.projectId > 0) {
@@ -1660,6 +2139,86 @@ function mergeOpenedPlannerSidebarFormData(
   };
 }
 
+function applyOpenAsRecurringConversionToInitialForm(
+  base: CreateTaskFormData,
+  openAsRecurringConversion: boolean,
+  editMode: boolean,
+  editTask: PlannerEditTask | undefined,
+): CreateTaskFormData {
+  if (!openAsRecurringConversion || !editMode || editTask == null) {
+    return base;
+  }
+  const typ = normalizeEditTaskType(editTask);
+  if (typ !== "todo" && typ !== "regular") {
+    return base;
+  }
+  const merged = mergeFormDataWithDueDateClamp(base);
+  return {
+    ...merged,
+    taskType: "recurring",
+    ...seedRecurringFieldsWhenSwitchingToRecurring(merged),
+  };
+}
+
+type PlannerSidebarPayload = ReturnType<typeof buildPlannerSidebarPayloadRecord>;
+
+async function submitPlannerSidebarTask(params: {
+  e?: React.MouseEvent;
+  isSubmitting: boolean;
+  validateBeforeSubmit: () => boolean;
+  setIsSubmitting: (value: boolean) => void;
+  buildPayload: () => PlannerSidebarPayload;
+  persistTaskFromPayload: (payload: PlannerSidebarPayload) => Promise<boolean>;
+  onSuccess?: (data: CreateTaskFormData) => void;
+  formData: CreateTaskFormData;
+  onClose?: () => void;
+  isEdit: boolean;
+}): Promise<void> {
+  const {
+    e,
+    isSubmitting,
+    validateBeforeSubmit,
+    setIsSubmitting,
+    buildPayload,
+    persistTaskFromPayload,
+    onSuccess,
+    formData,
+    onClose,
+    isEdit,
+  } = params;
+
+  e?.preventDefault();
+  e?.stopPropagation();
+  if (isSubmitting) return;
+  if (!validateBeforeSubmit()) return;
+
+  setIsSubmitting(true);
+  try {
+    const payload = buildPayload();
+    const ok = await persistTaskFromPayload(payload);
+    if (ok) {
+      onSuccess?.(formData);
+      onClose?.();
+    }
+  } catch (error) {
+    console.error(`Error ${isEdit ? "updating" : "creating"} task:`, error);
+  } finally {
+    setIsSubmitting(false);
+  }
+}
+
+function computePlannerSidebarStartDateChange(
+  prev: CreateTaskFormData,
+  newStart: string,
+): CreateTaskFormData {
+  if (prev.taskType === "recurring") {
+    return { ...prev, startDate: newStart };
+  }
+  const minDue = minDueDateFromTodayAndStart(newStart);
+  const nextDue = clampDueDateToMin(prev.dueDate, minDue);
+  return { ...prev, startDate: newStart, dueDate: nextDue };
+}
+
 function emptyPlannerSidebarFormWhenClosed(
   propProject: Project | undefined,
   selectedStatusForTask: number | null,
@@ -1683,6 +2242,15 @@ function emptyPlannerSidebarFormWhenClosed(
     repeatOn: "",
     dueTime: "",
     recurringIsActive: true,
+    recurringEndStrategy: "never",
+    recurringEndDate: "",
+    recurringOccurrences: 12,
+    estimatedDurationMinutes: "",
+    recurringReminderEnabled: false,
+    recurringReminderMinutes: 30,
+    recurringAutoCreateNextOnComplete: false,
+    recurringCreateNextIfPreviousIncomplete: false,
+    customIntervalUnit: "days",
   };
 }
 
@@ -1718,7 +2286,16 @@ function applyPlannerSidebarTaskTypeSelectChange(
   const nextType = raw as PlannerTaskType;
   const clamped = clampTaskTypeToAllowed(nextType, ctx.taskTypeOptions);
   if (ctx.editMode) {
-    ctx.setFormData((prev) => ({ ...prev, taskType: clamped }));
+    ctx.setFormData((prev) => {
+      if (clamped === "recurring" && prev.taskType !== "recurring") {
+        return {
+          ...prev,
+          taskType: "recurring",
+          ...seedRecurringFieldsWhenSwitchingToRecurring(prev),
+        };
+      }
+      return { ...prev, taskType: clamped };
+    });
     return;
   }
   const fresh = buildInitialFormForCreate(
@@ -1932,6 +2509,7 @@ type PlannerSidebarFormOpenLifecycleParams = Readonly<{
   getInitialFormData: () => CreateTaskFormData;
   setSearchQuery: React.Dispatch<React.SetStateAction<string>>;
   setFormData: React.Dispatch<React.SetStateAction<CreateTaskFormData>>;
+  openAsRecurringConversion: boolean;
 }>;
 
 function usePlannerSidebarFormOpenLifecycle(
@@ -1983,6 +2561,7 @@ function usePlannerSidebarFormOpenLifecycle(
     params.loadingProjects,
     params.selectedStatusForTask,
     params.taskTypeOptions,
+    params.openAsRecurringConversion,
   ]);
 }
 
@@ -2017,11 +2596,16 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
   taskTypeChoices,
   lockProjectSelection = false,
   taskEditScope = "full",
+  openAsRecurringConversion = false,
 }) => {
-  const taskTypeOptions = useNormalizedPlannerTaskTypeOptions(taskTypeChoices);
+  const normalizedTaskTypeOptions = useNormalizedPlannerTaskTypeOptions(taskTypeChoices);
+  const taskTypeOptions = useMemo(
+    () => restrictPlannerTaskTypeOptionsForEdit(isEdit, editTask, normalizedTaskTypeOptions),
+    [isEdit, editTask, normalizedTaskTypeOptions],
+  );
 
-  const getInitialFormData = (): CreateTaskFormData =>
-    getSidebarInitialFormData(
+  const getInitialFormData = useCallback((): CreateTaskFormData => {
+    const base = getSidebarInitialFormData(
       isEdit,
       editTask,
       extensions,
@@ -2029,6 +2613,21 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
       propStatuses,
       selectedStatusForTask,
     );
+    return applyOpenAsRecurringConversionToInitialForm(
+      base,
+      openAsRecurringConversion,
+      isEdit,
+      editTask,
+    );
+  }, [
+    isEdit,
+    editTask,
+    extensions,
+    propProject,
+    propStatuses,
+    selectedStatusForTask,
+    openAsRecurringConversion,
+  ]);
 
   const [formData, setFormData] = useState<CreateTaskFormData>(getInitialFormData());
   const [searchQuery, setSearchQuery] = useState("");
@@ -2123,6 +2722,7 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
     getInitialFormData,
     setSearchQuery,
     setFormData,
+    openAsRecurringConversion,
   });
 
   usePlannerSidebarBodyScrollLock(isOpen);
@@ -2212,28 +2812,19 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
   const submitPlannerTask = async (
     e: React.MouseEvent | undefined,
     onSuccess: ((data: CreateTaskFormData) => void) | undefined,
-  ) => {
-    if (e) {
-      e.preventDefault();
-      e.stopPropagation();
-    }
-    if (isSubmitting) return;
-    if (!validateBeforeSubmit()) return;
-
-    setIsSubmitting(true);
-    try {
-      const payload = buildPayload();
-      const ok = await persistTaskFromPayload(payload);
-      if (ok) {
-        onSuccess?.(formData);
-        onClose?.();
-      }
-    } catch (error) {
-      console.error(`Error ${isEdit ? "updating" : "creating"} task:`, error);
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
+  ) =>
+    submitPlannerSidebarTask({
+      e,
+      onSuccess,
+      isSubmitting,
+      validateBeforeSubmit,
+      setIsSubmitting,
+      buildPayload,
+      persistTaskFromPayload,
+      formData,
+      onClose,
+      isEdit,
+    });
 
   const handleCreate = async (e?: React.MouseEvent) => {
     await submitPlannerTask(e, onCreate);
@@ -2292,11 +2883,7 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
   const handleStartDateInputChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
       const newStart = e.target.value;
-      setFormData((prev) => {
-        const minDue = minDueDateFromTodayAndStart(newStart);
-        const nextDue = clampDueDateToMin(prev.dueDate, minDue);
-        return { ...prev, startDate: newStart, dueDate: nextDue };
-      });
+      setFormData((prev) => computePlannerSidebarStartDateChange(prev, newStart));
     },
     [],
   );
@@ -2376,11 +2963,12 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
 
   const sidebarEditTaskId = resolveSidebarEditTaskId(isEdit, editTask);
 
-  const labelStyle = {
-    fontSize: "14px",
-    color: "#141414",
+  const labelStyle: React.CSSProperties = {
+    fontSize: "13px",
+    color: PLANNER_TASK_SIDEBAR.text,
     fontWeight: 600,
-    marginBottom: 8,
+    marginBottom: 6,
+    letterSpacing: "0.01em",
   };
   const dueTimeFieldLabelStyle: React.CSSProperties = {
     ...labelStyle,
@@ -2388,38 +2976,21 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
     alignItems: "center",
     gap: 6,
   };
-  const groupClass = "mb-3";
+  const groupClass = "mb-3 planner-sidebar-field";
   const dueDateMin = minDueDateFromTodayAndStart(formData.startDate);
 
   return (
     <>
-      <style>{`
-        .create-task-sidebar-panel .form-control,
-        .create-task-sidebar-panel .form-select {
-          border-color: #8a8a8a !important;
-          border-radius: 4px !important;
-          height: 40px !important;
-          font-size: 16px !important;
-          font-weight: 300 !important;
-        }
-
-        .create-task-sidebar-panel .form-control::placeholder,
-        .create-task-sidebar-panel textarea::placeholder,
-        .create-task-sidebar-panel input::placeholder {
-          font-size: 16px !important;
-          font-weight: 300 !important;
-        }
-      `}</style>
-
       <button
         type="button"
         aria-label="Close sidebar"
+        className="create-task-sidebar-backdrop"
         onClick={onClose}
         style={{
           position: "fixed",
           inset: 0,
           zIndex: 1000,
-          backgroundColor: "rgba(0,0,0,0.2)",
+          backgroundColor: "rgba(15, 23, 42, 0.4)",
           border: "none",
           padding: 0,
           cursor: "pointer",
@@ -2434,8 +3005,11 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
           width: 520,
           maxWidth: "100vw",
           height: "100vh",
-          backgroundColor: "#fff",
-          boxShadow: "-4px 0 20px rgba(0,0,0,0.12)",
+          backgroundColor: PLANNER_TASK_SIDEBAR.surface,
+          boxShadow: PLANNER_TASK_SIDEBAR.shadow,
+          borderTopLeftRadius: PLANNER_TASK_SIDEBAR.radiusLg,
+          borderBottomLeftRadius: PLANNER_TASK_SIDEBAR.radiusLg,
+          borderLeft: `4px solid ${PLANNER_TASK_SIDEBAR.accent}`,
           zIndex: 999999,
           display: "flex",
           flexDirection: "column",
@@ -2445,8 +3019,9 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
         {/* Header */}
         <div
           style={{
-            padding: "16px 24px",
-            borderBottom: "1px solid #e8eef5",
+            padding: "18px 24px 16px",
+            background: `linear-gradient(180deg, ${PLANNER_TASK_SIDEBAR.surfaceMuted} 0%, ${PLANNER_TASK_SIDEBAR.surface} 100%)`,
+            borderBottom: `1px solid ${PLANNER_TASK_SIDEBAR.border}`,
             display: "flex",
             justifyContent: "space-between",
             alignItems: "center",
@@ -2455,31 +3030,59 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
         >
           <h2
             style={{
-              fontSize: 18,
-              fontWeight: 600,
+              fontSize: 19,
+              fontWeight: 700,
               margin: 0,
               display: "flex",
               alignItems: "center",
-              gap: 8,
+              gap: 10,
+              color: PLANNER_TASK_SIDEBAR.text,
+              letterSpacing: "-0.02em",
             }}
           >
-            <ListTodo size={20} color="#4e6fa5" />
+            <span
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                width: 40,
+                height: 40,
+                borderRadius: 12,
+                background: PLANNER_TASK_SIDEBAR.accentSoft,
+              }}
+            >
+              <ListTodo size={22} color={PLANNER_TASK_SIDEBAR.accent} strokeWidth={2.25} />
+            </span>
             {getSidebarTitle(formData.taskType, isEdit)}
           </h2>
           <button
             type="button"
             onClick={onClose}
+            title="Close"
             style={{
-              background: "none",
-              border: "none",
-              padding: 4,
+              background: PLANNER_TASK_SIDEBAR.surfaceMuted,
+              border: `1px solid ${PLANNER_TASK_SIDEBAR.border}`,
+              borderRadius: 10,
+              width: 40,
+              height: 40,
+              padding: 0,
               cursor: "pointer",
-              color: "#6c757d",
+              color: PLANNER_TASK_SIDEBAR.textMuted,
               display: "flex",
               alignItems: "center",
+              justifyContent: "center",
+              transition: "background 0.15s ease, color 0.15s ease",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = "#e2e8f0";
+              e.currentTarget.style.color = PLANNER_TASK_SIDEBAR.text;
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = PLANNER_TASK_SIDEBAR.surfaceMuted;
+              e.currentTarget.style.color = PLANNER_TASK_SIDEBAR.textMuted;
             }}
           >
-            <X size={20} />
+            <X size={20} strokeWidth={2} />
           </button>
         </div>
 
@@ -2498,7 +3101,8 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
               flex: 1,
               minHeight: 0,
               overflowY: "auto",
-              padding: "24px",
+              padding: "22px 24px 28px",
+              backgroundColor: PLANNER_TASK_SIDEBAR.surfaceMuted,
             }}
           >
           <Form onSubmit={(e) => { e.preventDefault(); handleCreate(); }}>
@@ -2552,7 +3156,11 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
               <Form.Select
                 value={taskTypeSelectHtmlValue(formData.taskType, taskTypeOptions)}
                 onChange={handleTaskTypeChange}
-                disabled={isEdit}
+                disabled={
+                  isEdit &&
+                  editTask != null &&
+                  normalizeEditTaskType(editTask) === "recurring"
+                }
                 className="py-2"
                 style={{ fontSize: "14px" }}
               >
@@ -2591,6 +3199,17 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
                   </Form.Select>
                 </Form.Group>
               </Col>
+
+              {isEdit &&
+                editTask != null &&
+                normalizeEditTaskType(editTask) !== "recurring" && (
+                  <Col xs={12}>
+                    <div className="planner-sidebar-hint mb-3">
+                      You can convert this task to <strong>Recurring</strong> only (not to the other
+                      non-recurring type). Recurring templates cannot be turned into Todo or Regular.
+                    </div>
+                  </Col>
+                )}
 
               <Col xs={12}>
               <Form.Group className={groupClass}>
@@ -3021,6 +3640,7 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
                   />
                 </Form.Group>
               </Col>
+              {formData.taskType !== "recurring" && (
               <Col xs={12} md={6}>
                 <Form.Group className={groupClass}>
                   <Form.Label style={labelStyle}>
@@ -3037,6 +3657,7 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
                   />
                 </Form.Group>
               </Col>
+              )}
               {(formData.taskType === "regular" || formData.taskType === "todo") && (
                 <Col xs={12} md={6}>
                   <Form.Group className={groupClass}>
@@ -3074,7 +3695,8 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
             </Row>
 
             {formData.taskType === "recurring" && (
-              <>
+              <div className="planner-sidebar-section">
+                <div className="planner-sidebar-section__title">Recurring schedule</div>
                 <Form.Group className={groupClass}>
                   <Form.Label style={labelStyle}>
                     <Calendar size={16} className="me-2" style={{ verticalAlign: "middle" }} />
@@ -3090,6 +3712,7 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
                     <option value="weekly">Weekly</option>
                     <option value="monthly">Monthly</option>
                     <option value="yearly">Yearly</option>
+                    <option value="custom">Custom</option>
                   </Form.Select>
                 </Form.Group>
                 <Row>
@@ -3117,9 +3740,33 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
                         {formData.frequency === "weekly" && "week(s)"}
                         {formData.frequency === "monthly" && "month(s)"}
                         {formData.frequency === "yearly" && "year(s)"}
+                        {formData.frequency === "custom" && "custom interval"}
                       </Form.Text>
                     </Form.Group>
                   </Col>
+                  {formData.frequency === "custom" && (
+                    <Col xs={12} md={6}>
+                      <Form.Group className={groupClass}>
+                        <Form.Label style={labelStyle}>Custom unit</Form.Label>
+                        <Form.Select
+                          value={formData.customIntervalUnit}
+                          onChange={(e) =>
+                            setFormData({
+                              ...formData,
+                              customIntervalUnit: e.target.value as CustomFrequencyUnit,
+                            })
+                          }
+                          className="py-2"
+                          style={{ fontSize: "14px" }}
+                        >
+                          <option value="days">Day(s)</option>
+                          <option value="weeks">Week(s)</option>
+                          <option value="months">Month(s)</option>
+                          <option value="years">Year(s)</option>
+                        </Form.Select>
+                      </Form.Group>
+                    </Col>
+                  )}
                   {(formData.frequency === "weekly" || formData.frequency === "monthly") && (
                     <Col xs={12} md={6}>
                       <Form.Group className={groupClass}>
@@ -3154,7 +3801,8 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
                             value={formData.repeatOn || ""}
                             onChange={(e) => {
                               const v = e.target.value;
-                              const num = v === "" ? "" : String(Math.max(1, Math.min(31, Number(v) || 1)));
+                              const num =
+                                v === "" ? "" : String(Math.max(1, Math.min(31, Number(v) || 1)));
                               setFormData({ ...formData, repeatOn: num });
                             }}
                             className="py-2"
@@ -3180,6 +3828,183 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
                     style={{ fontSize: "14px" }}
                   />
                 </Form.Group>
+                <Row>
+                  <Col xs={12} md={6}>
+                    <Form.Group className={groupClass}>
+                      <Form.Label style={labelStyle}>
+                        Estimated duration (optional)
+                      </Form.Label>
+                      <Form.Control
+                        type="number"
+                        min={0}
+                        max={525600}
+                        placeholder="Minutes"
+                        value={formData.estimatedDurationMinutes}
+                        onChange={(e) =>
+                          setFormData((prev) => ({
+                            ...prev,
+                            estimatedDurationMinutes: e.target.value,
+                          }))
+                        }
+                        className="py-2"
+                        style={{ fontSize: "14px" }}
+                      />
+                      <Form.Text className="text-muted">Copied to each occurrence (0–525600).</Form.Text>
+                    </Form.Group>
+                  </Col>
+                  <Col xs={12} md={6}>
+                    <Form.Group className={groupClass}>
+                      <Form.Label style={labelStyle}>Timezone</Form.Label>
+                      <div
+                        className="planner-sidebar-readonly-value"
+                        title="Detected from your browser"
+                        aria-live="polite"
+                      >
+                        {getAutoTimezone()}
+                      </div>
+                      <Form.Text className="text-muted">
+                        Detected from your browser and sent with each save. Not editable.
+                      </Form.Text>
+                    </Form.Group>
+                  </Col>
+                </Row>
+                <Form.Group className={groupClass}>
+                  <Form.Label style={labelStyle}>End condition</Form.Label>
+                  <div className="d-flex flex-column gap-2">
+                    <Form.Check
+                      type="radio"
+                      id="rec-end-never"
+                      name="planner-recurring-end"
+                      label="Never — open-ended until you deactivate the template"
+                      checked={formData.recurringEndStrategy === "never"}
+                      onChange={() =>
+                        setFormData((prev) => ({ ...prev, recurringEndStrategy: "never" }))
+                      }
+                    />
+                    <Form.Check
+                      type="radio"
+                      id="rec-end-date"
+                      name="planner-recurring-end"
+                      label="End by date"
+                      checked={formData.recurringEndStrategy === "end_date"}
+                      onChange={() =>
+                        setFormData((prev) => ({ ...prev, recurringEndStrategy: "end_date" }))
+                      }
+                    />
+                    {formData.recurringEndStrategy === "end_date" && (
+                      <Form.Control
+                        type="date"
+                        className="py-2 ms-4"
+                        style={{ maxWidth: 280, fontSize: "14px" }}
+                        value={formData.recurringEndDate}
+                        min={formData.startDate || undefined}
+                        onChange={(e) =>
+                          setFormData((prev) => ({
+                            ...prev,
+                            recurringEndDate: e.target.value,
+                          }))
+                        }
+                      />
+                    )}
+                    <Form.Check
+                      type="radio"
+                      id="rec-end-occ"
+                      name="planner-recurring-end"
+                      label="End after N materialized occurrences"
+                      checked={formData.recurringEndStrategy === "occurrences"}
+                      onChange={() =>
+                        setFormData((prev) => ({ ...prev, recurringEndStrategy: "occurrences" }))
+                      }
+                    />
+                    {formData.recurringEndStrategy === "occurrences" && (
+                      <div className="d-flex align-items-center gap-2 ms-4 flex-wrap">
+                        <Form.Control
+                          type="number"
+                          min={1}
+                          max={10000}
+                          style={{ maxWidth: 120, fontSize: "14px" }}
+                          value={formData.recurringOccurrences}
+                          onChange={(e) =>
+                            setFormData((prev) => ({
+                              ...prev,
+                              recurringOccurrences: Math.max(
+                                1,
+                                Math.min(10000, Number(e.target.value) || 1),
+                              ),
+                            }))
+                          }
+                          className="py-2"
+                        />
+                        <span className="text-muted small">occurrences</span>
+                      </div>
+                    )}
+                  </div>
+                </Form.Group>
+                <Form.Group className={groupClass}>
+                  <Form.Label style={labelStyle}>Reminders</Form.Label>
+                  <Form.Check
+                    type="switch"
+                    id="rec-reminder-switch"
+                    label="Send reminder before each occurrence is due"
+                    checked={formData.recurringReminderEnabled}
+                    onChange={(e) =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        recurringReminderEnabled: e.target.checked,
+                      }))
+                    }
+                  />
+                  {formData.recurringReminderEnabled && (
+                    <div className="d-flex align-items-center gap-2 mt-2 flex-wrap">
+                      <span className="small text-muted">Minutes before due</span>
+                      <Form.Control
+                        type="number"
+                        min={1}
+                        max={10080}
+                        style={{ maxWidth: 120, fontSize: "14px" }}
+                        value={formData.recurringReminderMinutes}
+                        onChange={(e) =>
+                          setFormData((prev) => ({
+                            ...prev,
+                            recurringReminderMinutes: Math.max(
+                              1,
+                              Math.min(10080, Number(e.target.value) || 1),
+                            ),
+                          }))
+                        }
+                        className="py-2"
+                      />
+                    </div>
+                  )}
+                </Form.Group>
+                <Form.Group className={groupClass}>
+                  <Form.Label style={labelStyle}>Automation</Form.Label>
+                  <Form.Check
+                    type="switch"
+                    id="rec-auto-next"
+                    className="mb-2"
+                    label="Auto-create next occurrence when one is completed"
+                    checked={formData.recurringAutoCreateNextOnComplete}
+                    onChange={(e) =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        recurringAutoCreateNextOnComplete: e.target.checked,
+                      }))
+                    }
+                  />
+                  <Form.Check
+                    type="switch"
+                    id="rec-create-if-prev-open"
+                    label="Allow new occurrences while a previous one is still incomplete"
+                    checked={formData.recurringCreateNextIfPreviousIncomplete}
+                    onChange={(e) =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        recurringCreateNextIfPreviousIncomplete: e.target.checked,
+                      }))
+                    }
+                  />
+                </Form.Group>
                 <Form.Group className={groupClass}>
                   <Form.Label style={labelStyle}>Is Active</Form.Label>
                   <Form.Select
@@ -3196,6 +4021,9 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
                     <option value="true">Active</option>
                     <option value="false">Not Active</option>
                   </Form.Select>
+                  <Form.Text className="text-muted">
+                    Inactive templates do not generate new occurrences.
+                  </Form.Text>
                 </Form.Group>
                 <PlannerSidebarRecurringRunAtReadOnlyRow
                   visible={isEdit}
@@ -3203,7 +4031,7 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
                   groupClass={groupClass}
                   labelStyle={labelStyle}
                 />
-              </>
+              </div>
             )}
 
 
@@ -3423,59 +4251,16 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
           />
         </div>
 
-        {/* Footer */}
-        <div
-          style={{
-            padding: "16px 24px",
-            borderTop: "1px solid #e8eef5",
-            display: "flex",
-            gap: 8,
-            justifyContent: "flex-end",
-            flexShrink: 0,
+        <PlannerSidebarFooter
+          isEdit={isEdit}
+          isSubmitting={isSubmitting}
+          onClose={onClose}
+          onCreateAndOpen={onCreateAndOpen}
+          onCreate={handleCreate}
+          onCreateAndOpenSubmit={(e) => {
+            void submitPlannerTask(e, onCreateAndOpen).catch(() => undefined);
           }}
-        >
-          <button
-            type="button"
-            onClick={onClose}
-            style={{
-              padding: "8px 20px",
-              fontSize: 14,
-              fontWeight: 600,
-              border: "1px solid #e2e8f0",
-              borderRadius: 4,
-              background: "#fff",
-              cursor: "pointer",
-            }}
-          >
-            Cancel
-          </button>
-          <PlannerSidebarCreateAndOpenButton
-            isEdit={isEdit}
-            isSubmitting={isSubmitting}
-            onCreateAndOpen={onCreateAndOpen}
-            onSubmit={(e) => {
-              if (onCreateAndOpen == null) return;
-              void submitPlannerTask(e, onCreateAndOpen).catch(() => undefined);
-            }}
-          />
-          <button
-            type="button"
-            onClick={() => handleCreate()}
-            disabled={isSubmitting}
-            style={{
-              padding: "8px 20px",
-              fontSize: 14,
-              fontWeight: 600,
-              backgroundColor: "#000000",
-              border: "none",
-              borderRadius: 4,
-              color: "#fff",
-              cursor: isSubmitting ? "not-allowed" : "pointer",
-            }}
-          >
-            {primarySubmitButtonLabel(isSubmitting, isEdit)}
-          </button>
-        </div>
+        />
       </div>
     </>
   );

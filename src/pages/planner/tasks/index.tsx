@@ -13,7 +13,7 @@ import { Button, Modal, Form, Dropdown } from "react-bootstrap";
 import { toast } from "react-toastify";
 import { useRouter } from "next/router";
 import moment from "moment";
-import { Plus, ChevronDown, MoreVertical, Settings, Trash2 } from "lucide-react";
+import { Plus, ChevronDown, MoreVertical, Repeat, Settings, Trash2 } from "lucide-react";
 import GenericTable, { TableColumn, TableAction } from "@components/GenericTable";
 import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
 import CreateTaskSidebar from "@components/CreatePlannerTaskSidebar";
@@ -648,6 +648,7 @@ const TasksListingPage = ({
     const [editingTaskEditScope, setEditingTaskEditScope] = useState<
       "none" | "limited" | "full"
     >("full");
+    const [openAsRecurringConversion, setOpenAsRecurringConversion] = useState(false);
   
     // ── Delete confirmation ──────────────────────────────────────────────────────
     const [showDelete, setShowDelete] = useState(false);
@@ -900,6 +901,21 @@ const TasksListingPage = ({
       (row: Task) => {
         const perms = getTaskRowPermissions(row);
         if (!perms.canOpenTaskEdit) return;
+        setOpenAsRecurringConversion(false);
+        setEditingTask(row);
+        setEditingTaskEditScope(perms.taskEditScope);
+        setShowCreate(true);
+      },
+      [getTaskRowPermissions],
+    );
+
+    const openConvertToRecurring = useCallback(
+      (row: Task) => {
+        const perms = getTaskRowPermissions(row);
+        if (!perms.canOpenTaskEdit) return;
+        const kind = row.task_type;
+        if (kind !== "todo" && kind !== "regular") return;
+        setOpenAsRecurringConversion(true);
         setEditingTask(row);
         setEditingTaskEditScope(perms.taskEditScope);
         setShowCreate(true);
@@ -1095,6 +1111,8 @@ const TasksListingPage = ({
           const perms = getTaskRowPermissions(row);
           const canEditRow = perms.canOpenTaskEdit;
           const canDeleteRow = perms.canDeleteTask;
+          const isTodoOrRegular =
+            row.task_type === "todo" || row.task_type === "regular";
           return (
             <Dropdown
               show={openTaskActionsId === row.id}
@@ -1131,6 +1149,27 @@ const TasksListingPage = ({
                   <Settings size={14} className="me-2" />
                   Edit Task
                 </Dropdown.Item>
+                {isTodoOrRegular && (
+                  <Dropdown.Item
+                    as="button"
+                    type="button"
+                    aria-disabled={!canEditRow}
+                    className={canEditRow ? undefined : "text-muted"}
+                    style={{
+                      cursor: canEditRow ? "pointer" : "not-allowed",
+                      opacity: canEditRow ? 1 : 0.65,
+                    }}
+                    title={plannerTaskRowEditDeniedTitle(canEditRow)}
+                    onClick={() => {
+                      if (!canEditRow) return;
+                      setOpenTaskActionsId(null);
+                      openConvertToRecurring(row);
+                    }}
+                  >
+                    <Repeat size={14} className="me-2" />
+                    Convert to recurring
+                  </Dropdown.Item>
+                )}
                 <Dropdown.Divider />
                 <Dropdown.Item
                   as="button"
@@ -1161,6 +1200,7 @@ const TasksListingPage = ({
       router,
       handleToggleComplete,
       openEdit,
+      openConvertToRecurring,
       openDeleteConfirm,
       getTaskRowPermissions,
       openTaskActionsId,
@@ -1380,7 +1420,11 @@ const TasksListingPage = ({
               {showCreateTaskButton && (
                 <button
                   type="button"
-                  onClick={() => { setEditingTask(null); setShowCreate(true); }}
+                  onClick={() => {
+                    setEditingTask(null);
+                    setOpenAsRecurringConversion(false);
+                    setShowCreate(true);
+                  }}
                   style={{
                     ...TASK_LIST_BTN_OUTLINE,
                     backgroundColor: "#000",
@@ -2143,11 +2187,13 @@ const TasksListingPage = ({
             setShowCreate(false);
             setEditingTask(null);
             setEditingTaskEditScope("full");
+            setOpenAsRecurringConversion(false);
           }}
           onCreate={async () => {
             setShowCreate(false);
             setEditingTask(null);
             setEditingTaskEditScope("full");
+            setOpenAsRecurringConversion(false);
             await fetchTasks();
           }}
           extensions={hierarchyDataExtensions as any}
@@ -2171,6 +2217,7 @@ const TasksListingPage = ({
           }
           lockProjectSelection={Boolean(sidebarProject)}
           taskEditScope={editingTask ? editingTaskEditScope : "full"}
+          openAsRecurringConversion={openAsRecurringConversion}
         />
   
         {/* ── Delete confirmation ── */}
