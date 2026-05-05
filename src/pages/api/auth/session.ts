@@ -1,8 +1,25 @@
-import { NextApiRequest, NextApiResponse } from 'next';
-import { getServerSession } from 'next-auth/next';
-import { authOptions } from './[...nextauth]';
-import { sessionStore, NextAuthSessionData } from '../../../utils/sessionStore';
-import { randomBytes } from 'crypto';
+import { NextApiRequest, NextApiResponse } from "next";
+import { getServerSession } from "next-auth/next";
+import { authOptions } from "./authOptions";
+import {
+  sessionStore,
+  NextAuthSessionData,
+  isLikelySessionIdHex,
+} from "../../../utils/sessionStore";
+import { verifySmallPayload } from "../../../utils/smallJwt";
+import { randomBytes } from "node:crypto";
+
+function getStableTmsSessionId(req: NextApiRequest): string | null {
+  const secret = process.env.NEXTAUTH_SECRET;
+  if (!secret || typeof secret !== "string") return null;
+  const raw =
+    req.cookies["next-auth.session-token"] ??
+    req.cookies["__Secure-next-auth.session-token"];
+  if (!raw || typeof raw !== "string") return null;
+  const verified = verifySmallPayload(raw, secret);
+  const sid = verified?.sessionId;
+  return sid && isLikelySessionIdHex(sid) ? sid : null;
+}
 
 // Request deduplication cache - stores pending requests by user identifier
 // This prevents multiple concurrent requests from the same user from blocking each other
@@ -15,16 +32,14 @@ declare global {
   var sessionRequestCache: Map<string, PendingRequest> | undefined;
 }
 
-if (!global.sessionRequestCache) {
-  global.sessionRequestCache = new Map();
-}
+globalThis.sessionRequestCache ??= new Map();
 
 // Clean up stale cache entries (older than 5 seconds)
 const cleanupCache = () => {
   const now = Date.now();
-  global.sessionRequestCache!.forEach((value, key) => {
+  globalThis.sessionRequestCache!.forEach((value, key) => {
     if (now - value.timestamp > 5000) {
-      global.sessionRequestCache!.delete(key);
+      globalThis.sessionRequestCache!.delete(key);
     }
   });
 };
@@ -32,23 +47,42 @@ const cleanupCache = () => {
 // Get a cache key based on cookies (to identify same user across tabs)
 const getCacheKey = (req: NextApiRequest): string => {
   // Use NextAuth session token cookie as identifier
-  const sessionToken = req.cookies['next-auth.session-token'] || req.cookies['__Secure-next-auth.session-token'];
-  return sessionToken || 'anonymous';
+  const sessionToken =
+    req.cookies["next-auth.session-token"] ||
+    req.cookies["__Secure-next-auth.session-token"];
+  return sessionToken || "anonymous";
 };
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+export default async function handler(
+  req: NextApiRequest,
+  res: NextApiResponse,
+) {
   // Ensure we always return JSON so NextAuth client never gets HTML (avoids CLIENT_FETCH_ERROR)
   const sendJson = (status: number, body: object) => {
     try {
       res.status(status).json(body);
-    } catch (e) {
-      res.setHeader('Content-Type', 'application/json').status(status).end(JSON.stringify(body));
+    } catch (error: unknown) {
+      console.error(
+        "Session API: res.json failed, using manual JSON body",
+        error,
+      );
+      try {
+        res
+          .setHeader("Content-Type", "application/json")
+          .status(status)
+          .end(JSON.stringify(body));
+      } catch (fallbackError: unknown) {
+        console.error(
+          "Session API: failed to send JSON response",
+          fallbackError,
+        );
+      }
     }
   };
 
   try {
-    if (req.method !== 'GET') {
-      sendJson(405, { message: 'Method not allowed' });
+    if (req.method !== "GET") {
+      sendJson(405, { message: "Method not allowed" });
       return;
     }
 
@@ -57,18 +91,21 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     // Get cache key for request deduplication
     const cacheKey = getCacheKey(req);
-    
+
     // Check if there's already a pending request for this user
-    const pendingRequest = global.sessionRequestCache!.get(cacheKey);
-    
+    const pendingRequest = globalThis.sessionRequestCache!.get(cacheKey);
+
     if (pendingRequest && Date.now() - pendingRequest.timestamp < 2000) {
       // If there's a recent pending request (within 2 seconds), wait for it
       try {
         const result = await pendingRequest.promise;
         return sendJson(200, result);
-      } catch (error) {
-        // If the pending request failed, continue with new request
-        global.sessionRequestCache!.delete(cacheKey);
+      } catch (error: unknown) {
+        console.warn(
+          "Session API: coalesced session request failed, retrying",
+          error,
+        );
+        globalThis.sessionRequestCache!.delete(cacheKey);
       }
     }
 
@@ -76,21 +113,22 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const requestPromise = (async () => {
       try {
         const session = await getServerSession(req, res, authOptions);
-        
+
         if (!session?.user) {
-          throw new Error('Not authenticated');
+          throw new Error("Not authenticated");
         }
 
-        // Generate a session ID for this request
-        const sessionId = randomBytes(32).toString('hex');
+        // Reuse NextAuth cookie session id so we don't allocate a new TMS row on every GET
+        const sessionId =
+          getStableTmsSessionId(req) ?? randomBytes(32).toString("hex");
         const expires = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
 
         // Create session data
         const sessionData: NextAuthSessionData = {
           user: {
-            ...session.user
+            ...session.user,
           },
-          expires: expires.toISOString()
+          expires: expires.toISOString(),
         };
 
         // Store session data in memory
@@ -101,42 +139,42 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           ...session,
           user: {
             ...session.user,
-            sessionId: sessionId
-          }
+            sessionId: sessionId,
+          },
         };
       } catch (error) {
-        console.error('Session API error:', error);
+        console.error("Session API error:", error);
         throw error;
       }
     })();
 
     // Store the pending request in cache
-    global.sessionRequestCache!.set(cacheKey, {
+    globalThis.sessionRequestCache!.set(cacheKey, {
       promise: requestPromise,
-      timestamp: Date.now()
+      timestamp: Date.now(),
     });
 
     try {
       const result = await requestPromise;
-      
+
       // Remove from cache after successful completion
-      global.sessionRequestCache!.delete(cacheKey);
-      
+      globalThis.sessionRequestCache!.delete(cacheKey);
+
       return sendJson(200, result);
     } catch (error: any) {
       // Remove from cache on error
-      global.sessionRequestCache!.delete(cacheKey);
-      
-      if (error?.message === 'Not authenticated') {
-        return sendJson(401, { message: 'Not authenticated' });
+      globalThis.sessionRequestCache!.delete(cacheKey);
+
+      if (error?.message === "Not authenticated") {
+        return sendJson(401, { message: "Not authenticated" });
       }
-      
-      console.error('Session API error:', error);
-      return sendJson(500, { message: 'Internal server error' });
+
+      console.error("Session API error:", error);
+      return sendJson(500, { message: "Internal server error" });
     }
   } catch (unexpectedError: any) {
     // Top-level catch: never send HTML; NextAuth expects JSON
-    console.error('Session API unexpected error:', unexpectedError);
-    sendJson(500, { message: 'Internal server error' });
+    console.error("Session API unexpected error:", unexpectedError);
+    sendJson(500, { message: "Internal server error" });
   }
 }

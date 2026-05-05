@@ -6,7 +6,7 @@ import { Button, Card, Col, Row, Alert, Badge } from 'react-bootstrap'
 import { toast } from 'react-toastify'
 import Link from 'next/link'
 import useCtiStomp from '../../../hooks/useCtiStomp'
-import { makeCall, endCall, holdCall, resumeCall, getCallingDeviceInfo, getRemotePartyDnForTransfer, getAllUserDevices, mergeCalls,transferCalls, RemoveCall, attendCall} from '../../../utils/dialer'
+import { makeCall, endCall, holdCall, resumeCall, getCallingDeviceInfo, getRemotePartyDnForTransfer, getAllUserDevices, mergeCalls,transferCalls, RemoveCall} from '../../../utils/dialer'
 import DeviceSelectionModal from '../../../components/DeviceSelectionModal'
 import Select from 'react-select'
 import { FaLastfmSquare } from 'react-icons/fa'
@@ -63,17 +63,6 @@ const CtiDialer = () => {
   const [transferCallId, setTransferCallId] = useState<string | null>(null)
   const [showTransferModal, setShowTransferModal] = useState(false)
   const [transferTarget, setTransferTarget] = useState('')
-  const [incomingCall, setIncomingCall] = useState<{
-    callId: string
-    callingAddress: string
-    calledAddress: string
-    controllerAddress: string
-    controllerDeviceName: string
-    controllerDeviceType: string
-    startTime: Date
-  } | null>(null)
-  const [showIncomingCallModal, setShowIncomingCallModal] = useState(false)
-  const [incomingCallTimer, setIncomingCallTimer] = useState<NodeJS.Timeout | null>(null)
   const [mergedCalls, setMergedCalls] = useState<Map<string, {
     id: string
     conferenceCallId?: string
@@ -1170,94 +1159,6 @@ const CtiDialer = () => {
     }
   }
 
-  const handleAttendCall = async () => {
-    // Check permission for attending calls
-    if (!hasPermission('dial-call-cti')) {
-      toast.error('You do not have permission to answer calls')
-      return
-    }
-
-    if (!incomingCall) {
-      toast.error('No incoming call to attend')
-      return
-    }
-
-    // Clear the timer
-    if (incomingCallTimer) {
-      clearTimeout(incomingCallTimer)
-      setIncomingCallTimer(null)
-    }
-
-    try {
-      setShowPageLoader(true);
-      
-     // console.log(incomingCall, "incomingCall");
-      // Call the attendCall API with the required payload
-      const result = await attendCall({
-        callId: incomingCall.callId,
-        callingAddress: incomingCall.callingAddress,
-        calledAddress: incomingCall.calledAddress,
-        controllerAddress: incomingCall.controllerAddress,
-        controllerDeviceName: incomingCall.controllerDeviceName,
-        controllerDeviceType: incomingCall.controllerDeviceType
-      })
-
-      if (result.success) {
-        setShowPageLoader(false);
-        
-        // Close the incoming call modal
-        setShowIncomingCallModal(false)
-        setIncomingCall(null)
-        
-        // Create a new call entry in activeCalls
-        const newCallId = `incoming_${Date.now()}`
-        const newCall = {
-          id: newCallId,
-          number: incomingCall.callingAddress,
-          status: 'connected',
-          startTime: new Date(),
-          callId: incomingCall.callId,
-          callingAddress: incomingCall.callingAddress,
-          calledAddress: incomingCall.calledAddress,
-          callingDeviceName: incomingCall.controllerDeviceName,
-          callingDeviceType: incomingCall.controllerDeviceType,
-          duration: 0
-        }
-
-        setActiveCalls(prev => {
-          const newMap = new Map(prev)
-          newMap.set(newCallId, newCall)
-          // Save to localStorage after updating
-          setTimeout(() => saveCallStatesToStorage(newMap), 0)
-          return newMap
-        })
-        
-       // toast.success('Call attended successfully')
-      } else {
-        setShowPageLoader(false);
-        console.error('Attend call API error:', result.error)
-        toast.error(`Failed to attend call: ${result.error}`)
-      }
-    } catch (error) {
-      setShowPageLoader(false);
-      console.error('Error calling attend call API:', error)
-      toast.error('Failed to attend call: Network error')
-    }
-  }
-
-  const handleRejectCall = () => {
-    // Clear the timer
-    if (incomingCallTimer) {
-      clearTimeout(incomingCallTimer)
-      setIncomingCallTimer(null)
-    }
-    
-    // Close the incoming call modal without attending
-    setShowIncomingCallModal(false)
-    setIncomingCall(null)
-    toast.info('Call rejected')
-  }
-
     // Event handling for CTI events
   useEffect(() => {
     if (eventLog && eventLog.length > 0) {
@@ -1666,40 +1567,13 @@ const CtiDialer = () => {
         }
       }
       
-      // Handle incoming call events
+      // Handle incoming call events — UI is GlobalFloatingCallBar only; track leg locally for this page.
       if (latestEvent.eventType === 'INCOMING_CALL' && latestEvent.parties) {
         console.log('INCOMING_CALL event received:', latestEvent)
-        
+
         const eventData = latestEvent.parties[0]
-        
-        // Check if this is an incoming call to our user address
+
         if (eventData.calledAddress === userAddress) {
-          // Clear any existing timer
-          if (incomingCallTimer) {
-            clearTimeout(incomingCallTimer)
-          }
-          
-          // Show incoming call modal with attend/reject options
-          setIncomingCall({
-            callId: eventData.callId || `incoming_${Date.now()}`,
-            callingAddress: eventData.callingAddress,
-            calledAddress: eventData.calledAddress,
-            controllerAddress: eventData.controllerAddress || userAddress,
-            controllerDeviceName: eventData.controllerDeviceName || 'WebCTI',
-            controllerDeviceType: eventData.controllerDeviceType || 'SOFT_HARD',
-            startTime: new Date()
-          })
-          setShowIncomingCallModal(true)
-          
-          // Set auto-dismiss timer (30 seconds)
-          const timer = setTimeout(() => {
-            setShowIncomingCallModal(false)
-            setIncomingCall(null)
-          //  toast.info('Incoming call timed out')
-          }, 30000)
-          setIncomingCallTimer(timer)
-          
-          // Also create a call entry for tracking
           const newCallId = createNewCall(eventData, 'ringing')
           if (newCallId) {
             setTimeout(() => {
@@ -1738,38 +1612,7 @@ const CtiDialer = () => {
         // Check if this is an incoming call to our user address
         if (eventData.calledAddress === userAddress) {
           console.log('Incoming RINGING call detected for user:', userAddress)
-          
-          // Clear any existing timer
-          if (incomingCallTimer) {
-            clearTimeout(incomingCallTimer)
-          }
-          
-          // Get device information for user 109 from dnsMap
-          const userDeviceInfo = dnsMap[userAddress]
-          const userDevices = userDeviceInfo ? Object.values(userDeviceInfo.devices || {}) : []
-          const activeUserDevice = userDevices.find(device => device.terminalState === 'REGISTERED')
-          
-          // Show incoming call modal with attend/reject options
-          setIncomingCall({
-            callId: eventData.callId || `incoming_${Date.now()}`,
-            callingAddress: eventData.callingAddress,
-            calledAddress: eventData.calledAddress,
-            controllerAddress: userAddress,
-            controllerDeviceName: activeUserDevice?.deviceName || '',
-            controllerDeviceType: activeUserDevice?.deviceType || '',
-            startTime: new Date()
-          })
-          setShowIncomingCallModal(true)
-          
-          // Set auto-dismiss timer (30 seconds)
-          const timer = setTimeout(() => {
-            setShowIncomingCallModal(false)
-            setIncomingCall(null)
-           // toast.info('Incoming call timed out')
-          }, 30000)
-          setIncomingCallTimer(timer)
-          
-          // Also create a call entry for tracking
+
           const newCallId = createNewCall(eventData, 'ringing')
           if (newCallId) {
             setTimeout(() => {
@@ -1909,32 +1752,10 @@ const CtiDialer = () => {
         hasParties: !!latestEvent.parties,
         isTerminationEvent: ['DISCONNECTED', 'DROPPED', 'ENDED'].includes(latestEvent.eventType)
       })
-      
-      // Check if incoming call was terminated by caller
-      if (['DISCONNECTED', 'DROPPED', 'ENDED'].includes(latestEvent.eventType) && latestEvent.parties && incomingCall) {
-        const eventData = latestEvent.parties[0]
-        if (eventData.callId === incomingCall.callId || 
-            (eventData.callingAddress === incomingCall.callingAddress && eventData.calledAddress === incomingCall.calledAddress)) {
-          console.log('Incoming call terminated by caller')
-          
-          // Clear the timer
-          if (incomingCallTimer) {
-            clearTimeout(incomingCallTimer)
-            setIncomingCallTimer(null)
-          }
-          
-          // Close the incoming call modal
-          setShowIncomingCallModal(false)
-          setIncomingCall(null)
-          
-          //toast.info('Incoming call ended by caller')
-          return
-        }
-      }
-      
+
       if (['DISCONNECTED', 'DROPPED', 'ENDED'].includes(latestEvent.eventType) && latestEvent.parties) {
         const eventData = latestEvent.parties[0]
-        
+
         // Enhanced logging to debug call termination
         console.log(`🔴 ${latestEvent.eventType} event received:`, {
           eventType: latestEvent.eventType,
@@ -2119,15 +1940,6 @@ const CtiDialer = () => {
     localStorage.removeItem('cti_caller_info')
    // console.log('🧹 Cleared stored caller info on page load')
   }, [])
-
-  // Cleanup incoming call timer on unmount
-  useEffect(() => {
-    return () => {
-      if (incomingCallTimer) {
-        clearTimeout(incomingCallTimer)
-      }
-    }
-  }, [incomingCallTimer])
 
   // Note: Call state restoration is disabled - all call states are cleared on page load
 
@@ -3467,121 +3279,6 @@ const CtiDialer = () => {
               >
                 Transfer Call
               </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Incoming Call Modal */}
-      {showIncomingCallModal && incomingCall && (
-        <div className="modal-overlay" style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundColor: 'rgba(0, 0, 0, 0.7)',
-          zIndex: 1060,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center'
-        }}>
-          <div className="modal-content" style={{
-            backgroundColor: 'white',
-            borderRadius: '1rem',
-            padding: '2rem',
-            maxWidth: '400px',
-            width: '90%',
-            textAlign: 'center',
-            boxShadow: '0 10px 30px rgba(0, 0, 0, 0.3)',
-            position: 'relative',
-            //animation: 'pulse 2s infinite'
-          }}>
-            <button
-              onClick={handleRejectCall}
-              disabled={showPageLoader}
-              style={{
-                position: 'absolute',
-                top: '1rem',
-                right: '1rem',
-                background: 'none',
-                border: 'none',
-                cursor: showPageLoader ? 'not-allowed' : 'pointer',
-                padding: '0.5rem',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                opacity: showPageLoader ? 0.5 : 1,
-                transition: 'opacity 0.2s'
-              }}
-              title="Close"
-            >
-              <i className="material-icons-two-tone" style={{ 
-                fontSize: '1.5rem', 
-                color: '#6c757d'
-              }}>
-                close
-              </i>
-            </button>
-            <div className="incoming-call-content">
-              <div className="mb-4">
-                <i className="material-icons-two-tone" style={{ 
-                  fontSize: '4rem', 
-                  color: '#28a745',
-                  animation: 'ring 1s infinite'
-                }}>
-                  call
-                </i>
-              </div>
-              
-              <h4 className="mb-3 text-primary">Incoming Call</h4>
-              
-              <div className="mb-4">
-                <h5 className="mb-2">
-                  <i className="material-icons-two-tone me-2">phone</i>
-                  {incomingCall.callingAddress}
-                </h5>
-                <p className="text-muted mb-0">
-                  Calling to {incomingCall.calledAddress}
-                </p>
-                <small className="text-muted">
-                  Started: {incomingCall.startTime.toLocaleTimeString()}
-                </small>
-              </div>
-              
-              <div className="mb-4">
-                <div className="row g-2">
-                  <div className="col-6">
-                    <Button
-                      variant="success"
-                    
-                      className="w-100 py-3 app-button text-center d-block"
-                      onClick={handleAttendCall}
-                      disabled={showPageLoader || !hasPermission('dial-call-cti')}
-                    >
-                      <i className="material-icons-two-tone me-2" style={{ backgroundColor: '#fff' }}>call</i>
-                      {showPageLoader ? 'Answering...' : 'Answer Call'}
-                    </Button>
-                  </div>
-                  <div className="col-6">
-                    <Button
-                      variant="secondary"
-                      className="w-100 py-3 app-button text-center d-block"
-                      onClick={handleRejectCall}
-                      disabled={showPageLoader}
-                    >
-                      <i className="material-icons-two-tone me-2" style={{ backgroundColor: '#fff' }}>call_end</i>
-                      Ignore Call
-                    </Button>
-                  </div>
-                </div>
-              </div>
-              
-              <div className="small text-muted">
-                <div>Call ID: {incomingCall.callId}</div>
-                <div>Controller: {incomingCall.controllerDeviceName}</div>
-                <div>Device Type: {incomingCall.controllerDeviceType}</div>
-              </div>
             </div>
           </div>
         </div>

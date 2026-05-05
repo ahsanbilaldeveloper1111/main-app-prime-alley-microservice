@@ -1,16 +1,111 @@
 import { NextApiRequest, NextApiResponse } from "next";
 import axios from "axios";
 import formidable from "formidable";
-import { promises as fs } from "fs";
+import { mkdirSync } from "node:fs";
+import { readFile, unlink } from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
 
 const BACKEND_URL =
   process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000/";
 
+/** Isolated temp directory for proxied uploads (not the process cwd or public/). */
+const PROXY_UPLOAD_DIR = path.join(os.tmpdir(), "mainapp-proxy-uploads");
+mkdirSync(PROXY_UPLOAD_DIR, { recursive: true });
+
+/** Lowercase extensions (with dot) permitted through this proxy. */
+const ALLOWED_UPLOAD_EXTENSIONS = new Set([
+  ".pdf",
+  ".doc",
+  ".docx",
+  ".xls",
+  ".xlsx",
+  ".ppt",
+  ".pptx",
+  ".odt",
+  ".ods",
+  ".csv",
+  ".txt",
+  ".rtf",
+  ".json",
+  ".xml",
+  ".png",
+  ".jpg",
+  ".jpeg",
+  ".gif",
+  ".webp",
+  ".svg",
+  ".ico",
+  ".bmp",
+  ".tif",
+  ".tiff",
+  ".heic",
+  ".avif",
+  ".mp3",
+  ".mp4",
+  ".mpeg",
+  ".wav",
+  ".webm",
+  ".ogg",
+  ".m4a",
+  ".aac",
+  ".zip",
+  ".7z",
+  ".gz",
+]);
+
+const ALLOWED_MIME_PREFIXES = [
+  "image/",
+  "audio/",
+  "video/",
+  "text/",
+] as const;
+
+const ALLOWED_MIME_EXACT = new Set<string>([
+  "application/pdf",
+  "application/json",
+  "application/xml",
+  "text/xml",
+  "application/msword",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/vnd.ms-excel",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  "application/vnd.ms-powerpoint",
+  "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  "application/zip",
+  "application/x-zip-compressed",
+  "application/x-7z-compressed",
+]);
+
+function getNormalizedExtension(originalFilename: string | null): string {
+  if (!originalFilename) return "";
+  const base = path.basename(originalFilename);
+  return path.extname(base).toLowerCase();
+}
+
+function isAllowedProxiedUpload(part: formidable.Part): boolean {
+  const mime = part.mimetype;
+  if (!mime) return false;
+
+  const ext = getNormalizedExtension(part.originalFilename);
+
+  if (ext) {
+    return ALLOWED_UPLOAD_EXTENSIONS.has(ext);
+  }
+
+  for (const prefix of ALLOWED_MIME_PREFIXES) {
+    if (mime.startsWith(prefix)) return true;
+  }
+  return ALLOWED_MIME_EXACT.has(mime);
+}
+
 // Custom body parser function for FormData
 const parseFormData = async (req: NextApiRequest) => {
   const form = formidable({
+    uploadDir: PROXY_UPLOAD_DIR,
     keepExtensions: true,
     maxFileSize: 10 * 1024 * 1024, // 10MB
+    filter: isAllowedProxiedUpload,
   });
 
   const [fields, files] = await form.parse(req);
@@ -19,7 +114,6 @@ const parseFormData = async (req: NextApiRequest) => {
   const formData = new FormData();
 
   // Add fields
-  console.log("FIELDS", fields, "files", files);
   Object.entries(fields).forEach(([key, values]) => {
     if (values && Array.isArray(values) && values.length > 0) {
       values.forEach((value) => {
@@ -33,10 +127,10 @@ const parseFormData = async (req: NextApiRequest) => {
     if (fileArray && Array.isArray(fileArray) && fileArray.length > 0) {
       for (const file of fileArray) {
         if (file.filepath && file.mimetype) {
-          //console.log(`Processing file: ${key}, MIME: ${file.mimetype}, Size: ${file.size}`);
+          
 
           // Read file buffer and append with proper MIME type
-          const fileBuffer = await fs.readFile(file.filepath);
+          const fileBuffer = await readFile(file.filepath);
 
           // Create a Blob with the correct MIME type
           // Convert Buffer to Uint8Array for proper Blob compatibility
@@ -48,7 +142,7 @@ const parseFormData = async (req: NextApiRequest) => {
           formData.append(key, blob, file.originalFilename || "file");
 
           // Clean up temporary file
-          await fs.unlink(file.filepath);
+          await unlink(file.filepath);
 
           //console.log(`File ${key} added with MIME type: ${file.mimetype}`);
         }
@@ -89,7 +183,7 @@ const parseJSON = async (req: NextApiRequest) => {
 
 export default async function handler(
   req: NextApiRequest,
-  res: NextApiResponse
+  res: NextApiResponse,
 ) {
   const { path } = req.query;
 
@@ -159,7 +253,6 @@ export default async function handler(
         throw new Error("Failed to parse FormData");
       }
 
-      console.log("=====================");
     } else if (isJSON) {
       // For JSON requests, parse manually
       // console.log('=== JSON DEBUG ===');
@@ -206,8 +299,8 @@ export default async function handler(
       responseType: isAudioDownload
         ? "arraybuffer"
         : req.headers["accept"]?.includes("blob")
-        ? "arraybuffer"
-        : "json",
+          ? "arraybuffer"
+          : "json",
     });
 
     // console.log('Backend response status:', response.status);

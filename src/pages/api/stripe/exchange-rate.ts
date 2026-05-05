@@ -54,18 +54,8 @@ export default async function handler(
     } catch (apiError: any) {
       console.error('Exchange rate API failed:', apiError.message);
       
-      // Optional: Try Stripe FX Quotes API if STRIPE_SECRET_KEY is configured
-      // Note: Stripe FX Quotes may have limited currency pair support
-      if (process.env.STRIPE_SECRET_KEY) {
-        try {
-          // Note: Stripe's FX Quotes API might be accessed differently
-          // For now, we'll rely on the public API which is more reliable for currency conversion
-          console.log('Stripe secret key found, but using public exchange rate API for better currency support');
-        } catch (stripeError) {
-          console.error('Stripe API error:', stripeError);
-        }
-      }
-      
+      // Optional: Stripe FX Quotes API could be wired here when STRIPE_SECRET_KEY is set.
+
       return res.status(500).json({ 
         success: false, 
         error: `Unable to fetch exchange rate: ${apiError.message}` 

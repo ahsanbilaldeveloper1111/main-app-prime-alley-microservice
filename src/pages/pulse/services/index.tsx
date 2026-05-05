@@ -311,7 +311,6 @@ const Services = () => {
     const handleEditSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!editingService) return;
-        console.log("ZE EDITING DEVICE", editingService, formData)
         try {
             await updateService(editingService.id, formData);
             toast.success('Service updated successfully');

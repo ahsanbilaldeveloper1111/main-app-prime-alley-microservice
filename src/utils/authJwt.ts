@@ -9,7 +9,7 @@
  */
 
 import type { JWT } from 'next-auth/jwt';
-import { jwtPayloadStore } from './sessionStore';
+import { JWT_STORED_AT_KEY, jwtPayloadStore } from './sessionStore';
 import { verifySmallPayload } from './smallJwt';
 
 /**
@@ -28,7 +28,10 @@ export async function customJwtDecode(params: {
   if (!payload) return null;
 
   const full = jwtPayloadStore.get(payload.sessionId);
-  if (full) return full as JWT;
+  if (full) {
+    const { [JWT_STORED_AT_KEY]: _ignored, ...tokenFields } = full;
+    return tokenFields as JWT;
+  }
 
   // Store empty (e.g. server restarted, in-memory store cleared): session no longer valid
   return null;

@@ -23,6 +23,8 @@ import {
   bulkAddLocalDNDBlocks,
   LocalDNDBlockRecord,
 } from "@utils/dncr";
+import { usePermissions } from "@utils/permissionUtils";
+import { HEADER_CONSTANTS } from "@constants/headerConstants";
 
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
@@ -42,8 +44,13 @@ type CsvRecordPayload = {
 
 const CALLED_NUMBER_REGEX = /^05\d{8}$/;
 
+/** Strip spaces/dashes; local DND expects 10 digits starting with 05 (e.g. 0501234567). */
+function digitsOnlyCalledNumber(value: string): string {
+  return value.replaceAll(/\D/g, "");
+}
+
 function isValidCalledNumber(value: string): boolean {
-  return CALLED_NUMBER_REGEX.test(value.trim());
+  return CALLED_NUMBER_REGEX.test(digitsOnlyCalledNumber(value));
 }
 
 function getErrorMessage(err: unknown, fallback: string): string {
@@ -54,7 +61,16 @@ function getErrorMessage(err: unknown, fallback: string): string {
   return fallback;
 }
 
+const { PERMISSIONS: P } = HEADER_CONSTANTS;
+const DNCR_PERM_MSG = "You do not have permission for this action.";
+
 const AddRecords = () => {
+    const { hasPermission } = usePermissions();
+    const canAddLocalDnd = hasPermission(P.ADD_LOCAL_DND_BLOCKS_DNCR);
+    const canBulkAddLocalDnd = hasPermission(P.BULK_ADD_LOCAL_DND_BLOCKS_DNCR);
+    const canDeleteLocalDnd = hasPermission(P.DELETE_LOCAL_DND_BLOCKS_DNCR);
+    const canBulkDeleteLocalDnd = hasPermission(P.BULK_DELETE_LOCAL_DND_BLOCKS_DNCR);
+
     const [calledNumber, setCalledNumber] = useState('');
     const [comments, setComments] = useState('');
     const [selectedItems, setSelectedItems] = useState<number[]>([]);
@@ -85,6 +101,27 @@ const AddRecords = () => {
     const [appliedFilters, setAppliedFilters] = useState({
       search: ''
     });
+
+    const resetCsvSelection = useCallback(() => {
+      setCsvFile(null);
+      setCsvPreview("");
+      if (csvInputRef.current) {
+        csvInputRef.current.value = "";
+      }
+    }, []);
+
+    useEffect(() => {
+      if (!canBulkDeleteLocalDnd) {
+        setSelectedItems([]);
+        setShowBulkDeleteModal(false);
+      }
+    }, [canBulkDeleteLocalDnd]);
+
+    useEffect(() => {
+      if (!canBulkAddLocalDnd) {
+        resetCsvSelection();
+      }
+    }, [canBulkAddLocalDnd, resetCsvSelection]);
 
     // Fetch Local DND Blocks data from API
     const fetchData = useCallback(async () => {
@@ -129,32 +166,30 @@ const AddRecords = () => {
       });
     }, [fetchData]);
 
-    const resetCsvSelection = useCallback(() => {
-      setCsvFile(null);
-      setCsvPreview('');
-      if (csvInputRef.current) {
-        csvInputRef.current.value = '';
-      }
-    }, []);
-
     // Add single record
     const handleAddBlock = async (e: React.FormEvent) => {
       e.preventDefault();
+      if (!canAddLocalDnd) {
+        toast.error(DNCR_PERM_MSG);
+        return;
+      }
       if (!calledNumber.trim()) {
         toast.error('Please enter a called number');
         return;
       }
 
-      const trimmedNumber = calledNumber.trim();
-      if (!isValidCalledNumber(trimmedNumber)) {
-        toast.error('Called number must be exactly 10 digits');
+      const normalizedNumber = digitsOnlyCalledNumber(calledNumber);
+      if (!isValidCalledNumber(normalizedNumber)) {
+        toast.error(
+          "Number must be 10 digits starting with 05 (e.g. 0501234567). Spaces and dashes are OK.",
+        );
         return;
       }
 
       setSubmitting(true);
       try {
         const response = await addLocalDNDBlock({
-          called_number: calledNumber.trim(),
+          called_number: normalizedNumber,
           comments: comments.trim() || undefined
         });
 
@@ -182,6 +217,11 @@ const AddRecords = () => {
     const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0];
       if (!file) return;
+      if (!canBulkAddLocalDnd) {
+        toast.error(DNCR_PERM_MSG);
+        e.target.value = "";
+        return;
+      }
 
       // Validate file type
       if (!file.name.toLowerCase().endsWith('.csv')) {
@@ -225,6 +265,10 @@ const AddRecords = () => {
     };
   
     const handleBulkUpload = async () => {
+      if (!canBulkAddLocalDnd) {
+        toast.error(DNCR_PERM_MSG);
+        return;
+      }
       if (!csvFile || !csvPreview) {
         toast.error('Please select a CSV file');
         return;
@@ -247,13 +291,14 @@ const AddRecords = () => {
           const values = line.split(',').map((v) => v.trim());
           const calledNum = values[0];
           if (!calledNum) continue;
-          if (!isValidCalledNumber(calledNum)) {
-            toast.error(`Invalid called number in CSV: ${calledNum}`);
+          const normalizedCsvNumber = digitsOnlyCalledNumber(calledNum);
+          if (!isValidCalledNumber(normalizedCsvNumber)) {
+            toast.error(`Invalid called number in CSV: ${calledNum}. Must be 10 digits starting with 05.`);
             resetCsvSelection();
             return;
           }
           records.push({
-            called_number: calledNum,
+            called_number: normalizedCsvNumber,
             comments: values[1] || '',
           });
         }
@@ -289,12 +334,20 @@ const AddRecords = () => {
   
     // Handle delete single record
     const handleDeleteClick = (record: LocalDNDBlockRecord) => {
+      if (!canDeleteLocalDnd) {
+        toast.error(DNCR_PERM_MSG);
+        return;
+      }
       setRecordToDelete(record);
       setShowDeleteModal(true);
     };
 
     const handleConfirmDelete = async () => {
       if (!recordToDelete) return;
+      if (!canDeleteLocalDnd) {
+        toast.error(DNCR_PERM_MSG);
+        return;
+      }
 
       setDeleting(true);
       try {
@@ -319,6 +372,10 @@ const AddRecords = () => {
   
     // Handle bulk delete
     const handleBulkDeleteClick = () => {
+      if (!canBulkDeleteLocalDnd) {
+        toast.error(DNCR_PERM_MSG);
+        return;
+      }
       if (selectedItems.length === 0) {
         toast.warn('Please select at least one record to delete');
         return;
@@ -328,6 +385,10 @@ const AddRecords = () => {
 
     const handleConfirmBulkDelete = async () => {
       if (selectedItems.length === 0) return;
+      if (!canBulkDeleteLocalDnd) {
+        toast.error(DNCR_PERM_MSG);
+        return;
+      }
 
       setDeleting(true);
       try {
@@ -412,7 +473,7 @@ const AddRecords = () => {
       showMoreFiltersButton: false,
       customActions: (
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          {selectedItems.length > 0 && (
+          {canBulkDeleteLocalDnd && selectedItems.length > 0 && (
             <Button
               variant="danger"
               size="sm"
@@ -485,15 +546,17 @@ const AddRecords = () => {
       },
     ];
 
-    const actions: TableAction<LocalDNDBlockRecord>[] = [
-      {
-        label: 'Delete',
-        icon: <Trash2 size={16} />,
-        onClick: (row) => handleDeleteClick(row),
-        variant: 'link',
-        className: 'text-danger',
-      },
-    ];
+    const actions: TableAction<LocalDNDBlockRecord>[] = canDeleteLocalDnd
+      ? [
+          {
+            label: 'Delete',
+            icon: <Trash2 size={16} />,
+            onClick: (row) => handleDeleteClick(row),
+            variant: 'link',
+            className: 'text-danger',
+          },
+        ]
+      : [];
 
   return (
     <React.Fragment>
@@ -509,10 +572,11 @@ const AddRecords = () => {
           </p>
         </div>
 
-        {/* Add Records Section */}
+        {(canAddLocalDnd || canBulkAddLocalDnd) && (
         <Row className="g-3 mb-4">
           {/* Add Single Record */}
-          <Col lg={6}>
+          {canAddLocalDnd && (
+          <Col lg={canBulkAddLocalDnd ? 6 : 12}>
             <Card className="border" style={{ height: '100%', backgroundColor: '#ffffff', borderRadius: '12px', borderColor: '#dee2e6' }}>
               <Card.Body className="p-3">
                 <h6 className="mb-3" style={{ color: '#212529', fontWeight: '600', fontSize: '1rem' }}>
@@ -577,9 +641,11 @@ const AddRecords = () => {
               </Card.Body>
             </Card>
           </Col>
+          )}
 
           {/* Bulk Add Records */}
-          <Col lg={6}>
+          {canBulkAddLocalDnd && (
+          <Col lg={canAddLocalDnd ? 6 : 12}>
             <Card className="border" style={{ height: '100%', backgroundColor: '#ffffff', borderRadius: '12px', borderColor: '#dee2e6' }}>
               <Card.Body className="p-3">
                 <h6 className="mb-3" style={{ color: '#212529', fontWeight: '600', fontSize: '1rem' }}>
@@ -668,7 +734,9 @@ const AddRecords = () => {
               </Card.Body>
             </Card>
           </Col>
+          )}
         </Row>
+        )}
 
         <div className="mb-2" style={{ color: '#212529', fontWeight: '600' }}>
           Blocked Numbers List
@@ -678,13 +746,13 @@ const AddRecords = () => {
           data={apiData}
           columns={columns}
           actions={actions}
-          showActions={true}
+          showActions={canDeleteLocalDnd}
           actionsLabel="ACTIONS"
           loading={loading}
           loadingMessage="Loading..."
           emptyMessage={error || 'No records found matching your filters'}
           uniqueKey="id"
-          selectable={true}
+          selectable={canBulkDeleteLocalDnd}
           selectedRows={selectedRows}
           onSelectionChange={(rows) => setSelectedItems(rows.map((row) => row.id))}
           showToolbar={true}

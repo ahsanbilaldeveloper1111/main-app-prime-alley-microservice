@@ -247,3 +247,24 @@ export function dispatchPrimaryCtiSsePayload(
     handler(data, ctx);
   }
 }
+
+export type PrimarySseDispatchCtxFactoryArgs = Omit<
+  PrimarySseDispatchCtx,
+  "getInstanceId" | "attemptReconnection"
+> & {
+  instanceIdRef: { current: string };
+  runAttemptReconnection: () => void | Promise<void>;
+};
+
+export function buildPrimarySseDispatchCtx(
+  args: PrimarySseDispatchCtxFactoryArgs,
+): PrimarySseDispatchCtx {
+  const { instanceIdRef, runAttemptReconnection, ...ctxBase } = args;
+  return {
+    ...ctxBase,
+    getInstanceId: () => instanceIdRef.current,
+    attemptReconnection: () => {
+      void runAttemptReconnection();
+    },
+  } as PrimarySseDispatchCtx;
+}

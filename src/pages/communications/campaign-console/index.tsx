@@ -56,7 +56,7 @@ import { LineChart, Line, ResponsiveContainer, AreaChart, Area } from 'recharts'
 
 import CallWidget from '../campaign-partials/CallWidget';
 import WrapUpModal from '../campaign-partials/WrapUp';
-import TopBar from '../campaign-partials/TopBarAgent';
+import TopBar, { type TeamOption } from '../campaign-partials/TopBarAgent';
 import FinesseAuthGate from '../campaign-partials/FinesseAuthGate';
 import { toast } from 'react-toastify';
 import {
@@ -84,86 +84,22 @@ import { useFinesseCampaignPreview } from '@hooks/live-calls/useFinesseCampaignP
 import { HEADER_CONSTANTS } from "@constants/headerConstants";
 import { usePermissions } from "@utils/permissionUtils";
 
-import "@assets/scss/common.scss";
-import "@assets/scss/tabs.scss";
-import PageHeader from "@components/PageHeader";
+import {
+  formatFinesseStateDuration,
+  getCampaignAgentStateColor,
+  mapEffectiveFinesseStateToTopBarReadyToggle,
+} from '../campaign-shared/finesseAgentDisplay';
+import type {
+  CampaignConsoleActionMenuPortalState,
+  CampaignConsoleDisplayAgent,
+  CampaignConsoleTeamApiResponse,
+  CampaignConsoleTeamUser,
+} from '../campaign-shared/campaignConsoleTypes';
 
-type TeamOption = { id: number; name: string };
-
-type TeamUser = {
-  loginId: string;
-  firstName?: string;
-  lastName?: string;
-  extension?: string;
-  state?: string;
-  stateChangeTime?: string;
-  reasonCode?: { label?: string };
-  uri?: string;
-  dialogsUri?: string;
-  mediaType?: number;
-  pendingState?: string;
-  wrapUpTimer?: number;
-};
-
-type TeamApiResponse = {
-  status?: string;
-  statusCode?: string;
-  responseData?: {
-    id?: number;
-    name?: string;
-    uri?: string;
-    users?: TeamUser[];
-  };
-};
-
-type DisplayAgent = {
-  id: string;
-  loginId: string;
-  name: string;
-  state: string;
-  stateColor: string;
-  timeInState: string;
-  extension: string;
-  label?: string;
-};
-
-/** TopBar only toggles READY / NOT_READY; map any other Finesse state to NOT_READY. */
-function mapEffectiveFinesseStateToTopBarReadyToggle(
-  raw: string | undefined,
-): 'READY' | 'NOT_READY' {
-  const u = (raw ?? '').trim().toUpperCase();
-  if (u === 'READY') return 'READY';
-  return 'NOT_READY';
-}
-
-/** Fixed menu in a portal; avoids table/overflow clipping and row paint order. */
-type ActionMenuPortalState = {
-  agent: DisplayAgent;
-  top: number;
-  left: number;
-  maxHeight: number;
-};
-
-const getStateColor = (state: string): string => {
-  if (state === 'READY' || state === 'LOGIN') return '#10b981';
-  if (state === 'NOT_READY') return '#ef4444';
-  return '#6b7280';
-};
-
-const formatDuration = (stateChangeTime?: string): string => {
-  if (!stateChangeTime) return '00:00:00';
-  try {
-    const then = new Date(stateChangeTime).getTime();
-    const diffMs = Date.now() - then;
-    const totalSec = Math.max(0, Math.floor(diffMs / 1000));
-    const h = Math.floor(totalSec / 3600);
-    const m = Math.floor((totalSec % 3600) / 60);
-    const s = totalSec % 60;
-    return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
-  } catch {
-    return '00:00:00';
-  }
-};
+type TeamUser = CampaignConsoleTeamUser;
+type TeamApiResponse = CampaignConsoleTeamApiResponse;
+type DisplayAgent = CampaignConsoleDisplayAgent;
+type ActionMenuPortalState = CampaignConsoleActionMenuPortalState;
 
 const { PERMISSIONS } = HEADER_CONSTANTS;
 
@@ -539,8 +475,10 @@ const LiveCallsAgentsManagement = () => {
         loginId: u.loginId,
         name: [u.firstName, u.lastName].filter(Boolean).join(' ').trim() || u.loginId,
         state: u.state ?? 'UNKNOWN',
-        stateColor: getStateColor(u.state ?? ''),
-        timeInState: formatDuration(u.stateChangeTime),
+        stateColor: getCampaignAgentStateColor(u.state ?? "", {
+          treatLoginAsReady: true,
+        }),
+        timeInState: formatFinesseStateDuration(u.stateChangeTime),
         extension: u.extension ?? '—'
       }));
 

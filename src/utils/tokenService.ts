@@ -208,7 +208,6 @@ class TokenService {
 
       const data = response.data;
 
-        console.log("ZEZEZE REFRESH DATA a", data);
         if (data.code === 200 && data.data?.access_token) {
           const now = Date.now();
           const newTokens: Partial<TokenData> = {
@@ -290,19 +289,16 @@ class TokenService {
     
     // Clear existing timers
     if (this.timers.sessionTimer) {
-      console.log('⚠️ Clearing existing session timer 1');
       clearTimeout(this.timers.sessionTimer);
       this.timers.sessionTimer = null;
     }
     if (this.timers.refreshTimer) {
-      console.log('⚠️ Clearing existing refresh timer 2');
       clearTimeout(this.timers.refreshTimer);
       this.timers.refreshTimer = null;
     }
 
     const tokens = this.getTokens();
     if (!tokens) {
-      console.log('❌ No tokens found, cannot setup refresh timers');
       return;
     }
 
@@ -311,14 +307,12 @@ class TokenService {
     // Setup access token refresh timer (refresh slightly before expiry)
     const sessionTimeUntilRefresh = Math.max(0, (tokens.accessTokenExpires - now) - this.REFRESH_BUFFER);
     this.timers.sessionTimer = setTimeout(async () => {
-      console.log('Step 1');
       await this.refreshToken(false);
     }, sessionTimeUntilRefresh);
 
     // Setup refresh token refresh timer (refresh slightly before expiry)
     const refreshTimeUntilRefresh = Math.max(0, (tokens.refreshTokenExpires - now) - this.REFRESH_BUFFER);
     this.timers.refreshTimer = setTimeout(async () => {
-      console.log('Step 2');
       await this.refreshToken(true);
     }, refreshTimeUntilRefresh);
 

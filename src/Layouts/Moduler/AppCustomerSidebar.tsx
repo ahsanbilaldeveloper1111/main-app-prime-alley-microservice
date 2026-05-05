@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useAppDispatch, useAppSelector } from '../../toolkit/hooks';
+import { setSidebarOpen, toggleSidebarExpanded } from '../../toolkit/layoutUi/slice';
 import {
   LayoutDashboard,
   Users,
@@ -364,25 +366,13 @@ function useSyncActiveModuleFromRoute(
   }, [pathname, menuItems, setActiveModule, setExpandedSubModules]);
 }
 
-interface SidebarProps {
-  sidebarOpen: boolean;
-  setSidebarOpen: (open: boolean) => void;
-  /** When provided, sidebar expand/collapse is controlled by parent (e.g. for topbar alignment) */
-  isSidebarExpanded?: boolean;
-  setSidebarExpanded?: (expanded: boolean) => void;
-}
-
-const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({ 
-  sidebarOpen, 
-  setSidebarOpen,
-  isSidebarExpanded: controlledExpanded,
-  setSidebarExpanded: setControlledExpanded,
-}) => {
-  const { data: session, status } = useSession();
-  const [internalExpanded, setInternalExpanded] = useState(false);
-  const isSidebarExpanded = controlledExpanded ?? internalExpanded;
-  const setIsSidebarExpanded = setControlledExpanded ?? setInternalExpanded;
+const ApplicationCustomerSidebar: React.FC = () => {
+  const dispatch = useAppDispatch();
+  const sidebarOpen = useAppSelector((s) => s.layoutUi.sidebarOpen);
+  const isSidebarExpanded = useAppSelector((s) => s.layoutUi.isSidebarExpanded);
+  const setSidebarOpenState = (open: boolean) => dispatch(setSidebarOpen(open));
   const router = useRouter();
+  const { data: session, status } = useSession();
   const [activeModule, setActiveModule] = useState<string | null>(null);
   const [expandedSubModules, setExpandedSubModules] = useState<string[]>([]);
   const [hoveredModuleId, setHoveredModuleId] = useState<string | null>(null);
@@ -1169,12 +1159,12 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
 
   const closeSidebarOnMobile = () => {
     const w = globalThis.window?.innerWidth;
-    if (w != null && w < 1200) setSidebarOpen(false);
+    if (w != null && w < 1200) setSidebarOpenState(false);
   };
 
   const closeSubmenuAndSidebarOnMobile = () => {
     if ((globalThis.window?.innerWidth ?? 0) < 1200) {
-      setSidebarOpen(false);
+      setSidebarOpenState(false);
       setActiveModule(null);
     }
   };
@@ -1271,7 +1261,7 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
     setHoveredModuleId(null);
     setHoveredItemRect(null);
     setIsFlyoutPinned(false);
-    if ((globalThis.window?.innerWidth ?? 0) < 1200) setSidebarOpen(false);
+    if ((globalThis.window?.innerWidth ?? 0) < 1200) setSidebarOpenState(false);
   };
 
   const isSidebarCollapsed = !isSidebarExpanded;
@@ -1353,7 +1343,7 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
         type="button"
         className={`sidebar-backdrop `}
         onClick={() => {
-          setSidebarOpen(false);
+          setSidebarOpenState(false);
           setActiveModule(null);
           if (isFlyoutPinned) {
             setHoveredModuleId(null);
@@ -1364,7 +1354,7 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
         onKeyDown={(e) => {
           if (e.key === 'Enter' || e.key === ' ') {
             e.preventDefault();
-            setSidebarOpen(false);
+            setSidebarOpenState(false);
             setActiveModule(null);
             if (isFlyoutPinned) {
               setHoveredModuleId(null);
@@ -1416,7 +1406,7 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
         <div className="sidebar-footer">
           <button 
             className="expand-toggle-btn"
-            onClick={() => setIsSidebarExpanded(!isSidebarExpanded)}
+            onClick={() => dispatch(toggleSidebarExpanded())}
           >
             {isSidebarExpanded ? <ChevronLeft size={20} /> : <ChevronRight size={20} />}
           </button>

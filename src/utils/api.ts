@@ -77,8 +77,7 @@ apiClient.interceptors.response.use(
       // Handle forbidden
       console.error('Access forbidden');
     } else if (error.response?.status >= 500) {
-      // Handle server errors
-      console.error('Server error:', error.response?.data);
+      console.error('Server error:', error.response?.status);
     }
     
     return Promise.reject(error);
@@ -153,7 +152,6 @@ export const authAPI = {
 
           const refreshTokenValue = response.data.data.refresh_token;
           const isEmptyObject = refreshTokenValue && typeof refreshTokenValue === 'object' && Object.keys(refreshTokenValue).length === 0;
-          console.log("ZEZEZE REFRESH TOKEN VALUE", refreshTokenValue);
           if (typeof refreshTokenValue === 'string' && refreshTokenValue.length > 0) {
             // New format: refresh_token is a direct string
             newRefreshToken = refreshTokenValue;
@@ -209,7 +207,6 @@ export const authAPI = {
       // If refresh fails, clear tokens and redirect to login
       if (typeof window !== 'undefined') {
         // Best-effort: clear server-side NextAuth session payload before wiping cookies
-        console.log("yyyyyyyyyyyy");
         fetch('/api/auth/logout', { method: 'POST', credentials: 'include' }).catch(() => {});
         sessionStorage.clear();
         clearAllLocalStorage();
