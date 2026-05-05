@@ -131,7 +131,7 @@ interface CreateTaskSidebarProps {
    */
   taskEditScope?: PlannerTaskEditScope;
   /**
-   * When opening edit for a todo or regular task, seed the form as recurring so the user can save a conversion in one step.
+   * When opening edit for a to-do or regular task, seed the form as recurring so the user can save a conversion in one step.
    */
   openAsRecurringConversion?: boolean;
 }
@@ -1162,6 +1162,82 @@ function PlannerSidebarCreateAndOpenButton({
   );
 }
 
+function PlannerSidebarFooter({
+  isEdit,
+  isSubmitting,
+  onClose,
+  onCreateAndOpen,
+  onCreate,
+  onCreateAndOpenSubmit,
+}: Readonly<{
+  isEdit: boolean;
+  isSubmitting: boolean;
+  onClose?: () => void;
+  onCreateAndOpen?: (data: CreateTaskFormData) => void;
+  onCreate: () => void;
+  onCreateAndOpenSubmit: (e: React.MouseEvent<HTMLButtonElement>) => void;
+}>): React.ReactNode {
+  return (
+    <div
+      className="create-task-sidebar-footer"
+      style={{
+        padding: "16px 24px 20px",
+        display: "flex",
+        gap: 10,
+        justifyContent: "flex-end",
+        flexShrink: 0,
+        alignItems: "center",
+      }}
+    >
+      <button
+        type="button"
+        onClick={onClose}
+        style={{
+          padding: "10px 22px",
+          fontSize: 14,
+          fontWeight: 600,
+          border: `1px solid ${PLANNER_TASK_SIDEBAR.border}`,
+          borderRadius: 10,
+          background: PLANNER_TASK_SIDEBAR.surface,
+          color: PLANNER_TASK_SIDEBAR.text,
+          cursor: "pointer",
+          transition: "background 0.15s ease, border-color 0.15s ease",
+        }}
+      >
+        Cancel
+      </button>
+      <PlannerSidebarCreateAndOpenButton
+        isEdit={isEdit}
+        isSubmitting={isSubmitting}
+        onCreateAndOpen={onCreateAndOpen}
+        onSubmit={onCreateAndOpenSubmit}
+      />
+      <button
+        type="button"
+        onClick={onCreate}
+        disabled={isSubmitting}
+        style={{
+          padding: "10px 24px",
+          fontSize: 14,
+          fontWeight: 600,
+          ...(isSubmitting
+            ? { backgroundColor: "#94a3b8" }
+            : {
+                backgroundImage: `linear-gradient(135deg, ${PLANNER_TASK_SIDEBAR.accent} 0%, #4338ca 100%)`,
+              }),
+          border: "none",
+          borderRadius: 10,
+          color: "#fff",
+          cursor: isSubmitting ? "not-allowed" : "pointer",
+          boxShadow: isSubmitting ? "none" : "0 4px 14px rgba(79, 70, 229, 0.35)",
+        }}
+      >
+        {primarySubmitButtonLabel(isSubmitting, isEdit)}
+      </button>
+    </div>
+  );
+}
+
 function PlannerSidebarRecurringRunAtReadOnlyRow({
   visible,
   editTask,
@@ -2084,6 +2160,65 @@ function applyOpenAsRecurringConversionToInitialForm(
   };
 }
 
+type PlannerSidebarPayload = ReturnType<typeof buildPlannerSidebarPayloadRecord>;
+
+async function submitPlannerSidebarTask(params: {
+  e?: React.MouseEvent;
+  isSubmitting: boolean;
+  validateBeforeSubmit: () => boolean;
+  setIsSubmitting: (value: boolean) => void;
+  buildPayload: () => PlannerSidebarPayload;
+  persistTaskFromPayload: (payload: PlannerSidebarPayload) => Promise<boolean>;
+  onSuccess?: (data: CreateTaskFormData) => void;
+  formData: CreateTaskFormData;
+  onClose?: () => void;
+  isEdit: boolean;
+}): Promise<void> {
+  const {
+    e,
+    isSubmitting,
+    validateBeforeSubmit,
+    setIsSubmitting,
+    buildPayload,
+    persistTaskFromPayload,
+    onSuccess,
+    formData,
+    onClose,
+    isEdit,
+  } = params;
+
+  e?.preventDefault();
+  e?.stopPropagation();
+  if (isSubmitting) return;
+  if (!validateBeforeSubmit()) return;
+
+  setIsSubmitting(true);
+  try {
+    const payload = buildPayload();
+    const ok = await persistTaskFromPayload(payload);
+    if (ok) {
+      onSuccess?.(formData);
+      onClose?.();
+    }
+  } catch (error) {
+    console.error(`Error ${isEdit ? "updating" : "creating"} task:`, error);
+  } finally {
+    setIsSubmitting(false);
+  }
+}
+
+function computePlannerSidebarStartDateChange(
+  prev: CreateTaskFormData,
+  newStart: string,
+): CreateTaskFormData {
+  if (prev.taskType === "recurring") {
+    return { ...prev, startDate: newStart };
+  }
+  const minDue = minDueDateFromTodayAndStart(newStart);
+  const nextDue = clampDueDateToMin(prev.dueDate, minDue);
+  return { ...prev, startDate: newStart, dueDate: nextDue };
+}
+
 function emptyPlannerSidebarFormWhenClosed(
   propProject: Project | undefined,
   selectedStatusForTask: number | null,
@@ -2677,28 +2812,19 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
   const submitPlannerTask = async (
     e: React.MouseEvent | undefined,
     onSuccess: ((data: CreateTaskFormData) => void) | undefined,
-  ) => {
-    if (e) {
-      e.preventDefault();
-      e.stopPropagation();
-    }
-    if (isSubmitting) return;
-    if (!validateBeforeSubmit()) return;
-
-    setIsSubmitting(true);
-    try {
-      const payload = buildPayload();
-      const ok = await persistTaskFromPayload(payload);
-      if (ok) {
-        onSuccess?.(formData);
-        onClose?.();
-      }
-    } catch (error) {
-      console.error(`Error ${isEdit ? "updating" : "creating"} task:`, error);
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
+  ) =>
+    submitPlannerSidebarTask({
+      e,
+      onSuccess,
+      isSubmitting,
+      validateBeforeSubmit,
+      setIsSubmitting,
+      buildPayload,
+      persistTaskFromPayload,
+      formData,
+      onClose,
+      isEdit,
+    });
 
   const handleCreate = async (e?: React.MouseEvent) => {
     await submitPlannerTask(e, onCreate);
@@ -2757,14 +2883,7 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
   const handleStartDateInputChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
       const newStart = e.target.value;
-      setFormData((prev) => {
-        if (prev.taskType === "recurring") {
-          return { ...prev, startDate: newStart };
-        }
-        const minDue = minDueDateFromTodayAndStart(newStart);
-        const nextDue = clampDueDateToMin(prev.dueDate, minDue);
-        return { ...prev, startDate: newStart, dueDate: nextDue };
-      });
+      setFormData((prev) => computePlannerSidebarStartDateChange(prev, newStart));
     },
     [],
   );
@@ -4132,69 +4251,16 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
           />
         </div>
 
-        {/* Footer */}
-        <div
-          className="create-task-sidebar-footer"
-          style={{
-            padding: "16px 24px 20px",
-            display: "flex",
-            gap: 10,
-            justifyContent: "flex-end",
-            flexShrink: 0,
-            alignItems: "center",
+        <PlannerSidebarFooter
+          isEdit={isEdit}
+          isSubmitting={isSubmitting}
+          onClose={onClose}
+          onCreateAndOpen={onCreateAndOpen}
+          onCreate={handleCreate}
+          onCreateAndOpenSubmit={(e) => {
+            void submitPlannerTask(e, onCreateAndOpen).catch(() => undefined);
           }}
-        >
-          <button
-            type="button"
-            onClick={onClose}
-            style={{
-              padding: "10px 22px",
-              fontSize: 14,
-              fontWeight: 600,
-              border: `1px solid ${PLANNER_TASK_SIDEBAR.border}`,
-              borderRadius: 10,
-              background: PLANNER_TASK_SIDEBAR.surface,
-              color: PLANNER_TASK_SIDEBAR.text,
-              cursor: "pointer",
-              transition: "background 0.15s ease, border-color 0.15s ease",
-            }}
-          >
-            Cancel
-          </button>
-          <PlannerSidebarCreateAndOpenButton
-            isEdit={isEdit}
-            isSubmitting={isSubmitting}
-            onCreateAndOpen={onCreateAndOpen}
-            onSubmit={(e) => {
-              if (onCreateAndOpen == null) return;
-              void submitPlannerTask(e, onCreateAndOpen).catch(() => undefined);
-            }}
-          />
-          <button
-            type="button"
-            onClick={() => handleCreate()}
-            disabled={isSubmitting}
-            style={{
-              padding: "10px 24px",
-              fontSize: 14,
-              fontWeight: 600,
-              ...(isSubmitting
-                ? { backgroundColor: "#94a3b8" }
-                : {
-                    backgroundImage: `linear-gradient(135deg, ${PLANNER_TASK_SIDEBAR.accent} 0%, #4338ca 100%)`,
-                  }),
-              border: "none",
-              borderRadius: 10,
-              color: "#fff",
-              cursor: isSubmitting ? "not-allowed" : "pointer",
-              boxShadow: isSubmitting
-                ? "none"
-                : "0 4px 14px rgba(79, 70, 229, 0.35)",
-            }}
-          >
-            {primarySubmitButtonLabel(isSubmitting, isEdit)}
-          </button>
-        </div>
+        />
       </div>
     </>
   );
