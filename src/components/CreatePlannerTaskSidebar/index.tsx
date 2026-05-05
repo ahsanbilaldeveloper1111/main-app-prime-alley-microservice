@@ -1064,16 +1064,13 @@ function mapListStatusesResponseToSidebarStatuses(response: unknown): Status[] {
 }
 
 function getSidebarTitle(taskType: PlannerTaskTypeOrUnset, isEdit: boolean): string {
-  if (taskType === "") {
-    return isEdit ? "Edit Task" : "Create Task";
-  }
-  if (taskType === "todo") {
-    return isEdit ? "Edit Todo" : "Create Todo";
-  }
-  if (taskType === "recurring") {
-    return isEdit ? "Edit Recurring" : "Create Recurring";
-  }
-  return isEdit ? "Edit Task" : "Create Task";
+  const defaultLabel = isEdit ? "Edit Task" : "Create Task";
+  const typeLabelMap: Partial<Record<PlannerTaskType, string>> = {
+    todo: isEdit ? "Edit Todo" : "Create Todo",
+    recurring: isEdit ? "Edit Recurring" : "Create Recurring",
+  };
+  if (taskType === "") return defaultLabel;
+  return typeLabelMap[taskType] ?? defaultLabel;
 }
 
 function linkedRecordsEmptyMessage(hasSearchQuery: boolean): string {
