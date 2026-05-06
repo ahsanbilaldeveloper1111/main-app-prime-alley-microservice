@@ -23,6 +23,96 @@ export type PlannerTaskFilterPill = Readonly<{
 
 type Option = Readonly<{ value: string; label: string }>;
 
+function nextAssigneeListAfterToggle(
+  prev: PlannerTasksFilterFormState,
+  optionValue: string,
+  isCurrentlySelected: boolean,
+): PlannerTasksFilterFormState {
+  let nextAssignees: string[];
+  if (isCurrentlySelected) {
+    const index = prev.assignee.indexOf(optionValue);
+    nextAssignees =
+      index === -1
+        ? prev.assignee
+        : [...prev.assignee.slice(0, index), ...prev.assignee.slice(index + 1)];
+  } else {
+    nextAssignees = [...prev.assignee, optionValue];
+  }
+  return { ...prev, assignee: nextAssignees };
+}
+
+function assigneeQuickOptionUpdater(
+  optionValue: string,
+  isCurrentlySelected: boolean,
+): React.SetStateAction<PlannerTasksFilterFormState> {
+  return (prev) => nextAssigneeListAfterToggle(prev, optionValue, isCurrentlySelected);
+}
+
+function quickFilterStatusUpdater(
+  value: string,
+): React.SetStateAction<PlannerTasksFilterFormState> {
+  return (prev) => ({ ...prev, status: value });
+}
+
+function quickFilterTaskTypeUpdater(
+  option: Option,
+): React.SetStateAction<PlannerTasksFilterFormState> {
+  return (prev) => ({
+    ...prev,
+    task_type: { value: option.value, label: option.label },
+  });
+}
+
+function quickFilterPriorityUpdater(
+  option: Option,
+): React.SetStateAction<PlannerTasksFilterFormState> {
+  return (prev) => ({
+    ...prev,
+    priority: { value: option.value, label: option.label },
+  });
+}
+
+function quickFilterProjectUpdater(
+  value: string,
+): React.SetStateAction<PlannerTasksFilterFormState> {
+  return (prev) => ({ ...prev, project: value });
+}
+
+function clearAssigneesUpdater(): React.SetStateAction<PlannerTasksFilterFormState> {
+  return (prev) => ({ ...prev, assignee: [] });
+}
+
+function clearTaskTypeQuickFilterUpdater(): React.SetStateAction<PlannerTasksFilterFormState> {
+  return (prev) => ({ ...prev, task_type: null });
+}
+
+function clearPriorityQuickFilterUpdater(): React.SetStateAction<PlannerTasksFilterFormState> {
+  return (prev) => ({ ...prev, priority: null });
+}
+
+function dueDateTodayUpdater(today: string): React.SetStateAction<PlannerTasksFilterFormState> {
+  return (prev) => ({ ...prev, due_date_from: today, due_date_to: today });
+}
+
+function dueDateRangeUpdater(
+  from: string,
+  to: string,
+): React.SetStateAction<PlannerTasksFilterFormState> {
+  return (prev) => ({ ...prev, due_date_from: from, due_date_to: to });
+}
+
+function clearDueDatesUpdater(): React.SetStateAction<PlannerTasksFilterFormState> {
+  return (prev) => ({ ...prev, due_date_from: "", due_date_to: "" });
+}
+
+function dueDateFromFieldUpdater(value: string): React.SetStateAction<PlannerTasksFilterFormState> {
+  return (prev) => ({ ...prev, due_date_from: value });
+}
+
+function dueDateToFieldUpdater(value: string): React.SetStateAction<PlannerTasksFilterFormState> {
+  return (prev) => ({ ...prev, due_date_to: value });
+}
+
 function QuickOptionButton({
   selected,
   onClick,
@@ -89,7 +179,7 @@ export function PlannerTasksQuickFiltersRow({
                       key={option.value}
                       selected={option.value === fForm.project}
                       onClick={() => {
-                        setFForm((prev) => ({ ...prev, project: option.value }));
+                        setFForm(quickFilterProjectUpdater(option.value));
                         setOpenQuickFilter(null);
                       }}
                     >
@@ -103,7 +193,7 @@ export function PlannerTasksQuickFiltersRow({
                   <QuickOptionButton
                     selected={fForm.assignee.length === 0}
                     onClick={() => {
-                      setFForm((prev) => ({ ...prev, assignee: [] }));
+                      setFForm(clearAssigneesUpdater());
                       setOpenQuickFilter(null);
                     }}
                   >
@@ -116,22 +206,8 @@ export function PlannerTasksQuickFiltersRow({
                         key={option.value}
                         selected={selected}
                         onClick={() => {
-                          setFForm((prev) => {
-                            let nextAssignees: string[];
-                            if (selected) {
-                              const index = prev.assignee.indexOf(option.value);
-                              nextAssignees =
-                                index === -1
-                                  ? prev.assignee
-                                  : [
-                                      ...prev.assignee.slice(0, index),
-                                      ...prev.assignee.slice(index + 1),
-                                    ];
-                            } else {
-                              nextAssignees = [...prev.assignee, option.value];
-                            }
-                            return { ...prev, assignee: nextAssignees };
-                          });
+                          setFForm(assigneeQuickOptionUpdater(option.value, selected));
+                          setOpenQuickFilter(null);
                         }}
                       >
                         {option.label}
@@ -145,7 +221,7 @@ export function PlannerTasksQuickFiltersRow({
                   <QuickOptionButton
                     selected={!fForm.task_type}
                     onClick={() => {
-                      setFForm((prev) => ({ ...prev, task_type: null }));
+                      setFForm(clearTaskTypeQuickFilterUpdater());
                       setOpenQuickFilter(null);
                     }}
                   >
@@ -158,10 +234,7 @@ export function PlannerTasksQuickFiltersRow({
                         key={option.value}
                         selected={selected}
                         onClick={() => {
-                          setFForm((prev) => ({
-                            ...prev,
-                            task_type: { value: option.value, label: option.label },
-                          }));
+                          setFForm(quickFilterTaskTypeUpdater(option));
                           setOpenQuickFilter(null);
                         }}
                       >
@@ -178,7 +251,7 @@ export function PlannerTasksQuickFiltersRow({
                       key={option.value}
                       selected={option.value === fForm.status}
                       onClick={() => {
-                        setFForm((prev) => ({ ...prev, status: option.value }));
+                        setFForm(quickFilterStatusUpdater(option.value));
                         setOpenQuickFilter(null);
                       }}
                     >
@@ -192,7 +265,7 @@ export function PlannerTasksQuickFiltersRow({
                   <QuickOptionButton
                     selected={!fForm.priority}
                     onClick={() => {
-                      setFForm((prev) => ({ ...prev, priority: null }));
+                      setFForm(clearPriorityQuickFilterUpdater());
                       setOpenQuickFilter(null);
                     }}
                   >
@@ -205,10 +278,7 @@ export function PlannerTasksQuickFiltersRow({
                         key={option.value}
                         selected={selected}
                         onClick={() => {
-                          setFForm((prev) => ({
-                            ...prev,
-                            priority: { value: option.value, label: option.label },
-                          }));
+                          setFForm(quickFilterPriorityUpdater(option));
                           setOpenQuickFilter(null);
                         }}
                       >
@@ -224,11 +294,7 @@ export function PlannerTasksQuickFiltersRow({
                     selected={false}
                     onClick={() => {
                       const today = moment().format("YYYY-MM-DD");
-                      setFForm((prev) => ({
-                        ...prev,
-                        due_date_from: today,
-                        due_date_to: today,
-                      }));
+                      setFForm(dueDateTodayUpdater(today));
                       setOpenQuickFilter(null);
                     }}
                   >
@@ -239,11 +305,7 @@ export function PlannerTasksQuickFiltersRow({
                     onClick={() => {
                       const from = moment().format("YYYY-MM-DD");
                       const to = moment().add(7, "days").format("YYYY-MM-DD");
-                      setFForm((prev) => ({
-                        ...prev,
-                        due_date_from: from,
-                        due_date_to: to,
-                      }));
+                      setFForm(dueDateRangeUpdater(from, to));
                       setOpenQuickFilter(null);
                     }}
                   >
@@ -252,7 +314,7 @@ export function PlannerTasksQuickFiltersRow({
                   <QuickOptionButton
                     selected={false}
                     onClick={() => {
-                      setFForm((prev) => ({ ...prev, due_date_from: "", due_date_to: "" }));
+                      setFForm(clearDueDatesUpdater());
                       setOpenQuickFilter(null);
                     }}
                   >
@@ -269,7 +331,7 @@ export function PlannerTasksQuickFiltersRow({
                       className="ptl-quick-date-input"
                       value={fForm.due_date_from || ""}
                       onChange={(e) =>
-                        setFForm((prev) => ({ ...prev, due_date_from: e.target.value || "" }))
+                        setFForm(dueDateFromFieldUpdater(e.target.value || ""))
                       }
                     />
                     <label htmlFor="quick-due-date-to" className="ptl-quick-label">
@@ -281,7 +343,7 @@ export function PlannerTasksQuickFiltersRow({
                       className="ptl-quick-date-input"
                       value={fForm.due_date_to || ""}
                       onChange={(e) =>
-                        setFForm((prev) => ({ ...prev, due_date_to: e.target.value || "" }))
+                        setFForm(dueDateToFieldUpdater(e.target.value || ""))
                       }
                     />
                   </div>

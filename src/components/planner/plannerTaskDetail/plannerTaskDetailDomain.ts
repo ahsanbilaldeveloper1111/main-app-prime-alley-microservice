@@ -17,16 +17,6 @@ export const PLANNER_TASK_DETAIL_WITH_RELATIONS = [
   "children.assignees",
 ] as const;
 
-export function getStatusVariant(status: string | { name?: string } | null | undefined): string {
-  const raw = typeof status === "object" && status?.name ? status.name : (status ?? "");
-  const s = String(raw).toLowerCase();
-  if (s.includes("progress")) return "warning";
-  if (s.includes("review")) return "secondary";
-  if (s.includes("overdue")) return "danger";
-  if (s.includes("complete")) return "success";
-  return "info";
-}
-
 export function readNestedRecurringRecord(
   task: Record<string, unknown>,
 ): Record<string, unknown> | null {
@@ -56,6 +46,19 @@ export function plannerDetailScalarString(value: unknown): string {
     return String(value);
   }
   return "";
+}
+
+export function getStatusVariant(status: string | { name?: string } | null | undefined): string {
+  const raw =
+    typeof status === "object" && status != null
+      ? plannerDetailScalarString(status.name)
+      : plannerDetailScalarString(status);
+  const s = raw.toLowerCase();
+  if (s.includes("progress")) return "warning";
+  if (s.includes("review")) return "secondary";
+  if (s.includes("overdue")) return "danger";
+  if (s.includes("complete")) return "success";
+  return "info";
 }
 
 export function plannerTaskTypeFromTask(
@@ -261,30 +264,55 @@ export type PlannerTaskDetailApiTask = Record<string, unknown> & {
   watcher_numbers?: string[];
 };
 
-export function buildPlannerTaskDetailViewModel(task: PlannerTaskDetailApiTask): PlannerTaskDetailViewModel {
-  const taskId = task.task_id ? String(task.task_id) : task.id != null ? `#${task.id}` : "—";
-  const statusObj = task.status;
-  let statusName = "N/A";
-  if (typeof statusObj === "object" && statusObj != null && "name" in statusObj) {
-    statusName = String((statusObj as { name?: string }).name ?? "N/A");
-  } else if (typeof statusObj === "string" && statusObj.trim() !== "") {
-    statusName = statusObj;
-  } else if (statusObj != null) {
-    statusName = String(statusObj);
+function resolvePlannerDetailTaskId(task: PlannerTaskDetailApiTask): string {
+  if (task.task_id) {
+    return String(task.task_id);
   }
+  if (task.id !== undefined && task.id !== null) {
+    return `#${task.id}`;
+  }
+  return "—";
+}
+
+function resolvePlannerDetailStatusName(statusObj: unknown): string {
+  if (typeof statusObj === "object" && statusObj != null && "name" in statusObj) {
+    const fromName = plannerDetailScalarString((statusObj as { name?: unknown }).name);
+    return fromName || "N/A";
+  }
+  if (typeof statusObj === "string" && statusObj.trim() !== "") {
+    return statusObj;
+  }
+  const fallback = plannerDetailScalarString(statusObj);
+  return fallback || "N/A";
+}
+
+function resolvePlannerDetailProjectName(proj: unknown): string {
+  if (typeof proj === "object" && proj != null && "name" in proj) {
+    const fromName = plannerDetailScalarString((proj as { name?: unknown }).name);
+    return fromName || "No Project";
+  }
+  return "No Project";
+}
+
+function resolvePlannerDetailWatchers(
+  watchersRaw: unknown,
+  watcherNumbers: string[] | undefined,
+): unknown[] {
+  if (Array.isArray(watchersRaw)) {
+    return watchersRaw;
+  }
+  if (Array.isArray(watcherNumbers)) {
+    return watcherNumbers.map((extNum: string) => ({ extension_number: extNum }));
+  }
+  return [];
+}
+
+export function buildPlannerTaskDetailViewModel(task: PlannerTaskDetailApiTask): PlannerTaskDetailViewModel {
+  const taskId = resolvePlannerDetailTaskId(task);
+  const statusName = resolvePlannerDetailStatusName(task.status);
   const priorityVal = String(task.priority || "normal");
-  const proj = task.project;
-  const projectName =
-    typeof proj === "object" && proj != null && "name" in proj
-      ? String((proj as { name?: string }).name ?? "No Project")
-      : "No Project";
-  const watchersRaw = task.watchers;
-  const watchers: unknown[] =
-    Array.isArray(watchersRaw)
-      ? watchersRaw
-      : Array.isArray(task.watcher_numbers)
-        ? task.watcher_numbers.map((extNum: string) => ({ extension_number: extNum }))
-        : [];
+  const projectName = resolvePlannerDetailProjectName(task.project);
+  const watchers = resolvePlannerDetailWatchers(task.watchers, task.watcher_numbers);
 
   const taskRecord = task as Record<string, unknown>;
   const detailTaskKind = plannerTaskTypeFromTask(taskRecord);
@@ -297,14 +325,16 @@ export function buildPlannerTaskDetailViewModel(task: PlannerTaskDetailApiTask):
     lastRunAt != null ||
     nextRunAt != null ||
     (typeof freqScalar === "string" && freqScalar.trim() !== "");
+  const pickedStartDate = pickScalar("start_date");
   const startDateDisplay =
     (typeof task.start_date === "string" && task.start_date.trim() !== ""
       ? task.start_date
       : null) ??
-    (typeof pickScalar("start_date") === "string" ? String(pickScalar("start_date")) : null);
+    (typeof pickedStartDate === "string" && pickedStartDate.trim() !== "" ? pickedStartDate : null);
+  const pickedEndDate = pickScalar("end_date");
   const endDateDisplay =
     (typeof task.due_date === "string" && task.due_date.trim() !== "" ? task.due_date : null) ??
-    (typeof pickScalar("end_date") === "string" ? String(pickScalar("end_date")) : null);
+    (typeof pickedEndDate === "string" && pickedEndDate.trim() !== "" ? pickedEndDate : null);
   const dueTimeDetailLabel = formatDueTimeForDetail(task.due_time);
 
   return {

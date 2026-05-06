@@ -24,7 +24,17 @@ export function PlannerStatusFormModal({
 }: PlannerStatusFormModalProps) {
   const isCreate = mode === "create";
   const title = isCreate ? "Create Status" : "Edit Status";
-  const primaryLabel = processing ? (isCreate ? "Creating..." : "Updating...") : isCreate ? "Create" : "Update";
+
+  let primaryLabel: string;
+  if (processing && isCreate) {
+    primaryLabel = "Creating...";
+  } else if (processing) {
+    primaryLabel = "Updating...";
+  } else if (isCreate) {
+    primaryLabel = "Create";
+  } else {
+    primaryLabel = "Update";
+  }
 
   return (
     <Modal show={show} onHide={onHide}>

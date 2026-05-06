@@ -20,16 +20,7 @@ export type ProjectDetailOffcanvasProps = {
   loadingProjectDetails: boolean;
   loadingOverdueTasks: boolean;
   overdueTasks: unknown[];
-  detailTab: string;
-  setDetailTab: (tab: string) => void;
-  loadingActivities: boolean;
-  projectActivities: unknown[];
   getUserNameFromExtension: (extensionNumber: string) => string;
-  getAvatarColor: (extensionNumber: string, index: number) => string;
-  getInitials: (extensionNumber: string) => string;
-  getActionColor: (action: string) => string;
-  formatTimeAgo: (dateString: string) => string;
-  formatDateTime: (dateString: string) => string;
 };
 
 export const ProjectDetailOffcanvas: React.FC<ProjectDetailOffcanvasProps> = ({
@@ -40,26 +31,8 @@ export const ProjectDetailOffcanvas: React.FC<ProjectDetailOffcanvasProps> = ({
   loadingProjectDetails,
   loadingOverdueTasks,
   overdueTasks,
-  detailTab: _detailTab,
-  setDetailTab: _setDetailTab,
-  loadingActivities: _loadingActivities,
-  projectActivities: _projectActivities,
   getUserNameFromExtension,
-  getAvatarColor: _getAvatarColor,
-  getInitials: _getInitials,
-  getActionColor: _getActionColor,
-  formatTimeAgo: _formatTimeAgo,
-  formatDateTime: _formatDateTime,
 }) => {
-  void _detailTab;
-  void _setDetailTab;
-  void _loadingActivities;
-  void _projectActivities;
-  void _getAvatarColor;
-  void _getInitials;
-  void _getActionColor;
-  void _formatTimeAgo;
-  void _formatDateTime;
   if (!show || !selectedProject) {
     return null;
   }

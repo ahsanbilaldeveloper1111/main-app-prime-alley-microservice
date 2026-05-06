@@ -166,10 +166,10 @@
   .subtask-row td {
     border-bottom: 1px solid #f8fafc;
   }
+}
 
-  &__table {
-    width: 100%;
-  }
+.wp-task-tree__table {
+  width: 100%;
 }
 
 .wp-task-tree-row {
@@ -264,7 +264,7 @@
 .wp-subtask-count-badge {
   font-size: 0.7rem;
   background-color: #e5e7eb;
-  color: #6b7280;
+  color: #374151;
   border-radius: 10px;
   padding: 1px 6px;
   font-weight: 600;
@@ -279,7 +279,7 @@
 .wp-task-label-chip {
   font-size: 0.65rem;
   background-color: #dbeafe;
-  color: #3b82f6;
+  color: #1e40af;
   border-radius: 4px;
   padding: 1px 5px;
   font-weight: 500;
@@ -610,14 +610,16 @@
   font-weight: 500;
 
   &--enabled {
-    background-color: #0091ae;
+    /* Darker teal so white label meets WCAG AA for 14px medium text */
+    background-color: #007a8c;
     color: #ffffff;
     cursor: pointer;
   }
 
   &--disabled {
     background-color: #cbd5e0;
-    color: #ffffff;
+    /* White on slate-300 fails contrast; use slate-700 text */
+    color: #334155;
     cursor: not-allowed;
   }
 }

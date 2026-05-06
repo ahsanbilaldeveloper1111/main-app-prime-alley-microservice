@@ -168,9 +168,15 @@ export function useWorkPlannerProjectsPage(): WorkPlannerProjectsPageViewModel {
     [pagination.page, pagination.limit],
   );
 
+  const scheduleFetchProjects = useCallback((filters?: ProjectListFetchParams) => {
+    fetchProjects(filters).catch((err) => {
+      console.error("[useWorkPlannerProjectsPage] fetchProjects failed", err);
+    });
+  }, [fetchProjects]);
+
   useEffect(() => {
     if (!hierarchyLoading) {
-      void fetchProjects({
+      scheduleFetchProjects({
         search: searchTerm,
         status: filterStatus,
         ownerExtensionNumbers: filterOwnerExtensions,
@@ -178,7 +184,7 @@ export function useWorkPlannerProjectsPage(): WorkPlannerProjectsPageViewModel {
         endDateTo: filterEndDateTo,
       });
     }
-  }, [pagination.page, pagination.limit, hierarchyLoading, fetchProjects]);
+  }, [pagination.page, pagination.limit, hierarchyLoading, scheduleFetchProjects]);
 
   const handleCreateProject = useCallback(() => {
     if (!sessionPlannerProjectCrud.canCreate) {
@@ -370,8 +376,8 @@ export function useWorkPlannerProjectsPage(): WorkPlannerProjectsPageViewModel {
       endDateTo: "",
     };
     setAppliedFilters(cleared);
-    void fetchProjects({ ...cleared, page: 1 });
-  }, [fetchProjects]);
+    scheduleFetchProjects({ ...cleared, page: 1 });
+  }, [scheduleFetchProjects]);
 
   const handleApplyFilters = useCallback(() => {
     setPagination((prev) => ({ ...prev, page: 1 }));
@@ -384,7 +390,7 @@ export function useWorkPlannerProjectsPage(): WorkPlannerProjectsPageViewModel {
       endDateTo: filterEndDateTo,
     };
     setAppliedFilters(next);
-    void fetchProjects({ ...next, page: 1 });
+    scheduleFetchProjects({ ...next, page: 1 });
   }, [
     searchTerm,
     filterStatus,
@@ -392,7 +398,7 @@ export function useWorkPlannerProjectsPage(): WorkPlannerProjectsPageViewModel {
     filterTeam,
     filterStartDateFrom,
     filterEndDateTo,
-    fetchProjects,
+    scheduleFetchProjects,
   ]);
 
   const applyProjectStatusFromPill = useCallback(
@@ -408,7 +414,7 @@ export function useWorkPlannerProjectsPage(): WorkPlannerProjectsPageViewModel {
         endDateTo: filterEndDateTo,
       };
       setAppliedFilters(next);
-      void fetchProjects({ ...next, page: 1 });
+      scheduleFetchProjects({ ...next, page: 1 });
     },
     [
       searchTerm,
@@ -416,7 +422,7 @@ export function useWorkPlannerProjectsPage(): WorkPlannerProjectsPageViewModel {
       filterTeam,
       filterStartDateFrom,
       filterEndDateTo,
-      fetchProjects,
+      scheduleFetchProjects,
     ],
   );
 
@@ -433,8 +439,8 @@ export function useWorkPlannerProjectsPage(): WorkPlannerProjectsPageViewModel {
       endDateTo: "",
     };
     setAppliedFilters(next);
-    void fetchProjects({ ...next, page: 1 });
-  }, [searchTerm, filterStatus, filterOwnerExtensions, filterTeam, fetchProjects]);
+    scheduleFetchProjects({ ...next, page: 1 });
+  }, [searchTerm, filterStatus, filterOwnerExtensions, filterTeam, scheduleFetchProjects]);
 
   const handleProjectStartDateChange = useCallback((value = "") => {
     setFilterStartDateFrom(value);
@@ -508,8 +514,8 @@ export function useWorkPlannerProjectsPage(): WorkPlannerProjectsPageViewModel {
       endDateTo: filterEndDateTo,
     };
     setAppliedFilters(next);
-    void fetchProjects({ ...next, page: 1 });
-  }, [searchTerm, filterStatus, filterTeam, filterStartDateFrom, filterEndDateTo, fetchProjects]);
+    scheduleFetchProjects({ ...next, page: 1 });
+  }, [searchTerm, filterStatus, filterTeam, filterStartDateFrom, filterEndDateTo, scheduleFetchProjects]);
 
   const applyOwnerExtensionsAndRefetch = useCallback(
     (extensions: string[]) => {
@@ -525,9 +531,9 @@ export function useWorkPlannerProjectsPage(): WorkPlannerProjectsPageViewModel {
         endDateTo: filterEndDateTo,
       };
       setAppliedFilters(next);
-      void fetchProjects({ ...next, page: 1 });
+      scheduleFetchProjects({ ...next, page: 1 });
     },
-    [searchTerm, filterStatus, filterTeam, filterStartDateFrom, filterEndDateTo, fetchProjects],
+    [searchTerm, filterStatus, filterTeam, filterStartDateFrom, filterEndDateTo, scheduleFetchProjects],
   );
 
   const applyOwnerExtensionsRef = useRef(applyOwnerExtensionsAndRefetch);

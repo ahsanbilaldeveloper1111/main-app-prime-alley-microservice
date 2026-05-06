@@ -45,7 +45,6 @@
 
 .ptl-btn-primary-dark:hover {
   background-color: #333 !important;
-  background: #333 !important;
 }
 
 .ptl-tabs-row {
@@ -266,6 +265,22 @@
 
 .ptl-title-edit-btn {
   flex-shrink: 0;
+  background-color: #fff;
+  border: 1px solid #8a8a8a;
+  color: #141414;
+  border-radius: 4px;
+  padding: 3px 9px;
+  font-size: 11px;
+  font-family: "Lexend Deca", Helvetica, Arial, sans-serif;
+  font-weight: 400;
+  line-height: 14px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+  outline: none;
+  text-decoration: none;
 }
 
 .ptl-priority-row {
@@ -379,26 +394,6 @@
 .ptl-due-date--overdue {
   color: #ef4444;
   font-weight: 500;
-}
-
-.ptl-title-edit-btn {
-  flex-shrink: 0;
-  background-color: #fff;
-  border: 1px solid #8a8a8a;
-  color: #141414;
-  border-radius: 4px;
-  padding: 3px 9px;
-  font-size: 11px;
-  font-family: "Lexend Deca", Helvetica, Arial, sans-serif;
-  font-weight: 400;
-  line-height: 14px;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  white-space: nowrap;
-  outline: none;
-  text-decoration: none;
 }
 
 .ptl-edit-columns-menu {

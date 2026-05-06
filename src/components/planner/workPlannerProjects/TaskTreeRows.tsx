@@ -1,5 +1,5 @@
 import React, { memo, useCallback, useState, type CSSProperties } from "react";
-import { ChevronRight, ChevronDown as ChevronDownIcon, Eye } from "lucide-react";
+import { ChevronRight, ChevronDown as ChevronDownIcon, Eye, type LucideIcon } from "lucide-react";
 import { formatDateGlobal } from "@utils/Helper";
 import { countAssignees, type SubTask, type Task } from "@planner/workPlannerProjectsDomain";
 import {
@@ -18,6 +18,108 @@ export interface TaskRowProps {
   onToggleTask: (taskId: string) => void;
   canPreviewEditTask: boolean;
   onPreviewSubtask: (parentTask: Task, sub: SubTask) => void | Promise<void>;
+}
+
+function runTaskPreview(task: Task, onPreview: TaskRowProps["onPreview"]): void {
+  Promise.resolve(onPreview(task)).catch(() => undefined);
+}
+
+type TaskRowNameCellProps = {
+  task: Task;
+  nameCellPad: number;
+  hasSubtasks: boolean;
+  isExpanded: boolean;
+  subtaskBadge: ReturnType<typeof getSubtaskBadgeCounts>;
+  statusIconClass: string;
+  StatusIcon: LucideIcon;
+  canPreviewEditTask: boolean;
+  onToggleTask: (taskId: string) => void;
+  onPreview: TaskRowProps["onPreview"];
+  hovered: boolean;
+};
+
+function TaskRowNameCell({
+  task,
+  nameCellPad,
+  hasSubtasks,
+  isExpanded,
+  subtaskBadge,
+  statusIconClass,
+  StatusIcon,
+  canPreviewEditTask,
+  onToggleTask,
+  onPreview,
+  hovered,
+}: Readonly<TaskRowNameCellProps>) {
+  return (
+    <td
+      className="wp-task-tree-row__cell-name"
+      style={{ "--wp-task-indent": `${nameCellPad}px` } as CSSProperties}
+    >
+      <div className="wp-task-tree-row__cell-name-inner">
+        <span className="wp-task-toggler-wrap">
+          {hasSubtasks ? (
+            <button
+              type="button"
+              className="wp-icon-btn-transparent"
+              onClick={(e) => {
+                e.stopPropagation();
+                onToggleTask(task.id);
+              }}
+              aria-expanded={isExpanded}
+            >
+              {isExpanded ? <ChevronDownIcon size={14} /> : <ChevronRight size={14} />}
+            </button>
+          ) : (
+            <span className="wp-task-indent-spacer" />
+          )}
+        </span>
+
+        <StatusIcon size={14} className={`${statusIconClass} wp-flex-shrink-0`} />
+
+        <button
+          type="button"
+          className={`wp-task-title-btn${canPreviewEditTask ? " wp-task-title-btn--clickable" : " wp-task-title-btn--default-cursor"}${task.status === "done" ? " wp-task-title-btn--done" : ""}`}
+          onClick={() => {
+            if (canPreviewEditTask) {
+              runTaskPreview(task, onPreview);
+            }
+          }}
+        >
+          {task.title}
+        </button>
+
+        {subtaskBadge ? (
+          <span className="wp-subtask-count-badge">
+            {subtaskBadge.completed}/{subtaskBadge.total}
+          </span>
+        ) : null}
+
+        {task.labels && task.labels.length > 0 ? (
+          <div className="wp-task-labels">
+            {task.labels.slice(0, 2).map((label) => (
+              <span key={label} className="wp-task-label-chip">
+                {label}
+              </span>
+            ))}
+          </div>
+        ) : null}
+
+        {hovered && canPreviewEditTask ? (
+          <button
+            type="button"
+            className="wp-task-preview-btn"
+            onClick={(e) => {
+              e.stopPropagation();
+              runTaskPreview(task, onPreview);
+            }}
+          >
+            Preview/Edit
+          </button>
+        ) : null}
+      </div>
+    </td>
+  );
 }
 
 const TaskRowInner: React.FC<TaskRowProps> = ({
@@ -57,73 +159,19 @@ const TaskRowInner: React.FC<TaskRowProps> = ({
         onMouseEnter={onEnter}
         onMouseLeave={onLeave}
       >
-        <td
-          className="wp-task-tree-row__cell-name"
-          style={{ "--wp-task-indent": `${nameCellPad}px` } as CSSProperties}
-        >
-          <div className="wp-task-tree-row__cell-name-inner">
-            <span className="wp-task-toggler-wrap">
-              {hasSubtasks ? (
-                <button
-                  type="button"
-                  className="wp-icon-btn-transparent"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onToggleTask(task.id);
-                  }}
-                  aria-expanded={isExpanded}
-                >
-                  {isExpanded ? <ChevronDownIcon size={14} /> : <ChevronRight size={14} />}
-                </button>
-              ) : (
-                <span className="wp-task-indent-spacer" />
-              )}
-            </span>
-
-            <StatusIcon size={14} className={`${statusIconClass} wp-flex-shrink-0`} />
-
-            <button
-              type="button"
-              className={`wp-task-title-btn${canPreviewEditTask ? " wp-task-title-btn--clickable" : " wp-task-title-btn--default-cursor"}${task.status === "done" ? " wp-task-title-btn--done" : ""}`}
-              onClick={() => {
-                if (canPreviewEditTask) {
-                  Promise.resolve(onPreview(task)).catch(() => undefined);
-                }
-              }}
-            >
-              {task.title}
-            </button>
-
-            {subtaskBadge ? (
-              <span className="wp-subtask-count-badge">
-                {subtaskBadge.completed}/{subtaskBadge.total}
-              </span>
-            ) : null}
-
-            {task.labels && task.labels.length > 0 ? (
-              <div className="wp-task-labels">
-                {task.labels.slice(0, 2).map((label) => (
-                  <span key={label} className="wp-task-label-chip">
-                    {label}
-                  </span>
-                ))}
-              </div>
-            ) : null}
-
-            {hovered && canPreviewEditTask ? (
-              <button
-                type="button"
-                className="wp-task-preview-btn"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  Promise.resolve(onPreview(task)).catch(() => undefined);
-                }}
-              >
-                Preview/Edit
-              </button>
-            ) : null}
-          </div>
-        </td>
+        <TaskRowNameCell
+          task={task}
+          nameCellPad={nameCellPad}
+          hasSubtasks={hasSubtasks}
+          isExpanded={isExpanded}
+          subtaskBadge={subtaskBadge}
+          statusIconClass={statusIconClass}
+          StatusIcon={StatusIcon}
+          canPreviewEditTask={canPreviewEditTask}
+          onToggleTask={onToggleTask}
+          onPreview={onPreview}
+          hovered={hovered}
+        />
 
         <td>
           <div className="member-avatar bg-primary">
@@ -148,32 +196,18 @@ const TaskRowInner: React.FC<TaskRowProps> = ({
         <td className="generic-table-actions-cell" />
       </tr>
 
-      {isExpanded && hasChildTasks
-        ? task.children!.map((child) => (
-            <TaskRow
-              key={child.id}
-              task={child}
-              depth={depth + 1}
-              onPreview={onPreview}
-              expandedTasks={expandedTasks}
-              onToggleTask={onToggleTask}
-              canPreviewEditTask={canPreviewEditTask}
-              onPreviewSubtask={onPreviewSubtask}
-            />
-          ))
-        : null}
-      {isExpanded && subtasksLoaded && !hasChildTasks
-        ? task.subtasks!.map((sub) => (
-            <SubtaskRow
-              key={sub.id}
-              subtask={sub}
-              depth={depth + 1}
-              canPreviewEditTask={canPreviewEditTask}
-              parentTask={task}
-              onPreviewSubtask={onPreviewSubtask}
-            />
-          ))
-        : null}
+      <TaskRowExpandedBranches
+        isExpanded={isExpanded}
+        hasChildTasks={hasChildTasks}
+        subtasksLoaded={subtasksLoaded}
+        task={task}
+        depth={depth}
+        onPreview={onPreview}
+        expandedTasks={expandedTasks}
+        onToggleTask={onToggleTask}
+        canPreviewEditTask={canPreviewEditTask}
+        onPreviewSubtask={onPreviewSubtask}
+      />
     </>
   );
 };
@@ -263,3 +297,71 @@ const SubtaskRowInner: React.FC<SubtaskRowProps> = ({
 };
 
 export const SubtaskRow = memo(SubtaskRowInner);
+
+type TaskRowExpandedBranchesProps = {
+  isExpanded: boolean;
+  hasChildTasks: boolean;
+  subtasksLoaded: boolean;
+  task: Task;
+  depth: number;
+} & Pick<
+  TaskRowProps,
+  "onPreview" | "expandedTasks" | "onToggleTask" | "canPreviewEditTask" | "onPreviewSubtask"
+>;
+
+function TaskRowExpandedBranches({
+  isExpanded,
+  hasChildTasks,
+  subtasksLoaded,
+  task,
+  depth,
+  onPreview,
+  expandedTasks,
+  onToggleTask,
+  canPreviewEditTask,
+  onPreviewSubtask,
+}: Readonly<TaskRowExpandedBranchesProps>) {
+  if (!isExpanded) {
+    return null;
+  }
+
+  const childTasks = task.children;
+  if (hasChildTasks && childTasks && childTasks.length > 0) {
+    return (
+      <>
+        {childTasks.map((child) => (
+          <TaskRow
+            key={child.id}
+            task={child}
+            depth={depth + 1}
+            onPreview={onPreview}
+            expandedTasks={expandedTasks}
+            onToggleTask={onToggleTask}
+            canPreviewEditTask={canPreviewEditTask}
+            onPreviewSubtask={onPreviewSubtask}
+          />
+        ))}
+      </>
+    );
+  }
+
+  const subs = task.subtasks;
+  if (subtasksLoaded && !hasChildTasks && subs && subs.length > 0) {
+    return (
+      <>
+        {subs.map((sub) => (
+          <SubtaskRow
+            key={sub.id}
+            subtask={sub}
+            depth={depth + 1}
+            canPreviewEditTask={canPreviewEditTask}
+            parentTask={task}
+            onPreviewSubtask={onPreviewSubtask}
+          />
+        ))}
+      </>
+    );
+  }
+
+  return null;
+}

@@ -3,6 +3,9 @@ import React, {
   useRef,
   useState,
   type CSSProperties,
+  type Dispatch,
+  type MouseEventHandler,
+  type SetStateAction,
 } from "react";
 import {
   FolderOpen,
@@ -50,10 +53,84 @@ import "@components/planner/workPlannerProjects/workPlannerProjectsPage.scss";
 
 const { PERMISSIONS } = HEADER_CONSTANTS;
 
+/** Shape used by CreateTaskSidebar extension pickers (structurally matches its internal Extension type). */
+export type PlannerTaskSidebarExtension = Readonly<{
+  id: string;
+  name: string;
+  extension_number?: string;
+}>;
+
+type CreateTaskSidebarSubmitPayload = Parameters<
+  NonNullable<React.ComponentProps<typeof CreateTaskSidebar>["onCreate"]>
+>[0];
+
+function projectExpandToggleClickHandler(
+  project: Project,
+  handleToggleProject: (project: Project, e: React.MouseEvent) => Promise<void>,
+): MouseEventHandler<HTMLButtonElement> {
+  return (e) => {
+    handleToggleProject(project, e).catch((err) => {
+      console.error("[WorkPlannerProjects] handleToggleProject failed", err);
+    });
+  };
+}
+
+function projectPreviewFloatingClickHandler(
+  project: Project,
+  onProjectClick: (project: Project) => void,
+): MouseEventHandler<HTMLButtonElement> {
+  return (e) => {
+    e.stopPropagation();
+    onProjectClick(project);
+  };
+}
+
+function projectOverviewMenuClickHandler(
+  project: Project,
+  setOpenProjectActionsId: Dispatch<SetStateAction<string | null>>,
+): () => void {
+  return () => {
+    setOpenProjectActionsId(null);
+    window.open(`/planner/projects/${project.id}`, "_blank");
+  };
+}
+
+function projectEditMenuClickHandler(
+  project: Project,
+  setOpenProjectActionsId: Dispatch<SetStateAction<string | null>>,
+  onEditProject: (project: Project) => void,
+): () => void {
+  return () => {
+    setOpenProjectActionsId(null);
+    onEditProject(project);
+  };
+}
+
+function projectDeleteMenuClickHandler(
+  project: Project,
+  setOpenProjectActionsId: Dispatch<SetStateAction<string | null>>,
+  onDeleteProject: (project: Project) => void,
+): () => void {
+  return () => {
+    setOpenProjectActionsId(null);
+    onDeleteProject(project);
+  };
+}
+
+function addExpandedProjectTaskClickHandler(
+  project: Project,
+  handleOpenCreateTaskForExpandedProject: (projectRow: Project) => void,
+): MouseEventHandler<HTMLButtonElement> {
+  return (e) => {
+    e.stopPropagation();
+    handleOpenCreateTaskForExpandedProject(project);
+  };
+}
+
 export interface ExpandableProjectTableProps {
   projects: Project[];
   loading: boolean;
-  extensions: unknown[];
+  extensions: PlannerTaskSidebarExtension[];
   onProjectClick: (project: Project) => void;
   onEditProject: (project: Project) => void;
   onDeleteProject: (project: Project) => void;
@@ -275,10 +352,7 @@ export const ExpandableProjectTable: React.FC<ExpandableProjectTableProps> = ({
             <button
               type="button"
               className="wp-add-task-btn"
-              onClick={(e) => {
-                e.stopPropagation();
-                handleOpenCreateTaskForExpandedProject(project);
-              }}
+              onClick={addExpandedProjectTaskClickHandler(project, handleOpenCreateTaskForExpandedProject)}
             >
               <Plus size={14} />
               Add task
@@ -336,7 +410,7 @@ export const ExpandableProjectTable: React.FC<ExpandableProjectTableProps> = ({
               <button
                 type="button"
                 className="wp-project-expand-btn"
-                onClick={(e) => void handleToggleProject(project, e)}
+                onClick={projectExpandToggleClickHandler(project, handleToggleProject)}
                 title={isExpanded ? "Collapse tasks" : "Expand tasks"}
               >
                 {isExpanded ? <ChevronDownIcon size={16} /> : <ChevronRight size={16} />}
@@ -354,10 +428,7 @@ export const ExpandableProjectTable: React.FC<ExpandableProjectTableProps> = ({
                 <button
                   type="button"
                   className="preview-button wp-project-preview-floating"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onProjectClick(project);
-                  }}
+                  onClick={projectPreviewFloatingClickHandler(project, onProjectClick)}
                 >
                   Preview
                 </button>
@@ -397,10 +468,7 @@ export const ExpandableProjectTable: React.FC<ExpandableProjectTableProps> = ({
                     <Dropdown.Item
                       as="button"
                       type="button"
-                      onClick={() => {
-                        setOpenProjectActionsId(null);
-                        window.open(`/planner/projects/${project.id}`, "_blank");
-                      }}
+                      onClick={projectOverviewMenuClickHandler(project, setOpenProjectActionsId)}
                     >
                       <Eye size={14} className="me-2" />
                       Project overview
@@ -412,10 +480,11 @@ export const ExpandableProjectTable: React.FC<ExpandableProjectTableProps> = ({
                         <Dropdown.Item
                           as="button"
                           type="button"
-                          onClick={() => {
-                            setOpenProjectActionsId(null);
-                            onEditProject(project);
-                          }}
+                          onClick={projectEditMenuClickHandler(
+                            project,
+                            setOpenProjectActionsId,
+                            onEditProject,
+                          )}
                         >
                           <Settings size={14} className="me-2" />
                           Edit Project
@@ -430,10 +499,11 @@ export const ExpandableProjectTable: React.FC<ExpandableProjectTableProps> = ({
                           as="button"
                           type="button"
                           className="text-danger"
-                          onClick={() => {
-                            setOpenProjectActionsId(null);
-                            onDeleteProject(project);
-                          }}
+                          onClick={projectDeleteMenuClickHandler(
+                            project,
+                            setOpenProjectActionsId,
+                            onDeleteProject,
+                          )}
                         >
                           <Trash2 size={14} className="me-2" />
                           Delete Project
@@ -462,25 +532,36 @@ export const ExpandableProjectTable: React.FC<ExpandableProjectTableProps> = ({
     setCreateTaskForProject(null);
   }, []);
 
+  const handleCreateTaskSidebarSubmit = useCallback(
+    async (data: CreateTaskSidebarSubmitPayload) => {
+      const projectIdNum =
+        data.projectId ??
+        projectIdFromSidebarEditTask(fetchedEditTask) ??
+        createTaskForProject?.apiData?.id ??
+        null;
+      if (projectIdNum != null) {
+        const projectIdStr = String(projectIdNum);
+        if (expandedProjects.has(projectIdStr)) {
+          await fetchAndStoreProjectTasks(projectIdStr);
+        }
+      }
+      closeCreateSidebar();
+    },
+    [
+      fetchedEditTask,
+      createTaskForProject,
+      expandedProjects,
+      fetchAndStoreProjectTasks,
+      closeCreateSidebar,
+    ],
+  );
+
   return (
     <>
       <CreateTaskSidebar
         isOpen={showCreateTaskSidebar}
         onClose={closeCreateSidebar}
-        onCreate={async (data) => {
-          const projectIdNum =
-            data.projectId ??
-            projectIdFromSidebarEditTask(fetchedEditTask) ??
-            createTaskForProject?.apiData?.id ??
-            null;
-          if (projectIdNum != null) {
-            const projectIdStr = String(projectIdNum);
-            if (expandedProjects.has(projectIdStr)) {
-              await fetchAndStoreProjectTasks(projectIdStr);
-            }
-          }
-          closeCreateSidebar();
-        }}
+        onCreate={handleCreateTaskSidebarSubmit}
         extensions={extensions}
         labels={createTaskForProject?.apiData?.labels ?? []}
         project={createTaskForProject ? mapTableProjectToPlannerSidebarProject(createTaskForProject) : undefined}

@@ -1,4 +1,11 @@
-import React, { useState, useCallback, useMemo, useRef, ReactElement } from "react";
+import React, {
+  useState,
+  useCallback,
+  useMemo,
+  useRef,
+  type ComponentProps,
+  type ReactElement,
+} from "react";
 import { useSession } from "next-auth/react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getSessionPhoneOrExtension } from "@planner/projectMemberRole";
@@ -295,7 +302,14 @@ const TaskDetailPage = () => {
           <Card>
             <Card.Body className="text-center py-5">
               <p className="text-muted mb-3">Task not found.</p>
-              <Button variant="primary" onClick={() => void router.push("/planner/tasks")}>
+              <Button
+                variant="primary"
+                onClick={() => {
+                  router.push("/planner/tasks").catch((err) => {
+                    console.error("[TaskDetailPage] navigation to /planner/tasks failed", err);
+                  });
+                }}
+              >
                 Back to Tasks
               </Button>
             </Card.Body>
@@ -336,7 +350,11 @@ const TaskDetailPage = () => {
           <Button
             variant="outline-secondary"
             size="sm"
-            onClick={() => void router.push("/planner/tasks")}
+            onClick={() => {
+              router.push("/planner/tasks").catch((err) => {
+                console.error("[TaskDetailPage] navigation to /planner/tasks failed", err);
+              });
+            }}
             className="d-flex align-items-center gap-1"
           >
             <ArrowLeft size={16} />
@@ -502,7 +520,11 @@ const TaskDetailPage = () => {
             }),
           ) ?? []
         }
-        task={task ? ({ ...task, rawData: task } as any) : undefined}
+        task={
+          { ...task, rawData: task } as NonNullable<
+            ComponentProps<typeof CreateTaskSidebar>["task"]
+          >
+        }
         isEdit={Boolean(showEditModal && task)}
         lockProjectSelection={false}
         taskEditScope={task ? taskDetailPermissions.taskEditScope : "full"}

@@ -7,7 +7,10 @@ import "@assets/scss/datatable-style.scss";
 import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
 import GenericFilterSidebar from "@components/GenericFilterSidebar";
 import { Container } from "react-bootstrap";
-import { ExpandableProjectTable } from "@components/planner/workPlannerProjects/ExpandableProjectTable";
+import {
+  ExpandableProjectTable,
+  type PlannerTaskSidebarExtension,
+} from "@components/planner/workPlannerProjects/ExpandableProjectTable";
 import { ProjectDetailOffcanvas } from "@components/planner/workPlannerProjects/ProjectDetailOffcanvas";
 import { ProjectFormSidebar } from "@components/planner/workPlannerProjects/ProjectFormSidebar";
 import { useWorkPlannerProjectsPage } from "@components/planner/workPlannerProjects/useWorkPlannerProjectsPage";
@@ -42,7 +45,7 @@ const WorkPlannerProjects = () => {
                 <ExpandableProjectTable
                   projects={p.filteredProjects}
                   loading={p.loading}
-                  extensions={(p.hierarchyDataExtensions as any[]) || []}
+                  extensions={(p.hierarchyDataExtensions as PlannerTaskSidebarExtension[]) || []}
                   sessionPlannerProjectCrud={p.sessionPlannerProjectCrud}
                   sessionUserPhoneOrExtension={p.sessionUserPhoneOrExtension}
                   onProjectClick={p.handleProjectClick}
@@ -67,16 +70,7 @@ const WorkPlannerProjects = () => {
                 loadingProjectDetails={p.loadingProjectDetails}
                 loadingOverdueTasks={p.loadingOverdueTasks}
                 overdueTasks={p.overdueTasks}
-                detailTab={p.detailTab}
-                setDetailTab={p.setDetailTab}
-                loadingActivities={p.loadingActivities}
-                projectActivities={p.projectActivities}
                 getUserNameFromExtension={p.getUserNameFromExtension}
-                getAvatarColor={p.getAvatarColor}
-                getInitials={p.getInitials}
-                getActionColor={p.getActionColor}
-                formatTimeAgo={p.formatTimeAgo}
-                formatDateTime={p.formatDateTime}
               />
             </div>
           </Container>

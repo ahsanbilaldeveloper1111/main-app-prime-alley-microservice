@@ -59,6 +59,76 @@ export type LoadProjectsFromApiArgs = {
   shouldApplyResults: () => boolean;
 };
 
+type SuccessfulProjectsListPayload = {
+  success: true;
+  data: ApiProject[];
+  pagination?: Partial<ProjectPaginationState>;
+  summary?: {
+    active?: number;
+    total?: number;
+    task_due_this_week?: number;
+    overdue_tasks?: number;
+  };
+};
+
+function buildListProjectsParams(
+  filters: ProjectListFetchParams | undefined,
+  pagination: Pick<ProjectPaginationState, "page" | "limit">,
+): Parameters<typeof listProjects>[0] {
+  const pageForRequest = typeof filters?.page === "number" ? filters.page : pagination.page;
+  const statusParam = filters?.status && filters.status !== "all" ? filters.status : undefined;
+  const extensionNumbers =
+    filters?.ownerExtensionNumbers && filters.ownerExtensionNumbers.length > 0
+      ? filters.ownerExtensionNumbers.map((ext) => String(ext).trim()).filter(Boolean)
+      : undefined;
+  let startFrom = filters?.startDateFrom?.trim() || undefined;
+  let endTo = filters?.endDateTo?.trim() || undefined;
+  if (startFrom && endTo && endTo < startFrom) {
+    endTo = startFrom;
+  }
+  return {
+    page: pageForRequest,
+    limit: pagination.limit,
+    search: filters?.search || "",
+    status: statusParam,
+    extension_numbers: extensionNumbers,
+    start_date_from: startFrom,
+    end_date_to: endTo,
+  };
+}
+
+function isSuccessfulProjectsListPayload(
+  response: unknown,
+): response is SuccessfulProjectsListPayload {
+  if (response == null || typeof response !== "object") {
+    return false;
+  }
+  const r = response as { success?: unknown; data?: unknown };
+  return r.success === true && Array.isArray(r.data);
+}
+
+function applySuccessfulProjectsListPayload(
+  response: SuccessfulProjectsListPayload,
+  setProjects: Dispatch<SetStateAction<Project[]>>,
+  setPagination: Dispatch<SetStateAction<ProjectPaginationState>>,
+  setStats: Dispatch<SetStateAction<ProjectStatsState>>,
+): void {
+  setProjects(response.data.map((p) => mapApiProjectToProject(p)));
+  if (response.pagination) {
+    setPagination((prev) => ({ ...prev, ...response.pagination }));
+  }
+  const summary = response.summary;
+  if (!summary) {
+    return;
+  }
+  setStats({
+    activeProjects: summary.active ?? 0,
+    totalProjects: summary.total ?? 0,
+    tasksDueThisWeek: summary.task_due_this_week ?? 0,
+    overdueAcrossProjects: summary.overdue_tasks ?? 0,
+  });
+}
+
 export async function loadProjectsFromApi({
   filters,
   pagination,
@@ -70,46 +140,14 @@ export async function loadProjectsFromApi({
 }: LoadProjectsFromApiArgs): Promise<void> {
   try {
     setLoading(true);
-    const pageForRequest = typeof filters?.page === "number" ? filters.page : pagination.page;
-    const statusParam = filters?.status && filters.status !== "all" ? filters.status : undefined;
-    const extensionNumbers =
-      filters?.ownerExtensionNumbers && filters.ownerExtensionNumbers.length > 0
-        ? filters.ownerExtensionNumbers.map((ext) => String(ext).trim()).filter(Boolean)
-        : undefined;
-    let startFrom = filters?.startDateFrom?.trim() || undefined;
-    let endTo = filters?.endDateTo?.trim() || undefined;
-    if (startFrom && endTo && endTo < startFrom) {
-      endTo = startFrom;
-    }
-
-    const response = await listProjects({
-      page: pageForRequest,
-      limit: pagination.limit,
-      search: filters?.search || "",
-      status: statusParam,
-      extension_numbers: extensionNumbers,
-      start_date_from: startFrom,
-      end_date_to: endTo,
-    });
+    const response = await listProjects(buildListProjectsParams(filters, pagination));
 
     if (!shouldApplyResults()) {
       return;
     }
 
-    if (response?.success === true && Array.isArray(response.data)) {
-      setProjects(response.data.map((p: ApiProject) => mapApiProjectToProject(p)));
-      if (response.pagination) {
-        setPagination((prev) => ({ ...prev, ...response.pagination }));
-      }
-      const summary = response.summary;
-      if (summary) {
-        setStats({
-          activeProjects: summary.active ?? 0,
-          totalProjects: summary.total ?? 0,
-          tasksDueThisWeek: summary.task_due_this_week ?? 0,
-          overdueAcrossProjects: summary.overdue_tasks ?? 0,
-        });
-      }
+    if (isSuccessfulProjectsListPayload(response)) {
+      applySuccessfulProjectsListPayload(response, setProjects, setPagination, setStats);
     } else {
       setProjects([]);
     }

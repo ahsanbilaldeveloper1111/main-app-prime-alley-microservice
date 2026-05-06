@@ -443,7 +443,9 @@ const TasksListingPage = ({
         plannerKeys.tasks.list({
           scope: isProjectScopedEmbed ? "embed" : "page",
           embedProjectId:
-            sidebarProject?.id != null ? Number(sidebarProject.id) : null,
+            sidebarProject?.id === undefined || sidebarProject?.id === null
+              ? null
+              : Number(sidebarProject.id),
           embedRefresh: isProjectScopedEmbed
             ? embeddedListRefreshSignal
             : undefined,
