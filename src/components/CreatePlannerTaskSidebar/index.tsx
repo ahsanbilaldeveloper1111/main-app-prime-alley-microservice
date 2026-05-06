@@ -52,15 +52,15 @@ const TASK_TITLE_MAX_LENGTH = 150;
 
 /** Shared visual tokens for create / edit task sidebar */
 const PLANNER_TASK_SIDEBAR = {
-  accent: "#4f46e5",
-  accentSoft: "rgba(79, 70, 229, 0.12)",
+  accent: "#141414",
+  accentSoft: "rgba(20, 20, 20, 0.06)",
   surface: "#ffffff",
-  surfaceMuted: "#f1f5f9",
-  border: "#e2e8f0",
-  text: "#0f172a",
-  textMuted: "#64748b",
-  shadow: "0 25px 50px -12px rgba(15, 23, 42, 0.18)",
-  radiusLg: 16,
+  surfaceMuted: "#f8fafc",
+  border: "#e5e7eb",
+  text: "#141414",
+  textMuted: "#6b7280",
+  shadow: "-8px 0 20px rgba(0, 0, 0, 0.08)",
+  radiusLg: 0,
 } as const;
 
 function clampTaskTitleLength(value: string): string {
@@ -1080,8 +1080,9 @@ function linkedRecordsEmptyMessage(hasSearchQuery: boolean): string {
   return "No tasks available";
 }
 
-function primarySubmitButtonLabel(isSubmitting: boolean, isEdit: boolean): string {
+function primarySubmitButtonLabel(isSubmitting: boolean, isEdit: boolean, isRecurringConversionMode: boolean): string {
   if (isSubmitting) return "Processing...";
+  if (isRecurringConversionMode) return "Convert to Recurring";
   if (isEdit) return "Update";
   return "Create";
 }
@@ -1169,6 +1170,7 @@ function PlannerSidebarFooter({
   onCreateAndOpen,
   onCreate,
   onCreateAndOpenSubmit,
+  isRecurringConversionMode,
 }: Readonly<{
   isEdit: boolean;
   isSubmitting: boolean;
@@ -1176,7 +1178,8 @@ function PlannerSidebarFooter({
   onCreateAndOpen?: (data: CreateTaskFormData) => void;
   onCreate: () => void;
   onCreateAndOpenSubmit: (e: React.MouseEvent<HTMLButtonElement>) => void;
-}>): React.ReactNode {
+  isRecurringConversionMode: boolean;
+  }>): React.ReactNode {
   return (
     <div
       className="create-task-sidebar-footer"
@@ -1232,7 +1235,7 @@ function PlannerSidebarFooter({
           boxShadow: isSubmitting ? "none" : "0 4px 14px rgba(79, 70, 229, 0.35)",
         }}
       >
-        {primarySubmitButtonLabel(isSubmitting, isEdit)}
+        {primarySubmitButtonLabel(isSubmitting, isEdit, isRecurringConversionMode)} 
       </button>
     </div>
   );
@@ -1721,6 +1724,17 @@ function applyRecurringOptionalNumericFields(
   fd: CreateTaskFormData,
   isEdit: boolean,
 ): void {
+  payload.reminder_minutes =
+    fd.recurringReminderEnabled && fd.recurringReminderMinutes > 0
+      ? Math.max(1, Math.floor(fd.recurringReminderMinutes))
+      : 0;
+}
+
+function applyEstimatedDurationMinutesToPayload(
+  payload: Record<string, unknown>,
+  fd: CreateTaskFormData,
+  isEdit: boolean,
+): void {
   const estTrim = fd.estimatedDurationMinutes.trim();
   if (estTrim !== "") {
     const est = Math.min(525600, Math.max(0, Math.floor(Number(estTrim))));
@@ -1730,10 +1744,6 @@ function applyRecurringOptionalNumericFields(
   } else if (isEdit) {
     payload.estimated_duration_minutes = null;
   }
-  payload.reminder_minutes =
-    fd.recurringReminderEnabled && fd.recurringReminderMinutes > 0
-      ? Math.max(1, Math.floor(fd.recurringReminderMinutes))
-      : 0;
 }
 
 function applyPlannerSidebarRecurringPayload(
@@ -1804,6 +1814,7 @@ function buildPlannerSidebarPayloadRecord(
     payload.due_date = fd.dueDate || "";
     applyPlannerSidebarRegularTodoDueTime(payload, fd, isEdit);
   }
+  applyEstimatedDurationMinutesToPayload(payload, fd, isEdit);
   return payload;
 }
 
@@ -1834,6 +1845,10 @@ function validateRecurringDurationAndReminder(formData: CreateTaskFormData): boo
     toast.error("Reminder minutes must be at least 1 when reminders are enabled");
     return false;
   }
+  return true;
+}
+
+function validateEstimatedDurationMinutes(formData: CreateTaskFormData): boolean {
   const estTrim = formData.estimatedDurationMinutes.trim();
   if (estTrim === "") {
     return true;
@@ -1923,6 +1938,9 @@ function validatePlannerSidebarFormForSubmit(
     taskTypeOptions,
   );
   if (taskTypeEff === "recurring" && !validatePlannerSidebarRecurringSubmit(formData)) {
+    return false;
+  }
+  if (!validateEstimatedDurationMinutes(formData)) {
     return false;
   }
   if (!validatePlannerSidebarDueTimeRequiresDueDate(formData, taskTypeEff)) {
@@ -2579,6 +2597,71 @@ function mapExtensionsToPlannerUsers(extensions: Extension[]): UserType[] {
   }));
 }
 
+function resolveSidebarTaskTypeOptions(
+  isEdit: boolean,
+  editTask: PlannerEditTask | undefined,
+  normalizedTaskTypeOptions: readonly PlannerTaskType[],
+  openAsRecurringConversion: boolean,
+): PlannerTaskType[] {
+  const restricted = restrictPlannerTaskTypeOptionsForEdit(
+    isEdit,
+    editTask,
+    normalizedTaskTypeOptions,
+  );
+  if (openAsRecurringConversion === false || isEdit === false) {
+    return restricted;
+  }
+  return restricted.includes("recurring")
+    ? (["recurring"] as PlannerTaskType[])
+    : restricted;
+}
+
+function buildLimitedEditBaselineFormData(
+  isEdit: boolean,
+  editTask: PlannerEditTask | undefined,
+  taskEditScope: "none" | "limited" | "full",
+  extensions: Extension[],
+  taskTypeOptions: readonly PlannerTaskType[],
+): CreateTaskFormData | null {
+  if (!isEdit || !editTask || taskEditScope !== "limited") return null;
+  const merged = mergeFormDataWithDueDateClamp(
+    buildInitialFormFromEdit(editTask, extensions),
+  );
+  const baselineType: PlannerTaskType =
+    merged.taskType === "" ? "regular" : merged.taskType;
+  return {
+    ...merged,
+    taskType: clampTaskTypeToAllowed(baselineType, taskTypeOptions),
+  };
+}
+
+function resolveLinkedRecordsProjectId(
+  currentProjectId: number | null | undefined,
+  isEdit: boolean,
+  editTask: PlannerEditTask | undefined,
+): number | null {
+  if (currentProjectId != null) return currentProjectId;
+  if (isEdit === false) return null;
+  return editTask?.project_id ?? editTask?.project?.id ?? null;
+}
+
+function isEditingRecurringTaskTemplate(
+  isEdit: boolean,
+  editTask: PlannerEditTask | undefined,
+): boolean {
+  if (!isEdit || editTask == null) return false;
+  return normalizeEditTaskType(editTask) === "recurring";
+}
+
+function shouldShowOneWayTaskConversionHint(
+  isEdit: boolean,
+  editTask: PlannerEditTask | undefined,
+  isEditingRecurringTemplate: boolean,
+): boolean {
+  if (!isEdit || editTask == null) return false;
+  return !isEditingRecurringTemplate;
+}
+
 // ─── Component ───────────────────────────────────────────────────────────────
 
 const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
@@ -2599,9 +2682,15 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
   openAsRecurringConversion = false,
 }) => {
   const normalizedTaskTypeOptions = useNormalizedPlannerTaskTypeOptions(taskTypeChoices);
-  const taskTypeOptions = useMemo(
-    () => restrictPlannerTaskTypeOptionsForEdit(isEdit, editTask, normalizedTaskTypeOptions),
-    [isEdit, editTask, normalizedTaskTypeOptions],
+  const taskTypeOptions = useMemo<PlannerTaskType[]>(
+    (): PlannerTaskType[] =>
+      resolveSidebarTaskTypeOptions(
+        isEdit,
+        editTask,
+        normalizedTaskTypeOptions,
+        openAsRecurringConversion,
+      ),
+    [isEdit, editTask, normalizedTaskTypeOptions, openAsRecurringConversion],
   );
 
   const getInitialFormData = useCallback((): CreateTaskFormData => {
@@ -2649,9 +2738,11 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
     async (query: string, currentProjectId?: number | null) => {
       setLoadingLinkedRecords(true);
       try {
-        const projectId =
-          currentProjectId ??
-          (isEdit ? editTask?.project_id ?? editTask?.project?.id : null);
+        const projectId = resolveLinkedRecordsProjectId(
+          currentProjectId,
+          isEdit,
+          editTask,
+        );
         const response = await listTasks({
           page: 1,
           limit: 30,
@@ -2774,18 +2865,25 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
   );
 
   const isLimitedTaskEdit = Boolean(isEdit && taskEditScope === "limited");
+  const isRecurringConversionMode = Boolean(isEdit && openAsRecurringConversion);
+  const isEditingRecurringTemplate = isEditingRecurringTaskTemplate(
+    isEdit,
+    editTask,
+  );
+  const showOneWayConversionHint = shouldShowOneWayTaskConversionHint(
+    isEdit,
+    editTask,
+    isEditingRecurringTemplate,
+  );
 
   const limitedEditBaselineForm = useMemo((): CreateTaskFormData | null => {
-    if (!isEdit || !editTask || taskEditScope !== "limited") return null;
-    const merged = mergeFormDataWithDueDateClamp(
-      buildInitialFormFromEdit(editTask, extensions),
+    return buildLimitedEditBaselineFormData(
+      isEdit,
+      editTask,
+      taskEditScope,
+      extensions,
+      taskTypeOptions,
     );
-    const baselineType: PlannerTaskType =
-      merged.taskType === "" ? "regular" : merged.taskType;
-    return {
-      ...merged,
-      taskType: clampTaskTypeToAllowed(baselineType, taskTypeOptions),
-    };
   }, [isEdit, editTask, taskEditScope, extensions, taskTypeOptions]);
 
   const buildPayloadForForm = (fd: CreateTaskFormData) =>
@@ -2978,6 +3076,8 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
   };
   const groupClass = "mb-3 planner-sidebar-field";
   const dueDateMin = minDueDateFromTodayAndStart(formData.startDate);
+  const conversionHeaderTone = PLANNER_TASK_SIDEBAR.surface;
+  const conversionBodyTone = PLANNER_TASK_SIDEBAR.surface;
 
   return (
     <>
@@ -2990,7 +3090,7 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
           position: "fixed",
           inset: 0,
           zIndex: 1000,
-          backgroundColor: "rgba(15, 23, 42, 0.4)",
+          backgroundColor: "rgba(15, 23, 42, 0.25)",
           border: "none",
           padding: 0,
           cursor: "pointer",
@@ -3002,14 +3102,14 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
           position: "fixed",
           top: 0,
           right: 0,
-          width: 520,
+          width: 560,
           maxWidth: "100vw",
           height: "100vh",
           backgroundColor: PLANNER_TASK_SIDEBAR.surface,
           boxShadow: PLANNER_TASK_SIDEBAR.shadow,
           borderTopLeftRadius: PLANNER_TASK_SIDEBAR.radiusLg,
           borderBottomLeftRadius: PLANNER_TASK_SIDEBAR.radiusLg,
-          borderLeft: `4px solid ${PLANNER_TASK_SIDEBAR.accent}`,
+          borderLeft: `1px solid ${PLANNER_TASK_SIDEBAR.border}`,
           zIndex: 999999,
           display: "flex",
           flexDirection: "column",
@@ -3019,8 +3119,8 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
         {/* Header */}
         <div
           style={{
-            padding: "18px 24px 16px",
-            background: `linear-gradient(180deg, ${PLANNER_TASK_SIDEBAR.surfaceMuted} 0%, ${PLANNER_TASK_SIDEBAR.surface} 100%)`,
+            padding: "14px 18px",
+            background: conversionHeaderTone,
             borderBottom: `1px solid ${PLANNER_TASK_SIDEBAR.border}`,
             display: "flex",
             justifyContent: "space-between",
@@ -3030,29 +3130,17 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
         >
           <h2
             style={{
-              fontSize: 19,
-              fontWeight: 700,
+              fontSize: 30,
+              fontWeight: 600,
               margin: 0,
               display: "flex",
               alignItems: "center",
-              gap: 10,
+              gap: 8,
               color: PLANNER_TASK_SIDEBAR.text,
-              letterSpacing: "-0.02em",
+              letterSpacing: "0",
             }}
           >
-            <span
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                width: 40,
-                height: 40,
-                borderRadius: 12,
-                background: PLANNER_TASK_SIDEBAR.accentSoft,
-              }}
-            >
-              <ListTodo size={22} color={PLANNER_TASK_SIDEBAR.accent} strokeWidth={2.25} />
-            </span>
+            <ListTodo size={20} color={PLANNER_TASK_SIDEBAR.textMuted} strokeWidth={2} />
             {getSidebarTitle(formData.taskType, isEdit)}
           </h2>
           <button
@@ -3062,9 +3150,9 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
             style={{
               background: PLANNER_TASK_SIDEBAR.surfaceMuted,
               border: `1px solid ${PLANNER_TASK_SIDEBAR.border}`,
-              borderRadius: 10,
-              width: 40,
-              height: 40,
+              borderRadius: 6,
+              width: 32,
+              height: 32,
               padding: 0,
               cursor: "pointer",
               color: PLANNER_TASK_SIDEBAR.textMuted,
@@ -3074,11 +3162,11 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
               transition: "background 0.15s ease, color 0.15s ease",
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.background = "#e2e8f0";
+              e.currentTarget.style.background = "#f3f4f6";
               e.currentTarget.style.color = PLANNER_TASK_SIDEBAR.text;
             }}
             onMouseLeave={(e) => {
-              e.currentTarget.style.background = PLANNER_TASK_SIDEBAR.surfaceMuted;
+              e.currentTarget.style.background = PLANNER_TASK_SIDEBAR.surface;
               e.currentTarget.style.color = PLANNER_TASK_SIDEBAR.textMuted;
             }}
           >
@@ -3101,13 +3189,14 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
               flex: 1,
               minHeight: 0,
               overflowY: "auto",
-              padding: "22px 24px 28px",
-              backgroundColor: PLANNER_TASK_SIDEBAR.surfaceMuted,
+              padding: "14px 18px 22px",
+              backgroundColor: conversionBodyTone,
             }}
           >
           <Form onSubmit={(e) => { e.preventDefault(); handleCreate(); }}>
 
             <LimitedTaskEditBanner visible={isLimitedTaskEdit} />
+            
 
             <Row>
 
@@ -3148,61 +3237,59 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
             </Form.Group>
               </Col>
 
-              <Col xs={12} md={6}>
-              <Form.Group className={groupClass}>
-              <Form.Label style={labelStyle}>
-                Task Type <span style={{ color: "#ef4444" }}>*</span>
-              </Form.Label>
-              <Form.Select
-                value={taskTypeSelectHtmlValue(formData.taskType, taskTypeOptions)}
-                onChange={handleTaskTypeChange}
-                disabled={
-                  isEdit &&
-                  editTask != null &&
-                  normalizeEditTaskType(editTask) === "recurring"
-                }
-                className="py-2"
-                style={{ fontSize: "14px" }}
-              >
-                {isEdit ? null : (
-                  <option value="">Select type</option>
-                )}
-                {taskTypeOptions.map((opt) => (
-                  <option key={opt} value={opt}>
-                    {TASK_TYPE_SELECT_LABELS[opt]}
-                  </option>
-                ))}
-              </Form.Select>
-            </Form.Group>
-              </Col>
-              <Col xs={12} md={6}>
-              <Form.Group className={groupClass}>
-                  <Form.Label style={labelStyle}>
-                    Priority <span style={{ color: "#ef4444" }}>*</span>
-                  </Form.Label>
-                  <Form.Select
-                    value={formData.priorityId || 0}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        priorityId: Number(e.target.value),
-                      })
-                    }
-                    className="py-2"
-                    style={{ fontSize: "14px" }}
-                  >
-                    {priorities.map((priority) => (
-                      <option key={priority.id} value={priority.id}>
-                        {plannerPriorityDisplayName(priority.name)}
-                      </option>
-                    ))}
-                  </Form.Select>
-                </Form.Group>
-              </Col>
+              {!isRecurringConversionMode && (
+                <Col xs={12} md={6}>
+                  <Form.Group className={groupClass}>
+                    <Form.Label style={labelStyle}>
+                      Task Type <span style={{ color: "#ef4444" }}>*</span>
+                    </Form.Label>
+                    <Form.Select
+                      value={taskTypeSelectHtmlValue(formData.taskType, taskTypeOptions)}
+                      onChange={handleTaskTypeChange}
+                      disabled={isEditingRecurringTemplate}
+                      className="py-2"
+                      style={{ fontSize: "14px" }}
+                    >
+                      {!isEdit && (
+                        <option value="">Select type</option>
+                      )}
+                      {taskTypeOptions.map((opt) => (
+                        <option key={opt} value={opt}>
+                          {TASK_TYPE_SELECT_LABELS[opt]}
+                        </option>
+                      ))}
+                    </Form.Select>
+                  </Form.Group>
+                </Col>
+              )}
+              {!isRecurringConversionMode && (
+                <Col xs={12} md={6}>
+                  <Form.Group className={groupClass}>
+                    <Form.Label style={labelStyle}>
+                      Priority <span style={{ color: "#ef4444" }}>*</span>
+                    </Form.Label>
+                    <Form.Select
+                      value={formData.priorityId || 0}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          priorityId: Number(e.target.value),
+                        })
+                      }
+                      className="py-2"
+                      style={{ fontSize: "14px" }}
+                    >
+                      {priorities.map((priority) => (
+                        <option key={priority.id} value={priority.id}>
+                          {plannerPriorityDisplayName(priority.name)}
+                        </option>
+                      ))}
+                    </Form.Select>
+                  </Form.Group>
+                </Col>
+              )}
 
-              {isEdit &&
-                editTask != null &&
-                normalizeEditTaskType(editTask) !== "recurring" && (
+              {!isRecurringConversionMode && showOneWayConversionHint && (
                   <Col xs={12}>
                     <div className="planner-sidebar-hint mb-3">
                       You can convert this task to <strong>Recurring</strong> only (not to the other
@@ -3211,6 +3298,7 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
                   </Col>
                 )}
 
+              {!isRecurringConversionMode && (
               <Col xs={12}>
               <Form.Group className={groupClass}>
                   <Form.Label style={labelStyle}>
@@ -3249,9 +3337,10 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
                   </div>
                 </Form.Group>
               </Col>
+              )}
 
               <Col xs={12}>
-              {formData.taskType !== "todo" && (
+              {!isRecurringConversionMode && formData.taskType !== "todo" && (
               <fieldset
                 disabled={isLimitedTaskEdit}
                 style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}
@@ -3434,7 +3523,7 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
               </Col>
 
               <Col xs={12}>
-              {formData.taskType !== "todo" && (
+              {!isRecurringConversionMode && formData.taskType !== "todo" && (
               <fieldset
                 disabled={isLimitedTaskEdit}
                 style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}
@@ -3621,25 +3710,27 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
 
               </Col>
 
-              <Col xs={12} md={6}>
-                <Form.Group className={groupClass}>
-                  <Form.Label style={labelStyle}>
-                    <Calendar size={16} className="me-2" style={{ verticalAlign: "middle" }} />
-                    Start Date
-                    {formData.taskType === "recurring" && (
-                      <span style={{ color: "#ef4444" }}> *</span>
-                    )}
-                  </Form.Label>
-                  <Form.Control
-                    type="date"
-                    value={formData.startDate}
-                    onChange={handleStartDateInputChange}
-                    className="py-2"
-                    style={{ fontSize: "14px" }}
-                    required={formData.taskType === "recurring"}
-                  />
-                </Form.Group>
-              </Col>
+              {!isRecurringConversionMode && (
+                <Col xs={12} md={6}>
+                  <Form.Group className={groupClass}>
+                    <Form.Label style={labelStyle}>
+                      <Calendar size={16} className="me-2" style={{ verticalAlign: "middle" }} />
+                      Start Date
+                      {formData.taskType === "recurring" && (
+                        <span style={{ color: "#ef4444" }}> *</span>
+                      )}
+                    </Form.Label>
+                    <Form.Control
+                      type="date"
+                      value={formData.startDate}
+                      onChange={handleStartDateInputChange}
+                      className="py-2"
+                      style={{ fontSize: "14px" }}
+                      required={formData.taskType === "recurring"}
+                    />
+                  </Form.Group>
+                </Col>
+              )}
               {formData.taskType !== "recurring" && (
               <Col xs={12} md={6}>
                 <Form.Group className={groupClass}>
@@ -3684,6 +3775,30 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
                       value={formData.dueTime}
                       onChange={(e) =>
                         setFormData({ ...formData, dueTime: e.target.value })
+                      }
+                      className="py-2"
+                      style={{ fontSize: "14px" }}
+                    />
+                  </Form.Group>
+                </Col>
+              )}
+              {formData.taskType !== "recurring" && (
+                <Col xs={12} md={6}>
+                  <Form.Group className={groupClass}>
+                    <Form.Label style={labelStyle}>
+                      Estimated duration (optional)
+                    </Form.Label>
+                    <Form.Control
+                      type="number"
+                      min={0}
+                      max={525600}
+                      placeholder="Minutes"
+                      value={formData.estimatedDurationMinutes}
+                      onChange={(e) =>
+                        setFormData((prev) => ({
+                          ...prev,
+                          estimatedDurationMinutes: e.target.value,
+                        }))
                       }
                       className="py-2"
                       style={{ fontSize: "14px" }}
@@ -3849,7 +3964,6 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
                         className="py-2"
                         style={{ fontSize: "14px" }}
                       />
-                      <Form.Text className="text-muted">Copied to each occurrence (0–525600).</Form.Text>
                     </Form.Group>
                   </Col>
                   <Col xs={12} md={6}>
@@ -3862,9 +3976,7 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
                       >
                         {getAutoTimezone()}
                       </div>
-                      <Form.Text className="text-muted">
-                        Detected from your browser and sent with each save. Not editable.
-                      </Form.Text>
+                    
                     </Form.Group>
                   </Col>
                 </Row>
@@ -3910,7 +4022,7 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
                       type="radio"
                       id="rec-end-occ"
                       name="planner-recurring-end"
-                      label="End after N materialized occurrences"
+                      label="End after N occurrences"
                       checked={formData.recurringEndStrategy === "occurrences"}
                       onChange={() =>
                         setFormData((prev) => ({ ...prev, recurringEndStrategy: "occurrences" }))
@@ -4043,6 +4155,7 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
 
             
 
+            {!isRecurringConversionMode && (
             <Form.Group className={groupClass}>
               <Form.Label style={labelStyle}>
                 <FileText size={16} className="me-2" style={{ verticalAlign: "middle" }} />
@@ -4060,7 +4173,9 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
                 maxLength={5000}
               />
             </Form.Group>
+            )}
 
+            {!isRecurringConversionMode && (
             <Row className="mb-3">
               {formData.taskType !== "todo" && (
                 <Col xs={12} className="mb-3">
@@ -4237,6 +4352,7 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
              
               
             </Row>
+            )}
 
             
 
@@ -4247,7 +4363,7 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
           <TaskSecondaryTabs
             taskId={sidebarEditTaskId}
             extensions={extensions}
-            visible={Boolean(sidebarEditTaskId)}
+            visible={Boolean(sidebarEditTaskId) && !isRecurringConversionMode}
           />
         </div>
 
@@ -4260,6 +4376,7 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
           onCreateAndOpenSubmit={(e) => {
             void submitPlannerTask(e, onCreateAndOpen).catch(() => undefined);
           }}
+          isRecurringConversionMode={isRecurringConversionMode}
         />
       </div>
     </>
