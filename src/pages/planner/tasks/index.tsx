@@ -128,6 +128,10 @@ const TasksListingPage = ({
       () => hasPermission(PERMISSIONS.CREATE_TASKS_WORK_PLANNER),
       [hasPermission],
     );
+    const sessionCanConvertToRecurringPlannerTask = useMemo(
+      () => hasPermission(PERMISSIONS.CONVERT_TO_RECURRING_TASK_WORK_PLANNER),
+      [hasPermission],
+    );
     const isProjectScopedEmbed = Boolean(sidebarProject?.id);
     const { hierarchyDataExtensions: hierarchyFromApi } = useHierarchyData(
       ModuleSlug.WORK_PLANNER,
@@ -318,6 +322,7 @@ const TasksListingPage = ({
     const [editingTaskEditScope, setEditingTaskEditScope] = useState<
       "none" | "limited" | "full"
     >("full");
+    const [openAsRecurringConversion, setOpenAsRecurringConversion] = useState(false);
   
     // ── Delete confirmation ──────────────────────────────────────────────────────
     const [showDelete, setShowDelete] = useState(false);
@@ -596,11 +601,27 @@ const TasksListingPage = ({
       (row: Task) => {
         const perms = getTaskRowPermissions(row);
         if (!perms.canOpenTaskEdit) return;
+        setOpenAsRecurringConversion(false);
         setEditingTask(row);
         setEditingTaskEditScope(perms.taskEditScope);
         setShowCreate(true);
       },
       [getTaskRowPermissions],
+    );
+
+    const openConvertToRecurring = useCallback(
+      (row: Task) => {
+        if (!sessionCanConvertToRecurringPlannerTask) return;
+        const perms = getTaskRowPermissions(row);
+        if (!perms.canOpenTaskEdit) return;
+        const kind = row.task_type;
+        if (kind !== "todo" && kind !== "regular") return;
+        setOpenAsRecurringConversion(true);
+        setEditingTask(row);
+        setEditingTaskEditScope(perms.taskEditScope);
+        setShowCreate(true);
+      },
+      [getTaskRowPermissions, sessionCanConvertToRecurringPlannerTask],
     );
 
     const openDeleteConfirm = useCallback(
@@ -732,6 +753,10 @@ const TasksListingPage = ({
           const perms = getTaskRowPermissions(row);
           const canEditRow = perms.canOpenTaskEdit;
           const canDeleteRow = perms.canDeleteTask;
+          const canConvertRow =
+            sessionCanConvertToRecurringPlannerTask && canEditRow;
+          const isTodoOrRegular =
+            row.task_type === "todo" || row.task_type === "regular";
           return (
             <PlannerTaskRowActionsMenu
               row={row}
@@ -751,10 +776,12 @@ const TasksListingPage = ({
       router,
       handleToggleComplete,
       openEdit,
+      openConvertToRecurring,
       openDeleteConfirm,
       getTaskRowPermissions,
       openTaskActionsId,
       hierarchyDataExtensions,
+      sessionCanConvertToRecurringPlannerTask,
     ]);
 
     const tableColumnsForGrid = useMemo(() => {
@@ -1034,6 +1061,7 @@ const TasksListingPage = ({
             setShowCreate(false);
             setEditingTask(null);
             setEditingTaskEditScope("full");
+            setOpenAsRecurringConversion(false);
           }}
           onCreate={async () => {
             setShowCreate(false);
@@ -1062,6 +1090,7 @@ const TasksListingPage = ({
           }
           lockProjectSelection={Boolean(sidebarProject)}
           taskEditScope={editingTask ? editingTaskEditScope : "full"}
+          openAsRecurringConversion={openAsRecurringConversion}
         />
   
         {/* ── Delete confirmation ── */}

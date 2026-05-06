@@ -161,14 +161,23 @@ interface CreateTaskData {
   type?: "regular" | "recurring" | "todo";
 }
 
+/** Subset of `frequency_config` when `frequency` is `custom` (task store request). */
+export interface TaskFrequencyConfigPayload {
+  unit: 'days' | 'weeks' | 'months' | 'years';
+  interval: number;
+}
+
 interface CreateRecurringTaskData {
   title: string;
   description?: string;
   frequency: string;
+  frequency_config?: TaskFrequencyConfigPayload;
   repeat_interval?: number;
   repeat_on?: string;
   start_date: string;
   end_date?: string | null;
+  /** Mutually exclusive with `end_date` for recurring templates. */
+  occurrences?: number | null;
   due_time?: string;
   priority?: string;
   project_id?: number;
@@ -177,6 +186,12 @@ interface CreateRecurringTaskData {
   label_ids?: number[];
   type: "recurring";
   is_active?: boolean;
+  timezone?: string;
+  time_zone?: string;
+  reminder_minutes?: number | null;
+  estimated_duration_minutes?: number | null;
+  recurring_auto_create_next_on_complete?: boolean;
+  recurring_create_next_if_previous_incomplete?: boolean;
 }
 
 interface UpdateTaskData {
@@ -201,12 +216,15 @@ interface UpdateTaskData {
 interface UpdateRecurringTaskData {
   title?: string;
   description?: string;
+  type?: 'recurring';
   frequency?: string;
+  frequency_config?: TaskFrequencyConfigPayload | null;
   repeat_interval?: number;
   repeat_on?: string;
   start_date?: string;
   end_date?: string | null;
-  due_time?: string;
+  occurrences?: number | null;
+  due_time?: string | null;
   priority?: string;
   project_id?: number;
   status_id?: number;
@@ -214,6 +232,12 @@ interface UpdateRecurringTaskData {
   label_ids?: number[];
   is_active?: boolean;
   parent_task_id?: number | string | null;
+  timezone?: string;
+  time_zone?: string;
+  reminder_minutes?: number | null;
+  estimated_duration_minutes?: number | null;
+  recurring_auto_create_next_on_complete?: boolean;
+  recurring_create_next_if_previous_incomplete?: boolean;
 }
 
 // ==================== Helper Functions ====================

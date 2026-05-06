@@ -1,0 +1,138 @@
+// Create / edit planner task sidebar — matches PLANNER_TASK_SIDEBAR in CreatePlannerTaskSidebar/index.tsx
+$planner-sidebar-accent: #4f46e5;
+$planner-sidebar-accent-soft: rgba(79, 70, 229, 0.12);
+$planner-sidebar-surface: #ffffff;
+$planner-sidebar-surface-muted: #f1f5f9;
+$planner-sidebar-border: #e2e8f0;
+$planner-sidebar-text: #0f172a;
+$planner-sidebar-text-muted: #64748b;
+$planner-sidebar-placeholder: #94a3b8;
+
+.create-task-sidebar-backdrop {
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+
+.create-task-sidebar-panel {
+  .form-control,
+  .form-select {
+    border-color: $planner-sidebar-border !important;
+    border-radius: 10px !important;
+    min-height: 42px !important;
+    font-size: 15px !important;
+    font-weight: 400 !important;
+    background-color: $planner-sidebar-surface !important;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  }
+
+  .form-control:focus,
+  .form-select:focus {
+    border-color: $planner-sidebar-accent !important;
+    box-shadow: 0 0 0 3px $planner-sidebar-accent-soft !important;
+  }
+
+  .form-control::placeholder,
+  textarea::placeholder,
+  input::placeholder {
+    font-size: 15px !important;
+    color: $planner-sidebar-placeholder !important;
+  }
+
+  .form-check-input:checked {
+    background-color: $planner-sidebar-accent;
+    border-color: $planner-sidebar-accent;
+  }
+
+  .form-switch .form-check-input:focus {
+    box-shadow: 0 0 0 3px $planner-sidebar-accent-soft;
+  }
+}
+
+.planner-sidebar-section {
+  background: $planner-sidebar-surface;
+  border: 1px solid $planner-sidebar-border;
+  border-radius: 14px;
+  padding: 18px 20px 20px;
+  margin-bottom: 1.25rem;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+
+.planner-sidebar-section__title {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: $planner-sidebar-text-muted;
+  margin-bottom: 14px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid $planner-sidebar-border;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+
+  &::before {
+    content: "";
+    width: 4px;
+    height: 16px;
+    border-radius: 2px;
+    background: $planner-sidebar-accent;
+    flex-shrink: 0;
+  }
+}
+
+.planner-sidebar-field {
+  .form-text {
+    font-size: 12px !important;
+    color: $planner-sidebar-text-muted !important;
+    margin-top: 6px !important;
+  }
+
+  .form-check {
+    padding-top: 2px;
+    padding-bottom: 2px;
+  }
+
+  .form-check-label {
+    font-size: 14px;
+    color: $planner-sidebar-text;
+    line-height: 1.45;
+  }
+}
+
+.planner-sidebar-hint {
+  font-size: 13px;
+  color: $planner-sidebar-text;
+  background: $planner-sidebar-surface;
+  border: 1px solid $planner-sidebar-border;
+  border-radius: 12px;
+  padding: 12px 14px;
+  margin-bottom: 4px;
+  line-height: 1.5;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+
+  strong {
+    color: $planner-sidebar-accent;
+    font-weight: 700;
+  }
+}
+
+.create-task-sidebar-footer {
+  background: $planner-sidebar-surface;
+  border-top: 1px solid $planner-sidebar-border;
+  box-shadow: 0 -8px 24px rgba(15, 23, 42, 0.06);
+}
+
+.planner-sidebar-readonly-value {
+  font-size: 14px;
+  font-weight: 500;
+  color: $planner-sidebar-text;
+  background: $planner-sidebar-surface-muted;
+  border: 1px solid $planner-sidebar-border;
+  border-radius: 10px;
+  min-height: 42px;
+  padding: 10px 12px;
+  display: flex;
+  align-items: center;
+  user-select: none;
+  cursor: default;
+}
