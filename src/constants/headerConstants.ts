@@ -288,6 +288,7 @@ export const HEADER_CONSTANTS = {
     CRM_SERVICES: "crm-services",
     COMMUNICATIONS_SERVICES: "communications-services-services",
     WORK_PLANNER_SERVICES: "work-planner-services",
+    CONVERT_TO_RECURRING_TASK_WORK_PLANNER: "convert-to-recurring-task-work-planner",
     PULSE_SERVICES: "pulse-services",
     VIRTUAL_AGENTS_SERVICES: "ai-ml-services",
     DNCR_SERVICES: "dncr-services",

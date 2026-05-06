@@ -476,6 +476,10 @@ const TasksListingPage = ({
       () => hasPermission(PERMISSIONS.CREATE_TASKS_WORK_PLANNER),
       [hasPermission],
     );
+    const sessionCanConvertToRecurringPlannerTask = useMemo(
+      () => hasPermission(PERMISSIONS.CONVERT_TO_RECURRING_TASK_WORK_PLANNER),
+      [hasPermission],
+    );
     const isProjectScopedEmbed = Boolean(sidebarProject?.id);
     const { hierarchyDataExtensions: hierarchyFromApi } = useHierarchyData(
       ModuleSlug.WORK_PLANNER,
@@ -911,6 +915,7 @@ const TasksListingPage = ({
 
     const openConvertToRecurring = useCallback(
       (row: Task) => {
+        if (!sessionCanConvertToRecurringPlannerTask) return;
         const perms = getTaskRowPermissions(row);
         if (!perms.canOpenTaskEdit) return;
         const kind = row.task_type;
@@ -920,7 +925,7 @@ const TasksListingPage = ({
         setEditingTaskEditScope(perms.taskEditScope);
         setShowCreate(true);
       },
-      [getTaskRowPermissions],
+      [getTaskRowPermissions, sessionCanConvertToRecurringPlannerTask],
     );
 
     const openDeleteConfirm = useCallback(
@@ -1111,6 +1116,8 @@ const TasksListingPage = ({
           const perms = getTaskRowPermissions(row);
           const canEditRow = perms.canOpenTaskEdit;
           const canDeleteRow = perms.canDeleteTask;
+          const canConvertRow =
+            sessionCanConvertToRecurringPlannerTask && canEditRow;
           const isTodoOrRegular =
             row.task_type === "todo" || row.task_type === "regular";
           return (
@@ -1153,15 +1160,21 @@ const TasksListingPage = ({
                   <Dropdown.Item
                     as="button"
                     type="button"
-                    aria-disabled={!canEditRow}
-                    className={canEditRow ? undefined : "text-muted"}
+                    aria-disabled={!canConvertRow}
+                    className={canConvertRow ? undefined : "text-muted"}
                     style={{
-                      cursor: canEditRow ? "pointer" : "not-allowed",
-                      opacity: canEditRow ? 1 : 0.65,
+                      cursor: canConvertRow ? "pointer" : "not-allowed",
+                      opacity: canConvertRow ? 1 : 0.65,
                     }}
-                    title={plannerTaskRowEditDeniedTitle(canEditRow)}
+                    title={
+                      canConvertRow
+                        ? ""
+                        : !sessionCanConvertToRecurringPlannerTask
+                          ? "You are not authorized to convert tasks to recurring"
+                          : plannerTaskRowEditDeniedTitle(canEditRow)
+                    }
                     onClick={() => {
-                      if (!canEditRow) return;
+                      if (!canConvertRow) return;
                       setOpenTaskActionsId(null);
                       openConvertToRecurring(row);
                     }}
@@ -1205,6 +1218,7 @@ const TasksListingPage = ({
       getTaskRowPermissions,
       openTaskActionsId,
       hierarchyDataExtensions,
+      sessionCanConvertToRecurringPlannerTask,
     ]);
 
     const tableColumnsForGrid = useMemo(() => {
