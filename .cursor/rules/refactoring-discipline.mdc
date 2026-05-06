@@ -1,0 +1,43 @@
+---
+description: Refactor playbook—imports, RQ vs Redux, hooks/components layout, leaks and rerenders, scope
+globs: src/**/*.{ts,tsx}
+alwaysApply: false
+---
+
+# Refactoring discipline
+
+## Before changing code
+- **Lock the goal**: one measurable outcome (e.g. "move list fetch to TanStack Query") and explicit **non-goals** (no UI redesign, no unrelated lint cleanup).
+- **Prefer vertical slices**: one flow or feature path per change set; avoid repo-wide mechanical edits unless agreed.
+- **Read first**: match naming, imports, folder layout, and error/toast patterns of the surrounding module.
+
+## Behavior and risk
+- **Preserve semantics** unless the task explicitly changes product behavior; call out any intentional deltas in the PR/summary.
+- **Reduce blast radius**: keep public props/APIs stable; use adapters or thin wrappers at boundaries instead of renaming across many consumers in one go.
+- **Validate**: run targeted checks (`tsc`, lint on touched paths, or the relevant page manually) after substantive refactors.
+
+## Imports
+- **Remove unused imports** in every touched file; keep imports ordered consistently with the surrounding file (path aliases, grouping).
+- **Prefer narrow imports**: import only what you need (`import { foo } from 'bar'`), not the whole library namespace, when the library supports tree-shaking—smaller bundles and clearer dependencies.
+
+## Data fetching, side effects, and state (this codebase)
+- **TanStack Query** owns **server/async remote state**: HTTP reads, caching, retries, and mutations that should **invalidate or patch** query cache (`useQuery` / `useMutation`). Put **side effects tied to server I/O** (`invalidateQueries`, `setQueryData`, refetch) in query/mutation callbacks—not scattered `useEffect` fetch chains when a query fits.
+- Use **query keys** from `src/query/keys.ts` (e.g. `communicationsKeys`, `plannerKeys`); follow `src/query/README.md`.
+- **Redux** is for **local and global client/UI state** (modals, wizard steps, ephemeral selections, features not yet migrated). **Do not** add new Redux thunks solely for CRUD/list reads—use RQ. During migration, avoid duplicating the same server list in Redux and RQ; document temporary overlap in the PR.
+
+## Structure: components and hooks
+- **Helper / presentational UI** that is reused or clutters a page belongs under **`src/components/`** with domain-first paths (e.g. `src/components/planner/...`, `src/components/communications/...`), co-located SCSS/types where the module already does.
+- **Reusable stateful logic** (pagination, filters, derived data, subscription setup) belongs in **`src/hooks/`** (or domain `use*.ts` next to the feature when the codebase already does)—not buried inside giant page files.
+
+## Memory leaks and rerenders
+- **Subscriptions**: always return cleanup from `useEffect` (listeners, timers, `EventSource`/SSE wrappers, observers). Avoid orphaned globals.
+- **Stable references**: memoize callbacks/values passed to memoized children when identity churn causes extra renders; fix **dependency arrays**—no stale closures, no missing deps that hide bugs.
+- **Lists**: stable `key`s; avoid inline object/array literals for props on heavy child trees in hot paths unless measured harmless.
+
+## Code quality during refactors
+- **No drive-by changes**: do not reformat, rename, or "clean up" files you are not touching for the refactor goal.
+- **Extract before duplicating**: shared fetch/transform logic belongs in one module (e.g. `fetchXPayload` + thin `useQuery`), not copied between thunk and component.
+- **Sonar-friendly**: avoid huge parameter lists in public APIs—use a single `params` object (query keys, hook options). Keep complexity down with small helpers.
+
+## PR / handoff
+- Describe **what**, **why**, and **how to verify** in complete sentences; link or name tickets when applicable.

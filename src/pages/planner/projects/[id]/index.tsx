@@ -2,7 +2,6 @@ import "@assets/scss/datatable-style.scss";
 import React, {
   ReactElement,
   useState,
-  useEffect,
   useMemo,
   useRef,
   type ComponentProps,
@@ -33,6 +32,8 @@ import { useHierarchyData } from "@components/filters/useHierarchyData";
 import { Plus, LayoutGrid } from "lucide-react";
 import { toast } from "react-toastify";
 import CreateTaskSidebar from "@components/CreatePlannerTaskSidebar";
+import { useQuery } from "@tanstack/react-query";
+import { plannerKeys } from "../../../../query/keys";
 
 const { PERMISSIONS } = HEADER_CONSTANTS;
 
@@ -43,8 +44,21 @@ type PlannerSidebarEditTask = NonNullable<
 const WorkPlannerProjectsDetails = () => {
   const router = useRouter();
   const { id } = router.query;
-  const [loading, setLoading] = useState(true);
-  const [project, setProject] = useState<any>(null);
+  const projectId = typeof id === "string" ? id : "";
+
+  const {
+    data: project,
+    isPending: projectQueryPending,
+    refetch: refetchProject,
+  } = useQuery({
+    queryKey: plannerKeys.projects.detail(projectId),
+    queryFn: () =>
+      getProject(projectId, Array.from(WORK_PLANNER_PROJECT_DETAIL_RELATIONS)),
+    enabled: router.isReady && projectId.length > 0,
+  });
+
+  const loading = !router.isReady || (projectId.length > 0 && projectQueryPending);
+
   const [showCreateTaskSidebar, setShowCreateTaskSidebar] = useState(false);
   const [sidebarEditTask, setSidebarEditTask] = useState<PlannerSidebarEditTask | null>(null);
   const [loadingSidebarEditTask, setLoadingSidebarEditTask] = useState(false);
@@ -66,35 +80,9 @@ const WorkPlannerProjectsDetails = () => {
     [project, sessionUserPhoneOrExtension],
   );
 
-  // Fetch project data
-  useEffect(() => {
-    if (id) {
-      fetchProjectData();
-    }
-  }, [id]);
-
-  const fetchProjectData = async () => {
-    try {
-      setLoading(true);
-      const projectData = await getProject(
-        id as string,
-        Array.from(WORK_PLANNER_PROJECT_DETAIL_RELATIONS),
-      );
-
-      if (projectData) {
-        setProject(projectData);
-      }
-    } catch (error) {
-      console.error('Error fetching project data:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   // Handle task creation - ProjectTabsContent will handle refreshing its own data
-  const handleCreateTask = async (formData: any) => {
+  const handleCreateTask = async (_formData: unknown) => {
     // The ProjectTabsContent component handles task creation and data refresh internally
-    // This callback can be used for additional logic if needed
   };
 
   const handleCreateTaskClick = () => {
@@ -111,7 +99,7 @@ const WorkPlannerProjectsDetails = () => {
   const handleCreateTaskSidebarSuccess = async () => {
     setShowCreateTaskSidebar(false);
     setSidebarEditTask(null);
-    await fetchProjectData();
+    await refetchProject();
     await projectTabsContentRef.current?.refreshAfterTaskChange();
   };
 

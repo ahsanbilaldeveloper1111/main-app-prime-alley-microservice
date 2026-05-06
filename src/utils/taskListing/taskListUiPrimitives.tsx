@@ -141,14 +141,17 @@ function taskDueDateListTimeClock12h(
   return "";
 }
 
+/** Visual tone for due-date cells (use with shared or page SCSS modifiers). */
+export type TaskDueDateCellTone = "empty" | "default" | "overdue";
+
 /** Date + optional time in 12-hour form; omits clock for UTC-midnight “date-only” dues unless a real `due_time` is present. */
 export function formatTaskDueDateCellParts(
   dueDateIso: string | null | undefined,
   rowStatus: "pending" | "completed" | "overdue",
   dueTimeRaw?: string | null,
-): { label: string; color: string; fontWeight: number } {
+): { label: string; color: string; fontWeight: number; tone: TaskDueDateCellTone } {
   if (!dueDateIso) {
-    return { label: "—", color: "#9ca3af", fontWeight: 300 };
+    return { label: "—", color: "#9ca3af", fontWeight: 300, tone: "empty" };
   }
   const m = moment(dueDateIso);
   const overdue = m.isBefore(moment()) && rowStatus !== "completed";
@@ -169,6 +172,7 @@ export function formatTaskDueDateCellParts(
     label,
     color: overdue ? "#ef4444" : "#374151",
     fontWeight: overdue ? 500 : 300,
+    tone: overdue ? "overdue" : "default",
   };
 }
 
@@ -179,6 +183,7 @@ export type TaskListingSearchRowProps = Readonly<{
   placeholder?: string;
   editColumnsSlot?: React.ReactNode;
   wrapperStyle?: React.CSSProperties;
+  wrapperClassName?: string;
 }>;
 
 export function TaskListingSearchRow({
@@ -188,6 +193,7 @@ export function TaskListingSearchRow({
   placeholder = "Search task title and notes",
   editColumnsSlot,
   wrapperStyle,
+  wrapperClassName,
 }: TaskListingSearchRowProps) {
   const rowStyle: React.CSSProperties = {
     display: "flex",
@@ -199,7 +205,7 @@ export function TaskListingSearchRow({
     ...wrapperStyle,
   };
   return (
-    <div style={rowStyle}>
+    <div className={wrapperClassName} style={rowStyle}>
       <div style={{ display: "flex", alignItems: "center", gap: 0 }}>
         <div style={{ position: "relative" }}>
           <FiSearch

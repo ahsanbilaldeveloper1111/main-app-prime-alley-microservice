@@ -1,8 +1,27 @@
-/** Initials for CRM avatar badges (first two words / first two letters, a–z only). */
-export function getInitials(name: string): string {
-  if (!name) return "NA";
+/** Coerce CRM/API values to a display string for avatars (never throws). */
+export function crmAvatarDisplayString(value: unknown): string {
+  if (value == null || value === "") return "";
+  if (typeof value === "string") return value;
+  if (typeof value === "number" || typeof value === "boolean" || typeof value === "bigint") {
+    return String(value);
+  }
+  if (typeof value === "object" && value !== null) {
+    const o = value as Record<string, unknown>;
+    for (const key of ["name", "company_name", "title", "label"] as const) {
+      const part = o[key];
+      if (typeof part === "string" && part.trim() !== "") return part;
+      if (typeof part === "number" || typeof part === "boolean") return String(part);
+    }
+  }
+  return "";
+}
 
-  const words = name.trim().split(/\s+/).slice(0, 2);
+/** Initials for CRM avatar badges (first two words / first two letters, a–z only). */
+export function getInitials(name: unknown): string {
+  const raw = crmAvatarDisplayString(name);
+  if (!raw) return "NA";
+
+  const words = raw.trim().split(/\s+/).slice(0, 2);
   const hasSecondWord = words.length >= 2;
   const secondWordHasLetter = hasSecondWord && /[a-z]/i.test(words[1]);
 
@@ -38,10 +57,11 @@ export function stableStringHash(input: string): number {
 }
 
 /** Deterministic hsla color from a display name for avatar backgrounds. */
-export function getRandomColor(name: string): string {
-  if (!name) return "#6c757d";
+export function getRandomColor(name: unknown): string {
+  const s = crmAvatarDisplayString(name);
+  if (!s) return "#6c757d";
 
-  const hash = stableStringHash(name);
+  const hash = stableStringHash(s);
   const hue = hash % 360;
   const saturation = 50 + (hash % 30);
   const lightness = 40 + (hash % 20);

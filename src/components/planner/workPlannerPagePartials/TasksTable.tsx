@@ -62,9 +62,9 @@ const TasksTable: React.FC<TasksTableProps> = ({
     );
     const name = extension?.name || extNumber;
     const initials =
-      name !== extNumber
-        ? name.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase()
-        : (extNumber || fallback).toUpperCase().slice(0, 2);
+      name === extNumber
+        ? (extNumber || fallback).toUpperCase().slice(0, 2)
+        : name.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase();
     return { name, initials };
   };
 
@@ -72,11 +72,15 @@ const TasksTable: React.FC<TasksTableProps> = ({
     if (!task.rawData?.assignees || task.rawData.assignees.length === 0) {
       return <span className="text-muted">Not assigned</span>;
     }
-    return task.rawData.assignees.map((assignee: any, idx: number) => {
+    return task.rawData.assignees.map((assignee: any) => {
       const extNumber = assignee.extension_number || '';
       const { name, initials } = getExtensionDisplay(extNumber, 'UN');
       return (
-        <div key={idx} className="assignee-badge" title={name}>
+        <div
+          key={`${task.id}:assignee:${extNumber.trim() || 'unknown'}`}
+          className="assignee-badge"
+          title={name}
+        >
           {initials}
         </div>
       );
@@ -89,11 +93,16 @@ const TasksTable: React.FC<TasksTableProps> = ({
       task.rawData?.watcher_numbers?.map((extNum: string) => ({ extension_number: extNum })) ??
       [];
     if (!watchers.length) return <span className="text-muted">—</span>;
-    return watchers.map((watcher: any, idx: number) => {
+    return watchers.map((watcher: any) => {
       const extNumber = watcher.extension_number ?? watcher ?? '';
-      const { name, initials } = getExtensionDisplay(String(extNumber), '—');
+      const extKey = String(extNumber).trim();
+      const { name, initials } = getExtensionDisplay(extKey, '—');
       return (
-        <div key={idx} className="assignee-badge" title={name}>
+        <div
+          key={`${task.id}:watcher:${extKey || 'unknown'}`}
+          className="assignee-badge"
+          title={name}
+        >
           {initials}
         </div>
       );
@@ -106,6 +115,81 @@ const TasksTable: React.FC<TasksTableProps> = ({
     const { name } = getExtensionDisplay(extNumber, '');
     return name || extNumber;
   };
+
+  function renderTasksTableBodyRows(): React.ReactNode {
+    if (loading) {
+      return (
+        <tr>
+          <td colSpan={12} className="text-center py-5">
+            <Spinner animation="border" variant="primary" />
+            <div className="mt-2">Loading {itemLabel}...</div>
+          </td>
+        </tr>
+      );
+    }
+    if (tasks.length === 0) {
+      return (
+        <tr>
+          <td colSpan={12} className="text-center py-5 text-muted">
+            No {itemLabel} found
+          </td>
+        </tr>
+      );
+    }
+    return tasks.map((task) => (
+      <tr key={task.id}>
+        <td className="task-id" onClick={() => onTaskClick(task)}>
+          {task.id}
+        </td>
+        <td onClick={() => onTaskClick(task)}>{task.title}</td>
+        <td onClick={() => onTaskClick(task)}>
+          <Badge bg={getStatusVariant(task.status)} className="px-3 py-2">
+            {task.status}
+          </Badge>
+        </td>
+        <td onClick={() => onTaskClick(task)}>
+          <Badge bg={getPriorityVariant(task.priority)} className="px-3 py-2">
+            {task.priority}
+          </Badge>
+        </td>
+        <td onClick={() => onTaskClick(task)}>{task.project}</td>
+        <td onClick={() => onTaskClick(task)}>
+          <div className="d-flex align-items-center gap-2">{renderAssignees(task)}</div>
+        </td>
+        <td onClick={() => onTaskClick(task)}>
+          <div className="d-flex align-items-center gap-2">{renderWatchers(task)}</div>
+        </td>
+        <td onClick={() => onTaskClick(task)}>
+          {task.rawData?.start_date
+            ? moment(task.rawData.start_date).format(GlobalDateTimeFormat)
+            : ''}
+        </td>
+        <td onClick={() => onTaskClick(task)}>
+          {task.rawData?.due_date
+            ? moment(task.rawData.due_date).format(GlobalDateFormat)
+            : ''}
+        </td>
+        <td onClick={() => onTaskClick(task)}>{renderCreatedBy(task)}</td>
+        <td onClick={() => onTaskClick(task)}>
+          {task.rawData?.created_at
+            ? moment(task.rawData.created_at).format(GlobalDateTimeFormat)
+            : ''}
+        </td>
+        <td>
+          <Button
+            variant="link"
+            className="text-secondary p-0 d-flex align-items-center gap-1"
+            onClick={(e) => {
+              e.stopPropagation();
+              onTaskClick(task);
+            }}
+          >
+            <MoreVertical size={20} />
+          </Button>
+        </td>
+      </tr>
+    ));
+  }
 
   return (
     <>
@@ -127,78 +211,7 @@ const TasksTable: React.FC<TasksTableProps> = ({
               <th>Actions</th>
             </tr>
           </thead>
-          <tbody>
-            {loading ? (
-              <tr>
-                <td colSpan={12} className="text-center py-5">
-                  <Spinner animation="border" variant="primary" />
-                  <div className="mt-2">Loading {itemLabel}...</div>
-                </td>
-              </tr>
-            ) : tasks.length === 0 ? (
-              <tr>
-                <td colSpan={12} className="text-center py-5 text-muted">
-                  No {itemLabel} found
-                </td>
-              </tr>
-            ) : (
-              tasks.map((task) => (
-                <tr key={task.id}>
-                  <td className="task-id" onClick={() => onTaskClick(task)}>
-                    {task.id}
-                  </td>
-                  <td onClick={() => onTaskClick(task)}>{task.title}</td>
-                  <td onClick={() => onTaskClick(task)}>
-                    <Badge bg={getStatusVariant(task.status)} className="px-3 py-2">
-                      {task.status}
-                    </Badge>
-                  </td>
-                  <td onClick={() => onTaskClick(task)}>
-                    <Badge bg={getPriorityVariant(task.priority)} className="px-3 py-2">
-                      {task.priority}
-                    </Badge>
-                  </td>
-                  <td onClick={() => onTaskClick(task)}>{task.project}</td>
-                  <td onClick={() => onTaskClick(task)}>
-                    <div className="d-flex align-items-center gap-2">{renderAssignees(task)}</div>
-                  </td>
-                  <td onClick={() => onTaskClick(task)}>
-                    <div className="d-flex align-items-center gap-2">{renderWatchers(task)}</div>
-                  </td>
-                  <td onClick={() => onTaskClick(task)}>
-                    {task.rawData?.start_date
-                      ? moment(task.rawData.start_date).format(GlobalDateTimeFormat)
-                      : ''}
-                  </td>
-                  <td onClick={() => onTaskClick(task)}>
-                    {task.rawData?.due_date
-                      ? moment(task.rawData.due_date).format(GlobalDateFormat)
-                      : ''}
-                  </td>
-                  <td onClick={() => onTaskClick(task)}>{renderCreatedBy(task)}</td>
-                  <td onClick={() => onTaskClick(task)}>
-                    {task.rawData?.created_at
-                      ? moment(task.rawData.created_at).format(GlobalDateTimeFormat)
-                      : ''}
-                  </td>
-                  <td>
-                    <div
-                      className="d-flex align-items-center gap-1"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <Button
-                        variant="link"
-                        className="text-secondary p-0"
-                        onClick={() => onTaskClick(task)}
-                      >
-                        <MoreVertical size={20} />
-                      </Button>
-                    </div>
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
+          <tbody>{renderTasksTableBodyRows()}</tbody>
         </Table>
       </div>
 
@@ -313,6 +326,20 @@ const TasksTable: React.FC<TasksTableProps> = ({
                   pageNum = pagination.page - 2 + i;
                 }
 
+                const isActivePage = pagination.page === pageNum;
+                let pageButtonBg: string;
+                let pageButtonColor: string;
+                if (isActivePage) {
+                  pageButtonBg = '#5b8fd8';
+                  pageButtonColor = 'white';
+                } else if (loading) {
+                  pageButtonBg = '#f8fafc';
+                  pageButtonColor = '#cbd5e0';
+                } else {
+                  pageButtonBg = 'white';
+                  pageButtonColor = '#4a5568';
+                }
+
                 return (
                   <button
                     key={pageNum}
@@ -328,13 +355,11 @@ const TasksTable: React.FC<TasksTableProps> = ({
                       padding: '0 8px',
                       border: '1px solid #e2e8f0',
                       borderRadius: '6px',
-                      backgroundColor:
-                        pagination.page === pageNum ? '#5b8fd8' : loading ? '#f8fafc' : 'white',
-                      color:
-                        pagination.page === pageNum ? 'white' : loading ? '#cbd5e0' : '#4a5568',
+                      backgroundColor: pageButtonBg,
+                      color: pageButtonColor,
                       cursor: loading ? 'not-allowed' : 'pointer',
                       fontSize: '13px',
-                      fontWeight: pagination.page === pageNum ? '600' : '500',
+                      fontWeight: isActivePage ? '600' : '500',
                       transition: 'all 0.2s'
                     }}
                     onMouseEnter={(e) => {

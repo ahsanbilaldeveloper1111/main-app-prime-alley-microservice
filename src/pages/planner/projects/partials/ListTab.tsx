@@ -5,9 +5,9 @@ import type { StatsCardData } from '@components/GenericStatsCards';
 import DeleteConfirmationModal from '@pages/partial/DeleteConfirmationModal';
 import CreateTaskModal from '@components/work-planner/createtask-modal';
 import { deleteTask, type ListTasksSummary } from '@utils/tasks';
-import TaskDetailOffcanvas from '@pages/planner/partials/TaskDetailOffcanvas';
-import TasksListingPage from '@pages/planner/tasks';
-import type { PaginationState } from '@pages/planner/partials/TasksTable';
+import TaskDetailOffcanvas from "@components/planner/taskDetailOffcanvas/TaskDetailOffcanvas";
+import TasksListingPage from "@pages/planner/tasks";
+import type { PaginationState } from "@components/planner/workPlannerPagePartials/TasksTable";
 
 export interface ListTabFilters {
   searchTerm: string;
