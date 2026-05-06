@@ -1,5 +1,6 @@
 import moment from "moment";
 import { GlobalDateFormat, formatDateForTable } from "@utils/Helper";
+import { crmAvatarDisplayString } from "@utils/crmNameAvatar";
 
 /**
  * Maps a CRM orders API record to the GenericTable grid row shape.
@@ -9,8 +10,9 @@ export function buildCrmOrderGridRowFromApiOrder(
   order: any,
   assignedAndOwnerLabel: string,
 ): Record<string, unknown> {
-  const companyName =
-      order.company?.name || order.deal?.company_name || order.customer_name || "";
+  const companyName = crmAvatarDisplayString(
+    order.company?.name || order.deal?.company_name || order.customer_name || "",
+  );
   return {
     id: order.id,
     orderNumber: order.order_number || "",
@@ -41,10 +43,10 @@ export function buildCrmOrderGridRowFromApiOrder(
     billingStatus: order.billing_status || "",
     paymentTerms: order.payment_terms || "",
     progressDial: order.progress_dial || 0,
-    pocName: order.poc_name || order.customer_name || "",
+    pocName: crmAvatarDisplayString(order.poc_name || order.customer_name || ""),
     pocTitle: order.poc_title || "",
     pocPhone: order.poc_phone || "",
-    company: order.company || order.deal?.company_name || "",
+    company: crmAvatarDisplayString(order.company || order.deal?.company_name || ""),
     industry: order.industry || order.deal?.industry || "",
     status: order.status || "pending",
     rawData: order,

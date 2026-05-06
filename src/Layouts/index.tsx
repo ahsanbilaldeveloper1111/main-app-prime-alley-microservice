@@ -1,4 +1,4 @@
-import React, { ReactNode, useMemo, useEffect, useState } from "react";
+import React, { ReactNode, useMemo, useEffect, useState, useCallback, useRef } from "react";
 import { useRouter } from "next/router";
 import Footer from "@components/Footer";
 import ApplicationCustomerSidebar, {
@@ -80,6 +80,17 @@ const Layout = ({ children }: LayoutProps) => {
 	const [availableDevices, setAvailableDevices] = useState<CtiDialerDevice[]>([]);
 	const [pendingDialedNumber, setPendingDialedNumber] = useState('');
 
+  const mountedRef = useRef(true);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
+
+  /** Stable primitive so permission effect does not re-run on new `permissions` array identity with same contents. */
+  const permissionsSignature = (session?.user?.permissions ?? []).join("\0");
+
   // Allow any page/component to open the global AI Assistant (Breeze) sidebar
   // by dispatching: window.dispatchEvent(new CustomEvent("breeze-assistant:open"))
   useEffect(() => {
@@ -123,7 +134,7 @@ const Layout = ({ children }: LayoutProps) => {
     if (!canAccessRoute(userPerms, pathname)) {
       router.replace("/access-denied");
     }
-  }, [router.pathname, router.asPath, status, session?.user?.permissions]);
+  }, [router.pathname, router.asPath, status, permissionsSignature]);
 
   const isDeviceRegistered = useMemo(() => {
     if (!userAddress || !dnsMap?.[userAddress]) {
@@ -140,83 +151,98 @@ const Layout = ({ children }: LayoutProps) => {
     );
   }, [userAddress, dnsMap]);
 
-  const handleDial = async (numberToDial: string = dialedNumber) => {
-    if (!numberToDial.trim()) {
-      return;
-    }
-
-    const userDevices = getAllUserDevices();
-    if (!userDevices) {
-      return;
-    }
-
-    if (userDevices.length > 1) {
-      setAvailableDevices(userDevices);
-      setPendingDialedNumber(numberToDial);
-      setShowDeviceSelectionModal(true);
-      return;
-    }
-
-    setIsDialing(true);
-    try {
-      const result = await dialNumber(numberToDial);
-
-      if (result.success) {
-        dispatch(setDialedNumber(""));
-        closeDialer();
+  const handleDial = useCallback(
+    async (numberToDial: string = dialedNumber) => {
+      if (!numberToDial.trim()) {
+        return;
       }
-    } catch (error) {
-      toast.error(`Failed to place call: ${getErrorMessage(error)}`, {
-        toastId: "layout_dial_failed",
-      });
-    } finally {
-      setIsDialing(false);
-    }
-  };
 
-  const handleDeviceSelect = async (device: CtiDialerDevice) => {
-    const callingDevice = {
-      callingAddress: userAddress,
-      callingDeviceType: device.deviceType,
-      callingDeviceName: device.deviceName,
-    };
-
-    const callerInfo = {
-      callingAddress: userAddress,
-      callingDeviceName: device.deviceName,
-      callingDeviceType: device.deviceType,
-      selectedAt: new Date().toISOString(),
-    };
-
-    localStorage.setItem("cti_caller_info", JSON.stringify(callerInfo));
-
-    setShowDeviceSelectionModal(false);
-    setAvailableDevices([]);
-
-    const numberToDial = pendingDialedNumber;
-    setPendingDialedNumber("");
-
-    setIsDialing(true);
-    try {
-      const result = await makeCall({
-        callingAddress: callingDevice.callingAddress,
-        calledAddress: numberToDial,
-        callingDeviceType: callingDevice.callingDeviceType,
-        callingDeviceName: callingDevice.callingDeviceName,
-      });
-
-      if (result.success) {
-        dispatch(setDialedNumber(""));
-        closeDialer();
+      const userDevices = getAllUserDevices();
+      if (!userDevices) {
+        return;
       }
-    } catch (error) {
-      toast.error(`Failed to place call: ${getErrorMessage(error)}`, {
-        toastId: "layout_make_call_failed",
-      });
-    } finally {
-      setIsDialing(false);
-    }
-  };
+
+      if (userDevices.length > 1) {
+        setAvailableDevices(userDevices);
+        setPendingDialedNumber(numberToDial);
+        setShowDeviceSelectionModal(true);
+        return;
+      }
+
+      setIsDialing(true);
+      try {
+        const result = await dialNumber(numberToDial);
+
+        if (result.success) {
+          dispatch(setDialedNumber(""));
+          closeDialer();
+        }
+      } catch (error) {
+        toast.error(`Failed to place call: ${getErrorMessage(error)}`, {
+          toastId: "layout_dial_failed",
+        });
+      } finally {
+        if (mountedRef.current) {
+          setIsDialing(false);
+        }
+      }
+    },
+    [dialedNumber, getAllUserDevices, dialNumber, dispatch, closeDialer],
+  );
+
+  const handleDeviceSelect = useCallback(
+    async (device: CtiDialerDevice) => {
+      const callingDevice = {
+        callingAddress: userAddress,
+        callingDeviceType: device.deviceType,
+        callingDeviceName: device.deviceName,
+      };
+
+      const callerInfo = {
+        callingAddress: userAddress,
+        callingDeviceName: device.deviceName,
+        callingDeviceType: device.deviceType,
+        selectedAt: new Date().toISOString(),
+      };
+
+      localStorage.setItem("cti_caller_info", JSON.stringify(callerInfo));
+
+      setShowDeviceSelectionModal(false);
+      setAvailableDevices([]);
+
+      const numberToDial = pendingDialedNumber;
+      setPendingDialedNumber("");
+
+      setIsDialing(true);
+      try {
+        const result = await makeCall({
+          callingAddress: callingDevice.callingAddress,
+          calledAddress: numberToDial,
+          callingDeviceType: callingDevice.callingDeviceType,
+          callingDeviceName: callingDevice.callingDeviceName,
+        });
+
+        if (result.success) {
+          dispatch(setDialedNumber(""));
+          closeDialer();
+        }
+      } catch (error) {
+        toast.error(`Failed to place call: ${getErrorMessage(error)}`, {
+          toastId: "layout_make_call_failed",
+        });
+      } finally {
+        if (mountedRef.current) {
+          setIsDialing(false);
+        }
+      }
+    },
+    [userAddress, pendingDialedNumber, makeCall, dispatch, closeDialer],
+  );
+
+  const handleDismissDialer = useCallback(() => {
+    closeDialer();
+    dispatch(setDialedNumber(""));
+  }, [closeDialer, dispatch]);
 
   const mainContentWidth = useMemo(() => {
     if (!showBreezeAssistant) return "100%";
@@ -240,10 +266,7 @@ const Layout = ({ children }: LayoutProps) => {
             dialerPosition={dialerPosition}
             isDeviceRegistered={isDeviceRegistered}
             isDialing={isDialing}
-            onDismiss={() => {
-              closeDialer();
-              dispatch(setDialedNumber(""));
-            }}
+            onDismiss={handleDismissDialer}
             onDial={handleDial}
           />
         )}

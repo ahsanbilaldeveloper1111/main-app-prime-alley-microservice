@@ -1,7 +1,7 @@
 import React from 'react';
 import { Spinner } from 'react-bootstrap';
 import { formatDateForTable } from '@utils/Helper';
-import AllActivitiesBrowserModal from '@pages/planner/partials/AllActivitiesBrowserModal';
+import AllActivitiesBrowserModal from "@components/planner/workPlannerPagePartials/AllActivitiesBrowserModal";
 import { useAllActivitiesBrowserModal } from '@planner/useAllActivitiesBrowserModal';
 import type { ActivityLogExtension } from '@planner/activityLogExtension';
 import { getExtensionDisplay } from '@planner/taskActivityLogModalShared';
