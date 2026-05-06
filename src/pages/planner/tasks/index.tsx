@@ -68,6 +68,18 @@ import {
   TASK_PRIORITY_DOT_COLORS,
 } from "@utils/taskListing/taskListUiPrimitives";
 
+function plannerTaskConvertDeniedTitle(
+  canConvertRow: boolean,
+  hasConvertPermission: boolean,
+  canEditRow: boolean,
+): string {
+  if (canConvertRow) return "";
+  if (hasConvertPermission === false) {
+    return "You are not authorized to convert tasks to recurring";
+  }
+  return plannerTaskRowEditDeniedTitle(canEditRow) ?? "";
+}
+
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
 interface Task {
@@ -1166,13 +1178,11 @@ const TasksListingPage = ({
                       cursor: canConvertRow ? "pointer" : "not-allowed",
                       opacity: canConvertRow ? 1 : 0.65,
                     }}
-                    title={
-                      canConvertRow
-                        ? ""
-                        : !sessionCanConvertToRecurringPlannerTask
-                          ? "You are not authorized to convert tasks to recurring"
-                          : plannerTaskRowEditDeniedTitle(canEditRow)
-                    }
+                    title={plannerTaskConvertDeniedTitle(
+                      canConvertRow,
+                      sessionCanConvertToRecurringPlannerTask,
+                      canEditRow,
+                    )}
                     onClick={() => {
                       if (!canConvertRow) return;
                       setOpenTaskActionsId(null);

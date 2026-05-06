@@ -2597,6 +2597,71 @@ function mapExtensionsToPlannerUsers(extensions: Extension[]): UserType[] {
   }));
 }
 
+function resolveSidebarTaskTypeOptions(
+  isEdit: boolean,
+  editTask: PlannerEditTask | undefined,
+  normalizedTaskTypeOptions: readonly PlannerTaskType[],
+  openAsRecurringConversion: boolean,
+): PlannerTaskType[] {
+  const restricted = restrictPlannerTaskTypeOptionsForEdit(
+    isEdit,
+    editTask,
+    normalizedTaskTypeOptions,
+  );
+  if (openAsRecurringConversion === false || isEdit === false) {
+    return restricted;
+  }
+  return restricted.includes("recurring")
+    ? (["recurring"] as PlannerTaskType[])
+    : restricted;
+}
+
+function buildLimitedEditBaselineFormData(
+  isEdit: boolean,
+  editTask: PlannerEditTask | undefined,
+  taskEditScope: "none" | "limited" | "full",
+  extensions: Extension[],
+  taskTypeOptions: readonly PlannerTaskType[],
+): CreateTaskFormData | null {
+  if (!isEdit || !editTask || taskEditScope !== "limited") return null;
+  const merged = mergeFormDataWithDueDateClamp(
+    buildInitialFormFromEdit(editTask, extensions),
+  );
+  const baselineType: PlannerTaskType =
+    merged.taskType === "" ? "regular" : merged.taskType;
+  return {
+    ...merged,
+    taskType: clampTaskTypeToAllowed(baselineType, taskTypeOptions),
+  };
+}
+
+function resolveLinkedRecordsProjectId(
+  currentProjectId: number | null | undefined,
+  isEdit: boolean,
+  editTask: PlannerEditTask | undefined,
+): number | null {
+  if (currentProjectId != null) return currentProjectId;
+  if (isEdit === false) return null;
+  return editTask?.project_id ?? editTask?.project?.id ?? null;
+}
+
+function isEditingRecurringTaskTemplate(
+  isEdit: boolean,
+  editTask: PlannerEditTask | undefined,
+): boolean {
+  if (!isEdit || editTask == null) return false;
+  return normalizeEditTaskType(editTask) === "recurring";
+}
+
+function shouldShowOneWayTaskConversionHint(
+  isEdit: boolean,
+  editTask: PlannerEditTask | undefined,
+  isEditingRecurringTemplate: boolean,
+): boolean {
+  if (!isEdit || editTask == null) return false;
+  return !isEditingRecurringTemplate;
+}
+
 // ─── Component ───────────────────────────────────────────────────────────────
 
 const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
@@ -2618,15 +2683,13 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
 }) => {
   const normalizedTaskTypeOptions = useNormalizedPlannerTaskTypeOptions(taskTypeChoices);
   const taskTypeOptions = useMemo<PlannerTaskType[]>(
-    (): PlannerTaskType[] => {
-      const restricted = restrictPlannerTaskTypeOptionsForEdit(
+    (): PlannerTaskType[] =>
+      resolveSidebarTaskTypeOptions(
         isEdit,
         editTask,
         normalizedTaskTypeOptions,
-      );
-      if (!openAsRecurringConversion || !isEdit) return restricted;
-      return restricted.includes("recurring") ? (["recurring"] as PlannerTaskType[]) : restricted;
-    },
+        openAsRecurringConversion,
+      ),
     [isEdit, editTask, normalizedTaskTypeOptions, openAsRecurringConversion],
   );
 
@@ -2675,9 +2738,11 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
     async (query: string, currentProjectId?: number | null) => {
       setLoadingLinkedRecords(true);
       try {
-        const projectId =
-          currentProjectId ??
-          (isEdit ? editTask?.project_id ?? editTask?.project?.id : null);
+        const projectId = resolveLinkedRecordsProjectId(
+          currentProjectId,
+          isEdit,
+          editTask,
+        );
         const response = await listTasks({
           page: 1,
           limit: 30,
@@ -2801,18 +2866,24 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
 
   const isLimitedTaskEdit = Boolean(isEdit && taskEditScope === "limited");
   const isRecurringConversionMode = Boolean(isEdit && openAsRecurringConversion);
+  const isEditingRecurringTemplate = isEditingRecurringTaskTemplate(
+    isEdit,
+    editTask,
+  );
+  const showOneWayConversionHint = shouldShowOneWayTaskConversionHint(
+    isEdit,
+    editTask,
+    isEditingRecurringTemplate,
+  );
 
   const limitedEditBaselineForm = useMemo((): CreateTaskFormData | null => {
-    if (!isEdit || !editTask || taskEditScope !== "limited") return null;
-    const merged = mergeFormDataWithDueDateClamp(
-      buildInitialFormFromEdit(editTask, extensions),
+    return buildLimitedEditBaselineFormData(
+      isEdit,
+      editTask,
+      taskEditScope,
+      extensions,
+      taskTypeOptions,
     );
-    const baselineType: PlannerTaskType =
-      merged.taskType === "" ? "regular" : merged.taskType;
-    return {
-      ...merged,
-      taskType: clampTaskTypeToAllowed(baselineType, taskTypeOptions),
-    };
   }, [isEdit, editTask, taskEditScope, extensions, taskTypeOptions]);
 
   const buildPayloadForForm = (fd: CreateTaskFormData) =>
@@ -3217,15 +3288,11 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
               <Form.Select
                 value={taskTypeSelectHtmlValue(formData.taskType, taskTypeOptions)}
                 onChange={handleTaskTypeChange}
-                disabled={
-                  isEdit &&
-                  editTask != null &&
-                  normalizeEditTaskType(editTask) === "recurring"
-                }
+                disabled={isEditingRecurringTemplate}
                 className="py-2"
                 style={{ fontSize: "14px" }}
               >
-                {isEdit ? null : (
+                {!isEdit && (
                   <option value="">Select type</option>
                 )}
                 {taskTypeOptions.map((opt) => (
@@ -3261,9 +3328,7 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
                 </Form.Group>
               </Col>
 
-              {isEdit &&
-                editTask != null &&
-                normalizeEditTaskType(editTask) !== "recurring" && (
+              {showOneWayConversionHint && (
                   <Col xs={12}>
                     <div className="planner-sidebar-hint mb-3">
                       You can convert this task to <strong>Recurring</strong> only (not to the other
