@@ -52,15 +52,15 @@ const TASK_TITLE_MAX_LENGTH = 150;
 
 /** Shared visual tokens for create / edit task sidebar */
 const PLANNER_TASK_SIDEBAR = {
-  accent: "#4f46e5",
-  accentSoft: "rgba(79, 70, 229, 0.12)",
+  accent: "#141414",
+  accentSoft: "rgba(20, 20, 20, 0.06)",
   surface: "#ffffff",
-  surfaceMuted: "#f1f5f9",
-  border: "#e2e8f0",
-  text: "#0f172a",
-  textMuted: "#64748b",
-  shadow: "0 25px 50px -12px rgba(15, 23, 42, 0.18)",
-  radiusLg: 16,
+  surfaceMuted: "#f8fafc",
+  border: "#e5e7eb",
+  text: "#141414",
+  textMuted: "#6b7280",
+  shadow: "-8px 0 20px rgba(0, 0, 0, 0.08)",
+  radiusLg: 0,
 } as const;
 
 function clampTaskTitleLength(value: string): string {
@@ -3076,10 +3076,8 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
   };
   const groupClass = "mb-3 planner-sidebar-field";
   const dueDateMin = minDueDateFromTodayAndStart(formData.startDate);
-  const conversionHeaderTone = isRecurringConversionMode
-    ? "linear-gradient(180deg, #ede9fe 0%, #f8fafc 100%)"
-    : `linear-gradient(180deg, ${PLANNER_TASK_SIDEBAR.surfaceMuted} 0%, ${PLANNER_TASK_SIDEBAR.surface} 100%)`;
-  const conversionBodyTone = isRecurringConversionMode ? "#f8f7ff" : PLANNER_TASK_SIDEBAR.surfaceMuted;
+  const conversionHeaderTone = PLANNER_TASK_SIDEBAR.surface;
+  const conversionBodyTone = PLANNER_TASK_SIDEBAR.surface;
 
   return (
     <>
@@ -3092,7 +3090,7 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
           position: "fixed",
           inset: 0,
           zIndex: 1000,
-          backgroundColor: "rgba(15, 23, 42, 0.4)",
+          backgroundColor: "rgba(15, 23, 42, 0.25)",
           border: "none",
           padding: 0,
           cursor: "pointer",
@@ -3104,14 +3102,14 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
           position: "fixed",
           top: 0,
           right: 0,
-          width: 520,
+          width: 560,
           maxWidth: "100vw",
           height: "100vh",
           backgroundColor: PLANNER_TASK_SIDEBAR.surface,
           boxShadow: PLANNER_TASK_SIDEBAR.shadow,
           borderTopLeftRadius: PLANNER_TASK_SIDEBAR.radiusLg,
           borderBottomLeftRadius: PLANNER_TASK_SIDEBAR.radiusLg,
-          borderLeft: `4px solid ${PLANNER_TASK_SIDEBAR.accent}`,
+          borderLeft: `1px solid ${PLANNER_TASK_SIDEBAR.border}`,
           zIndex: 999999,
           display: "flex",
           flexDirection: "column",
@@ -3121,7 +3119,7 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
         {/* Header */}
         <div
           style={{
-            padding: "18px 24px 16px",
+            padding: "14px 18px",
             background: conversionHeaderTone,
             borderBottom: `1px solid ${PLANNER_TASK_SIDEBAR.border}`,
             display: "flex",
@@ -3132,47 +3130,18 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
         >
           <h2
             style={{
-              fontSize: 19,
-              fontWeight: 700,
+              fontSize: 30,
+              fontWeight: 600,
               margin: 0,
               display: "flex",
               alignItems: "center",
-              gap: 10,
+              gap: 8,
               color: PLANNER_TASK_SIDEBAR.text,
-              letterSpacing: "-0.02em",
+              letterSpacing: "0",
             }}
           >
-            <span
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                width: 40,
-                height: 40,
-                borderRadius: 12,
-                background: PLANNER_TASK_SIDEBAR.accentSoft,
-              }}
-            >
-              <ListTodo size={22} color={PLANNER_TASK_SIDEBAR.accent} strokeWidth={2.25} />
-            </span>
+            <ListTodo size={20} color={PLANNER_TASK_SIDEBAR.textMuted} strokeWidth={2} />
             {getSidebarTitle(formData.taskType, isEdit)}
-            {isRecurringConversionMode && (
-              <span
-                style={{
-                  fontSize: 11,
-                  fontWeight: 700,
-                  textTransform: "uppercase",
-                  letterSpacing: "0.06em",
-                  color: "#5b21b6",
-                  backgroundColor: "#ddd6fe",
-                  border: "1px solid #c4b5fd",
-                  borderRadius: 999,
-                  padding: "4px 10px",
-                }}
-              >
-                Conversion mode
-              </span>
-            )}
           </h2>
           <button
             type="button"
@@ -3181,9 +3150,9 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
             style={{
               background: PLANNER_TASK_SIDEBAR.surfaceMuted,
               border: `1px solid ${PLANNER_TASK_SIDEBAR.border}`,
-              borderRadius: 10,
-              width: 40,
-              height: 40,
+              borderRadius: 6,
+              width: 32,
+              height: 32,
               padding: 0,
               cursor: "pointer",
               color: PLANNER_TASK_SIDEBAR.textMuted,
@@ -3193,11 +3162,11 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
               transition: "background 0.15s ease, color 0.15s ease",
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.background = "#e2e8f0";
+              e.currentTarget.style.background = "#f3f4f6";
               e.currentTarget.style.color = PLANNER_TASK_SIDEBAR.text;
             }}
             onMouseLeave={(e) => {
-              e.currentTarget.style.background = PLANNER_TASK_SIDEBAR.surfaceMuted;
+              e.currentTarget.style.background = PLANNER_TASK_SIDEBAR.surface;
               e.currentTarget.style.color = PLANNER_TASK_SIDEBAR.textMuted;
             }}
           >
@@ -3220,26 +3189,14 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
               flex: 1,
               minHeight: 0,
               overflowY: "auto",
-              padding: "22px 24px 28px",
+              padding: "14px 18px 22px",
               backgroundColor: conversionBodyTone,
             }}
           >
           <Form onSubmit={(e) => { e.preventDefault(); handleCreate(); }}>
 
             <LimitedTaskEditBanner visible={isLimitedTaskEdit} />
-            {isRecurringConversionMode && (
-              <div
-                className="planner-sidebar-hint mb-3"
-                style={{
-                  background: "#f5f3ff",
-                  border: "1px solid #c4b5fd",
-                  color: "#4c1d95",
-                }}
-              >
-                You are converting this task into a recurring template. Only recurring-related
-                settings are shown in this focused form.
-              </div>
-            )}
+            
 
             <Row>
 
@@ -3280,55 +3237,59 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
             </Form.Group>
               </Col>
 
-              <Col xs={12} md={6}>
-              <Form.Group className={groupClass}>
-              <Form.Label style={labelStyle}>
-                Task Type <span style={{ color: "#ef4444" }}>*</span>
-              </Form.Label>
-              <Form.Select
-                value={taskTypeSelectHtmlValue(formData.taskType, taskTypeOptions)}
-                onChange={handleTaskTypeChange}
-                disabled={isEditingRecurringTemplate}
-                className="py-2"
-                style={{ fontSize: "14px" }}
-              >
-                {!isEdit && (
-                  <option value="">Select type</option>
-                )}
-                {taskTypeOptions.map((opt) => (
-                  <option key={opt} value={opt}>
-                    {TASK_TYPE_SELECT_LABELS[opt]}
-                  </option>
-                ))}
-              </Form.Select>
-            </Form.Group>
-              </Col>
-              <Col xs={12} md={6}>
-              <Form.Group className={groupClass}>
-                  <Form.Label style={labelStyle}>
-                    Priority <span style={{ color: "#ef4444" }}>*</span>
-                  </Form.Label>
-                  <Form.Select
-                    value={formData.priorityId || 0}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        priorityId: Number(e.target.value),
-                      })
-                    }
-                    className="py-2"
-                    style={{ fontSize: "14px" }}
-                  >
-                    {priorities.map((priority) => (
-                      <option key={priority.id} value={priority.id}>
-                        {plannerPriorityDisplayName(priority.name)}
-                      </option>
-                    ))}
-                  </Form.Select>
-                </Form.Group>
-              </Col>
+              {!isRecurringConversionMode && (
+                <Col xs={12} md={6}>
+                  <Form.Group className={groupClass}>
+                    <Form.Label style={labelStyle}>
+                      Task Type <span style={{ color: "#ef4444" }}>*</span>
+                    </Form.Label>
+                    <Form.Select
+                      value={taskTypeSelectHtmlValue(formData.taskType, taskTypeOptions)}
+                      onChange={handleTaskTypeChange}
+                      disabled={isEditingRecurringTemplate}
+                      className="py-2"
+                      style={{ fontSize: "14px" }}
+                    >
+                      {!isEdit && (
+                        <option value="">Select type</option>
+                      )}
+                      {taskTypeOptions.map((opt) => (
+                        <option key={opt} value={opt}>
+                          {TASK_TYPE_SELECT_LABELS[opt]}
+                        </option>
+                      ))}
+                    </Form.Select>
+                  </Form.Group>
+                </Col>
+              )}
+              {!isRecurringConversionMode && (
+                <Col xs={12} md={6}>
+                  <Form.Group className={groupClass}>
+                    <Form.Label style={labelStyle}>
+                      Priority <span style={{ color: "#ef4444" }}>*</span>
+                    </Form.Label>
+                    <Form.Select
+                      value={formData.priorityId || 0}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          priorityId: Number(e.target.value),
+                        })
+                      }
+                      className="py-2"
+                      style={{ fontSize: "14px" }}
+                    >
+                      {priorities.map((priority) => (
+                        <option key={priority.id} value={priority.id}>
+                          {plannerPriorityDisplayName(priority.name)}
+                        </option>
+                      ))}
+                    </Form.Select>
+                  </Form.Group>
+                </Col>
+              )}
 
-              {showOneWayConversionHint && (
+              {!isRecurringConversionMode && showOneWayConversionHint && (
                   <Col xs={12}>
                     <div className="planner-sidebar-hint mb-3">
                       You can convert this task to <strong>Recurring</strong> only (not to the other
@@ -3749,25 +3710,27 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
 
               </Col>
 
-              <Col xs={12} md={6}>
-                <Form.Group className={groupClass}>
-                  <Form.Label style={labelStyle}>
-                    <Calendar size={16} className="me-2" style={{ verticalAlign: "middle" }} />
-                    Start Date
-                    {formData.taskType === "recurring" && (
-                      <span style={{ color: "#ef4444" }}> *</span>
-                    )}
-                  </Form.Label>
-                  <Form.Control
-                    type="date"
-                    value={formData.startDate}
-                    onChange={handleStartDateInputChange}
-                    className="py-2"
-                    style={{ fontSize: "14px" }}
-                    required={formData.taskType === "recurring"}
-                  />
-                </Form.Group>
-              </Col>
+              {!isRecurringConversionMode && (
+                <Col xs={12} md={6}>
+                  <Form.Group className={groupClass}>
+                    <Form.Label style={labelStyle}>
+                      <Calendar size={16} className="me-2" style={{ verticalAlign: "middle" }} />
+                      Start Date
+                      {formData.taskType === "recurring" && (
+                        <span style={{ color: "#ef4444" }}> *</span>
+                      )}
+                    </Form.Label>
+                    <Form.Control
+                      type="date"
+                      value={formData.startDate}
+                      onChange={handleStartDateInputChange}
+                      className="py-2"
+                      style={{ fontSize: "14px" }}
+                      required={formData.taskType === "recurring"}
+                    />
+                  </Form.Group>
+                </Col>
+              )}
               {formData.taskType !== "recurring" && (
               <Col xs={12} md={6}>
                 <Form.Group className={groupClass}>
