@@ -11,7 +11,7 @@ export function buildCrmOrderGridRowFromApiOrder(
   assignedAndOwnerLabel: string,
 ): Record<string, unknown> {
   const companyName = crmAvatarDisplayString(
-    order.company || order.deal?.company_name || order.customer_name || "",
+    order.company?.name || order.deal?.company_name || order.customer_name || "",
   );
   return {
     id: order.id,
