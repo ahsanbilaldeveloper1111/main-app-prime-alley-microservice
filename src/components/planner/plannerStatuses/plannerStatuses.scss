@@ -1,0 +1,55 @@
+/* Work Planner — global statuses page */
+
+.wps-toolbar {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 1rem;
+}
+
+@media (min-width: 768px) {
+  .wps-toolbar {
+    flex-direction: row;
+    align-items: center;
+  }
+}
+
+.wps-toolbar-spacer {
+  margin-bottom: 1rem;
+}
+
+@media (min-width: 768px) {
+  .wps-toolbar-spacer {
+    margin-bottom: 0;
+  }
+}
+
+.wps-color-cell {
+  display: flex;
+  align-items: center;
+}
+
+.wps-color-swatches {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.5rem;
+}
+
+.wps-color-swatch {
+  width: 40px;
+  height: 40px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  cursor: pointer;
+  padding: 0;
+}
+
+.wps-color-swatch--selected {
+  border: 3px solid #000;
+}
+
+.wps-empty-icon {
+  margin-bottom: 0.75rem;
+}

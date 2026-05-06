@@ -17,8 +17,6 @@ import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
 import { useAllActivitiesBrowserModal } from "@planner/useAllActivitiesBrowserModal";
 import { usePermissions } from "@utils/permissionUtils";
 import { HEADER_CONSTANTS } from "@constants/headerConstants";
-
-const { PERMISSIONS } = HEADER_CONSTANTS;
 import type { ActivityLogExtension } from "@planner/activityLogExtension";
 import {
   formatActivityDate,
@@ -26,6 +24,8 @@ import {
   normalizeTaskActivitiesPayload,
   ActivitiesTabPanel,
 } from "@planner/taskActivityLogModalShared";
+
+const { PERMISSIONS } = HEADER_CONSTANTS;
 
 export type { ActivityLogExtension as TaskSecondaryTabsExtension } from "@planner/activityLogExtension";
 

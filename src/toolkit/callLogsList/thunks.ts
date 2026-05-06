@@ -1,18 +1,14 @@
 import { createAsyncThunk } from "@reduxjs/toolkit";
 import { toast } from "react-toastify";
-import { DownloadCallsExport, ListCallLogs } from "@utils/calls";
+import { DownloadCallsExport } from "@utils/calls";
 import {
   formatDateTimeFilterForApi,
   shouldSkipCommunicationsListFetch,
 } from "@utils/communicationsDateUtils";
-import { ModuleSlug, getAutoTimezone } from "@utils/Helper";
-import { isExactPhoneMatch, normalizePhoneValue } from "@utils/phoneMatch";
-import {
-  extractCallLogRows,
-  normalizeCallLogRow,
-} from "@components/communications/callLogRowUtils";
-import type { CallLogRow, CallLogsSummary } from "@components/communications/callLogTypes";
+import { getAutoTimezone } from "@utils/Helper";
+import { normalizePhoneValue } from "@utils/phoneMatch";
 import type { RootState } from "../index";
+import { fetchCallLogsListPayload } from "./fetchCallLogsListPayload";
 import {
   applyCommittedCallLogsFilters,
   hydrateCallLogsFetchResult,
@@ -115,73 +111,14 @@ export const fetchCallLogsThunk = createAsyncThunk<
     dispatch(setShowPageLoader(true));
     dispatch(setTableLoading(true));
     try {
-      const response = await ListCallLogs(
-        {
-          page,
-          perPage,
-          search,
-          filters: appliedFilters,
-          moduleSlug: ModuleSlug.CALL_LOGS,
-        },
-        "call-logs/list",
-      );
+      const hydratePayload = await fetchCallLogsListPayload({
+        page,
+        perPage,
+        search,
+        appliedFilters,
+      });
 
-      let rowsArray: CallLogRow[] = extractCallLogRows(response).map((r) =>
-        normalizeCallLogRow(r as CallLogRow & Record<string, unknown>),
-      );
-
-      const exactPhoneFilter = normalizePhoneValue(
-        appliedFilters.phone_number as string | undefined,
-      );
-      if (exactPhoneFilter) {
-        rowsArray = rowsArray.filter((row) =>
-          isExactPhoneMatch(row.phone_number, exactPhoneFilter),
-        );
-      }
-
-      const rawData = response?.data as Record<string, unknown> | undefined;
-      const paginationData =
-        (rawData?.pagination as Record<string, unknown> | undefined) ??
-        (response?.pagination as Record<string, unknown> | undefined) ??
-        response;
-      const total =
-        (response as { recordsTotal?: number }).recordsTotal ??
-        (response as { total?: number }).total ??
-        (rawData?.recordsTotal as number | undefined) ??
-        (rawData?.total as number | undefined) ??
-        (paginationData as { total?: number })?.total ??
-        Math.max(rowsArray.length, 0);
-      const currentPage =
-        (response as { current_page?: number }).current_page ??
-        (paginationData as { current_page?: number })?.current_page ??
-        page;
-      const perPageVal =
-        (response as { per_page?: number }).per_page ??
-        (paginationData as { per_page?: number })?.per_page ??
-        perPage;
-
-      const selectedExtensionFilter = Array.isArray(
-        appliedFilters.extension_number,
-      )
-        ? (appliedFilters.extension_number as string[])
-        : [];
-
-      const respSummary = (response as { summary?: CallLogsSummary }).summary;
-      const dataFilters = (response as { filters?: { start_datetime?: string; end_datetime?: string } })
-        .filters;
-
-      dispatch(
-        hydrateCallLogsFetchResult({
-          rows: rowsArray,
-          currentPage,
-          rowsPerPage: perPageVal,
-          totalRows: Number(total) || 0,
-          totalCalls: Number(total) || 0,
-          responseSummary: respSummary,
-          dataFilters,
-          selectedExtensionFilter,
-        }),
-      );
+      dispatch(hydrateCallLogsFetchResult(hydratePayload));
     } finally {
       dispatch(setShowPageLoader(false));
       dispatch(setTableLoading(false));

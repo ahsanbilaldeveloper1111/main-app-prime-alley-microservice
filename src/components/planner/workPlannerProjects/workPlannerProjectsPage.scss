@@ -1,0 +1,666 @@
+// Work Planner — projects page & expandable project table (no inline styles)
+
+.wp-planner-projects {
+  .header-section {
+    background-color: white;
+    padding: 1.5rem 0;
+    margin-bottom: 2rem;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  }
+
+  .nav-tabs {
+    border: none;
+  }
+
+  .nav-tabs .nav-link {
+    color: #64748b;
+    border: none;
+    border-bottom: 3px solid transparent;
+    padding: 0.75rem 1.5rem;
+    font-weight: 500;
+    background: transparent;
+  }
+
+  .nav-tabs .nav-link.active {
+    color: #3b82f6;
+    background: transparent;
+    border-bottom: 3px solid #3b82f6;
+  }
+
+  .project-name {
+    font-weight: 600;
+    color: #334155;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+
+  .project-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.25rem;
+    flex-shrink: 0;
+  }
+
+  .member-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    color: white;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.75rem;
+    font-weight: 600;
+    margin-right: -8px;
+    border: 2px solid white;
+    position: relative;
+  }
+
+  .overdue-count {
+    color: #ef4444;
+    font-weight: 600;
+  }
+
+  .project-detail-panel {
+    width: 750px !important;
+    max-width: 750px !important;
+  }
+
+  .project-detail-panel .offcanvas-header {
+    padding: 16px 20px !important;
+    border-bottom: 1px solid #eaf0f6 !important;
+    background-color: #ffffff !important;
+  }
+
+  .project-detail-panel .offcanvas-body {
+    padding: 20px !important;
+    padding-right: 10px !important;
+    background-color: #ffffff !important;
+  }
+
+  .project-detail-panel .offcanvas-title {
+    font-size: 22px !important;
+    font-weight: 500 !important;
+    color: #141414 !important;
+  }
+
+  .detail-section {
+    margin-bottom: 16px;
+    padding: 16px;
+    background-color: #ffffff;
+    border-radius: 5px;
+    border: 1px solid #eaf0f6;
+  }
+
+  .detail-label {
+    font-size: 13px;
+    color: #666;
+    margin-bottom: 8px;
+    font-weight: 400;
+  }
+
+  .detail-tabs {
+    border-bottom: 1px solid #eaf0f6;
+    margin: 20px -20px 20px -20px;
+    padding: 0 20px;
+  }
+
+  .detail-tabs .nav-link {
+    color: #718096;
+    border: none;
+    border-bottom: 2px solid transparent;
+    padding: 12px 16px;
+    font-weight: 500;
+    font-size: 14px;
+    background: transparent;
+    margin-bottom: -1px;
+  }
+
+  .detail-tabs .nav-link.active {
+    color: #141414;
+    background: transparent;
+    border-bottom: 2px solid #0091ae;
+  }
+
+  .table-responsive .table th:last-child,
+  .table-responsive .table td:last-child {
+    min-width: initial !important;
+  }
+
+  .table-responsive .table th:first-child,
+  .table-responsive .table td:first-child {
+    min-width: initial !important;
+    max-width: initial !important;
+  }
+
+}
+
+.wp-planner-projects__layout {
+  display: flex;
+  align-items: stretch;
+  gap: 12px;
+}
+
+.wp-planner-projects__main {
+  flex: 1;
+  min-width: 0;
+}
+
+// Task tree (inside expandable table)
+.wp-task-tree {
+  .task-tree-row td {
+    padding: 8px 12px;
+    border-bottom: 1px solid #f1f5f9;
+    vertical-align: middle;
+  }
+
+  .task-tree-row:last-child td {
+    border-bottom: none;
+  }
+
+  .subtask-row td {
+    border-bottom: 1px solid #f8fafc;
+  }
+
+  &__table {
+    width: 100%;
+  }
+}
+
+.wp-task-tree-row {
+  background-color: #fafbfc;
+
+  &--hover {
+    background-color: #f8fafc;
+  }
+
+  &--subtask {
+    background-color: #f5f7fb;
+
+    &.wp-task-tree-row--hover {
+      background-color: #f0f4ff;
+    }
+  }
+}
+
+.wp-task-tree-row__cell-name {
+  position: relative;
+  padding-left: var(--wp-task-indent, 48px);
+}
+
+.wp-flex-shrink-0 {
+  flex-shrink: 0;
+}
+
+.wp-task-tree-row__cell-name-inner {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.wp-task-toggler-wrap {
+  width: 16px;
+  height: 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #9ca3af;
+  flex-shrink: 0;
+}
+
+.wp-icon-btn-transparent {
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  color: #6b7280;
+}
+
+.wp-task-indent-spacer {
+  width: 14px;
+  display: inline-block;
+  flex-shrink: 0;
+}
+
+.wp-task-title-btn {
+  font-size: 0.875rem;
+  color: #334155;
+  font-weight: 500;
+  background: none;
+  border: none;
+  padding: 0;
+  text-align: left;
+
+  &--clickable {
+    cursor: pointer;
+  }
+
+  &--default-cursor {
+    cursor: default;
+  }
+
+  &--done {
+    text-decoration: line-through;
+    opacity: 0.6;
+  }
+}
+
+.wp-task-title-btn--sub {
+  font-size: 0.825rem;
+  color: #475569;
+
+  &.wp-task-title-btn--done {
+    opacity: 0.55;
+  }
+}
+
+.wp-subtask-count-badge {
+  font-size: 0.7rem;
+  background-color: #e5e7eb;
+  color: #6b7280;
+  border-radius: 10px;
+  padding: 1px 6px;
+  font-weight: 600;
+}
+
+.wp-task-labels {
+  display: flex;
+  gap: 4px;
+  margin-left: 4px;
+}
+
+.wp-task-label-chip {
+  font-size: 0.65rem;
+  background-color: #dbeafe;
+  color: #3b82f6;
+  border-radius: 4px;
+  padding: 1px 5px;
+  font-weight: 500;
+}
+
+.wp-task-preview-btn {
+  margin-left: auto;
+  font-size: 0.75rem;
+  padding: 3px 10px;
+  background-color: #ffffff;
+  border: 1px solid #141414;
+  color: #141414;
+  font-weight: 400;
+  border-radius: 4px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+  position: absolute;
+  right: 8px;
+
+  &--sub {
+    padding: 2px 8px;
+  }
+}
+
+.wp-task-cell-muted {
+  font-size: 0.8rem;
+  color: #64748b;
+}
+
+.wp-task-cell-muted--faint {
+  color: #9ca3af;
+}
+
+.wp-overdue-text {
+  color: #ef4444;
+  font-weight: 600;
+}
+
+.wp-dash-muted {
+  color: #9ca3af;
+}
+
+// Status icon colors
+.wp-status-icon--todo {
+  color: #6b7280;
+}
+
+.wp-status-icon--in_progress {
+  color: #3b82f6;
+}
+
+.wp-status-icon--done {
+  color: #10b981;
+}
+
+.wp-status-icon--overdue {
+  color: #ef4444;
+}
+
+// Expandable project row
+.wp-project-row-expanded {
+  background-color: #f0f7ff;
+}
+
+.wp-project-expand-btn {
+  background: none;
+  border: none;
+  padding: 2px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  color: #6b7280;
+  flex-shrink: 0;
+  border-radius: 4px;
+  transition: background 0.15s;
+}
+
+.wp-project-row-name-cell {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.wp-project-icon-wrap {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  background-color: color-mix(in srgb, var(--wp-project-accent, #3b82f6) 20%, #ffffff);
+}
+
+.wp-project-icon-wrap svg {
+  color: var(--wp-project-accent, #3b82f6);
+}
+
+.wp-project-name-text {
+  font-weight: 600;
+}
+
+.wp-project-preview-floating {
+  position: absolute;
+  right: 8px;
+  font-size: 12px;
+  color: #141414;
+  border: 1px solid #141414;
+  border-radius: 4px;
+  background-color: #ffffff;
+}
+
+.wp-dropdown-toggle-muted {
+  color: #6b7280;
+}
+
+.wp-nested-row-muted {
+  background-color: #fafbfc;
+}
+
+.wp-nested-row-loading {
+  padding-left: 56px;
+  padding-top: 12px;
+  padding-bottom: 12px;
+}
+
+.wp-nested-row-loading-text {
+  color: #94a3b8;
+  font-size: 0.875rem;
+}
+
+.wp-spinner-muted {
+  color: #94a3b8;
+}
+
+.wp-nested-row-empty {
+  padding-left: 56px;
+  padding-top: 10px;
+  padding-bottom: 10px;
+  color: #9ca3af;
+  font-size: 0.875rem;
+}
+
+.wp-add-task-row {
+  padding-left: 56px;
+  padding-top: 6px;
+  padding-bottom: 6px;
+}
+
+.wp-add-task-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #9ca3af;
+  font-size: 0.825rem;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 0;
+}
+
+.wp-table-loading-center {
+  color: #94a3b8;
+}
+
+.wp-empty-folder-icon {
+  opacity: 0.3;
+  margin-bottom: 12px;
+}
+
+.wp-empty-state-text {
+  color: #64748b;
+}
+
+.wp-generic-table-empty {
+  padding: 2rem;
+  text-align: center;
+  color: #64748b;
+}
+
+.wp-generic-table-empty-icon {
+  margin-bottom: 1rem;
+  opacity: 0.5;
+}
+
+.wp-generic-table-empty-title {
+  font-size: 1.125rem;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+}
+
+// Project detail sidebar sections
+.wp-sidebar-progress-foot {
+  font-size: 0.875rem;
+  color: #64748b;
+  text-align: right;
+}
+
+.wp-sidebar-progress-bar {
+  height: 10px;
+  margin-bottom: 0.5rem;
+}
+
+.wp-sidebar-member-line {
+  font-size: 0.85rem;
+  color: #334155;
+}
+
+.wp-sidebar-description {
+  font-size: 0.875rem;
+  color: #475569;
+  line-height: 1.6;
+  margin: 0;
+  overflow-x: auto;
+  word-break: break-word;
+}
+
+.wp-sidebar-no-description {
+  color: #9ca3af;
+  font-size: 0.875rem;
+}
+
+// Project form sidebar
+.wp-project-form-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: transparent;
+}
+
+.wp-project-form-panel {
+  position: fixed;
+  top: 0;
+  right: 0;
+  width: 600px;
+  height: 100vh;
+  background-color: #ffffff;
+  box-shadow: -2px 0 8px rgba(0, 0, 0, 0.1);
+  z-index: 999999;
+  display: flex;
+  flex-direction: column;
+}
+
+.wp-project-form-header {
+  padding: 20px 24px;
+  border-bottom: 1px solid #eaf0f6;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.wp-project-form-title {
+  font-size: 20px;
+  font-weight: 600;
+  color: #141414;
+  margin: 0;
+}
+
+.wp-project-form-close {
+  background: transparent;
+  border: none;
+  padding: 4px;
+  cursor: pointer;
+  color: #718096;
+  display: flex;
+  align-items: center;
+}
+
+.wp-project-form-body {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
+.wp-project-form-scroll {
+  flex: 1;
+  overflow-y: auto;
+  padding: 40px;
+}
+
+.wp-project-form-group {
+  margin-bottom: 20px;
+}
+
+.wp-project-form-label {
+  display: block;
+  font-size: 14px;
+  font-weight: 600;
+  color: #141414;
+  margin-bottom: 8px;
+}
+
+.wp-required-asterisk {
+  color: #f2545b;
+}
+
+.wp-project-form-control {
+  padding: 10px 12px;
+  border: 1px solid #8a8a8a;
+  border-radius: 4px;
+  font-size: 14px;
+  min-height: 40px;
+}
+
+.wp-project-form-color-swatch {
+  width: 80px;
+  height: 40px;
+  padding: 4px;
+}
+
+.wp-project-form-footer {
+  padding: 16px 24px;
+  border-top: 1px solid #eaf0f6;
+  display: flex;
+  gap: 12px;
+  justify-content: flex-start;
+}
+
+.wp-project-form-submit {
+  padding: 10px 20px;
+  border: none;
+  border-radius: 4px;
+  font-size: 14px;
+  font-weight: 500;
+
+  &--enabled {
+    background-color: #0091ae;
+    color: #ffffff;
+    cursor: pointer;
+  }
+
+  &--disabled {
+    background-color: #cbd5e0;
+    color: #ffffff;
+    cursor: not-allowed;
+  }
+}
+
+.wp-project-form-cancel {
+  padding: 10px 20px;
+  background-color: transparent;
+  color: #141414;
+  border: 1px solid #8a8a8a;
+  border-radius: 4px;
+  font-size: 14px;
+  font-weight: 500;
+
+  &--enabled {
+    cursor: pointer;
+  }
+
+  &--disabled {
+    cursor: not-allowed;
+  }
+}
+
+// Toolbar create button
+.wp-create-project-toolbar-btn {
+  cursor: pointer;
+  transition: 150ms ease-out;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  border-radius: 4px;
+  border: 1px solid rgb(20, 20, 20);
+  padding: 8px 16px;
+  font-family: "Lexend Deca", Helvetica, Arial, sans-serif;
+  font-size: 12px;
+  font-weight: 300;
+  line-height: 14px;
+  background-color: rgb(20, 20, 20);
+  color: #ffffff;
+  position: absolute;
+  right: 35px;
+  top: 21px;
+}
+
+.wp-filter-date-dropdown {
+  min-width: 240px;
+}

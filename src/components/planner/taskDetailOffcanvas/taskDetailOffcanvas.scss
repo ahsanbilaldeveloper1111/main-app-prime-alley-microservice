@@ -1,0 +1,150 @@
+/* Task detail offcanvas (planner project list sidebar) */
+
+.task-detail-panel {
+  width: 500px;
+}
+
+.task-detail-header {
+  padding: 1.25rem 1.5rem;
+  border-bottom: 2px solid #e2e8f0;
+  background-color: #f8fafc;
+}
+
+.task-detail-body {
+  padding: 1.5rem;
+  background-color: #ffffff;
+}
+
+.detail-section {
+  margin-bottom: 1.25rem;
+  padding: 1rem;
+  background-color: #f8fafc;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+}
+
+.detail-label {
+  font-size: 0.75rem;
+  color: #64748b;
+  margin-bottom: 0.625rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.assignee-group {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.assignee-badge {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.add-assignee {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background-color: #e2e8f0;
+  color: #64748b;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.add-assignee:hover {
+  background-color: #cbd5e1;
+}
+
+.assignee-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.activity-item {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  font-size: 0.875rem;
+}
+
+.activity-date {
+  color: #94a3b8;
+  font-size: 0.75rem;
+  margin-bottom: 0.5rem;
+}
+
+.detail-tabs {
+  border-bottom: 2px solid #e2e8f0;
+  margin: 1.5rem -1.5rem 1.5rem -1.5rem;
+  padding: 0 1.5rem;
+}
+
+.detail-tabs .nav-link {
+  color: #64748b;
+  border: none;
+  border-bottom: 2px solid transparent;
+  padding: 0.75rem 1rem;
+  font-weight: 500;
+  font-size: 0.875rem;
+  background: transparent;
+  margin-bottom: -2px;
+}
+
+.detail-tabs .nav-link.active {
+  color: #3b82f6;
+  background: transparent;
+  border-bottom: 2px solid #3b82f6;
+}
+
+.activity-section {
+  background-color: #ffffff;
+  border-radius: 8px;
+  padding: 1rem;
+  border: 1px solid #e2e8f0;
+}
+
+.tdo-due-row {
+  display: flex;
+  align-items: center;
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.tdo-description {
+  font-size: 0.875rem;
+  color: #475569;
+  line-height: 1.6;
+  margin: 0;
+  overflow-x: auto;
+}
+
+.tdo-activities-modal-body {
+  max-height: 70vh;
+  overflow-y: auto;
+}
+
+@media (max-width: 768px) {
+  .task-detail-panel {
+    width: 100%;
+  }
+}
