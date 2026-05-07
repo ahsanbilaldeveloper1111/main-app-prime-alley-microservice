@@ -20,7 +20,14 @@ import {
   buildLeadConversionTableRows,
   CRM_INSIGHTS_PIE_COLORS_LEAD_SOURCE,
 } from "./crmInsightsDomain";
-import { CrmInsightsLoadingSpinner, CrmInsightsReportPanel } from "./crmInsightsUi";
+import {
+  CrmInsightsLoadingSpinner,
+  CrmInsightsReportEmptyState,
+  CrmInsightsReportPanel,
+  CrmInsightsReportScrollTable,
+  CrmInsightsTd,
+  CrmInsightsTh,
+} from "./crmInsightsUi";
 
 export type CrmInsightsLeadsSectionProps = Readonly<{
   loading: boolean;
@@ -49,12 +56,7 @@ export function CrmInsightsLeadsSection({
     sourceAnalysisBody = <CrmInsightsLoadingSpinner height={280} />;
   } else if (leadSources.length === 0) {
     sourceAnalysisBody = (
-      <div
-        className="d-flex justify-content-center align-items-center text-muted"
-        style={{ height: "280px" }}
-      >
-        No source data available
-      </div>
+      <CrmInsightsReportEmptyState height={280}>No source data available</CrmInsightsReportEmptyState>
     );
   } else {
     sourceAnalysisBody = (
@@ -124,71 +126,30 @@ export function CrmInsightsLeadsSection({
     assignmentReportBody = <CrmInsightsLoadingSpinner height={280} />;
   } else if (leadAssignments.length === 0) {
     assignmentReportBody = (
-      <div
-        className="d-flex justify-content-center align-items-center text-muted"
-        style={{ height: "280px" }}
-      >
-        No assignment data available
-      </div>
+      <CrmInsightsReportEmptyState height={280}>No assignment data available</CrmInsightsReportEmptyState>
     );
   } else {
     assignmentReportBody = (
-      <div style={{ maxHeight: "340px", overflowY: "auto" }}>
-        <table className="table table-sm table-hover mb-0" style={{ fontSize: "12px" }}>
-          <thead style={{ background: "#f8f9fa", position: "sticky", top: 0, zIndex: 1 }}>
-            <tr>
-              <th
-                style={{
-                  border: "none",
-                  padding: "10px",
-                  fontWeight: 600,
-                  color: "#1f2937",
-                }}
-              >
-                User/Owner
-              </th>
-              <th
-                style={{
-                  border: "none",
-                  padding: "10px",
-                  fontWeight: 600,
-                  color: "#1f2937",
-                  textAlign: "right",
-                }}
-              >
-                Assigned Leads
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {leadAssignments.map((item) => (
-              <tr key={`assignment-${item.user_extension}`}>
-                <td
-                  style={{
-                    padding: "10px",
-                    borderTop: "1px solid #f0f0f0",
-                    color: "#1f2937",
-                    fontWeight: 500,
-                  }}
-                >
-                  {getUserDisplayName(item.user_extension)}
-                </td>
-                <td
-                  style={{
-                    padding: "10px",
-                    borderTop: "1px solid #f0f0f0",
-                    textAlign: "right",
-                    fontWeight: 600,
-                    color: "#4F46E5",
-                  }}
-                >
-                  {item.assigned_count}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      <CrmInsightsReportScrollTable
+        maxHeight={340}
+        headerRow={
+          <tr>
+            <CrmInsightsTh>User/Owner</CrmInsightsTh>
+            <CrmInsightsTh align="right">Assigned Leads</CrmInsightsTh>
+          </tr>
+        }
+      >
+        {leadAssignments.map((item) => (
+          <tr key={`assignment-${item.user_extension}`}>
+            <CrmInsightsTd style={{ color: "#1f2937", fontWeight: 500 }}>
+              {getUserDisplayName(item.user_extension)}
+            </CrmInsightsTd>
+            <CrmInsightsTd align="right" style={{ fontWeight: 600, color: "#4F46E5" }}>
+              {item.assigned_count}
+            </CrmInsightsTd>
+          </tr>
+        ))}
+      </CrmInsightsReportScrollTable>
     );
   }
 
@@ -197,114 +158,36 @@ export function CrmInsightsLeadsSection({
     conversionReportBody = <CrmInsightsLoadingSpinner height={280} />;
   } else if (conversionRows.length === 0) {
     conversionReportBody = (
-      <div
-        className="d-flex justify-content-center align-items-center text-muted"
-        style={{ height: "280px" }}
-      >
-        No conversion data available
-      </div>
+      <CrmInsightsReportEmptyState height={280}>No conversion data available</CrmInsightsReportEmptyState>
     );
   } else {
     conversionReportBody = (
-      <div style={{ maxHeight: "280px", overflowY: "auto" }}>
-        <table className="table table-sm table-hover mb-0" style={{ fontSize: "12px" }}>
-          <thead style={{ background: "#f8f9fa", position: "sticky", top: 0, zIndex: 1 }}>
-            <tr>
-              <th
-                style={{
-                  border: "none",
-                  padding: "10px",
-                  fontWeight: 600,
-                  color: "#1f2937",
-                }}
-              >
-                Stage
-              </th>
-              <th
-                style={{
-                  border: "none",
-                  padding: "10px",
-                  fontWeight: 600,
-                  color: "#1f2937",
-                  textAlign: "right",
-                }}
-              >
-                Total Leads
-              </th>
-              <th
-                style={{
-                  border: "none",
-                  padding: "10px",
-                  fontWeight: 600,
-                  color: "#1f2937",
-                  textAlign: "right",
-                }}
-              >
-                Converted
-              </th>
-              <th
-                style={{
-                  border: "none",
-                  padding: "10px",
-                  fontWeight: 600,
-                  color: "#1f2937",
-                  textAlign: "right",
-                }}
-              >
-                Conv. Rate
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {conversionRows.map((item) => (
-              <tr key={`conversion-${item.stage}`}>
-                <td
-                  style={{
-                    padding: "10px",
-                    borderTop: "1px solid #f0f0f0",
-                    color: "#1f2937",
-                    fontWeight: 500,
-                  }}
-                >
-                  {item.stage}
-                </td>
-                <td
-                  style={{
-                    padding: "10px",
-                    borderTop: "1px solid #f0f0f0",
-                    textAlign: "right",
-                    color: "#6b7280",
-                  }}
-                >
-                  {item.count}
-                </td>
-                <td
-                  style={{
-                    padding: "10px",
-                    borderTop: "1px solid #f0f0f0",
-                    textAlign: "right",
-                    fontWeight: 600,
-                    color: "#10b981",
-                  }}
-                >
-                  {item.converted}
-                </td>
-                <td
-                  style={{
-                    padding: "10px",
-                    borderTop: "1px solid #f0f0f0",
-                    textAlign: "right",
-                    fontWeight: 600,
-                    color: "#4F46E5",
-                  }}
-                >
-                  {item.conversionRate}%
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      <CrmInsightsReportScrollTable
+        maxHeight={280}
+        headerRow={
+          <tr>
+            <CrmInsightsTh>Stage</CrmInsightsTh>
+            <CrmInsightsTh align="right">Total Leads</CrmInsightsTh>
+            <CrmInsightsTh align="right">Converted</CrmInsightsTh>
+            <CrmInsightsTh align="right">Conv. Rate</CrmInsightsTh>
+          </tr>
+        }
+      >
+        {conversionRows.map((item) => (
+          <tr key={`conversion-${item.stage}`}>
+            <CrmInsightsTd style={{ color: "#1f2937", fontWeight: 500 }}>{item.stage}</CrmInsightsTd>
+            <CrmInsightsTd align="right" style={{ color: "#6b7280" }}>
+              {item.count}
+            </CrmInsightsTd>
+            <CrmInsightsTd align="right" style={{ fontWeight: 600, color: "#10b981" }}>
+              {item.converted}
+            </CrmInsightsTd>
+            <CrmInsightsTd align="right" style={{ fontWeight: 600, color: "#4F46E5" }}>
+              {item.conversionRate}%
+            </CrmInsightsTd>
+          </tr>
+        ))}
+      </CrmInsightsReportScrollTable>
     );
   }
 
@@ -313,135 +196,40 @@ export function CrmInsightsLeadsSection({
     stageDurationReportBody = <CrmInsightsLoadingSpinner height={280} />;
   } else if (leadStageDuration.length === 0) {
     stageDurationReportBody = (
-      <div
-        className="d-flex justify-content-center align-items-center text-muted"
-        style={{ height: "280px" }}
-      >
-        No stage duration data available
-      </div>
+      <CrmInsightsReportEmptyState height={280}>No stage duration data available</CrmInsightsReportEmptyState>
     );
   } else {
     stageDurationReportBody = (
-      <div style={{ maxHeight: "280px", overflowY: "auto" }}>
-        <table className="table table-sm table-hover mb-0" style={{ fontSize: "12px" }}>
-          <thead style={{ background: "#f8f9fa", position: "sticky", top: 0, zIndex: 1 }}>
-            <tr>
-              <th
-                style={{
-                  border: "none",
-                  padding: "10px",
-                  fontWeight: 600,
-                  color: "#1f2937",
-                }}
-              >
-                Stage
-              </th>
-              <th
-                style={{
-                  border: "none",
-                  padding: "10px",
-                  fontWeight: 600,
-                  color: "#1f2937",
-                  textAlign: "right",
-                }}
-              >
-                Leads
-              </th>
-              <th
-                style={{
-                  border: "none",
-                  padding: "10px",
-                  fontWeight: 600,
-                  color: "#1f2937",
-                  textAlign: "right",
-                }}
-              >
-                Avg (Days)
-              </th>
-              <th
-                style={{
-                  border: "none",
-                  padding: "10px",
-                  fontWeight: 600,
-                  color: "#1f2937",
-                  textAlign: "right",
-                }}
-              >
-                Min
-              </th>
-              <th
-                style={{
-                  border: "none",
-                  padding: "10px",
-                  fontWeight: 600,
-                  color: "#1f2937",
-                  textAlign: "right",
-                }}
-              >
-                Max
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {leadStageDuration.map((item, index) => (
-              <tr key={`duration-${item.stage}-${index}`}>
-                <td
-                  style={{
-                    padding: "10px",
-                    borderTop: "1px solid #f0f0f0",
-                    color: "#1f2937",
-                    fontWeight: 500,
-                  }}
-                >
-                  {item.stage}
-                </td>
-                <td
-                  style={{
-                    padding: "10px",
-                    borderTop: "1px solid #f0f0f0",
-                    textAlign: "right",
-                    fontWeight: 600,
-                    color: "#1f2937",
-                  }}
-                >
-                  {item.lead_count}
-                </td>
-                <td
-                  style={{
-                    padding: "10px",
-                    borderTop: "1px solid #f0f0f0",
-                    textAlign: "right",
-                    fontWeight: 600,
-                    color: "#4F46E5",
-                  }}
-                >
-                  {item.avg_duration_days.toFixed(1)}
-                </td>
-                <td
-                  style={{
-                    padding: "10px",
-                    borderTop: "1px solid #f0f0f0",
-                    textAlign: "right",
-                    color: "#10b981",
-                  }}
-                >
-                  {item.min_duration_days.toFixed(1)}
-                </td>
-                <td
-                  style={{
-                    padding: "10px",
-                    borderTop: "1px solid #f0f0f0",
-                    textAlign: "right",
-                    color: "#6b7280",
-                  }}
-                >
-                  {item.max_duration_days.toFixed(1)}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      <CrmInsightsReportScrollTable
+        maxHeight={280}
+        headerRow={
+          <tr>
+            <CrmInsightsTh>Stage</CrmInsightsTh>
+            <CrmInsightsTh align="right">Leads</CrmInsightsTh>
+            <CrmInsightsTh align="right">Avg (Days)</CrmInsightsTh>
+            <CrmInsightsTh align="right">Min</CrmInsightsTh>
+            <CrmInsightsTh align="right">Max</CrmInsightsTh>
+          </tr>
+        }
+      >
+        {leadStageDuration.map((item, index) => (
+          <tr key={`duration-${item.stage}-${index}`}>
+            <CrmInsightsTd style={{ color: "#1f2937", fontWeight: 500 }}>{item.stage}</CrmInsightsTd>
+            <CrmInsightsTd align="right" style={{ fontWeight: 600, color: "#1f2937" }}>
+              {item.lead_count}
+            </CrmInsightsTd>
+            <CrmInsightsTd align="right" style={{ fontWeight: 600, color: "#4F46E5" }}>
+              {item.avg_duration_days.toFixed(1)}
+            </CrmInsightsTd>
+            <CrmInsightsTd align="right" style={{ color: "#10b981" }}>
+              {item.min_duration_days.toFixed(1)}
+            </CrmInsightsTd>
+            <CrmInsightsTd align="right" style={{ color: "#6b7280" }}>
+              {item.max_duration_days.toFixed(1)}
+            </CrmInsightsTd>
+          </tr>
+        ))}
+      </CrmInsightsReportScrollTable>
     );
   }
 

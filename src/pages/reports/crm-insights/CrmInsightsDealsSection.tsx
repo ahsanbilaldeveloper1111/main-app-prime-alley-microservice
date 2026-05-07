@@ -22,8 +22,14 @@ import {
 import {
   CrmInsightsKpiCard,
   CrmInsightsLoadingSpinner,
+  CrmInsightsPieTableRow,
+  CrmInsightsReportEmptyState,
   CrmInsightsReportPanel,
+  CrmInsightsReportScrollTable,
   CrmInsightsResponsiveKpiSlot,
+  CrmInsightsSwatchLabel,
+  CrmInsightsTd,
+  CrmInsightsTh,
 } from "./crmInsightsUi";
 
 export type CrmInsightsDealsSectionProps = Readonly<{
@@ -61,137 +67,49 @@ export function CrmInsightsDealsSection({
     funnelReportBody = <CrmInsightsLoadingSpinner height={340} />;
   } else if (dealFunnel.length > 0) {
     funnelReportBody = (
-      <div style={{ maxHeight: "340px", overflowY: "auto" }}>
-        <table className="table table-sm table-hover mb-0" style={{ fontSize: "12px" }}>
-          <thead style={{ background: "#f8f9fa", position: "sticky", top: 0, zIndex: 1 }}>
-            <tr>
-              <th style={{ border: "none", padding: "10px", fontWeight: 600, color: "#1f2937" }}>
-                Stage
-              </th>
-              <th
-                style={{
-                  border: "none",
-                  padding: "10px",
-                  fontWeight: 600,
-                  color: "#1f2937",
-                  textAlign: "center",
-                }}
-              >
-                Currency
-              </th>
-              <th
-                style={{
-                  border: "none",
-                  padding: "10px",
-                  fontWeight: 600,
-                  color: "#1f2937",
-                  textAlign: "right",
-                }}
-              >
-                Deals
-              </th>
-              <th
-                style={{
-                  border: "none",
-                  padding: "10px",
-                  fontWeight: 600,
-                  color: "#1f2937",
-                  textAlign: "right",
-                }}
-              >
-                Total Value
-              </th>
-              <th
-                style={{
-                  border: "none",
-                  padding: "10px",
-                  fontWeight: 600,
-                  color: "#1f2937",
-                  textAlign: "right",
-                }}
-              >
-                % of Total
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {dealFunnel.map((item, index) => (
-              <tr key={`funnel-${item.stage}-${item.currency}-${index}`}>
-                <td style={{ padding: "10px", borderTop: "1px solid #f0f0f0" }}>
-                  <div className="d-flex align-items-center gap-2">
-                    <div
-                      style={{
-                        width: "8px",
-                        height: "8px",
-                        borderRadius: "2px",
-                        background: funnelColors[index % funnelColors.length],
-                        flexShrink: 0,
-                      }}
-                    />
-                    <span style={{ color: "#1f2937", fontWeight: 500 }}>{item.stage}</span>
-                  </div>
-                </td>
-                <td
-                  style={{
-                    padding: "10px",
-                    borderTop: "1px solid #f0f0f0",
-                    textAlign: "center",
-                    color: "#6b7280",
-                  }}
-                >
-                  {item.currency}
-                </td>
-                <td
-                  style={{
-                    padding: "10px",
-                    borderTop: "1px solid #f0f0f0",
-                    textAlign: "right",
-                    fontWeight: 600,
-                    color: "#1f2937",
-                  }}
-                >
-                  {item.count}
-                </td>
-                <td
-                  style={{
-                    padding: "10px",
-                    borderTop: "1px solid #f0f0f0",
-                    textAlign: "right",
-                    fontWeight: 600,
-                    color: "#10b981",
-                  }}
-                >
-                  {item.currency}{" "}
-                  {item.value.toLocaleString(undefined, {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2,
-                  })}
-                </td>
-                <td
-                  style={{
-                    padding: "10px",
-                    borderTop: "1px solid #f0f0f0",
-                    textAlign: "right",
-                    fontWeight: 600,
-                    color: "#4F46E5",
-                  }}
-                >
-                  {item.percentage.toFixed(1)}%
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      <CrmInsightsReportScrollTable
+        maxHeight={340}
+        headerRow={
+          <tr>
+            <CrmInsightsTh>Stage</CrmInsightsTh>
+            <CrmInsightsTh align="center">Currency</CrmInsightsTh>
+            <CrmInsightsTh align="right">Deals</CrmInsightsTh>
+            <CrmInsightsTh align="right">Total Value</CrmInsightsTh>
+            <CrmInsightsTh align="right">% of Total</CrmInsightsTh>
+          </tr>
+        }
+      >
+        {dealFunnel.map((item, index) => (
+          <tr key={`funnel-${item.stage}-${item.currency}-${index}`}>
+            <CrmInsightsTd>
+              <CrmInsightsSwatchLabel
+                swatchColor={funnelColors[index % funnelColors.length]}
+                label={item.stage}
+              />
+            </CrmInsightsTd>
+            <CrmInsightsTd align="center" style={{ color: "#6b7280" }}>
+              {item.currency}
+            </CrmInsightsTd>
+            <CrmInsightsTd align="right" style={{ fontWeight: 600, color: "#1f2937" }}>
+              {item.count}
+            </CrmInsightsTd>
+            <CrmInsightsTd align="right" style={{ fontWeight: 600, color: "#10b981" }}>
+              {item.currency}{" "}
+              {item.value.toLocaleString(undefined, {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+              })}
+            </CrmInsightsTd>
+            <CrmInsightsTd align="right" style={{ fontWeight: 600, color: "#4F46E5" }}>
+              {item.percentage.toFixed(1)}%
+            </CrmInsightsTd>
+          </tr>
+        ))}
+      </CrmInsightsReportScrollTable>
     );
   } else {
     funnelReportBody = (
-      <div
-        className="d-flex justify-content-center align-items-center text-muted"
-        style={{ height: "340px" }}
-      >
-        No funnel data available
-      </div>
+      <CrmInsightsReportEmptyState height={340}>No funnel data available</CrmInsightsReportEmptyState>
     );
   }
 
@@ -201,137 +119,50 @@ export function CrmInsightsDealsSection({
     dealValueReportBody = <CrmInsightsLoadingSpinner height={280} />;
   } else if (dealValueRows && dealValueRows.length > 0) {
     dealValueReportBody = (
-      <div style={{ maxHeight: "280px", overflowY: "auto" }}>
-        <table className="table table-sm table-hover mb-0" style={{ fontSize: "12px" }}>
-          <thead style={{ background: "#f8f9fa", position: "sticky", top: 0, zIndex: 1 }}>
-            <tr>
-              <th style={{ border: "none", padding: "10px", fontWeight: 600, color: "#1f2937" }}>
-                Owner
-              </th>
-              <th
-                style={{
-                  border: "none",
-                  padding: "10px",
-                  fontWeight: 600,
-                  color: "#1f2937",
-                  textAlign: "center",
-                }}
-              >
-                Currency
-              </th>
-              <th
-                style={{
-                  border: "none",
-                  padding: "10px",
-                  fontWeight: 600,
-                  color: "#1f2937",
-                  textAlign: "right",
-                }}
-              >
-                Deals
-              </th>
-              <th
-                style={{
-                  border: "none",
-                  padding: "10px",
-                  fontWeight: 600,
-                  color: "#1f2937",
-                  textAlign: "right",
-                }}
-              >
-                Total Value
-              </th>
-              <th
-                style={{
-                  border: "none",
-                  padding: "10px",
-                  fontWeight: 600,
-                  color: "#1f2937",
-                  textAlign: "right",
-                }}
-              >
-                Avg Value
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {dealValueRows.map((item, index) => (
-              <tr key={`value-owner-${item.owner}-${item.currency}-${index}`}>
-                <td
-                  style={{
-                    padding: "10px",
-                    borderTop: "1px solid #f0f0f0",
-                    color: "#1f2937",
-                    fontWeight: 500,
-                  }}
-                >
-                  {getUserDisplayName(item.owner)}
-                </td>
-                <td
-                  style={{
-                    padding: "10px",
-                    borderTop: "1px solid #f0f0f0",
-                    textAlign: "center",
-                    color: "#6b7280",
-                  }}
-                >
-                  {item.currency}
-                </td>
-                <td
-                  style={{
-                    padding: "10px",
-                    borderTop: "1px solid #f0f0f0",
-                    textAlign: "right",
-                    fontWeight: 600,
-                    color: "#1f2937",
-                  }}
-                >
-                  {item.deal_count}
-                </td>
-                <td
-                  style={{
-                    padding: "10px",
-                    borderTop: "1px solid #f0f0f0",
-                    textAlign: "right",
-                    fontWeight: 600,
-                    color: "#10b981",
-                  }}
-                >
-                  {item.currency}{" "}
-                  {item.total_value.toLocaleString(undefined, {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2,
-                  })}
-                </td>
-                <td
-                  style={{
-                    padding: "10px",
-                    borderTop: "1px solid #f0f0f0",
-                    textAlign: "right",
-                    fontWeight: 600,
-                    color: "#4F46E5",
-                  }}
-                >
-                  {item.currency}{" "}
-                  {item.avg_value.toLocaleString(undefined, {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2,
-                  })}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      <CrmInsightsReportScrollTable
+        maxHeight={280}
+        headerRow={
+          <tr>
+            <CrmInsightsTh>Owner</CrmInsightsTh>
+            <CrmInsightsTh align="center">Currency</CrmInsightsTh>
+            <CrmInsightsTh align="right">Deals</CrmInsightsTh>
+            <CrmInsightsTh align="right">Total Value</CrmInsightsTh>
+            <CrmInsightsTh align="right">Avg Value</CrmInsightsTh>
+          </tr>
+        }
+      >
+        {dealValueRows.map((item, index) => (
+          <tr key={`value-owner-${item.owner}-${item.currency}-${index}`}>
+            <CrmInsightsTd style={{ color: "#1f2937", fontWeight: 500 }}>
+              {getUserDisplayName(item.owner)}
+            </CrmInsightsTd>
+            <CrmInsightsTd align="center" style={{ color: "#6b7280" }}>
+              {item.currency}
+            </CrmInsightsTd>
+            <CrmInsightsTd align="right" style={{ fontWeight: 600, color: "#1f2937" }}>
+              {item.deal_count}
+            </CrmInsightsTd>
+            <CrmInsightsTd align="right" style={{ fontWeight: 600, color: "#10b981" }}>
+              {item.currency}{" "}
+              {item.total_value.toLocaleString(undefined, {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+              })}
+            </CrmInsightsTd>
+            <CrmInsightsTd align="right" style={{ fontWeight: 600, color: "#4F46E5" }}>
+              {item.currency}{" "}
+              {item.avg_value.toLocaleString(undefined, {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+              })}
+            </CrmInsightsTd>
+          </tr>
+        ))}
+      </CrmInsightsReportScrollTable>
     );
   } else {
     dealValueReportBody = (
-      <div
-        className="d-flex justify-content-center align-items-center text-muted"
-        style={{ height: "280px" }}
-      >
-        No deal value data available
-      </div>
+      <CrmInsightsReportEmptyState height={280}>No deal value data available</CrmInsightsReportEmptyState>
     );
   }
 
@@ -340,88 +171,34 @@ export function CrmInsightsDealsSection({
     stageDurationReportBody = <CrmInsightsLoadingSpinner height={280} />;
   } else if (dealStageDuration.length > 0) {
     stageDurationReportBody = (
-      <div style={{ maxHeight: "280px", overflowY: "auto" }}>
-        <table className="table table-sm table-hover mb-0" style={{ fontSize: "12px" }}>
-          <thead style={{ background: "#f8f9fa", position: "sticky", top: 0, zIndex: 1 }}>
-            <tr>
-              <th style={{ border: "none", padding: "10px", fontWeight: 600, color: "#1f2937" }}>
-                Stage
-              </th>
-              <th
-                style={{
-                  border: "none",
-                  padding: "10px",
-                  fontWeight: 600,
-                  color: "#1f2937",
-                  textAlign: "right",
-                }}
-              >
-                Deals
-              </th>
-              <th
-                style={{
-                  border: "none",
-                  padding: "10px",
-                  fontWeight: 600,
-                  color: "#1f2937",
-                  textAlign: "right",
-                }}
-              >
-                Avg Duration (Days)
-              </th>
+      <CrmInsightsReportScrollTable
+        maxHeight={280}
+        headerRow={
+          <tr>
+            <CrmInsightsTh>Stage</CrmInsightsTh>
+            <CrmInsightsTh align="right">Deals</CrmInsightsTh>
+            <CrmInsightsTh align="right">Avg Duration (Days)</CrmInsightsTh>
+          </tr>
+        }
+      >
+        {dealStageDuration
+          .filter((item) => item.deal_count > 0)
+          .map((item, index) => (
+            <tr key={`deal-duration-${item.stage}-${index}`}>
+              <CrmInsightsTd style={{ color: "#1f2937", fontWeight: 500 }}>{item.stage}</CrmInsightsTd>
+              <CrmInsightsTd align="right" style={{ fontWeight: 600, color: "#1f2937" }}>
+                {item.deal_count}
+              </CrmInsightsTd>
+              <CrmInsightsTd align="right" style={{ fontWeight: 600, color: "#4F46E5" }}>
+                {item.avg_duration_days.toFixed(1)}
+              </CrmInsightsTd>
             </tr>
-          </thead>
-          <tbody>
-            {dealStageDuration
-              .filter((item) => item.deal_count > 0)
-              .map((item, index) => (
-                <tr key={`deal-duration-${item.stage}-${index}`}>
-                  <td
-                    style={{
-                      padding: "10px",
-                      borderTop: "1px solid #f0f0f0",
-                      color: "#1f2937",
-                      fontWeight: 500,
-                    }}
-                  >
-                    {item.stage}
-                  </td>
-                  <td
-                    style={{
-                      padding: "10px",
-                      borderTop: "1px solid #f0f0f0",
-                      textAlign: "right",
-                      fontWeight: 600,
-                      color: "#1f2937",
-                    }}
-                  >
-                    {item.deal_count}
-                  </td>
-                  <td
-                    style={{
-                      padding: "10px",
-                      borderTop: "1px solid #f0f0f0",
-                      textAlign: "right",
-                      fontWeight: 600,
-                      color: "#4F46E5",
-                    }}
-                  >
-                    {item.avg_duration_days.toFixed(1)}
-                  </td>
-                </tr>
-              ))}
-          </tbody>
-        </table>
-      </div>
+          ))}
+      </CrmInsightsReportScrollTable>
     );
   } else {
     stageDurationReportBody = (
-      <div
-        className="d-flex justify-content-center align-items-center text-muted"
-        style={{ height: "280px" }}
-      >
-        No stage duration data available
-      </div>
+      <CrmInsightsReportEmptyState height={280}>No stage duration data available</CrmInsightsReportEmptyState>
     );
   }
 
@@ -430,8 +207,10 @@ export function CrmInsightsDealsSection({
     lostReasonsReportBody = <CrmInsightsLoadingSpinner height={300} />;
   } else if (dealLostReasons.length > 0) {
     lostReasonsReportBody = (
-      <Row className="g-0">
-        <Col xs={5}>
+      <CrmInsightsPieTableRow
+        leftColXs={5}
+        rightColXs={7}
+        left={
           <ResponsiveContainer width="100%" height={300}>
             <PieChart>
               <Pie
@@ -454,141 +233,53 @@ export function CrmInsightsDealsSection({
               <Tooltip />
             </PieChart>
           </ResponsiveContainer>
-        </Col>
-        <Col xs={7}>
-          <div style={{ maxHeight: "300px", overflowY: "auto" }}>
-            <table className="table table-sm table-hover mb-0" style={{ fontSize: "12px" }}>
-              <thead style={{ background: "#f8f9fa", position: "sticky", top: 0, zIndex: 1 }}>
-                <tr>
-                  <th style={{ border: "none", padding: "10px", fontWeight: 600, color: "#1f2937" }}>
-                    Lost Reason
-                  </th>
-                  <th
-                    style={{
-                      border: "none",
-                      padding: "10px",
-                      fontWeight: 600,
-                      color: "#1f2937",
-                      textAlign: "center",
-                    }}
-                  >
-                    Currency
-                  </th>
-                  <th
-                    style={{
-                      border: "none",
-                      padding: "10px",
-                      fontWeight: 600,
-                      color: "#1f2937",
-                      textAlign: "right",
-                    }}
-                  >
-                    Count
-                  </th>
-                  <th
-                    style={{
-                      border: "none",
-                      padding: "10px",
-                      fontWeight: 600,
-                      color: "#1f2937",
-                      textAlign: "right",
-                    }}
-                  >
-                    % of Lost
-                  </th>
-                  <th
-                    style={{
-                      border: "none",
-                      padding: "10px",
-                      fontWeight: 600,
-                      color: "#1f2937",
-                      textAlign: "right",
-                    }}
-                  >
-                    Total Value Lost
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {dealLostReasons.map((item, rowIdx) => (
-                  <tr key={`lost-reason-${item.reason}-${item.currency}-${rowIdx}`}>
-                    <td style={{ padding: "10px", borderTop: "1px solid #f0f0f0" }}>
-                      <div className="d-flex align-items-center gap-2">
-                        <div
-                          style={{
-                            width: "8px",
-                            height: "8px",
-                            borderRadius: "2px",
-                            background: lostColors[rowIdx % lostColors.length],
-                            flexShrink: 0,
-                          }}
-                        />
-                        <span style={{ color: "#1f2937", fontWeight: 500 }}>{item.reason}</span>
-                      </div>
-                    </td>
-                    <td
-                      style={{
-                        padding: "10px",
-                        borderTop: "1px solid #f0f0f0",
-                        textAlign: "center",
-                        color: "#6b7280",
-                      }}
-                    >
-                      {item.currency}
-                    </td>
-                    <td
-                      style={{
-                        padding: "10px",
-                        borderTop: "1px solid #f0f0f0",
-                        textAlign: "right",
-                        fontWeight: 600,
-                        color: "#1f2937",
-                      }}
-                    >
-                      {item.count}
-                    </td>
-                    <td
-                      style={{
-                        padding: "10px",
-                        borderTop: "1px solid #f0f0f0",
-                        textAlign: "right",
-                        fontWeight: 600,
-                        color: "#4F46E5",
-                      }}
-                    >
-                      {item.percentage.toFixed(1)}%
-                    </td>
-                    <td
-                      style={{
-                        padding: "10px",
-                        borderTop: "1px solid #f0f0f0",
-                        textAlign: "right",
-                        fontWeight: 600,
-                        color: "#ef4444",
-                      }}
-                    >
-                      {item.currency}{" "}
-                      {item.total_value.toLocaleString(undefined, {
-                        minimumFractionDigits: 2,
-                        maximumFractionDigits: 2,
-                      })}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </Col>
-      </Row>
+        }
+        right={
+          <CrmInsightsReportScrollTable
+            maxHeight={300}
+            headerRow={
+              <tr>
+                <CrmInsightsTh>Lost Reason</CrmInsightsTh>
+                <CrmInsightsTh align="center">Currency</CrmInsightsTh>
+                <CrmInsightsTh align="right">Count</CrmInsightsTh>
+                <CrmInsightsTh align="right">% of Lost</CrmInsightsTh>
+                <CrmInsightsTh align="right">Total Value Lost</CrmInsightsTh>
+              </tr>
+            }
+          >
+            {dealLostReasons.map((item, rowIdx) => (
+              <tr key={`lost-reason-${item.reason}-${item.currency}-${rowIdx}`}>
+                <CrmInsightsTd>
+                  <CrmInsightsSwatchLabel
+                    swatchColor={lostColors[rowIdx % lostColors.length]}
+                    label={item.reason}
+                  />
+                </CrmInsightsTd>
+                <CrmInsightsTd align="center" style={{ color: "#6b7280" }}>
+                  {item.currency}
+                </CrmInsightsTd>
+                <CrmInsightsTd align="right" style={{ fontWeight: 600, color: "#1f2937" }}>
+                  {item.count}
+                </CrmInsightsTd>
+                <CrmInsightsTd align="right" style={{ fontWeight: 600, color: "#4F46E5" }}>
+                  {item.percentage.toFixed(1)}%
+                </CrmInsightsTd>
+                <CrmInsightsTd align="right" style={{ fontWeight: 600, color: "#ef4444" }}>
+                  {item.currency}{" "}
+                  {item.total_value.toLocaleString(undefined, {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })}
+                </CrmInsightsTd>
+              </tr>
+            ))}
+          </CrmInsightsReportScrollTable>
+        }
+      />
     );
   } else {
     lostReasonsReportBody = (
-      <div
-        className="d-flex justify-content-center align-items-center text-muted"
-        style={{ height: "300px" }}
-      >
-        No lost reasons data available
-      </div>
+      <CrmInsightsReportEmptyState height={300}>No lost reasons data available</CrmInsightsReportEmptyState>
     );
   }
 

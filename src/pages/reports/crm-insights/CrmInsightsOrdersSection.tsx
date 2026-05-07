@@ -36,8 +36,14 @@ import {
 import {
   CrmInsightsKpiCard,
   CrmInsightsLoadingSpinner,
+  CrmInsightsPieTableRow,
+  CrmInsightsReportEmptyState,
   CrmInsightsReportPanel,
+  CrmInsightsReportScrollTable,
   CrmInsightsResponsiveKpiSlot,
+  CrmInsightsSwatchLabel,
+  CrmInsightsTd,
+  CrmInsightsTh,
 } from "./crmInsightsUi";
 
 export type CrmInsightsOrdersSectionProps = Readonly<{
@@ -116,113 +122,47 @@ function renderOrdersRevenueByMonthSection(
           </ResponsiveContainer>
         </Col>
         <Col lg={5}>
-          <div style={{ maxHeight: "340px", overflowY: "auto" }}>
-            <table className="table table-sm table-hover mb-0" style={{ fontSize: "12px" }}>
-              <thead style={{ background: "#f8f9fa", position: "sticky", top: 0, zIndex: 1 }}>
-                <tr>
-                  <th style={{ border: "none", padding: "10px", fontWeight: 600, color: "#1f2937" }}>
-                    Month
-                  </th>
-                  <th
-                    style={{
-                      border: "none",
-                      padding: "10px",
-                      fontWeight: 600,
-                      color: "#1f2937",
-                      textAlign: "center",
-                    }}
-                  >
-                    Currency
-                  </th>
-                  <th
-                    style={{
-                      border: "none",
-                      padding: "10px",
-                      fontWeight: 600,
-                      color: "#1f2937",
-                      textAlign: "right",
-                    }}
-                  >
-                    Orders
-                  </th>
-                  <th
-                    style={{
-                      border: "none",
-                      padding: "10px",
-                      fontWeight: 600,
-                      color: "#1f2937",
-                      textAlign: "right",
-                    }}
-                  >
-                    Revenue
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {revenueByMonthRows.map((item, index) => (
-                  <tr key={`revenue-month-${item.month}-${item.currency}-${index}`}>
-                    <td
-                      style={{
-                        padding: "10px",
-                        borderTop: "1px solid #f0f0f0",
-                        color: "#1f2937",
-                        fontWeight: 500,
-                      }}
-                    >
-                      {new Date(`${item.month}-01`).toLocaleDateString("en-US", {
-                        month: "long",
-                        year: "numeric",
-                      })}
-                    </td>
-                    <td
-                      style={{
-                        padding: "10px",
-                        borderTop: "1px solid #f0f0f0",
-                        textAlign: "center",
-                        color: "#6b7280",
-                      }}
-                    >
-                      {item.currency}
-                    </td>
-                    <td
-                      style={{
-                        padding: "10px",
-                        borderTop: "1px solid #f0f0f0",
-                        textAlign: "right",
-                        fontWeight: 600,
-                        color: "#1f2937",
-                      }}
-                    >
-                      {item.order_count}
-                    </td>
-                    <td
-                      style={{
-                        padding: "10px",
-                        borderTop: "1px solid #f0f0f0",
-                        textAlign: "right",
-                        fontWeight: 600,
-                        color: "#10b981",
-                      }}
-                    >
-                      {item.currency}{" "}
-                      {item.total_value.toLocaleString(undefined, {
-                        minimumFractionDigits: 2,
-                        maximumFractionDigits: 2,
-                      })}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <CrmInsightsReportScrollTable
+            maxHeight={340}
+            headerRow={
+              <tr>
+                <CrmInsightsTh>Month</CrmInsightsTh>
+                <CrmInsightsTh align="center">Currency</CrmInsightsTh>
+                <CrmInsightsTh align="right">Orders</CrmInsightsTh>
+                <CrmInsightsTh align="right">Revenue</CrmInsightsTh>
+              </tr>
+            }
+          >
+            {revenueByMonthRows.map((item, index) => (
+              <tr key={`revenue-month-${item.month}-${item.currency}-${index}`}>
+                <CrmInsightsTd style={{ color: "#1f2937", fontWeight: 500 }}>
+                  {new Date(`${item.month}-01`).toLocaleDateString("en-US", {
+                    month: "long",
+                    year: "numeric",
+                  })}
+                </CrmInsightsTd>
+                <CrmInsightsTd align="center" style={{ color: "#6b7280" }}>
+                  {item.currency}
+                </CrmInsightsTd>
+                <CrmInsightsTd align="right" style={{ fontWeight: 600, color: "#1f2937" }}>
+                  {item.order_count}
+                </CrmInsightsTd>
+                <CrmInsightsTd align="right" style={{ fontWeight: 600, color: "#10b981" }}>
+                  {item.currency}{" "}
+                  {item.total_value.toLocaleString(undefined, {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })}
+                </CrmInsightsTd>
+              </tr>
+            ))}
+          </CrmInsightsReportScrollTable>
         </Col>
       </Row>
     );
   }
   return (
-    <div className="d-flex justify-content-center align-items-center text-muted" style={{ height: "380px" }}>
-      No revenue data available
-    </div>
+    <CrmInsightsReportEmptyState height={380}>No revenue data available</CrmInsightsReportEmptyState>
   );
 }
 
@@ -236,108 +176,42 @@ function renderOrdersRevenueByOwnerSection(
   }
   if (revenueByOwnerRows && revenueByOwnerRows.length > 0) {
     return (
-      <div style={{ maxHeight: "340px", overflowY: "auto" }}>
-        <table className="table table-sm table-hover mb-0" style={{ fontSize: "12px" }}>
-          <thead style={{ background: "#f8f9fa", position: "sticky", top: 0, zIndex: 1 }}>
-            <tr>
-              <th style={{ border: "none", padding: "10px", fontWeight: 600, color: "#1f2937" }}>
-                Owner
-              </th>
-              <th
-                style={{
-                  border: "none",
-                  padding: "10px",
-                  fontWeight: 600,
-                  color: "#1f2937",
-                  textAlign: "center",
-                }}
-              >
-                Currency
-              </th>
-              <th
-                style={{
-                  border: "none",
-                  padding: "10px",
-                  fontWeight: 600,
-                  color: "#1f2937",
-                  textAlign: "right",
-                }}
-              >
-                Orders
-              </th>
-              <th
-                style={{
-                  border: "none",
-                  padding: "10px",
-                  fontWeight: 600,
-                  color: "#1f2937",
-                  textAlign: "right",
-                }}
-              >
-                Total Revenue
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {revenueByOwnerRows.map((item, index) => (
-              <tr key={`revenue-owner-${item.owner || "null"}-${item.currency}-${index}`}>
-                <td
-                  style={{
-                    padding: "10px",
-                    borderTop: "1px solid #f0f0f0",
-                    color: "#1f2937",
-                    fontWeight: 500,
-                  }}
-                >
-                  {item.owner ? getUserDisplayName(item.owner) : "Unassigned"}
-                </td>
-                <td
-                  style={{
-                    padding: "10px",
-                    borderTop: "1px solid #f0f0f0",
-                    textAlign: "center",
-                    color: "#6b7280",
-                  }}
-                >
-                  {item.currency}
-                </td>
-                <td
-                  style={{
-                    padding: "10px",
-                    borderTop: "1px solid #f0f0f0",
-                    textAlign: "right",
-                    fontWeight: 600,
-                    color: "#1f2937",
-                  }}
-                >
-                  {item.order_count}
-                </td>
-                <td
-                  style={{
-                    padding: "10px",
-                    borderTop: "1px solid #f0f0f0",
-                    textAlign: "right",
-                    fontWeight: 600,
-                    color: "#10b981",
-                  }}
-                >
-                  {item.currency}{" "}
-                  {item.total_value.toLocaleString(undefined, {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2,
-                  })}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      <CrmInsightsReportScrollTable
+        maxHeight={340}
+        headerRow={
+          <tr>
+            <CrmInsightsTh>Owner</CrmInsightsTh>
+            <CrmInsightsTh align="center">Currency</CrmInsightsTh>
+            <CrmInsightsTh align="right">Orders</CrmInsightsTh>
+            <CrmInsightsTh align="right">Total Revenue</CrmInsightsTh>
+          </tr>
+        }
+      >
+        {revenueByOwnerRows.map((item, index) => (
+          <tr key={`revenue-owner-${item.owner || "null"}-${item.currency}-${index}`}>
+            <CrmInsightsTd style={{ color: "#1f2937", fontWeight: 500 }}>
+              {item.owner ? getUserDisplayName(item.owner) : "Unassigned"}
+            </CrmInsightsTd>
+            <CrmInsightsTd align="center" style={{ color: "#6b7280" }}>
+              {item.currency}
+            </CrmInsightsTd>
+            <CrmInsightsTd align="right" style={{ fontWeight: 600, color: "#1f2937" }}>
+              {item.order_count}
+            </CrmInsightsTd>
+            <CrmInsightsTd align="right" style={{ fontWeight: 600, color: "#10b981" }}>
+              {item.currency}{" "}
+              {item.total_value.toLocaleString(undefined, {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+              })}
+            </CrmInsightsTd>
+          </tr>
+        ))}
+      </CrmInsightsReportScrollTable>
     );
   }
   return (
-    <div className="d-flex justify-content-center align-items-center text-muted" style={{ height: "340px" }}>
-      No revenue data available
-    </div>
+    <CrmInsightsReportEmptyState height={340}>No revenue data available</CrmInsightsReportEmptyState>
   );
 }
 
@@ -350,127 +224,42 @@ function renderOrdersStageDurationSection(
   }
   if (orderStageDuration.length > 0) {
     return (
-      <div style={{ maxHeight: "340px", overflowY: "auto" }}>
-        <table className="table table-sm table-hover mb-0" style={{ fontSize: "12px" }}>
-          <thead style={{ background: "#f8f9fa", position: "sticky", top: 0, zIndex: 1 }}>
-            <tr>
-              <th style={{ border: "none", padding: "10px", fontWeight: 600, color: "#1f2937" }}>
-                Stage
-              </th>
-              <th
-                style={{
-                  border: "none",
-                  padding: "10px",
-                  fontWeight: 600,
-                  color: "#1f2937",
-                  textAlign: "right",
-                }}
-              >
-                Orders
-              </th>
-              <th
-                style={{
-                  border: "none",
-                  padding: "10px",
-                  fontWeight: 600,
-                  color: "#1f2937",
-                  textAlign: "right",
-                }}
-              >
-                Avg Duration (Days)
-              </th>
-              <th
-                style={{
-                  border: "none",
-                  padding: "10px",
-                  fontWeight: 600,
-                  color: "#1f2937",
-                  textAlign: "right",
-                }}
-              >
-                Min
-              </th>
-              <th
-                style={{
-                  border: "none",
-                  padding: "10px",
-                  fontWeight: 600,
-                  color: "#1f2937",
-                  textAlign: "right",
-                }}
-              >
-                Max
-              </th>
+      <CrmInsightsReportScrollTable
+        maxHeight={340}
+        headerRow={
+          <tr>
+            <CrmInsightsTh>Stage</CrmInsightsTh>
+            <CrmInsightsTh align="right">Orders</CrmInsightsTh>
+            <CrmInsightsTh align="right">Avg Duration (Days)</CrmInsightsTh>
+            <CrmInsightsTh align="right">Min</CrmInsightsTh>
+            <CrmInsightsTh align="right">Max</CrmInsightsTh>
+          </tr>
+        }
+      >
+        {orderStageDuration
+          .filter((item) => item.order_count > 0)
+          .map((item, index) => (
+            <tr key={`order-duration-${item.stage}-${index}`}>
+              <CrmInsightsTd style={{ color: "#1f2937", fontWeight: 500 }}>{item.stage}</CrmInsightsTd>
+              <CrmInsightsTd align="right" style={{ fontWeight: 600, color: "#1f2937" }}>
+                {item.order_count}
+              </CrmInsightsTd>
+              <CrmInsightsTd align="right" style={{ fontWeight: 600, color: "#4F46E5" }}>
+                {item.avg_duration_days.toFixed(1)}
+              </CrmInsightsTd>
+              <CrmInsightsTd align="right" style={{ color: "#10b981" }}>
+                {item.min_duration_days.toFixed(1)}
+              </CrmInsightsTd>
+              <CrmInsightsTd align="right" style={{ color: "#6b7280" }}>
+                {item.max_duration_days.toFixed(1)}
+              </CrmInsightsTd>
             </tr>
-          </thead>
-          <tbody>
-            {orderStageDuration
-              .filter((item) => item.order_count > 0)
-              .map((item, index) => (
-                <tr key={`order-duration-${item.stage}-${index}`}>
-                  <td
-                    style={{
-                      padding: "10px",
-                      borderTop: "1px solid #f0f0f0",
-                      color: "#1f2937",
-                      fontWeight: 500,
-                    }}
-                  >
-                    {item.stage}
-                  </td>
-                  <td
-                    style={{
-                      padding: "10px",
-                      borderTop: "1px solid #f0f0f0",
-                      textAlign: "right",
-                      fontWeight: 600,
-                      color: "#1f2937",
-                    }}
-                  >
-                    {item.order_count}
-                  </td>
-                  <td
-                    style={{
-                      padding: "10px",
-                      borderTop: "1px solid #f0f0f0",
-                      textAlign: "right",
-                      fontWeight: 600,
-                      color: "#4F46E5",
-                    }}
-                  >
-                    {item.avg_duration_days.toFixed(1)}
-                  </td>
-                  <td
-                    style={{
-                      padding: "10px",
-                      borderTop: "1px solid #f0f0f0",
-                      textAlign: "right",
-                      color: "#10b981",
-                    }}
-                  >
-                    {item.min_duration_days.toFixed(1)}
-                  </td>
-                  <td
-                    style={{
-                      padding: "10px",
-                      borderTop: "1px solid #f0f0f0",
-                      textAlign: "right",
-                      color: "#6b7280",
-                    }}
-                  >
-                    {item.max_duration_days.toFixed(1)}
-                  </td>
-                </tr>
-              ))}
-          </tbody>
-        </table>
-      </div>
+          ))}
+      </CrmInsightsReportScrollTable>
     );
   }
   return (
-    <div className="d-flex justify-content-center align-items-center text-muted" style={{ height: "340px" }}>
-      No stage duration data available
-    </div>
+    <CrmInsightsReportEmptyState height={340}>No stage duration data available</CrmInsightsReportEmptyState>
   );
 }
 
@@ -484,8 +273,10 @@ function renderOrdersCancellationsSection(
   }
   if (orderCancellations.length > 0) {
     return (
-      <Row className="g-0">
-        <Col xs={3}>
+      <CrmInsightsPieTableRow
+        leftColXs={3}
+        rightColXs={9}
+        left={
           <ResponsiveContainer width="100%" height={300}>
             <PieChart>
               <Pie
@@ -508,138 +299,53 @@ function renderOrdersCancellationsSection(
               <Tooltip />
             </PieChart>
           </ResponsiveContainer>
-        </Col>
-        <Col xs={9}>
-          <div style={{ maxHeight: "300px", overflowY: "auto" }}>
-            <table className="table table-sm table-hover mb-0" style={{ fontSize: "12px" }}>
-              <thead style={{ background: "#f8f9fa", position: "sticky", top: 0, zIndex: 1 }}>
-                <tr>
-                  <th style={{ border: "none", padding: "10px", fontWeight: 600, color: "#1f2937" }}>
-                    Lost Reason
-                  </th>
-                  <th
-                    style={{
-                      border: "none",
-                      padding: "10px",
-                      fontWeight: 600,
-                      color: "#1f2937",
-                      textAlign: "center",
-                    }}
-                  >
-                    Currency
-                  </th>
-                  <th
-                    style={{
-                      border: "none",
-                      padding: "10px",
-                      fontWeight: 600,
-                      color: "#1f2937",
-                      textAlign: "right",
-                    }}
-                  >
-                    Count
-                  </th>
-                  <th
-                    style={{
-                      border: "none",
-                      padding: "10px",
-                      fontWeight: 600,
-                      color: "#1f2937",
-                      textAlign: "right",
-                    }}
-                  >
-                    % of Cancelled
-                  </th>
-                  <th
-                    style={{
-                      border: "none",
-                      padding: "10px",
-                      fontWeight: 600,
-                      color: "#1f2937",
-                      textAlign: "right",
-                    }}
-                  >
-                    Value Lost
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {orderCancellations.map((item, rowIdx) => (
-                  <tr key={`cancellation-${item.reason}-${item.currency}-${rowIdx}`}>
-                    <td style={{ padding: "10px", borderTop: "1px solid #f0f0f0" }}>
-                      <div className="d-flex align-items-center gap-2">
-                        <div
-                          style={{
-                            width: "8px",
-                            height: "8px",
-                            borderRadius: "2px",
-                            background: cancelColors[rowIdx % cancelColors.length],
-                            flexShrink: 0,
-                          }}
-                        />
-                        <span style={{ color: "#1f2937", fontWeight: 500 }}>{item.reason}</span>
-                      </div>
-                    </td>
-                    <td
-                      style={{
-                        padding: "10px",
-                        borderTop: "1px solid #f0f0f0",
-                        textAlign: "center",
-                        color: "#6b7280",
-                      }}
-                    >
-                      {item.currency}
-                    </td>
-                    <td
-                      style={{
-                        padding: "10px",
-                        borderTop: "1px solid #f0f0f0",
-                        textAlign: "right",
-                        fontWeight: 600,
-                        color: "#1f2937",
-                      }}
-                    >
-                      {item.count}
-                    </td>
-                    <td
-                      style={{
-                        padding: "10px",
-                        borderTop: "1px solid #f0f0f0",
-                        textAlign: "right",
-                        fontWeight: 600,
-                        color: "#4F46E5",
-                      }}
-                    >
-                      {item.percentage.toFixed(1)}%
-                    </td>
-                    <td
-                      style={{
-                        padding: "10px",
-                        borderTop: "1px solid #f0f0f0",
-                        textAlign: "right",
-                        fontWeight: 600,
-                        color: "#ef4444",
-                      }}
-                    >
-                      {item.currency}{" "}
-                      {item.total_value.toLocaleString(undefined, {
-                        minimumFractionDigits: 2,
-                        maximumFractionDigits: 2,
-                      })}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </Col>
-      </Row>
+        }
+        right={
+          <CrmInsightsReportScrollTable
+            maxHeight={300}
+            headerRow={
+              <tr>
+                <CrmInsightsTh>Lost Reason</CrmInsightsTh>
+                <CrmInsightsTh align="center">Currency</CrmInsightsTh>
+                <CrmInsightsTh align="right">Count</CrmInsightsTh>
+                <CrmInsightsTh align="right">% of Cancelled</CrmInsightsTh>
+                <CrmInsightsTh align="right">Value Lost</CrmInsightsTh>
+              </tr>
+            }
+          >
+            {orderCancellations.map((item, rowIdx) => (
+              <tr key={`cancellation-${item.reason}-${item.currency}-${rowIdx}`}>
+                <CrmInsightsTd>
+                  <CrmInsightsSwatchLabel
+                    swatchColor={cancelColors[rowIdx % cancelColors.length]}
+                    label={item.reason}
+                  />
+                </CrmInsightsTd>
+                <CrmInsightsTd align="center" style={{ color: "#6b7280" }}>
+                  {item.currency}
+                </CrmInsightsTd>
+                <CrmInsightsTd align="right" style={{ fontWeight: 600, color: "#1f2937" }}>
+                  {item.count}
+                </CrmInsightsTd>
+                <CrmInsightsTd align="right" style={{ fontWeight: 600, color: "#4F46E5" }}>
+                  {item.percentage.toFixed(1)}%
+                </CrmInsightsTd>
+                <CrmInsightsTd align="right" style={{ fontWeight: 600, color: "#ef4444" }}>
+                  {item.currency}{" "}
+                  {item.total_value.toLocaleString(undefined, {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })}
+                </CrmInsightsTd>
+              </tr>
+            ))}
+          </CrmInsightsReportScrollTable>
+        }
+      />
     );
   }
   return (
-    <div className="d-flex justify-content-center align-items-center text-muted" style={{ height: "300px" }}>
-      No cancellation data available
-    </div>
+    <CrmInsightsReportEmptyState height={300}>No cancellation data available</CrmInsightsReportEmptyState>
   );
 }
 
