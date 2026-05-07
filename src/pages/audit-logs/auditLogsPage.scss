@@ -1,0 +1,327 @@
+.btn svg,
+.introjs-tooltip .introjs-button svg {
+  width: 9px !important;
+}
+.al-tabs-row {
+  display: flex;
+  align-items: stretch;
+  width: 100%;
+
+  overflow: visible;
+  background: transparent;
+  margin-bottom: 0;
+}
+.al-tabs-group {
+  display: flex;
+  flex: 1 1 0;
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+}
+.al-tab-btn {
+  flex: 1 1 0;
+  min-width: 0;
+  padding: 10px 16px;
+  font-size: 14px;
+  font-weight: 100;
+  color: #141414;
+  background: #f0f0f0;
+  border-left: 1px solid #8a8a8a;
+  border-right: 0px solid #8a8a8a;
+  border-bottom: 1px solid #8a8a8a;
+  border-top: 1px solid #8a8a8a;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: left;
+  outline: none;
+  position: relative;
+  transition:
+    background 0.12s,
+    color 0.12s;
+  line-height: 1.4;
+}
+.generic-table-responsive {
+  width: 100% !important;
+  border-radius: 0 !important;
+  margin: 14px 0 !important;
+}
+.generic-table-td {
+  padding: 1.2rem 1.7rem !important;
+  font-size: 15px !important;
+  color: #141414 !important;
+  font-weight: 100 !important;
+}
+
+.generic-table-th.sortable {
+  font-weight: 500 !important;
+  font-size: 11px !important;
+  padding: 1.2rem 1.7rem !important;
+}
+.generic-table-td span,
+.generic-table-td span * {
+  font-size: 14px !important;
+}
+.al-tab-btn:last-child {
+  border-right: 1px solid #8a8a8a;
+}
+.al-tab-btn:hover:not(.al-tab-active) {
+  background: #ebebeb;
+  color: #141414;
+}
+.al-tab-btn.al-tab-active {
+  background: #ffffff;
+  color: #141414;
+  font-weight: 100;
+  margin-bottom: -1px;
+  padding-bottom: 11px;
+  z-index: 2;
+  border-bottom: none;
+}
+.al-tabs-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 8px;
+  background: transparent;
+  border-left: 1px solid #cccccc;
+  flex-shrink: 0;
+}
+.al-mobile-tabs-toggle {
+  display: none;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 10px;
+  border: 1px solid #c5cdd8;
+  border-radius: 3px;
+  background: #ffffff;
+  color: #33475b;
+  font-size: 13px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.al-mobile-tabs-menu {
+  display: none;
+}
+.al-mobile-tabs-item {
+  width: 100%;
+  text-align: left;
+  border: 1px solid #d9d9d9;
+  background: #ffffff;
+  color: #141414;
+  border-radius: 4px;
+  padding: 8px 10px;
+  font-size: 13px;
+  cursor: pointer;
+}
+.al-mobile-tabs-item.al-mobile-tabs-item-active {
+  background: #f0fafa;
+  border-color: #8a8a8a;
+}
+.al-tabs-actions-right {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.al-tabs-icon-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid #c5cdd8;
+  border-radius: 3px;
+  background: #ffffff;
+  color: #516f90;
+  cursor: pointer;
+  transition: background 0.12s;
+  flex-shrink: 0;
+}
+.al-tabs-icon-btn:hover {
+  background: #f0f0f0;
+}
+.al-tabs-more-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 28px;
+  padding: 0 10px;
+  border: 1px solid #c5cdd8;
+  border-radius: 3px;
+  background: #ffffff;
+  color: #33475b;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.12s;
+  flex-shrink: 0;
+}
+.al-tabs-more-btn:hover {
+  background: #f0f0f0;
+}
+
+@media (max-width: 991px) {
+  .al-tab-btn {
+    flex: 0 0 auto;
+    min-width: 170px;
+    text-align: center;
+  }
+  .al-tabs-actions {
+    padding-left: 6px;
+    padding-right: 6px;
+  }
+}
+
+@media (max-width: 767px) {
+  .al-tabs-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+  .al-tabs-group {
+    display: none;
+  }
+  .al-tab-btn {
+    min-width: 160px;
+    padding: 9px 12px;
+    font-size: 13px;
+  }
+  .al-tabs-actions {
+    border-left: 0;
+    padding: 0;
+    justify-content: space-between;
+    width: 100%;
+    flex-wrap: wrap;
+  }
+  .al-mobile-tabs-toggle {
+    display: inline-flex;
+  }
+  .al-mobile-tabs-menu {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-top: 6px;
+  }
+  .al-tabs-more-btn {
+    margin-left: 0;
+  }
+}
+
+@media (max-width: 480px) {
+  .al-tab-btn {
+    min-width: 140px;
+  }
+  .al-tabs-icon-btn {
+    width: 26px;
+    height: 26px;
+  }
+  .al-tabs-more-btn {
+    height: 26px;
+    padding: 0 8px;
+    font-size: 12px;
+  }
+}
+.al-filter-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  padding: 19px 0 8px 0;
+  gap: 0;
+
+  margin-bottom: 0;
+}
+.al-filter-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-right: 23px;
+}
+.al-filter-label {
+  font-size: 14px;
+  color: #141414;
+  font-weight: 100;
+  white-space: nowrap;
+}
+.al-filter-val-btn {
+  font-size: 13px;
+  font-weight: 700;
+  color: #33475b;
+  background: none;
+  border: none;
+  padding: 2px 4px;
+  border-radius: 3px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  white-space: nowrap;
+  transition: background 0.12s;
+}
+.al-filter-val-btn:hover {
+  background: #f0f0f0;
+}
+.al-caret {
+  display: inline-block;
+  vertical-align: middle;
+  margin-left: 1px;
+}
+.al-filter-dd .dropdown-toggle {
+  font-size: 14px !important;
+  font-weight: 400 !important;
+  color: #141414 !important;
+  background: none !important;
+  border: none !important;
+  box-shadow: none !important;
+  padding: 2px 4px !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 2px !important;
+}
+.al-filter-dd .dropdown-toggle::after {
+  display: none !important;
+}
+.al-filter-dd .dropdown-toggle:hover,
+.al-filter-dd .dropdown-toggle:focus,
+.al-filter-dd .dropdown-toggle:active,
+.al-filter-dd .show > .dropdown-toggle {
+  background: #f0f0f0 !important;
+  border-radius: 3px !important;
+  color: #33475b !important;
+}
+.al-filter-dd .dropdown-menu {
+  font-size: 13px;
+  min-width: 180px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.13);
+  border: 1px solid #dde2e8;
+  border-radius: 4px;
+}
+.al-filter-dd .dropdown-item {
+  color: #33475b;
+  padding: 7px 16px;
+}
+.al-filter-dd .dropdown-item:hover {
+  background: #f0f8ff;
+  color: #0091ae;
+}
+.al-export-btn {
+  margin-left: auto;
+  font-size: 13px;
+  color: #33475b;
+  background: #fff;
+  border: 1px solid #c5cdd8;
+  border-radius: 4px;
+  padding: 5px 14px;
+  cursor: pointer;
+  font-weight: 400;
+  white-space: nowrap;
+  transition:
+    background 0.12s,
+    border-color 0.12s;
+}
+.al-export-btn:hover {
+  background: #f5f5f5;
+  border-color: #99aab5;
+}
