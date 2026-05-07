@@ -153,3 +153,129 @@ export const complianceKeys = {
       ] as const,
   },
 };
+
+/** Workforce / employee dashboard reads (`src/pages/workforce/dashboard/*`). */
+export const workforceKeys = {
+  root: ["workforce"] as const,
+
+  dashboard: {
+    all: () => [...workforceKeys.root, "dashboard"] as const,
+    counters: (paramsKey: string) =>
+      [...workforceKeys.dashboard.all(), "counters", paramsKey] as const,
+    departmentHeadcount: (paramsKey: string) =>
+      [...workforceKeys.dashboard.all(), "departmentHeadcount", paramsKey] as const,
+    approvalsAging: (paramsKey: string) =>
+      [...workforceKeys.dashboard.all(), "approvalsAging", paramsKey] as const,
+    /** Headcount + approvals aging + leave calendar fetched together (matches prior `Promise.all`). */
+    graphBundle: (paramsKey: string) =>
+      [...workforceKeys.dashboard.all(), "graphBundle", paramsKey] as const,
+  },
+
+  /** Employee list & detail (`src/pages/workforce/employees/*`). */
+  employees: {
+    all: () => [...workforceKeys.root, "employees"] as const,
+    profileDetail: (profileId: number) =>
+      [...workforceKeys.employees.all(), "profileDetail", profileId] as const,
+    /** Main-app directory rows for Add / Edit employee pickers (`fetchDepartmentUserRowsForModal`). */
+    departmentUsers: (params: { companyUuid: string; departmentId: number }) =>
+      [
+        ...workforceKeys.employees.all(),
+        "departmentUsers",
+        params.companyUuid,
+        params.departmentId,
+      ] as const,
+    list: (params: { page: number; limit: number; filtersKey: string }) =>
+      [
+        ...workforceKeys.employees.all(),
+        "list",
+        params.page,
+        params.limit,
+        params.filtersKey,
+      ] as const,
+  },
+
+  /** Employee journeys (`src/pages/workforce/journey/*`). */
+  journey: {
+    all: () => [...workforceKeys.root, "journey"] as const,
+    list: (params: { page: number; limit: number; filtersKey: string }) =>
+      [
+        ...workforceKeys.journey.all(),
+        "list",
+        params.page,
+        params.limit,
+        params.filtersKey,
+      ] as const,
+    detail: (journeyId: number) =>
+      [...workforceKeys.journey.all(), "detail", journeyId] as const,
+  },
+
+  /** Org chart tree (`src/pages/workforce/org-chart/*`). */
+  orgChart: {
+    all: () => [...workforceKeys.root, "orgChart"] as const,
+    tree: (filtersKey: string) =>
+      [...workforceKeys.orgChart.all(), "tree", filtersKey] as const,
+  },
+
+  /** Request categories / dynamic fields (`src/pages/workforce/request-categories/*`). */
+  requestCategories: {
+    all: () => [...workforceKeys.root, "requestCategories"] as const,
+    list: (params: { page: number; limit: number; search: string }) =>
+      [
+        ...workforceKeys.requestCategories.all(),
+        "list",
+        params.page,
+        params.limit,
+        params.search,
+      ] as const,
+    children: (parentId: number) =>
+      [...workforceKeys.requestCategories.all(), "children", parentId] as const,
+    fields: (categoryId: number) =>
+      [...workforceKeys.requestCategories.all(), "fields", categoryId] as const,
+    /** Flat picker list for create-request modal (`getUserRequestCategories` active tree). */
+    newRequestModalCategories: () =>
+      [...workforceKeys.requestCategories.all(), "newRequestModalCategories"] as const,
+    /** Paginated list with `children: true` (`src/pages/workforce/sub-categories/*`). */
+    subCategoriesList: (params: { page: number; limit: number }) =>
+      [
+        ...workforceKeys.requestCategories.all(),
+        "subCategoriesList",
+        params.page,
+        params.limit,
+      ] as const,
+  },
+
+  /** Attendance records + session status (`src/pages/workforce/attendance/*`). */
+  attendance: {
+    all: () => [...workforceKeys.root, "attendance"] as const,
+    list: (params: { page: number; limit: number; filtersKey: string }) =>
+      [
+        ...workforceKeys.attendance.all(),
+        "list",
+        params.page,
+        params.limit,
+        params.filtersKey,
+      ] as const,
+    status: () => [...workforceKeys.attendance.all(), "status"] as const,
+  },
+
+  /** Approval requests inbox (`src/pages/workforce/approval-requests/*`). */
+  approvalRequests: {
+    all: () => [...workforceKeys.root, "approvalRequests"] as const,
+    list: (params: { page: number; limit: number; filtersKey: string }) =>
+      [
+        ...workforceKeys.approvalRequests.all(),
+        "list",
+        params.page,
+        params.limit,
+        params.filtersKey,
+      ] as const,
+    categoriesBundle: () =>
+      [...workforceKeys.approvalRequests.all(), "categoriesBundle"] as const,
+    detail: (requestId: number) =>
+      [...workforceKeys.approvalRequests.all(), "detail", requestId] as const,
+    approvalInfo: (requestId: number) =>
+      [...workforceKeys.approvalRequests.all(), "approvalInfo", requestId] as const,
+    categoryDetail: (categoryId: number) =>
+      [...workforceKeys.approvalRequests.all(), "categoryDetail", categoryId] as const,
+  },
+};

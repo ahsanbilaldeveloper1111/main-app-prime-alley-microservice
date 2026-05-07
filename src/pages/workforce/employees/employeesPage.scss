@@ -1,0 +1,288 @@
+// Workforce employees page (`src/pages/workforce/employees`)
+
+.employees-page__layout-row {
+  display: flex;
+  gap: 0;
+  align-items: stretch;
+}
+
+.employees-page__main {
+  flex: 1;
+  min-width: 0;
+}
+
+.employees-page__charts-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+  gap: 24px;
+  margin-top: 24px;
+}
+
+.employees-page__chart-card {
+  background-color: #fff;
+  border-radius: 12px;
+  padding: 24px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.employees-page__chart-card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.employees-page__chart-card-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: #1f2937;
+  margin: 0;
+}
+
+.employees-page__chart-legend {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+
+.employees-page__chart-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.employees-page__chart-legend-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+}
+
+.employees-page__chart-legend-label {
+  font-size: 13px;
+  color: #6b7280;
+}
+
+/* Overview widget */
+.employees-page__overview-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: #1f2937;
+  margin-bottom: 20px;
+}
+
+.employees-page__overview-loading {
+  font-size: 14px;
+  color: #6b7280;
+}
+
+.employees-page__overview-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.employees-page__overview-block {
+  padding: 12px;
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+
+  &--muted {
+    background-color: #f9fafb;
+  }
+
+  &--amber {
+    background-color: #fffbeb;
+  }
+
+  &--green {
+    background-color: #f0fdf4;
+  }
+
+  &--blue {
+    background-color: #eff6ff;
+  }
+
+  &--purple {
+    background-color: #faf5ff;
+  }
+
+  &--rose {
+    background-color: #fef2f2;
+  }
+}
+
+.employees-page__overview-block-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #374151;
+  margin-bottom: 8px;
+}
+
+.employees-page__overview-inline-metrics {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.employees-page__overview-col-metrics {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.employees-page__overview-wrap-metrics {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.employees-page__overview-metric {
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.employees-page__overview-strong {
+  color: #1f2937;
+
+  &--green {
+    color: #059669;
+  }
+
+  &--red {
+    color: #dc2626;
+  }
+
+  &--blue {
+    color: #2563eb;
+  }
+
+  &--amber {
+    color: #d97706;
+  }
+}
+
+/* Table cells */
+.employees-page__cell-employee {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.employees-page__cell-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background-color: #e0e7ff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.employees-page__cell-name {
+  font-size: 14px;
+  font-weight: 500;
+  color: #1f2937;
+}
+
+.employees-page__cell-sub {
+  font-size: 12px;
+  color: #6b7280;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 2px;
+
+  &--capitalize {
+    text-transform: capitalize;
+  }
+}
+
+.employees-page__cell-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+
+  &--active {
+    background-color: #10b981;
+  }
+
+  &--inactive {
+    background-color: #ef4444;
+  }
+}
+
+.employees-page__cell-text-primary {
+  font-size: 14px;
+  color: #1f2937;
+}
+
+.employees-page__cell-muted {
+  font-size: 14px;
+  color: #6b7280;
+}
+
+.employees-page__status-pill {
+  padding: 4px 12px;
+  border-radius: 16px;
+  font-size: 13px;
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  text-transform: capitalize;
+
+  &--active {
+    background-color: #d1fae5;
+    color: #065f46;
+  }
+
+  &--inactive {
+    background-color: #fee2e2;
+    color: #991b1b;
+  }
+}
+
+.employees-page__status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+
+  &--active {
+    background-color: #10b981;
+  }
+
+  &--inactive {
+    background-color: #ef4444;
+  }
+}
+
+/* Manager filter pill */
+.employees-page__mgr-filter {
+  min-width: 260px;
+  max-height: 320px;
+  overflow: hidden;
+}
+
+.employees-page__mgr-filter-list {
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.employees-page__mgr-filter-item--selected {
+  background-color: #eef2ff;
+}
+
+.employees-page__mgr-filter-check {
+  width: 16px;
+}
+
+/* Journey modal */
+.employees-page__journey-employee-label {
+  font-weight: 600;
+  color: #1f2937;
+  margin-bottom: 2px;
+}
