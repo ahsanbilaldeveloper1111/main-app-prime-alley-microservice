@@ -6,12 +6,11 @@ import PageHeader from "@components/PageHeader";
 import { Button, Modal, Form } from "react-bootstrap";
 import { toast } from "react-toastify";
 import { useSession } from "next-auth/react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
-  getUserRequestCategories,
   createUserRequestCategory,
   updateUserRequestCategory,
   deleteUserRequestCategory,
-  getUserRequestCategoryFields,
   createUserRequestCategoryField,
   updateUserRequestCategoryField,
   deleteUserRequestCategoryField,
@@ -20,16 +19,10 @@ import {
   type UserRequestCategoryPayload,
   type UserRequestCategoryField,
   type UserRequestCategoryFieldPayload,
-  type UserRequestCategoryFieldType,
-  type UserRequestCategoryFieldConfig,
-  type FieldConfigValidation,
   type FieldsReorderItem,
-  type WorkflowLevelPayload,
-  type WorkflowLevelAssignee,
 } from "@utils/staffManagement";
 import { useMainAppLookups } from "@hooks/useMainAppLookups";
-import { Pencil, Trash2, List, Plus, ChevronUp, ChevronDown, GripVertical, FolderTree } from "lucide-react";
-import Select from "@components/AppSelect";
+import { Pencil, Trash2, List, Plus, ChevronUp, ChevronDown, FolderTree } from "lucide-react";
 import GenericTable from "@components/GenericTable";
 import CategoryEditSidebar, {
   CategorySidebarField,
@@ -37,603 +30,179 @@ import CategoryEditSidebar, {
   CategorySidebarSelect,
   CategorySidebarTextArea,
   CategorySidebarTextInput,
-  categorySidebarLabelStyle,
 } from "@components/CategoryEditSidebar";
 import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
-import { reportApiErrorFromCatch } from "@utils/sentryLogger";
-import { HEADER_CONSTANTS } from "@constants/headerConstants";
+import { workforceKeys } from "../../../query/keys";
 
-/** Permission key duplicated in UI checks — single source avoids typos (Sonar S1192). */
-const MANAGE_REQUEST_CATEGORIES_PERMISSION =
-  HEADER_CONSTANTS.PERMISSIONS.MANAGE_REQUEST_CATEGORIES_STAFF_MANAGEMENT;
+import {
+  MANAGE_REQUEST_CATEGORIES_PERMISSION,
+  categoryModalTitle,
+  categorySaveButtonLabel,
+  consumeHandledApiError,
+  defaultCategoryForm,
+  emptyFieldForm,
+  fieldPayloadFromExisting,
+  formatDescriptionPreview,
+  formatTrackingLabel,
+  getCategoryFormSubmitValidationError,
+  isCategoryFormReadyForSubmit,
+  getFieldFormSubmitValidationError,
+  normalizeWorkflowLevelsForPayload,
+  requestCategoryFieldTypeLabel,
+  slugifyForKey,
+  type CategoryFormState,
+} from "./requestCategoriesDomain";
+import {
+  useRequestCategoriesListQuery,
+  useRequestCategoryChildrenQuery,
+  useRequestCategoryFieldsQuery,
+} from "./useRequestCategoriesQueries";
+import { SubCategoryWorkflowForm } from "./partials/RequestCategoriesWorkflowForm";
+import RequestCategoryFieldModal from "./partials/RequestCategoryFieldModal";
 
-type FieldConditionOp = "eq" | "neq" | "in" | "contains";
-
-const FIELD_TYPES: { value: UserRequestCategoryFieldType; label: string }[] = [
-  { value: "text", label: "Text" },
-  { value: "textarea", label: "Textarea" },
-  { value: "number", label: "Number" },
-  { value: "date", label: "Date" },
-  { value: "select", label: "Select" },
-  { value: "multiselect", label: "Multi Select" },
-  { value: "boolean", label: "Boolean" },
-  { value: "checkbox", label: "Checkbox" },
-  { value: "radio", label: "Radio buttons" },
-  { value: "toggle", label: "Yes/No toggle" },
-  { value: "file", label: "File" },
-];
-
-const CONDITION_OPS: { value: FieldConditionOp; label: string }[] = [
-  { value: "eq", label: "equals" },
-  { value: "neq", label: "not equals" },
-  { value: "in", label: "in (comma list)" },
-  { value: "contains", label: "contains" },
-];
-
-const OPTION_TYPES = new Set<UserRequestCategoryFieldType>(["select", "multiselect", "radio", "checkbox"]);
-
-function requestCategoryFieldTypeLabel(type: string | null | undefined): string {
-  const raw = String(type ?? "").trim();
-  if (raw === "") return "—";
-  const normalized = raw.toLowerCase();
-  const found = FIELD_TYPES.find((t) => t.value === normalized);
-  if (found) return found.label;
-  return raw
-    .replaceAll("_", " ")
-    .split(" ")
-    .filter(Boolean)
-    .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
-    .join(" ");
-}
-
-function formatTrackingLabel(row: UserRequestCategory): string {
-  return row.tracking_enabled === true ? "Enabled" : "Disabled";
-}
-
-function formatDescriptionPreview(description: unknown): string {
-  if (description == null || description === "") return "—";
-  let s = "";
-  if (typeof description === "string") {
-    s = description;
-  } else if (
-    typeof description === "number" ||
-    typeof description === "boolean" ||
-    typeof description === "bigint"
-  ) {
-    s = String(description);
-  } else {
-    s = JSON.stringify(description) ?? "";
-  }
-  return s.length > 50 ? s.slice(0, 50) + "…" : s;
-}
-
-function categoryModalTitle(editingCategory: UserRequestCategory | null, parentId: number | null | undefined): string {
-  const isSub = parentId != null && parentId !== 0;
-  if (isSub) {
-    return editingCategory ? "Edit Sub Category" : "Create Sub Category";
-  }
-  return editingCategory ? "Edit Category" : "Create Category";
-}
-
-function categorySaveButtonLabel(savingCategory: boolean, editingCategory: UserRequestCategory | null): string {
-  if (savingCategory) return "Saving…";
-  return editingCategory ? "Update" : "Create";
-}
-
-function fieldModalTitle(editingField: UserRequestCategoryField | null): string {
-  return editingField ? "Edit Field" : "Add Field";
-}
-
-function fieldModalPrimaryButtonLabel(savingField: boolean, editingField: UserRequestCategoryField | null): string {
-  if (savingField) return "Saving…";
-  return editingField ? "Update" : "Add";
-}
-
-function patchFieldFormConfig(
-  f: UserRequestCategoryFieldPayload,
-  patch: Partial<UserRequestCategoryFieldConfig>
-): UserRequestCategoryFieldPayload {
-  const cfg = f.config;
-  return {
-    ...f,
-    config: cfg ? { ...cfg, ...patch } : ({ ...patch } as UserRequestCategoryFieldConfig),
-  };
-}
-
-function patchFieldFormValidation(
-  f: UserRequestCategoryFieldPayload,
-  patch: Partial<FieldConfigValidation>
-): UserRequestCategoryFieldPayload {
-  const cfg = f.config;
-  const val = cfg?.validation ?? {};
-  const nextValidation = { ...val, ...patch };
-  if (cfg) {
-    return { ...f, config: { ...cfg, validation: nextValidation } };
-  }
-  return { ...f, config: { validation: nextValidation } };
-}
-
-function normalizeWorkflowLevelsForPayload(
-  levels: WorkflowLevelPayload[] | undefined | null
-): WorkflowLevelPayload[] | undefined {
-  if (!levels?.length) return undefined;
-  return levels.map((lvl: WorkflowLevelPayload) => ({
-    ...lvl,
-    assignees: (lvl.assignees ?? [])
-      .filter((a: WorkflowLevelAssignee) => (a.user_id ?? "").trim() !== "")
-      .map((a: WorkflowLevelAssignee, i: number) => ({ ...a, sort_order: i })),
-  }));
-}
-
-function isSubCategoryForm(form: CategoryFormState): boolean {
-  return form.parent_id != null && form.parent_id !== 0;
-}
-
-/** Non-null message blocks submit (name + sub-category workflow rules). */
-function getCategoryFormSubmitValidationError(form: CategoryFormState): string | null {
-  if ((form.name?.trim() ?? "").length === 0) {
-    return "Category name is required.";
-  }
-  if (!isSubCategoryForm(form)) {
-    return null;
-  }
-  const workflowLevels = form.workflow_levels ?? [];
-  if (
-    workflowLevels.every(
-      (lvl: WorkflowLevelPayload) =>
-        !(lvl.assignees ?? []).some(
-          (a: WorkflowLevelAssignee) => (a.user_id ?? "").trim() !== "",
-        ),
-    )
-  ) {
-    return "Sub-categories require at least one approval workflow level with at least one assignee.";
-  }
-  return null;
-}
-
-function isCategoryFormReadyForSubmit(form: CategoryFormState): boolean {
-  return getCategoryFormSubmitValidationError(form) == null;
-}
-
-/**
- * UI catch blocks reset local state after API helpers toast/rethrow. Report for observability (Sentry dedupes similar events).
- */
-function consumeHandledApiError(error: unknown, source: string): void {
-  reportApiErrorFromCatch(error, source, { scope: "RequestCategories" });
-}
-
-function slugifyForKey(label: string): string {
-  const s = String(label ?? "")
-    .trim()
-    .toLowerCase()
-    .replaceAll(/\s+/g, "_")
-    .replaceAll(/[^a-z0-9_]/g, "");
-  if (!s) return "";
-  return /^[a-z]/.test(s) ? s : `field_${s}`;
-}
-
-function getFieldFormSubmitValidationError(f: UserRequestCategoryFieldPayload): string | null {
-  const trimmedLabel = f.label?.trim() ?? "";
-  if (!trimmedLabel) {
-    return "Label is required";
-  }
-  const effectiveKey = (f.key?.trim() ?? "") || slugifyForKey(trimmedLabel);
-  if (!effectiveKey) {
-    return "Failed to generate field key from label";
-  }
-  return null;
-}
-
-function isFieldFormReadyForSubmit(f: UserRequestCategoryFieldPayload): boolean {
-  return getFieldFormSubmitValidationError(f) == null;
-}
-
-const defaultCategoryForm: UserRequestCategoryPayload & { workflow_levels?: WorkflowLevelPayload[] } = {
-  name: "",
-  code: "",
-  description: "",
-  is_active: true,
-  sort_order: 0,
-  tracking_enabled: false,
-  tracking_code_prefix: "",
-  workflow_levels: [],
-};
-
-type CategoryFormState = UserRequestCategoryPayload & { workflow_levels?: WorkflowLevelPayload[] };
-
-type AssigneesListProps = Readonly<{
-  assignees: WorkflowLevelAssignee[];
-  mainAppUsers: { id: number; name: string; phone: string }[];
-  levelIndex: number;
-  categoryForm: CategoryFormState;
-  setCategoryForm: React.Dispatch<React.SetStateAction<CategoryFormState>>;
-}>;
-
-function AssigneesList({ assignees, mainAppUsers, levelIndex, categoryForm, setCategoryForm }: AssigneesListProps) {
-  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
-
-  const updateAssignees = (newAssignees: WorkflowLevelAssignee[]) => {
-    const levels = [...(categoryForm.workflow_levels ?? [])];
-    levels[levelIndex] = { ...levels[levelIndex], assignees: newAssignees };
-    setCategoryForm((f: CategoryFormState) => ({ ...f, workflow_levels: levels }));
-  };
-
-  const handleDragStart = (e: React.DragEvent, assigneeIdx: number) => {
-    setDraggedIndex(assigneeIdx);
-    e.dataTransfer.effectAllowed = "move";
-    e.dataTransfer.setData("text/plain", String(assigneeIdx));
-    e.dataTransfer.setData("application/json", JSON.stringify({ from: assigneeIdx }));
-  };
-
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = "move";
-  };
-
-  const handleDrop = (e: React.DragEvent, toIndex: number) => {
-    e.preventDefault();
-    setDraggedIndex(null);
-    const fromStr = e.dataTransfer.getData("text/plain");
-    const fromIndex = fromStr === "" ? -1 : Number.parseInt(fromStr, 10);
-    if (fromIndex < 0 || Number.isNaN(fromIndex) || fromIndex === toIndex || fromIndex >= assignees.length) return;
-    const reordered = [...assignees];
-    const [removed] = reordered.splice(fromIndex, 1);
-    if (removed === undefined) return;
-    reordered.splice(toIndex, 0, removed);
-    updateAssignees(reordered.map((a, i) => ({ ...a, sort_order: i })));
-  };
-
-  const handleDragEnd = () => {
-    setDraggedIndex(null);
-  };
-
-  const userOptions = mainAppUsers
-    .filter((u) => (u.phone ?? "").trim() !== "")
-    .map((u) => ({ value: String(u.phone).trim(), label: u.name ? `${u.name} (${u.phone})` : String(u.phone) }));
-
-  return (
-    <ul className="list-unstyled d-flex flex-column gap-2 mb-0" aria-label="Workflow assignees">
-      {assignees.map((assignee, assigneeIdx) => {
-        const uid = (assignee.user_id ?? "").trim();
-        const rowKey =
-          "wl-" +
-          String(levelIndex) +
-          "-assignee-" +
-          String(assignee.sort_order) +
-          "-" +
-          (uid.length > 0 ? uid : "empty");
-        return (
-        <li
-          key={rowKey}
-          draggable
-          aria-label={"Assignee position " + String(assigneeIdx + 1)}
-          onDragStart={(e) => handleDragStart(e, assigneeIdx)}
-          onDragOver={handleDragOver}
-          onDrop={(e) => handleDrop(e, assigneeIdx)}
-          onDragEnd={handleDragEnd}
-          className="d-flex align-items-center gap-2 p-2 border rounded bg-white"
-          style={{
-            opacity: draggedIndex === assigneeIdx ? 0.6 : 1,
-            cursor: "grab",
-          }}
-        >
-          <span className="d-flex align-items-center" style={{ cursor: "grab" }} aria-hidden>
-            <GripVertical size={18} className="text-muted" />
-          </span>
-          <div className="flex-grow-1" style={{ minWidth: 0 }}>
-            <Select<{ value: string; label: string }, false>
-              options={userOptions}
-              value={
-                assignee.user_id
-                  ? (() => {
-                      const u = mainAppUsers.find(
-                        (x) => String(x.phone ?? "").trim() === assignee.user_id || String(x.id) === assignee.user_id
-                      );
-                      if (u && (u.phone ?? "").trim() !== "") {
-                        return { value: String(u.phone).trim(), label: u.name ? `${u.name} (${u.phone})` : String(u.phone) };
-                      }
-                      return { value: assignee.user_id, label: u?.name ?? assignee.user_id };
-                    })()
-                  : null
-              }
-              onChange={(opt: { value: string; label: string } | null) => {
-                const next = [...assignees];
-                next[assigneeIdx] = { ...next[assigneeIdx], user_id: opt?.value ?? "", sort_order: assigneeIdx };
-                updateAssignees(next);
-              }}
-              placeholder="Select user..."
-              isClearable
-              className="react-select-container"
-              classNamePrefix="select"
-            />
-          </div>
-          <span className="small text-muted text-nowrap">Order: {assigneeIdx + 1}</span>
-          <Button
-            type="button"
-            variant="link"
-            className="text-danger p-0"
-            aria-label="Remove assignee"
-            onClick={() => {
-              const next = assignees.filter((_, i) => i !== assigneeIdx).map((a, i) => ({ ...a, sort_order: i }));
-              updateAssignees(next);
-            }}
-          >
-            <Trash2 size={18} />
-          </Button>
-        </li>
-        );
-      })}
-    </ul>
-  );
-}
-
-type WorkflowLevelRowProps = Readonly<{
-  lvl: WorkflowLevelPayload;
-  idx: number;
-  categoryForm: CategoryFormState;
-  setCategoryForm: React.Dispatch<React.SetStateAction<CategoryFormState>>;
-  mainAppUsers: { id: number; name: string; phone: string }[];
-}>;
-
-function WorkflowLevelRow({ lvl, idx, categoryForm, setCategoryForm, mainAppUsers }: WorkflowLevelRowProps) {
-  const removeLevel = () => {
-    const levels = categoryForm.workflow_levels ?? [];
-    setCategoryForm((f: CategoryFormState) => ({
-      ...f,
-      workflow_levels: levels
-        .filter((_: WorkflowLevelPayload, i: number) => i !== idx)
-        .map((l: WorkflowLevelPayload, i: number) => ({ ...l, level: i + 1 })),
-    }));
-  };
-
-  const updateLevelName = (name: string) => {
-    const levels = [...(categoryForm.workflow_levels ?? [])];
-    levels[idx] = { ...levels[idx], name: name || undefined };
-    setCategoryForm((f: CategoryFormState) => ({ ...f, workflow_levels: levels }));
-  };
-
-  const updateApprovalRule = (value: string) => {
-    const levels = [...(categoryForm.workflow_levels ?? [])];
-    levels[idx] = { ...levels[idx], approval_rule: (value as "any" | "all") || undefined };
-    setCategoryForm((f: CategoryFormState) => ({ ...f, workflow_levels: levels }));
-  };
-
-  const updateApproveInOrder = (checked: boolean) => {
-    const levels = [...(categoryForm.workflow_levels ?? [])];
-    levels[idx] = { ...levels[idx], approve_in_order: checked };
-    setCategoryForm((f: CategoryFormState) => ({ ...f, workflow_levels: levels }));
-  };
-
-  const addAssignee = () => {
-    const levels = [...(categoryForm.workflow_levels ?? [])];
-    const current = levels[idx].assignees ?? [];
-    levels[idx] = {
-      ...levels[idx],
-      assignees: [...current, { user_id: "", sort_order: current.length }],
-    };
-    setCategoryForm((f: CategoryFormState) => ({ ...f, workflow_levels: levels }));
-  };
-
-  const approvalRuleAll = lvl.approval_rule === "all";
-
-  return (
-    <div className="mb-3 pb-3 border-bottom border-secondary border-opacity-25">
-      <div className="d-flex align-items-center justify-content-between mb-2">
-        <strong style={{ fontSize: "14px", color: "#141414" }}>Level {lvl.level}</strong>
-        <Button type="button" variant="outline-danger" size="sm" onClick={removeLevel}>
-          Remove
-        </Button>
-      </div>
-      <CategorySidebarField>
-        <CategorySidebarLabel htmlFor={"wl-name-" + String(idx)}>Level name (optional)</CategorySidebarLabel>
-        <CategorySidebarTextInput
-          id={"wl-name-" + String(idx)}
-          type="text"
-          value={lvl.name ?? ""}
-          onChange={(e) => updateLevelName(e.target.value)}
-          placeholder="e.g. Manager approval"
-        />
-      </CategorySidebarField>
-      <CategorySidebarField>
-        <CategorySidebarLabel htmlFor={"wl-rule-" + String(idx)}>Approval rule</CategorySidebarLabel>
-        <CategorySidebarSelect
-          id={"wl-rule-" + String(idx)}
-          value={lvl.approval_rule ?? "any"}
-          onChange={(e) => updateApprovalRule(e.target.value)}
-        >
-          <option value="any">Any one can approve</option>
-          <option value="all">All must approve</option>
-        </CategorySidebarSelect>
-      </CategorySidebarField>
-      <CategorySidebarField>
-        <Form.Check
-          type="checkbox"
-          id={"wl-order-" + String(idx)}
-          label="Approve in order"
-          disabled={!approvalRuleAll}
-          checked={lvl.approve_in_order === true}
-          onChange={(e) => updateApproveInOrder(e.target.checked)}
-          title={approvalRuleAll ? undefined : "Only available when 'All must approve' is selected"}
-          style={{ fontSize: "14px", color: "#141414" }}
-        />
-        <span className="ms-1 small text-muted" title="Only when All must approve">
-          ⓘ
-        </span>
-      </CategorySidebarField>
-      <CategorySidebarField>
-        <div className="d-flex align-items-center justify-content-between mb-2">
-          <span style={{ ...categorySidebarLabelStyle, marginBottom: 0 }}>Assignees (who can approve this level)</span>
-          <Button type="button" variant="outline-primary" size="sm" onClick={addAssignee}>
-            <Plus size={14} className="me-1" />
-            Add
-          </Button>
-        </div>
-        {(lvl.assignees ?? []).length === 0 ? (
-          <div className="text-muted small py-2">No assignees. Click Add to assign approvers for this level.</div>
-        ) : (
-          <AssigneesList
-            assignees={lvl.assignees ?? []}
-            mainAppUsers={mainAppUsers}
-            levelIndex={idx}
-            categoryForm={categoryForm}
-            setCategoryForm={setCategoryForm}
-          />
-        )}
-      </CategorySidebarField>
-    </div>
-  );
-}
-
-type SubCategoryWorkflowFormProps = Readonly<{
-  categoryForm: CategoryFormState;
-  setCategoryForm: React.Dispatch<React.SetStateAction<CategoryFormState>>;
-  mainAppUsers: { id: number; name: string; phone: string }[];
-}>;
-
-function SubCategoryWorkflowForm({ categoryForm, setCategoryForm, mainAppUsers }: SubCategoryWorkflowFormProps) {
-  const workflowLevels = categoryForm.workflow_levels ?? [];
-
-  return (
-    <div style={{ marginTop: "24px" }}>
-      <div className="d-flex align-items-center justify-content-between mb-2">
-        <CategorySidebarLabel required>Approval workflow (level & order)</CategorySidebarLabel>
-
-        {workflowLevels.length > 0 && (
-          <Button
-            type="button"
-            variant="outline-primary"
-            size="sm"
-            onClick={() => {
-              const levels = categoryForm.workflow_levels ?? [];
-              const nextLevel = levels.length + 1;
-              setCategoryForm((f: CategoryFormState) => ({
-                ...f,
-                workflow_levels: [...levels, { level: nextLevel, name: "Level " + String(nextLevel), assignees: [] }],
-              }));
-            }}
-          >
-            <Plus size={14} className="me-1" />
-            Add level
-          </Button>
-        )}
-      </div>
-
-      {workflowLevels.length === 0 ? (
-        <div className="border rounded p-3 bg-light text-center text-muted">
-          <p className="mb-2 small">At least one approval level with an assignee is required for sub-categories.</p>
-          <Button
-            type="button"
-            variant="outline-primary"
-            size="sm"
-            onClick={() => {
-              setCategoryForm((f: CategoryFormState) => ({
-                ...f,
-                workflow_levels: [{ level: 1, name: "Level 1", assignees: [] }],
-              }));
-            }}
-          >
-            <Plus size={14} className="me-1" />
-            Add level (required)
-          </Button>
-        </div>
-      ) : (
-        <div className="border rounded p-3 bg-light">
-          {workflowLevels.map((lvl: WorkflowLevelPayload, idx: number) => (
-            <WorkflowLevelRow
-              key={"workflow-level-" + String(lvl.level)}
-              lvl={lvl}
-              idx={idx}
-              categoryForm={categoryForm}
-              setCategoryForm={setCategoryForm}
-              mainAppUsers={mainAppUsers}
-            />
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
+import "./requestCategoriesPage.scss";
 
 const RequestCategories = () => {
+  const queryClient = useQueryClient();
   const { data: session } = useSession();
-  const { mainAppUsers } = useMainAppLookups();
-  const [categories, setCategories] = useState<UserRequestCategory[]>([]);
-  const [pagination, setPagination] = useState<{ page: number; limit: number; total: number; last_page: number } | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { mainAppUsers, companyIdentifier } = useMainAppLookups();
+
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(10);
+  const [searchValue, setSearchValue] = useState("");
+
+  useEffect(() => {
+    setPage(1);
+  }, [searchValue]);
+
+  const listQuery = useRequestCategoriesListQuery({
+    companyIdentifier,
+    page,
+    limit,
+    search: searchValue,
+  });
+
+  const categories = listQuery.data?.data ?? [];
+  const pagination = listQuery.data?.pagination ?? null;
+  const loading = listQuery.isFetching;
+
   const [showCategoryModal, setShowCategoryModal] = useState(false);
   const [editingCategory, setEditingCategory] = useState<UserRequestCategory | null>(null);
-  const [categoryForm, setCategoryForm] = useState<UserRequestCategoryPayload & { workflow_levels?: WorkflowLevelPayload[] }>(defaultCategoryForm);
-  const [savingCategory, setSavingCategory] = useState(false);
+  const [categoryForm, setCategoryForm] = useState<CategoryFormState>(defaultCategoryForm);
+
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [categoryToDelete, setCategoryToDelete] = useState<UserRequestCategory | null>(null);
-  const [deleting, setDeleting] = useState(false);
+
   const [showFieldsModal, setShowFieldsModal] = useState(false);
   const [fieldsCategoryId, setFieldsCategoryId] = useState<number | null>(null);
   const [fieldsCategoryName, setFieldsCategoryName] = useState("");
-  const [fields, setFields] = useState<UserRequestCategoryField[]>([]);
-  const [loadingFields, setLoadingFields] = useState(false);
+
+  const fieldsQuery = useRequestCategoryFieldsQuery(
+    fieldsCategoryId,
+    showFieldsModal,
+    companyIdentifier,
+  );
+  const fields = fieldsQuery.data ?? [];
+  const loadingFields = fieldsQuery.isPending && showFieldsModal;
+
   const [showFieldModal, setShowFieldModal] = useState(false);
   const [editingField, setEditingField] = useState<UserRequestCategoryField | null>(null);
-  const [fieldForm, setFieldForm] = useState<UserRequestCategoryFieldPayload>({
-    key: "",
-    label: "",
-    type: "text",
-    required: false,
-    options: null,
-    config: null,
-    sort_order: 0,
-    is_active: true,
-  });
+  const [fieldForm, setFieldForm] = useState<UserRequestCategoryFieldPayload>(emptyFieldForm(0));
   const [showAdvanced, setShowAdvanced] = useState(true);
   const [autoGenerateKey, setAutoGenerateKey] = useState(true);
-  const [savingField, setSavingField] = useState(false);
-  const [reordering, setReordering] = useState(false);
+
   const [showChildrenModal, setShowChildrenModal] = useState(false);
   const [categoryForChildren, setCategoryForChildren] = useState<UserRequestCategory | null>(null);
-  const [childrenList, setChildrenList] = useState<UserRequestCategory[]>([]);
-  const [loadingChildren, setLoadingChildren] = useState(false);
+
+  const childrenQuery = useRequestCategoryChildrenQuery(
+    categoryForChildren?.id ?? null,
+    showChildrenModal,
+    companyIdentifier,
+  );
+  const childrenList = childrenQuery.data ?? [];
+  const loadingChildren = childrenQuery.isPending && showChildrenModal;
+
   const [showDeleteFieldModal, setShowDeleteFieldModal] = useState(false);
-  const [fieldPendingDelete, setFieldPendingDelete] = useState<UserRequestCategoryField | null>(null);
-  const [deletingField, setDeletingField] = useState(false);
-  const [searchValue, setSearchValue] = useState("");
+  const [fieldPendingDelete, setFieldPendingDelete] = useState<UserRequestCategoryField | null>(
+    null,
+  );
 
-  const loadCategories = useCallback(async (page = 1, limit = 10) => {
-    setLoading(true);
-    try {
-      const { data, pagination: p } = await getUserRequestCategories({ page, limit, parent_id: null, children: false, search: searchValue });
-      setCategories(data);
-      if (p) setPagination({ page: p.page, limit: p.limit, total: p.total, last_page: p.last_page });
-      else setPagination(null);
-    } catch (error: unknown) {
-      consumeHandledApiError(error, "RequestCategories.loadCategories");
-      setCategories([]);
-      setPagination(null);
-    } finally {
-      setLoading(false);
-    }
-  }, [searchValue]);
+  const saveCategoryMutation = useMutation({
+    mutationFn: async ({
+      editing,
+      payload,
+    }: {
+      editing: UserRequestCategory | null;
+      payload: UserRequestCategoryPayload;
+    }) => {
+      if (editing) return updateUserRequestCategory(editing.id, payload);
+      return createUserRequestCategory(payload);
+    },
+    onSuccess: (_, vars) => {
+      toast.success(vars.editing ? "Category updated" : "Category created");
+      void queryClient.invalidateQueries({ queryKey: workforceKeys.requestCategories.all() });
+    },
+    onError: (e: unknown) => consumeHandledApiError(e, "RequestCategories.handleSaveCategory"),
+  });
 
-  useEffect(() => {
-    loadCategories(1, pagination?.limit ?? 10);
-  }, [loadCategories]);
+  const deleteCategoryMutation = useMutation({
+    mutationFn: (id: number) => deleteUserRequestCategory(id),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: workforceKeys.requestCategories.all() });
+    },
+    onError: (e: unknown) => consumeHandledApiError(e, "RequestCategories.handleDeleteCategory"),
+  });
 
-  const loadChildren = useCallback(async (parentId: number) => {
-    setLoadingChildren(true);
-    try {
-      const { data } = await getUserRequestCategories({ parent_id: parentId, limit: 500 });
-      setChildrenList(data ?? []);
-    } catch (error: unknown) {
-      consumeHandledApiError(error, "RequestCategories.loadChildren");
-      setChildrenList([]);
-    } finally {
-      setLoadingChildren(false);
-    }
-  }, []);
+  const saveFieldMutation = useMutation({
+    mutationFn: async ({
+      categoryId,
+      editing,
+      body,
+    }: {
+      categoryId: number;
+      editing: UserRequestCategoryField | null;
+      body: UserRequestCategoryFieldPayload;
+    }) => {
+      if (editing) return updateUserRequestCategoryField(categoryId, editing.id, body);
+      return createUserRequestCategoryField(categoryId, body);
+    },
+    onSuccess: (_, vars) => {
+      toast.success(vars.editing ? "Field updated" : "Field added");
+      void queryClient.invalidateQueries({
+        queryKey: workforceKeys.requestCategories.fields(vars.categoryId),
+      });
+    },
+    onError: (e: unknown) => consumeHandledApiError(e, "RequestCategories.handleSaveField"),
+  });
+
+  const deleteFieldMutation = useMutation({
+    mutationFn: ({ categoryId, fieldId }: { categoryId: number; fieldId: number }) =>
+      deleteUserRequestCategoryField(categoryId, fieldId),
+    onSuccess: (_, vars) => {
+      toast.success("Field deleted");
+      void queryClient.invalidateQueries({
+        queryKey: workforceKeys.requestCategories.fields(vars.categoryId),
+      });
+    },
+    onError: (e: unknown) =>
+      consumeHandledApiError(e, "RequestCategories.handleConfirmDeleteField"),
+  });
+
+  const reorderFieldsMutation = useMutation({
+    mutationFn: ({ categoryId, order }: { categoryId: number; order: FieldsReorderItem[] }) =>
+      reorderUserRequestCategoryFields(categoryId, order),
+    onSuccess: (_, vars) => {
+      toast.success("Order updated");
+      void queryClient.invalidateQueries({
+        queryKey: workforceKeys.requestCategories.fields(vars.categoryId),
+      });
+    },
+    onError: (e: unknown) => consumeHandledApiError(e, "RequestCategories.moveField"),
+  });
 
   const openChildrenModal = (cat: UserRequestCategory) => {
     setCategoryForChildren(cat);
     setShowChildrenModal(true);
-    loadChildren(cat.id);
   };
 
   const openAddChildCategory = (parentCat: UserRequestCategory) => {
@@ -649,7 +218,7 @@ const RequestCategories = () => {
     setShowCategoryModal(true);
   };
 
-  const openEditCategory = (cat: UserRequestCategory) => {
+  const openEditCategory = useCallback((cat: UserRequestCategory) => {
     setEditingCategory(cat);
     setCategoryForm({
       name: cat.name ?? "",
@@ -663,7 +232,7 @@ const RequestCategories = () => {
       workflow_levels: Array.isArray(cat.workflow_levels) ? cat.workflow_levels : [],
     });
     setShowCategoryModal(true);
-  };
+  }, []);
 
   const handleSaveCategory = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -684,23 +253,12 @@ const RequestCategories = () => {
       tracking_code_prefix: (categoryForm.tracking_code_prefix ?? "").slice(0, 50) || undefined,
       workflow_levels: normalizeWorkflowLevelsForPayload(categoryForm.workflow_levels),
     };
-    setSavingCategory(true);
     try {
-      if (editingCategory) {
-        await updateUserRequestCategory(editingCategory.id, payload);
-        toast.success("Category updated");
-      } else {
-        await createUserRequestCategory(payload);
-        toast.success("Category created");
-      }
+      await saveCategoryMutation.mutateAsync({ editing: editingCategory, payload });
       setShowCategoryModal(false);
       setShowChildrenModal(false);
-      loadCategories(pagination?.page ?? 1, pagination?.limit ?? 10);
-      if (categoryForChildren) loadChildren(categoryForChildren.id);
-    } catch (error: unknown) {
-      consumeHandledApiError(error, "RequestCategories.handleSaveCategory");
-    } finally {
-      setSavingCategory(false);
+    } catch {
+      /* toast handled by mutation */
     }
   };
 
@@ -711,54 +269,25 @@ const RequestCategories = () => {
 
   const handleDeleteCategory = async () => {
     if (!categoryToDelete) return;
-    const deletedId = categoryToDelete.id;
-    const deletedParentId = categoryToDelete.parent_id;
-    const openParentId = categoryForChildren?.id;
-    const parentMatchesOpenModal =
-      openParentId != null &&
-      deletedParentId != null &&
-      Number(deletedParentId) === Number(openParentId);
-    const deletedRowWasInChildrenTable =
-      showChildrenModal &&
-      openParentId != null &&
-      childrenList.some((c) => Number(c.id) === Number(deletedId));
-    const shouldRefreshChildrenList =
-      showChildrenModal && openParentId != null && (parentMatchesOpenModal || deletedRowWasInChildrenTable);
-    setDeleting(true);
     try {
-      await deleteUserRequestCategory(categoryToDelete.id);
+      await deleteCategoryMutation.mutateAsync(categoryToDelete.id);
       setShowDeleteModal(false);
       setCategoryToDelete(null);
-      await loadCategories(pagination?.page ?? 1, pagination?.limit ?? 10);
-      if (shouldRefreshChildrenList) await loadChildren(openParentId);
-    } catch (error: unknown) {
-      consumeHandledApiError(error, "RequestCategories.handleDeleteCategory");
-    } finally {
-      setDeleting(false);
+    } catch {
+      /* handled */
     }
   };
 
-  const openFieldsModal = async (cat: UserRequestCategory) => {
+  const openFieldsModal = (cat: UserRequestCategory) => {
     setFieldsCategoryId(cat.id);
     setFieldsCategoryName(cat.name ?? "");
     setShowFieldsModal(true);
-    setLoadingFields(true);
-    try {
-      const list = await getUserRequestCategoryFields(cat.id);
-      setFields(list ?? []);
-    } catch (error: unknown) {
-      consumeHandledApiError(error, "RequestCategories.openFieldsModal");
-      setFields([]);
-    } finally {
-      setLoadingFields(false);
-    }
   };
 
   const closeFieldsModal = () => {
     setShowFieldsModal(false);
     setFieldsCategoryId(null);
     setFieldsCategoryName("");
-    setFields([]);
     setShowFieldModal(false);
     setShowDeleteFieldModal(false);
     setFieldPendingDelete(null);
@@ -767,15 +296,7 @@ const RequestCategories = () => {
   const openAddField = () => {
     setEditingField(null);
     setAutoGenerateKey(true);
-    setFieldForm({
-      key: "",
-      label: "",
-      type: "text",
-      required: false,
-      options: null,
-      sort_order: fields.length,
-      is_active: true,
-    });
+    setFieldForm(emptyFieldForm(fields.length));
     setShowFieldModal(true);
   };
 
@@ -783,30 +304,7 @@ const RequestCategories = () => {
     setEditingField(f);
     setAutoGenerateKey(false);
     setShowAdvanced(true);
-    const c = f.config ?? {};
-    setFieldForm({
-      key: f.key ?? "",
-      label: f.label ?? "",
-      type: f.type ?? "text",
-      required: f.required ?? false,
-      options: f.options ?? [],
-      config: {
-        placeholder: c.placeholder ?? "",
-        help_text: c.help_text ?? "",
-        validation: c.validation
-          ? {
-              pattern: c.validation.pattern ?? "",
-              mimes: c.validation.mimes ?? "",
-              min: c.validation.min ?? "",
-              max: c.validation.max ?? "",
-            }
-          : { pattern: "", mimes: "", min: "", max: "" },
-        required_if: c.required_if ?? null,
-        show_if: c.show_if ?? null,
-      },
-      sort_order: f.sort_order ?? 0,
-      is_active: f.is_active !== false,
-    });
+    setFieldForm(fieldPayloadFromExisting(f));
     setShowFieldModal(true);
   };
 
@@ -825,22 +323,15 @@ const RequestCategories = () => {
       label: trimmedLabel,
       key: fieldForm.key?.trim() || generatedKey,
     };
-    setSavingField(true);
     try {
-      if (editingField) {
-        await updateUserRequestCategoryField(fieldsCategoryId, editingField.id, payloadForSave);
-        toast.success("Field updated");
-      } else {
-        await createUserRequestCategoryField(fieldsCategoryId, payloadForSave);
-        toast.success("Field added");
-      }
+      await saveFieldMutation.mutateAsync({
+        categoryId: fieldsCategoryId,
+        editing: editingField,
+        body: payloadForSave,
+      });
       setShowFieldModal(false);
-      const list = await getUserRequestCategoryFields(fieldsCategoryId);
-      setFields(list ?? []);
-    } catch (error: unknown) {
-      consumeHandledApiError(error, "RequestCategories.handleSaveField");
-    } finally {
-      setSavingField(false);
+    } catch {
+      /* handled */
     }
   };
 
@@ -851,18 +342,15 @@ const RequestCategories = () => {
 
   const handleConfirmDeleteField = async () => {
     if (!fieldsCategoryId || !fieldPendingDelete) return;
-    setDeletingField(true);
     try {
-      await deleteUserRequestCategoryField(fieldsCategoryId, fieldPendingDelete.id);
-      toast.success("Field deleted");
+      await deleteFieldMutation.mutateAsync({
+        categoryId: fieldsCategoryId,
+        fieldId: fieldPendingDelete.id,
+      });
       setShowDeleteFieldModal(false);
       setFieldPendingDelete(null);
-      const list = await getUserRequestCategoryFields(fieldsCategoryId);
-      setFields(list ?? []);
-    } catch (error: unknown) {
-      consumeHandledApiError(error, "RequestCategories.handleConfirmDeleteField");
-    } finally {
-      setDeletingField(false);
+    } catch {
+      /* handled */
     }
   };
 
@@ -873,24 +361,23 @@ const RequestCategories = () => {
     if (swap < 0 || swap >= newFields.length) return;
     [newFields[index], newFields[swap]] = [newFields[swap], newFields[index]];
     const order: FieldsReorderItem[] = newFields.map((f, i) => ({ id: f.id, sort_order: i }));
-    setReordering(true);
     try {
-      await reorderUserRequestCategoryFields(fieldsCategoryId, order);
-      setFields(newFields);
-      toast.success("Order updated");
-    } catch (error: unknown) {
-      consumeHandledApiError(error, "RequestCategories.moveField");
-    } finally {
-      setReordering(false);
+      await reorderFieldsMutation.mutateAsync({ categoryId: fieldsCategoryId, order });
+    } catch {
+      /* handled */
     }
   };
+
+  const reordering = reorderFieldsMutation.isPending;
 
   let childrenModalMain: React.ReactNode;
   if (loadingChildren) {
     childrenModalMain = <p className="text-muted mb-0">Loading sub-categories…</p>;
   } else if (childrenList.length === 0) {
     childrenModalMain = (
-      <p className="text-muted mb-0">No sub-categories yet. Click &quot;Add sub-category&quot; to create one.</p>
+      <p className="text-muted mb-0">
+        No sub-categories yet. Click &quot;Add sub-category&quot; to create one.
+      </p>
     );
   } else {
     childrenModalMain = (
@@ -956,7 +443,9 @@ const RequestCategories = () => {
   if (loadingFields) {
     fieldsModalMain = <p className="text-muted mb-0">Loading fields…</p>;
   } else if (fields.length === 0) {
-    fieldsModalMain = <p className="text-muted mb-0">No fields yet. Add one to define the request form.</p>;
+    fieldsModalMain = (
+      <p className="text-muted mb-0">No fields yet. Add one to define the request form.</p>
+    );
   } else {
     fieldsModalMain = (
       <GenericTable<UserRequestCategoryField>
@@ -970,13 +459,7 @@ const RequestCategories = () => {
               <div className="d-flex align-items-center gap-1">
                 <button
                   type="button"
-                  style={{
-                    cursor: reordering ? "not-allowed" : "pointer",
-                    opacity: reordering ? 0.5 : 1,
-                    padding: "4px",
-                    border: "none",
-                    background: "none",
-                  }}
+                  className="request-categories-page__field-reorder-btn"
                   onClick={() => moveField(index, "up")}
                   disabled={reordering}
                   aria-label="Move up"
@@ -985,13 +468,7 @@ const RequestCategories = () => {
                 </button>
                 <button
                   type="button"
-                  style={{
-                    cursor: reordering ? "not-allowed" : "pointer",
-                    opacity: reordering ? 0.5 : 1,
-                    padding: "4px",
-                    border: "none",
-                    background: "none",
-                  }}
+                  className="request-categories-page__field-reorder-btn"
                   onClick={() => moveField(index, "down")}
                   disabled={reordering}
                   aria-label="Move down"
@@ -1001,7 +478,7 @@ const RequestCategories = () => {
               </div>
             ),
           },
-          
+
           { key: "label", label: "Label", type: "text" },
           {
             key: "type",
@@ -1041,9 +518,10 @@ const RequestCategories = () => {
     );
   }
 
+  const canManage = session?.user?.permissions?.includes(MANAGE_REQUEST_CATEGORIES_PERMISSION) ?? false;
+
   return (
-    <React.Fragment>
-      <style>{`.generic-table-responsive { padding-top: 0 !important; }`}</style>
+    <div className="request-categories-page">
       <BreadcrumbItem mainTitle="" mainLink="" subTitle="Request Categories" />
       <PageHeader
         title=""
@@ -1053,12 +531,12 @@ const RequestCategories = () => {
         onSearchChange={(value) => setSearchValue(value)}
         buttons={
           <>
-          {session?.user?.permissions?.includes(MANAGE_REQUEST_CATEGORIES_PERMISSION) && (
-          <Button variant="primary" onClick={openCreateCategory}>
-            <Plus size={18} className="me-1" />
-            Add Category
-          </Button>
-          )}
+            {canManage && (
+              <Button variant="primary" onClick={openCreateCategory}>
+                <Plus size={18} className="me-1" />
+                Add Category
+              </Button>
+            )}
           </>
         }
       />
@@ -1072,7 +550,7 @@ const RequestCategories = () => {
             type: "text",
             emptyValue: "—",
           },
-         
+
           {
             key: "description",
             label: "Description",
@@ -1104,21 +582,21 @@ const RequestCategories = () => {
             icon: <Pencil size={14} />,
             onClick: openEditCategory,
             variant: "outline-secondary",
-            show: () => session?.user?.permissions?.includes(MANAGE_REQUEST_CATEGORIES_PERMISSION) ?? false,
+            show: () => canManage,
           },
           {
             label: "Sub-categories",
             icon: <FolderTree size={14} />,
             onClick: openChildrenModal,
             variant: "outline-secondary",
-            show: () => session?.user?.permissions?.includes(MANAGE_REQUEST_CATEGORIES_PERMISSION) ?? false,
+            show: () => canManage,
           },
           {
             label: "Delete",
             icon: <Trash2 size={14} />,
             onClick: openDeleteCategory,
             variant: "outline-danger",
-            show: () => session?.user?.permissions?.includes(MANAGE_REQUEST_CATEGORIES_PERMISSION) ?? false,
+            show: () => canManage,
           },
         ]}
         showActions
@@ -1133,20 +611,24 @@ const RequestCategories = () => {
               }
             : undefined
         }
-        onPaginationChange={(page, rowsPerPage) => loadCategories(page, rowsPerPage)}
+        onPaginationChange={(p, rowsPerPage) => {
+          setPage(p);
+          setLimit(rowsPerPage);
+        }}
         uniqueKey="id"
         showToolbarActions={false}
       />
-
 
       <CategoryEditSidebar
         isOpen={showCategoryModal}
         title={categoryModalTitle(editingCategory, categoryForm.parent_id)}
         onClose={() => setShowCategoryModal(false)}
         onSubmit={handleSaveCategory}
-        savingCategory={savingCategory}
-        submitDisabled={savingCategory || !isCategoryFormReadyForSubmit(categoryForm)}
-        submitLabel={categorySaveButtonLabel(savingCategory, editingCategory)}
+        savingCategory={saveCategoryMutation.isPending}
+        submitDisabled={
+          saveCategoryMutation.isPending || !isCategoryFormReadyForSubmit(categoryForm)
+        }
+        submitLabel={categorySaveButtonLabel(saveCategoryMutation.isPending, editingCategory)}
       >
         <CategorySidebarField>
           <CategorySidebarLabel htmlFor="category-name" required>
@@ -1225,7 +707,7 @@ const RequestCategories = () => {
             }
             placeholder="e.g. REQ"
           />
-          <Form.Text style={{ fontSize: "12px", color: "#64748b", marginTop: "6px" }}>
+          <Form.Text className="request-categories-page__tracking-hint">
             Used when tracking is enabled.
           </Form.Text>
         </CategorySidebarField>
@@ -1250,19 +732,19 @@ const RequestCategories = () => {
       <DeleteConfirmationModal
         show={showDeleteModal}
         onHide={() => {
-          if (deleting) return;
+          if (deleteCategoryMutation.isPending) return;
           setShowDeleteModal(false);
           setCategoryToDelete(null);
         }}
         onConfirm={handleDeleteCategory}
         itemName={categoryToDelete?.name?.trim() || undefined}
         itemType="category"
-        loading={deleting}
+        loading={deleteCategoryMutation.isPending}
       />
       <DeleteConfirmationModal
         show={showDeleteFieldModal}
         onHide={() => {
-          if (deletingField) return;
+          if (deleteFieldMutation.isPending) return;
           setShowDeleteFieldModal(false);
           setFieldPendingDelete(null);
         }}
@@ -1273,10 +755,9 @@ const RequestCategories = () => {
             : undefined
         }
         itemType="field"
-        loading={deletingField}
+        loading={deleteFieldMutation.isPending}
       />
 
-      {/* Children Modal */}
       <Modal show={showChildrenModal} onHide={() => setShowChildrenModal(false)} size="lg" centered>
         <Modal.Header closeButton>
           <Modal.Title>{categoryForChildren?.name ?? "—"} Sub-categories</Modal.Title>
@@ -1300,7 +781,6 @@ const RequestCategories = () => {
         </Modal.Footer>
       </Modal>
 
-      {/* Manage Fields Modal */}
       <Modal show={showFieldsModal} onHide={closeFieldsModal} size="lg" centered>
         <Modal.Header closeButton>
           <Modal.Title>Fields: {fieldsCategoryName}</Modal.Title>
@@ -1322,384 +802,20 @@ const RequestCategories = () => {
         </Modal.Footer>
       </Modal>
 
-      {/* Add/Edit Field Modal */}
-      <Modal show={showFieldModal} onHide={() => setShowFieldModal(false)} centered>
-        <Modal.Header closeButton>
-          <Modal.Title>{fieldModalTitle(editingField)}</Modal.Title>
-        </Modal.Header>
-        <Form onSubmit={handleSaveField}>
-          <Modal.Body>
-            <div className="row g-3">
-              
-              <div className="col-md-6">
-                <Form.Group>
-                  <Form.Label>Label <span className="text-danger">*</span></Form.Label>
-                  <Form.Control
-                    type="text"
-                    value={fieldForm.label}
-                    onChange={(e) =>
-                      setFieldForm((f) => ({
-                        ...f,
-                        label: e.target.value,
-                        ...(autoGenerateKey && !editingField ? { key: slugifyForKey(e.target.value) } : {}),
-                      }))
-                    }
-                    placeholder="e.g. Document Type"
-                    required
-                  />
-                </Form.Group>
-              </div>
-              <div className="col-md-6">
-                <Form.Group>
-                  <Form.Label>Type <span className="text-danger">*</span></Form.Label>
-                  <Form.Select
-                    value={fieldForm.type}
-                    onChange={(e) => setFieldForm((f) => ({ ...f, type: e.target.value as UserRequestCategoryFieldType }))}
-                  >
-                    {FIELD_TYPES.map((t) => (
-                      <option key={t.value} value={t.value}>
-                        {t.label}
-                      </option>
-                    ))}
-                  </Form.Select>
-                </Form.Group>
-              </div>
-              <div className="col-md-6">
-                <Form.Group>
-                  <Form.Label>Is Required <span className="text-danger">*</span></Form.Label>
-                  <Form.Select
-                    value={fieldForm.required === true ? "true" : "false"}
-                    onChange={(e) => setFieldForm((f) => ({ ...f, required: e.target.value === "true" }))}
-                  >
-                    <option value="false">No</option>
-                    <option value="true">Yes</option>
-                  </Form.Select>
-                </Form.Group>
-              </div>
-              
-              <div className="col-md-6">
-                <Form.Group>
-                  <Form.Label>Active <span className="text-danger">*</span></Form.Label>
-                  <Form.Select
-                    value={fieldForm.is_active === false ? "false" : "true"}
-                    onChange={(e) => setFieldForm((f) => ({ ...f, is_active: e.target.value === "true" }))}
-                  >
-                    <option value="true">Yes</option>
-                    <option value="false">No</option>
-                  </Form.Select>
-                </Form.Group>
-              </div>
-              <div className="col-12">
-                <Button
-                  type="button"
-                  variant="outline-secondary"
-                  size="sm"
-                  onClick={() => setShowAdvanced((a) => !a)}
-                >
-                  {showAdvanced ? "Hide Advanced" : "Show Advanced"}
-                </Button>
-              </div>
-              {showAdvanced && (
-                <div className="col-12">
-                  <div className="border rounded p-3 bg-light">
-                    <div className="row g-3">
-                      <div className="col-md-6">
-                        <Form.Group>
-                          <Form.Label>Placeholder</Form.Label>
-                          <Form.Control
-                            placeholder="Shown inside the input (text/textarea/number)"
-                            value={fieldForm.config?.placeholder ?? ""}
-                            onChange={(e) => setFieldForm((f) => patchFieldFormConfig(f, { placeholder: e.target.value || null }))}
-                          />
-                        </Form.Group>
-                      </div>
-                      <div className="col-md-6">
-                        <Form.Group>
-                          <Form.Label>Help text</Form.Label>
-                          <Form.Control
-                            placeholder="Small helper under the field"
-                            value={fieldForm.config?.help_text ?? ""}
-                            onChange={(e) => setFieldForm((f) => patchFieldFormConfig(f, { help_text: e.target.value || null }))}
-                          />
-                        </Form.Group>
-                      </div>
-                      <div className="col-md-3">
-                        <Form.Group>
-                          <Form.Label>Min</Form.Label>
-                          <Form.Control
-                            placeholder="e.g. 0"
-                            value={fieldForm.config?.validation?.min ?? ""}
-                            onChange={(e) => setFieldForm((f) => patchFieldFormValidation(f, { min: e.target.value || null }))}
-                          />
-                        </Form.Group>
-                      </div>
-                      <div className="col-md-3">
-                        <Form.Group>
-                          <Form.Label>Max</Form.Label>
-                          <Form.Control
-                            placeholder="e.g. 100"
-                            value={fieldForm.config?.validation?.max ?? ""}
-                            onChange={(e) => setFieldForm((f) => patchFieldFormValidation(f, { max: e.target.value || null }))}
-                          />
-                        </Form.Group>
-                      </div>
-                      <div className="col-md-6">
-                        <Form.Group>
-                          <Form.Label>Regex pattern</Form.Label>
-                          <Form.Control
-                            placeholder="e.g. ^[0-9]{3}$"
-                            value={fieldForm.config?.validation?.pattern ?? ""}
-                            onChange={(e) => setFieldForm((f) => patchFieldFormValidation(f, { pattern: e.target.value || null }))}
-                          />
-                          <Form.Text className="text-muted small">Applied for text/textarea only.</Form.Text>
-                        </Form.Group>
-                      </div>
-                      <div className="col-md-6">
-                        <Form.Group>
-                          <Form.Label>File accept / mimes</Form.Label>
-                          <Form.Control
-                            placeholder="e.g. pdf,jpg,jpeg,png"
-                            value={fieldForm.config?.validation?.mimes ?? ""}
-                            onChange={(e) => setFieldForm((f) => patchFieldFormValidation(f, { mimes: e.target.value || null }))}
-                          />
-                          <Form.Text className="text-muted small">
-                            Applied for file fields (comma-separated extensions).
-                          </Form.Text>
-                        </Form.Group>
-                      </div>
-                      <div className="col-12">
-                        <div className="fw-semibold mb-2">Conditional required (optional)</div>
-                      </div>
-                      <div className="col-md-4">
-                        <Form.Group>
-                          <Form.Label>Required if key</Form.Label>
-                          <Form.Select
-                            value={fieldForm.config?.required_if?.key ?? ""}
-                            onChange={(e) =>
-                              setFieldForm((f) =>
-                                patchFieldFormConfig(f, {
-                                  required_if:
-                                    e.target.value === ""
-                                      ? null
-                                      : {
-                                          key: e.target.value,
-                                          op: (f.config?.required_if?.op ?? "eq") as FieldConditionOp,
-                                          value: f.config?.required_if?.value ?? "",
-                                        },
-                                })
-                              )
-                            }
-                          >
-                            <option value="">(none)</option>
-                            {fields
-                              .filter((ff) => ff.key && ff.key !== fieldForm.key)
-                              .map((ff) => (
-                                <option key={ff.id} value={ff.key ?? ""}>
-                                  {ff.key}
-                                </option>
-                              ))}
-                          </Form.Select>
-                        </Form.Group>
-                      </div>
-                      <div className="col-md-4">
-                        <Form.Group>
-                          <Form.Label>Operator</Form.Label>
-                          <Form.Select
-                            value={fieldForm.config?.required_if?.op ?? "eq"}
-                            onChange={(e) =>
-                              setFieldForm((f) =>
-                                patchFieldFormConfig(f, {
-                                  required_if: f.config?.required_if
-                                    ? { ...f.config.required_if, op: e.target.value as FieldConditionOp }
-                                    : null,
-                                })
-                              )
-                            }
-                          >
-                            {CONDITION_OPS.map((o) => (
-                              <option key={o.value} value={o.value}>
-                                {o.label}
-                              </option>
-                            ))}
-                          </Form.Select>
-                        </Form.Group>
-                      </div>
-                      <div className="col-md-4">
-                        <Form.Group>
-                          <Form.Label>Value</Form.Label>
-                          <Form.Control
-                            placeholder="value"
-                            value={fieldForm.config?.required_if?.value ?? ""}
-                            onChange={(e) =>
-                              setFieldForm((f) =>
-                                patchFieldFormConfig(f, {
-                                  required_if: f.config?.required_if ? { ...f.config.required_if, value: e.target.value } : null,
-                                })
-                              )
-                            }
-                          />
-                        </Form.Group>
-                      </div>
-                      <div className="col-12">
-                        <div className="fw-semibold mb-2">Conditional visibility (show/hide)</div>
-                        <Form.Text className="text-muted small">
-                          If not matched, the field will be hidden in the request form.
-                        </Form.Text>
-                      </div>
-                      <div className="col-md-4">
-                        <Form.Group>
-                          <Form.Label>Show if key</Form.Label>
-                          <Form.Select
-                            value={fieldForm.config?.show_if?.key ?? ""}
-                            onChange={(e) =>
-                              setFieldForm((f) =>
-                                patchFieldFormConfig(f, {
-                                  show_if:
-                                    e.target.value === ""
-                                      ? null
-                                      : {
-                                          key: e.target.value,
-                                          op: (f.config?.show_if?.op ?? "eq") as FieldConditionOp,
-                                          value: f.config?.show_if?.value ?? "",
-                                        },
-                                })
-                              )
-                            }
-                          >
-                            <option value="">(none)</option>
-                            {fields
-                              .filter((ff) => ff.key && ff.key !== fieldForm.key)
-                              .map((ff) => (
-                                <option key={ff.id} value={ff.key ?? ""}>
-                                  {ff.key}
-                                </option>
-                              ))}
-                          </Form.Select>
-                        </Form.Group>
-                      </div>
-                      <div className="col-md-4">
-                        <Form.Group>
-                          <Form.Label>Operator</Form.Label>
-                          <Form.Select
-                            value={fieldForm.config?.show_if?.op ?? "eq"}
-                            onChange={(e) =>
-                              setFieldForm((f) =>
-                                patchFieldFormConfig(f, {
-                                  show_if: f.config?.show_if ? { ...f.config.show_if, op: e.target.value as FieldConditionOp } : null,
-                                })
-                              )
-                            }
-                          >
-                            {CONDITION_OPS.map((o) => (
-                              <option key={o.value} value={o.value}>
-                                {o.label}
-                              </option>
-                            ))}
-                          </Form.Select>
-                        </Form.Group>
-                      </div>
-                      <div className="col-md-4">
-                        <Form.Group>
-                          <Form.Label>Value</Form.Label>
-                          <Form.Control
-                            placeholder="value"
-                            value={fieldForm.config?.show_if?.value ?? ""}
-                            onChange={(e) =>
-                              setFieldForm((f) =>
-                                patchFieldFormConfig(f, {
-                                  show_if: f.config?.show_if ? { ...f.config.show_if, value: e.target.value } : null,
-                                })
-                              )
-                            }
-                          />
-                        </Form.Group>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-              <div className="col-12">
-                <Form.Text className="text-muted small">
-                  Options are used for <strong>Select</strong>, <strong>Multi Select</strong>,{" "}
-                  <strong>Radio buttons</strong>, and <strong>Checkbox</strong> (as a checkbox list).
-                </Form.Text>
-              </div>
-              {OPTION_TYPES.has(fieldForm.type) && (
-                <div className="col-12">
-                  <div className="fw-semibold mb-2">Options</div>
-                  <div className="border rounded p-3 bg-light">
-                    {(fieldForm.options ?? []).map((opt, idx) => (
-                      <div key={`field-opt-${editingField?.id ?? "new"}-${idx}`} className="row g-2 align-items-center mb-2">
-                        <div className="col-md-5">
-                          <Form.Control
-                            placeholder="Label"
-                            value={opt.label}
-                            onChange={(e) => {
-                              const opts = [...(fieldForm.options ?? [])];
-                              opts[idx] = { ...opts[idx], label: e.target.value };
-                              setFieldForm((f) => ({ ...f, options: opts }));
-                            }}
-                          />
-                        </div>
-                        <div className="col-md-5">
-                          <Form.Control
-                            placeholder="Value"
-                            value={opt.value}
-                            onChange={(e) => {
-                              const opts = [...(fieldForm.options ?? [])];
-                              opts[idx] = { ...opts[idx], value: e.target.value };
-                              setFieldForm((f) => ({ ...f, options: opts }));
-                            }}
-                          />
-                        </div>
-                        <div className="col-md-2">
-                          <Button
-                            type="button"
-                            variant="outline-danger"
-                            size="sm"
-                            onClick={() => {
-                              const opts = (fieldForm.options ?? []).filter((_, i) => i !== idx);
-                              setFieldForm((f) => ({ ...f, options: opts }));
-                            }}
-                          >
-                            Remove
-                          </Button>
-                        </div>
-                      </div>
-                    ))}
-                    <Button
-                      type="button"
-                      variant="outline-secondary"
-                      size="sm"
-                      onClick={() =>
-                        setFieldForm((f) => ({
-                          ...f,
-                          options: [...(f.options ?? []), { label: "", value: "" }],
-                        }))
-                      }
-                    >
-                      Add option
-                    </Button>
-                  </div>
-                </div>
-              )}
-            </div>
-          </Modal.Body>
-          <Modal.Footer>
-            <Button variant="secondary" onClick={() => setShowFieldModal(false)}>
-              Cancel
-            </Button>
-            <Button
-              variant="primary"
-              type="submit"
-              disabled={savingField || !isFieldFormReadyForSubmit(fieldForm)}
-            >
-              {fieldModalPrimaryButtonLabel(savingField, editingField)}
-            </Button>
-          </Modal.Footer>
-        </Form>
-      </Modal>
-    </React.Fragment>
+      <RequestCategoryFieldModal
+        show={showFieldModal}
+        onHide={() => setShowFieldModal(false)}
+        editingField={editingField}
+        siblingFields={fields}
+        fieldForm={fieldForm}
+        setFieldForm={setFieldForm}
+        savingField={saveFieldMutation.isPending}
+        showAdvanced={showAdvanced}
+        setShowAdvanced={setShowAdvanced}
+        autoGenerateKey={autoGenerateKey}
+        onSubmit={handleSaveField}
+      />
+    </div>
   );
 };
 

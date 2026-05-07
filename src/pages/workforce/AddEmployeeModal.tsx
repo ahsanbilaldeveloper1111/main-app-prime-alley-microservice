@@ -1,10 +1,12 @@
-import React, { useCallback, useEffect, useMemo, useState, type CSSProperties } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Form } from "react-bootstrap";
 import { X } from "lucide-react";
 import Select from "@components/AppSelect";
 import { Country } from "country-state-city";
 import { toast } from "react-toastify";
 import { createUserProfile, type UserProfilePayload } from "@utils/staffManagement";
+import { reportApiErrorFromCatch } from "@utils/sentryLogger";
 import { buildAddressesForUserProfilePayload } from "@utils/employeeAddressPayload";
 import type { EmployeeModalAddressBase } from "@utils/employeeModalAddressMap";
 import { isOptionalWorkforcePhoneValid } from "@utils/workforcePhoneValidation";
@@ -16,11 +18,13 @@ import EmployeeModalProfileFields from "@components/workforce/EmployeeModalProfi
 import {
   createEmployeeModalAddressUiId,
   employeeModalReactSelectStyles,
-  fetchDepartmentUserRowsForModal,
   validateEmployeeModalAddressRows,
   validateEmployeeModalCoreRequiredFields,
   type DepartmentUserRow,
 } from "@utils/workforce/employeeModalShared";
+import { workforceKeys } from "../../query/keys";
+import "@assets/scss/workforceEmployeeModalSidebar.scss";
+import { useEmployeeModalDepartmentUsersQuery } from "./employeeModalQueries";
 
 export type AddressFormItem = EmployeeModalAddressBase;
 type AddressFieldKey = EmployeeModalAddressFieldKey;
@@ -66,81 +70,6 @@ const defaultForm: Partial<UserProfilePayload> = {
   status: "active",
 };
 
-const sidebarLabelStyle: CSSProperties = {
-  fontSize: "14px",
-  fontWeight: 600,
-  color: "#141414",
-};
-
-const sidebarPanelStyle: CSSProperties = {
-  position: "fixed",
-  top: 0,
-  right: 0,
-  width: "600px",
-  height: "100vh",
-  backgroundColor: "#ffffff",
-  boxShadow: "-2px 0 8px rgba(0, 0, 0, 0.1)",
-  zIndex: 999999,
-  display: "flex",
-  flexDirection: "column",
-};
-
-const sidebarHeaderStyle: CSSProperties = {
-  padding: "20px 24px",
-  borderBottom: "1px solid #eaf0f6",
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "space-between",
-};
-
-const sidebarTitleStyle: CSSProperties = {
-  fontSize: "20px",
-  fontWeight: 600,
-  color: "#141414",
-  margin: 0,
-};
-
-const sidebarCloseButtonStyle: CSSProperties = {
-  background: "transparent",
-  border: "none",
-  padding: "4px",
-  cursor: "pointer",
-  color: "#718096",
-  display: "flex",
-  alignItems: "center",
-};
-
-const sidebarFormStyle: CSSProperties = {
-  display: "flex",
-  flexDirection: "column",
-  flex: 1,
-  minHeight: 0,
-};
-
-const sidebarContentStyle: CSSProperties = {
-  flex: 1,
-  overflowY: "auto",
-  padding: "40px",
-};
-
-const sidebarFooterStyle: CSSProperties = {
-  padding: "16px 24px",
-  borderTop: "1px solid #eaf0f6",
-  display: "flex",
-  gap: "12px",
-  justifyContent: "flex-start",
-};
-
-const sidebarSecondaryButtonStyle: CSSProperties = {
-  padding: "10px 20px",
-  backgroundColor: "transparent",
-  color: "#141414",
-  border: "1px solid #8a8a8a",
-  borderRadius: "4px",
-  fontSize: "14px",
-  fontWeight: 500,
-};
-
 function getEmployeeUserSelectPlaceholder(
   hasDepartmentSelected: boolean,
   userOptionsLoading: boolean,
@@ -179,19 +108,6 @@ function createStateAddressPatch(
   };
 }
 
-function getPrimaryButtonStyle(isDisabled: boolean): CSSProperties {
-  return {
-    padding: "10px 20px",
-    backgroundColor: isDisabled ? "#cbd5e0" : "#0091ae",
-    color: "#ffffff",
-    border: "none",
-    borderRadius: "4px",
-    fontSize: "14px",
-    fontWeight: 500,
-    cursor: isDisabled ? "not-allowed" : "pointer",
-  };
-}
-
 const SidebarSelectField: React.FC<SidebarSelectFieldProps> = ({
   label,
   required = false,
@@ -205,7 +121,7 @@ const SidebarSelectField: React.FC<SidebarSelectFieldProps> = ({
   helpText,
 }) => (
   <Form.Group className="mb-3">
-    <Form.Label style={sidebarLabelStyle}>
+    <Form.Label className="workforce-employee-modal-sidebar__label">
       {label}
       {required && <span className="text-danger">*</span>}
     </Form.Label>
@@ -246,32 +162,23 @@ const AddEmployeeModal: React.FC<AddEmployeeModalProps> = ({
   tenantId,
   title = "Add Employee",
 }) => {
+  const queryClient = useQueryClient();
   const { mainAppDepartments, loadingDepartments, companyIdentifier } = useMainAppLookups();
   const [form, setForm] = useState<Partial<UserProfilePayload>>(defaultForm);
   const [addresses, setAddresses] = useState<AddressFormItemWithId[]>([]);
   const [addressCountries, setAddressCountries] = useState<{ isoCode: string; name: string }[]>([]);
-  const [submitting, setSubmitting] = useState(false);
-  const [departmentUsers, setDepartmentUsers] = useState<DepartmentUserRow[]>([]);
-  const [loadingDepartmentUsers, setLoadingDepartmentUsers] = useState(false);
 
   const companyUuid = tenantId?.trim() || companyIdentifier || null;
 
-  const fetchUsersByDepartment = useCallback(
-    async (departmentId: number) => {
-      if (!companyUuid) {
-        setDepartmentUsers([]);
-        return;
-      }
-      setLoadingDepartmentUsers(true);
-      try {
-        const list = await fetchDepartmentUserRowsForModal(companyUuid, departmentId);
-        setDepartmentUsers(list);
-      } finally {
-        setLoadingDepartmentUsers(false);
-      }
-    },
-    [companyUuid],
-  );
+  const hasDepartmentSelected = form.department_id !== null && form.department_id !== undefined;
+
+  const departmentUsersQuery = useEmployeeModalDepartmentUsersQuery({
+    companyUuid,
+    departmentId: form.department_id ?? null,
+    enabled: Boolean(show && hasDepartmentSelected),
+  });
+  const departmentUsers = departmentUsersQuery.rows;
+  const loadingDepartmentUsers = departmentUsersQuery.isFetching;
 
   useEffect(() => {
     try {
@@ -284,7 +191,6 @@ const AddEmployeeModal: React.FC<AddEmployeeModalProps> = ({
   const resetFormState = useCallback(() => {
     setForm(defaultForm);
     setAddresses([]);
-    setDepartmentUsers([]);
   }, []);
 
   /** Reset + close for Cancel, header close, and submit success; backdrop/Esc are disabled on Modal. */
@@ -293,66 +199,8 @@ const AddEmployeeModal: React.FC<AddEmployeeModalProps> = ({
     onHide();
   }, [onHide, resetFormState]);
 
-  const mainAppDepartmentOptions = useMemo(
-    () =>
-      (mainAppDepartments ?? []).map((d: { id?: string | number; name?: string }) => ({
-        value: String(d.id ?? ""),
-        label: String(d.name ?? "—"),
-      })),
-    [mainAppDepartments]
-  );
-
-  const hasDepartmentSelected = form.department_id !== null && form.department_id !== undefined;
-  const mainAppUserOptions = useMemo(() => {
-    if (!hasDepartmentSelected) {
-      return [];
-    }
-    return departmentUsers.map((u: DepartmentUserRow) => ({ value: u.phone, label: `${u.name} (${u.phone})` }));
-  }, [hasDepartmentSelected, departmentUsers]);
-
-  const userOptionsLoading = hasDepartmentSelected ? loadingDepartmentUsers : false;
-  const userSelectPlaceholder = getEmployeeUserSelectPlaceholder(hasDepartmentSelected, userOptionsLoading);
-
-  const removeAddressById = useCallback((addressId: string) => {
-    setAddresses((prev) => prev.filter((addr) => addr.uiId !== addressId));
-  }, []);
-
-  const updateAddressField = useCallback(
-    (addressId: string, field: AddressFieldKey, value: string) => {
-      setAddresses((prev) => prev.map((addr) => (addr.uiId === addressId ? { ...addr, [field]: value } : addr)));
-    },
-    []
-  );
-
-  const updateAddressPatch = useCallback((addressId: string, patch: Partial<AddressFormItemWithId>) => {
-    setAddresses((prev) => prev.map((addr) => (addr.uiId === addressId ? { ...addr, ...patch } : addr)));
-  }, []);
-
-  const requiredValidation = useMemo(() => validateEmployeeModalCoreRequiredFields(form), [form]);
-  const addressRowsValidation = useMemo(() => validateEmployeeModalAddressRows(addresses), [addresses]);
-  const phoneFieldValid = useMemo(() => isOptionalWorkforcePhoneValid(form.phone), [form.phone]);
-  const phoneShowInvalid = Boolean(form.phone?.toString().trim()) && !phoneFieldValid;
-  const isPrimaryDisabled =
-    submitting || !requiredValidation.ok || !addressRowsValidation.ok || !phoneFieldValid;
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const validation = validateEmployeeModalCoreRequiredFields(form);
-    if (!validation.ok) {
-      toast.error(validation.message);
-      return;
-    }
-    if (!phoneFieldValid) {
-      toast.error("Enter a valid phone number or clear the field.");
-      return;
-    }
-    const addressValidation = validateEmployeeModalAddressRows(addresses);
-    if (!addressValidation.ok) {
-      toast.error(addressValidation.message);
-      return;
-    }
-    setSubmitting(true);
-    try {
+  const createEmployeeMutation = useMutation({
+    mutationFn: async () => {
       const addressesPayload = buildAddressesForUserProfilePayload(addresses ?? []);
       await createUserProfile({
         tenant_id: tenantId?.trim() || undefined,
@@ -369,77 +217,103 @@ const AddEmployeeModal: React.FC<AddEmployeeModalProps> = ({
         status: form.status?.toString().trim() || null,
         addresses: addressesPayload,
       });
+    },
+    onSuccess: () => {
       toast.success("Employee created");
       resetFormState();
       onHide();
       onSuccess?.();
-    } catch {
-      // toast handled in API
-    } finally {
-      setSubmitting(false);
+      void queryClient.invalidateQueries({ queryKey: workforceKeys.employees.all() });
+    },
+    onError: (error: unknown) => {
+      reportApiErrorFromCatch(error, "AddEmployeeModal.createEmployee");
+    },
+  });
+
+  const mainAppDepartmentOptions = useMemo(
+    () =>
+      (mainAppDepartments ?? []).map((d: { id?: string | number; name?: string }) => ({
+        value: String(d.id ?? ""),
+        label: String(d.name ?? "—"),
+      })),
+    [mainAppDepartments],
+  );
+
+  const mainAppUserOptions = useMemo(() => {
+    if (!hasDepartmentSelected) {
+      return [];
     }
+    return departmentUsers.map((u: DepartmentUserRow) => ({
+      value: u.phone,
+      label: `${u.name} (${u.phone})`,
+    }));
+  }, [hasDepartmentSelected, departmentUsers]);
+
+  const userOptionsLoading = hasDepartmentSelected ? loadingDepartmentUsers : false;
+  const userSelectPlaceholder = getEmployeeUserSelectPlaceholder(hasDepartmentSelected, userOptionsLoading);
+
+  const removeAddressById = useCallback((addressId: string) => {
+    setAddresses((prev) => prev.filter((addr) => addr.uiId !== addressId));
+  }, []);
+
+  const updateAddressField = useCallback(
+    (addressId: string, field: AddressFieldKey, value: string) => {
+      setAddresses((prev) => prev.map((addr) => (addr.uiId === addressId ? { ...addr, [field]: value } : addr)));
+    },
+    [],
+  );
+
+  const updateAddressPatch = useCallback((addressId: string, patch: Partial<AddressFormItemWithId>) => {
+    setAddresses((prev) => prev.map((addr) => (addr.uiId === addressId ? { ...addr, ...patch } : addr)));
+  }, []);
+
+  const requiredValidation = useMemo(() => validateEmployeeModalCoreRequiredFields(form), [form]);
+  const addressRowsValidation = useMemo(() => validateEmployeeModalAddressRows(addresses), [addresses]);
+  const phoneFieldValid = useMemo(() => isOptionalWorkforcePhoneValid(form.phone), [form.phone]);
+  const phoneShowInvalid = Boolean(form.phone?.toString().trim()) && !phoneFieldValid;
+  const submitting = createEmployeeMutation.isPending;
+  const isPrimaryDisabled =
+    submitting || !requiredValidation.ok || !addressRowsValidation.ok || !phoneFieldValid;
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const validation = validateEmployeeModalCoreRequiredFields(form);
+    if (!validation.ok) {
+      toast.error(validation.message);
+      return;
+    }
+    if (!phoneFieldValid) {
+      toast.error("Enter a valid phone number or clear the field.");
+      return;
+    }
+    const addressValidation = validateEmployeeModalAddressRows(addresses);
+    if (!addressValidation.ok) {
+      toast.error(addressValidation.message);
+      return;
+    }
+    createEmployeeMutation.mutate();
   };
 
   if (!show) return null;
 
   return (
     <>
-      <style>
-        {`
-          .add-employee-sidebar {
-            font-family: "Lexend Deca", Helvetica, Arial, sans-serif;
-            color: #141414;
-          }
-          .add-employee-sidebar :is(.form-control, .form-select, input, select, textarea) {
-            font-size: 14px;
-            color: #141414;
-          }
-          .add-employee-sidebar :is(.form-control, .form-select, input, select) {
-            min-height: 40px;
-          }
-          .add-employee-sidebar .select__control {
-            min-height: 40px;
-            border-color: #8a8a8a;
-            border-radius: 4px;
-          }
-          .add-employee-sidebar :is(.select__value-container, .select__indicators) {
-            min-height: 40px;
-          }
-        `}
-      </style>
+      <div className="workforce-employee-modal-sidebar__backdrop" aria-hidden="true" />
 
-      <div
-        style={{
-          position: "fixed",
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          zIndex: 1000,
-          background: "transparent",
-        }}
-        aria-hidden="true"
-      />
-
-      <div
-        className="add-employee-sidebar"
-        style={sidebarPanelStyle}
-      >
-        <div style={sidebarHeaderStyle}>
-          <h2 style={sidebarTitleStyle}>
-            {title}
-          </h2>
+      <div className="workforce-employee-modal-sidebar__panel">
+        <div className="workforce-employee-modal-sidebar__header">
+          <h2 className="workforce-employee-modal-sidebar__title">{title}</h2>
           <button
             type="button"
             onClick={handleCancelClick}
-            style={sidebarCloseButtonStyle}
+            className="workforce-employee-modal-sidebar__close-btn"
           >
             <X size={24} />
           </button>
         </div>
 
-        <Form onSubmit={handleSubmit} style={sidebarFormStyle}>
-          <div style={sidebarContentStyle}>
+        <Form onSubmit={handleSubmit} className="workforce-employee-modal-sidebar__form">
+          <div className="workforce-employee-modal-sidebar__content">
             <SidebarSelectField
               label="Department "
               required
@@ -450,13 +324,9 @@ const AddEmployeeModal: React.FC<AddEmployeeModalProps> = ({
               value={findSelectedOption(mainAppDepartmentOptions, String(form.department_id ?? ""))}
               resetSearchOnValueChange={show}
               onChange={(opt: EmployeeSelectOption | null) => {
-                const deptId = opt?.value == null || opt.value === "" ? null : (Number(opt.value) || opt.value) as number;
+                const deptId =
+                  opt?.value == null || opt.value === "" ? null : (Number(opt.value) || opt.value) as number;
                 setForm((f: Partial<UserProfilePayload>) => ({ ...f, department_id: deptId, user_id: "" }));
-                if (deptId == null) {
-                  setDepartmentUsers([]);
-                  return;
-                }
-                fetchUsersByDepartment(deptId);
               }}
               helpText={loadingDepartments ? "Loading..." : undefined}
             />
@@ -499,38 +369,25 @@ const AddEmployeeModal: React.FC<AddEmployeeModalProps> = ({
               onAddAddress={() => setAddresses((prev) => [...prev, createDefaultAddress()])}
               onRemoveRow={removeAddressById}
               onUpdateField={updateAddressField}
-              onCountryChange={(
-                rowId: string,
-                opt: AddressSelectOption,
-              ) =>
+              onCountryChange={(rowId: string, opt: AddressSelectOption) =>
                 updateAddressPatch(rowId, createCountryAddressPatch(opt))
               }
-              onStateChange={(
-                rowId: string,
-                opt: AddressSelectOption,
-              ) =>
+              onStateChange={(rowId: string, opt: AddressSelectOption) =>
                 updateAddressPatch(rowId, createStateAddressPatch(opt))
               }
               allowAdHocCityOption={false}
             />
           </div>
 
-          <div style={sidebarFooterStyle}>
-            <button
-              type="submit"
-              disabled={isPrimaryDisabled}
-              style={getPrimaryButtonStyle(isPrimaryDisabled)}
-            >
+          <div className="workforce-employee-modal-sidebar__footer">
+            <button type="submit" disabled={isPrimaryDisabled} className="workforce-employee-modal-sidebar__btn-primary">
               {submitting ? "Creating..." : "Create"}
             </button>
             <button
               type="button"
               disabled={submitting}
               onClick={handleCancelClick}
-              style={{
-                ...sidebarSecondaryButtonStyle,
-                cursor: submitting ? "not-allowed" : "pointer",
-              }}
+              className="workforce-employee-modal-sidebar__btn-secondary"
             >
               Cancel
             </button>
