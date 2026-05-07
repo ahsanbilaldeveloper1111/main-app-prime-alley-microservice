@@ -12,22 +12,22 @@ import {
   DEPARTMENT_CHART_COLORS,
   departmentNameFromLookup,
   type LeaveCalendarDay,
-} from "./dashboardDomain";
-import { useEmployeeDashboardGraphBundle } from "./useEmployeeDashboardGraphBundle";
+} from "@page-modules/workforce/dashboard/dashboardDomain";
+import { useEmployeeDashboardGraphBundle } from "@page-modules/workforce/dashboard/useEmployeeDashboardGraphBundle";
 
-import DashboardStats from "./partials/DashboardStats";
-import DashboardPageToolbar, { type DashboardPeriodType } from "./partials/DashboardPageToolbar";
-import DashboardQuickActions from "./partials/DashboardQuickActions";
-import DepartmentHeadcountPanel from "./partials/DepartmentHeadcountPanel";
-import ApprovalsAgingPanel from "./partials/ApprovalsAgingPanel";
-import LeaveCalendarModal from "./partials/LeaveCalendarModal";
+import DashboardStats from "@page-modules/workforce/dashboard/partials/DashboardStats";
+import DashboardPageToolbar, { type DashboardPeriodType } from "@page-modules/workforce/dashboard/partials/DashboardPageToolbar";
+import DashboardQuickActions from "@page-modules/workforce/dashboard/partials/DashboardQuickActions";
+import DepartmentHeadcountPanel from "@page-modules/workforce/dashboard/partials/DepartmentHeadcountPanel";
+import ApprovalsAgingPanel from "@page-modules/workforce/dashboard/partials/ApprovalsAgingPanel";
+import LeaveCalendarModal from "@page-modules/workforce/dashboard/partials/LeaveCalendarModal";
 
-import AddEmployeeModal from "@pages/workforce/AddEmployeeModal";
-import NewRequestModal from "@pages/workforce/NewRequestModal";
+import AddEmployeeModal from "@page-modules/workforce/AddEmployeeModal";
+import NewRequestModal from "@page-modules/workforce/NewRequestModal";
 
 import { Plus, Calendar } from "lucide-react";
 
-import "./employeesDashboard.scss";
+import "@page-modules/workforce/dashboard/employeesDashboard.scss";
 
 const EmployeesDashboard = () => {
   const { mainAppUsers, mainAppDepartments, companyIdentifier } = useMainAppLookups();
