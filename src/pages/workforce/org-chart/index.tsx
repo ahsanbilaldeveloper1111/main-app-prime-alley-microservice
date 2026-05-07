@@ -28,7 +28,7 @@ import {
   ZoomOut,
   User,
 } from "lucide-react";
-import OrgEmployeeSidebar from "./sidebar";
+import OrgEmployeeSidebar from "@page-modules/workforce/org-chart/sidebar";
 import router from "next/router";
 import {
   findMainAppUserByOrgChartUserId,
@@ -43,11 +43,11 @@ import {
   filterMainAppUsersInOrgChart,
   flattenOrgChartTeam,
   type OrgChartEmployee,
-} from "./orgChartDomain";
-import { useOrgChartTreeQuery } from "./useOrgChartTreeQuery";
-import { OrgChartEmployeeNode } from "./partials/OrgChartEmployeeNode";
+} from "@page-modules/workforce/org-chart/orgChartDomain";
+import { useOrgChartTreeQuery } from "@page-modules/workforce/org-chart/useOrgChartTreeQuery";
+import { OrgChartEmployeeNode } from "@page-modules/workforce/org-chart/partials/OrgChartEmployeeNode";
 
-import "./orgChartPage.scss";
+import "@page-modules/workforce/org-chart/orgChartPage.scss";
 
 const Tree = dynamic(() => import("react-organizational-chart").then((mod) => mod.Tree), {
   ssr: false,

@@ -6,8 +6,8 @@ import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 import GenericSidebar, { SidebarSection } from "@components/GenericSidebarNew";
 import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
-import AddEmployeeModal from "@pages/workforce/AddEmployeeModal";
-import EditEmployeeModal from "@pages/workforce/EditEmployeeModal";
+import AddEmployeeModal from "@page-modules/workforce/AddEmployeeModal";
+import EditEmployeeModal from "@page-modules/workforce/EditEmployeeModal";
 
 import {
   createJourney,
@@ -39,21 +39,21 @@ import {
   buildDepartmentHeadcountChartRows,
   journeyStartDateMinIso,
   type EmployeesListAppliedFilters,
-} from "./employeesDomain";
-import { useEmployeesListQuery } from "./useEmployeesListQuery";
+} from "@page-modules/workforce/employees/employeesDomain";
+import { useEmployeesListQuery } from "@page-modules/workforce/employees/useEmployeesListQuery";
 import {
   useEmployeesDepartmentHeadcountQuery,
   useEmployeesDashboardCountersQuery,
-} from "./useEmployeesAnalyticsQueries";
-import { buildEmployeeTableActions, buildEmployeeTableColumns } from "./employeesTableConfig";
-import UsersPillDropdownContent from "./partials/UsersPillDropdownContent";
-import EmployeesDepartmentHeadcountPanel from "./partials/EmployeesDepartmentHeadcountPanel";
-import EmployeesDashboardOverviewPanel from "./partials/EmployeesDashboardOverviewPanel";
-import CreateJourneyModal from "./partials/CreateJourneyModal";
+} from "@page-modules/workforce/employees/useEmployeesAnalyticsQueries";
+import { buildEmployeeTableActions, buildEmployeeTableColumns } from "@page-modules/workforce/employees/employeesTableConfig";
+import UsersPillDropdownContent from "@page-modules/workforce/employees/partials/UsersPillDropdownContent";
+import EmployeesDepartmentHeadcountPanel from "@page-modules/workforce/employees/partials/EmployeesDepartmentHeadcountPanel";
+import EmployeesDashboardOverviewPanel from "@page-modules/workforce/employees/partials/EmployeesDashboardOverviewPanel";
+import CreateJourneyModal from "@page-modules/workforce/employees/partials/CreateJourneyModal";
 
 import { useSession } from "next-auth/react";
 
-import "./employeesPage.scss";
+import "@page-modules/workforce/employees/employeesPage.scss";
 
 const { PERMISSIONS } = HEADER_CONSTANTS;
 

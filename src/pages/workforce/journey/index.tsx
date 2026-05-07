@@ -35,7 +35,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "react-toastify";
 import { workforceKeys } from "../../../query/keys";
 
-import { hierarchyLabel } from "../employees/employeesDomain";
+import { hierarchyLabel } from "@page-modules/workforce/employees/employeesDomain";
 import {
   CONTRACT_TYPES,
   EMPLOYMENT_TYPES,
@@ -57,16 +57,16 @@ import {
   type JourneyStepRecord,
   type JourneysPagination,
   type OnboardingEmployee,
-} from "./journeyDomain";
-import { buildJourneySidebarSections } from "./buildJourneySidebarSections";
-import { buildJourneyFilterPills } from "./journeyFilterPills";
-import { buildOnboardingActions, buildOnboardingColumns } from "./journeyTableConfig";
-import { useJourneysListQuery } from "./useJourneysListQuery";
-import { useJourneyDetailQuery } from "./useJourneyDetailQuery";
-import AddJourneyStepModal from "./partials/AddJourneyStepModal";
-import EditJourneyStepModal from "./partials/EditJourneyStepModal";
+} from "@page-modules/workforce/journey/journeyDomain";
+import { buildJourneySidebarSections } from "@page-modules/workforce/journey/buildJourneySidebarSections";
+import { buildJourneyFilterPills } from "@page-modules/workforce/journey/journeyFilterPills";
+import { buildOnboardingActions, buildOnboardingColumns } from "@page-modules/workforce/journey/journeyTableConfig";
+import { useJourneysListQuery } from "@page-modules/workforce/journey/useJourneysListQuery";
+import { useJourneyDetailQuery } from "@page-modules/workforce/journey/useJourneyDetailQuery";
+import AddJourneyStepModal from "@page-modules/workforce/journey/partials/AddJourneyStepModal";
+import EditJourneyStepModal from "@page-modules/workforce/journey/partials/EditJourneyStepModal";
 
-import "./journeyPage.scss";
+import "@page-modules/workforce/journey/journeyPage.scss";
 
 const { PERMISSIONS } = HEADER_CONSTANTS;
 

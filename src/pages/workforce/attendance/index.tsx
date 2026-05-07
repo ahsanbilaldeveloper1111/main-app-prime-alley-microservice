@@ -25,10 +25,10 @@ import {
   ATTENDANCE_DATE_PRESETS,
   ATTENDANCE_ITEMS_PER_PAGE,
   consumeHandledAttendanceError,
-} from "./attendanceDomain";
-import { useAttendanceLiveSessionElapsed } from "./useAttendanceLiveSessionElapsed";
-import { useAttendanceListQuery, useAttendanceStatusQuery } from "./useAttendanceQueries";
-import { AttendanceStatusDisplay } from "./partials/AttendanceStatusUI";
+} from "@page-modules/workforce/attendance/attendanceDomain";
+import { useAttendanceLiveSessionElapsed } from "@page-modules/workforce/attendance/useAttendanceLiveSessionElapsed";
+import { useAttendanceListQuery, useAttendanceStatusQuery } from "@page-modules/workforce/attendance/useAttendanceQueries";
+import { AttendanceStatusDisplay } from "@page-modules/workforce/attendance/partials/AttendanceStatusUI";
 
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";

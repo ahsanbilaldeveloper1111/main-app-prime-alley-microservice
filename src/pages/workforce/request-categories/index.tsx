@@ -51,16 +51,16 @@ import {
   requestCategoryFieldTypeLabel,
   slugifyForKey,
   type CategoryFormState,
-} from "./requestCategoriesDomain";
+} from "@page-modules/workforce/request-categories/requestCategoriesDomain";
 import {
   useRequestCategoriesListQuery,
   useRequestCategoryChildrenQuery,
   useRequestCategoryFieldsQuery,
-} from "./useRequestCategoriesQueries";
-import { SubCategoryWorkflowForm } from "./partials/RequestCategoriesWorkflowForm";
-import RequestCategoryFieldModal from "./partials/RequestCategoryFieldModal";
+} from "@page-modules/workforce/request-categories/useRequestCategoriesQueries";
+import { SubCategoryWorkflowForm } from "@page-modules/workforce/request-categories/partials/RequestCategoriesWorkflowForm";
+import RequestCategoryFieldModal from "@page-modules/workforce/request-categories/partials/RequestCategoryFieldModal";
 
-import "./requestCategoriesPage.scss";
+import "@page-modules/workforce/request-categories/requestCategoriesPage.scss";
 
 const RequestCategories = () => {
   const queryClient = useQueryClient();

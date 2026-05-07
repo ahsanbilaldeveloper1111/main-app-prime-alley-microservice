@@ -27,11 +27,11 @@ import { Pencil, Trash2, List, Plus, ChevronUp, ChevronDown } from "lucide-react
 import GenericTable from "@components/GenericTable";
 import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
 import { workforceKeys } from "../../../query/keys";
-import { consumeHandledApiError } from "../request-categories/requestCategoriesDomain";
+import { consumeHandledApiError } from "@page-modules/workforce/request-categories/requestCategoriesDomain";
 import {
   useRequestCategoryFieldsQuery,
   useRequestSubCategoriesListQuery,
-} from "../request-categories/useRequestCategoriesQueries";
+} from "@page-modules/workforce/request-categories/useRequestCategoriesQueries";
 import {
   MANAGE_REQUEST_CATEGORIES_PERMISSION,
   type CategoryFormState,
@@ -40,11 +40,11 @@ import {
   fieldPayloadFromExisting,
   formatDescriptionCell,
   normalizeWorkflowLevelsForPayload,
-} from "./subCategoriesDomain";
-import SubCategoriesCategoryModal from "./partials/SubCategoriesCategoryModal";
-import SubCategoriesFieldModal from "./partials/SubCategoriesFieldModal";
+} from "@page-modules/workforce/sub-categories/subCategoriesDomain";
+import SubCategoriesCategoryModal from "@page-modules/workforce/sub-categories/partials/SubCategoriesCategoryModal";
+import SubCategoriesFieldModal from "@page-modules/workforce/sub-categories/partials/SubCategoriesFieldModal";
 
-import "./subCategoriesPage.scss";
+import "@page-modules/workforce/sub-categories/subCategoriesPage.scss";
 
 function RequestSubCategories() {
   const queryClient = useQueryClient();
