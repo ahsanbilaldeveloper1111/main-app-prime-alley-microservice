@@ -12,7 +12,8 @@ import BreadcrumbItem from "@common/BreadcrumbItem";
 import { toast } from "react-toastify";
 import { useRouter } from "next/router";
 import moment from "moment";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, Plus } from "lucide-react";
+import { Button, Form, Modal } from "react-bootstrap";
 import GenericTable, { TableColumn, TableAction } from "@components/GenericTable";
 import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
 import CreateTaskSidebar from "@components/CreatePlannerTaskSidebar";
@@ -22,6 +23,7 @@ import {
   deleteTask as deleteTaskApi,
   completeTask,
   incompleteTask,
+  type ListTasksSummary,
 } from "@utils/tasks";
 import { listStatuses } from "@utils/work-planner";
 import {
@@ -50,9 +52,29 @@ import {
   plannerTaskListTodayTriple,
 } from "@utils/taskListing/plannerTasksQueryParams";
 import {
+  PlannerTaskAssigneeCell,
+  PlannerTaskCompleteColumnRender,
+  PlannerTaskDueDateCell,
+  PlannerTaskNotesCell,
+  PlannerTaskPriorityCell,
+  PlannerTaskRepeatStatusCell,
+  PlannerTaskRowActionsMenu,
+  PlannerTaskTitleCell,
+  PlannerTaskTypeCell,
+  PlannerTaskWorkflowStatusCell,
+} from "@components/planner/plannerTasksListing/PlannerTaskListCells";
+import { PlannerTasksEditColumnsDropdown } from "@components/planner/plannerTasksListing/PlannerTasksEditColumnsDropdown";
+import {
+  TASK_LIST_BTN_OUTLINE,
   buildTaskListingPageStyleTag,
   TaskListingSearchRow,
 } from "@utils/taskListing/taskListUiPrimitives";
+import {
+  isStoredAsUtcMidnightCalendarDue,
+  parseApiDueTimeToTimeInput,
+  shouldSuppressDueTimeInListCell,
+} from "@utils/plannerTaskDueTime";
+import { extensionOrIdToTrimmedString } from "@planner/projectTabsContentUtils";
 
 function plannerTaskConvertDeniedTitle(
   canConvertRow: boolean,
@@ -1118,10 +1140,6 @@ const TasksListingPage = ({
           const perms = getTaskRowPermissions(row);
           const canEditRow = perms.canOpenTaskEdit;
           const canDeleteRow = perms.canDeleteTask;
-          const canConvertRow =
-            sessionCanConvertToRecurringPlannerTask && canEditRow;
-          const isTodoOrRegular =
-            row.task_type === "todo" || row.task_type === "regular";
           return (
             <PlannerTaskRowActionsMenu
               row={row}
