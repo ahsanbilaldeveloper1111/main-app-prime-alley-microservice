@@ -639,13 +639,7 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
       url: '',
       subItems: [
         ...(showMyDayInPlannerSidebar
-          ? [{
-              id: 'planner-my-day',
-              title: 'My Day',
-              icon: <ListChecks size={16} />,
-              url: '/planner/my-tasks',
-              permission: PERMISSIONS.VIEW_TASKSLIST_WORK_PLANNER,
-            }]
+          ? []
           : []),
 
         {
