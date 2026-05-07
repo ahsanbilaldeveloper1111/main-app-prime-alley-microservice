@@ -690,7 +690,6 @@ const ApplicationCustomerSidebar: React.FC = () => {
       label: "Planner",
       url: "",
       subItems: [
-
         {
           id: "planner-dashboard",
           title: "Dashboard",
