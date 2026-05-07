@@ -84,16 +84,6 @@ interface MainMenuItem {
 
 const SIDEBAR_WIDTH_COLLAPSED = 65;
 const SIDEBAR_WIDTH_EXPANDED = 235;
-const PLANNER_SHOW_MY_DAY_STORAGE_KEY = "planner-settings-show-my-day";
-
-function readShowMyDayInSidebarSetting(): boolean {
-  if (globalThis.window === undefined) return true;
-  const raw = globalThis.window.localStorage.getItem(
-    PLANNER_SHOW_MY_DAY_STORAGE_KEY,
-  );
-  if (raw == null) return true;
-  return raw === "true";
-}
 
 function getSidebarSectionItems(
   menuItems: MainMenuItem[],
@@ -447,8 +437,6 @@ const ApplicationCustomerSidebar: React.FC = () => {
   const [currentUserCompanyImageUrl, setCurrentUserCompanyImageUrl] = useState<
     string | null
   >(null);
-  const [showMyDayInPlannerSidebar, setShowMyDayInPlannerSidebar] =
-    useState<boolean>(true);
 
   useCompanyImage(setCurrentUserCompanyImageUrl);
 
@@ -457,17 +445,6 @@ const ApplicationCustomerSidebar: React.FC = () => {
 
   // Get permissions hook for checking access
   const { hasPermission } = usePermissions();
-
-  useEffect(() => {
-    setShowMyDayInPlannerSidebar(readShowMyDayInSidebarSetting());
-    const syncFromStorage = () => {
-      setShowMyDayInPlannerSidebar(readShowMyDayInSidebarSetting());
-    };
-    globalThis.window?.addEventListener("storage", syncFromStorage);
-    return () => {
-      globalThis.window?.removeEventListener("storage", syncFromStorage);
-    };
-  }, []);
 
   // Only these modules are enabled; others are hidden (can re-enable by adding id to this list)
   const ENABLED_MODULE_IDS = new Set([
