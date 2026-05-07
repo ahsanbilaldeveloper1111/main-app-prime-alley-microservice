@@ -469,19 +469,22 @@ const TasksListingPage = ({
       [session],
     );
     const sessionCanUpdatePlannerTask = useMemo(
-      () => hasPermission(PERMISSIONS.EDIT_TASKS_WORK_PLANNER),
+      () => hasPermission(HEADER_CONSTANTS.PERMISSIONS.EDIT_TASKS_WORK_PLANNER),
       [hasPermission],
     );
     const sessionCanDeletePlannerTask = useMemo(
-      () => hasPermission(PERMISSIONS.DELETE_TASKS_WORK_PLANNER),
+      () => hasPermission(HEADER_CONSTANTS.PERMISSIONS.DELETE_TASKS_WORK_PLANNER),
       [hasPermission],
     );
     const sessionCanCreatePlannerTask = useMemo(
-      () => hasPermission(PERMISSIONS.CREATE_TASKS_WORK_PLANNER),
+      () => hasPermission(HEADER_CONSTANTS.PERMISSIONS.CREATE_TASKS_WORK_PLANNER),
       [hasPermission],
     );
     const sessionCanConvertToRecurringPlannerTask = useMemo(
-      () => hasPermission(PERMISSIONS.CONVERT_TO_RECURRING_TASK_WORK_PLANNER),
+      () =>
+        hasPermission(
+          HEADER_CONSTANTS.PERMISSIONS.CONVERT_TO_RECURRING_TASK_WORK_PLANNER,
+        ),
       [hasPermission],
     );
     const isProjectScopedEmbed = Boolean(sidebarProject?.id);
