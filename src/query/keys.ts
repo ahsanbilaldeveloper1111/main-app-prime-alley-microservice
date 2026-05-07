@@ -27,6 +27,26 @@ export const communicationsKeys = {
       ] as const,
   },
 
+  callRecordings: {
+    all: () => [...communicationsKeys.root, "callRecordings"] as const,
+    list: (params: {
+      page: number;
+      perPage: number;
+      search: string;
+      filtersKey: string;
+      refreshKey: number;
+    }) =>
+      [
+        ...communicationsKeys.callRecordings.all(),
+        "list",
+        params.page,
+        params.perPage,
+        params.search,
+        params.filtersKey,
+        params.refreshKey,
+      ] as const,
+  },
+
   finesse: {
     all: () => [...communicationsKeys.root, "finesse"] as const,
     campaigns: (teamId: string | number, username: string) =>
@@ -88,6 +108,48 @@ export const plannerKeys = {
         ...plannerKeys.statuses.all(),
         "workflow",
         projectId ?? "global",
+      ] as const,
+  },
+};
+
+/** DNCR / compliance module list reads (`src/pages/compliance/*`). */
+export const complianceKeys = {
+  root: ["compliance"] as const,
+
+  cdr: {
+    all: () => [...complianceKeys.root, "cdr"] as const,
+    list: (params: {
+      page: number;
+      perPage: number;
+      /** Serialized `AppliedFilters` for stable cache identity */
+      filtersKey: string;
+    }) =>
+      [
+        ...complianceKeys.cdr.all(),
+        "list",
+        params.page,
+        params.perPage,
+        params.filtersKey,
+      ] as const,
+  },
+
+  localDndBlocks: {
+    all: () => [...complianceKeys.root, "localDndBlocks"] as const,
+    list: (params: {
+      variant: "add-records" | "call-block";
+      page: number;
+      perPage: number;
+      search: string;
+      company: string;
+    }) =>
+      [
+        ...complianceKeys.localDndBlocks.all(),
+        "list",
+        params.variant,
+        params.page,
+        params.perPage,
+        params.search,
+        params.company,
       ] as const,
   },
 };

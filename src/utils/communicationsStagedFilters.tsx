@@ -1,5 +1,4 @@
 import React, { useCallback, useMemo } from "react";
-import { Button } from "react-bootstrap";
 
 type Filters = Record<string, any>;
 
@@ -47,24 +46,22 @@ export function renderApplyResetFilterActions(
   return (
     <>
       {hasNonDefaultFilters && (
-        <Button
-          variant="outline-secondary"
-          size="sm"
+        <button
+          type="button"
           onClick={onReset}
-          className={`${classPrefix}-reset-filters-btn`}
+          className={`gt-toolbar-btn ${classPrefix}-reset-filters-btn`}
         >
           Reset
-        </Button>
+        </button>
       )}
-      <Button
-        variant="primary"
-        size="sm"
+      <button
+        type="button"
         onClick={onApply}
         disabled={!hasUnappliedFilterChanges}
-        className={`${classPrefix}-apply-filters-btn`}
+        className={`gt-toolbar-btn gt-toolbar-btn--primary ${classPrefix}-apply-filters-btn`}
       >
         Apply Filters
-      </Button>
+      </button>
     </>
   );
 }
