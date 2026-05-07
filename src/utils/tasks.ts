@@ -1396,4 +1396,233 @@ export const getTaskDocumentDownload = async (taskId: string | number, documentI
   }
 };
 
+export interface MyDayPreferences {
+  daily_capacity_minutes?: number;
+  my_day_default_view?: boolean;
+  rollover_shown_date?: string | null;
+}
+
+export interface MyDayTasksMeta {
+  planned_minutes?: number;
+  completed_minutes?: number;
+  active_count?: number;
+  completed_count?: number;
+}
+
+export interface MyDayTasksPayload {
+  active: unknown[];
+  completed: unknown[];
+  plan_date?: string;
+  meta?: MyDayTasksMeta;
+  read_only?: boolean;
+}
+
+export type MyDaySuggestionCategory =
+  | "overdue"
+  | "due_today"
+  | "high_priority"
+  | "assigned_to_me"
+  | "flexible_upcoming";
+
+export type MyDaySuggestionsPayload = Partial<Record<MyDaySuggestionCategory, unknown[]>>;
+
+export interface MyDayCapacityPayload {
+  default_capacity_minutes?: number;
+  override_capacity_minutes?: number | null;
+  effective_capacity_minutes?: number;
+  planned_minutes?: number;
+  completed_minutes?: number;
+}
+
+export interface MyDayRolloverPayload {
+  tasks: unknown[];
+  prompt_acknowledged_today?: boolean;
+}
+
+function parseMyDayResponseData<T>(response: { data?: unknown }): T {
+  const responseData = response?.data;
+  if (responseData == null || typeof responseData !== "object") {
+    throw new Error("Invalid My Day API response");
+  }
+  const body = responseData as { success?: boolean; message?: string; data?: T };
+  if (body.success === false) {
+    throw new Error(body.message || "My Day API request failed");
+  }
+  if (body.data !== undefined) {
+    return body.data;
+  }
+  return responseData as T;
+}
+
+function buildMyDayQuery(params: Record<string, string | number | undefined>): URLSearchParams {
+  const searchParams = new URLSearchParams();
+  Object.entries(params).forEach(([key, value]) => {
+    if (value === undefined || value === "") return;
+    searchParams.set(key, String(value));
+  });
+  return searchParams;
+}
+
+function buildMyDayUrl(path: string, query: URLSearchParams): string {
+  const queryString = query.toString();
+  if (queryString === "") return path;
+  return `${path}?${queryString}`;
+}
+
+export const getMyDayPreferences = async (
+  extensionNumber?: string,
+): Promise<MyDayPreferences> => {
+  const query = buildMyDayQuery({ extension_number: extensionNumber });
+  const url = buildMyDayUrl("my-day/preferences", query);
+  const response = await axiosInstance.get(url);
+  return parseMyDayResponseData<MyDayPreferences>(response);
+};
+
+export const patchMyDayPreferences = async (
+  payload: Partial<Pick<MyDayPreferences, "daily_capacity_minutes" | "my_day_default_view">>,
+  extensionNumber?: string,
+): Promise<MyDayPreferences> => {
+  const query = buildMyDayQuery({ extension_number: extensionNumber });
+  const url = buildMyDayUrl("my-day/preferences", query);
+  const response = await axiosInstance.patch(url, payload);
+  return parseMyDayResponseData<MyDayPreferences>(response);
+};
+
+export const listMyDayTasks = async (
+  params: { date?: string; extension_number?: string } = {},
+): Promise<MyDayTasksPayload> => {
+  const query = buildMyDayQuery({
+    date: params.date,
+    extension_number: params.extension_number,
+  });
+  const response = await axiosInstance.get(`my-day/tasks?${query.toString()}`);
+  const payload = parseMyDayResponseData<MyDayTasksPayload>(response);
+  return {
+    active: Array.isArray(payload.active) ? payload.active : [],
+    completed: Array.isArray(payload.completed) ? payload.completed : [],
+    plan_date: payload.plan_date,
+    meta: payload.meta ?? {},
+    read_only: payload.read_only === true,
+  };
+};
+
+export const getMyDaySuggestions = async (
+  params: { search?: string; extension_number?: string } = {},
+): Promise<MyDaySuggestionsPayload> => {
+  const query = buildMyDayQuery({
+    search: params.search ?? "",
+    extension_number: params.extension_number,
+  });
+  const response = await axiosInstance.get(`my-day/suggestions?${query.toString()}`);
+  return parseMyDayResponseData<MyDaySuggestionsPayload>(response);
+};
+
+export const getMyDayCapacity = async (
+  params: { date?: string; extension_number?: string } = {},
+): Promise<MyDayCapacityPayload> => {
+  const query = buildMyDayQuery({
+    date: params.date,
+    extension_number: params.extension_number,
+  });
+  const response = await axiosInstance.get(`my-day/capacity?${query.toString()}`);
+  return parseMyDayResponseData<MyDayCapacityPayload>(response);
+};
+
+export const overrideMyDayCapacity = async (
+  payload: { minutes: number; for_date?: string },
+  extensionNumber?: string,
+): Promise<MyDayCapacityPayload> => {
+  const query = buildMyDayQuery({ extension_number: extensionNumber });
+  const url = buildMyDayUrl("my-day/capacity/override", query);
+  const response = await axiosInstance.patch(url, payload);
+  return parseMyDayResponseData<MyDayCapacityPayload>(response);
+};
+
+export const addTaskToMyDay = async (
+  payload: { task_id: number; plan_date?: string; estimated_minutes?: number },
+  extensionNumber?: string,
+): Promise<{ added?: boolean; already_in_my_day?: boolean; task?: unknown }> => {
+  const query = buildMyDayQuery({ extension_number: extensionNumber });
+  const url = buildMyDayUrl("my-day/add", query);
+  const response = await axiosInstance.post(url, payload);
+  return parseMyDayResponseData(response);
+};
+
+export const removeTaskFromMyDay = async (
+  taskId: number,
+  params: { plan_date?: string; extension_number?: string } = {},
+): Promise<unknown> => {
+  const query = buildMyDayQuery({
+    plan_date: params.plan_date,
+    extension_number: params.extension_number,
+  });
+  const response = await axiosInstance.delete(
+    buildMyDayUrl(`my-day/remove/${taskId}`, query),
+  );
+  return parseMyDayResponseData(response);
+};
+
+export const toggleMyDayTaskComplete = async (
+  taskId: number,
+  extensionNumber?: string,
+): Promise<unknown> => {
+  const query = buildMyDayQuery({ extension_number: extensionNumber });
+  const response = await axiosInstance.patch(
+    buildMyDayUrl(`my-day/complete/${taskId}`, query),
+  );
+  return parseMyDayResponseData(response);
+};
+
+export const getMyDayRollover = async (
+  extensionNumber?: string,
+): Promise<MyDayRolloverPayload> => {
+  const query = buildMyDayQuery({ extension_number: extensionNumber });
+  const response = await axiosInstance.get(
+    buildMyDayUrl("my-day/rollover", query),
+  );
+  const payload = parseMyDayResponseData<MyDayRolloverPayload>(response);
+  return {
+    tasks: Array.isArray(payload.tasks) ? payload.tasks : [],
+    prompt_acknowledged_today: payload.prompt_acknowledged_today === true,
+  };
+};
+
+export const ackMyDayRolloverPrompt = async (extensionNumber?: string): Promise<unknown> => {
+  const query = buildMyDayQuery({ extension_number: extensionNumber });
+  const response = await axiosInstance.post(
+    buildMyDayUrl("my-day/rollover/ack", query),
+  );
+  return parseMyDayResponseData(response);
+};
+
+export const submitMyDayRolloverAction = async (
+  payload: { task_ids: number[]; action: "today" | "schedule" | "dismiss"; schedule_date?: string },
+  extensionNumber?: string,
+): Promise<unknown> => {
+  const query = buildMyDayQuery({ extension_number: extensionNumber });
+  const response = await axiosInstance.post(
+    buildMyDayUrl("my-day/rollover/action", query),
+    payload,
+  );
+  return parseMyDayResponseData(response);
+};
+
+export const getMyDayPastDaySnapshot = async (
+  date: string,
+  extensionNumber?: string,
+): Promise<MyDayTasksPayload> => {
+  const query = buildMyDayQuery({ extension_number: extensionNumber });
+  const response = await axiosInstance.get(
+    buildMyDayUrl(`my-day/past-days/${date}`, query),
+  );
+  const payload = parseMyDayResponseData<MyDayTasksPayload>(response);
+  return {
+    active: Array.isArray(payload.active) ? payload.active : [],
+    completed: Array.isArray(payload.completed) ? payload.completed : [],
+    plan_date: payload.plan_date,
+    meta: payload.meta ?? {},
+    read_only: payload.read_only === true,
+  };
+};
+
 
