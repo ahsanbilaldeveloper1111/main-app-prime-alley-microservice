@@ -1,6 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { getServerSession } from 'next-auth/next';
-import { authOptions } from './[...nextauth]';
+import { authOptions } from './authOptions';
 
 /**
  * API endpoint to sync tokens from client-side (sessionStorage).

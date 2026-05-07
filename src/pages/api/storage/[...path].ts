@@ -26,7 +26,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   
   // Construct the full storage server URL
   const targetUrl = `${baseUrl}${cleanPath}`;
-  console.log('Storage proxy request:', { targetUrl, targetPath, baseUrl });
   
   try {
     // Make the request to the storage server
@@ -61,13 +60,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     res.send(Buffer.from(response.data));
     
   } catch (error: any) {
-    console.error('=== STORAGE PROXY ERROR ===');
-    console.error('Error type:', error.constructor.name);
-    console.error('Error message:', error.message);
-    console.error('Error code:', error.code);
-    console.error('Target URL:', targetUrl);
-    console.error('==================');
-    
+    console.error('Storage proxy error:', error.message, error.response?.status);
+
     // Handle different types of errors
     if (error.response) {
       // The request was made and the server responded with a status code
@@ -82,7 +76,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
     } else if (error.request) {
       // The request was made but no response was received
-      console.log('No response received from storage server');
       res.status(503);
       res.json({ 
         error: 'Service unavailable',
@@ -90,7 +83,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       });
     } else {
       // Something happened in setting up the request
-      console.log('Request setup error:', error.message);
       res.status(500);
       res.json({ 
         error: 'Internal server error',

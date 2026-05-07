@@ -90,7 +90,6 @@ export const AuditLogSummary = async (params: any = {}) => {
 export const GetListCompanies = async (params: any = {}) => {
   try {
     const response = await axiosInstance.get('/tms/getCompanies');
-    console.log("response GetListCompanies", response.data);
     return handleResponse(response.data);
   } catch (error) {
     throw error;

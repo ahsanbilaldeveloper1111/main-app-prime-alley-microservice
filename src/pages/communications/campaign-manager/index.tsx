@@ -73,145 +73,19 @@ import {
 import { useFinesseCapabilities } from "@hooks/live-calls/useFinesseCapabilities";
 import { useFinesseStomp } from "@hooks/live-calls/useFinesseStomp";
 import { useFinesseCampaignPreview } from "@hooks/live-calls/useFinesseCampaignPreview";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { communicationsKeys } from "../../../query/keys";
 
-type ContactHeaderValueOption = { value: string; label: string };
-
-const VISUALLY_HIDDEN_INPUT_STYLE: React.CSSProperties = {
-  position: "absolute",
-  width: 1,
-  height: 1,
-  opacity: 0,
-  pointerEvents: "none",
-  margin: 0,
-};
-
-const CONTACT_HEADER_VALUE_OPTIONS: ContactHeaderValueOption[] = [
-  { value: "Phone1", label: "Phone1" },
-  { value: "First Name", label: "First Name" },
-  { value: "Last Name", label: "Last Name" },
-  { value: "Phone2", label: "Phone2" },
-  { value: "Phone3", label: "Phone3" },
-  { value: "Account Number", label: "Account Number" },
-  { value: "Dial Time", label: "Dial Time" },
-  { value: "None", label: "None" },
-];
-
-export interface CampaignRow {
-  id: number;
-  name: string;
-  type: string;
-  dialerType: string;
-  timeFrom: string;
-  timeTo: string;
-  startTime: string;
-  endTime: string;
-  timezone: string;
-  contactsRemaining: number;
-  pendingContacts: number;
-  enabled: boolean;
-}
-
-const extractRemainingContactsCount = (raw: unknown): number | null => {
-  if (raw == null) return null;
-  const data =
-    (raw as { data?: unknown })?.data ??
-    (raw as { responseData?: unknown })?.responseData ??
-    raw;
-  if (Array.isArray(data)) return data.length;
-  if (typeof data !== "object") return null;
-  const d = data as Record<string, unknown>;
-  const numericKeys = [
-    "pendingContacts",
-    "contactsRemaining",
-    "remaining",
-    "remainingContacts",
-    "pendingCount",
-    "pending",
-    "totalPending",
-    "count",
-    "total",
-    "totalElements",
-    "totalContacts",
-  ];
-  for (const key of numericKeys) {
-    const v = d[key];
-    if (typeof v === "number" && Number.isFinite(v)) return v;
-    if (typeof v === "string" && v.trim() !== "" && !Number.isNaN(Number(v))) {
-      return Number(v);
-    }
-  }
-  const arrayKeys = ["contacts", "items", "content", "rows", "results"];
-  for (const key of arrayKeys) {
-    const v = d[key];
-    if (Array.isArray(v)) return v.length;
-  }
-  return null;
-};
-
-const mapApiCampaignToRow = (item: any, index: number): CampaignRow => {
-  const timeFrom = item.startTime ?? item.timeFrom ?? "09:00";
-  const timeTo = item.endTime ?? item.timeTo ?? "17:00";
-  return {
-    id: item.id ?? item.campaignId ?? index + 1,
-    name: item.name ?? item.campaignName ?? "",
-    type: item.type ?? "Agent",
-    dialerType: item.dialerType ?? "Direct Preview",
-    timeFrom,
-    timeTo,
-    startTime: timeFrom,
-    endTime: timeTo,
-    timezone: item.timezone ?? "Server Time Zone-Gulf Standard Time",
-    contactsRemaining: item.contactsRemaining ?? item.contactCount ?? 0,
-    pendingContacts:
-      item.pendingContacts ?? item.contactsRemaining ?? item.contactCount ?? 0,
-    enabled: item.enabled ?? true,
-  };
-};
-
-interface ImportStatusShape {
-  status?: string;
-  result?: string;
-  lastImportTime?: string;
-  importedCount?: number;
-  message?: string;
-  importStatus?: {
-    states?: Array<{
-      result?: string;
-      numContactsImported?: number;
-      message?: string;
-    }>;
-  };
-}
-
-function formatImportStatusDisplay(
-  s: ImportStatusShape | null | undefined,
-): string {
-  if (!s) return "—";
-  const result = s.importStatus?.states?.[0]?.result ?? s.result ?? s.status;
-  const upper = String(result ?? "").toUpperCase();
-  if (upper === "SUCCESS") {
-    const count =
-      s.importStatus?.states?.[0]?.numContactsImported ?? s.importedCount ?? 0;
-    const date = s.lastImportTime
-      ? new Date(s.lastImportTime).toLocaleString(undefined, {
-          month: "short",
-          day: "numeric",
-          year: "numeric",
-          hour: "numeric",
-          minute: "2-digit",
-        })
-      : "";
-    const dateSuffix = date ? ` (${date})` : "";
-    return `Imported ${count} contacts${dateSuffix}.`;
-  }
-  if (upper === "IN_PROGRESS") return "Import in progress…";
-  if (upper === "FAILURE" || upper === "ERROR") {
-    const msg =
-      s.importStatus?.states?.[0]?.message ?? s.message ?? "Unknown error";
-    return `Failed: ${msg}`;
-  }
-  return "—";
-}
+import {
+  CAMPAIGN_MANAGER_CONTACT_HEADER_VALUE_OPTIONS,
+  CAMPAIGN_MANAGER_VISUALLY_HIDDEN_INPUT_STYLE,
+  extractRemainingContactsCount,
+  formatImportStatusDisplay,
+  mapApiCampaignToRow,
+  type CampaignRow,
+  type ContactHeaderValueOption,
+  type ImportStatusShape,
+} from "@utils/communications/campaign-shared/campaignManagerHelpers";
 
 const { PERMISSIONS } = HEADER_CONSTANTS;
 
@@ -392,43 +266,6 @@ const LiveCallsCampaignsManagement = () => {
     loadUser();
   }, [finesseHydrated, finesseUsername, session?.user]);
 
-  // Fetch campaigns from Finesse – runs when past FinesseAuthGate / after hydrate
-  useEffect(() => {
-    if (!finesseHydrated) return;
-    const data = getFinesseUserData();
-    const teamId = getEffectiveTeamId(data);
-    const username =
-      data?.loginId ??
-      data?.loginName ??
-      (session?.user as { username?: string } | undefined)?.username ??
-      "";
-    if (!username || teamId == null) return;
-
-    const loadCampaigns = async () => {
-      setCampaignsLoading(true);
-      try {
-        const response = await getFinesseCampaigns(teamId, username);
-        const list = response?.data ?? response?.responseData ?? response;
-        const arr = Array.isArray(list)
-          ? list
-          : (list?.campaigns ?? list?.items ?? []);
-        setCampaigns(
-          (arr as any[]).map((item, index) => mapApiCampaignToRow(item, index)),
-        );
-      } catch (err) {
-        toast.error(
-          (err as any)?.response?.data?.message ??
-            (err as Error)?.message ??
-            "Failed to load campaigns.",
-        );
-        setCampaigns([]);
-      } finally {
-        setCampaignsLoading(false);
-      }
-    };
-    loadCampaigns();
-  }, [finesseHydrated, finesseUsername, session?.user]);
-
   // Load import statuses in background – runs when past FinesseAuthGate / after hydrate
   useEffect(() => {
     if (!finesseHydrated) return;
@@ -466,13 +303,84 @@ const LiveCallsCampaignsManagement = () => {
     loadImportStatuses();
   }, [finesseHydrated, finesseUsername, session?.user]);
 
+  const campaignQueryContext = useMemo(() => {
+    if (!finesseHydrated)
+      return { teamId: null as number | null, username: "" };
+    const data = getFinesseUserData();
+    const teamId = data ? getEffectiveTeamId(data) : null;
+    const username =
+      data?.loginId ??
+      data?.loginName ??
+      (session?.user as { username?: string } | undefined)?.username ??
+      "";
+    return { teamId, username };
+  }, [finesseHydrated, session?.user]);
+
+  const queryClient = useQueryClient();
+
+  const campaignsQueryKey = useMemo(
+    () =>
+      finesseHydrated &&
+      campaignQueryContext.teamId != null &&
+      campaignQueryContext.username.length > 0
+        ? communicationsKeys.finesse.campaigns(
+            campaignQueryContext.teamId,
+            campaignQueryContext.username,
+          )
+        : null,
+    [
+      finesseHydrated,
+      campaignQueryContext.teamId,
+      campaignQueryContext.username,
+    ],
+  );
+
+  const { data: campaigns = [], isPending: campaignsLoading } = useQuery({
+    queryKey: campaignsQueryKey ?? [
+      "communications",
+      "finesse",
+      "campaigns",
+      "idle",
+    ],
+    enabled: Boolean(campaignsQueryKey),
+    queryFn: async () => {
+      const { teamId, username } = campaignQueryContext;
+      if (teamId == null || username.length === 0) return [];
+      try {
+        const response = await getFinesseCampaigns(teamId, username);
+        const list = response?.data ?? response?.responseData ?? response;
+        const arr = Array.isArray(list)
+          ? list
+          : (list?.campaigns ?? list?.items ?? []);
+        return (arr as any[]).map((item, index) =>
+          mapApiCampaignToRow(item, index),
+        );
+      } catch (err) {
+        toast.error(
+          (err as any)?.response?.data?.message ??
+            (err as Error)?.message ??
+            "Failed to load campaigns.",
+        );
+        throw err;
+      }
+    },
+  });
+
+  const patchCampaignsCache = useCallback(
+    (updater: (prev: CampaignRow[]) => CampaignRow[]) => {
+      if (!campaignsQueryKey) return;
+      queryClient.setQueryData<CampaignRow[]>(campaignsQueryKey, (prev) =>
+        updater(prev ?? []),
+      );
+    },
+    [campaignsQueryKey, queryClient],
+  );
+
   const statusOptions = [
     { value: "READY", label: "Ready", color: "#10b981", icon: CheckCircle },
     { value: "NOT_READY", label: "Not Ready", color: "#ef4444", icon: XCircle },
   ];
 
-  const [campaigns, setCampaigns] = useState<CampaignRow[]>([]);
-  const [campaignsLoading, setCampaignsLoading] = useState(false);
   const [importStatuses, setImportStatuses] = useState<Record<number, unknown>>(
     {},
   );
@@ -513,7 +421,7 @@ const LiveCallsCampaignsManagement = () => {
         }),
       );
       const countById = new Map(results.map((r) => [r.id, r.count]));
-      setCampaigns((prev) =>
+      patchCampaignsCache((prev) =>
         prev.map((c) => {
           const count = countById.get(c.id);
           if (count == null) return c;
@@ -525,7 +433,7 @@ const LiveCallsCampaignsManagement = () => {
         }),
       );
     },
-    [getFinesseContext],
+    [getFinesseContext, patchCampaignsCache],
   );
 
   const campaignIdsKey = useMemo(
@@ -579,6 +487,12 @@ const LiveCallsCampaignsManagement = () => {
     setToken(getFinesseToken());
   }, [session?.user]);
 
+  const handleStompConnected = useCallback(() => {
+    queryClient.invalidateQueries({
+      queryKey: communicationsKeys.finesse.all(),
+    });
+  }, [queryClient]);
+
   useFinesseStomp({
     token,
     finesseUserId: capabilityUsername,
@@ -590,6 +504,7 @@ const LiveCallsCampaignsManagement = () => {
     onAuthError: (msg) => toast.error(msg),
     onPreviewEvent: handlePreviewEvent,
     onRosterEvent: handleRosterEvent,
+    onStompConnected: handleStompConnected,
   });
 
   const filteredCampaigns = campaigns.filter(
@@ -704,7 +619,7 @@ const LiveCallsCampaignsManagement = () => {
     const newEnabled = !campaign.enabled;
     try {
       await setFinesseCampaignEnabled(teamId, username, id, newEnabled);
-      setCampaigns((prev) =>
+      patchCampaignsCache((prev) =>
         prev.map((c) => (c.id === id ? { ...c, enabled: newEnabled } : c)),
       );
     } catch (err: any) {
@@ -964,16 +879,14 @@ const LiveCallsCampaignsManagement = () => {
       );
       toast.success("Contacts imported successfully.");
       handleCloseUploadModal();
-      const response = await getFinesseCampaigns(teamId, username);
-      const list = response?.data ?? response?.responseData ?? response;
-      const arr = Array.isArray(list)
-        ? list
-        : (list?.campaigns ?? list?.items ?? []);
-      const refreshedRows = (arr as any[]).map((item, index) =>
-        mapApiCampaignToRow(item, index),
-      );
-      setCampaigns(refreshedRows);
-      refreshRemainingContacts(refreshedRows.map((c) => c.id)).catch(
+      if (campaignsQueryKey) {
+        await queryClient.refetchQueries({ queryKey: campaignsQueryKey });
+      }
+      const rowsAfter =
+        (campaignsQueryKey
+          ? queryClient.getQueryData<CampaignRow[]>(campaignsQueryKey)
+          : undefined) ?? [];
+      refreshRemainingContacts(rowsAfter.map((c) => c.id)).catch(
         () => undefined,
       );
       const statusData = await getFinesseCampaignsContactsStatus(
@@ -1021,8 +934,8 @@ const LiveCallsCampaignsManagement = () => {
     if (field === "timeTo") updates.endTime = value;
     const nextStart = updates.startTime ?? campaign.startTime;
     const nextEnd = updates.endTime ?? campaign.endTime;
-    setCampaigns(
-      campaigns.map((c) => (c.id === campaignId ? { ...c, ...updates } : c)),
+    patchCampaignsCache((prev) =>
+      prev.map((c) => (c.id === campaignId ? { ...c, ...updates } : c)),
     );
     const { username, teamId } = getFinesseContext();
     if (!username || teamId == null) return;
@@ -1034,8 +947,8 @@ const LiveCallsCampaignsManagement = () => {
       toast.success("Campaign schedule updated.");
     } catch (err: unknown) {
       toast.error(getFinesseApiErrorMessage(err, "Failed to update schedule"));
-      setCampaigns(
-        campaigns.map((c) => (c.id === campaignId ? { ...campaign } : c)),
+      patchCampaignsCache((prev) =>
+        prev.map((c) => (c.id === campaignId ? { ...campaign } : c)),
       );
     }
   };
@@ -2381,7 +2294,7 @@ const LiveCallsCampaignsManagement = () => {
                           }
                           onChange={handleSelectAll}
                           aria-label="Select all campaigns"
-                          style={VISUALLY_HIDDEN_INPUT_STYLE}
+                          style={CAMPAIGN_MANAGER_VISUALLY_HIDDEN_INPUT_STYLE}
                         />
                         {selectedCampaigns.length ===
                           filteredCampaigns.length &&
@@ -2461,7 +2374,7 @@ const LiveCallsCampaignsManagement = () => {
                                 handleSelectCampaign(campaign.id)
                               }
                               aria-label={`Select campaign ${campaign.name}`}
-                              style={VISUALLY_HIDDEN_INPUT_STYLE}
+                              style={CAMPAIGN_MANAGER_VISUALLY_HIDDEN_INPUT_STYLE}
                             />
                             {selectedCampaigns.includes(campaign.id) && (
                               <CheckCircle size={14} color="white" />
@@ -2897,12 +2810,12 @@ const LiveCallsCampaignsManagement = () => {
                               isSearchable={false}
                               isClearable={false}
                               isDisabled={columnsLoading}
-                              options={CONTACT_HEADER_VALUE_OPTIONS}
+                              options={CAMPAIGN_MANAGER_CONTACT_HEADER_VALUE_OPTIONS}
                               value={
-                                CONTACT_HEADER_VALUE_OPTIONS.find(
+                                CAMPAIGN_MANAGER_CONTACT_HEADER_VALUE_OPTIONS.find(
                                   (o) => o.value === column.value,
                                 ) ??
-                                CONTACT_HEADER_VALUE_OPTIONS.find(
+                                CAMPAIGN_MANAGER_CONTACT_HEADER_VALUE_OPTIONS.find(
                                   (o) => o.value === "None",
                                 ) ??
                                 null

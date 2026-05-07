@@ -47,10 +47,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (isFormData) {
       // For FormData requests, preserve the original Content-Type header with boundary
       headers['Content-Type'] = req.headers['content-type'] as string;
-      console.log('=== PROXY FORMDATA DEBUG ===');
-      console.log('Original Content-Type:', req.headers['content-type']);
-      console.log('Preserved Content-Type:', headers['Content-Type']);
-      console.log('Request body type:', typeof req.body);
       
       // Parse FormData manually to preserve file information
       const form = formidable({});
@@ -84,8 +80,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
       
       requestData = formData;
-      console.log('FormData reconstructed with proper MIME types');
-      console.log('==========================');
     } else {
       // For regular JSON requests, set default headers
       headers['Content-Type'] = 'application/json';
@@ -98,13 +92,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           requestData = JSON.parse(requestData);
         } catch (e) {
           // If parsing fails, keep it as is
-          console.log('Failed to parse request body as JSON, keeping as string');
         }
       }
     }
-
-    console.log('Proxy request data:', requestData);
-    console.log('Proxy request data type:', typeof requestData);
 
     // Make the request to the backend
     const response = await axios({
@@ -145,19 +135,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
     
   } catch (error: any) {
-    console.error('=== PROXY ERROR ===');
-    console.error('Error type:', error.constructor.name);
-    console.error('Error message:', error.message);
-    console.error('Error code:', error.code);
-    console.error('Error response:', error.response?.data);
-    console.error('Error status:', error.response?.status);
-    console.error('==================');
-    
+    console.error('Proxy error:', error.message, error.response?.status);
+
     // Handle different types of errors
     if (error.response) {
       // The request was made and the server responded with a status code
       // that falls out of the range of 2xx
-      console.log('Backend responded with error status:', error.response.status);
       res.status(error.response.status);
       
       // Handle error response data
@@ -172,7 +155,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
     } else if (error.request) {
       // The request was made but no response was received
-      console.log('No response received from backend');
       res.status(503);
       res.json({ 
         error: 'Service unavailable',
@@ -181,7 +163,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       });
     } else {
       // Something happened in setting up the request that triggered an Error
-      console.log('Request setup error:', error.message);
       res.status(500);
       res.json({ 
         error: 'Internal server error',

@@ -9,22 +9,19 @@ import React, {
 } from "react";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
-import { Button, Modal, Form, Dropdown } from "react-bootstrap";
 import { toast } from "react-toastify";
 import { useRouter } from "next/router";
 import moment from "moment";
-import { Plus, ChevronDown, MoreVertical, Repeat, Settings, Trash2 } from "lucide-react";
+import { ChevronDown } from "lucide-react";
 import GenericTable, { TableColumn, TableAction } from "@components/GenericTable";
 import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
 import CreateTaskSidebar from "@components/CreatePlannerTaskSidebar";
 import {
   listTasks,
-  listProjects,
   getProject,
   deleteTask as deleteTaskApi,
   completeTask,
   incompleteTask,
-  type ListTasksSummary,
 } from "@utils/tasks";
 import { listStatuses } from "@utils/work-planner";
 import {
@@ -37,15 +34,15 @@ import {
   plannerTaskRowDeleteDeniedTitle,
   plannerTaskRowEditDeniedTitle,
 } from "@planner/taskRowPermissions";
-import { extensionOrIdToTrimmedString } from "@planner/projectTabsContentUtils";
 import { useSession } from "next-auth/react";
 import { usePermissions } from "@utils/permissionUtils";
 import { HEADER_CONSTANTS } from "@constants/headerConstants";
-
-const { PERMISSIONS } = HEADER_CONSTANTS;
 import { useHierarchyData } from "@components/filters/useHierarchyData";
 import { ModuleSlug } from "@utils/Helper";
 import { useTasksListingPager } from "@hooks/useTasksListingPager";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { fetchPlannerProjectFilterDirectory } from "../../../query/fetchPlannerProjectFilterDirectory";
+import { plannerKeys } from "../../../query/keys";
 import {
   ALL_STATUS_VALUE,
   applyPlannerTaskFiltersToListParams,
@@ -53,19 +50,8 @@ import {
   plannerTaskListTodayTriple,
 } from "@utils/taskListing/plannerTasksQueryParams";
 import {
-  isStoredAsUtcMidnightCalendarDue,
-  parseApiDueTimeToTimeInput,
-  shouldSuppressDueTimeInListCell,
-} from "@utils/plannerTaskDueTime";
-import {
   buildTaskListingPageStyleTag,
-  formatTaskDueDateCellParts,
-  TaskCompleteCircleButton,
-  TaskListingAssigneeCell,
   TaskListingSearchRow,
-  TASK_LIST_BTN_OUTLINE,
-  TASK_LIST_CELL,
-  TASK_PRIORITY_DOT_COLORS,
 } from "@utils/taskListing/taskListUiPrimitives";
 
 function plannerTaskConvertDeniedTitle(
@@ -514,9 +500,10 @@ const TasksListingPage = ({
 
     const taskTypeFilterOptions = useMemo(
       () =>
-        omitTodoTaskType
+        (omitTodoTaskType
           ? TASK_TYPE_OPTIONS.filter((o) => o.value !== "todo")
-          : TASK_TYPE_OPTIONS,
+          : [...TASK_TYPE_OPTIONS]
+        ).map((o) => ({ value: o.value, label: o.label })),
       [omitTodoTaskType],
     );
 
@@ -656,22 +643,39 @@ const TasksListingPage = ({
     }, []);
   
     // ── Data ──────────────────────────────────────────────────────────────────────
-    const [tasks, setTasks]           = useState<Task[]>([]);
-    const [total, setTotal]           = useState(0);
-    const [loading, setLoading]       = useState(false);
+    const queryClient = useQueryClient();
     const [filters, setFilters]       = useState<Record<string, any>>({});
     const [search, setSearch]         = useState("");
-  
-  
+
+
     const { pager, setPager } = useTasksListingPager();
-  
+
     // ── Filter sidebar ────────────────────────────────────────────────────────────
-    const [allProjects, setAllProjects]  = useState<Array<{ id: number; name: string }>>([]);
+    const { data: projectDirectoryRows = [] } = useQuery({
+      queryKey: plannerKeys.projects.filterDirectory(),
+      queryFn: fetchPlannerProjectFilterDirectory,
+      enabled: !isProjectScopedEmbed,
+    });
+
+    const allProjects = useMemo((): Array<{ id: number; name: string }> => {
+      if (isProjectScopedEmbed && sidebarProject?.id != null) {
+        return [{ id: Number(sidebarProject.id), name: sidebarProject.name }];
+      }
+      return projectDirectoryRows.map((p) => ({
+        id: Number(p.id),
+        name: String(p.name ?? ""),
+      }));
+    }, [
+      isProjectScopedEmbed,
+      sidebarProject?.id,
+      sidebarProject?.name,
+      projectDirectoryRows,
+    ]);
+
     const [fForm, setFForm] = useState(INITIAL_FILTER_FORM);
-    const [workflowStatuses, setWorkflowStatuses] = useState<PlannerWorkflowStatusRow[]>([]);
     const [openQuickFilter, setOpenQuickFilter] = useState<string | null>(null);
     const quickFilterRef = useRef<HTMLDivElement | null>(null);
-  
+
     // ── Create/edit task sidebar ──────────────────────────────────────────────────
     const [showCreate, setShowCreate]   = useState(false);
     const [editingTask, setEditingTask] = useState<Task | null>(null);
@@ -720,27 +724,7 @@ const TasksListingPage = ({
       );
     }, [sidebarProject?.id, sidebarProject?.name]);
 
-    // Fetch projects for filter and sidebar (skip when embedded on a project — single project only)
-    useEffect(() => {
-      if (sidebarProject?.id) {
-        setAllProjects([{ id: sidebarProject.id, name: sidebarProject.name }]);
-        return;
-      }
-      const load = async () => {
-        try {
-          const res = await listProjects({ page: 1, limit: 100 });
-          if (res?.success === true && Array.isArray(res.data)) {
-            const list = res.data.map((p: any) => ({ id: p.id, name: p.name }));
-            setAllProjects(list);
-          }
-        } catch {
-          // ignore
-        }
-      };
-      void load();
-    }, [sidebarProject?.id, sidebarProject?.name]);
-
-    /** Embedded only — stable list so `fetchTasks` does not re-run when `allProjects` is set in an effect. */
+    /** Embedded only — stable list for filter application when project-scoped. */
     const embeddedProjectsForFilters = useMemo((): Array<{ id: number; name: string }> => {
       if (sidebarProject?.id == null) return [];
       return [{ id: Number(sidebarProject.id), name: sidebarProject.name }];
@@ -763,29 +747,25 @@ const TasksListingPage = ({
       return Number.isFinite(n) ? n : null;
     }, [sidebarProject?.id, fForm.project, allProjects]);
 
-    useEffect(() => {
-      let cancelled = false;
-      const load = async () => {
+    const { data: workflowStatuses = [] } = useQuery({
+      queryKey: plannerKeys.statuses.workflow(resolvedProjectIdForStatuses),
+      queryFn: async (): Promise<PlannerWorkflowStatusRow[]> => {
         try {
           if (resolvedProjectIdForStatuses != null) {
-            const data = await getProject(resolvedProjectIdForStatuses, [...PROJECT_DETAILS_STATUS_WITH]);
-            if (cancelled) return;
+            const data = await getProject(
+              String(resolvedProjectIdForStatuses),
+              [...PROJECT_DETAILS_STATUS_WITH],
+            );
             const statuses = (data as { statuses?: unknown } | null)?.statuses;
-            setWorkflowStatuses(normalizePlannerStatusesFromApi(statuses));
-            return;
+            return normalizePlannerStatusesFromApi(statuses);
           }
           const raw = await listStatuses();
-          if (cancelled) return;
-          setWorkflowStatuses(normalizePlannerStatusesFromApi(raw));
+          return normalizePlannerStatusesFromApi(raw);
         } catch {
-          if (!cancelled) setWorkflowStatuses([]);
+          return [];
         }
-      };
-      void load();
-      return () => {
-        cancelled = true;
-      };
-    }, [resolvedProjectIdForStatuses]);
+      },
+    });
 
     useEffect(() => {
       if (fForm.status === ALL_STATUS_VALUE) return;
@@ -799,75 +779,127 @@ const TasksListingPage = ({
       });
     }, [workflowStatuses, fForm.status]);
 
-    // ── Fetch ─────────────────────────────────────────────────────────────────────
-    const fetchTasks = useCallback(async () => {
-      setLoading(true);
-      try {
-        const params: any = {
+    const assigneeExtensionsKey = useMemo(
+      () =>
+        hierarchyDataExtensions
+          .map((ext) => {
+            const e = ext as HierarchyExtension;
+            return `${String(e.id ?? "")}:${String(e.extension_number ?? "")}`;
+          })
+          .join("|"),
+      [hierarchyDataExtensions],
+    );
+
+    const projectsForFiltersKey = useMemo(
+      () =>
+        JSON.stringify(
+          projectsForApplyFilters.map((p) => ({ id: p.id, name: p.name })),
+        ),
+      [projectsForApplyFilters],
+    );
+
+    const tasksListQueryKey = useMemo(
+      () =>
+        plannerKeys.tasks.list({
+          scope: isProjectScopedEmbed ? "embed" : "page",
+          embedProjectId:
+            sidebarProject?.id === undefined || sidebarProject?.id === null
+              ? null
+              : Number(sidebarProject.id),
+          embedRefresh: isProjectScopedEmbed
+            ? embeddedListRefreshSignal
+            : undefined,
           page: pager.page,
-          limit: pager.perPage,
-          search: filters.search || undefined,
-          order: { column: pager.sortCol === "due_date" ? "due_date" : "created_at", dir: pager.sortDir },
-          withRelations: ["project", "status", "assignees"],
-        };
-
-        applyPlannerTaskFiltersToListParams(params, filters, projectsForApplyFilters);
-        applyPlannerTaskTabToListParams(
-          params,
+          perPage: pager.perPage,
+          sortCol: pager.sortCol,
+          sortDir: pager.sortDir,
+          filtersKey: JSON.stringify(filters),
           activeTab,
-          plannerTaskListTodayTriple(),
-        );
+          projectsForFiltersKey,
+          assigneeExtensionsKey,
+        }),
+      [
+        isProjectScopedEmbed,
+        sidebarProject?.id,
+        embeddedListRefreshSignal,
+        pager.page,
+        pager.perPage,
+        pager.sortCol,
+        pager.sortDir,
+        filters,
+        activeTab,
+        projectsForFiltersKey,
+        assigneeExtensionsKey,
+      ],
+    );
 
-        if (sidebarProject?.id) {
-          params.project_id = sidebarProject.id;
-        }
+    const {
+      data: tasksQueryData,
+      isPending: tasksQueryPending,
+      isFetching: tasksQueryFetching,
+    } = useQuery({
+      queryKey: tasksListQueryKey,
+      queryFn: async () => {
+        try {
+          const params: any = {
+            page: pager.page,
+            limit: pager.perPage,
+            search: filters.search || undefined,
+            order: {
+              column: pager.sortCol === "due_date" ? "due_date" : "created_at",
+              dir: pager.sortDir,
+            },
+            withRelations: ["project", "status", "assignees"],
+          };
 
-        const res = await listTasks(params);
-        if (isProjectScopedEmbed && res?.summary != null) {
-          onEmbeddedListSummary?.(res.summary);
+          applyPlannerTaskFiltersToListParams(
+            params,
+            filters,
+            projectsForApplyFilters,
+          );
+          applyPlannerTaskTabToListParams(
+            params,
+            activeTab,
+            plannerTaskListTodayTriple(),
+          );
+
+          if (sidebarProject?.id) {
+            params.project_id = sidebarProject.id;
+          }
+
+          const res = await listTasks(params);
+          const summary =
+            isProjectScopedEmbed && res?.summary != null ? res.summary : undefined;
+          let mapped: Task[] = [];
+          let totalRows = 0;
+          if (res?.data) {
+            mapped = (res.data as ApiTask[]).map((t) => mapApiTaskToTask(t));
+            totalRows = res.pagination?.total ?? 0;
+          }
+          return { tasks: mapped, total: totalRows, summary };
+        } catch {
+          toast.error("Failed to load tasks");
+          return { tasks: [] as Task[], total: 0, summary: undefined };
         }
-        if (res?.data) {
-          const mapped = (res.data as ApiTask[]).map((task) => mapApiTaskToTask(task));
-          setTasks(mapped);
-          setTotal(res.pagination?.total ?? 0);
-        } else {
-          setTasks([]);
-          setTotal(0);
-        }
-      } catch {
-        setTasks([]);
-        setTotal(0);
-        toast.error("Failed to load tasks");
-      } finally {
-        setLoading(false);
-      }
+      },
+    });
+
+    useEffect(() => {
+      if (!isProjectScopedEmbed || tasksQueryData?.summary == null) return;
+      onEmbeddedListSummary?.(tasksQueryData.summary);
     }, [
-      pager.page,
-      pager.perPage,
-      pager.sortCol,
-      pager.sortDir,
-      filters,
-      activeTab,
-      mapApiTaskToTask,
-      projectsForApplyFilters,
-      sidebarProject?.id,
       isProjectScopedEmbed,
+      tasksQueryData?.summary,
       onEmbeddedListSummary,
     ]);
 
-    const prevEmbeddedRefreshSignal = useRef<number | undefined>(undefined);
-    useEffect(() => {
-      if (!isProjectScopedEmbed || embeddedListRefreshSignal === undefined) return;
-      if (prevEmbeddedRefreshSignal.current === undefined) {
-        prevEmbeddedRefreshSignal.current = embeddedListRefreshSignal;
-        return;
-      }
-      if (prevEmbeddedRefreshSignal.current === embeddedListRefreshSignal) return;
-      prevEmbeddedRefreshSignal.current = embeddedListRefreshSignal;
-      fetchTasks().catch(() => undefined);
-    }, [embeddedListRefreshSignal, isProjectScopedEmbed, fetchTasks]);
-  
-    useEffect(() => { fetchTasks(); }, [fetchTasks]);
+    const tasks = tasksQueryData?.tasks ?? [];
+    const total = tasksQueryData?.total ?? 0;
+    const loading = tasksQueryPending || tasksQueryFetching;
+
+    const invalidateTaskLists = useCallback(() => {
+      queryClient.invalidateQueries({ queryKey: plannerKeys.tasks.all() });
+    }, [queryClient]);
 
     const resolveProjectForMemberCheck = useCallback(
       (row: Task): unknown => {
@@ -973,7 +1005,7 @@ const TasksListingPage = ({
         await deleteTaskApi(toDelete.id);
         setShowDelete(false);
         setToDelete(null);
-        fetchTasks();
+        invalidateTaskLists();
       } catch {
         toast.error("Failed to delete task");
       }
@@ -991,12 +1023,12 @@ const TasksListingPage = ({
           } else {
             await completeTask(row.id);
           }
-          fetchTasks();
+          invalidateTaskLists();
         } catch {
           toast.error("Failed to update task");
         }
       },
-      [fetchTasks, getTaskRowPermissions],
+      [invalidateTaskLists, getTaskRowPermissions],
     );
   
     // ── Columns ───────────────────────────────────────────────────────────────────
@@ -1013,11 +1045,11 @@ const TasksListingPage = ({
             completeBtnTitle = plannerTaskRowEditDeniedTitle(false) ?? "";
           }
           return (
-            <TaskCompleteCircleButton
-              isCompleted={row.status === "completed"}
-              title={completeBtnTitle}
-              disabled={!canToggleComplete}
-              onClick={async (e) => {
+            <PlannerTaskCompleteColumnRender
+              row={row}
+              canToggleComplete={canToggleComplete}
+              completeBtnTitle={completeBtnTitle}
+              onToggleComplete={async (e) => {
                 e.stopPropagation();
                 if (!canToggleComplete) return;
                 await handleToggleComplete(row);
@@ -1029,109 +1061,50 @@ const TasksListingPage = ({
       {
         key: "title", label: "Title", sortable: true, type: "custom",
         render: (row) => (
-          <div className="task-title-cell" style={{ display: "flex", alignItems: "center", gap: 8, overflow: "hidden", minWidth: 0 }}>
-            <a
-              href={`/planner/tasks/${row.id}`}
-              onClick={e => { e.preventDefault(); e.stopPropagation(); router.push(`/planner/tasks/${row.id}`); }}
-              title={row.title}
-              style={{
-                color: "#2563eb", fontWeight: 400, fontSize: 13, cursor: "pointer",
-                fontFamily: "Lexend Deca, Helvetica, Arial, sans-serif",
-                flex: 1, minWidth: 0,
-                overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-                display: "block",
-              }}
-            >
-              {row.title}
-            </a>
-
-            {getTaskRowPermissions(row).canOpenTaskEdit && (
-              <button
-                className="task-edit-btn"
-                type="button"
-                onClick={e => { e.stopPropagation(); openEdit(row); }}
-                style={{
-                  ...TASK_LIST_BTN_OUTLINE,
-                  paddingTop: 3, paddingBottom: 3, paddingLeft: 9, paddingRight: 9, fontSize: 11,
-                  flexShrink: 0,
-                }}
-              >
-                Edit
-              </button>
-            )}
-          </div>
+          <PlannerTaskTitleCell
+            row={row}
+            canEdit={getTaskRowPermissions(row).canOpenTaskEdit}
+            onNavigate={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              router.push(`/planner/tasks/${row.id}`);
+            }}
+            onEditClick={(e) => {
+              e.stopPropagation();
+              openEdit(row);
+            }}
+          />
         ),
       },
       {
         key: "task_type", label: "Task Type", sortable: true, type: "custom",
-        render: (row) => (
-          <span style={TASK_LIST_CELL}>
-            {TASK_TYPE_OPTIONS.find(t => t.value === row.task_type)?.label || row.task_type}
-          </span>
-        ),
+        render: (row) => <PlannerTaskTypeCell row={row} />,
       },
       {
         key: "assigned_to", label: "Assigned to", sortable: true, type: "custom",
-        render: (row) => {
-          const names = assigneeDisplayNamesForTaskRow(row, hierarchyDataExtensions);
-          const display = names.length > 0 ? names.join(", ") : "";
-          return <TaskListingAssigneeCell label={display} />;
-        },
+        render: (row) => (
+          <PlannerTaskAssigneeCell row={row} hierarchyDataExtensions={hierarchyDataExtensions} />
+        ),
       },
       {
         key: "priority", label: "Priority", sortable: true, type: "custom",
-        render: (row) => {
-          if (!row.priority) return <span style={{ ...TASK_LIST_CELL, color: "#9ca3af" }}>—</span>;
-          return (
-            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-              <span style={{ width: 8, height: 8, borderRadius: "50%", flexShrink: 0, display: "inline-block",
-                backgroundColor: TASK_PRIORITY_DOT_COLORS[row.priority] }} />
-              <span style={TASK_LIST_CELL}>{row.priority.charAt(0).toUpperCase() + row.priority.slice(1)}</span>
-            </div>
-          );
-        },
+        render: (row) => <PlannerTaskPriorityCell row={row} />,
       },
       {
         key: "due_date", label: "Due date", sortable: true, type: "custom",
-        render: (row) => {
-          const parts = formatTaskDueDateCellParts(
-            row.due_date,
-            row.status,
-            apiDueTimeFromPlannerTaskRow(row),
-          );
-          return (
-            <span
-              style={{
-                ...TASK_LIST_CELL,
-                color: parts.color,
-                fontWeight: parts.fontWeight,
-              }}
-            >
-              {parts.label}
-            </span>
-          );
-        },
+        render: (row) => <PlannerTaskDueDateCell row={row} />,
       },
       {
         key: "notes", label: "Notes", sortable: true, type: "custom",
-        render: (row) => (
-          <span style={{ ...TASK_LIST_CELL, maxWidth: 200, overflow: "hidden",
-            textOverflow: "ellipsis", whiteSpace: "nowrap", display: "inline-block" }}
-            title={row.notes || ""}>{row.notes || "—"}</span>
-        ),
+        render: (row) => <PlannerTaskNotesCell row={row} />,
       },
       {
         key: "workflow_status", label: "Status", sortable: false, type: "custom",
-        render: (row) => (
-          <span style={TASK_LIST_CELL}>{taskStatusColumnLabel(row)}</span>
-        ),
+        render: (row) => <PlannerTaskWorkflowStatusCell row={row} />,
       },
       {
         key: "repeat_status", label: "Repeat Status", sortable: false, type: "custom",
-        render: (row) => {
-          const label = formatRepeatStatusLabel(row.repeat_status);
-          return <span style={TASK_LIST_CELL}>{label || "—"}</span>;
-        },
+        render: (row) => <PlannerTaskRepeatStatusCell row={row} />,
       },
       {
         key: "actions",
@@ -1147,93 +1120,21 @@ const TasksListingPage = ({
           const isTodoOrRegular =
             row.task_type === "todo" || row.task_type === "regular";
           return (
-            <Dropdown
-              show={openTaskActionsId === row.id}
-              onToggle={createTaskRowActionsToggleHandler(row.id, setOpenTaskActionsId)}
-              onClick={(e) => e.stopPropagation()}
-            >
-              <Dropdown.Toggle
-                variant="link"
-                size="sm"
-                className="p-1 text-decoration-none shadow-none"
-                style={{ color: "#6b7280" }}
-                id={`task-row-actions-${row.id}`}
-                aria-label="Task actions"
-              >
-                <MoreVertical size={16} />
-              </Dropdown.Toggle>
-              <Dropdown.Menu align="end">
-                <Dropdown.Item
-                  as="button"
-                  type="button"
-                  aria-disabled={!canEditRow}
-                  className={canEditRow ? undefined : "text-muted"}
-                  style={{
-                    cursor: canEditRow ? "pointer" : "not-allowed",
-                    opacity: canEditRow ? 1 : 0.65,
-                  }}
-                  title={plannerTaskRowEditDeniedTitle(canEditRow)}
-                  onClick={() => {
-                    if (!canEditRow) return;
-                    setOpenTaskActionsId(null);
-                    openEdit(row);
-                  }}
-                >
-                  <Settings size={14} className="me-2" />
-                  Edit Task
-                </Dropdown.Item>
-                {isTodoOrRegular && (
-                  <Dropdown.Item
-                    as="button"
-                    type="button"
-                    aria-disabled={!canConvertRow}
-                    className={canConvertRow ? undefined : "text-muted"}
-                    style={{
-                      cursor: canConvertRow ? "pointer" : "not-allowed",
-                      opacity: canConvertRow ? 1 : 0.65,
-                    }}
-                    title={plannerTaskConvertDeniedTitle(
-                      canConvertRow,
-                      sessionCanConvertToRecurringPlannerTask,
-                      canEditRow,
-                    )}
-                    onClick={() => {
-                      if (!canConvertRow) return;
-                      setOpenTaskActionsId(null);
-                      openConvertToRecurring(row);
-                    }}
-                  >
-                    <Repeat size={14} className="me-2" />
-                    Convert to recurring
-                  </Dropdown.Item>
-                )}
-                <Dropdown.Divider />
-                <Dropdown.Item
-                  as="button"
-                  type="button"
-                  aria-disabled={!canDeleteRow}
-                  className={canDeleteRow ? "text-danger" : "text-muted"}
-                  style={{
-                    cursor: canDeleteRow ? "pointer" : "not-allowed",
-                    opacity: canDeleteRow ? 1 : 0.65,
-                  }}
-                  title={plannerTaskRowDeleteDeniedTitle(perms)}
-                  onClick={() => {
-                    if (!canDeleteRow) return;
-                    setOpenTaskActionsId(null);
-                    openDeleteConfirm(row);
-                  }}
-                >
-                  <Trash2 size={14} className="me-2" />
-                  Delete Task
-                </Dropdown.Item>
-              </Dropdown.Menu>
-            </Dropdown>
+            <PlannerTaskRowActionsMenu
+              row={row}
+              isOpen={openTaskActionsId === row.id}
+              canEditRow={canEditRow}
+              canDeleteRow={canDeleteRow}
+              editTitle={plannerTaskRowEditDeniedTitle(canEditRow)}
+              deleteTitle={plannerTaskRowDeleteDeniedTitle(perms)}
+              setOpenTaskActionsId={setOpenTaskActionsId}
+              onEdit={() => openEdit(row)}
+              onDelete={() => openDeleteConfirm(row)}
+            />
           );
         },
       },
     ], [
-      fetchTasks,
       router,
       handleToggleComplete,
       openEdit,
@@ -1352,20 +1253,18 @@ const TasksListingPage = ({
       return () => document.removeEventListener("mousedown", onDocClick);
     }, []);
 
-    const filterPills = [
+    const filterPills = useMemo(
+      () => [
       {
         id: "project",
         label: fForm.project,
         icon: <ChevronDown size={12} />,
-        showDropdown: true,
         onClick: () => setOpenQuickFilter((prev) => (prev === "project" ? null : "project")),
-      }
-    ,
+      },
       {
         id: "assigned_to",
         label: `Assigned to (${fForm.assignee.length})`,
         icon: <ChevronDown size={12} />,
-        showDropdown: true,
         onClick: () => setOpenQuickFilter((prev) => (prev === "assigned_to" ? null : "assigned_to")),
       },
       {
@@ -1374,40 +1273,40 @@ const TasksListingPage = ({
           ? TASK_TYPE_OPTIONS.find((o) => o.value === fForm.task_type?.value)?.label || "Task type"
           : "Task type",
         icon: <ChevronDown size={12} />,
-        showDropdown: true,
         onClick: () => setOpenQuickFilter((prev) => (prev === "task_type" ? null : "task_type")),
       },
       {
         id: "status",
         label: statusFilterPillLabel,
         icon: <ChevronDown size={12} />,
-        showDropdown: true,
         onClick: () => setOpenQuickFilter((prev) => (prev === "status" ? null : "status")),
       },
       {
         id: "priority",
         label: priorityFilterPillLabel,
         icon: <ChevronDown size={12} />,
-        showDropdown: true,
         onClick: () => setOpenQuickFilter((prev) => (prev === "priority" ? null : "priority")),
       },
-      
       {
         id: "due_date",
         label: dueDateFilterPillLabel,
         icon: <ChevronDown size={12} />,
-        showDropdown: true,
         onClick: () => setOpenQuickFilter((prev) => (prev === "due_date" ? null : "due_date")),
       },
       {
         id: "queue",
         label: "Queue",
         icon: <ChevronDown size={12} />,
-        showDropdown: true,
         onClick: () => setOpenQuickFilter((prev) => (prev === "queue" ? null : "queue")),
       },
-      
-    ];
+      ],
+      [
+        fForm,
+        statusFilterPillLabel,
+        priorityFilterPillLabel,
+        dueDateFilterPillLabel,
+      ],
+    );
   
     // ── Render ─────────────────────────────────────────────────────────────────────
     return (
@@ -2137,57 +2036,22 @@ const TasksListingPage = ({
               setFilters((p) => ({ ...p, search }));
               setPager((p) => ({ ...p, page: 1 }));
             }}
-            wrapperStyle={{
-              borderBottom: "1px solid #e5e7eb",
-            }}
-            editColumnsSlot={(
-            <Dropdown align="end" autoClose="outside">
-              <Dropdown.Toggle
-                variant="outline-secondary"
-                id="tasks-edit-columns-dropdown"
-                style={{
-                  ...TASK_LIST_BTN_OUTLINE,
-                  fontSize: 12,
-                  backgroundColor: "#fff",
-                  borderColor: "#8a8a8a",
-                  color: "#141414",
-                }}
-              >
-                Edit columns
-              </Dropdown.Toggle>
-              <Dropdown.Menu style={{ minWidth: 240 }}>
-                {columns.map((col) => (
-                  <Dropdown.Item
-                    key={col.key}
-                    as="div"
-                    className="px-3 py-2"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    <Form.Check
-                      type="checkbox"
-                      id={`planner-task-col-${col.key}`}
-                      label={col.label || col.key}
-                      checked={visibleTaskColumnKeys.includes(col.key)}
-                      onChange={() => toggleTaskColumnVisibility(col.key)}
-                    />
-                  </Dropdown.Item>
-                ))}
-                <Dropdown.Divider />
-                <Dropdown.Item as="button" type="button" onClick={selectAllTaskColumns}>
-                  Select all
-                </Dropdown.Item>
-                <Dropdown.Item as="button" type="button" onClick={resetTaskColumnsToDefault}>
-                  Reset to default
-                </Dropdown.Item>
-              </Dropdown.Menu>
-            </Dropdown>
-            )}
+            wrapperClassName="ptl-search-row-border"
+            editColumnsSlot={
+              <PlannerTasksEditColumnsDropdown
+                columns={columns}
+                visibleTaskColumnKeys={visibleTaskColumnKeys}
+                toggleTaskColumnVisibility={toggleTaskColumnVisibility}
+                selectAllTaskColumns={selectAllTaskColumns}
+                resetTaskColumnsToDefault={resetTaskColumnsToDefault}
+              />
+            }
           />
   
           {/* ══════════════════════════════════════════════════════
               ROW 5 — Table (fills remaining height)
           ══════════════════════════════════════════════════════ */}
-          <div style={{ flex: 1, overflow: "hidden" }}>
+          <div className="ptl-table-wrap">
             <GenericTable
               data={tasks}
               columns={tableColumnsForGrid}
@@ -2233,8 +2097,7 @@ const TasksListingPage = ({
             setShowCreate(false);
             setEditingTask(null);
             setEditingTaskEditScope("full");
-            setOpenAsRecurringConversion(false);
-            await fetchTasks();
+            invalidateTaskLists();
           }}
           extensions={hierarchyDataExtensions as any}
           labels={sidebarProject?.labels ?? []}

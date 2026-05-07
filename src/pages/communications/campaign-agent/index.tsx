@@ -45,46 +45,12 @@ import {
 } from "@utils/finesseRosterMerge";
 import { useFinesseStomp } from "@hooks/live-calls/useFinesseStomp";
 import { useFinesseCampaignPreview } from "@hooks/live-calls/useFinesseCampaignPreview";
-
-const getStateColor = (state: string): string => {
-  if (state === "READY") return "#10b981";
-  if (state === "NOT_READY") return "#ef4444";
-  return "#6b7280";
-};
-
-const formatDuration = (stateChangeTime?: string, rerenderClock?: number): string => {
-  if (!stateChangeTime) return "00:00:00";
-  try {
-    const then = new Date(stateChangeTime).getTime();
-    const diffMs = Date.now() - then + 0 * (rerenderClock ?? 0);
-    const totalSec = Math.max(0, Math.floor(diffMs / 1000));
-    const h = Math.floor(totalSec / 3600);
-    const m = Math.floor((totalSec % 3600) / 60);
-    const s = totalSec % 60;
-    return `${h.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}:${s
-      .toString()
-      .padStart(2, "0")}`;
-  } catch {
-    return "00:00:00";
-  }
-};
-
-/** API may return reasonCode as a string or an object e.g. `{ label: string }`. */
-function formatFinesseReasonLabel(reasonCode: unknown): string | null {
-  if (reasonCode == null) return null;
-  if (typeof reasonCode === "string") {
-    const t = reasonCode.trim();
-    return t === "" ? null : t;
-  }
-  if (typeof reasonCode === "object" && reasonCode !== null && "label" in reasonCode) {
-    const lab = (reasonCode as { label?: unknown }).label;
-    if (typeof lab === "string" && lab.trim() !== "") return lab.trim();
-  }
-  if (typeof reasonCode === "number" && Number.isFinite(reasonCode)) {
-    return String(reasonCode);
-  }
-  return null;
-}
+import {
+  formatFinesseReasonLabel,
+  formatFinesseStateDuration,
+  getCampaignAgentStateColor,
+} from "@utils/communications/campaign-shared/finesseAgentDisplay";
+import { CAMPAIGN_AGENT_PAGE_STYLES } from "@utils/communications/campaign-shared/campaignAgentPageStyles";
 
 const CampaignAgentPage = () => {
   const { data: session } = useSession();
@@ -365,48 +331,7 @@ const CampaignAgentPage = () => {
         subTitle="Campaign Agent"
       />
 
-      <style>{`
-        .campaign-agent-page .agent-hero {
-          display: flex;
-          align-items: center;
-          gap: 16px;
-          margin-bottom: 24px;
-        }
-        .campaign-agent-page .detail-grid {
-          display: grid;
-          grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-          gap: 16px;
-        }
-        .campaign-agent-page .detail-tile {
-          background: #f8fafc;
-          border: 1px solid #e2e8f0;
-          border-radius: 12px;
-          padding: 16px 18px;
-        }
-        .campaign-agent-page .detail-label {
-          font-size: 12px;
-          font-weight: 600;
-          text-transform: uppercase;
-          letter-spacing: 0.04em;
-          color: #64748b;
-          margin-bottom: 6px;
-        }
-        .campaign-agent-page .detail-value {
-          font-size: 16px;
-          font-weight: 600;
-          color: #0f172a;
-          word-break: break-word;
-        }
-        .campaign-agent-page .state-pill {
-          display: inline-flex;
-          align-items: center;
-          gap: 8px;
-          padding: 6px 12px;
-          border-radius: 999px;
-          font-size: 14px;
-          font-weight: 600;
-        }
-      `}</style>
+      <style>{CAMPAIGN_AGENT_PAGE_STYLES}</style>
 
       <div className="campaign-agent-page">
         <Row>
@@ -518,8 +443,8 @@ const CampaignAgentPage = () => {
                     <span
                       className="state-pill"
                       style={{
-                        background: `${getStateColor(agentProfile?.state ?? agentStatus)}18`,
-                        color: getStateColor(agentProfile?.state ?? agentStatus),
+                        background: `${getCampaignAgentStateColor(agentProfile?.state ?? agentStatus)}18`,
+                        color: getCampaignAgentStateColor(agentProfile?.state ?? agentStatus),
                       }}
                     >
                       <span
@@ -527,7 +452,7 @@ const CampaignAgentPage = () => {
                           width: 8,
                           height: 8,
                           borderRadius: "50%",
-                          background: getStateColor(agentProfile?.state ?? agentStatus),
+                          background: getCampaignAgentStateColor(agentProfile?.state ?? agentStatus),
                         }}
                       />
                       {agentProfile?.state ?? agentStatus ?? "—"}
@@ -537,7 +462,7 @@ const CampaignAgentPage = () => {
                 <div className="detail-tile">
                   <div className="detail-label">Time in state</div>
                   <div className="detail-value" style={{ fontVariantNumeric: "tabular-nums" }}>
-                    {formatDuration(agentProfile?.stateChangeTime, timeRerender)}
+                    {formatFinesseStateDuration(agentProfile?.stateChangeTime, timeRerender)}
                   </div>
                 </div>
                 <div className="detail-tile">

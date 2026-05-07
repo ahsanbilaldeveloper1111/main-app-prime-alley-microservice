@@ -48,7 +48,10 @@ export function useGlobalFloatingCallBarDerived({
       return false;
     }
     const callState = callStateMap?.[activeCall.callId];
-    return canUserResumeHoldOnFloatingBar(userAddress, callState, dnsMap);
+    return canUserResumeHoldOnFloatingBar(userAddress, callState, dnsMap, {
+      callingAddress: activeCall.callingAddress,
+      calledAddress: activeCall.calledAddress,
+    });
   }, [activeCall, userAddress, callStateMap, dnsMap]);
 
   const [currentDuration, setCurrentDuration] = useState<number | null>(null);

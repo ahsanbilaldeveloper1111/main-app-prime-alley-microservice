@@ -225,6 +225,38 @@ function toDatetimeLocalInputValue(d: Date): string {
   return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}T${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
 }
 
+/** Parse `YYYY-MM-DDTHH:mm` from datetime-local controls as local wall time. */
+function parseDatetimeLocalFilterValue(value: string): Date | null {
+  const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/.exec(value.trim());
+  if (!m) return null;
+  const [, y, mo, d, h, mi] = m;
+  const date = new Date(
+    Number(y),
+    Number(mo) - 1,
+    Number(d),
+    Number(h),
+    Number(mi),
+    0,
+    0,
+  );
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+/** Human-readable label for datetime filter pills (not raw `YYYY-MM-DDTHH:mm`). */
+function formatCdrFilterDatetimeForDisplay(value: string): string {
+  const parsed = parseDatetimeLocalFilterValue(value);
+  if (!parsed) {
+    return value.trim();
+  }
+  return parsed.toLocaleString(undefined, {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
 function getCdrDefaultDateFromLocal(): string {
   const start = new Date();
   start.setHours(0, 0, 0, 0);
@@ -918,11 +950,13 @@ const CDRRecords = () => {
         draftValue: dateFromFilter,
         dropdownContent: dateFromDropdownContent,
         clearable: false,
+        formatActiveLabel: formatCdrFilterDatetimeForDisplay,
       }),
       makeFilterPill('cdr-date-to', 'Date To', 'date_to', {
         draftValue: dateToFilter,
         dropdownContent: dateToDropdownContent,
         clearable: false,
+        formatActiveLabel: formatCdrFilterDatetimeForDisplay,
       }),
     ],
     [

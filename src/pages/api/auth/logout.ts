@@ -14,7 +14,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (sessionId) {
       // Clear specific session from memory store
       sessionStore.delete(sessionId);
-      console.log('Cleared TMS session from memory store:', sessionId);
     }
 
     // Clear NextAuth server-side payload store entry for THIS browser session (small cookie contains sessionId)
@@ -29,7 +28,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         jwtPayloadStore.delete(payload.sessionId);
         // Also delete from sessionStore just in case something stored there with same key.
         sessionStore.delete(payload.sessionId);
-        console.log('Cleared NextAuth jwt payload for session:', payload.sessionId);
       }
     }
 

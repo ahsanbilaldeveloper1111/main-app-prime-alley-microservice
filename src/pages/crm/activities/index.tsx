@@ -295,7 +295,6 @@ const HistoryPage = () => {
             };
           },
         );
-        console.log("ZE MAPPED RECORDS", mappedRecords);
         setAllActivityRecords(mappedRecords || []);
         setPagination({
           current_page: paginationInfo.current_page || page,

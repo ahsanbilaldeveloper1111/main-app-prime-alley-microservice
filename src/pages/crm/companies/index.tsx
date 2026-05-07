@@ -813,7 +813,6 @@ const CrmCompanyManagement = () => {
       try {
         setHistoryLoading(true);
         const response = await getCrmDataHistory(page, 15);
-        console.log("ZE HISTORY DATA", response);
         setHistoryData(response.data);
         setHistoryPagination(response.pagination);
 

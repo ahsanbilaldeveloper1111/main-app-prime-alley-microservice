@@ -1,0 +1,114 @@
+/* Planner task detail — replaces scattered inline layout styles */
+
+.ptd-activity-item {
+  margin-bottom: 1rem;
+  display: flex;
+  gap: 12px;
+  padding: 0;
+  border-bottom: none;
+}
+
+.ptd-activity-item--large {
+  margin-bottom: 0;
+  padding: 1rem 0;
+}
+
+.ptd-activity-item--large:not(:last-child) {
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.ptd-activity-avatar {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  /* Darker stops so #fff meets WCAG AA vs the lightest area of the gradient */
+  background: linear-gradient(135deg, #4f46e5 0%, #5b21b6 100%);
+  color: #fff;
+  font-weight: 600;
+}
+
+.ptd-activity-avatar--sm {
+  width: 32px;
+  height: 32px;
+  font-size: 0.7rem;
+}
+
+.ptd-activity-avatar--lg {
+  width: 40px;
+  height: 40px;
+  font-size: 0.8rem;
+}
+
+.ptd-activity-body {
+  flex: 1;
+}
+
+.ptd-activity-title {
+  font-size: 0.875rem;
+  color: #1e293b;
+  margin-bottom: 0.25rem;
+}
+
+.ptd-activity-meta {
+  font-size: 0.75rem;
+  color: #94a3b8;
+}
+
+.ptd-link-muted {
+  color: #4e6fa5;
+}
+
+.ptd-hidden-input {
+  display: none;
+}
+
+.ptd-spinner-inline.spinner-border {
+  width: 14px;
+  height: 14px;
+  border-width: 0.15em;
+}
+
+.ptd-recurring-value {
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.ptd-due-row {
+  display: flex;
+  align-items: center;
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.ptd-entity-line {
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: #1e293b;
+}
+
+.ptd-muted-value {
+  font-size: 0.9rem;
+}
+
+.ptd-description-html {
+  font-size: 0.875rem;
+  color: #475569;
+  line-height: 1.6;
+  overflow-x: auto;
+}
+
+.ptd-nav-link-tab {
+  cursor: pointer;
+}
+
+.ptd-activities-modal-body {
+  max-height: 70vh;
+  overflow-y: auto;
+}
+
+.ptd-label-badge {
+  background-color: var(--ptd-label-bg, #94a3b8);
+  color: #141414;
+}

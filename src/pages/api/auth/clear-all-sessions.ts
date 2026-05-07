@@ -1,6 +1,6 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { getServerSession } from 'next-auth/next';
-import { authOptions } from './[...nextauth]';
+import { authOptions } from './authOptions';
 import { jwtPayloadStore, sessionStore } from '../../../utils/sessionStore';
 import { setCookieClearHeaders } from '../../../utils/cookieUtils';
 
@@ -62,8 +62,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     // Clear all cookies related to sessions (including NextAuth cookies)
     setCookieClearHeaders(res, true);
-
-    console.log(`Cleared ${clearedCount} sessions + ${clearedJwtPayloadCount} jwt payloads on browser close`);
 
     return res.status(200).json({
       success: true,

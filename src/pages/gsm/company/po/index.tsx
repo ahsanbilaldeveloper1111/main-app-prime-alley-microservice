@@ -108,7 +108,6 @@ const CompanyPO = () => {
           search,
           filters: currentFilters
         });
-        console.log("Company PO Data Response:", response);
         
        // console.log("ZEZEZE", response);          
         // Check if the API returns the expected nested structure

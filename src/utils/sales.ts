@@ -193,17 +193,15 @@ function extractData<T>(response: any): T {
   
   // Handle successful response with nested data structure
   if (response?.code === 200 && response?.data?.success) {
-    console.log("Extracting from nested data structure:", response.data.data);
     return response.data.data;
   }
 
   // Handle direct data response (fallback)
   if (response?.data) {
-    console.log("Extracting from direct data:", response.data);
     return response.data;
   }
 
-  console.error("Failed to extract data from response:", response);
+  console.error("Failed to extract data from sales API response");
 
   throw new Error(
     response?.data?.message || response?.message || "API request failed"

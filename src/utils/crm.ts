@@ -215,17 +215,15 @@ export interface DashboardData {
 function extractData<T>(response: any): T {
   // Handle successful response with nested data structure
   if (response?.code === 200 && response?.data?.success) {
-    console.log("Extracting from nested data structure:", response.data.data);
     return response.data.data;
   }
 
   // Handle direct data response (fallback)
   if (response?.data) {
-    console.log("Extracting from direct data:", response.data);
     return response.data;
   }
 
-  console.error("Failed to extract data from response:", response);
+  console.error("Failed to extract data from CRM response");
 
   const errorMessage =
     response?.data?.message || response?.message || "API request failed";
@@ -604,7 +602,6 @@ export const getStages = async (
   params?: { include_archived?: boolean },
 ): Promise<StageData[]> => {
   try {
-    console.log("getStages: Making API call to /crm/stages");
     const requestParams: any = type ? { type } : {};
     if (params?.include_archived) {
       requestParams.include_archived = true;
@@ -612,11 +609,8 @@ export const getStages = async (
     const response = await axiosInstance.get("/crm/stages", {
       params: requestParams,
     });
-    console.log("getStages: Raw axios response:", response);
-    console.log("getStages: Response data:", response.data);
 
     const extractedData = extractData<StageData[]>(response.data);
-    console.log("getStages: Extracted data:", extractedData);
     return extractedData;
   } catch (error: any) {
     console.error("getStages: Error occurred:", error);
@@ -2283,7 +2277,6 @@ export const getDeals = async (
 }> => {
   try {
     const response = await axiosInstance.get("/crm/deals", { params });
-    console.log("Raw response from getDeals:", response);
 
     // Handle nested response structure
     // The API returns: { code: 200, data: { success: true, data: { current_page, data: [...], total, ... }, summary_tiles: {...} } }
@@ -2317,7 +2310,6 @@ export const getDeals = async (
 export const getDeal = async (id: number): Promise<DealData> => {
   try {
     const response = await axiosInstance.get(`/crm/deals/${id}`);
-    console.log("Raw response from getDeal:", response);
     // Handle nested response structure
     // The API returns: { code: 200, data: { success: true, data: {...} } }
     const responseData: any = response.data?.data;
@@ -2357,7 +2349,6 @@ export const updateDeal = async (
 ): Promise<DealData> => {
   try {
     data.id = id;
-    console.log("updateDeal data:", data);
     const response = await axiosInstance.put(`/crm/update-deal`, data);
     const responseData: any = response.data?.data;
     toast.success("Deal updated successfully");
@@ -2657,7 +2648,6 @@ export const getOrders = async (
 }> => {
   try {
     const response = await axiosInstance.get("/crm/orders", { params });
-    console.log("Raw response from getOrders:", response);
 
     // Handle nested response structure
     const responseData: any = response.data?.data;
@@ -2690,7 +2680,6 @@ export const getOrders = async (
 export const getOrder = async (id: number): Promise<OrderData> => {
   try {
     const response = await axiosInstance.get(`/crm/orders/${id}`);
-    console.log("Raw response from getOrder:", response);
     const responseData: any = response.data?.data;
     const orderData: OrderData =
       responseData?.data || responseData || response.data;
@@ -2753,7 +2742,6 @@ export const updateOrder = async (
 ): Promise<OrderData> => {
   try {
     data.id = id;
-    console.log("updateOrder data:", data);
     const response = await axiosInstance.put(`/crm/update-order`, data);
     const responseData: any = response.data?.data;
     toast.success("Order updated successfully");
@@ -2774,7 +2762,6 @@ export const updateOrderAccount = async (
 ): Promise<OrderData> => {
   try {
     data.id = id;
-    console.log("updateOrder data:", data);
     const response = await axiosInstance.put(
       `/crm/orders/accounts/${id}`,
       data,
@@ -2798,7 +2785,6 @@ export const updateOrderDelivery = async (
 ): Promise<OrderData> => {
   try {
     data.id = id;
-    console.log("updateOrder data:", data);
     const response = await axiosInstance.put(
       `/crm/orders/delivery/${id}`,
       data,

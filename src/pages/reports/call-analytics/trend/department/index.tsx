@@ -148,7 +148,6 @@ const CallTrendDepartment = () => {
             return;
         }
         
-        console.log('Fetching call logs with filters:', currentFilters);
         setLoading(true);
         setShowPageLoader(true);
         
@@ -161,22 +160,12 @@ const CallTrendDepartment = () => {
             if (response?.summary) {
                 setSummary(response.summary);
                 setDataLoaded(true);
-                console.log('Summary data set:', response.summary);
-                console.log('DataLoaded set to true');
             } else if (response?.data) {
-                // Fallback: check if data exists but no summary
-                console.log('Response has data but no summary:', response.data);
                 setDataLoaded(true);
-                console.log('DataLoaded set to true (fallback 1)');
             } else if (response && typeof response === 'object') {
-                // Check if response is an object but doesn't have expected properties
-                console.log('Response is object but missing expected properties:', response);
                 setDataLoaded(true);
-                console.log('DataLoaded set to true (fallback 2)');
             } else {
-                console.warn('No summary or data in response:', response);
-                setDataLoaded(true); // Mark as loaded even if no data
-                console.log('DataLoaded set to true (fallback 3)');
+                setDataLoaded(true);
             }
             
             setLoading(false);

@@ -59,11 +59,13 @@ function recordTerminatedCallForRebirthGuard(
 
 function pruneExpiredTerminatedCallGuards(): void {
   const now = Date.now();
-  for (const [id, g] of terminatedCallRebirthGuards) {
+  const expiredIds: string[] = [];
+  terminatedCallRebirthGuards.forEach((g, id) => {
     if (now > g.expiresAt) {
-      terminatedCallRebirthGuards.delete(id);
+      expiredIds.push(id);
     }
-  }
+  });
+  expiredIds.forEach((id) => terminatedCallRebirthGuards.delete(id));
 }
 
 function shouldSuppressTerminatedCallRebirth(callId: string, evt: any): boolean {
@@ -877,6 +879,23 @@ export function mergeOngoingCallsIntoCallStateMap(
       activeParties,
     );
 
+    const normalizedState = String(currentState || "").toUpperCase();
+    const isHeldState =
+      normalizedState === "HELD" || normalizedState === "ON_HOLD";
+
+    let heldByAddress: string | undefined;
+    if (
+      typeof callData.heldByAddress === "string" &&
+      callData.heldByAddress.length > 0
+    ) {
+      heldByAddress = callData.heldByAddress;
+    } else if (isHeldState && existingCall?.heldByAddress) {
+      // Ongoing snapshots often omit heldBy; keep reducer-computed value so only the holder sees Resume.
+      heldByAddress = existingCall.heldByAddress;
+    } else {
+      heldByAddress = undefined;
+    }
+
     updated[callId] = {
       ...callData,
       callId,
@@ -885,6 +904,7 @@ export function mergeOngoingCallsIntoCallStateMap(
       hasActiveParticipants: callData.hasActiveParticipants !== false,
       isTerminating: callData.isTerminating === true,
       eventTime: callData.eventTime ?? existingCall?.eventTime ?? "",
+      heldByAddress,
     };
   });
 

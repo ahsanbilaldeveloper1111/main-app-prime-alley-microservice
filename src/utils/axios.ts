@@ -165,11 +165,6 @@ axiosInstance.interceptors.request.use(
       }
     }
 
-    if (config.data instanceof FormData) {
-      console.log("Headers after interceptor:", config.headers);
-      console.log("=====================");
-    }
-
     return config;
   },
   (requestError) => {

@@ -1,0 +1,69 @@
+// /communications/text-messages — wrapper: .text-messages-page
+.text-messages-page {
+  &,
+  .generic-table-th,
+  .generic-table-td,
+  .page-header-title h2,
+  .modal-title,
+  .btn,
+  small,
+  .small,
+  .badge {
+    color: #141414 !important;
+    font-weight: 100 !important;
+  }
+
+  div.pagination-buttons .btn.btn-primary {
+    color: #ffffff !important;
+  }
+
+  .btn.show {
+    color: #ffffff !important;
+  }
+
+  .generic-table-responsive {
+    border: none !important;
+  }
+
+  thead,
+  tbody,
+  tfoot,
+  tr,
+  td,
+  th {
+    border: 1px solid #dbe0e5 !important;
+  }
+
+  .gt-toolbar-tabs-section .gt-tab-button {
+    margin-left: 12px;
+  }
+
+  .generic-table {
+    min-width: 1080px;
+  }
+
+  .gsm-message-cell {
+    min-width: 420px;
+    max-width: 720px;
+  }
+
+  @media (max-width: 1200px) {
+    .generic-table {
+      min-width: 980px;
+    }
+
+    .gsm-message-cell {
+      min-width: 360px;
+    }
+  }
+
+  @media (max-width: 992px) {
+    .generic-table {
+      min-width: 900px;
+    }
+
+    .gsm-message-cell {
+      min-width: 320px;
+    }
+  }
+}

@@ -1,0 +1,36 @@
+// Layout tweaks for /communications/call-analysis (wrap page root in .call-analysis-page)
+.call-analysis-page {
+  .gt-toolbar-tabs-section .gt-tab-button {
+    margin-left: 12px;
+  }
+
+  .call-analysis-date-chip {
+    max-width: 100%;
+  }
+
+  .call-analysis-date-text {
+    white-space: nowrap;
+    line-height: 1.35;
+  }
+
+  @media (max-width: 992px) {
+    .gt-toolbar-tabs-section > .d-flex {
+      flex-wrap: wrap;
+      row-gap: 8px;
+    }
+
+    .call-analysis-date-range-wrap {
+      width: 100%;
+    }
+
+    .call-analysis-date-chip {
+      width: 100%;
+    }
+
+    .call-analysis-date-text {
+      white-space: normal !important;
+      overflow-wrap: anywhere;
+      word-break: break-word;
+    }
+  }
+}

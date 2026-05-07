@@ -30,7 +30,7 @@ import {
   parseApiDueTimeToTimeInput,
 } from "@utils/plannerTaskDueTime";
 import RichTextEditor from "../../pages/help-center/partials/RichTextEditor";
-import TaskSecondaryTabs from "@pages/planner/partials/TaskSecondaryTabs";
+import TaskSecondaryTabs from "@components/planner/workPlannerPagePartials/TaskSecondaryTabs";
 import type { PlannerTaskEditScope } from "@planner/taskRowPermissions";
 
 // ─── Types (from createtask-modal) ─────────────────────────────────────────────
