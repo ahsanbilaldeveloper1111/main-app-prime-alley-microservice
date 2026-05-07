@@ -30,8 +30,8 @@ import {
   applyCallAnalyticsFilters,
   canViewCallLogsFromSession,
 } from '@utils/callPermissionUtils';
-import { parseCallAnalyticsChartRows } from "../../callAnalyticsChartSeries";
-import { CALL_ANALYTICS_TAB_VARIANTS } from "../../callAnalyticsMotion";
+import { parseCallAnalyticsChartRows } from "@page-modules/reports/call-analytics/callAnalyticsChartSeries";
+import { CALL_ANALYTICS_TAB_VARIANTS } from "@page-modules/reports/call-analytics/callAnalyticsMotion";
 
 const { PERMISSIONS } = HEADER_CONSTANTS;
 
