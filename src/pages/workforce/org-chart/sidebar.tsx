@@ -125,7 +125,11 @@ const OrganizationEmployeeSidebar: React.FC<OrganizationEmployeeSidebarProps> = 
   const [directReportSearch, setDirectReportSearch] = useState("");
 
   const invalidateOrgChartTree = useCallback(() => {
-    void queryClient.invalidateQueries({ queryKey: workforceKeys.orgChart.all() });
+    queryClient
+      .invalidateQueries({ queryKey: workforceKeys.orgChart.all() })
+      .catch((err: unknown) => {
+        console.error("[OrgChartSidebar] invalidateQueries", err);
+      });
   }, [queryClient]);
 
   const updateParentMutation = useMutation({

@@ -223,7 +223,11 @@ const AddEmployeeModal: React.FC<AddEmployeeModalProps> = ({
       resetFormState();
       onHide();
       onSuccess?.();
-      void queryClient.invalidateQueries({ queryKey: workforceKeys.employees.all() });
+      queryClient
+        .invalidateQueries({ queryKey: workforceKeys.employees.all() })
+        .catch((e: unknown) =>
+          reportApiErrorFromCatch(e, "AddEmployeeModal.invalidateEmployeesQueries"),
+        );
     },
     onError: (error: unknown) => {
       reportApiErrorFromCatch(error, "AddEmployeeModal.createEmployee");

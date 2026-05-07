@@ -110,7 +110,8 @@
 
 .workforce-employee-modal-sidebar__btn-primary {
   padding: 10px 20px;
-  background-color: #0091ae;
+  /* Darker than legacy #0091ae so white label meets WCAG AA contrast (~4.5:1) at 14px */
+  background-color: #006f86;
   color: #ffffff;
   border: none;
   border-radius: 4px;
@@ -120,6 +121,7 @@
 
   &:disabled {
     background-color: #cbd5e0;
+    color: #334155;
     cursor: not-allowed;
   }
 }

@@ -140,14 +140,24 @@ const Employees = () => {
   const openIdNum = useMemo(() => {
     if (!router.isReady) return null;
     const raw = router.query.openId;
-    const s = typeof raw === "string" ? raw : Array.isArray(raw) ? raw[0] : undefined;
+    let s: string | undefined;
+    if (typeof raw === "string") {
+      s = raw;
+    } else if (Array.isArray(raw)) {
+      s = raw[0];
+    }
     if (!s || Number.isNaN(Number(s))) return null;
     return Number(s);
   }, [router.isReady, router.query.openId]);
 
   const { data: profileFromOpenId } = useQuery({
     queryKey: workforceKeys.employees.profileDetail(openIdNum ?? 0),
-    queryFn: () => getUserProfile(openIdNum!),
+    queryFn: () => {
+      if (openIdNum == null) {
+        return Promise.reject(new Error("Employees openId query ran without openIdNum"));
+      }
+      return getUserProfile(openIdNum);
+    },
     enabled: router.isReady && openIdNum != null,
   });
 

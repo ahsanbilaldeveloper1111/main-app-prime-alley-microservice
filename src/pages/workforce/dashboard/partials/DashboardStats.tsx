@@ -8,7 +8,7 @@ import {
   type EmployeeDashboardCounters,
 } from "../dashboardDomain";
 
-export type { EmployeeDashboardCounters };
+export type { EmployeeDashboardCounters } from "../dashboardDomain";
 
 interface DashboardStatsProps {
   onViewCalendar?: (e: React.MouseEvent) => void;
@@ -93,9 +93,13 @@ const DashboardStats: React.FC<DashboardStatsProps> = ({ onViewCalendar, params 
           <div className="employees-dashboard-stats__big-number">{counters?.leave?.on_leave_today ?? 0}</div>
         </div>
         <div className="employees-dashboard-stats__label">On Leave Today</div>
-        <a href="#" className="employees-dashboard-stats__link" onClick={onViewCalendar}>
+        <button
+          type="button"
+          className="employees-dashboard-stats__link"
+          onClick={onViewCalendar}
+        >
           View calendar →
-        </a>
+        </button>
       </div>
 
       <div className="employees-dashboard-stats__card">

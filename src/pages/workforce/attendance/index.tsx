@@ -103,7 +103,9 @@ const AttendancePage = () => {
   const attendanceStatusQuery = useAttendanceStatusQuery();
 
   const invalidateAttendanceReads = useCallback(() => {
-    void queryClient.invalidateQueries({ queryKey: workforceKeys.attendance.all() });
+    queryClient.invalidateQueries({ queryKey: workforceKeys.attendance.all() }).catch((err: unknown) => {
+      consumeHandledAttendanceError(err, "Attendance.invalidateReads");
+    });
   }, [queryClient]);
 
   const sessionUserId = session?.user?.id;

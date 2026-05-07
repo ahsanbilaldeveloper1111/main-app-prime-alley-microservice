@@ -341,7 +341,7 @@ export function serializeJourneyListFiltersKey(filters: JourneyListAppliedFilter
     department: filters.appliedDepartment,
     employmentType: filters.appliedEmploymentType,
     contract: filters.appliedContract,
-    userIds: [...filters.appliedUserIds].sort(),
+    userIds: [...filters.appliedUserIds].sort((a, b) => a.localeCompare(b)),
     status: filters.appliedStatus,
   });
 }

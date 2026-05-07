@@ -69,25 +69,32 @@ export default function SubCategoriesAssigneesList({
     label: u.name ?? String(u.id),
   }));
 
+  const assigneeRowKey = (a: WorkflowLevelAssignee) =>
+    `wf-assignee-${levelIndex}-${a.sort_order ?? 0}-${(a.user_id ?? "").trim() || "empty"}`;
+
   return (
-    <div className="d-flex flex-column gap-2">
+    <ul className="list-unstyled mb-0 ps-0 d-flex flex-column gap-2">
       {assignees.map((assignee, assigneeIdx) => (
-        <div
-          key={assigneeIdx}
-          draggable
-          onDragStart={(e) => handleDragStart(e, assigneeIdx)}
+        <li
+          key={assigneeRowKey(assignee)}
           onDragOver={handleDragOver}
           onDrop={(e) => handleDrop(e, assigneeIdx)}
-          onDragEnd={handleDragEnd}
           className="d-flex align-items-center gap-2 p-2 border rounded bg-white"
           style={{
             opacity: draggedIndex === assigneeIdx ? 0.6 : 1,
-            cursor: "grab",
           }}
         >
-          <span className="d-flex align-items-center" style={{ cursor: "grab" }} aria-hidden>
-            <GripVertical size={18} className="text-muted" />
-          </span>
+          <button
+            type="button"
+            draggable
+            onDragStart={(e) => handleDragStart(e, assigneeIdx)}
+            onDragEnd={handleDragEnd}
+            className="btn btn-link p-0 d-flex align-items-center text-muted border-0"
+            style={{ cursor: "grab" }}
+            aria-label="Drag to reorder assignee"
+          >
+            <GripVertical size={18} aria-hidden />
+          </button>
           <div className="flex-grow-1" style={{ minWidth: 0 }}>
             <Select<{ value: string; label: string }, false>
               options={userOptions}
@@ -129,8 +136,8 @@ export default function SubCategoriesAssigneesList({
           >
             <Trash2 size={18} />
           </Button>
-        </div>
+        </li>
       ))}
-    </div>
+    </ul>
   );
 }

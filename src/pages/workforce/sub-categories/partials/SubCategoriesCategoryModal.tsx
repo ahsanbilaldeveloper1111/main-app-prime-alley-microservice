@@ -96,7 +96,7 @@ export default function SubCategoriesCategoryModal({
                 >
                   <option value="">— Main category (no parent) —</option>
                   {categoryOptions
-                    .filter((c) => !editingCategory || c.id !== editingCategory.id)
+                    .filter((c) => c.id !== editingCategory?.id)
                     .map((c) => (
                       <option key={c.id} value={c.id}>
                         {c.name ?? `Category ${c.id}`}

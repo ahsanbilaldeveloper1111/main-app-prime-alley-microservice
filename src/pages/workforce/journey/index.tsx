@@ -55,6 +55,7 @@ import {
   toggleSelectedJourneyUserIds,
   type JourneyListAppliedFilters,
   type JourneyStepRecord,
+  type JourneysPagination,
   type OnboardingEmployee,
 } from "./journeyDomain";
 import { buildJourneySidebarSections } from "./buildJourneySidebarSections";
@@ -68,6 +69,120 @@ import EditJourneyStepModal from "./partials/EditJourneyStepModal";
 import "./journeyPage.scss";
 
 const { PERMISSIONS } = HEADER_CONSTANTS;
+
+function deletingStepIdFromMutationState(
+  isPending: boolean,
+  variables: { sid: number } | undefined,
+): number | null {
+  if (!isPending || variables == null) return null;
+  return variables.sid;
+}
+
+function nextRowsPerPageAfterPaginationChange(
+  page: number,
+  limit: number,
+  prevLimit: number,
+  setCurrentPage: React.Dispatch<React.SetStateAction<number>>,
+): number {
+  if (prevLimit !== limit) {
+    setCurrentPage(1);
+    return limit;
+  }
+  setCurrentPage(page);
+  return prevLimit;
+}
+
+function genericTablePaginationFromJourneys(
+  journeysPagination: JourneysPagination | null,
+  currentPage: number,
+  rowsPerPage: number,
+):
+  | {
+      currentPage: number;
+      rowsPerPage: number;
+      totalRows: number;
+      pageSizeOptions: number[];
+    }
+  | undefined {
+  if (journeysPagination == null) return undefined;
+  return {
+    currentPage: journeysPagination.page ?? currentPage,
+    rowsPerPage: journeysPagination.limit ?? rowsPerPage,
+    totalRows: journeysPagination.total ?? 0,
+    pageSizeOptions: [15, 25, 50, 100],
+  };
+}
+
+function employeeAfterStatusUpdate(
+  prev: OnboardingEmployee | null,
+  apiStatus: string,
+): OnboardingEmployee | null {
+  if (!prev) return prev;
+  const displayStatus = STATUS_DISPLAY[apiStatus] ?? prev.status;
+  return { ...prev, status: displayStatus };
+}
+
+function deleteStepModalItemName(step: JourneyStepRecord | null): string {
+  const trimmed = step?.title?.trim();
+  if (trimmed) return `step "${trimmed}"`;
+  return "this journey step";
+}
+
+function deleteJourneyModalItemName(employee: OnboardingEmployee | null): string {
+  if (employee) return `onboarding journey for ${employee.name}`;
+  return "this journey";
+}
+
+function confirmDeleteStepIfAllowed(args: {
+  canDelete: boolean;
+  stepId: number | null | undefined;
+  journeyId: number;
+  closeModal: () => void;
+  mutate: (payload: { jid: number; sid: number }) => void;
+}): void {
+  const { canDelete, stepId, journeyId, closeModal, mutate } = args;
+  if (!canDelete || stepId == null) {
+    closeModal();
+    return;
+  }
+  mutate({ jid: journeyId, sid: stepId });
+}
+
+type JourneyAppliedFiltersSummaryProps = {
+  appliedSearch: string;
+  appliedDepartment: string;
+  appliedDepartmentLabel: string;
+  appliedEmploymentType: string;
+  appliedContract: string;
+  appliedStatus: string;
+  appliedStatusLabel: string;
+  appliedUserIds: string[];
+  appliedUserNames: string;
+};
+
+function JourneyAppliedFiltersSummary(props: Readonly<JourneyAppliedFiltersSummaryProps>) {
+  const {
+    appliedSearch,
+    appliedDepartment,
+    appliedDepartmentLabel,
+    appliedEmploymentType,
+    appliedContract,
+    appliedStatus,
+    appliedStatusLabel,
+    appliedUserIds,
+    appliedUserNames,
+  } = props;
+  return (
+    <div className="journey-page__applied-summary">
+      {appliedSearch.trim() ? `Search: ${appliedSearch} | ` : ""}
+      {appliedDepartment ? `Department: ${appliedDepartmentLabel} | ` : ""}
+      {appliedEmploymentType ? `Employment: ${appliedEmploymentType} | ` : ""}
+      {appliedContract ? `Contract: ${appliedContract} | ` : ""}
+      {appliedStatus ? `Status: ${appliedStatusLabel} | ` : ""}
+      {appliedUserIds.length > 0 ? `Users: ${appliedUserNames}` : ""}
+    </div>
+  );
+}
 
 const EmployeesOnboarding = () => {
   const queryClient = useQueryClient();
@@ -102,7 +217,7 @@ const EmployeesOnboarding = () => {
   const [showDeleteStepModal, setShowDeleteStepModal] = useState(false);
   const [stepPendingDelete, setStepPendingDelete] = useState<JourneyStepRecord | null>(null);
 
-  const users = useMemo(() => (mainAppUsers ?? []) as MainAppUserLookup[], [mainAppUsers]);
+  const users = mainAppUsers;
   const managers = users;
 
   const journeyId = Number(selectedEmployee?.id);
@@ -181,12 +296,7 @@ const EmployeesOnboarding = () => {
     mutationFn: ({ jid, status }: { jid: number; status: string }) => updateJourney(jid, { status }),
     onSuccess: (_data, variables) => {
       setStatusValue(variables.status);
-      setSelectedEmployee((prev) => {
-        if (!prev) return prev;
-        const displayStatus =
-          STATUS_DISPLAY[variables.status as keyof typeof STATUS_DISPLAY] ?? prev.status;
-        return { ...prev, status: displayStatus };
-      });
+      setSelectedEmployee((prev) => employeeAfterStatusUpdate(prev, variables.status));
       toast.success("Status updated.");
       invalidateJourneyQueries();
     },
@@ -244,15 +354,17 @@ const EmployeesOnboarding = () => {
   }, []);
 
   const confirmDeleteStep = useCallback(() => {
-    if (!canDeleteJourneyStepPerm || stepPendingDelete?.id == null) {
-      closeDeleteStepModal();
-      return;
-    }
-    deleteStepMutation.mutate({ jid: journeyId, sid: stepPendingDelete.id });
+    confirmDeleteStepIfAllowed({
+      canDelete: canDeleteJourneyStepPerm,
+      stepId: stepPendingDelete?.id,
+      journeyId,
+      closeModal: closeDeleteStepModal,
+      mutate: deleteStepMutation.mutate,
+    });
   }, [
     canDeleteJourneyStepPerm,
     closeDeleteStepModal,
-    deleteStepMutation,
+    deleteStepMutation.mutate,
     journeyId,
     stepPendingDelete?.id,
   ]);
@@ -285,14 +397,9 @@ const EmployeesOnboarding = () => {
   ]);
 
   const handlePaginationChange = useCallback((page: number, limit: number) => {
-    setRowsPerPage((prevLimit) => {
-      if (prevLimit !== limit) {
-        setCurrentPage(1);
-        return limit;
-      }
-      setCurrentPage(page);
-      return prevLimit;
-    });
+    setRowsPerPage((prevLimit) =>
+      nextRowsPerPageAfterPaginationChange(page, limit, prevLimit, setCurrentPage),
+    );
   }, []);
 
   const resetFilters = useCallback(() => {
@@ -369,10 +476,10 @@ const EmployeesOnboarding = () => {
     [],
   );
 
-  const deletingStepIdForUi =
-    deleteStepMutation.isPending && deleteStepMutation.variables
-      ? deleteStepMutation.variables.sid
-      : null;
+  const deletingStepIdForUi = deletingStepIdFromMutationState(
+    deleteStepMutation.isPending,
+    deleteStepMutation.variables,
+  );
 
   const journeySidebarSections = useMemo(
     () =>
@@ -664,16 +771,11 @@ const EmployeesOnboarding = () => {
             emptyMessage="No onboarding journeys found"
             hover={true}
             uniqueKey="id"
-            pagination={
-              journeysPagination
-                ? {
-                    currentPage: journeysPagination.page ?? currentPage,
-                    rowsPerPage: journeysPagination.limit ?? rowsPerPage,
-                    totalRows: journeysPagination.total ?? 0,
-                    pageSizeOptions: [15, 25, 50, 100],
-                  }
-                : undefined
-            }
+            pagination={genericTablePaginationFromJourneys(
+              journeysPagination,
+              currentPage,
+              rowsPerPage,
+            )}
             onPaginationChange={handlePaginationChange}
             onRowClick={(row) => {
               setSelectedEmployee(row);
@@ -691,14 +793,17 @@ const EmployeesOnboarding = () => {
           />
 
           {hasAppliedFilters && (
-            <div className="journey-page__applied-summary">
-              {appliedSearch.trim() ? `Search: ${appliedSearch} | ` : ""}
-              {appliedDepartment ? `Department: ${appliedDepartmentLabel} | ` : ""}
-              {appliedEmploymentType ? `Employment: ${appliedEmploymentType} | ` : ""}
-              {appliedContract ? `Contract: ${appliedContract} | ` : ""}
-              {appliedStatus ? `Status: ${appliedStatusLabel} | ` : ""}
-              {appliedUserIds.length > 0 ? `Users: ${appliedUserNames}` : ""}
-            </div>
+            <JourneyAppliedFiltersSummary
+              appliedSearch={appliedSearch}
+              appliedDepartment={appliedDepartment}
+              appliedDepartmentLabel={appliedDepartmentLabel}
+              appliedEmploymentType={appliedEmploymentType}
+              appliedContract={appliedContract}
+              appliedStatus={appliedStatus}
+              appliedStatusLabel={appliedStatusLabel}
+              appliedUserIds={appliedUserIds}
+              appliedUserNames={appliedUserNames}
+            />
           )}
         </div>
 
@@ -743,11 +848,7 @@ const EmployeesOnboarding = () => {
           show={showDeleteStepModal}
           onHide={closeDeleteStepModal}
           onConfirm={confirmDeleteStep}
-          itemName={
-            stepPendingDelete?.title?.trim()
-              ? `step "${stepPendingDelete.title.trim()}"`
-              : "this journey step"
-          }
+          itemName={deleteStepModalItemName(stepPendingDelete)}
           itemType="step"
           loading={deleteStepMutation.isPending}
         />
@@ -755,9 +856,7 @@ const EmployeesOnboarding = () => {
           show={showDeleteJourneyModal}
           onHide={() => setShowDeleteJourneyModal(false)}
           onConfirm={handleDeleteJourney}
-          itemName={
-            selectedEmployee ? `onboarding journey for ${selectedEmployee.name}` : "this journey"
-          }
+          itemName={deleteJourneyModalItemName(selectedEmployee)}
           itemType="journey"
           loading={deleteJourneyMutation.isPending}
         />

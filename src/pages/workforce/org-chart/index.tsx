@@ -309,7 +309,7 @@ const OrganizationalChart = () => {
                 <div className="org-chart-page__dropdown-menu org-chart-page__dropdown-menu--scroll">
                   <button
                     type="button"
-                    className={`org-chart-page__dropdown-item${!selectedUserId ? " org-chart-page__dropdown-item--active" : ""}`}
+                    className={`org-chart-page__dropdown-item${selectedUserId === "" ? " org-chart-page__dropdown-item--active" : ""}`}
                     onClick={() => {
                       setSelectedUserId("");
                       setShowUserDropdown(false);

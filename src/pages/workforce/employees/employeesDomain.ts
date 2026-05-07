@@ -158,7 +158,7 @@ export function serializeEmployeesListFiltersKey(filters: EmployeesListAppliedFi
     status: filters.appliedStatus,
     employmentType: filters.appliedEmploymentType,
     contract: filters.appliedContract,
-    managerIds: [...filters.appliedManagerIds].sort(),
+    managerIds: [...filters.appliedManagerIds].sort((a, b) => a.localeCompare(b)),
   });
 }
 

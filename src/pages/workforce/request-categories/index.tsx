@@ -140,7 +140,9 @@ const RequestCategories = () => {
     },
     onSuccess: (_, vars) => {
       toast.success(vars.editing ? "Category updated" : "Category created");
-      void queryClient.invalidateQueries({ queryKey: workforceKeys.requestCategories.all() });
+      queryClient
+        .invalidateQueries({ queryKey: workforceKeys.requestCategories.all() })
+        .catch((e: unknown) => consumeHandledApiError(e, "RequestCategories.invalidateAll"));
     },
     onError: (e: unknown) => consumeHandledApiError(e, "RequestCategories.handleSaveCategory"),
   });
@@ -148,7 +150,9 @@ const RequestCategories = () => {
   const deleteCategoryMutation = useMutation({
     mutationFn: (id: number) => deleteUserRequestCategory(id),
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: workforceKeys.requestCategories.all() });
+      queryClient
+        .invalidateQueries({ queryKey: workforceKeys.requestCategories.all() })
+        .catch((e: unknown) => consumeHandledApiError(e, "RequestCategories.invalidateAll"));
     },
     onError: (e: unknown) => consumeHandledApiError(e, "RequestCategories.handleDeleteCategory"),
   });
@@ -168,9 +172,11 @@ const RequestCategories = () => {
     },
     onSuccess: (_, vars) => {
       toast.success(vars.editing ? "Field updated" : "Field added");
-      void queryClient.invalidateQueries({
-        queryKey: workforceKeys.requestCategories.fields(vars.categoryId),
-      });
+      queryClient
+        .invalidateQueries({
+          queryKey: workforceKeys.requestCategories.fields(vars.categoryId),
+        })
+        .catch((e: unknown) => consumeHandledApiError(e, "RequestCategories.invalidateFields"));
     },
     onError: (e: unknown) => consumeHandledApiError(e, "RequestCategories.handleSaveField"),
   });
@@ -180,9 +186,11 @@ const RequestCategories = () => {
       deleteUserRequestCategoryField(categoryId, fieldId),
     onSuccess: (_, vars) => {
       toast.success("Field deleted");
-      void queryClient.invalidateQueries({
-        queryKey: workforceKeys.requestCategories.fields(vars.categoryId),
-      });
+      queryClient
+        .invalidateQueries({
+          queryKey: workforceKeys.requestCategories.fields(vars.categoryId),
+        })
+        .catch((e: unknown) => consumeHandledApiError(e, "RequestCategories.invalidateFields"));
     },
     onError: (e: unknown) =>
       consumeHandledApiError(e, "RequestCategories.handleConfirmDeleteField"),
@@ -193,9 +201,11 @@ const RequestCategories = () => {
       reorderUserRequestCategoryFields(categoryId, order),
     onSuccess: (_, vars) => {
       toast.success("Order updated");
-      void queryClient.invalidateQueries({
-        queryKey: workforceKeys.requestCategories.fields(vars.categoryId),
-      });
+      queryClient
+        .invalidateQueries({
+          queryKey: workforceKeys.requestCategories.fields(vars.categoryId),
+        })
+        .catch((e: unknown) => consumeHandledApiError(e, "RequestCategories.invalidateFields"));
     },
     onError: (e: unknown) => consumeHandledApiError(e, "RequestCategories.moveField"),
   });
