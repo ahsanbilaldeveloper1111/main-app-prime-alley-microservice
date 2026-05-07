@@ -335,7 +335,12 @@ const MyDayTasksPage: React.FC = () => {
         type: "custom",
         sortable: false,
         render: (row) => (
-          <button className="myday-toggle-btn" onClick={() => void handleToggleComplete(row)}>
+          <button
+            className="myday-toggle-btn"
+            onClick={() => {
+              handleToggleComplete(row).catch(() => undefined);
+            }}
+          >
             {row.isCompleted ? <CircleCheckBig size={18} /> : <Circle size={18} />}
           </button>
         ),
@@ -358,7 +363,9 @@ const MyDayTasksPage: React.FC = () => {
                   type="button"
                   className="myday-toggle-btn"
                   title="Remove from My Day"
-                  onClick={() => void handleRemoveFromMyDay(row.id)}
+                  onClick={() => {
+                    handleRemoveFromMyDay(row.id).catch(() => undefined);
+                  }}
                 >
                   <Trash2 size={15} />
                 </button>
@@ -403,7 +410,13 @@ const MyDayTasksPage: React.FC = () => {
                     setCapacityMinutes(next);
                   }}
                 />
-                <button type="button" className="btn btn-sm btn-outline-secondary" onClick={() => void handleSaveCapacity()}>
+                <button
+                  type="button"
+                  className="btn btn-sm btn-outline-secondary"
+                  onClick={() => {
+                    handleSaveCapacity().catch(() => undefined);
+                  }}
+                >
                   Save
                 </button>
               </div>
@@ -442,26 +455,26 @@ const MyDayTasksPage: React.FC = () => {
                 </button>
                 <button
                   type="button"
-                  onClick={() =>
-                    void submitMyDayRolloverAction({
+                  onClick={() => {
+                    submitMyDayRolloverAction({
                       task_ids: selectedCarryOverIds,
                       action: "dismiss",
                     }).then(() => {
                       setCarryOverMode("skipped");
                       return fetchMyDayData();
-                    })
-                  }
+                    }).catch(() => undefined);
+                  }}
                 >
                   Skip
                 </button>
                 <button
                   type="button"
-                  onClick={() =>
-                    void submitMyDayRolloverAction({
+                  onClick={() => {
+                    submitMyDayRolloverAction({
                       task_ids: selectedCarryOverIds,
                       action: "today",
-                    }).then(() => fetchMyDayData())
-                  }
+                    }).then(() => fetchMyDayData()).catch(() => undefined);
+                  }}
                 >
                   Apply
                 </button>
@@ -516,7 +529,9 @@ const MyDayTasksPage: React.FC = () => {
                 type="button"
                 className="myday-suggested-item"
                 disabled={task.alreadyInMyDay}
-                onClick={() => void handleAddSuggestedTask(task)}
+                onClick={() => {
+                  handleAddSuggestedTask(task).catch(() => undefined);
+                }}
               >
                 <div className="title">{task.title}</div>
                 <div className="meta">
@@ -582,7 +597,13 @@ const MyDayTasksPage: React.FC = () => {
           >
             Skip
           </Button>
-          <Button onClick={() => void confirmEstimateAndAdd()}>Add to My Day</Button>
+          <Button
+            onClick={() => {
+              confirmEstimateAndAdd().catch(() => undefined);
+            }}
+          >
+            Add to My Day
+          </Button>
         </Modal.Footer>
       </Modal>
     </div>

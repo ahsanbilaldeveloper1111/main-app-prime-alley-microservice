@@ -3193,6 +3193,25 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
     [],
   );
 
+  const handleDueTimeInputChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const nextDueTime = e.target.value;
+      setFormData((prev) => ({ ...prev, dueTime: nextDueTime }));
+    },
+    [],
+  );
+
+  const handleEstimatedDurationInputChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const nextEstimatedDuration = e.target.value;
+      setFormData((prev) => ({
+        ...prev,
+        estimatedDurationMinutes: nextEstimatedDuration,
+      }));
+    },
+    [],
+  );
+
   const selectedAssignees = users.filter((u) =>
     formData.assigneeIds.includes(u.id),
   );
@@ -4005,9 +4024,7 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
                     <Form.Control
                       type="time"
                       value={formData.dueTime}
-                      onChange={(e) =>
-                        setFormData({ ...formData, dueTime: e.target.value })
-                      }
+                      onChange={handleDueTimeInputChange}
                       className="py-2"
                       style={{ fontSize: "14px" }}
                     />
@@ -4026,12 +4043,7 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
                       max={525600}
                       placeholder="Minutes"
                       value={formData.estimatedDurationMinutes}
-                      onChange={(e) =>
-                        setFormData((prev) => ({
-                          ...prev,
-                          estimatedDurationMinutes: e.target.value,
-                        }))
-                      }
+                      onChange={handleEstimatedDurationInputChange}
                       className="py-2"
                       style={{ fontSize: "14px" }}
                     />
@@ -4196,9 +4208,7 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
                     <Form.Control
                       type="time"
                       value={formData.dueTime}
-                      onChange={(e) =>
-                        setFormData({ ...formData, dueTime: e.target.value })
-                      }
+                      onChange={handleDueTimeInputChange}
                       className="py-2"
                       style={{ fontSize: "14px" }}
                     />
@@ -4215,12 +4225,7 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
                           max={525600}
                           placeholder="Minutes"
                           value={formData.estimatedDurationMinutes}
-                          onChange={(e) =>
-                            setFormData((prev) => ({
-                              ...prev,
-                              estimatedDurationMinutes: e.target.value,
-                            }))
-                          }
+                          onChange={handleEstimatedDurationInputChange}
                           className="py-2"
                           style={{ fontSize: "14px" }}
                         />
