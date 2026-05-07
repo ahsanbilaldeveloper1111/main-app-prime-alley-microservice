@@ -56,6 +56,10 @@ type SuggestedTask = MyDayTask & {
 const ESTIMATE_REQUIRED_STORAGE_KEY = "planner-settings-require-estimate-for-my-day";
 const ESTIMATE_PRESETS = [15, 30, 60, 90, 120, 180] as const;
 
+function swallowAsyncError(promise: Promise<unknown>): void {
+  promise.catch(() => undefined);
+}
+
 function toMinutesDisplay(totalMinutes: number): string {
   const m = Math.max(0, totalMinutes);
   const h = Math.floor(m / 60);
@@ -327,6 +331,20 @@ const MyDayTasksPage: React.FC = () => {
     }
   }, [capacityMinutes, fetchMyDayData, today]);
 
+  const onTaskToggleCompleteClick = useCallback(
+    (task: MyDayTask) => {
+      swallowAsyncError(handleToggleComplete(task));
+    },
+    [handleToggleComplete],
+  );
+
+  const onTaskRemoveClick = useCallback(
+    (taskId: number) => {
+      swallowAsyncError(handleRemoveFromMyDay(taskId));
+    },
+    [handleRemoveFromMyDay],
+  );
+
   const columns: TableColumn<MyDayTask>[] = useMemo(
     () => [
       {
@@ -337,9 +355,7 @@ const MyDayTasksPage: React.FC = () => {
         render: (row) => (
           <button
             className="myday-toggle-btn"
-            onClick={() => {
-              handleToggleComplete(row).catch(() => undefined);
-            }}
+            onClick={() => onTaskToggleCompleteClick(row)}
           >
             {row.isCompleted ? <CircleCheckBig size={18} /> : <Circle size={18} />}
           </button>
@@ -363,9 +379,7 @@ const MyDayTasksPage: React.FC = () => {
                   type="button"
                   className="myday-toggle-btn"
                   title="Remove from My Day"
-                  onClick={() => {
-                    handleRemoveFromMyDay(row.id).catch(() => undefined);
-                  }}
+                  onClick={() => onTaskRemoveClick(row.id)}
                 >
                   <Trash2 size={15} />
                 </button>
@@ -375,7 +389,7 @@ const MyDayTasksPage: React.FC = () => {
         ),
       },
     ],
-    [handleRemoveFromMyDay, handleToggleComplete],
+    [onTaskRemoveClick, onTaskToggleCompleteClick],
   );
 
   return (
