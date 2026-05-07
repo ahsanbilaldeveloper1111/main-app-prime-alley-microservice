@@ -54,9 +54,9 @@ export interface ApiNumberCheckPageViewModel {
   csvValidCount: number;
   csvInvalidCount: number;
   handleFileUpload: (e: ChangeEvent<HTMLInputElement>) => void;
-  handleDragOver: (e: DragEvent<HTMLDivElement>) => void;
-  handleDrop: (e: DragEvent<HTMLDivElement>) => void;
-  handleDropzoneKeyDown: (e: KeyboardEvent<HTMLDivElement>) => void;
+  handleDragOver: (e: DragEvent<HTMLElement>) => void;
+  handleDrop: (e: DragEvent<HTMLElement>) => void;
+  handleDropzoneKeyDown: (e: KeyboardEvent<HTMLElement>) => void;
   onRemoveCsvFile: () => void;
   downloadSampleFile: () => void;
   handleBulkUpload: () => void;
@@ -267,11 +267,11 @@ export function useApiNumberCheckPage(): ApiNumberCheckPageViewModel {
     setCsvFile(file);
   };
 
-  const handleDragOver = (e: DragEvent<HTMLDivElement>): void => {
+  const handleDragOver = (e: DragEvent<HTMLElement>): void => {
     e.preventDefault();
   };
 
-  const handleDrop = (e: DragEvent<HTMLDivElement>): void => {
+  const handleDrop = (e: DragEvent<HTMLElement>): void => {
     e.preventDefault();
     if (!canBulkCheckDncr) {
       toast.error(BULK_DNCR_PERMISSION_TOAST);
@@ -284,11 +284,12 @@ export function useApiNumberCheckPage(): ApiNumberCheckPageViewModel {
     toast.success(`File "${file.name}" selected successfully`);
   };
 
-  const handleDropzoneKeyDown = (e: KeyboardEvent<HTMLDivElement>): void => {
-    if (!canBulkCheckDncr) return;
+  const handleDropzoneKeyDown = (e: KeyboardEvent<HTMLElement>): void => {
     if (e.key !== "Enter" && e.key !== " ") return;
-    e.preventDefault();
-    csvInputRef.current?.click();
+    if (!canBulkCheckDncr) {
+      e.preventDefault();
+      toast.error(BULK_DNCR_PERMISSION_TOAST);
+    }
   };
 
   const handleBulkUpload = useCallback(async (): Promise<void> => {

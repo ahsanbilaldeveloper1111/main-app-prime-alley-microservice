@@ -12,9 +12,9 @@ export interface ApiNumberCheckCsvTabProps {
   csvFile: File | null;
   csvInputRef: RefObject<HTMLInputElement | null>;
   onFileUpload: (e: ChangeEvent<HTMLInputElement>) => void;
-  onDragOver: (e: DragEvent<HTMLDivElement>) => void;
-  onDrop: (e: DragEvent<HTMLDivElement>) => void;
-  onDropzoneKeyDown: (e: KeyboardEvent<HTMLDivElement>) => void;
+  onDragOver: (e: DragEvent<HTMLElement>) => void;
+  onDrop: (e: DragEvent<HTMLElement>) => void;
+  onDropzoneKeyDown: (e: KeyboardEvent<HTMLElement>) => void;
   onRemoveFile: () => void;
   onDownloadSample: () => void;
 }
@@ -33,19 +33,19 @@ export function ApiNumberCheckCsvTab(
     onDownloadSample,
   } = props;
 
+  const dropzoneClassName = `apiNumberCheck-dropzone${
+    csvFile ? " apiNumberCheck-dropzone--hasFile" : " apiNumberCheck-dropzone--empty"
+  }`;
+
   return (
     <div className="apiNumberCheck-csvTab">
-      <div
-        className={`apiNumberCheck-dropzone${
-          csvFile ? " apiNumberCheck-dropzone--hasFile" : ""
-        }`}
-        onDragOver={onDragOver}
-        onDrop={onDrop}
-        onKeyDown={onDropzoneKeyDown}
-        tabIndex={0}
-        aria-label="Upload CSV file by drop or keyboard"
-      >
-        {csvFile ? (
+      {csvFile ? (
+        <section
+          className={dropzoneClassName}
+          aria-label={`CSV file loaded: ${csvFile.name}`}
+          onDragOver={onDragOver}
+          onDrop={onDrop}
+        >
           <div className="apiNumberCheck-dropzoneInner">
             <Upload
               size={32}
@@ -71,30 +71,34 @@ export function ApiNumberCheckCsvTab(
               Remove File
             </button>
           </div>
-        ) : (
-          <>
+        </section>
+      ) : (
+        <div className={dropzoneClassName}>
+          <input
+            ref={csvInputRef}
+            id="csvUpload"
+            type="file"
+            accept=".csv"
+            onChange={onFileUpload}
+            onDragOver={onDragOver}
+            onDrop={onDrop}
+            onKeyDown={onDropzoneKeyDown}
+            className="apiNumberCheck-fileInputOverlay"
+            aria-label="Upload CSV file by drop or keyboard"
+          />
+          <div className="apiNumberCheck-dropzoneFace" aria-hidden="true">
             <Upload
               size={32}
               color="#6c757d"
               className="apiNumberCheck-dropzoneIcon"
             />
-            <p className="apiNumberCheck-dropzoneText">
+            <span className="apiNumberCheck-dropzoneText">
               Drag and drop or browse to upload CSV
-            </p>
-            <input
-              ref={csvInputRef}
-              type="file"
-              accept=".csv"
-              onChange={onFileUpload}
-              className="apiNumberCheck-fileInput"
-              id="csvUpload"
-            />
-            <label htmlFor="csvUpload" className="apiNumberCheck-browseLabel">
-              Browse
-            </label>
-          </>
-        )}
-      </div>
+            </span>
+            <span className="apiNumberCheck-browseLabel">Browse</span>
+          </div>
+        </div>
+      )}
       <div className="apiNumberCheck-csvInfo">
         <span className="apiNumberCheck-mutedLink">CSV column: PhoneNumber</span>
         <button

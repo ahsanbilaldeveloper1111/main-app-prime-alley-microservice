@@ -45,16 +45,13 @@ export function CheckNumberBulkUploadModal(
             Upload a CSV file with phone numbers (one per line)
           </p>
 
-          <div
-            className={`checkNumberPage-dropzone border-2 rounded p-4 text-center ${
-              vm.bulkFile
-                ? "checkNumberPage-dropzone--hasFile"
-                : "checkNumberPage-dropzone--empty"
-            }`}
-            onDrop={vm.handleFileDrop}
-            onDragOver={vm.handleDragOver}
-          >
-            {vm.bulkFile ? (
+          {vm.bulkFile ? (
+            <section
+              className="checkNumberPage-dropzone border-2 rounded p-4 text-center checkNumberPage-dropzone--hasFile"
+              aria-label={`CSV file loaded: ${vm.bulkFile.name}`}
+              onDrop={vm.handleFileDrop}
+              onDragOver={vm.handleDragOver}
+            >
               <div>
                 <i className="fas fa-file-csv text-success fa-2x mb-2" />
                 <p className="mb-1">
@@ -69,29 +66,34 @@ export function CheckNumberBulkUploadModal(
                   Remove File
                 </Button>
               </div>
-            ) : (
-              <div>
+            </section>
+          ) : (
+            <div className="checkNumberPage-dropzone border-2 rounded p-4 text-center checkNumberPage-dropzone--empty">
+              <Form.Control
+                ref={vm.bulkFileInputRef}
+                type="file"
+                accept=".csv"
+                onChange={vm.handleFileSelect}
+                onDragOver={vm.handleDragOver}
+                onDrop={vm.handleFileDrop}
+                className="checkNumberPage-fileInputOverlay"
+                id="bulk-file-input"
+              />
+              <div className="checkNumberPage-dropzoneFace" aria-hidden="true">
                 <i className="fas fa-cloud-upload-alt text-muted fa-2x mb-2" />
                 <p className="mb-1">Drag and drop your CSV file here</p>
                 <p className="text-muted mb-2">or</p>
-                <Form.Control
-                  ref={vm.bulkFileInputRef}
-                  type="file"
-                  accept=".csv"
-                  onChange={vm.handleFileSelect}
-                  className="checkNumberPage-fileInputHidden"
-                  id="bulk-file-input"
-                />
-                <Button
-                  variant="outline-primary"
-                  size="sm"
-                  onClick={vm.openBulkFilePicker}
-                >
-                  Browse File
-                </Button>
               </div>
-            )}
-          </div>
+              <Button
+                variant="outline-primary"
+                size="sm"
+                className="checkNumberPage-browseBtn"
+                onClick={vm.openBulkFilePicker}
+              >
+                Browse File
+              </Button>
+            </div>
+          )}
         </div>
       </Modal.Body>
       <Modal.Footer>
@@ -102,8 +104,12 @@ export function CheckNumberBulkUploadModal(
               size="sm"
               onClick={vm.downloadSampleFile}
             >
-              <i className="fas fa-download me-2" />
-              Download Sample File
+              <span className="d-inline-flex align-items-center gap-2">
+                <span aria-hidden="true">
+                  <i className="fas fa-download" />
+                </span>
+                <span>Download Sample File</span>
+              </span>
             </Button>
           </div>
           <div>
@@ -120,14 +126,17 @@ export function CheckNumberBulkUploadModal(
               disabled={!vm.bulkFile || vm.isUploading}
             >
               {vm.isUploading ? (
-                <>
+                <output
+                  className="d-inline-flex align-items-center gap-2 mb-0 align-middle border-0 p-0 bg-transparent"
+                  aria-live="polite"
+                  aria-label="Uploading"
+                >
                   <span
-                    className="spinner-border spinner-border-sm me-2"
-                    role="status"
+                    className="spinner-border spinner-border-sm"
                     aria-hidden="true"
                   />
-                  Uploading...
-                </>
+                  <span>Uploading...</span>
+                </output>
               ) : (
                 "Upload & Check Numbers"
               )}

@@ -60,7 +60,9 @@ export function LocalDndCallBlockBulkAddModal(
               type="file"
               accept=".csv"
               onChange={(e) => {
-                void vm.handleFileSelect(e);
+                void vm.handleFileSelect(
+                  e as React.ChangeEvent<HTMLInputElement>,
+                );
               }}
               disabled={vm.bulkSubmitting}
             />
@@ -99,13 +101,17 @@ export function LocalDndCallBlockBulkAddModal(
           className="localDndCallBlockPage-modalSubmit"
         >
           {vm.bulkSubmitting ? (
-            <>
-              <div
-                className="spinner-border spinner-border-sm me-2"
-                role="status"
+            <output
+              className="d-inline-flex align-items-center gap-2 mb-0 align-middle border-0 p-0 bg-transparent"
+              aria-live="polite"
+              aria-label="Uploading"
+            >
+              <span
+                className="spinner-border spinner-border-sm"
+                aria-hidden="true"
               />
-              Uploading...
-            </>
+              <span>Uploading...</span>
+            </output>
           ) : (
             "Upload & Add Records"
           )}

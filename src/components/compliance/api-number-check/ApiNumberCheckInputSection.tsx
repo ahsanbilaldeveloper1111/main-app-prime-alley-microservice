@@ -30,9 +30,9 @@ export interface ApiNumberCheckInputSectionProps {
   csvValidCount: number;
   csvInvalidCount: number;
   handleFileUpload: (e: ChangeEvent<HTMLInputElement>) => void;
-  handleDragOver: (e: DragEvent<HTMLDivElement>) => void;
-  handleDrop: (e: DragEvent<HTMLDivElement>) => void;
-  handleDropzoneKeyDown: (e: KeyboardEvent<HTMLDivElement>) => void;
+  handleDragOver: (e: DragEvent<HTMLElement>) => void;
+  handleDrop: (e: DragEvent<HTMLElement>) => void;
+  handleDropzoneKeyDown: (e: KeyboardEvent<HTMLElement>) => void;
   onRemoveCsvFile: () => void;
   downloadSampleFile: () => void;
   handleBulkUpload: () => void;

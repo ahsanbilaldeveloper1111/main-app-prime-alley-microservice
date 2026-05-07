@@ -23,12 +23,12 @@ export interface BulkCheckResultValue {
 }
 
 export function isValidPhoneCharacter(char: string): boolean {
-  const phoneRegex = /[\d\s\-\+\(\)]/;
+  const phoneRegex = /[\d\s()+-]/;
   return phoneRegex.test(char);
 }
 
 export function isValidPhoneInput(value: string): boolean {
-  const phoneRegex = /^[\d\s\-\+\(\)]+$/;
+  const phoneRegex = /^[\d\s()+-]+$/;
   return phoneRegex.test(value);
 }
 

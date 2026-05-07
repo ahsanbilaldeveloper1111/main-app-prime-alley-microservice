@@ -184,7 +184,7 @@
 
   &-btnPrimary {
     padding: 8px 20px;
-    background-color: #4a9eff;
+    background-color: #2176d9;
     color: #ffffff;
     border: none;
     border-radius: 6px;
@@ -201,7 +201,7 @@
 
   &-btnPrimaryLarge {
     padding: 10px 24px;
-    background-color: #4a9eff;
+    background-color: #2176d9;
     color: #ffffff;
     border: none;
     border-radius: 6px;
@@ -265,6 +265,25 @@
       border-color: #28a745;
       background-color: #f0f9ff;
     }
+
+    &--empty {
+      position: relative;
+    }
+  }
+
+  &-dropzoneFace {
+    pointer-events: none;
+  }
+
+  &-fileInputOverlay {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    opacity: 0;
+    cursor: pointer;
+    font-size: 0;
+    z-index: 2;
   }
 
   &-dropzoneInner {
@@ -272,6 +291,7 @@
   }
 
   &-dropzoneText {
+    display: block;
     color: #6c757d;
     font-size: 14px;
     margin-bottom: 12px;
@@ -372,7 +392,7 @@
   &-statusBadgeDisabled {
     padding: 6px 12px;
     background-color: #e9ecef;
-    color: #6c757d;
+    color: #495057;
     border-radius: 6px;
     font-size: 13px;
     display: flex;
@@ -410,7 +430,7 @@
 
     &--invalid {
       background-color: #c4c4c4;
-      color: gray;
+      color: #212529;
       border-color: #c4c4c4;
     }
 

@@ -18,7 +18,7 @@ export function ApiNumberCheckManualTab({
   isChecking,
   onCheck,
   onClear,
-}: ApiNumberCheckManualTabProps): React.ReactElement {
+}: Readonly<ApiNumberCheckManualTabProps>): React.ReactElement {
   return (
     <div className="apiNumberCheck-manualTab">
       <textarea

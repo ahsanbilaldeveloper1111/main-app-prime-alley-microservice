@@ -29,7 +29,7 @@ export function ApiNumberCheckStatusBar({
   showDownloadResults,
   onDownloadResults,
   disableBulkSubmit,
-}: ApiNumberCheckStatusBarProps): React.ReactElement {
+}: Readonly<ApiNumberCheckStatusBarProps>): React.ReactElement {
   return (
     <div className="apiNumberCheck-statusBar">
       <div className="apiNumberCheck-statusLeft">

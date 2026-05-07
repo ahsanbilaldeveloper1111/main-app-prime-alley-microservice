@@ -52,8 +52,8 @@ export interface CheckNumberPageViewModel {
   setBulkFile: (f: File | null) => void;
   isUploading: boolean;
   handleBulkUpload: () => Promise<void>;
-  handleFileDrop: (e: DragEvent<HTMLDivElement>) => void;
-  handleDragOver: (e: DragEvent<HTMLDivElement>) => void;
+  handleFileDrop: (e: DragEvent<HTMLElement>) => void;
+  handleDragOver: (e: DragEvent<HTMLElement>) => void;
   handleFileSelect: (e: ChangeEvent<HTMLInputElement>) => void;
   bulkFileInputRef: React.RefObject<HTMLInputElement | null>;
   openBulkFilePicker: () => void;
@@ -173,7 +173,7 @@ export function useCheckNumberPage(): CheckNumberPageViewModel {
   }, [bulkFile]);
 
   const handleFileDrop = useCallback(
-    (e: DragEvent<HTMLDivElement>) => {
+    (e: DragEvent<HTMLElement>) => {
       e.preventDefault();
       const files = e.dataTransfer.files;
       if (files.length === 0) return;
@@ -182,7 +182,7 @@ export function useCheckNumberPage(): CheckNumberPageViewModel {
     [applyValidatedBulkFile],
   );
 
-  const handleDragOver = useCallback((e: DragEvent<HTMLDivElement>) => {
+  const handleDragOver = useCallback((e: DragEvent<HTMLElement>) => {
     e.preventDefault();
   }, []);
 
@@ -205,8 +205,9 @@ export function useCheckNumberPage(): CheckNumberPageViewModel {
 
   const onPhoneKeyPress = useCallback(
     (e: React.KeyboardEvent<HTMLInputElement>) => {
-      const char = String.fromCharCode(e.which);
-      if (!isValidPhoneCharacter(char)) {
+      const { key } = e;
+      if (key.length !== 1) return;
+      if (!isValidPhoneCharacter(key)) {
         e.preventDefault();
       }
     },

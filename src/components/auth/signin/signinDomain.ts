@@ -9,7 +9,7 @@ export function composeSigninEmail(usernameRaw: string): string {
  */
 export function normalizeSigninUsername(value: string): string {
   const atIndex = value.indexOf("@");
-  return atIndex === -1 ? value.replace(/@/g, "") : value.slice(0, atIndex);
+  return atIndex === -1 ? value.replaceAll("@", "") : value.slice(0, atIndex);
 }
 
 export const SIGNIN_DEFAULT_REDIRECT = "/dashboard";

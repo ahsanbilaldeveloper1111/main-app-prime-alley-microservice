@@ -153,7 +153,7 @@ export function useLocalDndCallBlockPage(): LocalDndCallBlockViewModel {
   }
 
   const invalidateLocalDndLists = useCallback(() => {
-    void queryClient.invalidateQueries({
+    queryClient.invalidateQueries({
       queryKey: complianceKeys.localDndBlocks.all(),
     });
   }, [queryClient]);

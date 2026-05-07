@@ -80,6 +80,7 @@ $sales-dashboard-text: #141414;
   }
 
   &__nav-tab {
+    font: inherit;
     font-weight: 400;
     font-size: 14px;
     color: $sales-dashboard-text;
@@ -91,7 +92,6 @@ $sales-dashboard-text: #141414;
     text-decoration: none;
     display: block;
     background: none;
-    font: inherit;
     box-shadow: none;
     flex-shrink: 0;
 
@@ -178,18 +178,18 @@ $sales-dashboard-text: #141414;
   }
 
   &__view-all-link {
+    font: inherit;
     font-size: 13px;
+    font-weight: 400;
     color: $sales-dashboard-teal;
     text-decoration: none;
     display: flex;
     align-items: center;
     gap: 3px;
     cursor: pointer;
-    font-weight: 400;
     border: none;
     background: none;
     padding: 0;
-    font: inherit;
   }
 
   &__task-filters {
