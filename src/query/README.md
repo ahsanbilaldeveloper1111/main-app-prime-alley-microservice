@@ -37,7 +37,14 @@
 ## Communications pilot
 
 - **Call logs**: list fetch uses `useQuery` + `communicationsKeys.callLogs.list(...)`; Redux still holds filters, pagination UX, and table data via `hydrateCallLogsFetchResult` on success (transitional).
+- **Call recordings**: list fetch uses `useQuery` + `communicationsKeys.callRecordings.list(...)` with `fetchCallRecordingsListPayload`; Redux still holds filters, pagination, charts/table via `hydrateCallRecordingsFetchResult` on success (transitional). Export uses `useMutation` + invalidation of `communicationsKeys.callRecordings.all()`.
 - **Campaign manager**: Finesse campaigns list uses `useQuery` + `communicationsKeys.finesse.campaigns`; STOMP `onStompConnected` invalidates `communicationsKeys.finesse.all()` to resync after transport readiness.
+
+## Compliance (DNCR)
+
+- **CDR records** (`/compliance/cdr-records`): list uses `useQuery` + `complianceKeys.cdr.list({ page, perPage, filtersKey })` with `fetchComplianceCdrList` in `src/query/fetchComplianceCdrList.ts`. `filtersKey` is `JSON.stringify(appliedFilters)`.
+- **Local DND blocks** (`/compliance/add-records`, `/compliance/local-dnd-call-block`): list uses `useQuery` + `complianceKeys.localDndBlocks.list({ variant, page, perPage, search, company })` and shared invalidation via `complianceKeys.localDndBlocks.all()` after add / delete / bulk operations (`invalidateQueries`).
+- **Check-number flows** (`api-number-check`, `check-number`): remain imperative POST helpers (`CheckNumber`, `BulkCheckNumber`); candidates for `useMutation` later if you want centralized pending/error state.
 
 ## Redux migration strategy (backlog)
 

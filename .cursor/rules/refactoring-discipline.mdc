@@ -28,6 +28,8 @@ alwaysApply: false
 ## Structure: components and hooks
 - **Helper / presentational UI** that is reused or clutters a page belongs under **`src/components/`** with domain-first paths (e.g. `src/components/planner/...`, `src/components/communications/...`), co-located SCSS/types where the module already does.
 - **Reusable stateful logic** (pagination, filters, derived data, subscription setup) belongs in **`src/hooks/`** (or domain `use*.ts` next to the feature when the codebase already does)—not buried inside giant page files.
+- **Split large UI blocks**: pages should not carry multi-hundred-line JSX trees for a single feature. Extract **tab panels, modals, tables/results shells, and-status bars** into co-located components (same feature folder) so each file stays readable and Sonar complexity stays down.
+- **Reduce inline `style={...}`**: prefer **SCSS** (or the project’s existing pattern) with meaningful class names. Reserve inline styles for truly dynamic values that cannot be expressed with classes, or merge them into the stylesheet with modifiers (e.g. BEM `--active`, `--disabled`).
 
 ## Memory leaks and rerenders
 - **Subscriptions**: always return cleanup from `useEffect` (listeners, timers, `EventSource`/SSE wrappers, observers). Avoid orphaned globals.

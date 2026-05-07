@@ -1,0 +1,26 @@
+/* Compliance — Check Number on DNCR */
+.checkNumberPage {
+  &-dropzone {
+    border-style: dashed;
+    border-width: 2px;
+    cursor: pointer;
+    min-height: 120px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+  }
+
+  &-dropzone--empty {
+    border-color: var(--bs-secondary);
+  }
+
+  &-dropzone--hasFile {
+    border-color: var(--bs-success);
+    background-color: var(--bs-light);
+  }
+
+  &-fileInputHidden {
+    display: none;
+  }
+}

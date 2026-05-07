@@ -1,0 +1,538 @@
+/* API Number Check — feature-scoped layout (page wrapper sets root class). */
+.apiNumberCheck {
+  &-container {
+    background-color: #f8f9fa;
+  }
+
+  &-inner {
+    max-width: 1400px;
+    margin: 0 auto;
+  }
+
+  &-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 24px;
+    flex-wrap: wrap;
+    gap: 16px;
+  }
+
+  &-title {
+    color: #212529;
+    font-size: 28px;
+    font-weight: 500;
+    margin: 0;
+  }
+
+  &-formatGuideBtn {
+    color: #4a9eff;
+    text-decoration: none;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 0;
+  }
+
+  &-card {
+    background-color: #ffffff;
+    border-radius: 8px;
+    margin-bottom: 24px;
+    overflow: hidden;
+    border: 1px solid #dee2e6;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  }
+
+  &-cardHeader {
+    padding: 20px 24px;
+    border-bottom: 1px solid #dee2e6;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 16px;
+    background-color: #f8f9fa;
+  }
+
+  &-sectionTitle {
+    display: flex;
+    align-items: center;
+    color: #212529;
+    font-size: 16px;
+    font-weight: 500;
+  }
+
+  &-iconBadge {
+    width: 32px;
+    height: 32px;
+    border-radius: 6px;
+    background-color: #e9ecef;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-right: 12px;
+  }
+
+  &-resultStats {
+    display: flex;
+    gap: 24px;
+    font-size: 14px;
+    color: #6c757d;
+    flex-wrap: wrap;
+  }
+
+  &-statItem {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+
+    &--permitted {
+      color: #28a745;
+    }
+
+    &--denied {
+      color: #dc3545;
+    }
+
+    &--invalid {
+      color: #856404;
+    }
+  }
+
+  &-cardBody {
+    padding: 24px;
+  }
+
+  &-tabsContainer {
+    margin-bottom: 20px;
+  }
+
+  &-tabs {
+    display: flex;
+    gap: 8px;
+    border-bottom: 1px solid #dee2e6;
+  }
+
+  &-tab {
+    padding: 12px 20px;
+    background-color: transparent;
+    border: none;
+    color: #6c757d;
+    font-size: 14px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    border-bottom: 2px solid transparent;
+    transition: all 0.2s;
+
+    &--active {
+      color: #4a9eff;
+      border-bottom-color: #4a9eff;
+      font-weight: 500;
+    }
+  }
+
+  &-tabIcon {
+    margin-right: 6px;
+  }
+
+  &-tabContent {
+    margin-top: 20px;
+  }
+
+  &-manualTab {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  &-textarea {
+    width: 100%;
+    min-height: 120px;
+    padding: 12px;
+    background-color: #ffffff;
+    border: 1px solid #dee2e6;
+    border-radius: 6px;
+    color: #212529;
+    font-size: 14px;
+    resize: vertical;
+    font-family: inherit;
+    box-sizing: border-box;
+  }
+
+  &-manualFooter {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+
+  &-hint {
+    font-size: 13px;
+    color: #6c757d;
+  }
+
+  &-manualButtons {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+
+  &-btnPrimary {
+    padding: 8px 20px;
+    background-color: #4a9eff;
+    color: #ffffff;
+    border: none;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background-color 0.2s;
+
+    &:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+  }
+
+  &-btnPrimaryLarge {
+    padding: 10px 24px;
+    background-color: #4a9eff;
+    color: #ffffff;
+    border: none;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background-color 0.2s;
+
+    &:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+  }
+
+  &-btnSecondary {
+    padding: 8px 20px;
+    background-color: transparent;
+    color: #6c757d;
+    border: 1px solid #dee2e6;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  &-btnSecondarySm {
+    margin-top: 8px;
+    padding: 6px 16px;
+    font-size: 12px;
+  }
+
+  &-btnOutline {
+    padding: 10px 24px;
+    background-color: transparent;
+    color: #6c757d;
+    border: 1px solid #dee2e6;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  &-csvTab {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  &-dropzone {
+    border: 2px dashed #dee2e6;
+    border-radius: 8px;
+    padding: 48px;
+    text-align: center;
+    background-color: #f8f9fa;
+    cursor: pointer;
+    transition: border-color 0.2s;
+
+    &--hasFile {
+      border-color: #28a745;
+      background-color: #f0f9ff;
+    }
+  }
+
+  &-dropzoneInner {
+    text-align: center;
+  }
+
+  &-dropzoneText {
+    color: #6c757d;
+    font-size: 14px;
+    margin-bottom: 12px;
+
+    &--success {
+      color: #28a745;
+      font-weight: 500;
+    }
+
+    &--meta {
+      font-size: 12px;
+    }
+  }
+
+  &-dropzoneIcon {
+    margin-bottom: 12px;
+  }
+
+  &-fileInput {
+    display: none;
+  }
+
+  &-browseLabel {
+    color: #4a9eff;
+    cursor: pointer;
+    font-size: 14px;
+    text-decoration: underline;
+  }
+
+  &-csvInfo {
+    display: flex;
+    gap: 16px;
+    font-size: 13px;
+    flex-wrap: wrap;
+  }
+
+  &-mutedLink {
+    color: #4a9eff;
+    text-decoration: none;
+  }
+
+  &-textLinkBtn {
+    color: #4a9eff;
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 0;
+    text-decoration: underline;
+    font-size: inherit;
+    font-family: inherit;
+  }
+
+  &-statusBar {
+    margin-top: 20px;
+    padding: 16px;
+    background-color: #f8f9fa;
+    border-radius: 6px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 12px;
+    border: 1px solid #dee2e6;
+  }
+
+  &-statusRow {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  &-statusLeft {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+
+  &-statusRight {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+
+  &-statusBadgeSuccess {
+    padding: 6px 12px;
+    background-color: #d4edda;
+    color: #155724;
+    border-radius: 6px;
+    font-size: 13px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    border: 1px solid #c3e6cb;
+  }
+
+  &-statusBadgeDisabled {
+    padding: 6px 12px;
+    background-color: #e9ecef;
+    color: #6c757d;
+    border-radius: 6px;
+    font-size: 13px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    border: 1px solid #dee2e6;
+  }
+
+  &-statusBadgeError {
+    padding: 6px 12px;
+    background-color: #f8d7da;
+    color: #721c24;
+    border-radius: 6px;
+    font-size: 13px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    border: 1px solid #dee2e6;
+  }
+
+  &-emptyResults {
+    text-align: center;
+    padding: 40px;
+    color: #6c757d;
+  }
+
+  /* DNCR status badge (table / results) */
+  &-dncrBadge {
+    padding: 4px 12px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 500;
+    border: 1px solid transparent;
+    display: inline-block;
+
+    &--invalid {
+      background-color: #c4c4c4;
+      color: gray;
+      border-color: #c4c4c4;
+    }
+
+    &--denied {
+      background-color: #f8d7da;
+      color: #721c24;
+      border-color: #f5c6cb;
+    }
+
+    &--permitted {
+      background-color: #d4edda;
+      color: #155724;
+      border-color: #c3e6cb;
+    }
+  }
+
+  /* Format guide modal */
+  &-modalTitle {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  &-modalBody {
+    padding: 24px;
+  }
+
+  &-modalStack {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+  }
+
+  &-guideBlockTitle {
+    margin-bottom: 12px;
+    color: #212529;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  &-guidePanel {
+    background-color: #f8f9fa;
+    padding: 16px;
+    border-radius: 8px;
+    border: 1px solid #dee2e6;
+  }
+
+  &-guideList {
+    margin: 0;
+    padding-left: 20px;
+    color: #495057;
+    line-height: 1.8;
+  }
+
+  &-guideExample {
+    margin-top: 12px;
+    padding: 12px;
+    background-color: #ffffff;
+    border-radius: 4px;
+    border: 1px solid #dee2e6;
+  }
+
+  &-guideExampleLabel {
+    color: #212529;
+    display: block;
+    margin-bottom: 8px;
+  }
+
+  &-guideCode {
+    color: #0d6efd;
+    font-size: 14px;
+  }
+
+  &-guideCodeBlock {
+    color: #0d6efd;
+    font-size: 14px;
+    display: block;
+    white-space: pre;
+  }
+
+  &-guideWarning {
+    background-color: #fff3cd;
+    padding: 16px;
+    border-radius: 8px;
+    border: 1px solid #ffc107;
+  }
+
+  &-guideWarningTitle {
+    margin-bottom: 8px;
+    color: #856404;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  &-guideWarningText {
+    margin: 0;
+    color: #856404;
+    font-size: 14px;
+    line-height: 1.6;
+  }
+
+  &-modalCloseBtn {
+    padding: 8px 16px;
+    background-color: #6c757d;
+    color: #ffffff;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+  }
+
+  &-inlineIconSm {
+    margin-right: 4px;
+    display: inline;
+    vertical-align: middle;
+  }
+
+  &-downloadIcon {
+    margin-right: 6px;
+    display: inline;
+    vertical-align: middle;
+  }
+}
