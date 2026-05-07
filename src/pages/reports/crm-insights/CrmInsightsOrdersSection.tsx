@@ -1,5 +1,5 @@
 import React, { useMemo } from "react";
-import { Row, Col, Card } from "react-bootstrap";
+import { Row, Col } from "react-bootstrap";
 import {
   ShoppingBag,
   Clock,
@@ -33,6 +33,12 @@ import {
   formatAedAvgCompact,
   formatAedTotalCompact,
 } from "./crmInsightsDomain";
+import {
+  CrmInsightsKpiCard,
+  CrmInsightsLoadingSpinner,
+  CrmInsightsReportPanel,
+  CrmInsightsResponsiveKpiSlot,
+} from "./crmInsightsUi";
 
 export type CrmInsightsOrdersSectionProps = Readonly<{
   orderLoading: boolean;
@@ -69,30 +75,6 @@ function ordersRevenueTooltipFormatter(
   return [value, "Orders"];
 }
 
-const spinner380 = (
-  <div className="d-flex justify-content-center align-items-center" style={{ height: "380px" }}>
-    <div className="spinner-border spinner-border-sm">
-      <span className="visually-hidden">Loading...</span>
-    </div>
-  </div>
-);
-
-const spinner340 = (
-  <div className="d-flex justify-content-center align-items-center" style={{ height: "340px" }}>
-    <div className="spinner-border spinner-border-sm">
-      <span className="visually-hidden">Loading...</span>
-    </div>
-  </div>
-);
-
-const spinner300 = (
-  <div className="d-flex justify-content-center align-items-center" style={{ height: "300px" }}>
-    <div className="spinner-border spinner-border-sm">
-      <span className="visually-hidden">Loading...</span>
-    </div>
-  </div>
-);
-
 type OrdersMonthChartSeries = ReturnType<typeof aggregateOrderRevenueByMonthChartPoints>;
 
 function renderOrdersRevenueByMonthSection(
@@ -101,7 +83,7 @@ function renderOrdersRevenueByMonthSection(
   revenueChartData: OrdersMonthChartSeries,
 ): React.ReactNode {
   if (orderLoading) {
-    return spinner380;
+    return <CrmInsightsLoadingSpinner height={380} />;
   }
   if (revenueByMonthRows && revenueByMonthRows.length > 0) {
     return (
@@ -250,7 +232,7 @@ function renderOrdersRevenueByOwnerSection(
   getUserDisplayName: (extension: string | number) => string,
 ): React.ReactNode {
   if (orderLoading) {
-    return spinner340;
+    return <CrmInsightsLoadingSpinner height={340} />;
   }
   if (revenueByOwnerRows && revenueByOwnerRows.length > 0) {
     return (
@@ -364,7 +346,7 @@ function renderOrdersStageDurationSection(
   orderStageDuration: OrderStageDurationReport[],
 ): React.ReactNode {
   if (orderLoading) {
-    return spinner340;
+    return <CrmInsightsLoadingSpinner height={340} />;
   }
   if (orderStageDuration.length > 0) {
     return (
@@ -498,7 +480,7 @@ function renderOrdersCancellationsSection(
 ): React.ReactNode {
   const cancelColors = CRM_INSIGHTS_CANCELLATION_COLORS;
   if (orderLoading) {
-    return spinner300;
+    return <CrmInsightsLoadingSpinner height={300} />;
   }
   if (orderCancellations.length > 0) {
     return (
@@ -709,6 +691,15 @@ export function CrmInsightsOrdersSection({
     orderCancellations,
   );
 
+  const orderKpiDesktopCol = {
+    xs: 12,
+    sm: 6,
+    md: 4,
+    lg: 3,
+    style: { flex: "0 0 auto" as const, width: "20%" },
+  };
+  const orderKpiMobileCol = { xs: 12, sm: 6, md: 4 };
+
   return (
     <div style={{ padding: "0 32px 24px", background: "#f8f9fa" }}>
       <div style={{ marginBottom: "24px" }}>
@@ -716,317 +707,92 @@ export function CrmInsightsOrdersSection({
           Order Overview
         </h6>
         <Row className="g-3">
-          <Col xs={12} sm={6} md={4} lg={3} style={{ flex: "0 0 auto", width: "20%" }} className="d-none d-lg-block">
-            <Card className="border-0 shadow-sm">
-              <Card.Body>
-                <div className="d-flex align-items-end justify-content-between mb-3">
-                  <div style={{ color: "#f59e0b" }}>
-                    <ShoppingBag size={16} />
-                  </div>
-                  <div className="text-end">
-                    <p
-                      className="text-muted text-uppercase small mb-1"
-                      style={{ fontSize: "0.75rem", fontWeight: 500 }}
-                    >
-                      TOTAL ORDERS
-                    </p>
-                  </div>
-                </div>
-                <h2 className="mb-2 fw-bold text-end" style={{ fontSize: "1.75rem" }}>
-                  {orderSummary?.total_orders?.toLocaleString() || 0}
-                </h2>
-                <div className="d-flex align-items-center justify-content-end mt-2" style={{ minHeight: "20px" }} />
-              </Card.Body>
-            </Card>
-          </Col>
-          <Col xs={12} sm={6} md={4} className="d-lg-none">
-            <Card className="border-0 shadow-sm">
-              <Card.Body>
-                <div className="d-flex align-items-end justify-content-between mb-3">
-                  <div style={{ color: "#f59e0b" }}>
-                    <ShoppingBag size={16} />
-                  </div>
-                  <div className="text-end">
-                    <p
-                      className="text-muted text-uppercase small mb-1"
-                      style={{ fontSize: "0.75rem", fontWeight: 500 }}
-                    >
-                      TOTAL ORDERS
-                    </p>
-                  </div>
-                </div>
-                <h2 className="mb-2 fw-bold text-end" style={{ fontSize: "1.75rem" }}>
-                  {orderSummary?.total_orders?.toLocaleString() || 0}
-                </h2>
-                <div className="d-flex align-items-center justify-content-end mt-2" style={{ minHeight: "20px" }} />
-              </Card.Body>
-            </Card>
-          </Col>
-
-          <Col xs={12} sm={6} md={4} lg={3} style={{ flex: "0 0 auto", width: "20%" }} className="d-none d-lg-block">
-            <Card className="border-0 shadow-sm">
-              <Card.Body>
-                <div className="d-flex align-items-end justify-content-between mb-3">
-                  <div style={{ color: "#3b82f6" }}>
-                    <Clock size={16} />
-                  </div>
-                  <div className="text-end">
-                    <p
-                      className="text-muted text-uppercase small mb-1"
-                      style={{ fontSize: "0.75rem", fontWeight: 500 }}
-                    >
-                      PENDING
-                    </p>
-                  </div>
-                </div>
-                <h2 className="mb-2 fw-bold text-end" style={{ fontSize: "1.75rem" }}>
-                  {pendingCount}
-                </h2>
-                <div className="d-flex align-items-center justify-content-end mt-2">
+          <CrmInsightsResponsiveKpiSlot
+            desktopCol={orderKpiDesktopCol}
+            mobileCol={orderKpiMobileCol}
+            renderContent={() => (
+              <CrmInsightsKpiCard
+                iconColor="#f59e0b"
+                icon={<ShoppingBag size={16} />}
+                label="TOTAL ORDERS"
+                value={orderSummary?.total_orders?.toLocaleString() || 0}
+              />
+            )}
+          />
+          <CrmInsightsResponsiveKpiSlot
+            desktopCol={orderKpiDesktopCol}
+            mobileCol={orderKpiMobileCol}
+            renderContent={() => (
+              <CrmInsightsKpiCard
+                iconColor="#3b82f6"
+                icon={<Clock size={16} />}
+                label="PENDING"
+                value={pendingCount}
+                footer={
                   <span className="text-muted small" style={{ fontSize: "0.8rem" }}>
                     {pendingPercentLabel}
                   </span>
-                </div>
-              </Card.Body>
-            </Card>
-          </Col>
-          <Col xs={12} sm={6} md={4} className="d-lg-none">
-            <Card className="border-0 shadow-sm">
-              <Card.Body>
-                <div className="d-flex align-items-end justify-content-between mb-3">
-                  <div style={{ color: "#3b82f6" }}>
-                    <Clock size={16} />
-                  </div>
-                  <div className="text-end">
-                    <p
-                      className="text-muted text-uppercase small mb-1"
-                      style={{ fontSize: "0.75rem", fontWeight: 500 }}
-                    >
-                      PENDING
-                    </p>
-                  </div>
-                </div>
-                <h2 className="mb-2 fw-bold text-end" style={{ fontSize: "1.75rem" }}>
-                  {pendingCount}
-                </h2>
-                <div className="d-flex align-items-center justify-content-end mt-2">
-                  <span className="text-muted small" style={{ fontSize: "0.8rem" }}>
-                    {pendingPercentLabel}
-                  </span>
-                </div>
-              </Card.Body>
-            </Card>
-          </Col>
-
-          <Col xs={12} sm={6} md={4} lg={3} style={{ flex: "0 0 auto", width: "20%" }} className="d-none d-lg-block">
-            <Card className="border-0 shadow-sm">
-              <Card.Body>
-                <div className="d-flex align-items-end justify-content-between mb-3">
-                  <div style={{ color: "#10b981" }}>
-                    <CheckCircle size={16} />
-                  </div>
-                  <div className="text-end">
-                    <p
-                      className="text-muted text-uppercase small mb-1"
-                      style={{ fontSize: "0.75rem", fontWeight: 500 }}
-                    >
-                      APPROVED
-                    </p>
-                  </div>
-                </div>
-                <h2 className="mb-2 fw-bold text-end" style={{ fontSize: "1.75rem" }}>
-                  {approvedCount}
-                </h2>
-                <div className="d-flex align-items-center justify-content-end mt-2" style={{ minHeight: "20px" }} />
-              </Card.Body>
-            </Card>
-          </Col>
-          <Col xs={12} sm={6} md={4} className="d-lg-none">
-            <Card className="border-0 shadow-sm">
-              <Card.Body>
-                <div className="d-flex align-items-end justify-content-between mb-3">
-                  <div style={{ color: "#10b981" }}>
-                    <CheckCircle size={16} />
-                  </div>
-                  <div className="text-end">
-                    <p
-                      className="text-muted text-uppercase small mb-1"
-                      style={{ fontSize: "0.75rem", fontWeight: 500 }}
-                    >
-                      APPROVED
-                    </p>
-                  </div>
-                </div>
-                <h2 className="mb-2 fw-bold text-end" style={{ fontSize: "1.75rem" }}>
-                  {approvedCount}
-                </h2>
-                <div className="d-flex align-items-center justify-content-end mt-2" style={{ minHeight: "20px" }} />
-              </Card.Body>
-            </Card>
-          </Col>
-
-          <Col xs={12} sm={6} md={4} lg={3} style={{ flex: "0 0 auto", width: "20%" }} className="d-none d-lg-block">
-            <Card className="border-0 shadow-sm">
-              <Card.Body>
-                <div className="d-flex align-items-end justify-content-between mb-3">
-                  <div style={{ color: "#10b981" }}>
-                    <DollarSign size={16} />
-                  </div>
-                  <div className="text-end">
-                    <p
-                      className="text-muted text-uppercase small mb-1"
-                      style={{ fontSize: "0.75rem", fontWeight: 500 }}
-                    >
-                      TOTAL REVENUE
-                    </p>
-                  </div>
-                </div>
-                <h2 className="mb-2 fw-bold text-end" style={{ fontSize: "1.75rem" }}>
-                  {formatAedTotalCompact(aedTotal)}
-                </h2>
-                <div className="d-flex align-items-center justify-content-end mt-2" style={{ minHeight: "20px" }} />
-              </Card.Body>
-            </Card>
-          </Col>
-          <Col xs={12} sm={6} md={4} className="d-lg-none">
-            <Card className="border-0 shadow-sm">
-              <Card.Body>
-                <div className="d-flex align-items-end justify-content-between mb-3">
-                  <div style={{ color: "#10b981" }}>
-                    <DollarSign size={16} />
-                  </div>
-                  <div className="text-end">
-                    <p
-                      className="text-muted text-uppercase small mb-1"
-                      style={{ fontSize: "0.75rem", fontWeight: 500 }}
-                    >
-                      TOTAL REVENUE
-                    </p>
-                  </div>
-                </div>
-                <h2 className="mb-2 fw-bold text-end" style={{ fontSize: "1.75rem" }}>
-                  {formatAedTotalCompact(aedTotal)}
-                </h2>
-                <div className="d-flex align-items-center justify-content-end mt-2" style={{ minHeight: "20px" }} />
-              </Card.Body>
-            </Card>
-          </Col>
-
-          <Col xs={12} sm={6} md={4} lg={3} style={{ flex: "0 0 auto", width: "20%" }} className="d-none d-lg-block">
-            <Card className="border-0 shadow-sm">
-              <Card.Body>
-                <div className="d-flex align-items-end justify-content-between mb-3">
-                  <div style={{ color: "#8b5cf6" }}>
-                    <Wallet size={16} />
-                  </div>
-                  <div className="text-end">
-                    <p
-                      className="text-muted text-uppercase small mb-1"
-                      style={{ fontSize: "0.75rem", fontWeight: 500 }}
-                    >
-                      AVG ORDER VALUE
-                    </p>
-                  </div>
-                </div>
-                <h2 className="mb-2 fw-bold text-end" style={{ fontSize: "1.75rem" }}>
-                  {formatAedAvgCompact(aedAvg)}
-                </h2>
-                <div className="d-flex align-items-center justify-content-end mt-2" style={{ minHeight: "20px" }} />
-              </Card.Body>
-            </Card>
-          </Col>
-          <Col xs={12} sm={6} md={4} className="d-lg-none">
-            <Card className="border-0 shadow-sm">
-              <Card.Body>
-                <div className="d-flex align-items-end justify-content-between mb-3">
-                  <div style={{ color: "#8b5cf6" }}>
-                    <Wallet size={16} />
-                  </div>
-                  <div className="text-end">
-                    <p
-                      className="text-muted text-uppercase small mb-1"
-                      style={{ fontSize: "0.75rem", fontWeight: 500 }}
-                    >
-                      AVG ORDER VALUE
-                    </p>
-                  </div>
-                </div>
-                <h2 className="mb-2 fw-bold text-end" style={{ fontSize: "1.75rem" }}>
-                  {formatAedAvgCompact(aedAvg)}
-                </h2>
-                <div className="d-flex align-items-center justify-content-end mt-2" style={{ minHeight: "20px" }} />
-              </Card.Body>
-            </Card>
-          </Col>
+                }
+              />
+            )}
+          />
+          <CrmInsightsResponsiveKpiSlot
+            desktopCol={orderKpiDesktopCol}
+            mobileCol={orderKpiMobileCol}
+            renderContent={() => (
+              <CrmInsightsKpiCard
+                iconColor="#10b981"
+                icon={<CheckCircle size={16} />}
+                label="APPROVED"
+                value={approvedCount}
+              />
+            )}
+          />
+          <CrmInsightsResponsiveKpiSlot
+            desktopCol={orderKpiDesktopCol}
+            mobileCol={orderKpiMobileCol}
+            renderContent={() => (
+              <CrmInsightsKpiCard
+                iconColor="#10b981"
+                icon={<DollarSign size={16} />}
+                label="TOTAL REVENUE"
+                value={formatAedTotalCompact(aedTotal)}
+              />
+            )}
+          />
+          <CrmInsightsResponsiveKpiSlot
+            desktopCol={orderKpiDesktopCol}
+            mobileCol={orderKpiMobileCol}
+            renderContent={() => (
+              <CrmInsightsKpiCard
+                iconColor="#8b5cf6"
+                icon={<Wallet size={16} />}
+                label="AVG ORDER VALUE"
+                value={formatAedAvgCompact(aedAvg)}
+              />
+            )}
+          />
         </Row>
       </div>
 
       <Row className="g-3 mb-3">
         <Col lg={12}>
-          <div
-            style={{
-              background: "white",
-              borderRadius: "8px",
-              padding: "20px",
-              border: "1px solid #e5e7eb",
-            }}
-          >
-            <h6 className="mb-3" style={{ fontSize: "15px", fontWeight: 600, color: "#1f2937" }}>
-              Revenue by Month
-            </h6>
-            {revenueByMonthSectionBody}
-          </div>
+          <CrmInsightsReportPanel title="Revenue by Month">{revenueByMonthSectionBody}</CrmInsightsReportPanel>
         </Col>
       </Row>
 
       <Row className="g-3 mb-3">
         <Col lg={6}>
-          <div
-            style={{
-              background: "white",
-              borderRadius: "8px",
-              padding: "20px",
-              border: "1px solid #e5e7eb",
-            }}
-          >
-            <h6 className="mb-3" style={{ fontSize: "15px", fontWeight: 600, color: "#1f2937" }}>
-              Revenue by Owner
-            </h6>
-            {revenueByOwnerSectionBody}
-          </div>
+          <CrmInsightsReportPanel title="Revenue by Owner">{revenueByOwnerSectionBody}</CrmInsightsReportPanel>
         </Col>
         <Col lg={6}>
-          <div
-            style={{
-              background: "white",
-              borderRadius: "8px",
-              padding: "20px",
-              border: "1px solid #e5e7eb",
-            }}
-          >
-            <h6 className="mb-3" style={{ fontSize: "15px", fontWeight: 600, color: "#1f2937" }}>
-              Stage Duration
-            </h6>
-            {stageDurationSectionBody}
-          </div>
+          <CrmInsightsReportPanel title="Stage Duration">{stageDurationSectionBody}</CrmInsightsReportPanel>
         </Col>
       </Row>
 
       <Row className="g-3 mb-3">
         <Col lg={12}>
-          <div
-            style={{
-              background: "white",
-              borderRadius: "8px",
-              padding: "20px",
-              border: "1px solid #e5e7eb",
-            }}
-          >
-            <h6 className="mb-3" style={{ fontSize: "15px", fontWeight: 600, color: "#1f2937" }}>
-              Cancellations
-            </h6>
-            {cancellationsSectionBody}
-          </div>
+          <CrmInsightsReportPanel title="Cancellations">{cancellationsSectionBody}</CrmInsightsReportPanel>
         </Col>
       </Row>
     </div>

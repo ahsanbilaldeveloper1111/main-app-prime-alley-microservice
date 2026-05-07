@@ -20,6 +20,7 @@ import {
   buildLeadConversionTableRows,
   CRM_INSIGHTS_PIE_COLORS_LEAD_SOURCE,
 } from "./crmInsightsDomain";
+import { CrmInsightsLoadingSpinner, CrmInsightsReportPanel } from "./crmInsightsUi";
 
 export type CrmInsightsLeadsSectionProps = Readonly<{
   loading: boolean;
@@ -30,14 +31,6 @@ export type CrmInsightsLeadsSectionProps = Readonly<{
   leadStageDuration: LeadStageDurationReport[];
   getUserDisplayName: (extension: string | number) => string;
 }>;
-
-const loadingSpinner280 = (
-  <div className="d-flex justify-content-center align-items-center" style={{ height: "280px" }}>
-    <div className="spinner-border spinner-border-sm">
-      <span className="visually-hidden">Loading...</span>
-    </div>
-  </div>
-);
 
 export function CrmInsightsLeadsSection({
   loading,
@@ -53,7 +46,7 @@ export function CrmInsightsLeadsSection({
 
   let sourceAnalysisBody: React.ReactNode;
   if (loading) {
-    sourceAnalysisBody = loadingSpinner280;
+    sourceAnalysisBody = <CrmInsightsLoadingSpinner height={280} />;
   } else if (leadSources.length === 0) {
     sourceAnalysisBody = (
       <div
@@ -128,7 +121,7 @@ export function CrmInsightsLeadsSection({
 
   let assignmentReportBody: React.ReactNode;
   if (loading) {
-    assignmentReportBody = loadingSpinner280;
+    assignmentReportBody = <CrmInsightsLoadingSpinner height={280} />;
   } else if (leadAssignments.length === 0) {
     assignmentReportBody = (
       <div
@@ -201,7 +194,7 @@ export function CrmInsightsLeadsSection({
 
   let conversionReportBody: React.ReactNode;
   if (loading) {
-    conversionReportBody = loadingSpinner280;
+    conversionReportBody = <CrmInsightsLoadingSpinner height={280} />;
   } else if (conversionRows.length === 0) {
     conversionReportBody = (
       <div
@@ -317,7 +310,7 @@ export function CrmInsightsLeadsSection({
 
   let stageDurationReportBody: React.ReactNode;
   if (loading) {
-    stageDurationReportBody = loadingSpinner280;
+    stageDurationReportBody = <CrmInsightsLoadingSpinner height={280} />;
   } else if (leadStageDuration.length === 0) {
     stageDurationReportBody = (
       <div
@@ -506,71 +499,25 @@ export function CrmInsightsLeadsSection({
 
       <Row className="g-3 mb-3">
         <Col lg={5}>
-          <div
-            style={{
-              background: "white",
-              borderRadius: "8px",
-              padding: "20px",
-              border: "1px solid #e5e7eb",
-              height: "100%",
-            }}
-          >
-            <h6 className="mb-3" style={{ fontSize: "15px", fontWeight: 600, color: "#1f2937" }}>
-              Lead Source Analysis
-            </h6>
+          <CrmInsightsReportPanel title="Lead Source Analysis" wrapStyle={{ height: "100%" }}>
             {sourceAnalysisBody}
-          </div>
+          </CrmInsightsReportPanel>
         </Col>
 
         <Col lg={7}>
-          <div
-            style={{
-              background: "white",
-              borderRadius: "8px",
-              padding: "20px",
-              border: "1px solid #e5e7eb",
-              height: "100%",
-            }}
-          >
-            <h6 className="mb-3" style={{ fontSize: "15px", fontWeight: 600, color: "#1f2937" }}>
-              Lead Assignment Report
-            </h6>
+          <CrmInsightsReportPanel title="Lead Assignment Report" wrapStyle={{ height: "100%" }}>
             {assignmentReportBody}
-          </div>
+          </CrmInsightsReportPanel>
         </Col>
       </Row>
 
       <Row className="g-3 mb-3">
         <Col lg={6}>
-          <div
-            style={{
-              background: "white",
-              borderRadius: "8px",
-              padding: "20px",
-              border: "1px solid #e5e7eb",
-            }}
-          >
-            <h6 className="mb-3" style={{ fontSize: "15px", fontWeight: 600, color: "#1f2937" }}>
-              Conversion Report by Stage
-            </h6>
-            {conversionReportBody}
-          </div>
+          <CrmInsightsReportPanel title="Conversion Report by Stage">{conversionReportBody}</CrmInsightsReportPanel>
         </Col>
 
         <Col lg={6}>
-          <div
-            style={{
-              background: "white",
-              borderRadius: "8px",
-              padding: "20px",
-              border: "1px solid #e5e7eb",
-            }}
-          >
-            <h6 className="mb-3" style={{ fontSize: "15px", fontWeight: 600, color: "#1f2937" }}>
-              Stage Duration Report
-            </h6>
-            {stageDurationReportBody}
-          </div>
+          <CrmInsightsReportPanel title="Stage Duration Report">{stageDurationReportBody}</CrmInsightsReportPanel>
         </Col>
       </Row>
     </div>

@@ -1,5 +1,5 @@
 import React from "react";
-import { Row, Col, Card } from "react-bootstrap";
+import { Row, Col } from "react-bootstrap";
 import {
   DollarSign,
   Handshake,
@@ -19,6 +19,12 @@ import {
   CRM_INSIGHTS_LOST_REASON_COLORS,
   formatAedTotalCompact,
 } from "./crmInsightsDomain";
+import {
+  CrmInsightsKpiCard,
+  CrmInsightsLoadingSpinner,
+  CrmInsightsReportPanel,
+  CrmInsightsResponsiveKpiSlot,
+} from "./crmInsightsUi";
 
 export type CrmInsightsDealsSectionProps = Readonly<{
   dealLoading: boolean;
@@ -52,13 +58,7 @@ export function CrmInsightsDealsSection({
 
   let funnelReportBody: React.ReactNode;
   if (dealLoading) {
-    funnelReportBody = (
-      <div className="d-flex justify-content-center align-items-center" style={{ height: "340px" }}>
-        <div className="spinner-border spinner-border-sm">
-          <span className="visually-hidden">Loading...</span>
-        </div>
-      </div>
-    );
+    funnelReportBody = <CrmInsightsLoadingSpinner height={340} />;
   } else if (dealFunnel.length > 0) {
     funnelReportBody = (
       <div style={{ maxHeight: "340px", overflowY: "auto" }}>
@@ -198,13 +198,7 @@ export function CrmInsightsDealsSection({
   let dealValueReportBody: React.ReactNode;
   const dealValueRows = dealValue?.by_owner;
   if (dealLoading) {
-    dealValueReportBody = (
-      <div className="d-flex justify-content-center align-items-center" style={{ height: "280px" }}>
-        <div className="spinner-border spinner-border-sm">
-          <span className="visually-hidden">Loading...</span>
-        </div>
-      </div>
-    );
+    dealValueReportBody = <CrmInsightsLoadingSpinner height={280} />;
   } else if (dealValueRows && dealValueRows.length > 0) {
     dealValueReportBody = (
       <div style={{ maxHeight: "280px", overflowY: "auto" }}>
@@ -343,13 +337,7 @@ export function CrmInsightsDealsSection({
 
   let stageDurationReportBody: React.ReactNode;
   if (dealLoading) {
-    stageDurationReportBody = (
-      <div className="d-flex justify-content-center align-items-center" style={{ height: "280px" }}>
-        <div className="spinner-border spinner-border-sm">
-          <span className="visually-hidden">Loading...</span>
-        </div>
-      </div>
-    );
+    stageDurationReportBody = <CrmInsightsLoadingSpinner height={280} />;
   } else if (dealStageDuration.length > 0) {
     stageDurationReportBody = (
       <div style={{ maxHeight: "280px", overflowY: "auto" }}>
@@ -439,13 +427,7 @@ export function CrmInsightsDealsSection({
 
   let lostReasonsReportBody: React.ReactNode;
   if (dealLoading) {
-    lostReasonsReportBody = (
-      <div className="d-flex justify-content-center align-items-center" style={{ height: "300px" }}>
-        <div className="spinner-border spinner-border-sm">
-          <span className="visually-hidden">Loading...</span>
-        </div>
-      </div>
-    );
+    lostReasonsReportBody = <CrmInsightsLoadingSpinner height={300} />;
   } else if (dealLostReasons.length > 0) {
     lostReasonsReportBody = (
       <Row className="g-0">
@@ -610,6 +592,15 @@ export function CrmInsightsDealsSection({
     );
   }
 
+  const dealKpiDesktopCol = {
+    xs: 12,
+    sm: 6,
+    md: 4,
+    lg: 3,
+    style: { flex: "0 0 auto" as const, width: "25%" },
+  };
+  const dealKpiMobileCol = { xs: 12, sm: 6, md: 4 };
+
   return (
     <div style={{ padding: "0 32px 24px", background: "#f8f9fa" }}>
       <div style={{ marginBottom: "24px" }}>
@@ -617,273 +608,81 @@ export function CrmInsightsDealsSection({
           Deal Overview
         </h6>
         <Row className="g-3">
-          <Col xs={12} sm={6} md={4} lg={3} style={{ flex: "0 0 auto", width: "25%" }} className="d-none d-lg-block">
-            <Card className="border-0 shadow-sm">
-              <Card.Body>
-                <div className="d-flex align-items-end justify-content-between mb-3">
-                  <div style={{ color: "#10b981" }}>
-                    <DollarSign size={16} />
-                  </div>
-                  <div className="text-end">
-                    <p
-                      className="text-muted text-uppercase small mb-1"
-                      style={{ fontSize: "0.75rem", fontWeight: 500 }}
-                    >
-                      TOTAL VALUE (AED)
-                    </p>
-                  </div>
-                </div>
-                <h2 className="mb-2 fw-bold text-end" style={{ fontSize: "1.75rem" }}>
-                  <AedTotalCompactHeading dealValue={dealValue} />
-                </h2>
-                <div className="d-flex align-items-center justify-content-end mt-2" style={{ minHeight: "20px" }} />
-              </Card.Body>
-            </Card>
-          </Col>
-          <Col xs={12} sm={6} md={4} className="d-lg-none">
-            <Card className="border-0 shadow-sm">
-              <Card.Body>
-                <div className="d-flex align-items-end justify-content-between mb-3">
-                  <div style={{ color: "#10b981" }}>
-                    <DollarSign size={16} />
-                  </div>
-                  <div className="text-end">
-                    <p
-                      className="text-muted text-uppercase small mb-1"
-                      style={{ fontSize: "0.75rem", fontWeight: 500 }}
-                    >
-                      TOTAL VALUE (AED)
-                    </p>
-                  </div>
-                </div>
-                <h2 className="mb-2 fw-bold text-end" style={{ fontSize: "1.75rem" }}>
-                  <AedTotalCompactHeading dealValue={dealValue} />
-                </h2>
-                <div className="d-flex align-items-center justify-content-end mt-2" style={{ minHeight: "20px" }} />
-              </Card.Body>
-            </Card>
-          </Col>
-
-          <Col xs={12} sm={6} md={4} lg={3} style={{ flex: "0 0 auto", width: "25%" }} className="d-none d-lg-block">
-            <Card className="border-0 shadow-sm">
-              <Card.Body>
-                <div className="d-flex align-items-end justify-content-between mb-3">
-                  <div style={{ color: "#4F46E5" }}>
-                    <Handshake size={16} />
-                  </div>
-                  <div className="text-end">
-                    <p
-                      className="text-muted text-uppercase small mb-1"
-                      style={{ fontSize: "0.75rem", fontWeight: 500 }}
-                    >
-                      TOTAL DEALS
-                    </p>
-                  </div>
-                </div>
-                <h2 className="mb-2 fw-bold text-end" style={{ fontSize: "1.75rem" }}>
-                  {dealConversion?.total_deals || 0}
-                </h2>
-                <div className="d-flex align-items-center justify-content-end mt-2" style={{ minHeight: "20px" }} />
-              </Card.Body>
-            </Card>
-          </Col>
-          <Col xs={12} sm={6} md={4} className="d-lg-none">
-            <Card className="border-0 shadow-sm">
-              <Card.Body>
-                <div className="d-flex align-items-end justify-content-between mb-3">
-                  <div style={{ color: "#4F46E5" }}>
-                    <Handshake size={16} />
-                  </div>
-                  <div className="text-end">
-                    <p
-                      className="text-muted text-uppercase small mb-1"
-                      style={{ fontSize: "0.75rem", fontWeight: 500 }}
-                    >
-                      TOTAL DEALS
-                    </p>
-                  </div>
-                </div>
-                <h2 className="mb-2 fw-bold text-end" style={{ fontSize: "1.75rem" }}>
-                  {dealConversion?.total_deals || 0}
-                </h2>
-                <div className="d-flex align-items-center justify-content-end mt-2" style={{ minHeight: "20px" }} />
-              </Card.Body>
-            </Card>
-          </Col>
-
-          <Col xs={12} sm={6} md={4} lg={3} style={{ flex: "0 0 auto", width: "25%" }} className="d-none d-lg-block">
-            <Card className="border-0 shadow-sm">
-              <Card.Body>
-                <div className="d-flex align-items-end justify-content-between mb-3">
-                  <div style={{ color: "#f59e0b" }}>
-                    <ShoppingBag size={16} />
-                  </div>
-                  <div className="text-end">
-                    <p
-                      className="text-muted text-uppercase small mb-1"
-                      style={{ fontSize: "0.75rem", fontWeight: 500 }}
-                    >
-                      CONVERTED TO ORDERS
-                    </p>
-                  </div>
-                </div>
-                <h2 className="mb-2 fw-bold text-end" style={{ fontSize: "1.75rem" }}>
-                  {dealConversion?.converted_to_orders || 0}
-                </h2>
-                <div className="d-flex align-items-center justify-content-end mt-2" style={{ minHeight: "20px" }} />
-              </Card.Body>
-            </Card>
-          </Col>
-          <Col xs={12} sm={6} md={4} className="d-lg-none">
-            <Card className="border-0 shadow-sm">
-              <Card.Body>
-                <div className="d-flex align-items-end justify-content-between mb-3">
-                  <div style={{ color: "#f59e0b" }}>
-                    <ShoppingBag size={16} />
-                  </div>
-                  <div className="text-end">
-                    <p
-                      className="text-muted text-uppercase small mb-1"
-                      style={{ fontSize: "0.75rem", fontWeight: 500 }}
-                    >
-                      CONVERTED TO ORDERS
-                    </p>
-                  </div>
-                </div>
-                <h2 className="mb-2 fw-bold text-end" style={{ fontSize: "1.75rem" }}>
-                  {dealConversion?.converted_to_orders || 0}
-                </h2>
-                <div className="d-flex align-items-center justify-content-end mt-2" style={{ minHeight: "20px" }} />
-              </Card.Body>
-            </Card>
-          </Col>
-
-          <Col xs={12} sm={6} md={4} lg={3} style={{ flex: "0 0 auto", width: "25%" }} className="d-none d-lg-block">
-            <Card className="border-0 shadow-sm">
-              <Card.Body>
-                <div className="d-flex align-items-end justify-content-between mb-3">
-                  <div style={{ color: "#8b5cf6" }}>
-                    <TrendingUp size={16} />
-                  </div>
-                  <div className="text-end">
-                    <p
-                      className="text-muted text-uppercase small mb-1"
-                      style={{ fontSize: "0.75rem", fontWeight: 500 }}
-                    >
-                      CONVERSION RATE
-                    </p>
-                  </div>
-                </div>
-                <h2 className="mb-2 fw-bold text-end" style={{ fontSize: "1.75rem" }}>
-                  {dealConversion?.conversion_rate?.toFixed(1) || "0.0"}%
-                </h2>
-                <div className="d-flex align-items-center justify-content-end mt-2">
+          <CrmInsightsResponsiveKpiSlot
+            desktopCol={dealKpiDesktopCol}
+            mobileCol={dealKpiMobileCol}
+            renderContent={() => (
+              <CrmInsightsKpiCard
+                iconColor="#10b981"
+                icon={<DollarSign size={16} />}
+                label="TOTAL VALUE (AED)"
+                value={<AedTotalCompactHeading dealValue={dealValue} />}
+              />
+            )}
+          />
+          <CrmInsightsResponsiveKpiSlot
+            desktopCol={dealKpiDesktopCol}
+            mobileCol={dealKpiMobileCol}
+            renderContent={() => (
+              <CrmInsightsKpiCard
+                iconColor="#4F46E5"
+                icon={<Handshake size={16} />}
+                label="TOTAL DEALS"
+                value={dealConversion?.total_deals || 0}
+              />
+            )}
+          />
+          <CrmInsightsResponsiveKpiSlot
+            desktopCol={dealKpiDesktopCol}
+            mobileCol={dealKpiMobileCol}
+            renderContent={() => (
+              <CrmInsightsKpiCard
+                iconColor="#f59e0b"
+                icon={<ShoppingBag size={16} />}
+                label="CONVERTED TO ORDERS"
+                value={dealConversion?.converted_to_orders || 0}
+              />
+            )}
+          />
+          <CrmInsightsResponsiveKpiSlot
+            desktopCol={dealKpiDesktopCol}
+            mobileCol={dealKpiMobileCol}
+            renderContent={() => (
+              <CrmInsightsKpiCard
+                iconColor="#8b5cf6"
+                icon={<TrendingUp size={16} />}
+                label="CONVERSION RATE"
+                value={`${dealConversion?.conversion_rate?.toFixed(1) || "0.0"}%`}
+                footer={
                   <span className="text-muted small" style={{ fontSize: "0.8rem" }}>
-                    {dealConversion?.converted_to_orders || 0} of {dealConversion?.total_deals || 0}{" "}
-                    deals
+                    {dealConversion?.converted_to_orders || 0} of {dealConversion?.total_deals || 0} deals
                   </span>
-                </div>
-              </Card.Body>
-            </Card>
-          </Col>
-          <Col xs={12} sm={6} md={4} className="d-lg-none">
-            <Card className="border-0 shadow-sm">
-              <Card.Body>
-                <div className="d-flex align-items-end justify-content-between mb-3">
-                  <div style={{ color: "#8b5cf6" }}>
-                    <TrendingUp size={16} />
-                  </div>
-                  <div className="text-end">
-                    <p
-                      className="text-muted text-uppercase small mb-1"
-                      style={{ fontSize: "0.75rem", fontWeight: 500 }}
-                    >
-                      CONVERSION RATE
-                    </p>
-                  </div>
-                </div>
-                <h2 className="mb-2 fw-bold text-end" style={{ fontSize: "1.75rem" }}>
-                  {dealConversion?.conversion_rate?.toFixed(1) || "0.0"}%
-                </h2>
-                <div className="d-flex align-items-center justify-content-end mt-2">
-                  <span className="text-muted small" style={{ fontSize: "0.8rem" }}>
-                    {dealConversion?.converted_to_orders || 0} of {dealConversion?.total_deals || 0}{" "}
-                    deals
-                  </span>
-                </div>
-              </Card.Body>
-            </Card>
-          </Col>
+                }
+              />
+            )}
+          />
         </Row>
       </div>
 
       <Row className="g-3 mb-3">
         <Col lg={12}>
-          <div
-            style={{
-              background: "white",
-              borderRadius: "8px",
-              padding: "20px",
-              border: "1px solid #e5e7eb",
-            }}
-          >
-            <h6 className="mb-3" style={{ fontSize: "15px", fontWeight: 600, color: "#1f2937" }}>
-              Deal Funnel Report
-            </h6>
-            {funnelReportBody}
-          </div>
+          <CrmInsightsReportPanel title="Deal Funnel Report">{funnelReportBody}</CrmInsightsReportPanel>
         </Col>
       </Row>
 
       <Row className="g-3 mb-3">
         <Col lg={6}>
-          <div
-            style={{
-              background: "white",
-              borderRadius: "8px",
-              padding: "20px",
-              border: "1px solid #e5e7eb",
-            }}
-          >
-            <h6 className="mb-3" style={{ fontSize: "15px", fontWeight: 600, color: "#1f2937" }}>
-              Deal Value Report
-            </h6>
-            {dealValueReportBody}
-          </div>
+          <CrmInsightsReportPanel title="Deal Value Report">{dealValueReportBody}</CrmInsightsReportPanel>
         </Col>
 
         <Col lg={6}>
-          <div
-            style={{
-              background: "white",
-              borderRadius: "8px",
-              padding: "20px",
-              border: "1px solid #e5e7eb",
-            }}
-          >
-            <h6 className="mb-3" style={{ fontSize: "15px", fontWeight: 600, color: "#1f2937" }}>
-              Stage Duration Report
-            </h6>
-            {stageDurationReportBody}
-          </div>
+          <CrmInsightsReportPanel title="Stage Duration Report">{stageDurationReportBody}</CrmInsightsReportPanel>
         </Col>
       </Row>
 
       <Row className="g-3 mb-3">
         <Col lg={12}>
-          <div
-            style={{
-              background: "white",
-              borderRadius: "8px",
-              padding: "20px",
-              border: "1px solid #e5e7eb",
-            }}
-          >
-            <h6 className="mb-3" style={{ fontSize: "15px", fontWeight: 600, color: "#1f2937" }}>
-              Lost Reasons Report
-            </h6>
-            {lostReasonsReportBody}
-          </div>
+          <CrmInsightsReportPanel title="Lost Reasons Report">{lostReasonsReportBody}</CrmInsightsReportPanel>
         </Col>
       </Row>
     </div>
