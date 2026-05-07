@@ -69,8 +69,6 @@ import {
   type HierarchyExtension,
   type PlannerWorkflowStatusRow,
   type Task,
-  apiDueTimeFromPlannerTaskRow,
-  assigneeDisplayNamesForTaskRow,
   DEFAULT_TASK_TABLE_COLUMN_KEYS,
   DEFAULT_VISIBLE_TAB_IDS,
   getInitialVisibleTabIds,
