@@ -227,6 +227,9 @@ export interface TasksListingPageProps {
   embeddedListRefreshSignal?: number;
   /** Receives `summary` from `listTasks` so project list-tab stats cards stay in sync. */
   onEmbeddedListSummary?: (summary: ListTasksSummary | undefined) => void;
+  lockedTabId?: string;
+  pageTitle?: string;
+  breadcrumbSubTitle?: string;
 }
 
 // ─── Constants ─────────────────────────────────────────────────────────────────
@@ -468,6 +471,9 @@ const TasksListingPage = ({
   hierarchyExtensionsFromParent,
   embeddedListRefreshSignal,
   onEmbeddedListSummary,
+  lockedTabId,
+  pageTitle = "Tasks",
+  breadcrumbSubTitle = "Tasks",
 }: TasksListingPageProps) => {
     const router = useRouter();
     const { data: session } = useSession();
@@ -587,9 +593,10 @@ const TasksListingPage = ({
     }, [hierarchyDataExtensions]);
 
     // ── Tab state ─────────────────────────────────────────────────────────────────
-    const [activeTab, setActiveTab] = useState("all");
+    const [activeTab, setActiveTab] = useState(lockedTabId ?? "all");
     const [visibleTabIds, setVisibleTabIds] = useState<string[]>(() => [...DEFAULT_VISIBLE_TAB_IDS]);
     const [showAddViewModal, setShowAddViewModal] = useState(false);
+    const isTabLocked = Boolean(lockedTabId);
 
     useLayoutEffect(() => {
       setVisibleTabIds(getInitialVisibleTabIds());
@@ -616,18 +623,25 @@ const TasksListingPage = ({
 
     useEffect(() => {
       if (isProjectScopedEmbed) return;
+      if (isTabLocked) return;
       if (router.isReady && router.query.tab) {
         const t = String(router.query.tab);
         if (TASK_VIEW_TAB_IDS.has(t)) setActiveTab(t);
       }
-    }, [router.isReady, router.query.tab, isProjectScopedEmbed]);
+    }, [router.isReady, router.query.tab, isProjectScopedEmbed, isTabLocked]);
+
+    useEffect(() => {
+      if (!isTabLocked) return;
+      setActiveTab(lockedTabId ?? "all");
+    }, [isTabLocked, lockedTabId]);
   
     const switchTab = useCallback((id: string) => {
+      if (isTabLocked) return;
       setActiveTab(id);
       setPager(p => ({ ...p, page: 1 }));
       if (isProjectScopedEmbed) return;
       router.push({ pathname: router.pathname, query: { ...router.query, tab: id } }, undefined, { shallow: true });
-    }, [router, isProjectScopedEmbed]);
+    }, [router, isProjectScopedEmbed, isTabLocked]);
 
     const toggleVisibleTab = useCallback((tabId: string, isVisible: boolean, isOnlyOne: boolean) => {
       if (isVisible && isOnlyOne) return;
@@ -1408,7 +1422,7 @@ const TasksListingPage = ({
           }}
         />
   
-        <BreadcrumbItem mainTitle="Planner" mainLink="/planner/dashboard" subTitle="Tasks" />
+        <BreadcrumbItem mainTitle="Planner" mainLink="/planner/dashboard" subTitle={breadcrumbSubTitle} />
   
         <div className="tasks-page" style={{
           backgroundColor: "#fff",
@@ -1433,7 +1447,7 @@ const TasksListingPage = ({
               <h4 style={{
                 fontWeight: 700, fontSize: 20, margin: 0, color: "#141414",
                 fontFamily: "Lexend Deca, Helvetica, Arial, sans-serif",
-              }}>Tasks</h4>
+              }}>{pageTitle}</h4>
               <p style={{
                 fontSize: 12, color: "#6b7280", margin: "3px 0 0",
                 fontFamily: "Lexend Deca, Helvetica, Arial, sans-serif", fontWeight: 400,
@@ -1475,6 +1489,7 @@ const TasksListingPage = ({
               Design: [All ✕] [Due today flex-1] [Overdue flex-1] [Upcoming flex-1]
                       ────────── spacer ──────────  [+ Add view (4/50)]  [All Views]
           ══════════════════════════════════════════════════════ */}
+          {!isTabLocked && (
           <div style={{
             display: "flex",
             alignItems: "stretch",
@@ -1580,6 +1595,7 @@ const TasksListingPage = ({
               );
             })()}
           </div>
+          )}
 
           {/* Add view / Manage tabs modal */}
           <Modal show={showAddViewModal} onHide={() => setShowAddViewModal(false)} centered>

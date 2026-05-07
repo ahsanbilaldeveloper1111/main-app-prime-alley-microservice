@@ -63,6 +63,13 @@ type ControlledTabsProps = {
   onTabChange?: (tabId: string) => void
 }
 
+const PLANNER_DAILY_CAPACITY_STORAGE_KEY = 'planner-settings-daily-capacity'
+const PLANNER_SHOW_MY_DAY_STORAGE_KEY = 'planner-settings-show-my-day'
+const PLANNER_REQUIRE_ESTIMATE_FOR_MY_DAY_STORAGE_KEY = 'planner-settings-require-estimate-for-my-day'
+const DEFAULT_PLANNER_DAILY_CAPACITY = 8
+const DEFAULT_PLANNER_SHOW_MY_DAY= true
+const DEFAULT_PLANNER_REQUIRE_ESTIMATE_FOR_MY_DAY = false
+
 function getUserPermissions(session: unknown): string[] {
   const perms = (session as { user?: { permissions?: unknown } } | null | undefined)?.user?.permissions
   if (Array.isArray(perms)) return perms.map(String)
@@ -87,6 +94,135 @@ function resolveAllowedActiveTabId(routeActiveTab: string | undefined, activeTab
     (allowedIds.has(activeTab) ? activeTab : null) ??
     allowedTabs[0]?.id ??
     ''
+  )
+}
+
+const PlannerGeneralSettings: React.FC = () => {
+  const [capacityInput, setCapacityInput] = useState<string>(String(DEFAULT_PLANNER_DAILY_CAPACITY))
+  const [showMyDay, setShowMyDay] = useState<boolean>(DEFAULT_PLANNER_SHOW_MY_DAY)
+  const [requireEstimateForMyDay, setRequireEstimateForMyDay] = useState<boolean>(DEFAULT_PLANNER_REQUIRE_ESTIMATE_FOR_MY_DAY)
+  const [saveFeedback, setSaveFeedback] = useState<string>('')
+  
+  useEffect(() => {
+    if (globalThis.window === undefined) return
+    const rawValue = globalThis.window.localStorage.getItem(PLANNER_DAILY_CAPACITY_STORAGE_KEY)
+    const rawShowMyDay = globalThis.window.localStorage.getItem(PLANNER_SHOW_MY_DAY_STORAGE_KEY)
+    const rawRequireEstimate = globalThis.window.localStorage.getItem(PLANNER_REQUIRE_ESTIMATE_FOR_MY_DAY_STORAGE_KEY)
+    const parsed = Number.parseInt(rawValue ?? '', 10)
+    if (Number.isFinite(parsed) && parsed > 0) {
+      setCapacityInput(String(parsed))
+    } else {
+      setCapacityInput(String(DEFAULT_PLANNER_DAILY_CAPACITY))
+    }
+    setShowMyDay(rawShowMyDay == null ? DEFAULT_PLANNER_SHOW_MY_DAY : rawShowMyDay === 'true')
+    setRequireEstimateForMyDay(rawRequireEstimate == null ? DEFAULT_PLANNER_REQUIRE_ESTIMATE_FOR_MY_DAY : rawRequireEstimate === 'true')
+  }, [])
+
+  const handleSave = (): void => {
+    const parsed = Number.parseInt(capacityInput, 10)
+    if (!Number.isFinite(parsed) || parsed <= 0) {
+      setSaveFeedback('Please enter a valid capacity greater than 0.')
+      return
+    }
+    if (globalThis.window !== undefined) {
+      globalThis.window.localStorage.setItem(PLANNER_DAILY_CAPACITY_STORAGE_KEY, String(parsed))
+      globalThis.window.localStorage.setItem(PLANNER_SHOW_MY_DAY_STORAGE_KEY, String(showMyDay))
+      globalThis.window.localStorage.setItem(PLANNER_REQUIRE_ESTIMATE_FOR_MY_DAY_STORAGE_KEY, String(requireEstimateForMyDay))
+    }
+    setCapacityInput(String(parsed))
+    setSaveFeedback('Planner general settings saved.')
+  }
+
+  return (
+    <div
+      style={{
+        border: '1px solid #e5e7eb',
+        borderRadius: '10px',
+        background: '#ffffff',
+        padding: '20px',
+        maxWidth: '520px',
+      }}
+    >
+      <div style={{ marginBottom: '8px', fontSize: '16px', fontWeight: 600, color: '#111827' }}>
+        General
+      </div>
+      <div style={{ marginBottom: '14px', fontSize: '13px', color: '#6b7280' }}>
+        Configure planner defaults for My Day and task estimation behavior.
+      </div>
+      <div style={{ marginBottom: '18px' }}>
+        <div style={{ marginBottom: '6px', fontSize: '14px', fontWeight: 500, color: '#111827' }}>
+          Capacity per day
+        </div>
+        <div style={{ marginBottom: '10px', fontSize: '12px', color: '#6b7280' }}>
+          Default number of tasks a user can handle per day.
+        </div>
+        <input
+          type="number"
+          min={1}
+          step={1}
+          value={capacityInput}
+          onChange={(e) => {
+            setCapacityInput(e.target.value)
+            if (saveFeedback.length > 0) setSaveFeedback('')
+          }}
+          style={{
+            width: '140px',
+            padding: '8px 10px',
+            border: '1px solid #d1d5db',
+            borderRadius: '6px',
+            outline: 'none',
+          }}
+        />
+      </div>
+      <div style={{ marginBottom: '16px' }}>
+        <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', color: '#111827' }}>
+          <input
+            type="checkbox"
+              checked={showMyDay}
+            onChange={(e) => {
+              setShowMyDay(e.target.checked)
+              if (saveFeedback.length > 0) setSaveFeedback('')
+            }}  
+          />
+          <span>Show My Day</span>
+        </label>
+      </div>
+      <div style={{ marginBottom: '16px' }}>
+        <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', color: '#111827' }}>
+          <input
+            type="checkbox"
+            checked={requireEstimateForMyDay}
+            onChange={(e) => {
+              setRequireEstimateForMyDay(e.target.checked)
+              if (saveFeedback.length > 0) setSaveFeedback('')
+            }}
+          />
+          <span>Ask for estimate minutes when adding tasks for My Day</span>
+        </label>
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
+        <button
+          type="button"
+          onClick={handleSave}
+          style={{
+            border: '1px solid #111827',
+            background: '#111827',
+            color: '#ffffff',
+            borderRadius: '6px',
+            padding: '8px 14px',
+            fontSize: '13px',
+            cursor: 'pointer',
+          }}
+        >
+          Save
+        </button>
+      </div>
+      {saveFeedback.length > 0 ? (
+        <div style={{ fontSize: '12px', color: saveFeedback === 'Planner general settings saved.' ? '#16a34a' : '#dc2626' }}>
+          {saveFeedback}
+        </div>
+      ) : null}
+    </div>
   )
 }
 
@@ -1485,6 +1621,7 @@ const CommunicationsPage: React.FC<ControlledTabsProps> = ({ activeTab: routeAct
 
 // ─── Planner (from settings: Work Planner Statuses) ───────────────────────────
 const plannerTabs: Tab[] = [
+  { id: 'general', label: 'General' },
   { id: 'statuses', label: 'Statuses', permission: PERMISSIONS.VIEW_STATUSES_WORK_PLANNER },
 ]
 
@@ -1492,7 +1629,7 @@ const PlannerPage: React.FC<ControlledTabsProps> = ({ activeTab: routeActiveTab,
   const { data: session } = useSession()
   const userPermissions = useMemo(() => getUserPermissions(session), [session])
   const allowedTabs = useMemo(() => filterTabsByPermission(plannerTabs, userPermissions), [userPermissions])
-  const [activeTab, setActiveTab] = useState('statuses')
+  const [activeTab, setActiveTab] = useState('general')
 
   useEffect(() => {
     const next = resolveAllowedActiveTabId(routeActiveTab, activeTab, allowedTabs)
@@ -1500,6 +1637,7 @@ const PlannerPage: React.FC<ControlledTabsProps> = ({ activeTab: routeActiveTab,
   }, [routeActiveTab, activeTab, allowedTabs])
 
   const tabContentMap: Record<string, React.ReactNode> = {
+    general: <PlannerGeneralSettings />,
     statuses: <WorkPlannerStatuses />,
   }
 
@@ -3536,7 +3674,7 @@ export const sectionPageMap: Record<string, SectionRenderer> = {
   'users-teams': ({ subTab, onSubTabChange }) => <UsersTeamsPage activeTab={subTab} onTabChange={onSubTabChange} />,
   'smart-crm': ({ subTab, onSubTabChange }) => <SmartCrmPage activeTab={subTab} onTabChange={onSubTabChange} />,
   communications: ({ subTab, onSubTabChange }) => <CommunicationsPage activeTab={subTab} onTabChange={onSubTabChange} />,
-  planner: () => <PlannerPage />,
+  planner: ({ subTab, onSubTabChange }) => <PlannerPage activeTab={subTab} onTabChange={onSubTabChange} />,
   workforce: ({ subTab, onSubTabChange }) => <WorkforcePage activeTab={subTab} onTabChange={onSubTabChange} />,
   billing: ({ subTab, onSubTabChange }) => <BillingPage activeTab={subTab} onTabChange={onSubTabChange} />,
   tickets: ({ subTab, onSubTabChange }) => <TicketsPage activeTab={subTab} onTabChange={onSubTabChange} />,

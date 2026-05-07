@@ -37,8 +37,6 @@ import {
   CheckCheck,
   Layers2,
   ListChecks,
-  ListTree,
-  MapPin,
   ChevronRight,
   ChevronLeft,
   House,
@@ -81,6 +79,14 @@ interface MainMenuItem {
 
 const SIDEBAR_WIDTH_COLLAPSED = 65;
 const SIDEBAR_WIDTH_EXPANDED = 235;
+const PLANNER_SHOW_MY_DAY_STORAGE_KEY = 'planner-settings-show-my-day';
+
+function readShowMyDayInSidebarSetting(): boolean {
+  if (globalThis.window === undefined) return true;
+  const raw = globalThis.window.localStorage.getItem(PLANNER_SHOW_MY_DAY_STORAGE_KEY);
+  if (raw == null) return true;
+  return raw === 'true';
+}
 
 function getSidebarSectionItems(menuItems: MainMenuItem[], hasUnifiedWorkspace: boolean) {
   const dashboardItems = menuItems.filter((item) =>
@@ -390,6 +396,7 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
   const [isFlyoutPinned, setIsFlyoutPinned] = useState(false);
   const hoverTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [currentUserCompanyImageUrl, setCurrentUserCompanyImageUrl] = useState<string | null>(null);
+  const [showMyDayInPlannerSidebar, setShowMyDayInPlannerSidebar] = useState<boolean>(true);
 
   useCompanyImage(setCurrentUserCompanyImageUrl);
 
@@ -398,6 +405,17 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
 
   // Get permissions hook for checking access
   const { hasPermission } = usePermissions();
+
+  useEffect(() => {
+    setShowMyDayInPlannerSidebar(readShowMyDayInSidebarSetting());
+    const syncFromStorage = () => {
+      setShowMyDayInPlannerSidebar(readShowMyDayInSidebarSetting());
+    };
+    globalThis.window?.addEventListener('storage', syncFromStorage);
+    return () => {
+      globalThis.window?.removeEventListener('storage', syncFromStorage);
+    };
+  }, []);
 
   // Only these modules are enabled; others are hidden (can re-enable by adding id to this list)
   const ENABLED_MODULE_IDS = new Set([
@@ -620,6 +638,15 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
       label: "Planner",
       url: '',
       subItems: [
+        ...(showMyDayInPlannerSidebar
+          ? [{
+              id: 'planner-my-day',
+              title: 'My Day',
+              icon: <ListChecks size={16} />,
+              url: '/planner/my-tasks',
+              permission: PERMISSIONS.VIEW_TASKSLIST_WORK_PLANNER,
+            }]
+          : []),
 
         {
           id: 'planner-dashboard',

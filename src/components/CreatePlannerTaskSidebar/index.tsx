@@ -13,6 +13,7 @@ import {
   FolderOpen,
   Check,
 } from "lucide-react";
+import Select from "react-select";
 import { toast } from "react-toastify";
 import {
   listProjects,
@@ -46,7 +47,11 @@ const TASK_TYPE_SELECT_LABELS: Record<PlannerTaskType, string> = {
   recurring: "Recurring",
 };
 
-const ALL_PLANNER_TASK_TYPES: PlannerTaskType[] = ["todo", "regular", "recurring"];
+const ALL_PLANNER_TASK_TYPES: PlannerTaskType[] = [
+  "todo",
+  "regular",
+  "recurring",
+];
 
 const TASK_TITLE_MAX_LENGTH = 150;
 
@@ -62,6 +67,8 @@ const PLANNER_TASK_SIDEBAR = {
   shadow: "-8px 0 20px rgba(0, 0, 0, 0.08)",
   radiusLg: 0,
 } as const;
+const PLANNER_REQUIRE_ESTIMATE_FOR_MY_DAY_STORAGE_KEY =
+  "planner-settings-require-estimate-for-my-day";
 
 function clampTaskTitleLength(value: string): string {
   return value.slice(0, TASK_TITLE_MAX_LENGTH);
@@ -253,7 +260,7 @@ interface CreateTaskFormData {
   // Recurring-only
   frequency: string;
   repeatInterval: number;
-  repeatOn: string;
+  repeatOn: string[];
   /** Local `HH:mm` for API `due_time`: with start date when recurring, with due date for regular and to-do tasks. */
   dueTime: string;
   /** Recurring tasks only; maps to API `is_active`. */
@@ -302,10 +309,15 @@ function formatDateTimeForDisplay(iso: string | null | undefined): string {
   if (iso == null || String(iso).trim() === "") return "—";
   const d = new Date(String(iso).trim());
   if (Number.isNaN(d.getTime())) return "—";
-  return d.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
+  return d.toLocaleString(undefined, {
+    dateStyle: "medium",
+    timeStyle: "short",
+  });
 }
 
-function readNestedRecurring(editTask: PlannerEditTask | undefined): Record<string, unknown> | null {
+function readNestedRecurring(
+  editTask: PlannerEditTask | undefined,
+): Record<string, unknown> | null {
   if (!editTask) return null;
   const top = (editTask as unknown as Record<string, unknown>).recurring;
   if (top && typeof top === "object" && !Array.isArray(top)) {
@@ -322,7 +334,10 @@ function readNestedRecurring(editTask: PlannerEditTask | undefined): Record<stri
   return null;
 }
 
-function pickRecurringScalar(editTask: PlannerEditTask | undefined, key: string): unknown {
+function pickRecurringScalar(
+  editTask: PlannerEditTask | undefined,
+  key: string,
+): unknown {
   if (!editTask) return undefined;
   const top = (editTask as unknown as Record<string, unknown>)[key];
   if (top != null && top !== "") return top;
@@ -344,7 +359,9 @@ function recurringScheduleField(
   field: "last_run_at" | "next_run_at",
 ): string | undefined {
   if (!task) return undefined;
-  const fromRecord = (rec: Record<string, unknown> | null | undefined): string | undefined => {
+  const fromRecord = (
+    rec: Record<string, unknown> | null | undefined,
+  ): string | undefined => {
     if (!rec) return undefined;
     const v = rec[field];
     if (typeof v === "string" && v.trim()) return v.trim();
@@ -386,7 +403,9 @@ function clampDueDateToMin(dueDate: string, minStr: string): string {
   return dueDate < minStr ? minStr : dueDate;
 }
 
-function mergeFormDataWithDueDateClamp(data: CreateTaskFormData): CreateTaskFormData {
+function mergeFormDataWithDueDateClamp(
+  data: CreateTaskFormData,
+): CreateTaskFormData {
   if (data.taskType === "recurring") {
     return data;
   }
@@ -469,15 +488,13 @@ function seedRecurringFieldsWhenSwitchingToRecurring(
   | "customIntervalUnit"
 > {
   const start =
-    prev.startDate.trim() ||
-    prev.dueDate.trim() ||
-    todayLocalIsoDate();
+    prev.startDate.trim() || prev.dueDate.trim() || todayLocalIsoDate();
   return {
     startDate: start,
     dueDate: "",
     frequency: "weekly",
     repeatInterval: 1,
-    repeatOn: "monday",
+    repeatOn: ["monday"],
     dueTime: prev.dueTime,
     recurringIsActive: true,
     recurringEndStrategy: "never",
@@ -492,30 +509,48 @@ function seedRecurringFieldsWhenSwitchingToRecurring(
   };
 }
 
-function resolveExtensionUserId(extensions: Extension[], extRef: string | undefined): number {
+function resolveExtensionUserId(
+  extensions: Extension[],
+  extRef: string | undefined,
+): number {
   if (extRef == null || extRef === "") return Number.NaN;
   const extension = extensions.find(
-    (ext) => String(ext.id) === String(extRef) || ext.extension_number === extRef,
+    (ext) =>
+      String(ext.id) === String(extRef) || ext.extension_number === extRef,
   );
   return extension ? Number(extension.id) : Number(extRef);
 }
 
-function mapAssigneeIdsFromEditTask(editTask: PlannerEditTask, extensions: Extension[]): number[] {
+function mapAssigneeIdsFromEditTask(
+  editTask: PlannerEditTask,
+  extensions: Extension[],
+): number[] {
   if (editTask.assignees?.length) {
-    return editTask.assignees.map((a) => resolveExtensionUserId(extensions, a.extension_number));
+    return editTask.assignees.map((a) =>
+      resolveExtensionUserId(extensions, a.extension_number),
+    );
   }
   if (editTask.extension_numbers?.length) {
-    return editTask.extension_numbers.map((extNum) => resolveExtensionUserId(extensions, extNum));
+    return editTask.extension_numbers.map((extNum) =>
+      resolveExtensionUserId(extensions, extNum),
+    );
   }
   return [];
 }
 
-function mapWatcherIdsFromEditTask(editTask: PlannerEditTask, extensions: Extension[]): number[] {
+function mapWatcherIdsFromEditTask(
+  editTask: PlannerEditTask,
+  extensions: Extension[],
+): number[] {
   if (editTask.watchers?.length) {
-    return editTask.watchers.map((w) => resolveExtensionUserId(extensions, w.extension_number));
+    return editTask.watchers.map((w) =>
+      resolveExtensionUserId(extensions, w.extension_number),
+    );
   }
   if (editTask.watcher_numbers?.length) {
-    return editTask.watcher_numbers.map((extNum) => resolveExtensionUserId(extensions, extNum));
+    return editTask.watcher_numbers.map((extNum) =>
+      resolveExtensionUserId(extensions, extNum),
+    );
   }
   return [];
 }
@@ -607,11 +642,15 @@ function restrictPlannerTaskTypeOptionsForEdit(
     return [...allowedFromProps];
   }
   if (origin === "todo") {
-    const next = allowedFromProps.filter((t) => t === "todo" || t === "recurring");
+    const next = allowedFromProps.filter(
+      (t) => t === "todo" || t === "recurring",
+    );
     return next.length > 0 ? [...next] : ["todo"];
   }
   if (origin === "regular") {
-    const next = allowedFromProps.filter((t) => t === "regular" || t === "recurring");
+    const next = allowedFromProps.filter(
+      (t) => t === "regular" || t === "recurring",
+    );
     return next.length > 0 ? [...next] : ["regular"];
   }
   return [...allowedFromProps];
@@ -630,7 +669,10 @@ const WEEKLY_REPEAT_ON_VALUES = [
 
 type WeeklyRepeatOnValue = (typeof WEEKLY_REPEAT_ON_VALUES)[number];
 
-const WEEKLY_REPEAT_ON_OPTIONS: { label: string; value: WeeklyRepeatOnValue }[] = [
+const WEEKLY_REPEAT_ON_OPTIONS: {
+  label: string;
+  value: WeeklyRepeatOnValue;
+}[] = [
   { label: "Monday", value: "monday" },
   { label: "Tuesday", value: "tuesday" },
   { label: "Wednesday", value: "wednesday" },
@@ -655,22 +697,7 @@ function isWeeklyRepeatOnValue(s: string): s is WeeklyRepeatOnValue {
   return (WEEKLY_REPEAT_ON_VALUES as readonly string[]).includes(s);
 }
 
-function normalizeWeeklyRepeatOnFromApi(raw: unknown): string {
-  if (raw == null || raw === "") return "";
-  let asString: string;
-  if (typeof raw === "string") {
-    asString = raw;
-  } else if (typeof raw === "number" && Number.isFinite(raw)) {
-    asString = String(raw);
-  } else if (typeof raw === "bigint") {
-    asString = String(raw);
-  } else if (typeof raw === "boolean") {
-    asString = String(raw);
-  } else {
-    return "";
-  }
-  const s = asString.trim().toLowerCase();
-  if (isWeeklyRepeatOnValue(s)) return s;
+function normalizeWeeklyRepeatOnFromApi(raw: unknown): WeeklyRepeatOnValue[] {
   const shortMap: Record<string, WeeklyRepeatOnValue> = {
     sun: "sunday",
     mon: "monday",
@@ -680,27 +707,66 @@ function normalizeWeeklyRepeatOnFromApi(raw: unknown): string {
     fri: "friday",
     sat: "saturday",
   };
-  if (shortMap[s]) return shortMap[s];
-  if (s.includes(",")) {
-    const first = s.split(",")[0]?.trim() ?? "";
-    if (first) return normalizeWeeklyRepeatOnFromApi(first);
-    return "";
+
+  const normalizeOne = (value: unknown): WeeklyRepeatOnValue | null => {
+    if (value == null || value === "") return null;
+    let asString: string;
+    if (typeof value === "string") {
+      asString = value;
+    } else if (typeof value === "number" && Number.isFinite(value)) {
+      asString = String(value);
+    } else if (typeof value === "bigint") {
+      asString = String(value);
+    } else if (typeof value === "boolean") {
+      asString = String(value);
+    } else {
+      return null;
+    }
+    const s = asString.trim().toLowerCase();
+    if (isWeeklyRepeatOnValue(s)) return s;
+    if (shortMap[s]) return shortMap[s];
+    const n = Number(s);
+    if (s !== "" && Number.isInteger(n) && n >= 0 && n <= 6) {
+      return LEGACY_DAY_INDEX_TO_WEEKDAY[n] ?? null;
+    }
+    return null;
+  };
+
+  let tokens: unknown[] = [];
+  if (Array.isArray(raw)) {
+    tokens = raw;
+  } else if (
+    typeof raw === "string" ||
+    typeof raw === "number" ||
+    typeof raw === "bigint" ||
+    typeof raw === "boolean"
+  ) {
+    tokens = String(raw)
+      .split(",")
+      .map((t) => t.trim())
+      .filter(Boolean);
   }
-  const n = Number(s);
-  if (s !== "" && Number.isInteger(n) && n >= 0 && n <= 6) {
-    return LEGACY_DAY_INDEX_TO_WEEKDAY[n] ?? "";
+
+  const out: WeeklyRepeatOnValue[] = [];
+  for (const token of tokens) {
+    const normalized = normalizeOne(token);
+    if (normalized && !out.includes(normalized)) out.push(normalized);
   }
-  return "";
+  return out;
 }
 
-function repeatOnForEditTask(editTask: PlannerEditTask, frequency: string): string {
+function repeatOnForEditTask(
+  editTask: PlannerEditTask,
+  frequency: string,
+): string[] {
   const freq = (frequency || "weekly").toLowerCase();
   const rawOn = pickRecurringScalar(editTask, "repeat_on");
   if (freq === "weekly") {
     return normalizeWeeklyRepeatOnFromApi(rawOn);
   }
-  if (rawOn == null) return "";
-  return unknownToPrimitiveString(rawOn);
+  if (rawOn == null) return [];
+  const scalar = unknownToPrimitiveString(rawOn).trim();
+  return scalar === "" ? [] : [scalar];
 }
 
 function readParentTaskFromRaw(
@@ -721,7 +787,9 @@ function readParentTaskFromRaw(
 }
 
 /** Parent / "associate with" task for edit mode (`parent_task_id` from API). */
-function resolveParentTaskLinkFromEditTask(editTask: PlannerEditTask): LinkedRecord | null {
+function resolveParentTaskLinkFromEditTask(
+  editTask: PlannerEditTask,
+): LinkedRecord | null {
   const raw: unknown = editTask.rawData ?? editTask;
   const rawParent = readParentTaskFromRaw(raw);
   const nestedParent = editTask.parent_task ?? rawParent;
@@ -735,7 +803,9 @@ function resolveParentTaskLinkFromEditTask(editTask: PlannerEditTask): LinkedRec
   const title = String(nestedParent?.title ?? "").trim();
   const refRaw = nestedParent?.reference;
   const reference =
-    typeof refRaw === "string" && refRaw.trim() !== "" ? refRaw.trim() : `#${id}`;
+    typeof refRaw === "string" && refRaw.trim() !== ""
+      ? refRaw.trim()
+      : `#${id}`;
   return {
     id,
     type: "task",
@@ -782,7 +852,10 @@ function readEstimatedDurationFormStringFromEdit(
   return String(Math.floor(estNum));
 }
 
-function readRecurringBooleanFlag(editTask: PlannerEditTask, key: string): boolean {
+function readRecurringBooleanFlag(
+  editTask: PlannerEditTask,
+  key: string,
+): boolean {
   const raw = pickRecurringScalar(editTask, key);
   return raw === true || raw === 1;
 }
@@ -804,20 +877,30 @@ type RecurringTemplateSlice = Pick<
   | "recurringIsActive"
 >;
 
-function readRecurringTemplateFormSlice(editTask: PlannerEditTask): RecurringTemplateSlice {
+function readRecurringTemplateFormSlice(
+  editTask: PlannerEditTask,
+): RecurringTemplateSlice {
   const isRecurringTemplate = normalizeEditTaskType(editTask) === "recurring";
   const freqRaw = pickRecurringScalar(editTask, "frequency");
   const freqStr = unknownToPrimitiveString(freqRaw).trim();
   const frequency = freqStr === "" ? "weekly" : freqStr;
   const freqConfig = readFrequencyConfigFromEdit(editTask);
   const customIntervalUnit: CustomFrequencyUnit = freqConfig?.unit ?? "days";
-  const repeatIntervalBase = Math.max(1, Number(pickRecurringScalar(editTask, "repeat_interval")) || 1);
+  const repeatIntervalBase = Math.max(
+    1,
+    Number(pickRecurringScalar(editTask, "repeat_interval")) || 1,
+  );
   const repeatInterval =
-    frequency === "custom" && freqConfig ? freqConfig.interval : repeatIntervalBase;
+    frequency === "custom" && freqConfig
+      ? freqConfig.interval
+      : repeatIntervalBase;
   const repeatOn = repeatOnForEditTask(editTask, frequency);
-  const occParsed = parsePositiveIntFromUnknown(pickRecurringScalar(editTask, "occurrences"));
+  const occParsed = parsePositiveIntFromUnknown(
+    pickRecurringScalar(editTask, "occurrences"),
+  );
   const endDateScalar =
-    pickRecurringScalar(editTask, "end_date") ?? pickRecurringScalar(editTask, "due_date");
+    pickRecurringScalar(editTask, "end_date") ??
+    pickRecurringScalar(editTask, "due_date");
   const endDateFormatted = formatDateForInput(
     typeof endDateScalar === "string" ? endDateScalar : undefined,
   );
@@ -826,21 +909,35 @@ function readRecurringTemplateFormSlice(editTask: PlannerEditTask): RecurringTem
     isRecurringTemplate ? endDateFormatted : "",
   );
   const recurringEndDate =
-    isRecurringTemplate && recurringEndStrategy === "end_date" ? endDateFormatted : "";
+    isRecurringTemplate && recurringEndStrategy === "end_date"
+      ? endDateFormatted
+      : "";
   const recurringOccurrences =
-    isRecurringTemplate && recurringEndStrategy === "occurrences" && occParsed != null
+    isRecurringTemplate &&
+    recurringEndStrategy === "occurrences" &&
+    occParsed != null
       ? occParsed
       : 12;
-  const reminderState = readRecurringReminderStateFromEdit(editTask, isRecurringTemplate);
+  const reminderState = readRecurringReminderStateFromEdit(
+    editTask,
+    isRecurringTemplate,
+  );
   const estimatedDurationMinutes = readEstimatedDurationFormStringFromEdit(
     editTask,
     isRecurringTemplate,
   );
   const recurringAutoCreateNextOnComplete =
-    isRecurringTemplate && readRecurringBooleanFlag(editTask, "recurring_auto_create_next_on_complete");
+    isRecurringTemplate &&
+    readRecurringBooleanFlag(
+      editTask,
+      "recurring_auto_create_next_on_complete",
+    );
   const recurringCreateNextIfPreviousIncomplete =
     isRecurringTemplate &&
-    readRecurringBooleanFlag(editTask, "recurring_create_next_if_previous_incomplete");
+    readRecurringBooleanFlag(
+      editTask,
+      "recurring_create_next_if_previous_incomplete",
+    );
   return {
     frequency,
     repeatInterval,
@@ -875,7 +972,8 @@ function buildInitialFormFromEdit(
       ? parseApiDueTimeToTimeInput(dueTimeRaw)
       : "";
   const startDateRaw =
-    (pickRecurringScalar(editTask, "start_date") as string | undefined) ?? editTask.start_date;
+    (pickRecurringScalar(editTask, "start_date") as string | undefined) ??
+    editTask.start_date;
   const topDueForNonRecurring =
     typeof editTask.due_date === "string" && editTask.due_date.trim() !== ""
       ? editTask.due_date
@@ -925,7 +1023,7 @@ function buildInitialFormForCreate(
     linkedRecordIds: [],
     frequency: "weekly",
     repeatInterval: 1,
-    repeatOn: taskType === "recurring" ? "monday" : "",
+    repeatOn: taskType === "recurring" ? ["monday"] : [],
     dueTime: "",
     recurringIsActive: true,
     recurringEndStrategy: "never",
@@ -944,18 +1042,17 @@ function computeFrequencyChangeState(
   prev: Pick<CreateTaskFormData, "frequency" | "repeatOn">,
   nextFreq: string,
 ): Pick<CreateTaskFormData, "frequency" | "repeatOn"> {
-  let nextRepeatOn: string;
+  let nextRepeatOn: string[];
   if (nextFreq === "weekly") {
     const normalized = normalizeWeeklyRepeatOnFromApi(prev.repeatOn);
-    nextRepeatOn = normalized || "monday";
+    nextRepeatOn = normalized.length > 0 ? normalized : ["monday"];
   } else if (nextFreq === "monthly") {
-    nextRepeatOn = /^\d+$/.test(prev.repeatOn.trim())
-      ? prev.repeatOn.trim()
-      : "1";
+    const first = prev.repeatOn[0]?.trim() ?? "";
+    nextRepeatOn = /^\d+$/.test(first) ? [first] : ["1"];
   } else if (nextFreq === "custom") {
-    nextRepeatOn = "";
+    nextRepeatOn = [];
   } else {
-    nextRepeatOn = "";
+    nextRepeatOn = [];
   }
   return { frequency: nextFreq, repeatOn: nextRepeatOn };
 }
@@ -984,7 +1081,10 @@ function resolvePreferredStatusId(
   return statuses[0].id;
 }
 
-function resolveSidebarProjects(fetchedProjects: Project[], propProject: Project | undefined): Project[] {
+function resolveSidebarProjects(
+  fetchedProjects: Project[],
+  propProject: Project | undefined,
+): Project[] {
   if (fetchedProjects.length > 0) {
     return fetchedProjects;
   }
@@ -1063,11 +1163,21 @@ function mapListStatusesResponseToSidebarStatuses(response: unknown): Status[] {
   return [];
 }
 
-function getSidebarTitle(taskType: PlannerTaskTypeOrUnset, isEdit: boolean): string {
+function getSidebarTitle(
+  taskType: PlannerTaskTypeOrUnset,
+  isEdit: boolean,
+  isRecurringConversionMode: boolean,
+): string {
   const defaultLabel = isEdit ? "Edit Task" : "Create Task";
+  let recurringLabel = "Create Recurring";
+  if (isRecurringConversionMode) {
+    recurringLabel = "Convert to Recurring";
+  } else if (isEdit) {
+    recurringLabel = "Edit Recurring";
+  }
   const typeLabelMap: Partial<Record<PlannerTaskType, string>> = {
     todo: isEdit ? "Edit Todo" : "Create Todo",
-    recurring: isEdit ? "Edit Recurring" : "Create Recurring",
+    recurring: recurringLabel,
   };
   if (taskType === "") return defaultLabel;
   return typeLabelMap[taskType] ?? defaultLabel;
@@ -1080,7 +1190,11 @@ function linkedRecordsEmptyMessage(hasSearchQuery: boolean): string {
   return "No tasks available";
 }
 
-function primarySubmitButtonLabel(isSubmitting: boolean, isEdit: boolean, isRecurringConversionMode: boolean): string {
+function primarySubmitButtonLabel(
+  isSubmitting: boolean,
+  isEdit: boolean,
+  isRecurringConversionMode: boolean,
+): string {
   if (isSubmitting) return "Processing...";
   if (isRecurringConversionMode) return "Convert to Recurring";
   if (isEdit) return "Update";
@@ -1097,8 +1211,8 @@ function LimitedTaskEditBanner({ visible }: { readonly visible: boolean }) {
         background: PLANNER_TASK_SIDEBAR.accentSoft,
       }}
     >
-      <strong>Assignees</strong> and <strong>watchers</strong> cannot be changed for your role;
-      all other fields can be updated.
+      <strong>Assignees</strong> and <strong>watchers</strong> cannot be changed
+      for your role; all other fields can be updated.
     </div>
   );
 }
@@ -1179,7 +1293,7 @@ function PlannerSidebarFooter({
   onCreate: () => void;
   onCreateAndOpenSubmit: (e: React.MouseEvent<HTMLButtonElement>) => void;
   isRecurringConversionMode: boolean;
-  }>): React.ReactNode {
+}>): React.ReactNode {
   return (
     <div
       className="create-task-sidebar-footer"
@@ -1232,10 +1346,16 @@ function PlannerSidebarFooter({
           borderRadius: 10,
           color: "#fff",
           cursor: isSubmitting ? "not-allowed" : "pointer",
-          boxShadow: isSubmitting ? "none" : "0 4px 14px rgba(79, 70, 229, 0.35)",
+          boxShadow: isSubmitting
+            ? "none"
+            : "0 4px 14px rgba(79, 70, 229, 0.35)",
         }}
       >
-        {primarySubmitButtonLabel(isSubmitting, isEdit, isRecurringConversionMode)} 
+        {primarySubmitButtonLabel(
+          isSubmitting,
+          isEdit,
+          isRecurringConversionMode,
+        )}
       </button>
     </div>
   );
@@ -1381,7 +1501,10 @@ function StatusSelectOptions({
   );
 }
 
-function renderProjectSelectChildren(loadingProjects: boolean, projects: Project[]): React.ReactNode {
+function renderProjectSelectChildren(
+  loadingProjects: boolean,
+  projects: Project[],
+): React.ReactNode {
   if (loadingProjects) {
     return <option value="">Loading projects...</option>;
   }
@@ -1635,7 +1758,9 @@ function applyLimitedEditLockAssigneesAndWatchers(
   };
 }
 
-function plannerPriorityIdToApiString(priorityId: number | null): string | undefined {
+function plannerPriorityIdToApiString(
+  priorityId: number | null,
+): string | undefined {
   if (!priorityId || priorityId === 0) return "";
   const priorityMap: Record<number, string> = {
     1: "low",
@@ -1674,10 +1799,11 @@ function applyRecurringRepeatAndFrequencyConfig(
 ): void {
   payload.frequency = fd.frequency;
   payload.repeat_interval = Math.max(1, fd.repeatInterval);
-  if (fd.frequency === "weekly" && fd.repeatOn.trim()) {
-    payload.repeat_on = fd.repeatOn.trim().toLowerCase();
-  } else if (fd.frequency === "monthly" && fd.repeatOn.trim()) {
-    payload.repeat_on = fd.repeatOn.trim();
+  if (fd.frequency === "weekly" && fd.repeatOn.length > 0) {
+    payload.repeat_on = fd.repeatOn.map((d) => d.trim().toLowerCase()).filter(Boolean);
+  } else if (fd.frequency === "monthly") {
+    const monthlyDay = fd.repeatOn[0]?.trim() ?? "";
+    if (monthlyDay !== "") payload.repeat_on = monthlyDay;
   }
   if (fd.frequency === "custom") {
     payload.frequency_config = {
@@ -1704,7 +1830,10 @@ function applyRecurringDueTimeToPayload(
   }
 }
 
-function applyRecurringEndStrategyToPayload(payload: Record<string, unknown>, fd: CreateTaskFormData): void {
+function applyRecurringEndStrategyToPayload(
+  payload: Record<string, unknown>,
+  fd: CreateTaskFormData,
+): void {
   if (fd.recurringEndStrategy === "end_date") {
     payload.end_date = fd.recurringEndDate.trim() || null;
     payload.occurrences = null;
@@ -1757,7 +1886,8 @@ function applyPlannerSidebarRecurringPayload(
   payload.is_active = fd.recurringIsActive;
   payload.timezone = getAutoTimezone();
   applyRecurringOptionalNumericFields(payload, fd, isEdit);
-  payload.recurring_auto_create_next_on_complete = fd.recurringAutoCreateNextOnComplete;
+  payload.recurring_auto_create_next_on_complete =
+    fd.recurringAutoCreateNextOnComplete;
   payload.recurring_create_next_if_previous_incomplete =
     fd.recurringCreateNextIfPreviousIncomplete;
 }
@@ -1818,13 +1948,18 @@ function buildPlannerSidebarPayloadRecord(
   return payload;
 }
 
-function validateRecurringEndAndOccurrences(formData: CreateTaskFormData): boolean {
+function validateRecurringEndAndOccurrences(
+  formData: CreateTaskFormData,
+): boolean {
   if (formData.recurringEndStrategy === "end_date") {
     if (!formData.recurringEndDate.trim()) {
       toast.error("Please set an end date or choose a different end condition");
       return false;
     }
-    if (formData.startDate.trim() && formData.recurringEndDate < formData.startDate.trim()) {
+    if (
+      formData.startDate.trim() &&
+      formData.recurringEndDate < formData.startDate.trim()
+    ) {
       toast.error("Schedule end date cannot be before the start date");
       return false;
     }
@@ -1833,22 +1968,34 @@ function validateRecurringEndAndOccurrences(formData: CreateTaskFormData): boole
   if (formData.recurringEndStrategy !== "occurrences") {
     return true;
   }
-  if (!Number.isFinite(formData.recurringOccurrences) || formData.recurringOccurrences < 1) {
+  if (
+    !Number.isFinite(formData.recurringOccurrences) ||
+    formData.recurringOccurrences < 1
+  ) {
     toast.error("Occurrences must be at least 1");
     return false;
   }
   return true;
 }
 
-function validateRecurringDurationAndReminder(formData: CreateTaskFormData): boolean {
-  if (formData.recurringReminderEnabled && formData.recurringReminderMinutes < 1) {
-    toast.error("Reminder minutes must be at least 1 when reminders are enabled");
+function validateRecurringDurationAndReminder(
+  formData: CreateTaskFormData,
+): boolean {
+  if (
+    formData.recurringReminderEnabled &&
+    formData.recurringReminderMinutes < 1
+  ) {
+    toast.error(
+      "Reminder minutes must be at least 1 when reminders are enabled",
+    );
     return false;
   }
   return true;
 }
 
-function validateEstimatedDurationMinutes(formData: CreateTaskFormData): boolean {
+function validateEstimatedDurationMinutes(
+  formData: CreateTaskFormData,
+): boolean {
   const estTrim = formData.estimatedDurationMinutes.trim();
   if (estTrim === "") {
     return true;
@@ -1861,7 +2008,17 @@ function validateEstimatedDurationMinutes(formData: CreateTaskFormData): boolean
   return true;
 }
 
-function validatePlannerSidebarRecurringSubmit(formData: CreateTaskFormData): boolean {
+function shouldRequireEstimateForMyDayFromSettings(): boolean {
+  if (globalThis.window === undefined) return false;
+  const raw = globalThis.window.localStorage.getItem(
+    PLANNER_REQUIRE_ESTIMATE_FOR_MY_DAY_STORAGE_KEY,
+  );
+  return raw === "true";
+}
+
+function validatePlannerSidebarRecurringSubmit(
+  formData: CreateTaskFormData,
+): boolean {
   if (!formData.statusId) {
     toast.error("Recurring tasks require a status");
     return false;
@@ -1870,7 +2027,7 @@ function validatePlannerSidebarRecurringSubmit(formData: CreateTaskFormData): bo
     toast.error("Recurring tasks require a start date");
     return false;
   }
-  if (formData.frequency === "weekly" && !formData.repeatOn.trim()) {
+  if (formData.frequency === "weekly" && formData.repeatOn.length === 0) {
     toast.error("Please select a day of the week");
     return false;
   }
@@ -1937,10 +2094,20 @@ function validatePlannerSidebarFormForSubmit(
     formData.taskType as PlannerTaskType,
     taskTypeOptions,
   );
-  if (taskTypeEff === "recurring" && !validatePlannerSidebarRecurringSubmit(formData)) {
+  if (
+    taskTypeEff === "recurring" &&
+    !validatePlannerSidebarRecurringSubmit(formData)
+  ) {
     return false;
   }
   if (!validateEstimatedDurationMinutes(formData)) {
+    return false;
+  }
+  if (
+    shouldRequireEstimateForMyDayFromSettings() &&
+    formData.estimatedDurationMinutes.trim() === ""
+  ) {
+    toast.error("Please add estimated duration in minutes for this task");
     return false;
   }
   if (!validatePlannerSidebarDueTimeRequiresDueDate(formData, taskTypeEff)) {
@@ -1976,10 +2143,7 @@ async function persistPlannerSidebarEditTask(
     );
   }
   return Boolean(
-    await updateTask(
-      editTaskId,
-      payload as Parameters<typeof updateTask>[1],
-    ),
+    await updateTask(editTaskId, payload as Parameters<typeof updateTask>[1]),
   );
 }
 
@@ -2045,7 +2209,12 @@ function getSidebarInitialFormData(
   if (editMode && editTask) {
     return buildInitialFormFromEdit(editTask, extensions);
   }
-  return buildInitialFormForCreate("", propProject, propStatuses, selectedStatusForTask);
+  return buildInitialFormForCreate(
+    "",
+    propProject,
+    propStatuses,
+    selectedStatusForTask,
+  );
 }
 
 function linkedRecordsFromListTasksForSidebar(
@@ -2136,10 +2305,7 @@ function shouldDeferPlannerSidebarOpenUntilProjectsLoaded(
   loadingProjects: boolean,
 ): boolean {
   return (
-    editMode &&
-    Boolean(task) &&
-    fetchedProjectsCount === 0 &&
-    loadingProjects
+    editMode && Boolean(task) && fetchedProjectsCount === 0 && loadingProjects
   );
 }
 
@@ -2178,7 +2344,9 @@ function applyOpenAsRecurringConversionToInitialForm(
   };
 }
 
-type PlannerSidebarPayload = ReturnType<typeof buildPlannerSidebarPayloadRecord>;
+type PlannerSidebarPayload = ReturnType<
+  typeof buildPlannerSidebarPayloadRecord
+>;
 
 async function submitPlannerSidebarTask(params: {
   e?: React.MouseEvent;
@@ -2257,7 +2425,7 @@ function emptyPlannerSidebarFormWhenClosed(
     linkedRecordIds: [],
     frequency: "weekly",
     repeatInterval: 1,
-    repeatOn: "",
+    repeatOn: [],
     dueTime: "",
     recurringIsActive: true,
     recurringEndStrategy: "never",
@@ -2334,7 +2502,9 @@ function applyPlannerSidebarTaskTypeSelectChange(
   ctx.setShowAssigneeDropdown(false);
   ctx.setWatcherSearchQuery("");
   ctx.setShowWatcherDropdown(false);
-  ctx.fetchLinkRecordsForSearch("", mergedOpen.projectId).catch(() => undefined);
+  ctx
+    .fetchLinkRecordsForSearch("", mergedOpen.projectId)
+    .catch(() => undefined);
 }
 
 function usePlannerSidebarReferenceLists(isOpen: boolean) {
@@ -2444,14 +2614,10 @@ function usePlannerSidebarCreateModeStatusSync(
     if (availableStatuses.length === 0) return;
 
     const idInList = (id: number | null): boolean =>
-      id != null &&
-      availableStatuses.some((s) => String(s.id) === String(id));
+      id != null && availableStatuses.some((s) => String(s.id) === String(id));
 
     setFormData((prev) => {
-      if (
-        selectedStatusForTask != null &&
-        idInList(selectedStatusForTask)
-      ) {
+      if (selectedStatusForTask != null && idInList(selectedStatusForTask)) {
         if (prev.statusId === selectedStatusForTask) return prev;
         return { ...prev, statusId: selectedStatusForTask };
       }
@@ -2491,16 +2657,16 @@ function usePlannerSidebarWeeklyRepeatOnGuard(
   isOpen: boolean,
   taskType: PlannerTaskTypeOrUnset,
   frequency: string,
-  repeatOn: string,
+  repeatOn: string[],
   setFormData: React.Dispatch<React.SetStateAction<CreateTaskFormData>>,
 ): void {
   useEffect(() => {
     if (!isOpen || taskType !== "recurring" || frequency !== "weekly") {
       return;
     }
-    const v = repeatOn.trim().toLowerCase();
-    if (!isWeeklyRepeatOnValue(v)) {
-      setFormData((prev) => ({ ...prev, repeatOn: "monday" }));
+    const normalized = normalizeWeeklyRepeatOnFromApi(repeatOn);
+    if (normalized.length === 0) {
+      setFormData((prev) => ({ ...prev, repeatOn: ["monday"] }));
     }
   }, [isOpen, taskType, frequency, repeatOn, setFormData]);
 }
@@ -2559,7 +2725,10 @@ function usePlannerSidebarFormOpenLifecycle(
         return;
       }
       setFormData(
-        mergeOpenedPlannerSidebarFormData(getInitialFormData(), taskTypeOptions),
+        mergeOpenedPlannerSidebarFormData(
+          getInitialFormData(),
+          taskTypeOptions,
+        ),
       );
     } else {
       setSearchQuery("");
@@ -2681,7 +2850,8 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
   taskEditScope = "full",
   openAsRecurringConversion = false,
 }) => {
-  const normalizedTaskTypeOptions = useNormalizedPlannerTaskTypeOptions(taskTypeChoices);
+  const normalizedTaskTypeOptions =
+    useNormalizedPlannerTaskTypeOptions(taskTypeChoices);
   const taskTypeOptions = useMemo<PlannerTaskType[]>(
     (): PlannerTaskType[] =>
       resolveSidebarTaskTypeOptions(
@@ -2718,7 +2888,8 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
     openAsRecurringConversion,
   ]);
 
-  const [formData, setFormData] = useState<CreateTaskFormData>(getInitialFormData());
+  const [formData, setFormData] =
+    useState<CreateTaskFormData>(getInitialFormData());
   const [searchQuery, setSearchQuery] = useState("");
   const [assigneeSearchQuery, setAssigneeSearchQuery] = useState("");
   const [showAssigneeDropdown, setShowAssigneeDropdown] = useState(false);
@@ -2731,7 +2902,9 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
     loadingGenericStatuses,
   } = usePlannerSidebarReferenceLists(isOpen);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [linkedRecordsFromApi, setLinkedRecordsFromApi] = useState<LinkedRecord[]>([]);
+  const [linkedRecordsFromApi, setLinkedRecordsFromApi] = useState<
+    LinkedRecord[]
+  >([]);
   const [loadingLinkedRecords, setLoadingLinkedRecords] = useState(false);
 
   const fetchLinkRecordsForSearch = useCallback(
@@ -2747,7 +2920,9 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
           page: 1,
           limit: 30,
           search: query.trim() || undefined,
-          ...(projectId != null && projectId > 0 ? { project_id: projectId } : {}),
+          ...(projectId != null && projectId > 0
+            ? { project_id: projectId }
+            : {}),
         });
         setLinkedRecordsFromApi(
           linkedRecordsFromListTasksForSidebar(response, isEdit, editTask),
@@ -2765,7 +2940,7 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
       editTask?.id,
       editTask?.project_id,
       editTask?.project?.id,
-    ]
+    ],
   );
 
   const handleTaskTypeChange = useCallback(
@@ -2797,7 +2972,9 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
 
   useEffect(() => {
     if (!isOpen) return;
-    fetchLinkRecordsForSearch(searchQuery, formData.projectId).catch(() => undefined);
+    fetchLinkRecordsForSearch(searchQuery, formData.projectId).catch(
+      () => undefined,
+    );
   }, [isOpen, fetchLinkRecordsForSearch]);
 
   usePlannerSidebarFormOpenLifecycle({
@@ -2820,7 +2997,10 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
 
   const users: UserType[] = mapExtensionsToPlannerUsers(extensions);
 
-  const projects: Project[] = resolveSidebarProjects(fetchedProjects, propProject);
+  const projects: Project[] = resolveSidebarProjects(
+    fetchedProjects,
+    propProject,
+  );
 
   const statuses: Status[] = resolveSidebarStatusesForProject(
     formData.projectId,
@@ -2865,7 +3045,9 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
   );
 
   const isLimitedTaskEdit = Boolean(isEdit && taskEditScope === "limited");
-  const isRecurringConversionMode = Boolean(isEdit && openAsRecurringConversion);
+  const isRecurringConversionMode = Boolean(
+    isEdit && openAsRecurringConversion,
+  );
   const isEditingRecurringTemplate = isEditingRecurringTaskTemplate(
     isEdit,
     editTask,
@@ -2965,7 +3147,9 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
   const toggleLinkedRecord = useCallback((recordId: number) => {
     setFormData((prev) => ({
       ...prev,
-      linkedRecordIds: prev.linkedRecordIds.includes(recordId) ? [] : [recordId],
+      linkedRecordIds: prev.linkedRecordIds.includes(recordId)
+        ? []
+        : [recordId],
     }));
   }, []);
 
@@ -2973,7 +3157,9 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
     (e: React.ChangeEvent<HTMLInputElement>) => {
       const value = e.target.value;
       setSearchQuery(value);
-      fetchLinkRecordsForSearch(value, formData.projectId).catch(() => undefined);
+      fetchLinkRecordsForSearch(value, formData.projectId).catch(
+        () => undefined,
+      );
     },
     [formData.projectId, fetchLinkRecordsForSearch],
   );
@@ -2981,7 +3167,9 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
   const handleStartDateInputChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
       const newStart = e.target.value;
-      setFormData((prev) => computePlannerSidebarStartDateChange(prev, newStart));
+      setFormData((prev) =>
+        computePlannerSidebarStartDateChange(prev, newStart),
+      );
     },
     [],
   );
@@ -3006,14 +3194,12 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
   );
 
   const selectedAssignees = users.filter((u) =>
-    formData.assigneeIds.includes(u.id)
+    formData.assigneeIds.includes(u.id),
   );
   const selectedWatchers = users.filter((u) =>
-    formData.watcherIds.includes(u.id)
+    formData.watcherIds.includes(u.id),
   );
-  const selectedLabels = labels.filter((l) =>
-    formData.labelIds.includes(l.id)
-  );
+  const selectedLabels = labels.filter((l) => formData.labelIds.includes(l.id));
 
   const linkedRecordsForDisplay = useMemo(
     () =>
@@ -3141,7 +3327,7 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
             }}
           >
             <ListTodo size={20} color={PLANNER_TASK_SIDEBAR.textMuted} strokeWidth={2} />
-            {getSidebarTitle(formData.taskType, isEdit)}
+            {getSidebarTitle(formData.taskType, isEdit, isRecurringConversionMode)}
           </h2>
           <button
             type="button"
@@ -3198,44 +3384,45 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
             <LimitedTaskEditBanner visible={isLimitedTaskEdit} />
             
 
-            <Row>
-
-              <Col xs={12}>
-              <Form.Group className={groupClass}>
-              <Form.Label style={labelStyle}>
-                <FileText size={16} className="me-2" style={{ verticalAlign: "middle" }} />
-                Title <span style={{ color: "#ef4444" }}>*</span>
-              </Form.Label>
-              <Form.Control
-                type="text"
-                placeholder="Enter task title"
-                value={formData.title}
-                maxLength={TASK_TITLE_MAX_LENGTH}
-                onChange={(e) =>
-                  setFormData((prev) => ({
-                    ...prev,
-                    title: clampTaskTitleLength(e.target.value),
-                  }))
-                }
-                className="py-2"
-                style={{ fontSize: "14px" }}
-                required
-              />
-              <div
-                className="d-flex justify-content-between align-items-baseline gap-2 mt-1"
-              >
-                <Form.Text className="text-muted mb-0">
-                  Maximum {TASK_TITLE_MAX_LENGTH} characters.
-                </Form.Text>
-                <Form.Text
-                  className="text-muted mb-0 small text-nowrap"
-                  aria-live="polite"
-                >
-                  {formData.title.length}/{TASK_TITLE_MAX_LENGTH}
-                </Form.Text>
-              </div>
-            </Form.Group>
-              </Col>
+              <Row>
+                <Col xs={12}>
+                  <Form.Group className={groupClass}>
+                    <Form.Label style={labelStyle}>
+                      <FileText
+                        size={16}
+                        className="me-2"
+                        style={{ verticalAlign: "middle" }}
+                      />
+                      Title <span style={{ color: "#ef4444" }}>*</span>
+                    </Form.Label>
+                    <Form.Control
+                      type="text"
+                      placeholder="Enter task title"
+                      value={formData.title}
+                      maxLength={TASK_TITLE_MAX_LENGTH}
+                      onChange={(e) =>
+                        setFormData((prev) => ({
+                          ...prev,
+                          title: clampTaskTitleLength(e.target.value),
+                        }))
+                      }
+                      className="py-2"
+                      style={{ fontSize: "14px" }}
+                      required
+                    />
+                    <div className="d-flex justify-content-between align-items-baseline gap-2 mt-1">
+                      <Form.Text className="text-muted mb-0">
+                        Maximum {TASK_TITLE_MAX_LENGTH} characters.
+                      </Form.Text>
+                      <Form.Text
+                        className="text-muted mb-0 small text-nowrap"
+                        aria-live="polite"
+                      >
+                        {formData.title.length}/{TASK_TITLE_MAX_LENGTH}
+                      </Form.Text>
+                    </div>
+                  </Form.Group>
+                </Col>
 
               {!isRecurringConversionMode && (
                 <Col xs={12} md={6}>
@@ -3298,417 +3485,462 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
                   </Col>
                 )}
 
-              {!isRecurringConversionMode && (
-              <Col xs={12}>
-              <Form.Group className={groupClass}>
-                  <Form.Label style={labelStyle}>
-                    Associate with records
-                  </Form.Label>
-                  <PlannerSidebarLinkedRecordChipsStrip
-                    records={selectedLinkedRecords}
-                    onRemove={removeLinkedRecordById}
-                  />
-                  <div style={{ marginBottom: 8 }}>
-                    <Form.Control
-                      type="text"
-                      placeholder="Search task..."
-                      value={searchQuery}
-                      onChange={handleLinkedRecordsSearchChange}
-                      className="py-2"
-                      style={{ fontSize: "14px" }}
-                    />
-                  </div>
-                  <div
-                    style={{
-                      maxHeight: 200,
-                      overflowY: "auto",
-                      backgroundColor: "#f8fafc",
-                      border: "1px solid #e2e8f0",
-                      borderRadius: 4,
-                    }}
-                  >
-                    <PlannerSidebarLinkedRecordsBody
-                      loadingLinkedRecords={loadingLinkedRecords}
-                      linkedRecordsForDisplay={linkedRecordsForDisplay}
-                      searchQuery={searchQuery}
-                      linkedRecordIds={formData.linkedRecordIds}
-                      toggleLinkedRecord={toggleLinkedRecord}
-                    />
-                  </div>
-                </Form.Group>
-              </Col>
-              )}
-
-              <Col xs={12}>
-              {!isRecurringConversionMode && formData.taskType !== "todo" && (
-              <fieldset
-                disabled={isLimitedTaskEdit}
-                style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}
-              >
-              <Form.Group className={groupClass}>
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    marginBottom: 8,
-                  }}
-                >
-                  <Form.Label style={{ ...labelStyle, marginBottom: 0 }}>
-                    <Users size={16} className="me-2" style={{ verticalAlign: "middle" }} />
-                    Assigned To
-                  </Form.Label>
-                  {!isLimitedTaskEdit && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setShowAssigneeDropdown(!showAssigneeDropdown);
-                        if (!showAssigneeDropdown) setAssigneeSearchQuery("");
-                      }}
-                      style={{
-                        backgroundColor: "rgb(255, 255, 255)",
-                        borderColor: "rgb(138, 138, 138)",
-                        color: "rgb(20, 20, 20)",
-                        textDecoration: "none",
-                        borderRadius: 4,
-                        borderWidth: 1,
-                        borderStyle: "solid",
-                        verticalAlign: "middle",
-                        paddingBlock: "8px",
-                        paddingInline: "16px",
-                        maxWidth: "100%",
-                        fontFamily: '"Lexend Deca", Helvetica, Arial, sans-serif',
-                        fontSize: "12px",
-                        fontWeight: 300,
-                        letterSpacing: "0px",
-                        lineHeight: "14px",
-                        textUnderlineOffset: "24%",
-                        display: "inline-flex",
-                        alignItems: "center",
-                        gap: 6,
-                        cursor: "pointer",
-                      }}
-                    >
-                      <Plus size={14} />
-                      Add Assignee
-                    </button>
-                  )}
-                </div>
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 8,
-                    flexWrap: "wrap",
-                    marginBottom: 8,
-                  }}
-                >
-                  {selectedAssignees.map((user) =>
-                    isLimitedTaskEdit ? (
-                      <span
-                        key={user.id}
-                        style={{
-                          display: "inline-flex",
-                          alignItems: "center",
-                          gap: 8,
-                          padding: "6px 12px",
-                          borderRadius: 6,
-                          backgroundColor: "#edf6ff",
-                          border: "1px solid #bfdbfe",
-                          fontSize: "0.875rem",
-                          color: "#141414",
-                          fontWeight: 500,
-                        }}
-                      >
-                        {user.name}
-                      </span>
-                    ) : (
-                      <button
-                        key={user.id}
-                        type="button"
-                        onClick={() => toggleAssignee(user.id)}
-                        style={{
-                          display: "inline-flex",
-                          alignItems: "center",
-                          gap: 8,
-                          padding: "6px 12px",
-                          borderRadius: 6,
-                          backgroundColor: "#edf6ff",
-                          border: "1px solid #bfdbfe",
-                          fontSize: "0.875rem",
-                          cursor: "pointer",
-                          font: "inherit",
-                        }}
-                      >
-                        <span style={{ color: "#141414", fontWeight: 500 }}>
-                          {user.name}
-                        </span>
-                        <X size={14} style={{ color: "#64748b" }} />
-                      </button>
-                    ),
-                  )}
-                </div>
-                {showAssigneeDropdown && !isLimitedTaskEdit && (
-                  <div
-                    style={{
-                      border: "1px solid #e2e8f0",
-                      borderRadius: 4,
-                      backgroundColor: "#f8fafc",
-                      maxHeight: 250,
-                      overflowY: "auto",
-                    }}
-                  >
-                    <div
-                      className="p-2 border-bottom"
-                      style={{ backgroundColor: "white" }}
-                    >
-                      <Form.Control
-                        type="text"
-                        placeholder="Search assignees..."
-                        value={assigneeSearchQuery}
-                        onChange={(e) =>
-                          setAssigneeSearchQuery(e.target.value)
-                        }
-                        className="py-2"
-                        style={{ paddingLeft: 40, fontSize: "14px" }}
+                {!isRecurringConversionMode && (
+                  <Col xs={12}>
+                    <Form.Group className={groupClass}>
+                      <Form.Label style={labelStyle}>
+                        Associate with records
+                      </Form.Label>
+                      <PlannerSidebarLinkedRecordChipsStrip
+                        records={selectedLinkedRecords}
+                        onRemove={removeLinkedRecordById}
                       />
-                    </div>
-                    {users
-                      .filter((user) =>
-                        user.name
-                          .toLowerCase()
-                          .includes(assigneeSearchQuery.toLowerCase())
-                      )
-                      .map((user) => (
-                        <button
-                          key={user.id}
-                          type="button"
-                          onClick={() => toggleAssignee(user.id)}
-                          style={{
-                            padding: "7px 12px",
-                            cursor: "pointer",
-                            backgroundColor: formData.assigneeIds.includes(user.id)
-                              ? "#edf6ff"
-                              : "white",
-                            border: "none",
-                            borderBottom: "1px solid #d5d5d5",
-                            width: "100%",
-                            textAlign: "left",
-                            font: "inherit",
-                          }}
-                        >
-                          <span
-                            style={{
-                              fontSize: "13px",
-                              color: "#141414",
-                            }}
-                          >
-                            {user.name}
-                          </span>
-                          {formData.assigneeIds.includes(user.id) && (
-                            <Check
-                              size={18}
-                              className="text-primary ms-2"
-                              style={{ flexShrink: 0, display: "inline", verticalAlign: "middle" }}
-                            />
-                          )}
-                        </button>
-                      ))}
-                    
-                  </div>
+                      <div style={{ marginBottom: 8 }}>
+                        <Form.Control
+                          type="text"
+                          placeholder="Search task..."
+                          value={searchQuery}
+                          onChange={handleLinkedRecordsSearchChange}
+                          className="py-2"
+                          style={{ fontSize: "14px" }}
+                        />
+                      </div>
+                      <div
+                        style={{
+                          maxHeight: 200,
+                          overflowY: "auto",
+                          backgroundColor: "#f8fafc",
+                          border: "1px solid #e2e8f0",
+                          borderRadius: 4,
+                        }}
+                      >
+                        <PlannerSidebarLinkedRecordsBody
+                          loadingLinkedRecords={loadingLinkedRecords}
+                          linkedRecordsForDisplay={linkedRecordsForDisplay}
+                          searchQuery={searchQuery}
+                          linkedRecordIds={formData.linkedRecordIds}
+                          toggleLinkedRecord={toggleLinkedRecord}
+                        />
+                      </div>
+                    </Form.Group>
+                  </Col>
                 )}
-              </Form.Group>
-              </fieldset>
-            )}
-              </Col>
 
-              <Col xs={12}>
-              {!isRecurringConversionMode && formData.taskType !== "todo" && (
-              <fieldset
-                disabled={isLimitedTaskEdit}
-                style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}
-              >
-              <Form.Group className={groupClass}>
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    marginBottom: 8,
-                  }}
-                >
-                  <Form.Label style={{ ...labelStyle, marginBottom: 0 }}>
-                    <Eye size={16} className="me-2" style={{ verticalAlign: "middle" }} />
-                    Watchers
-                  </Form.Label>
-                  {!isLimitedTaskEdit && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setShowWatcherDropdown(!showWatcherDropdown);
-                        if (!showWatcherDropdown) setWatcherSearchQuery("");
-                      }}
-                      style={{
-                        backgroundColor: "rgb(255, 255, 255)",
-                        borderColor: "rgb(138, 138, 138)",
-                        color: "rgb(20, 20, 20)",
-                        textDecoration: "none",
-                        borderRadius: 4,
-                        borderWidth: 1,
-                        borderStyle: "solid",
-                        verticalAlign: "middle",
-                        paddingBlock: "8px",
-                        paddingInline: "16px",
-                        maxWidth: "100%",
-                        fontFamily: '"Lexend Deca", Helvetica, Arial, sans-serif',
-                        fontSize: "12px",
-                        fontWeight: 300,
-                        letterSpacing: "0px",
-                        lineHeight: "14px",
-                        textUnderlineOffset: "24%",
-                        display: "inline-flex",
-                        alignItems: "center",
-                        gap: 6,
-                        cursor: "pointer",
-                      }}
-                    >
-                      <Plus size={14} />
-                      Add Watcher
-                    </button>
-                  )}
-                </div>
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 8,
-                    flexWrap: "wrap",
-                    marginBottom: 8,
-                  }}
-                >
-                  {selectedWatchers.map((user) =>
-                    isLimitedTaskEdit ? (
-                      <span
-                        key={user.id}
+                <Col xs={12}>
+                  {!isRecurringConversionMode &&
+                    formData.taskType !== "todo" && (
+                      <fieldset
+                        disabled={isLimitedTaskEdit}
                         style={{
-                          display: "inline-flex",
-                          alignItems: "center",
-                          gap: 8,
-                          padding: "6px 12px",
-                          borderRadius: 6,
-                          backgroundColor: "#f0fdf4",
-                          border: "1px solid #bbf7d0",
-                          fontSize: "0.875rem",
-                          color: "#141414",
-                          fontWeight: 500,
+                          border: 0,
+                          padding: 0,
+                          margin: 0,
+                          minWidth: 0,
                         }}
                       >
-                        {user.name}
-                      </span>
-                    ) : (
-                      <button
-                        key={user.id}
-                        type="button"
-                        onClick={() => toggleWatcher(user.id)}
-                        style={{
-                          display: "inline-flex",
-                          alignItems: "center",
-                          gap: 8,
-                          padding: "6px 12px",
-                          borderRadius: 6,
-                          backgroundColor: "#f0fdf4",
-                          border: "1px solid #bbf7d0",
-                          fontSize: "0.875rem",
-                          cursor: "pointer",
-                          font: "inherit",
-                        }}
-                      >
-                        <span style={{ color: "#141414", fontWeight: 500 }}>
-                          {user.name}
-                        </span>
-                        <X size={14} style={{ color: "#64748b" }} />
-                      </button>
-                    ),
-                  )}
-                </div>
-                {showWatcherDropdown && !isLimitedTaskEdit && (
-                  <div
-                    style={{
-                      border: "1px solid #e2e8f0",
-                      borderRadius: 4,
-                      backgroundColor: "#f8fafc",
-                      maxHeight: 250,
-                      overflowY: "auto",
-                    }}
-                  >
-                    <div
-                      className="p-2 border-bottom"
-                      style={{ backgroundColor: "white" }}
-                    >
-                      <Form.Control
-                        type="text"
-                        placeholder="Search watchers..."
-                        value={watcherSearchQuery}
-                        onChange={(e) =>
-                          setWatcherSearchQuery(e.target.value)
-                        }
-                        className="py-2"
-                        style={{ paddingLeft: 40, fontSize: "14px" }}
-                      />
-                    </div>
-                    {users
-                      .filter((user) =>
-                        user.name
-                          .toLowerCase()
-                          .includes(watcherSearchQuery.toLowerCase())
-                      )
-                      .map((user) => (
-                        <button
-                          key={user.id}
-                          type="button"
-                          onClick={() => toggleWatcher(user.id)}
-                          style={{
-                            padding: "7px 12px",
-                            cursor: "pointer",
-                            backgroundColor: formData.watcherIds.includes(user.id)
-                              ? "#f0fdf4"
-                              : "white",
-                            border: "none",
-                            borderBottom: "1px solid #d5d5d5",
-                            width: "100%",
-                            textAlign: "left",
-                            font: "inherit",
-                          }}
-                        >
-                          <span
+                        <Form.Group className={groupClass}>
+                          <div
                             style={{
-                              fontSize: "13px",
-                              color: "#141414",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "space-between",
+                              marginBottom: 8,
                             }}
                           >
-                            {user.name}
-                          </span>
-                          {formData.watcherIds.includes(user.id) && (
-                            <Check
-                              size={18}
+                            <Form.Label
+                              style={{ ...labelStyle, marginBottom: 0 }}
+                            >
+                              <Users
+                                size={16}
+                                className="me-2"
+                                style={{ verticalAlign: "middle" }}
+                              />
+                              Assigned To
+                            </Form.Label>
+                            {!isLimitedTaskEdit && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setShowAssigneeDropdown(
+                                    !showAssigneeDropdown,
+                                  );
+                                  if (!showAssigneeDropdown)
+                                    setAssigneeSearchQuery("");
+                                }}
+                                style={{
+                                  backgroundColor: "rgb(255, 255, 255)",
+                                  borderColor: "rgb(138, 138, 138)",
+                                  color: "rgb(20, 20, 20)",
+                                  textDecoration: "none",
+                                  borderRadius: 4,
+                                  borderWidth: 1,
+                                  borderStyle: "solid",
+                                  verticalAlign: "middle",
+                                  paddingBlock: "8px",
+                                  paddingInline: "16px",
+                                  maxWidth: "100%",
+                                  fontFamily:
+                                    '"Lexend Deca", Helvetica, Arial, sans-serif',
+                                  fontSize: "12px",
+                                  fontWeight: 300,
+                                  letterSpacing: "0px",
+                                  lineHeight: "14px",
+                                  textUnderlineOffset: "24%",
+                                  display: "inline-flex",
+                                  alignItems: "center",
+                                  gap: 6,
+                                  cursor: "pointer",
+                                }}
+                              >
+                                <Plus size={14} />
+                                Add Assignee
+                              </button>
+                            )}
+                          </div>
+                          <div
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 8,
+                              flexWrap: "wrap",
+                              marginBottom: 8,
+                            }}
+                          >
+                            {selectedAssignees.map((user) =>
+                              isLimitedTaskEdit ? (
+                                <span
+                                  key={user.id}
+                                  style={{
+                                    display: "inline-flex",
+                                    alignItems: "center",
+                                    gap: 8,
+                                    padding: "6px 12px",
+                                    borderRadius: 6,
+                                    backgroundColor: "#edf6ff",
+                                    border: "1px solid #bfdbfe",
+                                    fontSize: "0.875rem",
+                                    color: "#141414",
+                                    fontWeight: 500,
+                                  }}
+                                >
+                                  {user.name}
+                                </span>
+                              ) : (
+                                <button
+                                  key={user.id}
+                                  type="button"
+                                  onClick={() => toggleAssignee(user.id)}
+                                  style={{
+                                    display: "inline-flex",
+                                    alignItems: "center",
+                                    gap: 8,
+                                    padding: "6px 12px",
+                                    borderRadius: 6,
+                                    backgroundColor: "#edf6ff",
+                                    border: "1px solid #bfdbfe",
+                                    fontSize: "0.875rem",
+                                    cursor: "pointer",
+                                    font: "inherit",
+                                  }}
+                                >
+                                  <span
+                                    style={{
+                                      color: "#141414",
+                                      fontWeight: 500,
+                                    }}
+                                  >
+                                    {user.name}
+                                  </span>
+                                  <X size={14} style={{ color: "#64748b" }} />
+                                </button>
+                              ),
+                            )}
+                          </div>
+                          {showAssigneeDropdown && !isLimitedTaskEdit && (
+                            <div
                               style={{
-                                flexShrink: 0,
-                                display: "inline",
-                                verticalAlign: "middle",
-                                color: "#22c55e",
+                                border: "1px solid #e2e8f0",
+                                borderRadius: 4,
+                                backgroundColor: "#f8fafc",
+                                maxHeight: 250,
+                                overflowY: "auto",
                               }}
-                            />
+                            >
+                              <div
+                                className="p-2 border-bottom"
+                                style={{ backgroundColor: "white" }}
+                              >
+                                <Form.Control
+                                  type="text"
+                                  placeholder="Search assignees..."
+                                  value={assigneeSearchQuery}
+                                  onChange={(e) =>
+                                    setAssigneeSearchQuery(e.target.value)
+                                  }
+                                  className="py-2"
+                                  style={{ paddingLeft: 40, fontSize: "14px" }}
+                                />
+                              </div>
+                              {users
+                                .filter((user) =>
+                                  user.name
+                                    .toLowerCase()
+                                    .includes(
+                                      assigneeSearchQuery.toLowerCase(),
+                                    ),
+                                )
+                                .map((user) => (
+                                  <button
+                                    key={user.id}
+                                    type="button"
+                                    onClick={() => toggleAssignee(user.id)}
+                                    style={{
+                                      padding: "7px 12px",
+                                      cursor: "pointer",
+                                      backgroundColor:
+                                        formData.assigneeIds.includes(user.id)
+                                          ? "#edf6ff"
+                                          : "white",
+                                      border: "none",
+                                      borderBottom: "1px solid #d5d5d5",
+                                      width: "100%",
+                                      textAlign: "left",
+                                      font: "inherit",
+                                    }}
+                                  >
+                                    <span
+                                      style={{
+                                        fontSize: "13px",
+                                        color: "#141414",
+                                      }}
+                                    >
+                                      {user.name}
+                                    </span>
+                                    {formData.assigneeIds.includes(user.id) && (
+                                      <Check
+                                        size={18}
+                                        className="text-primary ms-2"
+                                        style={{
+                                          flexShrink: 0,
+                                          display: "inline",
+                                          verticalAlign: "middle",
+                                        }}
+                                      />
+                                    )}
+                                  </button>
+                                ))}
+                            </div>
                           )}
-                        </button>
-                      ))}
-                    
-                  </div>
-                )}
-              </Form.Group>
-              </fieldset>
-            )}
+                        </Form.Group>
+                      </fieldset>
+                    )}
+                </Col>
 
-              </Col>
+                <Col xs={12}>
+                  {!isRecurringConversionMode &&
+                    formData.taskType !== "todo" && (
+                      <fieldset
+                        disabled={isLimitedTaskEdit}
+                        style={{
+                          border: 0,
+                          padding: 0,
+                          margin: 0,
+                          minWidth: 0,
+                        }}
+                      >
+                        <Form.Group className={groupClass}>
+                          <div
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "space-between",
+                              marginBottom: 8,
+                            }}
+                          >
+                            <Form.Label
+                              style={{ ...labelStyle, marginBottom: 0 }}
+                            >
+                              <Eye
+                                size={16}
+                                className="me-2"
+                                style={{ verticalAlign: "middle" }}
+                              />
+                              Watchers
+                            </Form.Label>
+                            {!isLimitedTaskEdit && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setShowWatcherDropdown(!showWatcherDropdown);
+                                  if (!showWatcherDropdown)
+                                    setWatcherSearchQuery("");
+                                }}
+                                style={{
+                                  backgroundColor: "rgb(255, 255, 255)",
+                                  borderColor: "rgb(138, 138, 138)",
+                                  color: "rgb(20, 20, 20)",
+                                  textDecoration: "none",
+                                  borderRadius: 4,
+                                  borderWidth: 1,
+                                  borderStyle: "solid",
+                                  verticalAlign: "middle",
+                                  paddingBlock: "8px",
+                                  paddingInline: "16px",
+                                  maxWidth: "100%",
+                                  fontFamily:
+                                    '"Lexend Deca", Helvetica, Arial, sans-serif',
+                                  fontSize: "12px",
+                                  fontWeight: 300,
+                                  letterSpacing: "0px",
+                                  lineHeight: "14px",
+                                  textUnderlineOffset: "24%",
+                                  display: "inline-flex",
+                                  alignItems: "center",
+                                  gap: 6,
+                                  cursor: "pointer",
+                                }}
+                              >
+                                <Plus size={14} />
+                                Add Watcher
+                              </button>
+                            )}
+                          </div>
+                          <div
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 8,
+                              flexWrap: "wrap",
+                              marginBottom: 8,
+                            }}
+                          >
+                            {selectedWatchers.map((user) =>
+                              isLimitedTaskEdit ? (
+                                <span
+                                  key={user.id}
+                                  style={{
+                                    display: "inline-flex",
+                                    alignItems: "center",
+                                    gap: 8,
+                                    padding: "6px 12px",
+                                    borderRadius: 6,
+                                    backgroundColor: "#f0fdf4",
+                                    border: "1px solid #bbf7d0",
+                                    fontSize: "0.875rem",
+                                    color: "#141414",
+                                    fontWeight: 500,
+                                  }}
+                                >
+                                  {user.name}
+                                </span>
+                              ) : (
+                                <button
+                                  key={user.id}
+                                  type="button"
+                                  onClick={() => toggleWatcher(user.id)}
+                                  style={{
+                                    display: "inline-flex",
+                                    alignItems: "center",
+                                    gap: 8,
+                                    padding: "6px 12px",
+                                    borderRadius: 6,
+                                    backgroundColor: "#f0fdf4",
+                                    border: "1px solid #bbf7d0",
+                                    fontSize: "0.875rem",
+                                    cursor: "pointer",
+                                    font: "inherit",
+                                  }}
+                                >
+                                  <span
+                                    style={{
+                                      color: "#141414",
+                                      fontWeight: 500,
+                                    }}
+                                  >
+                                    {user.name}
+                                  </span>
+                                  <X size={14} style={{ color: "#64748b" }} />
+                                </button>
+                              ),
+                            )}
+                          </div>
+                          {showWatcherDropdown && !isLimitedTaskEdit && (
+                            <div
+                              style={{
+                                border: "1px solid #e2e8f0",
+                                borderRadius: 4,
+                                backgroundColor: "#f8fafc",
+                                maxHeight: 250,
+                                overflowY: "auto",
+                              }}
+                            >
+                              <div
+                                className="p-2 border-bottom"
+                                style={{ backgroundColor: "white" }}
+                              >
+                                <Form.Control
+                                  type="text"
+                                  placeholder="Search watchers..."
+                                  value={watcherSearchQuery}
+                                  onChange={(e) =>
+                                    setWatcherSearchQuery(e.target.value)
+                                  }
+                                  className="py-2"
+                                  style={{ paddingLeft: 40, fontSize: "14px" }}
+                                />
+                              </div>
+                              {users
+                                .filter((user) =>
+                                  user.name
+                                    .toLowerCase()
+                                    .includes(watcherSearchQuery.toLowerCase()),
+                                )
+                                .map((user) => (
+                                  <button
+                                    key={user.id}
+                                    type="button"
+                                    onClick={() => toggleWatcher(user.id)}
+                                    style={{
+                                      padding: "7px 12px",
+                                      cursor: "pointer",
+                                      backgroundColor:
+                                        formData.watcherIds.includes(user.id)
+                                          ? "#f0fdf4"
+                                          : "white",
+                                      border: "none",
+                                      borderBottom: "1px solid #d5d5d5",
+                                      width: "100%",
+                                      textAlign: "left",
+                                      font: "inherit",
+                                    }}
+                                  >
+                                    <span
+                                      style={{
+                                        fontSize: "13px",
+                                        color: "#141414",
+                                      }}
+                                    >
+                                      {user.name}
+                                    </span>
+                                    {formData.watcherIds.includes(user.id) && (
+                                      <Check
+                                        size={18}
+                                        style={{
+                                          flexShrink: 0,
+                                          display: "inline",
+                                          verticalAlign: "middle",
+                                          color: "#22c55e",
+                                        }}
+                                      />
+                                    )}
+                                  </button>
+                                ))}
+                            </div>
+                          )}
+                        </Form.Group>
+                      </fieldset>
+                    )}
+                </Col>
 
               {!isRecurringConversionMode && (
                 <Col xs={12} md={6}>
@@ -3809,556 +4041,598 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
 
             </Row>
 
-            {formData.taskType === "recurring" && (
-              <div className="planner-sidebar-section">
-                <div className="planner-sidebar-section__title">Recurring schedule</div>
-                <Form.Group className={groupClass}>
-                  <Form.Label style={labelStyle}>
-                    <Calendar size={16} className="me-2" style={{ verticalAlign: "middle" }} />
-                    Frequency
-                  </Form.Label>
-                  <Form.Select
-                    value={formData.frequency}
-                    onChange={handleRecurringFrequencySelectChange}
-                    className="py-2"
-                    style={{ fontSize: "14px" }}
-                  >
-                    <option value="daily">Daily</option>
-                    <option value="weekly">Weekly</option>
-                    <option value="monthly">Monthly</option>
-                    <option value="yearly">Yearly</option>
-                    <option value="custom">Custom</option>
-                  </Form.Select>
-                </Form.Group>
-                <Row>
-                  <Col xs={12} md={6}>
-                    <Form.Group className={groupClass}>
-                      <Form.Label style={labelStyle}>
-                        Repeat every
-                      </Form.Label>
-                      <Form.Control
-                        type="number"
-                        min={1}
-                        max={99}
-                        value={formData.repeatInterval}
-                        onChange={(e) =>
-                          setFormData({
-                            ...formData,
-                            repeatInterval: Math.max(1, Math.min(99, Number(e.target.value) || 1)),
-                          })
-                        }
-                        className="py-2"
-                        style={{ fontSize: "14px" }}
+              {formData.taskType === "recurring" && (
+                <div className="planner-sidebar-section">
+                  <div className="planner-sidebar-section__title">
+                    Recurring schedule
+                  </div>
+                  <Form.Group className={groupClass}>
+                    <Form.Label style={labelStyle}>
+                      <Calendar
+                        size={16}
+                        className="me-2"
+                        style={{ verticalAlign: "middle" }}
                       />
-                      <Form.Text className="text-muted">
-                        {formData.frequency === "daily" && "day(s)"}
-                        {formData.frequency === "weekly" && "week(s)"}
-                        {formData.frequency === "monthly" && "month(s)"}
-                        {formData.frequency === "yearly" && "year(s)"}
-                        {formData.frequency === "custom" && "custom interval"}
-                      </Form.Text>
-                    </Form.Group>
-                  </Col>
-                  {formData.frequency === "custom" && (
+                      Frequency
+                    </Form.Label>
+                    <Form.Select
+                      value={formData.frequency}
+                      onChange={handleRecurringFrequencySelectChange}
+                      className="py-2"
+                      style={{ fontSize: "14px" }}
+                    >
+                      <option value="daily">Daily</option>
+                      <option value="weekly">Weekly</option>
+                      <option value="monthly">Monthly</option>
+                      <option value="yearly">Yearly</option>
+                      <option value="custom">Custom</option>
+                    </Form.Select>
+                  </Form.Group>
+                  <Row>
                     <Col xs={12} md={6}>
                       <Form.Group className={groupClass}>
-                        <Form.Label style={labelStyle}>Custom unit</Form.Label>
-                        <Form.Select
-                          value={formData.customIntervalUnit}
+                        <Form.Label style={labelStyle}>Repeat every</Form.Label>
+                        <Form.Control
+                          type="number"
+                          min={1}
+                          max={99}
+                          value={formData.repeatInterval}
                           onChange={(e) =>
                             setFormData({
                               ...formData,
-                              customIntervalUnit: e.target.value as CustomFrequencyUnit,
+                              repeatInterval: Math.max(
+                                1,
+                                Math.min(99, Number(e.target.value) || 1),
+                              ),
                             })
                           }
                           className="py-2"
                           style={{ fontSize: "14px" }}
-                        >
-                          <option value="days">Day(s)</option>
-                          <option value="weeks">Week(s)</option>
-                          <option value="months">Month(s)</option>
-                          <option value="years">Year(s)</option>
-                        </Form.Select>
+                        />
+                        <Form.Text className="text-muted">
+                          {formData.frequency === "daily" && "day(s)"}
+                          {formData.frequency === "weekly" && "week(s)"}
+                          {formData.frequency === "monthly" && "month(s)"}
+                          {formData.frequency === "yearly" && "year(s)"}
+                          {formData.frequency === "custom" && "custom interval"}
+                        </Form.Text>
                       </Form.Group>
                     </Col>
-                  )}
-                  {(formData.frequency === "weekly" || formData.frequency === "monthly") && (
-                    <Col xs={12} md={6}>
-                      <Form.Group className={groupClass}>
-                        <Form.Label style={labelStyle}>
-                          {formData.frequency === "weekly" ? "Repeat on" : "Day of month"}
-                        </Form.Label>
-                        {formData.frequency === "weekly" ? (
+                    {formData.frequency === "custom" && (
+                      <Col xs={12} md={6}>
+                        <Form.Group className={groupClass}>
+                          <Form.Label style={labelStyle}>
+                            Custom unit
+                          </Form.Label>
                           <Form.Select
-                            value={
-                              isWeeklyRepeatOnValue(formData.repeatOn.trim().toLowerCase())
-                                ? formData.repeatOn.trim().toLowerCase()
-                                : "monday"
-                            }
+                            value={formData.customIntervalUnit}
                             onChange={(e) =>
-                              setFormData({ ...formData, repeatOn: e.target.value })
+                              setFormData({
+                                ...formData,
+                                customIntervalUnit: e.target
+                                  .value as CustomFrequencyUnit,
+                              })
                             }
                             className="py-2"
                             style={{ fontSize: "14px" }}
                           >
-                            {WEEKLY_REPEAT_ON_OPTIONS.map((opt) => (
-                              <option key={opt.value} value={opt.value}>
-                                {opt.label}
-                              </option>
-                            ))}
+                            <option value="days">Day(s)</option>
+                            <option value="weeks">Week(s)</option>
+                            <option value="months">Month(s)</option>
+                            <option value="years">Year(s)</option>
                           </Form.Select>
-                        ) : (
-                          <Form.Control
-                            type="number"
-                            min={1}
-                            max={31}
-                            placeholder="e.g. 15"
-                            value={formData.repeatOn || ""}
-                            onChange={(e) => {
-                              const v = e.target.value;
-                              const num =
-                                v === "" ? "" : String(Math.max(1, Math.min(31, Number(v) || 1)));
-                              setFormData({ ...formData, repeatOn: num });
-                            }}
-                            className="py-2"
-                            style={{ fontSize: "14px" }}
-                          />
-                        )}
-                      </Form.Group>
-                    </Col>
-                  )}
-                </Row>
-                <Form.Group className={groupClass}>
-                  <Form.Label style={labelStyle}>
-                    <Calendar size={16} className="me-2" style={{ verticalAlign: "middle" }} />
-                    Time (optional)
-                  </Form.Label>
-                  <Form.Control
-                    type="time"
-                    value={formData.dueTime}
-                    onChange={(e) =>
-                      setFormData({ ...formData, dueTime: e.target.value })
-                    }
-                    className="py-2"
-                    style={{ fontSize: "14px" }}
-                  />
-                </Form.Group>
-                <Row>
-                  <Col xs={12} md={6}>
-                    <Form.Group className={groupClass}>
-                      <Form.Label style={labelStyle}>
-                        Estimated duration (optional)
-                      </Form.Label>
-                      <Form.Control
-                        type="number"
-                        min={0}
-                        max={525600}
-                        placeholder="Minutes"
-                        value={formData.estimatedDurationMinutes}
-                        onChange={(e) =>
-                          setFormData((prev) => ({
-                            ...prev,
-                            estimatedDurationMinutes: e.target.value,
-                          }))
-                        }
-                        className="py-2"
-                        style={{ fontSize: "14px" }}
-                      />
-                    </Form.Group>
-                  </Col>
-                  <Col xs={12} md={6}>
-                    <Form.Group className={groupClass}>
-                      <Form.Label style={labelStyle}>Timezone</Form.Label>
-                      <div
-                        className="planner-sidebar-readonly-value"
-                        title="Detected from your browser"
-                        aria-live="polite"
-                      >
-                        {getAutoTimezone()}
-                      </div>
-                    
-                    </Form.Group>
-                  </Col>
-                </Row>
-                <Form.Group className={groupClass}>
-                  <Form.Label style={labelStyle}>End condition</Form.Label>
-                  <div className="d-flex flex-column gap-2">
-                    <Form.Check
-                      type="radio"
-                      id="rec-end-never"
-                      name="planner-recurring-end"
-                      label="Never — open-ended until you deactivate the template"
-                      checked={formData.recurringEndStrategy === "never"}
-                      onChange={() =>
-                        setFormData((prev) => ({ ...prev, recurringEndStrategy: "never" }))
-                      }
-                    />
-                    <Form.Check
-                      type="radio"
-                      id="rec-end-date"
-                      name="planner-recurring-end"
-                      label="End by date"
-                      checked={formData.recurringEndStrategy === "end_date"}
-                      onChange={() =>
-                        setFormData((prev) => ({ ...prev, recurringEndStrategy: "end_date" }))
-                      }
-                    />
-                    {formData.recurringEndStrategy === "end_date" && (
-                      <Form.Control
-                        type="date"
-                        className="py-2 ms-4"
-                        style={{ maxWidth: 280, fontSize: "14px" }}
-                        value={formData.recurringEndDate}
-                        min={formData.startDate || undefined}
-                        onChange={(e) =>
-                          setFormData((prev) => ({
-                            ...prev,
-                            recurringEndDate: e.target.value,
-                          }))
-                        }
-                      />
+                        </Form.Group>
+                      </Col>
                     )}
-                    <Form.Check
-                      type="radio"
-                      id="rec-end-occ"
-                      name="planner-recurring-end"
-                      label="End after N occurrences"
-                      checked={formData.recurringEndStrategy === "occurrences"}
-                      onChange={() =>
-                        setFormData((prev) => ({ ...prev, recurringEndStrategy: "occurrences" }))
+                    {(formData.frequency === "weekly" ||
+                      formData.frequency === "monthly") && (
+                      <Col xs={12} md={6}>
+                        <Form.Group className={groupClass}>
+                          <Form.Label style={labelStyle}>
+                            {formData.frequency === "weekly"
+                              ? "Repeat on"
+                              : "Day of month"}
+                          </Form.Label>
+                          {formData.frequency === "weekly" ? (
+                            <Select
+                              isMulti
+                              closeMenuOnSelect={false}
+                              options={WEEKLY_REPEAT_ON_OPTIONS}
+                              value={WEEKLY_REPEAT_ON_OPTIONS.filter((opt) =>
+                                formData.repeatOn.includes(opt.value),
+                              )}
+                              onChange={(selected) => {
+                                const nextValues = Array.isArray(selected)
+                                  ? selected.map((item) => item.value)
+                                  : [];
+                                setFormData({
+                                  ...formData,
+                                  repeatOn: nextValues,
+                                });
+                              }}
+                              classNamePrefix="react-select"
+                              placeholder="Select days"
+                            />
+                          ) : (
+                            <Form.Control
+                              type="number"
+                              min={1}
+                              max={31}
+                              placeholder="e.g. 15"
+                              value={formData.repeatOn[0] || ""}
+                              onChange={(e) => {
+                                const v = e.target.value;
+                                const num =
+                                  v === ""
+                                    ? ""
+                                    : String(
+                                        Math.max(
+                                          1,
+                                          Math.min(31, Number(v) || 1),
+                                        ),
+                                      );
+                                setFormData({
+                                  ...formData,
+                                  repeatOn: num === "" ? [] : [num],
+                                });
+                              }}
+                              className="py-2"
+                              style={{ fontSize: "14px" }}
+                            />
+                          )}
+                        </Form.Group>
+                      </Col>
+                    )}
+                  </Row>
+                  <Form.Group className={groupClass}>
+                    <Form.Label style={labelStyle}>
+                      <Calendar
+                        size={16}
+                        className="me-2"
+                        style={{ verticalAlign: "middle" }}
+                      />
+                      Time (optional)
+                    </Form.Label>
+                    <Form.Control
+                      type="time"
+                      value={formData.dueTime}
+                      onChange={(e) =>
+                        setFormData({ ...formData, dueTime: e.target.value })
                       }
+                      className="py-2"
+                      style={{ fontSize: "14px" }}
                     />
-                    {formData.recurringEndStrategy === "occurrences" && (
-                      <div className="d-flex align-items-center gap-2 ms-4 flex-wrap">
+                  </Form.Group>
+                  <Row>
+                    <Col xs={12} md={6}>
+                      <Form.Group className={groupClass}>
+                        <Form.Label style={labelStyle}>
+                          Estimated duration (optional)
+                        </Form.Label>
                         <Form.Control
                           type="number"
-                          min={1}
-                          max={10000}
-                          style={{ maxWidth: 120, fontSize: "14px" }}
-                          value={formData.recurringOccurrences}
+                          min={0}
+                          max={525600}
+                          placeholder="Minutes"
+                          value={formData.estimatedDurationMinutes}
                           onChange={(e) =>
                             setFormData((prev) => ({
                               ...prev,
-                              recurringOccurrences: Math.max(
+                              estimatedDurationMinutes: e.target.value,
+                            }))
+                          }
+                          className="py-2"
+                          style={{ fontSize: "14px" }}
+                        />
+                      </Form.Group>
+                    </Col>
+                    <Col xs={12} md={6}>
+                      <Form.Group className={groupClass}>
+                        <Form.Label style={labelStyle}>Timezone</Form.Label>
+                        <div
+                          className="planner-sidebar-readonly-value"
+                          title="Detected from your browser"
+                          aria-live="polite"
+                        >
+                          {getAutoTimezone()}
+                        </div>
+                      </Form.Group>
+                    </Col>
+                  </Row>
+                  <Form.Group className={groupClass}>
+                    <Form.Label style={labelStyle}>End condition</Form.Label>
+                    <div className="d-flex flex-column gap-2">
+                      <Form.Check
+                        type="radio"
+                        id="rec-end-never"
+                        name="planner-recurring-end"
+                        label="Never — open-ended until you deactivate the template"
+                        checked={formData.recurringEndStrategy === "never"}
+                        onChange={() =>
+                          setFormData((prev) => ({
+                            ...prev,
+                            recurringEndStrategy: "never",
+                          }))
+                        }
+                      />
+                      <Form.Check
+                        type="radio"
+                        id="rec-end-date"
+                        name="planner-recurring-end"
+                        label="End by date"
+                        checked={formData.recurringEndStrategy === "end_date"}
+                        onChange={() =>
+                          setFormData((prev) => ({
+                            ...prev,
+                            recurringEndStrategy: "end_date",
+                          }))
+                        }
+                      />
+                      {formData.recurringEndStrategy === "end_date" && (
+                        <Form.Control
+                          type="date"
+                          className="py-2 ms-4"
+                          style={{ maxWidth: 280, fontSize: "14px" }}
+                          value={formData.recurringEndDate}
+                          min={formData.startDate || undefined}
+                          onChange={(e) =>
+                            setFormData((prev) => ({
+                              ...prev,
+                              recurringEndDate: e.target.value,
+                            }))
+                          }
+                        />
+                      )}
+                      <Form.Check
+                        type="radio"
+                        id="rec-end-occ"
+                        name="planner-recurring-end"
+                        label="End after N occurrences"
+                        checked={
+                          formData.recurringEndStrategy === "occurrences"
+                        }
+                        onChange={() =>
+                          setFormData((prev) => ({
+                            ...prev,
+                            recurringEndStrategy: "occurrences",
+                          }))
+                        }
+                      />
+                      {formData.recurringEndStrategy === "occurrences" && (
+                        <div className="d-flex align-items-center gap-2 ms-4 flex-wrap">
+                          <Form.Control
+                            type="number"
+                            min={1}
+                            max={10000}
+                            style={{ maxWidth: 120, fontSize: "14px" }}
+                            value={formData.recurringOccurrences}
+                            onChange={(e) =>
+                              setFormData((prev) => ({
+                                ...prev,
+                                recurringOccurrences: Math.max(
+                                  1,
+                                  Math.min(10000, Number(e.target.value) || 1),
+                                ),
+                              }))
+                            }
+                            className="py-2"
+                          />
+                          <span className="text-muted small">occurrences</span>
+                        </div>
+                      )}
+                    </div>
+                  </Form.Group>
+                  <Form.Group className={groupClass}>
+                    <Form.Label style={labelStyle}>Reminders</Form.Label>
+                    <Form.Check
+                      type="switch"
+                      id="rec-reminder-switch"
+                      label="Send reminder before each occurrence is due"
+                      checked={formData.recurringReminderEnabled}
+                      onChange={(e) =>
+                        setFormData((prev) => ({
+                          ...prev,
+                          recurringReminderEnabled: e.target.checked,
+                        }))
+                      }
+                    />
+                    {formData.recurringReminderEnabled && (
+                      <div className="d-flex align-items-center gap-2 mt-2 flex-wrap">
+                        <span className="small text-muted">
+                          Minutes before due
+                        </span>
+                        <Form.Control
+                          type="number"
+                          min={1}
+                          max={10080}
+                          style={{ maxWidth: 120, fontSize: "14px" }}
+                          value={formData.recurringReminderMinutes}
+                          onChange={(e) =>
+                            setFormData((prev) => ({
+                              ...prev,
+                              recurringReminderMinutes: Math.max(
                                 1,
-                                Math.min(10000, Number(e.target.value) || 1),
+                                Math.min(10080, Number(e.target.value) || 1),
                               ),
                             }))
                           }
                           className="py-2"
                         />
-                        <span className="text-muted small">occurrences</span>
                       </div>
                     )}
-                  </div>
-                </Form.Group>
-                <Form.Group className={groupClass}>
-                  <Form.Label style={labelStyle}>Reminders</Form.Label>
-                  <Form.Check
-                    type="switch"
-                    id="rec-reminder-switch"
-                    label="Send reminder before each occurrence is due"
-                    checked={formData.recurringReminderEnabled}
-                    onChange={(e) =>
-                      setFormData((prev) => ({
-                        ...prev,
-                        recurringReminderEnabled: e.target.checked,
-                      }))
-                    }
-                  />
-                  {formData.recurringReminderEnabled && (
-                    <div className="d-flex align-items-center gap-2 mt-2 flex-wrap">
-                      <span className="small text-muted">Minutes before due</span>
-                      <Form.Control
-                        type="number"
-                        min={1}
-                        max={10080}
-                        style={{ maxWidth: 120, fontSize: "14px" }}
-                        value={formData.recurringReminderMinutes}
-                        onChange={(e) =>
-                          setFormData((prev) => ({
-                            ...prev,
-                            recurringReminderMinutes: Math.max(
-                              1,
-                              Math.min(10080, Number(e.target.value) || 1),
-                            ),
-                          }))
-                        }
-                        className="py-2"
-                      />
-                    </div>
-                  )}
-                </Form.Group>
-                <Form.Group className={groupClass}>
-                  <Form.Label style={labelStyle}>Automation</Form.Label>
-                  <Form.Check
-                    type="switch"
-                    id="rec-auto-next"
-                    className="mb-2"
-                    label="Auto-create next occurrence when one is completed"
-                    checked={formData.recurringAutoCreateNextOnComplete}
-                    onChange={(e) =>
-                      setFormData((prev) => ({
-                        ...prev,
-                        recurringAutoCreateNextOnComplete: e.target.checked,
-                      }))
-                    }
-                  />
-                  <Form.Check
-                    type="switch"
-                    id="rec-create-if-prev-open"
-                    label="Allow new occurrences while a previous one is still incomplete"
-                    checked={formData.recurringCreateNextIfPreviousIncomplete}
-                    onChange={(e) =>
-                      setFormData((prev) => ({
-                        ...prev,
-                        recurringCreateNextIfPreviousIncomplete: e.target.checked,
-                      }))
-                    }
-                  />
-                </Form.Group>
-                <Form.Group className={groupClass}>
-                  <Form.Label style={labelStyle}>Is Active</Form.Label>
-                  <Form.Select
-                    value={formData.recurringIsActive ? "true" : "false"}
-                    onChange={(e) =>
-                      setFormData((prev) => ({
-                        ...prev,
-                        recurringIsActive: e.target.value === "true",
-                      }))
-                    }
-                    className="py-2"
-                    style={{ fontSize: "14px" }}
-                  >
-                    <option value="true">Active</option>
-                    <option value="false">Not Active</option>
-                  </Form.Select>
-                  <Form.Text className="text-muted">
-                    Inactive templates do not generate new occurrences.
-                  </Form.Text>
-                </Form.Group>
-                <PlannerSidebarRecurringRunAtReadOnlyRow
-                  visible={isEdit}
-                  editTask={editTask}
-                  groupClass={groupClass}
-                  labelStyle={labelStyle}
-                />
-              </div>
-            )}
-
-
-
-
-            
-
-            
-
-            
-
-            {!isRecurringConversionMode && (
-            <Form.Group className={groupClass}>
-              <Form.Label style={labelStyle}>
-                <FileText size={16} className="me-2" style={{ verticalAlign: "middle" }} />
-                Description
-              </Form.Label>
-              <RichTextEditor
-                buttonSize="sm"
-                value={formData.description || ""}
-                onChange={(html: string) => {
-                  setFormData({ ...formData, description: html });
-                }}
-                placeholder="Describe the task..."
-                minHeight="100px"
-                maxHeight="200px"
-                maxLength={5000}
-              />
-            </Form.Group>
-            )}
-
-            {!isRecurringConversionMode && (
-            <Row className="mb-3">
-              {formData.taskType !== "todo" && (
-                <Col xs={12} className="mb-3">
+                  </Form.Group>
                   <Form.Group className={groupClass}>
-                    <Form.Label style={labelStyle}>
-                      <FolderOpen size={16} className="me-2" style={{ verticalAlign: "middle" }} />
-                      Project
-                      {formData.taskType === "recurring" && (
-                        <span style={{ fontWeight: 400, color: "#6b7280" }}> (optional)</span>
-                      )}
-                    </Form.Label>
+                    <Form.Label style={labelStyle}>Automation</Form.Label>
+                    <Form.Check
+                      type="switch"
+                      id="rec-auto-next"
+                      className="mb-2"
+                      label="Auto-create next occurrence when one is completed"
+                      checked={formData.recurringAutoCreateNextOnComplete}
+                      onChange={(e) =>
+                        setFormData((prev) => ({
+                          ...prev,
+                          recurringAutoCreateNextOnComplete: e.target.checked,
+                        }))
+                      }
+                    />
+                    <Form.Check
+                      type="switch"
+                      id="rec-create-if-prev-open"
+                      label="Allow new occurrences while a previous one is still incomplete"
+                      checked={formData.recurringCreateNextIfPreviousIncomplete}
+                      onChange={(e) =>
+                        setFormData((prev) => ({
+                          ...prev,
+                          recurringCreateNextIfPreviousIncomplete:
+                            e.target.checked,
+                        }))
+                      }
+                    />
+                  </Form.Group>
+                  <Form.Group className={groupClass}>
+                    <Form.Label style={labelStyle}>Is Active</Form.Label>
                     <Form.Select
-                      value={formData.projectId || ""}
-                      onChange={handleProjectSelectChange}
+                      value={formData.recurringIsActive ? "true" : "false"}
+                      onChange={(e) =>
+                        setFormData((prev) => ({
+                          ...prev,
+                          recurringIsActive: e.target.value === "true",
+                        }))
+                      }
                       className="py-2"
                       style={{ fontSize: "14px" }}
-                      disabled={
-                        lockProjectSelection ||
-                        loadingProjects ||
-                        projects.length === 0
-                      }
                     >
-                      {renderProjectSelectChildren(loadingProjects, projects)}
+                      <option value="true">Active</option>
+                      <option value="false">Not Active</option>
                     </Form.Select>
+                    <Form.Text className="text-muted">
+                      Inactive templates do not generate new occurrences.
+                    </Form.Text>
                   </Form.Group>
-                </Col>
+                  <PlannerSidebarRecurringRunAtReadOnlyRow
+                    visible={isEdit}
+                    editTask={editTask}
+                    groupClass={groupClass}
+                    labelStyle={labelStyle}
+                  />
+                </div>
               )}
 
-             
-                <Col xs={6} className="mb-3">
-                  <Form.Group className={groupClass}>
-                    <Form.Label style={labelStyle}>
-                      <ListTodo size={16} className="me-2" style={{ verticalAlign: "middle" }} />
-                      Status
-                    </Form.Label>
-                    <Form.Select
-                      value={formData.statusId ?? ""}
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          statusId: e.target.value
-                            ? Number(e.target.value)
-                            : null,
-                        })
-                      }
-                      className="py-2"
-                      style={{ fontSize: "14px" }}
-                      disabled={
-                        (formData.projectId && loadingProjects) ||
-                        (!formData.projectId && loadingGenericStatuses) ||
-                        statuses.length === 0
-                      }
-                    >
-                      <StatusSelectOptions
-                        formDataProjectId={formData.projectId}
-                        loadingProjects={loadingProjects}
-                        loadingGenericStatuses={loadingGenericStatuses}
-                        statuses={statuses}
-                        isEdit={isEdit}
-                        statusId={formData.statusId}
-                        editTask={editTask}
-                      />
-                    </Form.Select>
-                  </Form.Group>
-                </Col>
-             
-
-{formData.taskType !== "todo" && (
-                <Col xs={12} md={6}>
+              {!isRecurringConversionMode && (
                 <Form.Group className={groupClass}>
                   <Form.Label style={labelStyle}>
-                    <Tag size={16} className="me-2" style={{ verticalAlign: "middle" }} />
-                    Labels
+                    <FileText
+                      size={16}
+                      className="me-2"
+                      style={{ verticalAlign: "middle" }}
+                    />
+                    Description
                   </Form.Label>
-                  {selectedLabels.length > 0 && (
-                    <div
-                      style={{
-                        display: "flex",
-                        gap: 8,
-                        flexWrap: "wrap",
-                        marginBottom: 12,
-                      }}
-                    >
-                      {selectedLabels.map((label) => (
-                        <button
-                          key={label.id}
-                          type="button"
-                          onClick={() => toggleLabel(label.id)}
-                          style={{
-                            display: "inline-flex",
-                            alignItems: "center",
-                            gap: 8,
-                            padding: "6px 12px",
-                            backgroundColor: label.color,
-                            color: "#141414",
-                            fontSize: "0.875rem",
-                            fontWeight: 500,
-                            cursor: "pointer",
-                            borderRadius: 6,
-                            border: "none",
-                            font: "inherit",
-                          }}
-                        >
-                          <Tag size={12} />
-                          {label.name}
-                          <X size={12} />
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                  <div
-                    style={{
-                      backgroundColor: "#f8fafc",
-                      maxHeight: 140,
-                      overflowY: "auto",
-                      padding: 9,
-                      borderRadius: 4,
-                      border: "1px solid #e2e8f0",
+                  <RichTextEditor
+                    buttonSize="sm"
+                    value={formData.description || ""}
+                    onChange={(html: string) => {
+                      setFormData({ ...formData, description: html });
                     }}
-                  >
-                    {labels.length === 0 ? (
-                      <div
-                        style={{
-                          textAlign: "center",
-                          color: "#718096",
-                          fontSize: "14px",
-                        }}
+                    placeholder="Describe the task..."
+                    minHeight="100px"
+                    maxHeight="200px"
+                    maxLength={5000}
+                  />
+                </Form.Group>
+              )}
+
+              {!isRecurringConversionMode && (
+                <Row className="mb-3">
+                  {formData.taskType !== "todo" && (
+                    <Col xs={12} className="mb-3">
+                      <Form.Group className={groupClass}>
+                        <Form.Label style={labelStyle}>
+                          <FolderOpen
+                            size={16}
+                            className="me-2"
+                            style={{ verticalAlign: "middle" }}
+                          />
+                          Project
+                          {formData.taskType === "recurring" && (
+                            <span style={{ fontWeight: 400, color: "#6b7280" }}>
+                              {" "}
+                              (optional)
+                            </span>
+                          )}
+                        </Form.Label>
+                        <Form.Select
+                          value={formData.projectId || ""}
+                          onChange={handleProjectSelectChange}
+                          className="py-2"
+                          style={{ fontSize: "14px" }}
+                          disabled={
+                            lockProjectSelection ||
+                            loadingProjects ||
+                            projects.length === 0
+                          }
+                        >
+                          {renderProjectSelectChildren(
+                            loadingProjects,
+                            projects,
+                          )}
+                        </Form.Select>
+                      </Form.Group>
+                    </Col>
+                  )}
+
+                  <Col xs={6} className="mb-3">
+                    <Form.Group className={groupClass}>
+                      <Form.Label style={labelStyle}>
+                        <ListTodo
+                          size={16}
+                          className="me-2"
+                          style={{ verticalAlign: "middle" }}
+                        />
+                        Status
+                      </Form.Label>
+                      <Form.Select
+                        value={formData.statusId ?? ""}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            statusId: e.target.value
+                              ? Number(e.target.value)
+                              : null,
+                          })
+                        }
+                        className="py-2"
+                        style={{ fontSize: "14px" }}
+                        disabled={
+                          (formData.projectId && loadingProjects) ||
+                          (!formData.projectId && loadingGenericStatuses) ||
+                          statuses.length === 0
+                        }
                       >
-                        No labels available
-                      </div>
-                    ) : (
-                      <div
-                        style={{
-                          display: "flex",
-                          gap: 6,
-                          flexWrap: "wrap",
-                        }}
-                      >
-                        {labels.map((label) => (
-                          <button
-                            key={label.id}
-                            type="button"
-                            onClick={() => toggleLabel(label.id)}
+                        <StatusSelectOptions
+                          formDataProjectId={formData.projectId}
+                          loadingProjects={loadingProjects}
+                          loadingGenericStatuses={loadingGenericStatuses}
+                          statuses={statuses}
+                          isEdit={isEdit}
+                          statusId={formData.statusId}
+                          editTask={editTask}
+                        />
+                      </Form.Select>
+                    </Form.Group>
+                  </Col>
+
+                  {formData.taskType !== "todo" && (
+                    <Col xs={12} md={6}>
+                      <Form.Group className={groupClass}>
+                        <Form.Label style={labelStyle}>
+                          <Tag
+                            size={16}
+                            className="me-2"
+                            style={{ verticalAlign: "middle" }}
+                          />
+                          Labels
+                        </Form.Label>
+                        {selectedLabels.length > 0 && (
+                          <div
                             style={{
-                              backgroundColor: formData.labelIds.includes(
-                                label.id
-                              )
-                                ? label.color
-                                : "#ffffff",
-                              color: "#141414",
-                              fontSize: "0.75rem",
-                              fontWeight: 500,
-                              padding: "6px 12px",
-                              cursor: "pointer",
-                              border: formData.labelIds.includes(label.id)
-                                ? "2px solid #3b82f6"
-                                : "1px solid #e2e8f0",
-                              borderRadius: 6,
-                              font: "inherit",
+                              display: "flex",
+                              gap: 8,
+                              flexWrap: "wrap",
+                              marginBottom: 12,
                             }}
                           >
-                            {label.name}
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </Form.Group>
-                </Col>
-            )}
-
-                
-
-             
-              
-            </Row>
-            )}
-
-            
-
-            
-            
-          </Form>
+                            {selectedLabels.map((label) => (
+                              <button
+                                key={label.id}
+                                type="button"
+                                onClick={() => toggleLabel(label.id)}
+                                style={{
+                                  display: "inline-flex",
+                                  alignItems: "center",
+                                  gap: 8,
+                                  padding: "6px 12px",
+                                  backgroundColor: label.color,
+                                  color: "#141414",
+                                  fontSize: "0.875rem",
+                                  fontWeight: 500,
+                                  cursor: "pointer",
+                                  borderRadius: 6,
+                                  border: "none",
+                                  font: "inherit",
+                                }}
+                              >
+                                <Tag size={12} />
+                                {label.name}
+                                <X size={12} />
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                        <div
+                          style={{
+                            backgroundColor: "#f8fafc",
+                            maxHeight: 140,
+                            overflowY: "auto",
+                            padding: 9,
+                            borderRadius: 4,
+                            border: "1px solid #e2e8f0",
+                          }}
+                        >
+                          {labels.length === 0 ? (
+                            <div
+                              style={{
+                                textAlign: "center",
+                                color: "#718096",
+                                fontSize: "14px",
+                              }}
+                            >
+                              No labels available
+                            </div>
+                          ) : (
+                            <div
+                              style={{
+                                display: "flex",
+                                gap: 6,
+                                flexWrap: "wrap",
+                              }}
+                            >
+                              {labels.map((label) => (
+                                <button
+                                  key={label.id}
+                                  type="button"
+                                  onClick={() => toggleLabel(label.id)}
+                                  style={{
+                                    backgroundColor: formData.labelIds.includes(
+                                      label.id,
+                                    )
+                                      ? label.color
+                                      : "#ffffff",
+                                    color: "#141414",
+                                    fontSize: "0.75rem",
+                                    fontWeight: 500,
+                                    padding: "6px 12px",
+                                    cursor: "pointer",
+                                    border: formData.labelIds.includes(label.id)
+                                      ? "2px solid #3b82f6"
+                                      : "1px solid #e2e8f0",
+                                    borderRadius: 6,
+                                    font: "inherit",
+                                  }}
+                                >
+                                  {label.name}
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </Form.Group>
+                    </Col>
+                  )}
+                </Row>
+              )}
+            </Form>
           </div>
           <TaskSecondaryTabs
             taskId={sidebarEditTaskId}

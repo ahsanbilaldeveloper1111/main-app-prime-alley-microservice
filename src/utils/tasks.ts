@@ -173,7 +173,7 @@ interface CreateRecurringTaskData {
   frequency: string;
   frequency_config?: TaskFrequencyConfigPayload;
   repeat_interval?: number;
-  repeat_on?: string;
+  repeat_on?: string | string[];
   start_date: string;
   end_date?: string | null;
   /** Mutually exclusive with `end_date` for recurring templates. */
@@ -211,6 +211,7 @@ interface UpdateTaskData {
   label_ids?: number[];
   /** Send `null` to detach parent when updating. */
   parent_task_id?: number | string | null;
+  estimated_duration_minutes?: number | null;
 }
 
 interface UpdateRecurringTaskData {
@@ -220,7 +221,7 @@ interface UpdateRecurringTaskData {
   frequency?: string;
   frequency_config?: TaskFrequencyConfigPayload | null;
   repeat_interval?: number;
-  repeat_on?: string;
+  repeat_on?: string | string[];
   start_date?: string;
   end_date?: string | null;
   occurrences?: number | null;
