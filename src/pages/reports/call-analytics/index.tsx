@@ -16,7 +16,7 @@ import {
     CALL_ANALYTICS_REPORT_DEFINITIONS,
     buildCallAnalyticsReportSidebarSections,
     type CallAnalyticsReportRow,
-} from "./callAnalyticsReportCatalog";
+} from "@page-modules/reports/call-analytics/callAnalyticsReportCatalog";
 
 const PageReports = () => {
     const { data: session } = useSession();

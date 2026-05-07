@@ -1,8 +1,8 @@
 import React, { ReactElement } from "react";
 import Layout from "@layout/index";
-import "./auditLogsPage.scss";
-import { AuditLogsScreen } from "./AuditLogsScreen";
-import { useAuditLogsPage } from "./useAuditLogsPage";
+import "@page-modules/audit-logs/auditLogsPage.scss";
+import { AuditLogsScreen } from "@page-modules/audit-logs/AuditLogsScreen";
+import { useAuditLogsPage } from "@page-modules/audit-logs/useAuditLogsPage";
 
 function AuditLogsNewPage() {
   const vm = useAuditLogsPage();

@@ -6,11 +6,11 @@ import { Calendar } from "lucide-react";
 import moment from "moment";
 import Layout from "@layout/index";
 import ProtectedRoute from "@components/ProtectedRoute";
-import { CrmInsightsDealsSection } from "./CrmInsightsDealsSection";
-import { CrmInsightsFiltersBar } from "./CrmInsightsFiltersBar";
-import { CrmInsightsLeadsSection } from "./CrmInsightsLeadsSection";
-import { CrmInsightsOrdersSection } from "./CrmInsightsOrdersSection";
-import { useCrmInsightsPage } from "./useCrmInsightsPage";
+import { CrmInsightsDealsSection } from "@page-modules/reports/crm-insights/CrmInsightsDealsSection";
+import { CrmInsightsFiltersBar } from "@page-modules/reports/crm-insights/CrmInsightsFiltersBar";
+import { CrmInsightsLeadsSection } from "@page-modules/reports/crm-insights/CrmInsightsLeadsSection";
+import { CrmInsightsOrdersSection } from "@page-modules/reports/crm-insights/CrmInsightsOrdersSection";
+import { useCrmInsightsPage } from "@page-modules/reports/crm-insights/useCrmInsightsPage";
 
 const CrmReports = () => {
   const page = useCrmInsightsPage();

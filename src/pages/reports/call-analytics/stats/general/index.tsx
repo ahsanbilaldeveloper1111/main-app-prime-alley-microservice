@@ -18,7 +18,7 @@ import moment from 'moment';
 import { formatMinutesAndSeconds, formatCurrency, ModuleSlug, GlobalDateTimeFormat, formatDateTimeToLocal, getAutoTimezone } from '@utils/Helper';
 import { HEADER_CONSTANTS } from '@constants/headerConstants';
 import { canViewCallLogsFromSession } from '@utils/callPermissionUtils';
-import { normalizeBarFiltersForApi } from "../../callAnalyticsBarFilters";
+import { normalizeBarFiltersForApi } from "@page-modules/reports/call-analytics/callAnalyticsBarFilters";
 
 // Helper function to convert HH:MM:SS to seconds
 const timeStringToSeconds = (timeStr: string): number => {
