@@ -12,7 +12,8 @@ import BreadcrumbItem from "@common/BreadcrumbItem";
 import { toast } from "react-toastify";
 import { useRouter } from "next/router";
 import moment from "moment";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, Plus } from "lucide-react";
+import { Button, Form, Modal } from "react-bootstrap";
 import GenericTable, { TableColumn, TableAction } from "@components/GenericTable";
 import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
 import CreateTaskSidebar from "@components/CreatePlannerTaskSidebar";
@@ -22,6 +23,7 @@ import {
   deleteTask as deleteTaskApi,
   completeTask,
   incompleteTask,
+  type ListTasksSummary,
 } from "@utils/tasks";
 import { listStatuses } from "@utils/work-planner";
 import {
@@ -50,39 +52,6 @@ import {
   plannerTaskListTodayTriple,
 } from "@utils/taskListing/plannerTasksQueryParams";
 import {
-  buildTaskListingPageStyleTag,
-  TaskListingSearchRow,
-} from "@utils/taskListing/taskListUiPrimitives";
-import {
-  type Task,
-  type ApiTask,
-  type TasksListingPageProps,
-  type PlannerWorkflowStatusRow,
-  type HierarchyExtension,
-  resolvePlannerListTaskDueDate,
-  lookupHierarchyExtensionDisplayName,
-  TASK_TYPE_OPTIONS,
-  PRIORITY_OPTIONS,
-  INITIAL_FILTER_FORM,
-  DEFAULT_TASK_TABLE_COLUMN_KEYS,
-  readVisibleTaskColumnKeysFromStorage,
-  persistVisibleTaskColumnKeys,
-  POSSIBLE_TABS,
-  TASK_VIEW_TAB_IDS,
-  DEFAULT_VISIBLE_TAB_IDS,
-  normalizePlannerStatusesFromApi,
-  PROJECT_DETAILS_STATUS_WITH,
-  stripHtmlTags,
-  normalizeVisibleTabIdsForStorage,
-  persistVisibleTabIds,
-  getInitialVisibleTabIds,
-  orderTaskColumnKeysByDefault,
-} from "@components/planner/plannerTasksListing/plannerTasksListingDomain";
-import { PlannerTasksTabsBar } from "@components/planner/plannerTasksListing/PlannerTasksTabsBar";
-import { PlannerTasksPageHeader } from "@components/planner/plannerTasksListing/PlannerTasksPageHeader";
-import { PlannerTasksQuickFiltersRow } from "@components/planner/plannerTasksListing/PlannerTasksQuickFiltersRow";
-import { PlannerTasksEditColumnsDropdown } from "@components/planner/plannerTasksListing/PlannerTasksEditColumnsDropdown";
-import {
   PlannerTaskAssigneeCell,
   PlannerTaskCompleteColumnRender,
   PlannerTaskDueDateCell,
@@ -94,11 +63,76 @@ import {
   PlannerTaskTypeCell,
   PlannerTaskWorkflowStatusCell,
 } from "@components/planner/plannerTasksListing/PlannerTaskListCells";
-import "@components/planner/plannerTasksListing/plannerTasksListing.scss";
+import { PlannerTasksEditColumnsDropdown } from "@components/planner/plannerTasksListing/PlannerTasksEditColumnsDropdown";
+import {
+  type ApiTask,
+  type HierarchyExtension,
+  type PlannerWorkflowStatusRow,
+  type Task,
+  DEFAULT_TASK_TABLE_COLUMN_KEYS,
+  DEFAULT_VISIBLE_TAB_IDS,
+  getInitialVisibleTabIds,
+  INITIAL_FILTER_FORM,
+  lookupHierarchyExtensionDisplayName,
+  normalizePlannerStatusesFromApi,
+  normalizeVisibleTabIdsForStorage,
+  orderTaskColumnKeysByDefault,
+  persistVisibleTabIds,
+  persistVisibleTaskColumnKeys,
+  POSSIBLE_TABS,
+  PRIORITY_OPTIONS,
+  PROJECT_DETAILS_STATUS_WITH,
+  readVisibleTaskColumnKeysFromStorage,
+  resolvePlannerListTaskDueDate,
+  stripHtmlTags,
+  TASK_TYPE_OPTIONS,
+  TASK_VIEW_TAB_IDS,
+  TOTAL_VIEWS,
+} from "@components/planner/plannerTasksListing/plannerTasksListingDomain";
+import {
+  TASK_LIST_BTN_OUTLINE,
+  buildTaskListingPageStyleTag,
+  TaskListingSearchRow,
+} from "@utils/taskListing/taskListUiPrimitives";
 
-export type { TasksListingPageProps } from "@components/planner/plannerTasksListing/plannerTasksListingDomain";
+function plannerTaskConvertDeniedTitle(
+  canConvertRow: boolean,
+  hasConvertPermission: boolean,
+  canEditRow: boolean,
+): string {
+  if (canConvertRow) return "";
+  if (hasConvertPermission === false) {
+    return "You are not authorized to convert tasks to recurring";
+  }
+  return plannerTaskRowEditDeniedTitle(canEditRow) ?? "";
+}
 
-const { PERMISSIONS } = HEADER_CONSTANTS;
+export interface TasksListingPageProps {
+  /** When true (e.g. embedded on project details list tab), To-do is omitted from filters and create/edit sidebar. */
+  omitTodoTaskType?: boolean;
+  /** When set (e.g. project list tab), create/edit sidebar uses this project and locks the project field. */
+  sidebarProject?: {
+    id: number;
+    name: string;
+    color?: string;
+    statuses?: any[];
+    labels?: any[];
+    members?: unknown[];
+    owner_extension_number?: string | null;
+  };
+  /**
+   * When embedded with `sidebarProject`, use these extensions for assignee labels and skip GetHierarchyData.
+   * Should match the shape returned by GetHierarchyData `extensions` (id, extension_number, name).
+   */
+  hierarchyExtensionsFromParent?: unknown[];
+  /** Increment from parent to refetch when embedded on project detail (parent skips its own list fetch). */
+  embeddedListRefreshSignal?: number;
+  /** Receives `summary` from `listTasks` so project list-tab stats cards stay in sync. */
+  onEmbeddedListSummary?: (summary: ListTasksSummary | undefined) => void;
+  lockedTabId?: string;
+  pageTitle?: string;
+  breadcrumbSubTitle?: string;
+}
 
 // ─── Component ─────────────────────────────────────────────────────────────────
 
@@ -108,6 +142,9 @@ const TasksListingPage = ({
   hierarchyExtensionsFromParent,
   embeddedListRefreshSignal,
   onEmbeddedListSummary,
+  lockedTabId,
+  pageTitle = "Tasks",
+  breadcrumbSubTitle = "Tasks",
 }: TasksListingPageProps) => {
     const router = useRouter();
     const { data: session } = useSession();
@@ -117,19 +154,22 @@ const TasksListingPage = ({
       [session],
     );
     const sessionCanUpdatePlannerTask = useMemo(
-      () => hasPermission(PERMISSIONS.EDIT_TASKS_WORK_PLANNER),
+      () => hasPermission(HEADER_CONSTANTS.PERMISSIONS.EDIT_TASKS_WORK_PLANNER),
       [hasPermission],
     );
     const sessionCanDeletePlannerTask = useMemo(
-      () => hasPermission(PERMISSIONS.DELETE_TASKS_WORK_PLANNER),
+      () => hasPermission(HEADER_CONSTANTS.PERMISSIONS.DELETE_TASKS_WORK_PLANNER),
       [hasPermission],
     );
     const sessionCanCreatePlannerTask = useMemo(
-      () => hasPermission(PERMISSIONS.CREATE_TASKS_WORK_PLANNER),
+      () => hasPermission(HEADER_CONSTANTS.PERMISSIONS.CREATE_TASKS_WORK_PLANNER),
       [hasPermission],
     );
     const sessionCanConvertToRecurringPlannerTask = useMemo(
-      () => hasPermission(PERMISSIONS.CONVERT_TO_RECURRING_TASK_WORK_PLANNER),
+      () =>
+        hasPermission(
+          HEADER_CONSTANTS.PERMISSIONS.CONVERT_TO_RECURRING_TASK_WORK_PLANNER,
+        ),
       [hasPermission],
     );
     const isProjectScopedEmbed = Boolean(sidebarProject?.id);
@@ -228,9 +268,10 @@ const TasksListingPage = ({
     }, [hierarchyDataExtensions]);
 
     // ── Tab state ─────────────────────────────────────────────────────────────────
-    const [activeTab, setActiveTab] = useState("all");
+    const [activeTab, setActiveTab] = useState(lockedTabId ?? "all");
     const [visibleTabIds, setVisibleTabIds] = useState<string[]>(() => [...DEFAULT_VISIBLE_TAB_IDS]);
     const [showAddViewModal, setShowAddViewModal] = useState(false);
+    const isTabLocked = Boolean(lockedTabId);
 
     useLayoutEffect(() => {
       setVisibleTabIds(getInitialVisibleTabIds());
@@ -257,18 +298,25 @@ const TasksListingPage = ({
 
     useEffect(() => {
       if (isProjectScopedEmbed) return;
+      if (isTabLocked) return;
       if (router.isReady && router.query.tab) {
         const t = String(router.query.tab);
         if (TASK_VIEW_TAB_IDS.has(t)) setActiveTab(t);
       }
-    }, [router.isReady, router.query.tab, isProjectScopedEmbed]);
+    }, [router.isReady, router.query.tab, isProjectScopedEmbed, isTabLocked]);
+
+    useEffect(() => {
+      if (!isTabLocked) return;
+      setActiveTab(lockedTabId ?? "all");
+    }, [isTabLocked, lockedTabId]);
   
     const switchTab = useCallback((id: string) => {
+      if (isTabLocked) return;
       setActiveTab(id);
       setPager(p => ({ ...p, page: 1 }));
       if (isProjectScopedEmbed) return;
       router.push({ pathname: router.pathname, query: { ...router.query, tab: id } }, undefined, { shallow: true });
-    }, [router, isProjectScopedEmbed]);
+    }, [router, isProjectScopedEmbed, isTabLocked]);
 
     const toggleVisibleTab = useCallback((tabId: string, isVisible: boolean, isOnlyOne: boolean) => {
       if (isVisible && isOnlyOne) return;
@@ -755,10 +803,6 @@ const TasksListingPage = ({
           const perms = getTaskRowPermissions(row);
           const canEditRow = perms.canOpenTaskEdit;
           const canDeleteRow = perms.canDeleteTask;
-          const canConvertRow =
-            sessionCanConvertToRecurringPlannerTask && canEditRow;
-          const isTodoOrRegular =
-            row.task_type === "todo" || row.task_type === "regular";
           return (
             <PlannerTaskRowActionsMenu
               row={row}
@@ -961,43 +1005,711 @@ const TasksListingPage = ({
           }}
         />
   
-        <BreadcrumbItem mainTitle="Planner" mainLink="/planner/dashboard" subTitle="Tasks" />
-        
-        <div className="tasks-page ptl-page">
-          <PlannerTasksPageHeader
-            total={total}
-            showCreateTaskButton={showCreateTaskButton}
-            onCreateTaskClick={() => {
-              setEditingTask(null);
-              setShowCreate(true);
-            }}
-          />
+        <BreadcrumbItem mainTitle="Planner" mainLink="/planner/dashboard" subTitle={breadcrumbSubTitle} />
+  
+        <div className="tasks-page" style={{
+          backgroundColor: "#fff",
+          display: "flex",
+          flexDirection: "column",
+          height: "calc(100vh - 100px)",
+          overflow: "hidden",
+        }}>
+  
+          {/* ══════════════════════════════════════════════════════
+              ROW 1 — Page title + top-right buttons
+          ══════════════════════════════════════════════════════ */}
+          <div style={{
+            padding: "14px 20px",
+            backgroundColor: "#fff",
+            display: "flex",
+            alignItems: "flex-start",
+            justifyContent: "space-between",
+            flexShrink: 0,
+          }}>
+            <div>
+              <h4 style={{
+                fontWeight: 700, fontSize: 20, margin: 0, color: "#141414",
+                fontFamily: "Lexend Deca, Helvetica, Arial, sans-serif",
+              }}>{pageTitle}</h4>
+              <p style={{
+                fontSize: 12, color: "#6b7280", margin: "3px 0 0",
+                fontFamily: "Lexend Deca, Helvetica, Arial, sans-serif", fontWeight: 400,
+              }}>{total} records</p>
+            </div>
+  
+            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              {showCreateTaskButton && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditingTask(null);
+                    setOpenAsRecurringConversion(false);
+                    setShowCreate(true);
+                  }}
+                  style={{
+                    ...TASK_LIST_BTN_OUTLINE,
+                    backgroundColor: "#000",
+                    background: "#000",
+                    borderColor: "#000",
+                    color: "#fff",
+                    fontWeight: 600,
+                  }}
+                  onMouseEnter={e => {
+                    e.currentTarget.style.backgroundColor = "#333";
+                    e.currentTarget.style.background = "#333";
+                  }}
+                  onMouseLeave={e => {
+                    e.currentTarget.style.backgroundColor = "#000";
+                    e.currentTarget.style.background = "#000";
+                  }}
+                >Create task</button>
+              )}
+            </div>
+          </div>
+  
+          {/* ══════════════════════════════════════════════════════
+              ROW 2 — Tabs
+              Design: [All ✕] [Due today flex-1] [Overdue flex-1] [Upcoming flex-1]
+                      ────────── spacer ──────────  [+ Add view (4/50)]  [All Views]
+          ══════════════════════════════════════════════════════ */}
+          {!isTabLocked && (
+          <div style={{
+            display: "flex",
+            alignItems: "stretch",
+            backgroundColor: "#fff",
+            
+         
+            height: 44,
+            flexShrink: 0,
+          }}>
+            {(() => {
+              const currentViewCount = allTabs.length;
+              const hasAllViews = visibleTabIds.length === POSSIBLE_TABS.length;
+              return (
+                <>
+            {/* Tabs with equal width */}
+            {allTabs.map(tab => (
+              <button
+                key={tab.id}
+                onClick={() => switchTab(tab.id)}
+                style={{
+                  flex: 1,
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "flex-start",
+                  padding: "0 20px",
+                  border: "none",
+                  borderRight: "1px solid #8A8A8A",
+                  borderTop: "1px solid #8A8A8A",
+                  backgroundColor: activeTab === tab.id ? "#f7f2f7" : "#fff",
+                  borderBottom: activeTab === tab.id ? "none" : "1px solid #8A8A8A",
+                  color: "#141414",
+                  fontSize: 13,
+                  fontWeight: activeTab === tab.id ? 500 : 400,
+                  fontFamily: "Lexend Deca, Helvetica, Arial, sans-serif",
+                  cursor: "pointer",
+                  height: "100%",
+                  gap: tab.id === "all" ? 10 : 0,
+                }}
+              >
+                {tab.label}
+                {tab.id === "all"}
+              </button>
+            ))}
 
-          <PlannerTasksTabsBar
-            allTabs={allTabs}
-            activeTab={activeTab}
-            switchTab={switchTab}
-            visibleTabIds={visibleTabIds}
-            setVisibleTabIds={setVisibleTabIds}
-            showAddViewModal={showAddViewModal}
-            setShowAddViewModal={setShowAddViewModal}
-            toggleVisibleTab={toggleVisibleTab}
-          />
+            {/* + Add view — opens popup to toggle which tabs are visible */}
+            <button
+              onClick={() => setShowAddViewModal(true)}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 4,
+                padding: "0 16px",
+               border: "none",
+              //   borderLeft: "1px solid #e5e7eb",
+                borderTop: "none",
+                backgroundColor: "#fff",
+                color: "#374151",
+                fontSize: 13,
+                fontFamily: "Lexend Deca, Helvetica, Arial, sans-serif",
+                fontWeight: 400,
+                cursor: "pointer",
+                flexShrink: 0,
+                height: "100%",
+                whiteSpace: "nowrap",
+                borderRight: "none",
+                borderBottom: "1px solid #ccc",
+              }}
+            >
+              <Plus size={14} />
+              Add view ({currentViewCount}/{TOTAL_VIEWS})
+            </button>
 
-          <PlannerTasksQuickFiltersRow
-            quickFilterRef={quickFilterRef}
-            filterPills={filterPills}
-            openQuickFilter={openQuickFilter}
-            fForm={fForm}
-            setFForm={setFForm}
-            setOpenQuickFilter={setOpenQuickFilter}
-            projectOptions={projectOptions}
-            assigneeOptions={assigneeOptions}
-            taskTypeFilterOptions={taskTypeFilterOptions}
-            statusFilterOptions={statusFilterOptions}
-            applyCurrentFilters={applyCurrentFilters}
-            resetCurrentFilters={resetCurrentFilters}
-          />
+            {/* All Views — enable all tabs, then hide this button */}
+            {!hasAllViews && (
+              <button
+                onClick={() => {
+                  const all = POSSIBLE_TABS.map((t) => t.id);
+                  setVisibleTabIds(all);
+                  persistVisibleTabIds(all);
+                }}
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  padding: "0 16px",
+                  border: "none",
+                  borderBottom: "1px solid #ccc",
+                  borderLeft: "none",
+                  borderTop: "none",
+                  borderRight: "none",
+                  backgroundColor: "#fff",
+                  color: "#2563eb",
+                  fontSize: 13,
+                  fontWeight: 600,
+                  fontFamily: "Lexend Deca, Helvetica, Arial, sans-serif",
+                  cursor: "pointer",
+                  flexShrink: 0,
+                  height: "100%",
+                  whiteSpace: "nowrap",
+                }}
+              >All Views</button>
+            )}
+                </>
+              );
+            })()}
+          </div>
+          )}
+
+          {/* Add view / Manage tabs modal */}
+          <Modal show={showAddViewModal} onHide={() => setShowAddViewModal(false)} centered>
+            <Modal.Header closeButton>
+              <Modal.Title>Manage views</Modal.Title>
+            </Modal.Header>
+            <Modal.Body>
+              <p className="text-muted small mb-3">
+                Toggle which views appear in the tab bar. At least one must be visible.
+              </p>
+              {POSSIBLE_TABS.map((tab) => {
+                const isVisible = visibleTabIds.includes(tab.id);
+                const isOnlyOne = visibleTabIds.length === 1;
+                return (
+                  <Form.Check
+                    key={tab.id}
+                    type="switch"
+                    id={`view-${tab.id}`}
+                    label={tab.label}
+                    checked={isVisible}
+                    disabled={isVisible && isOnlyOne}
+                    onChange={() => {
+                      toggleVisibleTab(tab.id, isVisible, isOnlyOne);
+                    }}
+                    className="mb-2"
+                  />
+                );
+              })}
+            </Modal.Body>
+            <Modal.Footer>
+              <Button variant="secondary" onClick={() => setShowAddViewModal(false)}>
+                Close
+              </Button>
+            </Modal.Footer>
+          </Modal>
+
+          {/* ══════════════════════════════════════════════════════
+              ROW 3 — Filter controls row
+              LEFT:  Assigned to (1) ✕ | Task type ▼ | Due date ▼ | Queue ▼ | Clear all
+              RIGHT: Save view | Start N tasks
+          ══════════════════════════════════════════════════════ */}
+          <div style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            padding: "10px 16px",
+            backgroundColor: "#fff",
+            borderBottom: "1px solid #e5e7eb",
+            gap: 8,
+            flexShrink: 0,
+          }}>
+  
+            {/* LEFT — filter pills (GenericTable style) */}
+            <div className="gt-filter-pills" ref={quickFilterRef}>
+              <div className="d-flex align-items-center gap-2 flex-wrap">
+                {filterPills.map((pill) => (
+                  <div key={pill.id} style={{ position: "relative" }}>
+                    <button
+                      className="gt-filter-pill"
+                      onClick={pill.onClick}
+                    >
+                      {pill.icon && <span className="me-1">{pill.icon}</span>}
+                      <span>{pill.label}</span>
+                    </button>
+                    {pill.id === "project" && openQuickFilter === "project" && (
+                      <div style={{
+                        position: "absolute",
+                        top: "calc(100% + 4px)",
+                        left: 0,
+                        zIndex: 30,
+                        minWidth: 220,
+                        maxHeight: 260,
+                        overflowY: "auto",
+                        background: "#fff",
+                        border: "1px solid #e5e7eb",
+                        borderRadius: 8,
+                        boxShadow: "0 10px 24px rgba(0,0,0,0.12)",
+                        padding: 6,
+                      }}>
+                        {projectOptions.map((option) => (
+                          <button
+                            key={option.value}
+                            onClick={() => {
+                              setFForm({ ...fForm, project: option.value });
+                              setOpenQuickFilter(null);
+                            }}
+                            style={{
+                              width: "100%",
+                              textAlign: "left",
+                              border: "none",
+                              background: option.value === fForm.project ? "#f3f4f6" : "transparent",
+                              borderRadius: 6,
+                              padding: "8px 10px",
+                              fontSize: 12,
+                              fontFamily: "Lexend Deca, Helvetica, Arial, sans-serif",
+                            }}
+                          >
+                            {option.label}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    {pill.id === "assigned_to" && openQuickFilter === "assigned_to" && (
+                      <div style={{
+                        position: "absolute",
+                        top: "calc(100% + 4px)",
+                        left: 0,
+                        zIndex: 30,
+                        minWidth: 220,
+                        maxHeight: 260,
+                        overflowY: "auto",
+                        background: "#fff",
+                        border: "1px solid #e5e7eb",
+                        borderRadius: 8,
+                        boxShadow: "0 10px 24px rgba(0,0,0,0.12)",
+                        padding: 6,
+                      }}>
+                        <button
+                          onClick={() => {
+                            setFForm((prev) => ({ ...prev, assignee: [] }));
+                            setOpenQuickFilter(null);
+                          }}
+                          style={{
+                            width: "100%",
+                            textAlign: "left",
+                            border: "none",
+                            background: fForm.assignee.length === 0 ? "#f3f4f6" : "transparent",
+                            borderRadius: 6,
+                            padding: "8px 10px",
+                            fontSize: 12,
+                            fontFamily: "Lexend Deca, Helvetica, Arial, sans-serif",
+                          }}
+                        >
+                          All assignees
+                        </button>
+                        {assigneeOptions.map((option) => {
+                          const selected = fForm.assignee.includes(option.value);
+                          return (
+                            <button
+                              key={option.value}
+                              onClick={() => {
+                                let nextAssignees: string[];
+                                if (selected) {
+                                  const index = fForm.assignee.indexOf(option.value);
+                                  nextAssignees =
+                                    index === -1
+                                      ? fForm.assignee
+                                      : [...fForm.assignee.slice(0, index), ...fForm.assignee.slice(index + 1)];
+                                } else {
+                                  nextAssignees = [...fForm.assignee, option.value];
+                                }
+                                setFForm({ ...fForm, assignee: nextAssignees });
+                              }}
+                              style={{
+                                width: "100%",
+                                textAlign: "left",
+                                border: "none",
+                                background: selected ? "#f3f4f6" : "transparent",
+                                borderRadius: 6,
+                                padding: "8px 10px",
+                                fontSize: 12,
+                                fontFamily: "Lexend Deca, Helvetica, Arial, sans-serif",
+                              }}
+                            >
+                              {option.label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                    {pill.id === "task_type" && openQuickFilter === "task_type" && (
+                      <div style={{
+                        position: "absolute",
+                        top: "calc(100% + 4px)",
+                        left: 0,
+                        zIndex: 30,
+                        minWidth: 220,
+                        maxHeight: 260,
+                        overflowY: "auto",
+                        background: "#fff",
+                        border: "1px solid #e5e7eb",
+                        borderRadius: 8,
+                        boxShadow: "0 10px 24px rgba(0,0,0,0.12)",
+                        padding: 6,
+                      }}>
+                        <button
+                          onClick={() => {
+                            setFForm((prev) => ({ ...prev, task_type: null }));
+                            setOpenQuickFilter(null);
+                          }}
+                          style={{
+                            width: "100%",
+                            textAlign: "left",
+                            border: "none",
+                            background: fForm.task_type ? "transparent" : "#f3f4f6",
+                            borderRadius: 6,
+                            padding: "8px 10px",
+                            fontSize: 12,
+                            fontFamily: "Lexend Deca, Helvetica, Arial, sans-serif",
+                          }}
+                        >
+                          All task types
+                        </button>
+                        {taskTypeFilterOptions.map((option) => {
+                          const selected = fForm.task_type?.value === option.value;
+                          return (
+                            <button
+                              key={option.value}
+                              onClick={() => {
+                                const selectedType = { value: option.value, label: option.label };
+                                setFForm({ ...fForm, task_type: selectedType });
+                                setOpenQuickFilter(null);
+                              }}
+                              style={{
+                                width: "100%",
+                                textAlign: "left",
+                                border: "none",
+                                background: selected ? "#f3f4f6" : "transparent",
+                                borderRadius: 6,
+                                padding: "8px 10px",
+                                fontSize: 12,
+                                fontFamily: "Lexend Deca, Helvetica, Arial, sans-serif",
+                              }}
+                            >
+                              {option.label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                    {pill.id === "status" && openQuickFilter === "status" && (
+                      <div style={{
+                        position: "absolute",
+                        top: "calc(100% + 4px)",
+                        left: 0,
+                        zIndex: 30,
+                        minWidth: 220,
+                        maxHeight: 260,
+                        overflowY: "auto",
+                        background: "#fff",
+                        border: "1px solid #e5e7eb",
+                        borderRadius: 8,
+                        boxShadow: "0 10px 24px rgba(0,0,0,0.12)",
+                        padding: 6,
+                      }}>
+                        {statusFilterOptions.map((option) => (
+                          <button
+                            key={option.value}
+                            onClick={() => {
+                              setFForm({ ...fForm, status: option.value });
+                              setOpenQuickFilter(null);
+                            }}
+                            style={{
+                              width: "100%",
+                              textAlign: "left",
+                              border: "none",
+                              background: option.value === fForm.status ? "#f3f4f6" : "transparent",
+                              borderRadius: 6,
+                              padding: "8px 10px",
+                              fontSize: 12,
+                              fontFamily: "Lexend Deca, Helvetica, Arial, sans-serif",
+                            }}
+                          >
+                            {option.label}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    {pill.id === "priority" && openQuickFilter === "priority" && (
+                      <div style={{
+                        position: "absolute",
+                        top: "calc(100% + 4px)",
+                        left: 0,
+                        zIndex: 30,
+                        minWidth: 220,
+                        maxHeight: 260,
+                        overflowY: "auto",
+                        background: "#fff",
+                        border: "1px solid #e5e7eb",
+                        borderRadius: 8,
+                        boxShadow: "0 10px 24px rgba(0,0,0,0.12)",
+                        padding: 6,
+                      }}>
+                        <button
+                          onClick={() => {
+                            setFForm((prev) => ({ ...prev, priority: null }));
+                            setOpenQuickFilter(null);
+                          }}
+                          style={{
+                            width: "100%",
+                            textAlign: "left",
+                            border: "none",
+                            background: fForm.priority ? "transparent" : "#f3f4f6",
+                            borderRadius: 6,
+                            padding: "8px 10px",
+                            fontSize: 12,
+                            fontFamily: "Lexend Deca, Helvetica, Arial, sans-serif",
+                          }}
+                        >
+                          All priorities
+                        </button>
+                        {PRIORITY_OPTIONS.map((option) => {
+                          const selected = fForm.priority?.value === option.value;
+                          return (
+                            <button
+                              key={option.value}
+                              onClick={() => {
+                                setFForm({
+                                  ...fForm,
+                                  priority: { value: option.value, label: option.label },
+                                });
+                                setOpenQuickFilter(null);
+                              }}
+                              style={{
+                                width: "100%",
+                                textAlign: "left",
+                                border: "none",
+                                background: selected ? "#f3f4f6" : "transparent",
+                                borderRadius: 6,
+                                padding: "8px 10px",
+                                fontSize: 12,
+                                fontFamily: "Lexend Deca, Helvetica, Arial, sans-serif",
+                              }}
+                            >
+                              {option.label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                    {pill.id === "due_date" && openQuickFilter === "due_date" && (
+                      <div style={{
+                        position: "absolute",
+                        top: "calc(100% + 4px)",
+                        left: 0,
+                        zIndex: 30,
+                        minWidth: 220,
+                        background: "#fff",
+                        border: "1px solid #e5e7eb",
+                        borderRadius: 8,
+                        boxShadow: "0 10px 24px rgba(0,0,0,0.12)",
+                        padding: 6,
+                      }}>
+                        <button
+                          onClick={() => {
+                            const today = moment().format("YYYY-MM-DD");
+                            setFForm((prev) => ({ ...prev, due_date_from: today, due_date_to: today }));
+                            setOpenQuickFilter(null);
+                          }}
+                          style={{
+                            width: "100%",
+                            textAlign: "left",
+                            border: "none",
+                            background: "transparent",
+                            borderRadius: 6,
+                            padding: "8px 10px",
+                            fontSize: 12,
+                            fontFamily: "Lexend Deca, Helvetica, Arial, sans-serif",
+                          }}
+                        >
+                          Due today
+                        </button>
+                        <button
+                          onClick={() => {
+                            const from = moment().format("YYYY-MM-DD");
+                            const to = moment().add(7, "days").format("YYYY-MM-DD");
+                            setFForm((prev) => ({ ...prev, due_date_from: from, due_date_to: to }));
+                            setOpenQuickFilter(null);
+                          }}
+                          style={{
+                            width: "100%",
+                            textAlign: "left",
+                            border: "none",
+                            background: "transparent",
+                            borderRadius: 6,
+                            padding: "8px 10px",
+                            fontSize: 12,
+                            fontFamily: "Lexend Deca, Helvetica, Arial, sans-serif",
+                          }}
+                        >
+                          Next 7 days
+                        </button>
+                        <button
+                          onClick={() => {
+                            setFForm((prev) => ({ ...prev, due_date_from: "", due_date_to: "" }));
+                            setOpenQuickFilter(null);
+                          }}
+                          style={{
+                            width: "100%",
+                            textAlign: "left",
+                            border: "none",
+                            background: "transparent",
+                            borderRadius: 6,
+                            padding: "8px 10px",
+                            fontSize: 12,
+                            fontFamily: "Lexend Deca, Helvetica, Arial, sans-serif",
+                          }}
+                        >
+                          Clear due date
+                        </button>
+                        <div style={{ borderTop: "1px solid #e5e7eb", margin: "6px 0" }} />
+                        <div style={{ padding: "6px 10px" }}>
+                          <label
+                            htmlFor="quick-due-date-from"
+                            style={{
+                              display: "block",
+                              fontSize: 11,
+                              color: "#6b7280",
+                              marginBottom: 4,
+                            }}
+                          >
+                            Due date from
+                          </label>
+                          <input
+                            id="quick-due-date-from"
+                            type="date"
+                            value={fForm.due_date_from || ""}
+                            onChange={(e) =>
+                              setFForm((prev) => ({ ...prev, due_date_from: e.target.value || "" }))
+                            }
+                            style={{
+                              width: "100%",
+                              border: "1px solid #d1d5db",
+                              borderRadius: 6,
+                              padding: "6px 8px",
+                              fontSize: 12,
+                              marginBottom: 8,
+                            }}
+                          />
+                          <label
+                            htmlFor="quick-due-date-to"
+                            style={{
+                              display: "block",
+                              fontSize: 11,
+                              color: "#6b7280",
+                              marginBottom: 4,
+                            }}
+                          >
+                            Due date to
+                          </label>
+                          <input
+                            id="quick-due-date-to"
+                            type="date"
+                            value={fForm.due_date_to || ""}
+                            onChange={(e) =>
+                              setFForm((prev) => ({ ...prev, due_date_to: e.target.value || "" }))
+                            }
+                            style={{
+                              width: "100%",
+                              border: "1px solid #d1d5db",
+                              borderRadius: 6,
+                              padding: "6px 8px",
+                              fontSize: 12,
+                            }}
+                          />
+                        </div>
+                      </div>
+                    )}
+                    {pill.id === "queue" && openQuickFilter === "queue" && (
+                      <div style={{
+                        position: "absolute",
+                        top: "calc(100% + 4px)",
+                        left: 0,
+                        zIndex: 30,
+                        minWidth: 220,
+                        background: "#fff",
+                        border: "1px solid #e5e7eb",
+                        borderRadius: 8,
+                        boxShadow: "0 10px 24px rgba(0,0,0,0.12)",
+                        padding: 10,
+                        fontSize: 12,
+                        color: "#6b7280",
+                        fontFamily: "Lexend Deca, Helvetica, Arial, sans-serif",
+                      }}>
+                        Queue quick filters are not configured yet.
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+  
+            {/* RIGHT */}
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginLeft: "auto" }}>
+              <button
+                type="button"
+                onClick={applyCurrentFilters}
+                style={{
+                  ...TASK_LIST_BTN_OUTLINE,
+                  backgroundColor: "#000",
+                  background: "#000",
+                  borderColor: "#000",
+                  color: "#fff",
+                  fontWeight: 600,
+                }}
+                onMouseEnter={e => {
+                  e.currentTarget.style.backgroundColor = "#333";
+                  e.currentTarget.style.background = "#333";
+                }}
+                onMouseLeave={e => {
+                  e.currentTarget.style.backgroundColor = "#000";
+                  e.currentTarget.style.background = "#000";
+                }}
+              >
+                Apply filters
+              </button>
+              <button
+                type="button"
+                onClick={resetCurrentFilters}
+                style={{
+                  ...TASK_LIST_BTN_OUTLINE,
+                  backgroundColor: "#000",
+                  background: "#000",
+                  borderColor: "#000",
+                  color: "#fff",
+                  fontWeight: 600,
+                }}
+                onMouseEnter={e => {
+                  e.currentTarget.style.backgroundColor = "#333";
+                  e.currentTarget.style.background = "#333";
+                }}
+                onMouseLeave={e => {
+                  e.currentTarget.style.backgroundColor = "#000";
+                  e.currentTarget.style.background = "#000";
+                }}
+              >
+                Reset filters
+              </button>
+            </div>
+          </div>
+  
           {/* ══════════════════════════════════════════════════════
               ROW 4 — Search + Edit columns
           ══════════════════════════════════════════════════════ */}

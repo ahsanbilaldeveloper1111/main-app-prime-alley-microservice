@@ -49,6 +49,7 @@ export const defaultSubTabBySection: Record<string, string | undefined> = {
   'users-teams': 'user-directory',
   'smart-crm': 'stages',
   communications: 'manage-extensions',
+  planner: 'general',
   workforce: 'request-categories',
   billing: 'payment-methods',
   tickets: 'statuses',

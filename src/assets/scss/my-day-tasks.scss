@@ -1,0 +1,274 @@
+.myday-page-shell {
+  .myday-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 300px;
+    gap: 16px;
+    align-items: start;
+  }
+
+  .myday-main {
+    min-width: 0;
+  }
+
+  .myday-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 12px;
+
+    h2 {
+      margin: 0;
+      font-size: 24px;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+      color: #141414;
+    }
+
+    p {
+      margin: 4px 0 0;
+      font-size: 12px;
+      color: #6b7280;
+    }
+  }
+
+  .myday-capacity-card,
+  .myday-carry-card,
+  .myday-table-card,
+  .myday-suggested {
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    background: #fff;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+  }
+
+  .myday-capacity-card {
+    padding: 12px 14px;
+    margin-bottom: 12px;
+  }
+
+  .myday-capacity-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+  }
+
+  .myday-capacity-title {
+    font-size: 14px;
+    color: #111827;
+  }
+
+  .myday-capacity-input {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    color: #6b7280;
+
+    input {
+      width: 96px;
+      border: 1px solid #d1d5db;
+      border-radius: 6px;
+      padding: 4px 8px;
+      font-size: 12px;
+    }
+  }
+
+  .myday-progress-track {
+    height: 9px;
+    border-radius: 999px;
+    background: #f3f4f6;
+    overflow: hidden;
+    margin-bottom: 8px;
+  }
+
+  .myday-progress-fill {
+    height: 100%;
+
+    &.planned {
+      background: #fb923c;
+    }
+
+    &.done {
+      background: #22c55e;
+    }
+  }
+
+  .myday-carry-card {
+    padding: 12px;
+    margin-bottom: 12px;
+
+    h4 {
+      margin: 0 0 8px;
+      font-size: 15px;
+      font-weight: 700;
+      color: #141414;
+    }
+  }
+
+  .myday-carry-list {
+    display: grid;
+    gap: 8px;
+    margin-bottom: 10px;
+  }
+
+  .myday-carry-item {
+    width: 100%;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    background: #fff;
+    padding: 8px 10px;
+    display: flex;
+    justify-content: space-between;
+    font-size: 12px;
+    color: #111827;
+
+    &.selected {
+      background: #eef2ff;
+      border-color: #93c5fd;
+    }
+  }
+
+  .myday-carry-actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+
+    button {
+      border: 1px solid #d1d5db;
+      background: #fff;
+      color: #374151;
+      border-radius: 8px;
+      padding: 6px 10px;
+      font-size: 12px;
+
+      &:first-child {
+        border-color: #2563eb;
+        background: #2563eb;
+        color: #fff;
+      }
+    }
+  }
+
+  .myday-table-card {
+    padding: 6px;
+    margin-bottom: 12px;
+  }
+
+  .myday-section-title {
+    padding: 8px 10px;
+    font-size: 12px;
+    font-weight: 700;
+    color: #374151;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  .myday-completed-card {
+    border-style: dashed;
+  }
+
+  .myday-toggle-btn {
+    border: none;
+    background: transparent;
+    padding: 0;
+    color: #64748b;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .myday-task-cell {
+    display: grid;
+    gap: 4px;
+    text-align: left;
+
+    &.is-completed .myday-task-title {
+      text-decoration: line-through;
+      color: #9ca3af;
+    }
+  }
+
+  .myday-task-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: #141414;
+  }
+
+  .myday-task-meta {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    font-size: 11px;
+    color: #6b7280;
+  }
+
+  .myday-suggested {
+    padding: 12px;
+
+    h4 {
+      margin: 0 0 10px;
+      font-size: 16px;
+      font-weight: 700;
+      color: #141414;
+    }
+  }
+
+  .myday-search-wrap {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    padding: 6px 8px;
+    margin-bottom: 10px;
+    color: #6b7280;
+
+    input {
+      border: none;
+      outline: none;
+      width: 100%;
+      font-size: 12px;
+    }
+  }
+
+  .myday-suggested-list {
+    display: grid;
+    gap: 8px;
+  }
+
+  .myday-suggested-item {
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    background: #fff;
+    padding: 8px 10px;
+    text-align: left;
+
+    .title {
+      font-size: 12px;
+      font-weight: 600;
+      color: #111827;
+      margin-bottom: 2px;
+    }
+
+    .meta {
+      font-size: 11px;
+      color: #6b7280;
+    }
+  }
+
+  .myday-estimate-chip {
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    background: #fff;
+    color: #111827;
+    padding: 6px 10px;
+    font-size: 12px;
+  }
+
+  @media (max-width: 1200px) {
+    .myday-layout {
+      grid-template-columns: 1fr;
+    }
+  }
+}
