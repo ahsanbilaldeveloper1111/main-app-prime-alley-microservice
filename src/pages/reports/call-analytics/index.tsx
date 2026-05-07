@@ -133,6 +133,7 @@ const PageReports = () => {
                         data={visibleReports}
                         columns={CALL_ANALYTICS_REPORT_COLUMNS}
                         uniqueKey="id"
+                        onRowClick={handlePreviewClick}
                         showActions
                         showToolbarActions={false}
                         actions={reportActions}

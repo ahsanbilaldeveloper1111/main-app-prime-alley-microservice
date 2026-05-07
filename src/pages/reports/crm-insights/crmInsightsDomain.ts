@@ -76,18 +76,31 @@ export function toOrderReportFilters(fields: SharedCrmReportFilterFields): Order
   return fields;
 }
 
+/** Primitive id/extension only — never stringify arbitrary row objects. */
+export function crmInsightsHierarchyUserKey(u: Record<string, unknown>): string | undefined {
+  const id = u.id;
+  if (typeof id === "string" || typeof id === "number") {
+    return id.toString();
+  }
+  const ext = u.extension;
+  if (typeof ext === "string" || typeof ext === "number") {
+    return ext.toString();
+  }
+  return undefined;
+}
+
 /** Hierarchy extension rows from GetHierarchyData (shape varies). */
 export function resolveCrmInsightsUserDisplayName(
   users: Record<string, unknown>[],
   extension: string | number,
 ): string {
-  if (extension === "" || extension == null || extension === undefined) {
+  if (extension == null || extension === "") {
     return `User ${extension}`;
   }
-  const user = users.find((u) => {
-    const userId = u.id ?? u.extension ?? u;
-    return userId != null && userId.toString() === extension.toString();
-  }) as { display_name?: string; name?: string } | undefined;
+  const extensionKey = String(extension);
+  const user = users.find((u) => crmInsightsHierarchyUserKey(u) === extensionKey) as
+    | { display_name?: string; name?: string }
+    | undefined;
   if (user) {
     return user.display_name || user.name || `User ${extension}`;
   }

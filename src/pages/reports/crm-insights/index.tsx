@@ -127,9 +127,13 @@ const CrmReports = () => {
               key={tab.id}
               onClick={() => {
                 setSelectedReportModule(tab.id);
-                if (tab.id === "leads") void fetchLeadReports();
-                else if (tab.id === "deals") void fetchDealReports();
-                else if (tab.id === "orders") void fetchOrderReports();
+                if (tab.id === "leads") {
+                  fetchLeadReports();
+                } else if (tab.id === "deals") {
+                  fetchDealReports();
+                } else if (tab.id === "orders") {
+                  fetchOrderReports();
+                }
               }}
               style={{
                 padding: "16px 0",

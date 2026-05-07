@@ -1,8 +1,9 @@
 import React from "react";
 import { Row, Col, Card, Button, Form } from "react-bootstrap";
 import type { CampaignData, StageData } from "@utils/crm";
+import { crmInsightsHierarchyUserKey } from "./crmInsightsDomain";
 
-export type CrmInsightsFiltersBarProps = {
+export type CrmInsightsFiltersBarProps = Readonly<{
   selectedDateRange: string;
   onDateRangeChange: (range: string) => void;
   startDate: string;
@@ -23,7 +24,7 @@ export type CrmInsightsFiltersBarProps = {
   loading: boolean;
   dealLoading: boolean;
   orderLoading: boolean;
-};
+}>;
 
 export function CrmInsightsFiltersBar({
   selectedDateRange,
@@ -100,13 +101,16 @@ export function CrmInsightsFiltersBar({
               >
                 <option value="">All Owners</option>
                 {users.map((user) => {
-                  const userId = user.id ?? user.extension ?? user;
+                  const optionKey = crmInsightsHierarchyUserKey(user);
+                  if (optionKey === undefined) {
+                    return null;
+                  }
                   const userLabel =
                     (user.display_name as string | undefined) ||
                     (user.name as string | undefined) ||
-                    String(userId);
+                    `User ${optionKey}`;
                   return (
-                    <option key={String(userId)} value={String(userId)}>
+                    <option key={optionKey} value={optionKey}>
                       {userLabel}
                     </option>
                   );

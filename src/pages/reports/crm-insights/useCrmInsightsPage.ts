@@ -72,7 +72,7 @@ export function useCrmInsightsPage() {
   }, [canViewLeadsReports, canViewDealsReports, canViewOrdersReports]);
 
   const [selectedReportModule, setSelectedReportModule] = useState<CrmReportModuleId>(getInitialTab);
-  const [, setShowDatePicker] = useState(false);
+  const [showDatePicker, setShowDatePicker] = useState(false);
   const [startDate, setStartDate] = useState(moment().subtract(30, "days").format("YYYY-MM-DD"));
   const [endDate, setEndDate] = useState(moment().format("YYYY-MM-DD"));
 
@@ -215,7 +215,7 @@ export function useCrmInsightsPage() {
         console.error("Failed to fetch filter data:", error);
       }
     };
-    void fetchFilterData();
+    fetchFilterData();
   }, [selectedReportModule]);
 
   const handleDateRangeChange = useCallback((range: string) => {
@@ -241,11 +241,11 @@ export function useCrmInsightsPage() {
 
   useEffect(() => {
     if (selectedReportModule === "leads") {
-      void fetchLeadReports();
+      fetchLeadReports();
     } else if (selectedReportModule === "deals") {
-      void fetchDealReports();
+      fetchDealReports();
     } else if (selectedReportModule === "orders") {
-      void fetchOrderReports();
+      fetchOrderReports();
     }
     // Only refetch when the module tab changes; filter changes require Apply (matches legacy behavior).
     // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional
@@ -287,9 +287,13 @@ export function useCrmInsightsPage() {
   );
 
   const fetchCurrentModuleReports = useCallback(() => {
-    if (selectedReportModule === "leads") void fetchLeadReports();
-    else if (selectedReportModule === "deals") void fetchDealReports();
-    else if (selectedReportModule === "orders") void fetchOrderReports();
+    if (selectedReportModule === "leads") {
+      fetchLeadReports();
+    } else if (selectedReportModule === "deals") {
+      fetchDealReports();
+    } else if (selectedReportModule === "orders") {
+      fetchOrderReports();
+    }
   }, [selectedReportModule, fetchLeadReports, fetchDealReports, fetchOrderReports]);
 
   const resetFilters = useCallback(() => {
@@ -311,6 +315,7 @@ export function useCrmInsightsPage() {
     canViewOrdersReports,
     selectedReportModule,
     setSelectedReportModule,
+    showDatePicker,
     setShowDatePicker,
     startDate,
     setStartDate,
