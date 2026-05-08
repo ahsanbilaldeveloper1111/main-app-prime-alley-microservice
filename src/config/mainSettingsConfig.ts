@@ -31,7 +31,6 @@ export const sidebarGroups: SidebarGroup[] = [
       { id: 'smart-crm', label: 'Smart CRM', permission: PERMISSIONS.CRM_SERVICES },
       { id: 'communications', label: 'Communications', permission: PERMISSIONS.COMMUNICATIONS_SERVICES },
       { id: 'planner', label: 'Planner', permission: PERMISSIONS.WORK_PLANNER_SERVICES },
-      { id: 'virtual-agents', label: 'Virtual Agents', permission: PERMISSIONS.AI_ML_SERVICES },
       { id: 'pulse', label: 'Pulse', permission: PERMISSIONS.PULSE_SERVICES },
       { id: 'compliance', label: 'Compliance', badge: 'Beta', permission: PERMISSIONS.DNCR_SERVICES },
       { id: 'workforce', label: 'Workforce', permission: PERMISSIONS.STAFF_MANAGEMENT_SERVICES },
@@ -55,6 +54,5 @@ export const defaultSubTabBySection: Record<string, string | undefined> = {
   tickets: 'statuses',
   'help-center': 'modules',
   'ai-chat': 'tools-profiles',
-  'virtual-agents': 'trunk-profiles',
   pulse: 'assign-devices',
 }

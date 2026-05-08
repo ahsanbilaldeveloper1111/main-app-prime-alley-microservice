@@ -1398,7 +1398,7 @@ export const FORMAT_CLOCK = (clock: string) => {
   return `${day} ${month} ${year} ${hourStr}:${minutes}:${seconds} ${ampm}`;
 };
 
-/** Minimal shape for company list lookups (CRM + voicebot inbound). */
+/** Minimal shape for company list lookups (CRM and similar id variants). */
 type CompanyIdListItem = {
   id?: string | number;
   name?: string;
@@ -1422,7 +1422,7 @@ function companyListIdMatches(
 
 /**
  * Find company name by id from a list of { id, name } objects.
- * Also supports voicebot inbound rows (`company_id`, `identifier`, `company_name`)
+ * Also supports rows with `company_id`, `identifier`, `company_name`
  * and camelCase-style ids when present on list items.
  * @param id - Company id (e.g. 1)
  * @param companiesObject - Array of objects with at least { id, name }
@@ -1445,43 +1445,6 @@ export function getCompanyByCrmId(
   const idNum = Number(idStr);
   const found = companiesObject.find((c) => companyListIdMatches(c, idStr, idNum));
   const rawName = found?.name ?? found?.company_name;
-  if (typeof rawName !== "string") return undefined;
-  const trimmed = rawName.trim();
-  return trimmed || undefined;
-}
-
-/** Minimal shape for inbound bot list lookups (snake_case + camelCase ids). */
-type InboundBotListItem = {
-  id?: string | number;
-  bot_id?: string | number;
-  name?: string;
-  bot_name?: string;
-};
-
-/**
- * Resolve a display name for an inbound voicebot from GET /bots/ list items.
- * Matches `id` or `bot_id` (string compare, case-insensitive for UUID-like ids).
- */
-export function getBotNameByInboundId(
-  id: string | number | null | undefined,
-  bots: InboundBotListItem[] | null | undefined,
-): string | undefined {
-  if (id == null || id === "" || !Array.isArray(bots) || bots.length === 0) {
-    return undefined;
-  }
-  const idStr = String(id).trim();
-  if (!idStr) return undefined;
-  const idLower = idStr.toLowerCase();
-  const found = bots.find((b) => {
-    const candidates = [b.id, b.bot_id].filter(
-      (v) => v != null && v !== "",
-    );
-    return candidates.some((v) => {
-      const s = String(v).trim();
-      return s === idStr || s.toLowerCase() === idLower;
-    });
-  });
-  const rawName = found?.name ?? found?.bot_name;
   if (typeof rawName !== "string") return undefined;
   const trimmed = rawName.trim();
   return trimmed || undefined;

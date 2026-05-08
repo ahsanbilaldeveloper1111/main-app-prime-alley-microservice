@@ -410,31 +410,6 @@ const OverviewPage = () => {
             </div>
           </div>
 
-          <div style={{ marginBottom: 24 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-              <div>
-                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                  <h3 style={styles.subHeading}>Virtual Agents Trial</h3>
-                  <span style={{
-                    background: "#ff5c35", color: "#fff", fontSize: 11, fontWeight: 600,
-                    padding: "3px 8px", borderRadius: 12, whiteSpace: "nowrap" as const,
-                  }}>Beta</span>
-                </div>
-                <p style={{ fontSize: 13, color: "#666", margin: "6px 0 6px 0" }}>
-                  You won't be charged at the end of your trial - you'll just return to your current plan
-                </p>
-                <p style={{ fontSize: 13, color: "#666", margin: 0 }}>
-                  Data hosting location:{" "}
-                  <Link href="/settings" style={{ ...styles.link, display: "inline-flex", alignItems: "center", gap: 4 }}>
-                    <span>Gulf Region</span>
-                    <ExternalLink size={13} strokeWidth={2} />
-                  </Link>
-                </p>
-              </div>
-              <button style={styles.btnLight}>View pricing</button>
-            </div>
-          </div>
-
           <div>
             <h3 style={styles.subHeading}>Total Credits</h3>
             <p style={{ fontSize: 14, color: "#141414", margin: "6px 0 0 0" }}>0 Included Credits</p>
