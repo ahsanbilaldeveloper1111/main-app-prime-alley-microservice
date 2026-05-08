@@ -11,7 +11,7 @@ import { useSession } from "next-auth/react";
 import { HEADER_CONSTANTS } from "@constants/headerConstants";
 
 const Billing = () => {
-    const { data:session, status } = useSession();
+    const { data: session } = useSession();
   return (
     <React.Fragment>
       <BreadcrumbItem mainTitle="" mainLink="" subTitle="Billing" />
