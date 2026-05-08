@@ -231,8 +231,8 @@ const PaymentMethods = () => {
   const paymentMethods = (paymentMethodsQuery.data ??
     []) as StripePaymentMethodRow[];
 
-  const invalidatePaymentMethods = () => {
-    void queryClient.invalidateQueries({
+  const invalidatePaymentMethods = async () => {
+    await queryClient.invalidateQueries({
       queryKey: billingCustomerKeys.paymentMethods.stripePortal(),
     });
   };
@@ -258,7 +258,7 @@ const PaymentMethods = () => {
 
     const handleSetDefault = async (id: string | number) => {
       await setDefaultPaymentMethod(String(id));
-      invalidatePaymentMethods();
+      await invalidatePaymentMethods();
     };
 
     const [deletePaymentMethodId, setDeletePaymentMethodId] = useState<string | null>(null);
@@ -272,16 +272,16 @@ const PaymentMethods = () => {
   const handleConfirmDelete = async () => {
     if (deletePaymentMethodId) {
       await deletePaymentMethod(String(deletePaymentMethodId));
-      invalidatePaymentMethods();
+      await invalidatePaymentMethods();
       setDeletePaymentMethodConfirm(false);
       setDeletePaymentMethodId(null);
       toast.success("Payment method deleted successfully");
     }
   };
 
-  const handleAddCardSuccess = () => {
+  const handleAddCardSuccess = async () => {
     setShowAddCardModal(false);
-    invalidatePaymentMethods();
+    await invalidatePaymentMethods();
   };
 
   return (

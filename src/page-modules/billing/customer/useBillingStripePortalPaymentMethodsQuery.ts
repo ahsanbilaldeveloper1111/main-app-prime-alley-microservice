@@ -13,15 +13,17 @@ function parseStripePortalPaymentMethods(
   payload: unknown,
 ): StripePortalPaymentMethodRow[] {
   if (
-    payload &&
-    typeof payload === "object" &&
-    "payment_methods" in payload &&
-    Array.isArray((payload as { payment_methods: unknown }).payment_methods)
+    payload === null ||
+    typeof payload !== "object" ||
+    !("payment_methods" in payload)
   ) {
-    return (payload as { payment_methods: StripePortalPaymentMethodRow[] })
-      .payment_methods;
+    return [];
   }
-  return [];
+  const methods = payload.payment_methods;
+  if (!Array.isArray(methods)) {
+    return [];
+  }
+  return methods as StripePortalPaymentMethodRow[];
 }
 
 export function useBillingStripePortalPaymentMethodsQuery() {

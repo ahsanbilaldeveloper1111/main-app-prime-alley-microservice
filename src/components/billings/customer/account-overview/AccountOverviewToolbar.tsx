@@ -8,7 +8,7 @@ import type { CountrySelectOption } from "./accountOverviewTypes";
 export type AccountOverviewToolbarProps = Readonly<{
   companyOptions: BillingCompanyOption[];
   selectedCompanyId: string | number;
-  onCompanyChange: (nextId: string | number | "") => void;
+  onCompanyChange: (nextId: string | number) => void;
   currencyOptions: CountrySelectOption[];
   customerCurrency: string;
   isLoadingCustomer: boolean;
@@ -54,7 +54,7 @@ export function AccountOverviewToolbar({
             showEmptyOption={false}
             value={selectedCompanyId}
             onChange={(next) => {
-              onCompanyChange(next === "" ? "" : next);
+              onCompanyChange(next);
             }}
             companies={companyOptions}
           />

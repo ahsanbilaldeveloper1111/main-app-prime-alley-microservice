@@ -169,16 +169,16 @@ type SidebarSectionViewProps = Readonly<{
   renderField: (field: SidebarField, index: number) => React.ReactNode;
 }>;
 
-function SidebarSectionView({ section, renderField }: SidebarSectionViewProps) {
-  const [expanded, setExpanded] = useState(section.defaultExpanded ?? true);
-  const SectionIcon = section.icon;
-  const EmptyIcon = section.emptyState?.icon;
-  const showBody = !section.collapsible || expanded;
+function renderSidebarSectionBody(
+  section: SidebarSection,
+  renderField: (field: SidebarField, index: number) => React.ReactNode,
+): React.ReactNode {
+  if (section.customContent) {
+    return section.customContent;
+  }
 
-  const sectionBody =
-    section.customContent ? (
-      section.customContent
-    ) : section.fields && section.fields.length > 0 ? (
+  if (section.fields && section.fields.length > 0) {
+    return (
       <div
         style={{
           display: 'grid',
@@ -188,61 +188,81 @@ function SidebarSectionView({ section, renderField }: SidebarSectionViewProps) {
       >
         {section.fields.map((field, index) => renderField(field, index))}
       </div>
-    ) : section.emptyState ? (
-      <div
+    );
+  }
+
+  if (!section.emptyState) {
+    return null;
+  }
+
+  const empty = section.emptyState;
+  const EmptyIcon = empty.icon;
+  const emptyMessageMargin = empty.action ? '0 0 16px 0' : 0;
+
+  return (
+    <div
+      style={{
+        padding: '32px 20px',
+        backgroundColor: '#fafafa',
+        borderRadius: '10px',
+        border: '1px solid #f3f4f6',
+        textAlign: 'center',
+      }}
+    >
+      {EmptyIcon && (
+        <EmptyIcon size={40} style={{ color: '#d1d5db', marginBottom: '12px' }} />
+      )}
+      <p
         style={{
-          padding: '32px 20px',
-          backgroundColor: '#fafafa',
-          borderRadius: '10px',
-          border: '1px solid #f3f4f6',
-          textAlign: 'center',
+          fontSize: '13px',
+          color: '#6b7280',
+          margin: emptyMessageMargin,
+          lineHeight: '1.5',
         }}
       >
-        {EmptyIcon && (
-          <EmptyIcon size={40} style={{ color: '#d1d5db', marginBottom: '12px' }} />
-        )}
-        <p
+        {empty.message}
+      </p>
+      {empty.action && (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            empty.action?.onClick();
+          }}
           style={{
+            padding: '8px 16px',
+            backgroundColor: '#6366f1',
+            color: 'white',
+            border: 'none',
+            borderRadius: '6px',
             fontSize: '13px',
-            color: '#6b7280',
-            margin: section.emptyState.action ? '0 0 16px 0' : 0,
-            lineHeight: '1.5',
+            fontWeight: '500',
+            cursor: 'pointer',
+            transition: 'all 0.2s',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.backgroundColor = '#4f46e5';
+            e.currentTarget.style.transform = 'translateY(-1px)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.backgroundColor = '#6366f1';
+            e.currentTarget.style.transform = 'translateY(0)';
           }}
         >
-          {section.emptyState.message}
-        </p>
-        {section.emptyState.action && (
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              section.emptyState?.action?.onClick();
-            }}
-            style={{
-              padding: '8px 16px',
-              backgroundColor: '#6366f1',
-              color: 'white',
-              border: 'none',
-              borderRadius: '6px',
-              fontSize: '13px',
-              fontWeight: '500',
-              cursor: 'pointer',
-              transition: 'all 0.2s',
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = '#4f46e5';
-              e.currentTarget.style.transform = 'translateY(-1px)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = '#6366f1';
-              e.currentTarget.style.transform = 'translateY(0)';
-            }}
-          >
-            {section.emptyState.action.label}
-          </button>
-        )}
-      </div>
-    ) : null;
+          {empty.action.label}
+        </button>
+      )}
+    </div>
+  );
+}
+
+function SidebarSectionView({ section, renderField }: SidebarSectionViewProps) {
+  const [expanded, setExpanded] = useState(section.defaultExpanded ?? true);
+  const SectionIcon = section.icon;
+  const showBody = !section.collapsible || expanded;
+  const sectionBody = renderSidebarSectionBody(section, renderField);
+  const CollapseChevron = expanded ? ChevronUp : ChevronDown;
+  const collapseAriaLabel = expanded ? 'Collapse section' : 'Expand section';
 
   return (
     <div>
@@ -287,7 +307,7 @@ function SidebarSectionView({ section, renderField }: SidebarSectionViewProps) {
             <button
               type="button"
               aria-expanded={expanded}
-              aria-label={expanded ? 'Collapse section' : 'Expand section'}
+              aria-label={collapseAriaLabel}
               onClick={(e) => {
                 e.stopPropagation();
                 setExpanded((v) => !v);
@@ -303,17 +323,13 @@ function SidebarSectionView({ section, renderField }: SidebarSectionViewProps) {
                 justifyContent: 'center',
               }}
             >
-              {expanded ? (
-                <ChevronUp size={18} color="#374151" />
-              ) : (
-                <ChevronDown size={18} color="#374151" />
-              )}
+              <CollapseChevron size={18} color="#374151" />
             </button>
           ) : null}
         </div>
       </div>
 
-      {showBody ? sectionBody : null}
+      {showBody && sectionBody}
     </div>
   );
 }

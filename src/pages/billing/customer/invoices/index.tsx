@@ -257,7 +257,7 @@ function StripePaymentModalPanel({ children, marginBottom }: StripePaymentModalP
   return (
     <div
       className="bc-stripe-modal-panel"
-      style={marginBottom !== undefined ? { marginBottom } : undefined}
+      style={marginBottom === undefined ? undefined : { marginBottom }}
     >
       {children}
     </div>

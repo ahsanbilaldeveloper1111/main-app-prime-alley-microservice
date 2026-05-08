@@ -27,12 +27,16 @@ export function parseBillingInvoiceListResponse(
   };
   const data = Array.isArray(r?.data) ? r.data : [];
   const rawTotal = r?.pagination?.total;
-  const totalNum =
-    typeof rawTotal === "number"
-      ? rawTotal
-      : typeof rawTotal === "string"
-        ? Number(rawTotal)
-        : NaN;
+
+  let totalNum: number;
+  if (typeof rawTotal === "number") {
+    totalNum = rawTotal;
+  } else if (typeof rawTotal === "string") {
+    totalNum = Number(rawTotal);
+  } else {
+    totalNum = Number.NaN;
+  }
+
   const total = Number.isFinite(totalNum) ? totalNum : 0;
   return {
     list: data,
@@ -73,16 +77,17 @@ export function useBillingCustomerInvoiceListQuery(
     }),
     queryFn: async () => {
       try {
-        const response = await getInvoices({
+        const params = {
           page,
           per_page: perPage,
           search: filters.search || "",
           crm_company_not_null: true,
           ...filters,
-          ...(crmKey !== "" && crmKey !== "all"
-            ? { crm_company_id: crmKey }
-            : {}),
-        });
+        };
+        if (crmKey !== "" && crmKey !== "all") {
+          Object.assign(params, { crm_company_id: crmKey });
+        }
+        const response = await getInvoices(params);
         return parseBillingInvoiceListResponse(response);
       } catch (error) {
         toast.error(`Failed to load invoices: ${getErrorMessage(error)}`, {

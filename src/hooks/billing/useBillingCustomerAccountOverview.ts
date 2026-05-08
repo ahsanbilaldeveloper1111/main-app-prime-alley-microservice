@@ -33,7 +33,10 @@ import {
   type EnsureCustomerSettledResult,
   useEnsureCustomerForCrmCompany,
 } from "@hooks/billing/useEnsureCustomerForCrmCompany";
-import { useMinifiedCompaniesForSelect } from "@hooks/billing/useMinifiedCompaniesForSelect";
+import {
+  useMinifiedCompaniesForSelect,
+  type BillingCompanyOption,
+} from "@hooks/billing/useMinifiedCompaniesForSelect";
 import { billingCustomerRoutes } from "@utils/billingCustomerRoutes";
 import { getErrorMessage } from "@utils/errors";
 import { resolveCompanyLabelForToolbar } from "@components/billings/customer/account-overview/AccountOverviewToolbar";
@@ -83,7 +86,7 @@ export type UseBillingCustomerAccountOverviewResult = Readonly<{
   billingInfo: BillingInfoFormState;
   setBillingInfo: Dispatch<SetStateAction<BillingInfoFormState>>;
   companyDetails: BillingCustomerView | null;
-  companyOptions: ReturnType<typeof useMinifiedCompaniesForSelect>["companyOptions"];
+  companyOptions: BillingCompanyOption[];
   selectedCompanyId: string | number;
   selectedCompanyName: string;
   customerCurrency: string;
@@ -109,7 +112,7 @@ export type UseBillingCustomerAccountOverviewResult = Readonly<{
   selectedCountryOption: SingleValue<CountrySelectOption>;
   paymentMethodBody: ReactElement;
 
-  handleToolbarCompanyChange: (nextId: string | number | "") => void;
+  handleToolbarCompanyChange: (nextId: string | number) => void;
   handleToolbarCurrencyChange: (nextCurrency: string) => void;
   goToInvoices: () => void;
   goToBillingSettings: () => void;
@@ -376,12 +379,16 @@ export function useBillingCustomerAccountOverview(): UseBillingCustomerAccountOv
               "",
           );
           setCustomerCurrency(refreshedCurrency);
-          void queryClient.invalidateQueries({
-            queryKey: billingCustomerKeys.crm(String(companyId)),
-          });
-          void queryClient.invalidateQueries({
-            queryKey: billingCustomerKeys.dashboard.prefix(String(companyId)),
-          });
+          queryClient
+            .invalidateQueries({
+              queryKey: billingCustomerKeys.crm(String(companyId)),
+            })
+            .catch(() => undefined);
+          queryClient
+            .invalidateQueries({
+              queryKey: billingCustomerKeys.dashboard.prefix(String(companyId)),
+            })
+            .catch(() => undefined);
         } catch (refreshErr) {
           if (!mountedRef.current) return;
           toast.error(
@@ -502,9 +509,11 @@ export function useBillingCustomerAccountOverview(): UseBillingCustomerAccountOv
       const view = customer as BillingCustomerView;
       setCustomerData(view);
       setCompanyDetails(view);
-      void queryClient.invalidateQueries({
-        queryKey: billingCustomerKeys.crm(String(companyId)),
-      });
+      queryClient
+        .invalidateQueries({
+          queryKey: billingCustomerKeys.crm(String(companyId)),
+        })
+        .catch(() => undefined);
     } catch (err) {
       if (!mountedRef.current) return;
       toast.error(`Failed to update tax information: ${getErrorMessage(err)}`, {
@@ -540,15 +549,21 @@ export function useBillingCustomerAccountOverview(): UseBillingCustomerAccountOv
   }, []);
 
   const handleToolbarCompanyChange = useCallback(
-    (next: string | number | "") => {
-      setSelectedCompanyId(next === "" ? "" : next);
-      if (next !== "" && next != null) {
+    (next: string | number) => {
+      setSelectedCompanyId(next);
+      if (typeof next === "number") {
         setSelectedCompanyName(
           resolveCompanyLabelForToolbar(next, companyOptions),
         );
-      } else {
-        setSelectedCompanyName("");
+        return;
       }
+      if (next === "") {
+        setSelectedCompanyName("");
+        return;
+      }
+      setSelectedCompanyName(
+        resolveCompanyLabelForToolbar(next, companyOptions),
+      );
     },
     [companyOptions],
   );
@@ -599,11 +614,11 @@ export function useBillingCustomerAccountOverview(): UseBillingCustomerAccountOv
   ]);
 
   const flushBillingSave = useCallback(() => {
-    void saveBillingInfo();
+    saveBillingInfo().catch(() => undefined);
   }, [saveBillingInfo]);
 
   const flushTaxSave = useCallback(() => {
-    void saveTaxInfo();
+    saveTaxInfo().catch(() => undefined);
   }, [saveTaxInfo]);
 
   const paymentMethodBody = useMemo(

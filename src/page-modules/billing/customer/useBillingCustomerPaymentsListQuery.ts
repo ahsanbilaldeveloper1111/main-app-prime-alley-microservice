@@ -19,12 +19,16 @@ export function parseBillingPaymentsListResponse(
     r?.meta != null && typeof r.meta === "object"
       ? (r.meta as { total?: unknown }).total
       : undefined;
-  const totalNum =
-    typeof rawTotal === "number"
-      ? rawTotal
-      : typeof rawTotal === "string"
-        ? Number(rawTotal)
-        : NaN;
+
+  let totalNum: number;
+  if (typeof rawTotal === "number") {
+    totalNum = rawTotal;
+  } else if (typeof rawTotal === "string") {
+    totalNum = Number(rawTotal);
+  } else {
+    totalNum = Number.NaN;
+  }
+
   const arr = Array.isArray(list) ? list : [];
   const total = Number.isFinite(totalNum)
     ? totalNum
@@ -68,15 +72,16 @@ export function useBillingCustomerPaymentsListQuery(
     }),
     queryFn: async () => {
       try {
-        const response = await GetPayments({
+        const params = {
           page,
           per_page: perPage,
           search,
           status,
-          ...(crmKey !== "" && crmKey !== "all"
-            ? { crm_company_id: crmKey }
-            : {}),
-        });
+        };
+        if (crmKey !== "" && crmKey !== "all") {
+          Object.assign(params, { crm_company_id: crmKey });
+        }
+        const response = await GetPayments(params);
         return parseBillingPaymentsListResponse(response);
       } catch (error) {
         toast.error(`Failed to load payments: ${getErrorMessage(error)}`, {

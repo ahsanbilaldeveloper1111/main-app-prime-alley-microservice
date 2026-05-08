@@ -25,12 +25,13 @@ export function AccountOverviewHeroRow({
   onPayNow,
   onViewInvoices,
 }: AccountOverviewHeroRowProps) {
-  const currencyLabel =
-    typeof companyDetails?.profile?.currency === "string"
-      ? companyDetails.profile.currency
-      : typeof companyDetails?.profile?.currency_code === "string"
-        ? companyDetails.profile.currency_code
-        : "";
+  const profile = companyDetails?.profile;
+  let currencyLabel = "";
+  if (typeof profile?.currency === "string") {
+    currencyLabel = profile.currency;
+  } else if (typeof profile?.currency_code === "string") {
+    currencyLabel = profile.currency_code;
+  }
 
   return (
     <Row className="mb-3">
