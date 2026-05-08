@@ -1,9 +1,9 @@
 import "@components/billings/customer/billingCustomerDatatablePortalStyles";
 import { BillingCustomerPortalTableShell } from "@components/billings/customer/BillingCustomerPortalTableShell";
-import React, { ReactElement, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { ReactElement, useCallback, useEffect, useMemo, useState } from "react";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
-import { GetPayments } from "@utils/accounting";
+import { useBillingCustomerPaymentsListQuery } from "@page-modules/billing/customer/useBillingCustomerPaymentsListQuery";
 import { getBillingCustomerPortalTabsDropdownItems } from "@utils/billingProductsTabs";
 import { billingCustomerRoutes } from "@utils/billingCustomerRoutes";
 import moment from "moment";
@@ -94,9 +94,6 @@ const ProductDetails = () => {
     setCurrentFilters(filters);
   }, []);
 
-  const [dataList, setDataList] = useState<any[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [totalRecords, setTotalRecords] = useState(0);
   const [pagination, setPagination] = useState({
     currentPage: 1,
     rowsPerPage: 15,
@@ -116,7 +113,37 @@ const ProductDetails = () => {
     setPagination((prev) => ({ ...prev, currentPage: 1 }));
   }, [transactionSearch]);
 
-  const requestIdRef = useRef(0);
+  const transactionsFiltersKey = useMemo(
+    () =>
+      JSON.stringify({
+        search: currentFilters.search ?? "",
+        status: currentFilters.status ?? "",
+      }),
+    [currentFilters.search, currentFilters.status],
+  );
+
+  const paymentsQuery = useBillingCustomerPaymentsListQuery({
+    crmKey:
+      selectedCompanyId != null && selectedCompanyId !== ""
+        ? String(selectedCompanyId)
+        : "all",
+    page: pagination.currentPage,
+    perPage: pagination.rowsPerPage,
+    filtersKey: transactionsFiltersKey,
+    refreshKey,
+    search: currentFilters.search || "",
+    status: currentFilters.status || undefined,
+  });
+
+  const dataList = paymentsQuery.data?.list ?? [];
+  const loading = paymentsQuery.isFetching;
+  const totalRecords = paymentsQuery.data?.total ?? 0;
+
+  useEffect(() => {
+    const total = paymentsQuery.data?.total ?? 0;
+    setPagination((prev) => ({ ...prev, totalRows: total }));
+    setTotalAllTransactions(total);
+  }, [paymentsQuery.data?.total]);
 
   const handleOpenFiltersSidebar = useCallback(() => {
     setShowFiltersSidebar(true);
@@ -125,49 +152,6 @@ const ProductDetails = () => {
   const handleCloseFiltersSidebar = useCallback(() => {
     setShowFiltersSidebar(false);
   }, []);
-
-  const fetchPayments = useCallback(async () => {
-    requestIdRef.current += 1;
-    const currentRequestId = requestIdRef.current;
-    setLoading(true);
-    try {
-      const response = (await GetPayments({
-        page: pagination.currentPage,
-        per_page: pagination.rowsPerPage,
-        search: currentFilters.search || "",
-        status: currentFilters.status || undefined,
-        ...(selectedCompanyId ? { crm_company_id: selectedCompanyId } : {}),
-      })) as any;
-
-      if (currentRequestId !== requestIdRef.current) return;
-
-      const list = response?.dataList ?? response?.data ?? [];
-      const total =
-        response?.meta?.total ??
-        response?.recordsTotal ??
-        response?.recordsFiltered ??
-        (Array.isArray(list) ? list.length : 0);
-
-      setDataList(list);
-      setTotalRecords(total);
-      setTotalAllTransactions(total);
-      setPagination((prev) => ({ ...prev, totalRows: total }));
-    } catch (error) {
-      if (currentRequestId !== requestIdRef.current) return;
-      console.error("Error fetching payments:", error);
-      setDataList([]);
-      setTotalRecords(0);
-      setPagination((prev) => ({ ...prev, totalRows: 0 }));
-    } finally {
-      if (currentRequestId === requestIdRef.current) {
-        setLoading(false);
-      }
-    }
-  }, [pagination.currentPage, pagination.rowsPerPage, currentFilters, refreshKey, selectedCompanyId]);
-
-  useEffect(() => {
-    fetchPayments();
-  }, [fetchPayments]);
 
   const tableColumns: TableColumn<any>[] = useMemo(
     () => [
@@ -214,7 +198,7 @@ const ProductDetails = () => {
         sortable: false,
         type: "custom",
         render: (payment) => (
-          <div style={{ whiteSpace: "pre-line" }}>
+          <div className="bc-pre-line">
             {payment?.invoice?.items
               ?.map((item: any) => item?.product?.name)
               .filter(Boolean)
@@ -311,7 +295,7 @@ const ProductDetails = () => {
         setRefreshKey((k) => k + 1);
       },
       dropdownContent: (
-        <div style={{ minWidth: 200 }}>
+        <div className="bc-filter-dropdown-min-200">
           {[
             { value: "completed", label: "Processed" },
             { value: "failed", label: "Failed" },
@@ -319,16 +303,7 @@ const ProductDetails = () => {
             <button
               key={s.value}
               type="button"
-              style={{
-                padding: "8px 12px",
-                cursor: "pointer",
-                background:
-                  currentFilters.status === s.value ? "#f0f0f0" : "transparent",
-                borderRadius: "4px",
-                border: "none",
-                width: "100%",
-                textAlign: "left",
-              }}
+              className={`bc-filter-pill-option${currentFilters.status === s.value ? " bc-filter-pill-option--active" : ""}`}
               onClick={() => applyStatusFilter(s.value)}
             >
               {s.label}
@@ -429,7 +404,7 @@ const ProductDetails = () => {
       {/* Main flex container for content and sidebar — same pattern as prospects.tsx */}
       <BillingCustomerPortalTableShell>
         {/* Main content area */}
-        <div style={{ flex: 1, overflowY: "auto", overflowX: "hidden" }}>
+        <div className="bc-main-scroll">
 
           {/* Company selector above the table */}
           <div className="mb-3 d-flex align-items-center gap-2">

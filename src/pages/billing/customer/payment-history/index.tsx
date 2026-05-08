@@ -3,7 +3,6 @@ import React, {
   useCallback,
   useEffect,
   useMemo,
-  useRef,
   useState,
 } from "react";
 import Layout from "@layout/index";
@@ -24,7 +23,7 @@ import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
 import "@assets/scss/datatable-style.scss";
 
-import { GetPayments } from "@utils/accounting";
+import { useBillingCustomerPaymentsListQuery } from "@page-modules/billing/customer/useBillingCustomerPaymentsListQuery";
 import { useSession } from "next-auth/react";
 import moment from "moment";
 import FormModal from "@pages/partial/FormModal";
@@ -116,9 +115,6 @@ const BillingHistory = () => {
   const [activeStatusTab, setActiveStatusTab] = useState<string | null>(null);
   const [showFilterTabs, setShowFilterTabs] = useState(false);
   const [showFiltersSidebar, setShowFiltersSidebar] = useState(false);
-  const [paymentList, setPaymentList] = useState<PaymentRow[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [totalRecords, setTotalRecords] = useState(0);
   const [pagination, setPagination] = useState({
     currentPage: 1,
     rowsPerPage: 15,
@@ -134,46 +130,43 @@ const BillingHistory = () => {
   const requestIdRef = useRef(0);
   const memoizedFilters = useMemo(() => currentFilters, [currentFilters]);
 
-  const loadPayments = useCallback(async () => {
-    requestIdRef.current += 1;
-    const currentRequestId = requestIdRef.current;
-    setLoading(true);
-    try {
-      const response = (await GetPayments({
-        page: pagination.currentPage,
-        per_page: pagination.rowsPerPage,
-        search: memoizedFilters.search || "",
-        status: memoizedFilters.status,
-        // date_from: memoizedFilters.payment_date_from,
-        // date_to: memoizedFilters.payment_date_to,
-        ...(selectedCompanyId ? { crm_company_id: selectedCompanyId } : {}),
-      })) as any;
-      if (currentRequestId !== requestIdRef.current) return;
-      const list = response?.dataList ?? response?.data ?? [];
-      const total = response?.meta?.total ?? response?.recordsTotal ?? 0;
-      setPaymentList(list);
-      setTotalRecords(total);
-      setPagination((prev) => ({ ...prev, totalRows: total }));
-    } catch (error) {
-      if (currentRequestId !== requestIdRef.current) return;
-      console.error("Error fetching payments:", error);
-      setPaymentList([]);
-      setTotalRecords(0);
-      setPagination((prev) => ({ ...prev, totalRows: 0 }));
-    } finally {
-      if (requestIdRef.current === currentRequestId) setLoading(false);
-    }
-  }, [
-    pagination.currentPage,
-    pagination.rowsPerPage,
-    memoizedFilters,
+  const paymentsFiltersKey = useMemo(
+    () =>
+      JSON.stringify({
+        search: memoizedFilters.search ?? "",
+        status: memoizedFilters.status ?? "",
+        payment_date_from: memoizedFilters.payment_date_from ?? "",
+        payment_date_to: memoizedFilters.payment_date_to ?? "",
+      }),
+    [
+      memoizedFilters.search,
+      memoizedFilters.status,
+      memoizedFilters.payment_date_from,
+      memoizedFilters.payment_date_to,
+    ],
+  );
+
+  const paymentsQuery = useBillingCustomerPaymentsListQuery({
+    crmKey:
+      selectedCompanyId != null && selectedCompanyId !== ""
+        ? String(selectedCompanyId)
+        : "all",
+    page: pagination.currentPage,
+    perPage: pagination.rowsPerPage,
+    filtersKey: paymentsFiltersKey,
     refreshKey,
-    selectedCompanyId,
-  ]);
+    search: memoizedFilters.search || "",
+    status: memoizedFilters.status,
+  });
+
+  const paymentList = (paymentsQuery.data?.list ?? []) as PaymentRow[];
+  const loading = paymentsQuery.isFetching;
+  const totalRecords = paymentsQuery.data?.total ?? 0;
 
   useEffect(() => {
-    loadPayments();
-  }, [loadPayments]);
+    const total = paymentsQuery.data?.total ?? 0;
+    setPagination((prev) => ({ ...prev, totalRows: total }));
+  }, [paymentsQuery.data?.total]);
 
   const openPaymentSidebar = useCallback((row: PaymentRow) => {
     setSelectedPaymentSidebar(row);
@@ -325,7 +318,7 @@ const BillingHistory = () => {
         <div className="d-flex flex-wrap gap-2 align-items-center">
           <Form.Select
             size="sm"
-            style={{ width: "220px" }}
+            className="bc-company-select-w"
             value={getCompanySelectValue(selectedCompanyId)}
             onChange={(e) =>
               setSelectedCompanyId(

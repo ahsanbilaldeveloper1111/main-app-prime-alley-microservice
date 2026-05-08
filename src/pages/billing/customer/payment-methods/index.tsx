@@ -20,10 +20,13 @@ import "@assets/scss/billing.scss";
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
 import PageHeader from "@components/PageHeader";
-import { GetPaymentMethods,setDefaultPaymentMethod,deletePaymentMethod,addPaymentMethod } from "@utils/accounting";
+import { setDefaultPaymentMethod, deletePaymentMethod, addPaymentMethod } from "@utils/accounting";
 import { toast } from "react-toastify";
 import ConfirmModal from "@pages/partial/ConfirmModal";
 import { getErrorMessage } from "@utils/errors";
+import { useBillingStripePortalPaymentMethodsQuery } from "@page-modules/billing/customer/useBillingStripePortalPaymentMethodsQuery";
+import { useQueryClient } from "@tanstack/react-query";
+import { billingCustomerKeys } from "../../../../query/keys";
 
 import { loadStripe } from "@stripe/stripe-js";
 import {
@@ -121,7 +124,7 @@ const AddCardForm: React.FC<{
     <form onSubmit={handleSubmit}>
       <div className="mb-3">
         <label className="form-label" htmlFor="card-element">Card Information *</label>
-        <div className="p-3 border rounded bg-light" id="card-element" style={{ position: 'relative' }}>
+        <div className="p-3 border rounded bg-light bc-card-element-wrap" id="card-element">
           {/* Hide Stripe Link banner if it appears */}
           <style>{`
             #card-element [data-testid="link-authentication-element"],
@@ -222,27 +225,20 @@ const AddCardForm: React.FC<{
 
 const PaymentMethods = () => {
   const { data: session } = useSession();
+  const queryClient = useQueryClient();
+
+  const paymentMethodsQuery = useBillingStripePortalPaymentMethodsQuery();
+  const paymentMethods = (paymentMethodsQuery.data ??
+    []) as StripePaymentMethodRow[];
+
+  const invalidatePaymentMethods = () => {
+    void queryClient.invalidateQueries({
+      queryKey: billingCustomerKeys.paymentMethods.stripePortal(),
+    });
+  };
 
   const [showAddCardModal, setShowAddCardModal] = useState(false);
   const [stripePublishableKey, setStripePublishableKey] = useState<string>("");
-
-  const [paymentMethods, setPaymentMethods] = useState<StripePaymentMethodRow[]>([]);
-
-  const fetchPaymentMethods = async () => {
-    const response = await GetPaymentMethods();
-    if (
-      response &&
-      typeof response === "object" &&
-      "payment_methods" in response &&
-      Array.isArray((response as { payment_methods: unknown }).payment_methods)
-    ) {
-      setPaymentMethods(
-        (response as { payment_methods: StripePaymentMethodRow[] }).payment_methods,
-      );
-      return;
-    }
-    setPaymentMethods([]);
-  };
 
     // Load Stripe publishable key
     const loadStripePublishableKey = async () => {
@@ -255,15 +251,14 @@ const PaymentMethods = () => {
     };
 
     useEffect(() => {
-      fetchPaymentMethods();
       loadStripePublishableKey();
     }, []);
 
     
 
-    const handleSetDefault = (id: string | number) => {
-      setDefaultPaymentMethod(String(id));
-      fetchPaymentMethods();
+    const handleSetDefault = async (id: string | number) => {
+      await setDefaultPaymentMethod(String(id));
+      invalidatePaymentMethods();
     };
 
     const [deletePaymentMethodId, setDeletePaymentMethodId] = useState<string | null>(null);
@@ -277,7 +272,7 @@ const PaymentMethods = () => {
   const handleConfirmDelete = async () => {
     if (deletePaymentMethodId) {
       await deletePaymentMethod(String(deletePaymentMethodId));
-      fetchPaymentMethods();
+      invalidatePaymentMethods();
       setDeletePaymentMethodConfirm(false);
       setDeletePaymentMethodId(null);
       toast.success("Payment method deleted successfully");
@@ -286,7 +281,7 @@ const PaymentMethods = () => {
 
   const handleAddCardSuccess = () => {
     setShowAddCardModal(false);
-    fetchPaymentMethods();
+    invalidatePaymentMethods();
   };
 
   return (

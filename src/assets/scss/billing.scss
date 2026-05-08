@@ -34,3 +34,279 @@ body {
 // .customer-management-card {
 //     min-height: 200px;
 // }
+
+/* --- Customer billing portal: replaces scattered inline styles --- */
+
+.bc-dashboard-skeleton-cards-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 16px;
+}
+
+.bc-card-body-p-20.card-body {
+    padding: 20px;
+}
+
+.bc-ph-h-14 {
+    height: 14px;
+}
+
+.bc-ph-h-20 {
+    height: 20px;
+}
+
+.bc-ph-h-22 {
+    height: 22px;
+}
+
+.bc-ph-h-24 {
+    height: 24px;
+}
+
+.bc-ph-h-28 {
+    height: 28px;
+}
+
+.bc-chart-skeleton-h {
+    height: 354px;
+}
+
+.bc-ph-bar {
+    min-width: 24px;
+}
+
+.bc-dashboard-soft-card {
+    border: none;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.bc-ph-36 {
+    width: 36px;
+    height: 36px;
+}
+
+.bc-period-select {
+    width: 150px;
+}
+
+.bc-subscriptions-scroll {
+    max-height: 367px;
+    overflow-y: auto;
+}
+
+.bc-subscription-icon-wrap {
+    width: 36px;
+    height: 36px;
+    flex-shrink: 0;
+    background-color: var(--bc-sub-bg, transparent);
+}
+
+.bc-subscription-icon-inner {
+    color: var(--bc-sub-icon, inherit);
+}
+
+.bc-subscription-main {
+    min-width: 0;
+    flex: 1;
+}
+
+.bc-subscription-title {
+    font-size: 0.9rem;
+    font-weight: 500;
+}
+
+.bc-subscription-badge-wrap {
+    margin-left: 8px;
+    flex-shrink: 0;
+}
+
+.bc-subscription-status-badge.badge {
+    font-size: 0.75rem;
+    padding: 0.35rem 0.65rem;
+}
+
+/* Toolbar actions (subscriptions / invoices create CTAs) */
+.bc-table-toolbar-floating {
+    position: absolute;
+    right: 19px;
+    top: 18px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.bc-btn-billing-dark {
+    padding: 9px 13px;
+    background-color: #000;
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+
+    &:hover:not(:disabled) {
+        background-color: #1a1a1a;
+    }
+}
+
+/* Filter dropdowns (tables) */
+.bc-filter-dropdown-min-200 {
+    min-width: 200px;
+}
+
+.bc-filter-dropdown-min-220 {
+    min-width: 220px;
+    padding: 4px 0;
+}
+
+.bc-filter-date-label {
+    padding: 4px 12px 8px;
+    font-size: 12px;
+    color: #666;
+}
+
+.bc-filter-date-input {
+    width: 100%;
+    padding: 6px 12px;
+    border: 1px solid #e5e7eb;
+    border-radius: 4px;
+}
+
+.bc-filter-date-input--mb {
+    margin-bottom: 8px;
+}
+
+.bc-filter-pill-option {
+    padding: 8px 12px;
+    cursor: pointer;
+    background: transparent;
+    border-radius: 4px;
+    border: none;
+    width: 100%;
+    text-align: left;
+    font-size: 13px;
+
+    &--active {
+        background: #f0f0f0;
+    }
+
+    &--capitalize {
+        text-transform: capitalize;
+    }
+}
+
+.bc-table-icon-btn {
+    background: transparent;
+    border: none;
+    padding: 4px;
+    cursor: pointer;
+
+    &:disabled {
+        cursor: not-allowed;
+        opacity: 0.5;
+    }
+
+    &--primary {
+        color: #0d6efd;
+    }
+
+    &--danger {
+        color: #dc3545;
+    }
+}
+
+.bc-main-scroll {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+
+.bc-pre-line {
+    white-space: pre-line;
+}
+
+.bc-sidebar-border-start {
+    border-left: 1px solid #e2e8f0;
+}
+
+.bc-company-select-w {
+    width: 220px;
+}
+
+.bc-spinner-1rem {
+    width: 1rem;
+    height: 1rem;
+    vertical-align: middle;
+}
+
+.bc-stripe-modal-panel {
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    padding: 16px;
+    background: #fff;
+}
+
+.bc-stripe-url-toolbar-row {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.bc-modal-section-title {
+    margin-bottom: 8px;
+}
+
+.bc-modal-muted-p {
+    margin-bottom: 12px;
+    color: #6b7280;
+    font-size: 14px;
+
+    &--tight {
+        margin-bottom: 8px;
+    }
+}
+
+.bc-modal-muted-hint {
+    margin-bottom: 10px;
+    color: #6b7280;
+    font-size: 13px;
+}
+
+.bc-card-element-wrap {
+    position: relative;
+}
+
+.bc-product-name-link {
+    color: #1d6ae5;
+    font-weight: 500;
+}
+
+.bc-product-cell-muted-mono {
+    color: #6b7280;
+    font-size: 13px;
+    font-family: monospace;
+}
+
+.bc-product-cell-text {
+    color: #374151;
+    font-size: 13px;
+}
+
+.bc-product-cell-text--medium {
+    font-weight: 500;
+}
+
+.bc-prospect-scroll-fill {
+    flex: 1;
+}
+
+.bc-prospect-table-wrapper {
+    flex: 1;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}

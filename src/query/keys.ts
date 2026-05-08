@@ -279,3 +279,104 @@ export const workforceKeys = {
       [...workforceKeys.approvalRequests.all(), "categoryDetail", categoryId] as const,
   },
 };
+
+/** Customer billing portal reads (`src/pages/billing/customer/*`). */
+export const billingCustomerKeys = {
+  root: ["billingCustomer"] as const,
+
+  /** Scoped subtree for one CRM company — use with `invalidateQueries({ queryKey })`. */
+  crm: (crmId: string) =>
+    [...billingCustomerKeys.root, "crm", crmId] as const,
+
+  currencies: {
+    all: () => [...billingCustomerKeys.root, "currencies"] as const,
+  },
+
+  paymentMethods: {
+    /** Stripe portal cards (`GetPaymentMethods()` without company). */
+    stripePortal: () =>
+      [...billingCustomerKeys.root, "paymentMethods", "stripePortal"] as const,
+    /** Accounting API scoped to CRM company. */
+    forCompany: (crmId: string) =>
+      [...billingCustomerKeys.crm(crmId), "paymentMethods"] as const,
+  },
+
+  payments: {
+    recentOverview: (crmId: string) =>
+      [...billingCustomerKeys.crm(crmId), "payments", "recentOverview"] as const,
+    list: (params: {
+      crmKey: string;
+      page: number;
+      perPage: number;
+      filtersKey: string;
+      refreshKey: number;
+    }) =>
+      [
+        ...billingCustomerKeys.crm(params.crmKey),
+        "payments",
+        "list",
+        params.page,
+        params.perPage,
+        params.filtersKey,
+        params.refreshKey,
+      ] as const,
+  },
+
+  invoices: {
+    recentOverview: (crmId: string) =>
+      [...billingCustomerKeys.crm(crmId), "invoices", "recentOverview"] as const,
+    list: (params: {
+      crmKey: string;
+      page: number;
+      perPage: number;
+      filtersKey: string;
+      refreshKey: number;
+    }) =>
+      [
+        ...billingCustomerKeys.crm(params.crmKey),
+        "invoices",
+        "list",
+        params.page,
+        params.perPage,
+        params.filtersKey,
+        params.refreshKey,
+      ] as const,
+  },
+
+  dashboardCounters: {
+    overviewSlice: (crmId: string) =>
+      [...billingCustomerKeys.crm(crmId), "dashboardCounters", "overviewSlice"] as const,
+  },
+
+  dashboard: {
+    bundle: (crmKey: string, period: string, refreshKey: number) =>
+      [
+        ...billingCustomerKeys.root,
+        "dashboardBundle",
+        crmKey,
+        period,
+        refreshKey,
+      ] as const,
+    prefix: (crmKey: string) =>
+      [...billingCustomerKeys.root, "dashboardBundle", crmKey] as const,
+  },
+
+  subscriptions: {
+    pricingList: (params: {
+      crmId: string;
+      page: number;
+      perPage: number;
+      filtersKey: string;
+      refreshKey: number;
+    }) =>
+      [
+        ...billingCustomerKeys.crm(params.crmId),
+        "subscriptions",
+        "pricingList",
+        params.page,
+        params.perPage,
+        params.filtersKey,
+        params.refreshKey,
+      ] as const,
+  },
+};

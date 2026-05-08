@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Maximize2, Minimize2, LucideIcon, User, Phone, Mail, ChevronLeft, ChevronRight, MessageSquare, Video, Calendar } from 'lucide-react';
-import { Badge, Button } from 'react-bootstrap';
+import { X, Maximize2, Minimize2, LucideIcon, User, Phone, Mail, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, MessageSquare, Video, Calendar } from 'lucide-react';
+import { Badge, Dropdown } from 'react-bootstrap';
 import AICompose, { type AIComposeOpenedFrom } from '@components/aicompose';
 import { usePermissions } from '@utils/permissionUtils';
 import { HEADER_CONSTANTS } from '@constants/headerConstants';
@@ -158,6 +158,164 @@ export interface SidebarSection {
     };
   };
   customContent?: React.ReactNode;
+  /** When true, section body toggles with a chevron control */
+  collapsible?: boolean;
+  /** Used only when {@link collapsible} is true; defaults to expanded */
+  defaultExpanded?: boolean;
+}
+
+type SidebarSectionViewProps = Readonly<{
+  section: SidebarSection;
+  renderField: (field: SidebarField, index: number) => React.ReactNode;
+}>;
+
+function SidebarSectionView({ section, renderField }: SidebarSectionViewProps) {
+  const [expanded, setExpanded] = useState(section.defaultExpanded ?? true);
+  const SectionIcon = section.icon;
+  const EmptyIcon = section.emptyState?.icon;
+  const showBody = !section.collapsible || expanded;
+
+  const sectionBody =
+    section.customContent ? (
+      section.customContent
+    ) : section.fields && section.fields.length > 0 ? (
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: '1fr',
+          gap: '14px',
+        }}
+      >
+        {section.fields.map((field, index) => renderField(field, index))}
+      </div>
+    ) : section.emptyState ? (
+      <div
+        style={{
+          padding: '32px 20px',
+          backgroundColor: '#fafafa',
+          borderRadius: '10px',
+          border: '1px solid #f3f4f6',
+          textAlign: 'center',
+        }}
+      >
+        {EmptyIcon && (
+          <EmptyIcon size={40} style={{ color: '#d1d5db', marginBottom: '12px' }} />
+        )}
+        <p
+          style={{
+            fontSize: '13px',
+            color: '#6b7280',
+            margin: section.emptyState.action ? '0 0 16px 0' : 0,
+            lineHeight: '1.5',
+          }}
+        >
+          {section.emptyState.message}
+        </p>
+        {section.emptyState.action && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              section.emptyState?.action?.onClick();
+            }}
+            style={{
+              padding: '8px 16px',
+              backgroundColor: '#6366f1',
+              color: 'white',
+              border: 'none',
+              borderRadius: '6px',
+              fontSize: '13px',
+              fontWeight: '500',
+              cursor: 'pointer',
+              transition: 'all 0.2s',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = '#4f46e5';
+              e.currentTarget.style.transform = 'translateY(-1px)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = '#6366f1';
+              e.currentTarget.style.transform = 'translateY(0)';
+            }}
+          >
+            {section.emptyState.action.label}
+          </button>
+        )}
+      </div>
+    ) : null;
+
+  return (
+    <div>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          marginBottom: '16px',
+          paddingBottom: '12px',
+          borderBottom: '2px solid #f3f4f6',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          {SectionIcon && <SectionIcon size={20} style={{ color: '#4f46e5' }} />}
+          <h3
+            style={{
+              fontSize: '15px',
+              fontWeight: '600',
+              color: '#111827',
+              margin: 0,
+            }}
+          >
+            {section.title}
+          </h3>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          {section.badge && (
+            <Badge
+              bg={section.badge.variant || 'secondary'}
+              style={{
+                fontSize: '11px',
+                padding: '4px 10px',
+                borderRadius: '12px',
+                fontWeight: '600',
+              }}
+            >
+              {section.badge.value}
+            </Badge>
+          )}
+          {section.collapsible ? (
+            <button
+              type="button"
+              aria-expanded={expanded}
+              aria-label={expanded ? 'Collapse section' : 'Expand section'}
+              onClick={(e) => {
+                e.stopPropagation();
+                setExpanded((v) => !v);
+              }}
+              style={{
+                border: 'none',
+                background: '#f3f4f6',
+                borderRadius: '8px',
+                padding: '4px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              {expanded ? (
+                <ChevronUp size={18} color="#374151" />
+              ) : (
+                <ChevronDown size={18} color="#374151" />
+              )}
+            </button>
+          ) : null}
+        </div>
+      </div>
+
+      {showBody ? sectionBody : null}
+    </div>
+  );
 }
 
 export interface SidebarTab {
@@ -180,6 +338,140 @@ export interface SidebarAction {
   variant?: 'primary' | 'success' | 'danger' | 'warning' | 'secondary' | 'outline-primary' | 'outline-secondary';
   show?: boolean;
   disabled?: boolean;
+}
+
+/** Optional CRM-style quick action tiles (e.g. invoice detail sidebar). */
+export interface SidebarQuickActionItem {
+  id: string;
+  label: string;
+  icon: LucideIcon;
+  onClick: () => void;
+}
+
+export interface SidebarActionsDropdownConfig {
+  label: string;
+  items: ReadonlyArray<{ label: string; onClick: () => void }>;
+}
+
+type SidebarInvoiceQuickActionsPanelProps = Readonly<{
+  quickActions: SidebarQuickActionItem[];
+  actionsDropdown?: SidebarActionsDropdownConfig;
+}>;
+
+function SidebarInvoiceQuickActionsPanel({
+  quickActions,
+  actionsDropdown,
+}: SidebarInvoiceQuickActionsPanelProps) {
+  const columnCount = Math.min(Math.max(quickActions.length, 1), 3);
+
+  return (
+    <div
+      style={{
+        padding: '16px 24px',
+        borderBottom: '1px solid #e5e7eb',
+        backgroundColor: '#fafbfc',
+      }}
+    >
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          marginBottom: '12px',
+          gap: '8px',
+        }}
+      >
+        <div
+          style={{
+            fontSize: '12px',
+            fontWeight: '600',
+            color: '#6b7280',
+            textTransform: 'uppercase',
+            letterSpacing: '0.5px',
+          }}
+        >
+          Quick Actions
+        </div>
+        {actionsDropdown && actionsDropdown.items.length > 0 ? (
+          <Dropdown align="end">
+            <Dropdown.Toggle variant="outline-secondary" size="sm" id="generic-sidebar-actions-dd">
+              {actionsDropdown.label}
+            </Dropdown.Toggle>
+            <Dropdown.Menu>
+              {actionsDropdown.items.map((item, index) => (
+                <Dropdown.Item
+                  key={`${item.label}-${index}`}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    item.onClick();
+                  }}
+                >
+                  {item.label}
+                </Dropdown.Item>
+              ))}
+            </Dropdown.Menu>
+          </Dropdown>
+        ) : null}
+      </div>
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: `repeat(${columnCount}, 1fr)`,
+          gap: '10px',
+        }}
+      >
+        {quickActions.map((qa) => {
+          const QaIcon = qa.icon;
+          return (
+            <button
+              key={qa.id}
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                qa.onClick();
+              }}
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: '14px 10px',
+                backgroundColor: 'transparent',
+                border: 'none',
+                borderRadius: '10px',
+                cursor: 'pointer',
+                transition: 'all 0.2s',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = '#f3f4f6';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = 'transparent';
+              }}
+            >
+              <QaIcon
+                size={22}
+                color="#6366f1"
+                strokeWidth={2.5}
+                style={{ marginBottom: '6px' }}
+              />
+              <span
+                style={{
+                  fontSize: '12px',
+                  fontWeight: '600',
+                  color: '#374151',
+                  textAlign: 'center',
+                  lineHeight: '1.2',
+                }}
+              >
+                {qa.label}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
 }
 
 export interface GenericSidebarProps {
@@ -209,31 +501,36 @@ export interface GenericSidebarProps {
   tabs?: SidebarTab[];
   actions?: SidebarAction[];
   width?: string;
+  quickActions?: SidebarQuickActionItem[];
+  actionsDropdown?: SidebarActionsDropdownConfig;
 }
 
-const GenericSidebar: React.FC<GenericSidebarProps> = ({
-  isOpen,
-  onClose,
-  title,
-  subtitle,
-  metadata,
-  email,
-  phone,
-  completePhone,
-  avatar,
-  onCall = () => console.log('Call action clicked'),
-  onWhatsApp = () => console.log('WhatsApp action clicked'),
-  onEmail = () => console.log('Email action clicked'),
-  onSMS = () => console.log('SMS action clicked'),
-  onMeetNow = () => console.log('Meet Now action clicked'),
-  onSchedule = () => console.log('Schedule action clicked'),
-  contextPayload,
-  moduleSlug,
-  sections,
-  tabs,
-  actions,
-  width = '400px'
-}) => {
+function GenericSidebar(props: Readonly<GenericSidebarProps>): React.ReactElement | null {
+  const {
+    isOpen,
+    onClose,
+    title,
+    subtitle,
+    metadata,
+    email,
+    phone,
+    completePhone,
+    avatar,
+    onCall = () => console.log('Call action clicked'),
+    onWhatsApp = () => console.log('WhatsApp action clicked'),
+    onEmail = () => console.log('Email action clicked'),
+    onSMS = () => console.log('SMS action clicked'),
+    onMeetNow = () => console.log('Meet Now action clicked'),
+    onSchedule = () => console.log('Schedule action clicked'),
+    contextPayload,
+    moduleSlug,
+    sections,
+    tabs,
+    actions,
+    width = '400px',
+    quickActions,
+    actionsDropdown,
+  } = props;
   const { hasPermission } = usePermissions();
   const [activeTab, setActiveTab] = useState(tabs && tabs.length > 0 ? tabs[0].id : '');
   const [showLeftArrow, setShowLeftArrow] = useState(false);
@@ -454,105 +751,6 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
     );
   };
 
-  const renderSection = (section: SidebarSection) => {
-    const SectionIcon = section.icon;
-    const EmptyIcon = section.emptyState?.icon;
-
-    return (
-      <div key={section.id}>
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          marginBottom: '16px',
-          paddingBottom: '12px',
-          borderBottom: '2px solid #f3f4f6'
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            {SectionIcon && <SectionIcon size={20} style={{ color: '#4f46e5' }} />}
-            <h3 style={{
-              fontSize: '15px',
-              fontWeight: '600',
-              color: '#111827',
-              margin: 0
-            }}>
-              {section.title}
-            </h3>
-          </div>
-          {section.badge && (
-            <Badge bg={section.badge.variant || 'secondary'} style={{
-              fontSize: '11px',
-              padding: '4px 10px',
-              borderRadius: '12px',
-              fontWeight: '600'
-            }}>
-              {section.badge.value}
-            </Badge>
-          )}
-        </div>
-
-        {section.customContent ? (
-          section.customContent
-        ) : section.fields && section.fields.length > 0 ? (
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: '1fr',
-            gap: '14px'
-          }}>
-            {section.fields.map((field, index) => renderField(field, index))}
-          </div>
-        ) : section.emptyState ? (
-          <div style={{
-            padding: '32px 20px',
-            backgroundColor: '#fafafa',
-            borderRadius: '10px',
-            border: '1px solid #f3f4f6',
-            textAlign: 'center'
-          }}>
-            {EmptyIcon && <EmptyIcon size={40} style={{ color: '#d1d5db', marginBottom: '12px' }} />}
-            <p style={{
-              fontSize: '13px',
-              color: '#6b7280',
-              margin: section.emptyState.action ? '0 0 16px 0' : 0,
-              lineHeight: '1.5'
-            }}>
-              {section.emptyState.message}
-            </p>
-            {section.emptyState.action && (
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  section.emptyState?.action?.onClick();
-                }}
-                style={{
-                  padding: '8px 16px',
-                  backgroundColor: '#6366f1',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '6px',
-                  fontSize: '13px',
-                  fontWeight: '500',
-                  cursor: 'pointer',
-                  transition: 'all 0.2s'
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = '#4f46e5';
-                  e.currentTarget.style.transform = 'translateY(-1px)';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = '#6366f1';
-                  e.currentTarget.style.transform = 'translateY(0)';
-                }}
-              >
-                {section.emptyState.action.label}
-              </button>
-            )}
-          </div>
-        ) : null}
-      </div>
-    );
-  };
-
   return (
     <div
       onClick={onClose}
@@ -757,7 +955,13 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
           </div>
         </div>
 
-        {/* Quick Actions - Permanent Section */}
+        {/* Quick Actions — invoice/custom tiles or default CRM strip */}
+        {quickActions && quickActions.length > 0 ? (
+          <SidebarInvoiceQuickActionsPanel
+            quickActions={quickActions}
+            actionsDropdown={actionsDropdown}
+          />
+        ) : (
         <div style={{
           padding: '16px 24px',
           borderBottom: '1px solid #e5e7eb',
@@ -1071,6 +1275,7 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
             )}
           </div>
         </div>
+        )}
 
         {/* Navigation Tabs */}
         {tabs && tabs.length > 0 && (
@@ -1187,7 +1392,13 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
           }}
         >
           <div style={{ display: 'flex', flexDirection: 'column', gap: '28px' }}>
-            {displaySections.map(section => renderSection(section))}
+            {displaySections.map((section) => (
+              <SidebarSectionView
+                key={section.id}
+                section={section}
+                renderField={renderField}
+              />
+            ))}
           </div>
 
           {/* Actions */}
@@ -1200,10 +1411,9 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
               flexWrap: 'wrap',
               gap: '12px'
             }}>
-              {actions.filter(action => action.show !== false).map((action, index) => {
+              {actions.filter(action => action.show !== false).map((action) => {
                 const ActionIcon = action.icon;
-                const isOutline = action.variant?.includes('outline');
-                
+
                 const baseStyles = {
                   padding: '10px 20px',
                   borderRadius: '8px',
@@ -1229,7 +1439,7 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
 
                 return (
                   <button
-                    key={index}
+                    key={action.label}
                     disabled={action.disabled}
                     onClick={() => { if (!action.disabled) action.onClick(); }}
                     style={{
@@ -1249,6 +1459,6 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
       </div>
     </div>
   );
-};
+}
 
 export default GenericSidebar;

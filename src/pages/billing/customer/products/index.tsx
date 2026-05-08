@@ -1,4 +1,5 @@
 import "@components/billings/customer/billingCustomerDatatableCommonTabsStyles";
+import "@assets/scss/billing.scss";
 import { BillingCustomerPortalTableShell } from "@components/billings/customer/BillingCustomerPortalTableShell";
 import React, {
   ReactElement,
@@ -339,44 +340,6 @@ function loadProductTableColumnsFromStorage(): string[] {
   return legacy ?? [...DEFAULT_PRODUCT_TABLE_COLUMN_KEYS];
 }
 
-const ACTION_BUTTON_BASE_STYLE: React.CSSProperties = {
-  padding: "9px 13px",
-  backgroundColor: "#000000",
-  color: "#ffffff",
-  border: "none",
-  borderRadius: "4px",
-  fontSize: "12px",
-  fontWeight: 500,
-  cursor: "pointer",
-  display: "flex",
-  alignItems: "center",
-  gap: "8px",
-};
-
-function BillingProductsToolbarButton({
-  onClick,
-  children,
-}: Readonly<{
-  onClick: () => void;
-  children: React.ReactNode;
-}>) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      style={ACTION_BUTTON_BASE_STYLE}
-      onMouseEnter={(e) => {
-        e.currentTarget.style.backgroundColor = "#1a1a1a";
-      }}
-      onMouseLeave={(e) => {
-        e.currentTarget.style.backgroundColor = "#000000";
-      }}
-    >
-      {children}
-    </button>
-  );
-}
-
 const BillingManagement = () => {
   const { data: session } = useSession();
   const { hasPermission, hasAnyPermission } = usePermissions();
@@ -665,21 +628,15 @@ const BillingManagement = () => {
       todayYmd,
     );
     const createDateDropdown = (
-      <div style={{ minWidth: 220, padding: "4px 0" }}>
-        <div style={{ padding: "4px 12px 8px", fontSize: 12, color: "#666" }}>
+      <div className="bc-filter-dropdown-min-220">
+        <div className="bc-filter-date-label">
           From
         </div>
         <input
           type="date"
           value={currentFilters.created_at_from ?? ""}
           max={createdFromMax}
-          style={{
-            width: "100%",
-            padding: "6px 12px",
-            border: "1px solid #e5e7eb",
-            borderRadius: 4,
-            marginBottom: 8,
-          }}
+          className="bc-filter-date-input bc-filter-date-input--mb"
           onChange={(e) => {
             const nextStart = e.target.value || undefined;
             setCurrentFilters((prev) => ({
@@ -694,7 +651,7 @@ const BillingManagement = () => {
             setRefreshKey((k) => k + 1);
           }}
         />
-        <div style={{ padding: "4px 12px 8px", fontSize: 12, color: "#666" }}>
+        <div className="bc-filter-date-label">
           To
         </div>
         <input
@@ -702,12 +659,7 @@ const BillingManagement = () => {
           value={currentFilters.created_at_to ?? ""}
           min={currentFilters.created_at_from || undefined}
           max={todayYmd}
-          style={{
-            width: "100%",
-            padding: "6px 12px",
-            border: "1px solid #e5e7eb",
-            borderRadius: 4,
-          }}
+          className="bc-filter-date-input"
           onChange={(e) => {
             const nextEndRaw = e.target.value || undefined;
             setCurrentFilters((prev) => ({
@@ -740,7 +692,7 @@ const BillingManagement = () => {
           setRefreshKey((k) => k + 1);
         },
         dropdownContent: (
-          <div style={{ minWidth: 200 }}>
+          <div className="bc-filter-dropdown-min-200">
             {([
               { label: "Active", value: true },
               { label: "Inactive", value: false },
@@ -748,15 +700,7 @@ const BillingManagement = () => {
               <button
                 key={label}
                 type="button"
-                style={{
-                  padding: "8px 12px",
-                  cursor: "pointer",
-                  background: currentFilters.is_active === value ? "#f0f0f0" : "transparent",
-                  borderRadius: "4px",
-                  border: "none",
-                  width: "100%",
-                  textAlign: "left",
-                }}
+                className={`bc-filter-pill-option${currentFilters.is_active === value ? " bc-filter-pill-option--active" : ""}`}
                 onClick={() => applyIsActiveFilter(value)}
               >
                 {label}
@@ -1021,12 +965,7 @@ const BillingManagement = () => {
         sortable: true,
         type: "custom",
         render: (row) => (
-          <span
-            style={{
-              color: "#1d6ae5",
-              fontWeight: 500,
-            }}
-          >
+          <span className="bc-product-name-link">
             {getProductDisplayName(row)}
           </span>
         ),
@@ -1038,7 +977,7 @@ const BillingManagement = () => {
         sortable: true,
         type: "custom",
         render: (row) => (
-          <span style={{ color: "#6b7280", fontSize: 13, fontFamily: "monospace" }}>
+          <span className="bc-product-cell-muted-mono">
             {getProductSku(row)}
           </span>
         ),
@@ -1049,7 +988,7 @@ const BillingManagement = () => {
         sortable: false,
         type: "custom",
         render: (row) => (
-          <span style={{ color: "#374151", fontSize: 13 }}>
+          <span className="bc-product-cell-text">
             {getProductCategoryDisplayName(row, productCategoryIdToName)}
           </span>
         ),
@@ -1060,7 +999,7 @@ const BillingManagement = () => {
         sortable: true,
         type: "custom",
         render: (row) => (
-          <span style={{ color: "#374151", fontSize: 13, fontWeight: 500 }}>
+          <span className="bc-product-cell-text bc-product-cell-text--medium">
             {formatProductPriceAED(row)}
           </span>
         ),
@@ -1073,7 +1012,7 @@ const BillingManagement = () => {
         render: (row) => {
           const status = row.is_active ? "Active" : "Inactive";
           return (
-            <span style={{ color: "#374151", fontSize: 13 }}>{status}</span>
+            <span className="bc-product-cell-text">{status}</span>
           );
         },
       },
@@ -1083,7 +1022,7 @@ const BillingManagement = () => {
         sortable: true,
         type: "custom",
         render: (row) => (
-          <span style={{ color: "#374151", fontSize: 13 }}>
+          <span className="bc-product-cell-text">
             {formatDateTimeGlobal(row.created_at) || "—"}
           </span>
         ),
@@ -1100,14 +1039,8 @@ const BillingManagement = () => {
             {canUpdateBillingProduct ? (
             <button
               type="button"
+              className="bc-table-icon-btn bc-table-icon-btn--primary"
               onClick={() => openProductEditModal(row)}
-              style={{
-                background: "transparent",
-                border: "none",
-                padding: "4px",
-                cursor: "pointer",
-                color: "#0d6efd",
-              }}
             >
               <FiEdit size={16} />
             </button>
@@ -1115,14 +1048,8 @@ const BillingManagement = () => {
             {canDeleteBillingProduct ? (
             <button
               type="button"
+              className="bc-table-icon-btn bc-table-icon-btn--danger"
               onClick={() => openProductDeleteModal(row)}
-              style={{
-                background: "transparent",
-                border: "none",
-                padding: "4px",
-                cursor: "pointer",
-                color: "#dc3545",
-              }}
             >
               <FiTrash2 size={16} />
             </button>
@@ -1159,14 +1086,7 @@ const BillingManagement = () => {
 
   const renderAddProductButton = () => (
     <div
-      style={{
-        position: "absolute",
-        right: "19px",
-        top: "18px",
-        display: "flex",
-        alignItems: "center",
-        gap: "8px",
-      }}
+      className="bc-table-toolbar-floating"
       ref={addContactsRef}
     >
       {session?.user?.permissions?.includes(
@@ -1174,16 +1094,10 @@ const BillingManagement = () => {
       ) ? (
         <button
           type="button"
+          className="bc-btn-billing-dark"
           onClick={() =>
             router.push(billingCustomerRoutes.productsManageCategories())
           }
-          style={ACTION_BUTTON_BASE_STYLE}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.backgroundColor = "#1a1a1a";
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.backgroundColor = "#000000";
-          }}
         >
           <Plus size={16} />
           Manage Categories
@@ -1192,14 +1106,8 @@ const BillingManagement = () => {
         {canCreateBillingProduct ? (
         <button
           type="button"
+          className="bc-btn-billing-dark"
           onClick={() => setShowCreateProductModal(true)}
-          style={ACTION_BUTTON_BASE_STYLE}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.backgroundColor = "#1a1a1a";
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.backgroundColor = "#000000";
-          }}
         >
           <Plus size={16} />
           Add Product
@@ -1511,19 +1419,13 @@ const BillingManagement = () => {
       {/* Main flex container for content and sidebar */}
       <BillingCustomerPortalTableShell>
         {/* Main content area */}
-        <div className="prospects-scrollable-content" style={{ flex: 1 }}>
+        <div className="prospects-scrollable-content bc-prospect-scroll-fill">
           
 
           <div className="container-fluid">
             {/* Prospects Table */}
             <div
-              className="prospects-table-wrapper"
-              style={{
-                flex: 1,
-                overflow: "hidden",
-                display: "flex",
-                flexDirection: "column",
-              }}
+              className="prospects-table-wrapper bc-prospect-table-wrapper"
             >
               <GenericTable
                 data={dataList}
