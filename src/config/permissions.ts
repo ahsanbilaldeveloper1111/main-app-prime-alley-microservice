@@ -51,7 +51,6 @@ export const routePermissions: RoutePermission[] = [
             { path: '/smart-crm', permissions: [PERMISSIONS.CRM_SERVICES] },
             { path: '/communications', permissions: [PERMISSIONS.COMMUNICATIONS_SERVICES] },
             { path: '/planner', permissions: [PERMISSIONS.WORK_PLANNER_SERVICES] },
-            { path: '/virtual-agents', permissions: [PERMISSIONS.VIRTUAL_AGENTS_SERVICES] },
             { path: '/pulse', permissions: [PERMISSIONS.PULSE_SERVICES] },
             { path: '/compliance', permissions: [PERMISSIONS.DNCR_SERVICES] },
             { path: '/workforce', permissions: [PERMISSIONS.STAFF_MANAGEMENT_SERVICES] },
@@ -63,7 +62,6 @@ export const routePermissions: RoutePermission[] = [
     },
     { path: '/chat', permissions: [PERMISSIONS.VIEW_AI_CHAT_AI_CHAT] },
     
-    {path:'/chat/ai-bot-faqs',permissions: [PERMISSIONS.MANAGE_AI_BOT_FAQS]},
     {path:'/chat/ai-faqs/tenant',permissions: [PERMISSIONS.MANAGE_TENANT_PROFILE_AI_CHAT]},
     { path: '/chat/ai-faqs/global', permissions: [PERMISSIONS.MANAGE_GLOBAL_FAQS_AI_CHAT] },
     { path: '/chat/faq-profiles', permissions: [PERMISSIONS.VIEW_FAQS_PROFILE_AI_CHAT] },
@@ -299,26 +297,6 @@ export const routePermissions: RoutePermission[] = [
     },
         //finance services end
 
-
-    //virtual agents services start
-    {
-        path: '/agents',
-        permissions: [PERMISSIONS.AI_ML_SERVICES],
-        children: [
-            { path: '/outbound-agent',permissions: [PERMISSIONS.VIEW_OUTBOUND_CALLS_AIML]},
-            { path: '/inbound-agent',permissions: [PERMISSIONS.VIEW_INBOUND_CALLS_AIML]},
-            { path: '/agent-campaigns', permissions: [PERMISSIONS.VIEW_AGENT_CAMPAIGNS_AIML] },
-            { path: '/create-campaign',permissions: [PERMISSIONS.CREATE_CAMPAIGN_AIML]},
-            { path: '/pitch-deck',permissions: [PERMISSIONS.VIEW_PITCH_DECK_AIML]},
-            { path: '/live-monitoring',permissions: [PERMISSIONS.VIEW_LIVE_MONITORING_AIML]},
-            { path: '/analytics',permissions: [PERMISSIONS.VIEW_ANALYTICS_AIML]},
-            { path: '/usage-reports', permissions: [PERMISSIONS.OUTBOUND_CALLS_AIML] },
-            
-        ]
-    },
-    //virtual agents services end
-
-    
 
     //netops services start
     {
@@ -629,35 +607,6 @@ export const routePermissions: RoutePermission[] = [
         ]
     },
 
-    //ai-agent services start
-    {
-        path: '/ai-agent',
-        permissions: [PERMISSIONS.OUTBOUND_CALLS_AIML],
-        children: [
-        
-            { path: '/outbound', permissions: [PERMISSIONS.OUTBOUND_CALLS_AIML],
-                children: [
-                    { path: '/trunk-profiles', permissions: [PERMISSIONS.OUTBOUND_CALLS_AIML] },
-                    { path: '/pitch-deck', permissions: [PERMISSIONS.OUTBOUND_CALLS_AIML] },
-                    { path: '/usage-reports', permissions: [PERMISSIONS.OUTBOUND_CALLS_AIML] }
-                ]
-            },
-            { path: '/inbound', permissions: [PERMISSIONS.OUTBOUND_CALLS_AIML],
-                children: [
-                    { path: '/trunk-profiles', permissions: [PERMISSIONS.OUTBOUND_CALLS_AIML] },
-                    { path: '/faqs', permissions: [PERMISSIONS.OUTBOUND_CALLS_AIML] },
-                    { path: '/campaign-reports', permissions: [PERMISSIONS.OUTBOUND_CALLS_AIML] },
-                    { path: '/bot-profiles', permissions: [PERMISSIONS.OUTBOUND_CALLS_AIML] },
-                    { path: '/live-monitoring', permissions: [PERMISSIONS.OUTBOUND_CALLS_AIML] },
-                    { path: '/usage-reports', permissions: [PERMISSIONS.OUTBOUND_CALLS_AIML] }
-
-                ]
-            },
-
-        ]
-    },
-
-
     //gsm services start
     {
         path: '/gsm',
@@ -754,45 +703,6 @@ export const routePermissions: RoutePermission[] = [
         ]
     },
 
-    // voicebot inbound (platform) – companies, bots, calls
-    {
-        path: '/voicebot/inbound',
-        permissions: [PERMISSIONS.VIRTUAL_AGENTS_SERVICES],
-        children: [
-            { path: '/', permissions: [PERMISSIONS.VIEW_INBOUND_DASHBOARD_INBOUND] },
-            { path: '/dashboard', permissions: [PERMISSIONS.VIEW_INBOUND_DASHBOARD_INBOUND] },
-            { path: '/companies', permissions: [PERMISSIONS.VIEW_INBOUND_DASHBOARD_INBOUND] },
-            { path: '/bots', permissions: [PERMISSIONS.VIEW_INBOUND_BOTS_INBOUND] },
-            { path: '/bots/create', permissions: [PERMISSIONS.CREATE_INBOUND_BOTS_INBOUND] },
-            { path: '/bots/edit', permissions: [PERMISSIONS.EDIT_INBOUND_BOTS_INBOUND] },
-            { path: '/sip-trunks', permissions: [PERMISSIONS.VIEW_INBOUND_TRUNK_INBOUND] },
-            { path: '/sip-trunks/create', permissions: [PERMISSIONS.CREATE_INBOUND_TRUNK_INBOUND] },
-            { path: '/conversations', permissions: [PERMISSIONS.VIEW_INBOUND_CONVERSATIONS_INBOUND] },
-            { path: '/analytics', permissions: [PERMISSIONS.VIEW_INBOUND_ANALYTICS_INBOUND] },
-        ]
-    },
-
-    {
-        path: '/voicebot/outbound',
-        permissions: [PERMISSIONS.VIRTUAL_AGENTS_SERVICES],
-        children: [
-            { path: '/', permissions: [PERMISSIONS.VIEW_OUTBOUND_DASHBOARD_OUTBOUND] },
-            { path: '/dashboard', permissions: [PERMISSIONS.VIEW_OUTBOUND_DASHBOARD_OUTBOUND] },
-            { path: '/trunks', permissions: [PERMISSIONS.VIEW_OUTBOUND_SIP_TRUNCK_OUTBOUND] },
-            { path: '/voicebots', permissions: [PERMISSIONS.VIEW_OUTBOUND_BOTS_OUTBOUND] },
-            { path: '/voicebots/create', permissions: [PERMISSIONS.CREATE_OUTBOUND_BOTS_OUTBOUND] },
-            { path: '/voicebots/edit', permissions: [PERMISSIONS.EDIT_OUTBOUND_BOTS_OUTBOUND] },
-            { path: '/campaigns', permissions: [PERMISSIONS.VIEW_OUTBOUND_CAMPAIGNS_OUTBOUND] },
-            { path: '/campaigns/create', permissions: [PERMISSIONS.CREATE_OUTBOUND_CAMPAIGNS_OUTBOUND] },
-            { path: '/campaigns/edit/:id', permissions: [PERMISSIONS.EDIT_OUTBOUND_CAMPAIGNS_OUTBOUND] },
-            { path: '/reports', permissions: [PERMISSIONS.VIEW_OUTBOUND_REPORT_OUTBOUND] },
-            { path: '/analytics', permissions: [PERMISSIONS.VIEW_OUTBOUND_ANALYTICS_OUTBOUND] },
-
-
-
-        ]
-    },
-    //voicebot services end
 
     
 ];

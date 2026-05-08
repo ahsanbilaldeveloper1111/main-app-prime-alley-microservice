@@ -15,11 +15,6 @@ import BusinessTypes from '@pages/crm/business-types'
 import ManageExtensions from '@pages/ai-ml/manage-extensions'
 import ManualAnalysis from '@pages/ai-ml/analysis'
 import WorkPlannerStatuses from '@pages/planner/statuses'
-import OutboundTrunkProfiles from '@pages/ai-agent/outbound/trunk-profiles'
-import AIMLProfiles from '@pages/agents/outbound-agent'
-import InboundTrunkProfiles from '@pages/ai-agent/inbound/trunk-profiles'
-import InboundBotProfiles from '@pages/agents/inbound-agent'
-import InboundFAQs from '@pages/ai-agent/inbound/faqs'
 import RequestCategories from '@pages/workforce/request-categories'
 import PaymentMethods from '@pages/billing/customer/payment-methods'
 import TicketStatuses from '@pages/tickets/statuses'
@@ -2096,101 +2091,6 @@ const AIChatPage: React.FC<ControlledTabsProps> = ({ activeTab: routeActiveTab, 
   )
 }
 
-// ─── Virtual Agents (from settings: Outbound AI Agent – Trunk Profiles, Bot Profiles) ───
-const virtualAgentsTabs: Tab[] = [
-  { id: 'trunk-profiles', label: 'Outbound Trunks',permission: PERMISSIONS.LIST_TRUNKS_AIML },
-  { id: 'bot-profiles', label: 'Outbound Bots',permission: PERMISSIONS.VIEW_OUTBOUND_CALLS_AIML },
-
-  { id: 'inbound-trunks', label: 'Inbound Trunks',permission: PERMISSIONS.VIEW_INBOUND_CALLS_AIML },
-  { id: 'inbound-bots', label: 'Inbound Bots',permission: PERMISSIONS.VIEW_INBOUND_CALLS_AIML },
-  { id: 'inbound-faqs', label: 'Inbound FAQs' , permission: PERMISSIONS.MANAGE_AI_BOT_FAQS},
-]
-
-const VirtualAgentsPage: React.FC<ControlledTabsProps> = ({ activeTab: routeActiveTab, onTabChange }) => {
-  const { data: session } = useSession()
-  const userPermissions = useMemo(() => getUserPermissions(session), [session])
-  const allowedTabs = useMemo(() => filterTabsByPermission(virtualAgentsTabs, userPermissions), [userPermissions])
-  const [activeTab, setActiveTab] = useState('trunk-profiles')
-
-  useEffect(() => {
-    const next = resolveAllowedActiveTabId(routeActiveTab, activeTab, allowedTabs)
-    if (next !== activeTab) setActiveTab(next)
-  }, [routeActiveTab, activeTab, allowedTabs])
-
-  const tabContentMap: Record<string, React.ReactNode> = {
-    'trunk-profiles': <OutboundTrunkProfiles />,
-    'bot-profiles': <AIMLProfiles />,
-    'inbound-trunks': <InboundTrunkProfiles />,
-    'inbound-bots': <InboundBotProfiles />,
-    'inbound-faqs': <InboundFAQs />,
-  }
-
-  return (
-    <div style={{ padding: '32px 40px', flex: 1 }}>
-      <h1
-        style={{
-          fontFamily: 'Lexend Deca, Helvetica, Arial, sans-serif',
-          fontSize: '24px',
-          fontWeight: 'bold',
-          color: '#141414',
-          marginBottom: '24px',
-          letterSpacing: 0,
-        }}
-      >
-        Virtual Agents
-      </h1>
-
-      <div
-        style={{
-          display: 'flex',
-          marginBottom: '32px',
-          overflow: 'hidden',
-        }}
-      >
-        {allowedTabs.map((tab, index) => {
-          const isActive = activeTab === tab.id
-          const isLast = index === allowedTabs.length - 1
-          return (
-            <button
-              key={tab.id}
-              onClick={() => {
-                setActiveTab(tab.id)
-                onTabChange?.(tab.id)
-              }}
-              style={{
-                padding: '12px 28px',
-                background: isActive ? '#ffffff' : 'whitesmoke',
-                border: '1px solid #e0e0e0',
-                borderRight: isLast ? '1px solid #e0e0e0' : 'none',
-                borderBottom: isActive ? '2px solid #ffffff' : '2px solid #e0e0e0',
-                cursor: 'pointer',
-                fontFamily: 'Lexend Deca, Helvetica, Arial, sans-serif',
-                fontSize: '14px',
-                fontWeight: 300,
-                color: '#141414',
-                whiteSpace: 'nowrap',
-                transition: 'background 0.15s',
-                position: 'relative',
-                top: '1px',
-              }}
-            >
-              {tab.label}
-            </button>
-          )
-        })}
-      </div>
-
-      <div>
-        {allowedTabs.length === 0 ? (
-          <div style={{ color: '#6b7280' }}>You don&apos;t have permission to view this section.</div>
-        ) : (
-          tabContentMap[activeTab]
-        )}
-      </div>
-    </div>
-  )
-}
-
 // ─── Pulse (GSM tooling) ───
 const pulseTabs: Tab[] = [
   { id: 'assign-devices', label: 'Assign Devices',permission: PERMISSIONS.VIEW_GSM_ASSIGNMENT },
@@ -2369,14 +2269,6 @@ const defaultTopics: NotificationTopic[] = [
     subtopics: [
       { id: "planner-tasks", label: "Task reminders", description: "Get notified about upcoming tasks and deadlines.", channels: { popup: false, browser: true, bell: true, email: true } },
       { id: "planner-assignments", label: "New assignments", description: "Receive notifications when work items are assigned to you.", channels: { popup: false, browser: false, bell: true, email: false } },
-    ],
-  },
-  {
-    id: "virtual-agents", label: "Virtual Agents",
-    channels: { popup: false, browser: false, bell: true, email: true },
-    subtopics: [
-      { id: "virtual-agents-outbound", label: "Outbound agent activity", description: "Get notified about outbound AI agent campaigns and results.", channels: { popup: false, browser: false, bell: true, email: true } },
-      { id: "virtual-agents-inbound", label: "Inbound agent alerts", description: "Receive notifications about inbound bot interactions.", channels: { popup: false, browser: false, bell: false, email: true } },
     ],
   },
   {
@@ -3671,7 +3563,6 @@ export const sectionPageMap: Record<string, SectionRenderer> = {
   tickets: ({ subTab, onSubTabChange }) => <TicketsPage activeTab={subTab} onTabChange={onSubTabChange} />,
   'help-center': ({ subTab, onSubTabChange }) => <HelpCenterPage activeTab={subTab} onTabChange={onSubTabChange} />,
   'ai-chat': ({ subTab, onSubTabChange }) => <AIChatPage activeTab={subTab} onTabChange={onSubTabChange} />,
-  'virtual-agents': ({ subTab, onSubTabChange }) => <VirtualAgentsPage activeTab={subTab} onTabChange={onSubTabChange} />,
   pulse: ({ subTab, onSubTabChange }) => <PulsePage activeTab={subTab} onTabChange={onSubTabChange} />,
   compliance: () => <GenericPage title="Compliance" />,
   'product-updates': () => <GenericPage title="Product Updates" />,

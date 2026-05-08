@@ -38,7 +38,7 @@ const normalizeTrunkList = (items: Trunk[]) =>
       }));
 
 const DEFAULT_VBOT_CONTEXT =
-  'You are an AI assistant representing RingEdge Limited. Start the call politely and explain our AI voicebot services.';
+  'You are an AI assistant representing RingEdge Limited. Start the call politely and explain our AI calling services.';
 
 const METADATA_REGEX = /metadata:"((?:\\.|[^"\\])*)"/;
 

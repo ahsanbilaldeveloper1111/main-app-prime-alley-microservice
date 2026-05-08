@@ -20,7 +20,6 @@ import {
   History,
   FileChartPie,
   Ban,
-  Workflow,
   DollarSign,
   Monitor,
   Server,
@@ -453,7 +452,6 @@ const ApplicationCustomerSidebar: React.FC = () => {
     "communications",
     "planner",
     "pulse",
-    "virtual-agents",
     "finance",
     "compliance",
     "workforce",
@@ -705,150 +703,6 @@ const ApplicationCustomerSidebar: React.FC = () => {
       ].filter((item) => !item.permission || hasPermission(item.permission)),
     },
     //planner services end
-
-    //virtual agent start
-    {
-      id: "virtual-agents",
-      key: "virtual-agents",
-      permission: PERMISSIONS.VIRTUAL_AGENTS_SERVICES,
-      icon: <Workflow size={16} />,
-      color: MENU_COLORS.AUTOMATION,
-      title: "Virtual Agents",
-      label: "Virtual Agents",
-      url: "",
-      subItems: (() => {
-        const outboundItems: SubMenuItem[] = [
-          {
-            id: "voicebot-outbound-dashboard",
-            title: "Outbound Dashboard",
-            icon: <LayoutDashboard size={16} />,
-            permission: PERMISSIONS.VIEW_OUTBOUND_DASHBOARD_OUTBOUND,
-            url: "/voicebot/outbound/dashboard",
-          },
-          {
-            id: "voicebot-outbound-trunks",
-            title: "Trunks",
-            icon: <LayoutDashboard size={16} />,
-            permission: PERMISSIONS.VIEW_OUTBOUND_SIP_TRUNCK_OUTBOUND,
-            url: "/voicebot/outbound/trunks",
-          },
-          {
-            id: "voicebot-outbound-voicebots",
-            title: "Bots",
-            icon: <LayoutDashboard size={16} />,
-            permission: PERMISSIONS.VIEW_OUTBOUND_BOTS_OUTBOUND,
-            url: "/voicebot/outbound/voicebots",
-          },
-          {
-            id: "voicebot-outbound-campaigns",
-            title: "Campaigns",
-            icon: <LayoutDashboard size={16} />,
-            permission: PERMISSIONS.VIEW_OUTBOUND_CAMPAIGNS_OUTBOUND,
-            url: "/voicebot/outbound/campaigns",
-          },
-          {
-            id: "voicebot-outbound-reports",
-            title: "Reports",
-            icon: <LayoutDashboard size={16} />,
-            permission: PERMISSIONS.VIEW_OUTBOUND_REPORT_OUTBOUND,
-            url: "/voicebot/outbound/reports",
-          },
-          {
-            id: "voicebot-outbound-analytics",
-            title: "Analytics",
-            icon: <LayoutDashboard size={16} />,
-            permission: PERMISSIONS.VIEW_OUTBOUND_ANALYTICS_OUTBOUND,
-            url: "/voicebot/outbound/analytics",
-          },
-        ].filter((item) => !item.permission || hasPermission(item.permission));
-
-        const inboundItems: SubMenuItem[] = [
-          {
-            id: "voicebot-inbound-dashboard",
-            title: "Inbound Dashboard",
-            icon: <LayoutDashboard size={16} />,
-            permission: PERMISSIONS.VIEW_INBOUND_DASHBOARD_INBOUND,
-            url: "/voicebot/inbound/dashboard",
-          },
-          {
-            id: "voicebot-inbound-bots",
-            title: "Bots",
-            icon: <LayoutDashboard size={16} />,
-            permission: PERMISSIONS.VIEW_INBOUND_BOTS_INBOUND,
-            url: "/voicebot/inbound/bots",
-          },
-          {
-            id: "voicebot-inbound-sip-trunks",
-            title: "SIP trunks",
-            icon: <Server size={16} />,
-            permission: PERMISSIONS.VIEW_INBOUND_TRUNK_INBOUND,
-            url: "/voicebot/inbound/sip-trunks",
-          },
-          {
-            id: "voicebot-inbound-calls",
-            title: "Conversations",
-            icon: <LayoutDashboard size={16} />,
-            permission: PERMISSIONS.VIEW_INBOUND_CONVERSATIONS_INBOUND,
-            url: "/voicebot/inbound/conversations",
-          },
-          {
-            id: "voicebot-inbound-analytics",
-            title: "Analytics",
-            icon: <LayoutDashboard size={16} />,
-            permission: PERMISSIONS.VIEW_INBOUND_ANALYTICS_INBOUND,
-            url: "/voicebot/inbound/analytics",
-          },
-        ].filter((item) => !item.permission || hasPermission(item.permission));
-
-        const legacyItems: SubMenuItem[] = [
-          {
-            id: "virtual-agents-live-monitoring",
-            title: "Live Monitoring",
-            icon: <MonitorCheck size={16} />,
-            permission: PERMISSIONS.VIEW_LIVE_MONITORING_AIML,
-            url: "/agents/live-monitoring",
-          },
-          {
-            id: "virtual-agents-analytics",
-            title: "Analytics",
-            icon: <BarChart3 size={16} />,
-            permission: PERMISSIONS.VIEW_ANALYTICS_AIML,
-            url: "/agents/analytics",
-          },
-        ].filter((item) => !item.permission || hasPermission(item.permission));
-
-        const grouped: SubMenuItem[] = [];
-        if (outboundItems.length > 0) {
-          grouped.push({
-            id: "virtual-agents-outbound-group",
-            title: "Outbound",
-            icon: <Phone size={16} />,
-            subItems: outboundItems,
-          });
-        }
-        if (inboundItems.length > 0) {
-          grouped.push({
-            id: "virtual-agents-inbound-group",
-            title: "Inbound",
-            icon: <PhoneCall size={16} />,
-            subItems: inboundItems,
-          });
-        }
-        if (legacyItems.length > 0) {
-          if (grouped.length > 0) {
-            grouped.push({
-              id: "virtual-agents-separator",
-              title: "---",
-              icon: null,
-              url: "",
-            });
-          }
-          grouped.push(...legacyItems);
-        }
-        return grouped;
-      })(),
-    },
-    //virtual agent end
 
     //netops services start
     {
@@ -1143,9 +997,6 @@ const ApplicationCustomerSidebar: React.FC = () => {
   ].filter((item) => {
     if (!ENABLED_MODULE_IDS.has(item.id)) return false;
     if (!item.permission || hasPermission(item.permission)) return true;
-    if (item.id === "virtual-agents" && Array.isArray(item.subItems)) {
-      return item.subItems.length > 0;
-    }
     return false;
   });
 
