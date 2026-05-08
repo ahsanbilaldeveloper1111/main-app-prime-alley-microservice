@@ -20,9 +20,6 @@ import AIMLProfiles from '@pages/agents/outbound-agent'
 import InboundTrunkProfiles from '@pages/ai-agent/inbound/trunk-profiles'
 import InboundBotProfiles from '@pages/agents/inbound-agent'
 import InboundFAQs from '@pages/ai-agent/inbound/faqs'
-import Hosts from '@pages/pulse/hosts'
-import HostGroups from '@pages/pulse/host-groups'
-import Events from '@pages/pulse/events'
 import RequestCategories from '@pages/workforce/request-categories'
 import PaymentMethods from '@pages/billing/customer/payment-methods'
 import TicketStatuses from '@pages/tickets/statuses'
@@ -2194,11 +2191,8 @@ const VirtualAgentsPage: React.FC<ControlledTabsProps> = ({ activeTab: routeActi
   )
 }
 
-// ─── Pulse (Host Groups, Alerts) ───
+// ─── Pulse (GSM tooling) ───
 const pulseTabs: Tab[] = [
-  { id: 'hosts', label: 'Hosts',permission: PERMISSIONS.VIEW_HOSTS_NETOPS },
-  { id: 'host-groups', label: 'Host Groups',permission: PERMISSIONS.VIEW_HOST_GROUPS_NETOPS },
-  { id: 'events', label: 'Events',permission: PERMISSIONS.VIEW_EVENTS_NETOPS },
   { id: 'assign-devices', label: 'Assign Devices',permission: PERMISSIONS.VIEW_GSM_ASSIGNMENT },
   { id: 'sync-gsm', label: 'Sync GSM',permission: PERMISSIONS.VIEW_GSM_SYNC },
   { id: 'company-profiling', label: 'Company Profiling',permission: PERMISSIONS.VIEW_GSM_COMPANY_PROFILLING },
@@ -2208,7 +2202,7 @@ const PulsePage: React.FC<ControlledTabsProps> = ({ activeTab: routeActiveTab, o
   const { data: session } = useSession()
   const userPermissions = useMemo(() => getUserPermissions(session), [session])
   const allowedTabs = useMemo(() => filterTabsByPermission(pulseTabs, userPermissions), [userPermissions])
-  const [activeTab, setActiveTab] = useState('host-groups')
+  const [activeTab, setActiveTab] = useState('assign-devices')
 
   useEffect(() => {
     const next = resolveAllowedActiveTabId(routeActiveTab, activeTab, allowedTabs)
@@ -2216,9 +2210,6 @@ const PulsePage: React.FC<ControlledTabsProps> = ({ activeTab: routeActiveTab, o
   }, [routeActiveTab, activeTab, allowedTabs])
 
   const tabContentMap: Record<string, React.ReactNode> = {
-    'hosts': <Hosts />,
-    'host-groups': <HostGroups />,
-    events: <Events />,
     'assign-devices': <GsmAssign />,
     'sync-gsm': <GsmSync />,
     'company-profiling': <CompanyPO />,

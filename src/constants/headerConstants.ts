@@ -200,7 +200,6 @@ export const HEADER_CONSTANTS = {
     ERROR_LOGS: "Error Logs",
 
     // NetOps
-    NETOPS_DASHBOARD: "Dashboard",
     NETOPS_DEVICES: "Devices",
     NETOPS_SERVICES: "Service status",
     NETOPS_ALERTS: "Alerts and Notifications",
@@ -405,7 +404,6 @@ export const HEADER_CONSTANTS = {
 
     //pulse permissions start
 
-    VIEW_NETOPS_DASHBOARD: "dashboard-netops",
     VIEW_NETOPS_DEVICES: "devices-netops",
     VIEW_NETOPS_SERVICES: "services-netops",
     VIEW_NETOPS_ALERTS: "alerts-netops",
@@ -419,26 +417,7 @@ export const HEADER_CONSTANTS = {
     EDIT_SERVICE: "edit-service-netops",
     DELETE_SERVICE: "delete-service-netops",
 
-    VIEW_ALERTS_NETOPS: "alerts-netops",
-    RESOLVE_ALERT: "resolve-alert-netops",
-    MONITER_NETOPS: "moniter-netops",
-
-    VIEW_HOSTS_NETOPS: "hosts-netops-netops",
-    VIEW_HOST_GROUPS_NETOPS: "host-groups-netops-netops",
-    VIEW_TEMPLATES_NETOPS: "templates-netops-netops",
-    VIEW_EVENTS_NETOPS: "events-netops-netops",
-    ACKNOWLEDGED_EVENTS_NETOPS: "acknowledged-events-netops-netops",
-    VIEW_CUSTOMERS_NETOPS: "customers-netops-netops",
-    ADD_CUSTOMER_NETOPS: "add-customer-netops-netops",
-    ALERT_NETOPS: "alert-netops-netops",
     VIEW_SERVER_INSIGHTS_NETOPS: "server-insights-netops-netops",
-    ADD_HOST_NETOPS: "add-host-netops-netops",
-    UPDATE_HOST_NETOPS: "update-host-netops-netops",
-    DELETE_HOST_NETOPS: "delete-host-netops-netops",
-    REFRESH_HOST_CACHE_NETOPS: "refresh-host-cache-netops-netops",
-    ADD_HOST_GROUP_NETOPS: "add-host-group-netops-netops",
-    UPDATE_HOST_GROUP_NETOPS: "update-host-group-netops-netops",
-    DELETE_HOST_GROUP_NETOPS: "delete-host-group-netops-netops",
     //pulse permissions end
 
     LIVE_CHAT_USERS: "live-chat-users",

@@ -339,7 +339,7 @@ const Services = () => {
     
     return (
         <React.Fragment>
-            <BreadcrumbItem mainTitle="Pulse" mainLink="/pulse/dashboard" subTitle="Services" />
+            <BreadcrumbItem mainTitle="Pulse" mainLink="/pulse/uptime-sla" subTitle="Services" />
            
             <Row className="mb-3">
                 <Col md={12}>

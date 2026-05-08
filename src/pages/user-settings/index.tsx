@@ -296,13 +296,6 @@ const APP_PERMISSION_MODULES: AppPermissionModule[] = [
     id: "pulse",
     label: "Pulse",
     categories: [
-      { id: "pulse-dashboard", label: "Dashboard" },
-      { id: "pulse-hosts", label: "Hosts" },
-      { id: "pulse-hosts-groups", label: "Hosts Groups" },
-      { id: "pulse-hosts-alerts", label: "Alerts" },
-      { id: "pulse-templates", label: "Templates" },
-      { id: "pulse-events", label: "Events" },
-      { id: "pulse-customers", label: "Customers" },
       { id: "pulse-uptime-sla", label: "Uptime SLA" },
       { id: "pulse-select-server", label: "Server Insights" },
       { id: "pulse-gateways", label: "Gateways" },
