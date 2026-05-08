@@ -767,13 +767,6 @@ const ApplicationSidebar: React.FC<SidebarProps> = ({
       url: '',
       subItems: [
         {
-          id: 'netops-dashboard',
-          title: HEADER_CONSTANTS.SUBMENU_LABELS.NETOPS_DASHBOARD,
-          icon: <LayoutDashboard size={16} />,
-          permission: PERMISSIONS.VIEW_NETOPS_DASHBOARD,
-          url: '/pulse/dashboard'
-        },
-        {
           id: 'netops-devices',
           title: HEADER_CONSTANTS.SUBMENU_LABELS.NETOPS_DEVICES,
           icon: <MonitorSpeaker size={16} />,
@@ -786,13 +779,6 @@ const ApplicationSidebar: React.FC<SidebarProps> = ({
           icon: <Server size={16} />,
           permission: PERMISSIONS.VIEW_NETOPS_SERVICES,
           url: '/pulse/services'
-        },
-        {
-          id: 'netops-alerts',
-          title: HEADER_CONSTANTS.SUBMENU_LABELS.NETOPS_ALERTS,
-          icon: <Megaphone size={16} />,
-          permission: PERMISSIONS.VIEW_NETOPS_ALERTS,
-          url: '/pulse/alerts'
         },
         {
           id: 'netops-uptime-sla',

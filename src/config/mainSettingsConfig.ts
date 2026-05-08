@@ -56,5 +56,5 @@ export const defaultSubTabBySection: Record<string, string | undefined> = {
   'help-center': 'modules',
   'ai-chat': 'tools-profiles',
   'virtual-agents': 'trunk-profiles',
-  pulse: 'host-groups',
+  pulse: 'assign-devices',
 }

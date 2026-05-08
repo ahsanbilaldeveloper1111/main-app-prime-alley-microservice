@@ -862,56 +862,6 @@ const ApplicationCustomerSidebar: React.FC = () => {
       url: "",
       subItems: [
         {
-          id: "pulse-dashboard",
-          title: HEADER_CONSTANTS.SUBMENU_LABELS.NETOPS_DASHBOARD,
-          icon: <LayoutDashboard size={16} />,
-          permission: PERMISSIONS.VIEW_NETOPS_DASHBOARD,
-          url: "/pulse/dashboard",
-        },
-        {
-          id: "pulse-hosts",
-          title: "Hosts",
-          icon: <Server size={16} />,
-          permission: PERMISSIONS.VIEW_HOSTS_NETOPS,
-          url: "/pulse/hosts",
-        },
-        {
-          id: "pulse-hosts-groups",
-          title: "Hosts Groups",
-          icon: <Server size={16} />,
-          permission: PERMISSIONS.VIEW_HOST_GROUPS_NETOPS,
-          url: "/pulse/host-groups",
-        },
-        {
-          id: "pulse-hosts-alerts",
-          title: "Alerts",
-          icon: <Server size={16} />,
-          permission: PERMISSIONS.VIEW_ALERTS_NETOPS,
-          url: "/pulse/alerts",
-        },
-        {
-          id: "pulse-templates",
-          title: "Templates",
-          icon: <FileText size={16} />,
-          permission: PERMISSIONS.VIEW_TEMPLATES_NETOPS,
-          url: "/pulse/templates",
-        },
-        {
-          id: "pulse-events",
-          title: "Events",
-          icon: <FileText size={16} />,
-          permission: PERMISSIONS.VIEW_EVENTS_NETOPS,
-          url: "/pulse/events",
-        },
-        {
-          id: "pulse-customers",
-          title: "Customers",
-          icon: <Megaphone size={16} />,
-          permission: PERMISSIONS.VIEW_CUSTOMERS_NETOPS,
-          url: "/pulse/customers",
-        },
-
-        {
           id: "pulse-uptime-sla",
           title: HEADER_CONSTANTS.SUBMENU_LABELS.NETOPS_UPTIME_SLA,
           icon: <Monitor size={16} />,

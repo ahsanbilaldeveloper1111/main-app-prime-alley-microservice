@@ -325,23 +325,11 @@ export const routePermissions: RoutePermission[] = [
         path: '/pulse',
         permissions: [PERMISSIONS.NETOPS_SERVICES],
         children: [
-            { path: '/dashboard', permissions: [PERMISSIONS.VIEW_NETOPS_DASHBOARD] },
-            { path: '/customers', permissions: [PERMISSIONS.VIEW_CUSTOMERS_NETOPS] },
             {  path: '/devices',permissions: [PERMISSIONS.VIEW_NETOPS_DEVICES]},
             {path: '/services', permissions: [PERMISSIONS.VIEW_NETOPS_SERVICES]},
-            { path: '/alerts',permissions: [PERMISSIONS.VIEW_NETOPS_ALERTS]},
             {path: '/uptime-sla',permissions: [PERMISSIONS.VIEW_NETOPS_UPTIME_SLA]},
             {path: '/server-insights',permissions: [PERMISSIONS.VIEW_SERVER_INSIGHTS_NETOPS]},
             {path: '/application-monitoring',permissions: [PERMISSIONS.VIEW_SERVER_INSIGHTS_NETOPS]},
-            {
-                path: '/hosts', permissions: [PERMISSIONS.VIEW_HOSTS_NETOPS],
-                children: [
-                    { path: '/:hostid', permissions: [PERMISSIONS.VIEW_HOSTS_NETOPS] },
-                ]
-            },
-            { path: '/host-groups', permissions: [PERMISSIONS.VIEW_HOST_GROUPS_NETOPS] },
-            { path: '/templates', permissions: [PERMISSIONS.VIEW_TEMPLATES_NETOPS] },
-            { path: '/events', permissions: [PERMISSIONS.VIEW_EVENTS_NETOPS]},
             { path: '/gateways', permissions: [PERMISSIONS.VIEW_GSM_MANAGEMENT]},
             { path: '/gateway-ports', permissions: [PERMISSIONS.VIEW_GSM_PORTS]},
         ]
