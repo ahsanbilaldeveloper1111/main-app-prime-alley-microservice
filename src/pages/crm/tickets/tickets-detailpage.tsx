@@ -52,8 +52,8 @@ import React, {
   import DeviceSelectionModal from "@components/DeviceSelectionModal";
   import { toast } from "react-toastify";
   import { GetHierarchyData } from "@utils/users";
-  import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
-  import SuccessfulModal from "@pages/partial/SuccessfulModal";
+  import DeleteConfirmationModal from "@components/page-partials/DeleteConfirmationModal";
+  import SuccessfulModal from "@components/page-partials/SuccessfulModal";
   import { createNonPrngId } from "@utils/id";
   
   // ============================================================================

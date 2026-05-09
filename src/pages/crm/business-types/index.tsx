@@ -12,7 +12,7 @@ import {
   UpdateBusinessTypePayload,
 } from "@utils/crm";
 import { reportApiErrorFromCatch } from "@utils/sentryLogger";
-import { formatDateTimeToLocal, GlobalDateFormat } from "@utils/Helper";
+import { formatDateTimeToLocal, GlobalDateFormat, normalizeSearchQuery } from "@utils/Helper";
 import GenericTable, {
   TableColumn,
   ToolbarConfig,
@@ -31,7 +31,7 @@ import {
   Check,
 } from "lucide-react";
 import "@assets/scss/common.scss";
-import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
+import DeleteConfirmationModal from "@components/page-partials/DeleteConfirmationModal";
 import { CrmTruncatedDescriptionCell } from "@components/crm/crmTruncatedDescriptionCell";
 import {
   CRM_DIALOG_FOOTER_ACTIONS_ROW_STYLE,
@@ -42,6 +42,7 @@ import { useSession } from "next-auth/react";
 import { useCrmSettingsTableState } from "@hooks/useCrmSettingsTableState";
 import { useDebouncedSearchInput } from "@hooks/useDebouncedSearchInput";
 import { HEADER_CONSTANTS } from "@constants/headerConstants";
+import type { CrmPageDisplayProps } from "@pages/crm/crmPageDisplayProps";
 
 const { PERMISSIONS } = HEADER_CONSTANTS;
 const BUSINESS_TYPES_TABLE_COLUMN_STORAGE_KEY =
@@ -82,7 +83,7 @@ function primarySubmitLabel(submitting: boolean, editing: BusinessTypeData | nul
   return editing ? "Update" : "Create";
 }
 
-const BusinessTypes = () => {
+const BusinessTypes = ({ hideBreadcrumb }: CrmPageDisplayProps = {}) => {
   const { data: session } = useSession();
   // State
   const [businessTypes, setBusinessTypes] = useState<BusinessTypeData[]>([]);
@@ -104,7 +105,7 @@ const BusinessTypes = () => {
     queryValue: search,
     handleInputChange: handleSearchChange,
     submitQuery: submitSearch,
-  } = useDebouncedSearchInput();
+  } = useDebouncedSearchInput({ normalize: normalizeSearchQuery });
   const [showModal, setShowModal] = useState(false);
   const [editingBusinessType, setEditingBusinessType] = useState<BusinessTypeData | null>(null);
   const [deletingBusinessType, setDeletingBusinessType] = useState<BusinessTypeData | null>(null);
@@ -120,9 +121,8 @@ const BusinessTypes = () => {
         page: pagination.currentPage,
         per_page: pagination.rowsPerPage,
       };
-      const trimmed = search.trim();
-      if (trimmed) {
-        params.search = trimmed;
+      if (search) {
+        params.search = search;
       }
       const response = await getBusinessTypes(params);
       setBusinessTypes(response?.data || []);
@@ -323,7 +323,9 @@ const BusinessTypes = () => {
 
   return (
     <React.Fragment>
-      <BreadcrumbItem mainTitle="CRM" mainLink="/crm/dashboard" subTitle="Business Types" />
+      {!hideBreadcrumb && (
+        <BreadcrumbItem mainTitle="CRM" mainLink="/crm/dashboard" subTitle="Business Types" />
+      )}
       <div>
         <GenericTable<BusinessTypeData>
           data={businessTypes}
