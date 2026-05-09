@@ -380,3 +380,128 @@ export const billingCustomerKeys = {
       ] as const,
   },
 };
+
+/** Tickets module (`src/pages/tickets/*`). */
+export const ticketsKeys = {
+  root: ["tickets"] as const,
+
+  statuses: {
+    all: () => [...ticketsKeys.root, "statuses"] as const,
+    list: (params: { page: number; perPage: number; search: string }) =>
+      [
+        ...ticketsKeys.statuses.all(),
+        "list",
+        params.page,
+        params.perPage,
+        params.search,
+      ] as const,
+  },
+
+  /** `GetHierarchyData(ModuleSlug.TICKET)` — extension pickers for ticket modules. */
+  hierarchyExtensions: () => [...ticketsKeys.root, "hierarchyExtensions"] as const,
+
+  /** `GetAllModules()` — dropdowns (categories / sub-categories). */
+  modulesAll: () => [...ticketsKeys.root, "modulesAll"] as const,
+
+  modules: {
+    all: () => [...ticketsKeys.root, "ticketModules"] as const,
+    list: (params: { page: number; perPage: number; search: string }) =>
+      [
+        ...ticketsKeys.modules.all(),
+        "list",
+        params.page,
+        params.perPage,
+        params.search,
+      ] as const,
+    /** Submodules under one ticket module (list modal). */
+    submodulesByModule: (moduleId: string | number) =>
+      [...ticketsKeys.modules.all(), "submodules", String(moduleId)] as const,
+  },
+
+  types: {
+    all: () => [...ticketsKeys.root, "ticketTypes"] as const,
+    list: (params: { page: number; perPage: number; search: string }) =>
+      [
+        ...ticketsKeys.types.all(),
+        "list",
+        params.page,
+        params.perPage,
+        params.search,
+      ] as const,
+  },
+};
+
+/** FAQs / Help Center admin (`src/pages/faqs/*`). */
+export const faqsKeys = {
+  root: ["faqs"] as const,
+
+  modules: {
+    all: () => [...faqsKeys.root, "modules"] as const,
+    list: (params: { page: number; perPage: number; search: string }) =>
+      [
+        ...faqsKeys.modules.all(),
+        "list",
+        params.page,
+        params.perPage,
+        params.search,
+      ] as const,
+    /** `getAllFAQModules` — topic form dropdown. */
+    picker: () => [...faqsKeys.modules.all(), "picker"] as const,
+  },
+
+  topics: {
+    all: () => [...faqsKeys.root, "topics"] as const,
+    list: (params: { page: number; perPage: number; search: string }) =>
+      [
+        ...faqsKeys.topics.all(),
+        "list",
+        params.page,
+        params.perPage,
+        params.search,
+      ] as const,
+    /** `getAllFAQTopics` — item forms + types filter. */
+    allTopics: () => [...faqsKeys.topics.all(), "all"] as const,
+  },
+
+  items: {
+    all: () => [...faqsKeys.root, "items"] as const,
+    list: (params: { page: number; perPage: number; search: string }) =>
+      [
+        ...faqsKeys.items.all(),
+        "list",
+        params.page,
+        params.perPage,
+        params.search,
+      ] as const,
+  },
+
+  /** Distinct FAQ item type strings (`getFAQTypes`). */
+  itemTypes: {
+    all: () => [...faqsKeys.root, "itemTypes"] as const,
+    byTopic: (topicId: number | null) =>
+      [...faqsKeys.itemTypes.all(), topicId ?? "all"] as const,
+  },
+};
+
+/** AI Chat / tools admin (`src/pages/chat/*`). */
+export const chatKeys = {
+  root: ["chat"] as const,
+
+  tools: {
+    all: () => [...chatKeys.root, "tools"] as const,
+    list: () => [...chatKeys.tools.all(), "list"] as const,
+  },
+
+  companies: {
+    all: () => [...chatKeys.root, "companies"] as const,
+  },
+};
+
+/** GSM / Telco gateway (`src/pages/gsm/*`). */
+export const gsmKeys = {
+  root: ["gsm"] as const,
+  sync: {
+    all: () => [...gsmKeys.root, "sync"] as const,
+    gsmSelectOptions: () => [...gsmKeys.sync.all(), "gsmSelectOptions"] as const,
+  },
+};
