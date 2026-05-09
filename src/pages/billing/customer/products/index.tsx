@@ -62,7 +62,7 @@ import {
   type ProductData,
 } from "@utils/accounts";
 
-import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
+import DeleteConfirmationModal from "@components/page-partials/DeleteConfirmationModal";
 
 /** Row from `getProducts` / list-products — not CRM `getCrmData`. */
 type BillingProductRow = ProductData & Record<string, unknown>;
