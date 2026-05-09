@@ -1,6 +1,7 @@
 import "@assets/scss/datatable-style.scss";
 import "@assets/scss/industries-page.scss";
 import React, {
+  useCallback,
   useMemo,
   type FormEvent,
   type Dispatch,
@@ -739,6 +740,13 @@ const IndustriesPage = ({ hideBreadcrumb }: CrmPageDisplayProps = {}) => {
   const canEditIndustryDetail =
     perms?.includes(PERMISSIONS.EDIT_CRM_INDUSTRY) ?? false;
 
+  const onViewIndustry = useCallback(
+    (ind: IndustryData) => {
+      handleView(ind).catch(() => undefined);
+    },
+    [handleView],
+  );
+
   const industriesTableColumns = useMemo<TableColumn<IndustryData>[]>(
     () => [
       {
@@ -781,7 +789,7 @@ const IndustriesPage = ({ hideBreadcrumb }: CrmPageDisplayProps = {}) => {
             <Button
               variant="outline-info"
               size="sm"
-              onClick={() => void handleView(ind)}
+              onClick={() => onViewIndustry(ind)}
             >
               <Eye size={14} />
             </Button>
@@ -812,7 +820,7 @@ const IndustriesPage = ({ hideBreadcrumb }: CrmPageDisplayProps = {}) => {
     [
       session?.user?.permissions,
       PERMISSIONS,
-      handleView,
+      onViewIndustry,
       handleOpenModal,
       requestDeleteIndustry,
     ],
