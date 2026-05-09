@@ -1,3 +1,4 @@
+import { ticketsKeys } from "../query/keys";
 import { toast } from "react-toastify";
 import axiosInstance from "./axios";
 
@@ -42,6 +43,53 @@ export const ListModules = async (params: PaginationParams = {}) => {
     throw error;
   }
 };
+
+/** Row shape for ticket module list UIs. */
+export interface TicketModuleRecord {
+  id: string | number;
+  name: string;
+  description: string;
+  color: string;
+  user_extension: string | null;
+  created_at: string;
+}
+
+export type TicketModulesListPayload = Readonly<{
+  data: TicketModuleRecord[];
+  total: number;
+}>;
+
+export type TicketModulesListPageParams = Readonly<{
+  page: number;
+  perPage: number;
+  search: string;
+}>;
+
+export async function fetchTicketModulesListPage(
+  params: TicketModulesListPageParams,
+): Promise<TicketModulesListPayload> {
+  const response = await ListModules({
+    page: params.page,
+    perPage: params.perPage,
+    search: params.search,
+    filters: { search: params.search },
+  });
+  return {
+    data: (response?.data ?? []) as TicketModuleRecord[],
+    total: response?.total ?? 0,
+  };
+}
+
+export function getTicketModulesListQueryOptions(params: TicketModulesListPageParams) {
+  return {
+    queryKey: ticketsKeys.modules.list({
+      page: params.page,
+      perPage: params.perPage,
+      search: params.search,
+    }),
+    queryFn: () => fetchTicketModulesListPage(params),
+  };
+}
 
 export const GetAllModules = async () => {
     try {
