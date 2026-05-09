@@ -63,9 +63,15 @@ const EditGsmModel: React.FC<EditGsmModelProps> = ({ show, onHide, onSuccess }) 
       {show && (
         <div id="new-assign-modal" className="modal customModal" style={{display: 'flex'}}>
           <div className="modal-content">
-            <span className="close-btn" id="new-assign-close-btn" onClick={handleClose}>
-              <i className="fas fa-times"></i>
-            </span>
+            <button
+              type="button"
+              className="close-btn"
+              id="new-assign-close-btn"
+              onClick={handleClose}
+              aria-label="Close dialog"
+            >
+              <i className="fas fa-times" aria-hidden="true"></i>
+            </button>
             <h2 id="modal-title">New GSM Assignment</h2>
             
             <div className="step-indicators">
@@ -78,7 +84,7 @@ const EditGsmModel: React.FC<EditGsmModelProps> = ({ show, onHide, onSuccess }) 
               <div className="modal-step" id="step-1" style={{display: currentStep === 1 ? 'block' : 'none'}}>
                 <p>Select the GSM device you want to assign from the available options below.</p>
                 <div className="form-group">
-                  <label>Select GSM</label>
+                  <label htmlFor="gsm-select">Select GSM</label>
                   <select 
                     id="gsm-select" 
                     value={selectedGsm} 
@@ -95,7 +101,7 @@ const EditGsmModel: React.FC<EditGsmModelProps> = ({ show, onHide, onSuccess }) 
               <div className="modal-step" id="step-2" style={{display: currentStep === 2 ? 'block' : 'none'}}>
                 <p>Choose the company that will be associated with this selected GSM device.</p>
                 <div className="form-group">
-                  <label>Select Company</label>
+                  <label htmlFor="company-select">Select Company</label>
                   <select 
                     id="company-select" 
                     value={selectedCompany} 
@@ -160,9 +166,15 @@ const EditGsmModel: React.FC<EditGsmModelProps> = ({ show, onHide, onSuccess }) 
       {showSuccessModal && (
         <div id="action-modal" className="modal customModal" style={{display: 'flex'}}>
           <div className="modal-content">
-            <span className="close-btn" id="action-close-btn" onClick={handleSuccessModalClose}>
-              <i className="fas fa-times"></i>
-            </span>
+            <button
+              type="button"
+              className="close-btn"
+              id="action-close-btn"
+              onClick={handleSuccessModalClose}
+              aria-label="Close dialog"
+            >
+              <i className="fas fa-times" aria-hidden="true"></i>
+            </button>
             <h2 id="action-modal-title">Assignment Successful!</h2>
             <p id="action-modal-text">
               The GSM **"{selectedGsm} (IP: 192.168.1.100)"** has been successfully assigned to **"{selectedCompany}"**.
