@@ -7,9 +7,9 @@ import {ListGroups, updateGroup,deleteGroup,addGroup, addTeamsToGroup, removeTea
 import { Button, Form, Modal, Row, Col, Card } from 'react-bootstrap';
 import { useSession } from 'next-auth/react';
 import '@assets/scss/common.scss';
-import FormModal from "@pages/partial/FormModal";
-import SuccessfulModal from '@pages/partial/SuccessfulModal';
-import ConfirmModal from '@pages/partial/ConfirmModal';
+import FormModal from "@components/page-partials/FormModal";
+import SuccessfulModal from '@components/page-partials/SuccessfulModal';
+import ConfirmModal from '@components/page-partials/ConfirmModal';
 import { Edit, Info, Trash2, Users, UserPlus, UserMinus, Layers, PackageMinus, Boxes } from 'lucide-react';
 import  { MultiValue } from 'react-select';
 import { getAllTeams } from '@utils/teams';
@@ -17,6 +17,7 @@ import { toast } from 'react-toastify';
 import { useModuleSelection } from '@hooks/useModuleSelection';
 import { Module } from '@typings/controlhub/users';
 import SelectCheckBox, { SelectCheckBoxOption } from '@components/SelectCheckBox';
+import { useDebouncedValue } from '@hooks/useDebouncedValue';
 
 interface GroupRow {
     id: number;
@@ -41,6 +42,7 @@ const Groups = () => {
     const [rowsPerPage, setRowsPerPage] = useState(15);
     const [totalRows, setTotalRows] = useState(0);
     const [searchValue, setSearchValue] = useState('');
+    const debouncedSearchValue = useDebouncedValue(searchValue, 400);
 
     const [refreshKey, setRefreshKey] = useState<number>(0);
     const [currentFilters] = useState({});
@@ -83,8 +85,8 @@ const Groups = () => {
     );
 
     useEffect(() => {
-        loadGroups(currentPage, rowsPerPage, searchValue);
-    }, [currentPage, rowsPerPage, searchValue, refreshKey, loadGroups]);
+        loadGroups(currentPage, rowsPerPage, debouncedSearchValue);
+    }, [currentPage, rowsPerPage, debouncedSearchValue, refreshKey, loadGroups]);
 
 
     

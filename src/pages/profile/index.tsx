@@ -3,7 +3,7 @@ import Layout from '@layout/index'
 import BreadcrumbItem from '@common/BreadcrumbItem'
 import { Card, Col, Row, Tab, Tabs } from 'react-bootstrap'
 import { useSession } from 'next-auth/react'
-import SuccessfulModal from '@pages/partial/SuccessfulModal'
+import SuccessfulModal from '@components/page-partials/SuccessfulModal'
 
 import { GetUserProfile } from '@utils/users'
 

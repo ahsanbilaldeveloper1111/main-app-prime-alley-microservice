@@ -39,8 +39,8 @@ import { useCrmLogActivityModals } from "@hooks/useCrmLogActivityModals";
 import type { CrmAuditLogRecordType } from "@utils/crm";
 import { useCti } from "@hooks/useCti";
 import DeviceSelectionModal from "@components/DeviceSelectionModal";
-import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
-import SuccessfulModal from "@pages/partial/SuccessfulModal";
+import DeleteConfirmationModal from "@components/page-partials/DeleteConfirmationModal";
+import SuccessfulModal from "@components/page-partials/SuccessfulModal";
 import { toast } from "react-toastify";
 import {
   sidebarContainerStyle,

@@ -18,9 +18,9 @@ import {
 import { Button, Form, Modal, Row, Col, Card } from 'react-bootstrap';
 import { useSession } from 'next-auth/react';
 import '@assets/scss/common.scss';
-import FormModal from '@pages/partial/FormModal';
-import SuccessfulModal from '@pages/partial/SuccessfulModal';
-import ConfirmModal from '@pages/partial/ConfirmModal';
+import FormModal from '@components/page-partials/FormModal';
+import SuccessfulModal from '@components/page-partials/SuccessfulModal';
+import ConfirmModal from '@components/page-partials/ConfirmModal';
 import { Edit, Info, Trash2, Users, UserPlus, UserMinus, Package } from 'lucide-react';
 import { MultiValue } from 'react-select';
 import { getParentUsers } from '@utils/users';
@@ -29,6 +29,7 @@ import { toast } from 'react-toastify';
 import { HEADER_CONSTANTS } from '@constants/headerConstants';
 import SelectCheckBox, { SelectCheckBoxOption } from '@components/SelectCheckBox';
 import GenericTable, { TableColumn, TableAction } from '@components/GenericTable';
+import { useDebouncedValue } from '@hooks/useDebouncedValue';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -219,6 +220,7 @@ const Teams = () => {
     const [currentPage, setCurrentPage] = useState(1);
     const [rowsPerPage, setRowsPerPage] = useState(15);
     const [searchValue, setSearchValue] = useState('');
+    const debouncedSearchValue = useDebouncedValue(searchValue, 400);
     const [totalRows, setTotalRows] = useState(0);
     const [tableData, setTableData] = useState<TeamRow[]>([]);
     const [isTableLoading, setIsTableLoading] = useState(false);
@@ -309,8 +311,8 @@ const Teams = () => {
     );
 
     useEffect(() => {
-        loadTeams(currentPage, rowsPerPage, searchValue);
-    }, [currentPage, rowsPerPage, searchValue, refreshKey, loadTeams]);
+        loadTeams(currentPage, rowsPerPage, debouncedSearchValue);
+    }, [currentPage, rowsPerPage, debouncedSearchValue, refreshKey, loadTeams]);
 
     const triggerRefresh = useCallback(() => setRefreshKey((prev) => prev + 1), []);
 

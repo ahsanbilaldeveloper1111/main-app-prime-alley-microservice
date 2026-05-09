@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Card, Col, Row } from 'react-bootstrap';
-import FormModal from '@pages/partial/FormModal';
+import FormModal from '@components/page-partials/FormModal';
 import Select from 'react-select';
 import { User, Role, Group } from '@typings/controlhub/users';
 import { assignRoleToUser, assignGroupToUser, MarkAsCompanyAdmin } from '@utils/users';

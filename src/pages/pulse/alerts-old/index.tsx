@@ -27,9 +27,9 @@ import {
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
 import PageHeader from "@components/PageHeader";
-import FormModal from "../../partial/FormModal";
-import ConfirmModal from "@pages/partial/ConfirmModal";
-import SuccessfulModal from "@pages/partial/SuccessfulModal";
+import FormModal from "@components/page-partials/FormModal";
+import ConfirmModal from "@components/page-partials/ConfirmModal";
+import SuccessfulModal from "@components/page-partials/SuccessfulModal";
 import PageSummaryGrid, { SummaryCard } from '@components/PageSummaryGrid';
 import DatatableActionButton from "@components/DatatableActionButton";
 import { FiEdit, FiTrash2, FiEye, FiPlus, FiCheck } from "react-icons/fi";
