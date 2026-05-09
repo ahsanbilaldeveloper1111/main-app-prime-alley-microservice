@@ -1,11 +1,7 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { Search, FileText, Landmark, FileMinus, ChevronDown } from "lucide-react";
 import { Form } from "react-bootstrap";
-import {
-  downloadInvoicePdf,
-  getInvoice,
-  getInvoices,
-} from "@utils/accounts";
+import { downloadInvoicePdf, getInvoice } from "@utils/accounts";
 import type { InvoiceData } from "@utils/accounts";
 import { formatNumber, GlobalDateTimeFormat } from "@utils/Helper";
 import moment from "moment";
@@ -20,6 +16,9 @@ import { toast } from "react-toastify";
 import { getErrorMessage } from "@utils/errors";
 import { useEnsureCustomerForCrmCompany } from "@hooks/billing/useEnsureCustomerForCrmCompany";
 import { useMinifiedCompaniesSendAll } from "@hooks/billing/useMinifiedCompaniesSendAll";
+import { useQueryClient } from "@tanstack/react-query";
+import { accountBillingKeys } from "../../../query/keys";
+import { useAccountBillingInvoiceHistoryQuery } from "@page-modules/billing/account-billing/useAccountBillingInvoiceHistoryQuery";
 
 const font = BILLING_FONT;
 const { PERMISSIONS } = HEADER_CONSTANTS;
@@ -958,10 +957,7 @@ export default function BillingHistoryPage({
     PERMISSIONS.VIEW_STATIC_SECTIONS_BILLING,
   );
 
-  const [invoices, setInvoices] = useState<any[]>([]);
-  /** Start true so the first paint shows loading, not an empty state, before `useEffect` fetches. */
-  const [loadingInvoices, setLoadingInvoices] = useState(true);
-  const requestIdRef = useRef(0);
+  const queryClient = useQueryClient();
   const viewInvoiceRequestRef = useRef(0);
   const payNowRequestRef = useRef(0);
   const [showViewInvoiceModal, setShowViewInvoiceModal] = useState(false);
@@ -976,11 +972,10 @@ export default function BillingHistoryPage({
     },
   });
   const [selectedCompanyId, setSelectedCompanyId] = useState<string | number>("");
-  const [ensureCustomerRefreshKey, setEnsureCustomerRefreshKey] = useState(0);
 
   const bumpInvoicesAfterCustomerCreated = useCallback(() => {
-    setEnsureCustomerRefreshKey((k) => k + 1);
-  }, []);
+    void queryClient.invalidateQueries({ queryKey: accountBillingKeys.invoiceHistory.all() });
+  }, [queryClient]);
 
   useEnsureCustomerForCrmCompany(customerCompanyPicker ? selectedCompanyId : null, {
     onCreated: bumpInvoicesAfterCustomerCreated,
@@ -1029,60 +1024,34 @@ export default function BillingHistoryPage({
     }
   }, []);
 
-  const fetchInvoices = useCallback(async (search: string) => {
-    requestIdRef.current += 1;
-    const requestId = requestIdRef.current;
+  const invoiceHistoryParams = useMemo(
+    () => ({
+      customerCompanyPicker,
+      selectedCompanyId,
+      search: searchQuery,
+      dateFrom,
+      dateTo,
+      statusFilter,
+      paymentStatusFilter,
+    }),
+    [
+      customerCompanyPicker,
+      selectedCompanyId,
+      searchQuery,
+      dateFrom,
+      dateTo,
+      statusFilter,
+      paymentStatusFilter,
+    ],
+  );
 
-    setLoadingInvoices(true);
-    try {
-      const baseParams = {
-        page: 1,
-        per_page: 50,
-        limit: 50,
-        search: search || undefined,
-        date_from: dateFrom || undefined,
-        date_to: dateTo || undefined,
-        status: statusFilter === "All Statuses" ? "" : statusFilter,
-        payment_status: paymentStatusFilter === "All Payments" ? "" : paymentStatusFilter,
-      };
-      const companyIdTrimmed = String(selectedCompanyId).trim();
-      const params = customerCompanyPicker
-        ? {
-            ...baseParams,
-            crm_company_not_null: true,
-            ...(companyIdTrimmed ? { crm_company_id: selectedCompanyId } : {}),
-          }
-        : {
-            ...baseParams,
-            crm_company_id: "null",
-          };
-
-      const res = (await getInvoices(params)) as { data?: unknown[] };
-
-      if (requestId !== requestIdRef.current) return;
-
-      setInvoices(res?.data || []);
-    } catch (err) {
-      if (requestId !== requestIdRef.current) return;
-      console.error("BillingHistoryPage getInvoices error:", err);
-      setInvoices([]);
-    } finally {
-      if (requestId === requestIdRef.current) {
-        setLoadingInvoices(false);
-      }
-    }
-  }, [
-    customerCompanyPicker,
-    selectedCompanyId,
-    dateFrom,
-    dateTo,
-    statusFilter,
-    paymentStatusFilter,
-  ]);
+  const invoicesQuery = useAccountBillingInvoiceHistoryQuery(invoiceHistoryParams);
+  const invoices = invoicesQuery.data ?? [];
+  const loadingInvoices = invoicesQuery.isFetching;
 
   const { openInvoicePayment: openInvoicePaymentModal, invoicePaymentModal } = useInvoicePaymentModal({
     onPaymentSuccess: () => {
-      fetchInvoices(searchQuery).then(() => undefined);
+      void queryClient.invalidateQueries({ queryKey: accountBillingKeys.invoiceHistory.all() });
     },
   });
 
@@ -1104,21 +1073,6 @@ export default function BillingHistoryPage({
     },
     [canPayInvoices, openInvoicePaymentModal]
   );
-
-  useEffect(() => {
-    fetchInvoices(searchQuery).catch((err) => {
-      console.error("BillingHistoryPage fetchInvoices effect error:", err);
-    });
-  }, [
-    fetchInvoices,
-    searchQuery,
-    dateFrom,
-    dateTo,
-    statusFilter,
-    paymentStatusFilter,
-    selectedCompanyId,
-    ensureCustomerRefreshKey,
-  ]);
 
   const filters = useMemo(
     () =>

@@ -1,29 +1,18 @@
 import { useQuery } from "@tanstack/react-query";
 
+import type { PaymentMethodLike } from "@components/billings/shared/paymentMethods";
+import { normalizePaymentMethods } from "@components/billings/shared/paymentMethods";
 import { billingCustomerKeys } from "../../../query/keys";
 import { GetPaymentMethods } from "@utils/accounting";
 import { getErrorMessage } from "@utils/errors";
 import { toast } from "react-toastify";
 
-export type StripePortalPaymentMethodRow = Record<string, unknown> & {
-  id?: string | number;
-};
+export type StripePortalPaymentMethodRow = PaymentMethodLike;
 
 function parseStripePortalPaymentMethods(
   payload: unknown,
 ): StripePortalPaymentMethodRow[] {
-  if (
-    payload === null ||
-    typeof payload !== "object" ||
-    !("payment_methods" in payload)
-  ) {
-    return [];
-  }
-  const methods = payload.payment_methods;
-  if (!Array.isArray(methods)) {
-    return [];
-  }
-  return methods as StripePortalPaymentMethodRow[];
+  return normalizePaymentMethods(payload);
 }
 
 export function useBillingStripePortalPaymentMethodsQuery() {

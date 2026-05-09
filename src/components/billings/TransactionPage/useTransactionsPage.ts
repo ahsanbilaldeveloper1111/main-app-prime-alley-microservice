@@ -1,14 +1,16 @@
-import { useCallback, useEffect, useRef, useState } from "react";
-import { GetPayments } from "@utils/accounting";
+import { useCallback, useRef, useState } from "react";
 import { downloadInvoicePdf, getInvoice } from "@utils/accounts";
+import { useAccountBillingTenantPaymentsQuery } from "@page-modules/billing/account-billing/useAccountBillingTenantPaymentsQuery";
 
 export function useTransactionsPage() {
   const [hoveredRow, setHoveredRow] = useState<number | null>(null);
-  const [payments, setPayments] = useState<any[]>([]);
   const [showViewInvoiceModal, setShowViewInvoiceModal] = useState(false);
   const [selectedInvoiceForView, setSelectedInvoiceForView] = useState<any>(null);
   const [isInvoiceLoading, setIsInvoiceLoading] = useState(false);
   const viewInvoiceGen = useRef(0);
+
+  const paymentsQuery = useAccountBillingTenantPaymentsQuery();
+  const payments = (paymentsQuery.data ?? []) as any[];
 
   const closeViewInvoiceModal = useCallback(() => {
     setShowViewInvoiceModal(false);
@@ -53,26 +55,6 @@ export function useTransactionsPage() {
     } catch (err) {
       console.error("PDF download error:", err);
     }
-  }, []);
-
-  useEffect(() => {
-    let cancelled = false;
-    const load = async () => {
-      try {
-        const response = await GetPayments({ page: 1, per_page: 500 });
-        if (!cancelled) {
-          setPayments(response?.dataList || []);
-        }
-      } catch (err) {
-        if (!cancelled) {
-          console.error("TransactionsPage GetPayments error:", err);
-        }
-      }
-    };
-    load();
-    return () => {
-      cancelled = true;
-    };
   }, []);
 
   return {

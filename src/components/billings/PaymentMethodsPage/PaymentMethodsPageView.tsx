@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { X, CreditCard, Check } from "lucide-react";
-import { addPaymentMethod, GetCompanyDetails } from "@utils/accounting";
+import { addPaymentMethod } from "@utils/accounting";
+import { useAccountBillingCompanyDetailsQuery } from "@page-modules/billing/account-billing/useAccountBillingCompanyDetailsQuery";
 import { toast } from "react-toastify";
 import { loadStripe } from "@stripe/stripe-js";
 import { Elements, CardNumberElement, CardExpiryElement, CardCvcElement, useStripe, useElements } from "@stripe/react-stripe-js";
@@ -302,26 +303,12 @@ function AddPaymentSidebar({ onClose }: Readonly<{ onClose: () => void }>) {
   const { hasPermission } = usePermissions();
   const canMarkDefault = hasPermission(PERMISSIONS.MARK_PAYMENT_METHOD_DEFAULT_BILLING);
   const [stripePublishableKey, setStripePublishableKey] = useState<string | null>(null);
-  const [companyDetails, setCompanyDetails] = useState<any>(null);
+  const companyDetailsQuery = useAccountBillingCompanyDetailsQuery("session");
+  const companyDetails = companyDetailsQuery.data ?? null;
 
   useEffect(() => {
     const key = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || "";
     setStripePublishableKey(key || null);
-  }, []);
-
-  useEffect(() => {
-    let cancelled = false;
-    const fetchCompany = async () => {
-      try {
-        const res = await GetCompanyDetails();
-        if (!cancelled) setCompanyDetails(res);
-      } catch (err) {
-        console.error("AddPaymentSidebar fetchCompany error:", err);
-        if (!cancelled) setCompanyDetails(null);
-      }
-    };
-    fetchCompany();
-    return () => { cancelled = true; };
   }, []);
 
   const handleSuccess = () => {
@@ -471,8 +458,11 @@ export function PaymentMethodsPageView({
       </tr>
     );
   } else {
-    tableRows = paymentMethods.map((method) => (
-      <tr key={method?.id}>
+    tableRows = paymentMethods.map((method, idx) => {
+      const idStr = method.id != null ? String(method.id) : null;
+      const rowKey = idStr ?? `pm-${idx}`;
+      return (
+      <tr key={rowKey}>
         <td style={s.td}>
           <div style={{ display: "flex", alignItems: "center" }}>
             <span style={s.visaChip}>{brand(method)}</span>
@@ -508,15 +498,17 @@ export function PaymentMethodsPageView({
         <td style={s.td}> <div style={{ display: "flex", alignItems: "center", gap: 4 }}> {isDefault(method) ? <Check size={20} color="#006162" /> : <></>} <span style={{ fontSize: 12, fontFamily: font, color: "#141414" }}>{isDefault(method) ? "Default" : ""}</span></div></td>
        
         <td style={{ ...s.td, position: "relative" as const }}>
-          {(canMarkDefaultPaymentMethod || canDeletePaymentMethod) && (
+          {(canMarkDefaultPaymentMethod || canDeletePaymentMethod) && idStr && (
             <>
           <button
             style={s.actionsBtn}
-            onClick={() => setActionsOpenId(actionsOpenId === method?.id ? null : method?.id)}
+            onClick={() =>
+              setActionsOpenId(actionsOpenId === idStr ? null : idStr)
+            }
           >
             Actions ▾
           </button>
-          {actionsOpenId === method?.id && (
+          {idStr && actionsOpenId === idStr && (
             <>
               <button
                 type="button"
@@ -543,10 +535,10 @@ export function PaymentMethodsPageView({
                 minWidth: 180,
                 padding: "6px 0",
               }}>
-                {canMarkDefaultPaymentMethod && !isDefault(method) && (
+                {canMarkDefaultPaymentMethod && !isDefault(method) && idStr && (
                   <button
                     type="button"
-                    onClick={() => handleSetDefault(method.id)}
+                    onClick={() => handleSetDefault(idStr)}
                     style={{
                       width: "100%",
                       textAlign: "left",
@@ -562,10 +554,10 @@ export function PaymentMethodsPageView({
                     Set as default
                   </button>
                 )}
-                {canDeletePaymentMethod && (
+                {canDeletePaymentMethod && idStr && (
                 <button
                   type="button"
-                  onClick={() => handleDeleteClick(method.id)}
+                  onClick={() => handleDeleteClick(idStr)}
                   style={{
                     width: "100%",
                     textAlign: "left",
@@ -588,7 +580,8 @@ export function PaymentMethodsPageView({
           )}
         </td>
       </tr>
-    ));
+      );
+    });
   }
 
   return (

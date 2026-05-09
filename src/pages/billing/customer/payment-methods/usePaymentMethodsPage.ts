@@ -12,7 +12,7 @@ export function usePaymentMethodsPage() {
   const queryClient = useQueryClient();
 
   const paymentMethodsQuery = useBillingStripePortalPaymentMethodsQuery();
-  const paymentMethods = (paymentMethodsQuery.data ?? []) as StripePaymentMethodRow[];
+  const paymentMethods = (paymentMethodsQuery.data ?? []) as unknown as StripePaymentMethodRow[];
 
   const invalidatePaymentMethods = useCallback(async () => {
     await queryClient.invalidateQueries({

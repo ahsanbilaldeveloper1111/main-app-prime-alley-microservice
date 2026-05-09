@@ -381,6 +381,58 @@ export const billingCustomerKeys = {
   },
 };
 
+/** Params for {@link accountBillingKeys.invoiceHistory.list}. */
+export type AccountBillingInvoiceHistoryListParams = {
+  customerCompanyPicker: boolean;
+  selectedCompanyId: string | number;
+  search: string;
+  dateFrom: string;
+  dateTo: string;
+  statusFilter: string;
+  paymentStatusFilter: string;
+};
+
+/**
+ * Account (tenant) billing area – `src/components/billings/*` and
+ * `src/pages/billing/account-billing/*`.
+ */
+export const accountBillingKeys = {
+  root: ["accountBilling"] as const,
+
+  /**
+   * `tenant`: company details with empty `crm_company_id` (subscription / overview).
+   * `session`: default company details (company info page, add-card sidebar).
+   */
+  companyDetails: (variant: "tenant" | "session") =>
+    [...accountBillingKeys.root, "companyDetails", variant] as const,
+
+  overviewUsersSummary: () =>
+    [...accountBillingKeys.root, "overviewUsersSummary"] as const,
+
+  tenantPayments: () => [...accountBillingKeys.root, "tenantPayments"] as const,
+
+  documents: {
+    all: () => [...accountBillingKeys.root, "documents"] as const,
+    list: (companyId: string) =>
+      [...accountBillingKeys.documents.all(), "list", companyId] as const,
+  },
+
+  invoiceHistory: {
+    all: () => [...accountBillingKeys.root, "invoiceHistory"] as const,
+    list: (params: AccountBillingInvoiceHistoryListParams) =>
+      [
+        ...accountBillingKeys.invoiceHistory.all(),
+        params.customerCompanyPicker,
+        String(params.selectedCompanyId),
+        params.search,
+        params.dateFrom,
+        params.dateTo,
+        params.statusFilter,
+        params.paymentStatusFilter,
+      ] as const,
+  },
+};
+
 /** Tickets module (`src/pages/tickets/*`). */
 export const ticketsKeys = {
   root: ["tickets"] as const,
