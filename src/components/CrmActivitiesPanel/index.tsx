@@ -82,7 +82,7 @@ import EmailModal from "@components/EmailModal";
 import TaskModal, { type TaskModalSaveTaskData } from "@components/TaskModal";
 import MeetingModal from "@components/MeetingModal";
 import LogSmsModal from "@components/LogSms";
-import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
+import DeleteConfirmationModal from "@components/page-partials/DeleteConfirmationModal";
 import { useHierarchyData } from "@components/filters/useHierarchyData";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/router";
