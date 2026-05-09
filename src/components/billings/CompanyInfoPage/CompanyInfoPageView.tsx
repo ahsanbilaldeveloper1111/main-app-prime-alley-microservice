@@ -1,7 +1,7 @@
 import { Info, Plus } from "lucide-react";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
-import { HEADER_CONSTANTS, type PermissionName } from "@constants/headerConstants";
+import { HEADER_CONSTANTS } from "@constants/headerConstants";
 import {
   getAddressDisplay,
   getBillingContactLabel,
@@ -138,7 +138,7 @@ export function CompanyInfoPageView({ companyDetails, loading }: CompanyInfoPage
 
       <div style={{ ...s.sectionHeadingRow, marginTop: 8 }}>
         <h2 style={s.sectionHeading}>Points of Contact</h2>
-        {session?.user?.permissions?.includes(HEADER_CONSTANTS.PERMISSIONS.VIEW_SETTINGS as PermissionName) && (
+        {session?.user?.permissions?.includes(HEADER_CONSTANTS.PERMISSIONS.VIEW_SETTINGS) && (
           <Link href="/main-settings/account-defaults?tab=general" style={s.link}>
             Looking for user permissions?
           </Link>
