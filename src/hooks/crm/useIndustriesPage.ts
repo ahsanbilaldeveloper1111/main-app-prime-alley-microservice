@@ -103,7 +103,7 @@ export function useIndustriesPage() {
   }, [pagination.currentPage, pagination.rowsPerPage, search]);
 
   useEffect(() => {
-    void fetchIndustries();
+    fetchIndustries().catch(() => undefined);
   }, [fetchIndustries]);
 
   useEffect(() => {
