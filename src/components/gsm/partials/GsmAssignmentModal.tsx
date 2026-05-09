@@ -1,16 +1,43 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { NewAssignement } from '@utils/GsmAssign';
+import { getGsmData } from '@utils/GsmManagement';
 
-interface EditGsmModelProps {
+interface GsmAssignmentModalProps {
   show: boolean;
   onHide: () => void;
   onSuccess?: (assignment: { selectedGsm: string; selectedCompany: string }) => void;
 }
 
-const EditGsmModel: React.FC<EditGsmModelProps> = ({ show, onHide, onSuccess }) => {
+const GsmAssignmentModal: React.FC<GsmAssignmentModalProps> = ({ show, onHide, onSuccess }) => {
   const [currentStep, setCurrentStep] = useState(1);
   const [selectedGsm, setSelectedGsm] = useState('');
   const [selectedCompany, setSelectedCompany] = useState('');
   const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [gsmList, setGsmList] = useState<any[]>([]);
+  const [companyList, setCompanyList] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+
+  // Fetch GSM and company data when modal opens
+  useEffect(() => {
+    if (show) {
+      fetchData();
+    }
+  }, [show]);
+
+  const fetchData = async () => {
+    setIsLoading(true);
+    try {
+      const response = await getGsmData();
+      if (response) {
+        setGsmList(response?.gsm || []);
+        setCompanyList(response?.company || []);
+      }
+    } catch (error) {
+      console.error('Error fetching data:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleNextStep = () => {
     if (currentStep < 3) {
@@ -24,24 +51,31 @@ const EditGsmModel: React.FC<EditGsmModelProps> = ({ show, onHide, onSuccess }) 
     }
   };
 
-  const handleSaveAssignment = () => {
-    // Handle save logic here
-    console.log('Saving assignment:', { selectedGsm, selectedCompany });
-    
-    // Close the main modal
-    onHide();
-    
-    // Reset form state
-    setCurrentStep(1);
-    setSelectedGsm('');
-    setSelectedCompany('');
-    
-    // Show success modal
-    setShowSuccessModal(true);
-    
-    // Call success callback if provided
-    if (onSuccess) {
-      onSuccess({ selectedGsm, selectedCompany });
+  const handleSaveAssignment = async () => {
+    try {
+      // Call the API to create the assignment
+      const response = await NewAssignement(selectedGsm, selectedCompany);
+      
+      if (response) {
+        // Close the main modal
+        onHide();
+        
+        // Reset form state
+        setCurrentStep(1);
+        setSelectedGsm('');
+        setSelectedCompany('');
+        
+        // Show success modal
+        setShowSuccessModal(true);
+        
+        // Call success callback if provided
+        if (onSuccess) {
+          onSuccess({ selectedGsm, selectedCompany });
+        }
+      }
+    } catch (error) {
+      console.error('Assignment error:', error);
+      // Error handling is already done in the NewAssignement function via toast
     }
   };
 
@@ -63,9 +97,15 @@ const EditGsmModel: React.FC<EditGsmModelProps> = ({ show, onHide, onSuccess }) 
       {show && (
         <div id="new-assign-modal" className="modal customModal" style={{display: 'flex'}}>
           <div className="modal-content">
-            <span className="close-btn" id="new-assign-close-btn" onClick={handleClose}>
-              <i className="fas fa-times"></i>
-            </span>
+            <button
+              type="button"
+              className="close-btn"
+              id="new-assign-close-btn"
+              onClick={handleClose}
+              aria-label="Close dialog"
+            >
+              <i className="fas fa-times" aria-hidden="true"></i>
+            </button>
             <h2 id="modal-title">New GSM Assignment</h2>
             
             <div className="step-indicators">
@@ -78,43 +118,54 @@ const EditGsmModel: React.FC<EditGsmModelProps> = ({ show, onHide, onSuccess }) 
               <div className="modal-step" id="step-1" style={{display: currentStep === 1 ? 'block' : 'none'}}>
                 <p>Select the GSM device you want to assign from the available options below.</p>
                 <div className="form-group">
-                  <label>Select GSM</label>
+                  <label htmlFor="gsm-select">Select GSM</label>
                   <select 
                     id="gsm-select" 
                     value={selectedGsm} 
                     onChange={(e) => setSelectedGsm(e.target.value)}
+                    disabled={isLoading}
                   >
                     <option value="">-- Choose a GSM Device --</option>
-                    <option value="Production">Production (IP: 192.168.1.100)</option>
-                    <option value="Test Gsm">Test Gsm (IP: 192.168.1.101)</option>
-                    <option value="Unassigned GSM">Unassigned GSM (IP: 192.168.1.102)</option>
+                    {gsmList.map((gsm: any) => (
+                      <option key={gsm.id} value={gsm.id}>
+                        {gsm.name}
+                      </option>
+                    ))}
                   </select>
+                  {isLoading && <small>Loading GSM devices...</small>}
                 </div>
               </div>
 
               <div className="modal-step" id="step-2" style={{display: currentStep === 2 ? 'block' : 'none'}}>
                 <p>Choose the company that will be associated with this selected GSM device.</p>
                 <div className="form-group">
-                  <label>Select Company</label>
+                  <label htmlFor="company-select">Select Company</label>
                   <select 
                     id="company-select" 
                     value={selectedCompany} 
                     onChange={(e) => setSelectedCompany(e.target.value)}
+                    disabled={isLoading}
                   >
                     <option value="">-- Choose a Company --</option>
-                    <option value="Prime Alley Technology LLC">Prime Alley Technology LLC</option>
-                    <option value="Fly Light Group">Fly Light Group</option>
-                    <option value="ABC Corporation">ABC Corporation</option>
-                    <option value="Global Solutions Inc.">Global Solutions Inc.</option>
+                    {companyList.map((company: any) => (
+                      <option key={company.identifier} value={company.identifier}>
+                        {company.name}
+                      </option>
+                    ))}
                   </select>
+                  {isLoading && <small>Loading companies...</small>}
                 </div>
               </div>
               
               <div className="modal-step" id="step-3" style={{display: currentStep === 3 ? 'block' : 'none'}}>
                 <p>Review the details below to ensure all information is correct before finalizing the assignment.</p>
                 <div className="confirmation-details">
-                  <p><strong>Selected GSM:</strong> <span id="confirm-gsm">{selectedGsm}</span></p>
-                  <p><strong>Assigned to Company:</strong> <span id="confirm-company">{selectedCompany}</span></p>
+                  <p><strong>Selected GSM:</strong> <span id="confirm-gsm">
+                    {gsmList.find(gsm => gsm.id === selectedGsm)?.name || selectedGsm}
+                  </span></p>
+                  <p><strong>Assigned to Company:</strong> <span id="confirm-company">
+                    {companyList.find(company => company.identifier === selectedCompany)?.name || selectedCompany}
+                  </span></p>
                   <p>
                     <small style={{color: 'var(--light-text)'}}>
                       *Ports will be assigned in a subsequent step or automatically based on company policy.
@@ -160,12 +211,18 @@ const EditGsmModel: React.FC<EditGsmModelProps> = ({ show, onHide, onSuccess }) 
       {showSuccessModal && (
         <div id="action-modal" className="modal customModal" style={{display: 'flex'}}>
           <div className="modal-content">
-            <span className="close-btn" id="action-close-btn" onClick={handleSuccessModalClose}>
-              <i className="fas fa-times"></i>
-            </span>
+            <button
+              type="button"
+              className="close-btn"
+              id="action-close-btn"
+              onClick={handleSuccessModalClose}
+              aria-label="Close dialog"
+            >
+              <i className="fas fa-times" aria-hidden="true"></i>
+            </button>
             <h2 id="action-modal-title">Assignment Successful!</h2>
             <p id="action-modal-text">
-              The GSM **"{selectedGsm} (IP: 192.168.1.100)"** has been successfully assigned to **"{selectedCompany}"**.
+              The GSM **"{gsmList.find(gsm => gsm.id === selectedGsm)?.name || selectedGsm}"** has been successfully assigned to **"{companyList.find(company => company.identifier === selectedCompany)?.name || selectedCompany}"**.
             </p>
             <div className="modal-footer">
               <button className="btn btn-export" id="action-cancel-btn" style={{display: 'none'}}>Cancel</button>
@@ -178,4 +235,4 @@ const EditGsmModel: React.FC<EditGsmModelProps> = ({ show, onHide, onSuccess }) 
   );
 };
 
-export default EditGsmModel;
+export default GsmAssignmentModal;

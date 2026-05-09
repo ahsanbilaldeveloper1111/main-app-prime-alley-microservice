@@ -73,9 +73,9 @@ import { FiPlus } from "react-icons/fi";
 import { toast } from "react-toastify";
 import moment from "moment";
 
-import FormModal from "../../pages/partial/FormModal";
-import SuccessfulModal from "@pages/partial/SuccessfulModal";
-import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
+import FormModal from "@components/page-partials/FormModal";
+import SuccessfulModal from "@components/page-partials/SuccessfulModal";
+import DeleteConfirmationModal from "@components/page-partials/DeleteConfirmationModal";
 import { CrmListColumnEditorModal } from "@crm/shared/CrmListColumnEditorModal";
 import CreateLeadModal from "@components/CreateLeadModal";
 import CallRecordingPlayerModal from "@components/CallRecordingPlayerModal";

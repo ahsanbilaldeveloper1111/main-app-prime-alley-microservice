@@ -1,6 +1,6 @@
-export { default as SuccessfulModal } from "@pages/partial/SuccessfulModal";
-export { default as FormModal } from "@pages/partial/FormModal";
-export { default as DeleteConfirmationModal } from "@pages/partial/DeleteConfirmationModal";
+export { default as SuccessfulModal } from "@components/page-partials/SuccessfulModal";
+export { default as FormModal } from "@components/page-partials/FormModal";
+export { default as DeleteConfirmationModal } from "@components/page-partials/DeleteConfirmationModal";
 export {
   CrmPhoneDisplay as PhoneDisplay,
   CrmKPICard as KPICard,

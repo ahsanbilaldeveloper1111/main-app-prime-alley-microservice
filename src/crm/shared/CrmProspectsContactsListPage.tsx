@@ -45,7 +45,7 @@ import { buildCrmPersonListRowDispositionUpdatePayload } from "@utils/crmPersonD
 
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
-import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
+import DeleteConfirmationModal from "@components/page-partials/DeleteConfirmationModal";
 import {
   RECORD_TYPES,
   formatCrmPreviewDate,

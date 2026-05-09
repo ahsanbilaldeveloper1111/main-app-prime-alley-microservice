@@ -1,6 +1,6 @@
 import React from "react";
-import FormModal from "@pages/partial/FormModal";
-import SuccessfulModal from "@pages/partial/SuccessfulModal";
+import FormModal from "@components/page-partials/FormModal";
+import SuccessfulModal from "@components/page-partials/SuccessfulModal";
 import CallRecordingPlayerModal from "@components/CallRecordingPlayerModal";
 import { CrmListDataAssignmentFormContent } from "@crm/shared/CrmListDataAssignmentFormContent";
 import type { CrmListDataAssignmentFormContentProps } from "@crm/shared/CrmListDataAssignmentFormContent";
