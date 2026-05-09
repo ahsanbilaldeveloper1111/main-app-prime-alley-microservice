@@ -41,7 +41,7 @@ import { useCrmToolbarConfig } from "@hooks/useCrmToolbarConfig";
 import { useEnsureCustomerForCrmCompany } from "@hooks/billing/useEnsureCustomerForCrmCompany";
 import { useMinifiedCompaniesForSelect } from "@hooks/billing/useMinifiedCompaniesForSelect";
 import { BillingCustomerCompanySelect } from "@components/billings/customer/BillingCustomerCompanySelect";
-import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
+import DeleteConfirmationModal from "@components/page-partials/DeleteConfirmationModal";
 import ColumnEditorModal from "@components/ColumnEditorModal";
 
 interface Product {

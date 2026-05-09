@@ -26,7 +26,7 @@ import "@assets/scss/datatable-style.scss";
 import { useBillingCustomerPaymentsListQuery } from "@page-modules/billing/customer/useBillingCustomerPaymentsListQuery";
 import { useSession } from "next-auth/react";
 import moment from "moment";
-import FormModal from "@pages/partial/FormModal";
+import FormModal from "@components/page-partials/FormModal";
 
 import GenericTable, { TableColumn } from "@components/GenericTable";
 import { GENERIC_TABLE_PAGE_SIZE_OPTIONS } from "@constants/genericTable";
