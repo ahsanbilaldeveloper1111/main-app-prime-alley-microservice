@@ -145,7 +145,8 @@
   outline: none;
 
   &:focus {
-    border-color: #0091ae;
+    // Aligned with accessible teal used for sidebar submit / WCAG-friendly focus
+    border-color: #006d82;
   }
 }
 
@@ -165,7 +166,7 @@
   outline: none;
 
   &:focus {
-    border-color: #0091ae;
+    border-color: #006d82;
   }
 }
 
@@ -196,7 +197,8 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  background-color: #0091ae;
+  // Darkened from #0091ae so #fff text clears WCAG AA (4.5:1) on the button.
+  background-color: #006d82;
 
   &:disabled {
     background-color: #cbd5e0;
@@ -204,7 +206,8 @@
   }
 
   &:not(:disabled):hover {
-    background-color: #007a94;
+    // Darker than base so hover state also meets contrast with #fff.
+    background-color: #005566;
   }
 }
 
@@ -291,7 +294,7 @@
 }
 
 .products-view-section-icon {
-  color: #4680ff;
+  color: #2967ee;
 }
 
 .products-view-grid {
@@ -347,7 +350,7 @@
 }
 
 .products-view-inline-icon {
-  color: #4680ff;
+  color: #2967ee;
   margin-right: 6px;
 }
 
@@ -371,7 +374,8 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  background: #4680ff;
+  // Darkened from #4680ff so #fff text clears WCAG AA (4.5:1) on the button.
+  background: #2967ee;
   border: none;
   color: #fff;
   cursor: pointer;

@@ -160,7 +160,7 @@ export function AIFaqsTenantPageView({ ctx }: AIFaqsTenantPageViewProps) {
               </Form.Group>
 
               {faqItems.map((item, index) => (
-                <Card key={index} className="mb-3">
+                <Card key={item.clientKey} className="mb-3">
                   <Card.Body>
                     <div className="d-flex justify-content-between align-items-center mb-2">
                       <strong>FAQ #{index + 1}</strong>
@@ -217,7 +217,7 @@ export function AIFaqsTenantPageView({ ctx }: AIFaqsTenantPageViewProps) {
                   <div className="mt-2">
                     {selectedFiles.map((file, index) => (
                       <div
-                        key={index}
+                        key={`${file.name}-${String(file.size)}-${String(file.lastModified)}`}
                         className="d-flex justify-content-between align-items-center p-2 bg-light rounded mb-1"
                       >
                         <span className="small">{file.name}</span>
@@ -274,7 +274,7 @@ export function AIFaqsTenantPageView({ ctx }: AIFaqsTenantPageViewProps) {
               </div>
 
               {faqItems.map((item, index) => (
-                <Card key={index} className="mb-3">
+                <Card key={item.clientKey} className="mb-3">
                   <Card.Body>
                     <Form.Group className="mb-3">
                       <Form.Label>
@@ -318,7 +318,7 @@ export function AIFaqsTenantPageView({ ctx }: AIFaqsTenantPageViewProps) {
                   <div className="mt-2">
                     {selectedFiles.map((file, index) => (
                       <div
-                        key={index}
+                        key={`${file.name}-${String(file.size)}-${String(file.lastModified)}`}
                         className="d-flex justify-content-between align-items-center p-2 bg-light rounded mb-1"
                       >
                         <span className="small">{file.name}</span>
