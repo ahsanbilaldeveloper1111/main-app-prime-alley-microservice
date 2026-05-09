@@ -424,6 +424,11 @@ export interface ToolbarConfig {
   searchPlaceholder?: string;
   onSearchChange?: (value: string) => void;
   onSearch?: () => void;
+  /**
+   * When > 0, `onSearchChange` is called after typing pauses (reduces API calls).
+   * Omit or set `0` for immediate updates (e.g. client-side filtering or parent-managed debounce).
+   */
+  searchDebounceMs?: number;
 
   // Tabs
   showTabs?: boolean;
@@ -1184,6 +1189,33 @@ const GenericTable = <T extends Record<string, any>>({
   const columnCustomizerHeaderId = useId();
   const columnCustomizerPlaceholderId = useId();
   const columnCustomizerActionsHeaderId = useId();
+
+  const toolbarSearchDebounceMs = toolbar?.searchDebounceMs ?? 0;
+  const debounceToolbarSearch = Boolean(
+    showToolbar &&
+      toolbar?.showSearch &&
+      toolbar?.onSearchChange &&
+      toolbarSearchDebounceMs > 0,
+  );
+  const [toolbarSearchDraft, setToolbarSearchDraft] = useState(
+    () => toolbar?.searchValue ?? "",
+  );
+  useEffect(() => {
+    if (!debounceToolbarSearch) return;
+    setToolbarSearchDraft(toolbar?.searchValue ?? "");
+  }, [debounceToolbarSearch, toolbar?.searchValue]);
+
+  const onToolbarSearchChangeRef = useRef(toolbar?.onSearchChange);
+  onToolbarSearchChangeRef.current = toolbar?.onSearchChange;
+
+  useEffect(() => {
+    if (!debounceToolbarSearch) return;
+    const t = globalThis.setTimeout(() => {
+      onToolbarSearchChangeRef.current?.(toolbarSearchDraft);
+    }, toolbarSearchDebounceMs);
+    return () => globalThis.clearTimeout(t);
+  }, [debounceToolbarSearch, toolbarSearchDraft, toolbarSearchDebounceMs]);
+
   // Sorting state (synced from props when parent controls sort, e.g. server-side)
   const [sortBy, setSortBy] = useState(defaultSortBy);
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">(defaultSortOrder);
@@ -1637,22 +1669,37 @@ const GenericTable = <T extends Record<string, any>>({
                 <Form.Control
                   type="text"
                   placeholder={toolbar.searchPlaceholder || "Search"}
-                  value={toolbar.searchValue || ""}
-                  onChange={(e) =>
-                    toolbar.onSearchChange?.(
-                      sanitizeSearchInputLive(e.target.value),
-                    )
+                  value={
+                    debounceToolbarSearch
+                      ? toolbarSearchDraft
+                      : toolbar.searchValue || ""
                   }
+                  onChange={(e) => {
+                    const v = sanitizeSearchInputLive(e.target.value);
+                    if (debounceToolbarSearch) {
+                      setToolbarSearchDraft(v);
+                    } else {
+                      toolbar.onSearchChange?.(v);
+                    }
+                  }}
                   onPaste={(e) => {
                     const target = e.currentTarget;
                     globalThis.setTimeout(() => {
-                      toolbar.onSearchChange?.(
-                        sanitizeSearchInputLive(target.value),
-                      );
+                      const v = sanitizeSearchInputLive(target.value);
+                      if (debounceToolbarSearch) {
+                        setToolbarSearchDraft(v);
+                      } else {
+                        toolbar.onSearchChange?.(v);
+                      }
                     }, 0);
                   }}
                   onKeyDown={(e) => {
                     if (e.key === "Enter" && toolbar.onSearch) {
+                      if (debounceToolbarSearch) {
+                        onToolbarSearchChangeRef.current?.(
+                          sanitizeSearchInputLive(toolbarSearchDraft),
+                        );
+                      }
                       toolbar.onSearch();
                     }
                   }}
