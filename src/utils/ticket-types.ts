@@ -1,3 +1,4 @@
+import { ticketsKeys } from "../query/keys";
 import { toast } from "react-toastify";
 import axiosInstance from "./axios";
 
@@ -42,6 +43,50 @@ export const ListTypes = async (params: PaginationParams = {}) => {
     throw error;
   }
 };
+
+export interface TicketTypeRecord {
+  id: string | number;
+  name: string;
+  description: string;
+  created_at: string;
+}
+
+export type TicketTypesListPayload = Readonly<{
+  data: TicketTypeRecord[];
+  total: number;
+}>;
+
+export type TicketTypesListPageParams = Readonly<{
+  page: number;
+  perPage: number;
+  search: string;
+}>;
+
+export async function fetchTicketTypesListPage(
+  params: TicketTypesListPageParams,
+): Promise<TicketTypesListPayload> {
+  const response = await ListTypes({
+    page: params.page,
+    perPage: params.perPage,
+    search: params.search,
+    filters: {},
+  });
+  return {
+    data: (response?.data ?? []) as TicketTypeRecord[],
+    total: response?.total ?? 0,
+  };
+}
+
+export function getTicketTypesListQueryOptions(params: TicketTypesListPageParams) {
+  return {
+    queryKey: ticketsKeys.types.list({
+      page: params.page,
+      perPage: params.perPage,
+      search: params.search,
+    }),
+    queryFn: () => fetchTicketTypesListPage(params),
+  };
+}
 
 export const GetAllTypes = async () => {
     try {
