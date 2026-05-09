@@ -92,7 +92,7 @@ const { PERMISSIONS } = HEADER_CONSTANTS;
 
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
-import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
+import DeleteConfirmationModal from "@components/page-partials/DeleteConfirmationModal";
 
 // KPI Card Component
 interface KPICardData {
