@@ -1,22 +1,12 @@
-import { useQuery } from "@tanstack/react-query";
 import { getTools, type Tool } from "@utils/tools";
-import { getErrorMessage } from "@utils/errors";
-import { toast } from "react-toastify";
 import { chatKeys } from "../../query/keys";
+import { useArrayListQuery } from "../_shared/listQuery";
 
 export function useToolsListQuery() {
-  return useQuery({
+  return useArrayListQuery<Tool>({
     queryKey: chatKeys.tools.list(),
-    queryFn: async (): Promise<Tool[]> => {
-      try {
-        const list = await getTools();
-        return Array.isArray(list) ? list : [];
-      } catch (e) {
-        toast.error(`Failed to load tools: ${getErrorMessage(e)}`, {
-          toastId: "tools_list_failed",
-        });
-        return [];
-      }
-    },
+    fetch: getTools,
+    errorLabel: "tools",
+    toastId: "tools_list_failed",
   });
 }
