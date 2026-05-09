@@ -1,28 +1,20 @@
-import { useQuery } from "@tanstack/react-query";
 import {
   fetchTicketStatusesListPage,
   getTicketStatusesListQueryOptions,
-  type TicketStatusesListPayload,
 } from "@utils/ticket-statuses";
-import { getErrorMessage } from "@utils/errors";
-import { toast } from "react-toastify";
+import {
+  usePaginatedListQuery,
+  type PaginatedListArgs,
+} from "../_shared/listQuery";
 
-export type { TicketStatusesListPayload };
+export type { TicketStatusesListPayload } from "@utils/ticket-statuses";
 
-export function useTicketStatusesListQuery(
-  args: Readonly<{ page: number; perPage: number; search: string }>,
-) {
-  return useQuery({
-    ...getTicketStatusesListQueryOptions(args),
-    queryFn: async (): Promise<TicketStatusesListPayload> => {
-      try {
-        return await fetchTicketStatusesListPage(args);
-      } catch (error) {
-        toast.error(`Failed to load ticket statuses: ${getErrorMessage(error)}`, {
-          toastId: "ticket_statuses_list_failed",
-        });
-        return { data: [], total: 0 };
-      }
-    },
+export function useTicketStatusesListQuery(args: PaginatedListArgs) {
+  return usePaginatedListQuery({
+    args,
+    queryKey: getTicketStatusesListQueryOptions(args).queryKey,
+    fetchPage: fetchTicketStatusesListPage,
+    errorLabel: "ticket statuses",
+    toastId: "ticket_statuses_list_failed",
   });
 }
