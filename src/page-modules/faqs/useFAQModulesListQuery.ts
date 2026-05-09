@@ -1,7 +1,7 @@
 import { ListFAQModules } from "@utils/faqs";
 import { faqsKeys } from "../../query/keys";
 import {
-  normalizeListResponse,
+  makePaginatedListFetcher,
   usePaginatedListQuery,
   type ListPayload,
   type PaginatedListArgs,
@@ -9,14 +9,13 @@ import {
 
 export type FAQModulesListPayload = ListPayload;
 
+const fetchFAQModulesPage = makePaginatedListFetcher(ListFAQModules);
+
 export function useFAQModulesListQuery(args: PaginatedListArgs) {
   return usePaginatedListQuery<unknown>({
     args,
     queryKey: faqsKeys.modules.list(args),
-    fetchPage: async ({ page, perPage, search }) =>
-      normalizeListResponse(
-        await ListFAQModules({ page, perPage, search, filters: {} }),
-      ),
+    fetchPage: fetchFAQModulesPage,
     errorLabel: "FAQ modules",
     toastId: "faq_modules_list_failed",
   });

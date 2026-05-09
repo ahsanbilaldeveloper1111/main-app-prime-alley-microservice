@@ -1,7 +1,7 @@
 import { ListFAQItems } from "@utils/faqs";
 import { faqsKeys } from "../../query/keys";
 import {
-  normalizeListResponse,
+  makePaginatedListFetcher,
   usePaginatedListQuery,
   type ListPayload,
   type PaginatedListArgs,
@@ -9,15 +9,15 @@ import {
 
 export type FAQItemsListPayload = ListPayload;
 
+const fetchFAQItemsPage = makePaginatedListFetcher(ListFAQItems, {
+  fallbackToRoot: true,
+});
+
 export function useFAQItemsListQuery(args: PaginatedListArgs) {
   return usePaginatedListQuery<unknown>({
     args,
     queryKey: faqsKeys.items.list(args),
-    fetchPage: async ({ page, perPage, search }) =>
-      normalizeListResponse(
-        await ListFAQItems({ page, perPage, search, filters: {} }),
-        { fallbackToRoot: true },
-      ),
+    fetchPage: fetchFAQItemsPage,
     errorLabel: "FAQs",
     toastId: "faq_items_list_failed",
   });

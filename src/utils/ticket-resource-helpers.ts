@@ -138,3 +138,75 @@ export function handleFetchOneOrAllResponse<T = unknown>(
   toast.error(failureMessage);
   return undefined;
 }
+
+/**
+ * Generic POST + `handleCrudResponse` for the ticket admin write endpoints
+ * (`update-*`, `delete-*`). The Update verbs use the bare-success branch; the
+ * Delete verbs add `requireDataSuccess: true`.
+ */
+export async function postWriteRequest(
+  url: string,
+  payload: Record<string, unknown>,
+  config: CrudResponseConfig,
+): Promise<boolean> {
+  const response = await axiosInstance.post(url, payload);
+  return handleCrudResponse(response, config);
+}
+
+export type ListPageParams = Readonly<{
+  page: number;
+  perPage: number;
+  search: string;
+}>;
+
+/**
+ * Generic `fetchTicketXxxListPage` body. Calls the resource's `Listxxx` helper
+ * and unwraps the `{ data, total }` envelope.
+ *
+ * `passSearchInFilters=true` mirrors the ticket-statuses / ticket-modules
+ * convention of passing `filters: { search }`. Ticket types historically pass
+ * `filters: {}`, so the default is `false`.
+ */
+export async function fetchTicketResourcePage<T>(
+  list: (params: PaginationParams) => Promise<unknown>,
+  args: ListPageParams,
+  options: Readonly<{ passSearchInFilters?: boolean }> = {},
+): Promise<{ data: T[]; total: number }> {
+  const response = await list({
+    page: args.page,
+    perPage: args.perPage,
+    search: args.search,
+    filters: options.passSearchInFilters ? { search: args.search } : {},
+  });
+  return {
+    data: ((response as { data?: unknown[] })?.data ?? []) as T[],
+    total: (response as { total?: number })?.total ?? 0,
+  };
+}
+
+/**
+ * Like {@link postWriteRequest} but also catches transport failures, logs them
+ * with an entity prefix, and rethrows — matching the legacy `CreateXxx`
+ * behavior across the ticket utils.
+ */
+export async function postCreateRequest(
+  url: string,
+  payload: Record<string, unknown>,
+  config: Readonly<{
+    /** Entity noun used in the `console.error` prefix on failure ("status", "module", …). */
+    entity: string;
+    successMessage: string;
+    failureMessage: string;
+  }>,
+): Promise<boolean> {
+  try {
+    return await postWriteRequest(url, payload, {
+      successMessage: config.successMessage,
+      failureMessage: config.failureMessage,
+      requireDataSuccess: true,
+    });
+  } catch (error) {
+    console.error(`Error creating ${config.entity}:`, error);
+    throw error;
+  }
+}

@@ -1,9 +1,11 @@
 import axiosInstance from "./axios";
 import { ticketsKeys } from "../query/keys";
 import {
-  handleCrudResponse,
+  fetchTicketResourcePage,
   handleFetchOneOrAllResponse,
+  postCreateRequest,
   postPaginatedListRequest,
+  postWriteRequest,
   type PaginationParams,
 } from "./ticket-resource-helpers";
 
@@ -44,77 +46,59 @@ export const ListStatuses = (params: PaginationParams = {}) =>
  * Fetches one page of ticket statuses (used by TanStack `queryFn` and anywhere else).
  * Errors propagate; callers (e.g. the query hook) handle toasts / empty fallbacks.
  */
-export async function fetchTicketStatusesListPage(
+export const fetchTicketStatusesListPage = (
   params: TicketStatusesListPageParams,
-): Promise<TicketStatusesListPayload> {
-  const response = await ListStatuses({
-    page: params.page,
-    perPage: params.perPage,
-    search: params.search,
-    filters: { search: params.search },
+): Promise<TicketStatusesListPayload> =>
+  fetchTicketResourcePage<TicketStatusRecord>(ListStatuses, params, {
+    passSearchInFilters: true,
   });
-  return {
-    data: (response?.data ?? []) as TicketStatusRecord[],
-    total: response?.total ?? 0,
-  };
-}
 
 /**
  * Stable `queryKey` + default `queryFn` for TanStack Query (`useQuery`, `prefetchQuery`, etc.).
  */
-export function getTicketStatusesListQueryOptions(params: TicketStatusesListPageParams) {
-  return {
-    queryKey: ticketsKeys.statuses.list({
-      page: params.page,
-      perPage: params.perPage,
-      search: params.search,
-    }),
-    queryFn: () => fetchTicketStatusesListPage(params),
-  };
-}
+export const getTicketStatusesListQueryOptions = (
+  params: TicketStatusesListPageParams,
+) => ({
+  queryKey: ticketsKeys.statuses.list(params),
+  queryFn: () => fetchTicketStatusesListPage(params),
+});
 
 export const GetAllStatuses = async () => {
   const response = await axiosInstance.post(`/tickets/statuses`, { all: true });
   return handleFetchOneOrAllResponse(response, "Failed to fetch statuses");
 };
 
-export const UpdateStatus = async (id: string, name: string, color: string) => {
-  const response = await axiosInstance.post(`/tickets/update-status`, {
-    id,
-    name,
-    color,
-  });
-  return handleCrudResponse(response, {
-    successMessage: "Status updated successfully",
-    failureMessage: "Failed to update status",
-  });
-};
+export const UpdateStatus = (id: string, name: string, color: string) =>
+  postWriteRequest(
+    `/tickets/update-status`,
+    { id, name, color },
+    {
+      successMessage: "Status updated successfully",
+      failureMessage: "Failed to update status",
+    },
+  );
 
-export const DeleteStatus = async (id: string) => {
-  const response = await axiosInstance.post(`/tickets/delete-status`, { id });
-  return handleCrudResponse(response, {
-    successMessage: "Status deleted successfully",
-    failureMessage: "Failed to delete status",
-    requireDataSuccess: true,
-  });
-};
+export const DeleteStatus = (id: string) =>
+  postWriteRequest(
+    `/tickets/delete-status`,
+    { id },
+    {
+      successMessage: "Status deleted successfully",
+      failureMessage: "Failed to delete status",
+      requireDataSuccess: true,
+    },
+  );
 
-export const CreateStatus = async (name: string, color: string) => {
-  try {
-    const response = await axiosInstance.post("/tickets/create-status", {
-      name,
-      color,
-    });
-    return handleCrudResponse(response, {
+export const CreateStatus = (name: string, color: string) =>
+  postCreateRequest(
+    "/tickets/create-status",
+    { name, color },
+    {
+      entity: "status",
       successMessage: "Status created successfully",
       failureMessage: "Failed to create status",
-      requireDataSuccess: true,
-    });
-  } catch (error) {
-    console.error("Error creating status:", error);
-    throw error;
-  }
-};
+    },
+  );
 
 export const GetStatus = async (id: string) => {
   const response = await axiosInstance.post(`/tickets/view-status`, { id });

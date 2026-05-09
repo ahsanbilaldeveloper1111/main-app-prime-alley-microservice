@@ -13,8 +13,10 @@ export type ListPayload<T = unknown> = { data: T[]; total: number };
 const EMPTY_PAYLOAD: ListPayload<never> = { data: [], total: 0 };
 
 export function emptyListPayload<T = unknown>(): ListPayload<T> {
-  return EMPTY_PAYLOAD as ListPayload<T>;
+  return EMPTY_PAYLOAD;
 }
+
+type NormalizeOptions = Readonly<{ fallbackToRoot?: boolean }>;
 
 /**
  * Normalize a raw list response into `{ data, total }`.
@@ -25,7 +27,7 @@ export function emptyListPayload<T = unknown>(): ListPayload<T> {
  */
 export function normalizeListResponse<T = unknown>(
   response: unknown,
-  options: Readonly<{ fallbackToRoot?: boolean }> = {},
+  options: NormalizeOptions = {},
 ): ListPayload<T> {
   if (!response) return emptyListPayload<T>();
 
@@ -42,6 +44,30 @@ export function normalizeListResponse<T = unknown>(
     (options.fallbackToRoot ? dataArray.length : 0);
 
   return { data: dataArray, total };
+}
+
+type RawPaginatedFetcher = (input: {
+  page: number;
+  perPage: number;
+  search: string;
+  filters: Record<string, unknown>;
+}) => Promise<unknown>;
+
+/**
+ * Build a `fetchPage` for {@link usePaginatedListQuery} from a `Listxxx`-style
+ * helper that already accepts `{ page, perPage, search, filters }`. Eliminates
+ * the per-resource `async ({ page, perPage, search }) => normalizeListResponse(await Listxxx({...}))`
+ * lambda that every FAQ/admin hook would otherwise repeat.
+ */
+export function makePaginatedListFetcher<T = unknown>(
+  fetcher: RawPaginatedFetcher,
+  options?: NormalizeOptions,
+): (args: PaginatedListArgs) => Promise<ListPayload<T>> {
+  return async ({ page, perPage, search }) =>
+    normalizeListResponse<T>(
+      await fetcher({ page, perPage, search, filters: {} }),
+      options,
+    );
 }
 
 export type UsePaginatedListQueryOptions<T> = Readonly<{
@@ -74,6 +100,55 @@ export function usePaginatedListQuery<T = unknown>(
           toastId,
         });
         return emptyListPayload<T>();
+      }
+    },
+  });
+}
+
+export type UseArrayListQueryOptions<T> = Readonly<{
+  queryKey: QueryKey;
+  fetch: () => Promise<unknown>;
+  /**
+   * Optional projector for non-array responses (e.g. unwrapping `response.dataList`)
+   * or for typed mapping. When omitted the response is treated as `T[]`.
+   */
+  select?: (raw: unknown) => T[];
+  /** Human-readable noun for the failure toast ("companies", "tools"…). */
+  errorLabel: string;
+  /** Stable `toastId` to avoid stacking identical errors. */
+  toastId: string;
+  enabled?: boolean;
+  staleTime?: number;
+}>;
+
+/**
+ * Generic TanStack hook for endpoints that return a *flat array* (no pagination):
+ * fetch, project to `T[]`, and on failure show one toast + return `[]`.
+ */
+export function useArrayListQuery<T>(options: UseArrayListQueryOptions<T>) {
+  const {
+    queryKey,
+    fetch,
+    select,
+    errorLabel,
+    toastId,
+    enabled,
+    staleTime,
+  } = options;
+  return useQuery({
+    queryKey,
+    enabled,
+    staleTime,
+    queryFn: async (): Promise<T[]> => {
+      try {
+        const raw = await fetch();
+        if (select) return select(raw);
+        return Array.isArray(raw) ? (raw as T[]) : [];
+      } catch (error) {
+        toast.error(`Failed to load ${errorLabel}: ${getErrorMessage(error)}`, {
+          toastId,
+        });
+        return [];
       }
     },
   });
