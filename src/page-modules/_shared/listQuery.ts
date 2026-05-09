@@ -18,32 +18,18 @@ export function emptyListPayload<T = unknown>(): ListPayload<T> {
 
 type NormalizeOptions = Readonly<{ fallbackToRoot?: boolean }>;
 
-/**
- * Normalize a raw list response into `{ data, total }`.
- *
- * `fallbackToRoot=true` treats the whole response as `data` when no `.data`
- * field is present (used by the FAQ items endpoint, which historically returns
- * either `{ data, total }` or a bare array).
- */
+/** Normalize a raw list response into `{ data, total }`. */
 export function normalizeListResponse<T = unknown>(
   response: unknown,
   options: NormalizeOptions = {},
 ): ListPayload<T> {
   if (!response) return emptyListPayload<T>();
-
-  const responseAsObject = response as { data?: unknown; total?: number };
-
-  let resolvedData: unknown = responseAsObject.data;
-  if (resolvedData === undefined && options.fallbackToRoot) {
-    resolvedData = response;
-  }
-
-  const dataArray = Array.isArray(resolvedData) ? (resolvedData as T[]) : [];
-  const total =
-    responseAsObject.total ??
-    (options.fallbackToRoot ? dataArray.length : 0);
-
-  return { data: dataArray, total };
+  const obj = response as { data?: unknown; total?: number };
+  const resolved =
+    obj.data === undefined && options.fallbackToRoot ? response : obj.data;
+  const data = Array.isArray(resolved) ? (resolved as T[]) : [];
+  const total = obj.total ?? (options.fallbackToRoot ? data.length : 0);
+  return { data, total };
 }
 
 type RawPaginatedFetcher = (input: {
@@ -53,12 +39,7 @@ type RawPaginatedFetcher = (input: {
   filters: Record<string, unknown>;
 }) => Promise<unknown>;
 
-/**
- * Build a `fetchPage` for {@link usePaginatedListQuery} from a `Listxxx`-style
- * helper that already accepts `{ page, perPage, search, filters }`. Eliminates
- * the per-resource `async ({ page, perPage, search }) => normalizeListResponse(await Listxxx({...}))`
- * lambda that every FAQ/admin hook would otherwise repeat.
- */
+/** Build a `fetchPage` for {@link usePaginatedListQuery} from a `Listxxx` helper. */
 export function makePaginatedListFetcher<T = unknown>(
   fetcher: RawPaginatedFetcher,
   options?: NormalizeOptions,
@@ -70,86 +51,81 @@ export function makePaginatedListFetcher<T = unknown>(
     );
 }
 
+/**
+ * Run a `queryFn` body that, on failure, toasts a single message and falls back
+ * to a typed default. Centralizes the shared error envelope used by every list
+ * hook below so the boilerplate doesn't repeat per resource.
+ */
+const runWithToastFallback = async <T>(
+  fetch: () => Promise<T>,
+  fallback: T,
+  errorLabel: string,
+  toastId: string,
+): Promise<T> => {
+  try {
+    return await fetch();
+  } catch (error) {
+    toast.error(`Failed to load ${errorLabel}: ${getErrorMessage(error)}`, {
+      toastId,
+    });
+    return fallback;
+  }
+};
+
 export type UsePaginatedListQueryOptions<T> = Readonly<{
   args: PaginatedListArgs;
   queryKey: QueryKey;
   fetchPage: (args: PaginatedListArgs) => Promise<ListPayload<T>>;
-  /** Human-readable noun used in the toast message ("FAQ modules", "ticket statuses", ...). */
   errorLabel: string;
-  /** Stable `toastId` so the same failure does not stack up. */
   toastId: string;
 }>;
 
-/**
- * Generic TanStack hook for the paginated list pattern used across modules:
- * fetch a page, on failure show one toast and fall back to an empty payload.
- *
- * Eliminates ~20 lines of duplicated boilerplate per list resource.
- */
+/** Generic TanStack hook for paginated list endpoints (`{ data, total }`). */
 export function usePaginatedListQuery<T = unknown>(
   options: UsePaginatedListQueryOptions<T>,
 ) {
   const { queryKey, fetchPage, args, errorLabel, toastId } = options;
   return useQuery({
     queryKey,
-    queryFn: async (): Promise<ListPayload<T>> => {
-      try {
-        return await fetchPage(args);
-      } catch (error) {
-        toast.error(`Failed to load ${errorLabel}: ${getErrorMessage(error)}`, {
-          toastId,
-        });
-        return emptyListPayload<T>();
-      }
-    },
+    queryFn: () =>
+      runWithToastFallback(
+        () => fetchPage(args),
+        emptyListPayload<T>(),
+        errorLabel,
+        toastId,
+      ),
   });
 }
 
 export type UseArrayListQueryOptions<T> = Readonly<{
   queryKey: QueryKey;
   fetch: () => Promise<unknown>;
-  /**
-   * Optional projector for non-array responses (e.g. unwrapping `response.dataList`)
-   * or for typed mapping. When omitted the response is treated as `T[]`.
-   */
+  /** Optional projector for non-array responses or typed mapping. */
   select?: (raw: unknown) => T[];
-  /** Human-readable noun for the failure toast ("companies", "tools"…). */
   errorLabel: string;
-  /** Stable `toastId` to avoid stacking identical errors. */
   toastId: string;
   enabled?: boolean;
   staleTime?: number;
 }>;
 
-/**
- * Generic TanStack hook for endpoints that return a *flat array* (no pagination):
- * fetch, project to `T[]`, and on failure show one toast + return `[]`.
- */
+/** Generic TanStack hook for endpoints that return a flat array. */
 export function useArrayListQuery<T>(options: UseArrayListQueryOptions<T>) {
-  const {
-    queryKey,
-    fetch,
-    select,
-    errorLabel,
-    toastId,
-    enabled,
-    staleTime,
-  } = options;
+  const { queryKey, fetch, select, errorLabel, toastId, enabled, staleTime } =
+    options;
   return useQuery({
     queryKey,
     enabled,
     staleTime,
-    queryFn: async (): Promise<T[]> => {
-      try {
-        const raw = await fetch();
-        if (select) return select(raw);
-        return Array.isArray(raw) ? (raw as T[]) : [];
-      } catch (error) {
-        toast.error(`Failed to load ${errorLabel}: ${getErrorMessage(error)}`, {
-          toastId,
-        });
-        return [];
-      }
-    },
+    queryFn: () =>
+      runWithToastFallback(
+        async () => {
+          const raw = await fetch();
+          if (select) return select(raw);
+          return Array.isArray(raw) ? (raw as T[]) : [];
+        },
+        [] as T[],
+        errorLabel,
+        toastId,
+      ),
   });
 }
