@@ -12,7 +12,7 @@ import { getUserById, getUserPermissions, GetCustomFields, GetModules, getParent
 import { getAllRoles } from '@utils/roles';
 import { getAllGroups } from '@utils/groups';
 import { ModuleSlug } from '@utils/Helper';
-import SuccessfulModal from '@pages/partial/SuccessfulModal';
+import SuccessfulModal from '@components/page-partials/SuccessfulModal';
 
 // Import partial components
 import OverviewTab from './partials/OverviewTab';

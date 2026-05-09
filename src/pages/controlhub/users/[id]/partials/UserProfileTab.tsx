@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Card, Col, Row, Button, Form } from 'react-bootstrap';
-import FormModal from '@pages/partial/FormModal';
+import FormModal from '@components/page-partials/FormModal';
 import { Country, State, City } from 'country-state-city';
 import { languages as languagesData } from '@config/languages';
 import { updateUserProfile } from '@utils/users';

@@ -6,7 +6,7 @@ import { UserPlus, Edit, Trash2, Users, Filter } from 'lucide-react';
 import { addMember, updateMemberRole, removeMember } from '@utils/tasks';
 import GenericTable, { TableColumn, TableAction, ToolbarConfig, FilterPill } from '@components/GenericTable';
 import type { StatsCardData } from '@components/GenericStatsCards';
-import DeleteConfirmationModal from '@pages/partial/DeleteConfirmationModal';
+import DeleteConfirmationModal from '@components/page-partials/DeleteConfirmationModal';
 import { usePermissions } from '@utils/permissionUtils';
 import { HEADER_CONSTANTS } from '@constants/headerConstants';
 

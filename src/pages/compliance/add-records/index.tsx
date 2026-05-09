@@ -2,7 +2,7 @@ import "@assets/scss/datatable-style.scss";
 import React, { FormEvent, ReactElement } from "react";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
-import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
+import DeleteConfirmationModal from "@components/page-partials/DeleteConfirmationModal";
 import GenericTable from "@components/GenericTable";
 import { Row } from "react-bootstrap";
 

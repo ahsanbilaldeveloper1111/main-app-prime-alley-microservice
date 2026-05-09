@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Form } from "react-bootstrap";
 import GenericTable, {
   FilterPill,
@@ -7,6 +7,7 @@ import GenericTable, {
 } from "@components/GenericTable";
 import { Column } from "@components/CustomDataTable";
 import SimpleCanvas from "@components/SimpleCanvas";
+import { useDebouncedSearchInput } from "@hooks/useDebouncedSearchInput";
 
 interface UsersListProps {
   columns: Column[];
@@ -64,8 +65,23 @@ const UsersList: React.FC<UsersListProps> = ({
 }) => {
   const [rows, setRows] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
-  const [searchValue, setSearchValue] = useState<string>(currentFilters?.search || "");
   const [pendingFilters, setPendingFilters] = useState<Record<string, any>>(currentFilters || {});
+  const pendingFiltersRef = useRef(pendingFilters);
+  pendingFiltersRef.current = pendingFilters;
+  const handleFiltersChangeRef = useRef(handleFiltersChange);
+  handleFiltersChangeRef.current = handleFiltersChange;
+
+  const {
+    inputValue: searchInput,
+    queryValue: searchQuery,
+    handleInputChange: handleSearchChange,
+    submitQuery: flushSearchToFilters,
+    setInputValue: setSearchInputValue,
+    setQueryValue: setSearchQueryValue,
+  } = useDebouncedSearchInput({
+    initialValue: currentFilters?.search || "",
+  });
+
   const [pagination, setPagination] = useState<UsersPaginationState>({
     currentPage: 1,
     rowsPerPage: 15,
@@ -85,8 +101,17 @@ const UsersList: React.FC<UsersListProps> = ({
 
   useEffect(() => {
     setPendingFilters(currentFilters || {});
-    setSearchValue(currentFilters?.search || "");
-  }, [currentFilters]);
+    const s = currentFilters?.search || "";
+    setSearchInputValue(s);
+    setSearchQueryValue(s);
+  }, [currentFilters, setSearchInputValue, setSearchQueryValue]);
+
+  useEffect(() => {
+    handleFiltersChangeRef.current({
+      ...pendingFiltersRef.current,
+      search: searchQuery.trim() ? searchQuery : undefined,
+    });
+  }, [searchQuery]);
 
   useEffect(() => {
     setPagination((prev) =>
@@ -138,41 +163,36 @@ const UsersList: React.FC<UsersListProps> = ({
 
   const applyFilterField = useCallback(
     (key: string, value: string | undefined) => {
-      const nextFilters = { ...pendingFilters, [key]: value || undefined };
-      setPendingFilters(nextFilters);
-      handleFiltersChange(nextFilters);
+      const nextPending = { ...pendingFilters, [key]: value || undefined };
+      setPendingFilters(nextPending);
+      const searchMerge = searchInput.trim() ? searchInput : undefined;
+      handleFiltersChange({
+        ...nextPending,
+        search: searchMerge,
+      });
     },
-    [pendingFilters, handleFiltersChange],
+    [pendingFilters, handleFiltersChange, searchInput],
   );
 
   const clearFilterField = useCallback(
     (key: string) => {
-      const nextFilters = { ...pendingFilters, [key]: undefined };
-      setPendingFilters(nextFilters);
-      handleFiltersChange(nextFilters);
+      const nextPending = { ...pendingFilters, [key]: undefined };
+      setPendingFilters(nextPending);
+      const searchMerge = searchInput.trim() ? searchInput : undefined;
+      handleFiltersChange({
+        ...nextPending,
+        search: searchMerge,
+      });
     },
-    [pendingFilters, handleFiltersChange],
+    [pendingFilters, handleFiltersChange, searchInput],
   );
-
-  const handleSearchChange = useCallback(
-    (value: string) => {
-      setSearchValue(value);
-      handleFiltersChange({ ...currentFilters, search: value || undefined });
-    },
-    [currentFilters, handleFiltersChange],
-  );
-
-  const handleSearchSubmit = useCallback(() => {
-    const filtersWithSearch = { ...pendingFilters, search: searchValue || undefined };
-    setPendingFilters(filtersWithSearch);
-    handleFiltersChange(filtersWithSearch);
-  }, [pendingFilters, searchValue, handleFiltersChange]);
 
   const handleResetFilters = useCallback(() => {
     setPendingFilters({});
-    setSearchValue("");
+    setSearchInputValue("");
+    setSearchQueryValue("");
     handleFiltersChange({});
-  }, [handleFiltersChange]);
+  }, [handleFiltersChange, setSearchInputValue, setSearchQueryValue]);
 
   const filterPills = useMemo<FilterPill[]>(() => {
     return USER_FILTER_FIELDS.map((field) => {
@@ -215,10 +235,10 @@ const UsersList: React.FC<UsersListProps> = ({
   const toolbarConfig = useMemo<ToolbarConfig>(
     () => ({
       showSearch: true,
-      searchValue,
+      searchValue: searchInput,
       searchPlaceholder: "Type ( Extension, User Name, Display Name )",
       onSearchChange: handleSearchChange,
-      onSearch: handleSearchSubmit,
+      onSearch: flushSearchToFilters,
       showFiltersButton: showFilters,
       showFilterPills: false,
       filterPills,
@@ -233,7 +253,7 @@ const UsersList: React.FC<UsersListProps> = ({
         </button>
       ),
     }),
-    [searchValue, handleSearchChange, handleSearchSubmit, showFilters, filterPills, handleResetFilters],
+    [searchInput, handleSearchChange, flushSearchToFilters, showFilters, filterPills, handleResetFilters],
   );
 
   if (!hasPermission) {

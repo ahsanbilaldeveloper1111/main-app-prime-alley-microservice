@@ -87,7 +87,7 @@ import CreateLeadModal from "@components/CreateLeadModal";
 import CrmIntelligenceTab from "@components/CrmIntelligenceTab";
 import CrmAssociatedCompaniesCard from "@components/CrmAssociatedCompaniesCard";
 import { CreateDealSidebar } from "@components/renderCreateDealForm";
-import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
+import DeleteConfirmationModal from "@components/page-partials/DeleteConfirmationModal";
 import {
   CrmRevenueQuoteToCash,
   type SubscriptionItem,

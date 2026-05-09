@@ -32,7 +32,7 @@ import {
   updateProductCategory,
 } from "@utils/accounts";
 import { billingCustomerRoutes } from "@utils/billingCustomerRoutes";
-import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
+import DeleteConfirmationModal from "@components/page-partials/DeleteConfirmationModal";
 import PageHeader from "@components/PageHeader";
 import { GENERIC_TABLE_PAGE_SIZE_OPTIONS } from "@constants/genericTable";
 import { usePermissions } from "@utils/permissionUtils";

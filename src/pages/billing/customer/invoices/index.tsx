@@ -23,7 +23,7 @@ import GenericSidebar from "@components/GenericSidebar";
 import GenericFilterSidebar, { FilterField } from "@components/GenericFilterSidebar";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 import { StatsCardData } from "@components/GenericStatsCards";
-import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
+import DeleteConfirmationModal from "@components/page-partials/DeleteConfirmationModal";
 import { useRouter } from "next/router";
 import {
   getInvoice,

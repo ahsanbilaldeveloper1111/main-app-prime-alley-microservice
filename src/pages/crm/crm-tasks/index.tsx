@@ -25,8 +25,8 @@ import React, {
     FilterPill,
   } from "@components/GenericTable";
   import GenericFilterSidebar, { FilterField } from "@components/GenericFilterSidebar";
-  import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
-  import SuccessfulModal from "@pages/partial/SuccessfulModal";
+  import DeleteConfirmationModal from "@components/page-partials/DeleteConfirmationModal";
+  import SuccessfulModal from "@components/page-partials/SuccessfulModal";
   import CreateTaskSidebar from "@components/CreateTaskSidebar";
 import { useTasksListingPager } from "@hooks/useTasksListingPager";
 import { buildCrmTasksListQueryParams } from "@utils/taskListing/buildCrmTasksListQueryParams";

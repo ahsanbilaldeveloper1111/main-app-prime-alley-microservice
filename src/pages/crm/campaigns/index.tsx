@@ -70,10 +70,10 @@ import axiosInstance from "@utils/axios";
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
 
-import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
-import { ModuleSlug, checkRequiredFields, formatDateForTable } from "@utils/Helper";
+import DeleteConfirmationModal from "@components/page-partials/DeleteConfirmationModal";
+import { ModuleSlug, checkRequiredFields, formatDateForTable, normalizeSearchQuery } from "@utils/Helper";
 import { useSession } from "next-auth/react";
-import SuccessfulModal from "@pages/partial/SuccessfulModal";
+import SuccessfulModal from "@components/page-partials/SuccessfulModal";
 import { CrmDescriptionDetailsBlock, CrmTruncatedDescriptionCell } from "@components/crm/crmTruncatedDescriptionCell";
 import {
   CRM_DIALOG_FOOTER_ACTIONS_ROW_STYLE,
@@ -84,6 +84,7 @@ import { useCrmSettingsTableState } from "@hooks/useCrmSettingsTableState";
 import { useDebouncedSearchInput } from "@hooks/useDebouncedSearchInput";
 import moment from "moment";
 import { HEADER_CONSTANTS } from "@constants/headerConstants";
+import type { CrmPageDisplayProps } from "@pages/crm/crmPageDisplayProps";
 
 const { PERMISSIONS } = HEADER_CONSTANTS;
 
@@ -1365,7 +1366,7 @@ const DEFAULT_CAMPAIGN_SELECTED_COLUMNS: string[] = [
   "actions",
 ];
 
-const CrmCampaigns = () => { // NOSONAR
+const CrmCampaigns = ({ hideBreadcrumb }: CrmPageDisplayProps = {}) => { // NOSONAR
   const { data: session } = useSession();
 
   const [refreshKey, setRefreshKey] = useState(0);
@@ -1386,7 +1387,7 @@ const CrmCampaigns = () => { // NOSONAR
     queryValue: campaignsSearchQuery,
     handleInputChange: handleCampaignsSearchChange,
     submitQuery: submitCampaignsSearch,
-  } = useDebouncedSearchInput();
+  } = useDebouncedSearchInput({ normalize: normalizeSearchQuery });
   const {
     pagination: campaignsPagination,
     setPagination: setCampaignsPagination,
@@ -2168,7 +2169,9 @@ const CrmCampaigns = () => { // NOSONAR
 
   return (
     <React.Fragment>
-      <BreadcrumbItem mainTitle="CRM" mainLink="/crm/dashboard" subTitle="Campaigns" />
+      {!hideBreadcrumb && (
+        <BreadcrumbItem mainTitle="CRM" mainLink="/crm/dashboard" subTitle="Campaigns" />
+      )}
 
       {/* Analytics Section - Collapsible */}
       {showCampaignsAnalytics &&

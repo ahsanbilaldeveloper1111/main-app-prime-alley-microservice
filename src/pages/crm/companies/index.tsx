@@ -124,9 +124,9 @@ import {
 } from "@utils/crm";
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
-import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
-import FormModal from "../../partial/FormModal";
-import SuccessfulModal from "@pages/partial/SuccessfulModal";
+import DeleteConfirmationModal from "@components/page-partials/DeleteConfirmationModal";
+import FormModal from "@components/page-partials/FormModal";
+import SuccessfulModal from "@components/page-partials/SuccessfulModal";
 import {
   ModuleSlug,
   formatDuration,
