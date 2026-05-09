@@ -168,7 +168,12 @@ const ConfirmModal: React.FC<ConfirmModalProps> = ({
         >
           {loading ? (
             <>
-              <div className="spinner-border spinner-border-sm me-1" role="status" />
+              <output
+                className="spinner-border spinner-border-sm me-1 d-inline-block"
+                aria-live="polite"
+              >
+                <span className="visually-hidden">Confirming…</span>
+              </output>
               {confirmButtonText}...
             </>
           ) : (
