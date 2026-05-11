@@ -32,7 +32,7 @@ export function useGsmSyncPage() {
       } else {
         toast.error("Sync failed");
       }
-      void queryClient.invalidateQueries({ queryKey: gsmKeys.sync.all() });
+      queryClient.invalidateQueries({ queryKey: gsmKeys.sync.all() });
     },
     onError: () => {
       toast.error("Sync failed. Please try again.");
@@ -53,7 +53,7 @@ export function useGsmSyncPage() {
       } else {
         toast.error("Mobile numbers sync failed");
       }
-      void queryClient.invalidateQueries({ queryKey: gsmKeys.sync.all() });
+      queryClient.invalidateQueries({ queryKey: gsmKeys.sync.all() });
     },
     onError: () => {
       toast.error("Mobile numbers sync failed. Please try again.");

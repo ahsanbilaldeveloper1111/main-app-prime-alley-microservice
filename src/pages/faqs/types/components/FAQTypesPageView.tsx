@@ -21,7 +21,7 @@ export const FAQTypesPageView: React.FC<FAQTypesPageViewProps> = ({
   types,
   loading,
 }) => {
-  const renderCardBody = () => {
+  const renderCardBody = (): React.ReactNode => {
     if (loading) {
       return (
         <div className="text-center py-5">
@@ -33,39 +33,38 @@ export const FAQTypesPageView: React.FC<FAQTypesPageViewProps> = ({
       );
     }
 
-    if (types.length === 0) {
-      let emptyMessage: string;
-      if (selectedTopic === null) {
-        emptyMessage =
-          "No FAQ types found. Types are automatically created when FAQ items are assigned a type.";
-      } else {
-        emptyMessage = "No types found for the selected topic";
-      }
+    if (types.length > 0) {
+      const typePluralSuffix = types.length === 1 ? "" : "s";
       return (
-        <div className="text-center py-5">
-          <Tag size={48} className="text-muted mb-3" />
-          <p className="text-muted">{emptyMessage}</p>
+        <div>
+          <div className="mb-3">
+            <p className="text-muted mb-0">
+              <Info size={14} className="me-1" />
+              Found {types.length} unique type{typePluralSuffix}
+              {selectedTopic == null ? null : " for selected topic"}
+            </p>
+          </div>
+          <div className="d-flex flex-wrap gap-2">
+            {types.map((type) => (
+              <Badge key={type} bg="primary" className="p-2" style={{ fontSize: "0.9rem" }}>
+                <Tag size={14} className="me-1" />
+                {type}
+              </Badge>
+            ))}
+          </div>
         </div>
       );
     }
 
+    const emptyMessage =
+      selectedTopic == null
+        ? "No FAQ types found. Types are automatically created when FAQ items are assigned a type."
+        : "No types found for the selected topic";
+
     return (
-      <div>
-        <div className="mb-3">
-          <p className="text-muted mb-0">
-            <Info size={14} className="me-1" />
-            Found {types.length} unique type{types.length === 1 ? "" : "s"}
-            {selectedTopic === null ? null : ` for selected topic`}
-          </p>
-        </div>
-        <div className="d-flex flex-wrap gap-2">
-          {types.map((type) => (
-            <Badge key={type} bg="primary" className="p-2" style={{ fontSize: "0.9rem" }}>
-              <Tag size={14} className="me-1" />
-              {type}
-            </Badge>
-          ))}
-        </div>
+      <div className="text-center py-5">
+        <Tag size={48} className="text-muted mb-3" />
+        <p className="text-muted">{emptyMessage}</p>
       </div>
     );
   };

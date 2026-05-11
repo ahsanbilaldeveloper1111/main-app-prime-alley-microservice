@@ -13,10 +13,14 @@ export function useFAQTypesPage() {
     return [
       { value: null as number | null, label: "All Topics" },
       ...topics.map((t: any) => {
-        const moduleSuffix = t.faq_module ? ` (${t.faq_module.name})` : "";
+        let label = String(t.name);
+        if (t.faq_module) {
+          const moduleLabel = String(t.faq_module.name);
+          label += " (" + moduleLabel + ")";
+        }
         return {
           value: t.id as number,
-          label: `${t.name}${moduleSuffix}`,
+          label,
         };
       }),
     ];

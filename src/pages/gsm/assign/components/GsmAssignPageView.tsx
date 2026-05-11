@@ -1,8 +1,7 @@
 import React from "react";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 import GenericListPage from "@components/GenericListPage";
-import { Button, Modal, Row } from "react-bootstrap";
-import { Col } from "react-bootstrap";
+import { Button, Col, Modal, Row } from "react-bootstrap";
 import Select from "@components/AppSelect";
 
 import GsmCompanyFilter from "@components/filters/GsmCompanyFilter";
@@ -12,7 +11,23 @@ import ConfirmModal from "@components/page-partials/ConfirmModal";
 import PortLinkUnlinkModal from "@components/gsm/partials/PortLinkUnlinkModal";
 import type { GsmAssignPageContext } from "../useGsmAssignPage";
 
-export function GsmAssignPageView({ ctx }: { ctx: GsmAssignPageContext }) {
+/**
+ * Single `.find` for react-select `value` (avoids duplicate search + find-as-boolean smell).
+ */
+function selectOptionFromList<T>(
+  list: T[],
+  match: (item: T) => boolean,
+  optionValue: unknown,
+  toLabel: (item: T) => string,
+): { value: unknown; label: string } | null {
+  const found = list.find(match);
+  if (found === undefined) {
+    return null;
+  }
+  return { value: optionValue, label: toLabel(found) };
+}
+
+export function GsmAssignPageView({ ctx }: Readonly<{ ctx: GsmAssignPageContext }>) {
   const {
     session,
     columns,
@@ -107,6 +122,7 @@ export function GsmAssignPageView({ ctx }: { ctx: GsmAssignPageContext }) {
               </Col>
               <Col md={7} className="d-flex justify-content-end">
                 <div className="action-buttons">
+
 {session?.user?.permissions?.includes("list-gsm-assignment") && (
                   <GsmCompanyFilter
                     onFiltersChange={handleFiltersChange}
@@ -279,16 +295,12 @@ export function GsmAssignPageView({ ctx }: { ctx: GsmAssignPageContext }) {
                   value: gsm.id,
                   label: gsm.name,
                 }))}
-                value={
-                  gsmList.find((gsm: any) => gsm.id === selectedGsmEditLink)
-                    ? {
-                        value: selectedGsmEditLink,
-                        label: gsmList.find(
-                          (gsm: any) => gsm.id === selectedGsmEditLink
-                        )?.name,
-                      }
-                    : null
-                }
+                value={selectOptionFromList(
+                  gsmList,
+                  (gsm: any) => gsm.id === selectedGsmEditLink,
+                  selectedGsmEditLink,
+                  (gsm: any) => gsm.name,
+                )}
                 onChange={(selectedOption) =>
                   setSelectedGsmEditLink(selectedOption?.value)
                 }
@@ -302,20 +314,12 @@ export function GsmAssignPageView({ ctx }: { ctx: GsmAssignPageContext }) {
                   value: company?.identifier,
                   label: company?.name,
                 }))}
-                value={
-                  companyList.find(
-                    (company: any) =>
-                      company?.identifier === selectedCompanyEditLink
-                  )
-                    ? {
-                        value: selectedCompanyEditLink,
-                        label: companyList.find(
-                          (company: any) =>
-                            company?.identifier === selectedCompanyEditLink
-                        )?.name,
-                      }
-                    : null
-                }
+                value={selectOptionFromList(
+                  companyList,
+                  (company: any) => company?.identifier === selectedCompanyEditLink,
+                  selectedCompanyEditLink,
+                  (company: any) => company?.name ?? "",
+                )}
                 onChange={(selectedOption) =>
                   setSelectedCompanyEditLink(selectedOption?.value)
                 }
@@ -422,15 +426,13 @@ export function GsmAssignPageView({ ctx }: { ctx: GsmAssignPageContext }) {
       />
 
       {successfulPortsModal && (
-        <>
-          <SuccessfulModal
-            show={successfulPortsModal}
-            onHide={() => setSuccessfulPortsModal(false)}
-            title="Ports Updated!"
-            description={`The ports for **${gsmName}** have been successfully updated.`}
-            confirmButtonText="OK"
-          />
-        </>
+        <SuccessfulModal
+          show={successfulPortsModal}
+          onHide={() => setSuccessfulPortsModal(false)}
+          title="Ports Updated!"
+          description={`The ports for **${gsmName}** have been successfully updated.`}
+          confirmButtonText="OK"
+        />
       )}
 
       {showAssignPortsModalNew && (
@@ -448,29 +450,25 @@ export function GsmAssignPageView({ ctx }: { ctx: GsmAssignPageContext }) {
       )}
 
       {showDelinkCompanyModal && (
-        <>
-          <ConfirmModal
-            show={showDelinkCompanyModal}
-            onHide={() => setShowDelinkCompanyModal(false)}
-            title="Delink Company"
-            description={`Are you sure you want to delink **${selectedDelinkGsmName}** from **${selectedDelinkCompanyName}**? This action cannot be undone.`}
-            targetName="this operation"
-            confirmButtonText="Confirm Delink"
-            onConfirm={(confirmationText) => handleSubmitDelinkCompany()}
-          />
-        </>
+        <ConfirmModal
+          show={showDelinkCompanyModal}
+          onHide={() => setShowDelinkCompanyModal(false)}
+          title="Delink Company"
+          description={`Are you sure you want to delink **${selectedDelinkGsmName}** from **${selectedDelinkCompanyName}**? This action cannot be undone.`}
+          targetName="this operation"
+          confirmButtonText="Confirm Delink"
+          onConfirm={(confirmationText) => handleSubmitDelinkCompany()}
+        />
       )}
 
       {showExportSuccessfulModal && (
-        <>
-          <SuccessfulModal
-            show={showExportSuccessfulModal}
-            onHide={() => setShowExportSuccessfulModal(false)}
-            title="Export Successful!"
-            description="The GSM data has been successfully exported as a JSON file."
-            confirmButtonText="OK"
-          />
-        </>
+        <SuccessfulModal
+          show={showExportSuccessfulModal}
+          onHide={() => setShowExportSuccessfulModal(false)}
+          title="Export Successful!"
+          description="The GSM data has been successfully exported as a JSON file."
+          confirmButtonText="OK"
+        />
       )}
 
       {showUssdModal && (
@@ -548,14 +546,15 @@ export function GsmAssignPageView({ ctx }: { ctx: GsmAssignPageContext }) {
                disabled={ussdLoading}
              >
                {ussdLoading ? (
-                 <>
-                   <output
-                     className="spinner-border spinner-border-sm me-2 d-inline-block align-middle"
-                     aria-hidden="true"
-                   />
+                 <output
+                   className="d-inline-flex align-items-center m-0 p-0 border-0 bg-transparent"
+                   style={{ font: "inherit", color: "inherit" }}
+                   aria-live="polite"
+                 >
+                   <span className="spinner-border spinner-border-sm me-2" aria-hidden />
                    {" "}
                    <span>Sending...</span>
-                 </>
+                 </output>
                ) : (
                  "Send USSD Command"
                )}
@@ -645,14 +644,15 @@ export function GsmAssignPageView({ ctx }: { ctx: GsmAssignPageContext }) {
                disabled={smsLoading}
              >
                {smsLoading ? (
-                 <>
-                   <output
-                     className="spinner-border spinner-border-sm me-2 d-inline-block align-middle"
-                     aria-hidden="true"
-                   />
+                 <output
+                   className="d-inline-flex align-items-center m-0 p-0 border-0 bg-transparent"
+                   style={{ font: "inherit", color: "inherit" }}
+                   aria-live="polite"
+                 >
+                   <span className="spinner-border spinner-border-sm me-2" aria-hidden />
                    {" "}
                    <span>Sending...</span>
-                 </>
+                 </output>
                ) : (
                  "Send SMS"
                )}

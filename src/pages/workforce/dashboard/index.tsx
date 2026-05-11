@@ -1,5 +1,7 @@
 import "@assets/scss/datatable-style.scss";
-import React, { ReactElement, useCallback, useMemo, useState } from "react";
+import React, { ReactElement, useCallback, useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/router";
+import { useQueryClient } from "@tanstack/react-query";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 
@@ -28,9 +30,37 @@ import NewRequestModal from "@page-modules/workforce/NewRequestModal";
 import { Plus, Calendar } from "lucide-react";
 
 import "@page-modules/workforce/dashboard/employeesDashboard.scss";
+import { workforceKeys } from "../../../query/keys";
 
 const EmployeesDashboard = () => {
+  const router = useRouter();
+  const queryClient = useQueryClient();
   const { mainAppUsers, mainAppDepartments, companyIdentifier } = useMainAppLookups();
+
+  const refreshDashboardQueries = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: workforceKeys.dashboard.all() });
+  }, [queryClient]);
+
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState !== "visible") return;
+      if (router.pathname !== "/workforce/dashboard") return;
+      refreshDashboardQueries();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, [router.pathname, refreshDashboardQueries]);
+
+  useEffect(() => {
+    const onRouteDone = (url: string) => {
+      const path = String(url).split("?")[0];
+      if (path === "/workforce/dashboard") refreshDashboardQueries();
+    };
+    router.events.on("routeChangeComplete", onRouteDone);
+    return () => {
+      router.events.off("routeChangeComplete", onRouteDone);
+    };
+  }, [router.events, refreshDashboardQueries]);
   const [showAddEmployeeModal, setShowAddEmployeeModal] = useState(false);
   const [showNewRequestModal, setShowNewRequestModal] = useState(false);
 
@@ -216,10 +246,15 @@ const EmployeesDashboard = () => {
         <AddEmployeeModal
           show={showAddEmployeeModal}
           onHide={() => setShowAddEmployeeModal(false)}
+          onSuccess={refreshDashboardQueries}
           tenantId={companyIdentifier ?? undefined}
         />
 
-        <NewRequestModal show={showNewRequestModal} onHide={() => setShowNewRequestModal(false)} />
+        <NewRequestModal
+          show={showNewRequestModal}
+          onHide={() => setShowNewRequestModal(false)}
+          onSuccess={refreshDashboardQueries}
+        />
       </div>
     </React.Fragment>
   );
