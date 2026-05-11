@@ -459,7 +459,7 @@ export function PaymentMethodsPageView({
     );
   } else {
     tableRows = paymentMethods.map((method, idx) => {
-      const idStr = method.id != null ? String(method.id) : null;
+      const idStr = method.id == null ? null : String(method.id);
       const rowKey = idStr ?? `pm-${idx}`;
       return (
       <tr key={rowKey}>
@@ -535,7 +535,7 @@ export function PaymentMethodsPageView({
                 minWidth: 180,
                 padding: "6px 0",
               }}>
-                {canMarkDefaultPaymentMethod && !isDefault(method) && idStr && (
+                {canMarkDefaultPaymentMethod && isDefault(method) === false && idStr && (
                   <button
                     type="button"
                     onClick={() => handleSetDefault(idStr)}
