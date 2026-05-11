@@ -54,10 +54,15 @@ type MainAppUser = {
 const AttendancePage = () => {
   const queryClient = useQueryClient();
   const { data: session, status: sessionStatus } = useSession();
-  const { hasPermission } = usePermissions();
-  const canDeleteAttendance = hasPermission(PERMISSIONS.DELETE_ATTENDANCE_STAFF_MANAGEMENT);
+  const { hasAnyPermission } = usePermissions();
+  /** Backend may emit either slug variant; accept both so delete is not silently hidden. */
+  const canDeleteAttendance = hasAnyPermission([
+    PERMISSIONS.DELETE_ATTENDANCE_STAFF_MANAGEMENT,
+    "delete-attendance-staff-management",
+  ]);
   const { mainAppUsers } = useMainAppLookups();
 
+  // True → list/dropdown use full company scope. False → only Control Hub team (+ self); see canViewAllEmployeesAttendance (admin/root/permission).
   const canViewAllEmployees = useMemo(
     () => canViewAllEmployeesAttendance(session?.user),
     [session?.user],
@@ -67,6 +72,7 @@ const AttendancePage = () => {
   const [teamScopeLoading, setTeamScopeLoading] = useState(false);
 
   useEffect(() => {
+    // Privileged users skip team fetch entirely so attendance API is not limited to getTeamUsers.
     if (canViewAllEmployees || sessionStatus !== "authenticated") {
       setTeamScopeUserIds([]);
       setTeamScopeLoading(false);
@@ -112,8 +118,10 @@ const AttendancePage = () => {
   const getDisplayName = useCallback(
     (userId: string | number | null | undefined): string => {
       if (userId == null || userId === "") return "—";
-      const idStr = String(userId);
-      const u = users.find((x) => String(x.id) === idStr);
+      const idStr = String(userId).trim();
+      const u = users.find(
+        (x) => String(x.id) === idStr || String(x.phone ?? "").trim() === idStr,
+      );
       return u?.name ?? idStr;
     },
     [users],
@@ -201,6 +209,14 @@ const AttendancePage = () => {
     },
   );
 
+  const teamDeleteAllowSet = useMemo(
+    () =>
+      new Set(
+        teamScopeUserIds.map((x) => String(x).trim()).filter((x) => x.length > 0),
+      ),
+    [teamScopeUserIds],
+  );
+
   const attendanceStatusQuery = useAttendanceStatusQuery();
 
   const invalidateAttendanceReads = useCallback(() => {
@@ -272,40 +288,38 @@ const AttendancePage = () => {
     checkOutMutation.mutate();
   }, [checkOutMutation]);
 
+  const canDeleteAttendanceRow = useCallback(
+    (record: AttendanceRecord): boolean => {
+      if (!canDeleteAttendance) return false;
+      if (canViewAllEmployees) return true;
+      const sid = String(session?.user?.id ?? "").trim();
+      const rid = String(record.user_id ?? "").trim();
+      if (sid !== "" && rid === sid) return true;
+      return teamDeleteAllowSet.has(rid);
+    },
+    [canDeleteAttendance, canViewAllEmployees, session?.user?.id, teamDeleteAllowSet],
+  );
+
   const handleConfirmDelete = useCallback(() => {
     if (!canDeleteAttendance || !recordToDelete) return;
-    if (
-      !canViewAllEmployees &&
-      session?.user?.id != null &&
-      String(recordToDelete.user_id) !== String(session.user.id)
-    ) {
-      toast.error("You can only delete your own attendance records.");
+    if (!canDeleteAttendanceRow(recordToDelete)) {
+      toast.error("You cannot delete this attendance record.");
       return;
     }
     deleteAttendanceMutation.mutate(recordToDelete.id);
-  }, [
-    canDeleteAttendance,
-    canViewAllEmployees,
-    deleteAttendanceMutation,
-    recordToDelete,
-    session?.user?.id,
-  ]);
+  }, [canDeleteAttendance, canDeleteAttendanceRow, deleteAttendanceMutation, recordToDelete]);
 
   const handleDeleteAttendanceClick = useCallback(
     (record: AttendanceRecord) => {
-      if (!canDeleteAttendance) return;
-      if (
-        !canViewAllEmployees &&
-        session?.user?.id != null &&
-        String(record.user_id) !== String(session.user.id)
-      ) {
-        toast.error("You can only delete your own attendance records.");
+      if (!canDeleteAttendanceRow(record)) {
+        if (!canDeleteAttendance) return;
+        toast.error("You cannot delete this attendance record.");
         return;
       }
       setRecordToDelete(record);
       setShowDeleteModal(true);
     },
-    [canDeleteAttendance, canViewAllEmployees, session?.user?.id],
+    [canDeleteAttendance, canDeleteAttendanceRow],
   );
 
   const attendanceUserDropdownRows = useMemo(
@@ -456,22 +470,12 @@ const AttendancePage = () => {
           handleDeleteAttendanceClick(record);
         },
         show: () => canDeleteAttendance,
-        disabled: (record: AttendanceRecord) =>
-          Boolean(
-            !canViewAllEmployees &&
-              session?.user?.id != null &&
-              String(record.user_id) !== String(session.user.id),
-          ),
-        disabledTitle: "You can only delete your own attendance records.",
+        disabled: (record: AttendanceRecord) => !canDeleteAttendanceRow(record),
+        disabledTitle: "You can only delete attendance for yourself or your team (with permission).",
         variant: "link",
       },
     ],
-    [
-      canDeleteAttendance,
-      canViewAllEmployees,
-      handleDeleteAttendanceClick,
-      session?.user?.id,
-    ],
+    [canDeleteAttendance, canDeleteAttendanceRow, handleDeleteAttendanceClick],
   );
 
   const records = attendanceListQuery.data?.records ?? [];
