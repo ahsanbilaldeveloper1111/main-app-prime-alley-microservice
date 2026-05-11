@@ -275,7 +275,7 @@ const AIMLCampaignReports = () => {
   };
   return (
     <React.Fragment>
-      <style jsx global>{`
+      <style>{`
         .generic-table-responsive {
           margin: 0 !important;
           width: 100% !important;

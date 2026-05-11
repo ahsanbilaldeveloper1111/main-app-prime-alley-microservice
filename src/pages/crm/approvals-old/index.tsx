@@ -1079,7 +1079,7 @@ const CrmApprovals = () => {
               </div>
             ) : (
               <>
-                <style jsx>{`
+                <style>{`
                   .lead-detail-filter-buttons {
                     display: flex;
                     gap: 12px;

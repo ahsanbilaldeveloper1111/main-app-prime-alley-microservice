@@ -22,10 +22,26 @@ on:
           - "0"
           - "1"
         default: "0"
+      reload_nginx:
+        description: "Run `nginx -t && systemctl reload nginx` after deploy (0 or 1)"
+        required: false
+        type: choice
+        options:
+          - "0"
+          - "1"
+        default: "1"
   push:
     branches:
       - develop
       - main
+
+# The deploy host is expected to have:
+#   * nginx (config installed from deploy/nginx/mainapp.conf — see deploy/README.md)
+#   * a systemd unit named `${STREAMING_SERVICE_NAME}` running the sidecar
+#     (deploy/systemd/mainapp-streaming.service). Default name: mainapp-streaming.
+# Override either name via repo/environment secrets:
+#   DEV_STREAMING_SERVICE_NAME, STAGE_STREAMING_SERVICE_NAME
+
 jobs:
   deploy-dev:
     name: Deploy to Dev (self-hosted)
@@ -37,9 +53,10 @@ jobs:
     env:
       APP_DIR: ${{ secrets.DEV_APP_DIR }}
       DOTENV_CONTENT: ${{ secrets.DEV_DOTENV }}
-      SERVICE_NAME: ${{ secrets.DEV_SERVICE_NAME }}
+      STREAMING_SERVICE_NAME: ${{ secrets.DEV_STREAMING_SERVICE_NAME }}
       DEFAULT_BRANCH: ${{ secrets.DEV_BRANCH }}
       BRANCH_OVERRIDE: ${{ github.event.inputs.branch }}
+      RELOAD_NGINX: ${{ github.event.inputs.reload_nginx || '0' }}
 
     steps:
       - name: Checkout
@@ -51,14 +68,15 @@ jobs:
           set -euo pipefail
 
           APP_DIR="${APP_DIR:?DEV_APP_DIR secret is required}"
-          SERVICE_NAME="${SERVICE_NAME:-nextjs}"
+          STREAMING_SERVICE_NAME="${STREAMING_SERVICE_NAME:-mainapp-streaming}"
           BRANCH="${DEFAULT_BRANCH:-develop}"
+          RELOAD_NGINX="${RELOAD_NGINX:-0}"
 
           if [ -n "${BRANCH_OVERRIDE}" ]; then
             BRANCH="${BRANCH_OVERRIDE}"
           fi
 
-          echo "Deploying Next.js [dev] → $APP_DIR (branch=$BRANCH)"
+          echo "Deploying mainapp [dev] → $APP_DIR (branch=$BRANCH, streaming=$STREAMING_SERVICE_NAME)"
 
           cd "$APP_DIR"
 
@@ -68,11 +86,13 @@ jobs:
           git pull origin "$BRANCH"
 
           echo "→ Writing .env.local"
+          # Both Vite (build time) and the streaming sidecar (runtime) read
+          # from .env.local first, then .env. Keep secrets here.
           printf "%b" "$DOTENV_CONTENT" > .env.local
           chmod 600 .env.local || true
 
-          echo "→ Stopping service"
-          sudo systemctl stop "$SERVICE_NAME" || true
+          echo "→ Stopping streaming sidecar"
+          sudo systemctl stop "$STREAMING_SERVICE_NAME" || true
 
           echo "→ Installing dependencies"
           if [[ -f package-lock.json ]]; then
@@ -81,14 +101,39 @@ jobs:
             npm install --no-audit --no-fund
           fi
 
-          echo "→ Building app"
+          echo "→ Building SPA (Vite)"
           npm run build
 
-          echo "→ Starting service"
-          sudo systemctl start "$SERVICE_NAME"
+          echo "→ Verifying build output"
+          test -f "$APP_DIR/dist/index.html" \
+            || { echo "Build did not produce dist/index.html"; exit 1; }
+
+          echo "→ Starting streaming sidecar"
+          sudo systemctl start "$STREAMING_SERVICE_NAME"
+
+          echo "→ Waiting for sidecar to come up"
+          for i in {1..15}; do
+            if curl -fsS --max-time 2 "http://127.0.0.1:${STREAMING_PORT:-3102}/healthz" >/dev/null; then
+              echo "  sidecar healthy after ${i}s"
+              break
+            fi
+            sleep 1
+            if [[ $i -eq 15 ]]; then
+              echo "Sidecar did not become healthy in 15s"
+              sudo systemctl --no-pager status "$STREAMING_SERVICE_NAME" || true
+              sudo journalctl -u "$STREAMING_SERVICE_NAME" -n 200 --no-pager || true
+              exit 1
+            fi
+          done
+
+          if [[ "$RELOAD_NGINX" = "1" ]]; then
+            echo "→ Reloading nginx (config-only change)"
+            sudo nginx -t
+            sudo systemctl reload nginx
+          fi
 
           echo "→ Service status"
-          sudo systemctl --no-pager status "$SERVICE_NAME" || true
+          sudo systemctl --no-pager status "$STREAMING_SERVICE_NAME" || true
 
   deploy-stage:
     name: Deploy to Stage (self-hosted)
@@ -100,10 +145,11 @@ jobs:
     env:
       APP_DIR: ${{ secrets.STAGE_APP_DIR }}
       DOTENV_CONTENT: ${{ secrets.STAGE_DOTENV }}
-      SERVICE_NAME: ${{ secrets.STAGE_SERVICE_NAME }}
+      STREAMING_SERVICE_NAME: ${{ secrets.STAGE_STREAMING_SERVICE_NAME }}
       DEFAULT_BRANCH: ${{ secrets.STAGE_BRANCH }}
       BRANCH_OVERRIDE: ${{ github.event.inputs.branch }}
       STAGE_RUN_NPM: ${{ github.event.inputs.stage_run_npm || '0' }}
+      RELOAD_NGINX: ${{ github.event.inputs.reload_nginx || '0' }}
 
     steps:
       - name: Checkout
@@ -115,15 +161,16 @@ jobs:
           set -euo pipefail
 
           APP_DIR="${APP_DIR:?STAGE_APP_DIR secret is required}"
-          SERVICE_NAME="${SERVICE_NAME:-nextjs}"
+          STREAMING_SERVICE_NAME="${STREAMING_SERVICE_NAME:-mainapp-streaming}"
           BRANCH="${DEFAULT_BRANCH:-main}"
           STAGE_RUN_NPM="${STAGE_RUN_NPM:-0}"
+          RELOAD_NGINX="${RELOAD_NGINX:-0}"
 
           if [ -n "${BRANCH_OVERRIDE}" ]; then
             BRANCH="${BRANCH_OVERRIDE}"
           fi
 
-          echo "Deploying Next.js [stage] → $APP_DIR (branch=$BRANCH, STAGE_RUN_NPM=$STAGE_RUN_NPM)"
+          echo "Deploying mainapp [stage] → $APP_DIR (branch=$BRANCH, streaming=$STREAMING_SERVICE_NAME, STAGE_RUN_NPM=$STAGE_RUN_NPM)"
 
           cd "$APP_DIR"
 
@@ -136,21 +183,50 @@ jobs:
           printf "%b" "$DOTENV_CONTENT" > .env.local
           chmod 600 .env.local || true
 
-          echo "→ Stopping service"
-          sudo systemctl stop "$SERVICE_NAME" || true
+          echo "→ Stopping streaming sidecar"
+          sudo systemctl stop "$STREAMING_SERVICE_NAME" || true
 
-          echo "→ Installing dependencies"
-          if [[ -f package-lock.json ]]; then
-            npm ci --no-audit --no-fund
+          if [[ "$STAGE_RUN_NPM" = "1" ]]; then
+            echo "→ Installing dependencies"
+            if [[ -f package-lock.json ]]; then
+              npm ci --no-audit --no-fund
+            else
+              npm install --no-audit --no-fund
+            fi
           else
-            npm install --no-audit --no-fund
+            echo "→ Skipping npm install (STAGE_RUN_NPM=0)"
           fi
 
-          echo "→ Building app"
+          echo "→ Building SPA (Vite)"
           npm run build
 
-          echo "→ Starting service"
-          sudo systemctl start "$SERVICE_NAME"
+          echo "→ Verifying build output"
+          test -f "$APP_DIR/dist/index.html" \
+            || { echo "Build did not produce dist/index.html"; exit 1; }
+
+          echo "→ Starting streaming sidecar"
+          sudo systemctl start "$STREAMING_SERVICE_NAME"
+
+          echo "→ Waiting for sidecar to come up"
+          for i in {1..15}; do
+            if curl -fsS --max-time 2 "http://127.0.0.1:${STREAMING_PORT:-3102}/healthz" >/dev/null; then
+              echo "  sidecar healthy after ${i}s"
+              break
+            fi
+            sleep 1
+            if [[ $i -eq 15 ]]; then
+              echo "Sidecar did not become healthy in 15s"
+              sudo systemctl --no-pager status "$STREAMING_SERVICE_NAME" || true
+              sudo journalctl -u "$STREAMING_SERVICE_NAME" -n 200 --no-pager || true
+              exit 1
+            fi
+          done
+
+          if [[ "$RELOAD_NGINX" = "1" ]]; then
+            echo "→ Reloading nginx (config-only change)"
+            sudo nginx -t
+            sudo systemctl reload nginx
+          fi
 
           echo "→ Service status"
-          sudo systemctl --no-pager status "$SERVICE_NAME" || true
+          sudo systemctl --no-pager status "$STREAMING_SERVICE_NAME" || true

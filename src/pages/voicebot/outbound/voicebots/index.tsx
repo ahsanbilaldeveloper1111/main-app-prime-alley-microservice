@@ -329,7 +329,7 @@ const VoicebotsPage = () => {
 
   return (
     <React.Fragment>
-      <style jsx global>{`
+      <style>{`
         .voicebot-page .add-voicebot-btn {
           padding: 9px 13px !important;
           height: 38px !important;

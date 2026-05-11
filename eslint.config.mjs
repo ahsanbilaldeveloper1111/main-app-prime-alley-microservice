@@ -1,34 +1,47 @@
-import { dirname } from "path";
-import { fileURLToPath } from "url";
-import { FlatCompat } from "@eslint/eslintrc";
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-
-const compat = new FlatCompat({
-  baseDirectory: __dirname,
-});
+import js from "@eslint/js";
 
 const eslintConfig = [
-  ...compat.extends("next/core-web-vitals", "next/typescript"),
+  js.configs.recommended,
   {
+    languageOptions: {
+      ecmaVersion: 2024,
+      sourceType: "module",
+      globals: {
+        window: "readonly",
+        document: "readonly",
+        navigator: "readonly",
+        console: "readonly",
+        process: "readonly",
+        globalThis: "readonly",
+        sessionStorage: "readonly",
+        localStorage: "readonly",
+        fetch: "readonly",
+        FormData: "readonly",
+        URLSearchParams: "readonly",
+        URL: "readonly",
+        Blob: "readonly",
+        Buffer: "readonly",
+        setTimeout: "readonly",
+        clearTimeout: "readonly",
+        setInterval: "readonly",
+        clearInterval: "readonly",
+        atob: "readonly",
+        btoa: "readonly",
+      },
+    },
     rules: {
-      "@typescript-eslint/no-unused-vars": "off",
-      "@typescript-eslint/no-explicit-any": "off",
-      "@next/next/no-img-element": "off",
-      "react/no-unescaped-entities": "off",
-      "@next/next/no-html-link-for-pages": "off",
-      "react-hooks/exhaustive-deps": "off",
-      "prefer-const": "off",
-      "react/jsx-key": "off",
-      "react/no-children-prop": "off",
-      "react/display-name": "off",
-      "@typescript-eslint/no-unused-expressions": "off",
-      "@typescript-eslint/no-implicit-any-catch": "off",
-      "@typescript-eslint/no-implicit-any": "off",
-      "@typescript-eslint/no-empty-object-type": "off"
-    }
-  }
+      "no-unused-vars": "off",
+      "no-empty": "off",
+      "no-prototype-builtins": "off",
+      "no-undef": "off",
+      "no-redeclare": "off",
+      "no-irregular-whitespace": "off",
+      "no-useless-escape": "off",
+    },
+  },
+  {
+    ignores: ["node_modules/**", "dist/**", ".vite/**", "build/**"],
+  },
 ];
 
 export default eslintConfig;

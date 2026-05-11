@@ -50,7 +50,7 @@ const ThemeSelect: React.FC<SelectProps> = ({ classNamePrefix = 'theme-react-sel
   return (
     <>
       <ReactSelect classNamePrefix={classNamePrefix} isClearable={true} {...props} />
-      <style jsx global>{`
+      <style>{`
         .theme-react-select__control {
           border-color: var(--bs-border-color) !important;
           min-height: 48px !important;

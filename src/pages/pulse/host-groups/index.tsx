@@ -413,7 +413,7 @@ const HostGroups = () => {
         loading={deleteLoading}
       />
 
-      <style jsx global>{`
+      <style>{`
         .pulse-hostgroups-page .hg-btn {
           padding: 9px 13px;
           background-color: rgb(0, 0, 0);

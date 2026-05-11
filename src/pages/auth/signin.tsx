@@ -1,18 +1,79 @@
 import NonLayout from "@layout/NonLayout";
-import Image from "next/image";
 import React, { ReactElement, useState, useEffect, useRef } from "react";
 import { signIn, signOut, useSession } from "next-auth/react";
 import { useRouter } from "next/router";
 import Head from "next/head";
-import Link from "next/link";
 import { toast } from "react-toastify";
 import { FaSpinner } from "react-icons/fa";
-import "@assets/scss/login.scss";
 import PageLoader from "@components/PageLoader";
-import logodark from "@assets/images/Prime3.png";
 import tokenService from "@utils/tokenService";
 
+// Mirrors @assets/scss/login.scss from the original Next build. We do NOT
+// `import` login.scss here because Vite would load that global stylesheet for
+// the whole SPA lifetime, leaking `body { font-family }` and `.btn-primary`
+// rules to every other route. Next previously bundled login.scss into a
+// per-page chunk that unmounted with the page; we replicate that scoping by
+// injecting these rules into <head> only while this component is mounted (see
+// the useEffect below). The CSS lives in a constant rather than a JSX
+// `<style>` block because SonarQube's JSX parser misreads large template
+// literals inside <style> as CSS, polluting analysis of the surrounding JSX.
+const SIGNIN_PAGE_STYLES = [
+  "html, body, #root {",
+  "  width: 100% !important;",
+  "  height: 100% !important;",
+  "  margin: 0;",
+  "  padding: 0;",
+  "}",
+  "body {",
+  "  font-family: 'Inter', sans-serif;",
+  "  color: #2c3e50;",
+  "}",
+  ".auth-form .btn-primary,",
+  ".auth-form .btn.btn-primary {",
+  "  padding: 15px;",
+  "  border: none;",
+  "  border-radius: 8px;",
+  "  font-weight: 600;",
+  "  cursor: pointer;",
+  "  transition: 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);",
+  "  display: flex;",
+  "  align-items: center;",
+  "  justify-content: center;",
+  "  gap: 8px;",
+  "  font-size: 1rem;",
+  "  text-decoration: none;",
+  "  box-shadow: 0 4px 15px rgba(30, 112, 227, 0.25);",
+  "  position: relative;",
+  "}",
+  ".auth-form .btn-primary:disabled {",
+  "  cursor: not-allowed;",
+  "  opacity: 0.7;",
+  "}",
+  ".auth-form .btn-primary:hover {",
+  "  transform: translateY(-2px);",
+  "  box-shadow: 0 6px 20px rgba(30, 112, 227, 0.35);",
+  "}",
+  ".auth-form .btn-primary:active {",
+  "  transform: translateY(0);",
+  "  box-shadow: 0 2px 10px rgba(30, 112, 227, 0.25);",
+  "}",
+].join("\n");
+
+function useSigninPageStyles() {
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    const styleEl = document.createElement("style");
+    styleEl.dataset.scope = "signin-page";
+    styleEl.textContent = SIGNIN_PAGE_STYLES;
+    document.head.appendChild(styleEl);
+    return () => {
+      styleEl.remove();
+    };
+  }, []);
+}
+
 const Signin = () => {
+  useSigninPageStyles();
   const [credentials, setCredentials] = useState({
     email: "",
     password: "",
@@ -331,7 +392,9 @@ const Signin = () => {
             // ignore
           }
           // Could not sync or tokens expired – clear stale server session and show sign-in form
-          fetch('/api/auth/logout', { method: 'POST', credentials: 'include' }).catch(() => {});
+          // BE logout is best-effort. The new auth context handles its own
+          // teardown in signOut(); this fetch existed for the NextAuth session-store
+          // and is no longer required.
           signOut({ redirect: false });
         })();
         return;
@@ -359,18 +422,6 @@ const Signin = () => {
     <React.Fragment>
       <Head>
         <title>Business Workspace AI-Powered </title>
-        <style>{`
-          #__next {
-            width: 100% !important;
-            height: 100% !important;
-          }
-          html, body {
-            width: 100% !important;
-            height: 100% !important;
-            margin: 0;
-            padding: 0;
-          }
-        `}</style>
       </Head>
 
       {/* Session Loading Overlay */}

@@ -861,7 +861,7 @@ const OutboundReportsPage = () => {
 
   return (
     <React.Fragment>
-      <style jsx global>{`
+      <style>{`
         .generic-sidebar-new-container {
           margin-top: 0px !important;
         }

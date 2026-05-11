@@ -23,6 +23,7 @@ import {
   type ListCampaignsParams,
 } from "@utils/voicebot/outbound";
 import { safeDisplayString, toFormString } from "@utils/voicebot/formDisplay";
+import { backendUrl } from "@utils/backendUrl";
 import { GetCompanies } from "@utils/users";
 import {
   normalizeCompaniesResponse,
@@ -681,9 +682,9 @@ const CampaignsPage = () => {
     const params = new URLSearchParams({
       company_id: effectiveCompanyId,
     });
-    const sseUrl = `/api/campaigns/stream?${params.toString()}`;
+    const sseUrl = backendUrl(`/api/campaigns/stream?${params.toString()}`);
 
-    const eventSource = new EventSource(sseUrl);
+    const eventSource = new EventSource(sseUrl, { withCredentials: true });
 
     eventSource.onerror = () => {
       eventSource.close();
@@ -984,7 +985,7 @@ const CampaignsPage = () => {
 
   return (
     <React.Fragment>
-      <style jsx global>{`
+      <style>{`
         .voicebot-campaign-page .add-campaign-btn {
           padding: 9px 13px !important;
           height: 38px !important;

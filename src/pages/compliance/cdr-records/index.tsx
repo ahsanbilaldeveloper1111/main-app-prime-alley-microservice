@@ -1094,7 +1094,7 @@ const CDRRecords = () => {
         metricsGridMinWidth="200px"
       />
 
-      <style jsx global>{`
+      <style>{`
         .cdr-btn {
           padding: 9px 13px;
           background-color: rgb(0, 0, 0);

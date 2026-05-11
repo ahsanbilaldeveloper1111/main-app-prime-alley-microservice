@@ -521,7 +521,7 @@ const NetOpsDashboard = () => {
         </Modal.Body>
       </Modal>
 
-      <style jsx>{`
+      <style>{`
         .header-row-responsive {
           row-gap: 0.75rem;
         }

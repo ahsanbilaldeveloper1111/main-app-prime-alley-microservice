@@ -373,7 +373,7 @@ const NetopsEvents = () => {
         </Modal.Footer>
       </Modal>
 
-      <style jsx global>{`
+      <style>{`
         .pulse-events-page .events-btn {
           padding: 9px 13px;
           background-color: rgb(0, 0, 0);

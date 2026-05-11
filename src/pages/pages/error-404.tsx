@@ -118,7 +118,7 @@ const Error404 = () => {
                 </div>
 
                 {/* Custom CSS for animations */}
-                <style jsx>{`
+                <style>{`
                     @keyframes pulse {
                         0%, 100% { transform: scale(1); }
                         50% { transform: scale(1.05); }

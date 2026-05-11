@@ -1083,7 +1083,7 @@ const Hosts = () => {
         loading={deleteLoading}
       />
 
-      <style jsx global>{`
+      <style>{`
         .pulse-hosts-page .hosts-btn {
           padding: 9px 13px;
           background-color: rgb(0, 0, 0);

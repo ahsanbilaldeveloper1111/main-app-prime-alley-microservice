@@ -190,7 +190,7 @@ const OutboundDashboardPage = () => {
 
   return (
     <React.Fragment>
-      <style jsx global>{`
+      <style>{`
         .outbound-dashboard-stats > div {
           grid-template-columns: repeat(8, minmax(0, 1fr)) !important;
         }

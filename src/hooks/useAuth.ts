@@ -1,63 +1,55 @@
-import { useSession, signOut } from 'next-auth/react';
-import { useEffect, useState } from 'react';
-import { initializeTokensFromSession, hasTokens } from '../utils/tokenUtils';
-import { useTokenService } from './useTokenService';
-import { sessionStore } from '../utils/sessionStore';
-import { clearSessionCookiesClient } from '../utils/cookieUtils';
-import { getLogoutCallbackUrl } from '../utils/logoutRedirect';
-import { authAPI } from '../utils/api';
-import { clearFinesseManualReconnectRequired } from '../utils/finesse';
+/**
+ * Drop-in replacement for the previous NextAuth-backed useAuth hook.
+ *
+ * Exposes the same return shape (`session`, `status`, `isAuthenticated`,
+ * `hasTokens`, `isInitialized`, `logout`) so existing callsites compile.
+ */
+
+import { useMemo } from "react";
+import { useAuthContext } from "../auth/AuthProvider";
+import { hasTokens } from "../utils/tokenUtils";
+import { useTokenService } from "./useTokenService";
+
+interface ShimSession {
+  user: import("../auth/authStorage").AuthUser;
+  expires: string;
+}
+
+type AuthStatus = "loading" | "authenticated" | "unauthenticated";
+
+function buildShimSession(
+  user: import("../auth/authStorage").AuthUser | null,
+): ShimSession | null {
+  if (!user) return null;
+  return {
+    user,
+    expires: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+  };
+}
+
+function mapAuthStatus(
+  status: ReturnType<typeof useAuthContext>["status"],
+): AuthStatus {
+  if (status === "loading") return "loading";
+  if (status === "authenticated") return "authenticated";
+  return "unauthenticated";
+}
 
 export const useAuth = () => {
-  const { data: session, status } = useSession();
-  const { clearTokens, isAuthenticated } = useTokenService();
-  const [isInitialized, setIsInitialized] = useState(false);
+  const auth = useAuthContext();
+  const { isAuthenticated } = useTokenService();
 
-  useEffect(() => {
-    if (status === 'loading') {
-      return;
-    }
-
-    if (status === 'authenticated' && session) {
-      // Initialize tokens from session
-      initializeTokensFromSession(session);
-      setIsInitialized(true);
-    } else if (status === 'unauthenticated') {
-      // Clear tokens when not authenticated
-      clearTokens();
-      setIsInitialized(true);
-    }
-  }, [session, status, clearTokens]);
-
-  const logout = async () => {
-    try {
-      // Clear server-side NextAuth session payload + cookies first (best effort)
-      await authAPI.logout();
-      clearTokens();
-      clearFinesseManualReconnectRequired();
-      clearSessionCookiesClient(true);
-      const callbackUrl = getLogoutCallbackUrl();
-      await signOut({ callbackUrl, redirect: false });
-
-      // Redirect to login on current domain
-      if (typeof window !== 'undefined') {
-        window.location.href = callbackUrl;
-      }
-      
-    } catch (error) {
-      console.error('Logout error:', error);
-      if (typeof window !== 'undefined') {
-        window.location.href = getLogoutCallbackUrl();
-      }
-    }
-  };
-
-  return {
-    session,
-    status,
-    isAuthenticated: isAuthenticated(),
-    hasTokens: hasTokens(),
-    isInitialized,
-    logout,
-  };
-}; 
+  return useMemo(() => {
+    const session = buildShimSession(auth.user);
+    const status = mapAuthStatus(auth.status);
+    return {
+      session,
+      status,
+      isAuthenticated: isAuthenticated(),
+      hasTokens: hasTokens(),
+      isInitialized: status !== "loading",
+      logout: () =>
+        auth.signOut({ redirectTo: "/auth/signin" }),
+    };
+  }, [auth, isAuthenticated]);
+};

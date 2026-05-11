@@ -139,7 +139,7 @@ export const useAnalysisSSE = (config: SSEConfig) => {
       if (configRef.current.remotePartyNumber) params.append('remotePartyNumber', configRef.current.remotePartyNumber);
       if (configRef.current.dateTime) params.append('dateTime', configRef.current.dateTime);
       
-      const sseUrl = `/api/analysis-stream?${params.toString()}`;
+      const sseUrl = `/streaming/analysis-stream?${params.toString()}`;
       
       // CRITICAL: Check if we're already connecting to this exact URL
       // This prevents duplicate HTTP requests from being made
@@ -333,7 +333,7 @@ export const useAnalysisSSE = (config: SSEConfig) => {
     if (configRef.current.remotePartyNumber) params.append('remotePartyNumber', configRef.current.remotePartyNumber);
     if (configRef.current.dateTime) params.append('dateTime', configRef.current.dateTime);
 
-    const sseUrl = `/api/analysis-stream?${params.toString()}`;
+    const sseUrl = `/streaming/analysis-stream?${params.toString()}`;
     
     // CRITICAL: Check if we're already connecting to this exact URL
     if (currentConnectionUrlRef.current === sseUrl) {

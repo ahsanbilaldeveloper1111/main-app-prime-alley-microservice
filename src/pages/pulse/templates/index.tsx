@@ -220,7 +220,7 @@ const NetopsTemplates = () => {
         </div>
       </div>
 
-      <style jsx global>{`
+      <style>{`
         .pulse-templates-page .templates-btn {
           padding: 9px 13px;
           background-color: rgb(0, 0, 0);

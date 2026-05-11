@@ -1,59 +1,63 @@
-import { useSession } from 'next-auth/react';
-import { useRouter } from 'next/router';
-import { useEffect } from 'react';
-import { useAuth } from '../hooks/useAuth';
+import { useEffect, type ReactNode } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
+import { useAuth } from "../hooks/useAuth";
 
 interface ProtectedRouteProps {
-  children: React.ReactNode;
+  children: ReactNode;
   requiredPermissions?: string[];
 }
 
-const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ 
-  children, 
-  requiredPermissions = [] 
+const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
+  children,
+  requiredPermissions = [],
 }) => {
-  const { session, status, isAuthenticated, isInitialized } = useAuth();
-  const router = useRouter();
-
-  // useEffect(() => {
-  //   if (isInitialized && status === 'unauthenticated') {
-  //     // Store the current URL to redirect back after login
-  //     const currentUrl = router.asPath;
-  //     router.push(`/auth/signin?callbackUrl=${encodeURIComponent(currentUrl)}`);
-  //   }
-  // }, [isInitialized, status, router]);
+  const { session, status, isInitialized } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
 
   useEffect(() => {
-    if (isInitialized && status === 'authenticated' && requiredPermissions.length > 0) {
-      const userPermissions = session?.user?.permissions || [];
-      const hasRequiredPermissions = requiredPermissions.every(permission => 
-        userPermissions.includes(permission)
-      );
-
-      // if (!hasRequiredPermissions) {
-      //   router.push('/dashboard');
-      // }
+    if (!isInitialized) return;
+    if (status === "unauthenticated") {
+      const callbackUrl = `${location.pathname}${location.search}${location.hash}`;
+      navigate(`/auth/signin?callbackUrl=${encodeURIComponent(callbackUrl)}`, {
+        replace: true,
+      });
+      return;
     }
-  }, [isInitialized, status, session, requiredPermissions, router]);
+    if (status === "authenticated" && requiredPermissions.length > 0) {
+      const userPermissions = session?.user?.permissions ?? [];
+      const ok = requiredPermissions.every((p) => userPermissions.includes(p));
+      if (!ok) navigate("/access-denied", { replace: true });
+    }
+  }, [
+    isInitialized,
+    status,
+    session,
+    requiredPermissions,
+    navigate,
+    location.pathname,
+    location.search,
+    location.hash,
+  ]);
 
-  // Show loading state while checking authentication
-  if (!isInitialized || status === 'loading') {
+  if (!isInitialized || status === "loading") {
     return (
-      <div className="d-flex justify-content-center align-items-center" style={{ height: '100vh' }}>
-        <div className="spinner-border" role="status">
+      <div
+        className="d-flex justify-content-center align-items-center"
+        style={{ height: "100vh" }}
+      >
+        <output className="spinner-border">
           <span className="visually-hidden">Loading...</span>
-        </div>
+        </output>
       </div>
     );
   }
 
-  // Show nothing if not authenticated (will redirect)
-  if (status === 'unauthenticated') {
+  if (status === "unauthenticated") {
     return null;
   }
 
-  // Show children if authenticated and has required permissions
   return <>{children}</>;
 };
 
-export default ProtectedRoute; 
+export default ProtectedRoute;

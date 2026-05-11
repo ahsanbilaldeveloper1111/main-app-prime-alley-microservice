@@ -354,7 +354,7 @@ const AIMLTrunkProfile = () => {
                 hover
               />
             </div>
-            <style jsx global>{`
+            <style>{`
               .outbound-trunks-table .generic-table {
                 table-layout: fixed;
               }

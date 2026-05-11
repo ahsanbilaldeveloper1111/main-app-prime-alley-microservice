@@ -270,7 +270,7 @@ const TrunksPage = () => {
 
   return (
     <React.Fragment>
-      <style jsx global>{`
+      <style>{`
         .voicebot-page .add-trunk-btn {
           padding: 9px 13px !important;
           height: 38px !important;

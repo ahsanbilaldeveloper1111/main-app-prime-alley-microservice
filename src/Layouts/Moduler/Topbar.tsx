@@ -183,7 +183,7 @@ const TopBar = ({ handleOffcanvasToggle, changeThemeMode, toogleSidebarHide, too
                             </Dropdown> */}
 
                     
-                    <style jsx>{`
+                    <style>{`
                         .topbar-dialpad-container {
                             .app-button {
                                 font-size: 1.5rem;

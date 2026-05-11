@@ -1,2 +1,6 @@
 {
+    "sonarlint.connectedMode.project": {
+        "connectionId": "prime-alley-technology-llc",
+        "projectKey": "PRIME-ALLEY-TECHNOLOGY-LLC_main-app-microservice"
+    }
 }
