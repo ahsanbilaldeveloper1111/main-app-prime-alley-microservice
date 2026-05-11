@@ -1,28 +1,20 @@
-import { useQuery } from "@tanstack/react-query";
 import {
   fetchTicketModulesListPage,
   getTicketModulesListQueryOptions,
-  type TicketModulesListPayload,
 } from "@utils/ticket-module";
-import { getErrorMessage } from "@utils/errors";
-import { toast } from "react-toastify";
+import {
+  usePaginatedListQuery,
+  type PaginatedListArgs,
+} from "../_shared/listQuery";
 
-export type { TicketModulesListPayload };
+export type { TicketModulesListPayload } from "@utils/ticket-module";
 
-export function useTicketModulesListQuery(
-  args: Readonly<{ page: number; perPage: number; search: string }>,
-) {
-  return useQuery({
-    ...getTicketModulesListQueryOptions(args),
-    queryFn: async (): Promise<TicketModulesListPayload> => {
-      try {
-        return await fetchTicketModulesListPage(args);
-      } catch (error) {
-        toast.error(`Failed to load ticket modules: ${getErrorMessage(error)}`, {
-          toastId: "ticket_modules_list_failed",
-        });
-        return { data: [], total: 0 };
-      }
-    },
+export function useTicketModulesListQuery(args: PaginatedListArgs) {
+  return usePaginatedListQuery({
+    args,
+    queryKey: getTicketModulesListQueryOptions(args).queryKey,
+    fetchPage: fetchTicketModulesListPage,
+    errorLabel: "ticket modules",
+    toastId: "ticket_modules_list_failed",
   });
 }

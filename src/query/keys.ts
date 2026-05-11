@@ -3,6 +3,23 @@
  * Add domains here (e.g. `crmKeys`, `plannerKeys`) as migrations expand.
  */
 
+/**
+ * Build a `(page, perPage, search)` paginated list key under `base`.
+ * Shared shape used by every admin-style list (`tickets`, `faqs`, ...) so the
+ * builders themselves stay one-liners.
+ */
+export const paginatedListKey = <Base extends readonly unknown[]>(
+  base: Base,
+  params: { page: number; perPage: number; search: string },
+) =>
+  [
+    ...base,
+    "list",
+    params.page,
+    params.perPage,
+    params.search,
+  ] as const;
+
 export const communicationsKeys = {
   root: ["communications"] as const,
 
@@ -388,13 +405,7 @@ export const ticketsKeys = {
   statuses: {
     all: () => [...ticketsKeys.root, "statuses"] as const,
     list: (params: { page: number; perPage: number; search: string }) =>
-      [
-        ...ticketsKeys.statuses.all(),
-        "list",
-        params.page,
-        params.perPage,
-        params.search,
-      ] as const,
+      paginatedListKey(ticketsKeys.statuses.all(), params),
   },
 
   /** `GetHierarchyData(ModuleSlug.TICKET)` — extension pickers for ticket modules. */
@@ -406,13 +417,7 @@ export const ticketsKeys = {
   modules: {
     all: () => [...ticketsKeys.root, "ticketModules"] as const,
     list: (params: { page: number; perPage: number; search: string }) =>
-      [
-        ...ticketsKeys.modules.all(),
-        "list",
-        params.page,
-        params.perPage,
-        params.search,
-      ] as const,
+      paginatedListKey(ticketsKeys.modules.all(), params),
     /** Submodules under one ticket module (list modal). */
     submodulesByModule: (moduleId: string | number) =>
       [...ticketsKeys.modules.all(), "submodules", String(moduleId)] as const,
@@ -421,13 +426,7 @@ export const ticketsKeys = {
   types: {
     all: () => [...ticketsKeys.root, "ticketTypes"] as const,
     list: (params: { page: number; perPage: number; search: string }) =>
-      [
-        ...ticketsKeys.types.all(),
-        "list",
-        params.page,
-        params.perPage,
-        params.search,
-      ] as const,
+      paginatedListKey(ticketsKeys.types.all(), params),
   },
 };
 
@@ -438,13 +437,7 @@ export const faqsKeys = {
   modules: {
     all: () => [...faqsKeys.root, "modules"] as const,
     list: (params: { page: number; perPage: number; search: string }) =>
-      [
-        ...faqsKeys.modules.all(),
-        "list",
-        params.page,
-        params.perPage,
-        params.search,
-      ] as const,
+      paginatedListKey(faqsKeys.modules.all(), params),
     /** `getAllFAQModules` — topic form dropdown. */
     picker: () => [...faqsKeys.modules.all(), "picker"] as const,
   },
@@ -452,13 +445,7 @@ export const faqsKeys = {
   topics: {
     all: () => [...faqsKeys.root, "topics"] as const,
     list: (params: { page: number; perPage: number; search: string }) =>
-      [
-        ...faqsKeys.topics.all(),
-        "list",
-        params.page,
-        params.perPage,
-        params.search,
-      ] as const,
+      paginatedListKey(faqsKeys.topics.all(), params),
     /** `getAllFAQTopics` — item forms + types filter. */
     allTopics: () => [...faqsKeys.topics.all(), "all"] as const,
   },
@@ -466,13 +453,7 @@ export const faqsKeys = {
   items: {
     all: () => [...faqsKeys.root, "items"] as const,
     list: (params: { page: number; perPage: number; search: string }) =>
-      [
-        ...faqsKeys.items.all(),
-        "list",
-        params.page,
-        params.perPage,
-        params.search,
-      ] as const,
+      paginatedListKey(faqsKeys.items.all(), params),
   },
 
   /** Distinct FAQ item type strings (`getFAQTypes`). */
