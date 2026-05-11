@@ -1,174 +1,85 @@
-import { toast } from "react-toastify";
 import axiosInstance from "./axios";
+import { ticketsKeys } from "../query/keys";
+import {
+  fetchTicketResourcePage,
+  handleFetchOneOrAllResponse,
+  postCreateRequest,
+  postPaginatedListRequest,
+  postWriteRequest,
+  type PaginationParams,
+} from "./ticket-resource-helpers";
 
+export const ListTypes = (params: PaginationParams = {}) =>
+  postPaginatedListRequest("/tickets/types", params);
 
-interface PaginationParams {
-  page?: number;
-  perPage?: number;
-  search?: string;
-  draw?: number;
-  filters?: any;
-  isExport?: boolean;
-  exportType?: string;
+export interface TicketTypeRecord {
+  id: string | number;
+  name: string;
+  description: string;
+  created_at: string;
 }
 
-export const ListTypes = async (params: PaginationParams = {}) => {
-  try {
-    const { page = 1, perPage = 15, search = "", draw = 1, filters = {}, isExport = false, exportType = '' } = params;
-    
-    const response = await axiosInstance.post(
-      `/tickets/types`,
-      {
-        page,
-        perPage,
-        search,
-        draw,
-        ...filters,
-        isExport,
-        exportType
-      },
-      {
-        responseType: isExport ? 'blob' : 'json',
-        headers: isExport ? {
-          'Accept': '*/*',
-          'Content-Type': 'application/json'
-        } : undefined
-      }
-    );
-  
-    return response?.data;
-  } catch (error) {
-    console.error('API Error:', error);
-    throw error;
-  }
-};
+export type TicketTypesListPayload = Readonly<{
+  data: TicketTypeRecord[];
+  total: number;
+}>;
+
+export type TicketTypesListPageParams = Readonly<{
+  page: number;
+  perPage: number;
+  search: string;
+}>;
+
+export const fetchTicketTypesListPage = (
+  params: TicketTypesListPageParams,
+): Promise<TicketTypesListPayload> =>
+  fetchTicketResourcePage<TicketTypeRecord>(ListTypes, params);
+
+export const getTicketTypesListQueryOptions = (
+  params: TicketTypesListPageParams,
+) => ({
+  queryKey: ticketsKeys.types.list(params),
+  queryFn: () => fetchTicketTypesListPage(params),
+});
 
 export const GetAllTypes = async () => {
-    try {
-        
-      const response = await axiosInstance.post(
-        `/tickets/types`,{
-          all: true
-        }
-      );
-      if(response.data){
-        return response.data?.data;
-      }else{
-        toast.error('Failed to fetch ticket types');
-      }
-      
-    } catch (error) {
-      throw error;
-    }
-  };
+  const response = await axiosInstance.post(`/tickets/types`, { all: true });
+  return handleFetchOneOrAllResponse(response, "Failed to fetch ticket types");
+};
 
-export const UpdateType = async (id: string, name: string, description: string) => {
-    try {
-        
-      const response = await axiosInstance.post(
-        `/tickets/update-type`,
-        {
-          id: id,
-          name: name,
-          description: description
-        }
-      );
-      if(response.data){
-        const responseData = response.data;
-        if(responseData.code == 200){
-          toast.success('Ticket type updated successfully');
-          return true;
-        }else{
-          toast.error(responseData.message);
-          return false;
-        } 
-      }else{
-        toast.error('Failed to update ticket type');
-        return false;
-      }
-      
-    } catch (error) {
-      throw error;
-    }
-  };
+export const UpdateType = (id: string, name: string, description: string) =>
+  postWriteRequest(
+    `/tickets/update-type`,
+    { id, name, description },
+    {
+      successMessage: "Ticket type updated successfully",
+      failureMessage: "Failed to update ticket type",
+    },
+  );
 
-  export const DeleteType = async (id: string) => {
-    try {
-        
-      const response = await axiosInstance.post(
-        `/tickets/delete-type`,
-        {
-          id: id
-        }
-      );
-      if(response.data){
-        const responseData = response.data;
-        if(responseData.code == 200){
-          if(responseData?.data?.success == true){
-            toast.success('Ticket type deleted successfully');
-            return true;
-          }else{
-            toast.error(responseData?.data?.message);
-            return false;
-          }
-        }else{
-          toast.error(responseData.message);
-          return false;
-        } 
-      }else{
-        toast.error('Failed to delete ticket type');
-        return false;
-      }
-      
-    } catch (error) {
-      throw error;
-    }
-  };
+export const DeleteType = (id: string) =>
+  postWriteRequest(
+    `/tickets/delete-type`,
+    { id },
+    {
+      successMessage: "Ticket type deleted successfully",
+      failureMessage: "Failed to delete ticket type",
+      requireDataSuccess: true,
+    },
+  );
 
-  export const CreateType = async (name: string, description: string) => {
-    try {
-      const response = await axiosInstance.post('/tickets/create-type', {
-        name: name,
-        description: description
-      });
-
-      if(response){
-        const responseData = response.data;
-        if(responseData.code == 200){
-          if(responseData?.data?.success == true){
-            toast.success('Ticket type created successfully');
-            return true;
-          }else{
-            toast.error(responseData?.data?.message);
-            return false;
-          }
-        }else{
-          toast.error(responseData.message);
-          return false;
-        } 
-      }else{
-        toast.error('Failed to create ticket type');
-        return false;
-      }
-      
-    } catch (error) {
-      console.error('Error creating ticket type:', error);
-      throw error;
-    }
-  };
+export const CreateType = (name: string, description: string) =>
+  postCreateRequest(
+    "/tickets/create-type",
+    { name, description },
+    {
+      entity: "ticket type",
+      successMessage: "Ticket type created successfully",
+      failureMessage: "Failed to create ticket type",
+    },
+  );
 
 export const GetType = async (id: string) => {
-  try {
-    const response = await axiosInstance.post(`/tickets/view-type`, {
-      id: id
-    });
-    if(response.data){
-      return response.data?.data;
-    }else{
-      toast.error('Failed to fetch ticket type');
-    }
-    
-  } catch (error) {
-    throw error;
-  }
+  const response = await axiosInstance.post(`/tickets/view-type`, { id });
+  return handleFetchOneOrAllResponse(response, "Failed to fetch ticket type");
 };

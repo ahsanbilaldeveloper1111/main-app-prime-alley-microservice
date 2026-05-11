@@ -7,6 +7,7 @@ import React, {
 } from "react";
 import { Button, Card, Col, Modal, Row } from "react-bootstrap";
 import { useSession } from "next-auth/react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import dynamic from "next/dynamic";
 import moment from "moment";
 import { useStore } from "react-redux";
@@ -58,9 +59,11 @@ import {
   useStagedFiltersActions,
 } from "@utils/communicationsStagedFilters";
 import { HEADER_CONSTANTS } from "@constants/headerConstants";
+import { communicationsKeys } from "../../query/keys";
 import type { RootState } from "@toolkit/index";
 import { useAppDispatch, useAppSelector } from "@toolkit/hooks";
 import {
+  hydrateCallRecordingsFetchResult,
   setCallRecordingsCurrentFilters,
   setCallRecordingsPagination,
   setCallDurationBarChartModal,
@@ -68,12 +71,11 @@ import {
   setSearchValue,
   setShowPageLoader,
 } from "@toolkit/callRecordingsList/slice";
+import { fetchCallRecordingsListPayload } from "@toolkit/callRecordingsList/fetchCallRecordingsListPayload";
 import {
   commitCallRecordingsFiltersThunk,
   exportCallRecordingsExcelThunk,
-  fetchCallRecordingsThunk,
   resetCallRecordingsFiltersThunk,
-  runCallRecordingsFetchForRefreshKeyThunk,
 } from "@toolkit/callRecordingsList/thunks";
 
 const ReactApexChart = dynamic(() => import("react-apexcharts"), {
@@ -221,6 +223,7 @@ const CallRecordingsView: React.FC = () => {
   const { data: session } = useSession();
   const dispatch = useAppDispatch();
   const store = useStore<RootState>();
+  const queryClient = useQueryClient();
 
   const canPlayRecordings = session?.user?.permissions?.includes(
     PERMISSIONS.PLAY_RECORDING_CALL_RECORDINGS,
@@ -248,7 +251,6 @@ const CallRecordingsView: React.FC = () => {
   );
   const searchValue = useAppSelector((s) => s.callRecordingsList.searchValue);
   const tableData = useAppSelector((s) => s.callRecordingsList.tableData);
-  const tableLoading = useAppSelector((s) => s.callRecordingsList.tableLoading);
   const pagination = useAppSelector((s) => s.callRecordingsList.pagination);
   const summary = useAppSelector((s) => s.callRecordingsList.summary);
   const durationChart = useAppSelector((s) => s.callRecordingsList.durationChart);
@@ -264,6 +266,68 @@ const CallRecordingsView: React.FC = () => {
   );
   const startDateTime = useAppSelector((s) => s.callRecordingsList.startDateTime);
   const endDateTime = useAppSelector((s) => s.callRecordingsList.endDateTime);
+
+  const filtersKey = useMemo(
+    () => JSON.stringify(appliedFilters),
+    [appliedFilters],
+  );
+
+  const listQueryKey = useMemo(
+    () =>
+      communicationsKeys.callRecordings.list({
+        page: pagination.currentPage,
+        perPage: pagination.perPage,
+        search: searchValue.trim(),
+        filtersKey,
+        refreshKey,
+      }),
+    [
+      pagination.currentPage,
+      pagination.perPage,
+      searchValue,
+      filtersKey,
+      refreshKey,
+    ],
+  );
+
+  const {
+    data: listPayload,
+    isPending: listPending,
+    isFetching: listFetching,
+  } = useQuery({
+    queryKey: listQueryKey,
+    queryFn: () =>
+      fetchCallRecordingsListPayload({
+        page: pagination.currentPage,
+        perPage: pagination.perPage,
+        search: searchValue.trim(),
+        appliedFilters,
+      }),
+    enabled: canViewCallRecordings,
+  });
+
+  useEffect(() => {
+    if (listPayload) {
+      dispatch(hydrateCallRecordingsFetchResult(listPayload));
+    }
+  }, [listPayload, dispatch]);
+
+  useEffect(() => {
+    dispatch(setShowPageLoader(listPending));
+  }, [listPending, dispatch]);
+
+  const exportMutation = useMutation({
+    mutationFn: async () => {
+      await dispatch(exportCallRecordingsExcelThunk()).unwrap();
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({
+        queryKey: communicationsKeys.callRecordings.all(),
+      });
+    },
+  });
+
+  const tableLoading = listPending || listFetching;
 
   const showAnalytics = false;
   const [showDateRange] = useState(true);
@@ -434,10 +498,6 @@ const CallRecordingsView: React.FC = () => {
     };
   }, [directionChart]);
 
-  useEffect(() => {
-    dispatch(runCallRecordingsFetchForRefreshKeyThunk());
-  }, [refreshKey, dispatch]);
-
   const stageFilters = useCallback(
     (nextFilters: Record<string, unknown>) => {
       dispatch(setCallRecordingsCurrentFilters(nextFilters));
@@ -576,8 +636,8 @@ const CallRecordingsView: React.FC = () => {
   }, [dispatch]);
 
   const handleExportExcel = useCallback(() => {
-    dispatch(exportCallRecordingsExcelThunk());
-  }, [dispatch]);
+    exportMutation.mutate();
+  }, [exportMutation]);
 
   const tableToolbar = useMemo(() => {
     return {
@@ -601,13 +661,6 @@ const CallRecordingsView: React.FC = () => {
           setCallRecordingsPagination({
             ...st.pagination,
             currentPage: 1,
-          }),
-        );
-        dispatch(
-          fetchCallRecordingsThunk({
-            page: 1,
-            perPage: st.pagination.perPage,
-            search: st.searchValue.trim(),
           }),
         );
       },
@@ -1244,13 +1297,6 @@ const CallRecordingsView: React.FC = () => {
                 ...st.pagination,
                 currentPage: page,
                 perPage: rowsPerPage,
-              }),
-            );
-            dispatch(
-              fetchCallRecordingsThunk({
-                page,
-                perPage: rowsPerPage,
-                search: st.searchValue.trim(),
               }),
             );
           }}

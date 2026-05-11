@@ -1,0 +1,41 @@
+.request-categories-page {
+  .generic-table-responsive {
+    padding-top: 0 !important;
+  }
+
+  &__field-reorder-btn {
+    padding: 4px;
+    border: none;
+    background: none;
+
+    &:disabled {
+      cursor: not-allowed;
+      opacity: 0.5;
+    }
+
+    &:not(:disabled) {
+      cursor: pointer;
+      opacity: 1;
+    }
+  }
+
+  &__workflow-root {
+    margin-top: 24px;
+  }
+
+  &__workflow-level-title {
+    font-size: 14px;
+    color: #141414;
+  }
+
+  &__workflow-checkbox {
+    font-size: 14px;
+    color: #141414;
+  }
+
+  &__tracking-hint {
+    font-size: 12px;
+    color: #64748b;
+    margin-top: 6px;
+  }
+}

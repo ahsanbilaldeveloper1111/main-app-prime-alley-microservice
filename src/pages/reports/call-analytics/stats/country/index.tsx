@@ -35,6 +35,7 @@ import {
 } from "@utils/Helper";
 import { HEADER_CONSTANTS } from "@constants/headerConstants";
 import { canViewCallLogsFromSession } from "@utils/callPermissionUtils";
+import { normalizeBarFiltersForApi } from "@page-modules/reports/call-analytics/callAnalyticsBarFilters";
 import "@assets/scss/common.scss";
 
 const { PERMISSIONS } = HEADER_CONSTANTS;
@@ -416,61 +417,9 @@ const CallStatsCountry = () => {
   };
 
   const handleFiltersChange = (filters: any) => {
-    // Convert datetime values from local timezone to UTC before sending to API
-    const formattedFilters: any = { ...filters };
-
-    if (formattedFilters.start_datetime) {
-      // datetime-local returns YYYY-MM-DDTHH:mm format in local timezone
-      // Convert to UTC ISO format
-      let startMoment = moment(formattedFilters.start_datetime);
-
-      if (
-        formattedFilters.start_datetime.match(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/)
-      ) {
-        // Format is YYYY-MM-DDTHH:mm, add :00 seconds
-        startMoment = moment(formattedFilters.start_datetime + ":00");
-      } else if (!formattedFilters.start_datetime.includes("T")) {
-        // If only date, set to 00:00:00
-        startMoment = moment(formattedFilters.start_datetime).startOf("day");
-      }
-
-      // Convert to UTC
-      formattedFilters.start_datetime =
-        startMoment.utc().format("YYYY-MM-DDTHH:mm:ss") + "Z";
-    }
-
-    if (formattedFilters.end_datetime) {
-      // datetime-local returns YYYY-MM-DDTHH:mm format in local timezone
-      // Convert to UTC ISO format
-      let endMoment = moment(formattedFilters.end_datetime);
-
-      if (
-        formattedFilters.end_datetime.match(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/)
-      ) {
-        // Format is YYYY-MM-DDTHH:mm, check if it's 23:59, otherwise add :00
-        const timePart = formattedFilters.end_datetime.split("T")[1];
-        if (timePart === "23:59") {
-          endMoment = moment(formattedFilters.end_datetime + ":59");
-        } else {
-          endMoment = moment(formattedFilters.end_datetime + ":00");
-        }
-      } else if (!formattedFilters.end_datetime.includes("T")) {
-        // If only date, set to 23:59:59
-        endMoment = moment(formattedFilters.end_datetime).endOf("day");
-      }
-
-      // Convert to UTC
-      formattedFilters.end_datetime =
-        endMoment.utc().format("YYYY-MM-DDTHH:mm:ss") + "Z";
-    }
-
-    // Remove is_incoming_only if it's empty, null, or undefined (don't send to API by default)
-    if (
-      !formattedFilters.is_incoming_only ||
-      formattedFilters.is_incoming_only === ""
-    ) {
-      delete formattedFilters.is_incoming_only;
-    }
+    const formattedFilters = normalizeBarFiltersForApi(filters as Record<string, unknown>, {
+      stripEmptyIncomingOnly: true,
+    }) as Record<string, any>;
 
     // Update both state and ref immediately
     setCurrentFilters(formattedFilters);

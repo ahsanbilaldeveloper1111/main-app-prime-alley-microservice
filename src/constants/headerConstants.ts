@@ -200,7 +200,6 @@ export const HEADER_CONSTANTS = {
     ERROR_LOGS: "Error Logs",
 
     // NetOps
-    NETOPS_DASHBOARD: "Dashboard",
     NETOPS_DEVICES: "Devices",
     NETOPS_SERVICES: "Service status",
     NETOPS_ALERTS: "Alerts and Notifications",
@@ -279,7 +278,6 @@ export const HEADER_CONSTANTS = {
     VIEW_AI_CHAT: "view-ai-chat-general",
     VIEW_AI_CHAT_MENTIONS: "view-ai-chat-mentions-general",
     VIEW_AI_CHAT_RESPONSES: "view-ai-chat-responses-general",
-    VIEW_VIRTUAL_AGENTS: "view-virtual-agents-general",
     VIEW_PRICING_FEATURES: "view-pricing-general",
 
     //AI chat permissions end
@@ -290,7 +288,6 @@ export const HEADER_CONSTANTS = {
     WORK_PLANNER_SERVICES: "work-planner-services",
     CONVERT_TO_RECURRING_TASK_WORK_PLANNER: "convert-to-recurring-task-work-planner",
     PULSE_SERVICES: "pulse-services",
-    VIRTUAL_AGENTS_SERVICES: "ai-ml-services",
     DNCR_SERVICES: "dncr-services",
     ACCOUNTS_SERVICES: "accounts-services",
     STAFF_MANAGEMENT_SERVICES: "staff-management-services",
@@ -319,7 +316,6 @@ export const HEADER_CONSTANTS = {
     NETOPS_SERVICES: "health-care-services",
     CALL_HISTORY_SERVICES: "call-history-services",
     RESOURCES_SERVICES: "resources-services",
-    LIST_TRUNKS_AIML: "list-trunks-aiml",
     //Services permissions end
 
     //Work Planner permissions start
@@ -354,58 +350,8 @@ export const HEADER_CONSTANTS = {
       "delete-project-members-work-planner-work-planner",
     //Work Planner permissions end
 
-    //Virtual Agents permissions start
-    VIEW_OUTBOUND_CALLS_AIML: "view-outbound-calls-aiml-aiml",
-
-    VIEW_AGENT_CAMPAIGNS_AIML: "view-agent-campaigns-aiml-aiml",
-    CREATE_CAMPAIGN_AIML: "view-create-campaign-aiml-aiml",
-    VIEW_PITCH_DECK_AIML: "view-pitch-deck-aiml-aiml",
-    VIEW_LIVE_MONITORING_AIML: "view-live-monitoring-aiml-aiml",
-    VIEW_ANALYTICS_AIML: "view-analytics-aiml-aiml",
-    VIEW_USAGE_REPORTS_AIML: "view-usage-reports-aiml-aiml",
-
-    VIEW_INBOUND_CALLS_AIML: "view-inbound-calls-aiml-aiml",
-    VIEW_INBOUND_COMPANIES_AIML: "view-inbound-companies-aiml",
-    VIEW_INBOUND_BOTS_AIML: "view-inbound-bots-aiml",
-    VIEW_INBOUND_ANALYTICS_AIML: "view-inbound-analytics-aiml",
-    VIEW_INBOUND_USAGE_REPORTS_AIML: "view-inbound-dashboard-aiml",
-
-    MANAGE_INBOUND_COMPANIES_AIML: "manage-inbound-companies-aiml",
-    MANAGE_INBOUND_BOTS_AIML: "manage-inbound-bots-aiml",
-    VIEW_INBOUND_TRUNK_INBOUND: "view-inbound-trunk-inbound",
-    CREATE_INBOUND_TRUNK_INBOUND: "create-inbound-trunk-inbound",
-    DELETE_INBOUND_TRUNK_INBOUND: "delete-inbound-trunk-inbound",
-    VIEW_INBOUND_BOTS_INBOUND: "view-inbound-bots-inbound",
-    CREATE_INBOUND_BOTS_INBOUND: "create-inbound-bots-inbound",
-    EDIT_INBOUND_BOTS_INBOUND: "edit-inbound-bots-inbound",
-    DELETE_INBOUND_BOTS_INBOUND: "delete-inbound-bots-inbound",
-    INBOUND_BOT_VERSIONING_INBOUND: "inbound-bot-versioning-inbound",
-    VIEW_INBOUND_CONVERSATIONS_INBOUND: "view-Inbound-conversations-inbound",
-    VIEW_OUTBOUND_CAMPAIGNS_OUTBOUND: "view-outbound-campaign-outbound",
-    CREATE_OUTBOUND_CAMPAIGNS_OUTBOUND: "create-outbound-campaign-outbound",
-    EDIT_OUTBOUND_CAMPAIGNS_OUTBOUND: "edit-outbound-campaign-outbound",
-    DELETE_OUTBOUND_CAMPAIGNS_OUTBOUND: "delete-outbound-campaign-outbound",
-    VIEW_INBOUND_ANALYTICS_INBOUND: "view-inbound-analytics-inbound",
-    VIEW_INBOUND_DASHBOARD_INBOUND: "view-inbound-dashboard-inbound",
-    VIEW_OUTBOUND_BOTS_OUTBOUND: "view-outbound-bots-outbound",
-    CREATE_OUTBOUND_BOTS_OUTBOUND: "create-outbound-bots-outbound",
-    EDIT_OUTBOUND_BOTS_OUTBOUND: "edit-outbound-bots-outbound",
-    DELETE_OUTBOUND_BOTS_OUTBOUND: "delete-outbound-bots-outbound",
-    VIEW_OUTBOUND_SIP_TRUNCK_OUTBOUND: "view-outbound-sip-trunck-outbound",
-    CREATE_OUTBOUND_SIP_TRUNCK_OUTBOUND: "create-outbound-sip-trunck-outbound",
-    DELETE_OUTBOUND_SIP_TRUNCK_OUTBOUND: "delete-outbound-sip-trunck-outbound",
-    VIEW_OUTBOUND_REPORT_OUTBOUND: "view-outbound-report-outbound",
-    VIEW_OUTBOUND_ANALYTICS_OUTBOUND: "view-outbound-analytics-outbound",
-    VIEW_OUTBOUND_DASHBOARD_OUTBOUND: "view-outbound-dashboard-outbound",
-    OUTBOUND_DISPATCH_CAMPAIGN_OUTBOUND: "outbound-dispatch-campaign-outbound",
-    OUTBOUND_VIEW_CAMPAIGN_STATUS_OUTBOUND:
-      "outbound-view-campaign-status-outbound",
-
-    //Virtual Agents permissions end
-
     //pulse permissions start
 
-    VIEW_NETOPS_DASHBOARD: "dashboard-netops",
     VIEW_NETOPS_DEVICES: "devices-netops",
     VIEW_NETOPS_SERVICES: "services-netops",
     VIEW_NETOPS_ALERTS: "alerts-netops",
@@ -419,26 +365,7 @@ export const HEADER_CONSTANTS = {
     EDIT_SERVICE: "edit-service-netops",
     DELETE_SERVICE: "delete-service-netops",
 
-    VIEW_ALERTS_NETOPS: "alerts-netops",
-    RESOLVE_ALERT: "resolve-alert-netops",
-    MONITER_NETOPS: "moniter-netops",
-
-    VIEW_HOSTS_NETOPS: "hosts-netops-netops",
-    VIEW_HOST_GROUPS_NETOPS: "host-groups-netops-netops",
-    VIEW_TEMPLATES_NETOPS: "templates-netops-netops",
-    VIEW_EVENTS_NETOPS: "events-netops-netops",
-    ACKNOWLEDGED_EVENTS_NETOPS: "acknowledged-events-netops-netops",
-    VIEW_CUSTOMERS_NETOPS: "customers-netops-netops",
-    ADD_CUSTOMER_NETOPS: "add-customer-netops-netops",
-    ALERT_NETOPS: "alert-netops-netops",
     VIEW_SERVER_INSIGHTS_NETOPS: "server-insights-netops-netops",
-    ADD_HOST_NETOPS: "add-host-netops-netops",
-    UPDATE_HOST_NETOPS: "update-host-netops-netops",
-    DELETE_HOST_NETOPS: "delete-host-netops-netops",
-    REFRESH_HOST_CACHE_NETOPS: "refresh-host-cache-netops-netops",
-    ADD_HOST_GROUP_NETOPS: "add-host-group-netops-netops",
-    UPDATE_HOST_GROUP_NETOPS: "update-host-group-netops-netops",
-    DELETE_HOST_GROUP_NETOPS: "delete-host-group-netops-netops",
     //pulse permissions end
 
     LIVE_CHAT_USERS: "live-chat-users",
@@ -547,7 +474,6 @@ export const HEADER_CONSTANTS = {
     VIEW_FAQS_PROFILE_AI_CHAT: "view-faqs-profile-ai-chat",
     MANAGE_TENANT_PROFILE_AI_CHAT: "view-tenant-profile-ai-chat",
     MANAGE_GLOBAL_FAQS_AI_CHAT: "manage-global-faqs-ai-chat",
-    MANAGE_AI_BOT_FAQS: "manage-ai-bot-faqs-ai-chat-ai-chat",
     VIEW_AI_CHAT_AI_CHAT: "view-ai-chat-ai-chat",
     //AI chat permissions end
 

@@ -13,7 +13,7 @@ import {
   deleteTaskDocument,
 } from "@utils/tasks";
 import AllActivitiesBrowserModal from "./AllActivitiesBrowserModal";
-import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
+import DeleteConfirmationModal from "@components/page-partials/DeleteConfirmationModal";
 import { useAllActivitiesBrowserModal } from "@planner/useAllActivitiesBrowserModal";
 import { usePermissions } from "@utils/permissionUtils";
 import { HEADER_CONSTANTS } from "@constants/headerConstants";

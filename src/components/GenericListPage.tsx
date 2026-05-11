@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import CustomDataTable, { Column, ServerPaginationInfo } from '@components/CustomDataTable';
 import SimpleCanvas from '@components/SimpleCanvas';
+import { useDebouncedValue } from '@hooks/useDebouncedValue';
 
 interface GenericListPageProps {
-    columns: Column[];
+    /** Row type varies by page; use `Column<YourRow>` at the call site. */
+    columns: Column<any>[];
     fetchData: (page: number, perPage: number, search: string) => Promise<any>;
     title: string;
     searchPlaceholder?: string;
@@ -30,6 +32,8 @@ interface GenericListPageProps {
     exportText?: string;
     newText?: string;
     pageName?: string;
+    /** Delay before `fetchData` uses the search string (reduces API calls while typing). Set `0` to fetch on every keystroke. */
+    searchDebounceMs?: number;
 }
 
 const GenericListPage: React.FC<GenericListPageProps> = ({
@@ -60,6 +64,7 @@ const GenericListPage: React.FC<GenericListPageProps> = ({
     exportText,
     newText,
     pageName,
+    searchDebounceMs = 400,
 
 }) => {
     const [data, setData] = useState<any[]>([]);
@@ -71,7 +76,8 @@ const GenericListPage: React.FC<GenericListPageProps> = ({
         perPage: defaultPageSize,
     });
     const [searchTerm, setSearchTerm] = useState<string>('');
-    
+    const debouncedSearchTerm = useDebouncedValue(searchTerm, searchDebounceMs);
+
     // Canvas state
     const [canvasVisible, setCanvasVisible] = useState<boolean>(false);
     const [selectedRowData, setSelectedRowData] = useState<any>(null);
@@ -116,29 +122,29 @@ const GenericListPage: React.FC<GenericListPageProps> = ({
 
     // Track previous values to determine if this is a refresh or filter/search change
     const prevFiltersRef = useRef(filters);
-    const prevSearchTermRef = useRef(searchTerm);
-    
+    const prevDebouncedSearchRef = useRef(debouncedSearchTerm);
+
     // Combined effect to handle initial load, filters change, and refresh key changes
     useEffect(() => {
-        // Check if filters or search term changed (reset to page 1)
+        // Check if filters or debounced search changed (reset to page 1)
         const filtersChanged = JSON.stringify(filters) !== JSON.stringify(prevFiltersRef.current);
-        const searchChanged = searchTerm !== prevSearchTermRef.current;
-        
+        const searchChanged = debouncedSearchTerm !== prevDebouncedSearchRef.current;
+
         // Only reset to page 1 for filters and search changes, preserve current page for refreshKey changes
         const pageToFetch = (filtersChanged || searchChanged) ? 1 : paginationInfo.currentPage;
-        fetchAndSetData(pageToFetch, paginationInfo.perPage, searchTerm);
-        
+        fetchAndSetData(pageToFetch, paginationInfo.perPage, debouncedSearchTerm);
+
         // Update refs for next comparison
         prevFiltersRef.current = filters;
-        prevSearchTermRef.current = searchTerm;
-    }, [fetchAndSetData, filters, refreshKey, paginationInfo.perPage, searchTerm]);
+        prevDebouncedSearchRef.current = debouncedSearchTerm;
+    }, [fetchAndSetData, filters, refreshKey, paginationInfo.perPage, debouncedSearchTerm]);
 
     const handlePageChange = (page: number) => {
-        fetchAndSetData(page, paginationInfo.perPage, searchTerm);
+        fetchAndSetData(page, paginationInfo.perPage, debouncedSearchTerm);
     };
 
     const handlePerPageChange = (perPage: number) => {
-        fetchAndSetData(1, perPage, searchTerm);
+        fetchAndSetData(1, perPage, debouncedSearchTerm);
     };
 
     const handleSearch = (search: string) => {

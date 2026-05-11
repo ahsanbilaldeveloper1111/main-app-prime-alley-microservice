@@ -48,7 +48,7 @@ import {
   Trash2,
 } from "lucide-react";
 import DeleteConfirmationModal from "../../partial/DeleteConfirmationModal";
-import NewRequestModal from "@pages/workforce/NewRequestModal";
+import NewRequestModal from "@page-modules/workforce/NewRequestModal";
 import UserRequestDynamicFieldInput from "@components/workforce/UserRequestDynamicFieldInput";
 import WorkforceSidebarShell from "@components/workforce/WorkforceSidebarShell";
 import {
@@ -1820,6 +1820,7 @@ const ApprovalRequest = () => {
   rowsPerPageRef.current = rowsPerPage;
   const [selectedRequest, setSelectedRequest] = useState<UserRequest | null>(null);
 
+  /** Categories bundle driven by TanStack Query (`useApprovalRequestCategoriesBundleQuery` in-page wiring pending — legacy fetch retained below). */
   const [categories, setCategories] = useState<UserRequestCategory[]>([]);
   const [categoryFields, setCategoryFields] = useState<Record<number, UserRequestCategoryField[]>>({});
   const [loadingCategories, setLoadingCategories] = useState(false);

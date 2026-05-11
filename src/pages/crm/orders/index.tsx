@@ -111,9 +111,9 @@ import { toast } from "react-toastify";
 
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
-import SuccessfulModal from "@pages/partial/SuccessfulModal";
-import FormModal from "../../partial/FormModal";
-import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
+import SuccessfulModal from "@components/page-partials/SuccessfulModal";
+import FormModal from "@components/page-partials/FormModal";
+import DeleteConfirmationModal from "@components/page-partials/DeleteConfirmationModal";
 import { WorkPlannerAttachmentsModalBody } from "@utils/workPlannerOrderAttachmentsUi";
 import { useSession } from "next-auth/react";
 import moment from "moment";

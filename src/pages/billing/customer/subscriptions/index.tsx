@@ -5,7 +5,6 @@ import React, {
   useEffect,
   useCallback,
   useMemo,
-  useRef,
   useState,
 } from "react";
 import Layout from "@layout/index";
@@ -16,7 +15,8 @@ import { HEADER_CONSTANTS } from "@constants/headerConstants";
 
 const { PERMISSIONS } = HEADER_CONSTANTS;
 
-import { deleteCustomerProductPricing, getCustomerProductPricingList } from "@utils/accounts";
+import { deleteCustomerProductPricing } from "@utils/accounts";
+import { useBillingCustomerSubscriptionsPricingQuery } from "@page-modules/billing/customer/useBillingCustomerSubscriptionsPricingQuery";
 import CreateSubscriptionModal from "@components/CreateSubscriptionModal";
 import type { CustomerProductPricingDataItem } from "@utils/accounts";
 import moment from "moment";
@@ -41,7 +41,7 @@ import { useCrmToolbarConfig } from "@hooks/useCrmToolbarConfig";
 import { useEnsureCustomerForCrmCompany } from "@hooks/billing/useEnsureCustomerForCrmCompany";
 import { useMinifiedCompaniesForSelect } from "@hooks/billing/useMinifiedCompaniesForSelect";
 import { BillingCustomerCompanySelect } from "@components/billings/customer/BillingCustomerCompanySelect";
-import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
+import DeleteConfirmationModal from "@components/page-partials/DeleteConfirmationModal";
 import ColumnEditorModal from "@components/ColumnEditorModal";
 
 interface Product {
@@ -235,7 +235,6 @@ const ProductDetails = () => {
   });
 
   const [subscriptionSearch, setSubscriptionSearch] = useState("");
-  const [totalAllSubscriptions, setTotalAllSubscriptions] = useState(0);
 
   const [showFiltersSidebar, setShowFiltersSidebar] = useState(false);
   const [currentFilters, setCurrentFilters] = useState<{
@@ -250,9 +249,6 @@ const ProductDetails = () => {
     setCurrentFilters(filters);
   }, []);
 
-  const [dataList, setDataList] = useState<any[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [totalRecords, setTotalRecords] = useState(0);
   const [pagination, setPagination] = useState({
     currentPage: 1,
     rowsPerPage: 15,
@@ -265,7 +261,46 @@ const ProductDetails = () => {
     setPagination((prev) => ({ ...prev, currentPage: 1 }));
   }, [subscriptionSearch]);
 
-  const requestIdRef = useRef(0);
+  const subscriptionsFiltersKey = useMemo(
+    () =>
+      JSON.stringify({
+        search: currentFilters.search ?? "",
+        status: currentFilters.status ?? "",
+        billing_cycle: currentFilters.billing_cycle ?? "",
+        renewal_start_date: currentFilters.renewal_start_date ?? "",
+        renewal_end_date: currentFilters.renewal_end_date ?? "",
+      }),
+    [
+      currentFilters.search,
+      currentFilters.status,
+      currentFilters.billing_cycle,
+      currentFilters.renewal_start_date,
+      currentFilters.renewal_end_date,
+    ],
+  );
+
+  const pricingQuery = useBillingCustomerSubscriptionsPricingQuery({
+    crmId: selectedCompanyId ? String(selectedCompanyId) : "",
+    page: pagination.currentPage,
+    perPage: pagination.rowsPerPage,
+    filtersKey: subscriptionsFiltersKey,
+    refreshKey,
+    search: currentFilters.search || "",
+    status: currentFilters.status || undefined,
+    billing_cycle: currentFilters.billing_cycle || undefined,
+    renewal_start_date: currentFilters.renewal_start_date || undefined,
+    renewal_end_date: currentFilters.renewal_end_date || undefined,
+  });
+
+  const dataList = pricingQuery.data?.list ?? [];
+  const loading = pricingQuery.isFetching;
+  const totalRecords = pricingQuery.data?.total ?? 0;
+  const totalAllSubscriptions = totalRecords;
+
+  useEffect(() => {
+    const total = pricingQuery.data?.total ?? 0;
+    setPagination((prev) => ({ ...prev, totalRows: total }));
+  }, [pricingQuery.data?.total]);
 
   const handleOpenFiltersSidebar = useCallback(() => {
     setShowFiltersSidebar(true);
@@ -274,58 +309,6 @@ const ProductDetails = () => {
   const handleCloseFiltersSidebar = useCallback(() => {
     setShowFiltersSidebar(false);
   }, []);
-
-  const fetchProducts = useCallback(async () => {
-    requestIdRef.current += 1;
-    const currentRequestId = requestIdRef.current;
-    setLoading(true);
-    try {
-      if (!selectedCompanyId) {
-        setDataList([]);
-        setTotalRecords(0);
-        setTotalAllSubscriptions(0);
-        setPagination((prev) => ({ ...prev, totalRows: 0 }));
-        return;
-      }
-
-      const response = (await getCustomerProductPricingList(selectedCompanyId, {
-        page: pagination.currentPage,
-        per_page: pagination.rowsPerPage,
-        search: currentFilters.search || "",
-        status: currentFilters.status || undefined,
-        sort_order: "desc",
-        billing_cycle: currentFilters.billing_cycle || undefined,
-        renewal_start_date: currentFilters.renewal_start_date || undefined,
-        renewal_end_date: currentFilters.renewal_end_date || undefined,
-      })) as any;
-
-      if (currentRequestId !== requestIdRef.current) return;
-
-      const list = Array.isArray(response) ? response : response?.dataList ?? response?.data ?? [];
-      const total =
-        response?.meta?.total ??
-        response?.recordsTotal ??
-        response?.recordsFiltered ??
-        (Array.isArray(list) ? list.length : 0);
-
-      setDataList(list);
-      setTotalRecords(total);
-      setTotalAllSubscriptions(total);
-      setPagination((prev) => ({ ...prev, totalRows: total }));
-    } catch (error) {
-      if (currentRequestId !== requestIdRef.current) return;
-      toast.error(`Failed to load subscriptions: ${getErrorMessage(error)}`, {
-        toastId: "billing_subscriptions_fetch_failed",
-      });
-      setDataList([]);
-      setTotalRecords(0);
-      setPagination((prev) => ({ ...prev, totalRows: 0 }));
-    } finally {
-      if (currentRequestId === requestIdRef.current) {
-        setLoading(false);
-      }
-    }
-  }, [pagination.currentPage, pagination.rowsPerPage, currentFilters, refreshKey, selectedCompanyId]);
 
   const handleCreateSubscription = useCallback(() => {
     setShowCreateSubscriptionModal(false);
@@ -387,10 +370,6 @@ const ProductDetails = () => {
     setShowDeleteModal(false);
     setDeleteTarget(null);
   }, [deleteTarget, handleDeletePricing, canDeleteSubscription]);
-
-  useEffect(() => {
-    fetchProducts();
-  }, [fetchProducts]);
 
   const tableColumns: TableColumn<any>[] = useMemo(
     () => [
@@ -516,19 +495,12 @@ const ProductDetails = () => {
               {canUpdateSubscription ? (
               <button
                 type="button"
+                className="bc-table-icon-btn bc-table-icon-btn--primary"
                 disabled={!productId || isDeleting}
                 onClick={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
                   handleOpenEditModal(row);
-                }}
-                style={{
-                  background: "transparent",
-                  border: "none",
-                  padding: "4px",
-                  cursor: !productId || isDeleting ? "not-allowed" : "pointer",
-                  color: "#0d6efd",
-                  opacity: !productId || isDeleting ? 0.5 : 1,
                 }}
               >
                 <FiEdit size={16} />
@@ -538,20 +510,13 @@ const ProductDetails = () => {
               {canDeleteSubscription ? (
               <button
                 type="button"
+                className="bc-table-icon-btn bc-table-icon-btn--danger"
                 disabled={!productId || isDeleting}
                 onClick={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
                   if (!productId) return;
                   openDeleteConfirmation(row);
-                }}
-                style={{
-                  background: "transparent",
-                  border: "none",
-                  padding: "4px",
-                  cursor: !productId || isDeleting ? "not-allowed" : "pointer",
-                  color: "#dc3545",
-                  opacity: !productId || isDeleting ? 0.5 : 1,
                 }}
                 title={isDeleting ? "Deleting..." : "Delete"}
               >
@@ -651,20 +616,12 @@ const ProductDetails = () => {
         setRefreshKey((k) => k + 1);
       },
       dropdownContent: (
-        <div style={{ minWidth: 200 }}>
+        <div className="bc-filter-dropdown-min-200">
           {["Active", "Trial", "Inactive", "Suspended"].map((s) => (
             <button
               key={s}
               type="button"
-              style={{
-                padding: "8px 12px",
-                cursor: "pointer",
-                background: currentFilters.status === s ? "#f0f0f0" : "transparent",
-                borderRadius: "4px",
-                border: "none",
-                width: "100%",
-                textAlign: "left",
-              }}
+              className={`bc-filter-pill-option${currentFilters.status === s ? " bc-filter-pill-option--active" : ""}`}
               onClick={() => applyStatusFilter(s)}
             >
               {s}
@@ -691,13 +648,13 @@ const ProductDetails = () => {
         setRefreshKey((k) => k + 1);
       },
       dropdownContent: (
-        <div style={{ minWidth: 220, padding: "4px 0" }}>
-          <div style={{ padding: "4px 12px 8px", fontSize: 12, color: "#666" }}>From</div>
+        <div className="bc-filter-dropdown-min-220">
+          <div className="bc-filter-date-label">From</div>
           <input
             type="date"
             value={currentFilters.renewal_start_date ?? ""}
             max={currentFilters.renewal_end_date || undefined}
-            style={{ width: "100%", padding: "6px 12px", border: "1px solid #e5e7eb", borderRadius: 4, marginBottom: 8 }}
+            className="bc-filter-date-input bc-filter-date-input--mb"
             onChange={(e) => {
               const nextStart = e.target.value || undefined;
               setCurrentFilters((prev) => ({
@@ -709,12 +666,12 @@ const ProductDetails = () => {
               setRefreshKey((k) => k + 1);
             }}
           />
-          <div style={{ padding: "4px 12px 8px", fontSize: 12, color: "#666" }}>To</div>
+          <div className="bc-filter-date-label">To</div>
           <input
             type="date"
             value={currentFilters.renewal_end_date ?? ""}
             min={currentFilters.renewal_start_date || undefined}
-            style={{ width: "100%", padding: "6px 12px", border: "1px solid #e5e7eb", borderRadius: 4 }}
+            className="bc-filter-date-input"
             onChange={(e) => {
               const nextEndRaw = e.target.value || undefined;
               setCurrentFilters((prev) => ({
@@ -743,21 +700,12 @@ const ProductDetails = () => {
         setRefreshKey((k) => k + 1);
       },
       dropdownContent: (
-        <div style={{ minWidth: 200 }}>
+        <div className="bc-filter-dropdown-min-200">
           {["monthly", "quarterly", "yearly", "one time"].map((cycle) => (
             <button
               key={cycle}
               type="button"
-              style={{
-                padding: "8px 12px",
-                cursor: "pointer",
-                background: currentFilters.billing_cycle === cycle ? "#f0f0f0" : "transparent",
-                borderRadius: "4px",
-                border: "none",
-                width: "100%",
-                textAlign: "left",
-                textTransform: "capitalize",
-              }}
+              className={`bc-filter-pill-option bc-filter-pill-option--capitalize${currentFilters.billing_cycle === cycle ? " bc-filter-pill-option--active" : ""}`}
               onClick={() => applyBillingCycleFilter(cycle)}
             >
               {cycle}
@@ -771,33 +719,10 @@ const ProductDetails = () => {
   // Add Subscription button
   const renderAddSubscriptionButton = () =>
     canCreateSubscription ? (
-    <div
-      style={{
-        position: "absolute",
-        right: "19px",
-        top: "18px",
-        display: "flex",
-        alignItems: "center",
-        gap: "8px",
-      }}
-    >
+    <div className="bc-table-toolbar-floating">
       <button
         type="button"
-        style={{
-          padding: "9px 13px",
-          backgroundColor: "#000000",
-          color: "#ffffff",
-          border: "none",
-          borderRadius: "4px",
-          fontSize: "12px",
-          fontWeight: "500",
-          cursor: "pointer",
-          display: "flex",
-          alignItems: "center",
-          gap: "8px",
-        }}
-        onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = "#1a1a1a"; }}
-        onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "#000000"; }}
+        className="bc-btn-billing-dark"
         onClick={() => setShowCreateSubscriptionModal(true)}
       >
         <Plus size={16} />
@@ -916,7 +841,7 @@ const ProductDetails = () => {
       {/* Main flex container for content and sidebar — same pattern as prospects.tsx */}
       <BillingCustomerPortalTableShell>
         {/* Main content area */}
-        <div style={{ flex: 1, overflowY: "auto", overflowX: "hidden" }}>
+        <div className="bc-main-scroll">
 
           {/* Company selector above the table */}
           <div className="mb-3">
@@ -995,7 +920,7 @@ const ProductDetails = () => {
 
         {/* Subscription Detail Sidebar — sibling of main content, same pattern as prospects.tsx */}
         {showProductSidebar && (
-        <div style={{ borderLeft: "1px solid #e2e8f0" }}>
+        <div className="bc-sidebar-border-start">
         <GenericSidebar
         isOpen={showProductSidebar}
         onClose={handleCloseProductSidebar}

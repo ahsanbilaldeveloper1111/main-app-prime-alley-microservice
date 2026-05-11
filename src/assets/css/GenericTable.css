@@ -1010,6 +1010,29 @@ button.preview-button:hover, button.preview-button:focus {
 .gt-toolbar-btn.gt-icon-btn {
   padding: 6px 8px;
 }
+
+/* Primary toolbar-style button (e.g. Apply Filters) — matches app neutrals, not Bootstrap blue */
+.gt-toolbar-btn--primary {
+  background: #141414 !important;
+  color: #ffffff !important;
+  border-color: #141414 !important;
+  font-weight: 500 !important;
+}
+
+.gt-toolbar-btn--primary:hover:not(:disabled) {
+  background: #2d2d2d !important;
+  border-color: #2d2d2d !important;
+  color: #ffffff !important;
+}
+
+.gt-toolbar-btn--primary:focus-visible:not(:disabled) {
+  box-shadow: 0 0 0 2px rgba(20, 20, 20, 0.25);
+}
+
+.gt-toolbar-btn--primary:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
 .gt-toolbar-dropdown{
 background: #fff !important;
   padding: 7px 14px;
