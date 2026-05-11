@@ -118,19 +118,10 @@ export function GsmAssignPageView({ ctx }: Readonly<{ ctx: GsmAssignPageContext 
           <div className="page-header-title style-2">
             <Row className="align-items-center">
               <Col md={5}>
-                <h2 className="mb-0 d-flex align-items-center">
-                  {/* Telco Gateway Assign */}
-                  {/* {session?.user?.permissions?.includes('company-link-gsm-assignment') && (
-                          <Button variant="outline-primary" size="sm" className="ms-3" onClick={() => handleCreateAssignement()}>New Assign</Button>
-                      )} */}
-                </h2>
+                <h2 className="mb-0 d-flex align-items-center">Telco Gateway Assign</h2>
               </Col>
               <Col md={7} className="d-flex justify-content-end">
                 <div className="action-buttons">
-                  {/* <div className="search-container">
-                            <i className="fas fa-search search-icon"></i>
-                            <input type="text" className="search-bar" placeholder="Search GSM, Company..." onChange={(e) => handleFiltersChange({...currentFilters, search: e.target.value})}/>
-                        </div> */}
 
 {session?.user?.permissions?.includes("list-gsm-assignment") && (
                   <GsmCompanyFilter
@@ -435,15 +426,13 @@ export function GsmAssignPageView({ ctx }: Readonly<{ ctx: GsmAssignPageContext 
       />
 
       {successfulPortsModal && (
-        <>
-          <SuccessfulModal
-            show={successfulPortsModal}
-            onHide={() => setSuccessfulPortsModal(false)}
-            title="Ports Updated!"
-            description={`The ports for **${gsmName}** have been successfully updated.`}
-            confirmButtonText="OK"
-          />
-        </>
+        <SuccessfulModal
+          show={successfulPortsModal}
+          onHide={() => setSuccessfulPortsModal(false)}
+          title="Ports Updated!"
+          description={`The ports for **${gsmName}** have been successfully updated.`}
+          confirmButtonText="OK"
+        />
       )}
 
       {showAssignPortsModalNew && (
@@ -461,29 +450,25 @@ export function GsmAssignPageView({ ctx }: Readonly<{ ctx: GsmAssignPageContext 
       )}
 
       {showDelinkCompanyModal && (
-        <>
-          <ConfirmModal
-            show={showDelinkCompanyModal}
-            onHide={() => setShowDelinkCompanyModal(false)}
-            title="Delink Company"
-            description={`Are you sure you want to delink **${selectedDelinkGsmName}** from **${selectedDelinkCompanyName}**? This action cannot be undone.`}
-            targetName="this operation"
-            confirmButtonText="Confirm Delink"
-            onConfirm={(confirmationText) => handleSubmitDelinkCompany()}
-          />
-        </>
+        <ConfirmModal
+          show={showDelinkCompanyModal}
+          onHide={() => setShowDelinkCompanyModal(false)}
+          title="Delink Company"
+          description={`Are you sure you want to delink **${selectedDelinkGsmName}** from **${selectedDelinkCompanyName}**? This action cannot be undone.`}
+          targetName="this operation"
+          confirmButtonText="Confirm Delink"
+          onConfirm={(confirmationText) => handleSubmitDelinkCompany()}
+        />
       )}
 
       {showExportSuccessfulModal && (
-        <>
-          <SuccessfulModal
-            show={showExportSuccessfulModal}
-            onHide={() => setShowExportSuccessfulModal(false)}
-            title="Export Successful!"
-            description="The GSM data has been successfully exported as a JSON file."
-            confirmButtonText="OK"
-          />
-        </>
+        <SuccessfulModal
+          show={showExportSuccessfulModal}
+          onHide={() => setShowExportSuccessfulModal(false)}
+          title="Export Successful!"
+          description="The GSM data has been successfully exported as a JSON file."
+          confirmButtonText="OK"
+        />
       )}
 
       {showUssdModal && (
@@ -561,10 +546,15 @@ export function GsmAssignPageView({ ctx }: Readonly<{ ctx: GsmAssignPageContext 
                disabled={ussdLoading}
              >
                {ussdLoading ? (
-                 <>
-                   <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden />
-                   {"Sending..."}
-                 </>
+                 <output
+                   className="d-inline-flex align-items-center m-0 p-0 border-0 bg-transparent"
+                   style={{ font: "inherit", color: "inherit" }}
+                   aria-live="polite"
+                 >
+                   <span className="spinner-border spinner-border-sm me-2" aria-hidden />
+                   {" "}
+                   <span>Sending...</span>
+                 </output>
                ) : (
                  "Send USSD Command"
                )}
@@ -654,10 +644,15 @@ export function GsmAssignPageView({ ctx }: Readonly<{ ctx: GsmAssignPageContext 
                disabled={smsLoading}
              >
                {smsLoading ? (
-                 <>
-                   <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden />
-                   {"Sending..."}
-                 </>
+                 <output
+                   className="d-inline-flex align-items-center m-0 p-0 border-0 bg-transparent"
+                   style={{ font: "inherit", color: "inherit" }}
+                   aria-live="polite"
+                 >
+                   <span className="spinner-border spinner-border-sm me-2" aria-hidden />
+                   {" "}
+                   <span>Sending...</span>
+                 </output>
                ) : (
                  "Send SMS"
                )}
