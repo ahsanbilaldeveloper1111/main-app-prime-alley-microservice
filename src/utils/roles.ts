@@ -175,15 +175,25 @@ export const updateRole = async (id: string, name: string, user_type_id?: number
     }
   };
 
-  export const viewRank = async (id: string) => {
+  /** Next.js `router.query.id` may be `string | string[] | undefined`. */
+  function normalizeRankRouteId(id: string | string[] | undefined): string | null {
+    if (id == null) return null;
+    const raw = Array.isArray(id) ? id[0] : id;
+    const s = String(raw).trim();
+    return s === "" ? null : s;
+  }
+
+  export const viewRank = async (id: string | string[] | undefined) => {
+    const rankId = normalizeRankRouteId(id);
+    if (rankId == null) {
+      toast.error("Invalid rank");
+      throw new Error("Invalid rank id");
+    }
     try {
-        
-      const response = await axiosInstance.post(
-        `ranks/view`,
-        {
-          id: id
-        }
-      );
+      const response = await axiosInstance.post(`ranks/view`, {
+        id: rankId,
+        role_id: rankId,
+      });
       if(response.data){
         const responseData = response.data;
         if(responseData.code == 200){

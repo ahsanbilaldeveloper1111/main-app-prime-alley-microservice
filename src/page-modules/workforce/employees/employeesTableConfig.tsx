@@ -160,7 +160,7 @@ export function buildEmployeeTableActions({
       label: "Create Journey",
       icon: <Calendar size={16} />,
       onClick: (profile: UserProfile) => openJourneyModal(profile),
-      show: () => Boolean(permissions?.includes(PERMISSIONS.UPDATE_EMPLOYEE_STAFF_MANAGEMENT)),
+      show: () => Boolean(permissions?.includes(PERMISSIONS.CREATE_JOURNEY_STAFF_MANAGEMENT)),
       disabled: (profile: UserProfile) => (profile as UserProfile & { journey?: { id?: number } }).journey?.id != null,
       disabledTitle: "Journey already started",
       variant: "link",

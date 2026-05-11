@@ -31,6 +31,7 @@ import {
 import OrgEmployeeSidebar from "@page-modules/workforce/org-chart/sidebar";
 import router from "next/router";
 import {
+  filterOrgChartUsersWithMinifiedProfile,
   findMainAppUserByOrgChartUserId,
   mainAppUserRowKeyForSelection,
 } from "@utils/workforce/orgChartMainAppUserMatch";
@@ -129,7 +130,7 @@ const OrganizationalChart = () => {
     setSelectedEmployee(null);
   }, [activeTab]);
 
-  const { userProfilesMinified } = useUserProfilesMinified();
+  const { userProfilesMinified, loading: userProfilesMinifiedLoading } = useUserProfilesMinified();
 
   const departmentIdForQuery = useMemo(() => {
     if (selectedDepartment === ALL_DEPARTMENT || !selectedDepartment) return undefined;
@@ -206,18 +207,29 @@ const OrganizationalChart = () => {
 
   const chartLoading = Boolean(companyIdentifier) && orgChartQuery.isPending;
 
+  /** Only prune against the visible tree when showing the full chart; filtered trees are a subset and would drop valid multi-picks. */
   useEffect(() => {
     if (chartLoading || !orgChartTreeRaw.length || selectedUserIds.length === 0) return;
+    if (userIdsForQuery != null && userIdsForQuery.length > 0) return;
     setSelectedUserIds((prev) => {
       const next = prev.filter((id) => orgChartUserIds.has(id));
       return next.length === prev.length ? prev : next;
     });
-  }, [chartLoading, orgChartTreeRaw.length, orgChartUserIds, selectedUserIds]);
+  }, [chartLoading, orgChartTreeRaw.length, orgChartUserIds, selectedUserIds, userIdsForQuery]);
 
-  const usersInOrgChart = useMemo(
-    () => filterMainAppUsersInOrgChart(mainAppUsers ?? [], orgChartUserIds),
-    [mainAppUsers, orgChartUserIds],
-  );
+  /** Everyone with a workforce profile (not only nodes in the currently filtered tree) so multi-select stays usable. */
+  const userFilterDropdownRows = useMemo(() => {
+    const users = mainAppUsers ?? [];
+    if (userProfilesMinifiedLoading || userProfilesMinified.length === 0) {
+      return filterMainAppUsersInOrgChart(users, orgChartUserIds);
+    }
+    return filterOrgChartUsersWithMinifiedProfile(users, userProfilesMinified);
+  }, [
+    mainAppUsers,
+    orgChartUserIds,
+    userProfilesMinified,
+    userProfilesMinifiedLoading,
+  ]);
 
   const selectedUserSubtreeIds = useMemo(() => {
     if (selectedUserIds.length === 0 || !orgData) return new Set<string>();
@@ -228,10 +240,10 @@ const OrganizationalChart = () => {
     if (selectedUserIds.length === 0) return "All Users";
     if (selectedUserIds.length === 1) {
       const one = selectedUserIds[0];
-      return findMainAppUserByOrgChartUserId(usersInOrgChart, one)?.name ?? one;
+      return findMainAppUserByOrgChartUserId(userFilterDropdownRows, one)?.name ?? one;
     }
     return `${selectedUserIds.length} users selected`;
-  }, [selectedUserIds, usersInOrgChart]);
+  }, [selectedUserIds, userFilterDropdownRows]);
 
   const toggleOrgChartUserFilter = useCallback((uid: string) => {
     setSelectedUserIds((prev) => {
@@ -388,6 +400,9 @@ const OrganizationalChart = () => {
               <button
                 type="button"
                 className="org-chart-page__dropdown-trigger"
+                aria-expanded={showUserDropdown}
+                aria-haspopup="dialog"
+                aria-label="Filter org chart by employee. Multiple selections allowed."
                 onClick={() => setShowUserDropdown(!showUserDropdown)}
               >
                 {userFilterTriggerLabel}
@@ -395,6 +410,7 @@ const OrganizationalChart = () => {
               </button>
               {showUserDropdown && (
                 <div className="org-chart-page__dropdown-menu org-chart-page__dropdown-menu--scroll org-chart-page__dropdown-menu--multi">
+                  <p className="org-chart-page__dropdown-hint">Select one or more people, then Done.</p>
                   <button
                     type="button"
                     className={`org-chart-page__dropdown-item${selectedUserIds.length === 0 ? " org-chart-page__dropdown-item--active" : ""}`}
@@ -405,7 +421,7 @@ const OrganizationalChart = () => {
                   >
                     All Users
                   </button>
-                  {usersInOrgChart.map((u) => {
+                  {userFilterDropdownRows.map((u) => {
                     const uid = mainAppUserRowKeyForSelection(u);
                     const isSelected = selectedUserIds.includes(uid);
                     return (
