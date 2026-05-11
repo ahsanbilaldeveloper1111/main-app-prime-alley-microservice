@@ -9,12 +9,12 @@ import {
   INITIAL_CHUNKS_ANALYSIS_DATA,
   STEP_CODES,
   UNABLE_TO_ANALYZE_CALL,
-} from "@pages/ai-ml/analysis/constants";
-import type { AnalysisStepEntry, CallAnalysisWithDataParams } from "@pages/ai-ml/analysis/types";
+} from "@page-modules/ai-ml/analysis/constants";
+import type { AnalysisStepEntry, CallAnalysisWithDataParams } from "@page-modules/ai-ml/analysis/types";
 import {
   normalizeStep,
   updateStepInList,
-} from "@pages/ai-ml/analysis/analysisHelpers";
+} from "@page-modules/ai-ml/analysis/analysisHelpers";
 
 function isDefinedValue<T>(v: T | null | undefined): v is T {
   return v !== undefined && v !== null;

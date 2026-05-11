@@ -4,7 +4,6 @@ import path from "node:path";
 import webpack from "webpack";
 
 const nextConfig: NextConfig = {
-    pageExtensions: ["page.tsx", "page.ts", "page.jsx", "page.js"],
 
     eslint: {
         ignoreDuringBuilds: true,
