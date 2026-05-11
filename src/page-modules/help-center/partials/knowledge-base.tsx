@@ -43,13 +43,13 @@ function stripSimpleAngleBracketTags(html: string): string {
   let i = 0;
   const n = html.length;
   while (i < n) {
-    if (html.charCodeAt(i) !== LT) {
+    if (html.codePointAt(i) !== LT) {
       i += 1;
       continue;
     }
     const tagStart = i;
     let j = i + 1;
-    while (j < n && html.charCodeAt(j) !== GT) {
+    while (j < n && html.codePointAt(j) !== GT) {
       j += 1;
     }
     if (j >= n) {
@@ -213,7 +213,9 @@ const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({
 
         const items = normalizeFaqArrayResponse<FaqItemRow>(response);
         setFaqItems(items);
-        setHasMore(computeHasMoreFromResponse(response, items.length, 5, items.length));
+        setHasMore(
+          computeHasMoreFromResponse(response, items.length, 5, items.length),
+        );
       } catch (error) {
         console.error("Error fetching FAQ items:", error);
         setFaqItems([]);
@@ -437,7 +439,6 @@ const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({
     recentFAQs,
     resources,
   });
-
 
   return (
     <div
@@ -712,7 +713,12 @@ const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({
                     justifyContent: "center",
                   }}
                 >
-                  <TrendingUp aria-hidden size={18} color="#fff" strokeWidth={2.5} />
+                  <TrendingUp
+                    aria-hidden
+                    size={18}
+                    color="#fff"
+                    strokeWidth={2.5}
+                  />
                 </div>
                 <h5
                   style={{
@@ -776,7 +782,12 @@ const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({
                     justifyContent: "center",
                   }}
                 >
-                  <BookOpen aria-hidden size={18} color="#fff" strokeWidth={2.5} />
+                  <BookOpen
+                    aria-hidden
+                    size={18}
+                    color="#fff"
+                    strokeWidth={2.5}
+                  />
                 </div>
                 <h5
                   style={{
@@ -839,7 +850,12 @@ const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({
                     justifyContent: "center",
                   }}
                 >
-                  <HelpCircle aria-hidden size={18} color="#fff" strokeWidth={2.5} />
+                  <HelpCircle
+                    aria-hidden
+                    size={18}
+                    color="#fff"
+                    strokeWidth={2.5}
+                  />
                 </div>
                 <h5
                   style={{

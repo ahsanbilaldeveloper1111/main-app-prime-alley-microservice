@@ -76,6 +76,55 @@ function ticketIdToDisplayString(id: unknown): string | null {
   return null;
 }
 
+type CreateTicketSubmissionValidationArgs = Readonly<{
+  category: string;
+  subject: string;
+  description: string;
+  descriptionHTML: string;
+  attachedFiles: File[];
+}>;
+
+/** Returns toast error message, or null if input is valid. */
+function createTicketSubmissionValidationMessage(
+  args: CreateTicketSubmissionValidationArgs,
+): string | null {
+  if (!args.category) {
+    return 'Please select a category';
+  }
+  const trimmedSubject = args.subject.trim();
+  if (trimmedSubject.length < 5) {
+    return 'Please enter a subject (Min: 5 chars)';
+  }
+  const plainText = args.descriptionHTML
+    ? stripHTML(args.descriptionHTML)
+    : args.description;
+  if (plainText.length < 50 || plainText.length > 500) {
+    return 'Description must be between 50 and 500 characters';
+  }
+  const maxFileSize = 1024 * 1024;
+  for (let i = 0; i < args.attachedFiles.length; i += 1) {
+    const file = args.attachedFiles[i];
+    if (file.size > maxFileSize) {
+      return `File ${i + 1} size must be less than 1MB`;
+    }
+  }
+  return null;
+}
+
+function extractCreatedTicketDisplayId(response: unknown): string | null {
+  const rawId =
+    response &&
+    typeof response === 'object' &&
+    'data' in response
+      ? Reflect.get(response, 'data')
+      : undefined;
+  const extractedId =
+    rawId !== null && typeof rawId === 'object' && 'id' in rawId
+      ? Reflect.get(rawId, 'id')
+      : undefined;
+  return ticketIdToDisplayString(extractedId);
+}
+
 interface FormStepProgressProps {
   steps: { number: number; label: string }[];
   currentStep: number;
@@ -234,28 +283,16 @@ const CreateTicket: React.FC<CreateTicketProps> = ({ onBack }) => {
   };
 
   const handleSubmit = useCallback(async () => {
-    if (!category) {
-      toast.error('Please select a category');
+    const validationMessage = createTicketSubmissionValidationMessage({
+      category,
+      subject,
+      description,
+      descriptionHTML,
+      attachedFiles,
+    });
+    if (validationMessage) {
+      toast.error(validationMessage);
       return;
-    }
-    const trimmedSubject = subject.trim();
-    if (trimmedSubject.length < 5) {
-      toast.error('Please enter a subject (Min: 5 chars)');
-      return;
-    }
-    const plainText = descriptionHTML ? stripHTML(descriptionHTML) : description;
-    if (plainText.length < 50 || plainText.length > 500) {
-      toast.error('Description must be between 50 and 500 characters');
-      return;
-    }
-
-    const maxFileSize = 1024 * 1024;
-    for (let i = 0; i < attachedFiles.length; i++) {
-      const file = attachedFiles[i];
-      if (file.size > maxFileSize) {
-        toast.error(`File ${i + 1} size must be less than 1MB`);
-        return;
-      }
     }
 
     const typeId =
@@ -272,23 +309,14 @@ const CreateTicket: React.FC<CreateTicketProps> = ({ onBack }) => {
         priority,
         attachedFiles.length > 0 ? attachedFiles : undefined
       );
-      const rawId =
-        response &&
-        typeof response === 'object' &&
-        'data' in response
-          ? Reflect.get(response, 'data')
-          : undefined;
-      const extractedId =
-        rawId !== null && typeof rawId === 'object' && 'id' in rawId
-          ? Reflect.get(rawId, 'id')
-          : undefined;
-      const ticketId = ticketIdToDisplayString(extractedId);
+      const ticketId = extractCreatedTicketDisplayId(response);
 
-      if (ticketId !== null && ticketId.length > 0) {
-        setSubmittedTicketId(ticketId);
-        setIsSubmitted(true);
-        toast.success('Ticket created successfully!');
+      if (ticketId === null || ticketId.length === 0) {
+        return;
       }
+      setSubmittedTicketId(ticketId);
+      setIsSubmitted(true);
+      toast.success('Ticket created successfully!');
     } catch (error: unknown) {
       console.error('Error creating ticket:', error);
     } finally {
