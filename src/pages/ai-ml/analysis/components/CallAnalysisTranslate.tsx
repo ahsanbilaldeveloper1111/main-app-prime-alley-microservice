@@ -13,20 +13,11 @@ const translationParagraphStyle: React.CSSProperties = {
   fontSize: "20px",
 };
 
-const TRANSLATION_TABS = [
-  { eventKey: "en", title: "English", field: "en" },
-  { eventKey: "ar", title: "Arabic", field: "ar" },
-  { eventKey: "ur", title: "Urdu", field: "ur" },
-  { eventKey: "hi", title: "Hindi", field: "hi" },
-] as const;
-
 export function CallAnalysisTranslate({ chunksAnalysisData, subActiveTab, setSubActiveTab }: Props) {
-  const translations = chunksAnalysisData?.translations;
-
   return (
     <Row>
       <Col md={12}>
-        {translations && (
+        {chunksAnalysisData?.translations && (
           <Row>
             <Col md={12}>
               <Tabs
@@ -36,11 +27,18 @@ export function CallAnalysisTranslate({ chunksAnalysisData, subActiveTab, setSub
                 activeKey={subActiveTab}
                 onSelect={(k) => setSubActiveTab(k || "en")}
               >
-                {TRANSLATION_TABS.map(({ eventKey, title, field }) => (
-                  <Tab key={eventKey} eventKey={eventKey} title={title}>
-                    <p style={translationParagraphStyle}>{translations[field]}</p>
-                  </Tab>
-                ))}
+                <Tab eventKey="en" title="English">
+                  <p style={translationParagraphStyle}>{chunksAnalysisData?.translations?.en}</p>
+                </Tab>
+                <Tab eventKey="ar" title="Arabic">
+                  <p style={translationParagraphStyle}>{chunksAnalysisData?.translations?.ar}</p>
+                </Tab>
+                <Tab eventKey="ur" title="Urdu">
+                  <p style={translationParagraphStyle}>{chunksAnalysisData?.translations?.ur}</p>
+                </Tab>
+                <Tab eventKey="hi" title="Hindi">
+                  <p style={translationParagraphStyle}>{chunksAnalysisData?.translations?.hi}</p>
+                </Tab>
               </Tabs>
             </Col>
           </Row>

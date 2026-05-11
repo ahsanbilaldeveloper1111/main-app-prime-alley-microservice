@@ -1,36 +1,53 @@
 import {
   useCallback,
-  useEffect,
   useMemo,
   useRef,
   useState,
 } from "react";
 import type { ChangeEvent } from "react";
 import { useSession } from "next-auth/react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "react-toastify";
 import {
   DeleteCompanyDocument,
   GetCompanyDocumentDownload,
-  GetCompanyDocuments,
   PostCompanyDocuments,
 } from "@utils/accounting";
 import { HEADER_CONSTANTS, type PermissionName } from "@constants/headerConstants";
+import { accountBillingKeys } from "../../../query/keys";
+import { useAccountBillingCompanyDocumentsQuery } from "@page-modules/billing/account-billing/useAccountBillingCompanyDocumentsQuery";
 import {
   buildCompanyDocumentsFormData,
   getCompanyIdFromSession,
   getDocumentId,
   getDocumentName,
-  normalizeCompanyDocumentsResponse,
 } from "./documentPageHelpers";
 
 export function useDocumentsPage() {
   const { data: session, status: sessionStatus } = useSession();
+  const queryClient = useQueryClient();
   const companyId = useMemo(() => getCompanyIdFromSession(session), [session]);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const loadVersionRef = useRef(0);
 
-  const [documents, setDocuments] = useState<Record<string, unknown>[]>([]);
-  const [loadState, setLoadState] = useState<"idle" | "loading" | "error">("idle");
+  const documentsQuery = useAccountBillingCompanyDocumentsQuery(companyId, {
+    enabled: sessionStatus !== "loading" && Boolean(companyId),
+  });
+
+  const documents = documentsQuery.data ?? [];
+  const loadState = useMemo((): "idle" | "loading" | "error" => {
+    if (!companyId) return "idle";
+    if (documentsQuery.isError) return "error";
+    if (documentsQuery.isFetching) return "loading";
+    return "idle";
+  }, [companyId, documentsQuery.isError, documentsQuery.isFetching]);
+
+  const invalidateDocuments = useCallback(async () => {
+    if (!companyId) return;
+    await queryClient.invalidateQueries({
+      queryKey: accountBillingKeys.documents.list(companyId),
+    });
+  }, [companyId, queryClient]);
+
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const [uploading, setUploading] = useState(false);
@@ -39,28 +56,6 @@ export function useDocumentsPage() {
     null,
   );
   const [deletingDocument, setDeletingDocument] = useState(false);
-
-  const loadDocuments = useCallback(async () => {
-    if (!companyId) {
-      setDocuments([]);
-      setLoadState("idle");
-      return;
-    }
-    loadVersionRef.current += 1;
-    const version = loadVersionRef.current;
-    setLoadState("loading");
-    try {
-      const raw = await GetCompanyDocuments(companyId);
-      if (version !== loadVersionRef.current) return;
-      setDocuments(normalizeCompanyDocumentsResponse(raw));
-      setLoadState("idle");
-    } catch (err) {
-      if (version !== loadVersionRef.current) return;
-      console.error("DocumentsPage GetCompanyDocuments error:", err);
-      setDocuments([]);
-      setLoadState("error");
-    }
-  }, [companyId]);
 
   const handleDownloadDocument = useCallback(
     async (doc: Record<string, unknown>) => {
@@ -88,25 +83,6 @@ export function useDocumentsPage() {
     },
     [handleDownloadDocument],
   );
-
-  useEffect(() => {
-    if (sessionStatus === "loading") {
-      return undefined;
-    }
-
-    if (!companyId) {
-      loadVersionRef.current += 1;
-      setDocuments([]);
-      setLoadState("idle");
-      return undefined;
-    }
-
-    loadDocuments().catch(() => undefined);
-
-    return () => {
-      loadVersionRef.current += 1;
-    };
-  }, [companyId, sessionStatus, loadDocuments]);
 
   const canUseCompanyActions =
     Boolean(companyId) && sessionStatus !== "loading";
@@ -143,26 +119,39 @@ export function useDocumentsPage() {
     }
   }, [deletingDocument]);
 
-  const confirmDeleteDocument = useCallback(async () => {
-    if (!canDeleteDocumentBilling || !companyId || !documentPendingDelete) return;
-    const docId = getDocumentId(documentPendingDelete);
-    if (docId == null) return;
-    setDeletingDocument(true);
-    try {
-      const response = await DeleteCompanyDocument(companyId, docId);
+  const deleteMutation = useMutation({
+    mutationFn: async (args: { companyId: string; doc: Record<string, unknown> }) => {
+      const docId = getDocumentId(args.doc);
+      if (docId == null) throw new Error("Missing document id");
+      return DeleteCompanyDocument(args.companyId, docId);
+    },
+    onSuccess: async (response) => {
       const payload = response as { message?: string } | null | undefined;
       const apiMessage =
         payload && typeof payload.message === "string" ? payload.message.trim() : "";
       toast.success(apiMessage || "Document deleted successfully.");
       setShowDeleteDocumentModal(false);
       setDocumentPendingDelete(null);
-      await loadDocuments();
-    } catch (error: unknown) {
+      await invalidateDocuments();
+    },
+    onError: (error: unknown) => {
       console.error("DocumentsPage DeleteCompanyDocument error:", error);
+    },
+  });
+
+  const confirmDeleteDocument = useCallback(async () => {
+    if (!canDeleteDocumentBilling || !companyId || !documentPendingDelete) return;
+    const docId = getDocumentId(documentPendingDelete);
+    if (docId == null) return;
+    setDeletingDocument(true);
+    try {
+      await deleteMutation.mutateAsync({ companyId, doc: documentPendingDelete });
+    } catch {
+      /* toast / log via onError */
     } finally {
       setDeletingDocument(false);
     }
-  }, [canDeleteDocumentBilling, companyId, documentPendingDelete, loadDocuments]);
+  }, [canDeleteDocumentBilling, companyId, documentPendingDelete, deleteMutation]);
 
   const openUploadModal = useCallback(() => {
     if (!showAddDocumentButton) return;
@@ -203,7 +192,7 @@ export function useDocumentsPage() {
         if (fileInputRef.current) {
           fileInputRef.current.value = "";
         }
-        await loadDocuments();
+        await invalidateDocuments();
       }
     } catch (error) {
       console.error("DocumentsPage PostCompanyDocuments error:", error);
@@ -211,7 +200,7 @@ export function useDocumentsPage() {
     } finally {
       setUploading(false);
     }
-  }, [companyId, pendingFiles, loadDocuments, canAddDocumentBilling]);
+  }, [companyId, pendingFiles, canAddDocumentBilling, invalidateDocuments]);
 
   return {
     sessionStatus,

@@ -1,7 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
 import { useSession } from "next-auth/react";
-import { GetCompanyDetails, GetPaymentMethods } from "@utils/accounting";
-import { getAllUsers } from "@utils/users";
 import { HEADER_CONSTANTS } from "@constants/headerConstants";
 import {
   hasDefaultPaymentMethod,
@@ -9,36 +7,21 @@ import {
   pickDisplayPaymentMethod,
 } from "@components/billings/shared/paymentMethods";
 import { commonActions } from "./overviewConstants";
-import { extractSummaryUsersCount } from "./overviewHelpers";
+import { useBillingStripePortalPaymentMethodsQuery } from "@page-modules/billing/customer/useBillingStripePortalPaymentMethodsQuery";
+import { useAccountBillingCompanyDetailsQuery } from "@page-modules/billing/account-billing/useAccountBillingCompanyDetailsQuery";
+import { useAccountBillingOverviewUsersSummaryQuery } from "@page-modules/billing/account-billing/useAccountBillingOverviewUsersSummaryQuery";
 
 export function useBillingOverviewPage() {
   const { data: session } = useSession();
-  const [companyDetails, setCompanyDetails] = useState<any>(null);
-  const [paymentMethods, setPaymentMethods] = useState<any>(null);
-  const [usersCount, setUsersCount] = useState<number | null>(null);
+  const companyDetailsQuery = useAccountBillingCompanyDetailsQuery("tenant");
+  const paymentMethodsQuery = useBillingStripePortalPaymentMethodsQuery();
+  const usersSummaryQuery = useAccountBillingOverviewUsersSummaryQuery();
 
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const [companyRes, paymentMethodsRes, usersRes] = await Promise.all([
-          GetCompanyDetails({ crm_company_id: "" }),
-          GetPaymentMethods(),
-          getAllUsers({ page: 1, perPage: 1 }),
-        ]);
-
-        setCompanyDetails(companyRes);
-        setPaymentMethods(paymentMethodsRes);
-        setUsersCount(extractSummaryUsersCount(usersRes));
-      } catch (err) {
-        console.error("Overview API error:", err);
-      }
-    };
-    void fetchData();
-  }, []);
-
-  const paymentMethodsList = normalizePaymentMethods(paymentMethods);
+  const companyDetails = (companyDetailsQuery.data ?? null) as any;
+  const paymentMethodsList = normalizePaymentMethods(paymentMethodsQuery.data);
   const displayPaymentMethod = pickDisplayPaymentMethod(paymentMethodsList);
   const hasDefaultAccount = hasDefaultPaymentMethod(paymentMethodsList);
+  const usersCount = usersSummaryQuery.data ?? null;
   const seatsText =
     usersCount === null ? "—/—" : `${usersCount.toLocaleString()}/${usersCount.toLocaleString()}`;
   const canViewStaticBillingSections = Boolean(

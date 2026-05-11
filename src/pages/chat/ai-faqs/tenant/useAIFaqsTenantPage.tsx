@@ -2,6 +2,7 @@ import { useChatCompaniesQuery } from "@page-modules/chat/useChatCompaniesQuery"
 import {
   type CreateTenantFAQPayload,
   type FAQData,
+  type FAQItem,
   createTenantFAQ,
   deleteTenantFAQ,
   getTenantFAQs,

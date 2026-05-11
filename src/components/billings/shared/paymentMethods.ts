@@ -1,8 +1,22 @@
 export type PaymentMethodLike = {
+  id?: string | number;
   is_default?: boolean;
-  card?: { brand?: string; last4?: string };
-  billing_details?: { name?: string };
-  [key: string]: unknown;
+  card?: {
+    brand?: string;
+    last4?: string;
+    exp_month?: string | number;
+    exp_year?: string | number;
+  };
+  billing_details?: {
+    name?: string;
+    address?: {
+      line1?: string;
+      line2?: string;
+      city?: string;
+      postal_code?: string;
+      country?: string;
+    };
+  };
 };
 
 export function normalizePaymentMethods(paymentMethods: unknown): PaymentMethodLike[] {

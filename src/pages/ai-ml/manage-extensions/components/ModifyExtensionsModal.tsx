@@ -45,7 +45,9 @@ export function ModifyExtensionsModal({
             isMulti
             value={modalSelectedImagicles}
             onChange={(opts) =>
-              setModalSelectedImagicles((opts as ManageExtensionsSelectOption[]) ?? [])
+              setModalSelectedImagicles(
+                (opts as ManageExtensionsSelectOption[]) ?? [],
+              )
             }
             options={imagicleOptions}
           />
@@ -57,7 +59,9 @@ export function ModifyExtensionsModal({
             isMulti
             value={modalSelectedExtensions}
             onChange={(opts) =>
-              setModalSelectedExtensions((opts as ManageExtensionsSelectOption[]) ?? [])
+              setModalSelectedExtensions(
+                (opts as ManageExtensionsSelectOption[]) ?? [],
+              )
             }
             options={modalExtensionOptions}
             isDisabled={hierarchyLoading}
@@ -70,9 +74,7 @@ export function ModifyExtensionsModal({
         </Button>
         <Button
           variant="primary"
-          onClick={() => {
-            Promise.resolve(onSubmit()).catch(() => undefined);
-          }}
+          onClick={() => onSubmit()}
           disabled={updating}
         >
           {updating ? (

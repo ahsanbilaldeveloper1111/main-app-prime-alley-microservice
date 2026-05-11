@@ -8,13 +8,19 @@ type Props = Readonly<{
 }>;
 
 export function CallAnalysisStatusBanner({ steps, currentStep }: Props) {
-  const processingMatch =
-    currentStep && steps.find((s) => s.step === currentStep && s.status === "processing");
-  const showCompleteIdle = steps.some((s) => s.status === "done") && !currentStep;
+  const isCurrentStepProcessing =
+    Boolean(currentStep) &&
+    steps.some((s) => s.step === currentStep && s.status === "processing");
+  const isCompleteWithoutCurrentStep =
+    steps.some((s) => s.status === "done") && !currentStep;
 
-  let bannerMain: React.ReactNode;
-  if (processingMatch) {
-    bannerMain = (
+  let main: React.ReactNode;
+  if (isCurrentStepProcessing && currentStep) {
+    const stepMessage = steps.find((s) => s.step === currentStep)?.message;
+    const subtitleLabel =
+      stepMessage || `${currentStep.replaceAll("_", " ").toLowerCase()}...`;
+
+    main = (
       <>
         <div className="me-3">
           <Spinner animation="border" size="sm" variant="primary" className="me-2" />
@@ -22,13 +28,10 @@ export function CallAnalysisStatusBanner({ steps, currentStep }: Props) {
         <div className="flex-grow-1">
           <div className="d-flex align-items-center mb-1">
             <span className="badge bg-primary bg-opacity-10 text-primary me-2 px-2 py-1">
-              <i className="ti ti-brain me-1" aria-hidden />
-              {"Processing..."}
+              <i className="ti ti-brain me-1"></i>{" "}
+              Processing...
             </span>
-            <span className="text-muted small text-capitalize">
-              {steps.find((s) => s.step === currentStep)?.message ||
-                `${currentStep.replaceAll("_", " ").toLowerCase()}...`}
-            </span>
+            <span className="text-muted small text-capitalize">{subtitleLabel}</span>
           </div>
           <div className="skeleton-container mt-2">
             <div
@@ -43,8 +46,8 @@ export function CallAnalysisStatusBanner({ steps, currentStep }: Props) {
         </div>
       </>
     );
-  } else if (showCompleteIdle) {
-    bannerMain = (
+  } else if (isCompleteWithoutCurrentStep) {
+    main = (
       <>
         <div className="me-3">
           <i className="ti ti-check-circle text-success icon-large"></i>
@@ -58,7 +61,7 @@ export function CallAnalysisStatusBanner({ steps, currentStep }: Props) {
       </>
     );
   } else {
-    bannerMain = (
+    main = (
       <>
         <div className="me-3">
           <Spinner animation="border" size="sm" variant="secondary" className="me-2" />
@@ -77,9 +80,7 @@ export function CallAnalysisStatusBanner({ steps, currentStep }: Props) {
         <Card className="border-0 shadow-sm">
           <Card.Body className="py-3">
             <div className="d-flex align-items-center justify-content-between">
-              <div className="d-flex align-items-center flex-grow-1">
-                {bannerMain}
-              </div>
+              <div className="d-flex align-items-center flex-grow-1">{main}</div>
             </div>
           </Card.Body>
         </Card>
@@ -87,4 +88,3 @@ export function CallAnalysisStatusBanner({ steps, currentStep }: Props) {
     </Row>
   );
 }
-

@@ -1,6 +1,7 @@
 import {
   type CreateTenantFAQPayload,
   type FAQData,
+  type FAQItem,
   createGlobalFAQ,
   deleteGlobalFAQ,
   getGlobalFAQs,

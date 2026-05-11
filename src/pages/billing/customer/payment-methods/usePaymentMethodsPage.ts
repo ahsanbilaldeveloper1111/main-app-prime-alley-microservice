@@ -1,6 +1,9 @@
 import { billingCustomerKeys } from "../../../../query/keys";
 import { useBillingStripePortalPaymentMethodsQuery } from "@page-modules/billing/customer/useBillingStripePortalPaymentMethodsQuery";
-import { deletePaymentMethod, setDefaultPaymentMethod } from "@utils/accounting";
+import {
+  deletePaymentMethod,
+  setDefaultPaymentMethod,
+} from "@utils/accounting";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useSession } from "next-auth/react";
 import { useCallback, useEffect, useState } from "react";
@@ -12,7 +15,8 @@ export function usePaymentMethodsPage() {
   const queryClient = useQueryClient();
 
   const paymentMethodsQuery = useBillingStripePortalPaymentMethodsQuery();
-  const paymentMethods = (paymentMethodsQuery.data ?? []) as StripePaymentMethodRow[];
+  const paymentMethods = (paymentMethodsQuery.data ??
+    []) as unknown as StripePaymentMethodRow[];
 
   const invalidatePaymentMethods = useCallback(async () => {
     await queryClient.invalidateQueries({
@@ -59,8 +63,11 @@ export function usePaymentMethodsPage() {
     [setDefaultMutation],
   );
 
-  const [deletePaymentMethodId, setDeletePaymentMethodId] = useState<string | null>(null);
-  const [deletePaymentMethodConfirm, setDeletePaymentMethodConfirm] = useState(false);
+  const [deletePaymentMethodId, setDeletePaymentMethodId] = useState<
+    string | null
+  >(null);
+  const [deletePaymentMethodConfirm, setDeletePaymentMethodConfirm] =
+    useState(false);
 
   const handleDeleteCard = useCallback((id: string | number) => {
     setDeletePaymentMethodId(String(id));
@@ -81,9 +88,12 @@ export function usePaymentMethodsPage() {
   const canAddPaymentMethod =
     session?.user?.permissions?.includes("add-payment-method-billing") ?? false;
   const canMarkDefault =
-    session?.user?.permissions?.includes("mark-payment-method-default-billing") ?? false;
+    session?.user?.permissions?.includes(
+      "mark-payment-method-default-billing",
+    ) ?? false;
   const canDeletePaymentMethod =
-    session?.user?.permissions?.includes("delete-payment-method-billing") ?? false;
+    session?.user?.permissions?.includes("delete-payment-method-billing") ??
+    false;
 
   return {
     paymentMethods,

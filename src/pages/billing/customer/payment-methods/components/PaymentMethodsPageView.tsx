@@ -39,7 +39,10 @@ export function PaymentMethodsPageView() {
         buttons={
           <>
             {canAddPaymentMethod ? (
-              <Button variant="primary" onClick={() => setShowAddCardModal(true)}>
+              <Button
+                variant="primary"
+                onClick={() => setShowAddCardModal(true)}
+              >
                 <Plus size={16} className="me-2" />
                 Add Card
               </Button>
@@ -60,7 +63,9 @@ export function PaymentMethodsPageView() {
                     </div>
                     <div>
                       <h6 className="mb-0">{method.card?.brand}</h6>
-                      <small className="text-muted">•••• {method.card?.last4}</small>
+                      <small className="text-muted">
+                        •••• {method.card?.last4}
+                      </small>
                     </div>
                   </div>
                   {isDefaultPaymentMethod(method) ? (
@@ -71,7 +76,9 @@ export function PaymentMethodsPageView() {
                 </div>
                 <div className="mb-3">
                   <small className="text-muted d-block">Cardholder</small>
-                  <span className="fw-semibold">{method.billing_details?.name}</span>
+                  <span className="fw-semibold">
+                    {method.billing_details?.name}
+                  </span>
                 </div>
                 <div className="mb-3">
                   <small className="text-muted d-block">Expires</small>
@@ -81,7 +88,12 @@ export function PaymentMethodsPageView() {
                 </div>
                 <div className="d-flex gap-2">
                   {isDefaultPaymentMethod(method) ? (
-                    <Button variant="outline-secondary" size="sm" className="w-100" disabled>
+                    <Button
+                      variant="outline-secondary"
+                      size="sm"
+                      className="w-100"
+                      disabled
+                    >
                       Default Payment
                     </Button>
                   ) : (
@@ -131,7 +143,11 @@ export function PaymentMethodsPageView() {
       />
 
       {stripePublishableKey ? (
-        <Modal show={showAddCardModal} onHide={() => setShowAddCardModal(false)} size="lg">
+        <Modal
+          show={showAddCardModal}
+          onHide={() => setShowAddCardModal(false)}
+          size="lg"
+        >
           <Modal.Header closeButton>
             <Modal.Title>
               <div className="d-flex align-items-center">
@@ -155,10 +171,7 @@ export function PaymentMethodsPageView() {
               }}
             >
               <PaymentMethodAddCardForm
-                onSuccess={() => {
-                  handleAddCardSuccess().catch(() => undefined);
-                }}
-
+                onSuccess={() => handleAddCardSuccess()}
                 onCancel={() => setShowAddCardModal(false)}
               />
             </Elements>

@@ -20,63 +20,259 @@ type Props = Readonly<{
   onStopAudio: () => void;
 }>;
 
-function isSegmentPlaying(
+function isPlayingSegment(
   playingSegment: { start: number; end: number } | null,
-  start: number,
-  end: number,
+  item: Transcription,
 ): boolean {
-  return playingSegment?.start === start && playingSegment?.end === end;
+  return (
+    playingSegment?.start === item.start &&
+    playingSegment?.end === item.end
+  );
 }
 
-type SegmentAudioProps = Readonly<{
+function hasPlayableTimestamps(item: Transcription): boolean {
+  return item?.start != null && item?.end != null;
+}
+
+function renderMediaPlayerSection(props: {
+  audioLoading: boolean;
+  audioError: string | null;
+  setAudioError: (v: string | null) => void;
+  loadAuthenticatedAudio: () => Promise<void>;
+  mediaPlayerShow: boolean;
+  audioPlayerRef: RefObject<AudioPlayerRef | null>;
+  getAudioFilePath: () => string;
+  uuid: string;
+}): React.ReactNode {
+  const {
+    audioLoading,
+    audioError,
+    setAudioError,
+    loadAuthenticatedAudio,
+    mediaPlayerShow,
+    audioPlayerRef,
+    getAudioFilePath,
+    uuid,
+  } = props;
+
+  if (audioLoading) {
+    return (
+      <div className="text-center p-4">
+        <Spinner animation="border" role="status">
+          <span className="visually-hidden">Loading audio...</span>
+        </Spinner>
+        <p className="mt-2">Loading audio file...</p>
+      </div>
+    );
+  }
+
+  if (audioError) {
+    return (
+      <Alert variant="warning" className="text-center">
+        <Alert.Heading>Audio Loading Error</Alert.Heading>
+        <p>{audioError}</p>
+        <hr />
+        <div className="d-flex justify-content-end gap-2">
+          <Button
+            variant="outline-warning"
+            size="sm"
+            onClick={() => {
+              setAudioError(null);
+              void loadAuthenticatedAudio();
+            }}
+          >
+            Retry
+          </Button>
+        </div>
+      </Alert>
+    );
+  }
+
+  if (mediaPlayerShow) {
+    return (
+      <AudioPlayer
+        ref={audioPlayerRef}
+        audioSrc={getAudioFilePath()}
+        title={`Call Recording - ${uuid}`}
+        showWaveform={false}
+      />
+    );
+  }
+
+  return (
+    <Alert variant="info" className="text-center">
+      <Alert.Heading>No Audio Available</Alert.Heading>
+      <p>Audio file is not available for this call recording.</p>
+    </Alert>
+  );
+}
+
+type TranscriptPlayStopButtonProps = Readonly<{
   transcriptItem: Transcription;
   playingSegment: { start: number; end: number } | null;
   mediaPlayerShow: boolean;
   onTimeClick: (start: number, end: number) => void;
   onStopAudio: () => void;
-  paragraphClassName: string;
-  stampClassName: string;
+  variant: "in" | "out";
 }>;
 
-function TranscriptSegmentAudioControl({
+function TranscriptPlayStopButton({
   transcriptItem,
   playingSegment,
   mediaPlayerShow,
   onTimeClick,
   onStopAudio,
-  paragraphClassName,
-  stampClassName,
-}: SegmentAudioProps) {
-  const hasSegmentBounds =
-    transcriptItem.start != null && transcriptItem.end != null && mediaPlayerShow;
+  variant,
+}: TranscriptPlayStopButtonProps) {
+  const showControls =
+    hasPlayableTimestamps(transcriptItem) && Boolean(mediaPlayerShow);
 
-  if (!hasSegmentBounds) {
+  if (!showControls) {
     return null;
   }
 
-  const { start, end } = transcriptItem;
-  const playing = isSegmentPlaying(playingSegment, start, end);
+  const isActive = isPlayingSegment(playingSegment, transcriptItem);
+  const iconClass = isActive ? "ti-player-pause" : "ti-player-play";
+  const label = isActive ? "Stop" : "Listen";
 
   const handleActivate = () => {
-    if (playing) {
+    if (isActive) {
       onStopAudio();
-    } else {
-      onTimeClick(start, end);
+    } else if (transcriptItem.start != null && transcriptItem.end != null) {
+      onTimeClick(transcriptItem.start, transcriptItem.end);
     }
   };
 
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLButtonElement>) => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      handleActivate();
+    }
+  };
+
+  const isOut = variant === "out";
+  const paragraphClass = isOut ? "text-white mb-0" : "text-primary mb-0";
+  const buttonClass = [
+    "btn",
+    "btn-link",
+    "p-0",
+    "mb-0",
+    "text-decoration-none",
+    "time-stamp",
+    "cursor-pointer",
+    isOut ? "text-white time-stamp-padding" : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+
   return (
-    <p className={paragraphClassName}>
+    <p className={paragraphClass}>
       <button
         type="button"
-        className={stampClassName}
-        aria-label={playing ? "Stop playback" : "Play this segment"}
+        className={buttonClass}
         onClick={handleActivate}
+        onKeyDown={handleKeyDown}
+        aria-label={label}
       >
-        <i className={`ti ${playing ? "ti-player-pause" : "ti-player-play"}`} aria-hidden />
-        {playing ? "Stop" : "Listen"}
+        <i className={`ti ${iconClass}`} title={label} aria-hidden />
+        {label}
       </button>
     </p>
+  );
+}
+
+type TranscriptLineItemProps = Readonly<{
+  transcriptItem: Transcription;
+  playingSegment: { start: number; end: number } | null;
+  mediaPlayerShow: boolean;
+  onTimeClick: (start: number, end: number) => void;
+  onStopAudio: () => void;
+}>;
+
+function TranscriptLineItem({
+  transcriptItem,
+  playingSegment,
+  mediaPlayerShow,
+  onTimeClick,
+  onStopAudio,
+}: TranscriptLineItemProps) {
+  const isSpeaker1 = transcriptItem.speaker === TRANSCRIPTION_SPEAKER_1;
+
+  if (isSpeaker1) {
+    return (
+      <div>
+        <Row>
+          <Col md={6}>
+            <div className="message-in">
+              <div className="d-flex">
+                <div className="flex-shrink-0">
+                  <div className="chat-avtar">
+                    <img
+                      className="rounded-circle img-fluid wid-40"
+                      src={avatar.src}
+                      alt="Customer"
+                    />
+                    <i className="chat-badge bg-success"></i>
+                  </div>
+                </div>
+                <div className="flex-grow-1 mx-3">
+                  <div className="d-flex align-items-start flex-column">
+                    <div className="message d-flex align-items-start flex-column">
+                      <div className="d-flex align-items-center mb-1 chat-msg">
+                        <div className="flex-grow-1 me-3">
+                          <div className="msg-content card mb-0">
+                            <p className="mb-0">{transcriptItem.text}</p>
+                            <TranscriptPlayStopButton
+                              transcriptItem={transcriptItem}
+                              playingSegment={playingSegment}
+                              mediaPlayerShow={mediaPlayerShow}
+                              onTimeClick={onTimeClick}
+                              onStopAudio={onStopAudio}
+                              variant="in"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </Col>
+        </Row>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <Row>
+        <Col md={6}></Col>
+        <Col md={6}>
+          <div className="message-out">
+            <div className="d-flex align-items-end flex-column">
+              <div className="message d-flex align-items-end flex-column">
+                <div className="d-flex align-items-center mb-1 chat-msg">
+                  <div className="flex-grow-1 ms-3">
+                    <div className="msg-content card bg-primary">
+                      <p className="mb-0 text-white">{transcriptItem.text}</p>
+                      <TranscriptPlayStopButton
+                        transcriptItem={transcriptItem}
+                        playingSegment={playingSegment}
+                        mediaPlayerShow={mediaPlayerShow}
+                        onTimeClick={onTimeClick}
+                        onStopAudio={onStopAudio}
+                        variant="out"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </Col>
+      </Row>
+    </div>
   );
 }
 
@@ -94,53 +290,9 @@ export function CallAnalysisTranscript({
   onTimeClick,
   onStopAudio,
 }: Props) {
-  let mediaPlayerSection: React.ReactNode;
-  if (audioLoading) {
-    mediaPlayerSection = (
-      <div className="text-center p-4">
-        <Spinner animation="border" role="status">
-          <span className="visually-hidden">Loading audio...</span>
-        </Spinner>
-        <p className="mt-2">Loading audio file...</p>
-      </div>
-    );
-  } else if (audioError) {
-    mediaPlayerSection = (
-      <Alert variant="warning" className="text-center">
-        <Alert.Heading>Audio Loading Error</Alert.Heading>
-        <p>{audioError}</p>
-        <hr />
-        <div className="d-flex justify-content-end gap-2">
-          <Button
-            variant="outline-warning"
-            size="sm"
-            onClick={() => {
-              setAudioError(null);
-              loadAuthenticatedAudio().catch(() => undefined);
-            }}
-          >
-            Retry
-          </Button>
-        </div>
-      </Alert>
-    );
-  } else if (mediaPlayerShow) {
-    mediaPlayerSection = (
-      <AudioPlayer
-        ref={audioPlayerRef}
-        audioSrc={getAudioFilePath()}
-        title={`Call Recording - ${uuid}`}
-        showWaveform={false}
-      />
-    );
-  } else {
-    mediaPlayerSection = (
-      <Alert variant="info" className="text-center">
-        <Alert.Heading>No Audio Available</Alert.Heading>
-        <p>Audio file is not available for this call recording.</p>
-      </Alert>
-    );
-  }
+  const transcriptions = chunksAnalysisData?.transcriptions;
+  const hasTranscriptions =
+    Array.isArray(transcriptions) && transcriptions.length > 0;
 
   return (
     <Row>
@@ -151,88 +303,30 @@ export function CallAnalysisTranscript({
               <Row>
                 <Col md={12}>
                   <div className={`mb-4 mediaPlayerOuter ${mediaPlayerShow ? "show" : "d-none"}`}>
-                    {mediaPlayerSection}
+                    {renderMediaPlayerSection({
+                      audioLoading,
+                      audioError,
+                      setAudioError,
+                      loadAuthenticatedAudio,
+                      mediaPlayerShow,
+                      audioPlayerRef,
+                      getAudioFilePath,
+                      uuid,
+                    })}
                   </div>
                 </Col>
               </Row>
 
-              {chunksAnalysisData?.transcriptions &&
-                chunksAnalysisData.transcriptions.length > 0 &&
-                chunksAnalysisData.transcriptions.map((transcriptItem: Transcription, index: number) => (
-                  <div
-                    key={`${transcriptItem.speaker}-${transcriptItem.start}-${transcriptItem.end}-${index}`}
-                  >
-                    {transcriptItem.speaker === TRANSCRIPTION_SPEAKER_1 ? (
-                      <Row>
-                        <Col md={6}>
-                          <div className="message-in">
-                            <div className="d-flex">
-                              <div className="flex-shrink-0">
-                                <div className="chat-avtar">
-                                  <img
-                                    className="rounded-circle img-fluid wid-40"
-                                    src={avatar.src}
-                                    alt="Speaker avatar"
-                                  />
-                                  <i className="chat-badge bg-success"></i>
-                                </div>
-                              </div>
-                              <div className="flex-grow-1 mx-3">
-                                <div className="d-flex align-items-start flex-column">
-                                  <div className="message d-flex align-items-start flex-column">
-                                    <div className="d-flex align-items-center mb-1 chat-msg">
-                                      <div className="flex-grow-1 me-3">
-                                        <div className="msg-content card mb-0">
-                                          <p className="mb-0">{transcriptItem.text}</p>
-                                          <TranscriptSegmentAudioControl
-                                            transcriptItem={transcriptItem}
-                                            playingSegment={playingSegment}
-                                            mediaPlayerShow={mediaPlayerShow}
-                                            onTimeClick={onTimeClick}
-                                            onStopAudio={onStopAudio}
-                                            paragraphClassName="text-primary mb-0"
-                                            stampClassName="time-stamp cursor-pointer btn btn-link p-0 text-primary text-decoration-none"
-                                          />
-                                        </div>
-                                      </div>
-                                    </div>
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        </Col>
-                      </Row>
-                    ) : (
-                      <Row>
-                        <Col md={6}></Col>
-                        <Col md={6}>
-                          <div className="message-out">
-                            <div className="d-flex align-items-end flex-column">
-                              <div className="message d-flex align-items-end flex-column">
-                                <div className="d-flex align-items-center mb-1 chat-msg">
-                                  <div className="flex-grow-1 ms-3">
-                                    <div className="msg-content card bg-primary">
-                                      <p className="mb-0 text-white">{transcriptItem.text}</p>
-                                      <TranscriptSegmentAudioControl
-                                        transcriptItem={transcriptItem}
-                                        playingSegment={playingSegment}
-                                        mediaPlayerShow={mediaPlayerShow}
-                                        onTimeClick={onTimeClick}
-                                        onStopAudio={onStopAudio}
-                                        paragraphClassName="text-white mb-0"
-                                        stampClassName="time-stamp cursor-pointer time-stamp-padding btn btn-link p-0 text-white text-decoration-none"
-                                      />
-                                    </div>
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        </Col>
-                      </Row>
-                    )}
-                  </div>
+              {hasTranscriptions &&
+                transcriptions.map((transcriptItem: Transcription, index: number) => (
+                  <TranscriptLineItem
+                    key={`${index}-${transcriptItem.start ?? "s"}-${transcriptItem.end ?? "e"}-${transcriptItem.speaker ?? "sp"}`}
+                    transcriptItem={transcriptItem}
+                    playingSegment={playingSegment}
+                    mediaPlayerShow={mediaPlayerShow}
+                    onTimeClick={onTimeClick}
+                    onStopAudio={onStopAudio}
+                  />
                 ))}
             </div>
           </div>

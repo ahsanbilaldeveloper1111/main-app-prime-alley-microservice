@@ -103,7 +103,7 @@ export function useIndustriesPage() {
   }, [pagination.currentPage, pagination.rowsPerPage, search]);
 
   useEffect(() => {
-    fetchIndustries();
+    fetchIndustries().catch(() => undefined);
   }, [fetchIndustries]);
 
   useEffect(() => {
@@ -242,7 +242,7 @@ export function useIndustriesPage() {
       } else {
         const createPayload: CreateProductPayload = {
           name,
-          description,
+          description: description || "",
           sku,
           price,
           category,
