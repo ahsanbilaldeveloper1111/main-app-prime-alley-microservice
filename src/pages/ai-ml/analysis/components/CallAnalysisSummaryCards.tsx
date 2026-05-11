@@ -6,6 +6,7 @@ import {
   formatUnknownForDisplay,
   hasData,
 } from "@pages/ai-ml/analysis/analysisHelpers";
+import type { ReactNode } from "react";
 import React from "react";
 import { Col, Row } from "react-bootstrap";
 
@@ -16,6 +17,38 @@ type Props = Readonly<{
   analysis: any;
   analysisComplete: boolean;
 }>;
+
+function SummaryPendingField(props: Readonly<{
+  title: string;
+  analysisComplete: boolean;
+  hasMetric: boolean;
+  skeleton: ReactNode;
+  renderContent: () => ReactNode;
+  wrapClassName?: string;
+}>) {
+  const {
+    title,
+    analysisComplete,
+    hasMetric,
+    skeleton,
+    renderContent,
+    wrapClassName = "vbox w-100",
+  } = props;
+
+  return (
+    <div className={wrapClassName}>
+      <h5>{title}</h5>
+      <div className="card-text">
+        <CallAnalysisPendingOrEmpty
+          analysisComplete={analysisComplete}
+          hasData={hasMetric}
+          skeleton={skeleton}
+          renderContent={renderContent}
+        />
+      </div>
+    </div>
+  );
+}
 
 export function CallAnalysisSummaryCards({
   chunksAnalysisData,
@@ -39,53 +72,34 @@ export function CallAnalysisSummaryCards({
       <Col md={6}>
         <div className="card" style={{ backgroundImage: `url(${imgStatus1.src})` }}>
           <div className="card-body box1 gbox">
-            <div className="vbox w-100">
-              <h5>Resolution Status</h5>
-              <div className="card-text">
-                <CallAnalysisPendingOrEmpty
-                  analysisComplete={analysisComplete}
-                  hasData={hasData(resolutionStatus)}
-                  skeleton={<TextSkeleton lines={1} />}
-                  renderContent={() => <h6>{formatAnalysisFieldLabel(resolutionStatus)}</h6>}
-                />
-              </div>
-            </div>
-
-            <div className="vbox w-100">
-              <h5>Sentiment</h5>
-              <div className="card-text">
-                <CallAnalysisPendingOrEmpty
-                  analysisComplete={analysisComplete}
-                  hasData={hasData(sentiment)}
-                  skeleton={<TextSkeleton lines={1} />}
-                  renderContent={() => <h6>{formatAnalysisFieldLabel(sentiment)}</h6>}
-                />
-              </div>
-            </div>
-
-            <div className="vbox w-100">
-              <h5>Main Intention</h5>
-              <div className="card-text">
-                <CallAnalysisPendingOrEmpty
-                  analysisComplete={analysisComplete}
-                  hasData={hasMainTopic}
-                  skeleton={<TextSkeleton lines={1} />}
-                  renderContent={() => <h6>{chunksAnalysisData.main_topic}</h6>}
-                />
-              </div>
-            </div>
-
-            <div className="vbox w-100">
-              <h5>Summary</h5>
-              <div className="card-text">
-                <CallAnalysisPendingOrEmpty
-                  analysisComplete={analysisComplete}
-                  hasData={hasData(summary)}
-                  skeleton={<TextSkeleton lines={2} lastLineWidth="70%" />}
-                  renderContent={() => <h6>{formatUnknownForDisplay(summary)}</h6>}
-                />
-              </div>
-            </div>
+            <SummaryPendingField
+              title="Resolution Status"
+              analysisComplete={analysisComplete}
+              hasMetric={hasData(resolutionStatus)}
+              skeleton={<TextSkeleton lines={1} />}
+              renderContent={() => <h6>{formatAnalysisFieldLabel(resolutionStatus)}</h6>}
+            />
+            <SummaryPendingField
+              title="Sentiment"
+              analysisComplete={analysisComplete}
+              hasMetric={hasData(sentiment)}
+              skeleton={<TextSkeleton lines={1} />}
+              renderContent={() => <h6>{formatAnalysisFieldLabel(sentiment)}</h6>}
+            />
+            <SummaryPendingField
+              title="Main Intention"
+              analysisComplete={analysisComplete}
+              hasMetric={hasMainTopic}
+              skeleton={<TextSkeleton lines={1} />}
+              renderContent={() => <h6>{chunksAnalysisData.main_topic}</h6>}
+            />
+            <SummaryPendingField
+              title="Summary"
+              analysisComplete={analysisComplete}
+              hasMetric={hasData(summary)}
+              skeleton={<TextSkeleton lines={2} lastLineWidth="70%" />}
+              renderContent={() => <h6>{formatUnknownForDisplay(summary)}</h6>}
+            />
           </div>
         </div>
       </Col>
@@ -150,21 +164,17 @@ export function CallAnalysisSummaryCards({
           <Col md={6}>
             <div className="card">
               <div className="card-body gbox">
-                <div className="vbox">
-                  <h5>Customer Intention</h5>
-                </div>
-                <div className="vbox w-100">
-                  <CallAnalysisPendingOrEmpty
-                    analysisComplete={analysisComplete}
-                    hasData={Boolean(customerIntent)}
-                    skeleton={<TextSkeleton lines={2} />}
-                    renderContent={() => (
-                      <div className="card-text size2">
-                        <h6>{customerIntent.charAt(0).toUpperCase() + customerIntent.slice(1)}</h6>
-                      </div>
-                    )}
-                  />
-                </div>
+                <SummaryPendingField
+                  title="Customer Intention"
+                  analysisComplete={analysisComplete}
+                  hasMetric={Boolean(customerIntent)}
+                  skeleton={<TextSkeleton lines={2} />}
+                  renderContent={() => (
+                    <div className="card-text size2">
+                      <h6>{customerIntent.charAt(0).toUpperCase() + customerIntent.slice(1)}</h6>
+                    </div>
+                  )}
+                />
               </div>
             </div>
           </Col>

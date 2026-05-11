@@ -1,5 +1,6 @@
 import { ListSkeleton, TextSkeleton } from "@components/skeletons";
 import { hasArrayData, hasData } from "@pages/ai-ml/analysis/analysisHelpers";
+import { withOccurrenceKeys } from "@pages/ai-ml/analysis/callAnalysisListKeys";
 import React from "react";
 import { Col, Row } from "react-bootstrap";
 
@@ -11,17 +12,6 @@ type Props = Readonly<{
   analysisComplete: boolean;
 }>;
 
-/** Stable list keys without using array index (per-value occurrence handles duplicates). */
-function withOccurrenceKeys<T>(items: T[], prefix: string, identity: (item: T) => string): { key: string; item: T }[] {
-  const tallies = new Map<string, number>();
-  return items.map((item) => {
-    const part = identity(item);
-    const next = (tallies.get(part) ?? 0) + 1;
-    tallies.set(part, next);
-    return { key: `${prefix}__${part}__${next}`, item };
-  });
-}
-
 function TopicCheckLine({ label }: Readonly<{ label: string }>) {
   return (
     <div className="mb-2 callType">
@@ -32,6 +22,36 @@ function TopicCheckLine({ label }: Readonly<{ label: string }>) {
         <h6 className="card-text text-capitalize font-weight-normal">{label}</h6>
       </div>
     </div>
+  );
+}
+
+function EmotionStringList(props: Readonly<{
+  title: string;
+  items: unknown;
+  keyPrefix: string;
+  analysisComplete: boolean;
+}>) {
+  const { title, items, keyPrefix, analysisComplete } = props;
+  return (
+    <Col md={6}>
+      <div className="vbox">
+        <h5 className="mb-3">{title}</h5>
+      </div>
+      <div className="card-text">
+        <CallAnalysisPendingOrEmpty
+          analysisComplete={analysisComplete}
+          hasData={hasArrayData(items)}
+          skeleton={<ListSkeleton items={3} />}
+          renderContent={() =>
+            withOccurrenceKeys(items as string[], keyPrefix, (e) => e).map(({ key, item: emotion }) => (
+              <div className="text-capitalize me-2" key={key}>
+                <div className="emo_text">{emotion}</div>
+              </div>
+            ))
+          }
+        />
+      </div>
+    </Col>
   );
 }
 
@@ -57,49 +77,18 @@ export function CallAnalysisEmotionsAndTopics({
             <div className="card">
               <div className="card-body gbox gbox3">
                 <Row className="w-100">
-                  <Col md={6}>
-                    <div className="vbox">
-                      <h5 className="mb-3">Customer Emotions</h5>
-                    </div>
-                    <div className="card-text">
-                      <CallAnalysisPendingOrEmpty
-                        analysisComplete={analysisComplete}
-                        hasData={hasArrayData(customerEmotions)}
-                        skeleton={<ListSkeleton items={3} />}
-                        renderContent={() =>
-                          withOccurrenceKeys(customerEmotions as string[], "cust-emo", (e) => e).map(
-                            ({ key, item: emotion }) => (
-                              <div className="text-capitalize me-2" key={key}>
-                                <div className="emo_text">{emotion}</div>
-                              </div>
-                            ),
-                          )
-                        }
-                      />
-                    </div>
-                  </Col>
-
-                  <Col md={6}>
-                    <div className="vbox">
-                      <h5 className="mb-3">Operator Emotions</h5>
-                      <div className="card-text">
-                        <CallAnalysisPendingOrEmpty
-                          analysisComplete={analysisComplete}
-                          hasData={hasArrayData(operatorEmotions)}
-                          skeleton={<ListSkeleton items={3} />}
-                          renderContent={() =>
-                            withOccurrenceKeys(operatorEmotions as string[], "op-emo", (e) => e).map(
-                              ({ key, item: emotion }) => (
-                                <div className="text-capitalize me-2" key={key}>
-                                  <div className="emo_text">{emotion}</div>
-                                </div>
-                              ),
-                            )
-                          }
-                        />
-                      </div>
-                    </div>
-                  </Col>
+                  <EmotionStringList
+                    title="Customer Emotions"
+                    items={customerEmotions}
+                    keyPrefix="cust-emo"
+                    analysisComplete={analysisComplete}
+                  />
+                  <EmotionStringList
+                    title="Operator Emotions"
+                    items={operatorEmotions}
+                    keyPrefix="op-emo"
+                    analysisComplete={analysisComplete}
+                  />
                 </Row>
               </div>
             </div>
