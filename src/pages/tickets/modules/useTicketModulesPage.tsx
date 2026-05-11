@@ -155,7 +155,7 @@ export function useTicketModulesPage() {
     onSuccess: async (ok) => {
       if (!ok) return;
       await queryClient.invalidateQueries({ queryKey: ticketsKeys.modules.all() });
-      void submodulesQuery.refetch();
+      await submodulesQuery.refetch();
     },
   });
 

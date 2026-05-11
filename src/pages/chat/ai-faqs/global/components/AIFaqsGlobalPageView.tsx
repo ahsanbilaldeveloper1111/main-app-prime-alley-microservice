@@ -8,6 +8,16 @@ import { Button, Card, Form, Modal } from "react-bootstrap";
 import { ArrowLeft, Plus, X } from "lucide-react";
 import React from "react";
 
+function mapSelectedFilesWithKeys(files: readonly File[]) {
+  const seen = new Map<string, number>();
+  return files.map((file, originalIndex) => {
+    const sig = `${file.name}\u001f${file.size}\u001f${file.lastModified}`;
+    const ordinal = (seen.get(sig) ?? 0) + 1;
+    seen.set(sig, ordinal);
+    return { reactKey: `file:${sig}:${ordinal}`, file, originalIndex };
+  });
+}
+
 export type AIFaqsGlobalPageViewProps = Readonly<{
   ctx: ReturnType<typeof useAIFaqsGlobalPage>;
 }>;
@@ -100,7 +110,7 @@ export function AIFaqsGlobalPageView({ ctx }: AIFaqsGlobalPageViewProps) {
               </div>
 
               {faqItems.map((item, index) => (
-                <Card key={index} className="mb-3">
+                <Card key={item.draftId} className="mb-3">
                   <Card.Body>
                     <div className="d-flex justify-content-between align-items-center mb-2">
                       <strong>FAQ #{index + 1}</strong>
@@ -155,9 +165,9 @@ export function AIFaqsGlobalPageView({ ctx }: AIFaqsGlobalPageViewProps) {
                 />
                 {selectedFiles.length > 0 ? (
                   <div className="mt-2">
-                    {selectedFiles.map((file, index) => (
+                    {mapSelectedFilesWithKeys(selectedFiles).map(({ reactKey, file, originalIndex }) => (
                       <div
-                        key={index}
+                        key={reactKey}
                         className="d-flex justify-content-between align-items-center p-2 bg-light rounded mb-1"
                       >
                         <span className="small">{file.name}</span>
@@ -165,7 +175,7 @@ export function AIFaqsGlobalPageView({ ctx }: AIFaqsGlobalPageViewProps) {
                           variant="link"
                           size="sm"
                           className="text-danger p-0"
-                          onClick={() => handleRemoveFile(index)}
+                          onClick={() => handleRemoveFile(originalIndex)}
                         >
                           <X size={14} />
                         </Button>
@@ -214,7 +224,7 @@ export function AIFaqsGlobalPageView({ ctx }: AIFaqsGlobalPageViewProps) {
               </div>
 
               {faqItems.map((item, index) => (
-                <Card key={index} className="mb-3">
+                <Card key={item.draftId} className="mb-3">
                   <Card.Body>
                     <Form.Group className="mb-3">
                       <Form.Label>
@@ -256,9 +266,9 @@ export function AIFaqsGlobalPageView({ ctx }: AIFaqsGlobalPageViewProps) {
                 />
                 {selectedFiles.length > 0 ? (
                   <div className="mt-2">
-                    {selectedFiles.map((file, index) => (
+                    {mapSelectedFilesWithKeys(selectedFiles).map(({ reactKey, file, originalIndex }) => (
                       <div
-                        key={index}
+                        key={reactKey}
                         className="d-flex justify-content-between align-items-center p-2 bg-light rounded mb-1"
                       >
                         <span className="small">{file.name}</span>
@@ -266,7 +276,7 @@ export function AIFaqsGlobalPageView({ ctx }: AIFaqsGlobalPageViewProps) {
                           variant="link"
                           size="sm"
                           className="text-danger p-0"
-                          onClick={() => handleRemoveFile(index)}
+                          onClick={() => handleRemoveFile(originalIndex)}
                         >
                           <X size={14} />
                         </Button>

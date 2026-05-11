@@ -131,8 +131,8 @@ export const TicketStatusesPageView: React.FC<TicketStatusesPageViewProps> = ({
       color={newStatusColor}
       onNameChange={onNewStatusNameChange}
       onColorChange={onNewStatusColorChange}
-      onSubmit={() => {
-        void onSubmitCreateStatus();
+      onSubmit={async () => {
+        await onSubmitCreateStatus();
       }}
       onClose={onCloseCreateStatusSidebar}
     />
@@ -144,8 +144,8 @@ export const TicketStatusesPageView: React.FC<TicketStatusesPageViewProps> = ({
       color={selectedStatusColor}
       onNameChange={onEditStatusNameChange}
       onColorChange={onEditStatusColorChange}
-      onSubmit={() => {
-        void onSubmitEditStatus();
+      onSubmit={async () => {
+        await onSubmitEditStatus();
       }}
       onClose={onCloseEditStatusModal}
     />
@@ -158,8 +158,8 @@ export const TicketStatusesPageView: React.FC<TicketStatusesPageViewProps> = ({
       targetName={selectedStatusName || ""}
       confirmButtonText="Delete Status"
       cancelButtonText="Cancel"
-      onConfirm={() => {
-        void onSubmitDeleteStatus();
+      onConfirm={async () => {
+        await onSubmitDeleteStatus();
       }}
       onCancel={onCloseDeleteStatusModal}
       confirmButtonVariant="danger"

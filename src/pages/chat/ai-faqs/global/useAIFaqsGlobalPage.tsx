@@ -14,6 +14,23 @@ import { toast } from "react-toastify";
 import { Button } from "react-bootstrap";
 import { Edit, Eye, Trash2 } from "lucide-react";
 
+type AiFaqDraftItem = FAQItem & Readonly<{ draftId: string }>;
+
+let aiFaqGlobalDraftIdSeq = 0;
+
+function nextDraftRow(question = "", answer = ""): AiFaqDraftItem {
+  const c = globalThis.crypto;
+  const draftId =
+    c !== undefined && typeof c.randomUUID === "function"
+      ? c.randomUUID()
+      : `draft_${Date.now()}_${(++aiFaqGlobalDraftIdSeq).toString(36)}`;
+  return {
+    question,
+    answer,
+    draftId,
+  };
+}
+
 export function useAIFaqsGlobalPage() {
   const router = useRouter();
   const [refreshKey, setRefreshKey] = useState(0);
@@ -23,7 +40,7 @@ export function useAIFaqsGlobalPage() {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [selectedFAQ, setSelectedFAQ] = useState<FAQData | null>(null);
 
-  const [faqItems, setFaqItems] = useState<FAQItem[]>([{ question: "", answer: "" }]);
+  const [faqItems, setFaqItems] = useState<AiFaqDraftItem[]>([nextDraftRow()]);
   const [haveFiles, setHaveFiles] = useState(false);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [fileInputKey, setFileInputKey] = useState(0);
@@ -32,7 +49,7 @@ export function useAIFaqsGlobalPage() {
   const [viewFAQ, setViewFAQ] = useState<FAQData | null>(null);
 
   const resetForm = useCallback(() => {
-    setFaqItems([{ question: "", answer: "" }]);
+    setFaqItems([nextDraftRow()]);
     setHaveFiles(false);
     setSelectedFiles([]);
     setFileInputKey((k) => k + 1);
@@ -45,7 +62,7 @@ export function useAIFaqsGlobalPage() {
 
   const handleEditFAQ = useCallback((faq: FAQData) => {
     setSelectedFAQ(faq);
-    setFaqItems([{ question: faq.question, answer: faq.answer }]);
+    setFaqItems([nextDraftRow(faq.question, faq.answer)]);
     setHaveFiles(false);
     setSelectedFiles([]);
     setShowEditModal(true);
@@ -57,7 +74,7 @@ export function useAIFaqsGlobalPage() {
   }, []);
 
   const handleAddFAQItem = useCallback(() => {
-    setFaqItems((items) => [...items, { question: "", answer: "" }]);
+    setFaqItems((items) => [...items, nextDraftRow()]);
   }, []);
 
   const handleRemoveFAQItem = useCallback((index: number) => {
@@ -89,7 +106,9 @@ export function useAIFaqsGlobalPage() {
   }, []);
 
   const handleSubmit = useCallback(async () => {
-    const validFAQs = faqItems.filter((item) => item.question.trim() && item.answer.trim());
+    const validFAQs: FAQItem[] = faqItems
+      .filter((item) => item.question.trim() && item.answer.trim())
+      .map(({ question, answer }) => ({ question, answer }));
 
     if (validFAQs.length === 0) {
       toast.error("Please add at least one FAQ with both question and answer");

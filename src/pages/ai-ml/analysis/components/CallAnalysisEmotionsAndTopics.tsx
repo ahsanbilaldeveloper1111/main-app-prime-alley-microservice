@@ -1,5 +1,10 @@
 import { ListSkeleton, TextSkeleton } from "@components/skeletons";
-import { hasArrayData, hasData } from "@pages/ai-ml/analysis/analysisHelpers";
+import {
+  hasArrayData,
+  hasData,
+  keyedBySignature,
+  keyedStringItems,
+} from "@pages/ai-ml/analysis/analysisHelpers";
 import React from "react";
 import { Col, Row } from "react-bootstrap";
 
@@ -7,6 +12,13 @@ type Props = Readonly<{
   chunksAnalysisData: any;
   analysis: any;
   analysisComplete: boolean;
+}>;
+
+type ChunksAnalysisTag = Readonly<{
+  name?: string;
+  percentage?: unknown;
+  description?: string;
+  status?: unknown;
 }>;
 
 export function CallAnalysisEmotionsAndTopics({
@@ -37,9 +49,9 @@ export function CallAnalysisEmotionsAndTopics({
                     </div>
                     <div className="card-text">
                       {hasArrayData(customerEmotions) ? (
-                        customerEmotions.map((emotion: string, index: number) => (
-                          <div className="text-capitalize me-2" key={index}>
-                            <div className="emo_text">{emotion}</div>
+                        keyedStringItems(customerEmotions, "customer-emotion").map(({ key, value }) => (
+                          <div className="text-capitalize me-2" key={key}>
+                            <div className="emo_text">{value}</div>
                           </div>
                         ))
                       ) : (
@@ -56,9 +68,9 @@ export function CallAnalysisEmotionsAndTopics({
                       <h5 className="mb-3">Operator Emotions</h5>
                       <div className="card-text">
                         {hasArrayData(operatorEmotions) ? (
-                          operatorEmotions.map((emotion: string, index: number) => (
-                            <div className="text-capitalize me-2" key={index}>
-                              <div className="emo_text">{emotion}</div>
+                          keyedStringItems(operatorEmotions, "operator-emotion").map(({ key, value }) => (
+                            <div className="text-capitalize me-2" key={key}>
+                              <div className="emo_text">{value}</div>
                             </div>
                           ))
                         ) : (
@@ -84,13 +96,13 @@ export function CallAnalysisEmotionsAndTopics({
                 <div className="vbox w-100">
                   <div className="card-text">
                     {hasArrayData(keyTopics) ? (
-                      keyTopics.map((item: string, index: number) => (
-                        <div className="mb-2 callType" key={index}>
+                      keyedStringItems(keyTopics, "key-topic").map(({ key, value }) => (
+                        <div className="mb-2 callType" key={key}>
                           <div className="ic_box bg-success">
                             <i className="material-icons-two-tone">check</i>
                           </div>
                           <div>
-                            <h6 className="card-text text-capitalize font-weight-normal">{item}</h6>
+                            <h6 className="card-text text-capitalize font-weight-normal">{value}</h6>
                           </div>
                         </div>
                       ))
@@ -123,10 +135,15 @@ export function CallAnalysisEmotionsAndTopics({
                         </tr>
                       </thead>
                       <tbody>
-                        {chunksAnalysisData?.tags?.map((item: any, index: number) => {
+                        {keyedBySignature(
+                          (chunksAnalysisData.tags ?? []) as ChunksAnalysisTag[],
+                          (item) =>
+                            `${String(item.name ?? "")}|${String(item.percentage ?? "")}|${String(item.description ?? "")}|${String(item.status ?? "")}`,
+                          "analysis-tag",
+                        ).map(({ key, item }) => {
                           const isTrue = item.status === true;
                           return (
-                            <tr key={index}>
+                            <tr key={key}>
                               <td className="text-capitalize">
                                 <div className="d-flex align-items-center gap-2">
                                   <div className="tboxIn">
@@ -137,7 +154,11 @@ export function CallAnalysisEmotionsAndTopics({
                                   <div>{item.name || "N/A"}</div>
                                 </div>
                               </td>
-                              <td className="text-capitalize">{item.percentage || "N/A"}</td>
+                              <td className="text-capitalize">
+                                {item.percentage == null || item.percentage === ""
+                                  ? "N/A"
+                                  : String(item.percentage)}
+                              </td>
                               <td className="text-capitalize">{item.description || "N/A"}</td>
                             </tr>
                           );
@@ -165,13 +186,13 @@ export function CallAnalysisEmotionsAndTopics({
                 </div>
                 <div className="vbox w-100">
                   <div className="card-text">
-                    {!hasData(chunksAnalysisData?.summary) ? (
+                    {hasData(chunksAnalysisData?.summary) ? (
+                      <p>{chunksAnalysisData.summary}</p>
+                    ) : (
                       <>
                         {!analysisComplete && <TextSkeleton lines={4} lastLineWidth="70%" />}
                         {analysisComplete && <p className="text-muted">No data available</p>}
                       </>
-                    ) : (
-                      <p>{chunksAnalysisData.summary}</p>
                     )}
                   </div>
                 </div>
@@ -197,9 +218,9 @@ export function CallAnalysisEmotionsAndTopics({
                         </tr>
                       </thead>
                       <tbody>
-                        {Object.entries(qualificationFields).map(([key, value], index: number) => (
-                          <tr key={index}>
-                            <td>{key}</td>
+                        {Object.entries(qualificationFields).map(([fieldKey, value]) => (
+                          <tr key={fieldKey}>
+                            <td>{fieldKey}</td>
                             <td className="text-capitalize text-center">
                               {value === "null" ? "-" : String(value as string)}
                             </td>
@@ -223,13 +244,13 @@ export function CallAnalysisEmotionsAndTopics({
               <div className="card-body">
                 <h5 className="card-title">Action Items</h5>
                 {hasArrayData(actionItems) ? (
-                  actionItems.map((item: string, index: number) => (
-                    <div className="tagOuter" key={index}>
+                  keyedStringItems(actionItems, "action-item").map(({ key, value }) => (
+                    <div className="tagOuter" key={key}>
                       <div className="tagIcon bg-success">
                         <i className="material-icons-two-tone">check</i>
                       </div>
                       <div className="tagVal">
-                        <h6 className="card-text text-capitalize">{item}</h6>
+                        <h6 className="card-text text-capitalize">{value}</h6>
                       </div>
                     </div>
                   ))
@@ -250,13 +271,13 @@ export function CallAnalysisEmotionsAndTopics({
                 <div className="vbox w-100">
                   <div className="card-text">
                     {hasArrayData(callCategories) ? (
-                      callCategories.map((item: string, index: number) => (
-                        <div className="mb-2 callType" key={index}>
+                      keyedStringItems(callCategories, "call-category").map(({ key, value }) => (
+                        <div className="mb-2 callType" key={key}>
                           <div className="ic_box bg-success">
                             <i className="material-icons-two-tone">check</i>
                           </div>
                           <div>
-                            <h6 className="card-text text-capitalize font-weight-normal">{item}</h6>
+                            <h6 className="card-text text-capitalize font-weight-normal">{value}</h6>
                           </div>
                         </div>
                       ))

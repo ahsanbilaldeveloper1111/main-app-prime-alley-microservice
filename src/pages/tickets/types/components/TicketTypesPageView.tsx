@@ -158,7 +158,7 @@ export const TicketTypesPageView: React.FC<TicketTypesPageViewProps> = ({
 
             <div className="form-group mb-3">
               <label htmlFor="editTypeDescription" className="fw-semibold d-flex align-items-center gap-2 form-label">
-                Type Description
+                Type Description{" "}
                 <span
                   className="text-muted"
                   title="Enter a description that explains the ticket type"
@@ -251,7 +251,7 @@ export const TicketTypesPageView: React.FC<TicketTypesPageViewProps> = ({
 
             <div className="form-group mb-3">
               <label htmlFor="newTypeDescription" className="fw-semibold d-flex align-items-center gap-2 form-label">
-                Type Description
+                Type Description{" "}
                 <span
                   className="text-muted"
                   title="Enter a description that explains the ticket type"

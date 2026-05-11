@@ -339,12 +339,12 @@ export function useCallAnalysis() {
       setCurrentStep(parsedData.step);
     } else {
       setSteps((prev: AnalysisStepEntry[]) => {
-        if (prev.length > 0) {
-          const updated = [...prev];
-          updated[updated.length - 1] = { ...updated[updated.length - 1], status: 'error', message: errorMessage };
-          return updated;
-        }
-        return prev;
+        if (prev.length === 0) return prev;
+        const updated = [...prev];
+        const last = updated.at(-1);
+        if (last === undefined) return prev;
+        updated.splice(-1, 1, { ...last, status: 'error', message: errorMessage });
+        return updated;
       });
     }
     
@@ -535,7 +535,7 @@ export function useCallAnalysis() {
       }
       if (decodedDuration) {
         const formatedDuration = formatDuration(Number.parseInt(decodedDuration, 10) / 10000000);
-        setCallDurationFormatted(formatedDuration as string);
+        setCallDurationFormatted(formatedDuration);
         setCallDuration(decodedDuration);
       }
 

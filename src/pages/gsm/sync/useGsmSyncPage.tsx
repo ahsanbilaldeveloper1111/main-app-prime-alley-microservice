@@ -46,7 +46,7 @@ export function useGsmSyncPage() {
     }: {
       portIds: (string | number)[];
       gsmId: string | number;
-    }) => SyncPortsMobileNumber(portIds.map((id) => Number(id)), String(gsmId)),
+    }) => SyncPortsMobileNumber(portIds.map(Number), String(gsmId)),
     onSuccess: (response) => {
       if (response) {
         toast.success("Mobile numbers sync completed successfully");

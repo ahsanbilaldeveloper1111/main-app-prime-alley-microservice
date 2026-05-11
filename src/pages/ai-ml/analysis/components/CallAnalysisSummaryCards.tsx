@@ -11,6 +11,19 @@ type Props = Readonly<{
   analysisComplete: boolean;
 }>;
 
+function analysisFieldPlaceholder(
+  analysisComplete: boolean,
+  skeleton: Readonly<{ lines: number; lastLineWidth?: string }>,
+): React.ReactNode {
+  if (analysisComplete) {
+    return <p className="text-muted">No data available</p>;
+  }
+  if (skeleton.lastLineWidth === undefined) {
+    return <TextSkeleton lines={skeleton.lines} />;
+  }
+  return <TextSkeleton lines={skeleton.lines} lastLineWidth={skeleton.lastLineWidth} />;
+}
+
 export function CallAnalysisSummaryCards({
   chunksAnalysisData,
   analysis,
@@ -35,12 +48,9 @@ export function CallAnalysisSummaryCards({
               <h5>Resolution Status</h5>
               <div className="card-text">
                 {hasData(resolutionStatus) ? (
-                  <h6>{capitalizeFirst(resolutionStatus)}</h6>
+                  <h6>{capitalizeFirst(String(resolutionStatus))}</h6>
                 ) : (
-                  <>
-                    {!analysisComplete && <TextSkeleton lines={1} />}
-                    {analysisComplete && <p className="text-muted">No data available</p>}
-                  </>
+                  analysisFieldPlaceholder(analysisComplete, { lines: 1 })
                 )}
               </div>
             </div>
@@ -49,12 +59,9 @@ export function CallAnalysisSummaryCards({
               <h5>Sentiment</h5>
               <div className="card-text">
                 {hasData(sentiment) ? (
-                  <h6>{capitalizeFirst(sentiment)}</h6>
+                  <h6>{capitalizeFirst(String(sentiment))}</h6>
                 ) : (
-                  <>
-                    {!analysisComplete && <TextSkeleton lines={1} />}
-                    {analysisComplete && <p className="text-muted">No data available</p>}
-                  </>
+                  analysisFieldPlaceholder(analysisComplete, { lines: 1 })
                 )}
               </div>
             </div>
@@ -65,10 +72,7 @@ export function CallAnalysisSummaryCards({
                 {chunksAnalysisData?.main_topic && chunksAnalysisData.main_topic.trim().length > 0 ? (
                   <h6>{chunksAnalysisData.main_topic}</h6>
                 ) : (
-                  <>
-                    {!analysisComplete && <TextSkeleton lines={1} />}
-                    {analysisComplete && <p className="text-muted">No data available</p>}
-                  </>
+                  analysisFieldPlaceholder(analysisComplete, { lines: 1 })
                 )}
               </div>
             </div>
@@ -77,12 +81,9 @@ export function CallAnalysisSummaryCards({
               <h5>Summary</h5>
               <div className="card-text">
                 {hasData(summary) ? (
-                  <h6>{summary}</h6>
+                  <h6>{String(summary)}</h6>
                 ) : (
-                  <>
-                    {!analysisComplete && <TextSkeleton lines={2} lastLineWidth="70%" />}
-                    {analysisComplete && <p className="text-muted">No data available</p>}
-                  </>
+                  analysisFieldPlaceholder(analysisComplete, { lines: 2, lastLineWidth: "70%" })
                 )}
               </div>
             </div>
@@ -106,10 +107,7 @@ export function CallAnalysisSummaryCards({
                     <p className="card-text text-white size2">{qualified ? "Qualified" : "Unqualified"}</p>
                   ) : (
                     <div className="card-text text-white size2">
-                      <>
-                        {!analysisComplete && <TextSkeleton lines={1} />}
-                        {analysisComplete && <p className="text-muted">No data available</p>}
-                      </>
+                      {analysisFieldPlaceholder(analysisComplete, { lines: 1 })}
                     </div>
                   )}
                 </div>
@@ -122,7 +120,7 @@ export function CallAnalysisSummaryCards({
               <div className="card-body gbox">
                 <h5>Completion Percent</h5>
                 {hasCompletionPercent ? (
-                  <>
+                  <div>
                     <p className="card-text size2 text-bold">{completionPercent}%</p>
                     <div className="progress mb-3 progress-thin">
                       <div
@@ -134,13 +132,10 @@ export function CallAnalysisSummaryCards({
                         aria-valuemax={100}
                       />
                     </div>
-                  </>
+                  </div>
                 ) : (
                   <div className="card-text size2 text-bold d-block w-100">
-                    <>
-                      {!analysisComplete && <TextSkeleton lines={2} />}
-                      {analysisComplete && <p className="text-muted">No data available</p>}
-                    </>
+                    {analysisFieldPlaceholder(analysisComplete, { lines: 2 })}
                   </div>
                 )}
               </div>
@@ -160,10 +155,7 @@ export function CallAnalysisSummaryCards({
                     </div>
                   ) : (
                     <div className="card-text d-block w-100">
-                      <>
-                        {!analysisComplete && <TextSkeleton lines={2} />}
-                        {analysisComplete && <p className="text-muted">No data available</p>}
-                      </>
+                      {analysisFieldPlaceholder(analysisComplete, { lines: 2 })}
                     </div>
                   )}
                 </div>

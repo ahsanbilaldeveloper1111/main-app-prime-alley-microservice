@@ -48,10 +48,10 @@ export function CallAnalysisCustomerInfo({
                   <div className="callType">
                     <div className="desc">
                       <small className="card-title">Follow Up Required</small>
-                      {!analysisComplete ? (
-                        <TextSkeleton lines={1} />
-                      ) : (
+                      {analysisComplete ? (
                         <p className="text-muted">No data available</p>
+                      ) : (
+                        <TextSkeleton lines={1} />
                       )}
                     </div>
                   </div>

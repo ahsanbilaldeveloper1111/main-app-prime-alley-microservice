@@ -607,8 +607,8 @@ export const TicketModulesPageView: React.FC<TicketModulesPageViewProps> = ({
       submitButtonText="Create Module"
       isSubmitDisabled={!newModuleName}
       cancelButtonText="Cancel"
-      onSubmit={() => {
-        void onSubmitCreateModule();
+      onSubmit={async () => {
+        await onSubmitCreateModule();
       }}
       onCancel={onCloseCreateModuleModal}
       submitButtonVariant="primary"

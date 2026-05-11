@@ -216,7 +216,9 @@ export function useCrmProductsPage(): UseCrmProductsPageResult {
   }, []);
 
   useEffect(() => {
-    void fetchIndustries();
+    fetchIndustries().catch(() => {
+      /* errors handled inside fetchIndustries */
+    });
   }, [fetchIndustries]);
 
   const convertToDisplayData = useCallback(
@@ -305,7 +307,9 @@ export function useCrmProductsPage(): UseCrmProductsPageResult {
   ]);
 
   useEffect(() => {
-    void fetchProducts();
+    fetchProducts().catch(() => {
+      /* errors handled inside fetchProducts */
+    });
   }, [fetchProducts]);
 
   useEffect(() => {

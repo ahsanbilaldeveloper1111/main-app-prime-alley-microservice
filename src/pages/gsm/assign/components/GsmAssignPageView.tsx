@@ -103,20 +103,10 @@ export function GsmAssignPageView({ ctx }: { ctx: GsmAssignPageContext }) {
           <div className="page-header-title style-2">
             <Row className="align-items-center">
               <Col md={5}>
-                <h2 className="mb-0 d-flex align-items-center">
-                  {/* Telco Gateway Assign */}
-                  {/* {session?.user?.permissions?.includes('company-link-gsm-assignment') && (
-                          <Button variant="outline-primary" size="sm" className="ms-3" onClick={() => handleCreateAssignement()}>New Assign</Button>
-                      )} */}
-                </h2>
+                <h2 className="mb-0 d-flex align-items-center">Telco Gateway Assign</h2>
               </Col>
               <Col md={7} className="d-flex justify-content-end">
                 <div className="action-buttons">
-                  {/* <div className="search-container">
-                            <i className="fas fa-search search-icon"></i>
-                            <input type="text" className="search-bar" placeholder="Search GSM, Company..." onChange={(e) => handleFiltersChange({...currentFilters, search: e.target.value})}/>
-                        </div> */}
-
 {session?.user?.permissions?.includes("list-gsm-assignment") && (
                   <GsmCompanyFilter
                     onFiltersChange={handleFiltersChange}
@@ -559,8 +549,12 @@ export function GsmAssignPageView({ ctx }: { ctx: GsmAssignPageContext }) {
              >
                {ussdLoading ? (
                  <>
-                   <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
-                   Sending...
+                   <output
+                     className="spinner-border spinner-border-sm me-2 d-inline-block align-middle"
+                     aria-hidden="true"
+                   />
+                   {" "}
+                   <span>Sending...</span>
                  </>
                ) : (
                  "Send USSD Command"
@@ -652,8 +646,12 @@ export function GsmAssignPageView({ ctx }: { ctx: GsmAssignPageContext }) {
              >
                {smsLoading ? (
                  <>
-                   <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
-                   Sending...
+                   <output
+                     className="spinner-border spinner-border-sm me-2 d-inline-block align-middle"
+                     aria-hidden="true"
+                   />
+                   {" "}
+                   <span>Sending...</span>
                  </>
                ) : (
                  "Send SMS"

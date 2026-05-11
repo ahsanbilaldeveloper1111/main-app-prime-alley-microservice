@@ -7,6 +7,41 @@ type Props = Readonly<{
   currentStep: string | null;
 }>;
 
+type StepVisualState = "active" | "done" | "error" | "pending";
+
+function stepVisualStateClass(
+  isActive: boolean,
+  isCompleted: boolean,
+  stepIsError: boolean,
+): StepVisualState {
+  if (isActive) return "active";
+  if (isCompleted) return "done";
+  if (stepIsError) return "error";
+  return "pending";
+}
+
+function formatStepLabel(step: string): string {
+  return step.replaceAll("_", " ");
+}
+
+function stepCircleInner(
+  isCompleted: boolean,
+  stepIsError: boolean,
+  isActive: boolean,
+  stepNumber: number,
+): React.ReactNode {
+  if (isCompleted) {
+    return <i className="ti ti-check" />;
+  }
+  if (stepIsError) {
+    return <i className="ti ti-x" />;
+  }
+  if (isActive) {
+    return <Spinner animation="border" size="sm" variant="light" />;
+  }
+  return <span className="step-number">{stepNumber}</span>;
+}
+
 export function CallAnalysisProgressCard({ steps, currentStep }: Props) {
   return (
     <Row className="mb-3">
@@ -30,6 +65,7 @@ export function CallAnalysisProgressCard({ steps, currentStep }: Props) {
                     const stepIsError = stepEntry.status === "error";
                     const isLast = index === steps.length - 1;
                     const prevCompleted = index > 0 && steps[index - 1]?.status === "done";
+                    const visualState = stepVisualStateClass(isActive, isCompleted, stepIsError);
 
                     return (
                       <React.Fragment key={`${stepEntry.step}-${stepEntry.timestamp}-${index}`}>
@@ -40,26 +76,10 @@ export function CallAnalysisProgressCard({ steps, currentStep }: Props) {
                             maxWidth: `${100 / steps.length}%`,
                           }}
                         >
-                          <div
-                            className={`analysis-progress-step ${
-                              isActive ? "active" : isCompleted ? "done" : stepIsError ? "error" : "pending"
-                            }`}
-                          >
+                          <div className={`analysis-progress-step ${visualState}`}>
                             <div className="step-indicator-wrapper">
-                              <div
-                                className={`step-circle ${
-                                  isActive ? "active" : isCompleted ? "done" : stepIsError ? "error" : "pending"
-                                }`}
-                              >
-                                {isCompleted ? (
-                                  <i className="ti ti-check"></i>
-                                ) : stepIsError ? (
-                                  <i className="ti ti-x"></i>
-                                ) : isActive ? (
-                                  <Spinner animation="border" size="sm" variant="light" />
-                                ) : (
-                                  <span className="step-number">{index + 1}</span>
-                                )}
+                              <div className={`step-circle ${visualState}`}>
+                                {stepCircleInner(isCompleted, stepIsError, isActive, index + 1)}
                               </div>
                               {!isLast && (
                                 <div
@@ -68,10 +88,10 @@ export function CallAnalysisProgressCard({ steps, currentStep }: Props) {
                               )}
                             </div>
                             <div className="step-content">
-                              <div className="step-title">{stepEntry.step.replace(/_/g, " ")}</div>
+                              <div className="step-title">{formatStepLabel(stepEntry.step)}</div>
                               {stepEntry.message && (
                                 <div className="step-message">
-                                  {stepEntry.message || stepEntry.step.replace(/_/g, " ")}
+                                  {stepEntry.message || formatStepLabel(stepEntry.step)}
                                 </div>
                               )}
                             </div>
