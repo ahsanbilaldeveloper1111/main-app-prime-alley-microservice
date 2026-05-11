@@ -1,39 +1,18 @@
 import React, { forwardRef } from "react";
 import { Button } from "react-bootstrap";
-import { VerifyLdapUserParams, VerifyUserInfoParams } from "@models/tms/UnfidiedOp";
 
 interface ConfirmationFormProps {
-    verifyLdapUserFormData: VerifyLdapUserParams;
-    verifyUserInfoFormData: VerifyUserInfoParams;
-    companyData: any;
     completedSteps: Set<number>;
-    isUpdateMode: boolean;
     getCurrentLoadingState: (step: number) => boolean;
     canProceedToNext: (step: number) => boolean;
     onSubmit: () => void;
-    apiProgress: Record<
-        string,
-        {
-            status: "pending" | "in_progress" | "completed" | "failed";
-            message: string;
-        }
-    >;
-    overallProgress: number;
-    getStepStatusBadgeClass: (status: string) => string;
 }
 
 const ConfirmationForm = forwardRef<HTMLDivElement, ConfirmationFormProps>(({
-    verifyLdapUserFormData,
-    verifyUserInfoFormData,
-    companyData,
     completedSteps,
-    isUpdateMode,
     getCurrentLoadingState,
     canProceedToNext,
     onSubmit,
-    apiProgress,
-    overallProgress,
-    getStepStatusBadgeClass,
 }, ref) => {
     return (
         <div

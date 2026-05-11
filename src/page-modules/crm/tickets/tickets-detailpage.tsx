@@ -540,15 +540,20 @@ import React, {
     // Close dropdowns when clicking outside
     useEffect(() => {
       const handleClickOutside = (event: MouseEvent) => {
+        const target = event.target;
         if (
           dropdownRef.current &&
-          !dropdownRef.current.contains(event.target as Node)
+          (target instanceof Node
+            ? !dropdownRef.current.contains(target)
+            : true)
         ) {
           setShowActionsDropdown(false);
         }
         if (
           moreActivitiesRef.current &&
-          !moreActivitiesRef.current.contains(event.target as Node)
+          (target instanceof Node
+            ? !moreActivitiesRef.current.contains(target)
+            : true)
         ) {
           setShowMoreActivities(false);
         }

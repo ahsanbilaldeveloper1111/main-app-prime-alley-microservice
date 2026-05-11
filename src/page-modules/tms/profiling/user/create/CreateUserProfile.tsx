@@ -1,5 +1,4 @@
 import React, { useEffect, useMemo, useState, useRef } from "react";
-import { Card } from "react-bootstrap";
 import { useFormErrors } from "@hooks/tms/useFormErrors";
 import {
     MobileUser,
@@ -16,7 +15,7 @@ import {
     useGetAvailableExtensions,
     useGetCompany,
 } from "@hooks/tms/company";
-import { Company, User, UserType, UserProfile } from "@models/tms";
+import { Company, User } from "@models/tms";
 import { useOrganizationUnits } from "@hooks/tms/customerProfiling";
 // import { useGetUser, useUsers } from "@hooks/useUsers";
 import {
@@ -67,8 +66,6 @@ import Head from "next/head";
 import ProgressHeader from "./components/ProgressHeader";
 import CreateLdapUserForm from "./components/CreateLdapUserForm";
 import CallingAccessForm from "./components/CallingAccessForm";
-import ConfirmationForm from "./components/ConfirmationForm";
-import APIProgressSection from "./components/APIProgressSection";
 
 interface CreateUserProfileProps {
     initialUserData?: any;
@@ -90,13 +87,10 @@ const CreateUserProfile = ({ initialUserData }: CreateUserProfileProps = {}) => 
     const { id: userId } = router.query;
 
     const isDraft = Boolean(userId?.includes("-draftId"));
-    const isUpdateMode = !isNaN(Number(userId)) && !isDraft;
+    const isUpdateMode = !Number.isNaN(Number(userId)) && !isDraft;
 
-    console.log(userId, "uid");
-    
-    // TMS auth has been removed - user is set to null
-    // Using 'as' to prevent TypeScript from narrowing to never
-    const user = null as User | null;
+    // TMS auth has been removed — no signed-in TMS user context in this screen.
+    const user: User | null = null;
     // const { data: userData, isLoading: isUserDataLoading } = useGetUser(
     //     userId && !isDraft ? Number(userId) : 0,
     // );
@@ -169,14 +163,9 @@ const CreateUserProfile = ({ initialUserData }: CreateUserProfileProps = {}) => 
         if (isDraft) {      
             return Number(getUserProfilingDraft?.company_id);
         }
-        // Type guard to ensure TypeScript knows user could be User
-        if (user && user.user_type !== UserType.ADMIN) {
-            return user.company_id;
-        }
 
         return null;
     }, [
-        user,
         (userData as any)?.data?.company_id,
         getUserProfilingDraft?.company_id,
         userId,
@@ -214,7 +203,8 @@ const CreateUserProfile = ({ initialUserData }: CreateUserProfileProps = {}) => 
     
     const { data: companyList, isLoading: isCompanyListLoading } = useCompanyList(companyListParams);
 
-    console.log(userData, "userData");
+
+
     const { addUserInfo, isLoading: isAddUserInfoPending } = useAddUserInfo();
     const { verifyUserInfo, isLoading: isVerifyUserInfoPending } =
         useVerifyUserInfo();
@@ -284,195 +274,6 @@ const CreateUserProfile = ({ initialUserData }: CreateUserProfileProps = {}) => 
     // Track the last completed step to detect going back
     const [lastCompletedStep, setLastCompletedStep] = useState<string>("");
 
-    // Progress tracking for API calls
-    const [apiProgress, setApiProgress] = useState<
-        Record<
-            string,
-            {
-                status: "pending" | "in_progress" | "completed" | "failed";
-                message: string;
-            }
-        >
-    >({
-        // Create mode progress states
-        createLdapUser: { status: "pending", message: "Creating LDAP User..." },
-        createLocalUser: {
-            status: "pending",
-            message: "Creating Local User...",
-        },
-        runLdapSync: { status: "pending", message: "Running LDAP Sync..." },
-        addLine: { status: "pending", message: "Adding Line..." },
-        addPhone: { status: "pending", message: "Adding Phone..." },
-        updateAppUser: { status: "pending", message: "Updating App User..." },
-        updateUser: { status: "pending", message: "Updating User..." },
-        addRemoteDestinationProfile: {
-            status: "pending",
-            message: "Adding Remote Destination Profile...",
-        },
-        addRemoteDestination: {
-            status: "pending",
-            message: "Adding Remote Destination...",
-        },
-        updateDNCR: { status: "pending", message: "Updating DNCR Settings..." },
-
-        // Update mode progress states
-        updateLdapUser: { status: "pending", message: "Updating LDAP User..." },
-        removeMobileLine: {
-            status: "pending",
-            message: "Removing Mobile Line...",
-        },
-        removeMobilePhone: {
-            status: "pending",
-            message: "Removing Mobile Phone...",
-        },
-        addMobileLine: { status: "pending", message: "Adding Mobile Line..." },
-        addMobilePhone: {
-            status: "pending",
-            message: "Adding Mobile Phone...",
-        },
-        updateMobileAppUser: {
-            status: "pending",
-            message: "Updating Mobile App User...",
-        },
-        updateMobileUser: {
-            status: "pending",
-            message: "Updating Mobile User...",
-        },
-        updateLine: { status: "pending", message: "Updating Line..." },
-        addNewPhone: { status: "pending", message: "Adding New Phone..." },
-        updateUserDevices: {
-            status: "pending",
-            message: "Updating User Devices...",
-        },
-        updatePhone: { status: "pending", message: "Updating Phone..." },
-
-        // Additional missing progress states
-        syncPBX: { status: "pending", message: "Syncing PBX..." },
-        syncImagicle: { status: "pending", message: "Syncing Imagicle..." },
-        syncDNCR: { status: "pending", message: "Syncing DNCR..." },
-        verifyUserInfo: {
-            status: "pending",
-            message: "Verifying User Info...",
-        },
-        verifyLdapUser: {
-            status: "pending",
-            message: "Verifying LDAP User...",
-        },
-        removeUser: { status: "pending", message: "Removing User..." },
-        removeLdapUser: { status: "pending", message: "Removing LDAP User..." },
-        removeLine: { status: "pending", message: "Removing Line..." },
-        removePhone: { status: "pending", message: "Removing Phone..." },
-    });
-
-    const [currentApiStep, setCurrentApiStep] = useState<string>("");
-    const [overallProgress, setOverallProgress] = useState(0);
-
-    // Calculate initial progress when component mounts
-    useEffect(() => {
-        const totalSteps = Object.keys(apiProgress).length;
-        const completedSteps = Object.values(apiProgress).filter(
-            (item) => item.status === "completed",
-        ).length;
-        const progressPercentage =
-            totalSteps > 0
-                ? Math.round((completedSteps / totalSteps) * 100)
-                : 0;
-        setOverallProgress(progressPercentage);
-    }, [apiProgress]);
-
-    // Progress update functions
-    const updateApiProgress = (
-        step: string,
-        status: "pending" | "in_progress" | "completed" | "failed",
-        message?: string,
-    ) => {
-        setApiProgress((prev) => {
-            const newProgress = {
-                ...prev,
-                [step]: {
-                    status,
-                    message: message || prev[step]?.message || "",
-                },
-            };
-
-            // Update overall progress
-            const totalSteps = Object.keys(newProgress).length;
-            const completedSteps = Object.values(newProgress).filter(
-                (item) => item.status === "completed",
-            ).length;
-
-            // Calculate progress percentage
-            const progressPercentage =
-                totalSteps > 0
-                    ? Math.round((completedSteps / totalSteps) * 100)
-                    : 0;
-            setOverallProgress(progressPercentage);
-
-            return newProgress;
-        });
-    };
-
-    const resetApiProgress = () => {
-        setApiProgress((prev) => {
-            const reset: Record<string, any> = {};
-            Object.keys(prev).forEach((key) => {
-                reset[key] = { status: "pending", message: prev[key].message };
-            });
-            return reset;
-        });
-        setOverallProgress(0);
-        setCurrentApiStep("");
-    };
-
-    const resetUpdateProgress = () => {
-        setApiProgress((prev) => {
-            const reset = { ...prev };
-            // Reset only update-related progress states
-            const updateKeys = [
-                "updateLdapUser",
-                "removeMobileLine",
-                "removeMobilePhone",
-                "addMobileLine",
-                "addMobilePhone",
-                "updateMobileAppUser",
-                "updateMobileUser",
-                "updateLine",
-                "addNewPhone",
-                "updateUserDevices",
-                "updatePhone",
-                "addRemoteDestinationProfile",
-                "addRemoteDestination",
-                "updateDNCR",
-            ];
-            updateKeys.forEach((key) => {
-                if (reset[key]) {
-                    reset[key] = {
-                        status: "pending",
-                        message: reset[key].message,
-                    };
-                }
-            });
-            return reset;
-        });
-        setOverallProgress(0);
-        setCurrentApiStep("");
-    };
-
-    const getStepStatusBadgeClass = (status: string) => {
-        switch (status) {
-            case "completed":
-                return "bg-success";
-            case "in_progress":
-                return "bg-primary";
-            case "failed":
-                return "bg-danger";
-            case "pending":
-                return "bg-secondary";
-            default:
-                return "bg-secondary";
-        }
-    };
-
     const {
         data: availableExtensions,
         isLoading: isAvailableExtensionsLoading,
@@ -491,7 +292,6 @@ const CreateUserProfile = ({ initialUserData }: CreateUserProfileProps = {}) => 
             })) || [],
         [availableExtensions],
     );
-    console.log(companyList, "companyListl");
     const companyOptions = useMemo(
         () =>
             (companyList as any)?.map((company: Company) => ({
@@ -500,7 +300,6 @@ const CreateUserProfile = ({ initialUserData }: CreateUserProfileProps = {}) => 
             })) || [],
         [companyList],
     );
-    console.log(companyOptions, "companyOptionsss");
 
     const callRepetitionOptions = useMemo(
         () => [
@@ -525,8 +324,7 @@ const CreateUserProfile = ({ initialUserData }: CreateUserProfileProps = {}) => 
         ],
         [],
     );
-    console.log(touched, "touched");
-    
+
     const handleCreateFormChange = (
         field: string | number | symbol,
         value: any,
@@ -536,15 +334,6 @@ const CreateUserProfile = ({ initialUserData }: CreateUserProfileProps = {}) => 
             [field]: value,
         };
 
-        console.log(
-            value,
-            data,
-            availableExtensionsOptions[0],
-            "value",
-            "field",
-            field,
-        );
-        console.log(data, "data");
         setFieldTouched(field as string, true);
         clearFieldError(field as string);
 
@@ -567,12 +356,14 @@ const CreateUserProfile = ({ initialUserData }: CreateUserProfileProps = {}) => 
 
         // User ID is now manually entered, no auto-generation
         // Check if this is a completed step and field has changed
-        const currentStepNumber = parseInt(key.split("-")[1]);
+        const currentStepNumber = 1;
+        const stepTabPrefix = "tab-1";
         if (completedSteps.has(currentStepNumber)) {
-            const originalValue = originalFieldValues[`${key}.${String(field)}`];
+            const originalValue =
+                originalFieldValues[`${stepTabPrefix}.${String(field)}`];
             if (originalValue !== value) {
                 setStepsNeedingReconfirmation(
-                    (prev) => new Set(Array.from(prev).concat(key)),
+                    (prev) => new Set(Array.from(prev).concat(stepTabPrefix)),
                 );
                 // Mark that previous steps have changes
                 setHasPreviousStepChanges(true);
@@ -627,16 +418,9 @@ const CreateUserProfile = ({ initialUserData }: CreateUserProfileProps = {}) => 
             data.device_type = null;
         }
 
-        console.log(data, "data");
-
         // Check if step 2 is completed and field has changed
         if (completedSteps.has(2)) {
             const originalValue = originalFieldValues[`tab-2.${String(field)}`];
-            console.log(
-                originalValue,
-                "originalValue",
-                originalValue !== value,
-            );
             if (originalValue !== value) {
                 setStepsNeedingReconfirmation(
                     (prev) => new Set(Array.from(prev).concat("tab-2")),
@@ -660,11 +444,10 @@ const CreateUserProfile = ({ initialUserData }: CreateUserProfileProps = {}) => 
         setVerifyUserInfoFormData(data);
     };
 
-    // Handle API errors
-    const [key, setKey] = useState("tab-1");
-    const [currentUserCompanyId, setCurrentUserCompanyId] = useState<number | null>(null);
-    const [currentUserCompanyName, setCurrentUserCompanyName] = useState<string>("");
-    const totalTabs = 3;
+    const [currentUserCompanyId, setCurrentUserCompanyId] =
+        useState<number | null>(null);
+    const [currentUserCompanyName, setCurrentUserCompanyName] =
+        useState<string>("");
 
     // Populate form data from userData when available (for edit mode)
     useEffect(() => {
@@ -752,11 +535,6 @@ const CreateUserProfile = ({ initialUserData }: CreateUserProfileProps = {}) => 
             }
         }, 500);
     };
-
-    // Calculate progress
-    const progress = useMemo(() => {
-        return (completedSteps.size / 3) * 100;
-    }, [completedSteps.size]);
 
     // Helper function to get current loading state
     const getCurrentLoadingState = (step: number) => {
@@ -895,13 +673,6 @@ const CreateUserProfile = ({ initialUserData }: CreateUserProfileProps = {}) => 
         );
 
         const iccid = iccidData?.id || null;
-        console.log(
-            iccid,
-            "iccidiccid",
-            verifyUserInfoFormData.iccid_number,
-            companyData?.data?.iccids,
-            verifyUserInfoFormData.iccid_number,
-        );
         return (
             (companyData?.data?.calling_access || [])
                 .filter((access: CallingAccess) => {
@@ -945,7 +716,6 @@ const CreateUserProfile = ({ initialUserData }: CreateUserProfileProps = {}) => 
         verifyUserInfoFormData.call_repetition,
         verifyUserInfoFormData.iccid_number,
     ]);
-    console.log(callAccessOptions, "callAccessOptions");
     const iccidOptions = useMemo(() => {
         // Get ICCID options from companyData.iccids array
         const iccids = companyData?.data?.iccids || [];
@@ -962,7 +732,6 @@ const CreateUserProfile = ({ initialUserData }: CreateUserProfileProps = {}) => 
             label: iccid,
         }));
     }, [companyData?.data?.iccids]);
-    console.log(iccidOptions, "iccidOptions");
 
     // Form submission handlers
     const submitVerifyLdapUserForm = async () => {
@@ -972,7 +741,6 @@ const CreateUserProfile = ({ initialUserData }: CreateUserProfileProps = {}) => 
             
             // Check if form is valid
             if (!canProceedToNext(1)) {
-                console.log('Form validation failed');
                 return;
             }
 
@@ -996,11 +764,8 @@ const CreateUserProfile = ({ initialUserData }: CreateUserProfileProps = {}) => 
                 verify: true
             };
 
-            console.log('Submitting LDAP user form:', formData);
-
             // Call the verify LDAP user API
             const responseVerifyLdapUser = await verifyLdapUser(formData);
-            console.log('LDAP user verification', responseVerifyLdapUser);
             
             // Check if the response indicates failure
             if (responseVerifyLdapUser && responseVerifyLdapUser.success === false) {
@@ -1011,9 +776,7 @@ const CreateUserProfile = ({ initialUserData }: CreateUserProfileProps = {}) => 
                 toast.error(errorMessage);
                 return; // Stop execution here
             }
-            
-            //console.log('LDAP user verification successful');
-            
+
             // Mark step 1 as completed
             setCompletedSteps(prev => new Set(prev).add(1));
             
@@ -1044,7 +807,6 @@ const CreateUserProfile = ({ initialUserData }: CreateUserProfileProps = {}) => 
             
             // Check if form is valid
             if (!canProceedToNext(2)) {
-                console.log('Form validation failed');
                 return;
             }
 
@@ -1083,11 +845,8 @@ const CreateUserProfile = ({ initialUserData }: CreateUserProfileProps = {}) => 
                 verify: true
             };
 
-            console.log('Submitting user info form:', formData);
-
             // Call the verify user info API
             const responseVerifyUserInfo = await verifyUserInfo(formData);
-            console.log('User info verification response:', responseVerifyUserInfo);
             
             // Check if the response indicates failure
             if (responseVerifyUserInfo && responseVerifyUserInfo.success === false) {
@@ -1098,13 +857,9 @@ const CreateUserProfile = ({ initialUserData }: CreateUserProfileProps = {}) => 
                 toast.error(errorMessage);
                 return; // Stop execution here
             }
-            
-            console.log('User info verification successful');
-            
+
             // Call the add LDAP user API after successful verification
-            console.log('Calling add LDAP user API with data:', formData);
             const responseAddLdapUser = await addLdapUser(formData);
-            console.log('Add LDAP user response:', responseAddLdapUser);
             
             // Check if the response indicates failure
             if (responseAddLdapUser && responseAddLdapUser.success === false) {
@@ -1115,9 +870,7 @@ const CreateUserProfile = ({ initialUserData }: CreateUserProfileProps = {}) => 
                 toast.error(errorMessage);
                 return; // Stop execution here
             }
-            
-            console.log('LDAP user added successfully');
-            
+
             // Mark step 2 as completed
             setCompletedSteps(prev => new Set(prev).add(2));
             
@@ -1153,7 +906,6 @@ const CreateUserProfile = ({ initialUserData }: CreateUserProfileProps = {}) => 
             
             {/* Progress Header */}
             <ProgressHeader
-                progress={progress}
                 currentStep={currentStep}
                 completedSteps={completedSteps}
             />

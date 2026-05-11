@@ -272,16 +272,17 @@ const CreateTicket: React.FC<CreateTicketProps> = ({ onBack }) => {
         priority,
         attachedFiles.length > 0 ? attachedFiles : undefined
       );
-      const ticketId = ticketIdToDisplayString(
+      const rawId =
         response &&
-          typeof response === 'object' &&
-          'data' in response &&
-          response.data &&
-          typeof response.data === 'object' &&
-          'id' in response.data
-          ? (response.data as { id: unknown }).id
-          : undefined
-      );
+        typeof response === 'object' &&
+        'data' in response
+          ? Reflect.get(response, 'data')
+          : undefined;
+      const extractedId =
+        rawId !== null && typeof rawId === 'object' && 'id' in rawId
+          ? Reflect.get(rawId, 'id')
+          : undefined;
+      const ticketId = ticketIdToDisplayString(extractedId);
 
       if (ticketId !== null && ticketId.length > 0) {
         setSubmittedTicketId(ticketId);

@@ -25,15 +25,42 @@ function normalizeFaqArrayResponse<T>(response: unknown): T[] {
   if (Array.isArray(response)) {
     return response as T[];
   }
-  if (
-    response !== null &&
-    typeof response === "object" &&
-    "data" in response &&
-    Array.isArray((response as { data: unknown }).data)
-  ) {
-    return (response as { data: T[] }).data;
+  if (response !== null && typeof response === "object") {
+    const nested = Reflect.get(response, "data");
+    if (Array.isArray(nested)) {
+      return nested as T[];
+    }
   }
   return [];
+}
+
+/** Removes tag-shaped spans matching /<[^>]*>/ in linear time (no regex backtracking). */
+function stripSimpleAngleBracketTags(html: string): string {
+  const LT = 60;
+  const GT = 62;
+  const chunks: string[] = [];
+  let segmentStart = 0;
+  let i = 0;
+  const n = html.length;
+  while (i < n) {
+    if (html.charCodeAt(i) !== LT) {
+      i += 1;
+      continue;
+    }
+    const tagStart = i;
+    let j = i + 1;
+    while (j < n && html.charCodeAt(j) !== GT) {
+      j += 1;
+    }
+    if (j >= n) {
+      break;
+    }
+    chunks.push(html.slice(segmentStart, tagStart));
+    segmentStart = j + 1;
+    i = j + 1;
+  }
+  chunks.push(html.slice(segmentStart, n));
+  return chunks.join("").trim();
 }
 
 function buildArticleSummaryPreview(item: FaqItemRow): string {
@@ -44,7 +71,7 @@ function buildArticleSummaryPreview(item: FaqItemRow): string {
       : plainDesc;
   }
   if (item.answer) {
-    const stripped = item.answer.replaceAll(/<[^>]*>/g, "").trim();
+    const stripped = stripSimpleAngleBracketTags(item.answer);
     if (stripped.length > 0) {
       return stripped.length > 150
         ? `${stripped.substring(0, 150)}...`
@@ -64,7 +91,20 @@ function readPaginationMeta(response: unknown): PaginatedMeta | null {
   if (response === null || typeof response !== "object") {
     return null;
   }
-  return response as PaginatedMeta;
+  const out: PaginatedMeta = {};
+  const cp = Reflect.get(response, "current_page");
+  const lp = Reflect.get(response, "last_page");
+  const total = Reflect.get(response, "total");
+  if (typeof cp === "number") {
+    out.current_page = cp;
+  }
+  if (typeof lp === "number") {
+    out.last_page = lp;
+  }
+  if (typeof total === "number") {
+    out.total = total;
+  }
+  return out;
 }
 
 function computeHasMoreFromResponse(
