@@ -1,8 +1,7 @@
 import React from "react";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 import GenericListPage from "@components/GenericListPage";
-import { Button, Modal, Row } from "react-bootstrap";
-import { Col } from "react-bootstrap";
+import { Button, Col, Modal, Row } from "react-bootstrap";
 import Select from "@components/AppSelect";
 
 import GsmCompanyFilter from "@components/filters/GsmCompanyFilter";
@@ -12,7 +11,23 @@ import ConfirmModal from "@components/page-partials/ConfirmModal";
 import PortLinkUnlinkModal from "@components/gsm/partials/PortLinkUnlinkModal";
 import type { GsmAssignPageContext } from "../useGsmAssignPage";
 
-export function GsmAssignPageView({ ctx }: { ctx: GsmAssignPageContext }) {
+/**
+ * Single `.find` for react-select `value` (avoids duplicate search + find-as-boolean smell).
+ */
+function selectOptionFromList<T>(
+  list: T[],
+  match: (item: T) => boolean,
+  optionValue: unknown,
+  toLabel: (item: T) => string,
+): { value: unknown; label: string } | null {
+  const found = list.find(match);
+  if (found === undefined) {
+    return null;
+  }
+  return { value: optionValue, label: toLabel(found) };
+}
+
+export function GsmAssignPageView({ ctx }: Readonly<{ ctx: GsmAssignPageContext }>) {
   const {
     session,
     columns,
@@ -289,16 +304,12 @@ export function GsmAssignPageView({ ctx }: { ctx: GsmAssignPageContext }) {
                   value: gsm.id,
                   label: gsm.name,
                 }))}
-                value={
-                  gsmList.find((gsm: any) => gsm.id === selectedGsmEditLink)
-                    ? {
-                        value: selectedGsmEditLink,
-                        label: gsmList.find(
-                          (gsm: any) => gsm.id === selectedGsmEditLink
-                        )?.name,
-                      }
-                    : null
-                }
+                value={selectOptionFromList(
+                  gsmList,
+                  (gsm: any) => gsm.id === selectedGsmEditLink,
+                  selectedGsmEditLink,
+                  (gsm: any) => gsm.name,
+                )}
                 onChange={(selectedOption) =>
                   setSelectedGsmEditLink(selectedOption?.value)
                 }
@@ -312,20 +323,12 @@ export function GsmAssignPageView({ ctx }: { ctx: GsmAssignPageContext }) {
                   value: company?.identifier,
                   label: company?.name,
                 }))}
-                value={
-                  companyList.find(
-                    (company: any) =>
-                      company?.identifier === selectedCompanyEditLink
-                  )
-                    ? {
-                        value: selectedCompanyEditLink,
-                        label: companyList.find(
-                          (company: any) =>
-                            company?.identifier === selectedCompanyEditLink
-                        )?.name,
-                      }
-                    : null
-                }
+                value={selectOptionFromList(
+                  companyList,
+                  (company: any) => company?.identifier === selectedCompanyEditLink,
+                  selectedCompanyEditLink,
+                  (company: any) => company?.name ?? "",
+                )}
                 onChange={(selectedOption) =>
                   setSelectedCompanyEditLink(selectedOption?.value)
                 }
@@ -559,8 +562,8 @@ export function GsmAssignPageView({ ctx }: { ctx: GsmAssignPageContext }) {
              >
                {ussdLoading ? (
                  <>
-                   <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
-                   Sending...
+                   <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden />
+                   {"Sending..."}
                  </>
                ) : (
                  "Send USSD Command"
@@ -652,8 +655,8 @@ export function GsmAssignPageView({ ctx }: { ctx: GsmAssignPageContext }) {
              >
                {smsLoading ? (
                  <>
-                   <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
-                   Sending...
+                   <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden />
+                   {"Sending..."}
                  </>
                ) : (
                  "Send SMS"

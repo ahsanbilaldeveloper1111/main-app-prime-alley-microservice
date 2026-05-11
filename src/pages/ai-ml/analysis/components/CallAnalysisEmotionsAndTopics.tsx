@@ -3,6 +3,18 @@ import { hasArrayData, hasData } from "@pages/ai-ml/analysis/analysisHelpers";
 import React from "react";
 import { Col, Row } from "react-bootstrap";
 
+function tagRowKey(item: { name?: unknown; percentage?: unknown; description?: unknown }): string {
+  const part = (v: unknown): string => {
+    if (v === null || v === undefined) return "";
+    if (typeof v === "object") return JSON.stringify(v);
+    if (typeof v === "string") return v;
+    if (typeof v === "number" || typeof v === "boolean") return String(v);
+    if (typeof v === "bigint") return v.toString();
+    return "";
+  };
+  return [part(item.name), part(item.percentage), part(item.description)].join("|");
+}
+
 type Props = Readonly<{
   chunksAnalysisData: any;
   analysis: any;
@@ -37,8 +49,8 @@ export function CallAnalysisEmotionsAndTopics({
                     </div>
                     <div className="card-text">
                       {hasArrayData(customerEmotions) ? (
-                        customerEmotions.map((emotion: string, index: number) => (
-                          <div className="text-capitalize me-2" key={index}>
+                        customerEmotions.map((emotion: string) => (
+                          <div className="text-capitalize me-2" key={emotion}>
                             <div className="emo_text">{emotion}</div>
                           </div>
                         ))
@@ -56,8 +68,8 @@ export function CallAnalysisEmotionsAndTopics({
                       <h5 className="mb-3">Operator Emotions</h5>
                       <div className="card-text">
                         {hasArrayData(operatorEmotions) ? (
-                          operatorEmotions.map((emotion: string, index: number) => (
-                            <div className="text-capitalize me-2" key={index}>
+                          operatorEmotions.map((emotion: string) => (
+                            <div className="text-capitalize me-2" key={emotion}>
                               <div className="emo_text">{emotion}</div>
                             </div>
                           ))
@@ -84,8 +96,8 @@ export function CallAnalysisEmotionsAndTopics({
                 <div className="vbox w-100">
                   <div className="card-text">
                     {hasArrayData(keyTopics) ? (
-                      keyTopics.map((item: string, index: number) => (
-                        <div className="mb-2 callType" key={index}>
+                      keyTopics.map((item: string) => (
+                        <div className="mb-2 callType" key={item}>
                           <div className="ic_box bg-success">
                             <i className="material-icons-two-tone">check</i>
                           </div>
@@ -123,10 +135,10 @@ export function CallAnalysisEmotionsAndTopics({
                         </tr>
                       </thead>
                       <tbody>
-                        {chunksAnalysisData?.tags?.map((item: any, index: number) => {
+                        {chunksAnalysisData?.tags?.map((item: any) => {
                           const isTrue = item.status === true;
                           return (
-                            <tr key={index}>
+                            <tr key={tagRowKey(item)}>
                               <td className="text-capitalize">
                                 <div className="d-flex align-items-center gap-2">
                                   <div className="tboxIn">
@@ -165,13 +177,13 @@ export function CallAnalysisEmotionsAndTopics({
                 </div>
                 <div className="vbox w-100">
                   <div className="card-text">
-                    {!hasData(chunksAnalysisData?.summary) ? (
+                    {hasData(chunksAnalysisData?.summary) ? (
+                      <p>{chunksAnalysisData.summary}</p>
+                    ) : (
                       <>
                         {!analysisComplete && <TextSkeleton lines={4} lastLineWidth="70%" />}
                         {analysisComplete && <p className="text-muted">No data available</p>}
                       </>
-                    ) : (
-                      <p>{chunksAnalysisData.summary}</p>
                     )}
                   </div>
                 </div>
@@ -197,8 +209,8 @@ export function CallAnalysisEmotionsAndTopics({
                         </tr>
                       </thead>
                       <tbody>
-                        {Object.entries(qualificationFields).map(([key, value], index: number) => (
-                          <tr key={index}>
+                        {Object.entries(qualificationFields).map(([key, value]) => (
+                          <tr key={key}>
                             <td>{key}</td>
                             <td className="text-capitalize text-center">
                               {value === "null" ? "-" : String(value as string)}
@@ -223,8 +235,8 @@ export function CallAnalysisEmotionsAndTopics({
               <div className="card-body">
                 <h5 className="card-title">Action Items</h5>
                 {hasArrayData(actionItems) ? (
-                  actionItems.map((item: string, index: number) => (
-                    <div className="tagOuter" key={index}>
+                  actionItems.map((item: string) => (
+                    <div className="tagOuter" key={item}>
                       <div className="tagIcon bg-success">
                         <i className="material-icons-two-tone">check</i>
                       </div>
@@ -250,8 +262,8 @@ export function CallAnalysisEmotionsAndTopics({
                 <div className="vbox w-100">
                   <div className="card-text">
                     {hasArrayData(callCategories) ? (
-                      callCategories.map((item: string, index: number) => (
-                        <div className="mb-2 callType" key={index}>
+                      callCategories.map((item: string) => (
+                        <div className="mb-2 callType" key={item}>
                           <div className="ic_box bg-success">
                             <i className="material-icons-two-tone">check</i>
                           </div>

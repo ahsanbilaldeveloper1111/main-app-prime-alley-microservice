@@ -23,12 +23,12 @@ export function CallAnalysisStatusBanner({ steps, currentStep }: Props) {
                     <div className="flex-grow-1">
                       <div className="d-flex align-items-center mb-1">
                         <span className="badge bg-primary bg-opacity-10 text-primary me-2 px-2 py-1">
-                          <i className="ti ti-brain me-1"></i>
-                          Processing...
+                          <i className="ti ti-brain me-1" aria-hidden />
+                          {"Processing..."}
                         </span>
                         <span className="text-muted small text-capitalize">
                           {steps.find((s) => s.step === currentStep)?.message ||
-                            `${currentStep.replace(/_/g, " ").toLowerCase()}...`}
+                            `${currentStep.replaceAll("_", " ").toLowerCase()}...`}
                         </span>
                       </div>
                       <div className="skeleton-container mt-2">

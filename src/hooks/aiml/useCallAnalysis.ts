@@ -16,6 +16,102 @@ import {
   updateStepInList,
 } from "@pages/ai-ml/analysis/analysisHelpers";
 
+type RouterQueryRaw = string | string[] | undefined;
+
+type UrlDecodedAnalysisFields = {
+  id: string;
+  direction: string;
+  phone: string;
+  imagicle: string;
+  duration: string;
+  dateTime: string;
+  dateOnly: string;
+  ownerUsername: string;
+  localPartyNumber: string;
+};
+
+function emptyUrlDecodedFields(): UrlDecodedAnalysisFields {
+  return {
+    id: "",
+    direction: "",
+    phone: "",
+    imagicle: "",
+    duration: "",
+    dateTime: "",
+    dateOnly: "",
+    ownerUsername: "",
+    localPartyNumber: "",
+  };
+}
+
+function getFirstRouterQueryString(raw: RouterQueryRaw): string | undefined {
+  if (typeof raw === "string") {
+    return raw;
+  }
+  if (Array.isArray(raw)) {
+    return raw[0];
+  }
+  return undefined;
+}
+
+function decodeUrlAnalysisEncodedPayload(encoded: string | undefined): UrlDecodedAnalysisFields {
+  if (!encoded) {
+    return emptyUrlDecodedFields();
+  }
+  try {
+    const dataObject = decodeAnalysisData(encoded);
+    return {
+      id: dataObject.uuid,
+      direction: dataObject.direction,
+      phone: dataObject.phone,
+      imagicle: dataObject.imagicle,
+      duration: dataObject.duration,
+      dateTime: dataObject.dateTime,
+      dateOnly: dataObject.dateOnly,
+      ownerUsername: dataObject.localPartyNumber,
+      localPartyNumber: dataObject.ownerUsername,
+    };
+  } catch (decodeError) {
+    console.error("Error decoding encoded data:", decodeError);
+    return emptyUrlDecodedFields();
+  }
+}
+
+function shouldStartCallAnalysisFromDecodedUrl(
+  data: string | undefined,
+  decoded: UrlDecodedAnalysisFields,
+): boolean {
+  return Boolean(
+    data &&
+      decoded.id &&
+      (decoded.dateOnly || decoded.localPartyNumber || decoded.ownerUsername),
+  );
+}
+
+function buildCallAnalysisParamsFromDecoded(decoded: UrlDecodedAnalysisFields): CallAnalysisWithDataParams {
+  return {
+    dateParam: decoded.dateOnly,
+    localPartyNumberParam: decoded.localPartyNumber,
+    ownerUsernameParam: decoded.ownerUsername,
+    uuidParam: decoded.id,
+    imagicleParam: decoded.imagicle,
+    dateTimeParam: decoded.dateTime,
+    durationParam: decoded.duration,
+    directionParam: decoded.direction,
+    phoneParam: decoded.phone,
+  };
+}
+
+function applyDecodedDurationState(
+  durationRaw: string,
+  setFormatted: (v: string | null) => void,
+  setRaw: (v: string | null) => void,
+) {
+  const formatted = formatDuration(Number.parseInt(durationRaw, 10) / 10000000) as string;
+  setFormatted(formatted);
+  setRaw(durationRaw);
+}
+
 export function useCallAnalysis() {
   const router = useRouter();
   const [chunksAnalysisData, setChunksAnalysisData] = useState<any>({
@@ -479,87 +575,32 @@ export function useCallAnalysis() {
     if (!router.isReady) return;
 
     try {
-      const raw = router.query.data;
-      let data: string | undefined;
-      if (typeof raw === "string") {
-        data = raw;
-      } else if (Array.isArray(raw)) {
-        data = raw[0];
-      } else {
-        data = undefined;
+      const data = getFirstRouterQueryString(router.query.data);
+      const decoded = decodeUrlAnalysisEncodedPayload(data);
+
+      if (decoded.id) {
+        setAudioTrackId(decoded.id);
+        setUuid(decoded.id);
+      }
+      if (decoded.direction) {
+        setCallType(decoded.direction);
+      }
+      if (decoded.phone) {
+        setLocalPartyNumber(decoded.phone);
+        setRemotePartyNumber(decoded.phone);
+      }
+      if (decoded.imagicle) {
+        setImagicle(decoded.imagicle);
+      }
+      if (decoded.duration) {
+        applyDecodedDurationState(decoded.duration, setCallDurationFormatted, setCallDuration);
+      }
+      if (decoded.dateTime) {
+        setDateTime(decoded.dateTime);
       }
 
-      let decodedId = "";
-      let decodedDirection = "";
-      let decodedPhone = "";
-      let decodedImagicle = "";
-      let decodedDuration = "";
-      let decodedDateTime = "";
-      let decodedDateOnly = "";
-      let decodedOwnerUsername = "";
-      let decodedLocalPartyNumber = "";
-
-      if (data) {
-        try {
-          const dataObject = decodeAnalysisData(data);
-
-          console.log("dataObject", dataObject);
-          decodedId = dataObject.uuid;
-          decodedDirection = dataObject.direction;
-          decodedPhone = dataObject.phone;
-          decodedImagicle = dataObject.imagicle;
-          decodedDuration = dataObject.duration;
-          decodedDateTime = dataObject.dateTime;
-          decodedDateOnly = dataObject.dateOnly;
-          decodedOwnerUsername = dataObject.localPartyNumber;
-          decodedLocalPartyNumber = dataObject.ownerUsername;
-        } catch (decodeError) {
-          console.error("Error decoding encoded data:", decodeError);
-        }
-      }
-
-      if (decodedId) {
-        setAudioTrackId(decodedId);
-        setUuid(decodedId);
-      }
-      if (decodedDirection) {
-        setCallType(decodedDirection);
-      }
-      if (decodedPhone) {
-        setLocalPartyNumber(decodedPhone);
-        setRemotePartyNumber(decodedPhone);
-      }
-
-      if (decodedImagicle) {
-        setImagicle(decodedImagicle);
-      }
-      if (decodedDuration) {
-        const formatedDuration = formatDuration(Number.parseInt(decodedDuration, 10) / 10000000);
-        setCallDurationFormatted(formatedDuration as string);
-        setCallDuration(decodedDuration);
-      }
-
-      if (decodedDateTime) {
-        setDateTime(decodedDateTime);
-      }
-
-      const hasValidDecodedData =
-        data && decodedId && (decodedDateOnly || decodedLocalPartyNumber || decodedOwnerUsername);
-      if (hasValidDecodedData) {
-        setLocalPartyNumber(decodedLocalPartyNumber);
-        setOwnerUsername(decodedOwnerUsername);
-        setDate(decodedDateOnly);
-        void handleGetCallAnalysisWithData({
-          dateParam: decodedDateOnly,
-          localPartyNumberParam: decodedLocalPartyNumber,
-          ownerUsernameParam: decodedOwnerUsername,
-          uuidParam: decodedId,
-          imagicleParam: decodedImagicle,
-          dateTimeParam: decodedDateTime,
-          durationParam: decodedDuration,
-          directionParam: decodedDirection,
-          phoneParam: decodedPhone,
-        });
+      if (shouldStartCallAnalysisFromDecodedUrl(data, decoded)) {
+        void handleGetCallAnalysisWithData(buildCallAnalysisParamsFromDecoded(decoded));
       }
     } catch (error) {
       console.error("Error parsing URL data:", error);

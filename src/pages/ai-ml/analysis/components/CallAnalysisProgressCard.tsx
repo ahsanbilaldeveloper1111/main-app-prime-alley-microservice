@@ -2,6 +2,33 @@ import type { AnalysisStepEntry } from "@pages/ai-ml/analysis/types";
 import React from "react";
 import { Card, Col, Row, Spinner } from "react-bootstrap";
 
+function stepModifierClassName(isActive: boolean, isCompleted: boolean, stepIsError: boolean): string {
+  if (isActive) return "active";
+  if (isCompleted) return "done";
+  if (stepIsError) return "error";
+  return "pending";
+}
+
+type StepCircleContentProps = Readonly<{
+  isActive: boolean;
+  isCompleted: boolean;
+  stepIsError: boolean;
+  stepNumber: number;
+}>;
+
+function StepCircleContent({ isActive, isCompleted, stepIsError, stepNumber }: StepCircleContentProps) {
+  if (isCompleted) {
+    return <i className="ti ti-check"></i>;
+  }
+  if (stepIsError) {
+    return <i className="ti ti-x"></i>;
+  }
+  if (isActive) {
+    return <Spinner animation="border" size="sm" variant="light" />;
+  }
+  return <span className="step-number">{stepNumber}</span>;
+}
+
 type Props = Readonly<{
   steps: AnalysisStepEntry[];
   currentStep: string | null;
@@ -41,25 +68,26 @@ export function CallAnalysisProgressCard({ steps, currentStep }: Props) {
                           }}
                         >
                           <div
-                            className={`analysis-progress-step ${
-                              isActive ? "active" : isCompleted ? "done" : stepIsError ? "error" : "pending"
-                            }`}
+                            className={`analysis-progress-step ${stepModifierClassName(
+                              isActive,
+                              isCompleted,
+                              stepIsError,
+                            )}`}
                           >
                             <div className="step-indicator-wrapper">
                               <div
-                                className={`step-circle ${
-                                  isActive ? "active" : isCompleted ? "done" : stepIsError ? "error" : "pending"
-                                }`}
+                                className={`step-circle ${stepModifierClassName(
+                                  isActive,
+                                  isCompleted,
+                                  stepIsError,
+                                )}`}
                               >
-                                {isCompleted ? (
-                                  <i className="ti ti-check"></i>
-                                ) : stepIsError ? (
-                                  <i className="ti ti-x"></i>
-                                ) : isActive ? (
-                                  <Spinner animation="border" size="sm" variant="light" />
-                                ) : (
-                                  <span className="step-number">{index + 1}</span>
-                                )}
+                                <StepCircleContent
+                                  isActive={isActive}
+                                  isCompleted={isCompleted}
+                                  stepIsError={stepIsError}
+                                  stepNumber={index + 1}
+                                />
                               </div>
                               {!isLast && (
                                 <div

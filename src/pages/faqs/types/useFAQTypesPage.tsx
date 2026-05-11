@@ -14,7 +14,7 @@ export function useFAQTypesPage() {
       { value: null as number | null, label: "All Topics" },
       ...topics.map((t: any) => ({
         value: t.id as number,
-        label: `${t.name}${t.faq_module ? ` (${t.faq_module.name})` : ""}`,
+        label: t.faq_module ? `${t.name} (${t.faq_module.name})` : t.name,
       })),
     ];
   }, [allTopicsQuery.data]);

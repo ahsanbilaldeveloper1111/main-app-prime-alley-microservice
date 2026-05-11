@@ -195,7 +195,8 @@
   font-size: 14px;
   font-weight: 500;
   cursor: pointer;
-  background-color: #0091ae;
+  /* Darker than legacy #0091ae so white label meets WCAG AA contrast (~4.5:1) at 14px */
+  background-color: #006f86;
 
   &:disabled {
     background-color: #cbd5e0;
@@ -203,7 +204,7 @@
   }
 
   &:not(:disabled):hover {
-    background-color: #007a94;
+    background-color: #005a6e;
   }
 }
 

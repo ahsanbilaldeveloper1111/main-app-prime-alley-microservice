@@ -68,7 +68,7 @@ export function ModifyExtensionsModal({
         <Button variant="secondary" onClick={onHide}>
           Cancel
         </Button>
-        <Button variant="primary" onClick={() => void onSubmit()} disabled={updating}>
+        <Button variant="primary" onClick={onSubmit} disabled={updating}>
           {updating ? (
             <>
               <Spinner animation="border" size="sm" className="me-2" />

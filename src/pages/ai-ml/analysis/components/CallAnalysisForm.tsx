@@ -34,6 +34,23 @@ export function CallAnalysisForm({
   onSubmit,
   onReset,
 }: Props) {
+  let submitButtonContent: React.ReactNode = "Analyze Call";
+  if (socketConnecting) {
+    submitButtonContent = (
+      <>
+        <Spinner animation="border" size="sm" className="me-2" />
+        Connecting...
+      </>
+    );
+  } else if (loading) {
+    submitButtonContent = (
+      <>
+        <Spinner animation="border" size="sm" className="me-2" />
+        Analyzing...
+      </>
+    );
+  }
+
   return (
     <Row className="mb-1">
       <Col md={12}>
@@ -117,19 +134,7 @@ export function CallAnalysisForm({
                       disabled={loading || socketConnecting}
                       className="me-2"
                     >
-                      {socketConnecting ? (
-                        <>
-                          <Spinner animation="border" size="sm" className="me-2" />
-                          Connecting...
-                        </>
-                      ) : loading ? (
-                        <>
-                          <Spinner animation="border" size="sm" className="me-2" />
-                          Analyzing...
-                        </>
-                      ) : (
-                        "Analyze Call"
-                      )}
+                      {submitButtonContent}
                     </Button>
                     <Button type="button" variant="outline-secondary" onClick={onReset} className="me-2">
                       Reset

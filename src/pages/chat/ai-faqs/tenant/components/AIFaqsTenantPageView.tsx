@@ -4,8 +4,11 @@ import GenericListPage from "@components/GenericListPage";
 import ConfirmModal from "@components/page-partials/ConfirmModal";
 import type { Column } from "@components/CustomDataTable";
 import { useAIFaqsTenantPage } from "../useAIFaqsTenantPage";
-import { Button, Card, Form, Modal } from "react-bootstrap";
-import { ArrowLeft, Filter, Plus, X } from "lucide-react";
+import { FAQ_ATTACHMENTS_ACCEPT_TENANT } from "../../faqDraftUtils";
+import { FaqAttachmentsField } from "../../components/FaqAttachmentsField";
+import { FaqDraftItemCard } from "../../components/FaqDraftItemCard";
+import { Button, Form, Modal } from "react-bootstrap";
+import { ArrowLeft, Filter, Plus } from "lucide-react";
 import Select from "react-select";
 import React from "react";
 
@@ -101,7 +104,7 @@ export function AIFaqsTenantPageView({ ctx }: AIFaqsTenantPageViewProps) {
       </div>
 
       <GenericListPage
-        columns={columns as Column[]}
+        columns={columns as unknown as Column[]}
         fetchData={fetchData}
         title="Tenant FAQs"
         searchPlaceholder="Search FAQs..."
@@ -160,81 +163,26 @@ export function AIFaqsTenantPageView({ ctx }: AIFaqsTenantPageViewProps) {
               </Form.Group>
 
               {faqItems.map((item, index) => (
-                <Card key={index} className="mb-3">
-                  <Card.Body>
-                    <div className="d-flex justify-content-between align-items-center mb-2">
-                      <strong>FAQ #{index + 1}</strong>
-                      {faqItems.length > 1 ? (
-                        <Button
-                          variant="link"
-                          size="sm"
-                          className="text-danger p-0"
-                          onClick={() => handleRemoveFAQItem(index)}
-                        >
-                          <X size={16} />
-                        </Button>
-                      ) : null}
-                    </div>
-                    <Form.Group className="mb-3">
-                      <Form.Label>
-                        Question <span className="text-danger">*</span>
-                      </Form.Label>
-                      <Form.Control
-                        type="text"
-                        value={item.question}
-                        onChange={(e) => handleUpdateFAQItem(index, "question", e.target.value)}
-                        placeholder="Enter question"
-                      />
-                    </Form.Group>
-                    <Form.Group className="mb-0">
-                      <Form.Label>
-                        Answer <span className="text-danger">*</span>
-                      </Form.Label>
-                      <Form.Control
-                        as="textarea"
-                        rows={3}
-                        value={item.answer}
-                        onChange={(e) => handleUpdateFAQItem(index, "answer", e.target.value)}
-                        placeholder="Enter answer"
-                      />
-                    </Form.Group>
-                  </Card.Body>
-                </Card>
+                <FaqDraftItemCard
+                  key={item.draftId}
+                  item={item}
+                  index={index}
+                  totalCount={faqItems.length}
+                  variant="add"
+                  onUpdate={handleUpdateFAQItem}
+                  onRemoveItem={handleRemoveFAQItem}
+                />
               ))}
             </div>
 
-            {haveFiles ? (
-              <div className="mb-3">
-                <Form.Label>Files</Form.Label>
-                <Form.Control
-                  key={fileInputKey}
-                  type="file"
-                  multiple
-                  onChange={handleFileChange}
-                  accept=".pdf,.txt,.doc,.docx"
-                />
-                {selectedFiles.length > 0 ? (
-                  <div className="mt-2">
-                    {selectedFiles.map((file, index) => (
-                      <div
-                        key={index}
-                        className="d-flex justify-content-between align-items-center p-2 bg-light rounded mb-1"
-                      >
-                        <span className="small">{file.name}</span>
-                        <Button
-                          variant="link"
-                          size="sm"
-                          className="text-danger p-0"
-                          onClick={() => handleRemoveFile(index)}
-                        >
-                          <X size={14} />
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
-                ) : null}
-              </div>
-            ) : null}
+            <FaqAttachmentsField
+              haveFiles={haveFiles}
+              fileInputKey={fileInputKey}
+              selectedFiles={selectedFiles}
+              accept={FAQ_ATTACHMENTS_ACCEPT_TENANT}
+              onFileChange={handleFileChange}
+              onRemoveFile={handleRemoveFile}
+            />
           </Form>
         </Modal.Body>
         <Modal.Footer>
@@ -274,68 +222,26 @@ export function AIFaqsTenantPageView({ ctx }: AIFaqsTenantPageViewProps) {
               </div>
 
               {faqItems.map((item, index) => (
-                <Card key={index} className="mb-3">
-                  <Card.Body>
-                    <Form.Group className="mb-3">
-                      <Form.Label>
-                        Question <span className="text-danger">*</span>
-                      </Form.Label>
-                      <Form.Control
-                        type="text"
-                        value={item.question}
-                        onChange={(e) => handleUpdateFAQItem(index, "question", e.target.value)}
-                        placeholder="Enter question"
-                      />
-                    </Form.Group>
-                    <Form.Group className="mb-0">
-                      <Form.Label>
-                        Answer <span className="text-danger">*</span>
-                      </Form.Label>
-                      <Form.Control
-                        as="textarea"
-                        rows={3}
-                        value={item.answer}
-                        onChange={(e) => handleUpdateFAQItem(index, "answer", e.target.value)}
-                        placeholder="Enter answer"
-                      />
-                    </Form.Group>
-                  </Card.Body>
-                </Card>
+                <FaqDraftItemCard
+                  key={item.draftId}
+                  item={item}
+                  index={index}
+                  totalCount={faqItems.length}
+                  variant="edit"
+                  onUpdate={handleUpdateFAQItem}
+                  onRemoveItem={handleRemoveFAQItem}
+                />
               ))}
             </div>
 
-            {haveFiles ? (
-              <div className="mb-3">
-                <Form.Label>Files</Form.Label>
-                <Form.Control
-                  key={fileInputKey}
-                  type="file"
-                  multiple
-                  onChange={handleFileChange}
-                  accept=".pdf,.txt,.doc,.docx"
-                />
-                {selectedFiles.length > 0 ? (
-                  <div className="mt-2">
-                    {selectedFiles.map((file, index) => (
-                      <div
-                        key={index}
-                        className="d-flex justify-content-between align-items-center p-2 bg-light rounded mb-1"
-                      >
-                        <span className="small">{file.name}</span>
-                        <Button
-                          variant="link"
-                          size="sm"
-                          className="text-danger p-0"
-                          onClick={() => handleRemoveFile(index)}
-                        >
-                          <X size={14} />
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
-                ) : null}
-              </div>
-            ) : null}
+            <FaqAttachmentsField
+              haveFiles={haveFiles}
+              fileInputKey={fileInputKey}
+              selectedFiles={selectedFiles}
+              accept={FAQ_ATTACHMENTS_ACCEPT_TENANT}
+              onFileChange={handleFileChange}
+              onRemoveFile={handleRemoveFile}
+            />
           </Form>
         </Modal.Body>
         <Modal.Footer>

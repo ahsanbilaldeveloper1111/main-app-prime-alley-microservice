@@ -15,6 +15,7 @@ import { useCallback, useMemo, useState } from "react";
 import { toast } from "react-toastify";
 import { Button } from "react-bootstrap";
 import { Edit, Trash2 } from "lucide-react";
+import { createFaqDraft, faqDraftsToPayloadItems, type FAQDraftItem } from "../faqDraftUtils";
 
 export function useAIFaqsTenantPage() {
   const router = useRouter();
@@ -33,7 +34,7 @@ export function useAIFaqsTenantPage() {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [selectedFAQ, setSelectedFAQ] = useState<FAQData | null>(null);
 
-  const [faqItems, setFaqItems] = useState<FAQItem[]>([{ question: "", answer: "" }]);
+  const [faqItems, setFaqItems] = useState<FAQDraftItem[]>([createFaqDraft()]);
   const [haveFiles, setHaveFiles] = useState(false);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [fileInputKey, setFileInputKey] = useState(0);
@@ -48,7 +49,7 @@ export function useAIFaqsTenantPage() {
   }, [tenantId, filterTenantId, selectedCompanyForFilter, session?.user]);
 
   const resetForm = useCallback(() => {
-    setFaqItems([{ question: "", answer: "" }]);
+    setFaqItems([createFaqDraft()]);
     setHaveFiles(false);
     setSelectedFiles([]);
     setFileInputKey((k) => k + 1);
@@ -57,7 +58,7 @@ export function useAIFaqsTenantPage() {
   const handleEditFAQ = useCallback(
     (faq: FAQData) => {
       setSelectedFAQ(faq);
-      setFaqItems([{ question: faq.question, answer: faq.answer }]);
+      setFaqItems([createFaqDraft({ question: faq.question, answer: faq.answer })]);
       setHaveFiles(false);
       setSelectedFiles([]);
       setTenantId(filterTenantId || selectedCompanyForFilter || tenantId || "");
@@ -72,7 +73,7 @@ export function useAIFaqsTenantPage() {
   }, []);
 
   const handleAddFAQItem = useCallback(() => {
-    setFaqItems((items) => [...items, { question: "", answer: "" }]);
+    setFaqItems((items) => [...items, createFaqDraft()]);
   }, []);
 
   const handleRemoveFAQItem = useCallback((index: number) => {
@@ -104,7 +105,7 @@ export function useAIFaqsTenantPage() {
   }, []);
 
   const handleSubmit = useCallback(async () => {
-    const validFAQs = faqItems.filter((item) => item.question.trim() && item.answer.trim());
+    const validFAQs = faqDraftsToPayloadItems(faqItems);
 
     if (validFAQs.length === 0) {
       toast.error("Please add at least one FAQ with both question and answer");
