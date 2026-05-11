@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { FileText, CheckCircle2, AlertCircle, Clock } from 'lucide-react';
 import StatsCards from '@components/GenericStatsCards';
 import type { StatsCardData } from '@components/GenericStatsCards';
-import DeleteConfirmationModal from '@pages/partial/DeleteConfirmationModal';
+import DeleteConfirmationModal from '@components/page-partials/DeleteConfirmationModal';
 import CreateTaskModal from '@components/work-planner/createtask-modal';
 import { deleteTask, type ListTasksSummary } from '@utils/tasks';
 import TaskDetailOffcanvas from "@components/planner/taskDetailOffcanvas/TaskDetailOffcanvas";
