@@ -1,6 +1,7 @@
 import "@assets/scss/datatable-style.scss";
 import React, {
   ReactElement,
+  ReactNode,
   useState,
   useCallback,
   useMemo,
@@ -22,19 +23,14 @@ import { Column } from "@components/CustomDataTable";
 import { Button } from "react-bootstrap";
 import { toast } from "react-toastify";
 import { useSession } from "next-auth/react";
-import { GetHierarchyData } from "@utils/users";
-
-import "@assets/scss/common.scss";
-import "@assets/scss/tabs.scss";
 import PageHeader from "@components/PageHeader";
 import FormModal from "@components/page-partials/FormModal";
 import ConfirmModal from "@components/page-partials/ConfirmModal";
 
 import DatatableActionButton from "@components/DatatableActionButton";
 import { FiTrash2, FiEye } from "react-icons/fi";
-import { ModuleSlug } from "@utils/Helper";
 
-interface Submodule {
+interface Submodule extends Record<string, unknown> {
   id: string;
   name: string;
   description: string;
@@ -43,7 +39,7 @@ interface Submodule {
   updated_at: string;
 }
 
-interface SubmoduleChild {
+interface SubmoduleChild extends Record<string, unknown> {
   id: string;
   name: string;
   description: string;
@@ -52,18 +48,145 @@ interface SubmoduleChild {
   updated_at: string;
 }
 
-interface Module {
+interface Module extends Record<string, unknown> {
   id: string;
   name: string;
   color: string;
 }
 
+function SubmoduleModuleBadgeCell({
+  moduleId,
+  modules,
+}: Readonly<{ moduleId: string; modules: Module[] }>) {
+  const moduleItem = modules.find((m) => m.id === moduleId);
+  return (
+    <span
+      className="status-badge"
+      style={{
+        backgroundColor: moduleItem?.color || "#6c757d",
+        color: "white",
+      }}
+    >
+      {moduleItem?.name || "Unknown"}
+    </span>
+  );
+}
+
+function SubmoduleCreatedAtCell({ createdAt }: Readonly<{ createdAt: string }>) {
+  return <span className="text-muted">{new Date(createdAt).toLocaleDateString()}</span>;
+}
+
+function SubmoduleRowActions(
+  props: Readonly<{
+    row: Submodule;
+    onManageChildren: (row: Submodule) => void;
+    onRequestDelete: (id: string) => void;
+  }>,
+) {
+  const { row, onManageChildren, onRequestDelete } = props;
+  return (
+    <DatatableActionButton
+      actions={[
+        {
+          label: "Manage Children",
+          icon: <FiEye />,
+          onClick: () => onManageChildren(row),
+          className: "gap-2",
+        },
+        {
+          label: "Delete",
+          icon: <FiTrash2 />,
+          onClick: () => {
+            onRequestDelete(row.id);
+          },
+          className: "text-danger gap-2",
+        },
+      ]}
+    />
+  );
+}
+
+function renderSubmoduleModuleBadgeCell(row: Submodule, modulesList: Module[]) {
+  return React.createElement(SubmoduleModuleBadgeCell, {
+    moduleId: row.module_id,
+    modules: modulesList,
+  });
+}
+
+function renderSubmoduleCreatedAtCell(row: Submodule) {
+  return React.createElement(SubmoduleCreatedAtCell, {
+    createdAt: row.created_at,
+  });
+}
+
+function renderSubmoduleRowActionsCell(
+  row: Submodule,
+  onManageChildren: (submodule: Submodule) => void | Promise<void>,
+  onRequestDelete: (id: string) => void,
+) {
+  return React.createElement(SubmoduleRowActions, {
+    row,
+    onManageChildren,
+    onRequestDelete,
+  });
+}
+
+function buildSubmoduleColumns(
+  modulesList: Module[],
+  onManageChildren: (submodule: Submodule) => void | Promise<void>,
+  onRequestDelete: (id: string) => void,
+): Column<Submodule>[] {
+  return [
+    {
+      key: "name",
+      name: "Name",
+      selector: (row) => row.name,
+      sortable: true,
+    },
+    {
+      key: "description",
+      name: "Description",
+      selector: (row) => row.description || "No description",
+      sortable: true,
+    },
+    {
+      key: "module",
+      name: "Module",
+      selector: (row) => {
+        const moduleItem = modulesList.find((m) => m.id === row.module_id);
+        return moduleItem?.name || "Unknown";
+      },
+      sortable: true,
+      cell(row: Submodule) {
+        return renderSubmoduleModuleBadgeCell(row, modulesList);
+      },
+    },
+    {
+      key: "created_at",
+      name: "Created At",
+      selector: (row) => row.created_at,
+      sortable: true,
+      cell(row: Submodule) {
+        return renderSubmoduleCreatedAtCell(row);
+      },
+    },
+    {
+      key: "actions",
+      name: "Actions",
+      selector: (row) => row.id,
+      sortable: false,
+      cell(row: Submodule) {
+        return renderSubmoduleRowActionsCell(row, onManageChildren, onRequestDelete);
+      },
+    },
+  ];
+}
+
 const SubmodulesPage = () => {
-  const { data: session, status } = useSession();
+  const { data: session } = useSession();
   const [refreshKey, setRefreshKey] = useState<number>(0);
   const [currentFilters, setCurrentFilters] = useState({ search: "" });
   const [modules, setModules] = useState<Module[]>([]);
-  const [extensions, setExtensions] = useState<any[]>([]);
 
   // Modal states
   const [showCreateModal, setShowCreateModal] = useState<boolean>(false);
@@ -95,21 +218,13 @@ const SubmodulesPage = () => {
 
   const memoizedFilters = useMemo(() => currentFilters, [currentFilters]);
 
-  // Fetch modules and extensions
+  // Fetch modules
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [modulesData, hierarchyData] = await Promise.all([
-          GetAllModules(),
-          GetHierarchyData(ModuleSlug.TICKET),
-        ]);
-
+        const modulesData = await GetAllModules();
         if (modulesData) {
           setModules(modulesData);
-        }
-
-        if (hierarchyData?.extensions) {
-          setExtensions(hierarchyData.extensions);
         }
       } catch (error) {
         console.error("Error fetching data:", error);
@@ -273,84 +388,59 @@ const SubmodulesPage = () => {
     [selectedSubmodule, fetchSubmoduleChildren],
   );
 
-  const columns: Column[] = useMemo(
-    () => [
-      {
-        key: "name",
-        name: "Name",
-        selector: (row: Submodule) => row.name,
-        sortable: true,
-      },
-      {
-        key: "description",
-        name: "Description",
-        selector: (row: Submodule) => row.description || "No description",
-        sortable: true,
-      },
-      {
-        key: "module",
-        name: "Module",
-        selector: (row: Submodule) => {
-          const moduleItem = modules.find((m) => m.id == row.module_id);
-          return moduleItem?.name || "Unknown";
-        },
-        sortable: true,
-        cell: (props: Submodule) => {
-          const moduleItem = modules.find((m) => m.id == props.module_id);
-          return (
-            <span
-              className="status-badge"
-              style={{
-                backgroundColor: moduleItem?.color || "#6c757d",
-                color: "white",
-              }}
-            >
-              {moduleItem?.name || "Unknown"}
-            </span>
-          );
-        },
-      },
-      {
-        key: "created_at",
-        name: "Created At",
-        selector: (row: Submodule) => row.created_at,
-        sortable: true,
-        cell: (props: Submodule) => (
-          <span className="text-muted">
-            {new Date(props.created_at).toLocaleDateString()}
-          </span>
-        ),
-      },
-      {
-        key: "actions",
-        name: "Actions",
-        selector: (row: Submodule) => row.id,
-        sortable: false,
-        cell: (props: Submodule) => (
-          <DatatableActionButton
-            actions={[
-              {
-                label: "Manage Children",
-                icon: <FiEye />,
-                onClick: () => openSubmoduleChildrenModal(props),
-                className: "gap-2",
-              },
-              {
-                label: "Delete",
-                icon: <FiTrash2 />,
-                onClick: () => {
-                  setSelectedSubmoduleForDelete(props.id);
-                  setShowSubmoduleDeleteModal(true);
-                },
-                className: "text-danger gap-2",
-              },
-            ]}
-          />
-        ),
-      },
-    ],
-    [modules, extensions, openSubmoduleChildrenModal, handleDeleteSubmodule],
+  const columns = useMemo(
+    () =>
+      buildSubmoduleColumns(modules, openSubmoduleChildrenModal, (id) => {
+        setSelectedSubmoduleForDelete(id);
+        setShowSubmoduleDeleteModal(true);
+      }),
+    [modules, openSubmoduleChildrenModal],
   );
+
+  let existingChildrenSection: ReactNode;
+  if (isLoadingChildren) {
+    existingChildrenSection = (
+      <div className="text-center">
+        <p className="text-muted">Loading children...</p>
+      </div>
+    );
+  } else if (submoduleChildren.length === 0) {
+    existingChildrenSection = (
+      <div className="text-center">
+        <p className="text-muted">No children created yet.</p>
+      </div>
+    );
+  } else {
+    existingChildrenSection = (
+      <div
+        className="submodule-children-list"
+        style={{ maxHeight: "300px", overflowY: "auto" }}
+      >
+        {submoduleChildren.map((child: SubmoduleChild) => (
+          <div key={child.id} className="card mb-2">
+            <div className="card-body p-2">
+              <div className="d-flex justify-content-between align-items-center">
+                <div>
+                  <h6 className="mb-1">{child.name}</h6>
+                  <p className="mb-1 text-muted small">
+                    {child.description || "No description"}
+                  </p>
+                </div>
+
+                <Button
+                  variant="danger"
+                  size="sm"
+                  onClick={() => handleDeleteChild(child)}
+                >
+                  Delete
+                </Button>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  }
 
   return (
     <React.Fragment>
@@ -497,43 +587,7 @@ const SubmodulesPage = () => {
             {/* Existing Children Section */}
             <div className="col-md-6">
               <h5>Existing Children</h5>
-              {isLoadingChildren ? (
-                <div className="text-center">
-                  <p className="text-muted">Loading children...</p>
-                </div>
-              ) : submoduleChildren.length === 0 ? (
-                <div className="text-center">
-                  <p className="text-muted">No children created yet.</p>
-                </div>
-              ) : (
-                <div
-                  className="submodule-children-list"
-                  style={{ maxHeight: "300px", overflowY: "auto" }}
-                >
-                  {submoduleChildren.map((child: SubmoduleChild) => (
-                    <div key={child.id} className="card mb-2">
-                      <div className="card-body p-2">
-                        <div className="d-flex justify-content-between align-items-center">
-                          <div>
-                            <h6 className="mb-1">{child.name}</h6>
-                            <p className="mb-1 text-muted small">
-                              {child.description || "No description"}
-                            </p>
-                          </div>
-
-                          <Button
-                            variant="danger"
-                            size="sm"
-                            onClick={() => handleDeleteChild(child)}
-                          >
-                            Delete
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
+              {existingChildrenSection}
             </div>
           </div>
         }

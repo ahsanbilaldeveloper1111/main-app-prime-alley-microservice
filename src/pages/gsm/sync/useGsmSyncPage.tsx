@@ -66,7 +66,7 @@ export function useGsmSyncPage() {
     setPortsList([]);
 
     if (selectedOption) {
-      ViewGsm(selectedOption.value)
+      ViewGsm(String(selectedOption.value))
         .then((res: { data?: { id: string | number; port_number: string }[] }) => {
           if (res?.data) {
             const portOptions = res.data.map((port) => ({

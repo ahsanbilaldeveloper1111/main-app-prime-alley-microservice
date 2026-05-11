@@ -187,8 +187,8 @@ export const TicketTypesPageView: React.FC<TicketTypesPageViewProps> = ({
         submitButtonText="Update Type"
         isSubmitDisabled={!selectedTypeName}
         cancelButtonText="Cancel"
-        onSubmit={() => {
-          void onSubmitEditType();
+        onSubmit={async () => {
+          await onSubmitEditType();
         }}
         onCancel={onCloseEditTypeModal}
         submitButtonVariant="primary"
@@ -205,8 +205,8 @@ export const TicketTypesPageView: React.FC<TicketTypesPageViewProps> = ({
         targetName={selectedTypeName}
         confirmButtonText="Delete"
         cancelButtonText="Cancel"
-        onConfirm={() => {
-          void onSubmitDeleteType();
+        onConfirm={async () => {
+          await onSubmitDeleteType();
         }}
         onCancel={onCloseDeleteTypeModal}
       />
@@ -280,8 +280,8 @@ export const TicketTypesPageView: React.FC<TicketTypesPageViewProps> = ({
         submitButtonText="Create Type"
         isSubmitDisabled={!newTypeName}
         cancelButtonText="Cancel"
-        onSubmit={() => {
-          void onSubmitCreateType();
+        onSubmit={async () => {
+          await onSubmitCreateType();
         }}
         onCancel={onCloseCreateTypeModal}
       />

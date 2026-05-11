@@ -75,7 +75,7 @@ export function AIFaqsGlobalPageView({ ctx }: AIFaqsGlobalPageViewProps) {
       />
 
       <GenericListPage
-        columns={columns as Column[]}
+        columns={columns as Column<any>[]}
         fetchData={fetchData}
         title="Global FAQs"
         searchPlaceholder="Search FAQs..."

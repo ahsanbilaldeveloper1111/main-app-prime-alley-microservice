@@ -87,15 +87,15 @@ export function AIFaqsTenantPageView({ ctx }: AIFaqsTenantPageViewProps) {
             isLoading={companiesLoading}
             options={companies.map((c) => ({
               value: c.identifier,
-              label: (c.name ?? c.identifier) as string,
+              label: c.name ?? c.identifier,
             }))}
             value={
               selectedCompanyForFilter
                 ? {
                     value: selectedCompanyForFilter,
                     label:
-                      (companies.find((c) => c.identifier === selectedCompanyForFilter)?.name ??
-                        selectedCompanyForFilter) as string,
+                      companies.find((c) => c.identifier === selectedCompanyForFilter)?.name ??
+                      selectedCompanyForFilter,
                   }
                 : null
             }
@@ -111,7 +111,7 @@ export function AIFaqsTenantPageView({ ctx }: AIFaqsTenantPageViewProps) {
       </div>
 
       <GenericListPage
-        columns={columns as Column[]}
+        columns={columns as Column<any>[]}
         fetchData={fetchData}
         title="Tenant FAQs"
         searchPlaceholder="Search FAQs..."
@@ -151,13 +151,14 @@ export function AIFaqsTenantPageView({ ctx }: AIFaqsTenantPageViewProps) {
                   isLoading={companiesLoading}
                   options={companies.map((c) => ({
                     value: c.identifier,
-                    label: (c.name ?? c.identifier) as string,
+                    label: c.name ?? c.identifier,
                   }))}
                   value={
                     tenantId
                       ? {
                           value: tenantId,
-                          label: (companies.find((c) => c.identifier === tenantId)?.name ?? tenantId) as string,
+                          label:
+                            companies.find((c) => c.identifier === tenantId)?.name ?? tenantId,
                         }
                       : null
                   }

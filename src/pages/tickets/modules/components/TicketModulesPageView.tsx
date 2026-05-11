@@ -5,10 +5,12 @@ import ConfirmModal from "@components/page-partials/ConfirmModal";
 import type { TicketModule } from "../ticketModulesTypes";
 import React from "react";
 import { Button, Card, Col, Form, Row } from "react-bootstrap";
-import Select from "react-select";
+import Select, { type SingleValue } from "react-select";
 import { Package, Eye, Info } from "lucide-react";
 
 type ExtRow = { id?: string | number; display_name?: string };
+
+type UserExtensionOption = { value: string; label: string };
 
 export type TicketModulesPageViewProps = Readonly<{
   extensions: ExtRow[];
@@ -280,7 +282,7 @@ export const TicketModulesPageView: React.FC<TicketModulesPageViewProps> = ({
                     <Info size={14} />
                   </span>
                 </label>
-                <Select
+                <Select<UserExtensionOption>
                   id="editModuleUserExtension"
                   value={
                     selectedModuleUserExtension
@@ -293,7 +295,7 @@ export const TicketModulesPageView: React.FC<TicketModulesPageViewProps> = ({
                         }
                       : null
                   }
-                  onChange={(selectedOption: { value?: string } | null) =>
+                  onChange={(selectedOption: SingleValue<UserExtensionOption>) =>
                     onSelectedModuleUserExtensionChange(selectedOption?.value ?? null)
                   }
                   options={extensions.map((ext) => ({
@@ -371,8 +373,8 @@ export const TicketModulesPageView: React.FC<TicketModulesPageViewProps> = ({
       submitButtonText="Update Module"
       isSubmitDisabled={!selectedModuleName}
       cancelButtonText="Cancel"
-      onSubmit={() => {
-        void onSubmitEditModule();
+      onSubmit={async () => {
+        await onSubmitEditModule();
       }}
       onCancel={onCloseEditModuleModal}
       submitButtonVariant="primary"
@@ -387,8 +389,8 @@ export const TicketModulesPageView: React.FC<TicketModulesPageViewProps> = ({
       targetName={deleteTargetName || ""}
       confirmButtonText="Delete"
       cancelButtonText="Cancel"
-      onConfirm={() => {
-        void onSubmitDeleteModule();
+      onConfirm={async () => {
+        await onSubmitDeleteModule();
       }}
       onCancel={onCloseDeleteModuleModal}
       confirmButtonVariant="danger"
@@ -517,7 +519,7 @@ export const TicketModulesPageView: React.FC<TicketModulesPageViewProps> = ({
                     <Info size={14} />
                   </span>
                 </label>
-                <Select
+                <Select<UserExtensionOption>
                   id="newModuleUserExtension"
                   value={
                     newModuleUserExtension
@@ -530,7 +532,7 @@ export const TicketModulesPageView: React.FC<TicketModulesPageViewProps> = ({
                         }
                       : null
                   }
-                  onChange={(selectedOption: { value?: string } | null) =>
+                  onChange={(selectedOption: SingleValue<UserExtensionOption>) =>
                     onNewModuleUserExtensionChange(selectedOption?.value ?? null)
                   }
                   options={extensions.map((ext) => ({
