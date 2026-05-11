@@ -5,6 +5,20 @@ import { capitalizeFirst, hasData } from "@pages/ai-ml/analysis/analysisHelpers"
 import React from "react";
 import { Col, Row } from "react-bootstrap";
 
+/** Safe display string for API fields; avoids `[object Object]` from blind coercion. */
+function analysisScalarToString(value: unknown): string | null {
+  if (value === null || value === undefined) {
+    return null;
+  }
+  if (typeof value === "string") {
+    return value;
+  }
+  if (typeof value === "number" || typeof value === "boolean") {
+    return String(value);
+  }
+  return null;
+}
+
 type Props = Readonly<{
   chunksAnalysisData: any;
   analysis: any;
@@ -25,6 +39,13 @@ export function CallAnalysisSummaryCards({
     chunksAnalysisData?.completion_percent !== undefined &&
     chunksAnalysisData.completion_percent !== null;
   const completionPercent = hasCompletionPercent ? chunksAnalysisData.completion_percent : 0;
+  const resolutionLabel = analysisScalarToString(resolutionStatus);
+  const sentimentLabel = analysisScalarToString(sentiment);
+  const summaryLabel = analysisScalarToString(summary);
+  const customerIntentLabel = analysisScalarToString(customerIntent);
+  const mainTopicRaw =
+    typeof chunksAnalysisData?.main_topic === "string" ? chunksAnalysisData.main_topic : "";
+  const hasMainTopic = mainTopicRaw.trim().length > 0;
 
   return (
     <Row>
@@ -34,13 +55,14 @@ export function CallAnalysisSummaryCards({
             <div className="vbox w-100">
               <h5>Resolution Status</h5>
               <div className="card-text">
-                {hasData(resolutionStatus) ? (
-                  <h6>{capitalizeFirst(resolutionStatus)}</h6>
-                ) : (
-                  <>
-                    {!analysisComplete && <TextSkeleton lines={1} />}
-                    {analysisComplete && <p className="text-muted">No data available</p>}
-                  </>
+                {resolutionLabel != null && (
+                  <h6>{capitalizeFirst(resolutionLabel)}</h6>
+                )}
+                {resolutionLabel == null && analysisComplete === false && (
+                  <TextSkeleton lines={1} />
+                )}
+                {resolutionLabel == null && analysisComplete && (
+                  <p className="text-muted">No data available</p>
                 )}
               </div>
             </div>
@@ -48,13 +70,14 @@ export function CallAnalysisSummaryCards({
             <div className="vbox w-100">
               <h5>Sentiment</h5>
               <div className="card-text">
-                {hasData(sentiment) ? (
-                  <h6>{capitalizeFirst(sentiment)}</h6>
-                ) : (
-                  <>
-                    {!analysisComplete && <TextSkeleton lines={1} />}
-                    {analysisComplete && <p className="text-muted">No data available</p>}
-                  </>
+                {sentimentLabel != null && (
+                  <h6>{capitalizeFirst(sentimentLabel)}</h6>
+                )}
+                {sentimentLabel == null && analysisComplete === false && (
+                  <TextSkeleton lines={1} />
+                )}
+                {sentimentLabel == null && analysisComplete && (
+                  <p className="text-muted">No data available</p>
                 )}
               </div>
             </div>
@@ -62,13 +85,12 @@ export function CallAnalysisSummaryCards({
             <div className="vbox w-100">
               <h5>Main Intention</h5>
               <div className="card-text">
-                {chunksAnalysisData?.main_topic && chunksAnalysisData.main_topic.trim().length > 0 ? (
-                  <h6>{chunksAnalysisData.main_topic}</h6>
-                ) : (
-                  <>
-                    {!analysisComplete && <TextSkeleton lines={1} />}
-                    {analysisComplete && <p className="text-muted">No data available</p>}
-                  </>
+                {hasMainTopic && <h6>{mainTopicRaw}</h6>}
+                {hasMainTopic === false && analysisComplete === false && (
+                  <TextSkeleton lines={1} />
+                )}
+                {hasMainTopic === false && analysisComplete && (
+                  <p className="text-muted">No data available</p>
                 )}
               </div>
             </div>
@@ -76,13 +98,12 @@ export function CallAnalysisSummaryCards({
             <div className="vbox w-100">
               <h5>Summary</h5>
               <div className="card-text">
-                {hasData(summary) ? (
-                  <h6>{summary}</h6>
-                ) : (
-                  <>
-                    {!analysisComplete && <TextSkeleton lines={2} lastLineWidth="70%" />}
-                    {analysisComplete && <p className="text-muted">No data available</p>}
-                  </>
+                {summaryLabel != null && <h6>{summaryLabel}</h6>}
+                {summaryLabel == null && analysisComplete === false && (
+                  <TextSkeleton lines={2} lastLineWidth="70%" />
+                )}
+                {summaryLabel == null && analysisComplete && (
+                  <p className="text-muted">No data available</p>
                 )}
               </div>
             </div>
@@ -106,10 +127,8 @@ export function CallAnalysisSummaryCards({
                     <p className="card-text text-white size2">{qualified ? "Qualified" : "Unqualified"}</p>
                   ) : (
                     <div className="card-text text-white size2">
-                      <>
-                        {!analysisComplete && <TextSkeleton lines={1} />}
-                        {analysisComplete && <p className="text-muted">No data available</p>}
-                      </>
+                      {analysisComplete === false && <TextSkeleton lines={1} />}
+                      {analysisComplete && <p className="text-muted">No data available</p>}
                     </div>
                   )}
                 </div>
@@ -122,25 +141,24 @@ export function CallAnalysisSummaryCards({
               <div className="card-body gbox">
                 <h5>Completion Percent</h5>
                 {hasCompletionPercent ? (
-                  <>
-                    <p className="card-text size2 text-bold">{completionPercent}%</p>
-                    <div className="progress mb-3 progress-thin">
-                      <div
-                        className="progress-bar bg-success"
-                        role="progressbar"
-                        style={{ width: `${completionPercent}%` }}
-                        aria-valuenow={completionPercent}
-                        aria-valuemin={0}
-                        aria-valuemax={100}
-                      />
-                    </div>
-                  </>
+                  <p className="card-text size2 text-bold">{completionPercent}%</p>
+                ) : null}
+                {hasCompletionPercent ? (
+                  <progress
+                    className="mb-3 progress-thin"
+                    style={{
+                      accentColor: "var(--bs-success, #198754)",
+                      width: "100%",
+                      verticalAlign: "middle",
+                    }}
+                    max={100}
+                    value={completionPercent}
+                    aria-label={`Analysis completion ${completionPercent} percent`}
+                  />
                 ) : (
                   <div className="card-text size2 text-bold d-block w-100">
-                    <>
-                      {!analysisComplete && <TextSkeleton lines={2} />}
-                      {analysisComplete && <p className="text-muted">No data available</p>}
-                    </>
+                    {analysisComplete === false && <TextSkeleton lines={2} />}
+                    {analysisComplete && <p className="text-muted">No data available</p>}
                   </div>
                 )}
               </div>
@@ -154,16 +172,22 @@ export function CallAnalysisSummaryCards({
                   <h5>Customer Intention</h5>
                 </div>
                 <div className="vbox w-100">
-                  {customerIntent ? (
+                  {customerIntentLabel != null && (
                     <div className="card-text size2">
-                      <h6>{customerIntent.charAt(0).toUpperCase() + customerIntent.slice(1)}</h6>
+                      <h6>
+                        {customerIntentLabel.charAt(0).toUpperCase() +
+                          customerIntentLabel.slice(1)}
+                      </h6>
                     </div>
-                  ) : (
+                  )}
+                  {customerIntentLabel == null && analysisComplete === false && (
                     <div className="card-text d-block w-100">
-                      <>
-                        {!analysisComplete && <TextSkeleton lines={2} />}
-                        {analysisComplete && <p className="text-muted">No data available</p>}
-                      </>
+                      <TextSkeleton lines={2} />
+                    </div>
+                  )}
+                  {customerIntentLabel == null && analysisComplete && (
+                    <div className="card-text d-block w-100">
+                      <p className="text-muted">No data available</p>
                     </div>
                   )}
                 </div>

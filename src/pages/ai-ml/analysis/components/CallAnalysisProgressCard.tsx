@@ -7,6 +7,50 @@ type Props = Readonly<{
   currentStep: string | null;
 }>;
 
+function humanizeUnderscores(label: string): string {
+  return label.replaceAll("_", " ");
+}
+
+function stepAppearanceClass(
+  isActive: boolean,
+  isCompleted: boolean,
+  stepIsError: boolean,
+): string {
+  if (isActive) {
+    return "active";
+  }
+  if (isCompleted) {
+    return "done";
+  }
+  if (stepIsError) {
+    return "error";
+  }
+  return "pending";
+}
+
+function StepCircleInterior({
+  isCompleted,
+  stepIsError,
+  isActive,
+  stepNumber,
+}: Readonly<{
+  isCompleted: boolean;
+  stepIsError: boolean;
+  isActive: boolean;
+  stepNumber: number;
+}>) {
+  if (isCompleted) {
+    return <i className="ti ti-check"></i>;
+  }
+  if (stepIsError) {
+    return <i className="ti ti-x"></i>;
+  }
+  if (isActive) {
+    return <Spinner animation="border" size="sm" variant="light" />;
+  }
+  return <span className="step-number">{stepNumber}</span>;
+}
+
 export function CallAnalysisProgressCard({ steps, currentStep }: Props) {
   return (
     <Row className="mb-3">
@@ -25,11 +69,24 @@ export function CallAnalysisProgressCard({ steps, currentStep }: Props) {
               <div className="analysis-progress-container">
                 <div className="analysis-progress-wrapper">
                   {steps.map((stepEntry, index) => {
-                    const isActive = stepEntry.step === currentStep && stepEntry.status === "processing";
+                    const isActive =
+                      stepEntry.step === currentStep &&
+                      stepEntry.status === "processing";
                     const isCompleted = stepEntry.status === "done";
                     const stepIsError = stepEntry.status === "error";
                     const isLast = index === steps.length - 1;
-                    const prevCompleted = index > 0 && steps[index - 1]?.status === "done";
+                    const prevCompleted =
+                      index > 0 && steps[index - 1]?.status === "done";
+                    const appearance = stepAppearanceClass(
+                      isActive,
+                      isCompleted,
+                      stepIsError,
+                    );
+
+                    let connectorSuffix = "";
+                    if (isCompleted || prevCompleted) {
+                      connectorSuffix = "completed";
+                    }
 
                     return (
                       <React.Fragment key={`${stepEntry.step}-${stepEntry.timestamp}-${index}`}>
@@ -41,37 +98,31 @@ export function CallAnalysisProgressCard({ steps, currentStep }: Props) {
                           }}
                         >
                           <div
-                            className={`analysis-progress-step ${
-                              isActive ? "active" : isCompleted ? "done" : stepIsError ? "error" : "pending"
-                            }`}
+                            className={`analysis-progress-step ${appearance}`}
                           >
                             <div className="step-indicator-wrapper">
                               <div
-                                className={`step-circle ${
-                                  isActive ? "active" : isCompleted ? "done" : stepIsError ? "error" : "pending"
-                                }`}
+                                className={`step-circle ${appearance}`}
                               >
-                                {isCompleted ? (
-                                  <i className="ti ti-check"></i>
-                                ) : stepIsError ? (
-                                  <i className="ti ti-x"></i>
-                                ) : isActive ? (
-                                  <Spinner animation="border" size="sm" variant="light" />
-                                ) : (
-                                  <span className="step-number">{index + 1}</span>
-                                )}
+                                <StepCircleInterior
+                                  isCompleted={isCompleted}
+                                  stepIsError={stepIsError}
+                                  isActive={isActive}
+                                  stepNumber={index + 1}
+                                />
                               </div>
                               {!isLast && (
                                 <div
-                                  className={`step-connector ${isCompleted || prevCompleted ? "completed" : ""}`}
+                                  className={`step-connector ${connectorSuffix}`}
                                 />
                               )}
                             </div>
                             <div className="step-content">
-                              <div className="step-title">{stepEntry.step.replace(/_/g, " ")}</div>
+                              <div className="step-title">{humanizeUnderscores(stepEntry.step)}</div>
                               {stepEntry.message && (
                                 <div className="step-message">
-                                  {stepEntry.message || stepEntry.step.replace(/_/g, " ")}
+                                  {stepEntry.message ||
+                                    humanizeUnderscores(stepEntry.step)}
                                 </div>
                               )}
                             </div>

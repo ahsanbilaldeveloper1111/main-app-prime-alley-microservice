@@ -974,7 +974,9 @@ export default function BillingHistoryPage({
   const [selectedCompanyId, setSelectedCompanyId] = useState<string | number>("");
 
   const bumpInvoicesAfterCustomerCreated = useCallback(() => {
-    void queryClient.invalidateQueries({ queryKey: accountBillingKeys.invoiceHistory.all() });
+    queryClient
+      .invalidateQueries({ queryKey: accountBillingKeys.invoiceHistory.all() })
+      .catch(() => undefined);
   }, [queryClient]);
 
   useEnsureCustomerForCrmCompany(customerCompanyPicker ? selectedCompanyId : null, {
@@ -1051,7 +1053,9 @@ export default function BillingHistoryPage({
 
   const { openInvoicePayment: openInvoicePaymentModal, invoicePaymentModal } = useInvoicePaymentModal({
     onPaymentSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: accountBillingKeys.invoiceHistory.all() });
+      queryClient
+        .invalidateQueries({ queryKey: accountBillingKeys.invoiceHistory.all() })
+        .catch(() => undefined);
     },
   });
 

@@ -16,6 +16,347 @@ import {
   updateStepInList,
 } from "@pages/ai-ml/analysis/analysisHelpers";
 
+function isDefinedValue<T>(v: T | null | undefined): v is T {
+  return v !== undefined && v !== null;
+}
+
+/** Normalizes router `router.query.data` to a single string parameter. */
+function getRouterQueryString(raw: string | string[] | undefined): string | undefined {
+  if (typeof raw === "string") return raw;
+  if (Array.isArray(raw)) return raw.at(0);
+  return undefined;
+}
+
+type SetChunksAnalysis = React.Dispatch<React.SetStateAction<any>>;
+
+/** Appends Good Lead widget from `lead_quality`, if present. */
+function pushLeadQualityTag(result: any, out: unknown[]): void {
+  if (!isDefinedValue(result.lead_quality)) return;
+  out.push({
+    status: result.lead_quality.good_lead ?? false,
+    name: "Good Lead",
+    percentage: result.lead_quality.good_lead_percentage ?? "N/A",
+    description: result.lead_quality.good_lead_description ?? "N/A",
+  });
+}
+
+function pushBuyerIntentTags(result: any, out: unknown[]): void {
+  if (!isDefinedValue(result.buyer_intent)) return;
+  const bi = result.buyer_intent;
+  out.push(
+    {
+      status: bi.fast_buyer ?? false,
+      name: "Fast Buyer",
+      percentage: bi.fast_buyer_percentage ?? "N/A",
+      description: bi.fast_buyer_description ?? "N/A",
+    },
+    {
+      status: bi.big_budget_buyer ?? false,
+      name: "Big Budget Buyer",
+      percentage: bi.big_budget_buyer_percentage ?? "N/A",
+      description: bi.big_budget_buyer_description ?? "N/A",
+    },
+    {
+      status: bi.not_a_lead ?? false,
+      name: "Not a Lead",
+      percentage: bi.not_a_lead_percentage ?? "N/A",
+      description: bi.not_a_lead_description ?? "N/A",
+    },
+  );
+}
+
+function pushFeedbackTag(result: any, out: unknown[]): void {
+  if (!isDefinedValue(result.feedback)) return;
+  out.push({
+    status: result.feedback.negative_feedback ?? false,
+    name: "Negative Feedback",
+    percentage: result.feedback.negative_feedback_percentage ?? "N/A",
+    description: result.feedback.negative_feedback_description ?? "N/A",
+  });
+}
+
+const STEP_RESULT_CHUNK_HANDLERS: Record<
+  string,
+  (result: any, setChunks: SetChunksAnalysis) => void
+> = {
+  [STEP_CODES.TRANSCRIPTION]: (result, setChunks) => {
+    if (!isDefinedValue(result.transcription)) return;
+    setChunks((prev: any) => ({ ...prev, transcriptions: result.transcription }));
+  },
+  [STEP_CODES.ANALYSIS]: (result, setChunks) => {
+    if (result.analysis === undefined) return;
+    setChunks((prev: any) => ({ ...prev, analysis: result.analysis }));
+  },
+  [STEP_CODES.QUALIFICATION_FIELDS]: (result, setChunks) => {
+    if (result.extracted_qualification_fields !== undefined) {
+      setChunks((prev: any) => ({
+        ...prev,
+        extracted_qualification_fields: result.extracted_qualification_fields,
+      }));
+    }
+    if (result.qualified !== undefined) {
+      setChunks((prev: any) => ({ ...prev, qualified: result.qualified }));
+    }
+    if (result.completion_percent !== undefined) {
+      setChunks((prev: any) => ({ ...prev, completion_percent: result.completion_percent }));
+    }
+  },
+  [STEP_CODES.CLASSIFICATION]: (result, setChunks) => {
+    if (result.classification === undefined) return;
+    setChunks((prev: any) => ({
+      ...prev,
+      main_topic: result.classification?.main_topic,
+    }));
+  },
+  [STEP_CODES.SUMMARY]: (result, setChunks) => {
+    if (result.summary === undefined) return;
+    setChunks((prev: any) => ({ ...prev, summary: result.summary?.summary }));
+  },
+  [STEP_CODES.LEAD_QUALITY]: (result, setChunks) => {
+    if (!isDefinedValue(result.lead_quality)) return;
+    const tempLeadQuality = {
+      status: result.lead_quality.good_lead ?? false,
+      name: "Good Lead",
+      percentage: result.lead_quality.good_lead_percentage ?? "N/A",
+      description: result.lead_quality.good_lead_description ?? "N/A",
+    };
+    setChunks((prev: any) => ({ ...prev, tags: [...prev.tags, tempLeadQuality] }));
+  },
+  [STEP_CODES.BUYER_INTENT]: (result, setChunks) => {
+    if (!isDefinedValue(result.buyer_intent)) return;
+    const bi = result.buyer_intent;
+    const rows = [
+      {
+        status: bi.fast_buyer ?? false,
+        name: "Fast Buyer",
+        percentage: bi.fast_buyer_percentage ?? "N/A",
+        description: bi.fast_buyer_description ?? "N/A",
+      },
+      {
+        status: bi.big_budget_buyer ?? false,
+        name: "Big Budget Buyer",
+        percentage: bi.big_budget_buyer_percentage ?? "N/A",
+        description: bi.big_budget_buyer_description ?? "N/A",
+      },
+      {
+        status: bi.not_a_lead ?? false,
+        name: "Not a Lead",
+        percentage: bi.not_a_lead_percentage ?? "N/A",
+        description: bi.not_a_lead_description ?? "N/A",
+      },
+    ];
+    setChunks((prev: any) => ({ ...prev, tags: [...prev.tags, ...rows] }));
+  },
+  [STEP_CODES.FEEDBACK]: (result, setChunks) => {
+    if (!isDefinedValue(result.feedback)) return;
+    const tempFeedback = {
+      status: result.feedback.negative_feedback ?? false,
+      name: "Negative Feedback",
+      percentage: result.feedback.negative_feedback_percentage ?? "N/A",
+      description: result.feedback.negative_feedback_description ?? "N/A",
+    };
+    setChunks((prev: any) => ({ ...prev, tags: [...prev.tags, tempFeedback] }));
+  },
+  [STEP_CODES.TRANSLATIONS]: (result, setChunks) => {
+    if (result.translations === undefined) return;
+    setChunks((prev: any) => ({ ...prev, translations: result.translations }));
+  },
+};
+
+function mergeDoneStepEntry(
+  prev: AnalysisStepEntry[],
+  parsedStep: string | undefined,
+  message: string,
+): AnalysisStepEntry[] {
+  if (!parsedStep) return prev;
+  const stepEntry = {
+    step: parsedStep,
+    message: message || "Completed",
+    status: "done",
+    timestamp: Date.now(),
+  };
+  const normalizedTarget = normalizeStep(parsedStep);
+  const existingIndex = prev.findIndex(
+    (s) => normalizeStep(s.step) === normalizedTarget,
+  );
+  if (existingIndex >= 0) {
+    const updated = [...prev];
+    updated[existingIndex] = stepEntry;
+    return updated;
+  }
+  return [...prev, stepEntry];
+}
+
+/** Builds `{ ...chunks }` patch object from SSE `done` payload `result`. */
+function buildChunksUpdatesFromDoneResult(result: any): Record<string, unknown> {
+  const updates: Record<string, unknown> = {};
+
+  if (isDefinedValue(result.transcription)) {
+    updates.transcriptions = result.transcription;
+  }
+  if (isDefinedValue(result.analysis)) {
+    updates.analysis = result.analysis;
+  }
+  if (isDefinedValue(result.extracted_qualification_fields)) {
+    updates.extracted_qualification_fields = result.extracted_qualification_fields;
+  }
+  if (isDefinedValue(result.qualified)) {
+    updates.qualified = result.qualified;
+  }
+  if (isDefinedValue(result.completion_percent)) {
+    updates.completion_percent = result.completion_percent;
+  }
+  if (isDefinedValue(result.classification)) {
+    updates.main_topic = result?.classification?.main_topic;
+  }
+  if (isDefinedValue(result.summary)) {
+    updates.summary = result.summary?.summary;
+  }
+
+  const tagsArray: unknown[] = [];
+  pushLeadQualityTag(result, tagsArray);
+  pushBuyerIntentTags(result, tagsArray);
+  pushFeedbackTag(result, tagsArray);
+  if (tagsArray.length > 0) {
+    updates.tags = tagsArray;
+  }
+
+  if (isDefinedValue(result.translation)) {
+    updates.translations = result.translation?.translations || [];
+  }
+
+  return updates;
+}
+
+function attachErrorToLastStep(
+  prev: AnalysisStepEntry[],
+  errorMessage: string,
+): AnalysisStepEntry[] {
+  if (prev.length === 0) return prev;
+  const updated = [...prev];
+  const last = updated.at(-1);
+  if (last === undefined) return prev;
+  updated.splice(-1, 1, { ...last, status: "error", message: errorMessage });
+  return updated;
+}
+
+type DecodeUrlSnap = Readonly<{
+  dataBlob: string | undefined;
+  id: string;
+  direction: string;
+  phone: string;
+  imagicle: string;
+  duration: string;
+  dateTime: string;
+  dateOnly: string;
+  ownerUsername: string;
+  localPartyNumber: string;
+}>;
+
+const EMPTY_DECODE: DecodeUrlSnap = {
+  dataBlob: undefined,
+  id: "",
+  direction: "",
+  phone: "",
+  imagicle: "",
+  duration: "",
+  dateTime: "",
+  dateOnly: "",
+  ownerUsername: "",
+  localPartyNumber: "",
+};
+
+function decodeAnalysisRouterBlob(dataBlob: string | undefined): DecodeUrlSnap {
+  if (!dataBlob) return { ...EMPTY_DECODE, dataBlob };
+  try {
+    const o = decodeAnalysisData(dataBlob);
+    console.log("dataObject", o);
+    return {
+      dataBlob,
+      id: o.uuid,
+      direction: o.direction,
+      phone: o.phone,
+      imagicle: o.imagicle,
+      duration: o.duration,
+      dateTime: o.dateTime,
+      dateOnly: o.dateOnly,
+      ownerUsername: o.localPartyNumber,
+      localPartyNumber: o.ownerUsername,
+    };
+  } catch (decodeError) {
+    console.error("Error decoding encoded data:", decodeError);
+    return { ...EMPTY_DECODE, dataBlob };
+  }
+}
+
+function persistDecodedSnapToCallAnalysisState(
+  i: Readonly<{
+    snap: DecodeUrlSnap;
+    fetchWithParams: (params: CallAnalysisWithDataParams) => Promise<void>;
+    setAudioTrackId: React.Dispatch<React.SetStateAction<string>>;
+    setUuid: React.Dispatch<React.SetStateAction<string>>;
+    setCallType: React.Dispatch<React.SetStateAction<string | null>>;
+    setLocalPartyNumber: React.Dispatch<React.SetStateAction<string>>;
+    setRemotePartyNumber: React.Dispatch<React.SetStateAction<string>>;
+    setImagicle: React.Dispatch<React.SetStateAction<string>>;
+    setCallDurationFormatted: React.Dispatch<React.SetStateAction<string | null>>;
+    setCallDuration: React.Dispatch<React.SetStateAction<string | null>>;
+    setDateTime: React.Dispatch<React.SetStateAction<string>>;
+    setOwnerUsername: React.Dispatch<React.SetStateAction<string>>;
+    setDate: React.Dispatch<React.SetStateAction<string>>;
+  }>,
+): void {
+  const { snap } = i;
+  if (snap.id) {
+    i.setAudioTrackId(snap.id);
+    i.setUuid(snap.id);
+  }
+  if (snap.direction) {
+    i.setCallType(snap.direction);
+  }
+  if (snap.phone) {
+    i.setLocalPartyNumber(snap.phone);
+    i.setRemotePartyNumber(snap.phone);
+  }
+  if (snap.imagicle) {
+    i.setImagicle(snap.imagicle);
+  }
+  if (snap.duration) {
+    const formatted = formatDuration(Number.parseInt(snap.duration, 10) / 10000000);
+    i.setCallDurationFormatted(formatted);
+    i.setCallDuration(snap.duration);
+  }
+  if (snap.dateTime) {
+    i.setDateTime(snap.dateTime);
+  }
+
+  const hasValidDecodedData =
+    Boolean(snap.dataBlob) &&
+    Boolean(snap.id) &&
+    (Boolean(snap.dateOnly) ||
+      Boolean(snap.localPartyNumber) ||
+      Boolean(snap.ownerUsername));
+  if (!hasValidDecodedData) {
+    return;
+  }
+
+  i.setLocalPartyNumber(snap.localPartyNumber);
+  i.setOwnerUsername(snap.ownerUsername);
+  i.setDate(snap.dateOnly);
+  i.fetchWithParams({
+      dateParam: snap.dateOnly,
+      localPartyNumberParam: snap.localPartyNumber,
+      ownerUsernameParam: snap.ownerUsername,
+      uuidParam: snap.id,
+      imagicleParam: snap.imagicle,
+      dateTimeParam: snap.dateTime,
+      durationParam: snap.duration,
+      directionParam: snap.direction,
+      phoneParam: snap.phone,
+    })
+    .catch(() => undefined);
+}
+
 export function useCallAnalysis() {
   const router = useRouter();
   const [chunksAnalysisData, setChunksAnalysisData] = useState<any>({
@@ -55,256 +396,48 @@ export function useCallAnalysis() {
   const audioStopTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const handleStepDataUpdate = (stepCode: string, result: any) => {
-    const normalizedStepCode = String(stepCode).trim();
-    switch (normalizedStepCode) {
-      case STEP_CODES.TRANSCRIPTION:
-       
-        if (result.transcription !== undefined && result.transcription !== null) {
-          setChunksAnalysisData((prev: any) => ({ ...prev, transcriptions: result.transcription }));
-        } 
-        break;
-
-      case STEP_CODES.ANALYSIS:
-        if (result.analysis !== undefined) {
-          setChunksAnalysisData((prev: any) => ({ ...prev, analysis: result.analysis }));
-        }
-        break;
-
-      case STEP_CODES.QUALIFICATION_FIELDS:
-        if (result.extracted_qualification_fields !== undefined) {
-          setChunksAnalysisData((prev: any) => ({ ...prev, extracted_qualification_fields: result.extracted_qualification_fields }));
-        }
-        if (result.qualified !== undefined) {
-          setChunksAnalysisData((prev: any) => ({ ...prev, qualified: result.qualified }));
-        }
-
-        //completion_percent
-        if (result.completion_percent !== undefined) {
-          setChunksAnalysisData((prev: any) => ({ ...prev, completion_percent: result.completion_percent }));
-        }
-        break;
-
-      case STEP_CODES.CLASSIFICATION:
-        if (result.classification !== undefined) {
-          setChunksAnalysisData((prev: any) => ({ ...prev, main_topic: result.classification?.main_topic }));
-        }
-        break;
-
-      case STEP_CODES.SUMMARY:
-        if (result.summary !== undefined) {
-          setChunksAnalysisData((prev: any) => ({ ...prev, summary: result.summary?.summary }));
-        }
-        break;
-
-        case STEP_CODES.LEAD_QUALITY:
-          if(result.lead_quality !== undefined && result.lead_quality !== null){
-            const tempLeadQuality = {
-              status: result.lead_quality.good_lead ?? false,
-              name: 'Good Lead',
-              percentage: result.lead_quality.good_lead_percentage ?? 'N/A',
-              description: result.lead_quality.good_lead_description ?? 'N/A',
-            };
-            setChunksAnalysisData((prev: any) => ({ ...prev, tags: [...prev.tags, tempLeadQuality] }));
-          }
-          break;
-
-          case STEP_CODES.BUYER_INTENT:
-            // // Convert buyer_intent object to tags format
-            if(result.buyer_intent !== undefined && result.buyer_intent !== null){
-              
-              const tempFastBuyer = {
-                status: result.buyer_intent.fast_buyer ?? false,
-                name: 'Fast Buyer',
-                percentage: result.buyer_intent.fast_buyer_percentage ?? 'N/A',
-                description: result.buyer_intent.fast_buyer_description ?? 'N/A',
-              };
-              const tempBigBudgetBuyer = {
-                status: result.buyer_intent.big_budget_buyer ?? false,
-                name: 'Big Budget Buyer',
-                percentage: result.buyer_intent.big_budget_buyer_percentage ?? 'N/A',
-                description: result.buyer_intent.big_budget_buyer_description ?? 'N/A',
-              };
-              const tempNotALead = {
-                status: result.buyer_intent.not_a_lead ?? false,
-                name: 'Not a Lead',
-                percentage: result.buyer_intent.not_a_lead_percentage ?? 'N/A',
-                description: result.buyer_intent.not_a_lead_description ?? 'N/A',
-              };
-    
-              setChunksAnalysisData((prev: any) => ({ ...prev, tags: [...prev.tags, tempFastBuyer, tempBigBudgetBuyer, tempNotALead] }));
-            }
-            break;
-
-
-            case STEP_CODES.FEEDBACK:
-              // // Convert feedback object to tags format
-             if(result.feedback !== undefined && result.feedback !== null){
-       
-               const tempFeedback = {
-                 status: result.feedback.negative_feedback ?? false,
-                 name: 'Negative Feedback',
-                 percentage: result.feedback.negative_feedback_percentage ?? 'N/A',
-                 description: result.feedback.negative_feedback_description ?? 'N/A',
-               };
-               setChunksAnalysisData((prev: any) => ({ ...prev, tags: [...prev.tags, tempFeedback] }));
-             }
-               break;
-
-      case STEP_CODES.TRANSLATIONS:
-        if (result.translations !== undefined) {
-          setChunksAnalysisData((prev: any) => ({ ...prev, translations: result.translations }));
-        }
-        break;
-
-      default:
-        console.log('Unknown step code:', stepCode);
-        break;
+    const key = String(stepCode).trim();
+    const handler = STEP_RESULT_CHUNK_HANDLERS[key];
+    if (handler === undefined) {
+      console.log("Unknown step code:", stepCode);
+      return;
     }
+    handler(result, setChunksAnalysisData);
   };
 
   const handleDoneStatus = (parsedData: any) => {
     setLoading(false);
-    // Update step status if step field exists
     if (parsedData.step) {
-      const stepEntry = {
-        step: parsedData.step,
-        message: parsedData.message || 'Completed',
-        status: 'done',
-        timestamp: Date.now()
-      };
-      
-      setSteps((prev: AnalysisStepEntry[]) => {
-        const currentStepNormalized = normalizeStep(parsedData.step);
-        const existingIndex = prev.findIndex((s: AnalysisStepEntry) => normalizeStep(s.step) === currentStepNormalized);
-        
-        if (existingIndex >= 0) {
-          const updated = [...prev];
-          updated[existingIndex] = stepEntry;
-          return updated;
-        }
-        return [...prev, stepEntry];
-      });
+      setSteps((prev: AnalysisStepEntry[]) =>
+        mergeDoneStepEntry(prev, parsedData.step, parsedData.message ?? ""),
+      );
     }
-    
+
     if (!parsedData.result) {
-      console.warn('Status is done but result is missing:', parsedData);
+      console.warn("Status is done but result is missing:", parsedData);
       return;
     }
-    
-    const result = parsedData.result;
-    
-    // Build update object with all available data in a single update
-    const updates: any = {};
-    
-    if(result.transcription !== undefined && result.transcription !== null){
-      updates.transcriptions = result.transcription;
-    }
-    if(result.analysis !== undefined && result.analysis !== null){
-      updates.analysis = result.analysis;
-    }
-    if(result.extracted_qualification_fields !== undefined && result.extracted_qualification_fields !== null){
-      updates.extracted_qualification_fields = result.extracted_qualification_fields;
-    }
-    if(result.qualified !== undefined && result.qualified !== null){
-      updates.qualified = result.qualified;
-    }
-    if(result.completion_percent !== undefined && result.completion_percent !== null){
-      updates.completion_percent = result.completion_percent;
-    }
-    if(result.classification !== undefined && result.classification !== null){
-      updates.main_topic = result?.classification?.main_topic;
-    }
-    if(result.summary !== undefined && result.summary !== null){
-      updates.summary = result.summary?.summary;
-    }
-    
-    // Initialize tags array and merge lead_quality, buyer_intent, and feedback
-    const tagsArray: any[] = [];
-    
-    // Convert lead_quality object to tags format
-    if(result.lead_quality !== undefined && result.lead_quality !== null){
-      const tempLeadQuality = {
-        status: result.lead_quality.good_lead ?? false,
-        name: 'Good Lead',
-        percentage: result.lead_quality.good_lead_percentage ?? 'N/A',
-        description: result.lead_quality.good_lead_description ?? 'N/A',
-      };
-      tagsArray.push(tempLeadQuality);
-    }
-    
-    // Convert buyer_intent object to tags format
-    if(result.buyer_intent !== undefined && result.buyer_intent !== null){
-      const tempFastBuyer = {
-        status: result.buyer_intent.fast_buyer ?? false,
-        name: 'Fast Buyer',
-        percentage: result.buyer_intent.fast_buyer_percentage ?? 'N/A',
-        description: result.buyer_intent.fast_buyer_description ?? 'N/A',
-      };
-      const tempBigBudgetBuyer = {
-        status: result.buyer_intent.big_budget_buyer ?? false,
-        name: 'Big Budget Buyer',
-        percentage: result.buyer_intent.big_budget_buyer_percentage ?? 'N/A',
-        description: result.buyer_intent.big_budget_buyer_description ?? 'N/A',
-      };
-      const tempNotALead = {
-        status: result.buyer_intent.not_a_lead ?? false,
-        name: 'Not a Lead',
-        percentage: result.buyer_intent.not_a_lead_percentage ?? 'N/A',
-        description: result.buyer_intent.not_a_lead_description ?? 'N/A',
-      };
-      
-      tagsArray.push(tempFastBuyer, tempBigBudgetBuyer, tempNotALead);
-    }
-    
-    // Convert feedback object to tags format
-    if(result.feedback !== undefined && result.feedback !== null){
-      const tempFeedback = {
-        status: result.feedback.negative_feedback ?? false,
-        name: 'Negative Feedback',
-        percentage: result.feedback.negative_feedback_percentage ?? 'N/A',
-        description: result.feedback.negative_feedback_description ?? 'N/A',
-      };
-      tagsArray.push(tempFeedback);
-    }
 
-    if(result.translation !== undefined && result.translation !== null){
-      updates.translations = result.translation?.translations || [];
-    }
-    
-    // Set tags if we have any
-    if(tagsArray.length > 0){
-      updates.tags = tagsArray;
-    }
-
-    
-    
-    // Apply all updates in a single state update
-    if(Object.keys(updates).length > 0){
-     
+    const updates = buildChunksUpdatesFromDoneResult(parsedData.result);
+    if (Object.keys(updates).length > 0) {
       setChunksAnalysisData((prev: any) => ({ ...prev, ...updates }));
     } else {
-      console.warn('No valid updates found in result:', result);
+      console.warn("No valid updates found in result:", parsedData.result);
     }
-    // Handle analysis errors
-    if (result.analysis && result.analysis.error) {
-      console.error('Analysis error:', result.analysis.error);
+
+    if (parsedData.result.analysis?.error) {
+      console.error("Analysis error:", parsedData.result.analysis.error);
       setError(UNABLE_TO_ANALYZE_CALL);
-      setLoading(false);
-      setAnalysisComplete(true);
-      
     } else {
       setValidAnalysis(true);
     }
 
-    
     setLoading(false);
     setAnalysisComplete(true);
     setCurrentStep(null);
-    
-    // Mark all steps as done
-    setSteps((prev: AnalysisStepEntry[]) => prev.map((s: AnalysisStepEntry) => ({ ...s, status: 'done' })));
-
-    
+    setSteps((prev: AnalysisStepEntry[]) =>
+      prev.map((s: AnalysisStepEntry) => ({ ...s, status: "done" })),
+    );
     disconnectSocket();
   };
 
@@ -338,14 +471,7 @@ export function useCallAnalysis() {
       });
       setCurrentStep(parsedData.step);
     } else {
-      setSteps((prev: AnalysisStepEntry[]) => {
-        if (prev.length > 0) {
-          const updated = [...prev];
-          updated[updated.length - 1] = { ...updated[updated.length - 1], status: 'error', message: errorMessage };
-          return updated;
-        }
-        return prev;
-      });
+      setSteps((prev: AnalysisStepEntry[]) => attachErrorToLastStep(prev, errorMessage));
     }
     
     disconnectSocket();
@@ -479,88 +605,23 @@ export function useCallAnalysis() {
     if (!router.isReady) return;
 
     try {
-      const raw = router.query.data;
-      let data: string | undefined;
-      if (typeof raw === "string") {
-        data = raw;
-      } else if (Array.isArray(raw)) {
-        data = raw[0];
-      } else {
-        data = undefined;
-      }
+      const snap = decodeAnalysisRouterBlob(getRouterQueryString(router.query.data));
 
-      let decodedId = "";
-      let decodedDirection = "";
-      let decodedPhone = "";
-      let decodedImagicle = "";
-      let decodedDuration = "";
-      let decodedDateTime = "";
-      let decodedDateOnly = "";
-      let decodedOwnerUsername = "";
-      let decodedLocalPartyNumber = "";
-
-      if (data) {
-        try {
-          const dataObject = decodeAnalysisData(data);
-
-          console.log("dataObject", dataObject);
-          decodedId = dataObject.uuid;
-          decodedDirection = dataObject.direction;
-          decodedPhone = dataObject.phone;
-          decodedImagicle = dataObject.imagicle;
-          decodedDuration = dataObject.duration;
-          decodedDateTime = dataObject.dateTime;
-          decodedDateOnly = dataObject.dateOnly;
-          decodedOwnerUsername = dataObject.localPartyNumber;
-          decodedLocalPartyNumber = dataObject.ownerUsername;
-        } catch (decodeError) {
-          console.error("Error decoding encoded data:", decodeError);
-        }
-      }
-
-      if (decodedId) {
-        setAudioTrackId(decodedId);
-        setUuid(decodedId);
-      }
-      if (decodedDirection) {
-        setCallType(decodedDirection);
-      }
-      if (decodedPhone) {
-        setLocalPartyNumber(decodedPhone);
-        setRemotePartyNumber(decodedPhone);
-      }
-
-      if (decodedImagicle) {
-        setImagicle(decodedImagicle);
-      }
-      if (decodedDuration) {
-        const formatedDuration = formatDuration(Number.parseInt(decodedDuration, 10) / 10000000);
-        setCallDurationFormatted(formatedDuration as string);
-        setCallDuration(decodedDuration);
-      }
-
-      if (decodedDateTime) {
-        setDateTime(decodedDateTime);
-      }
-
-      const hasValidDecodedData =
-        data && decodedId && (decodedDateOnly || decodedLocalPartyNumber || decodedOwnerUsername);
-      if (hasValidDecodedData) {
-        setLocalPartyNumber(decodedLocalPartyNumber);
-        setOwnerUsername(decodedOwnerUsername);
-        setDate(decodedDateOnly);
-        void handleGetCallAnalysisWithData({
-          dateParam: decodedDateOnly,
-          localPartyNumberParam: decodedLocalPartyNumber,
-          ownerUsernameParam: decodedOwnerUsername,
-          uuidParam: decodedId,
-          imagicleParam: decodedImagicle,
-          dateTimeParam: decodedDateTime,
-          durationParam: decodedDuration,
-          directionParam: decodedDirection,
-          phoneParam: decodedPhone,
-        });
-      }
+      persistDecodedSnapToCallAnalysisState({
+        snap,
+        fetchWithParams: handleGetCallAnalysisWithData,
+        setAudioTrackId,
+        setUuid,
+        setCallType,
+        setLocalPartyNumber,
+        setRemotePartyNumber,
+        setImagicle,
+        setCallDurationFormatted,
+        setCallDuration,
+        setDateTime,
+        setOwnerUsername,
+        setDate,
+      });
     } catch (error) {
       console.error("Error parsing URL data:", error);
     }

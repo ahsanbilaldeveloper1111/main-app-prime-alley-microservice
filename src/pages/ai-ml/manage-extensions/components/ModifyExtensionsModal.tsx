@@ -45,7 +45,9 @@ export function ModifyExtensionsModal({
             isMulti
             value={modalSelectedImagicles}
             onChange={(opts) =>
-              setModalSelectedImagicles((opts as ManageExtensionsSelectOption[]) ?? [])
+              setModalSelectedImagicles(
+                (opts as ManageExtensionsSelectOption[]) ?? [],
+              )
             }
             options={imagicleOptions}
           />
@@ -57,7 +59,9 @@ export function ModifyExtensionsModal({
             isMulti
             value={modalSelectedExtensions}
             onChange={(opts) =>
-              setModalSelectedExtensions((opts as ManageExtensionsSelectOption[]) ?? [])
+              setModalSelectedExtensions(
+                (opts as ManageExtensionsSelectOption[]) ?? [],
+              )
             }
             options={modalExtensionOptions}
             isDisabled={hierarchyLoading}
@@ -68,7 +72,11 @@ export function ModifyExtensionsModal({
         <Button variant="secondary" onClick={onHide}>
           Cancel
         </Button>
-        <Button variant="primary" onClick={() => void onSubmit()} disabled={updating}>
+        <Button
+          variant="primary"
+          onClick={() => onSubmit()}
+          disabled={updating}
+        >
           {updating ? (
             <>
               <Spinner animation="border" size="sm" className="me-2" />

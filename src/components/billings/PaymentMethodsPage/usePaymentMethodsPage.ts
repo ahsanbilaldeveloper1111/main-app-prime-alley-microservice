@@ -79,7 +79,7 @@ export function usePaymentMethodsPage() {
 
   const handleCloseSidebar = () => {
     setSidebarOpen(false);
-    void invalidatePaymentMethods();
+    invalidatePaymentMethods().catch(() => undefined);
   };
 
   return {
