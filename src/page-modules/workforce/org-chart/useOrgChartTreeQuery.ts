@@ -58,8 +58,7 @@ export function useOrgChartTreeQuery(params: Readonly<UseOrgChartTreeQueryParams
         const raw = await getUserProfilesOrgChartTree(req);
         let nodes = parseOrgChartTreeResponse(raw);
         if (
-          attendance &&
-          attendance.sessionStatus === "authenticated" &&
+          attendance?.sessionStatus === "authenticated" &&
           (attendance.canViewAllAttendance || !attendance.teamScopeLoading)
         ) {
           const chartUserIds = collectUniqueOrgChartUserIdsAsArray(nodes);
