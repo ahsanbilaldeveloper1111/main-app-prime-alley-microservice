@@ -196,7 +196,11 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
+<<<<<<< refactor/section-09-ai-ml
   // #006d82: sufficient contrast vs #fff for 14px UI text (WCAG AA).
+=======
+  // Darkened from #0091ae so #fff text clears WCAG AA (4.5:1) on the button.
+>>>>>>> develop
   background-color: #006d82;
 
   &:disabled {
@@ -206,6 +210,10 @@
   }
 
   &:not(:disabled):hover {
+<<<<<<< refactor/section-09-ai-ml
+=======
+    // Darker than base so hover state also meets contrast with #fff.
+>>>>>>> develop
     background-color: #005566;
   }
 }
@@ -373,7 +381,11 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
+<<<<<<< refactor/section-09-ai-ml
   // #2967ee: sufficient contrast vs #fff for 14px UI text (WCAG AA).
+=======
+  // Darkened from #4680ff so #fff text clears WCAG AA (4.5:1) on the button.
+>>>>>>> develop
   background: #2967ee;
   border: none;
   color: #fff;

@@ -19,8 +19,7 @@ function CustomBarTooltip({ active, payload }: any) {
     return (
       <div style={{ background: "#141414", color: "#fff", padding: "6px 12px", borderRadius: 4, fontSize: 12, fontFamily: usageLimitsFont }}>
         <div>
-          Used:
-          <strong>{payload[0]?.value}</strong>
+          Used: <strong>{payload[0]?.value}</strong>
         </div>
       </div>
     );
