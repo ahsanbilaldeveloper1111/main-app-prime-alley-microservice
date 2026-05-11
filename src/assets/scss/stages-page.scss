@@ -175,6 +175,7 @@
   padding: 40px;
 }
 
+.stages-create-intro {
   color: #64748b;
   font-size: 14px;
   margin-top: 0;
@@ -348,9 +349,16 @@
   margin-bottom: 30px;
 }
 
+.stages-view-tile {
   background: #f8f9fa;
   padding: 16px;
   border-radius: 10px;
+  transition: all 0.3s;
+
+  &:hover {
+    background: #e5e7eb;
+    transform: translateY(-2px);
+  }
 }
 
 .stages-view-tile-label {
@@ -368,13 +376,14 @@
   font-weight: 500;
 }
 
+.stages-view-tile-value-row {
   display: flex;
   align-items: center;
   gap: 8px;
 }
 
-// Swatch: use with inline style={{ backgroundColor: viewingStage.color }}
-
+// Color comes from inline style (viewingStage.color)
+.stages-view-color-swatch {
   width: 20px;
   height: 20px;
   border-radius: 4px;

@@ -149,10 +149,12 @@
   &:focus {
     border-color: #0091ae;
   }
-}
 
-  background-color: #f7fafc;
-  cursor: not-allowed;
+  &:disabled,
+  &--readonly {
+    background-color: #f7fafc;
+    cursor: not-allowed;
+  }
 }
 
 .products-sidebar-textarea {
@@ -170,6 +172,7 @@
   }
 }
 
+.products-sidebar-switch-wrap {
   margin-bottom: 20px;
 }
 
