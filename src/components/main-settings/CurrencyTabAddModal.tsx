@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { ACCOUNT_DEFAULTS_FONT } from './accountDefaultsTabPrimitives'
 import { AVAILABLE_CURRENCY_DEFS } from './currencyTabConstants'
 import type { Currency } from './currencyTabTypes'
@@ -12,6 +12,14 @@ export const CurrencyTabAddModal: React.FC<CurrencyTabAddModalProps> = ({ onClos
   const [selected, setSelected] = useState('')
   const [rate, setRate] = useState('')
 
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onClose()
+    }
+    globalThis.addEventListener('keydown', handleKeyDown)
+    return () => globalThis.removeEventListener('keydown', handleKeyDown)
+  }, [onClose])
+
   const handleAdd = () => {
     const found = AVAILABLE_CURRENCY_DEFS.find((c) => c.code === selected)
     if (!found || !rate.trim()) return
@@ -20,7 +28,7 @@ export const CurrencyTabAddModal: React.FC<CurrencyTabAddModalProps> = ({ onClos
       name: found.name,
       exchangeRate: rate,
       format: found.format,
-      lastUpdatedDate: new Date().toLocaleDateString('en-GB').replace(/\//g, '/'),
+      lastUpdatedDate: new Date().toLocaleDateString('en-GB').replaceAll('/', '/'),
       lastUpdatedSource: 'CRM UI',
       updatedBy: 'Rizwan Haider',
       isCompanyCurrency: false,
@@ -67,29 +75,45 @@ export const CurrencyTabAddModal: React.FC<CurrencyTabAddModalProps> = ({ onClos
       style={{
         position: 'fixed',
         inset: 0,
-        background: 'rgba(0,0,0,0.35)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
         zIndex: 1000,
       }}
-      onClick={(e) => {
-        if (e.target === e.currentTarget) onClose()
-      }}
     >
-      <div
+      <button
+        type="button"
+        aria-label="Close dialog"
+        onClick={onClose}
         style={{
+          position: 'absolute',
+          inset: 0,
+          background: 'rgba(0,0,0,0.35)',
+          border: 'none',
+          padding: 0,
+          margin: 0,
+          cursor: 'default',
+        }}
+      />
+      <dialog
+        open
+        aria-labelledby="currency-add-title"
+        style={{
+          position: 'relative',
           background: '#fff',
+          border: 'none',
           borderRadius: '6px',
           width: '480px',
           maxWidth: '95vw',
           padding: '32px',
+          margin: 0,
           boxShadow: '0 8px 32px rgba(0,0,0,0.18)',
           fontFamily: ACCOUNT_DEFAULTS_FONT,
+          color: 'inherit',
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
-          <h3 style={{ fontFamily: ACCOUNT_DEFAULTS_FONT, fontSize: '18px', fontWeight: 600, color: '#141414', margin: 0 }}>
+          <h3 id="currency-add-title" style={{ fontFamily: ACCOUNT_DEFAULTS_FONT, fontSize: '18px', fontWeight: 600, color: '#141414', margin: 0 }}>
             Add Currency
           </h3>
           <button type="button" onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#888', fontSize: '22px', lineHeight: 1, padding: '0 4px' }}>
@@ -98,9 +122,10 @@ export const CurrencyTabAddModal: React.FC<CurrencyTabAddModalProps> = ({ onClos
         </div>
 
         <div style={{ marginBottom: '20px' }}>
-          <label style={{ display: 'block', fontFamily: ACCOUNT_DEFAULTS_FONT, fontSize: '14px', fontWeight: 600, color: '#141414', marginBottom: '8px' }}>Currency</label>
+          <label htmlFor="currency-add-select" style={{ display: 'block', fontFamily: ACCOUNT_DEFAULTS_FONT, fontSize: '14px', fontWeight: 600, color: '#141414', marginBottom: '8px' }}>Currency</label>
           <div style={{ position: 'relative' }}>
             <select
+              id="currency-add-select"
               value={selected}
               onChange={(e) => setSelected(e.target.value)}
               style={selectStyle}
@@ -121,8 +146,9 @@ export const CurrencyTabAddModal: React.FC<CurrencyTabAddModalProps> = ({ onClos
         </div>
 
         <div style={{ marginBottom: '28px' }}>
-          <label style={{ display: 'block', fontFamily: ACCOUNT_DEFAULTS_FONT, fontSize: '14px', fontWeight: 600, color: '#141414', marginBottom: '8px' }}>Exchange Rate</label>
+          <label htmlFor="currency-add-rate" style={{ display: 'block', fontFamily: ACCOUNT_DEFAULTS_FONT, fontSize: '14px', fontWeight: 600, color: '#141414', marginBottom: '8px' }}>Exchange Rate</label>
           <input
+            id="currency-add-rate"
             type="number"
             placeholder="e.g. 3.6725"
             value={rate}
@@ -135,6 +161,7 @@ export const CurrencyTabAddModal: React.FC<CurrencyTabAddModalProps> = ({ onClos
             Exchange rate relative to your company currency (AED).
           </p>
         </div>
+
 
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
           <button
@@ -173,7 +200,7 @@ export const CurrencyTabAddModal: React.FC<CurrencyTabAddModalProps> = ({ onClos
             Add Currency
           </button>
         </div>
-      </div>
+      </dialog>
     </div>
   )
 }

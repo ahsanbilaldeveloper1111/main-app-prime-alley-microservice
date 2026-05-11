@@ -61,7 +61,10 @@ export const GeneralSettingsProfileTab: React.FC<GeneralSettingsProfileTabProps>
             const file = e.target.files?.[0]
             if (file) {
               const reader = new FileReader()
-              reader.onload = (ev) => setProfileImage(ev.target?.result as string)
+              reader.onload = (ev) => {
+                const result = ev.target?.result
+                if (typeof result === 'string') setProfileImage(result)
+              }
               reader.readAsDataURL(file)
             }
           }}
