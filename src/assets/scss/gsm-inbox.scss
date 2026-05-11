@@ -521,6 +521,15 @@
       opacity: 1;
   }
 
+  button.close-btn {
+      background: none;
+      border: none;
+      padding: 0;
+      font: inherit;
+      line-height: 1;
+      appearance: none;
+  }
+
   /* Pagination Styles */
   .pagination {
       display: flex;

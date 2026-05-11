@@ -1,28 +1,20 @@
-import { useQuery } from "@tanstack/react-query";
 import {
   fetchTicketTypesListPage,
   getTicketTypesListQueryOptions,
-  type TicketTypesListPayload,
 } from "@utils/ticket-types";
-import { getErrorMessage } from "@utils/errors";
-import { toast } from "react-toastify";
+import {
+  usePaginatedListQuery,
+  type PaginatedListArgs,
+} from "../_shared/listQuery";
 
-export type { TicketTypesListPayload };
+export type { TicketTypesListPayload } from "@utils/ticket-types";
 
-export function useTicketTypesListQuery(
-  args: Readonly<{ page: number; perPage: number; search: string }>,
-) {
-  return useQuery({
-    ...getTicketTypesListQueryOptions(args),
-    queryFn: async (): Promise<TicketTypesListPayload> => {
-      try {
-        return await fetchTicketTypesListPage(args);
-      } catch (error) {
-        toast.error(`Failed to load ticket types: ${getErrorMessage(error)}`, {
-          toastId: "ticket_types_list_failed",
-        });
-        return { data: [], total: 0 };
-      }
-    },
+export function useTicketTypesListQuery(args: PaginatedListArgs) {
+  return usePaginatedListQuery({
+    args,
+    queryKey: getTicketTypesListQueryOptions(args).queryKey,
+    fetchPage: fetchTicketTypesListPage,
+    errorLabel: "ticket types",
+    toastId: "ticket_types_list_failed",
   });
 }
