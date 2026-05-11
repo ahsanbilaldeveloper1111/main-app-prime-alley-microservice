@@ -1,14 +1,23 @@
+import { HEADER_CONSTANTS } from "@constants/headerConstants";
+
+const VIEW_ALL_COMPANY_EMPLOYEES =
+  HEADER_CONSTANTS.PERMISSIONS.VIEW_ALL_COMPANY_EMPLOYEES_STAFF_MANAGEMENT;
+
 /**
- * Workforce attendance: admins / root may query any employee (with filters). Other users are
- * scoped to their Control Hub team (see `getTeamUsers` + `parseTeamUsersResponseForAttendanceScope`).
+ * Workforce attendance / org-chart: who may load **company-wide** data vs **team-only**
+ * (`getTeamUsers` scope).
  *
- * Admin flag: aligned with `usePermissions().isAdmin()` (`Boolean(session.user.is_admin)`), not only `"1"`.
+ * - **Team members** see only their team (plus self).
+ * - **Company-wide** when any of: `is_admin` from auth, portal `user_type` root/admin/administrator,
+ *   literal `root` on `role` / `username` (legacy), or **view all company employees** permission.
+ * - **Not** inferred from generic job-title strings on `role` (e.g. HR “Administrator”) — those stay team-scoped.
  */
 export type AttendancePrivilegedSessionUser = {
   is_admin?: string | number | boolean | null;
   user_type?: string | null;
   role?: string | null;
   username?: string | null;
+  permissions?: readonly string[] | null;
 };
 
 function isTruthyAdminFlag(isAdmin: string | number | boolean | null | undefined): boolean {
@@ -25,17 +34,12 @@ function isRootLike(value: string | null | undefined): boolean {
     .toLowerCase() === "root";
 }
 
-/** Backend role / userType strings that imply full attendance (when `is_admin` is missing or stale). */
-function isAdministratorRoleLabel(role: string | null | undefined): boolean {
-  const r = String(role ?? "")
+/** Login `userType` (and similar) — root / admin / administrator widen attendance; see module doc. */
+function isElevatedPortalUserType(value: string | null | undefined): boolean {
+  const t = String(value ?? "")
     .trim()
-    .toLowerCase()
-    .replaceAll(/\s+/g, " ");
-  if (r === "") return false;
-  const tokens = r.split(" ");
-  return tokens.some(
-    (t) => t === "admin" || t === "administrator" || t === "superadmin" || t === "super_admin",
-  );
+    .toLowerCase();
+  return t === "root" || t === "admin" || t === "administrator";
 }
 
 export function canViewAllEmployeesAttendance(
@@ -43,10 +47,11 @@ export function canViewAllEmployeesAttendance(
 ): boolean {
   if (!user) return false;
   if (isTruthyAdminFlag(user.is_admin)) return true;
-  if (isRootLike(user.user_type ?? undefined)) return true;
+  if (isElevatedPortalUserType(user.user_type ?? undefined)) return true;
   if (isRootLike(user.role ?? undefined)) return true;
   if (isRootLike(user.username ?? undefined)) return true;
-  if (isAdministratorRoleLabel(user.role ?? undefined)) return true;
-  if (isAdministratorRoleLabel(user.user_type ?? undefined)) return true;
+  if (user.permissions?.includes(VIEW_ALL_COMPANY_EMPLOYEES)) {
+    return true;
+  }
   return false;
 }

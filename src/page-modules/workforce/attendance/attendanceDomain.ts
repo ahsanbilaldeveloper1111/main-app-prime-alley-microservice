@@ -23,6 +23,8 @@ export type AttendancePaginationState = Readonly<{
 export function serializeAttendanceListFiltersKey(
   appliedUserIds: readonly string[],
   selectedDatePreset: string,
+  /** Cache segment when list is scoped to team / non–view-all users. */
+  scopeCacheSegment = "",
 ): string {
   const ids = [...appliedUserIds]
     .map((id) => String(id).trim())
@@ -30,7 +32,8 @@ export function serializeAttendanceListFiltersKey(
     .sort((a, b) => a.localeCompare(b))
     .join(",");
   const dateKey = selectedDatePreset ?? "";
-  return `${ids}|${dateKey}`;
+  const scope = scopeCacheSegment === "" ? "" : `|${scopeCacheSegment}`;
+  return `${ids}|${dateKey}${scope}`;
 }
 
 export function buildAttendanceListRequestParams(args: Readonly<{
@@ -38,6 +41,8 @@ export function buildAttendanceListRequestParams(args: Readonly<{
   limit: number;
   appliedUserIds: readonly string[];
   selectedDatePreset: string;
+  /** When set (team-scoped list), sent as `user_ids` instead of `appliedUserIds`. */
+  userIdsOverride?: readonly string[];
 }>): {
   page: number;
   limit: number;
@@ -55,9 +60,11 @@ export function buildAttendanceListRequestParams(args: Readonly<{
     page: args.page,
     limit: args.limit,
   };
-  const normalizedUserIds = args.appliedUserIds
-    .map((id) => String(id).trim())
-    .filter(Boolean);
+  const sourceIds =
+    args.userIdsOverride != null && args.userIdsOverride.length > 0
+      ? args.userIdsOverride
+      : args.appliedUserIds;
+  const normalizedUserIds = sourceIds.map((id) => String(id).trim()).filter(Boolean);
   if (normalizedUserIds.length > 0) {
     params.user_ids = normalizedUserIds;
   }
