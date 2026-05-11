@@ -122,26 +122,10 @@ export function deriveJourneyProgressFromSteps(steps: JourneyStepRecord[]): {
   return { total, completed, progress };
 }
 
-export function journeyStartDateToInputMin(iso: string | null | undefined): string | undefined {
-  if (iso == null || String(iso).trim() === "") return undefined;
-  const trimmed = String(iso).trim();
-  if (Number.isNaN(Date.parse(trimmed))) return undefined;
-  const parsed = new Date(trimmed);
-  const y = parsed.getUTCFullYear();
-  const m = String(parsed.getUTCMonth() + 1).padStart(2, "0");
-  const d = String(parsed.getUTCDate()).padStart(2, "0");
-  return `${y}-${m}-${d}`;
-}
-
 export function readJourneyStartDateFromPayload(data: unknown): string | null {
   if (data == null || typeof data !== "object") return null;
   const startDate = (data as { start_date?: unknown }).start_date;
   return typeof startDate === "string" && startDate.trim() !== "" ? startDate.trim() : null;
-}
-
-export function clampDueDateToJourneyMin(due: string, min: string | undefined): string {
-  if (min == null || min === "") return due;
-  return due < min ? min : due;
 }
 
 export function toInputDate(value: string | null | undefined): string {
@@ -152,12 +136,6 @@ export function toInputDate(value: string | null | undefined): string {
   const m = String(parsed.getMonth() + 1).padStart(2, "0");
   const d = String(parsed.getDate()).padStart(2, "0");
   return `${y}-${m}-${d}`;
-}
-
-export function formatDueDateForDisplay(value: string): string {
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) return value;
-  return parsed.toLocaleString();
 }
 
 export function journeyUsersPillLabel(selectedCount: number, appliedCount: number): string | undefined {

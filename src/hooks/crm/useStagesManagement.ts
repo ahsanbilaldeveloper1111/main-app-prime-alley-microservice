@@ -130,15 +130,11 @@ export function useStagesManagement() {
     fetchStages(
       typeFilter as StageType | undefined,
       includeArchived,
-    ).catch(() => {
-      /* errors handled inside fetchStages */
-    });
+    ).catch(() => undefined);
   }, [fetchStages, refreshKey, activeFilter]);
 
   useEffect(() => {
-    fetchAllStagesForCounts().catch(() => {
-      /* errors handled inside fetchAllStagesForCounts */
-    });
+    fetchAllStagesForCounts().catch(() => undefined);
   }, [fetchAllStagesForCounts, refreshKey]);
 
   useEffect(() => {

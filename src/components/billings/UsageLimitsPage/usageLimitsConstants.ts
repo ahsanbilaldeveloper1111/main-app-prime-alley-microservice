@@ -2,6 +2,18 @@ import type { CSSProperties } from "react";
 
 export const usageLimitsFont = "Lexend Deca, Helvetica, Arial, sans-serif";
 
+export const usageLimitsCreditsDisclaimer =
+  "Sometimes features may show more credits used than what you are billed for.";
+
+export const usageLogDateInputStyle: CSSProperties = {
+  fontFamily: usageLimitsFont,
+  fontSize: 13,
+  padding: "8px 12px",
+  border: "1px solid #ccc",
+  borderRadius: 4,
+  width: 130,
+};
+
 export const getTagStyle = (color: string, bg: string): CSSProperties => ({
   fontSize: 10, fontWeight: 700, fontFamily: usageLimitsFont, padding: "2px 8px",
   borderRadius: 10, color, backgroundColor: bg, marginLeft: 6,

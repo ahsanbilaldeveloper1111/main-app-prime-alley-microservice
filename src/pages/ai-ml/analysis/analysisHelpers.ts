@@ -42,8 +42,30 @@ export function keyedBySignature<T>(
 
 export const capitalizeFirst = (str: string) => {
   if (!str) return "";
-  return str.replaceAll("_", " ").replace(/\b\w/g, (char) => char.toUpperCase());
+  return str.replaceAll("_", " ").replaceAll(/\b\w/g, (char) => char.toUpperCase());
 };
+
+/** Safe string for inline display — avoids `[object Object]` when the API returns a nested value. */
+export function formatUnknownForDisplay(value: unknown): string {
+  if (value == null) return "";
+  if (typeof value === "string") return value;
+  if (typeof value === "number") return String(value);
+  if (typeof value === "boolean") return String(value);
+  if (typeof value === "bigint") return value.toString();
+  if (typeof value === "symbol") return value.description ?? "";
+  if (typeof value === "function") return "[Function]";
+  if (typeof value === "object") return JSON.stringify(value);
+  return "";
+}
+
+/** Uses formatUnknownForDisplay, then capitalizeFirst when the result is plain text (not JSON). */
+export function formatAnalysisFieldLabel(value: unknown): string {
+  const raw = formatUnknownForDisplay(value);
+  if (!raw) return "";
+  const trimmed = raw.trimStart();
+  if (trimmed.startsWith("{") || trimmed.startsWith("[")) return raw;
+  return capitalizeFirst(raw);
+}
 
 export const updateStepInList = (
   prevSteps: AnalysisStepEntry[],
