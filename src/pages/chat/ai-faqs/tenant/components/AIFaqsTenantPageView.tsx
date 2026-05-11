@@ -2,8 +2,8 @@ import BreadcrumbItem from "@common/BreadcrumbItem";
 import PageHeader from "@components/PageHeader";
 import GenericListPage from "@components/GenericListPage";
 import ConfirmModal from "@components/page-partials/ConfirmModal";
-import type { Column } from "@components/CustomDataTable";
 import { useAIFaqsTenantPage } from "../useAIFaqsTenantPage";
+import { faqAttachmentFileDomKey } from "../../faqItemDraft";
 import { Button, Card, Form, Modal } from "react-bootstrap";
 import { ArrowLeft, Filter, Plus, X } from "lucide-react";
 import Select from "react-select";
@@ -77,15 +77,15 @@ export function AIFaqsTenantPageView({ ctx }: AIFaqsTenantPageViewProps) {
             isLoading={companiesLoading}
             options={companies.map((c) => ({
               value: c.identifier,
-              label: (c.name ?? c.identifier) as string,
+              label: c.name ?? c.identifier,
             }))}
             value={
               selectedCompanyForFilter
                 ? {
                     value: selectedCompanyForFilter,
                     label:
-                      (companies.find((c) => c.identifier === selectedCompanyForFilter)?.name ??
-                        selectedCompanyForFilter) as string,
+                      companies.find((c) => c.identifier === selectedCompanyForFilter)?.name ??
+                      selectedCompanyForFilter,
                   }
                 : null
             }
@@ -101,7 +101,7 @@ export function AIFaqsTenantPageView({ ctx }: AIFaqsTenantPageViewProps) {
       </div>
 
       <GenericListPage
-        columns={columns as Column[]}
+        columns={columns}
         fetchData={fetchData}
         title="Tenant FAQs"
         searchPlaceholder="Search FAQs..."
@@ -141,13 +141,13 @@ export function AIFaqsTenantPageView({ ctx }: AIFaqsTenantPageViewProps) {
                   isLoading={companiesLoading}
                   options={companies.map((c) => ({
                     value: c.identifier,
-                    label: (c.name ?? c.identifier) as string,
+                    label: c.name ?? c.identifier,
                   }))}
                   value={
                     tenantId
                       ? {
                           value: tenantId,
-                          label: (companies.find((c) => c.identifier === tenantId)?.name ?? tenantId) as string,
+                          label: companies.find((c) => c.identifier === tenantId)?.name ?? tenantId,
                         }
                       : null
                   }
@@ -160,7 +160,7 @@ export function AIFaqsTenantPageView({ ctx }: AIFaqsTenantPageViewProps) {
               </Form.Group>
 
               {faqItems.map((item, index) => (
-                <Card key={index} className="mb-3">
+                <Card key={item.clientKey} className="mb-3">
                   <Card.Body>
                     <div className="d-flex justify-content-between align-items-center mb-2">
                       <strong>FAQ #{index + 1}</strong>
@@ -217,7 +217,7 @@ export function AIFaqsTenantPageView({ ctx }: AIFaqsTenantPageViewProps) {
                   <div className="mt-2">
                     {selectedFiles.map((file, index) => (
                       <div
-                        key={index}
+                        key={faqAttachmentFileDomKey(file)}
                         className="d-flex justify-content-between align-items-center p-2 bg-light rounded mb-1"
                       >
                         <span className="small">{file.name}</span>
@@ -274,7 +274,7 @@ export function AIFaqsTenantPageView({ ctx }: AIFaqsTenantPageViewProps) {
               </div>
 
               {faqItems.map((item, index) => (
-                <Card key={index} className="mb-3">
+                <Card key={item.clientKey} className="mb-3">
                   <Card.Body>
                     <Form.Group className="mb-3">
                       <Form.Label>
@@ -318,7 +318,7 @@ export function AIFaqsTenantPageView({ ctx }: AIFaqsTenantPageViewProps) {
                   <div className="mt-2">
                     {selectedFiles.map((file, index) => (
                       <div
-                        key={index}
+                        key={faqAttachmentFileDomKey(file)}
                         className="d-flex justify-content-between align-items-center p-2 bg-light rounded mb-1"
                       >
                         <span className="small">{file.name}</span>

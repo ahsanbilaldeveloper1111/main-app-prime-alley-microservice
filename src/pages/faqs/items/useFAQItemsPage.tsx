@@ -8,8 +8,6 @@ import type { ChangeEvent } from "react";
 import { useCallback, useMemo, useState } from "react";
 import { Edit, Trash2 } from "lucide-react";
 import {
-  CREATE_ITEM_CONFIG,
-  EDIT_ITEM_CONFIG,
   EMPTY_FORM_DATA,
   type FAQItemFormData,
   type FAQItemRow,

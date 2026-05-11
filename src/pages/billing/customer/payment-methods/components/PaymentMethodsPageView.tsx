@@ -91,7 +91,7 @@ export function PaymentMethodsPageView() {
                           variant="outline-primary"
                           size="sm"
                           className="flex-grow-1"
-                          onClick={() => void handleSetDefault(method.id)}
+                          onClick={() => handleSetDefault(method.id)}
                         >
                           Set Default
                         </Button>
@@ -155,7 +155,9 @@ export function PaymentMethodsPageView() {
               }}
             >
               <PaymentMethodAddCardForm
-                onSuccess={() => void handleAddCardSuccess()}
+                onSuccess={() => {
+                  Promise.resolve(handleAddCardSuccess()).catch(() => undefined);
+                }}
                 onCancel={() => setShowAddCardModal(false)}
               />
             </Elements>

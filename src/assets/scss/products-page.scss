@@ -196,15 +196,17 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  background-color: #0091ae;
+  // #006d82: sufficient contrast vs #fff for 14px UI text (WCAG AA).
+  background-color: #006d82;
 
   &:disabled {
     background-color: #cbd5e0;
+    color: #475569;
     cursor: not-allowed;
   }
 
   &:not(:disabled):hover {
-    background-color: #007a94;
+    background-color: #005566;
   }
 }
 
@@ -371,7 +373,8 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  background: #4680ff;
+  // #2967ee: sufficient contrast vs #fff for 14px UI text (WCAG AA).
+  background: #2967ee;
   border: none;
   color: #fff;
   cursor: pointer;

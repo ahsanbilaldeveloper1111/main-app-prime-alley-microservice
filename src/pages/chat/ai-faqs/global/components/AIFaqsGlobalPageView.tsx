@@ -2,8 +2,8 @@ import BreadcrumbItem from "@common/BreadcrumbItem";
 import PageHeader from "@components/PageHeader";
 import GenericListPage from "@components/GenericListPage";
 import ConfirmModal from "@components/page-partials/ConfirmModal";
-import type { Column } from "@components/CustomDataTable";
 import { useAIFaqsGlobalPage } from "../useAIFaqsGlobalPage";
+import { faqAttachmentFileDomKey } from "../../faqItemDraft";
 import { Button, Card, Form, Modal } from "react-bootstrap";
 import { ArrowLeft, Plus, X } from "lucide-react";
 import React from "react";
@@ -65,7 +65,7 @@ export function AIFaqsGlobalPageView({ ctx }: AIFaqsGlobalPageViewProps) {
       />
 
       <GenericListPage
-        columns={columns as Column[]}
+        columns={columns}
         fetchData={fetchData}
         title="Global FAQs"
         searchPlaceholder="Search FAQs..."
@@ -100,7 +100,7 @@ export function AIFaqsGlobalPageView({ ctx }: AIFaqsGlobalPageViewProps) {
               </div>
 
               {faqItems.map((item, index) => (
-                <Card key={index} className="mb-3">
+                <Card key={item.clientKey} className="mb-3">
                   <Card.Body>
                     <div className="d-flex justify-content-between align-items-center mb-2">
                       <strong>FAQ #{index + 1}</strong>
@@ -157,7 +157,7 @@ export function AIFaqsGlobalPageView({ ctx }: AIFaqsGlobalPageViewProps) {
                   <div className="mt-2">
                     {selectedFiles.map((file, index) => (
                       <div
-                        key={index}
+                        key={faqAttachmentFileDomKey(file)}
                         className="d-flex justify-content-between align-items-center p-2 bg-light rounded mb-1"
                       >
                         <span className="small">{file.name}</span>
@@ -214,7 +214,7 @@ export function AIFaqsGlobalPageView({ ctx }: AIFaqsGlobalPageViewProps) {
               </div>
 
               {faqItems.map((item, index) => (
-                <Card key={index} className="mb-3">
+                <Card key={item.clientKey} className="mb-3">
                   <Card.Body>
                     <Form.Group className="mb-3">
                       <Form.Label>
@@ -258,7 +258,7 @@ export function AIFaqsGlobalPageView({ ctx }: AIFaqsGlobalPageViewProps) {
                   <div className="mt-2">
                     {selectedFiles.map((file, index) => (
                       <div
-                        key={index}
+                        key={faqAttachmentFileDomKey(file)}
                         className="d-flex justify-content-between align-items-center p-2 bg-light rounded mb-1"
                       >
                         <span className="small">{file.name}</span>

@@ -35,7 +35,7 @@ export function CallAnalysisSummaryCards({
               <h5>Resolution Status</h5>
               <div className="card-text">
                 {hasData(resolutionStatus) ? (
-                  <h6>{capitalizeFirst(resolutionStatus)}</h6>
+                  <h6>{capitalizeFirst(String(resolutionStatus))}</h6>
                 ) : (
                   <>
                     {!analysisComplete && <TextSkeleton lines={1} />}
@@ -49,7 +49,7 @@ export function CallAnalysisSummaryCards({
               <h5>Sentiment</h5>
               <div className="card-text">
                 {hasData(sentiment) ? (
-                  <h6>{capitalizeFirst(sentiment)}</h6>
+                  <h6>{capitalizeFirst(String(sentiment))}</h6>
                 ) : (
                   <>
                     {!analysisComplete && <TextSkeleton lines={1} />}
@@ -77,7 +77,7 @@ export function CallAnalysisSummaryCards({
               <h5>Summary</h5>
               <div className="card-text">
                 {hasData(summary) ? (
-                  <h6>{summary}</h6>
+                  <h6>{String(summary)}</h6>
                 ) : (
                   <>
                     {!analysisComplete && <TextSkeleton lines={2} lastLineWidth="70%" />}
@@ -106,10 +106,8 @@ export function CallAnalysisSummaryCards({
                     <p className="card-text text-white size2">{qualified ? "Qualified" : "Unqualified"}</p>
                   ) : (
                     <div className="card-text text-white size2">
-                      <>
-                        {!analysisComplete && <TextSkeleton lines={1} />}
-                        {analysisComplete && <p className="text-muted">No data available</p>}
-                      </>
+                      {!analysisComplete && <TextSkeleton lines={1} />}
+                      {analysisComplete && <p className="text-muted">No data available</p>}
                     </div>
                   )}
                 </div>
@@ -124,23 +122,23 @@ export function CallAnalysisSummaryCards({
                 {hasCompletionPercent ? (
                   <>
                     <p className="card-text size2 text-bold">{completionPercent}%</p>
-                    <div className="progress mb-3 progress-thin">
-                      <div
-                        className="progress-bar bg-success"
-                        role="progressbar"
-                        style={{ width: `${completionPercent}%` }}
-                        aria-valuenow={completionPercent}
-                        aria-valuemin={0}
-                        aria-valuemax={100}
+                    <div className="mb-3 w-100">
+                      <progress
+                        className="w-100 d-block rounded-pill border-0"
+                        style={{
+                          height: "0.5rem",
+                          accentColor: "var(--bs-success, #198754)",
+                        }}
+                        value={completionPercent}
+                        max={100}
+                        aria-label={`Completion ${completionPercent} percent`}
                       />
                     </div>
                   </>
                 ) : (
                   <div className="card-text size2 text-bold d-block w-100">
-                    <>
-                      {!analysisComplete && <TextSkeleton lines={2} />}
-                      {analysisComplete && <p className="text-muted">No data available</p>}
-                    </>
+                    {!analysisComplete && <TextSkeleton lines={2} />}
+                    {analysisComplete && <p className="text-muted">No data available</p>}
                   </div>
                 )}
               </div>
@@ -160,10 +158,8 @@ export function CallAnalysisSummaryCards({
                     </div>
                   ) : (
                     <div className="card-text d-block w-100">
-                      <>
-                        {!analysisComplete && <TextSkeleton lines={2} />}
-                        {analysisComplete && <p className="text-muted">No data available</p>}
-                      </>
+                      {!analysisComplete && <TextSkeleton lines={2} />}
+                      {analysisComplete && <p className="text-muted">No data available</p>}
                     </div>
                   )}
                 </div>

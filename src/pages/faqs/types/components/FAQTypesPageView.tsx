@@ -65,7 +65,7 @@ export const FAQTypesPageView: React.FC<FAQTypesPageViewProps> = ({
                   <div className="mb-3">
                     <p className="text-muted mb-0">
                       <Info size={14} className="me-1" />
-                      Found {types.length} unique type{types.length !== 1 ? "s" : ""}
+                      Found {types.length} unique type{types.length === 1 ? "" : "s"}
                       {selectedTopic != null && ` for selected topic`}
                     </p>
                   </div>

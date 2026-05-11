@@ -9,6 +9,17 @@ type Props = Readonly<{
   analysisComplete: boolean;
 }>;
 
+/** Stable list keys without using array index (per-value occurrence handles duplicates). */
+function withOccurrenceKeys<T>(items: T[], prefix: string, identity: (item: T) => string): { key: string; item: T }[] {
+  const tallies = new Map<string, number>();
+  return items.map((item) => {
+    const part = identity(item);
+    const next = (tallies.get(part) ?? 0) + 1;
+    tallies.set(part, next);
+    return { key: `${prefix}__${part}__${next}`, item };
+  });
+}
+
 export function CallAnalysisEmotionsAndTopics({
   chunksAnalysisData,
   analysis,
@@ -37,8 +48,8 @@ export function CallAnalysisEmotionsAndTopics({
                     </div>
                     <div className="card-text">
                       {hasArrayData(customerEmotions) ? (
-                        customerEmotions.map((emotion: string, index: number) => (
-                          <div className="text-capitalize me-2" key={index}>
+                        withOccurrenceKeys(customerEmotions as string[], "cust-emo", (e) => e).map(({ key, item: emotion }) => (
+                          <div className="text-capitalize me-2" key={key}>
                             <div className="emo_text">{emotion}</div>
                           </div>
                         ))
@@ -56,8 +67,8 @@ export function CallAnalysisEmotionsAndTopics({
                       <h5 className="mb-3">Operator Emotions</h5>
                       <div className="card-text">
                         {hasArrayData(operatorEmotions) ? (
-                          operatorEmotions.map((emotion: string, index: number) => (
-                            <div className="text-capitalize me-2" key={index}>
+                          withOccurrenceKeys(operatorEmotions as string[], "op-emo", (e) => e).map(({ key, item: emotion }) => (
+                            <div className="text-capitalize me-2" key={key}>
                               <div className="emo_text">{emotion}</div>
                             </div>
                           ))
@@ -84,8 +95,8 @@ export function CallAnalysisEmotionsAndTopics({
                 <div className="vbox w-100">
                   <div className="card-text">
                     {hasArrayData(keyTopics) ? (
-                      keyTopics.map((item: string, index: number) => (
-                        <div className="mb-2 callType" key={index}>
+                      withOccurrenceKeys(keyTopics as string[], "key-topic", (t) => t).map(({ key, item }) => (
+                        <div className="mb-2 callType" key={key}>
                           <div className="ic_box bg-success">
                             <i className="material-icons-two-tone">check</i>
                           </div>
@@ -123,10 +134,12 @@ export function CallAnalysisEmotionsAndTopics({
                         </tr>
                       </thead>
                       <tbody>
-                        {chunksAnalysisData?.tags?.map((item: any, index: number) => {
+                        {withOccurrenceKeys(chunksAnalysisData.tags as any[], "tag", (t: any) =>
+                          [t?.name, t?.percentage, t?.description, String(t?.status)].join("|"),
+                        ).map(({ key, item }) => {
                           const isTrue = item.status === true;
                           return (
-                            <tr key={index}>
+                            <tr key={key}>
                               <td className="text-capitalize">
                                 <div className="d-flex align-items-center gap-2">
                                   <div className="tboxIn">
@@ -165,13 +178,13 @@ export function CallAnalysisEmotionsAndTopics({
                 </div>
                 <div className="vbox w-100">
                   <div className="card-text">
-                    {!hasData(chunksAnalysisData?.summary) ? (
+                    {hasData(chunksAnalysisData?.summary) ? (
+                      <p>{chunksAnalysisData.summary}</p>
+                    ) : (
                       <>
                         {!analysisComplete && <TextSkeleton lines={4} lastLineWidth="70%" />}
                         {analysisComplete && <p className="text-muted">No data available</p>}
                       </>
-                    ) : (
-                      <p>{chunksAnalysisData.summary}</p>
                     )}
                   </div>
                 </div>
@@ -197,9 +210,9 @@ export function CallAnalysisEmotionsAndTopics({
                         </tr>
                       </thead>
                       <tbody>
-                        {Object.entries(qualificationFields).map(([key, value], index: number) => (
-                          <tr key={index}>
-                            <td>{key}</td>
+                        {Object.entries(qualificationFields).map(([fieldKey, value]) => (
+                          <tr key={fieldKey}>
+                            <td>{fieldKey}</td>
                             <td className="text-capitalize text-center">
                               {value === "null" ? "-" : String(value as string)}
                             </td>
@@ -223,8 +236,8 @@ export function CallAnalysisEmotionsAndTopics({
               <div className="card-body">
                 <h5 className="card-title">Action Items</h5>
                 {hasArrayData(actionItems) ? (
-                  actionItems.map((item: string, index: number) => (
-                    <div className="tagOuter" key={index}>
+                  withOccurrenceKeys(actionItems as string[], "action", (a) => a).map(({ key, item }) => (
+                    <div className="tagOuter" key={key}>
                       <div className="tagIcon bg-success">
                         <i className="material-icons-two-tone">check</i>
                       </div>
@@ -250,8 +263,8 @@ export function CallAnalysisEmotionsAndTopics({
                 <div className="vbox w-100">
                   <div className="card-text">
                     {hasArrayData(callCategories) ? (
-                      callCategories.map((item: string, index: number) => (
-                        <div className="mb-2 callType" key={index}>
+                      withOccurrenceKeys(callCategories as string[], "call-cat", (c) => c).map(({ key, item }) => (
+                        <div className="mb-2 callType" key={key}>
                           <div className="ic_box bg-success">
                             <i className="material-icons-two-tone">check</i>
                           </div>
