@@ -1,38 +1,22 @@
 import "@assets/scss/datatable-style.scss";
-import '@assets/scss/common.scss';
-import React, { ReactElement, useEffect, useState, useCallback } from "react";
+import "@assets/scss/common.scss";
+import "@assets/scss/tabs.scss";
+import React, { ReactElement, useState, useCallback } from "react";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 import GenericListPage from "@components/GenericListPage";
 import { Column } from "@components/CustomDataTable";
-import { Button, Modal, Row, Col } from "react-bootstrap";
+import { Row, Col } from "react-bootstrap";
 import { toast } from "react-toastify";
 import { useSession } from "next-auth/react";
 
 import AlertsFilters from "@components/filters/AlertsFilters";
-import {
-  getAlerts,
-  getMonitoringDashboard,
-  resolveAlert,
-  Alert,
-  MonitoringDashboardResponse,
-} from "@utils/netops";
-import {
-  convertUTCToUserTimezone,
-  GlobalDateFormat,
-  GlobalTimeFormat,
-} from "@utils/Helper";
+import { getAlerts, resolveAlert, type Alert } from "@utils/netops";
+import { convertUTCToUserTimezone } from "@utils/Helper";
 
-
-import "@assets/scss/common.scss";
-import "@assets/scss/tabs.scss";
-import PageHeader from "@components/PageHeader";
-import FormModal from "@components/page-partials/FormModal";
-import ConfirmModal from "@components/page-partials/ConfirmModal";
-import SuccessfulModal from "@components/page-partials/SuccessfulModal";
-import PageSummaryGrid, { SummaryCard } from '@components/PageSummaryGrid';
+import PageSummaryGrid, { SummaryCard } from "@components/PageSummaryGrid";
 import DatatableActionButton from "@components/DatatableActionButton";
-import { FiEdit, FiTrash2, FiEye, FiPlus, FiCheck } from "react-icons/fi";
+import { FiCheck } from "react-icons/fi";
 
 
 
@@ -45,7 +29,7 @@ interface Summary {
 }
 
 const Alerts = () => {
-  const { data: session, status } = useSession();
+  const { data: session } = useSession();
 
   const columns: Column[] = [
     {
@@ -315,16 +299,13 @@ const Alerts = () => {
   const fetchAlerts = useCallback(
     async (page = 1, perPage = 15, search = "") => {
       try {
-        const [alertsResponse, dashboardResponse] = await Promise.all([
-          getAlerts({
-            page,
-            perPage,
-            limit: perPage,
-            search,
-            ...currentFilters,
-          }),
-          getMonitoringDashboard(),
-        ]);
+        const alertsResponse = await getAlerts({
+          page,
+          perPage,
+          limit: perPage,
+          search,
+          ...currentFilters,
+        });
 
         // Calculate alert summary from alerts data
         const alerts = (alertsResponse as any)?.alerts ?? [];

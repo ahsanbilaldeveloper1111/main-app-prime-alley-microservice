@@ -1,47 +1,36 @@
 import '@assets/scss/datatable-style.scss';
 import React, { ReactElement, useEffect, useState, useCallback, useRef } from 'react';
+import dynamic from 'next/dynamic';
 import Layout from '@layout/index';
 import BreadcrumbItem from '@common/BreadcrumbItem';
 import GenericListPage from '@components/GenericListPage';
-import { ListCallLogs, ExportCallLogs, DownloadStreamingExport, DownloadCallsExport } from '@utils/calls';
-
+import { ListCallLogs, DownloadCallsExport } from '@utils/calls';
 import { Column } from '@components/CustomDataTable';
-import { Button, Modal, Row, Tab, Tabs, Form } from 'react-bootstrap';
-import { Col } from 'react-bootstrap';
+import { Modal, Row, Tab, Tabs, Form, Col } from 'react-bootstrap';
 import { toast } from 'react-toastify';
-import { useTokenService } from 'src/hooks/useTokenService';
 import { useSession } from 'next-auth/react';
-import CallLogsFilters from '@components/filters/CallLogsFilters';
 import BarFilters from '@components/BarFilters';
 import SelectBox from '@components/SelectBox';
 import { useHierarchyData } from '@components/filters/useHierarchyData';
-import AnimatedNumber from '@components/AnimatedNumber';
 import ChartBar from '@components/ChartBar';
 import ChartDonut from '@components/ChartDonut';
 import PageSummaryGrid from '@components/PageSummaryGrid';
-import imgStatus1 from '@assets/images/widget/img-status-1.svg'
-import imgStatus2 from '@assets/images/widget/img-status-2.svg'
-import imgStatus3 from '@assets/images/widget/img-status-3.svg'
-import imgStatus4 from '@assets/images/widget/img-status-4.svg'
 import '@assets/scss/report-style.scss';
 import '@assets/scss/tabs.scss';
-import { motion, AnimatePresence } from "framer-motion";
-import { easeInOut, easeOut, easeIn } from "framer-motion";
+import "@assets/scss/common.scss";
+import { motion, AnimatePresence, easeOut, easeIn } from "framer-motion";
 import moment from 'moment';
-import { HEADER_CONSTANTS } from '@constants/headerConstants';
 import { canViewCallLogsFromSession } from '@utils/callPermissionUtils';
 import { normalizeBarFiltersForApi } from "@page-modules/reports/call-analytics/callAnalyticsBarFilters";
-import "@assets/scss/common.scss";
-import "@assets/scss/tabs.scss";
-import PageHeader from "@components/PageHeader";
-import FormModal from "@components/page-partials/FormModal";
-import ConfirmModal from "@components/page-partials/ConfirmModal";
-import SuccessfulModal from "@components/page-partials/SuccessfulModal";
-import DatatableActionButton from "@components/DatatableActionButton";
-import { FiEdit, FiTrash2, FiEye,FiPlus } from "react-icons/fi";
+import {
+  formatMinutesAndSeconds,
+  ModuleSlug,
+  GlobalDateTimeFormat,
+  formatDateTimeToLocal,
+  getAutoTimezone,
+} from '@utils/Helper';
 
-const { PERMISSIONS } = HEADER_CONSTANTS;
-
+const ReactApexChart = dynamic(() => import('react-apexcharts'), { ssr: false });
 
 
 interface Summary {
@@ -73,14 +62,8 @@ interface ChartData {
   avg_duration: number[];
   max_duration: number[];
 }
-
-import dynamic from 'next/dynamic';
-import { ApexOptions } from 'apexcharts';
-import { formatMinutesAndSeconds, formatCurrency, ModuleSlug, GlobalDateTimeFormat, formatDateTimeToLocal, getAutoTimezone } from '@utils/Helper';
-const ReactApexChart = dynamic(() => import('react-apexcharts'), { ssr: false });
-
 const CallIncomingCountry = () => {
-    const { data:session, status } = useSession();
+    const { data: session } = useSession();
 
     const [showDateRange, setShowDateRange] = useState(false);
     const [startDateTime, setStartDateTime] = useState<string>('');
