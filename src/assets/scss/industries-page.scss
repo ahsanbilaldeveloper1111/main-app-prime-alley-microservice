@@ -23,11 +23,7 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
-<<<<<<< refactor/section-09-ai-ml
   // #2967ee: sufficient contrast vs #fff for 14px UI text (WCAG AA).
-=======
-  // Darkened from #4680ff so #fff text clears WCAG AA (4.5:1) on the button.
->>>>>>> develop
   background: #2967ee;
   border: none;
   color: #fff;

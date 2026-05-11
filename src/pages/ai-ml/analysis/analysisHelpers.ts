@@ -14,14 +14,13 @@ export const capitalizeFirst = (str: string) => {
 /** Safe string for inline display — avoids `[object Object]` when the API returns a nested value. */
 export function formatUnknownForDisplay(value: unknown): string {
   if (value == null) return "";
-  const t = typeof value;
-  if (t === "string") return value;
-  if (t === "number") return String(value as number);
-  if (t === "boolean") return String(value as boolean);
-  if (t === "bigint") return (value as bigint).toString();
-  if (t === "symbol") return value.description ?? "";
-  if (t === "function") return "[Function]";
-  if (t === "object") return JSON.stringify(value);
+  if (typeof value === "string") return value;
+  if (typeof value === "number") return String(value);
+  if (typeof value === "boolean") return String(value);
+  if (typeof value === "bigint") return value.toString();
+  if (typeof value === "symbol") return value.description ?? "";
+  if (typeof value === "function") return "[Function]";
+  if (typeof value === "object") return JSON.stringify(value);
   return "";
 }
 
