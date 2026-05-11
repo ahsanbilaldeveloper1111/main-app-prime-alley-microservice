@@ -40,9 +40,11 @@ export type OrgChartRawProfile = ApiOrgChartNode;
 export function serializeOrgChartFiltersKey(
   departmentId: string | undefined,
   userIds: string[] | undefined,
+  /** Included so React Query refetches when team attendance scope changes. */
+  attendanceScopeKey = "",
 ): string {
   const sorted = [...(userIds ?? [])].sort((a, b) => a.localeCompare(b)).join(",");
-  return `${departmentId ?? ""}|${sorted}`;
+  return `${departmentId ?? ""}|${sorted}|${attendanceScopeKey}`;
 }
 
 export function buildOrgChartTreeRequestParams(
@@ -119,7 +121,7 @@ export interface BuildOrgChartDisplayTreeParams {
   departments: MainAppDepartmentLookup[];
   companyName: string;
   selectedDepartmentLabel: string;
-  selectedUserId: string;
+  selectedUserIds: readonly string[];
 }
 
 export function buildOrgChartDisplayTree(params: BuildOrgChartDisplayTreeParams): OrgChartEmployee | null {
@@ -129,7 +131,7 @@ export function buildOrgChartDisplayTree(params: BuildOrgChartDisplayTreeParams)
     departments,
     companyName,
     selectedDepartmentLabel,
-    selectedUserId,
+    selectedUserIds,
   } = params;
   if (!orgChartTreeRaw.length) return null;
 
@@ -165,7 +167,8 @@ export function buildOrgChartDisplayTree(params: BuildOrgChartDisplayTreeParams)
   };
 
   const roots = orgChartTreeRaw.map(apiNodeToEmployee);
-  const isChartFiltered = selectedDepartmentLabel !== "All Department" || selectedUserId !== "";
+  const isChartFiltered =
+    selectedDepartmentLabel !== "All Department" || selectedUserIds.length > 0;
   const syntheticRoot: OrgChartEmployee = {
     id: "root",
     name: companyName,
@@ -237,4 +240,18 @@ export function collectSubtreeIdsForUser(
     findAndCollect(orgData);
   }
   return set;
+}
+
+/** Union of subtree node ids for each selected org-chart `user_id`. */
+export function collectSubtreeIdsForUsers(
+  orgData: OrgChartEmployee,
+  selectedUserIds: readonly string[],
+): Set<string> {
+  const merged = new Set<string>();
+  for (const raw of selectedUserIds) {
+    const uid = String(raw).trim();
+    if (uid === "") continue;
+    collectSubtreeIdsForUser(orgData, uid).forEach((id) => merged.add(id));
+  }
+  return merged;
 }
