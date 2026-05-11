@@ -3,11 +3,10 @@ import PageHeader from "@components/PageHeader";
 import GenericListPage from "@components/GenericListPage";
 import type { Column } from "@components/CustomDataTable";
 import { AI_FAQ_GLOBAL_FILE_ACCEPT } from "../../faqItemDraft";
-import { AiFaqAttachmentField } from "../../components/AiFaqAttachmentField";
 import { AiFaqDeleteConfirmModal } from "../../components/AiFaqDeleteConfirmModal";
-import { AiFaqDraftItemsEditor } from "../../components/AiFaqDraftItemsEditor";
+import { AiFaqUpsertModal } from "../../components/AiFaqUpsertModal";
 import { useAIFaqsGlobalPage } from "../useAIFaqsGlobalPage";
-import { Button, Form, Modal } from "react-bootstrap";
+import { Button, Modal } from "react-bootstrap";
 import { ArrowLeft, Plus } from "lucide-react";
 import React from "react";
 
@@ -46,6 +45,17 @@ export function AIFaqsGlobalPageView({ ctx }: AIFaqsGlobalPageViewProps) {
     closeDeleteModal,
   } = ctx;
 
+  const closeAddModal = () => {
+    setShowAddModal(false);
+    resetForm();
+  };
+
+  const closeEditModal = () => {
+    setShowEditModal(false);
+    setSelectedFAQ(null);
+    resetForm();
+  };
+
   return (
     <React.Fragment>
       <BreadcrumbItem mainTitle="" mainLink="" subTitle="Global FAQs" />
@@ -79,95 +89,41 @@ export function AIFaqsGlobalPageView({ ctx }: AIFaqsGlobalPageViewProps) {
         tableStyle="table-style-2"
       />
 
-      <Modal
+      <AiFaqUpsertModal
         show={showAddModal}
-        onHide={() => {
-          setShowAddModal(false);
-          resetForm();
-        }}
-        size="lg"
-        centered
-      >
-        <Modal.Header closeButton>
-          <Modal.Title>Add Global FAQs</Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-          <Form>
-            <AiFaqDraftItemsEditor
-              mode="add"
-              faqItems={faqItems}
-              onAddItem={handleAddFAQItem}
-              onRemoveItem={handleRemoveFAQItem}
-              onUpdateItem={handleUpdateFAQItem}
-            />
-            <AiFaqAttachmentField
-              haveFiles={haveFiles}
-              fileInputKey={fileInputKey}
-              selectedFiles={selectedFiles}
-              accept={AI_FAQ_GLOBAL_FILE_ACCEPT}
-              onFileChange={handleFileChange}
-              onRemoveFile={handleRemoveFile}
-            />
-          </Form>
-        </Modal.Body>
-        <Modal.Footer>
-          <Button
-            variant="secondary"
-            onClick={() => {
-              setShowAddModal(false);
-              resetForm();
-            }}
-          >
-            Cancel
-          </Button>
-          <Button variant="primary" onClick={() => handleSubmit()}>
-            Create FAQs
-          </Button>
-        </Modal.Footer>
-      </Modal>
+        title="Add Global FAQs"
+        primaryActionLabel="Create FAQs"
+        editorMode="add"
+        fileAccept={AI_FAQ_GLOBAL_FILE_ACCEPT}
+        faqItems={faqItems}
+        haveFiles={haveFiles}
+        fileInputKey={fileInputKey}
+        selectedFiles={selectedFiles}
+        onRequestClose={closeAddModal}
+        onSubmit={handleSubmit}
+        onAddItem={handleAddFAQItem}
+        onRemoveItem={handleRemoveFAQItem}
+        onUpdateItem={handleUpdateFAQItem}
+        onFileChange={handleFileChange}
+        onRemoveFile={handleRemoveFile}
+      />
 
-      <Modal
+      <AiFaqUpsertModal
         show={showEditModal}
-        onHide={() => {
-          setShowEditModal(false);
-          setSelectedFAQ(null);
-          resetForm();
-        }}
-        size="lg"
-        centered
-      >
-        <Modal.Header closeButton>
-          <Modal.Title>Edit Global FAQ</Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-          <Form>
-            <AiFaqDraftItemsEditor mode="edit" faqItems={faqItems} onUpdateItem={handleUpdateFAQItem} />
-            <AiFaqAttachmentField
-              haveFiles={haveFiles}
-              fileInputKey={fileInputKey}
-              selectedFiles={selectedFiles}
-              accept={AI_FAQ_GLOBAL_FILE_ACCEPT}
-              onFileChange={handleFileChange}
-              onRemoveFile={handleRemoveFile}
-            />
-          </Form>
-        </Modal.Body>
-        <Modal.Footer>
-          <Button
-            variant="secondary"
-            onClick={() => {
-              setShowEditModal(false);
-              setSelectedFAQ(null);
-              resetForm();
-            }}
-          >
-            Cancel
-          </Button>
-          <Button variant="primary" onClick={() => handleSubmit()}>
-            Update FAQ
-          </Button>
-        </Modal.Footer>
-      </Modal>
+        title="Edit Global FAQ"
+        primaryActionLabel="Update FAQ"
+        editorMode="edit"
+        fileAccept={AI_FAQ_GLOBAL_FILE_ACCEPT}
+        faqItems={faqItems}
+        haveFiles={haveFiles}
+        fileInputKey={fileInputKey}
+        selectedFiles={selectedFiles}
+        onRequestClose={closeEditModal}
+        onSubmit={handleSubmit}
+        onUpdateItem={handleUpdateFAQItem}
+        onFileChange={handleFileChange}
+        onRemoveFile={handleRemoveFile}
+      />
 
       <AiFaqDeleteConfirmModal
         show={showDeleteModal}

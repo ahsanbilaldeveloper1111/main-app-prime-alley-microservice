@@ -30,3 +30,42 @@ export function faqToDraft(item: FAQItem): FAQItemDraft {
 export function faqAttachmentFileDomKey(file: File): string {
   return `${file.name}-${String(file.size)}-${String(file.lastModified)}`;
 }
+
+export type FaqListPageResult<T> = {
+  data: T[];
+  total: number;
+  page: number;
+  per_page: number;
+  last_page: number;
+};
+
+export function paginateArrayForTable<T>(rows: T[], page: number, perPage: number): FaqListPageResult<T> {
+  const start = (page - 1) * perPage;
+  const end = start + perPage;
+  return {
+    data: rows.slice(start, end),
+    total: rows.length,
+    page,
+    per_page: perPage,
+    last_page: Math.ceil(rows.length / perPage),
+  };
+}
+
+export function emptyFaqListPage<T>(perPage: number, page = 1): FaqListPageResult<T> {
+  return { data: [], total: 0, page, per_page: perPage, last_page: 1 };
+}
+
+/** Fields shared by global + tenant FAQ create/update payloads. */
+export function buildAiFaqSubmitFields(
+  validFAQs: FAQItem[],
+  haveFiles: boolean,
+  selectedFiles: File[],
+): { faqs: string; have_files: string; files: string[] | undefined } {
+  const faqsJson = JSON.stringify(validFAQs);
+  const filePaths: string[] = selectedFiles.map((file) => file.name);
+  return {
+    faqs: faqsJson,
+    have_files: haveFiles && selectedFiles.length > 0 ? "true" : "false",
+    files: filePaths.length > 0 ? filePaths : undefined,
+  };
+}

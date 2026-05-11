@@ -12,7 +12,16 @@ import { toast } from "react-toastify";
 import { Button } from "react-bootstrap";
 import { Edit, Eye, Trash2 } from "lucide-react";
 
-import { getValidFaqItemsForSubmit } from "../faqItemDraft";
+import {
+  aiFaqAnswerPreviewColumn,
+  aiFaqQuestionColumn,
+} from "../aiFaqListColumns";
+import {
+  buildAiFaqSubmitFields,
+  emptyFaqListPage,
+  getValidFaqItemsForSubmit,
+  paginateArrayForTable,
+} from "../faqItemDraft";
 import { useAiFaqDraftFormState } from "../useAiFaqDraftFormState";
 
 export function useAIFaqsGlobalPage() {
@@ -68,14 +77,11 @@ export function useAIFaqsGlobalPage() {
     }
 
     try {
-      const faqsJson = JSON.stringify(validFAQs);
-      const filePaths: string[] = selectedFiles.map((file) => file.name);
-
-      const payload: Omit<CreateTenantFAQPayload, "tenant_id"> = {
-        faqs: faqsJson,
-        have_files: haveFiles && selectedFiles.length > 0 ? "true" : "false",
-        files: filePaths.length > 0 ? filePaths : undefined,
-      };
+      const payload: Omit<CreateTenantFAQPayload, "tenant_id"> = buildAiFaqSubmitFields(
+        validFAQs,
+        haveFiles,
+        selectedFiles,
+      );
 
       await createGlobalFAQ(payload);
 
@@ -105,53 +111,17 @@ export function useAIFaqsGlobalPage() {
   const fetchData = useCallback(async (page = 1, perPage = 15, search = "") => {
     try {
       const allFAQs = await getGlobalFAQs(search || undefined);
-      const start = (page - 1) * perPage;
-      const end = start + perPage;
-      const paginated = allFAQs.slice(start, end);
-
-      return {
-        data: paginated,
-        total: allFAQs.length,
-        page,
-        per_page: perPage,
-        last_page: Math.ceil(allFAQs.length / perPage),
-      };
+      return paginateArrayForTable(allFAQs, page, perPage);
     } catch (error) {
       console.error("Error fetching FAQs:", error);
-      return {
-        data: [],
-        total: 0,
-        page: 1,
-        per_page: perPage,
-        last_page: 1,
-      };
+      return emptyFaqListPage<FAQData>(perPage);
     }
   }, []);
 
   const columns: Column<FAQData & Record<string, unknown>>[] = useMemo(
     () => [
-      {
-        key: "question",
-        name: "Question",
-        selector: (row: FAQData) => row.question,
-        sortable: true,
-        cell: (props: FAQData) => (
-          <div style={{ maxWidth: "400px" }}>
-            <strong>{props.question}</strong>
-          </div>
-        ),
-      },
-      {
-        key: "answer",
-        name: "Answer",
-        selector: (row: FAQData) => row.answer,
-        sortable: true,
-        cell: (props: FAQData) => (
-          <div>
-            {props.answer.length > 50 ? <span>{props.answer.substring(0, 50)}...</span> : <span>{props.answer}</span>}
-          </div>
-        ),
-      },
+      aiFaqQuestionColumn(),
+      aiFaqAnswerPreviewColumn({ previewLength: 50 }),
       {
         key: "Action",
         name: "Actions",
