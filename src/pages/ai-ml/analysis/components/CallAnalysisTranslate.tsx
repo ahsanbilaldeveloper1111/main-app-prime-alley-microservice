@@ -14,10 +14,10 @@ const translationParagraphStyle: React.CSSProperties = {
 };
 
 const TRANSLATION_TABS = [
-  { eventKey: "en", title: "English", translationKey: "en" },
-  { eventKey: "ar", title: "Arabic", translationKey: "ar" },
-  { eventKey: "ur", title: "Urdu", translationKey: "ur" },
-  { eventKey: "hi", title: "Hindi", translationKey: "hi" },
+  { eventKey: "en", title: "English", field: "en" },
+  { eventKey: "ar", title: "Arabic", field: "ar" },
+  { eventKey: "ur", title: "Urdu", field: "ur" },
+  { eventKey: "hi", title: "Hindi", field: "hi" },
 ] as const;
 
 export function CallAnalysisTranslate({ chunksAnalysisData, subActiveTab, setSubActiveTab }: Props) {
@@ -26,7 +26,7 @@ export function CallAnalysisTranslate({ chunksAnalysisData, subActiveTab, setSub
   return (
     <Row>
       <Col md={12}>
-        {translations ? (
+        {translations && (
           <Row>
             <Col md={12}>
               <Tabs
@@ -36,15 +36,15 @@ export function CallAnalysisTranslate({ chunksAnalysisData, subActiveTab, setSub
                 activeKey={subActiveTab}
                 onSelect={(k) => setSubActiveTab(k || "en")}
               >
-                {TRANSLATION_TABS.map(({ eventKey, title, translationKey }) => (
+                {TRANSLATION_TABS.map(({ eventKey, title, field }) => (
                   <Tab key={eventKey} eventKey={eventKey} title={title}>
-                    <p style={translationParagraphStyle}>{translations?.[translationKey]}</p>
+                    <p style={translationParagraphStyle}>{translations[field]}</p>
                   </Tab>
                 ))}
               </Tabs>
             </Col>
           </Row>
-        ) : null}
+        )}
       </Col>
     </Row>
   );

@@ -1473,7 +1473,7 @@ export const getMyDayPreferences = async (
   extensionNumber?: string,
 ): Promise<MyDayPreferences> => {
   const query = buildMyDayQuery({ extension_number: extensionNumber });
-  const url = buildMyDayUrl("my-day/preferences", query);
+  const url = buildMyDayUrl("work-planner/my-day/preferences", query);
   const response = await axiosInstance.get(url);
   return parseMyDayResponseData<MyDayPreferences>(response);
 };
@@ -1483,7 +1483,7 @@ export const patchMyDayPreferences = async (
   extensionNumber?: string,
 ): Promise<MyDayPreferences> => {
   const query = buildMyDayQuery({ extension_number: extensionNumber });
-  const url = buildMyDayUrl("my-day/preferences", query);
+  const url = buildMyDayUrl("work-planner/my-day/preferences", query);
   const response = await axiosInstance.patch(url, payload);
   return parseMyDayResponseData<MyDayPreferences>(response);
 };
@@ -1495,7 +1495,7 @@ export const listMyDayTasks = async (
     date: params.date,
     extension_number: params.extension_number,
   });
-  const response = await axiosInstance.get(`my-day/tasks?${query.toString()}`);
+  const response = await axiosInstance.get(`work-planner/my-day/tasks?${query.toString()}`);
   const payload = parseMyDayResponseData<MyDayTasksPayload>(response);
   return {
     active: Array.isArray(payload.active) ? payload.active : [],
@@ -1513,7 +1513,7 @@ export const getMyDaySuggestions = async (
     search: params.search ?? "",
     extension_number: params.extension_number,
   });
-  const response = await axiosInstance.get(`my-day/suggestions?${query.toString()}`);
+  const response = await axiosInstance.get(`work-planner/my-day/suggestions?${query.toString()}`);
   return parseMyDayResponseData<MyDaySuggestionsPayload>(response);
 };
 
@@ -1524,7 +1524,7 @@ export const getMyDayCapacity = async (
     date: params.date,
     extension_number: params.extension_number,
   });
-  const response = await axiosInstance.get(`my-day/capacity?${query.toString()}`);
+  const response = await axiosInstance.get(`work-planner/my-day/capacity?${query.toString()}`);
   return parseMyDayResponseData<MyDayCapacityPayload>(response);
 };
 
@@ -1533,7 +1533,7 @@ export const overrideMyDayCapacity = async (
   extensionNumber?: string,
 ): Promise<MyDayCapacityPayload> => {
   const query = buildMyDayQuery({ extension_number: extensionNumber });
-  const url = buildMyDayUrl("my-day/capacity/override", query);
+  const url = buildMyDayUrl("work-planner/my-day/capacity/override", query);
   const response = await axiosInstance.patch(url, payload);
   return parseMyDayResponseData<MyDayCapacityPayload>(response);
 };
@@ -1543,7 +1543,7 @@ export const addTaskToMyDay = async (
   extensionNumber?: string,
 ): Promise<{ added?: boolean; already_in_my_day?: boolean; task?: unknown }> => {
   const query = buildMyDayQuery({ extension_number: extensionNumber });
-  const url = buildMyDayUrl("my-day/add", query);
+  const url = buildMyDayUrl("work-planner/my-day/add", query);
   const response = await axiosInstance.post(url, payload);
   return parseMyDayResponseData(response);
 };
@@ -1557,7 +1557,7 @@ export const removeTaskFromMyDay = async (
     extension_number: params.extension_number,
   });
   const response = await axiosInstance.delete(
-    buildMyDayUrl(`my-day/remove/${taskId}`, query),
+    buildMyDayUrl(`work-planner/my-day/remove/${taskId}`, query),
   );
   return parseMyDayResponseData(response);
 };
@@ -1568,7 +1568,7 @@ export const toggleMyDayTaskComplete = async (
 ): Promise<unknown> => {
   const query = buildMyDayQuery({ extension_number: extensionNumber });
   const response = await axiosInstance.patch(
-    buildMyDayUrl(`my-day/complete/${taskId}`, query),
+    buildMyDayUrl(`work-planner/my-day/complete/${taskId}`, query),
   );
   return parseMyDayResponseData(response);
 };
@@ -1578,7 +1578,7 @@ export const getMyDayRollover = async (
 ): Promise<MyDayRolloverPayload> => {
   const query = buildMyDayQuery({ extension_number: extensionNumber });
   const response = await axiosInstance.get(
-    buildMyDayUrl("my-day/rollover", query),
+    buildMyDayUrl("work-planner/my-day/rollover", query),
   );
   const payload = parseMyDayResponseData<MyDayRolloverPayload>(response);
   return {
@@ -1590,7 +1590,7 @@ export const getMyDayRollover = async (
 export const ackMyDayRolloverPrompt = async (extensionNumber?: string): Promise<unknown> => {
   const query = buildMyDayQuery({ extension_number: extensionNumber });
   const response = await axiosInstance.post(
-    buildMyDayUrl("my-day/rollover/ack", query),
+    buildMyDayUrl("work-planner/my-day/rollover/ack", query),
   );
   return parseMyDayResponseData(response);
 };
@@ -1601,7 +1601,7 @@ export const submitMyDayRolloverAction = async (
 ): Promise<unknown> => {
   const query = buildMyDayQuery({ extension_number: extensionNumber });
   const response = await axiosInstance.post(
-    buildMyDayUrl("my-day/rollover/action", query),
+    buildMyDayUrl("work-planner/my-day/rollover/action", query),
     payload,
   );
   return parseMyDayResponseData(response);
@@ -1613,7 +1613,7 @@ export const getMyDayPastDaySnapshot = async (
 ): Promise<MyDayTasksPayload> => {
   const query = buildMyDayQuery({ extension_number: extensionNumber });
   const response = await axiosInstance.get(
-    buildMyDayUrl(`my-day/past-days/${date}`, query),
+    buildMyDayUrl(`work-planner/my-day/past-days/${date}`, query),
   );
   const payload = parseMyDayResponseData<MyDayTasksPayload>(response);
   return {

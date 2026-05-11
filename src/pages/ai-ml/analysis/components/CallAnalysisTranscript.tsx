@@ -28,59 +28,53 @@ function isSegmentPlaying(
   return playingSegment?.start === start && playingSegment?.end === end;
 }
 
-function transcriptItemKey(item: Transcription): string {
-  return `${item.speaker}-${item.start}-${item.end}`;
-}
-
-function canShowTranscriptAudioControls(item: Transcription, mediaPlayerShow: boolean): boolean {
-  return item.start != null && item.end != null && mediaPlayerShow;
-}
-
-type TranscriptTimestampControlProps = Readonly<{
+type SegmentAudioProps = Readonly<{
   transcriptItem: Transcription;
   playingSegment: { start: number; end: number } | null;
   mediaPlayerShow: boolean;
   onTimeClick: (start: number, end: number) => void;
   onStopAudio: () => void;
   paragraphClassName: string;
-  buttonClassName: string;
-  buttonTextClass?: string;
+  stampClassName: string;
 }>;
 
-function TranscriptTimestampControl({
+function TranscriptSegmentAudioControl({
   transcriptItem,
   playingSegment,
   mediaPlayerShow,
   onTimeClick,
   onStopAudio,
   paragraphClassName,
-  buttonClassName,
-  buttonTextClass,
-}: TranscriptTimestampControlProps) {
-  if (!canShowTranscriptAudioControls(transcriptItem, mediaPlayerShow)) {
+  stampClassName,
+}: SegmentAudioProps) {
+  const hasSegmentBounds =
+    transcriptItem.start != null && transcriptItem.end != null && mediaPlayerShow;
+
+  if (!hasSegmentBounds) {
     return null;
   }
 
   const { start, end } = transcriptItem;
   const playing = isSegmentPlaying(playingSegment, start, end);
-  const label = playing ? "Stop" : "Listen";
-  const iconClass = playing ? "ti-player-pause" : "ti-player-play";
+
+  const handleActivate = () => {
+    if (playing) {
+      onStopAudio();
+    } else {
+      onTimeClick(start, end);
+    }
+  };
 
   return (
     <p className={paragraphClassName}>
       <button
         type="button"
-        className={`${buttonClassName} border-0 bg-transparent p-0 text-start ${buttonTextClass ?? ""}`}
-        onClick={() => {
-          if (playing) {
-            onStopAudio();
-          } else {
-            onTimeClick(start, end);
-          }
-        }}
+        className={stampClassName}
+        aria-label={playing ? "Stop playback" : "Play this segment"}
+        onClick={handleActivate}
       >
-        <i className={`ti ${iconClass}`} title={label} aria-hidden />
-        {label}
+        <i className={`ti ${playing ? "ti-player-pause" : "ti-player-play"}`} aria-hidden />
+        {playing ? "Stop" : "Listen"}
       </button>
     </p>
   );
@@ -100,9 +94,9 @@ export function CallAnalysisTranscript({
   onTimeClick,
   onStopAudio,
 }: Props) {
-  let mediaPlayerPanel: React.ReactNode;
+  let mediaPlayerSection: React.ReactNode;
   if (audioLoading) {
-    mediaPlayerPanel = (
+    mediaPlayerSection = (
       <div className="text-center p-4">
         <Spinner animation="border" role="status">
           <span className="visually-hidden">Loading audio...</span>
@@ -111,7 +105,7 @@ export function CallAnalysisTranscript({
       </div>
     );
   } else if (audioError) {
-    mediaPlayerPanel = (
+    mediaPlayerSection = (
       <Alert variant="warning" className="text-center">
         <Alert.Heading>Audio Loading Error</Alert.Heading>
         <p>{audioError}</p>
@@ -122,7 +116,7 @@ export function CallAnalysisTranscript({
             size="sm"
             onClick={() => {
               setAudioError(null);
-              void loadAuthenticatedAudio();
+              loadAuthenticatedAudio().catch(() => undefined);
             }}
           >
             Retry
@@ -131,7 +125,7 @@ export function CallAnalysisTranscript({
       </Alert>
     );
   } else if (mediaPlayerShow) {
-    mediaPlayerPanel = (
+    mediaPlayerSection = (
       <AudioPlayer
         ref={audioPlayerRef}
         audioSrc={getAudioFilePath()}
@@ -140,15 +134,13 @@ export function CallAnalysisTranscript({
       />
     );
   } else {
-    mediaPlayerPanel = (
+    mediaPlayerSection = (
       <Alert variant="info" className="text-center">
         <Alert.Heading>No Audio Available</Alert.Heading>
         <p>Audio file is not available for this call recording.</p>
       </Alert>
     );
   }
-
-  const transcriptions = chunksAnalysisData?.transcriptions;
 
   return (
     <Row>
@@ -159,15 +151,17 @@ export function CallAnalysisTranscript({
               <Row>
                 <Col md={12}>
                   <div className={`mb-4 mediaPlayerOuter ${mediaPlayerShow ? "show" : "d-none"}`}>
-                    {mediaPlayerPanel}
+                    {mediaPlayerSection}
                   </div>
                 </Col>
               </Row>
 
-              {transcriptions &&
-                transcriptions.length > 0 &&
-                transcriptions.map((transcriptItem: Transcription) => (
-                  <div key={transcriptItemKey(transcriptItem)}>
+              {chunksAnalysisData?.transcriptions &&
+                chunksAnalysisData.transcriptions.length > 0 &&
+                chunksAnalysisData.transcriptions.map((transcriptItem: Transcription, index: number) => (
+                  <div
+                    key={`${transcriptItem.speaker}-${transcriptItem.start}-${transcriptItem.end}-${index}`}
+                  >
                     {transcriptItem.speaker === TRANSCRIPTION_SPEAKER_1 ? (
                       <Row>
                         <Col md={6}>
@@ -178,7 +172,7 @@ export function CallAnalysisTranscript({
                                   <img
                                     className="rounded-circle img-fluid wid-40"
                                     src={avatar.src}
-                                    alt=""
+                                    alt="Speaker avatar"
                                   />
                                   <i className="chat-badge bg-success"></i>
                                 </div>
@@ -190,15 +184,14 @@ export function CallAnalysisTranscript({
                                       <div className="flex-grow-1 me-3">
                                         <div className="msg-content card mb-0">
                                           <p className="mb-0">{transcriptItem.text}</p>
-                                          <TranscriptTimestampControl
+                                          <TranscriptSegmentAudioControl
                                             transcriptItem={transcriptItem}
                                             playingSegment={playingSegment}
                                             mediaPlayerShow={mediaPlayerShow}
                                             onTimeClick={onTimeClick}
                                             onStopAudio={onStopAudio}
                                             paragraphClassName="text-primary mb-0"
-                                            buttonClassName="time-stamp cursor-pointer"
-                                            buttonTextClass="text-primary"
+                                            stampClassName="time-stamp cursor-pointer btn btn-link p-0 text-primary text-decoration-none"
                                           />
                                         </div>
                                       </div>
@@ -221,15 +214,14 @@ export function CallAnalysisTranscript({
                                   <div className="flex-grow-1 ms-3">
                                     <div className="msg-content card bg-primary">
                                       <p className="mb-0 text-white">{transcriptItem.text}</p>
-                                      <TranscriptTimestampControl
+                                      <TranscriptSegmentAudioControl
                                         transcriptItem={transcriptItem}
                                         playingSegment={playingSegment}
                                         mediaPlayerShow={mediaPlayerShow}
                                         onTimeClick={onTimeClick}
                                         onStopAudio={onStopAudio}
                                         paragraphClassName="text-white mb-0"
-                                        buttonClassName="time-stamp cursor-pointer time-stamp-padding"
-                                        buttonTextClass="text-white"
+                                        stampClassName="time-stamp cursor-pointer time-stamp-padding btn btn-link p-0 text-white text-decoration-none"
                                       />
                                     </div>
                                   </div>

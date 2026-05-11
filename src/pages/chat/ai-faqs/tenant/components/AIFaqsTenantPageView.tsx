@@ -1,15 +1,13 @@
 import BreadcrumbItem from "@common/BreadcrumbItem";
 import PageHeader from "@components/PageHeader";
 import GenericListPage from "@components/GenericListPage";
-import type { Column } from "@components/CustomDataTable";
-import { AI_FAQ_TENANT_FILE_ACCEPT } from "../../faqItemDraft";
-import { AiFaqDeleteConfirmModal } from "../../components/AiFaqDeleteConfirmModal";
-import { AiFaqUpsertModal } from "../../components/AiFaqUpsertModal";
-import { useAIFaqsTenantPage } from "../useAIFaqsTenantPage";
+import { AiFaqPageModals } from "../../components/AiFaqPageModals";
 import { Button, Form } from "react-bootstrap";
 import { ArrowLeft, Filter, Plus } from "lucide-react";
 import Select from "react-select";
-import React, { useMemo } from "react";
+import React from "react";
+
+import { useAIFaqsTenantPage } from "../useAIFaqsTenantPage";
 
 export type AIFaqsTenantPageViewProps = Readonly<{
   ctx: ReturnType<typeof useAIFaqsTenantPage>;
@@ -34,6 +32,7 @@ export function AIFaqsTenantPageView({ ctx }: AIFaqsTenantPageViewProps) {
     showEditModal,
     setShowEditModal,
     showDeleteModal,
+    setShowDeleteModal,
     selectedFAQ,
     setSelectedFAQ,
     faqItems,
@@ -48,48 +47,13 @@ export function AIFaqsTenantPageView({ ctx }: AIFaqsTenantPageViewProps) {
     handleRemoveFile,
     handleSubmit,
     handleConfirmDelete,
-    closeDeleteModal,
     openAddModalWithTenant,
   } = ctx;
 
-  const companyOptions = useMemo(
-    () => companies.map((c) => ({ value: c.identifier, label: c.name ?? c.identifier })),
-    [companies],
-  );
-
-  const tenantSelect = (
-    <Form.Group className="mb-4">
-      <Form.Label>Tenant</Form.Label>
-      <Select
-        isLoading={companiesLoading}
-        options={companyOptions}
-        value={
-          tenantId
-            ? {
-                value: tenantId,
-                label: companies.find((c) => c.identifier === tenantId)?.name ?? tenantId,
-              }
-            : null
-        }
-        onChange={(opt) => {
-          if (opt) setTenantId(opt.value);
-        }}
-        placeholder="Select tenant..."
-        isClearable={false}
-      />
-    </Form.Group>
-  );
-
-  const closeAddModal = () => {
-    setShowAddModal(false);
-    resetForm();
-  };
-
-  const closeEditModal = () => {
-    setShowEditModal(false);
-    setSelectedFAQ(null);
-    resetForm();
-  };
+  const companyOptions = companies.map((c) => ({
+    value: c.identifier,
+    label: c.name ?? c.identifier,
+  }));
 
   return (
     <React.Fragment>
@@ -139,7 +103,7 @@ export function AIFaqsTenantPageView({ ctx }: AIFaqsTenantPageViewProps) {
       </div>
 
       <GenericListPage
-        columns={columns as unknown as Column[]}
+        columns={columns}
         fetchData={fetchData}
         title="Tenant FAQs"
         searchPlaceholder="Search FAQs..."
@@ -150,48 +114,50 @@ export function AIFaqsTenantPageView({ ctx }: AIFaqsTenantPageViewProps) {
         tableStyle="table-style-2"
       />
 
-      <AiFaqUpsertModal
-        show={showAddModal}
-        title="Add Tenant FAQs"
-        primaryActionLabel="Create FAQs"
-        editorMode="add"
-        fileAccept={AI_FAQ_TENANT_FILE_ACCEPT}
+      <AiFaqPageModals
+        scopeLabel="Tenant"
+        showAddModal={showAddModal}
+        setShowAddModal={setShowAddModal}
+        showEditModal={showEditModal}
+        setShowEditModal={setShowEditModal}
+        showDeleteModal={showDeleteModal}
+        setShowDeleteModal={setShowDeleteModal}
+        selectedFAQ={selectedFAQ}
+        setSelectedFAQ={setSelectedFAQ}
         faqItems={faqItems}
         haveFiles={haveFiles}
-        fileInputKey={fileInputKey}
         selectedFiles={selectedFiles}
-        onRequestClose={closeAddModal}
-        onSubmit={handleSubmit}
-        onAddItem={handleAddFAQItem}
-        onRemoveItem={handleRemoveFAQItem}
-        onUpdateItem={handleUpdateFAQItem}
-        onFileChange={handleFileChange}
-        onRemoveFile={handleRemoveFile}
-        childrenBeforeItems={tenantSelect}
-      />
-
-      <AiFaqUpsertModal
-        show={showEditModal}
-        title="Edit Tenant FAQ"
-        primaryActionLabel="Update FAQ"
-        editorMode="edit"
-        fileAccept={AI_FAQ_TENANT_FILE_ACCEPT}
-        faqItems={faqItems}
-        haveFiles={haveFiles}
         fileInputKey={fileInputKey}
-        selectedFiles={selectedFiles}
-        onRequestClose={closeEditModal}
-        onSubmit={handleSubmit}
-        onUpdateItem={handleUpdateFAQItem}
-        onFileChange={handleFileChange}
-        onRemoveFile={handleRemoveFile}
-      />
-
-      <AiFaqDeleteConfirmModal
-        show={showDeleteModal}
-        targetQuestion={selectedFAQ?.question ?? ""}
-        onConfirm={handleConfirmDelete}
-        onClose={closeDeleteModal}
+        resetForm={resetForm}
+        handleAddFAQItem={handleAddFAQItem}
+        handleRemoveFAQItem={handleRemoveFAQItem}
+        handleUpdateFAQItem={handleUpdateFAQItem}
+        handleFileChange={handleFileChange}
+        handleRemoveFile={handleRemoveFile}
+        handleSubmit={handleSubmit}
+        handleConfirmDelete={handleConfirmDelete}
+        addModalBodyPrefix={
+          <Form.Group className="mb-4">
+            <Form.Label>Tenant</Form.Label>
+            <Select
+              isLoading={companiesLoading}
+              options={companyOptions}
+              value={
+                tenantId
+                  ? {
+                      value: tenantId,
+                      label: companies.find((c) => c.identifier === tenantId)?.name ?? tenantId,
+                    }
+                  : null
+              }
+              onChange={(opt) => {
+                if (opt) setTenantId(opt.value);
+              }}
+              placeholder="Select tenant..."
+              isClearable={false}
+            />
+          </Form.Group>
+        }
       />
     </React.Fragment>
   );

@@ -34,7 +34,7 @@ export function CallAnalysisForm({
   onSubmit,
   onReset,
 }: Props) {
-  let submitButtonContent: React.ReactNode = "Analyze Call";
+  let submitButtonContent: React.ReactNode;
   if (socketConnecting) {
     submitButtonContent = (
       <>
@@ -49,6 +49,8 @@ export function CallAnalysisForm({
         Analyzing...
       </>
     );
+  } else {
+    submitButtonContent = "Analyze Call";
   }
 
   return (

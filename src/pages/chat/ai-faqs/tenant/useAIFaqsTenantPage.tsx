@@ -1,4 +1,3 @@
-import type { Column } from "@components/CustomDataTable";
 import { useChatCompaniesQuery } from "@page-modules/chat/useChatCompaniesQuery";
 import {
   type CreateTenantFAQPayload,
@@ -11,20 +10,16 @@ import { useRouter } from "next/router";
 import { useSession } from "next-auth/react";
 import { useCallback, useMemo, useState } from "react";
 import { toast } from "react-toastify";
-import { Button } from "react-bootstrap";
-import { Edit, Trash2 } from "lucide-react";
 
-import {
-  aiFaqAnswerPreviewColumn,
-  aiFaqQuestionColumn,
-} from "../aiFaqListColumns";
+import { useAiFaqListColumns } from "../aiFaqListColumns";
 import {
   buildAiFaqSubmitFields,
   emptyFaqListPage,
+  faqToDraft,
   getValidFaqItemsForSubmit,
   paginateArrayForTable,
 } from "../faqItemDraft";
-import { useAiFaqDraftFormState } from "../useAiFaqDraftFormState";
+import { useAiFaqDraftFormState } from "../hooks/useAiFaqDraftFormState";
 
 export function useAIFaqsTenantPage() {
   const router = useRouter();
@@ -45,11 +40,12 @@ export function useAIFaqsTenantPage() {
 
   const {
     faqItems,
+    setFaqItems,
     haveFiles,
     selectedFiles,
     fileInputKey,
     resetForm,
-    seedSingleFaqItem,
+    clearAttachments,
     handleAddFAQItem,
     handleRemoveFAQItem,
     handleUpdateFAQItem,
@@ -69,11 +65,12 @@ export function useAIFaqsTenantPage() {
   const handleEditFAQ = useCallback(
     (faq: FAQData) => {
       setSelectedFAQ(faq);
-      seedSingleFaqItem({ question: faq.question, answer: faq.answer });
+      setFaqItems([faqToDraft({ question: faq.question, answer: faq.answer })]);
+      clearAttachments();
       setTenantId(filterTenantId || selectedCompanyForFilter || tenantId || "");
       setShowEditModal(true);
     },
-    [filterTenantId, selectedCompanyForFilter, tenantId, seedSingleFaqItem],
+    [clearAttachments, filterTenantId, selectedCompanyForFilter, setFaqItems, tenantId],
   );
 
   const handleDeleteFAQ = useCallback((faq: FAQData) => {
@@ -83,6 +80,7 @@ export function useAIFaqsTenantPage() {
 
   const handleSubmit = useCallback(async () => {
     const validFAQs = getValidFaqItemsForSubmit(faqItems);
+
     if (validFAQs.length === 0) {
       toast.error("Please add at least one FAQ with both question and answer");
       return;
@@ -95,9 +93,12 @@ export function useAIFaqsTenantPage() {
         return;
       }
 
+      const fields = buildAiFaqSubmitFields(validFAQs, haveFiles, selectedFiles);
       const payload: CreateTenantFAQPayload = {
         tenant_id: tenantForPayload,
-        ...buildAiFaqSubmitFields(validFAQs, haveFiles, selectedFiles),
+        faqs: fields.faqs,
+        have_files: fields.have_files,
+        files: fields.files,
       };
 
       await createTenantFAQ(payload);
@@ -110,7 +111,7 @@ export function useAIFaqsTenantPage() {
     } catch (error) {
       console.error("Failed to save FAQs:", error);
     }
-  }, [faqItems, haveFiles, selectedFiles, getTenantId, resetForm]);
+  }, [faqItems, getTenantId, haveFiles, resetForm, selectedFiles]);
 
   const handleConfirmDelete = useCallback(async () => {
     if (!selectedFAQ?.id) return;
@@ -131,19 +132,27 @@ export function useAIFaqsTenantPage() {
     } catch (error) {
       console.error("Failed to delete FAQ:", error);
     }
-  }, [selectedFAQ, getTenantId]);
+  }, [getTenantId, selectedFAQ]);
 
   const fetchData = useCallback(
     async (page = 1, perPage = 15, search = "") => {
       if (!filterTenantId?.trim()) {
-        return emptyFaqListPage<FAQData>(perPage);
+        return emptyFaqListPage(perPage);
       }
       try {
         const allFAQs = await getTenantFAQs(filterTenantId.trim(), search || undefined);
-        return paginateArrayForTable(allFAQs, page, perPage);
+        const { slice, total, last_page } = paginateArrayForTable(allFAQs, page, perPage);
+
+        return {
+          data: slice,
+          total,
+          page,
+          per_page: perPage,
+          last_page,
+        };
       } catch (error) {
         console.error("Error fetching FAQs:", error);
-        return emptyFaqListPage<FAQData>(perPage);
+        return emptyFaqListPage(perPage);
       }
     },
     [filterTenantId],
@@ -165,53 +174,11 @@ export function useAIFaqsTenantPage() {
     setShowAddModal(true);
   }, [filterTenantId, selectedCompanyForFilter]);
 
-  const columns: Column<FAQData & Record<string, unknown>>[] = useMemo(
-    () => [
-      aiFaqQuestionColumn(),
-      aiFaqAnswerPreviewColumn({ previewLength: 100, maxWidth: "500px" }),
-      {
-        key: "created_at",
-        name: "Created At",
-        selector: (row: FAQData) => row.created_at || "",
-        sortable: true,
-        cell: (props: FAQData) => (
-          <span>{props.created_at ? new Date(props.created_at).toLocaleDateString() : "N/A"}</span>
-        ),
-      },
-      {
-        key: "Action",
-        name: "Actions",
-        selector: (row: FAQData) => row.id,
-        sortable: false,
-        cell: (props: FAQData) => (
-          <div className="d-flex gap-2">
-            <Button
-              variant="light"
-              className="btn-action-style-2 p-1 text-primary"
-              title="Edit"
-              onClick={() => handleEditFAQ(props)}
-            >
-              <Edit size={16} />
-            </Button>
-            <Button
-              variant="light"
-              className="btn-action-style-2 p-1 text-danger"
-              title="Delete"
-              onClick={() => handleDeleteFAQ(props)}
-            >
-              <Trash2 size={16} />
-            </Button>
-          </div>
-        ),
-      },
-    ],
-    [handleEditFAQ, handleDeleteFAQ],
-  );
-
-  const closeDeleteModal = useCallback(() => {
-    setShowDeleteModal(false);
-    setSelectedFAQ(null);
-  }, []);
+  const columns = useAiFaqListColumns({
+    variant: "tenant",
+    onEdit: handleEditFAQ,
+    onDelete: handleDeleteFAQ,
+  });
 
   return {
     router,
@@ -248,6 +215,5 @@ export function useAIFaqsTenantPage() {
     handleSubmit,
     handleConfirmDelete,
     openAddModalWithTenant,
-    closeDeleteModal,
   };
 }

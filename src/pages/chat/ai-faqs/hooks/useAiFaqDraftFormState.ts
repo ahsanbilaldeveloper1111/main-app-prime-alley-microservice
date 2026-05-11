@@ -1,28 +1,26 @@
+import type { FAQItem } from "@utils/chat";
 import type React from "react";
 import { useCallback, useState } from "react";
-
-import type { FAQItem } from "@utils/chat";
-
-import { emptyFaqDraft, faqToDraft, type FAQItemDraft } from "./faqItemDraft";
+import { emptyFaqDraft, type FAQItemDraft } from "../faqItemDraft";
 
 export function useAiFaqDraftFormState() {
-  const [faqItems, setFaqItems] = useState<FAQItemDraft[]>([emptyFaqDraft()]);
+  const [faqItems, setFaqItems] = useState<FAQItemDraft[]>(() => [emptyFaqDraft()]);
   const [haveFiles, setHaveFiles] = useState(false);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [fileInputKey, setFileInputKey] = useState(0);
 
-  const resetForm = useCallback(() => {
-    setFaqItems([emptyFaqDraft()]);
+  const clearFileFieldState = useCallback(() => {
     setHaveFiles(false);
     setSelectedFiles([]);
     setFileInputKey((k) => k + 1);
   }, []);
 
-  const seedSingleFaqItem = useCallback((item: FAQItem) => {
-    setFaqItems([faqToDraft(item)]);
-    setHaveFiles(false);
-    setSelectedFiles([]);
-  }, []);
+  const clearAttachments = clearFileFieldState;
+
+  const resetForm = useCallback(() => {
+    setFaqItems([emptyFaqDraft()]);
+    clearFileFieldState();
+  }, [clearFileFieldState]);
 
   const handleAddFAQItem = useCallback(() => {
     setFaqItems((items) => [...items, emptyFaqDraft()]);
@@ -58,11 +56,12 @@ export function useAiFaqDraftFormState() {
 
   return {
     faqItems,
+    setFaqItems,
     haveFiles,
     selectedFiles,
     fileInputKey,
     resetForm,
-    seedSingleFaqItem,
+    clearAttachments,
     handleAddFAQItem,
     handleRemoveFAQItem,
     handleUpdateFAQItem,

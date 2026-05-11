@@ -710,7 +710,13 @@ export const routePermissions: RoutePermission[] = [
 export function getRequiredPermissions(path: string): string[] {
     // Strip query parameters and normalize path
     const pathWithoutQuery = path.split('?')[0];
-    const normalizedPath = pathWithoutQuery.endsWith('/') ? pathWithoutQuery.slice(0, -1) : pathWithoutQuery;
+    let normalizedPath = pathWithoutQuery.endsWith('/') ? pathWithoutQuery.slice(0, -1) : pathWithoutQuery;
+    // `/workforce` only redirects to `/workforce/dashboard` (see pages/workforce/index.tsx).
+    // Without this, search and canAccessRoute treated `/workforce` as parent-permission-only,
+    // but navigation landed on the dashboard and failed with Access Denied.
+    if (normalizedPath === '/workforce') {
+        normalizedPath = '/workforce/dashboard';
+    }
     let requiredPermissions: string[] = [];
     let exactMatch = false;
 
@@ -883,6 +889,9 @@ export const SEARCH_EXCLUDED_ROUTES: string[] = [
     '/dialpad-use',
     '/help-center-new',
     '/dashboards',
+
+    // Redirect stub; use `/workforce/dashboard` or a specific workforce sub-route in search.
+    '/workforce',
     ''
 ];
 

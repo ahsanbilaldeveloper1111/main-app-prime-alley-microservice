@@ -201,13 +201,14 @@ export const workforceKeys = {
         params.companyUuid,
         params.departmentId,
       ] as const,
-    list: (params: { page: number; limit: number; filtersKey: string }) =>
+    list: (params: { page: number; limit: number; filtersKey: string; scopeKey: string }) =>
       [
         ...workforceKeys.employees.all(),
         "list",
         params.page,
         params.limit,
         params.filtersKey,
+        params.scopeKey,
       ] as const,
   },
 
