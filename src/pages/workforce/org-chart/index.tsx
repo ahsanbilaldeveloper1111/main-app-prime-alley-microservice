@@ -77,6 +77,7 @@ const OrganizationalChart = () => {
   const [selectedEmployee, setSelectedEmployee] = useState<OrgChartEmployee | null>(null);
   const [showEmployeeSidebar, setShowEmployeeSidebar] = useState(false);
 
+  // Same privilege gate as attendance: admin/root/elevated user_type or view-all permission → company-wide enrichment; else team only.
   const canViewAllAttendance = useMemo(
     () => canViewAllEmployeesAttendance(session?.user),
     [session?.user],
