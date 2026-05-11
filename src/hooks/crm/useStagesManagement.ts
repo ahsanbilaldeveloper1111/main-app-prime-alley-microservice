@@ -127,14 +127,14 @@ export function useStagesManagement() {
       activeFilter === "all" || activeFilter === "deleted"
         ? undefined
         : activeFilter;
-    void fetchStages(
+    fetchStages(
       typeFilter as StageType | undefined,
       includeArchived,
-    );
+    ).catch(() => undefined);
   }, [fetchStages, refreshKey, activeFilter]);
 
   useEffect(() => {
-    void fetchAllStagesForCounts();
+    fetchAllStagesForCounts().catch(() => undefined);
   }, [fetchAllStagesForCounts, refreshKey]);
 
   useEffect(() => {

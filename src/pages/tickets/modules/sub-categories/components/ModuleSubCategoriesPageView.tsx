@@ -6,8 +6,7 @@ import ConfirmModal from "@components/page-partials/ConfirmModal";
 import type { Column } from "@components/CustomDataTable";
 import React from "react";
 import { Button } from "react-bootstrap";
-import type { TicketModulePickerRow } from "../categories/moduleCategoriesTypes";
-import type { TicketSubmoduleRow } from "../categories/moduleCategoriesTypes";
+import type { TicketModulePickerRow, TicketSubmoduleRow } from "../../categories/moduleCategoriesTypes";
 
 export type ModuleSubCategoriesPageViewProps = Readonly<{
   refreshKey: number;

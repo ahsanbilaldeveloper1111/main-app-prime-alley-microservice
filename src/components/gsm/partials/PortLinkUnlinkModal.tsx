@@ -41,13 +41,13 @@ const PortLinkUnlinkModal: React.FC<PortLinkUnlinkModalProps> = ({
 
   // Parse assigned ports from comma-separated string
   const assignedPortsArray = assignedPorts 
-    ? assignedPorts.split(',').map(port => parseInt(port.trim())).filter(port => !isNaN(port))
+    ? assignedPorts.split(',').map(port => Number.parseInt(port.trim(), 10)).filter(port => !Number.isNaN(port))
     : [];
 
   // Create all ports array (assigned + unassigned)
   const allPorts = [
     ...assignedPortsArray.map(portNumber => ({ portNumber, isAssigned: true })),
-    ...unassignedPorts.map(port => ({ portNumber: parseInt(port.port_number), isAssigned: false, id: port.id }))
+    ...unassignedPorts.map(port => ({ portNumber: Number.parseInt(port.port_number, 10), isAssigned: false, id: port.id }))
   ].sort((a, b) => a.portNumber - b.portNumber);
 
   // Initialize selected ports when modal opens
@@ -85,7 +85,7 @@ const PortLinkUnlinkModal: React.FC<PortLinkUnlinkModalProps> = ({
       if (portsToAssign.length > 0) {
         // Get the port IDs for unassigned ports
         const portIdsToAssign = portsToAssign.map(portNumber => {
-          const port = unassignedPorts.find(p => parseInt(p.port_number) === portNumber);
+          const port = unassignedPorts.find(p => Number.parseInt(p.port_number, 10) === portNumber);
           return port ? port.id : null;
         }).filter(id => id !== null);
         
@@ -145,9 +145,15 @@ const PortLinkUnlinkModal: React.FC<PortLinkUnlinkModalProps> = ({
       {show && (
         <div id="ports-modal" className="modal customModal" data-gsm-name={gsmName} style={{display: 'flex'}}>
           <div className="modal-content" style={{maxWidth: '600px'}}>
-            <span className="close-btn" id="ports-close-btn" onClick={handleClose}>
-              <i className="fas fa-times"></i>
-            </span>
+            <button
+              type="button"
+              className="close-btn"
+              id="ports-close-btn"
+              onClick={handleClose}
+              aria-label="Close dialog"
+            >
+              <i className="fas fa-times" aria-hidden="true"></i>
+            </button>
             <div className="ports-header">
               <h2 id="ports-modal-title">{modalTitle}</h2>
               <h3 style={{color: 'var(--primary-accent-dark)'}}>
@@ -161,6 +167,7 @@ const PortLinkUnlinkModal: React.FC<PortLinkUnlinkModalProps> = ({
               <div className="ports-list-container">
                 {allPorts.map(port => (
                   <button 
+                    type="button"
                     key={port.portNumber}
                     className={`port-tag ${selectedPorts.includes(port.portNumber) ? 'selected' : ''}`}
                     data-port={port.portNumber}
@@ -180,10 +187,10 @@ const PortLinkUnlinkModal: React.FC<PortLinkUnlinkModalProps> = ({
               </div>
             </div>
             <div className="modal-footer">
-              <button className="btn btn-export" id="ports-cancel-btn" onClick={handleClose} disabled={isLoading}>
+              <button type="button" className="btn btn-export" id="ports-cancel-btn" onClick={handleClose} disabled={isLoading}>
                 Cancel
               </button>
-              <button className="btn btn-primary" id="ports-save-btn" onClick={handleSave} disabled={isLoading}>
+              <button type="button" className="btn btn-primary" id="ports-save-btn" onClick={handleSave} disabled={isLoading}>
                 {isLoading ? 'Saving...' : 'Save Ports'}
               </button>
             </div>
@@ -195,14 +202,20 @@ const PortLinkUnlinkModal: React.FC<PortLinkUnlinkModalProps> = ({
       {showSuccess && (
         <div id="action-modal" className="modal customModal" style={{display: 'flex'}}>
           <div className="modal-content">
-            <span className="close-btn" id="action-close-btn" onClick={handleSuccessClose}>
-              <i className="fas fa-times"></i>
-            </span>
+            <button
+              type="button"
+              className="close-btn"
+              id="action-close-btn"
+              onClick={handleSuccessClose}
+              aria-label="Close dialog"
+            >
+              <i className="fas fa-times" aria-hidden="true"></i>
+            </button>
             <h2 id="action-modal-title">Ports Updated!</h2>
             <p id="action-modal-text">{successMsg}</p>
             <div className="modal-footer">
-              <button className="btn btn-export" id="action-cancel-btn" style={{display: 'none'}}>Cancel</button>
-              <button className="btn btn-primary" id="action-confirm-btn" onClick={handleSuccessClose}>Done</button>
+              <button type="button" className="btn btn-export" id="action-cancel-btn" style={{display: 'none'}}>Cancel</button>
+              <button type="button" className="btn btn-primary" id="action-confirm-btn" onClick={handleSuccessClose}>Done</button>
             </div>
           </div>
         </div>

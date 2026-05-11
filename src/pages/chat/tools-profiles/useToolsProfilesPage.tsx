@@ -17,7 +17,6 @@ import { toast } from "react-toastify";
 import {
   EMPTY_FORM,
   buildFormFromTool,
-  getToolLabel,
   isCreatePayloadValid,
   isUpdatePayloadValid,
 } from "./toolsProfilesHelpers";

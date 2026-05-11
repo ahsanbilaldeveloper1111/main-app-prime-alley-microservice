@@ -71,9 +71,9 @@ const GsmDetailModel: React.FC<GsmDetailModelProps> = ({
     onHide();
   };
 
-  const [timeRange, setTimeRange] = React.useState('24h');
-  
-  const [gsmLatencyChart, setGsmLatencyChart] = React.useState({
+  const [timeRange, setTimeRange] = useState('24h');
+
+  const gsmLatencyChart = {
     series: [{
       name: "Latency",
       data: [63, 68, 66, 71, 68]
@@ -152,9 +152,9 @@ const GsmDetailModel: React.FC<GsmDetailModelProps> = ({
         }
       }
     }
-  });
+  };
 
-  const [gsmDataUsageChart, setGsmDataUsageChart] = React.useState({
+  const gsmDataUsageChart = {
       series: [{
         name: "Data Usage",
         data: [63, 68, 66, 71, 68]
@@ -233,12 +233,9 @@ const GsmDetailModel: React.FC<GsmDetailModelProps> = ({
           }
         }
       }
-    });
+  };
 
   const modalTitle = title || `GSM Details - ${gsmData?.name || 'Unknown'}`;
-
-
-  
 
   if (!show) return null;
 
@@ -247,9 +244,15 @@ const GsmDetailModel: React.FC<GsmDetailModelProps> = ({
       {/* Main GSM Detail Modal */}
       <div id="gsm-detail-modal" className="modal customModal " style={{display: 'flex'}}>
         <div className="modal-content" style={{maxWidth: '900px'}}>
-          <span className="close-btn" id="gsm-detail-close-btn" onClick={handleClose}>
-            <i className="fas fa-times"></i>
-          </span>
+          <button
+            type="button"
+            className="close-btn"
+            id="gsm-detail-close-btn"
+            onClick={handleClose}
+            aria-label="Close dialog"
+          >
+            <i className="fas fa-times" aria-hidden="true"></i>
+          </button>
           
           <div className="gsm-detail-header">
             <h2 id="gsm-detail-modal-title">{modalTitle}</h2>
@@ -261,7 +264,8 @@ const GsmDetailModel: React.FC<GsmDetailModelProps> = ({
                         <Card className="mb-3">
                               <Card.Body>
                               <h3 className="app-title-heading mb-3 text-center">Latency History</h3>
-                                          <div className="d-flex justify-content-center align-items-center gap-2" role="group">
+                                          <fieldset className="d-flex justify-content-center align-items-center gap-2 border-0 m-0 p-0">
+                                                <legend className="visually-hidden">Latency time range</legend>
                                                 <button 
                                                       type="button" 
                                                       className={`btn btn-sm ${timeRange === '24h' ? 'btn-primary' : 'btn-outline-secondary'}`}
@@ -283,7 +287,8 @@ const GsmDetailModel: React.FC<GsmDetailModelProps> = ({
                                                 >
                                                       30d
                                                 </button>
-                                          </div>                                    <ReactApexChart options={gsmLatencyChart.options as ApexOptions} series={gsmLatencyChart.series} type="area" height={200} />
+                                          </fieldset>
+                                          <ReactApexChart options={gsmLatencyChart.options as ApexOptions} series={gsmLatencyChart.series} type="area" height={200} />
                               </Card.Body>
                         </Card>
 
@@ -356,16 +361,13 @@ const GsmDetailModel: React.FC<GsmDetailModelProps> = ({
                                           </Row>
                                     </div>
                                     <div className="action-button-container mt-3 d-flex justify-content-center gap-2">
-                                          <button className="btn btn-primary app-button btn-sm">
-                                                {/* <i className="fas fa-paper-plane"></i>  */}
+                                          <button type="button" className="btn btn-primary app-button btn-sm">
                                                 Send Command
                                           </button>
-                                          <button className="btn btn-warning app-button btn-sm">
-                                                {/* <i className="fas fa-sync"></i> */}
+                                          <button type="button" className="btn btn-warning app-button btn-sm">
                                                  Force Update
                                           </button>
-                                          <button className="btn btn-success app-button btn-sm">
-                                                {/* <i className="fas fa-power-off"></i>  */}
+                                          <button type="button" className="btn btn-success app-button btn-sm">
                                                 Toggle Power
                                           </button>
                                     </div>
@@ -437,19 +439,19 @@ const GsmDetailModel: React.FC<GsmDetailModelProps> = ({
           </div>
 
           <div className="modal-footer">
-            <button className="btn btn-export" id="gsm-detail-cancel-btn" onClick={handleClose}>
+            <button type="button" className="btn btn-export" id="gsm-detail-cancel-btn" onClick={handleClose}>
               Close
             </button>
-            {/* {showEditButton && gsmData && (
-              <button className="btn btn-secondary" id="gsm-detail-edit-btn" onClick={handleEdit}>
-                <i className="fas fa-edit"></i> Edit
+            {showEditButton && gsmData && (
+              <button type="button" className="btn btn-secondary" id="gsm-detail-edit-btn" onClick={handleEdit}>
+                <i className="fas fa-edit" aria-hidden="true"></i> Edit
               </button>
             )}
             {showDeleteButton && gsmData && (
-              <button className="btn btn-danger" id="gsm-detail-delete-btn" onClick={handleDeleteClick}>
-                <i className="fas fa-trash"></i> Delete
+              <button type="button" className="btn btn-danger" id="gsm-detail-delete-btn" onClick={handleDeleteClick}>
+                <i className="fas fa-trash" aria-hidden="true"></i> Delete
               </button>
-            )} */}
+            )}
           </div>
         </div>
       </div>
@@ -458,20 +460,26 @@ const GsmDetailModel: React.FC<GsmDetailModelProps> = ({
       {showDeleteConfirm && (
         <div id="delete-confirm-modal" className="modal customModal" style={{display: 'flex'}}>
           <div className="modal-content">
-            <span className="close-btn" id="delete-confirm-close-btn" onClick={handleDeleteCancel}>
-              <i className="fas fa-times"></i>
-            </span>
+            <button
+              type="button"
+              className="close-btn"
+              id="delete-confirm-close-btn"
+              onClick={handleDeleteCancel}
+              aria-label="Close dialog"
+            >
+              <i className="fas fa-times" aria-hidden="true"></i>
+            </button>
             <h2 id="delete-confirm-modal-title">Confirm Delete</h2>
             <p id="delete-confirm-modal-text">
               Are you sure you want to delete GSM <strong>"{gsmData?.name}"</strong>? 
               This action cannot be undone.
             </p>
             <div className="modal-footer">
-              <button className="btn btn-export" id="delete-confirm-cancel-btn" onClick={handleDeleteCancel}>
+              <button type="button" className="btn btn-export" id="delete-confirm-cancel-btn" onClick={handleDeleteCancel}>
                 Cancel
               </button>
-              <button className="btn btn-danger" id="delete-confirm-delete-btn" onClick={handleDeleteConfirm}>
-                <i className="fas fa-trash"></i> Delete
+              <button type="button" className="btn btn-danger" id="delete-confirm-delete-btn" onClick={handleDeleteConfirm}>
+                <i className="fas fa-trash" aria-hidden="true"></i> Delete
               </button>
             </div>
           </div>

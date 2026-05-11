@@ -54,7 +54,7 @@ export function usePaymentMethodsPage() {
 
   const handleSetDefault = useCallback(
     (id: string | number) => {
-      void setDefaultMutation.mutate(id);
+      setDefaultMutation.mutate(id);
     },
     [setDefaultMutation],
   );
@@ -69,7 +69,7 @@ export function usePaymentMethodsPage() {
 
   const handleConfirmDelete = useCallback(() => {
     if (deletePaymentMethodId) {
-      void deleteCardMutation.mutate(deletePaymentMethodId);
+      deleteCardMutation.mutate(deletePaymentMethodId);
     }
   }, [deletePaymentMethodId, deleteCardMutation]);
 

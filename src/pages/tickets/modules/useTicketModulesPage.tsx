@@ -73,7 +73,9 @@ export function useTicketModulesPage() {
 
   const submodulesQuery = useQuery({
     queryKey: ticketsKeys.modules.submodulesByModule(
-      selectedModuleForSubmodules?.id != null ? String(selectedModuleForSubmodules.id) : "__none__",
+      selectedModuleForSubmodules?.id == null
+        ? "__none__"
+        : String(selectedModuleForSubmodules.id),
     ),
     queryFn: async () => {
       const mid = selectedModuleForSubmodules?.id;
@@ -155,7 +157,7 @@ export function useTicketModulesPage() {
     onSuccess: async (ok) => {
       if (!ok) return;
       await queryClient.invalidateQueries({ queryKey: ticketsKeys.modules.all() });
-      void submodulesQuery.refetch();
+      await submodulesQuery.refetch();
     },
   });
 

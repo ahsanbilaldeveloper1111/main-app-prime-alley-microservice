@@ -2,16 +2,11 @@ import React, { useEffect, useState } from "react";
 import { Form, Modal } from "react-bootstrap";
 import { toast } from "react-toastify";
 import { updateJourneyStep } from "@utils/staffManagement";
-import {
-  clampDueDateToJourneyMin,
-  toInputDate,
-  type JourneyStepRecord,
-} from "../journeyDomain";
+import { toInputDate, type JourneyStepRecord } from "../journeyDomain";
 
 export interface EditJourneyStepModalProps {
   step: JourneyStepRecord | null;
   journeyId: number;
-  journeyDueDateMin: string | undefined;
   onHide: () => void;
   onInvalidateJourneyQueries: () => void;
 }
@@ -19,7 +14,6 @@ export interface EditJourneyStepModalProps {
 const EditJourneyStepModal: React.FC<EditJourneyStepModalProps> = ({
   step,
   journeyId,
-  journeyDueDateMin,
   onHide,
   onInvalidateJourneyQueries,
 }) => {
@@ -40,18 +34,14 @@ const EditJourneyStepModal: React.FC<EditJourneyStepModalProps> = ({
       stage: step.stage ?? "",
       title: step.title ?? "",
       description: step.description ?? "",
-      due_date: clampDueDateToJourneyMin(dueRaw, journeyDueDateMin),
+      due_date: dueRaw,
       status: step.status ?? "pending",
       sort_order: Number(step.sort_order ?? 0),
     });
-  }, [step, journeyDueDateMin]);
+  }, [step]);
 
   const handleSubmit = async () => {
     if (step?.id == null) return;
-    if (journeyDueDateMin != null && form.due_date !== "" && form.due_date < journeyDueDateMin) {
-      toast.error("Due date cannot be before the journey start date.");
-      return;
-    }
     setSubmitting(true);
     try {
       await updateJourneyStep(journeyId, step.id, {
@@ -110,14 +100,8 @@ const EditJourneyStepModal: React.FC<EditJourneyStepModalProps> = ({
           <Form.Label>Due Date</Form.Label>
           <Form.Control
             type="date"
-            min={journeyDueDateMin}
             value={form.due_date}
-            onChange={(e) =>
-              setForm((prev) => ({
-                ...prev,
-                due_date: clampDueDateToJourneyMin(e.target.value, journeyDueDateMin),
-              }))
-            }
+            onChange={(e) => setForm((prev) => ({ ...prev, due_date: e.target.value }))}
           />
         </Form.Group>
         <Form.Group className="mb-3">

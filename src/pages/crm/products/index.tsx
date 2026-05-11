@@ -4,7 +4,6 @@ import React, { useMemo } from "react";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 import GenericTable, {
-  type FilterPill,
   type TableColumn,
   type ToolbarConfig,
 } from "@components/GenericTable";
@@ -268,7 +267,7 @@ function ProductsPage(props: CrmPageDisplayProps = {}) {
       onSearch: handleProductsSearchSubmit,
       showTabs: true,
       showFilterPills: true,
-      filterPills: productFilterPills as FilterPill[],
+      filterPills: productFilterPills,
       showMoreFiltersButton: false,
       tabs: [
         {
