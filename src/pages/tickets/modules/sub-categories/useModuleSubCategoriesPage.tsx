@@ -17,7 +17,7 @@ import { Trash2 } from "lucide-react";
 import moment from "moment";
 import type { TicketModulePickerRow, TicketSubmoduleRow } from "../categories/moduleCategoriesTypes";
 
-export interface SubCategoryRow {
+export interface SubCategoryRow extends Record<string, unknown> {
   id: string;
   name: string;
   description: string;
@@ -105,17 +105,17 @@ export function useModuleSubCategoriesPage() {
     },
   });
 
-  const handleCreateChild = useCallback(() => {
+  const handleCreateChild = useCallback(async () => {
     if (!newChildName.trim() || !newChildModuleId || !newChildSubmoduleId) {
       toast.error("Please fill in all required fields");
       return;
     }
-    void createSubCategoryMutation.mutate();
+    await createSubCategoryMutation.mutateAsync();
   }, [newChildName, newChildModuleId, newChildSubmoduleId, createSubCategoryMutation]);
 
-  const handleDeleteChild = useCallback(() => {
+  const handleDeleteChild = useCallback(async () => {
     if (!selectedSubcategoryForDelete) return;
-    void deleteSubCategoryMutation.mutate(selectedSubcategoryForDelete);
+    await deleteSubCategoryMutation.mutateAsync(selectedSubcategoryForDelete);
   }, [selectedSubcategoryForDelete, deleteSubCategoryMutation]);
 
   const closeSubCategoryModal = useCallback(() => {
@@ -127,21 +127,21 @@ export function useModuleSubCategoriesPage() {
     setSubmodules([]);
   }, []);
 
-  const columns: Column[] = useMemo(
+  const columns = useMemo<Column<SubCategoryRow>[]>(
     () => [
       {
         key: "name",
         name: "Name",
-        selector: (row: SubCategoryRow) => row.name,
+        selector: (row) => row.name,
         sortable: true,
-        cell: (props: SubCategoryRow) => <span className="fw-medium">{props.name}</span>,
+        cell: (props) => <span className="fw-medium">{props.name}</span>,
       },
       {
         key: "description",
         name: "Description",
-        selector: (row: SubCategoryRow) => row.description || "No description",
+        selector: (row) => row.description || "No description",
         sortable: true,
-        cell: (props: SubCategoryRow) => (
+        cell: (props) => (
           <span className="text-muted" style={{ fontSize: "0.875rem" }}>
             {props.description && props.description.length > 50 ? (
               <span className="text-muted text-overflow-ellipsis" style={{ fontSize: "0.875rem" }}>
@@ -158,9 +158,9 @@ export function useModuleSubCategoriesPage() {
       {
         key: "module",
         name: "Category",
-        selector: (row: SubCategoryRow) => row.submodule?.name || "Unknown",
+        selector: (row) => row.submodule?.name || "Unknown",
         sortable: true,
-        cell: (props: SubCategoryRow) => (
+        cell: (props) => (
           <span
             className="px-3 py-2 badge bg-outline-secondary text-secondary"
             style={{ fontSize: "0.813rem", border: `1px solid ${props.submodule?.color}40` }}
@@ -172,18 +172,18 @@ export function useModuleSubCategoriesPage() {
       {
         key: "created_at",
         name: "Created At",
-        selector: (row: SubCategoryRow) => row.created_at,
+        selector: (row) => row.created_at,
         sortable: true,
-        cell: (props: SubCategoryRow) => (
+        cell: (props) => (
           <span className="text-muted">{moment(props.created_at).format(GlobalDateTimeFormat)}</span>
         ),
       },
       {
         key: "actions",
         name: "Actions",
-        selector: (row: SubCategoryRow) => row.id,
+        selector: (row) => row.id,
         sortable: false,
-        cell: (props: SubCategoryRow) => (
+        cell: (props) => (
           <div className="d-flex gap-2">
             <Button
               variant="light"

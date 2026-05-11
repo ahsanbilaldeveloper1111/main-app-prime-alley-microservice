@@ -47,7 +47,6 @@ import {
   getJourneyStatusLabel,
   hasAppliedJourneyFilters,
   isEmployeeJourneyDisplayCompleted,
-  journeyStartDateToInputMin,
   mapJourneyRecordsToEmployees,
   pickActiveLabel,
   reconcileSelectedEmployeeProgress,
@@ -269,7 +268,6 @@ const EmployeesOnboarding = () => {
 
   const journeyDetailQuery = useJourneyDetailQuery(journeyId, journeyIdValid);
   const journeySteps = journeyDetailQuery.data?.steps ?? [];
-  const journeyStartDateIso = journeyDetailQuery.data?.startDateIso ?? null;
   const stepsLoading = journeyIdValid && journeyDetailQuery.isPending;
 
   useEffect(() => {
@@ -282,11 +280,6 @@ const EmployeesOnboarding = () => {
       }),
     );
   }, [journeySteps, stepsLoading, journeyIdValid, journeyId]);
-
-  const journeyDueDateMin = useMemo(
-    () => journeyStartDateToInputMin(journeyStartDateIso),
-    [journeyStartDateIso],
-  );
 
   useEffect(() => {
     setStatusValue(statusDisplayToApiValue(selectedEmployee?.status ?? "In Progress"));
@@ -830,7 +823,6 @@ const EmployeesOnboarding = () => {
         <AddJourneyStepModal
           show={showAddStepForm}
           journeyId={journeyId}
-          journeyDueDateMin={journeyDueDateMin}
           stepCount={journeySteps.length}
           onHide={() => setShowAddStepForm(false)}
           onInvalidateJourneyQueries={invalidateJourneyQueries}
@@ -839,7 +831,6 @@ const EmployeesOnboarding = () => {
         <EditJourneyStepModal
           step={editingStep}
           journeyId={journeyId}
-          journeyDueDateMin={journeyDueDateMin}
           onHide={() => setEditingStep(null)}
           onInvalidateJourneyQueries={invalidateJourneyQueries}
         />

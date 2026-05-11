@@ -37,7 +37,11 @@ export function useWorkPlannerStatuses() {
   });
 
   const invalidatePlannerStatuses = useCallback(() => {
-    void queryClient.invalidateQueries({ queryKey: plannerKeys.statuses.all() });
+    queryClient
+      .invalidateQueries({ queryKey: plannerKeys.statuses.all() })
+      .catch((error: unknown) => {
+        console.error("Error invalidating planner statuses:", error);
+      });
   }, [queryClient]);
 
   const [showCreateModal, setShowCreateModal] = useState(false);

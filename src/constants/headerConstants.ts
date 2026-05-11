@@ -371,6 +371,9 @@ export const HEADER_CONSTANTS = {
     LIVE_CHAT_USERS: "live-chat-users",
 
     VIEW_EMPLOYEES_STAFF_MANAGEMENT: "view-employees-staff-management",
+    /** When granted with view-employees, allows listing every company employee; without it, list is scoped to main-app user directory (managed users). */
+    VIEW_ALL_COMPANY_EMPLOYEES_STAFF_MANAGEMENT:
+      "view-all-company-employees-staff-management",
     VIEW_EMPLOYEES_DASHBOARD_STAFF_MANAGEMENT:
       "view-employees-dashboard-staff-management",
     VIEW_EMPLOYEES_ONBOARDING_STAFF_MANAGEMENT:
@@ -392,6 +395,9 @@ export const HEADER_CONSTANTS = {
       "update-journey-staff-management-staff-management",
     DELETE_JOURNEY_STAFF_MANAGEMENT:
       "delete-journey-staff-management-staff-management",
+    /** Start an onboarding journey for an employee (Employees page); separate from step CRUD. */
+    CREATE_JOURNEY_STAFF_MANAGEMENT:
+      "create-journey-staff-management-staff-management",
     CREATE_JOURNEY_STEP_STAFF_MANAGEMENT:
       "create-journey-step-staff-management-staff-management",
     UPDATE_JOURNEY_STEP_STAFF_MANAGEMENT:

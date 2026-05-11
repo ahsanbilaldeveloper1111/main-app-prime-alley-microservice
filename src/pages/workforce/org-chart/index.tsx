@@ -31,15 +31,19 @@ import {
 import OrgEmployeeSidebar from "@page-modules/workforce/org-chart/sidebar";
 import router from "next/router";
 import {
+  filterOrgChartUsersWithMinifiedProfile,
   findMainAppUserByOrgChartUserId,
   mainAppUserRowKeyForSelection,
 } from "@utils/workforce/orgChartMainAppUserMatch";
+import { canViewAllEmployeesAttendance } from "@utils/workforce/canViewAllEmployeesAttendance";
+import { parseTeamUsersResponseForAttendanceScope } from "@utils/workforce/attendanceTeamScope";
+import { getTeamUsers } from "@utils/teams";
 
 import {
   buildOrgChartDisplayTree,
   buildRawProfileByIdMap,
   collectOrgChartUserIds,
-  collectSubtreeIdsForUser,
+  collectSubtreeIdsForUsers,
   filterMainAppUsersInOrgChart,
   flattenOrgChartTeam,
   type OrgChartEmployee,
@@ -61,24 +65,72 @@ const ALL_DEPARTMENT = "All Department";
 type OrgChartTabId = "Org Chart" | "My Team";
 
 const OrganizationalChart = () => {
-  const { data: session } = useSession();
+  const { data: session, status: sessionStatus } = useSession();
   const { mainAppDepartments, mainAppUsers, companyIdentifier } = useMainAppLookups();
   const [activeTab, setActiveTab] = useState<OrgChartTabId>("Org Chart");
   const [showDepartmentDropdown, setShowDepartmentDropdown] = useState(false);
   const [selectedDepartment, setSelectedDepartment] = useState(ALL_DEPARTMENT);
-  const [selectedUserId, setSelectedUserId] = useState("");
+  const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
   const [showUserDropdown, setShowUserDropdown] = useState(false);
   const [zoomLevel, setZoomLevel] = useState(100);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState<OrgChartEmployee | null>(null);
   const [showEmployeeSidebar, setShowEmployeeSidebar] = useState(false);
 
+  const canViewAllAttendance = useMemo(
+    () => canViewAllEmployeesAttendance(session?.user),
+    [session?.user],
+  );
+  const [attendanceTeamScopeIds, setAttendanceTeamScopeIds] = useState<string[]>([]);
+  const [attendanceTeamScopeLoading, setAttendanceTeamScopeLoading] = useState(false);
+
+  useEffect(() => {
+    if (canViewAllAttendance || sessionStatus !== "authenticated") {
+      setAttendanceTeamScopeIds([]);
+      setAttendanceTeamScopeLoading(false);
+      return;
+    }
+    const selfRaw = session?.user?.id;
+    const selfStr = selfRaw == null ? "" : String(selfRaw).trim();
+    if (selfStr === "") {
+      setAttendanceTeamScopeIds([]);
+      setAttendanceTeamScopeLoading(false);
+      return;
+    }
+    let cancelled = false;
+    setAttendanceTeamScopeLoading(true);
+    void (async () => {
+      try {
+        const numericId = Number(selfStr);
+        const raw = await getTeamUsers(
+          undefined,
+          Number.isFinite(numericId) ? numericId : undefined,
+        );
+        if (cancelled) return;
+        const ids = parseTeamUsersResponseForAttendanceScope(raw, selfStr);
+        setAttendanceTeamScopeIds(ids);
+      } catch (e) {
+        console.error("[OrganizationalChart] getTeamUsers failed", e);
+        if (!cancelled) {
+          setAttendanceTeamScopeIds([selfStr]);
+        }
+      } finally {
+        if (!cancelled) {
+          setAttendanceTeamScopeLoading(false);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [canViewAllAttendance, sessionStatus, session?.user?.id]);
+
   useEffect(() => {
     setShowEmployeeSidebar(false);
     setSelectedEmployee(null);
   }, [activeTab]);
 
-  const { userProfilesMinified } = useUserProfilesMinified();
+  const { userProfilesMinified, loading: userProfilesMinifiedLoading } = useUserProfilesMinified();
 
   const departmentIdForQuery = useMemo(() => {
     if (selectedDepartment === ALL_DEPARTMENT || !selectedDepartment) return undefined;
@@ -86,12 +138,33 @@ const OrganizationalChart = () => {
     return id == null ? undefined : String(id);
   }, [selectedDepartment, mainAppDepartments]);
 
-  const userIdsForQuery = selectedUserId ? [selectedUserId] : undefined;
+  const userIdsForQuery = useMemo(() => {
+    if (selectedUserIds.length === 0) return undefined;
+    return [...selectedUserIds].sort((a, b) => a.localeCompare(b));
+  }, [selectedUserIds]);
+
+  const orgChartAttendanceContext = useMemo(
+    () => ({
+      canViewAllAttendance,
+      teamScopeLoading: attendanceTeamScopeLoading,
+      teamScopeUserIds: attendanceTeamScopeIds,
+      sessionUserId: session?.user?.id,
+      sessionStatus,
+    }),
+    [
+      canViewAllAttendance,
+      attendanceTeamScopeLoading,
+      attendanceTeamScopeIds,
+      session?.user?.id,
+      sessionStatus,
+    ],
+  );
 
   const orgChartQuery = useOrgChartTreeQuery({
     companyIdentifier,
     departmentId: departmentIdForQuery,
     userIds: userIdsForQuery,
+    attendance: orgChartAttendanceContext,
   });
 
   const orgChartTreeRaw = orgChartQuery.data ?? [];
@@ -107,7 +180,7 @@ const OrganizationalChart = () => {
       departments: mainAppDepartments ?? [],
       companyName,
       selectedDepartmentLabel: selectedDepartment,
-      selectedUserId,
+      selectedUserIds,
     });
   }, [
     orgChartTreeRaw,
@@ -115,17 +188,18 @@ const OrganizationalChart = () => {
     mainAppDepartments,
     companyName,
     selectedDepartment,
-    selectedUserId,
+    selectedUserIds,
   ]);
 
   useEffect(() => {
-    if (!selectedUserId) return;
+    if (selectedUserIds.length === 0) return;
     const timer = setTimeout(() => {
-      const el = document.querySelector(`[data-org-chart-user-id="${selectedUserId}"]`);
+      const first = selectedUserIds[0];
+      const el = document.querySelector(`[data-org-chart-user-id="${first}"]`);
       el?.scrollIntoView({ behavior: "smooth", block: "center", inline: "center" });
     }, 100);
     return () => clearTimeout(timer);
-  }, [selectedUserId]);
+  }, [selectedUserIds]);
 
   const rawProfileById = useMemo(() => buildRawProfileByIdMap(orgChartTreeRaw), [orgChartTreeRaw]);
 
@@ -133,22 +207,51 @@ const OrganizationalChart = () => {
 
   const chartLoading = Boolean(companyIdentifier) && orgChartQuery.isPending;
 
+  /** Only prune against the visible tree when showing the full chart; filtered trees are a subset and would drop valid multi-picks. */
   useEffect(() => {
-    if (!selectedUserId || chartLoading || !orgChartTreeRaw.length) return;
-    if (!orgChartUserIds.has(selectedUserId)) {
-      setSelectedUserId("");
-    }
-  }, [chartLoading, orgChartTreeRaw.length, orgChartUserIds, selectedUserId]);
+    if (chartLoading || !orgChartTreeRaw.length || selectedUserIds.length === 0) return;
+    if (userIdsForQuery != null && userIdsForQuery.length > 0) return;
+    setSelectedUserIds((prev) => {
+      const next = prev.filter((id) => orgChartUserIds.has(id));
+      return next.length === prev.length ? prev : next;
+    });
+  }, [chartLoading, orgChartTreeRaw.length, orgChartUserIds, selectedUserIds, userIdsForQuery]);
 
-  const usersInOrgChart = useMemo(
-    () => filterMainAppUsersInOrgChart(mainAppUsers ?? [], orgChartUserIds),
-    [mainAppUsers, orgChartUserIds],
-  );
+  /** Everyone with a workforce profile (not only nodes in the currently filtered tree) so multi-select stays usable. */
+  const userFilterDropdownRows = useMemo(() => {
+    const users = mainAppUsers ?? [];
+    if (userProfilesMinifiedLoading || userProfilesMinified.length === 0) {
+      return filterMainAppUsersInOrgChart(users, orgChartUserIds);
+    }
+    return filterOrgChartUsersWithMinifiedProfile(users, userProfilesMinified);
+  }, [
+    mainAppUsers,
+    orgChartUserIds,
+    userProfilesMinified,
+    userProfilesMinifiedLoading,
+  ]);
 
   const selectedUserSubtreeIds = useMemo(() => {
-    if (!selectedUserId || !orgData) return new Set<string>();
-    return collectSubtreeIdsForUser(orgData, selectedUserId);
-  }, [selectedUserId, orgData]);
+    if (selectedUserIds.length === 0 || !orgData) return new Set<string>();
+    return collectSubtreeIdsForUsers(orgData, selectedUserIds);
+  }, [selectedUserIds, orgData]);
+
+  const userFilterTriggerLabel = useMemo(() => {
+    if (selectedUserIds.length === 0) return "All Users";
+    if (selectedUserIds.length === 1) {
+      const one = selectedUserIds[0];
+      return findMainAppUserByOrgChartUserId(userFilterDropdownRows, one)?.name ?? one;
+    }
+    return `${selectedUserIds.length} users selected`;
+  }, [selectedUserIds, userFilterDropdownRows]);
+
+  const toggleOrgChartUserFilter = useCallback((uid: string) => {
+    setSelectedUserIds((prev) => {
+      const exists = prev.includes(uid);
+      if (exists) return prev.filter((x) => x !== uid);
+      return [...prev, uid];
+    });
+  }, []);
 
   const myTeamEmployees = useMemo(() => (orgData ? flattenOrgChartTeam(orgData) : []), [orgData]);
 
@@ -161,13 +264,13 @@ const OrganizationalChart = () => {
     (employee: OrgChartEmployee) => (
       <OrgChartEmployeeNode
         employee={employee}
-        selectedUserId={selectedUserId}
+        selectedUserIds={selectedUserIds}
         selectedUserSubtreeIds={selectedUserSubtreeIds}
         rawProfileById={rawProfileById}
         onNodeSelect={handleOrgChartNodeSelect}
       />
     ),
-    [selectedUserId, selectedUserSubtreeIds, rawProfileById, handleOrgChartNodeSelect],
+    [selectedUserIds, selectedUserSubtreeIds, rawProfileById, handleOrgChartNodeSelect],
   );
 
   const renderTree = useCallback(
@@ -297,43 +400,53 @@ const OrganizationalChart = () => {
               <button
                 type="button"
                 className="org-chart-page__dropdown-trigger"
+                aria-expanded={showUserDropdown}
+                aria-haspopup="dialog"
+                aria-label="Filter org chart by employee. Multiple selections allowed."
                 onClick={() => setShowUserDropdown(!showUserDropdown)}
               >
-                {selectedUserId
-                  ? (findMainAppUserByOrgChartUserId(usersInOrgChart, selectedUserId)?.name ??
-                    selectedUserId)
-                  : "All Users"}
+                {userFilterTriggerLabel}
                 <ChevronDown size={16} />
               </button>
               {showUserDropdown && (
-                <div className="org-chart-page__dropdown-menu org-chart-page__dropdown-menu--scroll">
+                <div className="org-chart-page__dropdown-menu org-chart-page__dropdown-menu--scroll org-chart-page__dropdown-menu--multi">
+                  <p className="org-chart-page__dropdown-hint">Select one or more people, then Done.</p>
                   <button
                     type="button"
-                    className={`org-chart-page__dropdown-item${selectedUserId === "" ? " org-chart-page__dropdown-item--active" : ""}`}
+                    className={`org-chart-page__dropdown-item${selectedUserIds.length === 0 ? " org-chart-page__dropdown-item--active" : ""}`}
                     onClick={() => {
-                      setSelectedUserId("");
+                      setSelectedUserIds([]);
                       setShowUserDropdown(false);
                     }}
                   >
                     All Users
                   </button>
-                  {usersInOrgChart.map((u) => {
+                  {userFilterDropdownRows.map((u) => {
                     const uid = mainAppUserRowKeyForSelection(u);
-                    const isSelected = selectedUserId === uid;
+                    const isSelected = selectedUserIds.includes(uid);
                     return (
                       <button
                         key={u.id}
                         type="button"
-                        className={`org-chart-page__dropdown-item${isSelected ? " org-chart-page__dropdown-item--active" : ""}`}
-                        onClick={() => {
-                          setSelectedUserId(uid);
-                          setShowUserDropdown(false);
-                        }}
+                        className={`org-chart-page__dropdown-item org-chart-page__dropdown-item--checkable${isSelected ? " org-chart-page__dropdown-item--active" : ""}`}
+                        onClick={() => toggleOrgChartUserFilter(uid)}
                       >
-                        {u.name}
+                        <span className="org-chart-page__dropdown-check" aria-hidden>
+                          {isSelected ? "✓" : ""}
+                        </span>
+                        <span className="org-chart-page__dropdown-item-label">{u.name}</span>
                       </button>
                     );
                   })}
+                  <div className="org-chart-page__dropdown-footer">
+                    <button
+                      type="button"
+                      className="org-chart-page__dropdown-done"
+                      onClick={() => setShowUserDropdown(false)}
+                    >
+                      Done
+                    </button>
+                  </div>
                 </div>
               )}
             </div>

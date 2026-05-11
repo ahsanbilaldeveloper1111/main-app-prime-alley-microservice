@@ -16,14 +16,13 @@ import {
   BusinessTypeData,
   getDealTemplate,
   DealTemplateData,
-  DealTemplateField,
   getIndustries,
   IndustryData,
   getCrmProducts,
   CrmProduct,
 } from "@utils/crm";
 import { GetHierarchyData } from "@utils/users";
-import { Button, Row, Col, Form, Card, Alert, Badge, Table, Modal } from "react-bootstrap";
+import { Button, Row, Col, Form, Card, Badge, Modal } from "react-bootstrap";
 import Select from "react-select";
 import {
   PhoneInput,
@@ -34,7 +33,6 @@ import {
 } from "@crm/leads/leadFormPhoneGeo";
 import { useSession } from "next-auth/react";
 import {
-  FiSave,
   FiArrowLeft,
   FiDatabase,
   FiTarget,
@@ -44,20 +42,13 @@ import {
   CheckCircle,
   ChevronLeft,
   ChevronRight,
-  AlertCircle,
   X,
-  Edit,
 } from "@crm/leads/leadFormLucideCommon";
 import Link from "next/link";
 import { toast } from "react-toastify";
 import { useRouter } from "next/router";
 
 import PageHeader from "@components/PageHeader";
-import FormModal from "@components/page-partials/FormModal";
-import ConfirmModal from "@components/page-partials/ConfirmModal";
-import SuccessfulModal from "@components/page-partials/SuccessfulModal";
-import PageSummaryGrid, { SummaryCard } from "@components/PageSummaryGrid";
-import DatatableActionButton from "@components/DatatableActionButton";
 import { ModuleSlug, ValidationType, checkRequiredFields } from "@utils/Helper";
 
 const CreateLead = () => {

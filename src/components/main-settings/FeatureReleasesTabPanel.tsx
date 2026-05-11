@@ -25,7 +25,7 @@ export const FeatureReleasesTabContent: React.FC = () => {
         >
           Product Updates page
         </a>
-        .
+        {'.'}
       </FeatureSectionHeading>
 
       <button
