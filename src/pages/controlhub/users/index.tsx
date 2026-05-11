@@ -9,10 +9,8 @@ import '@assets/scss/tabs.scss';
 import '@assets/scss/common.scss';
 
 // Import partial components
-import UsersTabs from './partials/UsersTabs';
 import UsersHeader from './partials/UsersHeader';
 import OverviewTab from './partials/OverviewTab';
-import InsightTab from './partials/InsightTab';
 import UserDetailsModal from './partials/UserDetailsModal';
 import SyncLdapUsersModal from './partials/SyncLdapUsersModal';
 import ResetPasswordModal from '@components/ResetPasswordModal';
@@ -20,17 +18,14 @@ import ChangeStatusModal from './partials/ChangeStatusModal';
 
 // Import hooks and utilities
 import { useUserColumns } from '@hooks/controlhub/users/userColumns';
-import { useUserCharts } from '@hooks/controlhub/users/useUserCharts';
 import { useUsersData } from '@hooks/controlhub/users/useUsersData';
 import { useLdapSync } from '@hooks/controlhub/users/useLdapSync';
 import { useUserModal } from '@hooks/controlhub/users/useUserModal';
-import { handleUserExport } from '@utils/controlhub/users/userExport';
 
 
 const Users = () => {
     const { data: session } = useSession();
     const router = useRouter();
-    const [activeTab, setActiveTab] = useState('overview');
     const roleId = router.query.role_id as string | undefined;
 
     // Reset password modal state
@@ -60,7 +55,6 @@ const Users = () => {
     const {
         customFieldColumns,
         currentFilters,
-        summaryCards,
         fetchUsers,
         handleFiltersChange
     } = useUsersData(session, baseColumns, roleId);
@@ -89,16 +83,6 @@ const Users = () => {
     });
     
     const {
-        growthChart,
-        departmentChart,
-        userActivityChart,
-        FailedLoginAttemptsChart,
-        departmentGrowthChart,
-        userLocationChart,
-        loginHeatMapChart
-    } = useUserCharts();
-
-    const {
         loadingLdapUsers,
         ldapSyncJob,
         showSyncLdapUsersModal,
@@ -113,61 +97,24 @@ const Users = () => {
         closeUserModal
     } = useUserModal();
 
-    const handleExport = async (exportType: string, filters: Record<string, any>) => {
-        handleUserExport(exportType, filters);
-    };
-
-
-
-
-
-
-
-
-
-
     return (
         <ProtectedRoute requiredPermissions={['view-users']}>
             <React.Fragment>
                 <BreadcrumbItem mainTitle="Controlhub" mainLink="/controlhub/users" subTitle="Users" />
                 
-                <UsersHeader
-                    currentFilters={currentFilters}
-                    handleFiltersChange={handleFiltersChange}
-                    handleExport={handleExport}
-                    syncLdapUsers={syncLdapUsers}
-                />
-
-                {/* <UsersTabs activeTab={activeTab} setActiveTab={setActiveTab} /> */}
+                <UsersHeader syncLdapUsers={syncLdapUsers} />
 
                 <div className="tab-content">
-                    {/* {activeTab === 'overview' && ( */}
                         <div className="tab-pane fade show active" role="tabpanel">
                             <OverviewTab
-                                summaryCards={summaryCards}
                                 columns={columns}
                                 fetchUsers={fetchUsers}
                                 customFieldColumns={customFieldColumns}
                                 currentFilters={currentFilters}
                                 handleFiltersChange={handleFiltersChange}
                                 hasListPermission={session?.user?.permissions?.includes('list-users') || false}
-                                growthChart={growthChart}
-                                departmentChart={departmentChart}
                             />
                         </div>
-                     {/* )} */}
-                    {/* {activeTab === 'insight' && (
-                        <div className="tab-pane fade show active" role="tabpanel">
-                            <InsightTab
-                                summaryCards={summaryCards}
-                                userActivityChart={userActivityChart}
-                                failedLoginAttemptsChart={FailedLoginAttemptsChart}
-                                departmentGrowthChart={departmentGrowthChart}
-                                loginHeatMapChart={loginHeatMapChart}
-                                userLocationChart={userLocationChart}
-                            />
-                        </div>
-                    )} */}
                 </div>
 
                 <UserDetailsModal

@@ -47,7 +47,7 @@ import {
   Pencil,
   Trash2,
 } from "lucide-react";
-import DeleteConfirmationModal from "../../partial/DeleteConfirmationModal";
+import DeleteConfirmationModal from "@components/page-partials/DeleteConfirmationModal";
 import NewRequestModal from "@page-modules/workforce/NewRequestModal";
 import UserRequestDynamicFieldInput from "@components/workforce/UserRequestDynamicFieldInput";
 import WorkforceSidebarShell from "@components/workforce/WorkforceSidebarShell";

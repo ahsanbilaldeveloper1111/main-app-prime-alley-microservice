@@ -1,5 +1,5 @@
 import '@assets/scss/datatable-style.scss';
-import React, { ReactElement, useEffect, useState, useCallback, useRef } from 'react';
+import React, { ReactElement, useState, useCallback, useRef } from 'react';
 import Layout from '@layout/index';
 import BreadcrumbItem from '@common/BreadcrumbItem';
 import GenericListPage from '@components/GenericListPage';
@@ -8,20 +8,15 @@ import { Button, Row, Col } from 'react-bootstrap';
 import { toast } from 'react-toastify';
 import { useSession } from 'next-auth/react';
 import PageSummaryGrid, { SummaryCard } from '@components/PageSummaryGrid';
-import { getDevices, getMonitoringDashboard, deleteDevice, createDevice, updateDevice, Device, MonitoringDashboardResponse, getDeviceMonitoringStatus, DeviceMonitoringStatusResponse } from '@utils/netops';
-import { convertUTCToUserTimezone, GlobalDateFormat, GlobalTimeFormat } from '@utils/Helper';
+import { getDevices, getMonitoringDashboard, deleteDevice, createDevice, updateDevice, Device, getDeviceMonitoringStatus } from '@utils/netops';
+import { convertUTCToUserTimezone } from '@utils/Helper';
 import "@assets/scss/common.scss";
-import { FiRefreshCw } from 'react-icons/fi';
+import { FiRefreshCw, FiEdit, FiTrash2, FiPlus } from "react-icons/fi";
 
 import "@assets/scss/tabs.scss";
-import PageHeader from "@components/PageHeader";
-import FormModal from "../../partial/FormModal";
-import ConfirmModal from "@pages/partial/ConfirmModal";
-import SuccessfulModal from "@pages/partial/SuccessfulModal";
+import FormModal from "@components/page-partials/FormModal";
+import ConfirmModal from "@components/page-partials/ConfirmModal";
 import DatatableActionButton from "@components/DatatableActionButton";
-import { FiEdit, FiTrash2, FiEye,FiPlus } from "react-icons/fi";
-
-
 
 
 
@@ -39,7 +34,7 @@ interface DeviceWithStatus extends Device {
 }
 
 const Devices = () => {
-    const { data: session, status } = useSession();
+    const { data: session } = useSession();
     
     const columns: Column[] = [
         { key: 'hostname', name: 'Hostname', selector: (row: any) => row.hostname, sortable: true },

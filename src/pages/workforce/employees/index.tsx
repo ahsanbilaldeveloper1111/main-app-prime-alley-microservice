@@ -5,7 +5,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 import GenericSidebar, { SidebarSection } from "@components/GenericSidebarNew";
-import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
+import DeleteConfirmationModal from "@components/page-partials/DeleteConfirmationModal";
 import AddEmployeeModal from "@page-modules/workforce/AddEmployeeModal";
 import EditEmployeeModal from "@page-modules/workforce/EditEmployeeModal";
 

@@ -1,5 +1,5 @@
 import React from 'react'
-import FormModal from '@pages/partial/FormModal'
+import FormModal from '@components/page-partials/FormModal'
 import { Spinner } from 'react-bootstrap'
 import type { LdapSyncJob } from '@hooks/controlhub/users/useLdapSync'
 

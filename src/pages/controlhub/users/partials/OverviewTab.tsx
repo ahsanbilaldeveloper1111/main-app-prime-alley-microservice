@@ -1,14 +1,11 @@
 import React from 'react';
 import { Row } from 'react-bootstrap';
 import { useSession } from 'next-auth/react';
-import { SummaryCard } from '@components/PageSummaryGrid';
 import UsersList from './UsersList';
 import RecentActivities from './RecentActivities';
 import { Column } from '@components/CustomDataTable';
 
 interface OverviewTabProps {
-    
-    summaryCards: SummaryCard[];
     columns: Column[];
     fetchUsers: (page?: number, perPage?: number, search?: string) => Promise<any>;
     customFieldColumns: Column[];
@@ -16,14 +13,6 @@ interface OverviewTabProps {
     handleFiltersChange: (filters: any) => void;
     hasListPermission: boolean;
     showFilters?: boolean;
-    growthChart: {
-        series: Array<{ name: string; data: number[] }>;
-        options: any;
-    };
-    departmentChart: {
-        series: number[];
-        options: any;
-    };
 }
 
 const OverviewTab: React.FC<OverviewTabProps> = ({
