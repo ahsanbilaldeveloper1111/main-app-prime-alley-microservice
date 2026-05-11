@@ -1,0 +1,71 @@
+@import "./crm-page-shared.scss";
+
+// CRM Products page — static layout (table wrapper, toolbar, sidebar field overrides).
+
+.products-table-wrapper {
+  width: 100%;
+  overflow: hidden;
+
+  .table-responsive {
+    width: 100%;
+    overflow-x: auto;
+    overflow-y: visible;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .table-responsive table {
+    width: 100%;
+    table-layout: auto;
+    margin-bottom: 0;
+  }
+
+  .table-responsive table th,
+  .table-responsive table td {
+    padding: 12px 16px;
+    vertical-align: middle;
+  }
+
+  .table-responsive table td:last-child,
+  .table-responsive table th:last-child {
+    max-width: none;
+  }
+
+  .table-responsive table td[style*="width"],
+  .table-responsive table th[style*="width"] {
+    max-width: none;
+  }
+}
+
+.products-toolbar-add-btn {
+  background-color: #4f46e5;
+  border: none;
+  border-radius: 8px;
+  color: #ffffff;
+  height: 33px;
+  font-size: 0.875rem;
+  padding: 0 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.products-filter-form {
+  min-width: 240px;
+}
+
+.products-filter-form--status {
+  min-width: 220px;
+}
+
+.products-sidebar-input--readonly {
+  background-color: #f7fafc;
+  cursor: not-allowed;
+}
+
+.products-sidebar-switch-wrap {
+  margin-bottom: 20px;
+}
+
+.products-sidebar-switch {
+  font-size: 14px;
+}

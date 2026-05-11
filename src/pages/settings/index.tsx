@@ -38,8 +38,6 @@ import {
   Globe,
   BarChart2,
   Settings as SettingsCogIcon,
-  PhoneOutgoing,
-  PhoneIncoming,
   Search
 } from 'lucide-react';
 
@@ -102,13 +100,6 @@ import AIChatFAQsGlobal from "@pages/chat/ai-faqs/global";
 import ManageExtensions from "@pages/ai-ml/manage-extensions";
 import BackendOperations from "@pages/ai-ml/backend-operations";
 import ManualAnalysis from "@pages/ai-ml/analysis";
-import AIMLProfiles from "@pages/agents/outbound-agent";
-
-// Import Outbound / Inbound AI Agent components
-import OutboundTrunkProfiles from "@pages/ai-agent/outbound/trunk-profiles";
-import InboundTrunkProfiles from "@pages/ai-agent/inbound/trunk-profiles";
-import InboundBotProfiles from "@pages/agents/inbound-agent";
-import InboundFAQs from "@pages/ai-agent/inbound/faqs";
 
 import NotificationsPage from "@pages/notifications";
 
@@ -1326,8 +1317,6 @@ const Settings = () => {
   const [activeWorkPlannerTab, setActiveWorkPlannerTab] = useState<string>("statuses");
   const [activeAIChatTab, setActiveAIChatTab] = useState<string>("tools-profiles");
   const [activeAIAnalysisTab, setActiveAIAnalysisTab] = useState<string>("manage-extensions");
-  const [activeOutboundAIAgentTab, setActiveOutboundAIAgentTab] = useState<string>("trunk-profiles");
-  const [activeInboundAIAgentTab, setActiveInboundAIAgentTab] = useState<string>("trunk-profiles");
 
   // Track which tabs have been visited to prevent re-mounting
   const [visitedTabs, setVisitedTabs] = useState<Set<string>>(new Set(["user-management"]));
@@ -1342,8 +1331,6 @@ const Settings = () => {
   const [visitedWorkPlannerTabs, setVisitedWorkPlannerTabs] = useState<Set<string>>(new Set(["statuses"]));
   const [visitedAIChatTabs, setVisitedAIChatTabs] = useState<Set<string>>(new Set(["tools-profiles"]));
   const [visitedAIAnalysisTabs, setVisitedAIAnalysisTabs] = useState<Set<string>>(new Set(["manage-extensions"]));
-  const [visitedOutboundAIAgentTabs, setVisitedOutboundAIAgentTabs] = useState<Set<string>>(new Set(["trunk-profiles"]));
-  const [visitedInboundAIAgentTabs, setVisitedInboundAIAgentTabs] = useState<Set<string>>(new Set(["trunk-profiles"]));
 
   const [showSearch, setShowSearch] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -1401,14 +1388,6 @@ const Settings = () => {
               setActiveAIAnalysisTab(subtab);
               setVisitedAIAnalysisTabs(prev => new Set(prev).add(subtab));
               break;
-            case "outbound-ai-agent":
-              setActiveOutboundAIAgentTab(subtab);
-              setVisitedOutboundAIAgentTabs(prev => new Set(prev).add(subtab));
-              break;
-            case "inbound-ai-agent":
-              setActiveInboundAIAgentTab(subtab);
-              setVisitedInboundAIAgentTabs(prev => new Set(prev).add(subtab));
-              break;
             case "billing":
               setVisitedBillingTab(true);
               break;
@@ -1455,14 +1434,6 @@ const Settings = () => {
             case "ai-analysis":
               setActiveAIAnalysisTab("manage-extensions");
               setVisitedAIAnalysisTabs(prev => new Set(prev).add("manage-extensions"));
-              break;
-            case "outbound-ai-agent":
-              setActiveOutboundAIAgentTab("trunk-profiles");
-              setVisitedOutboundAIAgentTabs(prev => new Set(prev).add("trunk-profiles"));
-              break;
-            case "inbound-ai-agent":
-              setActiveInboundAIAgentTab("trunk-profiles");
-              setVisitedInboundAIAgentTabs(prev => new Set(prev).add("trunk-profiles"));
               break;
             case "billing":
               setVisitedBillingTab(true);
@@ -1511,8 +1482,6 @@ const Settings = () => {
       case "work-planner": return "statuses";
       case "ai-chat": return "tools-profiles";
       case "ai-analysis": return "manage-extensions";
-      case "outbound-ai-agent": return "trunk-profiles";
-      case "inbound-ai-agent": return "trunk-profiles";
       default: return "";
     }
   };
@@ -1618,26 +1587,6 @@ const Settings = () => {
     }, undefined, { shallow: true });
   };
 
-  const handleOutboundAIAgentTabChange = (key: string | null) => {
-    const tabKey = key || "trunk-profiles";
-    setActiveOutboundAIAgentTab(tabKey);
-    setVisitedOutboundAIAgentTabs(prev => new Set(prev).add(tabKey));
-    router.replace({
-      pathname: router.pathname,
-      query: { ...router.query, tab: "outbound-ai-agent", subtab: tabKey }
-    }, undefined, { shallow: true });
-  };
-
-  const handleInboundAIAgentTabChange = (key: string | null) => {
-    const tabKey = key || "trunk-profiles";
-    setActiveInboundAIAgentTab(tabKey);
-    setVisitedInboundAIAgentTabs(prev => new Set(prev).add(tabKey));
-    router.replace({
-      pathname: router.pathname,
-      query: { ...router.query, tab: "inbound-ai-agent", subtab: tabKey }
-    }, undefined, { shallow: true });
-  };
-
   // Check if a tab should render
   const shouldRenderTab = (mainTab: string, subTab?: string) => {
     if (!visitedTabs.has(mainTab)) return false;
@@ -1667,10 +1616,6 @@ const Settings = () => {
           return visitedAIChatTabs.has(subTab) && activeAIChatTab === subTab;
         case "ai-analysis":
           return visitedAIAnalysisTabs.has(subTab) && activeAIAnalysisTab === subTab;
-        case "outbound-ai-agent":
-          return visitedOutboundAIAgentTabs.has(subTab) && activeOutboundAIAgentTab === subTab;
-        case "inbound-ai-agent":
-          return visitedInboundAIAgentTabs.has(subTab) && activeInboundAIAgentTab === subTab;
         case "general-prefs":
         case "notifications":
           return true;
@@ -1766,20 +1711,6 @@ const Settings = () => {
       icon: BarChart2,
       color: "#00bcd4",
       permission: PERMISSIONS.AI_ML_SERVICES
-    },
-    {
-      key: "outbound-ai-agent",
-      title: "Outbound Ai Agent",
-      icon: PhoneOutgoing,
-      color: "#00897b",
-      permission: PERMISSIONS.AI_ML_SERVICES
-    },
-    {
-      key: "inbound-ai-agent",
-      title: "Inbound Ai Agent",
-      icon: PhoneIncoming,
-      color: "#5e35b1",
-      permission: PERMISSIONS.AI_ML_SERVICES
     }
   ];
 
@@ -1839,15 +1770,6 @@ const Settings = () => {
       { key: "manage-extensions", title: "Manage Extensions", icon: SettingsCogIcon, color: "#00bcd4", permission: PERMISSIONS.MANAGE_EXTENSIONS_AIML },
       { key: "backend-operations", title: "Backend Operations", icon: Wrench, color: "#00bcd4", permission: PERMISSIONS.TRANSLATE_AIML },
       { key: "manual-analysis", title: "Manual Analysis", icon: FileText, color: "#00bcd4", permission: PERMISSIONS.TRANSCRIPTION_ANALYSIS_AIML }
-    ],
-    "outbound-ai-agent": [
-      { key: "trunk-profiles", title: "Trunk Profiles", icon: SettingsCogIcon, color: "#00897b", permission: PERMISSIONS.AI_ML_SERVICES },
-      { key: "bot-profiles", title: "Bot Profiles", icon: Bot, color: "#00897b", permission: PERMISSIONS.AI_ML_SERVICES }
-    ],
-    "inbound-ai-agent": [
-      { key: "trunk-profiles", title: "Trunk Profiles", icon: SettingsCogIcon, color: "#5e35b1", permission: PERMISSIONS.AI_ML_SERVICES },
-      { key: "bot-profiles", title: "Bot Profiles", icon: Bot, color: "#5e35b1", permission: PERMISSIONS.AI_ML_SERVICES },
-      { key: "faqs", title: "FAQs", icon: HelpCircle, color: "#5e35b1", permission: PERMISSIONS.AI_ML_SERVICES }
     ]
   };
 
@@ -1863,8 +1785,6 @@ const Settings = () => {
       case "work-planner": return activeWorkPlannerTab;
       case "ai-chat": return activeAIChatTab;
       case "ai-analysis": return activeAIAnalysisTab;
-      case "outbound-ai-agent": return activeOutboundAIAgentTab;
-      case "inbound-ai-agent": return activeInboundAIAgentTab;
       default: return "";
     }
   };
@@ -1881,8 +1801,6 @@ const Settings = () => {
       case "work-planner": handleWorkPlannerTabChange(subTabKey); break;
       case "ai-chat": handleAIChatTabChange(subTabKey); break;
       case "ai-analysis": handleAIAnalysisTabChange(subTabKey); break;
-      case "outbound-ai-agent": handleOutboundAIAgentTabChange(subTabKey); break;
-      case "inbound-ai-agent": handleInboundAIAgentTabChange(subTabKey); break;
     }
   };
 
@@ -2409,23 +2327,6 @@ const Settings = () => {
                     {activeAIAnalysisTab === "manage-extensions" && <ManageExtensions />}
                     {activeAIAnalysisTab === "backend-operations" && <BackendOperations />}
                     {activeAIAnalysisTab === "manual-analysis" && <ManualAnalysis />}
-                  </div>
-                )}
-
-                {/* Outbound Ai Agent Content */}
-                {activeTab === "outbound-ai-agent" && shouldRenderTab("outbound-ai-agent", activeOutboundAIAgentTab) && (
-                  <div>
-                    {activeOutboundAIAgentTab === "trunk-profiles" && <OutboundTrunkProfiles />}
-                    {activeOutboundAIAgentTab === "bot-profiles" && <AIMLProfiles />}
-                  </div>
-                )}
-
-                {/* Inbound Ai Agent Content */}
-                {activeTab === "inbound-ai-agent" && shouldRenderTab("inbound-ai-agent", activeInboundAIAgentTab) && (
-                  <div>
-                    {activeInboundAIAgentTab === "trunk-profiles" && <InboundTrunkProfiles />}
-                    {activeInboundAIAgentTab === "bot-profiles" && <InboundBotProfiles />}
-                    {activeInboundAIAgentTab === "faqs" && <InboundFAQs />}
                   </div>
                 )}
                   </div>

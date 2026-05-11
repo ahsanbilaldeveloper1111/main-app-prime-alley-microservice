@@ -962,6 +962,8 @@ export default function BillingHistoryPage({
   /** Start true so the first paint shows loading, not an empty state, before `useEffect` fetches. */
   const [loadingInvoices, setLoadingInvoices] = useState(true);
   const requestIdRef = useRef(0);
+  const viewInvoiceRequestRef = useRef(0);
+  const payNowRequestRef = useRef(0);
   const [showViewInvoiceModal, setShowViewInvoiceModal] = useState(false);
   const [selectedInvoiceForView, setSelectedInvoiceForView] = useState<InvoiceViewData | null>(null);
   const [isInvoiceLoading, setIsInvoiceLoading] = useState(false);
@@ -992,23 +994,30 @@ export default function BillingHistoryPage({
   }, [companyOptions, selectedCompanyId]);
 
   const closeViewInvoiceModal = useCallback(() => {
+    viewInvoiceRequestRef.current += 1;
     setShowViewInvoiceModal(false);
     setSelectedInvoiceForView(null);
     setIsInvoiceLoading(false);
   }, []);
 
   const handleViewInvoice = useCallback(async (invoiceId: number) => {
+    viewInvoiceRequestRef.current += 1;
+    const req = viewInvoiceRequestRef.current;
     setShowViewInvoiceModal(true);
     setSelectedInvoiceForView(null);
     setIsInvoiceLoading(true);
     try {
       const invoiceDetails = await getInvoice(invoiceId);
+      if (req !== viewInvoiceRequestRef.current) return;
       setSelectedInvoiceForView(toInvoiceViewData(invoiceDetails));
     } catch (err) {
       console.error("BillingHistoryPage view invoice error:", err);
+      if (req !== viewInvoiceRequestRef.current) return;
       closeViewInvoiceModal();
     } finally {
-      setIsInvoiceLoading(false);
+      if (req === viewInvoiceRequestRef.current) {
+        setIsInvoiceLoading(false);
+      }
     }
   }, [closeViewInvoiceModal]);
 
@@ -1083,8 +1092,11 @@ export default function BillingHistoryPage({
         toast.error("You are not authorized to pay invoices");
         return;
       }
+      payNowRequestRef.current += 1;
+      const req = payNowRequestRef.current;
       try {
         const invoiceDetails = await getInvoice(invoiceId);
+        if (req !== payNowRequestRef.current) return;
         openInvoicePaymentModal(invoiceDetails);
       } catch (err) {
         console.error("BillingHistoryPage pay now error:", err);

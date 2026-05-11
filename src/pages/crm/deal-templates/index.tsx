@@ -13,6 +13,7 @@ import {
   UpdateDealTemplatePayload,
   IndustryData,
 } from "@utils/crm";
+import { normalizeSearchQuery } from "@utils/Helper";
 import { reportApiErrorFromCatch } from "@utils/sentryLogger";
 import GenericTable, {
   TableColumn,
@@ -41,7 +42,7 @@ import {
 } from "lucide-react";
 import { toast } from "react-toastify";
 import "@assets/scss/common.scss";
-import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
+import DeleteConfirmationModal from "@components/page-partials/DeleteConfirmationModal";
 import { CrmDescriptionDetailsBlock, CrmTruncatedDescriptionCell } from "@components/crm/crmTruncatedDescriptionCell";
 import {
   CRM_DIALOG_FOOTER_ACTIONS_ROW_STYLE,
@@ -51,6 +52,7 @@ import {
 import { useCrmSettingsTableState } from "@hooks/useCrmSettingsTableState";
 import { useDebouncedSearchInput } from "@hooks/useDebouncedSearchInput";
 import { HEADER_CONSTANTS } from "@constants/headerConstants";
+import type { CrmPageDisplayProps } from "@pages/crm/crmPageDisplayProps";
 
 const { PERMISSIONS } = HEADER_CONSTANTS;
 
@@ -131,7 +133,7 @@ function consumeHandledApiError(error: unknown, source: string): void {
   reportApiErrorFromCatch(error, source, { scope: "DealTemplates" });
 }
 
-const DealTemplatesPage = () => {
+const DealTemplatesPage: React.FC<CrmPageDisplayProps> = ({ hideBreadcrumb } = {}) => {
   const { data: session } = useSession();
   // State
   const [templates, setTemplates] = useState<DealTemplateData[]>([]);
@@ -154,7 +156,7 @@ const DealTemplatesPage = () => {
     queryValue: search,
     handleInputChange: handleSearchChange,
     submitQuery: submitSearch,
-  } = useDebouncedSearchInput();
+  } = useDebouncedSearchInput({ normalize: normalizeSearchQuery });
   const [showModal, setShowModal] = useState(false);
   const [editingTemplate, setEditingTemplate] =
     useState<DealTemplateData | null>(null);
@@ -181,9 +183,8 @@ const DealTemplatesPage = () => {
         page: pagination.currentPage,
         per_page: pagination.rowsPerPage,
       };
-      const trimmed = search.trim();
-      if (trimmed) {
-        params.search = trimmed;
+      if (search) {
+        params.search = search;
       }
       const response = await getDealTemplates(params);
       setTemplates(response.data || []);
@@ -542,11 +543,13 @@ const DealTemplatesPage = () => {
 
   return (
     <React.Fragment>
-      <BreadcrumbItem
-        mainTitle="CRM"
-        mainLink="/crm/dashboard"
-        subTitle="Deal Templates"
-      />
+      {!hideBreadcrumb && (
+        <BreadcrumbItem
+          mainTitle="CRM"
+          mainLink="/crm/dashboard"
+          subTitle="Deal Templates"
+        />
+      )}
       <div>
         <GenericTable<DealTemplateData>
           data={templates}

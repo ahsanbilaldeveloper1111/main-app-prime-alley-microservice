@@ -3,7 +3,6 @@ import React, {
   useCallback,
   useEffect,
   useMemo,
-  useRef,
   useState,
 } from "react";
 import Layout from "@layout/index";
@@ -24,14 +23,14 @@ import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
 import "@assets/scss/datatable-style.scss";
 
-import { GetPayments } from "@utils/accounting";
+import { useBillingCustomerPaymentsListQuery } from "@page-modules/billing/customer/useBillingCustomerPaymentsListQuery";
 import { useSession } from "next-auth/react";
 import moment from "moment";
-import FormModal from "@pages/partial/FormModal";
+import FormModal from "@components/page-partials/FormModal";
 
 import GenericTable, { TableColumn } from "@components/GenericTable";
 import { GENERIC_TABLE_PAGE_SIZE_OPTIONS } from "@constants/genericTable";
-import GenericSidebar from "@components/GenericSidebar";
+import GenericSidebar, { type SidebarSection } from "@components/GenericSidebar";
 import { ModuleSlug, formatNumber } from "@utils/Helper";
 import GenericFilterSidebar, {
   FilterField,
@@ -83,6 +82,267 @@ function getCompanySelectValue(
   return selectedCompanyId == null ? "" : String(selectedCompanyId);
 }
 
+type PaymentHistoryFilterTab = "completed" | "cancelled" | "failed";
+
+type PaymentHistoryFilterTabsCardProps = Readonly<{
+  activeStatusTab: string | null;
+  onSelectTab: (tab: PaymentHistoryFilterTab | null) => void;
+}>;
+
+function PaymentHistoryFilterTabsCard({
+  activeStatusTab,
+  onSelectTab,
+}: PaymentHistoryFilterTabsCardProps) {
+  return (
+    <Card className="filter-bar-card">
+      <Card.Body className="filter-bar-body">
+        <div className="filter-bar-tabs">
+          <Button
+            variant={
+              activeStatusTab === null ? "primary" : "outline-secondary"
+            }
+            className="filter-bar-tab"
+            onClick={() => onSelectTab(null)}
+          >
+            <Receipt size={16} />
+            All
+          </Button>
+          <Button
+            variant={
+              activeStatusTab === "completed"
+                ? "primary"
+                : "outline-secondary"
+            }
+            className="filter-bar-tab"
+            onClick={() => onSelectTab("completed")}
+          >
+            <CheckCircle size={16} />
+            Completed
+          </Button>
+          <Button
+            variant={
+              activeStatusTab === "cancelled"
+                ? "primary"
+                : "outline-secondary"
+            }
+            className="filter-bar-tab"
+            onClick={() => onSelectTab("cancelled")}
+          >
+            <Ban size={16} />
+            Cancelled
+          </Button>
+          <Button
+            variant={
+              activeStatusTab === "failed" ? "primary" : "outline-secondary"
+            }
+            className="filter-bar-tab"
+            onClick={() => onSelectTab("failed")}
+          >
+            <AlertCircle size={16} />
+            Failed
+          </Button>
+        </div>
+      </Card.Body>
+    </Card>
+  );
+}
+
+function buildPaymentHistorySidebarSections(
+  payment: PaymentRow | null,
+): SidebarSection[] {
+  return [
+    {
+      id: "payment-info",
+      title: "Payment Information",
+      icon: FileText,
+      fields: [
+        {
+          label: "Payment ID",
+          value: payment ? `#${payment.id}` : "N/A",
+        },
+        {
+          label: "Invoice",
+          value: payment?.invoice?.invoice_number ?? "N/A",
+        },
+        {
+          label: "Amount",
+          value: payment
+            ? `${payment.currency_code || ""} ${formatNumber(payment?.amount)}`
+            : "N/A",
+        },
+        {
+          label: "Payment Method",
+          value: payment?.payment_method
+            ? String(payment.payment_method).toUpperCase()
+            : "N/A",
+        },
+        {
+          label: "Status",
+          value: payment?.status ?? "N/A",
+          type: "badge",
+          badgeVariant: payment
+            ? getStatusBadgeVariant(payment.status || "")
+            : "secondary",
+        },
+        {
+          label: "Date",
+          value: payment?.payment_date ?? null,
+          type: "date",
+          icon: Calendar,
+        },
+      ],
+    },
+    {
+      id: "parties",
+      title: "From / Bill To",
+      icon: FileText,
+      fields: [
+        {
+          label: "From",
+          value:
+            payment?.invoice?.reseller?.name ??
+            payment?.invoice?.company?.reseller?.name ??
+            "N/A",
+        },
+        {
+          label: "Bill To",
+          value: payment?.invoice?.company?.name ?? "N/A",
+        },
+      ],
+    },
+  ];
+}
+
+type PaymentHistoryReceiptModalBodyProps = Readonly<{
+  payment: PaymentRow | null | undefined;
+}>;
+
+function PaymentHistoryReceiptModalBody({
+  payment,
+}: PaymentHistoryReceiptModalBodyProps) {
+  return (
+    <>
+      <div className="mb-4 pb-4 border-bottom">
+        <div className="row">
+          <div className="col-md-6">
+            <h6 className="text-muted mb-2">From</h6>
+            <h6 className="mb-1">{payment?.invoice?.reseller?.name}</h6>
+            <p className="text-muted mb-0 small">
+              123 Business Street
+              <br />
+              London, UK SW1A 1AA
+            </p>
+          </div>
+          <div className="col-md-6">
+            <h6 className="text-muted mb-2">Bill To</h6>
+            <h6 className="mb-1">{payment?.invoice?.company?.name}</h6>
+            <p className="text-muted mb-0 small">
+              123 Business Street
+              <br />
+              London, SW1A 1AA
+            </p>
+          </div>
+        </div>
+      </div>
+      <div className="mb-4 pb-4 border-bottom">
+        <div className="row">
+          <div className="col-md-3 col-6">
+            <p className="text-muted mb-1 small">Invoice Date</p>
+            <p className="fw-semibold mb-0">
+              {payment?.invoice?.invoice_date
+                ? moment(payment.invoice.invoice_date).format("DD-MMM-YYYY")
+                : "—"}
+            </p>
+          </div>
+          <div className="col-md-3 col-6">
+            <p className="text-muted mb-1 small">Due Date</p>
+            <p className="fw-semibold mb-0">
+              {payment?.invoice?.due_date
+                ? moment(payment.invoice.due_date).format("DD-MMM-YYYY")
+                : "—"}
+            </p>
+          </div>
+          <div className="col-md-3 col-6">
+            <p className="text-muted mb-1 small">Payment Method</p>
+            <p className="fw-semibold mb-0">{payment?.payment_method}</p>
+          </div>
+          <div className="col-md-3 col-6">
+            <p className="text-muted mb-1 small">Invoice ID</p>
+            <p className="fw-semibold mb-0">
+              {payment?.invoice?.invoice_number}
+            </p>
+          </div>
+        </div>
+      </div>
+      <div className="mb-4">
+        <h6 className="text-muted mb-3">Items</h6>
+        <div className="table-responsive">
+          <table className="table">
+            <thead className="bg-light">
+              <tr>
+                <th>Description</th>
+                <th className="text-center">Quantity</th>
+                <th className="text-end">Unit Price</th>
+                <th className="text-end">Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              {payment?.invoice?.items?.map((item) => (
+                <tr key={item.id}>
+                  <td>{item?.product?.name}</td>
+                  <td className="text-center">{item.quantity}</td>
+                  <td className="text-end fw-semibold">
+                    {payment?.currency_code} {formatNumber(item.unit_price)}
+                  </td>
+                  <td className="text-end fw-semibold">
+                    {payment?.currency_code} {formatNumber(item.line_total)}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div className="bg-light rounded p-3">
+        <div className="mb-2 row">
+          <div className="col-6">
+            <p className="mb-0 text-muted">Subtotal:</p>
+          </div>
+          <div className="text-end col-6">
+            <p className="mb-0 fw-semibold">
+              {payment?.currency_code}{" "}
+              {formatNumber(payment?.invoice?.subtotal)}
+            </p>
+          </div>
+        </div>
+        <div className="mb-2 row">
+          <div className="col-6">
+            <p className="mb-0 text-muted">Tax:</p>
+          </div>
+          <div className="text-end col-6">
+            <p className="mb-0 fw-semibold">
+              {payment?.currency_code}{" "}
+              {formatNumber(payment?.invoice?.tax_amount)}
+            </p>
+          </div>
+        </div>
+        <hr />
+        <div className="row">
+          <div className="col-6">
+            <p className="mb-0 fw-bold">Total:</p>
+          </div>
+          <div className="text-end col-6">
+            <p className="mb-0 fw-bold text-primary fs-5">
+              {payment?.currency_code}{" "}
+              {formatNumber(payment?.invoice?.total_amount)}
+            </p>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
+
 const BillingHistory = () => {
   useSession();
 
@@ -116,9 +376,6 @@ const BillingHistory = () => {
   const [activeStatusTab, setActiveStatusTab] = useState<string | null>(null);
   const [showFilterTabs, setShowFilterTabs] = useState(false);
   const [showFiltersSidebar, setShowFiltersSidebar] = useState(false);
-  const [paymentList, setPaymentList] = useState<PaymentRow[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [totalRecords, setTotalRecords] = useState(0);
   const [pagination, setPagination] = useState({
     currentPage: 1,
     rowsPerPage: 15,
@@ -131,49 +388,45 @@ const BillingHistory = () => {
     useState<PaymentRow | null>(null);
   const [showViewPaymentModal, setShowViewPaymentModal] = useState(false);
 
-  const requestIdRef = useRef(0);
   const memoizedFilters = useMemo(() => currentFilters, [currentFilters]);
 
-  const loadPayments = useCallback(async () => {
-    requestIdRef.current += 1;
-    const currentRequestId = requestIdRef.current;
-    setLoading(true);
-    try {
-      const response = (await GetPayments({
-        page: pagination.currentPage,
-        per_page: pagination.rowsPerPage,
-        search: memoizedFilters.search || "",
-        status: memoizedFilters.status,
-        // date_from: memoizedFilters.payment_date_from,
-        // date_to: memoizedFilters.payment_date_to,
-        ...(selectedCompanyId ? { crm_company_id: selectedCompanyId } : {}),
-      })) as any;
-      if (currentRequestId !== requestIdRef.current) return;
-      const list = response?.dataList ?? response?.data ?? [];
-      const total = response?.meta?.total ?? response?.recordsTotal ?? 0;
-      setPaymentList(list);
-      setTotalRecords(total);
-      setPagination((prev) => ({ ...prev, totalRows: total }));
-    } catch (error) {
-      if (currentRequestId !== requestIdRef.current) return;
-      console.error("Error fetching payments:", error);
-      setPaymentList([]);
-      setTotalRecords(0);
-      setPagination((prev) => ({ ...prev, totalRows: 0 }));
-    } finally {
-      if (requestIdRef.current === currentRequestId) setLoading(false);
-    }
-  }, [
-    pagination.currentPage,
-    pagination.rowsPerPage,
-    memoizedFilters,
+  const paymentsFiltersKey = useMemo(
+    () =>
+      JSON.stringify({
+        search: memoizedFilters.search ?? "",
+        status: memoizedFilters.status ?? "",
+        payment_date_from: memoizedFilters.payment_date_from ?? "",
+        payment_date_to: memoizedFilters.payment_date_to ?? "",
+      }),
+    [
+      memoizedFilters.search,
+      memoizedFilters.status,
+      memoizedFilters.payment_date_from,
+      memoizedFilters.payment_date_to,
+    ],
+  );
+
+  const paymentsQuery = useBillingCustomerPaymentsListQuery({
+    crmKey:
+      selectedCompanyId != null && selectedCompanyId !== ""
+        ? String(selectedCompanyId)
+        : "all",
+    page: pagination.currentPage,
+    perPage: pagination.rowsPerPage,
+    filtersKey: paymentsFiltersKey,
     refreshKey,
-    selectedCompanyId,
-  ]);
+    search: memoizedFilters.search || "",
+    status: memoizedFilters.status,
+  });
+
+  const paymentList = (paymentsQuery.data?.list ?? []) as PaymentRow[];
+  const loading = paymentsQuery.isFetching;
+  const totalRecords = paymentsQuery.data?.total ?? 0;
 
   useEffect(() => {
-    loadPayments();
-  }, [loadPayments]);
+    const total = paymentsQuery.data?.total ?? 0;
+    setPagination((prev) => ({ ...prev, totalRows: total }));
+  }, [paymentsQuery.data?.total]);
 
   const openPaymentSidebar = useCallback((row: PaymentRow) => {
     setSelectedPaymentSidebar(row);
@@ -191,6 +444,34 @@ const BillingHistory = () => {
   const handleCloseFiltersSidebar = useCallback(() => {
     setShowFiltersSidebar(false);
   }, []);
+
+  const handlePaymentHistoryFilterTab = useCallback(
+    (tab: PaymentHistoryFilterTab | null) => {
+      setActiveStatusTab(tab);
+      setCurrentFilters(tab === null ? {} : { status: tab });
+      setRefreshKey((prev) => prev + 1);
+    },
+    [],
+  );
+
+  const paymentSidebarSections = useMemo(
+    () => buildPaymentHistorySidebarSections(selectedPaymentSidebar),
+    [selectedPaymentSidebar],
+  );
+
+  const invoiceNumberForSidebar =
+    selectedPaymentSidebar?.invoice?.invoice_number;
+  const paymentDateForSidebar = selectedPaymentSidebar?.payment_date;
+
+  const paymentSidebarTitle = selectedPaymentSidebar
+    ? `Payment #${selectedPaymentSidebar.id}`
+    : "Payment Details";
+  const paymentSidebarSubtitle = invoiceNumberForSidebar
+    ? `Invoice #${invoiceNumberForSidebar}`
+    : "";
+  const paymentSidebarMetadata = paymentDateForSidebar
+    ? moment(paymentDateForSidebar).format("DD-MMM-YYYY")
+    : undefined;
 
   const tableColumns: TableColumn<PaymentRow>[] = useMemo(
     () => [
@@ -325,7 +606,7 @@ const BillingHistory = () => {
         <div className="d-flex flex-wrap gap-2 align-items-center">
           <Form.Select
             size="sm"
-            style={{ width: "220px" }}
+            className="bc-company-select-w"
             value={getCompanySelectValue(selectedCompanyId)}
             onChange={(e) =>
               setSelectedCompanyId(
@@ -359,83 +640,12 @@ const BillingHistory = () => {
 
       {/* Filter Tabs & Search */}
 
-      {showFilterTabs && (
-        <Card className="filter-bar-card">
-          <Card.Body className="filter-bar-body">
-            <div className="filter-bar-tabs">
-              <Button
-                variant={
-                  activeStatusTab === null ? "primary" : "outline-secondary"
-                }
-                className="filter-bar-tab"
-                onClick={() => {
-                  setActiveStatusTab(null);
-                  setCurrentFilters({});
-                  setRefreshKey((prev) => prev + 1);
-                }}
-              >
-                <Receipt size={16} />
-                All
-              </Button>
-              <Button
-                variant={
-                  activeStatusTab === "completed"
-                    ? "primary"
-                    : "outline-secondary"
-                }
-                className="filter-bar-tab"
-                onClick={() => {
-                  setActiveStatusTab("completed");
-                  setCurrentFilters({ status: "completed" });
-                  setRefreshKey((prev) => prev + 1);
-                }}
-              >
-                <CheckCircle size={16} />
-                Completed
-              </Button>
-              <Button
-                variant={
-                  activeStatusTab === "cancelled"
-                    ? "primary"
-                    : "outline-secondary"
-                }
-                className="filter-bar-tab"
-                onClick={() => {
-                  setActiveStatusTab("cancelled");
-                  setCurrentFilters({ status: "cancelled" });
-                  setRefreshKey((prev) => prev + 1);
-                }}
-              >
-                <Ban size={16} />
-                Cancelled
-              </Button>
-              <Button
-                variant={
-                  activeStatusTab === "failed" ? "primary" : "outline-secondary"
-                }
-                className="filter-bar-tab"
-                onClick={() => {
-                  setActiveStatusTab("failed");
-                  setCurrentFilters({ status: "failed" });
-                  setRefreshKey((prev) => prev + 1);
-                }}
-              >
-                <AlertCircle size={16} />
-                Failed
-              </Button>
-            </div>
-            {/* <div className="filter-bar-actions">
-            <Form.Control
-              type="search"
-              placeholder="Search Invoices..."
-              onChange={(e) =>
-                setCurrentFilters({ ...currentFilters, search: e.target.value })
-              }
-            />
-          </div> */}
-          </Card.Body>
-        </Card>
-      )}
+      {showFilterTabs ? (
+        <PaymentHistoryFilterTabsCard
+          activeStatusTab={activeStatusTab}
+          onSelectTab={handlePaymentHistoryFilterTab}
+        />
+      ) : null}
 
       <GenericTable<PaymentRow>
         data={paymentList}
@@ -500,85 +710,11 @@ const BillingHistory = () => {
         isOpen={showPaymentSidebar}
         onClose={closePaymentSidebar}
         moduleSlug={ModuleSlug.BILLING}
-        title={
-          selectedPaymentSidebar
-            ? `Payment #${selectedPaymentSidebar.id}`
-            : "Payment Details"
-        }
-        subtitle={
-          selectedPaymentSidebar?.invoice?.invoice_number
-            ? `Invoice #${selectedPaymentSidebar.invoice.invoice_number}`
-            : ""
-        }
-        metadata={
-          selectedPaymentSidebar?.payment_date
-            ? moment(selectedPaymentSidebar.payment_date).format("DD-MMM-YYYY")
-            : undefined
-        }
+        title={paymentSidebarTitle}
+        subtitle={paymentSidebarSubtitle}
+        metadata={paymentSidebarMetadata}
         width="400px"
-        sections={[
-          {
-            id: "payment-info",
-            title: "Payment Information",
-            icon: FileText,
-            fields: [
-              {
-                label: "Payment ID",
-                value: selectedPaymentSidebar
-                  ? `#${selectedPaymentSidebar.id}`
-                  : "N/A",
-              },
-              {
-                label: "Invoice",
-                value: selectedPaymentSidebar?.invoice?.invoice_number ?? "N/A",
-              },
-              {
-                label: "Amount",
-                value: selectedPaymentSidebar
-                  ? `${selectedPaymentSidebar.currency_code || ""} ${formatNumber(selectedPaymentSidebar?.amount)}`
-                  : "N/A",
-              },
-              {
-                label: "Payment Method",
-                value: selectedPaymentSidebar?.payment_method
-                  ? String(selectedPaymentSidebar.payment_method).toUpperCase()
-                  : "N/A",
-              },
-              {
-                label: "Status",
-                value: selectedPaymentSidebar?.status ?? "N/A",
-                type: "badge",
-                badgeVariant: selectedPaymentSidebar
-                  ? getStatusBadgeVariant(selectedPaymentSidebar.status || "")
-                  : "secondary",
-              },
-              {
-                label: "Date",
-                value: selectedPaymentSidebar?.payment_date ?? null,
-                type: "date",
-                icon: Calendar,
-              },
-            ],
-          },
-          {
-            id: "parties",
-            title: "From / Bill To",
-            icon: FileText,
-            fields: [
-              {
-                label: "From",
-                value:
-                  selectedPaymentSidebar?.invoice?.reseller?.name ??
-                  selectedPaymentSidebar?.invoice?.company?.reseller?.name ??
-                  "N/A",
-              },
-              {
-                label: "Bill To",
-                value: selectedPaymentSidebar?.invoice?.company?.name ?? "N/A",
-              },
-            ],
-          },
-        ]}
+        sections={paymentSidebarSections}
         actions={[
           {
             label: "View Full Receipt",
@@ -606,138 +742,7 @@ const BillingHistory = () => {
         cancelButtonText="Cancel"
         onCancel={() => setShowViewPaymentModal(false)}
         formHtml={
-          <>
-            <div className="mb-4 pb-4 border-bottom">
-              <div className="row">
-                <div className="col-md-6">
-                  <h6 className="text-muted mb-2">From</h6>
-                  <h6 className="mb-1">
-                    {selectedPaymentView?.invoice?.reseller?.name}
-                  </h6>
-                  {/* <img alt="logo" className="img-fluid" src={CompanyLogo2.src} /> */}
-                  <p className="text-muted mb-0 small">
-                    123 Business Street
-                    <br />
-                    London, UK SW1A 1AA
-                  </p>
-                </div>
-                <div className="col-md-6">
-                  <h6 className="text-muted mb-2">Bill To</h6>
-                  <h6 className="mb-1">
-                    {selectedPaymentView?.invoice?.company?.name}
-                  </h6>
-                  <p className="text-muted mb-0 small">
-                    123 Business Street
-                    <br />
-                    London, SW1A 1AA
-                  </p>
-                </div>
-              </div>
-            </div>
-            <div className="mb-4 pb-4 border-bottom">
-              <div className="row">
-                <div className="col-md-3 col-6">
-                  <p className="text-muted mb-1 small">Invoice Date</p>
-                  <p className="fw-semibold mb-0">
-                    {selectedPaymentView?.invoice?.invoice_date
-                      ? moment(selectedPaymentView.invoice.invoice_date).format(
-                          "DD-MMM-YYYY",
-                        )
-                      : "—"}
-                  </p>
-                </div>
-                <div className="col-md-3 col-6">
-                  <p className="text-muted mb-1 small">Due Date</p>
-                  <p className="fw-semibold mb-0">
-                    {selectedPaymentView?.invoice?.due_date
-                      ? moment(selectedPaymentView.invoice.due_date).format(
-                          "DD-MMM-YYYY",
-                        )
-                      : "—"}
-                  </p>
-                </div>
-                <div className="col-md-3 col-6">
-                  <p className="text-muted mb-1 small">Payment Method</p>
-                  <p className="fw-semibold mb-0">
-                    {selectedPaymentView?.payment_method}
-                  </p>
-                </div>
-                <div className="col-md-3 col-6">
-                  <p className="text-muted mb-1 small">Invoice ID</p>
-                  <p className="fw-semibold mb-0">
-                    {selectedPaymentView?.invoice?.invoice_number}
-                  </p>
-                </div>
-              </div>
-            </div>
-            <div className="mb-4">
-              <h6 className="text-muted mb-3">Items</h6>
-              <div className="table-responsive">
-                <table className="table">
-                  <thead className="bg-light">
-                    <tr>
-                      <th>Description</th>
-                      <th className="text-center">Quantity</th>
-                      <th className="text-end">Unit Price</th>
-                      <th className="text-end">Total</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {selectedPaymentView?.invoice?.items?.map((item) => (
-                      <tr key={item.id}>
-                        <td>{item?.product?.name}</td>
-                        <td className="text-center">{item.quantity}</td>
-                        <td className="text-end fw-semibold">
-                          {selectedPaymentView?.currency_code}{" "}
-                          {formatNumber(item.unit_price)}
-                        </td>
-                        <td className="text-end fw-semibold">
-                          {selectedPaymentView?.currency_code}{" "}
-                          {formatNumber(item.line_total)}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-            <div className="bg-light rounded p-3">
-              <div className="mb-2 row">
-                <div className="col-6">
-                  <p className="mb-0 text-muted">Subtotal:</p>
-                </div>
-                <div className="text-end col-6">
-                  <p className="mb-0 fw-semibold">
-                    {selectedPaymentView?.currency_code}{" "}
-                    {formatNumber(selectedPaymentView?.invoice?.subtotal)}
-                  </p>
-                </div>
-              </div>
-              <div className="mb-2 row">
-                <div className="col-6">
-                  <p className="mb-0 text-muted">Tax:</p>
-                </div>
-                <div className="text-end col-6">
-                  <p className="mb-0 fw-semibold">
-                    {selectedPaymentView?.currency_code}{" "}
-                    {formatNumber(selectedPaymentView?.invoice?.tax_amount)}
-                  </p>
-                </div>
-              </div>
-              <hr />
-              <div className="row">
-                <div className="col-6">
-                  <p className="mb-0 fw-bold">Total:</p>
-                </div>
-                <div className="text-end col-6">
-                  <p className="mb-0 fw-bold text-primary fs-5">
-                    {selectedPaymentView?.currency_code}{" "}
-                    {formatNumber(selectedPaymentView?.invoice?.total_amount)}
-                  </p>
-                </div>
-              </div>
-            </div>
-          </>
+          <PaymentHistoryReceiptModalBody payment={selectedPaymentView} />
         }
         ShowSubmitButton={false}
       />

@@ -1417,16 +1417,6 @@ const Header = ({ themeMode }: HeaderProps) => {
         <div className="tab-pane" id="pc-tab-16" role="tabpanel" aria-labelledby="pc-tab-link-16" tabIndex={1}>
             <div className="pc-submenu-title">{MENU_LABELS.NETOPS}</div>
             <ul className="pc-navbar">
-                
-                {session?.user?.permissions?.includes(PERMISSIONS.VIEW_NETOPS_DASHBOARD) && (
-                <li className="pc-item">
-                    <Link className="pc-link" href={`${BASE_URL}/pulse/dashboard`}>
-                        <span className="pc-micon"><i className={ICONS.GAUGE}></i></span>
-                        <span className="pc-mtext">Dashboard</span>
-                    </Link>
-                </li>
-                )}
-
                 {session?.user?.permissions?.includes(PERMISSIONS.VIEW_NETOPS_DEVICES) && (
 
                 <li className="pc-item">
@@ -1443,15 +1433,6 @@ const Header = ({ themeMode }: HeaderProps) => {
                     <Link className="pc-link" href={`${BASE_URL}/pulse/services`}>
                         <span className="pc-micon"><i className="ph-duotone ph-gear"></i></span>
                         <span className="pc-mtext">Services</span>
-                    </Link>
-                </li>
-                )}
-
-                {session?.user?.permissions?.includes(PERMISSIONS.VIEW_ALERTS_NETOPS) && (
-                <li className="pc-item">
-                    <Link className="pc-link" href={`${BASE_URL}/pulse/alerts`}>
-                        <span className="pc-micon"><i className="ph-duotone ph-warning-circle"></i></span>
-                        <span className="pc-mtext">Alerts</span>
                     </Link>
                 </li>
                 )}

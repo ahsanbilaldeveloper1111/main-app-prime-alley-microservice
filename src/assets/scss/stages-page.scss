@@ -1,0 +1,98 @@
+@import "./crm-page-shared.scss";
+
+// CRM Stages page — static layout only. Dynamic values (e.g. stage colors) stay inline in TSX.
+
+.stages-kpi-card {
+  transition: all 0.2s ease;
+  border: 1px solid #e9ecef;
+
+  &--static {
+    cursor: default;
+  }
+
+  &--clickable {
+    cursor: pointer;
+
+    &:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    }
+  }
+}
+
+.stages-form-input--color {
+  padding: 6px;
+  cursor: pointer;
+}
+
+.stages-table-name-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+.stages-toolbar-btn {
+  height: 33px;
+  font-size: 0.875rem;
+  padding: 0 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-family: inherit;
+
+  &--analytics {
+    border: 1px solid #dee2e6;
+    color: #212529;
+    background: #f8f9fa;
+
+    &.is-active {
+      color: #fff;
+      background-color: #0d6efd;
+      border-color: #0d6efd;
+    }
+  }
+
+  &--add {
+    background-color: #4f46e5;
+    border: none;
+    color: #ffffff;
+  }
+}
+
+.stages-create-intro {
+  color: #64748b;
+  font-size: 14px;
+  margin-top: 0;
+  margin-bottom: 20px;
+}
+
+.stages-view-tile {
+  background: #f8f9fa;
+  padding: 16px;
+  border-radius: 10px;
+}
+
+.stages-view-tile-value-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.stages-view-color-swatch {
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
+}
+
+.stages-view-footer {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  align-items: center;
+  width: 100%;
+  justify-content: flex-end;
+  padding-top: 20px;
+  border-top: 1px solid #e5e7eb;
+}

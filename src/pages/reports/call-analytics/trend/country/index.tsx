@@ -23,7 +23,6 @@ import imgStatus4 from '@assets/images/widget/img-status-4.svg'
 import '@assets/scss/report-style.scss';
 import '@assets/scss/tabs.scss';
 import { motion, AnimatePresence } from "framer-motion";
-import { easeInOut, easeOut, easeIn } from "framer-motion";
 import { ModuleSlug, getAutoTimezone } from '@utils/Helper';
 import moment from 'moment';
 import { HEADER_CONSTANTS } from '@constants/headerConstants';
@@ -31,6 +30,8 @@ import {
   applyCallAnalyticsFilters,
   canViewCallLogsFromSession,
 } from '@utils/callPermissionUtils';
+import { parseCallAnalyticsChartRows } from "@page-modules/reports/call-analytics/callAnalyticsChartSeries";
+import { CALL_ANALYTICS_TAB_VARIANTS } from "@page-modules/reports/call-analytics/callAnalyticsMotion";
 
 const { PERMISSIONS } = HEADER_CONSTANTS;
 
@@ -44,26 +45,6 @@ interface Summary {
   avg_ring_time:number;
 }
 
-interface ChartData {
-  country: string[];
-
-  answered_calls: number[];
-  unanswered_calls: number[];
-  total_calls: number[];
-
-  max_ring_time: number[];
-  avg_ring_time: number[];
-  min_ring_time: number[];
-
-  min_cost: number[];
-  avg_cost: number[];
-  max_cost: number[];
-
-  min_duration: number[];
-  avg_duration: number[];
-  max_duration: number[];
-}
-
 import dynamic from 'next/dynamic';
 import { ApexOptions } from 'apexcharts';
 const ReactApexChart = dynamic(() => import('react-apexcharts'), { ssr: false });
@@ -72,34 +53,6 @@ const CallTrendCountry = () => {
     const { data:session, status } = useSession();
     const [loading, setLoading] = useState(false);
     const [activeTab, setActiveTab] = useState('calls_chart');
-    
-
-    // Animation variants for tab transitions
-    const tabVariants = {
-        hidden: { 
-            opacity: 0, 
-            x: 20,
-            scale: 0.95
-        },
-        visible: { 
-            opacity: 1, 
-            x: 0,
-            scale: 1,
-            transition: {
-                duration: 0.3,
-                ease: easeOut
-            }
-        },
-        exit: { 
-            opacity: 0, 
-            x: -20,
-            scale: 0.95,
-            transition: {
-                duration: 0.2,
-                ease: easeIn
-            }
-        }
-    };
 
     const columns: Column[] = [
         { key: 'Country', name: 'Country', selector: (row: any) => row.Country, sortable: true },
@@ -298,109 +251,13 @@ const CallTrendCountry = () => {
             const response = await ListCallLogs({ page: 1, perPage: 15, search: "", filters: currentFilters,reportType: 'chartCountry', 
                 moduleSlug: ModuleSlug.CALL_REPORTS }, 'call-logs/stats/country/chart');
            
-            const chartData = response?.chart_data;
-            
-            if(chartData && Array.isArray(chartData) && chartData.length > 0) {
-             
-              
-              const newChartData: ChartData = {
-                country: [],
-                answered_calls: [],
-                unanswered_calls: [],
-                total_calls: [],
-                max_ring_time: [],
-                avg_ring_time: [],
-                min_ring_time: [],
-                min_cost: [],
-                avg_cost: [],
-                max_cost: [],
-                min_duration: [],
-                avg_duration: [],
-                max_duration: [],
-              };
-              
-              
-              chartData.forEach((item: any, index: number) => {
-               
-                if (item && item.label) {
-                  newChartData.country.push(item.label);
-                  newChartData.answered_calls.push(Number(item.answered_calls) || 0);
-                  newChartData.unanswered_calls.push(Number(item.unanswered_calls) || 0);
-                  newChartData.total_calls.push(Number(item.total_calls) || 0);
-                  newChartData.max_ring_time.push(Number(item.max_ring_time) || 0);
-                  newChartData.avg_ring_time.push(Number(item.avg_ring_time) || 0);
-                  newChartData.min_ring_time.push(Number(item.min_ring_time) || 0);
-                  newChartData.min_cost.push(Number(item.min_cost) || 0);
-                  newChartData.avg_cost.push(Number(item.avg_cost) || 0);
-                  newChartData.max_cost.push(Number(item.max_cost) || 0);
-                  newChartData.min_duration.push(Number(item.min_duration) || 0);
-                  newChartData.avg_duration.push(Number(item.avg_duration) || 0);
-                  newChartData.max_duration.push(Number(item.max_duration) || 0);
-                } 
-              });
-              
-              
-              console.log("Chart data",newChartData);
-              
-              
-              const dataLength = newChartData.country.length;
-              
-              if (dataLength > 0 && 
-                  newChartData.answered_calls.length === dataLength &&
-                  newChartData.unanswered_calls.length === dataLength &&
-                  newChartData.total_calls.length === dataLength) {
-                
-                // Calls Chart
-                setChartCalls({
-                  series: [
-                    { name: 'Total', data: newChartData.total_calls },
-                    { name: 'Answered', data: newChartData.answered_calls },
-                    { name: 'Unanswered', data: newChartData.unanswered_calls }
-                  ],
-                  categories: newChartData.country
-                });
-
-                // Ring Time Chart
-                setChartRingTime({
-                  series: [
-                    { name: 'Max Ring Time', data: newChartData.max_ring_time },
-                    { name: 'Avg Ring Time', data: newChartData.avg_ring_time },
-                    { name: 'Min Ring Time', data: newChartData.min_ring_time }
-                  ],
-                  categories: newChartData.country
-                });
-
-                // Cost Chart
-                setChartCost({
-                  series: [
-                    { name: 'Max Cost', data: newChartData.max_cost },
-                    { name: 'Avg Cost', data: newChartData.avg_cost },
-                    { name: 'Min Cost', data: newChartData.min_cost }
-                  ],
-                  categories: newChartData.country
-                });
-
-                // Duration Chart
-                setChartDuration({
-                  series: [
-                    { name: 'Max Duration', data: newChartData.max_duration },
-                    { name: 'Avg Duration', data: newChartData.avg_duration },
-                    { name: 'Min Duration', data: newChartData.min_duration }
-                  ],
-                  categories: newChartData.country
-                });
-
-                
-
-              } else {
-                console.error('Chart data arrays have different lengths or no data');
-                setChartCalls(null);
-                setChartRingTime(null);
-                setChartCost(null);
-                setChartDuration(null);
-              }
+            const bundle = parseCallAnalyticsChartRows(response?.chart_data);
+            if (bundle) {
+              setChartCalls(bundle.chartCalls);
+              setChartRingTime(bundle.chartRingTime);
+              setChartCost(bundle.chartCost);
+              setChartDuration(bundle.chartDuration);
             } else {
-              console.log('No chart data available');
               setChartCalls(null);
               setChartRingTime(null);
               setChartCost(null);
@@ -573,7 +430,7 @@ const CallTrendCountry = () => {
                              {activeTab === 'calls_chart' && (
                                <motion.div
                                  key="calls_chart"
-                                 variants={tabVariants}
+                                 variants={CALL_ANALYTICS_TAB_VARIANTS}
                                  initial="hidden"
                                  animate="visible"
                                  exit="exit"
@@ -619,7 +476,7 @@ const CallTrendCountry = () => {
                              {activeTab === 'duration_chart' && (
                                <motion.div
                                  key="duration_chart"
-                                 variants={tabVariants}
+                                 variants={CALL_ANALYTICS_TAB_VARIANTS}
                                  initial="hidden"
                                  animate="visible"
                                  exit="exit"
@@ -664,7 +521,7 @@ const CallTrendCountry = () => {
                              {activeTab === 'ring_chart' && (
                                <motion.div
                                  key="ring_chart"
-                                 variants={tabVariants}
+                                 variants={CALL_ANALYTICS_TAB_VARIANTS}
                                  initial="hidden"
                                  animate="visible"
                                  exit="exit"
@@ -709,7 +566,7 @@ const CallTrendCountry = () => {
                              {activeTab === 'cost_chart' && (
                                <motion.div
                                  key="cost_chart"
-                                 variants={tabVariants}
+                                 variants={CALL_ANALYTICS_TAB_VARIANTS}
                                  initial="hidden"
                                  animate="visible"
                                  exit="exit"

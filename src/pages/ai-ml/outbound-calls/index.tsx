@@ -15,8 +15,8 @@ import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
 import axiosInstance from "@utils/axios";
 import { toast } from "react-toastify";
-import ConfirmModal from "@pages/partial/ConfirmModal";
-import FormModal from "@pages/partial/FormModal";
+import ConfirmModal from "@components/page-partials/ConfirmModal";
+import FormModal from "@components/page-partials/FormModal";
 
 interface Trunk {
       sip_trunk_id: string;
@@ -38,7 +38,7 @@ const normalizeTrunkList = (items: Trunk[]) =>
       }));
 
 const DEFAULT_VBOT_CONTEXT =
-  'You are an AI assistant representing RingEdge Limited. Start the call politely and explain our AI voicebot services.';
+  'You are an AI assistant representing RingEdge Limited. Start the call politely and explain our AI calling services.';
 
 const METADATA_REGEX = /metadata:"((?:\\.|[^"\\])*)"/;
 

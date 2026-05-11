@@ -1,0 +1,46 @@
+@import "./crm-page-shared.scss";
+
+// CRM Industries (product groups) page — static layout only.
+
+.industries-form-hint-text {
+  font-size: 0.813rem;
+}
+
+.industries-crm-dialog-footer--nowrap {
+  flex-wrap: nowrap;
+}
+
+.industries-crm-btn-primary--min148 {
+  min-width: 148px;
+}
+
+.industries-crm-btn-primary--min170 {
+  min-width: 170px;
+}
+
+.industries-modal-footer-hint-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  gap: 0.75rem;
+  flex-wrap: nowrap;
+}
+
+.industries-product-table-wrap {
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.industries-product-table {
+  th,
+  td {
+    font-size: 0.875rem;
+    padding: 12px;
+  }
+
+  th.industries-product-table-actions-col,
+  td.industries-product-table-actions-col {
+    width: 120px;
+  }
+}

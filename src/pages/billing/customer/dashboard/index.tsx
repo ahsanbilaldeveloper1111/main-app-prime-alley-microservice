@@ -23,6 +23,14 @@ import {
   Legend,
 } from "recharts";
 import { formatNumber } from "@utils/Helper";
+import { toast } from "react-toastify";
+import { getErrorMessage } from "@utils/errors";
+import { useEnsureCustomerForCrmCompany } from "@hooks/billing/useEnsureCustomerForCrmCompany";
+import { useMinifiedCompaniesForSelect } from "@hooks/billing/useMinifiedCompaniesForSelect";
+import { BillingCustomerCompanySelect } from "@components/billings/customer/BillingCustomerCompanySelect";
+import { billingCustomerRoutes } from "@utils/billingCustomerRoutes";
+import type { SpendingRow } from "@page-modules/billing/customer/billingCustomerDashboardModel";
+import { useBillingCustomerDashboardBundleQuery } from "@page-modules/billing/customer/useBillingCustomerDashboardBundleQuery";
 
 const CURRENCY_SYMBOL = "";
 const formatWithOneDecimal = (
@@ -34,28 +42,6 @@ const formatWithOneDecimal = (
   });
 const formatInteger = (value: number | string | undefined | null): string =>
   (Number(value) || 0).toLocaleString("en-US", { maximumFractionDigits: 0 });
-
-import {
-  GetDashboardCounters,
-  GetProfitLossData,
-  GetTopProducts,
-  GetRecentActivity,
-  GetAnalyticsByMonth,
-  GetCompanyDetails,
-} from "@utils/accounting";
-import { useEnsureCustomerForCrmCompany } from "@hooks/billing/useEnsureCustomerForCrmCompany";
-import { useMinifiedCompaniesForSelect } from "@hooks/billing/useMinifiedCompaniesForSelect";
-import { BillingCustomerCompanySelect } from "@components/billings/customer/BillingCustomerCompanySelect";
-import { billingCustomerRoutes } from "@utils/billingCustomerRoutes";
-
-type SpendingRow = {
-  month: string;
-  month_name?: string;
-  spent: number;
-  total_amount: number;
-  paid_amount: number;
-  outstanding_amount: number;
-};
 
 type SpendingChartTooltipProps = Readonly<{
   active?: boolean;
@@ -163,55 +149,59 @@ function DashboardSpendingChart({
   );
 }
 
-function formatChartDate(date: Date): string {
-  const day = String(date.getDate()).padStart(2, "0");
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const year = date.getFullYear();
-  return `${day}-${month}-${year}`;
-}
+type SubscriptionVisualStyle = {
+  badgeBg: string;
+  bgRgb: string;
+  iconColor: string;
+};
 
-function getDateRangeForPeriod(period: string): {
-  start_date: string;
-  end_date: string;
-} {
-  const today = new Date();
-  const endDate = new Date(today);
-  let startDate = new Date(today);
+const SUBSCRIPTION_STYLE_DEFAULT: SubscriptionVisualStyle = {
+  badgeBg: "primary",
+  bgRgb: "59, 130, 246",
+  iconColor: "#3b82f6",
+};
 
-  switch (period) {
-    case "Last 3 months":
-      startDate.setMonth(today.getMonth() - 3);
-      break;
-    case "Last 6 months":
-      startDate.setMonth(today.getMonth() - 6);
-      break;
-    case "This year":
-      startDate = new Date(today.getFullYear(), 0, 1);
-      break;
-    default:
-      startDate.setMonth(today.getMonth() - 3);
-  }
+const SUBSCRIPTION_STYLE_BY_STATUS_KEY: Record<
+  string,
+  SubscriptionVisualStyle
+> = {
+  active: {
+    badgeBg: "success",
+    bgRgb: "34, 197, 94",
+    iconColor: "#22c55e",
+  },
+  trial: {
+    badgeBg: "warning",
+    bgRgb: "251, 191, 36",
+    iconColor: "#fbbf24",
+  },
+  "in progress": {
+    badgeBg: "info",
+    bgRgb: "59, 130, 246",
+    iconColor: "#3b82f6",
+  },
+  suspended: {
+    badgeBg: "secondary",
+    bgRgb: "156, 163, 175",
+    iconColor: "#9ca3af",
+  },
+  inactive: {
+    badgeBg: "secondary",
+    bgRgb: "107, 114, 128",
+    iconColor: "#6b7280",
+  },
+};
 
-  return {
-    start_date: formatChartDate(startDate),
-    end_date: formatChartDate(endDate),
-  };
+function subscriptionStyleForStatus(
+  status: string | null | undefined,
+): SubscriptionVisualStyle {
+  const key = status?.trim().toLowerCase() ?? "";
+  return SUBSCRIPTION_STYLE_BY_STATUS_KEY[key] ?? SUBSCRIPTION_STYLE_DEFAULT;
 }
 
 const CustomerDashboard = () => {
-  const [currency, setCurrency] = useState<string>("");
-  const [topProducts, setTopProducts] = useState<
-    Array<{
-      name: string;
-      total_revenue: string;
-      status: string;
-      subscriptions: string;
-    }>
-  >([]);
-  const [spendingData, setSpendingData] = useState<SpendingRow[]>([]);
   const [selectedPeriod, setSelectedPeriod] =
     useState<string>("Last 3 months");
-  const [summaryCards, setSummaryCards] = useState<StatsCardData[]>([]);
   const { companyOptions } = useMinifiedCompaniesForSelect(
     "billing_dashboard_load_companies_failed",
   );
@@ -219,8 +209,6 @@ const CustomerDashboard = () => {
     string | number
   >("");
   const [customerEnsureRefreshKey, setCustomerEnsureRefreshKey] = useState(0);
-  const [isDashboardLoading, setIsDashboardLoading] =
-    useState<boolean>(true);
 
   const onAccountingCustomerCreated = useCallback(() => {
     setCustomerEnsureRefreshKey((k) => k + 1);
@@ -231,44 +219,64 @@ const CustomerDashboard = () => {
     errorToastId: "billing_dashboard_ensure_customer_failed",
   });
 
-  const loadDashboardCounters = async (params: {
-    crm_company_id?: string | number;
-  } = {}) => {
-    const response = (await GetDashboardCounters(params)) as any;
-    setSummaryCards([
+  const {
+    data: bundle,
+    isPending,
+    isError,
+    error,
+  } = useBillingCustomerDashboardBundleQuery(
+    selectedCompanyId,
+    selectedPeriod,
+    customerEnsureRefreshKey,
+  );
+
+  useEffect(() => {
+    if (!isError || error == null) return;
+    toast.error(`Failed to load dashboard: ${getErrorMessage(error)}`, {
+      toastId: "billing_dashboard_bundle_failed",
+    });
+  }, [isError, error]);
+
+  const currency = bundle?.currency ?? "";
+  const topProducts = bundle?.topProducts ?? [];
+  const spendingData = bundle?.spendingData ?? [];
+
+  const summaryCards = useMemo((): StatsCardData[] => {
+    if (!bundle) return [];
+    const inv = bundle.parsedCounters.invoices;
+    const parsed = bundle.parsedCounters;
+    return [
       {
         title: "Subscriptions",
-        value: formatInteger(response?.products?.total ?? 0),
+        value: formatInteger(parsed.productsTotal),
         icon: Package,
         iconColor: "#3b82f6",
         iconBgColor: "rgba(59, 130, 246, 0.1)",
       },
       {
         title: "Total Invoice Amount",
-        value: `${CURRENCY_SYMBOL} ${formatWithOneDecimal(response?.invoices?.total_amount)}`,
+        value: `${CURRENCY_SYMBOL} ${formatWithOneDecimal(inv.total_amount)}`,
         icon: FileText,
         iconColor: "#3b82f6",
         iconBgColor: "rgba(59, 130, 246, 0.1)",
       },
       {
         title: "Outstanding Amount",
-        value: `${CURRENCY_SYMBOL} ${formatWithOneDecimal(response?.invoices?.outstanding_amount)}`,
+        value: `${CURRENCY_SYMBOL} ${formatWithOneDecimal(inv.outstanding_amount)}`,
         icon: AlertCircle,
         iconColor: "#fbbf24",
         iconBgColor: "rgba(251, 191, 36, 0.1)",
       },
       {
         title: "Overdue Invoices",
-        value: formatInteger(
-          response?.invoices?.overdue_invoices_count ?? 0,
-        ),
+        value: formatInteger(inv.overdue_invoices_count),
         icon: Clock,
         iconColor: "#ef4444",
         iconBgColor: "rgba(239, 68, 68, 0.1)",
       },
       {
         title: "Overdue Amount",
-        value: `${CURRENCY_SYMBOL} ${formatWithOneDecimal(response?.invoices?.overdue_amount)}`,
+        value: `${CURRENCY_SYMBOL} ${formatWithOneDecimal(inv.overdue_amount)}`,
         icon: AlertCircle,
         iconColor: "#fbbf24",
         iconBgColor: "rgba(251, 191, 36, 0.1)",
@@ -279,132 +287,16 @@ const CustomerDashboard = () => {
       },
       {
         title: "Paid This Month",
-        value: `${CURRENCY_SYMBOL} ${formatWithOneDecimal(response?.invoices?.paid_amount)}`,
+        value: `${CURRENCY_SYMBOL} ${formatWithOneDecimal(inv.paid_amount)}`,
         icon: Wallet,
         iconColor: "#10B981",
         iconBgColor: "#D1FAE5",
         subtitle: "Last 30 days",
       },
-    ]);
-  };
+    ];
+  }, [bundle]);
 
-  const loadProfitLossData = async (params: {
-    crm_company_id?: string | number;
-  } = {}) => {
-    await GetProfitLossData(params);
-  };
-
-  const loadTopProducts = async (params: {
-    crm_company_id?: string | number;
-  } = {}) => {
-    const response = await GetTopProducts(params);
-    setTopProducts(response as any);
-  };
-
-  const loadRecentActivity = async (params: {
-    crm_company_id?: string | number;
-  } = {}) => {
-    await GetRecentActivity(params);
-  };
-
-  const loadAnalyticsByMonth = async (params: {
-    crm_company_id?: string | number;
-  } = {}) => {
-    const dateRange = getDateRangeForPeriod(selectedPeriod);
-    const response = (await GetAnalyticsByMonth(
-      dateRange.start_date,
-      dateRange.end_date,
-      params,
-    )) as any[];
-
-    const transformedData: SpendingRow[] = response.map((item: any) => {
-      const monthAbbr = item.month_name;
-      return {
-        month: monthAbbr,
-        month_name: item.month_name,
-        spent: item.total_amount || 0,
-        total_amount: item.total_amount || 0,
-        paid_amount: item.paid_amount || 0,
-        outstanding_amount: item.outstanding_amount || 0,
-      };
-    });
-
-    setSpendingData(transformedData);
-  };
-
-  const loadCompanyCurrency = async () => {
-    const response = (await GetCompanyDetails()) as any;
-    setCurrency(response?.profile?.currency ?? "");
-  };
-
-  useEffect(() => {
-    const apiPayload = selectedCompanyId
-      ? { crm_company_id: selectedCompanyId }
-      : {};
-    setIsDashboardLoading(true);
-    Promise.all([
-      loadDashboardCounters(apiPayload),
-      loadProfitLossData(apiPayload),
-      loadTopProducts(apiPayload),
-      loadRecentActivity(apiPayload),
-      loadAnalyticsByMonth(apiPayload),
-      loadCompanyCurrency(),
-    ]).finally(() => setIsDashboardLoading(false));
-  }, [selectedPeriod, selectedCompanyId, customerEnsureRefreshKey]);
-
-  const getStatusBadgeColor = (status: string | null | undefined) => {
-    if (!status) return "primary";
-    switch (status.toLowerCase()) {
-      case "active":
-        return "success";
-      case "trial":
-        return "warning";
-      case "suspended":
-        return "secondary";
-      case "in progress":
-        return "info";
-      case "inactive":
-        return "secondary";
-      default:
-        return "primary";
-    }
-  };
-
-  const getStatusBackgroundColor = (status: string | null | undefined) => {
-    if (!status) return "59, 130, 246";
-    switch (status.toLowerCase()) {
-      case "active":
-        return "34, 197, 94";
-      case "trial":
-        return "251, 191, 36";
-      case "in progress":
-        return "59, 130, 246";
-      case "suspended":
-        return "156, 163, 175";
-      case "inactive":
-        return "107, 114, 128";
-      default:
-        return "59, 130, 246";
-    }
-  };
-
-  const getStatusIconColor = (status: string | null | undefined) => {
-    if (!status) return "#3b82f6";
-    switch (status.toLowerCase()) {
-      case "active":
-        return "#22c55e";
-      case "trial":
-        return "#fbbf24";
-      case "in progress":
-        return "#3b82f6";
-      case "suspended":
-        return "#9ca3af";
-      case "inactive":
-        return "#6b7280";
-      default:
-        return "#3b82f6";
-    }
-  };
+  const isDashboardLoading = isPending && !bundle;
 
   const SKELETON_CARD_KEYS = [
     "sk-card-a",
@@ -464,26 +356,16 @@ const CustomerDashboard = () => {
 
         {isDashboardLoading ? (
           <>
-            <div
-              className="mb-4"
-              style={{
-                display: "grid",
-                gridTemplateColumns:
-                  "repeat(auto-fit, minmax(180px, 1fr))",
-                gap: "16px",
-              }}
-            >
+            <div className="mb-4 bc-dashboard-skeleton-cards-grid">
               {SKELETON_CARD_KEYS.map((skKey) => (
                 <Card key={skKey} className="border-0 shadow-sm">
-                  <Card.Body style={{ padding: "20px" }}>
+                  <Card.Body className="bc-card-body-p-20">
                     <div className="placeholder-glow">
                       <span
-                        className="placeholder d-block col-8 mb-2"
-                        style={{ height: 14 }}
+                        className="placeholder d-block col-8 mb-2 bc-ph-h-14"
                       />
                       <span
-                        className="placeholder d-block col-5"
-                        style={{ height: 28 }}
+                        className="placeholder d-block col-5 bc-ph-h-28"
                       />
                     </div>
                   </Card.Body>
@@ -497,20 +379,18 @@ const CustomerDashboard = () => {
                     <div className="d-flex justify-content-between align-items-center mb-4">
                       <div className="placeholder-glow">
                         <span
-                          className="placeholder col-4"
-                          style={{ height: 24 }}
+                          className="placeholder col-4 bc-ph-h-24"
                         />
                       </div>
                     </div>
                     <div
-                      className="placeholder-glow d-flex align-items-end gap-2"
-                      style={{ height: 354 }}
+                      className="placeholder-glow d-flex align-items-end gap-2 bc-chart-skeleton-h"
                     >
                       {[40, 65, 45, 80, 55, 70].map((h, i) => (
                         <span
                           key={SKELETON_BAR_KEYS[i]}
-                          className="placeholder flex-grow-1 rounded"
-                          style={{ height: `${h}%`, minWidth: 24 }}
+                          className="placeholder flex-grow-1 rounded bc-ph-bar"
+                          style={{ height: `${h}%` }}
                         />
                       ))}
                     </div>
@@ -518,17 +398,11 @@ const CustomerDashboard = () => {
                 </Card>
               </Col>
               <Col lg={4} className="mb-4">
-                <Card
-                  style={{
-                    border: "none",
-                    boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
-                  }}
-                >
+                <Card className="bc-dashboard-soft-card">
                   <Card.Body>
                     <div className="placeholder-glow mb-4">
                       <span
-                        className="placeholder col-5"
-                        style={{ height: 24 }}
+                        className="placeholder col-5 bc-ph-h-24"
                       />
                     </div>
                     <div className="d-flex flex-column gap-3">
@@ -538,16 +412,13 @@ const CustomerDashboard = () => {
                           className="d-flex align-items-center gap-2"
                         >
                           <span
-                            className="placeholder rounded"
-                            style={{ width: 36, height: 36 }}
+                            className="placeholder rounded bc-ph-36"
                           />
                           <span
-                            className="placeholder col-6"
-                            style={{ height: 20 }}
+                            className="placeholder col-6 bc-ph-h-20"
                           />
                           <span
-                            className="placeholder col-2"
-                            style={{ height: 22 }}
+                            className="placeholder col-2 bc-ph-h-22"
                           />
                         </div>
                       ))}
@@ -570,12 +441,12 @@ const CustomerDashboard = () => {
                 <Card>
                   <Card.Body>
                     <div className="d-flex justify-content-between align-items-center mb-4">
-                      <h5 className="mb-0" style={{ fontWeight: "600" }}>
+                      <h5 className="mb-0 fw-semibold">
                         Spending Overview
                       </h5>
                       <Form.Select
                         size="sm"
-                        style={{ width: "150px" }}
+                        className="bc-period-select"
                         value={selectedPeriod}
                         onChange={(e) => setSelectedPeriod(e.target.value)}
                       >
@@ -593,18 +464,17 @@ const CustomerDashboard = () => {
               </Col>
 
               <Col lg={4} className="mb-4">
-                <Card
-                  style={{
-                    border: "none",
-                    boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
-                  }}
-                >
+                <Card className="bc-dashboard-soft-card">
                   <Card.Body>
-                    <h5 className="mb-4" style={{ fontWeight: "600" }}>
+                    <h5 className="mb-4 fw-semibold">
                       Subscriptions
                     </h5>
-                    <div style={{ maxHeight: "367px", overflowY: "auto" }}>
-                      {topProducts.map((subscription) => (
+                    <div className="bc-subscriptions-scroll">
+                      {topProducts.map((subscription) => {
+                        const subStyle = subscriptionStyleForStatus(
+                          subscription.status,
+                        );
+                        return (
                         <div
                           key={
                             subscription.name
@@ -615,53 +485,37 @@ const CustomerDashboard = () => {
                         >
                           <div className="d-flex align-items-center gap-2">
                             <div
-                              className="rounded d-flex align-items-center justify-content-center"
-                              style={{
-                                width: "36px",
-                                height: "36px",
-                                backgroundColor: `rgba(${getStatusBackgroundColor(subscription?.status)}, 0.1)`,
-                                flexShrink: 0,
-                              }}
+                              className="rounded d-flex align-items-center justify-content-center bc-subscription-icon-wrap"
+                              style={
+                                {
+                                  "--bc-sub-bg": `rgba(${subStyle.bgRgb}, 0.1)`,
+                                  "--bc-sub-icon": subStyle.iconColor,
+                                } as React.CSSProperties
+                              }
                             >
-                              <div
-                                style={{
-                                  color: getStatusIconColor(
-                                    subscription?.status,
-                                  ),
-                                }}
-                              >
-                                {subscription?.subscriptions || "0"}
+                              <div className="bc-subscription-icon-inner">
+                                {subscription.subscriptions || "0"}
                               </div>
                             </div>
-                            <div style={{ minWidth: 0, flex: 1 }}>
+                            <div className="bc-subscription-main">
                               <h6
-                                className="mb-0 text-truncate text-capitalize"
-                                style={{
-                                  fontSize: "0.9rem",
-                                  fontWeight: "500",
-                                }}
+                                className="mb-0 text-truncate text-capitalize bc-subscription-title"
                               >
-                                {subscription?.name}
+                                {subscription.name}
                               </h6>
                             </div>
-                            <div
-                              style={{ marginLeft: "8px", flexShrink: 0 }}
-                            >
+                            <div className="bc-subscription-badge-wrap">
                               <Badge
-                                bg={getStatusBadgeColor(
-                                  subscription?.status,
-                                )}
-                                style={{
-                                  fontSize: "0.75rem",
-                                  padding: "0.35rem 0.65rem",
-                                }}
+                                bg={subStyle.badgeBg}
+                                className="bc-subscription-status-badge"
                               >
-                                {subscription?.status}
+                                {subscription.status}
                               </Badge>
                             </div>
                           </div>
                         </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   </Card.Body>
                 </Card>

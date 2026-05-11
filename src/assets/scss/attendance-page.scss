@@ -344,7 +344,37 @@
 }
 
 .attendance-page-shell .attendance-toolbar-right {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 60px;
+  flex-wrap: wrap;
   min-width: 0;
+}
+
+.attendance-page-shell .attendance-status-content {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.att-status-loading,
+.att-status-unavailable {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+  color: #6b7280;
+}
+
+.att-status-loading svg {
+  flex-shrink: 0;
+  color: #9ca3af;
+}
+
+.att-status-unavailable svg {
+  flex-shrink: 0;
 }
 
 @media (max-width: 991.98px) {

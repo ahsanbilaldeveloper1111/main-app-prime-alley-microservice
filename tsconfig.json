@@ -19,6 +19,7 @@
     "types": ["node"],
     "baseUrl": ".",
     "paths": {
+      "@pages/partial/*": ["src/components/page-partials/*"],
       "@pages/*": ["src/pages/*"],
       "@planner/*": ["src/planner/*"],
       "@toolkit/*": ["src/toolkit/*"],
@@ -58,6 +59,7 @@
       "next-auth": ["src/shims/next-auth.tsx"],
       "next-i18next": ["src/shims/next-i18next.tsx"],
       "next-redux-wrapper": ["src/shims/next-redux-wrapper.tsx"],
+      "@page-modules/*": ["src/page-modules/*"],
       "@sentry/nextjs": ["src/shims/sentry-nextjs.ts"]
     }
   },

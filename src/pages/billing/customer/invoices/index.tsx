@@ -1,4 +1,5 @@
 import "@components/billings/customer/billingCustomerDatatableCommonTabsStyles";
+import "@assets/scss/billing.scss";
 import { BillingCustomerPortalTableShell } from "@components/billings/customer/BillingCustomerPortalTableShell";
 
 import React, {
@@ -8,7 +9,6 @@ import React, {
   useCallback,
   useEffect,
   useMemo,
-  useRef,
   useState,
 } from "react";
 import Layout from "@layout/index";
@@ -23,15 +23,15 @@ import GenericSidebar from "@components/GenericSidebar";
 import GenericFilterSidebar, { FilterField } from "@components/GenericFilterSidebar";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 import { StatsCardData } from "@components/GenericStatsCards";
-import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
+import DeleteConfirmationModal from "@components/page-partials/DeleteConfirmationModal";
 import { useRouter } from "next/router";
 import {
   getInvoice,
   downloadInvoicePdf,
   deleteInvoice,
   InvoiceData,
-  getInvoices,
 } from "@utils/accounts";
+import { useBillingCustomerInvoiceListQuery } from "@page-modules/billing/customer/useBillingCustomerInvoiceListQuery";
 import {
   PostInvoiceStripeHostedCheckout,
   PostInvoiceStripePaymentLink,
@@ -42,6 +42,7 @@ import { BillingCustomerCompanySelect } from "@components/billings/customer/Bill
 import { formatNumber } from "@utils/Helper";
 import { getBillingCustomerPortalTabsDropdownItems } from "@utils/billingProductsTabs";
 import { billingCustomerRoutes } from "@utils/billingCustomerRoutes";
+import { getErrorMessage } from "@utils/errors";
 
 import { Button, Form, Modal, Spinner } from "react-bootstrap";
 import { toast } from "react-toastify";
@@ -130,12 +131,43 @@ function invoiceDownloadActionIcon(
         animation="border"
         role="status"
         size="sm"
-        style={{ width: "1rem", height: "1rem", verticalAlign: "middle" }}
+        className="bc-spinner-1rem"
         aria-label="Downloading PDF"
       />
     );
   }
   return <Download size={16} aria-hidden />;
+}
+
+type InvoiceDownloadTableActionProps = Readonly<{
+  row: InvoiceData;
+  downloadingInvoicePdfId: number | null;
+  onDownload: (invoice: InvoiceData) => Promise<void>;
+}>;
+
+function InvoiceDownloadTableAction({
+  row,
+  downloadingInvoicePdfId,
+  onDownload,
+}: InvoiceDownloadTableActionProps) {
+  const busy = downloadingInvoicePdfId === row.id;
+  const handleClick = (e: React.MouseEvent<HTMLButtonElement>) => {
+    e.stopPropagation();
+    if (busy) return;
+    Promise.resolve(onDownload(row)).catch(() => undefined);
+  };
+  return (
+    <Button
+      variant="link"
+      size="sm"
+      disabled={busy}
+      className="p-1"
+      title="Download"
+      onClick={handleClick}
+    >
+      {invoiceDownloadActionIcon(row, downloadingInvoicePdfId)}
+    </Button>
+  );
 }
 
 function loadInvoiceTableColumnsFromStorage(): string[] {
@@ -203,25 +235,6 @@ function getStatusLabel(status: string): string {
   }
 }
 
-function getErrorMessage(error: unknown): string {
-  if (error instanceof Error) return error.message || "Unknown error";
-  if (typeof error === "string") return error;
-  return "Unknown error";
-}
-
-const stripePaymentModalPanelStyle: React.CSSProperties = {
-  border: "1px solid #E5E7EB",
-  borderRadius: 8,
-  padding: 16,
-  background: "#FFFFFF",
-};
-
-const stripeUrlToolbarButtonRowStyle: React.CSSProperties = {
-  display: "flex",
-  gap: 8,
-  flexWrap: "wrap",
-};
-
 async function copyTextWithClipboardToast(
   text: string,
   successMessage: string,
@@ -241,11 +254,14 @@ type StripePaymentModalPanelProps = Readonly<{
 }>;
 
 function StripePaymentModalPanel({ children, marginBottom }: StripePaymentModalPanelProps) {
-  const style: React.CSSProperties = { ...stripePaymentModalPanelStyle };
-  if (marginBottom !== undefined) {
-    style.marginBottom = marginBottom;
-  }
-  return <div style={style}>{children}</div>;
+  return (
+    <div
+      className="bc-stripe-modal-panel"
+      style={marginBottom === undefined ? undefined : { marginBottom }}
+    >
+      {children}
+    </div>
+  );
 }
 
 type ReadonlyPaymentUrlToolbarProps = Readonly<{
@@ -273,9 +289,9 @@ function ReadonlyPaymentUrlToolbar({
 }: ReadonlyPaymentUrlToolbarProps) {
   return (
     <>
-      <Form.Control type="text" readOnly value={url} style={{ marginBottom: 10 }} />
+      <Form.Control type="text" readOnly value={url} className="mb-2" />
       {extraBelowField}
-      <div style={stripeUrlToolbarButtonRowStyle}>
+      <div className="bc-stripe-url-toolbar-row">
         <Button
           variant="outline-secondary"
           onClick={async () => {
@@ -359,55 +375,6 @@ async function applyStripeInvoiceModalResponse(
   toast.error(response?.message || labels.failureFallback);
 }
 
-type InvoiceListFetchOutcome =
-  | { kind: "stale" }
-  | {
-      kind: "success";
-      data: InvoiceData[];
-      total: number;
-      summary?: InvoiceSummary;
-    }
-  | { kind: "error"; message: string };
-
-async function fetchInvoiceListPage(
-  currentRequestId: number,
-  requestIdRef: { current: number },
-  args: {
-    page: number;
-    perPage: number;
-    memoizedFilters: InvoiceFilters;
-    selectedCompanyId: string;
-  },
-): Promise<InvoiceListFetchOutcome> {
-  const { page, perPage, memoizedFilters, selectedCompanyId } = args;
-  try {
-    const response = await getInvoices({
-      page,
-      per_page: perPage,
-      search: memoizedFilters.search || "",
-      crm_company_not_null: true,
-      ...memoizedFilters,
-      ...(selectedCompanyId ? { crm_company_id: selectedCompanyId } : {}),
-    });
-    if (currentRequestId !== requestIdRef.current) {
-      return { kind: "stale" };
-    }
-    const data = response?.data || [];
-    const total = response?.pagination?.total ?? 0;
-    return {
-      kind: "success",
-      data,
-      total,
-      summary: response?.summary,
-    };
-  } catch (error) {
-    if (currentRequestId !== requestIdRef.current) {
-      return { kind: "stale" };
-    }
-    return { kind: "error", message: getErrorMessage(error) };
-  }
-}
-
 const INVOICE_STATUS_FILTER_CHOICES: { value: string; label: string }[] = [
   { value: "", label: "All Status" },
   { value: STATUS_PAID, label: "Paid" },
@@ -416,17 +383,6 @@ const INVOICE_STATUS_FILTER_CHOICES: { value: string; label: string }[] = [
   { value: STATUS_PARTIALLY_PAID, label: "Partially Paid" },
   { value: STATUS_FAILED, label: "Failed" },
 ];
-
-const invoiceFilterPillButtonStyle: React.CSSProperties = {
-  padding: "8px 12px",
-  cursor: "pointer",
-  background: "transparent",
-  borderRadius: "4px",
-  border: "none",
-  width: "100%",
-  textAlign: "left",
-  fontSize: 13,
-};
 
 function buildInvoiceStatusFilterPills(
   currentFilters: InvoiceFilters,
@@ -453,25 +409,23 @@ function buildInvoiceStatusFilterPills(
         applyInvoiceFiltersAndRefresh();
       },
       dropdownContent: (
-        <div style={{ minWidth: 200 }}>
-          {INVOICE_STATUS_FILTER_CHOICES.map((opt) => (
+        <div className="bc-filter-dropdown-min-200">
+          {INVOICE_STATUS_FILTER_CHOICES.map((opt) => {
+            const isActive =
+              (opt.value === "" && !currentFilters.status) ||
+              currentFilters.status === opt.value;
+            return (
             <button
               key={opt.value || "all"}
               type="button"
-              style={{
-                ...invoiceFilterPillButtonStyle,
-                background:
-                  (opt.value === "" && !currentFilters.status) ||
-                  currentFilters.status === opt.value
-                    ? "#f0f0f0"
-                    : "transparent",
-              }}
+              className={`bc-filter-pill-option${isActive ? " bc-filter-pill-option--active" : ""}`}
               onMouseDown={(e) => e.stopPropagation()}
               onClick={() => handleStatusFilterPillSelect(opt.value)}
             >
               {opt.label}
             </button>
-          ))}
+            );
+          })}
         </div>
       ),
     },
@@ -489,16 +443,11 @@ function buildInvoiceStatusFilterPills(
         applyInvoiceFiltersAndRefresh();
       },
       dropdownContent: (
-        <div style={{ minWidth: 220, padding: "4px 0" }}>
+        <div className="bc-filter-dropdown-min-220">
           <input
             type="date"
             value={currentFilters.date_from ?? ""}
-            style={{
-              width: "100%",
-              padding: "6px 12px",
-              border: "1px solid #e5e7eb",
-              borderRadius: 4,
-            }}
+            className="bc-filter-date-input"
             onMouseDown={(e) => e.stopPropagation()}
             onChange={(e) =>
               handleInvoiceDateFromPillChange(e.target.value || undefined)
@@ -521,16 +470,11 @@ function buildInvoiceStatusFilterPills(
         applyInvoiceFiltersAndRefresh();
       },
       dropdownContent: (
-        <div style={{ minWidth: 220, padding: "4px 0" }}>
+        <div className="bc-filter-dropdown-min-220">
           <input
             type="date"
             value={currentFilters.date_to ?? ""}
-            style={{
-              width: "100%",
-              padding: "6px 12px",
-              border: "1px solid #e5e7eb",
-              borderRadius: 4,
-            }}
+            className="bc-filter-date-input"
             onMouseDown={(e) => e.stopPropagation()}
             onChange={(e) =>
               handleInvoiceDateToPillChange(e.target.value || undefined)
@@ -572,7 +516,7 @@ function InvoiceStripePaymentLinkModal({
   requestStripePaymentLinkForModal,
 }: InvoiceStripePaymentLinkModalProps) {
   const checkoutExpiryHint = checkoutExpiresLocalText ? (
-    <p style={{ marginBottom: 10, color: "#6B7280", fontSize: 13 }}>
+    <p className="bc-modal-muted-hint">
       Checkout session expires in about{" "}
       {checkoutRemainingText ? <strong>{checkoutRemainingText}</strong> : null}
     </p>
@@ -585,8 +529,8 @@ function InvoiceStripePaymentLinkModal({
       </Modal.Header>
       <Modal.Body>
         <StripePaymentModalPanel marginBottom={14}>
-          <h6 style={{ marginBottom: 8 }}>Stripe Checkout link</h6>
-          <p style={{ marginBottom: 12, color: "#6B7280", fontSize: 14 }}>
+          <h6 className="bc-modal-section-title">Stripe Checkout link</h6>
+          <p className="bc-modal-muted-p">
             One-time hosted page. Copy or open in browser. Success -&gt;
             {" "}
             <code>/public/payment/success?session_id=&#123;CHECKOUT_SESSION_ID&#125;</code>;
@@ -646,8 +590,8 @@ function InvoiceStripePaymentLinkModal({
         </StripePaymentModalPanel>
 
         <StripePaymentModalPanel>
-          <h6 style={{ marginBottom: 8 }}>Stripe Payment Link</h6>
-          <p style={{ marginBottom: 8, color: "#6B7280", fontSize: 14 }}>
+          <h6 className="bc-modal-section-title">Stripe Payment Link</h6>
+          <p className="bc-modal-muted-p bc-modal-muted-p--tight">
             Persistent link visible in Stripe Dashboard -&gt; Payment links.
             Same success/cancel redirects as Checkout.
           </p>
@@ -671,7 +615,7 @@ function InvoiceStripePaymentLinkModal({
             />
           ) : (
             <>
-              <p style={{ marginBottom: 12, color: "#6B7280", fontSize: 14 }}>
+              <p className="bc-modal-muted-p">
                 No Payment Link yet. Create one to get a persistent URL and see it in Stripe Dashboard.
               </p>
               <Button
@@ -1046,7 +990,9 @@ const InvoiceList = () => {
       {
         label: "View",
         icon: <Eye size={16} />,
-        onClick: (row: InvoiceData) => handleViewInvoice(row),
+        onClick: (row: InvoiceData) => {
+          Promise.resolve(handleViewInvoice(row)).catch(() => undefined);
+        },
       },
 
       
@@ -1056,7 +1002,9 @@ const InvoiceList = () => {
         icon: <Plus size={16} />,
         show: (row: InvoiceData) =>
           String(row.status ?? "").trim().toLowerCase() === STATUS_PENDING,
-        onClick: (row: InvoiceData) => openGeneratePaymentLinkModal(row),
+        onClick: (row: InvoiceData) => {
+          Promise.resolve(openGeneratePaymentLinkModal(row)).catch(() => undefined);
+        },
       },
       {
         label: "Edit",
@@ -1082,14 +1030,19 @@ const InvoiceList = () => {
         show: (row: InvoiceData) =>
           PAY_NOW_ELIGIBLE_STATUSES.has(row.status ?? "") &&
           !!session?.user?.permissions?.includes(PERMISSIONS.PAY_INVOICES_BILLING),
-        onClick: (row: InvoiceData) => handlePayInvoice(row),
+        onClick: (row: InvoiceData) => {
+          Promise.resolve(handlePayInvoice(row)).catch(() => undefined);
+        },
       },
       {
         label: "Download",
-        icon: (row: InvoiceData) =>
-          invoiceDownloadActionIcon(row, downloadingInvoicePdfId),
-        disabled: (row: InvoiceData) => downloadingInvoicePdfId === row.id,
-        onClick: (row: InvoiceData) => handleDownloadPDF(row),
+        render: (row: InvoiceData) => (
+          <InvoiceDownloadTableAction
+            row={row}
+            downloadingInvoicePdfId={downloadingInvoicePdfId}
+            onDownload={handleDownloadPDF}
+          />
+        ),
       },
     ],
     [
@@ -1167,73 +1120,64 @@ const InvoiceList = () => {
   );
 
   const memoizedFilters = useMemo(() => currentFilters, [currentFilters]);
-  const [summary, setSummary] = useState<InvoiceSummary | null>(null);
+  const invoiceFiltersKey = useMemo(
+    () =>
+      JSON.stringify({
+        search: memoizedFilters.search ?? "",
+        status: memoizedFilters.status ?? "",
+        invoice_date_from: memoizedFilters.invoice_date_from ?? "",
+        date_from: memoizedFilters.date_from ?? "",
+        date_to: memoizedFilters.date_to ?? "",
+      }),
+    [
+      memoizedFilters.search,
+      memoizedFilters.status,
+      memoizedFilters.invoice_date_from,
+      memoizedFilters.date_from,
+      memoizedFilters.date_to,
+    ],
+  );
 
-  const [invoiceList, setInvoiceList] = useState<InvoiceData[]>([]);
-  const [invoiceLoading, setInvoiceLoading] = useState(false);
-  const [totalRecords, setTotalRecords] = useState(0);
   const [pagination, setPagination] = useState({
     currentPage: 1,
     rowsPerPage: 15,
     totalRows: 0,
   });
+
+  const invoicesQuery = useBillingCustomerInvoiceListQuery({
+    crmKey: selectedCompanyId || "all",
+    page: pagination.currentPage,
+    perPage: pagination.rowsPerPage,
+    filtersKey: invoiceFiltersKey,
+    refreshKey,
+    filters: memoizedFilters,
+  });
+
+  const invoiceList = invoicesQuery.data?.list ?? [];
+  const invoiceLoading = invoicesQuery.isFetching;
+  const totalRecords = invoicesQuery.data?.total ?? 0;
+  const summary = (invoicesQuery.data?.summary ?? null) as InvoiceSummary | null;
+
+  useEffect(() => {
+    const total = invoicesQuery.data?.total ?? 0;
+    setPagination((prev) => ({ ...prev, totalRows: total }));
+  }, [invoicesQuery.data?.total]);
+
+  const [totalAllInvoices, setTotalAllInvoices] = useState(0);
+  useEffect(() => {
+    if (!memoizedFilters.status && invoicesQuery.data != null) {
+      setTotalAllInvoices(invoicesQuery.data.total);
+    }
+  }, [memoizedFilters.status, invoicesQuery.data]);
+
   const [selectedInvoiceSidebar, setSelectedInvoiceSidebar] = useState<InvoiceData | null>(null);
   const [showInvoiceSidebar, setShowInvoiceSidebar] = useState(false);
-  const invoiceRequestIdRef = useRef(0);
-  const [totalAllInvoices, setTotalAllInvoices] = useState(0);
   const canPayInvoices =
     session?.user?.permissions?.includes(PERMISSIONS.PAY_INVOICES_BILLING) === true;
   const canPaySelectedInvoice =
     !!selectedInvoiceSidebar &&
     canPayInvoices &&
     PAY_NOW_ELIGIBLE_STATUSES.has(selectedInvoiceSidebar.status ?? "");
-
-  const loadInvoices = useCallback(async () => {
-    invoiceRequestIdRef.current += 1;
-    const currentRequestId = invoiceRequestIdRef.current;
-    setInvoiceLoading(true);
-    try {
-      const outcome = await fetchInvoiceListPage(
-        currentRequestId,
-        invoiceRequestIdRef,
-        {
-          page: pagination.currentPage,
-          perPage: pagination.rowsPerPage,
-          memoizedFilters,
-          selectedCompanyId,
-        },
-      );
-      if (outcome.kind === "stale") {
-        return;
-      }
-      if (outcome.kind === "error") {
-        toast.error(`Failed to load invoices: ${outcome.message}`, {
-          toastId: "billing_invoices_load_failed",
-        });
-        setInvoiceList([]);
-        setTotalRecords(0);
-        setPagination((prev) => ({ ...prev, totalRows: 0 }));
-        return;
-      }
-      setInvoiceList(outcome.data);
-      setTotalRecords(outcome.total);
-      setPagination((prev) => ({ ...prev, totalRows: outcome.total }));
-      if (!memoizedFilters.status) {
-        setTotalAllInvoices(outcome.total);
-      }
-      if (outcome.summary) {
-        setSummary(outcome.summary);
-      }
-    } finally {
-      if (invoiceRequestIdRef.current === currentRequestId) {
-        setInvoiceLoading(false);
-      }
-    }
-  }, [pagination.currentPage, pagination.rowsPerPage, memoizedFilters, selectedCompanyId]);
-
-  React.useEffect(() => {
-    loadInvoices();
-  }, [loadInvoices, refreshKey]);
 
   const applyInvoiceFiltersAndRefresh = useCallback(() => {
     setPagination((prev) => ({ ...prev, currentPage: 1 }));
@@ -1340,39 +1284,12 @@ const InvoiceList = () => {
   // Render Create Invoice Button
   const renderCreateInvoiceButton = () =>
     canCreateInvoice ? (
-    <div
-      style={{
-        position: "absolute",
-        right: "19px",
-        top: "18px",
-        display: "flex",
-        alignItems: "center",
-        gap: "8px",
-      }}
-    >
+    <div className="bc-table-toolbar-floating">
       <button
         type="button"
+        className="bc-btn-billing-dark"
         onClick={() => {
           router.push(billingCustomerRoutes.createInvoice());
-        }}
-        style={{
-          padding: "9px 13px",
-          backgroundColor: "#000000",
-          color: "#ffffff",
-          border: "none",
-          borderRadius: "4px",
-          fontSize: "12px",
-          fontWeight: "500",
-          cursor: "pointer",
-          display: "flex",
-          alignItems: "center",
-          gap: "8px",
-        }}
-        onMouseEnter={(e) => {
-          e.currentTarget.style.backgroundColor = "#1a1a1a";
-        }}
-        onMouseLeave={(e) => {
-          e.currentTarget.style.backgroundColor = "#000000";
         }}
       >
         <Plus size={16} />
@@ -1443,7 +1360,7 @@ const InvoiceList = () => {
       {/* Main flex container — table + sidebar side-by-side */}
       <BillingCustomerPortalTableShell>
         {/* Main content area */}
-        <div style={{ flex: 1, overflowY: "auto", overflowX: "hidden" }}>
+        <div className="bc-main-scroll">
           <div className="container-fluid">
             <div className="mb-3 d-flex align-items-center gap-2">
               <BillingCustomerCompanySelect

@@ -1,6 +1,6 @@
 import React from "react";
 import moment from "moment";
-import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
+import DeleteConfirmationModal from "@components/page-partials/DeleteConfirmationModal";
 
 function deleteModalItemName(
   deleteModalMode: "single" | "bulk" | null,

@@ -54,7 +54,7 @@ import {
 } from "lucide-react";
 import { toast } from "react-toastify";
 import { useSession } from "next-auth/react";
-import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
+import DeleteConfirmationModal from "@components/page-partials/DeleteConfirmationModal";
 import { crmListPageReactSelectStyles as customSelectStyles } from "@utils/crmListPageReactSelectStyles";
 
 // Filter Bar Component

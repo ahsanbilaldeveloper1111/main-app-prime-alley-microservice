@@ -1,0 +1,295 @@
+/* Local DND Call Block page */
+.localDndCallBlockPage {
+  &-title {
+    color: #212529;
+    font-weight: 600;
+  }
+
+  &-titleMuted {
+    color: #6c757d;
+  }
+
+  &-btnDanger {
+    border: none;
+    border-radius: 8px;
+    height: 38px;
+    font-size: 0.875rem;
+    padding: 0 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  &-btnOutlinePrimary {
+    border: 1px solid #4f46e5;
+    border-radius: 8px;
+    color: #4f46e5;
+    height: 38px;
+    font-size: 0.875rem;
+    padding: 0 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background-color: transparent;
+  }
+
+  &-btnPrimary {
+    background-color: #4f46e5;
+    border: none;
+    border-radius: 8px;
+    color: #ffffff;
+    height: 38px;
+    font-size: 0.875rem;
+    padding: 0 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  &-filterShell {
+    background-color: #ffffff;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    padding: 8px 12px;
+    height: 38px;
+  }
+
+  &-filterIcon {
+    color: #6c757d;
+    margin-right: 8px;
+  }
+
+  &-filterInput {
+    border: none;
+    box-shadow: none;
+    font-size: 0.875rem;
+    padding: 0;
+  }
+
+  &-filterInputSearch {
+    border: none;
+    box-shadow: none;
+    font-size: 0.875rem;
+    color: #212529;
+    width: 250px;
+    padding: 0;
+  }
+
+  &-filterInputCompany {
+    border: none;
+    box-shadow: none;
+    font-size: 0.875rem;
+    width: 200px;
+    padding: 0;
+  }
+
+  &-btnReset {
+    background-color: #ffffff;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    color: #212529;
+    height: 38px;
+    font-size: 0.875rem;
+    padding: 0 16px;
+  }
+
+  &-btnApply {
+    background-color: #4f46e5;
+    border: none;
+    border-radius: 8px;
+    color: #ffffff;
+    height: 38px;
+    font-size: 0.875rem;
+    padding: 0 16px;
+  }
+
+  &-activeFiltersLabel {
+    color: #6c757d;
+    font-size: 0.875rem;
+  }
+
+  &-filterPill {
+    background-color: #e0e7ff;
+    color: #4f46e5;
+    padding: 4px 8px;
+    border-radius: 6px;
+    font-size: 0.75rem;
+  }
+
+  &-tableCard {
+    background-color: #ffffff;
+    border-radius: 12px;
+    border-color: #dee2e6;
+  }
+
+  &-tableCardHeader {
+    border-color: #dee2e6;
+  }
+
+  &-tableCardTitle {
+    color: #212529;
+  }
+
+  &-metaMuted {
+    color: #6c757d;
+    font-size: 0.875rem;
+  }
+
+  &-pageNavBtn {
+    background-color: #f8f9fa;
+    border: 1px solid #dee2e6;
+    color: #212529;
+  }
+
+  &-tableWrap {
+    overflow-x: auto;
+  }
+
+  &-table {
+    min-width: 800px;
+  }
+
+  &-thead {
+    background-color: #f8f9fa;
+  }
+
+  &-th {
+    color: #6c757d;
+    font-weight: 500;
+    font-size: 0.75rem;
+    padding: 12px;
+    border: none;
+  }
+
+  &-thCheckbox {
+    color: #6c757d;
+    font-weight: 500;
+    font-size: 0.75rem;
+    padding: 12px;
+    border: none;
+    width: 50px;
+  }
+
+  &-thActions {
+    color: #6c757d;
+    font-weight: 500;
+    font-size: 0.75rem;
+    padding: 12px;
+    border: none;
+    width: 80px;
+  }
+
+  &-td {
+    padding: 12px;
+    border: none;
+    color: #212529;
+    font-size: 0.875rem;
+  }
+
+  &-row {
+    border-bottom: 1px solid #dee2e6;
+  }
+
+  &-comments {
+    color: #6c757d;
+  }
+
+  &-deleteLink {
+    color: #dc3545;
+    padding: 4px 8px;
+    text-decoration: none;
+  }
+
+  &-stateCell {
+    text-align: center;
+    padding: 24px;
+  }
+
+  &-stateLoading {
+    text-align: center;
+    padding: 24px;
+    color: #6c757d;
+  }
+
+  &-stateError {
+    text-align: center;
+    padding: 24px;
+    color: #dc3545;
+  }
+
+  &-stateEmpty {
+    text-align: center;
+    padding: 24px;
+    color: #6c757d;
+  }
+
+  &-footerMeta {
+    color: #6c757d;
+    font-size: 0.875rem;
+    margin-right: 8px;
+  }
+
+  &-dropdownToggle {
+    background-color: #f8f9fa;
+    border: 1px solid #dee2e6;
+    color: #212529;
+  }
+
+  &-pageBtnEdge {
+    background-color: #f8f9fa;
+    border: 1px solid #dee2e6;
+    color: #212529;
+    margin-left: 12px;
+  }
+
+  &-pageCurrent {
+    background-color: #4f46e5;
+    border: none;
+    min-width: 32px;
+  }
+
+  &-modalSubmit {
+    background-color: #4f46e5;
+    border: none;
+  }
+
+  &-sampleLink {
+    padding: 0;
+    text-decoration: none;
+    color: #4f46e5;
+    font-size: 0.875rem;
+  }
+
+  &-codeBox {
+    background-color: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 6px;
+    padding: 12px;
+    font-size: 0.75rem;
+    font-family: monospace;
+    overflow-x: auto;
+    max-height: 200px;
+    overflow-y: auto;
+  }
+
+  &-codeBox pre {
+    margin: 0;
+    white-space: pre-wrap;
+  }
+
+  &-previewBox {
+    background-color: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 6px;
+    padding: 12px;
+    font-size: 0.75rem;
+    font-family: monospace;
+    max-height: 200px;
+    overflow: auto;
+  }
+
+  &-previewBox pre {
+    margin: 0;
+    white-space: pre-wrap;
+  }
+}
