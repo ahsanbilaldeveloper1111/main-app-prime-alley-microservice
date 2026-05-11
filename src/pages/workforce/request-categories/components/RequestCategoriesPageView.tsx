@@ -22,9 +22,116 @@ import { SubCategoryWorkflowForm } from "@page-modules/workforce/request-categor
 import DeleteConfirmationModal from "@components/page-partials/DeleteConfirmationModal";
 import type { UserRequestCategory, UserRequestCategoryField } from "@utils/staffManagement";
 import { ChevronDown, ChevronUp, FolderTree, List, Pencil, Plus, Trash2 } from "lucide-react";
-import React, { useMemo } from "react";
+import React, { useMemo, type ReactNode } from "react";
 import { Button, Form, Modal } from "react-bootstrap";
 import { useRequestCategoriesPage } from "../useRequestCategoriesPage";
+
+function CategoryActiveStatusBadge({ row }: Readonly<{ row: UserRequestCategory }>) {
+  return (
+    <span className={`gt-badge gt-badge-${row.is_active === false ? "secondary" : "success"}`}>
+      {row.is_active === false ? "Inactive" : "Active"}
+    </span>
+  );
+}
+
+function FieldReorderButtons({
+  index,
+  reordering,
+  onMove,
+}: Readonly<{
+  index: number;
+  reordering: boolean;
+  onMove: (i: number, direction: "up" | "down") => void;
+}>) {
+  return (
+    <div className="d-flex align-items-center gap-1">
+      <button
+        type="button"
+        className="request-categories-page__field-reorder-btn"
+        onClick={() => onMove(index, "up")}
+        disabled={reordering}
+        aria-label="Move up"
+      >
+        <ChevronUp size={16} />
+      </button>
+      <button
+        type="button"
+        className="request-categories-page__field-reorder-btn"
+        onClick={() => onMove(index, "down")}
+        disabled={reordering}
+        aria-label="Move down"
+      >
+        <ChevronDown size={16} />
+      </button>
+    </div>
+  );
+}
+
+function ManagedDeleteConfirmationModal({
+  show,
+  pending,
+  itemName,
+  itemType,
+  onConfirm,
+  onReset,
+}: Readonly<{
+  show: boolean;
+  pending: boolean;
+  itemName: string | undefined;
+  itemType: "category" | "field";
+  onConfirm: () => void | Promise<void>;
+  onReset: () => void;
+}>) {
+  return (
+    <DeleteConfirmationModal
+      show={show}
+      onHide={() => {
+        if (pending) return;
+        onReset();
+      }}
+      onConfirm={onConfirm}
+      itemName={itemName}
+      itemType={itemType}
+      loading={pending}
+    />
+  );
+}
+
+function RequestCategoriesLargeModal({
+  show,
+  onHide,
+  title,
+  toolbarHint,
+  toolbarAction,
+  bodyContent,
+}: Readonly<{
+  show: boolean;
+  onHide: () => void;
+  title: ReactNode;
+  toolbarHint: ReactNode;
+  toolbarAction?: ReactNode;
+  bodyContent: ReactNode;
+}>) {
+  return (
+    <Modal show={show} onHide={onHide} size="lg" centered>
+      <Modal.Header closeButton>
+        <Modal.Title>{title}</Modal.Title>
+      </Modal.Header>
+      <Modal.Body>
+        <div className="d-flex justify-content-between align-items-center mb-3">
+          <span className="text-muted">{toolbarHint}</span>
+          {toolbarAction}
+        </div>
+        {bodyContent}
+      </Modal.Body>
+      <Modal.Footer>
+        <Button variant="secondary" onClick={onHide}>
+          Close
+        </Button>
+      </Modal.Footer>
+    </Modal>
+  );
+}
 
 export function RequestCategoriesPageView() {
   const ctx = useRequestCategoriesPage();
@@ -119,13 +226,7 @@ export function RequestCategoriesPageView() {
       {
         key: "is_active",
         label: "Active",
-        render: (row: UserRequestCategory) => (
-          <span
-            className={`gt-badge gt-badge-${row.is_active === false ? "secondary" : "success"}`}
-          >
-            {row.is_active === false ? "Inactive" : "Active"}
-          </span>
-        ),
+        render: (row: UserRequestCategory) => <CategoryActiveStatusBadge row={row} />,
       },
     ],
     [],
@@ -187,13 +288,7 @@ export function RequestCategoriesPageView() {
           {
             key: "is_active",
             label: "Active",
-            render: (row) => (
-              <span
-                className={`gt-badge gt-badge-${row.is_active === false ? "secondary" : "success"}`}
-              >
-                {row.is_active === false ? "Inactive" : "Active"}
-              </span>
-            ),
+            render: (row) => <CategoryActiveStatusBadge row={row} />,
           },
         ]}
         actions={[
@@ -255,26 +350,7 @@ export function RequestCategoriesPageView() {
             label: "",
             sortable: false,
             render: (_row, index) => (
-              <div className="d-flex align-items-center gap-1">
-                <button
-                  type="button"
-                  className="request-categories-page__field-reorder-btn"
-                  onClick={() => moveField(index, "up")}
-                  disabled={reordering}
-                  aria-label="Move up"
-                >
-                  <ChevronUp size={16} />
-                </button>
-                <button
-                  type="button"
-                  className="request-categories-page__field-reorder-btn"
-                  onClick={() => moveField(index, "down")}
-                  disabled={reordering}
-                  aria-label="Move down"
-                >
-                  <ChevronDown size={16} />
-                </button>
-              </div>
+              <FieldReorderButtons index={index} reordering={reordering} onMove={moveField} />
             ),
           },
           { key: "label", label: "Label", type: "text" },
@@ -471,78 +547,62 @@ export function RequestCategoriesPageView() {
         </CategorySidebarField>
       </CategoryEditSidebar>
 
-      <DeleteConfirmationModal
+      <ManagedDeleteConfirmationModal
         show={showDeleteModal}
-        onHide={() => {
-          if (deleteCategoryPending) return;
+        pending={deleteCategoryPending}
+        itemName={categoryToDelete?.name?.trim() || undefined}
+        itemType="category"
+        onConfirm={handleDeleteCategory}
+        onReset={() => {
           setShowDeleteModal(false);
           setCategoryToDelete(null);
         }}
-        onConfirm={handleDeleteCategory}
-        itemName={categoryToDelete?.name?.trim() || undefined}
-        itemType="category"
-        loading={deleteCategoryPending}
       />
-      <DeleteConfirmationModal
+      <ManagedDeleteConfirmationModal
         show={showDeleteFieldModal}
-        onHide={() => {
-          if (deleteFieldPending) return;
-          setShowDeleteFieldModal(false);
-          setFieldPendingDelete(null);
-        }}
-        onConfirm={handleConfirmDeleteField}
+        pending={deleteFieldPending}
         itemName={
           fieldPendingDelete
             ? (fieldPendingDelete.label ?? fieldPendingDelete.key ?? "").trim() || undefined
             : undefined
         }
         itemType="field"
-        loading={deleteFieldPending}
+        onConfirm={handleConfirmDeleteField}
+        onReset={() => {
+          setShowDeleteFieldModal(false);
+          setFieldPendingDelete(null);
+        }}
       />
 
-      <Modal show={showChildrenModal} onHide={() => setShowChildrenModal(false)} size="lg" centered>
-        <Modal.Header closeButton>
-          <Modal.Title>{categoryForChildren?.name ?? "—"} Sub-categories</Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-          <div className="d-flex justify-content-between align-items-center mb-3">
-            <span className="text-muted">Sub-categories under this category. Add or edit below.</span>
-            {categoryForChildren && (
-              <Button variant="primary" size="sm" onClick={() => openAddChildCategory(categoryForChildren)}>
-                <Plus size={16} className="me-1" />
-                Add Sub Category
-              </Button>
-            )}
-          </div>
-          {childrenModalMain}
-        </Modal.Body>
-        <Modal.Footer>
-          <Button variant="secondary" onClick={() => setShowChildrenModal(false)}>
-            Close
-          </Button>
-        </Modal.Footer>
-      </Modal>
-
-      <Modal show={showFieldsModal} onHide={closeFieldsModal} size="lg" centered>
-        <Modal.Header closeButton>
-          <Modal.Title>Fields: {fieldsCategoryName}</Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-          <div className="d-flex justify-content-between align-items-center mb-3">
-            <span className="text-muted">Define form fields for this request category.</span>
-            <Button variant="primary" size="sm" onClick={openAddField}>
+      <RequestCategoriesLargeModal
+        show={showChildrenModal}
+        onHide={() => setShowChildrenModal(false)}
+        title={<>{categoryForChildren?.name ?? "—"} Sub-categories</>}
+        toolbarHint="Sub-categories under this category. Add or edit below."
+        toolbarAction={
+          categoryForChildren ? (
+            <Button variant="primary" size="sm" onClick={() => openAddChildCategory(categoryForChildren)}>
               <Plus size={16} className="me-1" />
-              Add Field
+              Add Sub Category
             </Button>
-          </div>
-          {fieldsModalMain}
-        </Modal.Body>
-        <Modal.Footer>
-          <Button variant="secondary" onClick={closeFieldsModal}>
-            Close
+          ) : null
+        }
+        bodyContent={childrenModalMain}
+      />
+
+      <RequestCategoriesLargeModal
+        show={showFieldsModal}
+        onHide={closeFieldsModal}
+        title={<>Fields: {fieldsCategoryName}</>}
+        toolbarHint="Define form fields for this request category."
+        toolbarAction={
+          <Button variant="primary" size="sm" onClick={openAddField}>
+            <Plus size={16} className="me-1" />
+            Add Field
           </Button>
-        </Modal.Footer>
-      </Modal>
+        }
+        bodyContent={fieldsModalMain}
+      />
 
       <RequestCategoryFieldModal
         show={showFieldModal}
