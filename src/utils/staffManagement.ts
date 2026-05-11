@@ -1,6 +1,7 @@
 import { toast } from "react-toastify";
 import axiosInstance from "./axios";
 import { GetMinifiedUsers } from "./users";
+import { getHttpApiErrorDetail } from "./errors";
 
 const PREFIX = "/staff-management";
 
@@ -62,11 +63,7 @@ function extractDataWithPagination<T>(
 }
 
 function handleApiError(error: unknown, fallbackMessage: string): never {
-  const msg =
-    error && typeof error === "object" && "message" in error
-      ? String((error as { message?: string }).message)
-      : fallbackMessage;
-  toast.error(msg);
+  toast.error(getHttpApiErrorDetail(error, fallbackMessage));
   throw error;
 }
 
@@ -952,11 +949,14 @@ export interface AttendanceStatusData {
   attendance: AttendanceRecord | null;
 }
 
-export const getAttendance = async (params?: {
-  page?: number;
-  limit?: number;
-  [key: string]: unknown;
-}): Promise<{ data: AttendanceRecord[]; pagination?: ApiPagination }> => {
+export const getAttendance = async (
+  params?: {
+    page?: number;
+    limit?: number;
+    [key: string]: unknown;
+  },
+  options?: { silent?: boolean }
+): Promise<{ data: AttendanceRecord[]; pagination?: ApiPagination }> => {
   try {
     const response = await axiosInstance.get<ApiResponse<AttendanceRecord[]>>(
       `${PREFIX}/attendance`,
@@ -964,6 +964,10 @@ export const getAttendance = async (params?: {
     );
     return extractDataWithPagination(response);
   } catch (error: unknown) {
+    if (options?.silent === true) {
+      console.warn("[getAttendance] request failed (silent)", error);
+      return { data: [] };
+    }
     handleApiError(error, "Failed to fetch attendance");
   }
 };

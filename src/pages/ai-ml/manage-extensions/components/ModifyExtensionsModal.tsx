@@ -68,7 +68,13 @@ export function ModifyExtensionsModal({
         <Button variant="secondary" onClick={onHide}>
           Cancel
         </Button>
-        <Button variant="primary" onClick={onSubmit} disabled={updating}>
+        <Button
+          variant="primary"
+          onClick={() => {
+            Promise.resolve(onSubmit()).catch(() => undefined);
+          }}
+          disabled={updating}
+        >
           {updating ? (
             <>
               <Spinner animation="border" size="sm" className="me-2" />

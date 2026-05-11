@@ -1,38 +1,7 @@
-// Shared CRM UI blocks used by products, industries, and stages pages (deduplicated for Sonar).
+// Shared CRM layout + dialog patterns across products / industries / stages (Sonar CPD).
+@use "crm-wcag-accents" as *;
 
-@mixin crm-slideover-submit-button($bg, $hover-bg) {
-  padding: 10px 20px;
-  color: #ffffff;
-  border: none;
-  border-radius: 4px;
-  font-size: 14px;
-  font-weight: 500;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  background-color: $bg;
-
-  &:disabled {
-    background-color: #cbd5e0;
-    cursor: not-allowed;
-  }
-
-  &:not(:disabled):hover {
-    background-color: $hover-bg;
-  }
-}
-
-.products-sidebar-submit {
-  // Darkened from #0091ae so #fff text clears WCAG AA (4.5:1) on the button.
-  @include crm-slideover-submit-button(#006d82, #005566);
-}
-
-.stages-create-submit {
-  /* Darker than legacy #0091ae so white label meets WCAG AA contrast (~4.5:1) at 14px */
-  @include crm-slideover-submit-button(#006f86, #005a6e);
-}
-
+// —— Slideover create sidebar (products + stages) ——
 .products-sidebar-overlay,
 .stages-create-overlay {
   position: fixed;
@@ -112,6 +81,31 @@
   justify-content: flex-start;
 }
 
+.products-sidebar-submit,
+.stages-create-submit {
+  padding: 10px 20px;
+  color: #ffffff;
+  border: none;
+  border-radius: 4px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background-color: $crm-wcag-teal;
+
+  &:disabled {
+    background-color: #cbd5e0;
+    color: #475569;
+    cursor: not-allowed;
+  }
+
+  &:not(:disabled):hover {
+    background-color: $crm-wcag-teal-hover;
+  }
+}
+
 .products-sidebar-cancel,
 .stages-create-cancel {
   padding: 10px 20px;
@@ -163,7 +157,7 @@
   outline: none;
 
   &:focus {
-    border-color: #0091ae;
+    border-color: $crm-wcag-teal;
   }
 }
 
@@ -179,10 +173,11 @@
   outline: none;
 
   &:focus {
-    border-color: #0091ae;
+    border-color: $crm-wcag-teal;
   }
 }
 
+// —— CRM dialog footers + action buttons ——
 .products-crm-dialog-footer,
 .industries-crm-dialog-footer,
 .stages-crm-dialog-footer {
@@ -192,6 +187,7 @@
   align-items: center;
 }
 
+.products-crm-btn-primary,
 .industries-crm-btn-primary,
 .stages-crm-btn-primary {
   padding: 10px 20px;
@@ -201,27 +197,7 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  // Darkened from #4680ff so #fff text clears WCAG AA (4.5:1) on the button.
-  background: #2967ee;
-  border: none;
-  color: #fff;
-  cursor: pointer;
-
-  &:disabled {
-    opacity: 0.65;
-    cursor: not-allowed;
-  }
-}
-
-.products-crm-btn-primary {
-  padding: 10px 20px;
-  border-radius: 8px;
-  font-weight: 500;
-  font-size: 14px;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  background: #2563eb;
+  background: $crm-wcag-blue;
   border: none;
   color: #fff;
   cursor: pointer;
@@ -253,6 +229,7 @@
   }
 }
 
+// —— Detail / view modal shell (products, industries product modal, stages) ——
 .products-view-header,
 .industries-product-view-header,
 .stages-view-header {
@@ -329,7 +306,7 @@
 .products-view-section-icon,
 .industries-product-view-section-icon,
 .stages-view-section-icon {
-  color: #4680ff;
+  color: $crm-wcag-blue;
 }
 
 .products-view-grid,
@@ -396,7 +373,7 @@
 
 .products-view-inline-icon,
 .industries-product-view-inline-icon {
-  color: #4680ff;
+  color: $crm-wcag-blue;
   margin-right: 6px;
 }
 

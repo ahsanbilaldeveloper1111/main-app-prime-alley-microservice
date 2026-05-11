@@ -155,7 +155,10 @@ export function PaymentMethodsPageView() {
               }}
             >
               <PaymentMethodAddCardForm
-                onSuccess={handleAddCardSuccess}
+                onSuccess={() => {
+                  handleAddCardSuccess().catch(() => undefined);
+                }}
+
                 onCancel={() => setShowAddCardModal(false)}
               />
             </Elements>

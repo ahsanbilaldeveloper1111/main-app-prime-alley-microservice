@@ -53,13 +53,13 @@ const ViewRolePermission = () => {
     const [selectedSeverityLevel, setSelectedSeverityLevel] = useState<string>('');
 
     useEffect(() => {
-        if (id) {
-            fetchRole();
-        }
-    }, [id]);
+        if (!router.isReady || id == null) return;
+        void fetchRole();
+    }, [router.isReady, id]);
 
     const fetchRole = async () => {
-        const role = await viewRank(id as string);
+        const role = await viewRank(id);
+        if (!role || typeof role !== "object") return;
         setRoleName(role.name);
         setRolePermissions(role.permissions);
     }
