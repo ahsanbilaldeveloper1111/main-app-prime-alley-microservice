@@ -9,63 +9,28 @@ import CategoryEditSidebar, {
 import GenericTable from "@components/GenericTable";
 import PageHeader from "@components/PageHeader";
 import {
+  buildChildrenRequestCategoryActions,
+  buildMainRequestCategoryActions,
+  buildRequestCategoryFieldsActions,
+  buildRequestCategoryFieldsColumns,
+  MAIN_REQUEST_CATEGORY_COLUMNS,
+  CHILD_REQUEST_CATEGORY_COLUMNS,
+  REQUEST_CATEGORIES_NESTED_TABLE_LAYOUT,
+} from "@page-modules/workforce/request-categories/partials/requestCategoriesGenericTableBlocks";
+import {
   categoryModalTitle,
   categorySaveButtonLabel,
-  formatDescriptionPreview,
-  formatTrackingLabel,
   isCategoryFormReadyForSubmit,
-  requestCategoryFieldTypeLabel,
   type CategoryFormState,
 } from "@page-modules/workforce/request-categories/requestCategoriesDomain";
 import RequestCategoryFieldModal from "@page-modules/workforce/request-categories/partials/RequestCategoryFieldModal";
 import { SubCategoryWorkflowForm } from "@page-modules/workforce/request-categories/partials/RequestCategoriesWorkflowForm";
 import DeleteConfirmationModal from "@components/page-partials/DeleteConfirmationModal";
 import type { UserRequestCategory, UserRequestCategoryField } from "@utils/staffManagement";
-import { ChevronDown, ChevronUp, FolderTree, List, Pencil, Plus, Trash2 } from "lucide-react";
+import { Plus } from "lucide-react";
 import React, { useMemo, type ReactNode } from "react";
 import { Button, Form, Modal } from "react-bootstrap";
 import { useRequestCategoriesPage } from "../useRequestCategoriesPage";
-
-function CategoryActiveStatusBadge({ row }: Readonly<{ row: UserRequestCategory }>) {
-  return (
-    <span className={`gt-badge gt-badge-${row.is_active === false ? "secondary" : "success"}`}>
-      {row.is_active === false ? "Inactive" : "Active"}
-    </span>
-  );
-}
-
-function FieldReorderButtons({
-  index,
-  reordering,
-  onMove,
-}: Readonly<{
-  index: number;
-  reordering: boolean;
-  onMove: (i: number, direction: "up" | "down") => void;
-}>) {
-  return (
-    <div className="d-flex align-items-center gap-1">
-      <button
-        type="button"
-        className="request-categories-page__field-reorder-btn"
-        onClick={() => onMove(index, "up")}
-        disabled={reordering}
-        aria-label="Move up"
-      >
-        <ChevronUp size={16} />
-      </button>
-      <button
-        type="button"
-        className="request-categories-page__field-reorder-btn"
-        onClick={() => onMove(index, "down")}
-        disabled={reordering}
-        aria-label="Move down"
-      >
-        <ChevronDown size={16} />
-      </button>
-    </div>
-  );
-}
 
 function ManagedDeleteConfirmationModal({
   show,
@@ -198,64 +163,13 @@ export function RequestCategoriesPageView() {
     openDeleteFieldModal,
   } = ctx;
 
-  const mainTableColumns = useMemo(
-    () => [
-      {
-        key: "name",
-        label: "Name",
-        type: "text" as const,
-        emptyValue: "—",
-      },
-      {
-        key: "description",
-        label: "Description",
-        render: (row: UserRequestCategory) => (
-          <span>{formatDescriptionPreview(row.description)}</span>
-        ),
-      },
-      {
-        key: "tracking_enabled",
-        label: "Tracking",
-        render: (row: UserRequestCategory) => <span>{formatTrackingLabel(row)}</span>,
-      },
-      {
-        key: "code_prefix",
-        label: "Code Prefix",
-        render: (row: UserRequestCategory) => <span>{row.tracking_code_prefix ?? "—"}</span>,
-      },
-      {
-        key: "is_active",
-        label: "Active",
-        render: (row: UserRequestCategory) => <CategoryActiveStatusBadge row={row} />,
-      },
-    ],
-    [],
-  );
-
   const mainTableActions = useMemo(
-    () => [
-      {
-        label: "Edit",
-        icon: <Pencil size={14} />,
-        onClick: openEditCategory,
-        variant: "outline-secondary" as const,
-        show: () => canManage,
-      },
-      {
-        label: "Sub-categories",
-        icon: <FolderTree size={14} />,
-        onClick: openChildrenModal,
-        variant: "outline-secondary" as const,
-        show: () => canManage,
-      },
-      {
-        label: "Delete",
-        icon: <Trash2 size={14} />,
-        onClick: openDeleteCategory,
-        variant: "outline-danger" as const,
-        show: () => canManage,
-      },
-    ],
+    () =>
+      buildMainRequestCategoryActions(canManage, {
+        openEditCategory,
+        openChildrenModal,
+        openDeleteCategory,
+      }),
     [canManage, openChildrenModal, openDeleteCategory, openEditCategory],
   );
 
@@ -273,54 +187,14 @@ export function RequestCategoriesPageView() {
     return (
       <GenericTable<UserRequestCategory>
         data={childrenList}
-        columns={[
-          {
-            key: "name",
-            label: "Name",
-            type: "text",
-            emptyValue: "—",
-          },
-          {
-            key: "tracking_enabled",
-            label: "Tracking",
-            render: (row) => <span>{formatTrackingLabel(row)}</span>,
-          },
-          {
-            key: "is_active",
-            label: "Active",
-            render: (row) => <CategoryActiveStatusBadge row={row} />,
-          },
-        ]}
-        actions={[
-          {
-            label: "Edit",
-            icon: <Pencil size={14} />,
-            onClick: (child) => {
-              setShowChildrenModal(false);
-              openEditCategory(child);
-            },
-            variant: "outline-secondary",
-          },
-          {
-            label: "Manage fields",
-            icon: <List size={14} />,
-            onClick: (child) => {
-              setShowChildrenModal(false);
-              openFieldsModal(child);
-            },
-            variant: "outline-secondary",
-          },
-          {
-            label: "Delete",
-            icon: <Trash2 size={14} />,
-            onClick: openDeleteCategory,
-            variant: "outline-danger",
-          },
-        ]}
-        showActions
-        uniqueKey="id"
-        showToolbarActions={false}
-        noBorder
+        columns={CHILD_REQUEST_CATEGORY_COLUMNS}
+        actions={buildChildrenRequestCategoryActions({
+          closeChildrenModal: () => setShowChildrenModal(false),
+          openEditCategory,
+          openFieldsModal,
+          openDeleteCategory,
+        })}
+        {...REQUEST_CATEGORIES_NESTED_TABLE_LAYOUT}
       />
     );
   }, [
@@ -344,50 +218,9 @@ export function RequestCategoriesPageView() {
     return (
       <GenericTable<UserRequestCategoryField>
         data={fields}
-        columns={[
-          {
-            key: "_order",
-            label: "",
-            sortable: false,
-            render: (_row, index) => (
-              <FieldReorderButtons index={index} reordering={reordering} onMove={moveField} />
-            ),
-          },
-          { key: "label", label: "Label", type: "text" },
-          {
-            key: "type",
-            label: "Type",
-            render: (row) => <span>{requestCategoryFieldTypeLabel(row.type)}</span>,
-          },
-          {
-            key: "required",
-            label: "Required",
-            render: (row) => <span>{row.required ? "Yes" : "No"}</span>,
-          },
-          {
-            key: "is_active",
-            label: "Active",
-            render: (row) => <span>{row.is_active === false ? "No" : "Yes"}</span>,
-          },
-        ]}
-        actions={[
-          {
-            label: "Edit",
-            icon: <Pencil size={14} />,
-            onClick: openEditField,
-            variant: "outline-secondary",
-          },
-          {
-            label: "Delete",
-            icon: <Trash2 size={14} />,
-            onClick: openDeleteFieldModal,
-            variant: "outline-danger",
-          },
-        ]}
-        showActions
-        uniqueKey="id"
-        showToolbarActions={false}
-        noBorder
+        columns={buildRequestCategoryFieldsColumns(moveField, reordering)}
+        actions={buildRequestCategoryFieldsActions(openEditField, openDeleteFieldModal)}
+        {...REQUEST_CATEGORIES_NESTED_TABLE_LAYOUT}
       />
     );
   }, [fields, loadingFields, moveField, openDeleteFieldModal, openEditField, reordering]);
@@ -415,7 +248,7 @@ export function RequestCategoriesPageView() {
 
       <GenericTable<UserRequestCategory>
         data={categories}
-        columns={mainTableColumns}
+        columns={MAIN_REQUEST_CATEGORY_COLUMNS}
         actions={mainTableActions}
         showActions
         loading={loading}

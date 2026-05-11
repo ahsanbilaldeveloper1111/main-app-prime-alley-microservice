@@ -1,7 +1,10 @@
 import {
   invalidateAllUserRequestCategories,
-  invalidateUserRequestCategoryFields,
 } from "@page-modules/workforce/request-categories/invalidateRequestCategoriesQueries";
+import {
+  runMutationWithQuietCatch,
+  toastSuccessAndInvalidateCategoryFields,
+} from "@page-modules/workforce/request-categories/requestCategoriesMutationHelpers";
 import {
   consumeHandledApiError,
   defaultCategoryForm,
@@ -144,8 +147,11 @@ export function useRequestCategoriesPage() {
       return createUserRequestCategoryField(categoryId, body);
     },
     onSuccess: (_, vars) => {
-      toast.success(vars.editing ? "Field updated" : "Field added");
-      invalidateUserRequestCategoryFields(queryClient, vars.categoryId);
+      toastSuccessAndInvalidateCategoryFields(
+        queryClient,
+        vars.categoryId,
+        vars.editing ? "Field updated" : "Field added",
+      );
     },
     onError: (e: unknown) => consumeHandledApiError(e, "RequestCategories.handleSaveField"),
   });
@@ -154,8 +160,7 @@ export function useRequestCategoriesPage() {
     mutationFn: ({ categoryId, fieldId }: { categoryId: number; fieldId: number }) =>
       deleteUserRequestCategoryField(categoryId, fieldId),
     onSuccess: (_, vars) => {
-      toast.success("Field deleted");
-      invalidateUserRequestCategoryFields(queryClient, vars.categoryId);
+      toastSuccessAndInvalidateCategoryFields(queryClient, vars.categoryId, "Field deleted");
     },
     onError: (e: unknown) =>
       consumeHandledApiError(e, "RequestCategories.handleConfirmDeleteField"),
@@ -165,8 +170,7 @@ export function useRequestCategoriesPage() {
     mutationFn: ({ categoryId, order }: { categoryId: number; order: FieldsReorderItem[] }) =>
       reorderUserRequestCategoryFields(categoryId, order),
     onSuccess: (_, vars) => {
-      toast.success("Order updated");
-      invalidateUserRequestCategoryFields(queryClient, vars.categoryId);
+      toastSuccessAndInvalidateCategoryFields(queryClient, vars.categoryId, "Order updated");
     },
     onError: (e: unknown) => consumeHandledApiError(e, "RequestCategories.moveField"),
   });
@@ -224,13 +228,11 @@ export function useRequestCategoriesPage() {
       tracking_code_prefix: (categoryForm.tracking_code_prefix ?? "").slice(0, 50) || undefined,
       workflow_levels: normalizeWorkflowLevelsForPayload(categoryForm.workflow_levels),
     };
-    try {
+    await runMutationWithQuietCatch(async () => {
       await saveCategoryMutation.mutateAsync({ editing: editingCategory, payload });
       setShowCategoryModal(false);
       setShowChildrenModal(false);
-    } catch {
-      /* toast handled by mutation */
-    }
+    });
   };
 
   const openDeleteCategory = (cat: UserRequestCategory) => {
@@ -240,13 +242,11 @@ export function useRequestCategoriesPage() {
 
   const handleDeleteCategory = async () => {
     if (!categoryToDelete) return;
-    try {
+    await runMutationWithQuietCatch(async () => {
       await deleteCategoryMutation.mutateAsync(categoryToDelete.id);
       setShowDeleteModal(false);
       setCategoryToDelete(null);
-    } catch {
-      /* handled */
-    }
+    });
   };
 
   const openFieldsModal = (cat: UserRequestCategory) => {
@@ -294,16 +294,14 @@ export function useRequestCategoriesPage() {
       label: trimmedLabel,
       key: fieldForm.key?.trim() || generatedKey,
     };
-    try {
+    await runMutationWithQuietCatch(async () => {
       await saveFieldMutation.mutateAsync({
         categoryId: fieldsCategoryId,
         editing: editingField,
         body: payloadForSave,
       });
       setShowFieldModal(false);
-    } catch {
-      /* handled */
-    }
+    });
   };
 
   const openDeleteFieldModal = (f: UserRequestCategoryField) => {
@@ -313,16 +311,14 @@ export function useRequestCategoriesPage() {
 
   const handleConfirmDeleteField = async () => {
     if (!fieldsCategoryId || !fieldPendingDelete) return;
-    try {
+    await runMutationWithQuietCatch(async () => {
       await deleteFieldMutation.mutateAsync({
         categoryId: fieldsCategoryId,
         fieldId: fieldPendingDelete.id,
       });
       setShowDeleteFieldModal(false);
       setFieldPendingDelete(null);
-    } catch {
-      /* handled */
-    }
+    });
   };
 
   const moveField = async (index: number, direction: "up" | "down") => {
@@ -332,11 +328,9 @@ export function useRequestCategoriesPage() {
     if (swap < 0 || swap >= newFields.length) return;
     [newFields[index], newFields[swap]] = [newFields[swap], newFields[index]];
     const order: FieldsReorderItem[] = newFields.map((f, i) => ({ id: f.id, sort_order: i }));
-    try {
+    await runMutationWithQuietCatch(async () => {
       await reorderFieldsMutation.mutateAsync({ categoryId: fieldsCategoryId, order });
-    } catch {
-      /* handled */
-    }
+    });
   };
 
   const reordering = reorderFieldsMutation.isPending;
