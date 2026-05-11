@@ -9,12 +9,12 @@ import '@assets/scss/tabs.scss';
 import '@assets/scss/common.scss';
 
 // Import partial components
-import UsersHeader from './partials/UsersHeader';
-import OverviewTab from './partials/OverviewTab';
-import UserDetailsModal from './partials/UserDetailsModal';
-import SyncLdapUsersModal from './partials/SyncLdapUsersModal';
+import UsersHeader from "@page-modules/controlhub/users/partials/UsersHeader";
+import OverviewTab from "@page-modules/controlhub/users/partials/OverviewTab";
+import UserDetailsModal from "@page-modules/controlhub/users/partials/UserDetailsModal";
+import SyncLdapUsersModal from "@page-modules/controlhub/users/partials/SyncLdapUsersModal";
 import ResetPasswordModal from '@components/ResetPasswordModal';
-import ChangeStatusModal from './partials/ChangeStatusModal';
+import ChangeStatusModal from "@page-modules/controlhub/users/partials/ChangeStatusModal";
 
 // Import hooks and utilities
 import { useUserColumns } from '@hooks/controlhub/users/userColumns';

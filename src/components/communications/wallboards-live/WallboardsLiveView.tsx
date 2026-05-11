@@ -12,9 +12,9 @@ import PageLoader from '@components/PageLoader'
 import { useSession } from 'next-auth/react'
 import { useCti } from '@hooks/useCti'
 import { CtiDevice } from '@components/live-calls/utils/types'
-import SummaryCards from '@pages/communications/wallboards-live/_partials/SummaryCards'
-import PageHeader from '@pages/communications/wallboards-live/_partials/PageHeader'
-import SectionsRenderer from '@pages/communications/wallboards-live/_partials/SectionsRenderer'
+import SummaryCards from '@page-modules/communications/wallboards-live/_partials/SummaryCards'
+import PageHeader from '@page-modules/communications/wallboards-live/_partials/PageHeader'
+import SectionsRenderer from '@page-modules/communications/wallboards-live/_partials/SectionsRenderer'
 import {
   buildWallboardMonitoringPayloadFromEvent,
   computeNextIdleSinceMap,

@@ -29,7 +29,7 @@ import {
   formatPlannerDueTimeAsUtcIso,
   parseApiDueTimeToTimeInput,
 } from "@utils/plannerTaskDueTime";
-import RichTextEditor from "../../pages/help-center/partials/RichTextEditor";
+import RichTextEditor from "@page-modules/help-center/partials/RichTextEditor";
 import TaskSecondaryTabs from "@components/planner/workPlannerPagePartials/TaskSecondaryTabs";
 import type { PlannerTaskEditScope } from "@planner/taskRowPermissions";
 

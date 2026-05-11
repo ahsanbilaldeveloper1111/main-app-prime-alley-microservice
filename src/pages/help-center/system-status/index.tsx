@@ -3,7 +3,7 @@ import React, { ReactElement } from "react";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 import { useRouter } from "next/router";
-import SystemStatus from "../partials/system-status";
+import SystemStatus from "@page-modules/help-center/partials/system-status";
 
 const SystemStatusPage = () => {
   const router = useRouter();

@@ -4,7 +4,7 @@ import "@assets/scss/tabs.scss";
 import "@page-modules/workforce/request-categories/requestCategoriesPage.scss";
 import React, { ReactElement } from "react";
 import Layout from "@layout/index";
-import { RequestCategoriesPageView } from "./components/RequestCategoriesPageView";
+import { RequestCategoriesPageView } from "@page-modules/workforce/request-categories/components/RequestCategoriesPageView";
 
 const RequestCategories = () => {
   return <RequestCategoriesPageView />;

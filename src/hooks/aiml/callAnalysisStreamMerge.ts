@@ -2,9 +2,9 @@
  * SSE / chunked analysis merge helpers — kept separate from {@link useCallAnalysis} for Sonar CPD.
  */
 import type { Dispatch, SetStateAction } from "react";
-import type { AnalysisStepEntry } from "@pages/ai-ml/analysis/types";
-import { normalizeStep } from "@pages/ai-ml/analysis/analysisHelpers";
-import { STEP_CODES } from "@pages/ai-ml/analysis/constants";
+import type { AnalysisStepEntry } from "@page-modules/ai-ml/analysis/types";
+import { normalizeStep } from "@page-modules/ai-ml/analysis/analysisHelpers";
+import { STEP_CODES } from "@page-modules/ai-ml/analysis/constants";
 
 export type ChunksStateSetter = Dispatch<SetStateAction<any>>;
 

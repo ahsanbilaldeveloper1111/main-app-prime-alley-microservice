@@ -4,7 +4,7 @@ import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
 import React, { ReactElement } from "react";
 import Layout from "@layout/index";
-import { PaymentMethodsPageView } from "./components/PaymentMethodsPageView";
+import { PaymentMethodsPageView } from "@page-modules/billing/customer/payment-methods/components/PaymentMethodsPageView";
 
 const PaymentMethods = () => {
   return <PaymentMethodsPageView />;

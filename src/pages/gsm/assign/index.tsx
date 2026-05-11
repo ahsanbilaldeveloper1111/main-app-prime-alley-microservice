@@ -2,8 +2,8 @@ import "@assets/scss/datatable-style.scss";
 import React, { ReactElement } from "react";
 import Layout from "@layout/index";
 import "@assets/scss/common.scss";
-import { useGsmAssignPage } from "./useGsmAssignPage";
-import { GsmAssignPageView } from "./components/GsmAssignPageView";
+import { useGsmAssignPage } from "@page-modules/gsm/assign/useGsmAssignPage";
+import { GsmAssignPageView } from "@page-modules/gsm/assign/components/GsmAssignPageView";
 
 const GsmAssign = () => {
   const ctx = useGsmAssignPage();

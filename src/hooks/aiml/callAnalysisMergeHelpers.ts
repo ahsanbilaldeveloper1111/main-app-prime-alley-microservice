@@ -1,4 +1,4 @@
-import { STEP_CODES } from "@pages/ai-ml/analysis/constants";
+import { STEP_CODES } from "@page-modules/ai-ml/analysis/constants";
 
 type AnyChunks = Record<string, unknown>;
 

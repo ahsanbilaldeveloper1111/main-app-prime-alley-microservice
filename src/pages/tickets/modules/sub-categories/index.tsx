@@ -3,8 +3,8 @@ import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
 import React, { ReactElement } from "react";
 import Layout from "@layout/index";
-import { ModuleSubCategoriesPageView } from "./components/ModuleSubCategoriesPageView";
-import { useModuleSubCategoriesPage } from "./useModuleSubCategoriesPage";
+import { ModuleSubCategoriesPageView } from "@page-modules/tickets/modules/sub-categories/components/ModuleSubCategoriesPageView";
+import { useModuleSubCategoriesPage } from "@page-modules/tickets/modules/sub-categories/useModuleSubCategoriesPage";
 
 const ModuleSubCategories = () => {
   const s = useModuleSubCategoriesPage();

@@ -3,7 +3,7 @@ import React, { ReactElement } from "react";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 import { useRouter } from "next/router";
-import ArticleDetail from "../partials/article-detail";
+import ArticleDetail from "@page-modules/help-center/partials/article-detail";
 
 const ArticleDetailPage = () => {
   const router = useRouter();

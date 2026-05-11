@@ -14,7 +14,7 @@ import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
 
 import { GetUserById } from "@utils/tms/tmsUserManagement";
-import CreateUserProfile from "@pages/tms/profiling/user/create/CreateUserProfile";
+import CreateUserProfile from "@page-modules/tms/profiling/user/create/CreateUserProfile";
 
 const TmsUserEdit = () => {
   const router = useRouter();

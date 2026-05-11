@@ -27,7 +27,7 @@ import {
   INDUSTRIES_TABLE_SELECTABLE_KEYS,
   type IndustryFormData,
   type ProductFormData,
-} from "@pages/crm/industries/industriesPageModel";
+} from "@page-modules/crm/industries/industriesPageModel";
 import { useSession } from "next-auth/react";
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 

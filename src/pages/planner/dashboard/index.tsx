@@ -6,7 +6,7 @@ import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
 import ProjectTabsContent, {
   type ProjectTabsContentRef,
-} from "../projects/partials/ProjectTabsContent";
+} from "@page-modules/planner/projects/partials/ProjectTabsContent";
 import { ModuleSlug } from "@utils/Helper";
 import { useHierarchyData } from "@components/filters/useHierarchyData";
 import { usePermissions } from "@utils/permissionUtils";

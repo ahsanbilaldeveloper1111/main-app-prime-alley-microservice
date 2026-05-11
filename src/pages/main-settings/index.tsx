@@ -2,8 +2,8 @@ import React, { ReactElement, useEffect } from 'react'
 import { useRouter } from 'next/router'
 import Layout from '@layout/index'
 
-export type { SectionRenderer } from './sectionPageMap'
-export { sectionPageMap } from './sectionPageMap'
+export type { SectionRenderer } from "@page-modules/main-settings/sectionPageMap";
+export { sectionPageMap } from "@page-modules/main-settings/sectionPageMap";
 
 const MainSettingsIndex = () => {
   const router = useRouter()

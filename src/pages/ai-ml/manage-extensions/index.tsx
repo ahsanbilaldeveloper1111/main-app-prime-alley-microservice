@@ -6,10 +6,10 @@ import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
 import { Card } from "react-bootstrap";
 import { useManageExtensions } from "@hooks/aiml/useManageExtensions";
-import { ManageExtensionsEmptyState } from "./components/ManageExtensionsEmptyState";
-import { ManageExtensionsFilters } from "./components/ManageExtensionsFilters";
-import { ManageExtensionsResultTable } from "./components/ManageExtensionsResultTable";
-import { ModifyExtensionsModal } from "./components/ModifyExtensionsModal";
+import { ManageExtensionsEmptyState } from "@page-modules/ai-ml/manage-extensions/components/ManageExtensionsEmptyState";
+import { ManageExtensionsFilters } from "@page-modules/ai-ml/manage-extensions/components/ManageExtensionsFilters";
+import { ManageExtensionsResultTable } from "@page-modules/ai-ml/manage-extensions/components/ManageExtensionsResultTable";
+import { ModifyExtensionsModal } from "@page-modules/ai-ml/manage-extensions/components/ModifyExtensionsModal";
 
 const ManageExtensions = () => {
   const {

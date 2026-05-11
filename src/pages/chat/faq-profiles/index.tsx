@@ -3,8 +3,8 @@ import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
 import React, { ReactElement } from "react";
 import Layout from "@layout/index";
-import { FaqProfilesPageView } from "./components/FaqProfilesPageView";
-import { useFaqProfilesPage } from "./useFaqProfilesPage";
+import { FaqProfilesPageView } from "@page-modules/chat/faq-profiles/components/FaqProfilesPageView";
+import { useFaqProfilesPage } from "@page-modules/chat/faq-profiles/useFaqProfilesPage";
 
 const FaqProfiles = () => {
   const ctx = useFaqProfilesPage();

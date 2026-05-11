@@ -4,8 +4,8 @@ import "@assets/scss/tabs.scss";
 import React, { ReactElement } from "react";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
-import { TicketStatusesPageView } from "./components/TicketStatusesPageView";
-import { useTicketStatusesPage } from "./useTicketStatusesPage";
+import { TicketStatusesPageView } from "@page-modules/tickets/statuses/components/TicketStatusesPageView";
+import { useTicketStatusesPage } from "@page-modules/tickets/statuses/useTicketStatusesPage";
 
 const TicketStatuses = () => {
   const {

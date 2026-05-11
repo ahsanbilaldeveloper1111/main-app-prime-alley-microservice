@@ -5,8 +5,8 @@ import BreadcrumbItem from "@common/BreadcrumbItem";
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
 import "@components/planner/plannerStatuses/plannerStatuses.scss";
-import { WorkPlannerStatusesView } from "./components/WorkPlannerStatusesView";
-import { useWorkPlannerStatuses } from "./useWorkPlannerStatuses";
+import { WorkPlannerStatusesView } from "@page-modules/planner/statuses/components/WorkPlannerStatusesView";
+import { useWorkPlannerStatuses } from "@page-modules/planner/statuses/useWorkPlannerStatuses";
 
 const WorkPlannerStatuses = () => {
   const {

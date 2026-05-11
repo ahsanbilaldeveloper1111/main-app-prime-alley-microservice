@@ -3,8 +3,8 @@ import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
 import React, { ReactElement } from "react";
 import Layout from "@layout/index";
-import { AIFaqsGlobalPageView } from "./components/AIFaqsGlobalPageView";
-import { useAIFaqsGlobalPage } from "./useAIFaqsGlobalPage";
+import { AIFaqsGlobalPageView } from "@page-modules/chat/ai-faqs/global/components/AIFaqsGlobalPageView";
+import { useAIFaqsGlobalPage } from "@page-modules/chat/ai-faqs/global/useAIFaqsGlobalPage";
 
 const AIChatFAQsGlobal = () => {
   const ctx = useAIFaqsGlobalPage();

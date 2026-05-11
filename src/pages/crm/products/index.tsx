@@ -22,7 +22,7 @@ import "@assets/scss/common.scss";
 import DeleteConfirmationModal from "@components/page-partials/DeleteConfirmationModal";
 import { HEADER_CONSTANTS } from "@constants/headerConstants";
 import type { CrmSettingsTablePaginationState } from "@hooks/useCrmSettingsTableState";
-import type { CrmPageDisplayProps } from "@pages/crm/crmPageDisplayProps";
+import type { CrmPageDisplayProps } from "@page-modules/crm/crmPageDisplayProps";
 import { useCrmProductsPage } from "@hooks/crm/useCrmProductsPage";
 import {
   DEFAULT_PRODUCT_TABLE_COLUMNS,
@@ -30,9 +30,9 @@ import {
   getStatusByFilterId,
   type ProductDisplayData,
   type ProductsPageFilters,
-} from "@pages/crm/products/productsPageModel";
-import ProductsFormSidebar from "@pages/crm/products/ProductsFormSidebar";
-import ProductsViewModal from "@pages/crm/products/ProductsViewModal";
+} from "@page-modules/crm/products/productsPageModel";
+import ProductsFormSidebar from "@page-modules/crm/products/ProductsFormSidebar";
+import ProductsViewModal from "@page-modules/crm/products/ProductsViewModal";
 
 const { PERMISSIONS } = HEADER_CONSTANTS;
 

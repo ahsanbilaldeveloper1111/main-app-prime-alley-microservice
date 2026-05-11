@@ -4,8 +4,8 @@ import "@assets/scss/tabs.scss";
 import React, { ReactElement } from "react";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
-import { TicketTypesPageView } from "./components/TicketTypesPageView";
-import { useTicketTypesPage } from "./useTicketTypesPage";
+import { TicketTypesPageView } from "@page-modules/tickets/types/components/TicketTypesPageView";
+import { useTicketTypesPage } from "@page-modules/tickets/types/useTicketTypesPage";
 
 const TicketTypes = () => {
   const {

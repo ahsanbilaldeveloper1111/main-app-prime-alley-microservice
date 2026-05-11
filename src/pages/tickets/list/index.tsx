@@ -46,7 +46,7 @@ import "@assets/scss/tabs.scss";
 import PageHeader from "@components/PageHeader";
 import FormModal from "@components/page-partials/FormModal";
 import ConfirmModal from "@components/page-partials/ConfirmModal";
-import RichTextEditor from "@pages/help-center/partials/RichTextEditor";
+import RichTextEditor from "@page-modules/help-center/partials/RichTextEditor";
 import { User,Edit,Trash2,Eye,Plus, Filter, Search,Info, AlertCircle, CheckCircle, X, Paperclip, FileText, Tag, Calendar, Clock, Download, MessageCircle, Send, CircleCheckBig, BarChart3, Ticket } from "lucide-react";
 
 import ThemeSelect from "@components/ThemeSelect";

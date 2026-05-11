@@ -1,7 +1,7 @@
 import React, { ReactElement } from 'react'
 import { useRouter } from 'next/router'
 import Layout from '@layout/index'
-import SettingsLayout from '../partials/SettingsLayout'
+import SettingsLayout from "@page-modules/main-settings/partials/SettingsLayout";
 import { sectionPageMap } from '../index'
 
 const MainSettingsSectionSubTabPage = () => {
