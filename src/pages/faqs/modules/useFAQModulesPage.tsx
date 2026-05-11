@@ -336,4 +336,4 @@ export function useFAQModulesPage() {
   };
 }
 
-export type { FAQModuleRow };
+export type { FAQModuleRow } from "./faqModulesTypes";

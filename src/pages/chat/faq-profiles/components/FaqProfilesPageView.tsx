@@ -1,0 +1,257 @@
+import BreadcrumbItem from "@common/BreadcrumbItem";
+import PageHeader from "@components/PageHeader";
+import { useFaqProfilesPage } from "../useFaqProfilesPage";
+import { Building2, Bot, ChevronRight, Globe, X } from "lucide-react";
+import { Button, Container, Form, Modal, Row, Col, Card, Spinner } from "react-bootstrap";
+import Select from "react-select";
+import React from "react";
+
+export type FaqProfilesPageViewProps = Readonly<{
+  ctx: ReturnType<typeof useFaqProfilesPage>;
+}>;
+
+export function FaqProfilesPageView({ ctx }: FaqProfilesPageViewProps) {
+  const {
+    router,
+    companies,
+    companiesLoading,
+    showCompanyModal,
+    setShowCompanyModal,
+    showTrainingModal,
+    trainingResponse,
+    selectedCompanyId,
+    setSelectedCompanyId,
+    handleTrainBotClick,
+    handleCompanySubmit,
+    closeTrainingModal,
+    trainingLoading,
+  } = ctx;
+
+  return (
+    <React.Fragment>
+      <BreadcrumbItem mainTitle="" mainLink="" subTitle="" />
+
+      <PageHeader
+        title=""
+        showSearch={false}
+        buttons={
+          <Button variant="primary" onClick={handleTrainBotClick} disabled={trainingLoading}>
+            {trainingLoading ? (
+              <>
+                <Spinner size="sm" className="me-2" />
+                Training...
+              </>
+            ) : (
+              <>
+                <Bot size={16} className="me-2" />
+                Train Bot
+              </>
+            )}
+          </Button>
+        }
+      />
+
+      <Container fluid className="">
+        <Row className="g-4">
+          <Col md={6}>
+            <Card
+              className="h-100 shadow-sm"
+              style={{
+                cursor: "pointer",
+                transition: "all 0.3s ease",
+                border: "1px solid #e9ecef",
+              }}
+              onClick={() => router.push("/chat/ai-faqs/tenant")}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = "translateY(-4px)";
+                e.currentTarget.style.boxShadow = "0 8px 16px rgba(0,0,0,0.1)";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = "translateY(0)";
+                e.currentTarget.style.boxShadow = "0 2px 4px rgba(0,0,0,0.1)";
+              }}
+            >
+              <Card.Body className="d-flex flex-column align-items-center justify-content-center text-center p-5">
+                <div
+                  className="rounded-circle d-flex align-items-center justify-content-center mb-3"
+                  style={{
+                    width: "80px",
+                    height: "80px",
+                    background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+                    color: "white",
+                  }}
+                >
+                  <Building2 size={40} />
+                </div>
+                <h4 className="mb-3" style={{ color: "#263238", fontWeight: "600" }}>
+                  Tenant FAQs
+                </h4>
+                <p className="text-muted mb-4" style={{ fontSize: "0.95rem" }}>
+                  Manage and configure tenant-specific frequently asked questions for your AI chat system.
+                </p>
+                <div
+                  className="d-flex align-items-center text-primary"
+                  style={{ fontSize: "0.9rem", fontWeight: "500" }}
+                >
+                  View Tenant FAQs
+                  <ChevronRight size={18} className="ms-1" />
+                </div>
+              </Card.Body>
+            </Card>
+          </Col>
+
+          <Col md={6}>
+            <Card
+              className="h-100 shadow-sm"
+              style={{
+                cursor: "pointer",
+                transition: "all 0.3s ease",
+                border: "1px solid #e9ecef",
+              }}
+              onClick={() => router.push("/chat/ai-faqs/global")}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = "translateY(-4px)";
+                e.currentTarget.style.boxShadow = "0 8px 16px rgba(0,0,0,0.1)";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = "translateY(0)";
+                e.currentTarget.style.boxShadow = "0 2px 4px rgba(0,0,0,0.1)";
+              }}
+            >
+              <Card.Body className="d-flex flex-column align-items-center justify-content-center text-center p-5">
+                <div
+                  className="rounded-circle d-flex align-items-center justify-content-center mb-3"
+                  style={{
+                    width: "80px",
+                    height: "80px",
+                    background: "linear-gradient(135deg, #f093fb 0%, #f5576c 100%)",
+                    color: "white",
+                  }}
+                >
+                  <Globe size={40} />
+                </div>
+                <h4 className="mb-3" style={{ color: "#263238", fontWeight: "600" }}>
+                  Global FAQs
+                </h4>
+                <p className="text-muted mb-4" style={{ fontSize: "0.95rem" }}>
+                  Manage and configure global frequently asked questions that apply across all tenants.
+                </p>
+                <div
+                  className="d-flex align-items-center text-primary"
+                  style={{ fontSize: "0.9rem", fontWeight: "500" }}
+                >
+                  View Global FAQs
+                  <ChevronRight size={18} className="ms-1" />
+                </div>
+              </Card.Body>
+            </Card>
+          </Col>
+        </Row>
+      </Container>
+
+      <Modal
+        show={showCompanyModal}
+        onHide={() => !trainingLoading && setShowCompanyModal(false)}
+        centered
+      >
+        <Modal.Header closeButton>
+          <Modal.Title className="d-flex align-items-center gap-2">
+            <Bot size={20} />
+            Train Bot
+          </Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <Form.Group>
+            <Form.Label>Select Company</Form.Label>
+            <Select
+              isLoading={companiesLoading}
+              options={companies.map((c) => ({
+                value: c.identifier,
+                label: (c.name ?? c.identifier) as string,
+              }))}
+              value={
+                selectedCompanyId
+                  ? {
+                      value: selectedCompanyId,
+                      label:
+                        (companies.find((c) => c.identifier === selectedCompanyId)?.name ??
+                          selectedCompanyId) as string,
+                    }
+                  : null
+              }
+              onChange={(opt) => setSelectedCompanyId(opt?.value ?? "")}
+              placeholder="Select company..."
+              isClearable
+            />
+          </Form.Group>
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={() => setShowCompanyModal(false)}>
+            Cancel
+          </Button>
+          <Button variant="primary" onClick={handleCompanySubmit} disabled={!selectedCompanyId?.trim()}>
+            Submit
+          </Button>
+        </Modal.Footer>
+      </Modal>
+
+      <Modal show={showTrainingModal} onHide={closeTrainingModal} size="lg" centered>
+        <Modal.Header style={{ borderBottom: "1px solid #e8eef5" }}>
+          <Modal.Title
+            style={{
+              fontSize: "18px",
+              fontWeight: "600",
+              display: "flex",
+              alignItems: "center",
+              gap: "8px",
+            }}
+          >
+            <Bot size={20} color="#4e6fa5" />
+            Training Results
+          </Modal.Title>
+          <Button
+            variant="link"
+            onClick={closeTrainingModal}
+            style={{
+              background: "none",
+              border: "none",
+              padding: "4px",
+              cursor: "pointer",
+              color: "#6c757d",
+              display: "flex",
+              alignItems: "center",
+            }}
+          >
+            <X size={20} />
+          </Button>
+        </Modal.Header>
+        <Modal.Body>
+          {trainingResponse ? (
+            <div style={{ padding: "20px", textAlign: "center" }}>
+              <p
+                style={{
+                  fontSize: "16px",
+                  color: "#2d3748",
+                  margin: 0,
+                  lineHeight: "1.6",
+                }}
+              >
+                {(() => {
+                  const tenantFiles = trainingResponse.tenant_documents?.files ?? 0;
+                  const globalFiles = trainingResponse.global_documents?.files ?? 0;
+                  const totalChunks = trainingResponse.total_chunks ?? 0;
+                  return `Training completed successfully! Processed ${tenantFiles} tenant files and ${globalFiles} global files. Total chunks: ${totalChunks}`;
+                })()}
+              </p>
+            </div>
+          ) : null}
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={closeTrainingModal}>
+            Close
+          </Button>
+        </Modal.Footer>
+      </Modal>
+    </React.Fragment>
+  );
+}

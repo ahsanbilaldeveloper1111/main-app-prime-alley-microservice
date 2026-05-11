@@ -1,5 +1,7 @@
 // CRM Industries (product groups) page — static layout only.
 
+@use "crm-wcag-accents" as *;
+
 .industries-form-hint-text {
   font-size: 0.813rem;
 }
@@ -23,8 +25,7 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  // Darkened from #4680ff so #fff text clears WCAG AA (4.5:1) on the button.
-  background: #2967ee;
+  background: $crm-wcag-blue;
   border: none;
   color: #fff;
   cursor: pointer;
@@ -152,7 +153,7 @@
 }
 
 .industries-product-view-section-icon {
-  color: #4680ff;
+  color: $crm-wcag-blue;
 }
 
 .industries-product-view-grid {
@@ -196,7 +197,7 @@
 }
 
 .industries-product-view-inline-icon {
-  color: #4680ff;
+  color: $crm-wcag-blue;
   margin-right: 6px;
 }
 
