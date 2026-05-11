@@ -244,7 +244,8 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  background: #4680ff;
+  // Darkened from #4680ff so #fff text clears WCAG AA (4.5:1) on the button.
+  background: #2967ee;
   border: none;
   color: #fff;
   cursor: pointer;

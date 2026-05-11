@@ -349,4 +349,4 @@ export function useFAQItemsPage() {
   };
 }
 
-export type { FAQItemRow };
+export type { FAQItemRow } from "./faqItemsTypes";
