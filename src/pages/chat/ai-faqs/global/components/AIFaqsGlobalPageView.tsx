@@ -97,7 +97,11 @@ export function AIFaqsGlobalPageView({ ctx }: AIFaqsGlobalPageViewProps) {
         handleRemoveFile={handleRemoveFile}
         handleSubmit={handleSubmit}
         handleConfirmDelete={handleConfirmDelete}
-        viewModal={{ show: showViewModal, setShow: setShowViewModal, faq: viewFAQ }}
+        viewModal={{
+          show: showViewModal,
+          setShow: setShowViewModal,
+          faq: viewFAQ,
+        }}
       />
     </React.Fragment>
   );

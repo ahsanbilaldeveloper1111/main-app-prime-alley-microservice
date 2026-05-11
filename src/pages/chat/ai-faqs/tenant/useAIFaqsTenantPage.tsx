@@ -21,6 +21,23 @@ import {
 } from "../faqItemDraft";
 import { useAiFaqDraftFormState } from "../hooks/useAiFaqDraftFormState";
 
+type AiFaqDraftItem = FAQItem & Readonly<{ draftId: string }>;
+
+let aiFaqTenantDraftIdSeq = 0;
+
+function nextDraftRow(question = "", answer = ""): AiFaqDraftItem {
+  const c = globalThis.crypto;
+  const draftId =
+    c !== undefined && typeof c.randomUUID === "function"
+      ? c.randomUUID()
+      : `draft_${Date.now()}_${(++aiFaqTenantDraftIdSeq).toString(36)}`;
+  return {
+    question,
+    answer,
+    draftId,
+  };
+}
+
 export function useAIFaqsTenantPage() {
   const router = useRouter();
   const { data: session } = useSession();

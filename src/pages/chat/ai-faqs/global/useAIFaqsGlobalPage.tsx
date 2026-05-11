@@ -19,6 +19,23 @@ import {
 } from "../faqItemDraft";
 import { useAiFaqDraftFormState } from "../hooks/useAiFaqDraftFormState";
 
+type AiFaqDraftItem = FAQItem & Readonly<{ draftId: string }>;
+
+let aiFaqGlobalDraftIdSeq = 0;
+
+function nextDraftRow(question = "", answer = ""): AiFaqDraftItem {
+  const c = globalThis.crypto;
+  const draftId =
+    c !== undefined && typeof c.randomUUID === "function"
+      ? c.randomUUID()
+      : `draft_${Date.now()}_${(++aiFaqGlobalDraftIdSeq).toString(36)}`;
+  return {
+    question,
+    answer,
+    draftId,
+  };
+}
+
 export function useAIFaqsGlobalPage() {
   const router = useRouter();
   const [refreshKey, setRefreshKey] = useState(0);

@@ -86,8 +86,9 @@ export function AIFaqsTenantPageView({ ctx }: AIFaqsTenantPageViewProps) {
                 ? {
                     value: selectedCompanyForFilter,
                     label:
-                      companies.find((c) => c.identifier === selectedCompanyForFilter)?.name ??
-                      selectedCompanyForFilter,
+                      companies.find(
+                        (c) => c.identifier === selectedCompanyForFilter,
+                      )?.name ?? selectedCompanyForFilter,
                   }
                 : null
             }
@@ -146,7 +147,9 @@ export function AIFaqsTenantPageView({ ctx }: AIFaqsTenantPageViewProps) {
                 tenantId
                   ? {
                       value: tenantId,
-                      label: companies.find((c) => c.identifier === tenantId)?.name ?? tenantId,
+                      label:
+                        companies.find((c) => c.identifier === tenantId)
+                          ?.name ?? tenantId,
                     }
                   : null
               }
