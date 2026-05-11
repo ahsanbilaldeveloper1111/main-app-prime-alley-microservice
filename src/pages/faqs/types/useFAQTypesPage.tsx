@@ -15,7 +15,8 @@ export function useFAQTypesPage() {
       ...topics.map((t: any) => {
         let label = String(t.name);
         if (t.faq_module) {
-          label += ` (${String(t.faq_module.name)})`;
+          const moduleLabel = String(t.faq_module.name);
+          label += " (" + moduleLabel + ")";
         }
         return {
           value: t.id as number,
