@@ -1,0 +1,549 @@
+import type { AudioPlayerRef } from "@components/AudioPlayer";
+import { useAnalysisSSE } from "@hooks/useAnalysisSSE";
+import {
+  applyAnalysisStepChunk,
+  buildDoneResultChunksPatch,
+  upsertCompletedStepEntry,
+} from "@hooks/aiml/callAnalysisStreamMerge";
+import axiosInstance from "@utils/axios";
+import { decodeAnalysisData, formatDuration } from "@utils/Helper";
+import { useRouter } from "next/router";
+import React, { useEffect, useRef, useState } from "react";
+import { toast } from "react-toastify";
+import {
+  INITIAL_CHUNKS_ANALYSIS_DATA,
+  UNABLE_TO_ANALYZE_CALL,
+} from "@pages/ai-ml/analysis/constants";
+import type { AnalysisStepEntry, CallAnalysisWithDataParams } from "@pages/ai-ml/analysis/types";
+import { updateStepInList } from "@pages/ai-ml/analysis/analysisHelpers";
+
+function firstRouterQueryValue(raw: unknown): string | undefined {
+  if (typeof raw === "string") return raw;
+  if (Array.isArray(raw) && typeof raw[0] === "string") return raw[0];
+  return undefined;
+}
+
+export function useCallAnalysis() {
+  const router = useRouter();
+  const [chunksAnalysisData, setChunksAnalysisData] = useState<any>({
+    ...INITIAL_CHUNKS_ANALYSIS_DATA,
+  });
+
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [analysisComplete, setAnalysisComplete] = useState<boolean>(false);
+  const [validAnalysis, setValidAnalysis] = useState(true);
+
+  const [steps, setSteps] = useState<AnalysisStepEntry[]>([]);
+  const [currentStep, setCurrentStep] = useState<string | null>(null);
+
+  const [uuid, setUuid] = useState("");
+  const [date, setDate] = useState("");
+  const [localPartyNumber, setLocalPartyNumber] = useState("");
+  const [remotePartyNumber, setRemotePartyNumber] = useState("");
+  const [ownerUsername, setOwnerUsername] = useState("");
+  const [imagicle, setImagicle] = useState("");
+  const [callType, setCallType] = useState<string | null>(null);
+  const [callDuration, setCallDuration] = useState<string | null>(null);
+  const [callDurationFormatted, setCallDurationFormatted] = useState<string | null>(null);
+  const [dateTime, setDateTime] = useState("");
+
+  const [audioTrackId, setAudioTrackId] = useState("");
+  const [audioUrl, setAudioUrl] = useState<string>("");
+  const [audioLoading, setAudioLoading] = useState(false);
+  const [audioError, setAudioError] = useState<string | null>(null);
+  const [playingSegment, setPlayingSegment] = useState<{ start: number; end: number } | null>(null);
+  const [mediaPlayerShow, setMediaPlayerShow] = useState(false);
+
+  const [activeTab, setActiveTab] = useState("summary");
+  const [subActiveTab, setSubActiveTab] = useState("en");
+
+  const audioPlayerRef = useRef<AudioPlayerRef>(null);
+  const audioStopTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const handleDoneStatus = (parsedData: any) => {
+    setLoading(false);
+    if (parsedData.step) {
+      upsertCompletedStepEntry(parsedData.step, parsedData.message, setSteps);
+    }
+
+    if (!parsedData.result) {
+      console.warn("Status is done but result is missing:", parsedData);
+      return;
+    }
+
+    const result = parsedData.result;
+    const updates = buildDoneResultChunksPatch(result);
+
+    if (Object.keys(updates).length > 0) {
+      setChunksAnalysisData((prev: any) => ({ ...prev, ...updates }));
+    } else {
+      console.warn("No valid updates found in result:", result);
+    }
+
+    if (result.analysis?.error) {
+      console.error("Analysis error:", result.analysis.error);
+      setError(UNABLE_TO_ANALYZE_CALL);
+      setLoading(false);
+      setAnalysisComplete(true);
+    } else {
+      setValidAnalysis(true);
+    }
+
+    setLoading(false);
+    setAnalysisComplete(true);
+    setCurrentStep(null);
+    setSteps((prev: AnalysisStepEntry[]) => prev.map((s: AnalysisStepEntry) => ({ ...s, status: "done" })));
+
+    disconnectSocket();
+  };
+
+  const handleErrorStatus = (parsedData: any) => {
+    console.error('Error status received from server:', parsedData);
+    const errorMessage = parsedData.msg || parsedData.message || 'Analysis error occurred';
+    setError(errorMessage);
+    setLoading(false);
+    setAnalysisComplete(true);
+    
+    // Update step error status
+    if (currentStep) {
+      setSteps((prev: AnalysisStepEntry[]) => prev.map((s: AnalysisStepEntry) => 
+        s.step === currentStep ? { ...s, status: 'error', message: errorMessage } : s
+      ));
+    } else if (parsedData.step) {
+      const stepEntry = {
+        step: parsedData.step,
+        message: errorMessage,
+        status: 'error',
+        timestamp: Date.now()
+      };
+      setSteps((prev: AnalysisStepEntry[]) => {
+        const existingIndex = prev.findIndex((s: AnalysisStepEntry) => s.step === parsedData.step);
+        if (existingIndex >= 0) {
+          const updated = [...prev];
+          updated[existingIndex] = stepEntry;
+          return updated;
+        }
+        return [...prev, stepEntry];
+      });
+      setCurrentStep(parsedData.step);
+    } else {
+      setSteps((prev: AnalysisStepEntry[]) => {
+        const last = prev.at(-1);
+        if (!last) return prev;
+        const updated = [...prev];
+        const lastIdx = updated.length - 1;
+        updated[lastIdx] = { ...last, status: "error", message: errorMessage };
+        return updated;
+      });
+    }
+    
+    disconnectSocket();
+  };
+
+  // Server-Sent Events connection to analysis server
+  const {
+    connected: socketConnected,
+    connecting: socketConnecting,
+    parametersReady: socketParametersReady,
+    connect: connectSocket,
+    disconnect: disconnectSocket,
+  } = useAnalysisSSE({
+
+    uuid: uuid,
+    date: date,
+    localPartyNumber: localPartyNumber,
+    ownerUsername: ownerUsername,
+    imagicle: imagicle,
+
+    callDuration: callDuration?.toString(),
+    callType: callType?.toString(),
+    remotePartyNumber: remotePartyNumber,
+    dateTime: dateTime,
+
+    preventAutoConnect: analysisComplete,
+    onMessage: (data) => {
+      if (!data) {
+        return;
+      }
+
+      // Handle case where data might be a string that needs parsing
+      let parsedData = data;
+      if (typeof data === 'string') {
+        try {
+          parsedData = JSON.parse(data);
+        } catch (e) {
+          console.error('Failed to parse string data:', e);
+          return;
+        }
+      }
+
+      // UNIVERSAL STEP TRACKING: Handle ALL events with a step field first
+      // This ensures every event with a step is captured, regardless of type/status
+      if (parsedData.step) {
+        const stepEntry = {
+          step: parsedData.step,
+          message: parsedData.message || '',
+          status: parsedData.status || 'processing',
+          timestamp: Date.now()
+        };
+        
+        setSteps((prev: AnalysisStepEntry[]) => updateStepInList(prev, stepEntry));
+        
+        // Set current step if it's processing or connecting
+        if (parsedData.status === 'processing' || parsedData.status === 'connecting' || parsedData.status === 'connected') {
+          setCurrentStep(parsedData.step);
+        }
+      }
+
+      // Update data based on step code whenever we have result and step_code, regardless of status or step field
+      // This handles cases where step_code and result are present but step field might be missing
+      if (parsedData.result && parsedData.step_code) {
+        applyAnalysisStepChunk(String(parsedData.step_code), parsedData.result, setChunksAnalysisData);
+      }
+
+      
+
+      // Handle status-specific logic
+      if (parsedData.status === 'processing') {
+        setLoading(true);
+      } else if (parsedData.status === 'done') {
+        handleDoneStatus(parsedData);
+      } else if (parsedData.status === 'error') {
+        handleErrorStatus(parsedData);
+      }
+
+      // Handle connection type messages
+      if (parsedData.type === 'connection') {
+        setLoading(true);
+      }
+      // Ping messages are handled silently to keep connection alive
+    },
+    onError: (error) => {
+      console.error('Analysis SSE error:', error);
+      const errorMessage = error?.msg || error?.message || (typeof error === 'string' ? error : UNABLE_TO_ANALYZE_CALL);
+      setError(errorMessage);
+      setLoading(false);
+      setAnalysisComplete(true); // Prevent auto-reconnect
+      // Disconnect socket on error
+      disconnectSocket();
+      toast.error(errorMessage);
+    },
+    onOpen: () => {
+      setError(null);
+    },
+    onClose: () => {
+      // Connection closed - handled silently
+    }
+  });
+      
+
+  const handleGetCallAnalysisWithData = async (params: CallAnalysisWithDataParams) => {
+    setUuid(params.uuidParam);
+    setDate(params.dateParam);
+    setLocalPartyNumber(params.localPartyNumberParam);
+    setOwnerUsername(params.ownerUsernameParam);
+    setImagicle(params.imagicleParam);
+
+    if (params.dateTimeParam) {
+      setDateTime(params.dateTimeParam);
+    }
+    if (params.durationParam) {
+      setCallDuration(params.durationParam);
+    }
+    if (params.directionParam) {
+      setCallType(params.directionParam);
+    }
+    if (params.phoneParam) {
+      setRemotePartyNumber(params.phoneParam);
+    }
+    setLoading(true);
+    setError(null);
+    setAnalysisComplete(false);
+    setSteps([]);
+    setCurrentStep(null);
+  };
+
+  // Extract data from URL parameters
+  useEffect(() => {
+    if (!router.isReady) return;
+
+    try {
+      const data = firstRouterQueryValue(router.query.data);
+
+      let decodedId = "";
+      let decodedDirection = "";
+      let decodedPhone = "";
+      let decodedImagicle = "";
+      let decodedDuration = "";
+      let decodedDateTime = "";
+      let decodedDateOnly = "";
+      let decodedOwnerUsername = "";
+      let decodedLocalPartyNumber = "";
+
+      if (data) {
+        try {
+          const dataObject = decodeAnalysisData(data);
+
+          console.log("dataObject", dataObject);
+          decodedId = dataObject.uuid;
+          decodedDirection = dataObject.direction;
+          decodedPhone = dataObject.phone;
+          decodedImagicle = dataObject.imagicle;
+          decodedDuration = dataObject.duration;
+          decodedDateTime = dataObject.dateTime;
+          decodedDateOnly = dataObject.dateOnly;
+          decodedOwnerUsername = dataObject.localPartyNumber;
+          decodedLocalPartyNumber = dataObject.ownerUsername;
+        } catch (decodeError) {
+          console.error("Error decoding encoded data:", decodeError);
+        }
+      }
+
+      if (decodedId) {
+        setAudioTrackId(decodedId);
+        setUuid(decodedId);
+      }
+      if (decodedDirection) {
+        setCallType(decodedDirection);
+      }
+      if (decodedPhone) {
+        setLocalPartyNumber(decodedPhone);
+        setRemotePartyNumber(decodedPhone);
+      }
+
+      if (decodedImagicle) {
+        setImagicle(decodedImagicle);
+      }
+      if (decodedDuration) {
+        const formatedDuration = formatDuration(Number.parseInt(decodedDuration, 10) / 10000000);
+        setCallDurationFormatted(formatedDuration);
+        setCallDuration(decodedDuration);
+      }
+
+      if (decodedDateTime) {
+        setDateTime(decodedDateTime);
+      }
+
+      const hasValidDecodedData =
+        data && decodedId && (decodedDateOnly || decodedLocalPartyNumber || decodedOwnerUsername);
+      if (hasValidDecodedData) {
+        setLocalPartyNumber(decodedLocalPartyNumber);
+        setOwnerUsername(decodedOwnerUsername);
+        setDate(decodedDateOnly);
+        void handleGetCallAnalysisWithData({
+          dateParam: decodedDateOnly,
+          localPartyNumberParam: decodedLocalPartyNumber,
+          ownerUsernameParam: decodedOwnerUsername,
+          uuidParam: decodedId,
+          imagicleParam: decodedImagicle,
+          dateTimeParam: decodedDateTime,
+          durationParam: decodedDuration,
+          directionParam: decodedDirection,
+          phoneParam: decodedPhone,
+        });
+      }
+    } catch (error) {
+      console.error("Error parsing URL data:", error);
+    }
+  }, [router.isReady, router.query.data]);
+
+  // Load audio when uuid changes
+  useEffect(() => {
+    if (audioTrackId) {
+      loadAuthenticatedAudio(audioTrackId);
+    }
+    
+    return () => {
+      if (audioUrl?.startsWith("blob:")) {
+        globalThis.URL.revokeObjectURL(audioUrl);
+      }
+    };
+  }, [audioTrackId]);
+
+  const handleGetCallAnalysis = async () => {
+    // Validate required parameters
+    if (!uuid || !date || !localPartyNumber || !ownerUsername) {
+      toast.error('Please fill in all required fields (UUID, Date, Extension, Username)');
+      return;
+    }
+    
+    setLoading(true);
+    setError(null);
+    setAnalysisComplete(false);
+    
+    // Reset steps for new analysis
+    setSteps([]);
+    setCurrentStep(null);
+    
+    // Connect to WebSocket for analysis
+    if (socketParametersReady && !socketConnected && !socketConnecting) {
+      connectSocket();
+    }
+  };
+
+  const loadAuthenticatedAudio = async (trackId?: string) => {
+    const currentTrackId = trackId || audioTrackId;
+    if (!currentTrackId) return;
+    
+    setAudioLoading(true);
+    setAudioError(null);
+    setMediaPlayerShow(false);
+  
+
+    
+    try {
+      const response = await axiosInstance.get(`call-logs/recordings/download/${currentTrackId}?extension_number=${ownerUsername}&node=${imagicle}`, {
+        responseType: 'blob',
+        headers: {
+          'Accept': 'audio/*, application/octet-stream, */*'
+        }
+      });
+      
+      if (response.status === 200) {
+        const blob = new Blob([response.data], { type: 'audio/mpeg' });
+        const audioUrl = globalThis.URL.createObjectURL(blob);
+        setAudioUrl(audioUrl);
+        setMediaPlayerShow(true);
+      } else {
+        setMediaPlayerShow(false);
+        setAudioError(`Unexpected response status: ${response.status}`);
+      }
+      
+    } catch (error: any) {
+      console.error('Error loading audio file via axiosInstance:', error);
+      
+      if (error.response) {
+        console.error('Error response status:', error.response.status);
+        console.error('Error response data:', error.response.data);
+        console.error('Error response headers:', error.response.headers);
+        
+        if (error.response.status === 204) {
+          setMediaPlayerShow(false);
+          setAudioError('Audio file not found (204)');
+        } else {
+          setMediaPlayerShow(false);
+          setAudioError(`Error loading audio: ${error.response.status}`);
+        }
+      } else if (error.request) {
+        console.error('No response received:', error.request);
+        setMediaPlayerShow(false);
+        setAudioError('No response received from server');
+      } else {
+        console.error('Error setting up request:', error.message);
+        setMediaPlayerShow(false);
+        setAudioError(`Request error: ${error.message}`);
+      }
+    } finally {
+      setAudioLoading(false);
+    }
+  };
+
+  const getAudioFilePath = () => {
+    return audioUrl || '';
+  };
+
+  const handleTimeClick = (start: number, end: number) => {
+    if (audioPlayerRef.current) {
+      if (audioStopTimeoutRef.current) {
+        clearTimeout(audioStopTimeoutRef.current);
+        audioStopTimeoutRef.current = null;
+      }
+      
+      setPlayingSegment({ start, end });
+      audioPlayerRef.current.seekTo(start);
+      audioPlayerRef.current.play();
+      
+      const duration = end - start;
+      
+      audioStopTimeoutRef.current = setTimeout(() => {
+        if (audioPlayerRef.current) {
+          audioPlayerRef.current.pause();
+        }
+        setPlayingSegment(null);
+      }, duration * 1000);
+    } else {
+      toast.error('Audio player not ready');
+    }
+  };
+
+  const handleStopAudio = () => {
+    if (audioPlayerRef.current) {
+      audioPlayerRef.current.pause();
+    }
+    if (audioStopTimeoutRef.current) {
+      clearTimeout(audioStopTimeoutRef.current);
+      audioStopTimeoutRef.current = null;
+    }
+    setPlayingSegment(null);
+  };
+
+  const handleFormSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    handleGetCallAnalysis();
+  };
+  const resetAnalysisForm = () => {
+    setUuid("");
+    setLocalPartyNumber("");
+    setOwnerUsername("");
+    setDate("");
+    setCallDurationFormatted(null);
+    setAnalysisComplete(false);
+    setLoading(false);
+    setError(null);
+    setSteps([]);
+    setCurrentStep(null);
+    setAudioUrl("");
+    setMediaPlayerShow(false);
+    setAudioError(null);
+    setPlayingSegment(null);
+    if (audioPlayerRef.current) {
+      audioPlayerRef.current.pause();
+    }
+    if (audioStopTimeoutRef.current) {
+      clearTimeout(audioStopTimeoutRef.current);
+      audioStopTimeoutRef.current = null;
+    }
+  };
+
+  return {
+    chunksAnalysisData,
+    loading,
+    error,
+    analysisComplete,
+    validAnalysis,
+    steps,
+    currentStep,
+    uuid,
+    setUuid,
+    date,
+    setDate,
+    localPartyNumber,
+    setLocalPartyNumber,
+    remotePartyNumber,
+    setRemotePartyNumber,
+    ownerUsername,
+    setOwnerUsername,
+    imagicle,
+    setImagicle,
+    callType,
+    callDurationFormatted,
+    activeTab,
+    setActiveTab,
+    subActiveTab,
+    setSubActiveTab,
+    socketConnecting,
+    audioPlayerRef,
+    mediaPlayerShow,
+    audioLoading,
+    audioError,
+    playingSegment,
+    handleFormSubmit,
+    resetAnalysisForm,
+    handleTimeClick,
+    handleStopAudio,
+    getAudioFilePath,
+    loadAuthenticatedAudio,
+    setAudioError,
+  };
+}
