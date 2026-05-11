@@ -1,9 +1,15 @@
 import { TextSkeleton } from "@components/skeletons";
 import imgStatus1 from "@assets/images/widget/img-status-1.svg";
 import imgStatus3 from "@assets/images/widget/img-status-3.svg";
-import { capitalizeFirst, hasData } from "@pages/ai-ml/analysis/analysisHelpers";
+import {
+  formatAnalysisFieldLabel,
+  formatUnknownForDisplay,
+  hasData,
+} from "@pages/ai-ml/analysis/analysisHelpers";
 import React from "react";
 import { Col, Row } from "react-bootstrap";
+
+import { CallAnalysisPendingOrEmpty } from "./CallAnalysisPendingOrEmpty";
 
 type Props = Readonly<{
   chunksAnalysisData: any;
@@ -25,6 +31,8 @@ export function CallAnalysisSummaryCards({
     chunksAnalysisData?.completion_percent !== undefined &&
     chunksAnalysisData.completion_percent !== null;
   const completionPercent = hasCompletionPercent ? chunksAnalysisData.completion_percent : 0;
+  const hasMainTopic =
+    Boolean(chunksAnalysisData?.main_topic) && String(chunksAnalysisData.main_topic).trim().length > 0;
 
   return (
     <Row>
@@ -34,56 +42,48 @@ export function CallAnalysisSummaryCards({
             <div className="vbox w-100">
               <h5>Resolution Status</h5>
               <div className="card-text">
-                {hasData(resolutionStatus) ? (
-                  <h6>{capitalizeFirst(String(resolutionStatus))}</h6>
-                ) : (
-                  <>
-                    {!analysisComplete && <TextSkeleton lines={1} />}
-                    {analysisComplete && <p className="text-muted">No data available</p>}
-                  </>
-                )}
+                <CallAnalysisPendingOrEmpty
+                  analysisComplete={analysisComplete}
+                  hasData={hasData(resolutionStatus)}
+                  skeleton={<TextSkeleton lines={1} />}
+                  renderContent={() => <h6>{formatAnalysisFieldLabel(resolutionStatus)}</h6>}
+                />
               </div>
             </div>
 
             <div className="vbox w-100">
               <h5>Sentiment</h5>
               <div className="card-text">
-                {hasData(sentiment) ? (
-                  <h6>{capitalizeFirst(String(sentiment))}</h6>
-                ) : (
-                  <>
-                    {!analysisComplete && <TextSkeleton lines={1} />}
-                    {analysisComplete && <p className="text-muted">No data available</p>}
-                  </>
-                )}
+                <CallAnalysisPendingOrEmpty
+                  analysisComplete={analysisComplete}
+                  hasData={hasData(sentiment)}
+                  skeleton={<TextSkeleton lines={1} />}
+                  renderContent={() => <h6>{formatAnalysisFieldLabel(sentiment)}</h6>}
+                />
               </div>
             </div>
 
             <div className="vbox w-100">
               <h5>Main Intention</h5>
               <div className="card-text">
-                {chunksAnalysisData?.main_topic && chunksAnalysisData.main_topic.trim().length > 0 ? (
-                  <h6>{chunksAnalysisData.main_topic}</h6>
-                ) : (
-                  <>
-                    {!analysisComplete && <TextSkeleton lines={1} />}
-                    {analysisComplete && <p className="text-muted">No data available</p>}
-                  </>
-                )}
+                <CallAnalysisPendingOrEmpty
+                  analysisComplete={analysisComplete}
+                  hasData={hasMainTopic}
+                  skeleton={<TextSkeleton lines={1} />}
+                  renderContent={() => <h6>{chunksAnalysisData.main_topic}</h6>}
+                />
               </div>
             </div>
 
             <div className="vbox w-100">
               <h5>Summary</h5>
               <div className="card-text">
-                {hasData(summary) ? (
-                  <h6>{String(summary)}</h6>
-                ) : (
-                  <>
-                    {!analysisComplete && <TextSkeleton lines={2} lastLineWidth="70%" />}
-                    {analysisComplete && <p className="text-muted">No data available</p>}
-                  </>
-                )}
+                <CallAnalysisPendingOrEmpty
+                  analysisComplete={analysisComplete}
+                  hasData={hasData(summary)}
+                  skeleton={<TextSkeleton lines={2} lastLineWidth="70%" />}
+                  renderContent={() => <h6>{formatUnknownForDisplay(summary)}</h6>}
+                />
               </div>
             </div>
           </div>
@@ -102,14 +102,14 @@ export function CallAnalysisSummaryCards({
                   <h6 className="text-white">Overall Assessment</h6>
                 </div>
                 <div className="vbox">
-                  {hasData(qualified) ? (
-                    <p className="card-text text-white size2">{qualified ? "Qualified" : "Unqualified"}</p>
-                  ) : (
-                    <div className="card-text text-white size2">
-                      {!analysisComplete && <TextSkeleton lines={1} />}
-                      {analysisComplete && <p className="text-muted">No data available</p>}
-                    </div>
-                  )}
+                  <CallAnalysisPendingOrEmpty
+                    analysisComplete={analysisComplete}
+                    hasData={hasData(qualified)}
+                    skeleton={<TextSkeleton lines={1} />}
+                    renderContent={() => (
+                      <p className="card-text text-white size2">{qualified ? "Qualified" : "Unqualified"}</p>
+                    )}
+                  />
                 </div>
               </div>
             </div>
@@ -119,28 +119,30 @@ export function CallAnalysisSummaryCards({
             <div className="card">
               <div className="card-body gbox">
                 <h5>Completion Percent</h5>
-                {hasCompletionPercent ? (
-                  <>
-                    <p className="card-text size2 text-bold">{completionPercent}%</p>
-                    <div className="mb-3 w-100">
-                      <progress
-                        className="w-100 d-block rounded-pill border-0"
-                        style={{
-                          height: "0.5rem",
-                          accentColor: "var(--bs-success, #198754)",
-                        }}
-                        value={completionPercent}
-                        max={100}
-                        aria-label={`Completion ${completionPercent} percent`}
-                      />
-                    </div>
-                  </>
-                ) : (
-                  <div className="card-text size2 text-bold d-block w-100">
-                    {!analysisComplete && <TextSkeleton lines={2} />}
-                    {analysisComplete && <p className="text-muted">No data available</p>}
-                  </div>
-                )}
+                <div className="card-text size2 text-bold d-block w-100">
+                  <CallAnalysisPendingOrEmpty
+                    analysisComplete={analysisComplete}
+                    hasData={hasCompletionPercent}
+                    skeleton={<TextSkeleton lines={2} />}
+                    renderContent={() => (
+                      <>
+                        <p className="card-text size2 text-bold">{completionPercent}%</p>
+                        <div className="mb-3 w-100">
+                          <progress
+                            className="w-100 d-block rounded-pill border-0"
+                            style={{
+                              height: "0.5rem",
+                              accentColor: "var(--bs-success, #198754)",
+                            }}
+                            value={completionPercent}
+                            max={100}
+                            aria-label={`Completion ${completionPercent} percent`}
+                          />
+                        </div>
+                      </>
+                    )}
+                  />
+                </div>
               </div>
             </div>
           </Col>
@@ -152,16 +154,16 @@ export function CallAnalysisSummaryCards({
                   <h5>Customer Intention</h5>
                 </div>
                 <div className="vbox w-100">
-                  {customerIntent ? (
-                    <div className="card-text size2">
-                      <h6>{customerIntent.charAt(0).toUpperCase() + customerIntent.slice(1)}</h6>
-                    </div>
-                  ) : (
-                    <div className="card-text d-block w-100">
-                      {!analysisComplete && <TextSkeleton lines={2} />}
-                      {analysisComplete && <p className="text-muted">No data available</p>}
-                    </div>
-                  )}
+                  <CallAnalysisPendingOrEmpty
+                    analysisComplete={analysisComplete}
+                    hasData={Boolean(customerIntent)}
+                    skeleton={<TextSkeleton lines={2} />}
+                    renderContent={() => (
+                      <div className="card-text size2">
+                        <h6>{customerIntent.charAt(0).toUpperCase() + customerIntent.slice(1)}</h6>
+                      </div>
+                    )}
+                  />
                 </div>
               </div>
             </div>

@@ -8,8 +8,31 @@ export const hasArrayData = (arr: unknown) => Array.isArray(arr) && arr.length >
 
 export const capitalizeFirst = (str: string) => {
   if (!str) return "";
-  return str.replaceAll("_", " ").replace(/\b\w/g, (char) => char.toUpperCase());
+  return str.replaceAll("_", " ").replaceAll(/\b\w/g, (char) => char.toUpperCase());
 };
+
+/** Safe string for inline display — avoids `[object Object]` when the API returns a nested value. */
+export function formatUnknownForDisplay(value: unknown): string {
+  if (value == null) return "";
+  const t = typeof value;
+  if (t === "string") return value;
+  if (t === "number") return String(value as number);
+  if (t === "boolean") return String(value as boolean);
+  if (t === "bigint") return (value as bigint).toString();
+  if (t === "symbol") return value.description ?? "";
+  if (t === "function") return "[Function]";
+  if (t === "object") return JSON.stringify(value);
+  return "";
+}
+
+/** Uses formatUnknownForDisplay, then capitalizeFirst when the result is plain text (not JSON). */
+export function formatAnalysisFieldLabel(value: unknown): string {
+  const raw = formatUnknownForDisplay(value);
+  if (!raw) return "";
+  const trimmed = raw.trimStart();
+  if (trimmed.startsWith("{") || trimmed.startsWith("[")) return raw;
+  return capitalizeFirst(raw);
+}
 
 export const updateStepInList = (
   prevSteps: AnalysisStepEntry[],

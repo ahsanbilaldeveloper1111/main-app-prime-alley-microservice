@@ -84,10 +84,10 @@ export function CallAnalysisProgressCard({ steps, currentStep }: Props) {
                               )}
                             </div>
                             <div className="step-content">
-                              <div className="step-title">{stepEntry.step.replace(/_/g, " ")}</div>
+                              <div className="step-title">{stepEntry.step.replaceAll("_", " ")}</div>
                               {stepEntry.message && (
                                 <div className="step-message">
-                                  {stepEntry.message || stepEntry.step.replace(/_/g, " ")}
+                                  {stepEntry.message || stepEntry.step.replaceAll("_", " ")}
                                 </div>
                               )}
                             </div>

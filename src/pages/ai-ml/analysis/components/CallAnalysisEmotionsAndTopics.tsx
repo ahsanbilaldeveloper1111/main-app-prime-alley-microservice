@@ -3,6 +3,8 @@ import { hasArrayData, hasData } from "@pages/ai-ml/analysis/analysisHelpers";
 import React from "react";
 import { Col, Row } from "react-bootstrap";
 
+import { CallAnalysisPendingOrEmpty } from "./CallAnalysisPendingOrEmpty";
+
 type Props = Readonly<{
   chunksAnalysisData: any;
   analysis: any;
@@ -18,6 +20,19 @@ function withOccurrenceKeys<T>(items: T[], prefix: string, identity: (item: T) =
     tallies.set(part, next);
     return { key: `${prefix}__${part}__${next}`, item };
   });
+}
+
+function TopicCheckLine({ label }: Readonly<{ label: string }>) {
+  return (
+    <div className="mb-2 callType">
+      <div className="ic_box bg-success">
+        <i className="material-icons-two-tone">check</i>
+      </div>
+      <div>
+        <h6 className="card-text text-capitalize font-weight-normal">{label}</h6>
+      </div>
+    </div>
+  );
 }
 
 export function CallAnalysisEmotionsAndTopics({
@@ -47,18 +62,20 @@ export function CallAnalysisEmotionsAndTopics({
                       <h5 className="mb-3">Customer Emotions</h5>
                     </div>
                     <div className="card-text">
-                      {hasArrayData(customerEmotions) ? (
-                        withOccurrenceKeys(customerEmotions as string[], "cust-emo", (e) => e).map(({ key, item: emotion }) => (
-                          <div className="text-capitalize me-2" key={key}>
-                            <div className="emo_text">{emotion}</div>
-                          </div>
-                        ))
-                      ) : (
-                        <>
-                          {!analysisComplete && <ListSkeleton items={3} />}
-                          {analysisComplete && <p className="text-muted">No data available</p>}
-                        </>
-                      )}
+                      <CallAnalysisPendingOrEmpty
+                        analysisComplete={analysisComplete}
+                        hasData={hasArrayData(customerEmotions)}
+                        skeleton={<ListSkeleton items={3} />}
+                        renderContent={() =>
+                          withOccurrenceKeys(customerEmotions as string[], "cust-emo", (e) => e).map(
+                            ({ key, item: emotion }) => (
+                              <div className="text-capitalize me-2" key={key}>
+                                <div className="emo_text">{emotion}</div>
+                              </div>
+                            ),
+                          )
+                        }
+                      />
                     </div>
                   </Col>
 
@@ -66,18 +83,20 @@ export function CallAnalysisEmotionsAndTopics({
                     <div className="vbox">
                       <h5 className="mb-3">Operator Emotions</h5>
                       <div className="card-text">
-                        {hasArrayData(operatorEmotions) ? (
-                          withOccurrenceKeys(operatorEmotions as string[], "op-emo", (e) => e).map(({ key, item: emotion }) => (
-                            <div className="text-capitalize me-2" key={key}>
-                              <div className="emo_text">{emotion}</div>
-                            </div>
-                          ))
-                        ) : (
-                          <>
-                            {!analysisComplete && <ListSkeleton items={3} />}
-                            {analysisComplete && <p className="text-muted">No data available</p>}
-                          </>
-                        )}
+                        <CallAnalysisPendingOrEmpty
+                          analysisComplete={analysisComplete}
+                          hasData={hasArrayData(operatorEmotions)}
+                          skeleton={<ListSkeleton items={3} />}
+                          renderContent={() =>
+                            withOccurrenceKeys(operatorEmotions as string[], "op-emo", (e) => e).map(
+                              ({ key, item: emotion }) => (
+                                <div className="text-capitalize me-2" key={key}>
+                                  <div className="emo_text">{emotion}</div>
+                                </div>
+                              ),
+                            )
+                          }
+                        />
                       </div>
                     </div>
                   </Col>
@@ -94,23 +113,16 @@ export function CallAnalysisEmotionsAndTopics({
                 </div>
                 <div className="vbox w-100">
                   <div className="card-text">
-                    {hasArrayData(keyTopics) ? (
-                      withOccurrenceKeys(keyTopics as string[], "key-topic", (t) => t).map(({ key, item }) => (
-                        <div className="mb-2 callType" key={key}>
-                          <div className="ic_box bg-success">
-                            <i className="material-icons-two-tone">check</i>
-                          </div>
-                          <div>
-                            <h6 className="card-text text-capitalize font-weight-normal">{item}</h6>
-                          </div>
-                        </div>
-                      ))
-                    ) : (
-                      <>
-                        {!analysisComplete && <ListSkeleton items={3} />}
-                        {analysisComplete && <p className="text-muted">No data available</p>}
-                      </>
-                    )}
+                    <CallAnalysisPendingOrEmpty
+                      analysisComplete={analysisComplete}
+                      hasData={hasArrayData(keyTopics)}
+                      skeleton={<ListSkeleton items={3} />}
+                      renderContent={() =>
+                        withOccurrenceKeys(keyTopics as string[], "key-topic", (t) => t).map(({ key, item }) => (
+                          <TopicCheckLine key={key} label={item} />
+                        ))
+                      }
+                    />
                   </div>
                 </div>
               </div>
@@ -124,45 +136,45 @@ export function CallAnalysisEmotionsAndTopics({
               <div className="card-body gbox">
                 <h5 className="card-title">Tags</h5>
                 <div className="card-text w-100">
-                  {hasArrayData(chunksAnalysisData?.tags) ? (
-                    <table className="table-bordered table-sm w-100">
-                      <thead>
-                        <tr>
-                          <th>Name</th>
-                          <th>Percentage</th>
-                          <th className="text-left">Description</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {withOccurrenceKeys(chunksAnalysisData.tags as any[], "tag", (t: any) =>
-                          [t?.name, t?.percentage, t?.description, String(t?.status)].join("|"),
-                        ).map(({ key, item }) => {
-                          const isTrue = item.status === true;
-                          return (
-                            <tr key={key}>
-                              <td className="text-capitalize">
-                                <div className="d-flex align-items-center gap-2">
-                                  <div className="tboxIn">
-                                    <div className={`ic_box small ${isTrue ? "bg-success" : "bg-danger"}`}>
-                                      <i className="material-icons-two-tone">{isTrue ? "check" : "close"}</i>
+                  <CallAnalysisPendingOrEmpty
+                    analysisComplete={analysisComplete}
+                    hasData={hasArrayData(chunksAnalysisData?.tags)}
+                    skeleton={<TextSkeleton lines={3} />}
+                    renderContent={() => (
+                      <table className="table-bordered table-sm w-100">
+                        <thead>
+                          <tr>
+                            <th>Name</th>
+                            <th>Percentage</th>
+                            <th className="text-left">Description</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {withOccurrenceKeys(chunksAnalysisData.tags as any[], "tag", (t: any) =>
+                            [t?.name, t?.percentage, t?.description, String(t?.status)].join("|"),
+                          ).map(({ key, item }) => {
+                            const isTrue = item.status === true;
+                            return (
+                              <tr key={key}>
+                                <td className="text-capitalize">
+                                  <div className="d-flex align-items-center gap-2">
+                                    <div className="tboxIn">
+                                      <div className={`ic_box small ${isTrue ? "bg-success" : "bg-danger"}`}>
+                                        <i className="material-icons-two-tone">{isTrue ? "check" : "close"}</i>
+                                      </div>
                                     </div>
+                                    <div>{item.name || "N/A"}</div>
                                   </div>
-                                  <div>{item.name || "N/A"}</div>
-                                </div>
-                              </td>
-                              <td className="text-capitalize">{item.percentage || "N/A"}</td>
-                              <td className="text-capitalize">{item.description || "N/A"}</td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  ) : (
-                    <>
-                      {!analysisComplete && <TextSkeleton lines={3} />}
-                      {analysisComplete && <p className="text-muted">No data available</p>}
-                    </>
-                  )}
+                                </td>
+                                <td className="text-capitalize">{item.percentage || "N/A"}</td>
+                                <td className="text-capitalize">{item.description || "N/A"}</td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    )}
+                  />
                 </div>
               </div>
             </div>
@@ -178,14 +190,12 @@ export function CallAnalysisEmotionsAndTopics({
                 </div>
                 <div className="vbox w-100">
                   <div className="card-text">
-                    {hasData(chunksAnalysisData?.summary) ? (
-                      <p>{chunksAnalysisData.summary}</p>
-                    ) : (
-                      <>
-                        {!analysisComplete && <TextSkeleton lines={4} lastLineWidth="70%" />}
-                        {analysisComplete && <p className="text-muted">No data available</p>}
-                      </>
-                    )}
+                    <CallAnalysisPendingOrEmpty
+                      analysisComplete={analysisComplete}
+                      hasData={hasData(chunksAnalysisData?.summary)}
+                      skeleton={<TextSkeleton lines={4} lastLineWidth="70%" />}
+                      renderContent={() => <p>{chunksAnalysisData.summary}</p>}
+                    />
                   </div>
                 </div>
               </div>
@@ -201,31 +211,31 @@ export function CallAnalysisEmotionsAndTopics({
               <div className="card-body gbox">
                 <h5 className="card-title">Qualification Fields</h5>
                 <div className="card-text w-100">
-                  {hasQualificationFields ? (
-                    <table className="table-bordered table-sm w-100">
-                      <thead>
-                        <tr>
-                          <th>Name</th>
-                          <th className="text-center">Value</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {Object.entries(qualificationFields).map(([fieldKey, value]) => (
-                          <tr key={fieldKey}>
-                            <td>{fieldKey}</td>
-                            <td className="text-capitalize text-center">
-                              {value === "null" ? "-" : String(value as string)}
-                            </td>
+                  <CallAnalysisPendingOrEmpty
+                    analysisComplete={analysisComplete}
+                    hasData={!!hasQualificationFields}
+                    skeleton={<TextSkeleton lines={6} />}
+                    renderContent={() => (
+                      <table className="table-bordered table-sm w-100">
+                        <thead>
+                          <tr>
+                            <th>Name</th>
+                            <th className="text-center">Value</th>
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  ) : (
-                    <>
-                      {!analysisComplete && <TextSkeleton lines={6} />}
-                      {analysisComplete && <p className="text-muted">No data available</p>}
-                    </>
-                  )}
+                        </thead>
+                        <tbody>
+                          {Object.entries(qualificationFields).map(([fieldKey, value]) => (
+                            <tr key={fieldKey}>
+                              <td>{fieldKey}</td>
+                              <td className="text-capitalize text-center">
+                                {value === "null" ? "-" : String(value as string)}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    )}
+                  />
                 </div>
               </div>
             </div>
@@ -235,23 +245,23 @@ export function CallAnalysisEmotionsAndTopics({
             <div className="card">
               <div className="card-body">
                 <h5 className="card-title">Action Items</h5>
-                {hasArrayData(actionItems) ? (
-                  withOccurrenceKeys(actionItems as string[], "action", (a) => a).map(({ key, item }) => (
-                    <div className="tagOuter" key={key}>
-                      <div className="tagIcon bg-success">
-                        <i className="material-icons-two-tone">check</i>
+                <CallAnalysisPendingOrEmpty
+                  analysisComplete={analysisComplete}
+                  hasData={hasArrayData(actionItems)}
+                  skeleton={<TextSkeleton lines={3} />}
+                  renderContent={() =>
+                    withOccurrenceKeys(actionItems as string[], "action", (a) => a).map(({ key, item }) => (
+                      <div className="tagOuter" key={key}>
+                        <div className="tagIcon bg-success">
+                          <i className="material-icons-two-tone">check</i>
+                        </div>
+                        <div className="tagVal">
+                          <h6 className="card-text text-capitalize">{item}</h6>
+                        </div>
                       </div>
-                      <div className="tagVal">
-                        <h6 className="card-text text-capitalize">{item}</h6>
-                      </div>
-                    </div>
-                  ))
-                ) : (
-                  <>
-                    {!analysisComplete && <TextSkeleton lines={3} />}
-                    {analysisComplete && <p className="text-muted">No data available</p>}
-                  </>
-                )}
+                    ))
+                  }
+                />
               </div>
             </div>
 
@@ -262,23 +272,16 @@ export function CallAnalysisEmotionsAndTopics({
                 </div>
                 <div className="vbox w-100">
                   <div className="card-text">
-                    {hasArrayData(callCategories) ? (
-                      withOccurrenceKeys(callCategories as string[], "call-cat", (c) => c).map(({ key, item }) => (
-                        <div className="mb-2 callType" key={key}>
-                          <div className="ic_box bg-success">
-                            <i className="material-icons-two-tone">check</i>
-                          </div>
-                          <div>
-                            <h6 className="card-text text-capitalize font-weight-normal">{item}</h6>
-                          </div>
-                        </div>
-                      ))
-                    ) : (
-                      <>
-                        {!analysisComplete && <TextSkeleton lines={3} />}
-                        {analysisComplete && <p className="text-muted">No data available</p>}
-                      </>
-                    )}
+                    <CallAnalysisPendingOrEmpty
+                      analysisComplete={analysisComplete}
+                      hasData={hasArrayData(callCategories)}
+                      skeleton={<TextSkeleton lines={3} />}
+                      renderContent={() =>
+                        withOccurrenceKeys(callCategories as string[], "call-cat", (c) => c).map(({ key, item }) => (
+                          <TopicCheckLine key={key} label={item} />
+                        ))
+                      }
+                    />
                   </div>
                 </div>
               </div>
