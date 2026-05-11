@@ -16,19 +16,7 @@ import { toast } from "react-toastify";
 import { Button } from "react-bootstrap";
 import { Edit, Trash2 } from "lucide-react";
 
-function createFaqDraftKey(): string {
-  return globalThis.crypto?.randomUUID?.() ?? `faq-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
-}
-
-type FAQItemDraft = FAQItem & { readonly clientKey: string };
-
-function emptyFaqDraft(): FAQItemDraft {
-  return { question: "", answer: "", clientKey: createFaqDraftKey() };
-}
-
-function faqToDraft(item: FAQItem): FAQItemDraft {
-  return { ...item, clientKey: createFaqDraftKey() };
-}
+import { emptyFaqDraft, faqToDraft, type FAQItemDraft } from "../faqItemDraft";
 
 export function useAIFaqsTenantPage() {
   const router = useRouter();

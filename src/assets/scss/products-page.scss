@@ -1,5 +1,7 @@
 // CRM Products page — static layout (table wrapper, sidebar, view modal, detail tiles).
 
+@use "crm-wcag-accents" as *;
+
 .products-table-wrapper {
   width: 100%;
   overflow: hidden;
@@ -146,7 +148,7 @@
 
   &:focus {
     // Aligned with accessible teal used for sidebar submit / WCAG-friendly focus
-    border-color: #006d82;
+    border-color: $crm-wcag-teal;
   }
 }
 
@@ -166,7 +168,7 @@
   outline: none;
 
   &:focus {
-    border-color: #006d82;
+    border-color: $crm-wcag-teal;
   }
 }
 
@@ -197,8 +199,7 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  // Darkened from #0091ae so #fff text clears WCAG AA (4.5:1) on the button.
-  background-color: #006d82;
+  background-color: $crm-wcag-teal;
 
   &:disabled {
     background-color: #cbd5e0;
@@ -206,8 +207,7 @@
   }
 
   &:not(:disabled):hover {
-    // Darker than base so hover state also meets contrast with #fff.
-    background-color: #005566;
+    background-color: $crm-wcag-teal-hover;
   }
 }
 
@@ -294,7 +294,7 @@
 }
 
 .products-view-section-icon {
-  color: #2967ee;
+  color: $crm-wcag-blue;
 }
 
 .products-view-grid {
@@ -350,7 +350,7 @@
 }
 
 .products-view-inline-icon {
-  color: #2967ee;
+  color: $crm-wcag-blue;
   margin-right: 6px;
 }
 
@@ -374,8 +374,7 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  // Darkened from #4680ff so #fff text clears WCAG AA (4.5:1) on the button.
-  background: #2967ee;
+  background: $crm-wcag-blue;
   border: none;
   color: #fff;
   cursor: pointer;

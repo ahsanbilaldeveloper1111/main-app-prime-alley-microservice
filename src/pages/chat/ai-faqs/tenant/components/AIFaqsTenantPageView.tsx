@@ -4,6 +4,7 @@ import GenericListPage from "@components/GenericListPage";
 import ConfirmModal from "@components/page-partials/ConfirmModal";
 import type { Column } from "@components/CustomDataTable";
 import { useAIFaqsTenantPage } from "../useAIFaqsTenantPage";
+import { faqAttachmentFileDomKey } from "../../faqItemDraft";
 import { Button, Card, Form, Modal } from "react-bootstrap";
 import { ArrowLeft, Filter, Plus, X } from "lucide-react";
 import Select from "react-select";
@@ -217,7 +218,7 @@ export function AIFaqsTenantPageView({ ctx }: AIFaqsTenantPageViewProps) {
                   <div className="mt-2">
                     {selectedFiles.map((file, index) => (
                       <div
-                        key={`${file.name}-${String(file.size)}-${String(file.lastModified)}`}
+                        key={faqAttachmentFileDomKey(file)}
                         className="d-flex justify-content-between align-items-center p-2 bg-light rounded mb-1"
                       >
                         <span className="small">{file.name}</span>
@@ -318,7 +319,7 @@ export function AIFaqsTenantPageView({ ctx }: AIFaqsTenantPageViewProps) {
                   <div className="mt-2">
                     {selectedFiles.map((file, index) => (
                       <div
-                        key={`${file.name}-${String(file.size)}-${String(file.lastModified)}`}
+                        key={faqAttachmentFileDomKey(file)}
                         className="d-flex justify-content-between align-items-center p-2 bg-light rounded mb-1"
                       >
                         <span className="small">{file.name}</span>
