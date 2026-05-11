@@ -2,6 +2,8 @@
 
 // CRM Stages page — static layout only. Dynamic values (e.g. stage colors) stay inline in TSX.
 
+@use "crm-wcag-accents" as *;
+
 // —— KPI analytics cards ——
 .stages-kpi-card {
   transition: all 0.2s ease;
@@ -22,9 +24,54 @@
 }
 
 // —— Stage form (create / embedded in update modal) ——
+.stages-form-field {
+  margin-bottom: 20px;
+}
+
+.stages-form-label {
+  display: block;
+  font-size: 14px;
+  font-weight: 600;
+  color: #141414;
+  margin-bottom: 8px;
+}
+
+.stages-form-required {
+  color: #f2545b;
+}
+
+.stages-form-input {
+  width: 100%;
+  min-height: 40px;
+  padding: 10px 12px;
+  border: 1px solid #8a8a8a;
+  border-radius: 4px;
+  font-size: 14px;
+  outline: none;
+
+  &:focus {
+    border-color: $crm-wcag-teal;
+  }
+}
+
 .stages-form-input--color {
   padding: 6px;
   cursor: pointer;
+}
+
+.stages-form-textarea {
+  width: 100%;
+  min-height: 96px;
+  resize: vertical;
+  padding: 10px 12px;
+  border: 1px solid #8a8a8a;
+  border-radius: 4px;
+  font-size: 14px;
+  outline: none;
+
+  &:focus {
+    border-color: $crm-wcag-teal;
+  }
 }
 
 // —— Table: name column color dot (backgroundColor from row stays inline) ——
@@ -72,7 +119,173 @@
   margin-bottom: 20px;
 }
 
-// —— View stage modal (tile surface differs from products/industries hover cards) ——
+.stages-create-footer {
+  padding: 16px 24px;
+  border-top: 1px solid #eaf0f6;
+  display: flex;
+  gap: 12px;
+  justify-content: flex-start;
+}
+
+.stages-create-submit {
+  padding: 10px 20px;
+  color: #ffffff;
+  border: none;
+  border-radius: 4px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  background-color: $crm-wcag-teal;
+
+  &:disabled {
+    background-color: #cbd5e0;
+    cursor: not-allowed;
+  }
+
+  &:not(:disabled):hover {
+    background-color: $crm-wcag-teal-hover;
+  }
+}
+
+.stages-create-cancel {
+  padding: 10px 20px;
+  background-color: transparent;
+  color: #141414;
+  border: 1px solid #8a8a8a;
+  border-radius: 4px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+
+  &:disabled {
+    color: #a0aec0;
+    cursor: not-allowed;
+  }
+
+  &:not(:disabled):hover {
+    background-color: #f7fafc;
+  }
+}
+
+// —— Shared CRM dialog actions (matches crmDialogActionButtonStyles) ——
+.stages-crm-dialog-footer {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.stages-crm-btn-primary {
+  padding: 10px 20px;
+  border-radius: 8px;
+  font-weight: 500;
+  font-size: 14px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: $crm-wcag-blue;
+  border: none;
+  color: #fff;
+  cursor: pointer;
+
+  &:disabled {
+    opacity: 0.65;
+    cursor: not-allowed;
+  }
+}
+
+.stages-crm-btn-secondary {
+  padding: 10px 20px;
+  border-radius: 8px;
+  font-weight: 500;
+  font-size: 14px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: white;
+  color: #6b7280;
+  border: 2px solid #e5e7eb;
+  cursor: pointer;
+
+  &:disabled {
+    opacity: 0.65;
+    cursor: not-allowed;
+  }
+}
+
+// —— View stage modal ——
+.stages-view-header {
+  color: black;
+  padding: 30px;
+  position: relative;
+  border-top-left-radius: 8px;
+  border-top-right-radius: 8px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.stages-view-close {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  background: rgba(255, 255, 255, 0.2);
+  border: none;
+  color: black;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  cursor: pointer;
+  transition: all 0.3s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  &:hover,
+  &:focus {
+    background: rgba(255, 255, 255, 0.3);
+    transform: rotate(90deg);
+    outline: none;
+  }
+}
+
+.stages-view-title {
+  margin: 0;
+  font-weight: 600;
+  font-size: 24px;
+}
+
+.stages-view-subtitle {
+  margin: 8px 0 0 0;
+  opacity: 0.9;
+  font-size: 14px;
+}
+
+.stages-view-body {
+  padding: 30px;
+}
+
+.stages-view-section-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #1f2937;
+  margin-bottom: 20px;
+  padding-bottom: 10px;
+  border-bottom: 2px solid #f8f9fa;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.stages-view-section-icon {
+  color: $crm-wcag-blue;
+}
+
+.stages-view-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 20px;
+  margin-bottom: 30px;
+}
+
 .stages-view-tile {
   background: #f8f9fa;
   padding: 16px;

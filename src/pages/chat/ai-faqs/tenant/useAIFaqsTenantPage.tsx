@@ -3,19 +3,28 @@ import { useChatCompaniesQuery } from "@page-modules/chat/useChatCompaniesQuery"
 import {
   type CreateTenantFAQPayload,
   type FAQData,
-  type FAQItem,
   createTenantFAQ,
   deleteTenantFAQ,
   getTenantFAQs,
 } from "@utils/chat";
 import { useRouter } from "next/router";
 import { useSession } from "next-auth/react";
-import type React from "react";
 import { useCallback, useMemo, useState } from "react";
 import { toast } from "react-toastify";
 import { Button } from "react-bootstrap";
 import { Edit, Trash2 } from "lucide-react";
-import { createFaqDraft, faqDraftsToPayloadItems, type FAQDraftItem } from "../faqDraftUtils";
+
+import {
+  aiFaqAnswerPreviewColumn,
+  aiFaqQuestionColumn,
+} from "../aiFaqListColumns";
+import {
+  buildAiFaqSubmitFields,
+  emptyFaqListPage,
+  getValidFaqItemsForSubmit,
+  paginateArrayForTable,
+} from "../faqItemDraft";
+import { useAiFaqDraftFormState } from "../useAiFaqDraftFormState";
 
 export function useAIFaqsTenantPage() {
   const router = useRouter();
@@ -34,10 +43,19 @@ export function useAIFaqsTenantPage() {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [selectedFAQ, setSelectedFAQ] = useState<FAQData | null>(null);
 
-  const [faqItems, setFaqItems] = useState<FAQDraftItem[]>([createFaqDraft()]);
-  const [haveFiles, setHaveFiles] = useState(false);
-  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
-  const [fileInputKey, setFileInputKey] = useState(0);
+  const {
+    faqItems,
+    haveFiles,
+    selectedFiles,
+    fileInputKey,
+    resetForm,
+    seedSingleFaqItem,
+    handleAddFAQItem,
+    handleRemoveFAQItem,
+    handleUpdateFAQItem,
+    handleFileChange,
+    handleRemoveFile,
+  } = useAiFaqDraftFormState();
 
   const getTenantId = useCallback((): string => {
     if (tenantId?.trim()) return tenantId.trim();
@@ -48,23 +66,14 @@ export function useAIFaqsTenantPage() {
     return "";
   }, [tenantId, filterTenantId, selectedCompanyForFilter, session?.user]);
 
-  const resetForm = useCallback(() => {
-    setFaqItems([createFaqDraft()]);
-    setHaveFiles(false);
-    setSelectedFiles([]);
-    setFileInputKey((k) => k + 1);
-  }, []);
-
   const handleEditFAQ = useCallback(
     (faq: FAQData) => {
       setSelectedFAQ(faq);
-      setFaqItems([createFaqDraft({ question: faq.question, answer: faq.answer })]);
-      setHaveFiles(false);
-      setSelectedFiles([]);
+      seedSingleFaqItem({ question: faq.question, answer: faq.answer });
       setTenantId(filterTenantId || selectedCompanyForFilter || tenantId || "");
       setShowEditModal(true);
     },
-    [filterTenantId, selectedCompanyForFilter, tenantId],
+    [filterTenantId, selectedCompanyForFilter, tenantId, seedSingleFaqItem],
   );
 
   const handleDeleteFAQ = useCallback((faq: FAQData) => {
@@ -72,41 +81,8 @@ export function useAIFaqsTenantPage() {
     setShowDeleteModal(true);
   }, []);
 
-  const handleAddFAQItem = useCallback(() => {
-    setFaqItems((items) => [...items, createFaqDraft()]);
-  }, []);
-
-  const handleRemoveFAQItem = useCallback((index: number) => {
-    setFaqItems((items) => (items.length > 1 ? items.filter((_, i) => i !== index) : items));
-  }, []);
-
-  const handleUpdateFAQItem = useCallback((index: number, field: keyof FAQItem, value: string) => {
-    setFaqItems((items) => {
-      const updated = [...items];
-      updated[index] = { ...updated[index], [field]: value };
-      return updated;
-    });
-  }, []);
-
-  const handleFileChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files) {
-      const files = Array.from(e.target.files);
-      setSelectedFiles(files);
-      setHaveFiles(files.length > 0);
-    }
-  }, []);
-
-  const handleRemoveFile = useCallback((index: number) => {
-    setSelectedFiles((prev) => {
-      const next = prev.filter((_, i) => i !== index);
-      setHaveFiles(next.length > 0);
-      return next;
-    });
-  }, []);
-
   const handleSubmit = useCallback(async () => {
-    const validFAQs = faqDraftsToPayloadItems(faqItems);
-
+    const validFAQs = getValidFaqItemsForSubmit(faqItems);
     if (validFAQs.length === 0) {
       toast.error("Please add at least one FAQ with both question and answer");
       return;
@@ -119,14 +95,9 @@ export function useAIFaqsTenantPage() {
         return;
       }
 
-      const faqsJson = JSON.stringify(validFAQs);
-      const filePaths: string[] = selectedFiles.map((file) => file.name);
-
       const payload: CreateTenantFAQPayload = {
         tenant_id: tenantForPayload,
-        faqs: faqsJson,
-        have_files: haveFiles && selectedFiles.length > 0 ? "true" : "false",
-        files: filePaths.length > 0 ? filePaths : undefined,
+        ...buildAiFaqSubmitFields(validFAQs, haveFiles, selectedFiles),
       };
 
       await createTenantFAQ(payload);
@@ -165,36 +136,14 @@ export function useAIFaqsTenantPage() {
   const fetchData = useCallback(
     async (page = 1, perPage = 15, search = "") => {
       if (!filterTenantId?.trim()) {
-        return {
-          data: [],
-          total: 0,
-          page: 1,
-          per_page: perPage,
-          last_page: 1,
-        };
+        return emptyFaqListPage<FAQData>(perPage);
       }
       try {
         const allFAQs = await getTenantFAQs(filterTenantId.trim(), search || undefined);
-        const start = (page - 1) * perPage;
-        const end = start + perPage;
-        const paginated = allFAQs.slice(start, end);
-
-        return {
-          data: paginated,
-          total: allFAQs.length,
-          page,
-          per_page: perPage,
-          last_page: Math.ceil(allFAQs.length / perPage),
-        };
+        return paginateArrayForTable(allFAQs, page, perPage);
       } catch (error) {
         console.error("Error fetching FAQs:", error);
-        return {
-          data: [],
-          total: 0,
-          page: 1,
-          per_page: perPage,
-          last_page: 1,
-        };
+        return emptyFaqListPage<FAQData>(perPage);
       }
     },
     [filterTenantId],
@@ -216,34 +165,10 @@ export function useAIFaqsTenantPage() {
     setShowAddModal(true);
   }, [filterTenantId, selectedCompanyForFilter]);
 
-  const columns: Column<FAQData>[] = useMemo(
+  const columns: Column<FAQData & Record<string, unknown>>[] = useMemo(
     () => [
-      {
-        key: "question",
-        name: "Question",
-        selector: (row: FAQData) => row.question,
-        sortable: true,
-        cell: (props: FAQData) => (
-          <div style={{ maxWidth: "400px" }}>
-            <strong>{props.question}</strong>
-          </div>
-        ),
-      },
-      {
-        key: "answer",
-        name: "Answer",
-        selector: (row: FAQData) => row.answer,
-        sortable: true,
-        cell: (props: FAQData) => (
-          <div style={{ maxWidth: "500px" }}>
-            {props.answer.length > 100 ? (
-              <span>{props.answer.substring(0, 100)}...</span>
-            ) : (
-              <span>{props.answer}</span>
-            )}
-          </div>
-        ),
-      },
+      aiFaqQuestionColumn(),
+      aiFaqAnswerPreviewColumn({ previewLength: 100, maxWidth: "500px" }),
       {
         key: "created_at",
         name: "Created At",
@@ -283,6 +208,11 @@ export function useAIFaqsTenantPage() {
     [handleEditFAQ, handleDeleteFAQ],
   );
 
+  const closeDeleteModal = useCallback(() => {
+    setShowDeleteModal(false);
+    setSelectedFAQ(null);
+  }, []);
+
   return {
     router,
     refreshKey,
@@ -318,5 +248,6 @@ export function useAIFaqsTenantPage() {
     handleSubmit,
     handleConfirmDelete,
     openAddModalWithTenant,
+    closeDeleteModal,
   };
 }

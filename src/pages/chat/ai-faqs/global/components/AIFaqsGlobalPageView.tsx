@@ -1,13 +1,12 @@
 import BreadcrumbItem from "@common/BreadcrumbItem";
 import PageHeader from "@components/PageHeader";
 import GenericListPage from "@components/GenericListPage";
-import ConfirmModal from "@components/page-partials/ConfirmModal";
 import type { Column } from "@components/CustomDataTable";
+import { AI_FAQ_GLOBAL_FILE_ACCEPT } from "../../faqItemDraft";
+import { AiFaqDeleteConfirmModal } from "../../components/AiFaqDeleteConfirmModal";
+import { AiFaqUpsertModal } from "../../components/AiFaqUpsertModal";
 import { useAIFaqsGlobalPage } from "../useAIFaqsGlobalPage";
-import { FAQ_ATTACHMENTS_ACCEPT_GLOBAL } from "../../faqDraftUtils";
-import { FaqAttachmentsField } from "../../components/FaqAttachmentsField";
-import { FaqDraftItemCard } from "../../components/FaqDraftItemCard";
-import { Button, Form, Modal } from "react-bootstrap";
+import { Button, Modal } from "react-bootstrap";
 import { ArrowLeft, Plus } from "lucide-react";
 import React from "react";
 
@@ -44,7 +43,19 @@ export function AIFaqsGlobalPageView({ ctx }: AIFaqsGlobalPageViewProps) {
     handleRemoveFile,
     handleSubmit,
     handleConfirmDelete,
+    closeDeleteModal,
   } = ctx;
+
+  const closeAddModal = () => {
+    setShowAddModal(false);
+    resetForm();
+  };
+
+  const closeEditModal = () => {
+    setShowEditModal(false);
+    setSelectedFAQ(null);
+    resetForm();
+  };
 
   return (
     <React.Fragment>
@@ -79,147 +90,48 @@ export function AIFaqsGlobalPageView({ ctx }: AIFaqsGlobalPageViewProps) {
         tableStyle="table-style-2"
       />
 
-      <Modal
+      <AiFaqUpsertModal
         show={showAddModal}
-        onHide={() => {
-          setShowAddModal(false);
-          resetForm();
-        }}
-        size="lg"
-        centered
-      >
-        <Modal.Header closeButton>
-          <Modal.Title>Add Global FAQs</Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-          <Form>
-            <div className="mb-4">
-              <div className="d-flex justify-content-between align-items-center mb-3">
-                <h6>FAQ Items</h6>
-                <Button variant="outline-primary" size="sm" onClick={handleAddFAQItem}>
-                  <Plus size={14} className="me-1" />
-                  Add FAQ
-                </Button>
-              </div>
+        title="Add Global FAQs"
+        primaryActionLabel="Create FAQs"
+        editorMode="add"
+        fileAccept={AI_FAQ_GLOBAL_FILE_ACCEPT}
+        faqItems={faqItems}
+        haveFiles={haveFiles}
+        fileInputKey={fileInputKey}
+        selectedFiles={selectedFiles}
+        onRequestClose={closeAddModal}
+        onSubmit={handleSubmit}
+        onAddItem={handleAddFAQItem}
+        onRemoveItem={handleRemoveFAQItem}
+        onUpdateItem={handleUpdateFAQItem}
+        onFileChange={handleFileChange}
+        onRemoveFile={handleRemoveFile}
+      />
 
-              {faqItems.map((item, index) => (
-                <FaqDraftItemCard
-                  key={item.draftId}
-                  item={item}
-                  index={index}
-                  totalCount={faqItems.length}
-                  variant="add"
-                  onUpdate={handleUpdateFAQItem}
-                  onRemoveItem={handleRemoveFAQItem}
-                />
-              ))}
-            </div>
-
-            <FaqAttachmentsField
-              haveFiles={haveFiles}
-              fileInputKey={fileInputKey}
-              selectedFiles={selectedFiles}
-              accept={FAQ_ATTACHMENTS_ACCEPT_GLOBAL}
-              onFileChange={handleFileChange}
-              onRemoveFile={handleRemoveFile}
-            />
-          </Form>
-        </Modal.Body>
-        <Modal.Footer>
-          <Button
-            variant="secondary"
-            onClick={() => {
-              setShowAddModal(false);
-              resetForm();
-            }}
-          >
-            Cancel
-          </Button>
-          <Button variant="primary" onClick={() => handleSubmit()}>
-            Create FAQs
-          </Button>
-        </Modal.Footer>
-      </Modal>
-
-      <Modal
+      <AiFaqUpsertModal
         show={showEditModal}
-        onHide={() => {
-          setShowEditModal(false);
-          setSelectedFAQ(null);
-          resetForm();
-        }}
-        size="lg"
-        centered
-      >
-        <Modal.Header closeButton>
-          <Modal.Title>Edit Global FAQ</Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-          <Form>
-            <div className="mb-4">
-              <div className="d-flex justify-content-between align-items-center mb-3">
-                <h6>FAQ Item</h6>
-              </div>
+        title="Edit Global FAQ"
+        primaryActionLabel="Update FAQ"
+        editorMode="edit"
+        fileAccept={AI_FAQ_GLOBAL_FILE_ACCEPT}
+        faqItems={faqItems}
+        haveFiles={haveFiles}
+        fileInputKey={fileInputKey}
+        selectedFiles={selectedFiles}
+        onRequestClose={closeEditModal}
+        onSubmit={handleSubmit}
+        onUpdateItem={handleUpdateFAQItem}
+        onFileChange={handleFileChange}
+        onRemoveFile={handleRemoveFile}
+      />
 
-              {faqItems.map((item, index) => (
-                <FaqDraftItemCard
-                  key={item.draftId}
-                  item={item}
-                  index={index}
-                  totalCount={faqItems.length}
-                  variant="edit"
-                  onUpdate={handleUpdateFAQItem}
-                  onRemoveItem={handleRemoveFAQItem}
-                />
-              ))}
-            </div>
-
-            <FaqAttachmentsField
-              haveFiles={haveFiles}
-              fileInputKey={fileInputKey}
-              selectedFiles={selectedFiles}
-              accept={FAQ_ATTACHMENTS_ACCEPT_GLOBAL}
-              onFileChange={handleFileChange}
-              onRemoveFile={handleRemoveFile}
-            />
-          </Form>
-        </Modal.Body>
-        <Modal.Footer>
-          <Button
-            variant="secondary"
-            onClick={() => {
-              setShowEditModal(false);
-              setSelectedFAQ(null);
-              resetForm();
-            }}
-          >
-            Cancel
-          </Button>
-          <Button variant="primary" onClick={() => handleSubmit()}>
-            Update FAQ
-          </Button>
-        </Modal.Footer>
-      </Modal>
-
-      {showDeleteModal ? (
-        <ConfirmModal
-          show={showDeleteModal}
-          onHide={() => {
-            setShowDeleteModal(false);
-            setSelectedFAQ(null);
-          }}
-          title="Delete FAQ?"
-          description="Are you sure you want to delete this FAQ? This action cannot be undone."
-          targetName={selectedFAQ?.question ?? ""}
-          confirmButtonText="Delete"
-          cancelButtonText="Cancel"
-          onConfirm={handleConfirmDelete}
-          onCancel={() => {
-            setShowDeleteModal(false);
-            setSelectedFAQ(null);
-          }}
-        />
-      ) : null}
+      <AiFaqDeleteConfirmModal
+        show={showDeleteModal}
+        targetQuestion={selectedFAQ?.question ?? ""}
+        onConfirm={handleConfirmDelete}
+        onClose={closeDeleteModal}
+      />
 
       <Modal show={showViewModal} onHide={() => setShowViewModal(false)} size="lg" centered>
         <Modal.Header closeButton>
