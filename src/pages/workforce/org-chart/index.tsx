@@ -7,7 +7,18 @@ import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
 
 import dynamic from "next/dynamic";
-import { getUserProfilesOrgChartTree } from "@utils/staffManagement";
+import {
+  getUserProfilesOrgChartTree,
+  getAttendance,
+  type AttendanceRecord,
+} from "@utils/staffManagement";
+import { getWorkforceTableDatePresetRange } from "@utils/workforceTableDatePresetRange";
+import {
+  ATTENDANCE_QUERY_MAX_USER_IDS,
+  parseTeamUsersResponseForAttendanceScope,
+} from "@utils/workforce/attendanceTeamScope";
+import { canViewAllEmployeesAttendance } from "@utils/workforce/canViewAllEmployeesAttendance";
+import { getTeamUsers } from "@utils/teams";
 import { useSession } from "next-auth/react";
 import { useMainAppLookups } from "@hooks/useMainAppLookups";
 import { useUserProfilesMinified } from "@hooks/useUserProfilesMinified";
@@ -97,6 +108,162 @@ function formatAttendanceLabel(attStatus: string | undefined): string {
   if (attStatus === "checked_in") return "Checked in";
   if (attStatus === "checked_out") return "Checked out";
   return attStatus.replaceAll("_", " ");
+}
+
+const ORG_CHART_ATTENDANCE_PAGE_LIMIT = 200;
+const ORG_CHART_ATTENDANCE_MAX_PAGES = 25;
+
+type OrgChartNodeAttendanceShape = Readonly<{
+  status: string;
+  check_in_at: string | null;
+  check_out_at: string | null;
+}>;
+
+function attendanceRankForMerge(status: string): number {
+  if (status === "checked_out") return 2;
+  if (status === "checked_in") return 1;
+  return 0;
+}
+
+function attendanceSummaryFromRecord(record: AttendanceRecord): OrgChartNodeAttendanceShape {
+  if (record.check_out_at) {
+    return {
+      status: "checked_out",
+      check_in_at: record.check_in_at,
+      check_out_at: record.check_out_at,
+    };
+  }
+  if (record.check_in_at) {
+    return {
+      status: "checked_in",
+      check_in_at: record.check_in_at,
+      check_out_at: record.check_out_at ?? null,
+    };
+  }
+  return { status: "none", check_in_at: null, check_out_at: null };
+}
+
+function collectUniqueOrgChartUserIds(nodes: readonly ApiOrgChartNode[]): string[] {
+  const seen = new Set<string>();
+  const walk = (list: readonly ApiOrgChartNode[]) => {
+    for (const n of list) {
+      const raw = n.user_id;
+      if (raw != null && String(raw).trim() !== "") {
+        seen.add(String(raw).trim());
+      }
+      if (n.children?.length) walk(n.children);
+    }
+  };
+  walk(nodes);
+  return Array.from(seen);
+}
+
+/** Non-privileged users: only fetch attendance chips for Control Hub team (or self while team loads). */
+function filterOrgChartUserIdsForAttendanceFetch(input: {
+  chartUserIds: readonly string[];
+  canViewAllAttendance: boolean;
+  attendanceTeamScopeLoading: boolean;
+  attendanceTeamScopeIds: readonly string[];
+  sessionUserId: string | number | undefined | null;
+}): string[] {
+  if (input.canViewAllAttendance) {
+    return [...input.chartUserIds];
+  }
+  if (input.attendanceTeamScopeLoading) {
+    return [];
+  }
+  const allow = new Set(
+    input.attendanceTeamScopeIds.map((x) => String(x).trim()).filter((x) => x.length > 0),
+  );
+  if (allow.size > 0) {
+    return input.chartUserIds.filter((id) => allow.has(String(id).trim()));
+  }
+  const self = String(input.sessionUserId ?? "").trim();
+  if (self === "") {
+    return [];
+  }
+  return input.chartUserIds.filter((id) => String(id).trim() === self);
+}
+
+function mergeAttendanceRowsIntoUserMap(
+  map: Map<string, OrgChartNodeAttendanceShape>,
+  rows: readonly AttendanceRecord[]
+): void {
+  for (const row of rows) {
+    const uid = String(row.user_id ?? "").trim();
+    if (uid === "") continue;
+    const next = attendanceSummaryFromRecord(row);
+    const prev = map.get(uid);
+    if (
+      !prev ||
+      attendanceRankForMerge(next.status) >= attendanceRankForMerge(prev.status)
+    ) {
+      map.set(uid, next);
+    }
+  }
+}
+
+async function fetchAttendanceRecordsForOrgChartChunk(
+  chunk: readonly string[],
+  dateFrom: string,
+  dateTo: string
+): Promise<AttendanceRecord[]> {
+  const all: AttendanceRecord[] = [];
+  let page = 1;
+  for (let guard = 0; guard < ORG_CHART_ATTENDANCE_MAX_PAGES; guard += 1) {
+    const { data, pagination } = await getAttendance(
+      {
+        page,
+        limit: ORG_CHART_ATTENDANCE_PAGE_LIMIT,
+        user_ids: [...chunk],
+        date_from: dateFrom,
+        date_to: dateTo,
+      },
+      { silent: true }
+    );
+    const rows = data ?? [];
+    all.push(...rows);
+    const lastPage = pagination?.last_page ?? 1;
+    if (!pagination || page >= lastPage || rows.length === 0) {
+      break;
+    }
+    page += 1;
+  }
+  return all;
+}
+
+async function fetchTodayAttendanceForOrgChartUserIds(
+  userIds: readonly string[]
+): Promise<Map<string, OrgChartNodeAttendanceShape>> {
+  const out = new Map<string, OrgChartNodeAttendanceShape>();
+  const today = getWorkforceTableDatePresetRange("Today");
+  if (!today || userIds.length === 0) {
+    return out;
+  }
+  for (let start = 0; start < userIds.length; start += ATTENDANCE_QUERY_MAX_USER_IDS) {
+    const chunk = userIds.slice(start, start + ATTENDANCE_QUERY_MAX_USER_IDS);
+    const rows = await fetchAttendanceRecordsForOrgChartChunk(chunk, today.from, today.to);
+    mergeAttendanceRowsIntoUserMap(out, rows);
+  }
+  return out;
+}
+
+function mergeAttendanceIntoOrgChartTree(
+  nodes: ApiOrgChartNode[],
+  byUserId: ReadonlyMap<string, OrgChartNodeAttendanceShape>
+): ApiOrgChartNode[] {
+  return nodes.map((node) => {
+    const next: ApiOrgChartNode = { ...node };
+    if (node.children && node.children.length > 0) {
+      next.children = mergeAttendanceIntoOrgChartTree(node.children, byUserId);
+    }
+    const uid = node.user_id == null ? "" : String(node.user_id).trim();
+    const fetched = uid === "" ? undefined : byUserId.get(uid);
+    if (fetched) {
+      next.attendance = fetched;
+    }
+    return next;
+  });
 }
 
 function getOrgChartNodeChrome(
@@ -342,8 +509,55 @@ function OrgChartEmployeeNode(props: Readonly<OrgChartEmployeeNodeProps>): React
 }
 
 const OrganizationalChart = () => {
-    const { data: session } = useSession();
+    const { data: session, status: sessionStatus } = useSession();
     const { mainAppDepartments, mainAppUsers } = useMainAppLookups();
+    const canViewAllAttendance = useMemo(
+      () => canViewAllEmployeesAttendance(session?.user),
+      [session?.user],
+    );
+    const [attendanceTeamScopeIds, setAttendanceTeamScopeIds] = useState<string[]>([]);
+    const [attendanceTeamScopeLoading, setAttendanceTeamScopeLoading] = useState(false);
+
+    useEffect(() => {
+      if (canViewAllAttendance || sessionStatus !== "authenticated") {
+        setAttendanceTeamScopeIds([]);
+        setAttendanceTeamScopeLoading(false);
+        return;
+      }
+      const selfRaw = session?.user?.id;
+      const selfStr = selfRaw == null ? "" : String(selfRaw).trim();
+      if (selfStr === "") {
+        setAttendanceTeamScopeIds([]);
+        setAttendanceTeamScopeLoading(false);
+        return;
+      }
+      let cancelled = false;
+      setAttendanceTeamScopeLoading(true);
+      void (async () => {
+        try {
+          const numericId = Number(selfStr);
+          const raw = await getTeamUsers(
+            undefined,
+            Number.isFinite(numericId) ? numericId : undefined,
+          );
+          if (cancelled) return;
+          const ids = parseTeamUsersResponseForAttendanceScope(raw, selfStr);
+          setAttendanceTeamScopeIds(ids);
+        } catch (e) {
+          console.error("[OrganizationalChart] getTeamUsers failed", e);
+          if (!cancelled) {
+            setAttendanceTeamScopeIds([selfStr]);
+          }
+        } finally {
+          if (!cancelled) {
+            setAttendanceTeamScopeLoading(false);
+          }
+        }
+      })();
+      return () => {
+        cancelled = true;
+      };
+    }, [canViewAllAttendance, sessionStatus, session?.user?.id]);
     const [activeTab, setActiveTab] = useState<'All Department' | 'Org Chart' | 'My Team'>('Org Chart');
     const [showDepartmentDropdown, setShowDepartmentDropdown] = useState(false);
     const [selectedDepartment, setSelectedDepartment] = useState('All Department');
@@ -363,21 +577,44 @@ const OrganizationalChart = () => {
 
     const { userProfilesMinified } = useUserProfilesMinified();
 
-    const refetchOrgChart = useCallback(async (departmentId?: string, userIds?: string[]) => {
-      setLoadingOrgChart(true);
-      try {
-        const params: { department_id?: string; user_ids?: string[] } = {};
-        if (departmentId != null && departmentId !== '') params.department_id = departmentId;
-        if (userIds != null && userIds.length > 0) params.user_ids = userIds;
-        const raw = await getUserProfilesOrgChartTree(Object.keys(params).length ? params : undefined);
-        setOrgChartTreeRaw(parseOrgChartTreeResponse(raw));
-      } catch (e) {
-        console.error("[OrganizationalChart] fetch org chart error:", e);
-        setOrgChartTreeRaw([]);
-      } finally {
-        setLoadingOrgChart(false);
-      }
-    }, []);
+    const refetchOrgChart = useCallback(
+      async (departmentId?: string, userIds?: string[]) => {
+        setLoadingOrgChart(true);
+        try {
+          const params: { department_id?: string; user_ids?: string[] } = {};
+          if (departmentId != null && departmentId !== "") params.department_id = departmentId;
+          if (userIds != null && userIds.length > 0) params.user_ids = userIds;
+          const raw = await getUserProfilesOrgChartTree(
+            Object.keys(params).length ? params : undefined
+          );
+          const parsed = parseOrgChartTreeResponse(raw);
+          const chartUserIds = collectUniqueOrgChartUserIds(parsed);
+          const idsForAttendance = filterOrgChartUserIdsForAttendanceFetch({
+            chartUserIds,
+            canViewAllAttendance,
+            attendanceTeamScopeLoading,
+            attendanceTeamScopeIds,
+            sessionUserId: session?.user?.id,
+          });
+          const attendanceByUser =
+            idsForAttendance.length > 0
+              ? await fetchTodayAttendanceForOrgChartUserIds(idsForAttendance)
+              : new Map<string, OrgChartNodeAttendanceShape>();
+          setOrgChartTreeRaw(mergeAttendanceIntoOrgChartTree(parsed, attendanceByUser));
+        } catch (e) {
+          console.error("[OrganizationalChart] fetch org chart error:", e);
+          setOrgChartTreeRaw([]);
+        } finally {
+          setLoadingOrgChart(false);
+        }
+      },
+      [
+        canViewAllAttendance,
+        attendanceTeamScopeIds,
+        attendanceTeamScopeLoading,
+        session?.user?.id,
+      ]
+    );
 
     const handleDepartmentChange = useCallback(
       (dept: string, selectedUserId?: string) => {

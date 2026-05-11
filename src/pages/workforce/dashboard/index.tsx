@@ -1,6 +1,7 @@
 import "@assets/scss/datatable-style.scss";
 import React, { ReactElement, useCallback, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
+import { useRouter } from "next/router";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 
@@ -90,9 +91,15 @@ function departmentNameFromLookup(
 }
 
 const EmployeesDashboard = () => {
+    const router = useRouter();
     const { mainAppUsers, mainAppDepartments, companyIdentifier } = useMainAppLookups();
     const [showAddEmployeeModal, setShowAddEmployeeModal] = useState(false);
     const [showNewRequestModal, setShowNewRequestModal] = useState(false);
+    const [dashboardRefreshToken, setDashboardRefreshToken] = useState(0);
+
+    const bumpDashboardData = useCallback(() => {
+      setDashboardRefreshToken((n) => n + 1);
+    }, []);
 
     const getDisplayName = useCallback(
       (userId: string | number | null | undefined, fallback?: string): string => {
@@ -168,8 +175,39 @@ const EmployeesDashboard = () => {
         }
       };
       fetchDashboardData();
-    }, [selectedDays, periodType, selectedDate, rangeStartDate, rangeEndDate]);
-  
+    }, [
+      selectedDays,
+      periodType,
+      selectedDate,
+      rangeStartDate,
+      rangeEndDate,
+      dashboardRefreshToken,
+      companyIdentifier,
+    ]);
+
+    useEffect(() => {
+      const onVisible = () => {
+        if (document.visibilityState !== "visible") return;
+        if (router.pathname !== "/workforce/dashboard") return;
+        bumpDashboardData();
+      };
+      document.addEventListener("visibilitychange", onVisible);
+      return () => document.removeEventListener("visibilitychange", onVisible);
+    }, [router.pathname, bumpDashboardData]);
+
+    useEffect(() => {
+      const onRouteDone = (url: string) => {
+        const path = String(url).split("?")[0];
+        if (path === "/workforce/dashboard") {
+          bumpDashboardData();
+        }
+      };
+      router.events.on("routeChangeComplete", onRouteDone);
+      return () => {
+        router.events.off("routeChangeComplete", onRouteDone);
+      };
+    }, [router.events, bumpDashboardData]);
+
     const daysOptions = ['7', '30', '60'];
   
     const toggleDropdown = (dropdown: string) => {
@@ -505,7 +543,11 @@ const EmployeesDashboard = () => {
         </div>
 
         {/* Stats Cards */}
-        <DashboardStats onViewCalendar={handleViewCalendar} params={dashboardParams} />
+        <DashboardStats
+          onViewCalendar={handleViewCalendar}
+          params={dashboardParams}
+          refreshToken={dashboardRefreshToken}
+        />
 
         {/* Action Buttons */}
         <div style={{
@@ -971,12 +1013,14 @@ const EmployeesDashboard = () => {
       <AddEmployeeModal
         show={showAddEmployeeModal}
         onHide={() => setShowAddEmployeeModal(false)}
+        onSuccess={bumpDashboardData}
         tenantId={companyIdentifier ?? undefined}
       />
 
       <NewRequestModal
         show={showNewRequestModal}
         onHide={() => setShowNewRequestModal(false)}
+        onSuccess={bumpDashboardData}
       />
 
       {/* Document Upload Modal — portaled to body to avoid parent/containment width caps */}

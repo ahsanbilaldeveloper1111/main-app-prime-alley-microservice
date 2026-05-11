@@ -11,6 +11,7 @@ import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 import GenericTable, {
   FilterPill,
+  TableAction,
   TableColumn,
   ToolbarConfig,
 } from "@components/GenericTable";
@@ -30,12 +31,18 @@ import moment from "moment";
 import { GlobalDateTimeFormat } from "@utils/Helper";
 import { useMainAppLookups } from "@hooks/useMainAppLookups";
 import { useSession } from "next-auth/react";
-import { Calendar, Clock, LogIn, LogOut } from "lucide-react";
+import { Calendar, Clock, LogIn, LogOut, Trash2 } from "lucide-react";
 import { HEADER_CONSTANTS } from "@constants/headerConstants";
 import { usePermissions } from "@utils/permissionUtils";
 import { getAvatarColor, getInitials } from "@utils/workforceUserAvatar";
 import { getWorkforceTableDatePresetRange } from "@utils/workforceTableDatePresetRange";
 import { WorkforceUserMultiSelectDropdown } from "@components/workforce/WorkforceUserMultiSelectDropdown";
+import { canViewAllEmployeesAttendance } from "@utils/workforce/canViewAllEmployeesAttendance";
+import {
+  parseTeamUsersResponseForAttendanceScope,
+  planTeamAttendanceListQuery,
+} from "@utils/workforce/attendanceTeamScope";
+import { getTeamUsers } from "@utils/teams";
 
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
@@ -45,6 +52,29 @@ const ITEMS_PER_PAGE = 15;
 const { PERMISSIONS } = HEADER_CONSTANTS;
 
 const dateOptions = ["Today", "Last 7 days", "Last 30 days", "Last 3 months", "All time"];
+
+function applyPrivilegedAttendanceUserFilters(
+  params: { user_ids?: string[] },
+  appliedUserIds: readonly string[],
+): void {
+  const normalizedUserIds = appliedUserIds
+    .map((id) => String(id).trim())
+    .filter((id) => id.length > 0);
+  if (normalizedUserIds.length > 0) {
+    params.user_ids = normalizedUserIds;
+  }
+}
+
+function applySelectedDateRangeToAttendanceParams(
+  params: { date_from?: string; date_to?: string },
+  selectedDate: string,
+): void {
+  const dateRange = getWorkforceTableDatePresetRange(selectedDate ?? "");
+  if (dateRange) {
+    params.date_from = dateRange.from;
+    params.date_to = dateRange.to;
+  }
+}
 
 type MainAppUser = {
   id: string | number;
@@ -369,10 +399,59 @@ function AttendanceStatusDisplay({
 }
 
 const AttendancePage = () => {
-  const { data: session } = useSession();
+  const { data: session, status: sessionStatus } = useSession();
   const { hasPermission } = usePermissions();
   const canDeleteAttendance = hasPermission(PERMISSIONS.DELETE_ATTENDANCE_STAFF_MANAGEMENT);
   const { mainAppUsers } = useMainAppLookups();
+
+  const canViewAllEmployees = useMemo(
+    () => canViewAllEmployeesAttendance(session?.user),
+    [session?.user],
+  );
+
+  const [teamScopeUserIds, setTeamScopeUserIds] = useState<string[]>([]);
+  const [teamScopeLoading, setTeamScopeLoading] = useState(false);
+
+  useEffect(() => {
+    if (canViewAllEmployees || sessionStatus !== "authenticated") {
+      setTeamScopeUserIds([]);
+      setTeamScopeLoading(false);
+      return;
+    }
+    const selfRaw = session?.user?.id;
+    const selfStr = selfRaw == null ? "" : String(selfRaw).trim();
+    if (selfStr === "") {
+      setTeamScopeUserIds([]);
+      setTeamScopeLoading(false);
+      return;
+    }
+    let cancelled = false;
+    setTeamScopeLoading(true);
+    void (async () => {
+      try {
+        const numericId = Number(selfStr);
+        const raw = await getTeamUsers(
+          undefined,
+          Number.isFinite(numericId) ? numericId : undefined,
+        );
+        if (cancelled) return;
+        const ids = parseTeamUsersResponseForAttendanceScope(raw, selfStr);
+        setTeamScopeUserIds(ids);
+      } catch (e) {
+        console.error("[AttendancePage] getTeamUsers failed", e);
+        if (!cancelled) {
+          setTeamScopeUserIds([selfStr]);
+        }
+      } finally {
+        if (!cancelled) {
+          setTeamScopeLoading(false);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [canViewAllEmployees, sessionStatus, session?.user?.id]);
 
   const users = useMemo(() => (mainAppUsers ?? []) as MainAppUser[], [mainAppUsers]);
 
@@ -412,7 +491,32 @@ const AttendancePage = () => {
   const [recordToDelete, setRecordToDelete] = useState<AttendanceRecord | null>(null);
   const [deleting, setDeleting] = useState(false);
 
-  const managers = users;
+  const managers = useMemo(() => {
+    if (canViewAllEmployees) {
+      return users;
+    }
+    const selfOnly = (): MainAppUser[] => {
+      const self = String(session?.user?.id ?? "").trim();
+      if (self === "") return [];
+      return users.filter(
+        (u) =>
+          String(u.id) === self ||
+          (u.phone != null && String(u.phone).trim() === self),
+      );
+    };
+    if (teamScopeLoading) {
+      return selfOnly();
+    }
+    const allow = new Set(teamScopeUserIds);
+    if (allow.size === 0) {
+      return selfOnly();
+    }
+    return users.filter(
+      (u) =>
+        allow.has(String(u.id)) ||
+        (u.phone != null && allow.has(String(u.phone).trim())),
+    );
+  }, [canViewAllEmployees, users, teamScopeUserIds, teamScopeLoading, session?.user?.id]);
 
   const toggleSelectedUserId = useCallback((idStr: string, isSelected: boolean) => {
     setSelectedUserIds((prev) => {
@@ -431,9 +535,23 @@ const AttendancePage = () => {
     });
   }, [managers, userSearchTerm]);
 
+  useEffect(() => {
+    if (canViewAllEmployees) return;
+    const allow = new Set(teamScopeUserIds);
+    if (allow.size === 0) return;
+    setAppliedUserIds((prev) => prev.filter((id) => allow.has(String(id).trim())));
+    setSelectedUserIds((prev) => prev.filter((id) => allow.has(String(id).trim())));
+  }, [canViewAllEmployees, teamScopeUserIds]);
+
   const loadAttendance = useCallback(async (page = 1) => {
     setLoading(true);
     try {
+      if (sessionStatus !== "authenticated") {
+        setRecords([]);
+        setPagination(null);
+        return;
+      }
+
       const params: {
         page: number;
         limit: number;
@@ -445,21 +563,48 @@ const AttendancePage = () => {
         page,
         limit: rowsPerPage,
       };
-      const normalizedUserIds = appliedUserIds
-        .map((id) => String(id).trim())
-        .filter(Boolean);
-      if (normalizedUserIds.length > 0) {
-        // Journey-compatible filter payload
-        params.user_ids = normalizedUserIds;
-        // Backward-compatible single user filter
+
+      let teamRowFilter: Set<string> | null = null;
+
+      if (canViewAllEmployees) {
+        applyPrivilegedAttendanceUserFilters(params, appliedUserIds);
+      } else {
+        const plan = planTeamAttendanceListQuery({
+          teamScopeLoading,
+          teamScopeUserIds,
+          sessionUserId: session?.user?.id,
+          appliedUserIds,
+        });
+        if (plan.kind === "wait_team") {
+          return;
+        }
+        if (plan.kind === "no_scope") {
+          setRecords([]);
+          setPagination(null);
+          return;
+        }
+        if (plan.kind === "empty_page") {
+          setRecords([]);
+          setPagination({
+            page: 1,
+            limit: rowsPerPage,
+            total: 0,
+            last_page: 1,
+          });
+          return;
+        }
+        params.user_ids = plan.user_ids;
+        teamRowFilter = plan.rowFilterAllow;
       }
-      const dateRange = getWorkforceTableDatePresetRange(selectedDate ?? "");
-      if (dateRange) {
-        params.date_from = dateRange.from;
-        params.date_to = dateRange.to;
-      }
+
+      applySelectedDateRangeToAttendanceParams(params, selectedDate);
       const { data, pagination: p } = await getAttendance(params);
-      setRecords(data ?? []);
+      const rawRows = data ?? [];
+      let rows = rawRows;
+      if (!canViewAllEmployees && teamRowFilter != null) {
+        rows = rawRows.filter((row) => teamRowFilter.has(String(row.user_id)));
+      }
+      setRecords(rows);
       if (p) {
         setPagination({
           page: p.page,
@@ -478,7 +623,16 @@ const AttendancePage = () => {
     } finally {
       setLoading(false);
     }
-  }, [appliedUserIds, selectedDate, rowsPerPage]);
+  }, [
+    appliedUserIds,
+    selectedDate,
+    rowsPerPage,
+    canViewAllEmployees,
+    session?.user?.id,
+    sessionStatus,
+    teamScopeUserIds,
+    teamScopeLoading,
+  ]);
 
   const handlePaginationChange = useCallback((page: number, limit: number) => {
     if (rowsPerPageRef.current !== limit) {
@@ -561,6 +715,14 @@ const AttendancePage = () => {
 
   const handleConfirmDelete = async () => {
     if (!canDeleteAttendance || !recordToDelete) return;
+    if (
+      !canViewAllEmployees &&
+      session?.user?.id != null &&
+      String(recordToDelete.user_id) !== String(session.user.id)
+    ) {
+      toast.error("You can only delete your own attendance records.");
+      return;
+    }
     setDeleting(true);
     try {
       await deleteAttendance(recordToDelete.id);
@@ -575,6 +737,23 @@ const AttendancePage = () => {
       setDeleting(false);
     }
   };
+
+  const handleDeleteAttendanceClick = useCallback(
+    (record: AttendanceRecord) => {
+      if (!canDeleteAttendance) return;
+      if (
+        !canViewAllEmployees &&
+        session?.user?.id != null &&
+        String(record.user_id) !== String(session.user.id)
+      ) {
+        toast.error("You can only delete your own attendance records.");
+        return;
+      }
+      setRecordToDelete(record);
+      setShowDeleteModal(true);
+    },
+    [canDeleteAttendance, canViewAllEmployees, session?.user?.id],
+  );
 
   const attendanceUserDropdownRows = useMemo(
     () =>
@@ -636,46 +815,48 @@ const AttendancePage = () => {
     ? getDisplayName(activeAttendanceUserId)
     : undefined;
 
-  const attendanceFilterPills = useMemo<FilterPill[]>(
-    () => [
-      {
-        id: "attendance-user-filter",
-        label: "User",
-        showDropdown: true,
-        searchable: true,
-        active: selectedUserIds.length > 0 || appliedUserIds.length > 0,
-        activeLabel: activeAttendanceUserLabel,
-        onClear:
-          selectedUserIds.length > 0 || appliedUserIds.length > 0
-            ? () => {
-                setSelectedUserIds([]);
-                setAppliedUserIds([]);
-                setUserSearchTerm("");
-                setCurrentPage(1);
-              }
-            : undefined,
-        dropdownContent: usersDropdownContent,
-      },
-      {
-        id: "attendance-date-filter",
-        label: "Date",
-        showDropdown: true,
-        searchable: true,
-        active: Boolean(selectedDate),
-        activeLabel: selectedDate || undefined,
-        onClear: selectedDate ? () => setSelectedDate("") : undefined,
-        dropdownOptions: dateFilterOptions,
-      },
-    ],
-    [
-      selectedUserIds,
-      appliedUserIds,
-      activeAttendanceUserLabel,
-      usersDropdownContent,
-      selectedDate,
-      dateFilterOptions,
-    ],
-  );
+  const attendanceFilterPills = useMemo<FilterPill[]>(() => {
+    const userPill: FilterPill = {
+      id: "attendance-user-filter",
+      label: "User",
+      showDropdown: true,
+      searchable: true,
+      active: selectedUserIds.length > 0 || appliedUserIds.length > 0,
+      activeLabel: activeAttendanceUserLabel,
+      onClear:
+        selectedUserIds.length > 0 || appliedUserIds.length > 0
+          ? () => {
+              setSelectedUserIds([]);
+              setAppliedUserIds([]);
+              setUserSearchTerm("");
+              setCurrentPage(1);
+            }
+          : undefined,
+      dropdownContent: usersDropdownContent,
+    };
+    const datePill: FilterPill = {
+      id: "attendance-date-filter",
+      label: "Date",
+      showDropdown: true,
+      searchable: true,
+      active: Boolean(selectedDate),
+      activeLabel: selectedDate || undefined,
+      onClear: selectedDate ? () => setSelectedDate("") : undefined,
+      dropdownOptions: dateFilterOptions,
+    };
+    const showUserFilter =
+      canViewAllEmployees || teamScopeUserIds.length > 1;
+    return showUserFilter ? [userPill, datePill] : [datePill];
+  }, [
+    selectedUserIds,
+    appliedUserIds,
+    activeAttendanceUserLabel,
+    usersDropdownContent,
+    selectedDate,
+    dateFilterOptions,
+    canViewAllEmployees,
+    teamScopeUserIds.length,
+  ]);
 
   const attendanceColumns = useMemo<TableColumn<AttendanceRecord>[]>(
     () => [
@@ -720,6 +901,33 @@ const AttendancePage = () => {
       },
     ],
     [getDisplayName],
+  );
+
+  const attendanceActions = useMemo<TableAction<AttendanceRecord>[]>(
+    () => [
+      {
+        label: "Delete",
+        icon: <Trash2 size={16} />,
+        onClick: (record: AttendanceRecord) => {
+          handleDeleteAttendanceClick(record);
+        },
+        show: () => canDeleteAttendance,
+        disabled: (record: AttendanceRecord) =>
+          Boolean(
+            !canViewAllEmployees &&
+              session?.user?.id != null &&
+              String(record.user_id) !== String(session.user.id),
+          ),
+        disabledTitle: "You can only delete your own attendance records.",
+        variant: "link",
+      },
+    ],
+    [
+      canDeleteAttendance,
+      canViewAllEmployees,
+      handleDeleteAttendanceClick,
+      session?.user?.id,
+    ],
   );
 
   const isCheckedIn = status?.is_checked_in === true;
@@ -806,6 +1014,7 @@ const AttendancePage = () => {
         <GenericTable<AttendanceRecord>
           data={records}
           columns={attendanceColumns}
+          actions={attendanceActions}
           showActions={true}
           actionsLabel="Actions"
           loading={loading}

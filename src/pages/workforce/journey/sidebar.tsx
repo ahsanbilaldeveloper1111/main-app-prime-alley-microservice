@@ -24,6 +24,7 @@ import {
 import { toast } from "react-toastify";
 import { Form, Modal } from "react-bootstrap";
 import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
+import { RequiredFieldAsterisk, RequiredFieldsFormHint } from "./requiredFieldMarkers";
 import { GlobalDateTimeFormat } from "@utils/Helper";
 import moment from "moment";
 import { JOURNEY_STATUS_OPTIONS as STATUS_OPTIONS } from "@utils/workforce/journeyStatusOptions";
@@ -212,8 +213,8 @@ const OnboardingDetailSidebar: React.FC<OnboardingDetailSidebarProps> = ({ emplo
   const handleAddStepSubmit = async () => {
     if (!canUpdateJourney) return;
 
-    if(!addStepForm.title.trim()) {
-      toast.error("Task is required");
+    if (!addStepForm.title.trim()) {
+      toast.error("Title is required.");
       return;
     }
     if (
@@ -278,6 +279,10 @@ const OnboardingDetailSidebar: React.FC<OnboardingDetailSidebarProps> = ({ emplo
 
   const handleEditStepSubmit = async () => {
     if (!editingStep?.id || !canUpdateJourney) return;
+    if (!editStepForm.title.trim()) {
+      toast.error("Title is required.");
+      return;
+    }
     if (
       journeyDueDateMin != null &&
       editStepForm.due_date !== "" &&
@@ -1058,21 +1063,26 @@ const OnboardingDetailSidebar: React.FC<OnboardingDetailSidebarProps> = ({ emplo
             <Modal.Body>
               <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
                 <Form.Group className="mb-3">
+                  <Form.Label htmlFor="journey-sidebar-add-step-title">
+                    Title <RequiredFieldAsterisk />
+                  </Form.Label>
+                  <Form.Control
+                    id="journey-sidebar-add-step-title"
+                    type="text"
+                    placeholder="Type the title"
+                    value={addStepForm.title}
+                    required
+                    aria-required={true}
+                    onChange={(e) => setAddStepForm((f) => ({ ...f, title: e.target.value }))}
+                  />
+                </Form.Group>
+                <Form.Group className="mb-3">
                   <Form.Label>Stage</Form.Label>
                   <Form.Control
                     type="text"
                     placeholder="Type the stage"
                     value={addStepForm.stage}
                     onChange={(e) => setAddStepForm((f) => ({ ...f, stage: e.target.value }))}
-                  />
-                </Form.Group>
-                <Form.Group className="mb-3">
-                  <Form.Label>Task <span className="text-danger">*</span></Form.Label>
-                  <Form.Control
-                    type="text"
-                    placeholder="Type the task"
-                    value={addStepForm.title}
-                    onChange={(e) => setAddStepForm((f) => ({ ...f, title: e.target.value }))}
                   />
                 </Form.Group>
                 <Form.Group className="mb-3">
@@ -1120,7 +1130,7 @@ const OnboardingDetailSidebar: React.FC<OnboardingDetailSidebarProps> = ({ emplo
                     onChange={(e) => setAddStepForm((f) => ({ ...f, sort_order: Number(e.target.value) || 0 }))}
                   />
                 </Form.Group> */}
-               
+                <RequiredFieldsFormHint />
               </div>
             </Modal.Body>
             <Modal.Footer>
@@ -1167,21 +1177,26 @@ const OnboardingDetailSidebar: React.FC<OnboardingDetailSidebarProps> = ({ emplo
             </Modal.Header>
             <Modal.Body>
               <Form.Group className="mb-3">
+                <Form.Label htmlFor="journey-sidebar-edit-step-title">
+                  Title <RequiredFieldAsterisk />
+                </Form.Label>
+                <Form.Control
+                  id="journey-sidebar-edit-step-title"
+                  type="text"
+                  placeholder="Title"
+                  value={editStepForm.title}
+                  required
+                  aria-required={true}
+                  onChange={(e) => setEditStepForm((f) => ({ ...f, title: e.target.value }))}
+                />
+              </Form.Group>
+              <Form.Group className="mb-3">
                 <Form.Label>Stage</Form.Label>
                 <Form.Control
                   type="text"
                   placeholder="Stage"
                   value={editStepForm.stage}
                   onChange={(e) => setEditStepForm((f) => ({ ...f, stage: e.target.value }))}
-                />
-              </Form.Group>
-              <Form.Group className="mb-3">
-                <Form.Label>Title</Form.Label>
-                <Form.Control
-                  type="text"
-                  placeholder="Title"
-                  value={editStepForm.title}
-                  onChange={(e) => setEditStepForm((f) => ({ ...f, title: e.target.value }))}
                 />
               </Form.Group>
               <Form.Group className="mb-3">
@@ -1229,6 +1244,7 @@ const OnboardingDetailSidebar: React.FC<OnboardingDetailSidebarProps> = ({ emplo
                   onChange={(e) => setEditStepForm((f) => ({ ...f, sort_order: Number(e.target.value) || 0 }))}
                 />
               </Form.Group> */}
+              <RequiredFieldsFormHint />
             </Modal.Body>
             <Modal.Footer>
               <button

@@ -21,9 +21,15 @@ export interface EmployeeDashboardCounters {
 interface DashboardStatsProps {
   onViewCalendar?: (e: React.MouseEvent) => void;
   params?: EmployeeDashboardParams;
+  /** Increment to refetch counters without changing filters (mutations, tab focus, company context). */
+  refreshToken?: number;
 }
 
-const DashboardStats: React.FC<DashboardStatsProps> = ({ onViewCalendar, params }) => {
+const DashboardStats: React.FC<DashboardStatsProps> = ({
+  onViewCalendar,
+  params,
+  refreshToken = 0,
+}) => {
   const [counters, setCounters] = useState<EmployeeDashboardCounters | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -40,7 +46,14 @@ const DashboardStats: React.FC<DashboardStatsProps> = ({ onViewCalendar, params 
       }
     };
     fetchCounters();
-  }, [params?.days, params?.period_type, params?.date, params?.start_date, params?.end_date]);
+  }, [
+    params?.days,
+    params?.period_type,
+    params?.date,
+    params?.start_date,
+    params?.end_date,
+    refreshToken,
+  ]);
 
   if (loading) {
     return (

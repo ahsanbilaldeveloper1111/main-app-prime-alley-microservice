@@ -28,6 +28,7 @@ import { JOURNEY_STATUS_OPTIONS } from "@utils/workforce/journeyStatusOptions";
 import { toast } from "react-toastify";
 import { Form, Modal } from "react-bootstrap";
 import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
+import { RequiredFieldAsterisk, RequiredFieldsFormHint } from "./requiredFieldMarkers";
 import { usePermissions } from "@utils/permissionUtils";
 import { HEADER_CONSTANTS } from "@constants/headerConstants";
 import { getAvatarColor, getInitials } from "@utils/workforceUserAvatar";
@@ -1239,7 +1240,7 @@ function AddJourneyStepModal({
 
   const handleSubmit = async () => {
     if (form.title.trim() === "") {
-      toast.error("Task is required");
+      toast.error("Title is required.");
       return;
     }
     if (journeyDueDateMin != null && form.due_date !== "" && form.due_date < journeyDueDateMin) {
@@ -1283,23 +1284,26 @@ function AddJourneyStepModal({
       <Modal.Body>
         <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
           <Form.Group className="mb-3">
+            <Form.Label htmlFor="journey-add-step-title">
+              Title <RequiredFieldAsterisk />
+            </Form.Label>
+            <Form.Control
+              id="journey-add-step-title"
+              type="text"
+              placeholder="Type the title"
+              value={form.title}
+              required
+              aria-required={true}
+              onChange={(e) => setForm((prev) => ({ ...prev, title: e.target.value }))}
+            />
+          </Form.Group>
+          <Form.Group className="mb-3">
             <Form.Label>Stage</Form.Label>
             <Form.Control
               type="text"
               placeholder="Type the stage"
               value={form.stage}
               onChange={(e) => setForm((prev) => ({ ...prev, stage: e.target.value }))}
-            />
-          </Form.Group>
-          <Form.Group className="mb-3">
-            <Form.Label>
-             Title <span className="text-danger">*</span>
-            </Form.Label>
-            <Form.Control
-              type="text"
-              placeholder="Type the title"
-              value={form.title}
-              onChange={(e) => setForm((prev) => ({ ...prev, title: e.target.value }))}
             />
           </Form.Group>
           <Form.Group className="mb-3">
@@ -1326,6 +1330,7 @@ function AddJourneyStepModal({
               }
             />
           </Form.Group>
+          <RequiredFieldsFormHint />
         </div>
       </Modal.Body>
       <Modal.Footer>
@@ -1413,6 +1418,10 @@ function EditJourneyStepModal({
 
   const handleSubmit = async () => {
     if (step?.id == null) return;
+    if (!form.title.trim()) {
+      toast.error("Title is required.");
+      return;
+    }
     if (journeyDueDateMin != null && form.due_date !== "" && form.due_date < journeyDueDateMin) {
       toast.error("Due date cannot be before the journey start date.");
       return;
@@ -1445,21 +1454,26 @@ function EditJourneyStepModal({
       </Modal.Header>
       <Modal.Body>
         <Form.Group className="mb-3">
+          <Form.Label htmlFor="journey-edit-step-title">
+            Title <RequiredFieldAsterisk />
+          </Form.Label>
+          <Form.Control
+            id="journey-edit-step-title"
+            type="text"
+            placeholder="Title"
+            value={form.title}
+            required
+            aria-required={true}
+            onChange={(e) => setForm((prev) => ({ ...prev, title: e.target.value }))}
+          />
+        </Form.Group>
+        <Form.Group className="mb-3">
           <Form.Label>Stage</Form.Label>
           <Form.Control
             type="text"
             placeholder="Stage"
             value={form.stage}
             onChange={(e) => setForm((prev) => ({ ...prev, stage: e.target.value }))}
-          />
-        </Form.Group>
-        <Form.Group className="mb-3">
-          <Form.Label>Title</Form.Label>
-          <Form.Control
-            type="text"
-            placeholder="Title"
-            value={form.title}
-            onChange={(e) => setForm((prev) => ({ ...prev, title: e.target.value }))}
           />
         </Form.Group>
         <Form.Group className="mb-3">
@@ -1498,6 +1512,7 @@ function EditJourneyStepModal({
             <option value="completed">Completed</option>
           </Form.Control>
         </Form.Group>
+        <RequiredFieldsFormHint />
       </Modal.Body>
       <Modal.Footer>
         <button

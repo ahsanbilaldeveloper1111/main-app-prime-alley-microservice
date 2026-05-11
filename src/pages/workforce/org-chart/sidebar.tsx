@@ -19,6 +19,10 @@ import {
   mainAppUserRowKeyForSelection,
   normalizeOrgChartUserKey,
 } from '@utils/workforce/orgChartMainAppUserMatch';
+import { usePermissions } from '@utils/permissionUtils';
+import { HEADER_CONSTANTS } from '@constants/headerConstants';
+
+const { PERMISSIONS } = HEADER_CONSTANTS;
 
 interface Employee {
   id: string;
@@ -154,6 +158,8 @@ function getCurrentStatusVisuals(status: SidebarEmployeeStatus): {
 }
 
 const OrganizationEmployeeSidebar: React.FC<OrganizationEmployeeSidebarProps> = ({ employee, onClose, allEmployees, rawProfile, users = [], userProfilesMinified = [], onRefresh }) => {
+  const { hasPermission } = usePermissions();
+  const canEditOrgReporting = hasPermission(PERMISSIONS.UPDATE_EMPLOYEE_STAFF_MANAGEMENT);
   const [activeTab, setActiveTab] = useState<'Overview' | 'Reporting'>('Overview');
   const [updatingParent, setUpdatingParent] = useState(false);
   const [childUserIds, setChildUserIds] = useState<string[]>([]);
@@ -234,6 +240,10 @@ const OrganizationEmployeeSidebar: React.FC<OrganizationEmployeeSidebarProps> = 
 
   const handleParentSelectChange = useCallback(
     async (e: React.ChangeEvent<HTMLSelectElement>) => {
+      if (!canEditOrgReporting) {
+        toast.error('You do not have permission to change reporting structure.');
+        return;
+      }
       const value = e.target.value;
       setUpdatingParent(true);
       try {
@@ -247,11 +257,15 @@ const OrganizationEmployeeSidebar: React.FC<OrganizationEmployeeSidebarProps> = 
         setUpdatingParent(false);
       }
     },
-    [employee.id, onRefresh]
+    [canEditOrgReporting, employee.id, onRefresh]
   );
 
   const handleDirectReportToggle = useCallback(
     async (uid: string, currentlyChecked: boolean) => {
+      if (!canEditOrgReporting) {
+        toast.error('You do not have permission to change direct reports.');
+        return;
+      }
       const prevIds = childUserIds;
       const newIds = currentlyChecked ? prevIds.filter((id) => id !== uid) : [...prevIds, uid];
       setChildUserIds(newIds);
@@ -268,7 +282,7 @@ const OrganizationEmployeeSidebar: React.FC<OrganizationEmployeeSidebarProps> = 
         setUpdatingBulkReports(false);
       }
     },
-    [childUserIds, employee.id, onRefresh]
+    [canEditOrgReporting, childUserIds, employee.id, onRefresh]
   );
 
   const filteredDirectReportOptionUsers = useMemo(() => {
@@ -453,6 +467,16 @@ const OrganizationEmployeeSidebar: React.FC<OrganizationEmployeeSidebarProps> = 
           Reporting Structure
         </h3>
 
+        {canEditOrgReporting ? null : (
+          <p style={{ fontSize: '13px', color: '#6b7280', margin: '0 0 16px 0', lineHeight: 1.5 }}>
+            You do not have permission to change who this employee reports to or who reports to them. An administrator can grant
+            {' '}
+            <strong>Update Employee</strong>
+            {' '}
+            (staff management) to use &quot;Choose Head&quot; and &quot;Choose Subordinates&quot;.
+          </p>
+        )}
+
         {manager && (
           <button
             type="button"
@@ -514,15 +538,16 @@ const OrganizationEmployeeSidebar: React.FC<OrganizationEmployeeSidebarProps> = 
             <select
               value={parentSelectValue}
               onChange={handleParentSelectChange}
-              disabled={updatingParent}
+              disabled={!canEditOrgReporting || updatingParent}
               style={{
                 width: '100%',
                 padding: '10px 12px',
                 border: '1px solid #e5e7eb',
                 borderRadius: '8px',
                 fontSize: '14px',
-                backgroundColor: 'white',
-                cursor: updatingParent ? 'wait' : 'pointer',
+                backgroundColor: canEditOrgReporting ? 'white' : '#f3f4f6',
+                color: canEditOrgReporting ? '#1f2937' : '#6b7280',
+                cursor: !canEditOrgReporting || updatingParent ? 'not-allowed' : 'pointer',
               }}
             >
               <option value="">Select manager</option>
@@ -557,6 +582,7 @@ const OrganizationEmployeeSidebar: React.FC<OrganizationEmployeeSidebarProps> = 
                 placeholder="Search users..."
                 value={directReportSearch}
                 onChange={(e) => setDirectReportSearch(e.target.value)}
+                disabled={!canEditOrgReporting}
                 style={{
                   width: '100%',
                   padding: '10px 12px 10px 38px',
@@ -564,8 +590,10 @@ const OrganizationEmployeeSidebar: React.FC<OrganizationEmployeeSidebarProps> = 
                   borderRadius: '8px',
                   fontSize: '14px',
                   outline: 'none',
-                  backgroundColor: 'white',
+                  backgroundColor: canEditOrgReporting ? 'white' : '#f3f4f6',
+                  color: canEditOrgReporting ? '#1f2937' : '#6b7280',
                   boxSizing: 'border-box',
+                  cursor: canEditOrgReporting ? 'text' : 'not-allowed',
                 }}
               />
             </div>
@@ -581,21 +609,23 @@ const OrganizationEmployeeSidebar: React.FC<OrganizationEmployeeSidebarProps> = 
                       alignItems: 'center',
                       gap: '10px',
                       padding: '8px 12px',
-                      backgroundColor: 'white',
+                      backgroundColor: canEditOrgReporting ? 'white' : '#f3f4f6',
                       border: '1px solid #e5e7eb',
                       borderRadius: '8px',
-                      cursor: updatingBulkReports ? 'wait' : 'pointer',
+                      cursor: !canEditOrgReporting || updatingBulkReports ? 'not-allowed' : 'pointer',
                       fontSize: '14px',
                     }}
                   >
                     <input
                       type="checkbox"
                       checked={checked}
-                      disabled={updatingBulkReports}
+                      disabled={!canEditOrgReporting || updatingBulkReports}
                       onChange={() => {
                         handleDirectReportToggle(uid, checked);
                       }}
-                      style={{ cursor: updatingBulkReports ? 'wait' : 'pointer' }}
+                      style={{
+                        cursor: !canEditOrgReporting || updatingBulkReports ? 'not-allowed' : 'pointer',
+                      }}
                     />
                     <span style={{ color: '#1f2937' }}>{u.name}</span>
                   </label>

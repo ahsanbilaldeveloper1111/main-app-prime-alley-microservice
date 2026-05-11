@@ -31,6 +31,12 @@ import moment from "moment";
 import { GlobalDateTimeFormat } from "@utils/Helper";
 import { formatPhoneForDisplay } from "@utils/phoneDisplay";
 import { HEADER_CONSTANTS } from "@constants/headerConstants";
+import {
+  applyEmployeeProfilesListFilters,
+  applyEmployeeProfilesListScopeToParams,
+  resolveEmployeeProfilesListScope,
+} from "@utils/workforce/employeeProfilesListScope";
+import { resolveUserProfileIdsForPhoneLikeSearch } from "@utils/workforce/employeeProfilesPhoneSearch";
 
 const EMPLOYMENT_TYPES = ["Full-Time", "Part-Time", "Contract", "Internship", "Freelance", "Temporary"];
 const CONTRACT_TYPES = ["Permanent", "Temporary", "Freelance", "Fixed-term", "Probation"];
@@ -97,6 +103,45 @@ function displayProfileName(p: UserProfile): string {
   return String((p as UserProfile & { name?: string }).name ?? p.user_id ?? p.employee_code ?? p.id ?? "—");
 }
 
+/** Single-line address for the employees table (multi-address profiles use the first populated row). */
+function formatProfileListAddress(profile: UserProfile): string {
+  const list = profile.addresses;
+  if (Array.isArray(list)) {
+    for (const entry of list) {
+      if (entry == null || typeof entry !== "object") continue;
+      const parts: string[] = [];
+      const line1 = entry.address ?? entry.name;
+      if (line1 != null && String(line1).trim() !== "") {
+        parts.push(String(line1).trim());
+      }
+      for (const key of ["city", "state", "country", "zip_code"] as const) {
+        const v = entry[key];
+        if (v != null && String(v).trim() !== "") {
+          parts.push(String(v).trim());
+        }
+      }
+      if (parts.length > 0) {
+        return parts.join(", ");
+      }
+    }
+  }
+  const withState = profile as UserProfile & { address_state?: string | null };
+  const flatParts: string[] = [];
+  for (const v of [
+    profile.address_address,
+    profile.address_city,
+    withState.address_state,
+    profile.address_country,
+    profile.address_zip_code,
+    profile.address_name,
+  ]) {
+    if (v != null && String(v).trim() !== "") {
+      flatParts.push(String(v).trim());
+    }
+  }
+  return flatParts.length > 0 ? flatParts.join(", ") : "—";
+}
+
 /** Label for department headcount chart: resolve id via main-app departments, else legacy name or placeholder */
 function departmentHeadcountDisplayName(
   departmentId: number | null,
@@ -153,6 +198,9 @@ interface DepartmentHeadcountChartRow {
 }
 
 const ITEMS_PER_PAGE = 15;
+
+/** Beyond this, omit `user_ids` on GET /user-profiles and rely on `view_all_company_employees` + backend scoping. */
+const MAX_USER_IDS_IN_PROFILES_QUERY = 120;
 
 const DEPARTMENT_CHART_COLORS = [
   "#6366f1",
@@ -362,7 +410,32 @@ function UsersPillDropdownContent({
 const Employees = () => {
   const router = useRouter();
   const { data: session } = useSession();
-  const { mainAppDepartments, mainAppUsers, companyIdentifier } = useMainAppLookups();
+  const { mainAppDepartments, mainAppUsers, companyIdentifier, loadingUsers } =
+    useMainAppLookups();
+
+  const mainAppUserPhones = useMemo(
+    () =>
+      (mainAppUsers ?? [])
+        .map((u) => String(u.phone ?? "").trim())
+        .filter((p) => p.length > 0),
+    [mainAppUsers],
+  );
+
+  const canViewAllCompanyEmployees = useMemo(() => {
+    const perms = session?.user?.permissions;
+    return (
+      Array.isArray(perms) &&
+      perms.includes(PERMISSIONS.VIEW_ALL_COMPANY_EMPLOYEES_STAFF_MANAGEMENT)
+    );
+  }, [session?.user?.permissions]);
+
+  const canCreateEmployeeJourney = useMemo(() => {
+    const perms = session?.user?.permissions;
+    return (
+      Array.isArray(perms) &&
+      perms.includes(PERMISSIONS.CREATE_JOURNEY_STAFF_MANAGEMENT)
+    );
+  }, [session?.user?.permissions]);
 
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedDepartment, setSelectedDepartment] = useState("");
@@ -450,17 +523,61 @@ const Employees = () => {
   const loadProfiles = useCallback(async (page = 1) => {
     setLoading(true);
     try {
-      const params: { page: number; limit: number; employment_type?: string; contract_type?: string; status?: string; location_id?: number; department_id?: number; search?: string; user_ids?: string[] } = {
+      if (!canViewAllCompanyEmployees && loadingUsers) {
+        return;
+      }
+
+      const params: {
+        page: number;
+        limit: number;
+        employment_type?: string;
+        contract_type?: string;
+        status?: string;
+        location_id?: number;
+        department_id?: number;
+        search?: string;
+        user_ids?: string[];
+        view_all_company_employees?: boolean;
+      } = {
         page,
         limit: rowsPerPage,
       };
-      if (appliedEmploymentType?.trim()) params.employment_type = appliedEmploymentType.trim();
-      if (appliedContract?.trim()) params.contract_type = appliedContract.trim();
-      if (appliedStatus?.trim()) params.status = appliedStatus.trim().toLowerCase();
-      if (appliedLocationId != null) params.location_id = appliedLocationId;
-      if (appliedDepartment?.trim()) params.department_id = Number(appliedDepartment.trim());
-      if (appliedSearch?.trim()) params.search = appliedSearch.trim();
-      if (appliedManagerIds.length > 0) params.user_ids = appliedManagerIds;
+      applyEmployeeProfilesListFilters(params, {
+        appliedEmploymentType,
+        appliedContract,
+        appliedStatus,
+        appliedLocationId,
+        appliedDepartment,
+        appliedSearch,
+      });
+
+      const scope = resolveEmployeeProfilesListScope({
+        canViewAllCompanyEmployees,
+        mainAppUserPhones,
+        appliedManagerIds,
+        maxUserIdsInQuery: MAX_USER_IDS_IN_PROFILES_QUERY,
+      });
+
+      if (scope.kind === "empty") {
+        setProfiles([]);
+        setPagination({ page: 1, limit: rowsPerPage, total: 0, last_page: 1 });
+        return;
+      }
+
+      applyEmployeeProfilesListScopeToParams(params, scope);
+
+      const phoneSearchUserIds = resolveUserProfileIdsForPhoneLikeSearch({
+        appliedSearch,
+        mainAppUsers: mainAppUsers ?? [],
+        scope,
+        mainAppUserPhones,
+        maxIds: MAX_USER_IDS_IN_PROFILES_QUERY,
+      });
+      if (phoneSearchUserIds != null) {
+        params.user_ids = phoneSearchUserIds;
+        delete params.search;
+      }
+
       const { data, pagination: p } = await getUserProfiles(params);
       setProfiles(data ?? []);
       if (p) setPagination({ page: p.page, limit: p.limit, total: p.total, last_page: p.last_page });
@@ -472,7 +589,20 @@ const Employees = () => {
     } finally {
       setLoading(false);
     }
-  }, [appliedEmploymentType, appliedContract, appliedStatus, appliedLocationId, appliedDepartment, appliedSearch, appliedManagerIds, rowsPerPage]);
+  }, [
+    appliedEmploymentType,
+    appliedContract,
+    appliedStatus,
+    appliedLocationId,
+    appliedDepartment,
+    appliedSearch,
+    appliedManagerIds,
+    rowsPerPage,
+    canViewAllCompanyEmployees,
+    loadingUsers,
+    mainAppUserPhones,
+    mainAppUsers,
+  ]);
 
   useEffect(() => {
     loadProfiles(currentPage);
@@ -557,6 +687,10 @@ const Employees = () => {
 
   const handleCreateJourney = async () => {
     if (journeyModalProfile == null) return;
+    if (!canCreateEmployeeJourney) {
+      toast.error("You do not have permission to create journeys.");
+      return;
+    }
     const startDate = journeyForm.startDate.trim();
     if (startDate === "") {
       toast.warn("Please select a start date.");
@@ -987,6 +1121,16 @@ const Employees = () => {
         sortable: false,
       },
       {
+        key: "employee_code",
+        label: "Employee Code",
+        type: "text",
+        sortable: false,
+        accessor: (profile: UserProfile) =>
+          profile.employee_code != null && String(profile.employee_code).trim() !== ""
+            ? String(profile.employee_code).trim()
+            : "—",
+      },
+      {
         key: "identification_number",
         label: "CNIC/ID",
         type: "text",
@@ -1031,6 +1175,32 @@ const Employees = () => {
         render: (profile: UserProfile) => (
           <span style={{ fontSize: "14px", color: "#1f2937" }}>{formatPhoneForDisplay(profile.phone)}</span>
         ),
+      },
+      {
+        key: "list_address",
+        label: "Address",
+        type: "custom",
+        sortable: false,
+        render: (profile: UserProfile) => {
+          const text = formatProfileListAddress(profile);
+          return (
+            <span
+              title={text === "—" ? undefined : text}
+              style={{
+                fontSize: "14px",
+                color: "#1f2937",
+                maxWidth: "min(280px, 28vw)",
+                display: "inline-block",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+                verticalAlign: "bottom",
+              }}
+            >
+              {text}
+            </span>
+          );
+        },
       },
       {
         key: "status",
@@ -1101,10 +1271,7 @@ const Employees = () => {
         label: "Create Journey",
         icon: <Calendar size={16} />,
         onClick: (profile: UserProfile) => openJourneyModal(profile),
-        show: () =>
-          Boolean(
-            session?.user?.permissions?.includes(PERMISSIONS.UPDATE_EMPLOYEE_STAFF_MANAGEMENT),
-          ),
+        show: () => canCreateEmployeeJourney,
         disabled: (profile: UserProfile) => (profile as UserProfile & { journey?: { id?: number } }).journey?.id != null,
         disabledTitle: "Journey already started",
         variant: "link",
@@ -1120,7 +1287,7 @@ const Employees = () => {
         variant: "link",
       },
     ],
-    [handleDeleteClick, openEditModal, openJourneyModal, session?.user?.permissions],
+    [canCreateEmployeeJourney, handleDeleteClick, openEditModal, openJourneyModal, session?.user?.permissions],
   );
 
   return (
@@ -1459,7 +1626,12 @@ const Employees = () => {
           <Button variant="secondary" onClick={closeJourneyModal} type="button">
             Cancel
           </Button>
-          <Button variant="primary" type="button" onClick={handleCreateJourney} disabled={journeySubmitting}>
+          <Button
+            variant="primary"
+            type="button"
+            onClick={handleCreateJourney}
+            disabled={journeySubmitting || !canCreateEmployeeJourney}
+          >
             {journeySubmitting ? "Creating…" : "Create"}
           </Button>
         </Modal.Footer>
