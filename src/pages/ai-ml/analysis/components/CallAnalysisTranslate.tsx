@@ -13,11 +13,20 @@ const translationParagraphStyle: React.CSSProperties = {
   fontSize: "20px",
 };
 
+const TRANSLATION_TABS = [
+  { eventKey: "en", title: "English", translationKey: "en" },
+  { eventKey: "ar", title: "Arabic", translationKey: "ar" },
+  { eventKey: "ur", title: "Urdu", translationKey: "ur" },
+  { eventKey: "hi", title: "Hindi", translationKey: "hi" },
+] as const;
+
 export function CallAnalysisTranslate({ chunksAnalysisData, subActiveTab, setSubActiveTab }: Props) {
+  const translations = chunksAnalysisData?.translations;
+
   return (
     <Row>
       <Col md={12}>
-        {chunksAnalysisData?.translations && (
+        {translations ? (
           <Row>
             <Col md={12}>
               <Tabs
@@ -27,22 +36,15 @@ export function CallAnalysisTranslate({ chunksAnalysisData, subActiveTab, setSub
                 activeKey={subActiveTab}
                 onSelect={(k) => setSubActiveTab(k || "en")}
               >
-                <Tab eventKey="en" title="English">
-                  <p style={translationParagraphStyle}>{chunksAnalysisData?.translations?.en}</p>
-                </Tab>
-                <Tab eventKey="ar" title="Arabic">
-                  <p style={translationParagraphStyle}>{chunksAnalysisData?.translations?.ar}</p>
-                </Tab>
-                <Tab eventKey="ur" title="Urdu">
-                  <p style={translationParagraphStyle}>{chunksAnalysisData?.translations?.ur}</p>
-                </Tab>
-                <Tab eventKey="hi" title="Hindi">
-                  <p style={translationParagraphStyle}>{chunksAnalysisData?.translations?.hi}</p>
-                </Tab>
+                {TRANSLATION_TABS.map(({ eventKey, title, translationKey }) => (
+                  <Tab key={eventKey} eventKey={eventKey} title={title}>
+                    <p style={translationParagraphStyle}>{translations?.[translationKey]}</p>
+                  </Tab>
+                ))}
               </Tabs>
             </Col>
           </Row>
-        )}
+        ) : null}
       </Col>
     </Row>
   );
