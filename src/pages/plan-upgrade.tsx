@@ -1,17 +1,9 @@
 import React, { ReactElement } from 'react';
 import Layout from '@layout/index';
 import BreadcrumbItem from '@common/BreadcrumbItem';
-import { Card, Row, Col, Button } from 'react-bootstrap';
-import Link from 'next/link';
+import { Row, Col } from 'react-bootstrap';
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
-import PageHeader from "@components/PageHeader";
-import FormModal from "@components/page-partials/FormModal";
-import ConfirmModal from "@components/page-partials/ConfirmModal";
-import SuccessfulModal from "@components/page-partials/SuccessfulModal";
-import PageSummaryGrid, { SummaryCard } from '@components/PageSummaryGrid';
-import DatatableActionButton from "@components/DatatableActionButton";
-import { FiEdit, FiTrash2, FiEye,FiPlus } from "react-icons/fi";
 import "@assets/scss/plan-upgrade.scss";
 
 

@@ -5,34 +5,22 @@ import React, {
   useState,
   useCallback,
   useMemo,
-  useEffect,
 } from "react";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 import GenericListPage from "@components/GenericListPage";
 import { Column } from "@components/CustomDataTable";
-import { Button, Modal, Row } from "react-bootstrap";
-import { Col } from "react-bootstrap";
-import { toast } from "react-toastify";
-import { useTokenService } from "src/hooks/useTokenService";
-import { useSession } from "next-auth/react";
 import moment from "moment";
-import Select from "@components/AppSelect";
-import AuditLogDetail from "./Details";
 
 import { GetTmsAuditLogs } from "@utils/tms/List";
-import AuditLogsFilters from "@components/filters/AuditLogsFilters";
 import { AuditLog } from "@models/tms/AuditLog";
 
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
 import PageHeader from "@components/PageHeader";
 import FormModal from "@components/page-partials/FormModal";
-import ConfirmModal from "@components/page-partials/ConfirmModal";
-import SuccessfulModal from "@components/page-partials/SuccessfulModal";
-import PageSummaryGrid, { SummaryCard } from '@components/PageSummaryGrid';
 import DatatableActionButton from "@components/DatatableActionButton";
-import { FiEdit, FiTrash2, FiEye,FiPlus } from "react-icons/fi";
+import { FiEye } from "react-icons/fi";
 
 
 interface SelectOption {
@@ -73,7 +61,6 @@ const resourceTypeOptions = [
 ];
 
 const TmsAuditLogs = () => {
-  const { data: session, status } = useSession();
 
   const [refreshKey, setRefreshKey] = useState<number>(0);
   const [currentFilters, setCurrentFilters] = useState({search: ""});

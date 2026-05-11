@@ -1,4 +1,6 @@
-// CRM Products page — static layout (table wrapper, sidebar, view modal, detail tiles).
+@import "./crm-page-shared.scss";
+
+// CRM Products page — static layout (table wrapper, toolbar, sidebar, view modal).
 
 .products-table-wrapper {
   width: 100%;
@@ -149,7 +151,6 @@
   }
 }
 
-.products-sidebar-input--readonly {
   background-color: #f7fafc;
   cursor: not-allowed;
 }
@@ -169,14 +170,12 @@
   }
 }
 
-.products-sidebar-switch-wrap {
   margin-bottom: 20px;
 }
 
 .products-sidebar-switch {
   font-size: 14px;
 }
-
 .products-sidebar-footer {
   padding: 16px 24px;
   border-top: 1px solid #eaf0f6;

@@ -26,6 +26,28 @@ export const EMPLOYEE_STATUS_OPTIONS = ["Active", "Inactive"];
 
 export const EMPLOYEES_ITEMS_PER_PAGE = 15;
 
+/** Max `user_ids` length when sending a scoped directory list to GET /user-profiles */
+export const EMPLOYEES_LIST_MAX_USER_IDS_IN_QUERY = 120;
+
+export type EmployeesListQueryScope = {
+  canViewAllCompanyEmployees: boolean;
+  mainAppUserPhones: readonly string[];
+  mainAppUsers: readonly { id: number | string; phone?: string | null }[];
+  loadingUsers: boolean;
+};
+
+export function serializeEmployeesListScopeKey(scope: EmployeesListQueryScope): string {
+  const phones = [...scope.mainAppUserPhones]
+    .map((p) => String(p).trim())
+    .filter((p) => p.length > 0)
+    .sort((a, b) => a.localeCompare(b));
+  return JSON.stringify({
+    viewAll: scope.canViewAllCompanyEmployees,
+    loading: scope.loadingUsers,
+    phones,
+  });
+}
+
 export const DEPARTMENT_HEADCOUNT_CHART_COLORS = [
   "#6366f1",
   "#10b981",

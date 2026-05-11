@@ -1,6 +1,9 @@
+@import "./crm-page-shared.scss";
+
 // CRM Stages page — static layout only. Dynamic values (e.g. stage colors) stay inline in TSX.
 
 // —— KPI analytics cards ——
+
 .stages-kpi-card {
   transition: all 0.2s ease;
   border: 1px solid #e9ecef;
@@ -172,7 +175,6 @@
   padding: 40px;
 }
 
-.stages-create-intro {
   color: #64748b;
   font-size: 14px;
   margin-top: 0;
@@ -346,7 +348,6 @@
   margin-bottom: 30px;
 }
 
-.stages-view-tile {
   background: #f8f9fa;
   padding: 16px;
   border-radius: 10px;
@@ -367,14 +368,13 @@
   font-weight: 500;
 }
 
-.stages-view-tile-value-row {
   display: flex;
   align-items: center;
   gap: 8px;
 }
 
 // Swatch: use with inline style={{ backgroundColor: viewingStage.color }}
-.stages-view-color-swatch {
+
   width: 20px;
   height: 20px;
   border-radius: 4px;

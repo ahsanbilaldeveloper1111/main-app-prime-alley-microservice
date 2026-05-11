@@ -66,18 +66,20 @@ function OrgChartNodeAttendance({
 
 export type OrgChartEmployeeNodeProps = Readonly<{
   employee: OrgChartEmployee;
-  selectedUserId: string;
+  selectedUserIds: readonly string[];
   selectedUserSubtreeIds: Set<string>;
   rawProfileById: Record<string, ApiOrgChartNode>;
   onNodeSelect: (emp: OrgChartEmployee) => void;
 }>;
 
 export function OrgChartEmployeeNode(props: OrgChartEmployeeNodeProps): React.ReactElement {
-  const { employee, selectedUserId, selectedUserSubtreeIds, rawProfileById, onNodeSelect } = props;
+  const { employee, selectedUserIds, selectedUserSubtreeIds, rawProfileById, onNodeSelect } = props;
   const isRoot = employee.id === "root";
-  const isSelectedUser = Boolean(selectedUserId && employee.userId === selectedUserId);
-  const isInSelectedSubtree = Boolean(selectedUserId && selectedUserSubtreeIds.has(employee.id));
-  const highlightActive = Boolean(selectedUserId) && selectedUserSubtreeIds.size > 0;
+  const uid = employee.userId?.trim() ?? "";
+  const isSelectedUser = Boolean(uid && selectedUserIds.includes(uid));
+  const hasUserFilter = selectedUserIds.length > 0;
+  const isInSelectedSubtree = Boolean(hasUserFilter && selectedUserSubtreeIds.has(employee.id));
+  const highlightActive = hasUserFilter && selectedUserSubtreeIds.size > 0;
   const shouldFade = Boolean(highlightActive && !isInSelectedSubtree && employee.id !== "root");
   const isChildHighlight = isInSelectedSubtree && !isSelectedUser;
 

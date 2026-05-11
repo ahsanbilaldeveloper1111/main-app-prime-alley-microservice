@@ -9,22 +9,94 @@ import CategoryEditSidebar, {
 import GenericTable from "@components/GenericTable";
 import PageHeader from "@components/PageHeader";
 import {
+  buildChildrenRequestCategoryActions,
+  buildMainRequestCategoryActions,
+  buildRequestCategoryFieldsActions,
+  buildRequestCategoryFieldsColumns,
+  MAIN_REQUEST_CATEGORY_COLUMNS,
+  CHILD_REQUEST_CATEGORY_COLUMNS,
+  REQUEST_CATEGORIES_NESTED_TABLE_LAYOUT,
+} from "@page-modules/workforce/request-categories/partials/requestCategoriesGenericTableBlocks";
+import {
   categoryModalTitle,
   categorySaveButtonLabel,
-  formatDescriptionPreview,
-  formatTrackingLabel,
   isCategoryFormReadyForSubmit,
-  requestCategoryFieldTypeLabel,
   type CategoryFormState,
 } from "@page-modules/workforce/request-categories/requestCategoriesDomain";
 import RequestCategoryFieldModal from "@page-modules/workforce/request-categories/partials/RequestCategoryFieldModal";
 import { SubCategoryWorkflowForm } from "@page-modules/workforce/request-categories/partials/RequestCategoriesWorkflowForm";
 import DeleteConfirmationModal from "@components/page-partials/DeleteConfirmationModal";
 import type { UserRequestCategory, UserRequestCategoryField } from "@utils/staffManagement";
-import { ChevronDown, ChevronUp, FolderTree, List, Pencil, Plus, Trash2 } from "lucide-react";
-import React, { useMemo } from "react";
+import { Plus } from "lucide-react";
+import React, { useMemo, type ReactNode } from "react";
 import { Button, Form, Modal } from "react-bootstrap";
 import { useRequestCategoriesPage } from "../useRequestCategoriesPage";
+
+function ManagedDeleteConfirmationModal({
+  show,
+  pending,
+  itemName,
+  itemType,
+  onConfirm,
+  onReset,
+}: Readonly<{
+  show: boolean;
+  pending: boolean;
+  itemName: string | undefined;
+  itemType: "category" | "field";
+  onConfirm: () => void | Promise<void>;
+  onReset: () => void;
+}>) {
+  return (
+    <DeleteConfirmationModal
+      show={show}
+      onHide={() => {
+        if (pending) return;
+        onReset();
+      }}
+      onConfirm={onConfirm}
+      itemName={itemName}
+      itemType={itemType}
+      loading={pending}
+    />
+  );
+}
+
+function RequestCategoriesLargeModal({
+  show,
+  onHide,
+  title,
+  toolbarHint,
+  toolbarAction,
+  bodyContent,
+}: Readonly<{
+  show: boolean;
+  onHide: () => void;
+  title: ReactNode;
+  toolbarHint: ReactNode;
+  toolbarAction?: ReactNode;
+  bodyContent: ReactNode;
+}>) {
+  return (
+    <Modal show={show} onHide={onHide} size="lg" centered>
+      <Modal.Header closeButton>
+        <Modal.Title>{title}</Modal.Title>
+      </Modal.Header>
+      <Modal.Body>
+        <div className="d-flex justify-content-between align-items-center mb-3">
+          <span className="text-muted">{toolbarHint}</span>
+          {toolbarAction}
+        </div>
+        {bodyContent}
+      </Modal.Body>
+      <Modal.Footer>
+        <Button variant="secondary" onClick={onHide}>
+          Close
+        </Button>
+      </Modal.Footer>
+    </Modal>
+  );
+}
 
 export function RequestCategoriesPageView() {
   const ctx = useRequestCategoriesPage();
@@ -91,70 +163,13 @@ export function RequestCategoriesPageView() {
     openDeleteFieldModal,
   } = ctx;
 
-  const mainTableColumns = useMemo(
-    () => [
-      {
-        key: "name",
-        label: "Name",
-        type: "text" as const,
-        emptyValue: "—",
-      },
-      {
-        key: "description",
-        label: "Description",
-        render: (row: UserRequestCategory) => (
-          <span>{formatDescriptionPreview(row.description)}</span>
-        ),
-      },
-      {
-        key: "tracking_enabled",
-        label: "Tracking",
-        render: (row: UserRequestCategory) => <span>{formatTrackingLabel(row)}</span>,
-      },
-      {
-        key: "code_prefix",
-        label: "Code Prefix",
-        render: (row: UserRequestCategory) => <span>{row.tracking_code_prefix ?? "—"}</span>,
-      },
-      {
-        key: "is_active",
-        label: "Active",
-        render: (row: UserRequestCategory) => (
-          <span
-            className={`gt-badge gt-badge-${row.is_active === false ? "secondary" : "success"}`}
-          >
-            {row.is_active === false ? "Inactive" : "Active"}
-          </span>
-        ),
-      },
-    ],
-    [],
-  );
-
   const mainTableActions = useMemo(
-    () => [
-      {
-        label: "Edit",
-        icon: <Pencil size={14} />,
-        onClick: openEditCategory,
-        variant: "outline-secondary" as const,
-        show: () => canManage,
-      },
-      {
-        label: "Sub-categories",
-        icon: <FolderTree size={14} />,
-        onClick: openChildrenModal,
-        variant: "outline-secondary" as const,
-        show: () => canManage,
-      },
-      {
-        label: "Delete",
-        icon: <Trash2 size={14} />,
-        onClick: openDeleteCategory,
-        variant: "outline-danger" as const,
-        show: () => canManage,
-      },
-    ],
+    () =>
+      buildMainRequestCategoryActions(canManage, {
+        openEditCategory,
+        openChildrenModal,
+        openDeleteCategory,
+      }),
     [canManage, openChildrenModal, openDeleteCategory, openEditCategory],
   );
 
@@ -172,60 +187,14 @@ export function RequestCategoriesPageView() {
     return (
       <GenericTable<UserRequestCategory>
         data={childrenList}
-        columns={[
-          {
-            key: "name",
-            label: "Name",
-            type: "text",
-            emptyValue: "—",
-          },
-          {
-            key: "tracking_enabled",
-            label: "Tracking",
-            render: (row) => <span>{formatTrackingLabel(row)}</span>,
-          },
-          {
-            key: "is_active",
-            label: "Active",
-            render: (row) => (
-              <span
-                className={`gt-badge gt-badge-${row.is_active === false ? "secondary" : "success"}`}
-              >
-                {row.is_active === false ? "Inactive" : "Active"}
-              </span>
-            ),
-          },
-        ]}
-        actions={[
-          {
-            label: "Edit",
-            icon: <Pencil size={14} />,
-            onClick: (child) => {
-              setShowChildrenModal(false);
-              openEditCategory(child);
-            },
-            variant: "outline-secondary",
-          },
-          {
-            label: "Manage fields",
-            icon: <List size={14} />,
-            onClick: (child) => {
-              setShowChildrenModal(false);
-              openFieldsModal(child);
-            },
-            variant: "outline-secondary",
-          },
-          {
-            label: "Delete",
-            icon: <Trash2 size={14} />,
-            onClick: openDeleteCategory,
-            variant: "outline-danger",
-          },
-        ]}
-        showActions
-        uniqueKey="id"
-        showToolbarActions={false}
-        noBorder
+        columns={CHILD_REQUEST_CATEGORY_COLUMNS}
+        actions={buildChildrenRequestCategoryActions({
+          closeChildrenModal: () => setShowChildrenModal(false),
+          openEditCategory,
+          openFieldsModal,
+          openDeleteCategory,
+        })}
+        {...REQUEST_CATEGORIES_NESTED_TABLE_LAYOUT}
       />
     );
   }, [
@@ -249,69 +218,9 @@ export function RequestCategoriesPageView() {
     return (
       <GenericTable<UserRequestCategoryField>
         data={fields}
-        columns={[
-          {
-            key: "_order",
-            label: "",
-            sortable: false,
-            render: (_row, index) => (
-              <div className="d-flex align-items-center gap-1">
-                <button
-                  type="button"
-                  className="request-categories-page__field-reorder-btn"
-                  onClick={() => moveField(index, "up")}
-                  disabled={reordering}
-                  aria-label="Move up"
-                >
-                  <ChevronUp size={16} />
-                </button>
-                <button
-                  type="button"
-                  className="request-categories-page__field-reorder-btn"
-                  onClick={() => moveField(index, "down")}
-                  disabled={reordering}
-                  aria-label="Move down"
-                >
-                  <ChevronDown size={16} />
-                </button>
-              </div>
-            ),
-          },
-          { key: "label", label: "Label", type: "text" },
-          {
-            key: "type",
-            label: "Type",
-            render: (row) => <span>{requestCategoryFieldTypeLabel(row.type)}</span>,
-          },
-          {
-            key: "required",
-            label: "Required",
-            render: (row) => <span>{row.required ? "Yes" : "No"}</span>,
-          },
-          {
-            key: "is_active",
-            label: "Active",
-            render: (row) => <span>{row.is_active === false ? "No" : "Yes"}</span>,
-          },
-        ]}
-        actions={[
-          {
-            label: "Edit",
-            icon: <Pencil size={14} />,
-            onClick: openEditField,
-            variant: "outline-secondary",
-          },
-          {
-            label: "Delete",
-            icon: <Trash2 size={14} />,
-            onClick: openDeleteFieldModal,
-            variant: "outline-danger",
-          },
-        ]}
-        showActions
-        uniqueKey="id"
-        showToolbarActions={false}
-        noBorder
+        columns={buildRequestCategoryFieldsColumns(moveField, reordering)}
+        actions={buildRequestCategoryFieldsActions(openEditField, openDeleteFieldModal)}
+        {...REQUEST_CATEGORIES_NESTED_TABLE_LAYOUT}
       />
     );
   }, [fields, loadingFields, moveField, openDeleteFieldModal, openEditField, reordering]);
@@ -339,7 +248,7 @@ export function RequestCategoriesPageView() {
 
       <GenericTable<UserRequestCategory>
         data={categories}
-        columns={mainTableColumns}
+        columns={MAIN_REQUEST_CATEGORY_COLUMNS}
         actions={mainTableActions}
         showActions
         loading={loading}
@@ -471,78 +380,62 @@ export function RequestCategoriesPageView() {
         </CategorySidebarField>
       </CategoryEditSidebar>
 
-      <DeleteConfirmationModal
+      <ManagedDeleteConfirmationModal
         show={showDeleteModal}
-        onHide={() => {
-          if (deleteCategoryPending) return;
+        pending={deleteCategoryPending}
+        itemName={categoryToDelete?.name?.trim() || undefined}
+        itemType="category"
+        onConfirm={handleDeleteCategory}
+        onReset={() => {
           setShowDeleteModal(false);
           setCategoryToDelete(null);
         }}
-        onConfirm={handleDeleteCategory}
-        itemName={categoryToDelete?.name?.trim() || undefined}
-        itemType="category"
-        loading={deleteCategoryPending}
       />
-      <DeleteConfirmationModal
+      <ManagedDeleteConfirmationModal
         show={showDeleteFieldModal}
-        onHide={() => {
-          if (deleteFieldPending) return;
-          setShowDeleteFieldModal(false);
-          setFieldPendingDelete(null);
-        }}
-        onConfirm={handleConfirmDeleteField}
+        pending={deleteFieldPending}
         itemName={
           fieldPendingDelete
             ? (fieldPendingDelete.label ?? fieldPendingDelete.key ?? "").trim() || undefined
             : undefined
         }
         itemType="field"
-        loading={deleteFieldPending}
+        onConfirm={handleConfirmDeleteField}
+        onReset={() => {
+          setShowDeleteFieldModal(false);
+          setFieldPendingDelete(null);
+        }}
       />
 
-      <Modal show={showChildrenModal} onHide={() => setShowChildrenModal(false)} size="lg" centered>
-        <Modal.Header closeButton>
-          <Modal.Title>{categoryForChildren?.name ?? "—"} Sub-categories</Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-          <div className="d-flex justify-content-between align-items-center mb-3">
-            <span className="text-muted">Sub-categories under this category. Add or edit below.</span>
-            {categoryForChildren && (
-              <Button variant="primary" size="sm" onClick={() => openAddChildCategory(categoryForChildren)}>
-                <Plus size={16} className="me-1" />
-                Add Sub Category
-              </Button>
-            )}
-          </div>
-          {childrenModalMain}
-        </Modal.Body>
-        <Modal.Footer>
-          <Button variant="secondary" onClick={() => setShowChildrenModal(false)}>
-            Close
-          </Button>
-        </Modal.Footer>
-      </Modal>
-
-      <Modal show={showFieldsModal} onHide={closeFieldsModal} size="lg" centered>
-        <Modal.Header closeButton>
-          <Modal.Title>Fields: {fieldsCategoryName}</Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-          <div className="d-flex justify-content-between align-items-center mb-3">
-            <span className="text-muted">Define form fields for this request category.</span>
-            <Button variant="primary" size="sm" onClick={openAddField}>
+      <RequestCategoriesLargeModal
+        show={showChildrenModal}
+        onHide={() => setShowChildrenModal(false)}
+        title={<>{categoryForChildren?.name ?? "—"} Sub-categories</>}
+        toolbarHint="Sub-categories under this category. Add or edit below."
+        toolbarAction={
+          categoryForChildren ? (
+            <Button variant="primary" size="sm" onClick={() => openAddChildCategory(categoryForChildren)}>
               <Plus size={16} className="me-1" />
-              Add Field
+              Add Sub Category
             </Button>
-          </div>
-          {fieldsModalMain}
-        </Modal.Body>
-        <Modal.Footer>
-          <Button variant="secondary" onClick={closeFieldsModal}>
-            Close
+          ) : null
+        }
+        bodyContent={childrenModalMain}
+      />
+
+      <RequestCategoriesLargeModal
+        show={showFieldsModal}
+        onHide={closeFieldsModal}
+        title={<>Fields: {fieldsCategoryName}</>}
+        toolbarHint="Define form fields for this request category."
+        toolbarAction={
+          <Button variant="primary" size="sm" onClick={openAddField}>
+            <Plus size={16} className="me-1" />
+            Add Field
           </Button>
-        </Modal.Footer>
-      </Modal>
+        }
+        bodyContent={fieldsModalMain}
+      />
 
       <RequestCategoryFieldModal
         show={showFieldModal}

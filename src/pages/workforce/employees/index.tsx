@@ -61,7 +61,33 @@ const Employees = () => {
   const router = useRouter();
   const queryClient = useQueryClient();
   const { data: session } = useSession();
-  const { mainAppDepartments, mainAppUsers, companyIdentifier } = useMainAppLookups();
+  const { mainAppDepartments, mainAppUsers, companyIdentifier, loadingUsers } = useMainAppLookups();
+
+  const canViewAllCompanyEmployees = useMemo(
+    () =>
+      Boolean(
+        session?.user?.permissions?.includes(PERMISSIONS.VIEW_ALL_COMPANY_EMPLOYEES_STAFF_MANAGEMENT),
+      ),
+    [session?.user?.permissions],
+  );
+
+  const mainAppUserPhones = useMemo(
+    () =>
+      (mainAppUsers ?? [])
+        .map((u) => String(u.phone ?? "").trim())
+        .filter((p) => p.length > 0),
+    [mainAppUsers],
+  );
+
+  const employeesListScope = useMemo(
+    () => ({
+      canViewAllCompanyEmployees,
+      mainAppUserPhones,
+      mainAppUsers: mainAppUsers ?? [],
+      loadingUsers,
+    }),
+    [canViewAllCompanyEmployees, mainAppUserPhones, mainAppUsers, loadingUsers],
+  );
 
   const refreshWorkforceQueries = useCallback(() => {
     queryClient.invalidateQueries({ queryKey: workforceKeys.employees.all() });
@@ -124,6 +150,7 @@ const Employees = () => {
     page: currentPage,
     limit: rowsPerPage,
     filters: listFilters,
+    scope: employeesListScope,
   });
 
   const profiles = listResult?.data ?? [];
