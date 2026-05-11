@@ -2,11 +2,20 @@ import type { FAQItem } from "@utils/chat";
 
 export type FAQItemDraft = FAQItem & { clientKey: string };
 
+let faqClientKeySeq = 0;
+
 function newClientKey(): string {
-  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
-    return crypto.randomUUID();
+  const c = globalThis.crypto;
+  if (c?.randomUUID) {
+    return c.randomUUID();
   }
-  return `faq-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+  if (c?.getRandomValues) {
+    const bytes = new Uint8Array(16);
+    c.getRandomValues(bytes);
+    return [...bytes].map((b) => b.toString(16).padStart(2, "0")).join("");
+  }
+  faqClientKeySeq += 1;
+  return `faq-${Date.now()}-${faqClientKeySeq}`;
 }
 
 export function emptyFaqDraft(): FAQItemDraft {

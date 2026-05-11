@@ -28,7 +28,49 @@ function answerPreviewCell(answer: string, maxLen: number) {
   return <span>{answer}</span>;
 }
 
-export function useAiFaqListColumns(params: AiFaqListColumnsParams): Column<FAQData>[] {
+function FaqRowActions(props: Readonly<{
+  row: Row;
+  onView?: (faq: FAQData) => void;
+  onEdit: (faq: FAQData) => void;
+  onDelete: (faq: FAQData) => void;
+}>) {
+  const { row, onView, onEdit, onDelete } = props;
+  return (
+    <div className="d-flex gap-2">
+      {onView ? (
+        <Button
+          variant="light"
+          className="btn-action-style-2 p-1 text-primary"
+          title="View"
+          type="button"
+          onClick={() => onView(row)}
+        >
+          <Eye size={16} />
+        </Button>
+      ) : null}
+      <Button
+        variant="light"
+        className="btn-action-style-2 p-1 text-primary"
+        title="Edit"
+        type="button"
+        onClick={() => onEdit(row)}
+      >
+        <Edit size={16} />
+      </Button>
+      <Button
+        variant="light"
+        className="btn-action-style-2 p-1 text-danger"
+        title="Delete"
+        type="button"
+        onClick={() => onDelete(row)}
+      >
+        <Trash2 size={16} />
+      </Button>
+    </div>
+  );
+}
+
+export function useAiFaqListColumns(params: AiFaqListColumnsParams): Column<Row>[] {
   const variant = params.variant;
   const isGlobal = variant === "global";
   const onView = isGlobal ? params.onView : undefined;
@@ -42,9 +84,9 @@ export function useAiFaqListColumns(params: AiFaqListColumnsParams): Column<FAQD
         name: "Question",
         selector: (row) => row.question,
         sortable: true,
-        cell: (props) => (
+        cell: (row) => (
           <div style={{ maxWidth: "400px" }}>
-            <strong>{props.question}</strong>
+            <strong>{row.question}</strong>
           </div>
         ),
       },
@@ -53,9 +95,9 @@ export function useAiFaqListColumns(params: AiFaqListColumnsParams): Column<FAQD
         name: "Answer",
         selector: (row) => row.answer,
         sortable: true,
-        cell: (props) => (
+        cell: (row) => (
           <div style={isGlobal ? undefined : { maxWidth: "500px" }}>
-            {answerPreviewCell(props.answer, isGlobal ? 50 : 100)}
+            {answerPreviewCell(row.answer, isGlobal ? 50 : 100)}
           </div>
         ),
       },
@@ -67,81 +109,22 @@ export function useAiFaqListColumns(params: AiFaqListColumnsParams): Column<FAQD
         name: "Created At",
         selector: (row) => row.created_at || "",
         sortable: true,
-        cell: (props) => (
-          <span>{props.created_at ? new Date(props.created_at).toLocaleDateString() : "N/A"}</span>
+        cell: (row) => (
+          <span>{row.created_at ? new Date(row.created_at).toLocaleDateString() : "N/A"}</span>
         ),
       });
     }
 
-    if (isGlobal && onView) {
-      base.push({
-        key: "Action",
-        name: "Actions",
-        selector: (row) => row.id,
-        sortable: false,
-        cell: (props) => (
-          <div className="d-flex gap-2">
-            <Button
-              variant="light"
-              className="btn-action-style-2 p-1 text-primary"
-              title="View"
-              type="button"
-              onClick={() => onView(props as FAQData)}
-            >
-              <Eye size={16} />
-            </Button>
-            <Button
-              variant="light"
-              className="btn-action-style-2 p-1 text-primary"
-              title="Edit"
-              type="button"
-              onClick={() => onEdit(props as FAQData)}
-            >
-              <Edit size={16} />
-            </Button>
-            <Button
-              variant="light"
-              className="btn-action-style-2 p-1 text-danger"
-              title="Delete"
-              type="button"
-              onClick={() => onDelete(props as FAQData)}
-            >
-              <Trash2 size={16} />
-            </Button>
-          </div>
-        ),
-      });
-    } else {
-      base.push({
-        key: "Action",
-        name: "Actions",
-        selector: (row) => row.id,
-        sortable: false,
-        cell: (props) => (
-          <div className="d-flex gap-2">
-            <Button
-              variant="light"
-              className="btn-action-style-2 p-1 text-primary"
-              title="Edit"
-              type="button"
-              onClick={() => onEdit(props as FAQData)}
-            >
-              <Edit size={16} />
-            </Button>
-            <Button
-              variant="light"
-              className="btn-action-style-2 p-1 text-danger"
-              title="Delete"
-              type="button"
-              onClick={() => onDelete(props as FAQData)}
-            >
-              <Trash2 size={16} />
-            </Button>
-          </div>
-        ),
-      });
-    }
+    base.push({
+      key: "Action",
+      name: "Actions",
+      selector: (row) => row.id,
+      sortable: false,
+      cell: (row) => (
+        <FaqRowActions row={row} onView={onView} onEdit={onEdit} onDelete={onDelete} />
+      ),
+    });
 
-    return base as unknown as Column<FAQData>[];
+    return base;
   }, [variant, isGlobal, onView, onEdit, onDelete]);
 }

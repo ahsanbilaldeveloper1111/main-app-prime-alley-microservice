@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Container, Row, Col, Card, Table, Badge, Form, Button, Dropdown, ProgressBar } from 'react-bootstrap';
 import { Search, Users, TrendingUp, CheckCircle, Phone, MoreVertical, Copy, Volume2, Download, PhoneOff, ChevronLeft, ChevronRight } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { sampleWaveformJitterPx } from "@utils/sampleWaveformJitter";
 
 interface Session {
   id: string;
@@ -131,7 +132,7 @@ const LiveMonitorDashboard = () => {
   // Sample waveform data
   const waveformData = Array.from({ length: 100 }, (_, i) => ({
     x: i,
-    y: Math.sin(i / 5) * 30 + Math.random() * 20 + 30
+    y: Math.sin(i / 5) * 30 + sampleWaveformJitterPx(20) + 30,
   }));
 
   const getStatusBadge = (status: string): string => {
