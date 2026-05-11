@@ -9,18 +9,18 @@ export function useAiFaqDraftFormState() {
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [fileInputKey, setFileInputKey] = useState(0);
 
-  const clearAttachments = useCallback(() => {
+  const clearFileFieldState = useCallback(() => {
     setHaveFiles(false);
     setSelectedFiles([]);
     setFileInputKey((k) => k + 1);
   }, []);
 
+  const clearAttachments = clearFileFieldState;
+
   const resetForm = useCallback(() => {
     setFaqItems([emptyFaqDraft()]);
-    setHaveFiles(false);
-    setSelectedFiles([]);
-    setFileInputKey((k) => k + 1);
-  }, []);
+    clearFileFieldState();
+  }, [clearFileFieldState]);
 
   const handleAddFAQItem = useCallback(() => {
     setFaqItems((items) => [...items, emptyFaqDraft()]);
