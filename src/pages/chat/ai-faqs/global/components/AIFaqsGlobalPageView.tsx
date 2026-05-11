@@ -23,7 +23,6 @@ export function AIFaqsGlobalPageView({ ctx }: AIFaqsGlobalPageViewProps) {
     showEditModal,
     setShowEditModal,
     showDeleteModal,
-    setShowDeleteModal,
     selectedFAQ,
     setSelectedFAQ,
     faqItems,

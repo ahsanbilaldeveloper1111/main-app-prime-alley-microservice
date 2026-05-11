@@ -156,12 +156,9 @@ export function PaymentMethodsPageView() {
             >
               <PaymentMethodAddCardForm
                 onSuccess={() => {
-<<<<<<< refactor/section-09-ai-ml
-                  Promise.resolve(handleAddCardSuccess()).catch(() => undefined);
-=======
                   handleAddCardSuccess().catch(() => undefined);
->>>>>>> develop
                 }}
+
                 onCancel={() => setShowAddCardModal(false)}
               />
             </Elements>

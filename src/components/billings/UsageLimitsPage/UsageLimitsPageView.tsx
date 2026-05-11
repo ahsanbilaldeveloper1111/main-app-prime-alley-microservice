@@ -9,9 +9,11 @@ import {
   getDotStyle,
   getTagStyle,
   historicalData,
+  usageLimitsCreditsDisclaimer,
   usageLimitsFont,
   usageLimitsStyles as s,
   usageLimitsFeatures,
+  usageLogDateInputStyle,
 } from "./usageLimitsConstants";
 
 function CustomBarTooltip({ active, payload }: any) {
@@ -19,7 +21,8 @@ function CustomBarTooltip({ active, payload }: any) {
     return (
       <div style={{ background: "#141414", color: "#fff", padding: "6px 12px", borderRadius: 4, fontSize: 12, fontFamily: usageLimitsFont }}>
         <div>
-          Used: <strong>{payload[0]?.value}</strong>
+          {"Used: "}
+          <strong>{payload[0]?.value}</strong>
         </div>
       </div>
     );
@@ -150,7 +153,7 @@ export function UsageLimitsPageView({
             <div style={{ marginTop: 24 }}>
               <div style={{ fontSize: 14, fontWeight: 700, fontFamily: usageLimitsFont, marginBottom: 4 }}>Manage credit usage by feature</div>
               <div style={{ fontSize: 13, color: "#666", fontFamily: usageLimitsFont, marginBottom: 16 }}>
-                Sometimes features may show more credits used than what you are billed for.
+                {usageLimitsCreditsDisclaimer}
               </div>
 
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
@@ -304,7 +307,7 @@ export function UsageLimitsPageView({
           <div style={s.card}>
             <h2 style={{ ...s.h1, marginBottom: 4 }}>Usage log</h2>
             <p style={{ fontSize: 13, color: "#666", fontFamily: usageLimitsFont, margin: "0 0 20px 0" }}>
-              Sometimes features may show more credits used than what you are billed for.
+              {usageLimitsCreditsDisclaimer}
             </p>
 
             <div style={{ marginBottom: 20 }}>
@@ -313,19 +316,13 @@ export function UsageLimitsPageView({
                 <input
                   type="text"
                   defaultValue="01/01/2026"
-                  style={{
-                    fontFamily: usageLimitsFont, fontSize: 13, padding: "8px 12px",
-                    border: "1px solid #ccc", borderRadius: 4, width: 130,
-                  }}
+                  style={usageLogDateInputStyle}
                 />
                 <span style={{ fontSize: 13, color: "#444" }}>to</span>
                 <input
                   type="text"
                   defaultValue="07/03/2026"
-                  style={{
-                    fontFamily: usageLimitsFont, fontSize: 13, padding: "8px 12px",
-                    border: "1px solid #ccc", borderRadius: 4, width: 130,
-                  }}
+                  style={usageLogDateInputStyle}
                 />
               </div>
             </div>

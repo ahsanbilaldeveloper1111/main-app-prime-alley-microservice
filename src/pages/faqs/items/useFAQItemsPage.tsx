@@ -38,7 +38,9 @@ export function useFAQItemsPage() {
   }, [queryClient]);
 
   const [formData, setFormData] = useState<FAQItemFormData>(EMPTY_FORM_DATA);
-  const [selectedItemId, setSelectedItemId] = useState<string | number | null>(null);
+  const [selectedItemId, setSelectedItemId] = useState<string | number | null>(
+    null,
+  );
 
   const [showCreateSidebar, setShowCreateSidebar] = useState(false);
   const [showEditSidebar, setShowEditSidebar] = useState(false);
@@ -121,15 +123,21 @@ export function useFAQItemsPage() {
   const handleTopicChange = useCallback((value: string) => {
     setFormData((prev) => ({ ...prev, topic_id: value }));
   }, []);
-  const handleQuestionChange = useCallback((e: ChangeEvent<HTMLInputElement>) => {
-    setFormData((prev) => ({ ...prev, question: e.target.value }));
-  }, []);
+  const handleQuestionChange = useCallback(
+    (e: ChangeEvent<HTMLInputElement>) => {
+      setFormData((prev) => ({ ...prev, question: e.target.value }));
+    },
+    [],
+  );
   const handleAnswerChange = useCallback((html: string) => {
     setFormData((prev) => ({ ...prev, answer: html }));
   }, []);
-  const handleDescriptionChange = useCallback((e: ChangeEvent<HTMLTextAreaElement>) => {
-    setFormData((prev) => ({ ...prev, description: e.target.value }));
-  }, []);
+  const handleDescriptionChange = useCallback(
+    (e: ChangeEvent<HTMLTextAreaElement>) => {
+      setFormData((prev) => ({ ...prev, description: e.target.value }));
+    },
+    [],
+  );
   const handleTypeChange = useCallback((e: ChangeEvent<HTMLInputElement>) => {
     setFormData((prev) => ({ ...prev, type: e.target.value }));
   }, []);
@@ -163,7 +171,12 @@ export function useFAQItemsPage() {
   }, []);
 
   const handleSubmitEditItem = useCallback(async () => {
-    if (!formData.topic_id || !formData.question || !formData.answer || selectedItemId == null) {
+    if (
+      !formData.topic_id ||
+      !formData.question ||
+      !formData.answer ||
+      selectedItemId == null
+    ) {
       return;
     }
     await updateMutation.mutateAsync({
@@ -191,12 +204,18 @@ export function useFAQItemsPage() {
     await deleteMutation.mutateAsync(selectedItemId);
   }, [selectedItemId, deleteMutation]);
 
-  const closeSuccessModal = useCallback(() => setShowSuccessfulModal(false), []);
+  const closeSuccessModal = useCallback(
+    () => setShowSuccessfulModal(false),
+    [],
+  );
 
-  const handlePaginationChange = useCallback((page: number, perPage: number) => {
-    setCurrentPage(page);
-    setRowsPerPage(perPage);
-  }, []);
+  const handlePaginationChange = useCallback(
+    (page: number, perPage: number) => {
+      setCurrentPage(page);
+      setRowsPerPage(perPage);
+    },
+    [],
+  );
 
   const handleSearchChange = useCallback((value: string) => {
     setSearchValue(value);
@@ -219,10 +238,16 @@ export function useFAQItemsPage() {
           if (!row.topic) return <span className="text-muted">No topic</span>;
           return (
             <div>
-              <span className="status-badge primary" title={row.topic.description || ""}>
+              <span
+                className="status-badge primary"
+                title={row.topic.description || ""}
+              >
                 {row.topic.name}
                 {row.topic.faq_module && (
-                  <span className="text-muted ms-1" style={{ fontSize: "0.85em" }}>
+                  <span
+                    className="text-muted ms-1"
+                    style={{ fontSize: "0.85em" }}
+                  >
                     ({row.topic.faq_module.name})
                   </span>
                 )}
@@ -253,7 +278,11 @@ export function useFAQItemsPage() {
         label: "Created At",
         sortable: true,
         render: (row: FAQItemRow) => (
-          <span>{row.created_at ? new Date(row.created_at).toLocaleDateString() : "N/A"}</span>
+          <span>
+            {row.created_at
+              ? new Date(row.created_at).toLocaleDateString()
+              : "N/A"}
+          </span>
         ),
       },
     ],
