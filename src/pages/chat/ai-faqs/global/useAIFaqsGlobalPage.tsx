@@ -2,19 +2,18 @@ import type { Column } from "@components/CustomDataTable";
 import {
   type CreateTenantFAQPayload,
   type FAQData,
-  type FAQItem,
   createGlobalFAQ,
   deleteGlobalFAQ,
   getGlobalFAQs,
 } from "@utils/chat";
 import { useRouter } from "next/router";
-import type React from "react";
 import { useCallback, useMemo, useState } from "react";
 import { toast } from "react-toastify";
 import { Button } from "react-bootstrap";
 import { Edit, Eye, Trash2 } from "lucide-react";
 
-import { emptyFaqDraft, faqToDraft, type FAQItemDraft } from "../faqItemDraft";
+import { getValidFaqItemsForSubmit } from "../faqItemDraft";
+import { useAiFaqDraftFormState } from "../useAiFaqDraftFormState";
 
 export function useAIFaqsGlobalPage() {
   const router = useRouter();
@@ -25,76 +24,44 @@ export function useAIFaqsGlobalPage() {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [selectedFAQ, setSelectedFAQ] = useState<FAQData | null>(null);
 
-  const [faqItems, setFaqItems] = useState<FAQItemDraft[]>([emptyFaqDraft()]);
-  const [haveFiles, setHaveFiles] = useState(false);
-  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
-  const [fileInputKey, setFileInputKey] = useState(0);
+  const {
+    faqItems,
+    haveFiles,
+    selectedFiles,
+    fileInputKey,
+    resetForm,
+    seedSingleFaqItem,
+    handleAddFAQItem,
+    handleRemoveFAQItem,
+    handleUpdateFAQItem,
+    handleFileChange,
+    handleRemoveFile,
+  } = useAiFaqDraftFormState();
 
   const [showViewModal, setShowViewModal] = useState(false);
   const [viewFAQ, setViewFAQ] = useState<FAQData | null>(null);
-
-  const resetForm = useCallback(() => {
-    setFaqItems([emptyFaqDraft()]);
-    setHaveFiles(false);
-    setSelectedFiles([]);
-    setFileInputKey((k) => k + 1);
-  }, []);
 
   const handleViewFAQ = useCallback((faq: FAQData) => {
     setViewFAQ(faq);
     setShowViewModal(true);
   }, []);
 
-  const handleEditFAQ = useCallback((faq: FAQData) => {
-    setSelectedFAQ(faq);
-    setFaqItems([faqToDraft({ question: faq.question, answer: faq.answer })]);
-    setHaveFiles(false);
-    setSelectedFiles([]);
-    setShowEditModal(true);
-  }, []);
+  const handleEditFAQ = useCallback(
+    (faq: FAQData) => {
+      setSelectedFAQ(faq);
+      seedSingleFaqItem({ question: faq.question, answer: faq.answer });
+      setShowEditModal(true);
+    },
+    [seedSingleFaqItem],
+  );
 
   const handleDeleteFAQ = useCallback((faq: FAQData) => {
     setSelectedFAQ(faq);
     setShowDeleteModal(true);
   }, []);
 
-  const handleAddFAQItem = useCallback(() => {
-    setFaqItems((items) => [...items, emptyFaqDraft()]);
-  }, []);
-
-  const handleRemoveFAQItem = useCallback((index: number) => {
-    setFaqItems((items) => (items.length > 1 ? items.filter((_, i) => i !== index) : items));
-  }, []);
-
-  const handleUpdateFAQItem = useCallback((index: number, field: keyof FAQItem, value: string) => {
-    setFaqItems((items) => {
-      const updated = [...items];
-      updated[index] = { ...updated[index], [field]: value };
-      return updated;
-    });
-  }, []);
-
-  const handleFileChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files) {
-      const files = Array.from(e.target.files);
-      setSelectedFiles(files);
-      setHaveFiles(files.length > 0);
-    }
-  }, []);
-
-  const handleRemoveFile = useCallback((index: number) => {
-    setSelectedFiles((prev) => {
-      const next = prev.filter((_, i) => i !== index);
-      setHaveFiles(next.length > 0);
-      return next;
-    });
-  }, []);
-
   const handleSubmit = useCallback(async () => {
-    const validFAQs: FAQItem[] = faqItems
-      .filter((item) => item.question.trim() && item.answer.trim())
-      .map(({ question, answer }) => ({ question, answer }));
-
+    const validFAQs = getValidFaqItemsForSubmit(faqItems);
     if (validFAQs.length === 0) {
       toast.error("Please add at least one FAQ with both question and answer");
       return;
@@ -161,7 +128,7 @@ export function useAIFaqsGlobalPage() {
     }
   }, []);
 
-  const columns: Column<FAQData>[] = useMemo(
+  const columns: Column<FAQData & Record<string, unknown>>[] = useMemo(
     () => [
       {
         key: "question",
@@ -223,6 +190,11 @@ export function useAIFaqsGlobalPage() {
     [handleViewFAQ, handleEditFAQ, handleDeleteFAQ],
   );
 
+  const closeDeleteModal = useCallback(() => {
+    setShowDeleteModal(false);
+    setSelectedFAQ(null);
+  }, []);
+
   return {
     router,
     refreshKey,
@@ -251,5 +223,6 @@ export function useAIFaqsGlobalPage() {
     handleRemoveFile,
     handleSubmit,
     handleConfirmDelete,
+    closeDeleteModal,
   };
 }
