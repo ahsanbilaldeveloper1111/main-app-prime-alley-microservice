@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Row, Col, Card, Form, Button } from 'react-bootstrap';
+import type { LucideIcon } from 'lucide-react';
 import {
   Paperclip,
   CheckCircle2,
@@ -12,9 +13,8 @@ import {
   Eye,
   Trash2
 } from 'lucide-react';
+import { useRouter } from 'next/router';
 import { CreateUserTicket } from '@utils/tickets';
-import { GetAllModules } from '@utils/ticket-module';
-import { GetAllStatuses } from '@utils/ticket-statuses';
 import { GetAllTypes } from '@utils/ticket-types';
 import { toast } from 'react-toastify';
 import RichTextEditor from './RichTextEditor';
@@ -23,7 +23,150 @@ interface CreateTicketProps {
   onBack: () => void;
 }
 
+type TicketTypeOption = {
+  id: number | string;
+  name?: string;
+};
+
+function normalizeTicketTypeList(data: unknown): TicketTypeOption[] {
+  if (Array.isArray(data)) {
+    return data as TicketTypeOption[];
+  }
+  return [];
+}
+
+function stripHTML(html: string): string {
+  const tmp = document.createElement('div');
+  tmp.innerHTML = html;
+  return tmp.textContent ?? tmp.innerText ?? '';
+}
+
+function getPriorityDisplayLabel(priority: string): string {
+  switch (priority) {
+    case '0':
+      return 'Low';
+    case '1':
+      return 'Medium';
+    case '2':
+      return 'High';
+    case '3':
+      return 'Critical';
+    default:
+      return 'Not selected';
+  }
+}
+
+function openBlobInNewTab(file: File): void {
+  const url = URL.createObjectURL(file);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.target = '_blank';
+  anchor.rel = 'noopener noreferrer';
+  anchor.click();
+  globalThis.setTimeout(() => URL.revokeObjectURL(url), 500);
+}
+
+function ticketIdToDisplayString(id: unknown): string | null {
+  if (id === undefined || id === null) {
+    return null;
+  }
+  if (typeof id === 'string' || typeof id === 'number') {
+    return String(id);
+  }
+  return null;
+}
+
+interface FormStepProgressProps {
+  steps: { number: number; label: string }[];
+  currentStep: number;
+  setCurrentStep: (step: number) => void;
+}
+
+function FormStepProgress({
+  steps,
+  currentStep,
+  setCurrentStep
+}: Readonly<FormStepProgressProps>) {
+  return (
+    <div
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: '12px',
+        marginBottom: '0'
+      }}
+    >
+      {steps.map((step, index) => (
+        <React.Fragment key={step.number}>
+          <button
+            type="button"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              cursor: step.number <= currentStep + 1 ? 'pointer' : 'default',
+              border: 'none',
+              background: 'none',
+              padding: 0,
+              fontFamily: 'inherit',
+              textAlign: 'left'
+            }}
+            onClick={() => {
+              if (step.number <= currentStep + 1) {
+                setCurrentStep(step.number);
+              }
+            }}
+            aria-current={currentStep === step.number ? 'step' : undefined}
+            aria-label={`Step ${step.number}: ${step.label}`}
+          >
+            <div
+              style={{
+                width: '32px',
+                height: '32px',
+                borderRadius: '50%',
+                background: currentStep >= step.number ? '#4680ff' : '#e9ecef',
+                color: currentStep >= step.number ? '#fff' : '#6c757d',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '14px',
+                fontWeight: '600'
+              }}
+            >
+              {currentStep > step.number ? (
+                <CheckCircle2 aria-hidden size={16} />
+              ) : (
+                step.number
+              )}
+            </div>
+            <span
+              style={{
+                fontSize: '14px',
+                fontWeight: currentStep === step.number ? '600' : '400',
+                color: currentStep >= step.number ? '#4680ff' : '#6c757d'
+              }}
+            >
+              {step.label}
+            </span>
+          </button>
+          {index < steps.length - 1 && (
+            <ChevronRight aria-hidden size={16} color="#6c757d" />
+          )}
+        </React.Fragment>
+      ))}
+    </div>
+  );
+}
+
+const reviewFieldLabelStyle: React.CSSProperties = {
+  fontSize: '12px',
+  color: '#6c757d',
+  display: 'block',
+  marginBottom: '4px'
+};
+
 const CreateTicket: React.FC<CreateTicketProps> = ({ onBack }) => {
+  const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
   
   // Form state
@@ -33,20 +176,11 @@ const CreateTicket: React.FC<CreateTicketProps> = ({ onBack }) => {
   const [descriptionHTML, setDescriptionHTML] = useState<string>("");
   const [attachedFiles, setAttachedFiles] = useState<File[]>([]);
   const [currentStep, setCurrentStep] = useState<number>(1);
-  
-  // Legacy state for API compatibility
-  const [newTicketType, setNewTicketType] = useState<string>("");
-  const [newTicketStatus, setNewTicketStatus] = useState<string>("");
-  const [newTicketModule, setNewTicketModule] = useState<string>("");
-  const [newTicketSubmodule] = useState<string>("");
-  const [newTicketSubmoduleChild] = useState<string>("");
-  const [newTicketPriority, setNewTicketPriority] = useState<string>("");
-  
+  const [newTicketPriority, setNewTicketPriority] = useState<string>('');
+
   // Data state
-  const [modules, setModules] = useState<any[]>([]);
-  const [types, setTypes] = useState<any[]>([]);
-  const [statuses, setStatuses] = useState<any[]>([]);
-  
+  const [types, setTypes] = useState<TicketTypeOption[]>([]);
+
   // UI state
   const [creatingTicket, setCreatingTicket] = useState<boolean>(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
@@ -56,20 +190,13 @@ const CreateTicket: React.FC<CreateTicketProps> = ({ onBack }) => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [modulesData, typesData, statusesData] = await Promise.all([
-          GetAllModules(),
-          GetAllTypes(),
-          GetAllStatuses()
-        ]);
-        
-        setModules(modulesData || []);
-        setTypes(typesData || []);
-        setStatuses(statusesData || []);
+        const typesData = await GetAllTypes();
+        setTypes(normalizeTicketTypeList(typesData));
       } catch (error) {
         console.error('Error fetching data:', error);
       }
     };
-    
+
     fetchData();
   }, []);
 
@@ -98,7 +225,7 @@ const CreateTicket: React.FC<CreateTicketProps> = ({ onBack }) => {
 
   // Remove file
   const removeFile = (index: number) => {
-    setAttachedFiles(attachedFiles.filter((_, i) => i !== index));
+    setAttachedFiles((prev) => prev.filter((_, i) => i !== index));
   };
 
   const handleEditorChange = (html: string, text: string) => {
@@ -106,69 +233,63 @@ const CreateTicket: React.FC<CreateTicketProps> = ({ onBack }) => {
     setDescription(text);
   };
 
-  const stripHTML = (html: string): string => {
-    const tmp = document.createElement('DIV');
-    tmp.innerHTML = html;
-    return tmp.textContent || tmp.innerText || '';
-  };
-
   const handleSubmit = useCallback(async () => {
-    // Validation
     if (!category) {
-      toast.error("Please select a category");
+      toast.error('Please select a category');
       return;
     }
-    if (!subject?.trim() || subject?.trim()?.length < 5) {
-      toast.error("Please enter a subject (Min: 5 chars)");
+    const trimmedSubject = subject.trim();
+    if (trimmedSubject.length < 5) {
+      toast.error('Please enter a subject (Min: 5 chars)');
       return;
     }
-    // Get plain text from HTML for validation
     const plainText = descriptionHTML ? stripHTML(descriptionHTML) : description;
     if (plainText.length < 50 || plainText.length > 500) {
-      toast.error("Description must be between 50 and 500 characters");
+      toast.error('Description must be between 50 and 500 characters');
       return;
     }
 
-    // Validate files
-    if (attachedFiles && attachedFiles.length > 0) {
-      const maxSize = 1 * 1024 * 1024; // 1 MB
-      for (let i = 0; i < attachedFiles.length; i++) {
-        const file = attachedFiles[i];
-        if (file.size > maxSize) {
-          toast.error(`File ${i + 1} size must be less than 1MB`);
-          return;
-        }
+    const maxFileSize = 1024 * 1024;
+    for (let i = 0; i < attachedFiles.length; i++) {
+      const file = attachedFiles[i];
+      if (file.size > maxFileSize) {
+        toast.error(`File ${i + 1} size must be less than 1MB`);
+        return;
       }
     }
 
-    // Get ticket type ID from category
-    const typeId = category || newTicketType || (types.length > 0 ? types[0].id : '');
-    
-    // Convert priority to number (0=low, 1=medium, 2=high, 4=critical)
-    const priority = Number.parseInt(newTicketPriority || "0", 10);
-
-    // Use HTML description if available, otherwise use plain text
+    const typeId =
+      category || (types.length > 0 ? String(types[0].id) : '');
+    const priority = Number.parseInt(newTicketPriority || '0', 10);
     const ticketDescription = descriptionHTML || description;
 
     setCreatingTicket(true);
     try {
-      const response: any = await CreateUserTicket(
+      const response: unknown = await CreateUserTicket(
         subject,
         ticketDescription,
         Number.parseInt(typeId.toString(), 10),
         priority,
         attachedFiles.length > 0 ? attachedFiles : undefined
       );
-      console.log(response, "response cti");
-      if (response && (response?.data?.id )) {
-        const ticketId = response?.data?.id;
-        setSubmittedTicketId(ticketId?.toString());
+      const ticketId = ticketIdToDisplayString(
+        response &&
+          typeof response === 'object' &&
+          'data' in response &&
+          response.data &&
+          typeof response.data === 'object' &&
+          'id' in response.data
+          ? (response.data as { id: unknown }).id
+          : undefined
+      );
+
+      if (ticketId !== null && ticketId.length > 0) {
+        setSubmittedTicketId(ticketId);
         setIsSubmitted(true);
-        toast.success("Ticket created successfully!");
-      } 
-    } catch (error: any) {
-      console.error("Error creating ticket:", error);
-      
+        toast.success('Ticket created successfully!');
+      }
+    } catch (error: unknown) {
+      console.error('Error creating ticket:', error);
     } finally {
       setCreatingTicket(false);
     }
@@ -178,7 +299,6 @@ const CreateTicket: React.FC<CreateTicketProps> = ({ onBack }) => {
     description,
     descriptionHTML,
     attachedFiles,
-    newTicketType,
     newTicketPriority,
     types
   ]);
@@ -212,7 +332,7 @@ const CreateTicket: React.FC<CreateTicketProps> = ({ onBack }) => {
             justifyContent: 'center',
             margin: '0 auto 24px'
           }}>
-            <CheckCircle2 size={40} color="#fff" strokeWidth={2.5} />
+            <CheckCircle2 aria-hidden size={40} color="#fff" strokeWidth={2.5} />
           </div>
 
           <h2 style={{
@@ -271,25 +391,31 @@ const CreateTicket: React.FC<CreateTicketProps> = ({ onBack }) => {
     "Can't find your answer?"
   ];
 
-  const suggestedArticles = [
+  const suggestedArticles: {
+    title: string;
+    subtitle: string;
+    description: string;
+    icon: LucideIcon;
+    color: string;
+  }[] = [
     {
       title: 'Setting Up',
       subtitle: 'Two-Factor Authentication',
-      description: 'Browse help articles sosent',
+      description: 'Step-by-step help for securing your account.',
       icon: Plus,
       color: '#4680ff'
     },
     {
       title: 'Resetting Your 2FA',
       subtitle: 'Device',
-      description: 'Find out eosents solutions',
+      description: 'Replace or reset your authentication device.',
       icon: RotateCcw,
       color: '#04a9f5'
     },
     {
       title: 'Troubleshooting',
       subtitle: '2FA Issues',
-      description: 'Fix, eweeting- problems',
+      description: 'Fix common two-factor sign-in problems.',
       icon: FileQuestion,
       color: '#5babf6'
     }
@@ -328,56 +454,11 @@ const CreateTicket: React.FC<CreateTicketProps> = ({ onBack }) => {
                   </p>
 
                   {/* Step Progress Indicator */}
-                  <div style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '12px',
-                    marginBottom: '0'
-                  }}>
-                    {steps.map((step, index) => (
-                      <React.Fragment key={step.number}>
-                        <div 
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '8px',
-                            cursor: step.number <= currentStep + 1 ? 'pointer' : 'default'
-                          }}
-                          onClick={() => {
-                            // Allow navigation to any step that's been reached or is the next step
-                            if (step.number <= currentStep + 1) {
-                              setCurrentStep(step.number);
-                            }
-                          }}
-                        >
-                          <div style={{
-                            width: '32px',
-                            height: '32px',
-                            borderRadius: '50%',
-                            background: currentStep >= step.number ? '#4680ff' : '#e9ecef',
-                            color: currentStep >= step.number ? '#fff' : '#6c757d',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            fontSize: '14px',
-                            fontWeight: '600'
-                          }}>
-                            {currentStep > step.number ? <CheckCircle2 size={16} /> : step.number}
-                          </div>
-                          <span style={{
-                            fontSize: '14px',
-                            fontWeight: currentStep === step.number ? '600' : '400',
-                            color: currentStep >= step.number ? '#4680ff' : '#6c757d'
-                          }}>
-                            {step.label}
-                          </span>
-                        </div>
-                        {index < steps.length - 1 && (
-                          <ChevronRight size={16} color="#6c757d" />
-                        )}
-                      </React.Fragment>
-                    ))}
-                  </div>
+                  <FormStepProgress
+                    steps={steps}
+                    currentStep={currentStep}
+                    setCurrentStep={setCurrentStep}
+                  />
                 </div>
             {/* Category */}
             <div style={{ marginBottom: '24px' }}>
@@ -394,8 +475,6 @@ const CreateTicket: React.FC<CreateTicketProps> = ({ onBack }) => {
                 value={category}
                 onChange={(e) => {
                   setCategory(e.target.value);
-                  // Map category to type
-                  setNewTicketType(e.target.value);
                 }}
                 style={{
                   fontSize: '14px',
@@ -406,8 +485,8 @@ const CreateTicket: React.FC<CreateTicketProps> = ({ onBack }) => {
                 }}
               >
                 <option value="">Select a category</option>
-                {types.map((type: any) => (
-                  <option key={type.id} value={type.id}>
+                {types.map((type) => (
+                  <option key={String(type.id)} value={String(type.id)}>
                     {type.name}
                   </option>
                 ))}
@@ -501,7 +580,7 @@ const CreateTicket: React.FC<CreateTicketProps> = ({ onBack }) => {
                     fontSize: '14px'
                   }}
                 >
-                  <Paperclip size={16} />
+                  <Paperclip aria-hidden size={16} />
                   Add screenshot
                 </Button>
                 <span style={{
@@ -511,7 +590,7 @@ const CreateTicket: React.FC<CreateTicketProps> = ({ onBack }) => {
                   1 file (Up to 1MB)
                 </span>
               </div>
-              {currentStep === 1 ? (
+              {currentStep === 1 && (
                 <Button
                   onClick={() => {
                     // Validate step 1 before moving forward
@@ -541,9 +620,7 @@ const CreateTicket: React.FC<CreateTicketProps> = ({ onBack }) => {
                 >
                   Next
                 </Button>
-              ) : currentStep === 3 ? (
-                <></>
-              ) : null}
+              )}
             </div>
 
             {/* Additional Info Text - Only show on step 1 */}
@@ -581,11 +658,12 @@ const CreateTicket: React.FC<CreateTicketProps> = ({ onBack }) => {
                           color: '#495057'
                         }}
                       >
-                        <Paperclip size={14} />
+                        <Paperclip aria-hidden size={14} />
                         <span style={{ maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                           {file.name}
                         </span>
                         <button
+                          type="button"
                           onClick={() => removeFile(index)}
                           style={{
                             background: 'none',
@@ -597,7 +675,7 @@ const CreateTicket: React.FC<CreateTicketProps> = ({ onBack }) => {
                             alignItems: 'center'
                           }}
                         >
-                          <X size={14} />
+                          <X aria-hidden size={14} />
                         </button>
                       </div>
                     ))}
@@ -712,28 +790,18 @@ const CreateTicket: React.FC<CreateTicketProps> = ({ onBack }) => {
                     border: '1px solid #e9ecef'
                   }}>
                     <div style={{ marginBottom: '16px' }}>
-                      <label style={{
-                        fontSize: '12px',
-                        color: '#6c757d',
-                        display: 'block',
-                        marginBottom: '4px'
-                      }}>Category</label>
+                      <div style={reviewFieldLabelStyle}>Category</div>
                       <p style={{
                         fontSize: '14px',
                         fontWeight: '500',
                         color: '#2c3e50',
                         margin: 0
                       }}>
-                        {types.find((t: any) => t.id.toString() === category)?.name || 'Not selected'}
+                        {types.find((t) => String(t.id) === String(category))?.name || 'Not selected'}
                       </p>
                     </div>
                     <div style={{ marginBottom: '16px' }}>
-                      <label style={{
-                        fontSize: '12px',
-                        color: '#6c757d',
-                        display: 'block',
-                        marginBottom: '4px'
-                      }}>Subject</label>
+                      <div style={reviewFieldLabelStyle}>Subject</div>
                       <p style={{
                         fontSize: '14px',
                         fontWeight: '500',
@@ -742,12 +810,7 @@ const CreateTicket: React.FC<CreateTicketProps> = ({ onBack }) => {
                       }}>{subject || 'Not provided'}</p>
                     </div>
                     <div style={{ marginBottom: '16px' }}>
-                      <label style={{
-                        fontSize: '12px',
-                        color: '#6c757d',
-                        display: 'block',
-                        marginBottom: '4px'
-                      }}>Description</label>
+                      <div style={reviewFieldLabelStyle}>Description</div>
                       <p style={{
                         fontSize: '14px',
                         color: '#2c3e50',
@@ -756,31 +819,23 @@ const CreateTicket: React.FC<CreateTicketProps> = ({ onBack }) => {
                       }}>{description || 'Not provided'}</p>
                     </div>
                     <div style={{ marginBottom: '16px' }}>
-                      <label style={{
-                        fontSize: '12px',
-                        color: '#6c757d',
-                        display: 'block',
-                        marginBottom: '4px'
-                      }}>Priority</label>
+                      <div style={reviewFieldLabelStyle}>Priority</div>
                       <p style={{
                         fontSize: '14px',
                         fontWeight: '500',
                         color: '#2c3e50',
                         margin: 0
                       }}>
-                        {newTicketPriority === '0' ? 'Low' : 
-                         newTicketPriority === '1' ? 'Medium' : 
-                         newTicketPriority === '2' ? 'High' : 
-                         newTicketPriority === '3' ? 'Critical' : 'Not selected'}
+                        {getPriorityDisplayLabel(newTicketPriority)}
                       </p>
                     </div>
                     <div>
-                      <label style={{
+                      <div style={{
                         fontSize: '12px',
                         color: '#6c757d',
                         display: 'block',
                         marginBottom: '8px'
-                      }}>Attachments</label>
+                      }}>Attachments</div>
                       {attachedFiles.length > 0 ? (
                         <div style={{
                           display: 'flex',
@@ -802,7 +857,7 @@ const CreateTicket: React.FC<CreateTicketProps> = ({ onBack }) => {
                                 color: '#495057'
                               }}
                             >
-                              <Paperclip size={14} />
+                              <Paperclip aria-hidden size={14} />
                               <span style={{ maxWidth: '150px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                                 {file.name}
                               </span>
@@ -810,11 +865,8 @@ const CreateTicket: React.FC<CreateTicketProps> = ({ onBack }) => {
                                 ({(file.size / 1024).toFixed(1)} KB)
                               </span>
                               <button
-                                onClick={() => {
-                                  // Create a preview URL for the file
-                                  const url = URL.createObjectURL(file);
-                                  window.open(url, '_blank');
-                                }}
+                                type="button"
+                                onClick={() => openBlobInNewTab(file)}
                                 style={{
                                   background: 'none',
                                   border: 'none',
@@ -833,10 +885,12 @@ const CreateTicket: React.FC<CreateTicketProps> = ({ onBack }) => {
                                   e.currentTarget.style.background = 'none';
                                 }}
                                 title="View file"
+                                aria-label={`View file ${file.name}`}
                               >
-                                <Eye size={14} />
+                                <Eye aria-hidden size={14} />
                               </button>
                               <button
+                                type="button"
                                 onClick={() => removeFile(index)}
                                 style={{
                                   background: 'none',
@@ -856,8 +910,9 @@ const CreateTicket: React.FC<CreateTicketProps> = ({ onBack }) => {
                                   e.currentTarget.style.background = 'none';
                                 }}
                                 title="Remove file"
+                                aria-label={`Remove file ${file.name}`}
                               >
-                                <Trash2 size={14} />
+                                <Trash2 aria-hidden size={14} />
                               </button>
                             </div>
                           ))}
@@ -935,7 +990,7 @@ const CreateTicket: React.FC<CreateTicketProps> = ({ onBack }) => {
                   color: '#2c3e50',
                   marginBottom: '16px'
                 }}>
-                  Look like you need help with Two-Factor Authentication?
+                  Looks like you need help with Two-Factor Authentication?
                 </h5>
 
                 <div style={{
@@ -947,8 +1002,11 @@ const CreateTicket: React.FC<CreateTicketProps> = ({ onBack }) => {
                   {helpSuggestions.map((suggestion) => {
                     const Icon = suggestion.icon;
                     return (
-                      <div
+                      <button
                         key={suggestion.title}
+                        type="button"
+                        onClick={() => router.push('/help-center/knowledge-base')}
+                        aria-label={`Open knowledge base: ${suggestion.title}`}
                         style={{
                           display: 'flex',
                           alignItems: 'flex-start',
@@ -957,7 +1015,12 @@ const CreateTicket: React.FC<CreateTicketProps> = ({ onBack }) => {
                           background: '#f8f9fa',
                           borderRadius: '8px',
                           cursor: 'pointer',
-                          transition: 'all 0.2s ease'
+                          transition: 'all 0.2s ease',
+                          border: '1px solid transparent',
+                          width: '100%',
+                          textAlign: 'left',
+                          fontFamily: 'inherit',
+                          margin: 0
                         }}
                         onMouseEnter={(e) => {
                           e.currentTarget.style.background = '#f0f4f8';
@@ -976,7 +1039,7 @@ const CreateTicket: React.FC<CreateTicketProps> = ({ onBack }) => {
                           justifyContent: 'center',
                           flexShrink: 0
                         }}>
-                          <Icon size={18} color={suggestion.color} />
+                          <Icon aria-hidden size={18} color={suggestion.color} />
                         </div>
                         <div style={{ flex: 1 }}>
                           <h6 style={{
@@ -997,7 +1060,7 @@ const CreateTicket: React.FC<CreateTicketProps> = ({ onBack }) => {
                             {suggestion.description}
                           </p>
                         </div>
-                      </div>
+                      </button>
                     );
                   })}
                 </div>
@@ -1020,13 +1083,15 @@ const CreateTicket: React.FC<CreateTicketProps> = ({ onBack }) => {
                     }}>
                       Did this help?
                     </span>
-                    <ChevronRight size={16} color="#6c757d" />
+                    <ChevronRight aria-hidden size={16} color="#6c757d" />
                   </div>
 
                   <Row className="g-2">
                     <Col xs={6}>
                       <Button
                         variant="outline-secondary"
+                        type="button"
+                        onClick={() => router.push('/help-center/knowledge-base')}
                         style={{
                           width: '100%',
                           padding: '8px',
@@ -1039,13 +1104,14 @@ const CreateTicket: React.FC<CreateTicketProps> = ({ onBack }) => {
                           color: '#495057'
                         }}
                       >
-                        <FileQuestion size={16} />
-                        FA Q
+                        <FileQuestion aria-hidden size={16} />
+                        FAQ
                       </Button>
                     </Col>
                     <Col xs={6}>
                       <Button
                         variant="outline-secondary"
+                        type="button"
                         style={{
                           width: '100%',
                           padding: '8px',
@@ -1058,7 +1124,7 @@ const CreateTicket: React.FC<CreateTicketProps> = ({ onBack }) => {
                           color: '#495057'
                         }}
                       >
-                        <Phone size={16} />
+                        <Phone aria-hidden size={16} />
                         No, continue with ticket
                       </Button>
                     </Col>
@@ -1090,15 +1156,26 @@ const CreateTicket: React.FC<CreateTicketProps> = ({ onBack }) => {
                   gap: '0'
                 }}>
                   {frequentTopics.map((topic, index) => (
-                    <div
+                    <button
                       key={topic}
+                      type="button"
+                      onClick={() => router.push('/help-center/knowledge-base')}
+                      aria-label={`${topic} — open knowledge base`}
                       style={{
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'space-between',
+                        width: '100%',
                         padding: '12px 0',
                         cursor: 'pointer',
-                        borderBottom: index < frequentTopics.length - 1 ? '1px solid #f0f0f0' : 'none'
+                        borderBottom: index < frequentTopics.length - 1 ? '1px solid #f0f0f0' : 'none',
+                        background: 'none',
+                        borderTop: 'none',
+                        borderLeft: 'none',
+                        borderRight: 'none',
+                        fontFamily: 'inherit',
+                        textAlign: 'left',
+                        margin: 0
                       }}
                     >
                       <span style={{
@@ -1107,8 +1184,8 @@ const CreateTicket: React.FC<CreateTicketProps> = ({ onBack }) => {
                       }}>
                         {topic}
                       </span>
-                      <ChevronRight size={16} color="#c0c0c0" />
-                    </div>
+                      <ChevronRight aria-hidden size={16} color="#c0c0c0" />
+                    </button>
                   ))}
                 </div>
               </Card.Body>
@@ -1131,16 +1208,25 @@ const CreateTicket: React.FC<CreateTicketProps> = ({ onBack }) => {
               const Icon = article.icon;
               return (
                 <Col xs={12} sm={4} key={`${article.title}-${article.subtitle}`}>
-                  <div style={{
-                    padding: '16px',
-                    background: '#fff',
-                    border: '1px solid #e9ecef',
-                    borderRadius: '8px',
-                    cursor: 'pointer',
-                    transition: 'all 0.2s ease',
-                    height: '100%',
-                    boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
-                  }}
+                  <button
+                    type="button"
+                    onClick={() => router.push('/help-center/knowledge-base')}
+                    aria-label={`Open suggested article: ${article.title} ${article.subtitle}`}
+                    style={{
+                      padding: '16px',
+                      background: '#fff',
+                      border: '1px solid #e9ecef',
+                      borderRadius: '8px',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s ease',
+                      height: '100%',
+                      width: '100%',
+                      display: 'block',
+                      textAlign: 'left',
+                      fontFamily: 'inherit',
+                      margin: 0,
+                      boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
+                    }}
                     onMouseEnter={(e) => {
                       e.currentTarget.style.background = '#f8f9fa';
                       e.currentTarget.style.borderColor = article.color;
@@ -1148,7 +1234,8 @@ const CreateTicket: React.FC<CreateTicketProps> = ({ onBack }) => {
                     onMouseLeave={(e) => {
                       e.currentTarget.style.background = '#fff';
                       e.currentTarget.style.borderColor = '#e9ecef';
-                    }}>
+                    }}
+                  >
                     <div style={{
                       width: '40px',
                       height: '40px',
@@ -1159,7 +1246,7 @@ const CreateTicket: React.FC<CreateTicketProps> = ({ onBack }) => {
                       justifyContent: 'center',
                       marginBottom: '12px'
                     }}>
-                      <Icon size={20} color={article.color} />
+                      <Icon aria-hidden size={20} color={article.color} />
                     </div>
                     <h6 style={{
                       fontSize: '14px',
@@ -1187,7 +1274,7 @@ const CreateTicket: React.FC<CreateTicketProps> = ({ onBack }) => {
                     }}>
                       {article.description}
                     </p>
-                  </div>
+                  </button>
                 </Col>
               );
             })}
@@ -1195,6 +1282,8 @@ const CreateTicket: React.FC<CreateTicketProps> = ({ onBack }) => {
           <div style={{ textAlign: 'center', marginTop: '16px' }}>
             <Button
               variant="link"
+              type="button"
+              onClick={() => router.push('/help-center/knowledge-base')}
               style={{
                 fontSize: '13px',
                 color: '#4680ff',
@@ -1205,7 +1294,7 @@ const CreateTicket: React.FC<CreateTicketProps> = ({ onBack }) => {
                 padding: 0
               }}
             >
-              See All Suggestions <ChevronRight size={16} />
+              See All Suggestions <ChevronRight aria-hidden size={16} />
             </Button>
           </div>
         </div>

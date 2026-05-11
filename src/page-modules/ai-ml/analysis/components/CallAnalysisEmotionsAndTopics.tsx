@@ -9,6 +9,62 @@ type Props = Readonly<{
   analysisComplete: boolean;
 }>;
 
+function EmotionListContent({
+  emotions,
+  analysisComplete,
+}: Readonly<{
+  emotions: unknown;
+  analysisComplete: boolean;
+}>) {
+  if (!hasArrayData(emotions)) {
+    return (
+      <>
+        {!analysisComplete && <ListSkeleton items={3} />}
+        {analysisComplete && <p className="text-muted">No data available</p>}
+      </>
+    );
+  }
+  return (
+    <>
+      {(emotions as string[]).map((emotion: string) => (
+        <div className="text-capitalize me-2" key={emotion}>
+          <div className="emo_text">{emotion}</div>
+        </div>
+      ))}
+    </>
+  );
+}
+
+function KeyTopicStyleList({
+  items,
+  analysisComplete,
+}: Readonly<{
+  items: unknown;
+  analysisComplete: boolean;
+}>) {
+  return (
+    <div className="card-text">
+      {hasArrayData(items) ? (
+        (items as string[]).map((item: string) => (
+          <div className="mb-2 callType" key={item}>
+            <div className="ic_box bg-success">
+              <i className="material-icons-two-tone">check</i>
+            </div>
+            <div>
+              <h6 className="card-text text-capitalize font-weight-normal">{item}</h6>
+            </div>
+          </div>
+        ))
+      ) : (
+        <>
+          {!analysisComplete && <ListSkeleton items={3} />}
+          {analysisComplete && <p className="text-muted">No data available</p>}
+        </>
+      )}
+    </div>
+  );
+}
+
 export function CallAnalysisEmotionsAndTopics({
   chunksAnalysisData,
   analysis,
@@ -36,18 +92,10 @@ export function CallAnalysisEmotionsAndTopics({
                       <h5 className="mb-3">Customer Emotions</h5>
                     </div>
                     <div className="card-text">
-                      {hasArrayData(customerEmotions) ? (
-                        customerEmotions.map((emotion: string) => (
-                          <div className="text-capitalize me-2" key={emotion}>
-                            <div className="emo_text">{emotion}</div>
-                          </div>
-                        ))
-                      ) : (
-                        <>
-                          {!analysisComplete && <ListSkeleton items={3} />}
-                          {analysisComplete && <p className="text-muted">No data available</p>}
-                        </>
-                      )}
+                      <EmotionListContent
+                        emotions={customerEmotions}
+                        analysisComplete={analysisComplete}
+                      />
                     </div>
                   </Col>
 
@@ -55,18 +103,10 @@ export function CallAnalysisEmotionsAndTopics({
                     <div className="vbox">
                       <h5 className="mb-3">Operator Emotions</h5>
                       <div className="card-text">
-                        {hasArrayData(operatorEmotions) ? (
-                          operatorEmotions.map((emotion: string) => (
-                            <div className="text-capitalize me-2" key={emotion}>
-                              <div className="emo_text">{emotion}</div>
-                            </div>
-                          ))
-                        ) : (
-                          <>
-                            {!analysisComplete && <ListSkeleton items={3} />}
-                            {analysisComplete && <p className="text-muted">No data available</p>}
-                          </>
-                        )}
+                        <EmotionListContent
+                          emotions={operatorEmotions}
+                          analysisComplete={analysisComplete}
+                        />
                       </div>
                     </div>
                   </Col>
@@ -82,25 +122,10 @@ export function CallAnalysisEmotionsAndTopics({
                   <h5 className="mb-3">Key Topics</h5>
                 </div>
                 <div className="vbox w-100">
-                  <div className="card-text">
-                    {hasArrayData(keyTopics) ? (
-                      keyTopics.map((item: string) => (
-                        <div className="mb-2 callType" key={item}>
-                          <div className="ic_box bg-success">
-                            <i className="material-icons-two-tone">check</i>
-                          </div>
-                          <div>
-                            <h6 className="card-text text-capitalize font-weight-normal">{item}</h6>
-                          </div>
-                        </div>
-                      ))
-                    ) : (
-                      <>
-                        {!analysisComplete && <ListSkeleton items={3} />}
-                        {analysisComplete && <p className="text-muted">No data available</p>}
-                      </>
-                    )}
-                  </div>
+                  <KeyTopicStyleList
+                    items={keyTopics}
+                    analysisComplete={analysisComplete}
+                  />
                 </div>
               </div>
             </div>
@@ -252,25 +277,10 @@ export function CallAnalysisEmotionsAndTopics({
                   <h5 className="mb-3">Categories</h5>
                 </div>
                 <div className="vbox w-100">
-                  <div className="card-text">
-                    {hasArrayData(callCategories) ? (
-                      callCategories.map((item: string) => (
-                        <div className="mb-2 callType" key={item}>
-                          <div className="ic_box bg-success">
-                            <i className="material-icons-two-tone">check</i>
-                          </div>
-                          <div>
-                            <h6 className="card-text text-capitalize font-weight-normal">{item}</h6>
-                          </div>
-                        </div>
-                      ))
-                    ) : (
-                      <>
-                        {!analysisComplete && <TextSkeleton lines={3} />}
-                        {analysisComplete && <p className="text-muted">No data available</p>}
-                      </>
-                    )}
-                  </div>
+                  <KeyTopicStyleList
+                    items={callCategories}
+                    analysisComplete={analysisComplete}
+                  />
                 </div>
               </div>
             </div>

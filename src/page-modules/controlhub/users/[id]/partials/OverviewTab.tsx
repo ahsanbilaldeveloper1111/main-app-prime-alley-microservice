@@ -9,6 +9,35 @@ import UserProfileTab from './UserProfileTab';
 import OrganizationalHierarchyTab from './OrganizationalHierarchyTab';
 import { getStorageImageUrl } from '@utils/imageUtils';
 
+function buildRoleDropdownValue(
+    updatedRole: string,
+    roles: Role[],
+): { value: number; label: string } | null {
+    const role = roles.find((r) => r.id.toString() === updatedRole);
+    if (role) {
+        return { value: role.id, label: role.name };
+    }
+    return null;
+}
+
+function formatRoleDropdownOptionLabel(role: Role, showCompanyInLabel: boolean): string {
+    if (showCompanyInLabel) {
+        const companySuffix =
+            role.company && role.company !== 'null' ? `(${role.company})` : '';
+        if (companySuffix) {
+            return `${role.name} ${companySuffix}`;
+        }
+    }
+    return role.name;
+}
+
+function displayFieldOrNa(value: string | undefined): string {
+    if (value === undefined || value === '' || value === 'N/A') {
+        return 'N/A';
+    }
+    return value;
+}
+
 interface OverviewTabProps {
     currentUser: User | null;
     roles: Role[];
@@ -82,6 +111,27 @@ const OverviewTab: React.FC<OverviewTabProps> = ({
         }
     }, [currentUser]);
 
+    const avatarContent = profilePicture ? (
+        <img
+            src={getStorageImageUrl(profilePicture) || ''}
+            alt="Profile"
+            className="img-fluid rounded-circle"
+        />
+    ) : (
+        <div className="text">
+            <i className="material-icons-two-tone">person</i>
+        </div>
+    );
+
+    const isSessionAdmin = session?.user?.is_admin === '1';
+
+    const roleSelectOptions = roles.map((role) => ({
+        value: role.id,
+        label: formatRoleDropdownOptionLabel(role, isSessionAdmin),
+    }));
+
+    const roleSelectValue =
+        updatedRole === '' ? null : buildRoleDropdownValue(updatedRole, roles);
 
     return (
         <>
@@ -92,12 +142,7 @@ const OverviewTab: React.FC<OverviewTabProps> = ({
                             <Row className="align-items-center">
                                 <Col xs={3}>
                                     <div className="user-avatar">
-                                        {profilePicture ? 
-                                        <img src={getStorageImageUrl(profilePicture) || ''} alt="Profile" className="img-fluid rounded-circle" /> : 
-                                        <div className="text">
-                                            <i className="material-icons-two-tone">person</i>
-                                        </div>
-}
+                                        {avatarContent}
                                     </div>
                                 </Col>
                                 <Col xs={9}>
@@ -107,7 +152,7 @@ const OverviewTab: React.FC<OverviewTabProps> = ({
                                     <hr className="theme-hr" />
                                     <p className="text-white mb-0 text-opacity">Company</p>
                                     <p className="text-white mb-2">
-                                        {currentUser?.company && currentUser?.company !== 'N/A' ? currentUser?.company : 'N/A'}
+                                        {displayFieldOrNa(currentUser?.company)}
                                     </p>
                                 </Col>
                             </Row>
@@ -126,11 +171,11 @@ const OverviewTab: React.FC<OverviewTabProps> = ({
                                     </p>
                                     <p className="mb-0 small text-primary"><b>Department</b></p>
                                     <p className="mb-2 text-capitalize">
-                                        {currentUser?.department && currentUser?.department !== 'N/A' ? currentUser?.department : 'N/A'}
+                                        {displayFieldOrNa(currentUser?.department)}
                                     </p>
                                     <p className="mb-0 small text-primary"><b>Extension</b></p>
                                     <p className="mb-0 text-capitalize">
-                                        {currentUser?.phone && currentUser?.phone !== 'N/A' ? currentUser?.phone : 'N/A'}
+                                        {displayFieldOrNa(currentUser?.phone)}
                                     </p>
                                 </Col>
                                 <Col md={6}>
@@ -138,22 +183,28 @@ const OverviewTab: React.FC<OverviewTabProps> = ({
                                     <p className="mb-2 text-capitalize d-flex justify-content-between">
                                         {currentUser?.role?.name || 'Rank not assigned'}
                                         {session?.user?.permissions?.includes('assign-rank-users') && (
-                                        <span>
-                                            <i className="ti ti-edit" onClick={() => {
-                                                setShowChangeRoleModal(true);
-                                            }} style={{ cursor: 'pointer' }}></i>
-                                        </span>
+                                            <button
+                                                type="button"
+                                                className="p-0 border-0 bg-transparent d-inline-flex align-items-center text-white"
+                                                aria-label="Change rank"
+                                                onClick={() => setShowChangeRoleModal(true)}
+                                            >
+                                                <i className="ti ti-edit" aria-hidden />
+                                            </button>
                                         )}
                                     </p>
                                     <p className="mb-0 small text-primary"><b>Group</b></p>
                                     <p className="mb-2 text-capitalize d-flex justify-content-between">
                                         {currentUser?.group?.name || 'Group not assigned'}
                                         {session?.user?.permissions?.includes('assign-group-users') && (
-                                        <span>
-                                            <i className="ti ti-edit" onClick={() => {
-                                                setShowChangeGroupModal(true);
-                                            }} style={{ cursor: 'pointer' }}></i>
-                                        </span>
+                                            <button
+                                                type="button"
+                                                className="p-0 border-0 bg-transparent d-inline-flex align-items-center text-white"
+                                                aria-label="Change group"
+                                                onClick={() => setShowChangeGroupModal(true)}
+                                            >
+                                                <i className="ti ti-edit" aria-hidden />
+                                            </button>
                                         )}
                                     </p>
                                     {session?.user?.permissions?.includes('mark-company-admin-users') && (
@@ -161,11 +212,14 @@ const OverviewTab: React.FC<OverviewTabProps> = ({
                                             <p className="mb-0 small text-primary"><b>Company Admin</b></p>
                                             <p className="mb-0 text-capitalize d-flex justify-content-between">
                                                 {currentUser?.is_company_admin === "1" ? "Yes" : "No"}
-                                                <span>
-                                                    <i className="ti ti-edit" onClick={() => {
-                                                        setShowChangeCompanyAdminModal(true);
-                                                    }} style={{ cursor: 'pointer' }}></i>
-                                                </span>
+                                                <button
+                                                    type="button"
+                                                    className="p-0 border-0 bg-transparent d-inline-flex align-items-center text-white"
+                                                    aria-label="Change company admin"
+                                                    onClick={() => setShowChangeCompanyAdminModal(true)}
+                                                >
+                                                    <i className="ti ti-edit" aria-hidden />
+                                                </button>
                                             </p>
                                         </div>
                                     )}
@@ -197,26 +251,24 @@ const OverviewTab: React.FC<OverviewTabProps> = ({
                 title="Change Group"
                 desc="Please select the group to change"
                 formHtml={
-                    <>
-                        <div className="form-group">
-                            <label htmlFor="group">Group</label>
-                            <select className="form-control" id="group"
-                                onChange={(e) => {
-                                    setUpdatedGroup(e.target.value);
-                                }}
-                                value={updatedGroup}>
-                                <option value="">Select Group</option>
-                                {groups.map((group) => (
-                                    <option
-                                        key={group.id}
-                                        value={group.id}>
-                                        {group.name}
-                                    </option>
-                                ))}
-                            </select>
-                            <p className="text-muted mt-2 small">Update the assigned group for a user to reflect their new group or permissions within the system</p>
-                        </div>
-                    </>
+                    <div className="form-group">
+                        <label htmlFor="group">Group</label>
+                        <select className="form-control" id="group"
+                            onChange={(e) => {
+                                setUpdatedGroup(e.target.value);
+                            }}
+                            value={updatedGroup}>
+                            <option value="">Select Group</option>
+                            {groups.map((group) => (
+                                <option
+                                    key={group.id}
+                                    value={group.id}>
+                                    {group.name}
+                                </option>
+                            ))}
+                        </select>
+                        <p className="text-muted mt-2 small">Update the assigned group for a user to reflect their new group or permissions within the system</p>
+                    </div>
                 }
                 submitButtonText="Change Group"
                 cancelButtonText="Cancel"
@@ -230,34 +282,22 @@ const OverviewTab: React.FC<OverviewTabProps> = ({
                 title="Change Rank"
                 desc="Please select the rank to change"
                 formHtml={
-                    <>
-                        <div className="form-group">
-                            <label htmlFor="role">Role</label>
-                            <Select
-                                className="basic-single"
-                                classNamePrefix="select"
-                                isClearable={true}
-                                isSearchable={true}
-                                onChange={(selectedOption: any) => {
-                                    setUpdatedRole(selectedOption ? selectedOption.value.toString() : '');
-                                }}
-                                value={roles.find(role => role.id.toString() === updatedRole) ? {
-                                    value: updatedRole,
-                                    label: session?.user?.is_admin === "1"
-                                        ? `${roles.find(role => role.id.toString() === updatedRole)?.name}`
-                                        : roles.find(role => role.id.toString() === updatedRole)?.name
-                                } : null}
-                                options={roles.map((role) => ({
-                                    value: role.id,
-                                    label: session?.user?.is_admin === "1"
-                                        ? `${role.name} ${role.company && role.company !== 'null' ? '(' + role.company + ')' : ''}`
-                                        : role.name
-                                }))}
-                                placeholder="Select Rank"
-                            />
-                            <p className="text-muted mt-2 small">Update the assigned rank for a user to reflect their new role or permissions within the system</p>
-                        </div>
-                    </>
+                    <div className="form-group">
+                        <label htmlFor="role">Role</label>
+                        <Select
+                            className="basic-single"
+                            classNamePrefix="select"
+                            isClearable={true}
+                            isSearchable={true}
+                            onChange={(selectedOption: any) => {
+                                setUpdatedRole(selectedOption ? selectedOption.value.toString() : '');
+                            }}
+                            value={roleSelectValue}
+                            options={roleSelectOptions}
+                            placeholder="Select Rank"
+                        />
+                        <p className="text-muted mt-2 small">Update the assigned rank for a user to reflect their new role or permissions within the system</p>
+                    </div>
                 }
                 submitButtonText="Change Rank"
                 cancelButtonText="Cancel"
@@ -271,18 +311,16 @@ const OverviewTab: React.FC<OverviewTabProps> = ({
                 title="Mark as Company Admin"
                 desc="Please select the company admin to change"
                 formHtml={
-                    <>
-                        <div className="form-group">
-                            <label htmlFor="companyAdmin">Mark as Company Admin</label>
-                            <select className="form-control" id="companyAdmin"
-                                onChange={(e) =>
-                                    setIsCompanyAdmin(e.target.value === "1")}
-                                value={isCompanyAdmin ? "1" : "0"}>
-                                <option value="1" selected={isCompanyAdmin === true}>Yes</option>
-                                <option value="0" selected={isCompanyAdmin === false}>No</option>
-                            </select>
-                        </div>
-                    </>
+                    <div className="form-group">
+                        <label htmlFor="companyAdmin">Mark as Company Admin</label>
+                        <select className="form-control" id="companyAdmin"
+                            onChange={(e) =>
+                                setIsCompanyAdmin(e.target.value === "1")}
+                            value={isCompanyAdmin ? "1" : "0"}>
+                            <option value="1">Yes</option>
+                            <option value="0">No</option>
+                        </select>
+                    </div>
                 }
                 submitButtonText="Mark as Company Admin"
                 cancelButtonText="Cancel"

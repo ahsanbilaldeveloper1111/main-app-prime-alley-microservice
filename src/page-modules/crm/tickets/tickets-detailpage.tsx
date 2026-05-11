@@ -298,6 +298,8 @@ import React, {
       phone_country_code: "",
       phoneNumber: "",
       campaign_id: null,
+      campaign_name: null,
+      campaign_status: null,
       contact_owner: null,
       lifecycle_stage: "Lead",
       disposition: "",
@@ -306,7 +308,7 @@ import React, {
       scheduled_call_at: "",
       tags: [],
       note: "",
-      source: "",
+      source_file: "",
       custom_fields: [],
     });
     // Edit Prospect Sidebar States
@@ -480,7 +482,6 @@ import React, {
         globalThis.URL.revokeObjectURL(url);
         toast.success("Exported ticket successfully!");
       } catch (err) {
-        // eslint-disable-next-line no-console
         console.error("Export ticket error:", err);
         toast.error("Failed to export ticket");
       }
@@ -503,7 +504,6 @@ import React, {
         setSuccessModalDescription("Ticket has been deleted successfully");
         router.push("/crm-tickets");
       } catch (error: any) {
-        // eslint-disable-next-line no-console
         console.error("Delete ticket error:", error);
         toast.error("Failed to delete ticket");
       }
@@ -668,6 +668,8 @@ import React, {
         phone_country_code: phoneCountryCode,
         phoneNumber,
         campaign_id: item.campaign_id ?? d.campaign_id ?? null,
+        campaign_name: item.campaign_name ?? d.campaign_name ?? null,
+        campaign_status: item.campaign_status ?? d.campaign_status ?? null,
         contact_owner:
           item.user_extension ??
           d.contact_owner ??
@@ -683,7 +685,7 @@ import React, {
         ),
         tags: tagsArray,
         note: item.note ?? d.note ?? "",
-        source:
+        source_file:
           item.source_file ??
           d.source ??
           item.source ??
@@ -874,7 +876,7 @@ import React, {
           phone: phoneForPayload,
           campaign_id: data.campaign_id ?? null,
           company_domain: data.company_domain?.trim() || undefined,
-          source: data.source?.trim() || undefined,
+          source: data.source_file?.trim() || undefined,
           scheduled_call_at: data.scheduled_call_at || undefined,
           data: dataPayload,
         });

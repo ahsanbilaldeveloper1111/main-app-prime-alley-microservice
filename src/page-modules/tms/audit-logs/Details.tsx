@@ -1,9 +1,49 @@
-import { Card } from "react-bootstrap";
-import { Button } from "react-bootstrap";
-import { useState } from "react";
-import { Modal } from "react-bootstrap";
+import React from "react";
+import { Card, Button, Modal, Row, Col, Badge } from "react-bootstrap";
 import { AuditLog } from "@models/tms/AuditLog";
-import { Row, Col, Badge } from "react-bootstrap";
+
+function formatAuditFieldLabel(fieldKey: string): string {
+    return fieldKey
+        .split("_")
+        .filter((w) => w.length > 0)
+        .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+        .join(" ");
+}
+
+function keyPartFromUnknown(item: unknown): string {
+    if (typeof item === "object") {
+        if (item === null) {
+            return "null";
+        }
+        try {
+            return JSON.stringify(item);
+        } catch {
+            return "[Unserializable]";
+        }
+    }
+    if (typeof item === "string" || typeof item === "number" || typeof item === "boolean") {
+        return String(item);
+    }
+    if (typeof item === "bigint") {
+        return String(item);
+    }
+    if (typeof item === "symbol") {
+        return String(item);
+    }
+    if (typeof item === "function") {
+        return item.name ? `fn:${item.name}` : "fn:anonymous";
+    }
+    if (item === undefined) {
+        return "undefined";
+    }
+    return "unknown";
+}
+
+function stableArrayItemKey(prefix: string, index: number, item: unknown): string {
+    const raw = keyPartFromUnknown(item);
+    const slice = raw.length > 160 ? raw.slice(0, 160) : raw;
+    return `${prefix}-${index}-${slice}`;
+}
 
 
 
@@ -93,20 +133,15 @@ const AuditLogDetail = ({ auditLog, close, show }: AuditLogDetailProps) => {
 
         const oldData = parseJsonData(auditLog.old_values);
         const newData = parseJsonData(auditLog.new_values);
-        console.log(oldData, "oldData");
-        console.log(newData, "newData");
 
         // Handle different data types
-        if ((Array.isArray(oldData)&&oldData.length>0) || (Array.isArray(newData)&&newData.length>0)) {
-            console.log(newData, "oldDatasdfasrfsfa",Array.isArray(newData),Array.isArray(oldData));
+        if ((Array.isArray(oldData) && oldData.length > 0) || (Array.isArray(newData) && newData.length > 0)) {
             // Handle arrays
             return renderArrayComparison(oldData, newData);
         } else if (typeof oldData === 'object' && oldData !== null && typeof newData === 'object' && newData !== null) {
-            console.log(oldData, "oldDataprasda");
             // Both are objects
             return renderObjectComparison(oldData, newData);
         } else {
-            console.log(oldData, "oldDatapr");
             // Handle primitive values or mixed types
             return renderPrimitiveComparison(oldData, newData);
         }
@@ -116,9 +151,7 @@ const AuditLogDetail = ({ auditLog, close, show }: AuditLogDetailProps) => {
         const oldArrayData = Array.isArray(oldArray) ? oldArray : [];
         const newArrayData = Array.isArray(newArray) ? newArray : [];
         
-        const maxLength = Math.max(oldArrayData.length, newArrayData.length);
         const hasChanges = JSON.stringify(oldArrayData) !== JSON.stringify(newArrayData);
-        console.log(hasChanges, "hasChanges", oldArrayData, newArrayData);
 
         return (
             <Card className="border-0 shadow-sm mt-3">
@@ -128,7 +161,7 @@ const AuditLogDetail = ({ auditLog, close, show }: AuditLogDetailProps) => {
                     borderRadius: '0.375rem 0.375rem 0 0'
                 }}>
                     <h5 className="mb-0 text-white d-flex align-items-center">
-                        <i data-feather="list" style={{ width: '20px', height: '20px', marginRight: '8px' }}></i>
+                        <i data-feather="list" style={{ width: '20px', height: '20px', marginRight: '8px' }} />{' '}
                         Array Changes
                         {hasChanges && <Badge bg="warning" className="ms-2">Modified</Badge>}
                     </h5>
@@ -138,13 +171,13 @@ const AuditLogDetail = ({ auditLog, close, show }: AuditLogDetailProps) => {
                         <Col md={6}>
                             <div className="array-section">
                                 <h6 className="text-danger mb-2">
-                                    <i data-feather="minus-circle" style={{ width: '16px', height: '16px', marginRight: '4px' }}></i>
+                                    <i data-feather="minus-circle" style={{ width: '16px', height: '16px', marginRight: '4px' }} />{' '}
                                     Old Array ({oldArrayData.length} items)
                                 </h6>
                                 <div className="array-content old-array">
                                     {oldArrayData.length > 0 ? (
                                         oldArrayData.map((item, index) => (
-                                            <div key={index} className={`array-item ${hasChanges && index < newArrayData.length && JSON.stringify(item) !== JSON.stringify(newArrayData[index]) ? 'changed' : ''}`}>
+                                            <div key={stableArrayItemKey('old', index, item)} className={`array-item ${hasChanges && index < newArrayData.length && JSON.stringify(item) !== JSON.stringify(newArrayData[index]) ? 'changed' : ''}`}>
                                                 <div className="array-item-header">
                                                     <span className="array-index">[{index}]</span>
                                                 </div>
@@ -162,13 +195,13 @@ const AuditLogDetail = ({ auditLog, close, show }: AuditLogDetailProps) => {
                         <Col md={6}>
                             <div className="array-section">
                                 <h6 className="text-success mb-2">
-                                    <i data-feather="plus-circle" style={{ width: '16px', height: '16px', marginRight: '4px' }}></i>
+                                    <i data-feather="plus-circle" style={{ width: '16px', height: '16px', marginRight: '4px' }} />{' '}
                                     New Array ({newArrayData.length} items)
                                 </h6>
                                 <div className="array-content new-array">
                                     {newArrayData.length > 0 ? (
                                         newArrayData.map((item, index) => (
-                                            <div key={index} className={`array-item ${hasChanges && index < oldArrayData.length && JSON.stringify(item) !== JSON.stringify(oldArrayData[index]) ? 'changed' : ''}`}>
+                                            <div key={stableArrayItemKey('new', index, item)} className={`array-item ${hasChanges && index < oldArrayData.length && JSON.stringify(item) !== JSON.stringify(oldArrayData[index]) ? 'changed' : ''}`}>
                                                 <div className="array-item-header">
                                                     <span className="array-index">[{index}]</span>
                                                 </div>
@@ -204,7 +237,7 @@ const AuditLogDetail = ({ auditLog, close, show }: AuditLogDetailProps) => {
                     borderRadius: '0.375rem 0.375rem 0 0'
                 }}>
                     <h5 className="mb-0 text-white d-flex align-items-center">
-                        <i data-feather="git-compare" style={{ width: '20px', height: '20px', marginRight: '8px' }}></i>
+                        <i data-feather="git-compare" style={{ width: '20px', height: '20px', marginRight: '8px' }} />{' '}
                         Data Changes
                     </h5>
                 </Card.Header>
@@ -214,13 +247,13 @@ const AuditLogDetail = ({ auditLog, close, show }: AuditLogDetailProps) => {
                             <div className="comparison-header">
                                 <div className="old-column">
                                     <h6 className="text-danger mb-2">
-                                        <i data-feather="minus-circle" style={{ width: '16px', height: '16px', marginRight: '4px' }}></i>
+                                        <i data-feather="minus-circle" style={{ width: '16px', height: '16px', marginRight: '4px' }} />{' '}
                                         Old Values
                                     </h6>
                                 </div>
                                 <div className="new-column">
                                     <h6 className="text-success mb-2">
-                                        <i data-feather="plus-circle" style={{ width: '16px', height: '16px', marginRight: '4px' }}></i>
+                                        <i data-feather="plus-circle" style={{ width: '16px', height: '16px', marginRight: '4px' }} />{' '}
                                         New Values
                                     </h6>
                                 </div>
@@ -235,7 +268,7 @@ const AuditLogDetail = ({ auditLog, close, show }: AuditLogDetailProps) => {
                                 <Col md={12} key={key}>
                                     <div className={`data-change-item ${hasChanged ? 'changed' : 'unchanged'}`}>
                                         <div className="field-name">
-                                            <strong>{key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}</strong>
+                                            <strong>{formatAuditFieldLabel(key)}</strong>
                                         </div>
                                         <div className="field-values">
                                             <div className="old-value">
@@ -274,7 +307,7 @@ const AuditLogDetail = ({ auditLog, close, show }: AuditLogDetailProps) => {
                         <span className="empty-array">Empty Array</span>
                     ) : (
                         value.map((item, index) => (
-                            <div key={index} className="array-item-display">
+                            <div key={stableArrayItemKey('vc', index, item)} className="array-item-display">
                                 {/* <span className="item-index">[{index}]</span> */}
                                 <div className="item-content capitalize">
                                     {renderValueContent(item)}
@@ -319,7 +352,7 @@ const AuditLogDetail = ({ auditLog, close, show }: AuditLogDetailProps) => {
                     borderRadius: '0.375rem 0.375rem 0 0'
                 }}>
                     <h5 className="mb-0 text-white d-flex align-items-center">
-                        <i data-feather="git-compare" style={{ width: '20px', height: '20px', marginRight: '8px' }}></i>
+                        <i data-feather="git-compare" style={{ width: '20px', height: '20px', marginRight: '8px' }} />{' '}
                         Value Changes
                     </h5>
                 </Card.Header>
@@ -373,7 +406,7 @@ const AuditLogDetail = ({ auditLog, close, show }: AuditLogDetailProps) => {
                     borderRadius: '0.375rem 0.375rem 0 0'
                 }}>
                     <h5 className="mb-0 text-white d-flex align-items-center">
-                        <i className="fas fa-info-circle me-2"></i>
+                        <i className="fas fa-info-circle me-2" />{' '}
                         Additional Information
                     </h5>
                 </Card.Header>
@@ -388,11 +421,11 @@ const AuditLogDetail = ({ auditLog, close, show }: AuditLogDetailProps) => {
                             return (
                                 <Col md={12} key={field.key}>
                                     <div className="detail-item">
-                                        <label className="detail-label">
-                                            <i data-feather={field.icon}></i>
+                                        <label className="detail-label" htmlFor={`audit-additional-${field.key}`}>
+                                            <i data-feather={field.icon} />{' '}
                                             {field.label}
                                         </label>
-                                        <div className="detail-value">
+                                        <div id={`audit-additional-${field.key}`} className="detail-value">
                                             {field.key === 'status' ? (
                                                 getStatusBadge(formattedValue)
                                             ) : (
@@ -423,8 +456,8 @@ const AuditLogDetail = ({ auditLog, close, show }: AuditLogDetailProps) => {
                 color: 'white',
                 borderBottom: 'none'
             }}>
-                <Modal.Title style={{ fontWeight: '600' }}>
-                    <i className="fas fa-clipboard-list me-2"></i>
+                <Modal.Title style={{ fontWeight: '600' }} id="audit-log-modal-title">
+                    <i className="fas fa-clipboard-list me-2" />{' '}
                     Audit Log Details
                 </Modal.Title>
             </Modal.Header>
@@ -436,7 +469,7 @@ const AuditLogDetail = ({ auditLog, close, show }: AuditLogDetailProps) => {
                         borderRadius: '0.375rem 0.375rem 0 0'
                     }}>
                         <h5 className="mb-0 text-white d-flex align-items-center">
-                            <i className="fas fa-info-circle me-2"></i>
+                            <i className="fas fa-info-circle me-2" />{' '}
                             Log Information
                         </h5>
                     </Card.Header>
@@ -444,31 +477,31 @@ const AuditLogDetail = ({ auditLog, close, show }: AuditLogDetailProps) => {
                         <Row className="g-3">
                             <Col md={6}>
                                 <div className="detail-item">
-                                    <label className="detail-label">
-                                        <i data-feather="briefcase"></i>
+                                    <label className="detail-label" htmlFor="audit-log-company">
+                                        <i data-feather="briefcase" />{' '}
                                         Company
                                     </label>
-                                    <p className="detail-value">{auditLog.company?.name || 'N/A'}</p>
+                                    <p id="audit-log-company" className="detail-value">{auditLog.company?.name || 'N/A'}</p>
                                 </div>
                             </Col>
                             <Col md={6}>
                                 <div className="detail-item">
-                                    <label className="detail-label">
-                                        <i data-feather="user"></i>
+                                    <label className="detail-label" htmlFor="audit-log-user">
+                                        <i data-feather="user" />{' '}
                                         User
                                     </label>
-                                    <p className="detail-value">{auditLog.user?.name || 'N/A'}</p>
+                                    <p id="audit-log-user" className="detail-value">{auditLog.user?.name || 'N/A'}</p>
                                 </div>
                             </Col>
                           
                             {auditLog.action && (
                                 <Col md={12}>
                                     <div className="detail-item">
-                                        <label className="detail-label">
-                                            <i data-feather="zap"></i>
+                                        <label className="detail-label" htmlFor="audit-log-action">
+                                            <i data-feather="zap" />{' '}
                                             Action
                                         </label>
-                                        <p className="detail-value">{auditLog.action}</p>
+                                        <p id="audit-log-action" className="detail-value">{auditLog.action}</p>
                                     </div>
                                 </Col>
                             )}
@@ -476,22 +509,22 @@ const AuditLogDetail = ({ auditLog, close, show }: AuditLogDetailProps) => {
                             {auditLog.ip_address && (
                                 <Col md={6}>
                                     <div className="detail-item">
-                                        <label className="detail-label">
-                                            <i data-feather="monitor"></i>
+                                        <label className="detail-label" htmlFor="audit-log-ip">
+                                            <i data-feather="monitor" />{' '}
                                             IP Address
                                         </label>
-                                        <p className="detail-value">{auditLog.ip_address}</p>
+                                        <p id="audit-log-ip" className="detail-value">{auditLog.ip_address}</p>
                                     </div>
                                 </Col>
                             )}
                             {auditLog.user_agent && (
                                 <Col md={6}>
                                     <div className="detail-item">
-                                        <label className="detail-label">
-                                            <i data-feather="tablet"></i>
+                                        <label className="detail-label" htmlFor="audit-log-user-agent">
+                                            <i data-feather="tablet" />{' '}
                                             User Agent
                                         </label>
-                                        <p className="detail-value text-truncate" title={auditLog.user_agent}>
+                                        <p id="audit-log-user-agent" className="detail-value text-truncate" title={auditLog.user_agent}>
                                             {auditLog.user_agent}
                                         </p>
                                     </div>
@@ -499,11 +532,11 @@ const AuditLogDetail = ({ auditLog, close, show }: AuditLogDetailProps) => {
                             )}
                             <Col md={6}>
                                 <div className="detail-item">
-                                    <label className="detail-label">
-                                        <i data-feather="calendar"></i>
+                                    <label className="detail-label" htmlFor="audit-log-created">
+                                        <i data-feather="calendar" />{' '}
                                         Created At
                                     </label>
-                                    <p className="detail-value">
+                                    <p id="audit-log-created" className="detail-value">
                                         {auditLog.created_at ? formatDate(auditLog.created_at) : 'N/A'}
                                     </p>
                                 </div>
@@ -534,8 +567,10 @@ const AuditLogDetail = ({ auditLog, close, show }: AuditLogDetailProps) => {
                         fontWeight: '500'
                     }}
                 >
-                    <i className="fas fa-times me-2"></i>
-                    Close
+                    <span className="d-inline-flex align-items-center gap-2">
+                        <i className="fas fa-times" aria-hidden />
+                        <span>Close</span>
+                    </span>
                 </Button>
             </Modal.Footer>
             

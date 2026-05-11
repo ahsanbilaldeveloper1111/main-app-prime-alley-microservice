@@ -1,8 +1,6 @@
 import React, { forwardRef } from "react";
-import { Card, Button } from "react-bootstrap";
+import { Button } from "react-bootstrap";
 import { VerifyLdapUserParams, VerifyUserInfoParams } from "@models/tms/UnfidiedOp";
-import { MobileUser, DNCRCallingAccess, FacInfoCallingAccess, DeviceType } from "@models/tms/Company";
-import APIProgressSection from "./APIProgressSection";
 
 interface ConfirmationFormProps {
     verifyLdapUserFormData: VerifyLdapUserParams;
@@ -40,7 +38,7 @@ const ConfirmationForm = forwardRef<HTMLDivElement, ConfirmationFormProps>(({
     return (
         <div
             ref={ref}
-            className={`mb-4 shadow-sm mb-5`}
+            className="mb-5 shadow-sm"
         >
             <div className="text-end mt-3 mb-5">
                     <Button
@@ -53,14 +51,13 @@ const ConfirmationForm = forwardRef<HTMLDivElement, ConfirmationFormProps>(({
                         }
                     >
                         {getCurrentLoadingState(3) ? (
-                            <>
+                            <output className="d-inline-flex align-items-center gap-2 border-0 bg-transparent p-0 m-0">
                                 <span
-                                    className="spinner-border spinner-border-sm me-2"
-                                    role="status"
+                                    className="spinner-border spinner-border-sm"
                                     aria-hidden="true"
-                                ></span>
-                                Submitting...
-                            </>
+                                />
+                                <span>Submitting...</span>
+                            </output>
                         ) : (
                             "Submit User Profile"
                         )}

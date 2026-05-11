@@ -1,15 +1,14 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Row, Col, Card, Form, Badge, Button, Dropdown } from 'react-bootstrap';
+import { Row, Col, Card, Form, Badge, Button } from 'react-bootstrap';
 import { GetTicket, GetComments, GetAssigneeComments, AddComment } from '@utils/tickets';
 import { toast } from 'react-toastify';
 import moment from 'moment';
-import {useSession} from 'next-auth/react';
+import { useSession } from 'next-auth/react';
+import type { LucideIcon } from 'lucide-react';
 import {
   ChevronLeft,
   Clock,
   Hash,
-  Share2,
-  ChevronDown,
   AlertTriangle,
   FileText,
   RefreshCw,
@@ -27,9 +26,105 @@ import {
 const PRIORITY_LABELS = ['Low', 'Medium', 'High', 'Critical'];
 const DEFAULT_AVATAR = 'https://i.pravatar.cc/150?img=48';
 
+const RELATED_ARTICLES: Array<{ title: string; icon: LucideIcon; color: string }> = [
+  { title: 'Setting Up Two-Factor Authentication', icon: BookOpen, color: '#4680ff' },
+  { title: 'Troubleshooting 2FA Issues', icon: Wrench, color: '#04a9f5' },
+  { title: 'Resetting Your 2FA Device', icon: RotateCcw, color: '#1de9b6' }
+];
+
+interface TicketData {
+  id: number | string;
+  title?: string;
+  description?: string;
+  status?: { name?: string } | string;
+  priority?: number | string;
+  user_extension?: string | string[];
+  due_date?: string;
+  created_at?: string;
+  assignee?: { name?: string };
+}
+
 interface GetTicketResponse {
   success?: boolean;
-  data?: any;
+  data?: TicketData;
+}
+
+type ChatMessage = {
+  id: string;
+  user: string;
+  avatar: string;
+  time: string;
+  message: string;
+  isAgent?: boolean;
+};
+
+type CommentSourceRow = Record<string, unknown>;
+
+function asTrimmedString(value: unknown, fallback: string): string {
+  if (value == null) {
+    return fallback;
+  }
+  if (typeof value === 'string') {
+    return value;
+  }
+  if (typeof value === 'number' || typeof value === 'boolean' || typeof value === 'bigint') {
+    return String(value);
+  }
+  return fallback;
+}
+
+function commentRowId(
+  row: CommentSourceRow,
+  sortKey: string,
+  isAgent: boolean,
+  index: number
+): string {
+  const rawId = row.id;
+  if (typeof rawId === 'string' || typeof rawId === 'number') {
+    return String(rawId);
+  }
+  return `local-${sortKey}-${isAgent ? 'a' : 'c'}-${index}`;
+}
+
+function mapCommentToMerged(
+  c: CommentSourceRow,
+  isAgent: boolean,
+  fallbackName: string,
+  index: number
+): ChatMessage & { sortKey: string } {
+  const sortKey = asTrimmedString(c.created_at, '');
+  const id = commentRowId(c, sortKey, isAgent, index);
+  const userRaw = c.user_name ?? c.user_extension;
+  const user = asTrimmedString(userRaw, fallbackName) || fallbackName;
+  const created = c.created_at;
+  let time = '';
+  if (typeof created === 'string' || typeof created === 'number') {
+    time = moment(String(created)).fromNow();
+  }
+  return {
+    id,
+    user,
+    avatar: DEFAULT_AVATAR,
+    time,
+    message: asTrimmedString(c.content, ''),
+    isAgent,
+    sortKey
+  };
+}
+
+function getTicketStatusLabel(status: TicketData['status']): string {
+  if (status == null) {
+    return 'Open';
+  }
+  if (typeof status === 'string') {
+    return status || 'Open';
+  }
+  if (typeof status === 'object' && 'name' in status) {
+    const name = (status as { name?: unknown }).name;
+    const label = asTrimmedString(name, '');
+    return label === '' ? 'Open' : label;
+  }
+  return 'Open';
 }
 
 interface TicketDetailProps {
@@ -39,15 +134,40 @@ interface TicketDetailProps {
 
 const TicketDetail: React.FC<TicketDetailProps> = ({ ticketId, onBack }) => {
   const { data: session } = useSession();
-  const [ticketData, setTicketData] = useState<any>(null);
+  const [ticketData, setTicketData] = useState<TicketData | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [replyText, setReplyText] = useState('');
   const [replyAttachment, setReplyAttachment] = useState<File | null>(null);
-  const [messages, setMessages] = useState<Array<{ user: string; avatar: string; time: string; message: string; isAgent?: boolean }>>([]);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [loadingComments, setLoadingComments] = useState<boolean>(false);
   const [sendingReply, setSendingReply] = useState<boolean>(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const fetchComments = useCallback(async (id: string) => {
+    setLoadingComments(true);
+    try {
+      const [commentsRes, assigneeRes] = await Promise.all([
+        GetComments(id),
+        GetAssigneeComments(id)
+      ]);
+      const commentsList = (commentsRes?.data?.data ?? commentsRes?.data ?? commentsRes) ?? [];
+      const assigneeList = (assigneeRes?.data?.data ?? assigneeRes?.data ?? assigneeRes) ?? [];
+      const customerRows = (Array.isArray(commentsList) ? commentsList : []).map((c, i) =>
+        mapCommentToMerged(c as CommentSourceRow, false, 'Customer', i)
+      );
+      const agentRows = (Array.isArray(assigneeList) ? assigneeList : []).map((c, i) =>
+        mapCommentToMerged(c as CommentSourceRow, true, 'Support', i)
+      );
+      const merged = [...customerRows, ...agentRows];
+      merged.sort((a, b) => a.sortKey.localeCompare(b.sortKey));
+      setMessages(merged.map(({ sortKey, ...rest }) => rest));
+    } catch (err) {
+      console.error('Error fetching comments:', err);
+    } finally {
+      setLoadingComments(false);
+    }
+  }, []);
 
   const fetchTicket = useCallback(async () => {
     if (!ticketId) return;
@@ -71,46 +191,7 @@ const TicketDetail: React.FC<TicketDetailProps> = ({ ticketId, onBack }) => {
     } finally {
       setLoading(false);
     }
-  }, [ticketId]);
-
-  const fetchComments = useCallback(async (id: string) => {
-    setLoadingComments(true);
-    try {
-      const [commentsRes, assigneeRes] = await Promise.all([
-        GetComments(id),
-        GetAssigneeComments(id)
-      ]);
-      const commentsList = (commentsRes?.data?.data ?? commentsRes?.data ?? commentsRes) ?? [];
-      const assigneeList = (assigneeRes?.data?.data ?? assigneeRes?.data ?? assigneeRes) ?? [];
-      const merged: Array<{ user: string; avatar: string; time: string; message: string; isAgent?: boolean; sortKey: string }> = [];
-      (Array.isArray(commentsList) ? commentsList : []).forEach((c: any) => {
-        merged.push({
-          user: c.user_name ?? c.user_extension ?? 'Customer',
-          avatar: DEFAULT_AVATAR,
-          time: c.created_at ? moment(c.created_at).fromNow() : '',
-          message: c.content ?? '',
-          isAgent: false,
-          sortKey: c.created_at ?? ''
-        });
-      });
-      (Array.isArray(assigneeList) ? assigneeList : []).forEach((c: any) => {
-        merged.push({
-          user: c.user_name ?? c.user_extension ?? 'Support',
-          avatar: DEFAULT_AVATAR,
-          time: c.created_at ? moment(c.created_at).fromNow() : '',
-          message: c.content ?? '',
-          isAgent: true,
-          sortKey: c.created_at ?? ''
-        });
-      });
-      merged.sort((a, b) => (a.sortKey > b.sortKey ? 1 : -1));
-      setMessages(merged.map(({ sortKey, ...rest }) => rest));
-    } catch (err) {
-      console.error('Error fetching comments:', err);
-    } finally {
-      setLoadingComments(false);
-    }
-  }, []);
+  }, [ticketId, fetchComments]);
 
   useEffect(() => {
     if (ticketId) fetchTicket();
@@ -141,7 +222,8 @@ const TicketDetail: React.FC<TicketDetailProps> = ({ ticketId, onBack }) => {
   }, [replyText, replyAttachment, ticketData, fetchComments]);
 
   const getPriorityStyle = (priority: string | number) => {
-    const p = typeof priority === 'string' ? Number.parseInt(priority, 10) : (priority ?? 0);
+    const raw = typeof priority === 'string' ? Number.parseInt(priority, 10) : Number(priority ?? 0);
+    const p = Number.isNaN(raw) ? 0 : raw;
     switch (p) {
       case 3: return { bg: '#fee', color: '#dc3545', dotColor: '#dc3545' };
       case 2: return { bg: '#fff3cd', color: '#856404', dotColor: '#f4c22b' };
@@ -160,13 +242,7 @@ const TicketDetail: React.FC<TicketDetailProps> = ({ ticketId, onBack }) => {
     return { bg: '#4680ff', color: '#fff' };
   };
 
-  const relatedArticles = [
-    { title: 'Setting Up Two-Factor Authentication', icon: BookOpen, color: '#4680ff' },
-    { title: 'Troubleshooting 2FA Issues', icon: Wrench, color: '#04a9f5' },
-    { title: 'Resetting Your 2FA Device', icon: RotateCcw, color: '#1de9b6' }
-  ];
-
-  const statusName = ticketData?.status?.name ?? ticketData?.status ?? 'Open';
+  const statusName = getTicketStatusLabel(ticketData?.status);
   const priorityNum = ticketData?.priority ?? 0;
   const priorityLabel = PRIORITY_LABELS[Number(priorityNum)] ?? 'Low';
   const priorityStyle = getPriorityStyle(priorityNum);
@@ -183,7 +259,7 @@ const TicketDetail: React.FC<TicketDetailProps> = ({ ticketId, onBack }) => {
     return (
       <div style={{ background: '#f4f7fa', minHeight: '100vh', padding: '40px', textAlign: 'center' }}>
         <p style={{ color: '#dc3545' }}>{error ?? 'Ticket not found'}</p>
-        <Button variant="outline-primary" onClick={onBack}>Back to My Tickets</Button>
+        <Button type="button" variant="outline-primary" onClick={onBack}>Back to My Tickets</Button>
       </div>
     );
   }
@@ -193,8 +269,10 @@ const TicketDetail: React.FC<TicketDetailProps> = ({ ticketId, onBack }) => {
       {/* Breadcrumb */}
       <div style={{ marginBottom: '20px' }}>
         <Button
+          type="button"
           variant="link"
           onClick={onBack}
+          aria-label="Back to Help Center"
           style={{
             textDecoration: 'none',
             color: '#6c757d',
@@ -205,16 +283,25 @@ const TicketDetail: React.FC<TicketDetailProps> = ({ ticketId, onBack }) => {
             gap: '5px'
           }}
         >
-          <ChevronLeft size={16} /> Help Center
+          <ChevronLeft size={16} aria-hidden focusable={false} /> Help Center
         </Button>
-        <span style={{ color: '#6c757d', margin: '0 8px' }}>›</span>
-        <span 
+        <span style={{ color: '#6c757d', margin: '0 8px' }} aria-hidden>›</span>
+        <Button
+          type="button"
+          variant="link"
           onClick={onBack}
-          style={{ color: '#6c757d', fontSize: '14px', cursor: 'pointer' }}
+          aria-label="Back to My Tickets"
+          style={{
+            color: '#6c757d',
+            fontSize: '14px',
+            padding: 0,
+            textDecoration: 'none',
+            display: 'inline'
+          }}
         >
           My Tickets
-        </span>
-        <span style={{ color: '#6c757d', margin: '0 8px' }}>›</span>
+        </Button>
+        <span style={{ color: '#6c757d', margin: '0 8px' }} aria-hidden>›</span>
         <span style={{ color: '#2c3e50', fontWeight: '600', fontSize: '14px' }}>
           Ticket #{ticketData.id}
         </span>
@@ -249,13 +336,7 @@ const TicketDetail: React.FC<TicketDetailProps> = ({ ticketId, onBack }) => {
                 alignItems: 'center',
                 gap: '3px'
               }}>
-                <Flag size={16} color={priorityStyle.dotColor} style={{ flexShrink: 0 }} />
-                <div style={{
-                  // width: '8px',
-                  // height: '8px',
-                  // borderRadius: '50%',
-                  background: priorityStyle.dotColor
-                }} />
+                <Flag size={16} color={priorityStyle.dotColor} style={{ flexShrink: 0 }} aria-hidden focusable={false} />
                 <span style={{ textTransform: 'capitalize' }}>
                   {priorityLabel}
                 </span>
@@ -268,13 +349,7 @@ const TicketDetail: React.FC<TicketDetailProps> = ({ ticketId, onBack }) => {
                 alignItems: 'center',
                 gap: '3px'
               }}>
-                <CircleDot size={16} color={statusStyle.bg} style={{ flexShrink: 0 }} />
-                <div style={{
-                  // width: '0px',
-                  // height: '0px',
-                  // borderRadius: '50%',
-                  background: statusStyle.bg
-                }} />
+                <CircleDot size={16} color={statusStyle.bg} style={{ flexShrink: 0 }} aria-hidden focusable={false} />
                 <span>{statusName}</span>
               </div>
             </div>
@@ -318,28 +393,6 @@ const TicketDetail: React.FC<TicketDetailProps> = ({ ticketId, onBack }) => {
                     gap: '16px',
                     flexWrap: 'wrap'
                   }}>
-                    {/* Priority Badge */}
-                    {/* <Badge style={{
-                      background: priorityStyle.bg,
-                      color: priorityStyle.color,
-                      padding: '6px 12px',
-                      borderRadius: '6px',
-                      fontWeight: '500',
-                      fontSize: '13px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '6px'
-                    }}>
-                      <div style={{
-                        width: '8px',
-                        height: '8px',
-                        borderRadius: '50%',
-                        background: priorityStyle.dotColor
-                      }} />
-                      <span style={{ textTransform: 'capitalize' }}>{priorityLabel}</span>
-                    </Badge> */}
-
-                    {/* Status Badge */}
                     <Badge style={{
                       background: statusStyle.bg,
                       color: statusStyle.color,
@@ -361,37 +414,6 @@ const TicketDetail: React.FC<TicketDetailProps> = ({ ticketId, onBack }) => {
                     </Badge>
                   </div>
                 </div>
-
-                {/* Action Buttons */}
-                {/* <div style={{ display: 'flex', gap: '8px' }}>
-                  <Button
-                    variant="outline-secondary"
-                    size="sm"
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '6px',
-                      padding: '6px 12px',
-                      fontSize: '13px',
-                      border: '1px solid #dee2e6'
-                    }}
-                  >
-                    <Share2 size={14} /> Share
-                  </Button>
-                  <Dropdown>
-                    <Dropdown.Toggle
-                      variant="outline-secondary"
-                      size="sm"
-                      style={{
-                        padding: '6px 10px',
-                        fontSize: '13px',
-                        border: '1px solid #dee2e6'
-                      }}
-                    >
-                      <ChevronDown size={14} />
-                    </Dropdown.Toggle>
-                  </Dropdown>
-                </div> */}
               </div>
 
               {/* Agent and meta Info */}
@@ -404,18 +426,16 @@ const TicketDetail: React.FC<TicketDetailProps> = ({ ticketId, onBack }) => {
                 background: '#f8f9fa',
                 borderRadius: '8px'
               }}>
-                <>
-
                 {ticketData.due_date && (
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <Clock size={14} color="#6c757d" />
+                      <Clock size={14} color="#6c757d" aria-hidden focusable={false} />
                       <span style={{ fontSize: '13px', color: '#495057', fontWeight: '500' }}>
                         Due {moment(ticketData.due_date).format('MMM D, YYYY')}
                       </span>
                     </div>
                   )}
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <Hash size={14} color="#6c757d" />
+                    <Hash size={14} color="#6c757d" aria-hidden focusable={false} />
                     <span style={{ fontSize: '13px', color: '#6c757d' }}>Channel:</span>
                     <span style={{ fontSize: '13px', color: '#495057', fontWeight: '500' }}>
                       Portal
@@ -427,26 +447,6 @@ const TicketDetail: React.FC<TicketDetailProps> = ({ ticketId, onBack }) => {
                       {ticketData.created_at ? moment(ticketData.created_at).format('MMM D, YYYY') : '—'}
                     </span>
                   </div>
-                </>
-                {/* <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                  <img
-                    src={DEFAULT_AVATAR}
-                    alt="Agent"
-                    style={{
-                      width: '36px',
-                      height: '36px',
-                      borderRadius: '50%',
-                      objectFit: 'cover'
-                    }}
-                  />
-                  <span style={{ fontSize: '14px', color: '#495057', fontWeight: '500' }}>
-                    {ticketData.assignee?.name ?? ticketData.user_extension ?? 'Support'}
-                  </span>
-                </div> */}
-                {/* <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between',gap: '16px' }}>
-                  
-                  
-                </div> */}
               </div>
 
               {/* Description (initial message) */}
@@ -455,7 +455,7 @@ const TicketDetail: React.FC<TicketDetailProps> = ({ ticketId, onBack }) => {
                   <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
                     <img
                       src={DEFAULT_AVATAR}
-                      alt=""
+                      alt={session?.user?.name ? `${session.user.name} avatar` : 'Your avatar'}
                       style={{ width: '40px', height: '40px', borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }}
                     />
                     <div style={{ flex: 1 }}>
@@ -481,7 +481,7 @@ const TicketDetail: React.FC<TicketDetailProps> = ({ ticketId, onBack }) => {
                   <p style={{ fontSize: '14px', color: '#6c757d' }}>Loading replies...</p>
                 ) : (
                   messages.map((message, index) => (
-                    <div key={index} style={{
+                    <div key={message.id} style={{
                       marginBottom: '24px',
                       paddingBottom: '24px',
                       borderBottom: index < messages.length - 1 ? '1px solid #f0f0f0' : 'none'
@@ -575,6 +575,7 @@ const TicketDetail: React.FC<TicketDetailProps> = ({ ticketId, onBack }) => {
                   alignItems: 'center'
                 }}>
                   <Button
+                    type="button"
                     variant="link"
                     onClick={() => fileInputRef.current?.click()}
                     disabled={!!replyAttachment}
@@ -588,13 +589,14 @@ const TicketDetail: React.FC<TicketDetailProps> = ({ ticketId, onBack }) => {
                       gap: '6px'
                     }}
                   >
-                    <Paperclip size={16} />
+                    <Paperclip size={16} aria-hidden focusable={false} />
                     Add screenshot
                     <span style={{ fontSize: '12px', color: '#6c757d', marginLeft: '4px' }}>
                       1 file (Up to 1MB)
                     </span>
                   </Button>
                   <Button
+                    type="button"
                     onClick={handleSendReply}
                     disabled={sendingReply || !replyText.trim()}
                     style={{
@@ -609,7 +611,7 @@ const TicketDetail: React.FC<TicketDetailProps> = ({ ticketId, onBack }) => {
                       gap: '8px'
                     }}
                   >
-                    <Send size={16} />
+                    <Send size={16} aria-hidden focusable={false} />
                     {sendingReply ? 'Sending...' : 'Send reply'}
                   </Button>
                 </div>
@@ -640,6 +642,7 @@ const TicketDetail: React.FC<TicketDetailProps> = ({ ticketId, onBack }) => {
               
               {/* Escalate Button */}
               <Button
+                type="button"
                 style={{
                   width: '100%',
                   background: '#fff3cd',
@@ -662,6 +665,7 @@ const TicketDetail: React.FC<TicketDetailProps> = ({ ticketId, onBack }) => {
 
               {/* Add Internal Note */}
               <Button
+                type="button"
                 variant="outline-secondary"
                 style={{
                   width: '100%',
@@ -684,6 +688,7 @@ const TicketDetail: React.FC<TicketDetailProps> = ({ ticketId, onBack }) => {
 
               {/* Change Status */}
               <Button
+                type="button"
                 variant="outline-secondary"
                 style={{
                   width: '100%',
@@ -713,6 +718,7 @@ const TicketDetail: React.FC<TicketDetailProps> = ({ ticketId, onBack }) => {
 
               {/* Request Call Back */}
               <Button
+                type="button"
                 variant="outline-secondary"
                 style={{
                   width: '100%',
@@ -752,11 +758,12 @@ const TicketDetail: React.FC<TicketDetailProps> = ({ ticketId, onBack }) => {
               </h5>
               
               <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                {relatedArticles.map((article, index) => {
+                {RELATED_ARTICLES.map((article) => {
                   const Icon = article.icon;
                   return (
-                    <div
-                      key={index}
+                    <button
+                      key={article.title}
+                      type="button"
                       style={{
                         display: 'flex',
                         alignItems: 'center',
@@ -766,7 +773,11 @@ const TicketDetail: React.FC<TicketDetailProps> = ({ ticketId, onBack }) => {
                         borderRadius: '6px',
                         cursor: 'pointer',
                         transition: 'all 0.2s ease',
-                        border: '1px solid transparent'
+                        border: '1px solid transparent',
+                        width: '100%',
+                        textAlign: 'left',
+                        font: 'inherit',
+                        color: 'inherit'
                       }}
                       onMouseEnter={(e) => {
                         e.currentTarget.style.background = '#f0f4f8';
@@ -787,7 +798,7 @@ const TicketDetail: React.FC<TicketDetailProps> = ({ ticketId, onBack }) => {
                         justifyContent: 'center',
                         flexShrink: 0
                       }}>
-                        <Icon size={18} color={article.color} />
+                        <Icon size={18} color={article.color} aria-hidden focusable={false} />
                       </div>
                       <div style={{ flex: 1 }}>
                         <span style={{
@@ -799,8 +810,8 @@ const TicketDetail: React.FC<TicketDetailProps> = ({ ticketId, onBack }) => {
                           {article.title}
                         </span>
                       </div>
-                      <ChevronRight size={16} color="#6c757d" />
-                    </div>
+                      <ChevronRight size={16} color="#6c757d" aria-hidden focusable={false} />
+                    </button>
                   );
                 })}
               </div>

@@ -319,7 +319,7 @@ function MonitoringModalFooter({
       return
     }
     const toneToUse = selectedTone[dn] || 'NONE'
-    onStartMonitoring(dn, selection as MonitorMode, toneToUse)
+    onStartMonitoring(dn, selection, toneToUse)
   }
 
   return (

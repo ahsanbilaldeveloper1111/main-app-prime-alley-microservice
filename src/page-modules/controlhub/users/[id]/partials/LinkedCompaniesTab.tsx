@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { Card, Col, Row, Button } from 'react-bootstrap';
-import { useSession } from 'next-auth/react';
 import { toast } from 'react-toastify';
 import Select, { MultiValue } from 'react-select';
 import FormModal from '@components/page-partials/FormModal';
@@ -89,21 +88,23 @@ const LinkedCompaniesTab: React.FC<LinkedCompaniesTabProps> = ({
         setShowDeleteLinkedCompanyModal(true);
     };
 
-    const handleLinkedCompanyCheckboxChange = (linkId: string, isChecked: boolean) => {
-        if (isChecked) {
-            setSelectedLinkedCompanies(prev => [...prev, linkId]);
-        } else {
-            setSelectedLinkedCompanies(prev => prev.filter(id => id !== linkId));
-        }
+    const selectLinkedCompany = (linkId: string) => {
+        setSelectedLinkedCompanies(prev => [...prev, linkId]);
     };
 
-    const handleSelectAllLinkedCompanies = (isChecked: boolean) => {
-        if (isChecked) {
-            const allLinkedCompanyIds = linkedCompanies?.map(linkedCompany => (linkedCompany.id || linkedCompany.link_id)?.toString()).filter(Boolean) || [];
-            setSelectedLinkedCompanies(allLinkedCompanyIds);
-        } else {
-            setSelectedLinkedCompanies([]);
-        }
+    const deselectLinkedCompany = (linkId: string) => {
+        setSelectedLinkedCompanies(prev => prev.filter(id => id !== linkId));
+    };
+
+    const getAllLinkedCompanyIds = (): string[] =>
+        linkedCompanies?.map(linkedCompany => (linkedCompany.id || linkedCompany.link_id)?.toString()).filter(Boolean) as string[] || [];
+
+    const selectAllLinkedCompanies = () => {
+        setSelectedLinkedCompanies(getAllLinkedCompanyIds());
+    };
+
+    const clearLinkedCompanySelection = () => {
+        setSelectedLinkedCompanies([]);
     };
 
     const handleBulkDeleteLinkedCompaniesClick = () => {
@@ -236,7 +237,11 @@ const LinkedCompaniesTab: React.FC<LinkedCompaniesTabProps> = ({
                                             <input
                                                 type="checkbox"
                                                 checked={selectedLinkedCompanies.length > 0 && selectedLinkedCompanies.length === (linkedCompanies?.length || 0)}
-                                                onChange={(e) => handleSelectAllLinkedCompanies(e.target.checked)}
+                                                onChange={(e) =>
+                                                    e.target.checked
+                                                        ? selectAllLinkedCompanies()
+                                                        : clearLinkedCompanySelection()
+                                                }
                                             />
                                         </th>
                                         <th>Company</th>
@@ -252,7 +257,13 @@ const LinkedCompaniesTab: React.FC<LinkedCompaniesTabProps> = ({
                                                     <input
                                                         type="checkbox"
                                                         checked={selectedLinkedCompanies.includes((obj.id || obj.link_id)?.toString())}
-                                                        onChange={(e) => handleLinkedCompanyCheckboxChange((obj.id || obj.link_id)?.toString(), e.target.checked)}
+                                                        onChange={(e) => {
+                                                            const linkId = (obj.id || obj.link_id)?.toString();
+                                                            if (!linkId) return;
+                                                            e.target.checked
+                                                                ? selectLinkedCompany(linkId)
+                                                                : deselectLinkedCompany(linkId);
+                                                        }}
                                                     />
                                                 </td>
                                                 <td>{obj?.company?.name || obj?.company?.company_name || obj?.company_name || 'N/A'}</td>

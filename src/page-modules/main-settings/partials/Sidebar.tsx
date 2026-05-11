@@ -2,11 +2,97 @@ import React, { useState } from 'react'
 import { Search, ChevronLeft } from 'lucide-react'
 import { useRouter } from 'next/router'
 import { usePermissions } from '@utils/permissionUtils'
-import { sidebarGroups, defaultSubTabBySection } from '@config/mainSettingsConfig'
+import { sidebarGroups, defaultSubTabBySection, type SidebarItem } from '@config/mainSettingsConfig'
 
 type SidebarProps = {
   activeSection: string
   onNavigate: (sectionId: string, subTabId?: string) => void
+}
+
+function navRowBackground(isActive: boolean, isHovered: boolean): string {
+  if (isActive) {
+    return 'whitesmoke'
+  }
+  if (isHovered) {
+    return '#f5f5f5'
+  }
+  return 'transparent'
+}
+
+type SidebarNavItemProps = Readonly<{
+  item: SidebarItem
+  isActive: boolean
+  isHovered: boolean
+  onSelect: () => void
+  onHoverEnter: () => void
+  onHoverLeave: () => void
+}>
+
+function SidebarNavItem({
+  item,
+  isActive,
+  isHovered,
+  onSelect,
+  onHoverEnter,
+  onHoverLeave,
+}: SidebarNavItemProps) {
+  return (
+    <button
+      type="button"
+      onClick={onSelect}
+      aria-current={isActive ? 'true' : undefined}
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        width: '100%',
+        paddingLeft: '20px',
+        paddingRight: '16px',
+        paddingTop: '5px',
+        paddingBottom: '5px',
+        cursor: 'pointer',
+        background: navRowBackground(isActive, isHovered),
+        border: 'none',
+        borderLeft: isActive ? '3px solid #141414' : '3px solid transparent',
+        color: 'rgb(20, 20, 20)',
+        fontFamily: 'Lexend Deca, Helvetica, Arial, sans-serif',
+        fontSize: '14px',
+        fontWeight: isActive ? 400 : 300,
+        letterSpacing: '0px',
+        lineHeight: '24px',
+        transition: 'background 0.12s, border-color 0.12s',
+        userSelect: 'none',
+        textAlign: 'left',
+        boxSizing: 'border-box',
+      }}
+      onMouseEnter={onHoverEnter}
+      onMouseLeave={onHoverLeave}
+    >
+      <span>{item.label}</span>
+      <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+        {item.badge !== undefined && item.badge !== '' && (
+          <span
+            style={{
+              background: '#7b5cf5',
+              color: '#fff',
+              fontSize: '10px',
+              fontWeight: 600,
+              padding: '1px 6px',
+              borderRadius: '3px',
+              letterSpacing: '0.3px',
+            }}
+          >
+            {item.badge}
+          </span>
+        )}
+        {item.externalLink === true && (
+          <span style={{ fontSize: '11px', color: '#aaa' }} aria-hidden>
+            ↗
+          </span>
+        )}
+      </span>
+    </button>
+  )
 }
 
 const Sidebar: React.FC<SidebarProps> = ({ activeSection, onNavigate }) => {
@@ -14,6 +100,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeSection, onNavigate }) => {
   const { hasPermission } = usePermissions()
   const [showSearch, setShowSearch] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
+  const [hoveredNavItemId, setHoveredNavItemId] = useState<string | null>(null)
 
   const handleItemClick = (itemId: string) => {
     const defaultSubTab = defaultSubTabBySection[itemId]
@@ -40,6 +127,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeSection, onNavigate }) => {
         <button
           type="button"
           onClick={() => router.push('/')}
+          aria-label="Back to dashboard"
           style={{
             display: 'flex',
             alignItems: 'center',
@@ -57,7 +145,9 @@ const Sidebar: React.FC<SidebarProps> = ({ activeSection, onNavigate }) => {
             left: '-45px',
           }}
         >
-          <span style={{ fontSize: '14px' }}><ChevronLeft size={18} /></span> Dashboard
+          <ChevronLeft size={18} aria-hidden focusable={false} />
+          {' '}
+          Dashboard
         </button>
       </div>
 
@@ -87,7 +177,8 @@ const Sidebar: React.FC<SidebarProps> = ({ activeSection, onNavigate }) => {
           Settings
         </span>
         <button
-          onClick={() => setShowSearch(!showSearch)}
+          type="button"
+          onClick={() => setShowSearch((open) => !open)}
           style={{
             background: 'none',
             border: 'none',
@@ -99,17 +190,24 @@ const Sidebar: React.FC<SidebarProps> = ({ activeSection, onNavigate }) => {
             justifyContent: 'center',
           }}
           title="Search settings"
+          aria-expanded={showSearch}
+          aria-controls="settings-sidebar-search"
         >
-          <Search size={18} />
+          <Search size={18} aria-hidden focusable={false} />
         </button>
       </div>
 
       {/* Search Input */}
       {showSearch && (
-        <div style={{ paddingLeft: '20px', paddingRight: '20px', marginBottom: '16px' }}>
+        <div
+          id="settings-sidebar-search"
+          style={{ paddingLeft: '20px', paddingRight: '20px', marginBottom: '16px' }}
+        >
           <div style={{ position: 'relative' }}>
             <Search
               size={16}
+              aria-hidden
+              focusable={false}
               style={{
                 position: 'absolute',
                 left: '10px',
@@ -120,8 +218,10 @@ const Sidebar: React.FC<SidebarProps> = ({ activeSection, onNavigate }) => {
               }}
             />
             <input
+              id="settings-sidebar-search-input"
               type="text"
               placeholder="Search settings..."
+              aria-label="Search settings"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               autoFocus
@@ -146,9 +246,11 @@ const Sidebar: React.FC<SidebarProps> = ({ activeSection, onNavigate }) => {
 
       {/* Groups */}
       {sidebarGroups.map((group) => {
-        const permissionFilteredItems = group.items.filter(
-          (item) => !item.permission || hasPermission(item.permission)
-        )
+        const permissionFilteredItems = group.items.filter((item) => {
+          const required = item.permission
+          if (!required) return true
+          return hasPermission(required)
+        })
         const filteredItems = searchQuery.trim()
           ? permissionFilteredItems.filter((item) =>
               item.label.toLowerCase().includes(searchQuery.toLowerCase())
@@ -176,59 +278,21 @@ const Sidebar: React.FC<SidebarProps> = ({ activeSection, onNavigate }) => {
             </div>
             {filteredItems.map((item) => {
               const isActive = activeSection === item.id
+              const isHovered = hoveredNavItemId === item.id
               return (
-                <div
+                <SidebarNavItem
                   key={item.id}
-                  onClick={() => handleItemClick(item.id)}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    paddingLeft: '20px',
-                    paddingRight: '16px',
-                    paddingTop: '5px',
-                    paddingBottom: '5px',
-                    cursor: 'pointer',
-                    background: isActive ? 'whitesmoke' : 'transparent',
-                    borderLeft: isActive ? '3px solid #141414' : '3px solid transparent',
-                    color: 'rgb(20, 20, 20)',
-                    fontFamily: 'Lexend Deca, Helvetica, Arial, sans-serif',
-                    fontSize: '14px',
-                    fontWeight: isActive ? 400 : 300,
-                    letterSpacing: '0px',
-                    lineHeight: '24px',
-                    transition: 'background 0.12s, border-color 0.12s',
-                    userSelect: 'none',
+                  item={item}
+                  isActive={isActive}
+                  isHovered={isHovered}
+                  onSelect={() => handleItemClick(item.id)}
+                  onHoverEnter={() => {
+                    if (!isActive) {
+                      setHoveredNavItemId(item.id)
+                    }
                   }}
-                  onMouseEnter={(e) => {
-                    if (!isActive) (e.currentTarget as HTMLDivElement).style.background = '#f5f5f5'
-                  }}
-                  onMouseLeave={(e) => {
-                    if (!isActive) (e.currentTarget as HTMLDivElement).style.background = 'transparent'
-                  }}
-                >
-                  <span>{item.label}</span>
-                  <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    {item.badge && (
-                      <span
-                        style={{
-                          background: '#7b5cf5',
-                          color: '#fff',
-                          fontSize: '10px',
-                          fontWeight: 600,
-                          padding: '1px 6px',
-                          borderRadius: '3px',
-                          letterSpacing: '0.3px',
-                        }}
-                      >
-                        {item.badge}
-                      </span>
-                    )}
-                    {item.externalLink && (
-                      <span style={{ fontSize: '11px', color: '#aaa' }}>↗</span>
-                    )}
-                  </span>
-                </div>
+                  onHoverLeave={() => setHoveredNavItemId(null)}
+                />
               )
             })}
           </div>

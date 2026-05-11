@@ -1,10 +1,10 @@
-import React from 'react';
-import { Col, Row } from 'react-bootstrap';
+import React from "react";
+import { Col } from "react-bootstrap";
 
 const RecentActivities: React.FC = () => {
-    return (
-        <Col md={12} className="mb-3">
-            {/* <div className="card">
+  return (
+    <Col md={12} className="mb-3">
+      {/* <div className="card">
                 <div className="card-header">
                     <h5>Recent Activities</h5>
                 </div>
@@ -39,9 +39,8 @@ const RecentActivities: React.FC = () => {
                     </Row>
                 </div>
             </div> */}
-        </Col>
-    );
+    </Col>
+  );
 };
 
 export default RecentActivities;
-

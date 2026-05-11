@@ -1,5 +1,6 @@
 import React from 'react';
 import { Row, Col, Card, Button } from 'react-bootstrap';
+import type { LucideIcon } from 'lucide-react';
 import {
   ChevronLeft,
   MessageCircle,
@@ -23,6 +24,16 @@ interface ContactSupportProps {
   onSendMessage?: () => void;
 }
 
+type MainContactOption = {
+  icon: LucideIcon;
+  title: string;
+  description: string;
+  buttonText: string;
+  buttonAction: () => void;
+  color: string;
+  disabled?: boolean;
+};
+
 const ContactSupport: React.FC<ContactSupportProps> = ({ 
   onBack, 
   onStartChat,
@@ -30,31 +41,45 @@ const ContactSupport: React.FC<ContactSupportProps> = ({
   onSendMessage 
 }) => {
   const router = useRouter();
-  const handleEmailSupport = () => {
+
+  const openWhatsAppSupport = () => {
+    const phoneDigits = '97143035555';
+    const message = encodeURIComponent('Hello, I need support assistance.');
+    const whatsappUrl = `https://wa.me/${phoneDigits}?text=${message}`;
+    const anchor = document.createElement('a');
+    anchor.href = whatsappUrl;
+    anchor.target = '_blank';
+    anchor.rel = 'noopener noreferrer';
+    anchor.click();
+  };
+
+  const navigateToEmailSupport = () => {
+    if (onSendMessage) {
+      onSendMessage();
+      return;
+    }
     globalThis.location.href = 'mailto:info@primealley.com';
   };
 
-  const handleRequestCall = () => {
+  const navigateToPhoneSupport = () => {
+    if (onRequestCall) {
+      onRequestCall();
+      return;
+    }
     globalThis.location.href = 'tel:+97143035555';
   };
 
-  const handleWhatsApp = () => {
-    // Format phone number for WhatsApp (remove spaces and keep +)
-    const phoneNumber = '+97143035555';
-    // Pre-filled message
-    const message = encodeURIComponent('Hello, I need support assistance.');
-    // Open WhatsApp
-    const whatsappUrl = `https://wa.me/${phoneNumber}?text=${message}`;
-    window.open(whatsappUrl, '_blank');
+  const handleStartChat = () => {
+    onStartChat?.();
   };
 
-  const mainOptions = [
+  const mainOptions: MainContactOption[] = [
     {
       icon: MessageCircle,
       title: 'Live Chat',
       description: 'Chat with a live agent for immediate assistance.',
       buttonText: 'Online',
-      buttonAction: onStartChat,
+      buttonAction: handleStartChat,
       color: '#5babf6',
       disabled: false
     },
@@ -63,7 +88,7 @@ const ContactSupport: React.FC<ContactSupportProps> = ({
       title: 'Request Call Back',
       description: 'Schedule a call with our support team to get help.',
       buttonText: 'Request a call',
-      buttonAction: handleRequestCall,
+      buttonAction: navigateToPhoneSupport,
       color: '#5babf6'
     },
     {
@@ -71,7 +96,7 @@ const ContactSupport: React.FC<ContactSupportProps> = ({
       title: 'Email Support',
       description: 'Submit a support ticket for assistance via email.',
       buttonText: 'Send a message',
-      buttonAction: handleEmailSupport,
+      buttonAction: navigateToEmailSupport,
       color: '#5babf6'
     }
   ];
@@ -80,19 +105,19 @@ const ContactSupport: React.FC<ContactSupportProps> = ({
     {
       icon: Shield,
       title: 'Setting Up Two-Factor Authentication',
-      description: 'Chat with information waûlor issues.',
+      description: 'Learn how to enable 2FA and secure your account.',
       color: '#4680ff'
     },
     {
       icon: RotateCcw,
       title: 'Resetting Your 2FA Device',
-      description: 'Resolve screenshots, and webis ûssues.',
+      description: 'Steps to replace or reset your two-factor device.',
       color: '#04a9f5'
     },
     {
       icon: AlertCircle,
-      title: 'Tnroubleshoot 2FA Issues',
-      description: 'Fix, aweeting. problems. problems.',
+      title: 'Troubleshoot 2FA Issues',
+      description: 'Common sign-in problems and how to fix them.',
       color: '#5babf6'
     }
   ];
@@ -100,7 +125,7 @@ const ContactSupport: React.FC<ContactSupportProps> = ({
   const faqs = [
     'How do I recover my account?',
     'How can I change my billing plan?',
-    'Cant find your answer?'
+    "Can't find your answer?"
   ];
 
   return (
@@ -120,7 +145,7 @@ const ContactSupport: React.FC<ContactSupportProps> = ({
             gap: '5px'
           }}
         >
-          <ChevronLeft size={16} /> Help Center
+          <ChevronLeft aria-hidden size={16} /> Help Center
         </Button>
         <span style={{ color: '#6c757d', margin: '0 8px' }}>›</span>
         <span style={{ color: '#2c3e50', fontWeight: '600', fontSize: '14px' }}>
@@ -178,7 +203,7 @@ const ContactSupport: React.FC<ContactSupportProps> = ({
                       justifyContent: 'center',
                       margin: '0 auto 20px'
                     }}>
-                      <Icon size={32} color={option.color} strokeWidth={1.5} />
+                      <Icon aria-hidden size={32} color={option.color} strokeWidth={1.5} />
                     </div>
                     <h5 style={{
                       fontSize: '18px',
@@ -198,7 +223,7 @@ const ContactSupport: React.FC<ContactSupportProps> = ({
                     </p>
                     <Button
                       onClick={option.buttonAction}
-                      disabled={option.disabled || false}
+                      disabled={option.disabled === true}
                       style={{
                         background: option.disabled ? '#c0c0c0' : option.color,
                         border: 'none',
@@ -215,7 +240,7 @@ const ContactSupport: React.FC<ContactSupportProps> = ({
                         opacity: option.disabled ? 0.6 : 1
                       }}
                     >
-                      {option.buttonText} <ChevronRight size={16} />
+                      {option.buttonText} <ChevronRight aria-hidden size={16} />
                     </Button>
                   </Card>
                 </Col>
@@ -267,14 +292,14 @@ const ContactSupport: React.FC<ContactSupportProps> = ({
                       gap: '8px',
                      
                     }}
-                    onClick={handleRequestCall}
+                    onClick={navigateToPhoneSupport}
                   >
-                    <PhoneCall size={18} />
+                    <PhoneCall aria-hidden size={18} />
                     +971 4 303 5555
                   </Button>
                   <Button
                     variant="outline-success"
-                    onClick={handleWhatsApp}
+                    onClick={openWhatsAppSupport}
                     style={{
                       borderRadius: '6px',
                       padding: '8px 16px',
@@ -286,7 +311,7 @@ const ContactSupport: React.FC<ContactSupportProps> = ({
                      
                     }}
                   >
-                    <FaWhatsapp size={18} />
+                    <FaWhatsapp aria-hidden size={18} />
                     WhatsApp
                   </Button>
                   <Button
@@ -303,7 +328,7 @@ const ContactSupport: React.FC<ContactSupportProps> = ({
                       
                     }}
                   >
-                    <Ticket size={18} />
+                    <Ticket aria-hidden size={18} />
                     Submit a ticket
                   </Button>
                 </div>
@@ -332,23 +357,33 @@ const ContactSupport: React.FC<ContactSupportProps> = ({
                   const Icon = article.icon;
                   return (
                     <Col xs={12} sm={4} key={article.title}>
-                      <div style={{
-                        padding: '20px',
-                        background: '#f8f9fa',
-                        border: '1px solid #e9ecef',
-                        borderRadius: '8px',
-                        cursor: 'pointer',
-                        transition: 'all 0.2s ease',
-                        height: '100%'
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.background = '#f0f4f8';
-                        e.currentTarget.style.borderColor = article.color;
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.background = '#f8f9fa';
-                        e.currentTarget.style.borderColor = '#e9ecef';
-                      }}>
+                      <button
+                        type="button"
+                        onClick={() => router.push('/help-center/knowledge-base')}
+                        aria-label={`Open suggested article: ${article.title}`}
+                        style={{
+                          padding: '20px',
+                          background: '#f8f9fa',
+                          border: '1px solid #e9ecef',
+                          borderRadius: '8px',
+                          cursor: 'pointer',
+                          transition: 'all 0.2s ease',
+                          height: '100%',
+                          width: '100%',
+                          display: 'block',
+                          textAlign: 'left',
+                          fontFamily: 'inherit',
+                          margin: 0
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.background = '#f0f4f8';
+                          e.currentTarget.style.borderColor = article.color;
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.background = '#f8f9fa';
+                          e.currentTarget.style.borderColor = '#e9ecef';
+                        }}
+                      >
                         <div style={{
                           width: '48px',
                           height: '48px',
@@ -359,7 +394,7 @@ const ContactSupport: React.FC<ContactSupportProps> = ({
                           justifyContent: 'center',
                           marginBottom: '16px'
                         }}>
-                          <Icon size={24} color={article.color} strokeWidth={2} />
+                          <Icon aria-hidden size={24} color={article.color} strokeWidth={2} />
                         </div>
                         <h6 style={{
                           fontSize: '15px',
@@ -378,7 +413,7 @@ const ContactSupport: React.FC<ContactSupportProps> = ({
                         }}>
                           {article.description}
                         </p>
-                      </div>
+                      </button>
                     </Col>
                   );
                 })}
@@ -397,7 +432,7 @@ const ContactSupport: React.FC<ContactSupportProps> = ({
                     padding: '8px 0'
                   }}
                 >
-                  See All Suggestions <ChevronRight size={16} />
+                  See All Suggestions <ChevronRight aria-hidden size={16} />
                 </Button>
               </div>
             </Card.Body>
@@ -421,7 +456,7 @@ const ContactSupport: React.FC<ContactSupportProps> = ({
                 gap: '12px',
                 marginBottom: '16px'
               }}>
-                <Clock size={24} color="#4680ff" />
+                <Clock aria-hidden size={24} color="#4680ff" />
                 <h5 style={{
                   fontSize: '16px',
                   fontWeight: '600',
@@ -465,14 +500,14 @@ const ContactSupport: React.FC<ContactSupportProps> = ({
                     gap: '6px',
                     
                   }}
-                  onClick={handleRequestCall}
+                  onClick={navigateToPhoneSupport}
                 >
-                  <PhoneCall size={16} />
+                  <PhoneCall aria-hidden size={16} />
                   Click to call
                 </Button>
                 <Button
                   variant="outline-success"
-                  onClick={handleWhatsApp}
+                  onClick={openWhatsAppSupport}
                   style={{
                     flex: 1,
                     borderRadius: '6px',
@@ -486,7 +521,7 @@ const ContactSupport: React.FC<ContactSupportProps> = ({
                     
                   }}
                 >
-                  <FaWhatsapp size={16} />
+                  <FaWhatsapp aria-hidden size={16} />
                   WhatsApp
                 </Button>
               </div>
@@ -515,16 +550,27 @@ const ContactSupport: React.FC<ContactSupportProps> = ({
                 flexDirection: 'column',
                 gap: '0'
               }}>
-                {faqs.map((faq) => (
-                  <div
+                {faqs.map((faq, index) => (
+                  <button
                     key={faq}
+                    type="button"
+                    onClick={() => router.push('/help-center/knowledge-base')}
+                    aria-label={`${faq} — open knowledge base`}
                     style={{
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'space-between',
+                      width: '100%',
                       padding: '12px 0',
                       cursor: 'pointer',
-                      borderBottom: faqs.indexOf(faq) < faqs.length - 1 ? '1px solid #f0f0f0' : 'none'
+                      borderBottom: index < faqs.length - 1 ? '1px solid #f0f0f0' : 'none',
+                      background: 'none',
+                      borderTop: 'none',
+                      borderLeft: 'none',
+                      borderRight: 'none',
+                      fontFamily: 'inherit',
+                      textAlign: 'left',
+                      margin: 0
                     }}
                   >
                     <span style={{
@@ -533,8 +579,8 @@ const ContactSupport: React.FC<ContactSupportProps> = ({
                     }}>
                       {faq}
                     </span>
-                    <ChevronRight size={16} color="#c0c0c0" />
-                  </div>
+                    <ChevronRight aria-hidden size={16} color="#c0c0c0" />
+                  </button>
                 ))}
               </div>
             </Card.Body>

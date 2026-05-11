@@ -1,32 +1,32 @@
-import React from 'react';
-import { Card, Col, Row } from 'react-bootstrap';
+import React from "react";
+import { Row } from "react-bootstrap";
 
 interface RecentActivitiesTabProps {
-    activities?: Array<{
-        id?: number;
-        title: string;
-        date: string;
-        time: string;
-        device?: string;
-        browser?: string;
-    }>;
+  activities?: Array<{
+    id?: number;
+    title: string;
+    date: string;
+    time: string;
+    device?: string;
+    browser?: string;
+  }>;
 }
 
 const RecentActivitiesTab: React.FC<RecentActivitiesTabProps> = ({
-    activities = [
-        {
-            id: 1,
-            title: 'Login to platform',
-            date: '23 Aug 2024',
-            time: '12:00:00',
-            device: 'MacBook Pro',
-            browser: 'Chrome'
-        }
-    ]
+  activities = [
+    {
+      id: 1,
+      title: "Login to platform",
+      date: "23 Aug 2024",
+      time: "12:00:00",
+      device: "MacBook Pro",
+      browser: "Chrome",
+    },
+  ],
 }) => {
-    return (
-        <Row>
-            {/* <Col md={12}>
+  return (
+    <Row>
+      {/* <Col md={12}>
                 <Card>
                     <Card.Header>
                         <h5>Recent Activities</h5>
@@ -70,9 +70,8 @@ const RecentActivitiesTab: React.FC<RecentActivitiesTabProps> = ({
                     </Card.Body>
                 </Card>
             </Col> */}
-        </Row>
-    );
+    </Row>
+  );
 };
 
 export default RecentActivitiesTab;
-

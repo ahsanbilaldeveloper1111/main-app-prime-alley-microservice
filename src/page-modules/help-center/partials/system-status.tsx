@@ -1,5 +1,5 @@
-
-import React, { useState } from 'react';
+import React, { useId, useState } from 'react';
+import type { LucideIcon } from 'lucide-react';
 import { ChevronLeft, ChevronRight, CheckCircle, Clock, TrendingUp, Activity, Database, Satellite, CreditCard } from 'lucide-react';
 
 type SystemStatusProps = {
@@ -9,7 +9,28 @@ type SystemStatusProps = {
 
 type SubscriptionType = 'portal' | 'email' | 'sms' | 'webhook';
 
+const OPERATIONAL_COLOR = '#10b981';
+const DEGRADED_COLOR = '#ef4444';
+
+function statusIndicatorColor(status: string): string {
+  if (status === 'Operational') {
+    return OPERATIONAL_COLOR;
+  }
+  return DEGRADED_COLOR;
+}
+
+type IncidentIconId = 'database' | 'satellite' | 'creditCard';
+
+const INCIDENT_ICONS: Record<IncidentIconId, LucideIcon> = {
+  database: Database,
+  satellite: Satellite,
+  creditCard: CreditCard
+};
+
 const SystemStatus: React.FC<SystemStatusProps> = ({ onBack }) => {
+  const chartGradientId = useId().replaceAll(':', '');
+  const chartShadowId = `${chartGradientId}-shadow`;
+
   const [subscriptions, setSubscriptions] = useState<Record<SubscriptionType, boolean>>({
     portal: true,
     email: true,
@@ -28,12 +49,19 @@ const SystemStatus: React.FC<SystemStatusProps> = ({ onBack }) => {
     { name: 'Integrations', status: 'Operational', uptime: '99.98%' }
   ];
 
-  const incidents = [
+  const incidents: {
+    title: string;
+    description: string;
+    date: string;
+    iconId: IncidentIconId;
+    color: string;
+    status: string;
+  }[] = [
     {
       title: 'Database Migration',
       description: 'Successfully completed maintenance window',
       date: 'Dec 15, 2025',
-      icon: <Database size={28} color="#10b981" />, // Lucide icon
+      iconId: 'database',
       color: '#10b981',
       status: 'Resolved'
     },
@@ -41,7 +69,7 @@ const SystemStatus: React.FC<SystemStatusProps> = ({ onBack }) => {
       title: 'API Rate Limiting',
       description: 'Temporary service degradation',
       date: 'Dec 10, 2025',
-      icon: <Satellite size={28} color="#f59e0b" />, // Lucide icon
+      iconId: 'satellite',
       color: '#f59e0b',
       status: 'Monitoring'
     },
@@ -49,7 +77,7 @@ const SystemStatus: React.FC<SystemStatusProps> = ({ onBack }) => {
       title: 'Payment Gateway',
       description: 'Brief interruption in payment processing',
       date: 'Dec 5, 2025',
-      icon: <CreditCard size={28} color="#3b82f6" />, // Lucide icon
+      iconId: 'creditCard',
       color: '#3b82f6',
       status: 'Resolved'
     }
@@ -70,16 +98,13 @@ const SystemStatus: React.FC<SystemStatusProps> = ({ onBack }) => {
     }));
   };
 
-
-  const getStatusColor = (status: string): string => {
-    return status === 'Operational' ? '#10b981' : '#ef4444';
-  };
-
   return (
     <div>
       {/* Breadcrumb */}
       <div style={{ marginBottom: '24px' }}>
         <button
+          type="button"
+          aria-label="Back to Help Center"
           onClick={onBack}
           style={{
             background: 'none',
@@ -104,7 +129,7 @@ const SystemStatus: React.FC<SystemStatusProps> = ({ onBack }) => {
             e.currentTarget.style.color = '#6b7280';
           }}
         >
-          <ChevronLeft size={16} /> Back to Help Center
+          <ChevronLeft aria-hidden size={16} /> Back to Help Center
         </button>
       </div>
 
@@ -159,7 +184,7 @@ const SystemStatus: React.FC<SystemStatusProps> = ({ onBack }) => {
             alignItems: 'center',
             justifyContent: 'center'
           }}>
-            <TrendingUp size={24} color="#fff" />
+            <TrendingUp aria-hidden size={24} color="#fff" />
           </div>
           <div>
             <div style={{ fontSize: '24px', fontWeight: '700', color: '#1f2937' }}>99.98%</div>
@@ -185,7 +210,7 @@ const SystemStatus: React.FC<SystemStatusProps> = ({ onBack }) => {
             alignItems: 'center',
             justifyContent: 'center'
           }}>
-            <Activity size={24} color="#fff" />
+            <Activity aria-hidden size={24} color="#fff" />
           </div>
           <div>
             <div style={{ fontSize: '24px', fontWeight: '700', color: '#1f2937' }}>8</div>
@@ -211,10 +236,10 @@ const SystemStatus: React.FC<SystemStatusProps> = ({ onBack }) => {
             alignItems: 'center',
             justifyContent: 'center'
           }}>
-            <Clock size={24} color="#fff" />
+            <Clock aria-hidden size={24} color="#fff" />
           </div>
           <div>
-            <div style={{ fontSize: '24px', fontWeight: '700', color: '#1f2937' }}>&lt; 2ms</div>
+            <div style={{ fontSize: '24px', fontWeight: '700', color: '#1f2937' }}>{'< 2ms'}</div>
             <div style={{ fontSize: '13px', color: '#6b7280' }}>Avg Response</div>
           </div>
         </div>
@@ -247,15 +272,16 @@ const SystemStatus: React.FC<SystemStatusProps> = ({ onBack }) => {
                 alignItems: 'center',
                 gap: '10px'
               }}>
-                <Activity size={22} color="#667eea" />
+                <Activity aria-hidden size={22} color="#667eea" />
                 Service Components
               </h4>
             </div>
 
             <div style={{ padding: '0' }}>
               {components.map((component, index) => (
-                <div
-                  key={index}
+                <button
+                  key={component.name}
+                  type="button"
                   style={{
                     display: 'flex',
                     alignItems: 'center',
@@ -264,7 +290,14 @@ const SystemStatus: React.FC<SystemStatusProps> = ({ onBack }) => {
                     borderBottom: index < components.length - 1 ? '1px solid #f3f4f6' : 'none',
                     cursor: 'pointer',
                     transition: 'all 0.2s',
-                    background: '#fff'
+                    background: '#fff',
+                    width: '100%',
+                    border: 'none',
+                    borderLeft: 'none',
+                    borderRight: 'none',
+                    borderTop: 'none',
+                    textAlign: 'left',
+                    fontFamily: 'inherit'
                   }}
                   onMouseEnter={(e) => {
                     e.currentTarget.style.background = '#f9fafb';
@@ -285,8 +318,8 @@ const SystemStatus: React.FC<SystemStatusProps> = ({ onBack }) => {
                       width: '10px',
                       height: '10px',
                       borderRadius: '50%',
-                      background: getStatusColor(component.status),
-                      boxShadow: `0 0 0 3px ${getStatusColor(component.status)}20`,
+                      background: statusIndicatorColor(component.status),
+                      boxShadow: `0 0 0 3px ${statusIndicatorColor(component.status)}20`,
                       animation: 'pulse 2s infinite'
                     }} />
                     <span style={{
@@ -315,16 +348,16 @@ const SystemStatus: React.FC<SystemStatusProps> = ({ onBack }) => {
                       padding: '6px 12px',
                       borderRadius: '6px'
                     }}>
-                      <CheckCircle size={14} color="#10b981" />
+                      <CheckCircle aria-hidden size={14} color="#10b981" />
                       <span style={{
                         fontSize: '13px',
                         color: '#059669',
                         fontWeight: '600'
                       }}>{component.status}</span>
                     </div>
-                    <ChevronRight size={18} color="#9ca3af" />
+                    <ChevronRight aria-hidden size={18} color="#9ca3af" />
                   </div>
-                </div>
+                </button>
               ))}
             </div>
           </div>
@@ -354,27 +387,39 @@ const SystemStatus: React.FC<SystemStatusProps> = ({ onBack }) => {
                 alignItems: 'center',
                 gap: '10px'
               }}>
-                <Clock size={22} color="#667eea" />
+                <Clock aria-hidden size={22} color="#667eea" />
                 Recent Incidents
               </h4>
-              <a href="#" style={{
-                fontSize: '14px',
-                color: '#667eea',
-                textDecoration: 'none',
-                fontWeight: '600',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '4px'
-              }}>
-                View all <ChevronRight size={14} />
-              </a>
+              <button
+                type="button"
+                style={{
+                  fontSize: '14px',
+                  color: '#667eea',
+                  textDecoration: 'none',
+                  fontWeight: '600',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  fontFamily: 'inherit',
+                  padding: 0
+                }}
+              >
+                View all <ChevronRight aria-hidden size={14} />
+              </button>
             </div>
 
             <div style={{ padding: '24px' }}>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '16px' }}>
-                {incidents.map((incident, index) => (
-                  <div 
-                    key={index}
+                {incidents.map((incident) => {
+                  const IncidentIcon = INCIDENT_ICONS[incident.iconId];
+                  return (
+                  <button
+                    key={incident.title}
+                    type="button"
+                    aria-label={`${incident.title}, ${incident.status}`}
                     style={{
                       background: 'linear-gradient(135deg, #f9fafb 0%, #fff 100%)',
                       border: '1px solid #e5e7eb',
@@ -383,7 +428,10 @@ const SystemStatus: React.FC<SystemStatusProps> = ({ onBack }) => {
                       cursor: 'pointer',
                       transition: 'all 0.3s',
                       position: 'relative',
-                      overflow: 'hidden'
+                      overflow: 'hidden',
+                      width: '100%',
+                      textAlign: 'left',
+                      fontFamily: 'inherit'
                     }}
                     onMouseEnter={(e) => {
                       e.currentTarget.style.borderColor = incident.color;
@@ -414,7 +462,7 @@ const SystemStatus: React.FC<SystemStatusProps> = ({ onBack }) => {
                       justifyContent: 'center',
                       marginBottom: '14px'
                     }}>
-                      {incident.icon}
+                      <IncidentIcon aria-hidden size={28} color={incident.color} />
                     </div>
                     <h6 style={{
                       fontSize: '16px',
@@ -447,8 +495,9 @@ const SystemStatus: React.FC<SystemStatusProps> = ({ onBack }) => {
                         borderRadius: '6px'
                       }}>{incident.status}</span>
                     </div>
-                  </div>
-                ))}
+                  </button>
+                  );
+                })}
               </div>
             </div>
           </div>
@@ -529,11 +578,11 @@ const SystemStatus: React.FC<SystemStatusProps> = ({ onBack }) => {
                   {/* Uptime area chart */}
                   <svg style={{ width: '100%', height: '100%' }} viewBox="0 0 100 100" preserveAspectRatio="none">
                     <defs>
-                      <linearGradient id="areaGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                      <linearGradient id={chartGradientId} x1="0%" y1="0%" x2="0%" y2="100%">
                         <stop offset="0%" style={{ stopColor: '#10b981', stopOpacity: 0.3 }} />
                         <stop offset="100%" style={{ stopColor: '#10b981', stopOpacity: 0.05 }} />
                       </linearGradient>
-                      <filter id="shadow">
+                      <filter id={chartShadowId}>
                         <feDropShadow dx="0" dy="2" stdDeviation="2" floodColor="#10b981" floodOpacity="0.3"/>
                       </filter>
                     </defs>
@@ -541,7 +590,7 @@ const SystemStatus: React.FC<SystemStatusProps> = ({ onBack }) => {
                     {/* Area fill */}
                     <polygon
                       points="0,100 0,15 16,10 33,18 50,15 66,17 83,12 100,15 100,100"
-                      fill="url(#areaGradient)"
+                      fill={`url(#${chartGradientId})`}
                     />
                     
                     {/* Line */}
@@ -551,7 +600,7 @@ const SystemStatus: React.FC<SystemStatusProps> = ({ onBack }) => {
                       stroke="#10b981"
                       strokeWidth="1"
                       vectorEffect="non-scaling-stroke"
-                      filter="url(#shadow)"
+                      filter={`url(#${chartShadowId})`}
                     />
                   </svg>
 
@@ -565,9 +614,9 @@ const SystemStatus: React.FC<SystemStatusProps> = ({ onBack }) => {
                       { left: '66%', top: '17%' },
                       { left: '83%', top: '12%' },
                       { left: '100%', top: '15%' }
-                    ].map((point, i) => (
+                    ].map((point) => (
                       <div
-                        key={i}
+                        key={`${point.left}-${point.top}`}
                         style={{
                           position: 'absolute',
                           left: point.left,
@@ -681,6 +730,7 @@ const SystemStatus: React.FC<SystemStatusProps> = ({ onBack }) => {
               </div>
 
               <button
+                type="button"
                 style={{
                   background: 'linear-gradient(135deg, #667eea 0%, #667eea 100%)',
                   border: 'none',
@@ -730,8 +780,10 @@ const SystemStatus: React.FC<SystemStatusProps> = ({ onBack }) => {
             </div>
             <div style={{ padding: '0' }}>
               {faqs.map((faq, index) => (
-                <div
-                  key={index}
+                <button
+                  key={faq.question}
+                  type="button"
+                  aria-label={faq.question}
                   style={{
                     display: 'flex',
                     alignItems: 'center',
@@ -740,7 +792,14 @@ const SystemStatus: React.FC<SystemStatusProps> = ({ onBack }) => {
                     borderBottom: index < faqs.length - 1 ? '1px solid #f3f4f6' : 'none',
                     cursor: 'pointer',
                     transition: 'all 0.2s',
-                    background: '#fff'
+                    background: '#fff',
+                    width: '100%',
+                    border: 'none',
+                    borderLeft: 'none',
+                    borderRight: 'none',
+                    borderTop: 'none',
+                    textAlign: 'left',
+                    fontFamily: 'inherit'
                   }}
                   onMouseEnter={(e) => {
                     e.currentTarget.style.background = '#f9fafb';
@@ -764,8 +823,8 @@ const SystemStatus: React.FC<SystemStatusProps> = ({ onBack }) => {
                       fontWeight: '500'
                     }}>{faq.category}</div>
                   </div>
-                  <ChevronRight size={18} color="#9ca3af" />
-                </div>
+                  <ChevronRight aria-hidden size={18} color="#9ca3af" />
+                </button>
               ))}
             </div>
           </div>

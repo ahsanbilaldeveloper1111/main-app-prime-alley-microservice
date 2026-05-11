@@ -9,6 +9,30 @@ import { User, SelectOption, Module } from '@typings/controlhub/users';
 import { linkUsers, unlinkUsers, getParentUsers } from '@utils/users';
 import { useModuleSelection } from '@hooks/useModuleSelection';
 
+function isParentUserAlreadyLinked(user: User, linkedUsers: any[]): boolean {
+    return linkedUsers.some((lu) => lu.id === user.id);
+}
+
+function parentUserMatchesSearch(user: User, lower: string): boolean {
+    return (
+        Boolean(user.name?.toLowerCase().includes(lower)) ||
+        Boolean(user.username?.toLowerCase().includes(lower)) ||
+        Boolean(user.email?.toLowerCase().includes(lower))
+    );
+}
+
+function buildParentUserSelectOptions(
+    candidates: User[],
+    linkedUsers: any[],
+    searchLower: string
+): SelectOption[] {
+    return candidates
+        .filter((user) => !isParentUserAlreadyLinked(user, linkedUsers))
+        .filter((user) => parentUserMatchesSearch(user, searchLower))
+        .slice(0, 200)
+        .map((user) => ({ value: user.id, label: `${user.name} (${user.username})` }));
+}
+
 interface LinkedUsersTabProps {
     linkedUsers: any[];
     parentUsers: User[];
@@ -56,34 +80,23 @@ const LinkedUsersTab: React.FC<LinkedUsersTabProps> = ({
     };
 
 
-    const loadParentUserOptions = (inputValue: string): Promise<SelectOption[]> => {
-        const trimmed = (inputValue || '').trim();
-        if (trimmed.length < 2) {
-            return Promise.resolve([]);
-        }
-        const ensureData = parentUsers.length === 0 && !isParentUsersLoading
-            ? fetchParentUsers()
-            : Promise.resolve();
-        return ensureData.then(() => {
-            const lower = trimmed.toLowerCase();
-            const options = parentUsers
-                .filter((user) => !linkedUsers.some((lu) => lu.id === user.id))
-                .filter((user) =>
-                    (user.name && user.name.toLowerCase().includes(lower)) ||
-                    (user.username && user.username.toLowerCase().includes(lower)) ||
-                    (user.email && user.email.toLowerCase().includes(lower))
-                )
-                .slice(0, 200)
-                .map((user) => ({ value: user.id, label: `${user.name} (${user.username})` }));
-            return options;
-        });
-    };
-
     const fetchParentUsers = async () => {
         setIsParentUsersLoading(true);
         const response = await getParentUsers();
         setIsParentUsersLoading(false);
         return response;
+    };
+
+    const loadParentUserOptions = async (inputValue: string): Promise<SelectOption[]> => {
+        const trimmed = (inputValue || '').trim();
+        if (trimmed.length < 2) {
+            return [];
+        }
+        if (parentUsers.length === 0 && !isParentUsersLoading) {
+            await fetchParentUsers();
+        }
+        const lower = trimmed.toLowerCase();
+        return buildParentUserSelectOptions(parentUsers, linkedUsers, lower);
     };
 
     const handleSubmitAddLinkedUser = async () => {
@@ -119,21 +132,26 @@ const LinkedUsersTab: React.FC<LinkedUsersTabProps> = ({
         setShowDeleteLinkedUserModal(true);
     };
 
-    const handleLinkedUserCheckboxChange = (linkedUserId: string, isChecked: boolean) => {
-        if (isChecked) {
-            setSelectedLinkedUsers(prev => [...prev, linkedUserId]);
-        } else {
-            setSelectedLinkedUsers(prev => prev.filter(id => id !== linkedUserId));
-        }
+    const selectLinkedUserRow = (compositeId: string) => {
+        setSelectedLinkedUsers(prev => [...prev, compositeId]);
     };
 
-    const handleSelectAllLinkedUsers = (isChecked: boolean) => {
-        if (isChecked) {
-            const allLinkedUserIds = linkedUsers?.map(linkedUser => `${linkedUser.linked_user.id}-${linkedUser.module.id}`) || [];
-            setSelectedLinkedUsers(allLinkedUserIds);
-        } else {
-            setSelectedLinkedUsers([]);
-        }
+    const deselectLinkedUserRow = (compositeId: string) => {
+        setSelectedLinkedUsers(prev => prev.filter(id => id !== compositeId));
+    };
+
+    const getAllLinkedUserCompositeIds = (): string[] =>
+        linkedUsers?.map(
+            (linkedUser) =>
+                `${linkedUser.linked_user?.id}-${linkedUser.module?.id}`
+        ) ?? [];
+
+    const selectAllLinkedUserRows = () => {
+        setSelectedLinkedUsers(getAllLinkedUserCompositeIds());
+    };
+
+    const clearLinkedUserSelection = () => {
+        setSelectedLinkedUsers([]);
     };
 
     const handleBulkDeleteLinkedUsersClick = () => {
@@ -270,7 +288,11 @@ const LinkedUsersTab: React.FC<LinkedUsersTabProps> = ({
                                             <input
                                                 type="checkbox"
                                                 checked={selectedLinkedUsers.length > 0 && selectedLinkedUsers.length === (linkedUsers?.length || 0)}
-                                                onChange={(e) => handleSelectAllLinkedUsers(e.target.checked)}
+                                                onChange={(e) =>
+                                                    e.target.checked
+                                                        ? selectAllLinkedUserRows()
+                                                        : clearLinkedUserSelection()
+                                                }
                                             />
                                         </th>
                                         <th>Name</th>
@@ -290,7 +312,12 @@ const LinkedUsersTab: React.FC<LinkedUsersTabProps> = ({
                                                     <input
                                                         type="checkbox"
                                                         checked={selectedLinkedUsers.includes(`${obj?.linked_user?.id}-${obj?.module?.id}`)}
-                                                        onChange={(e) => handleLinkedUserCheckboxChange(`${obj?.linked_user?.id}-${obj?.module?.id}`, e.target.checked)}
+                                                        onChange={(e) => {
+                                                            const compositeId = `${obj?.linked_user?.id}-${obj?.module?.id}`;
+                                                            e.target.checked
+                                                                ? selectLinkedUserRow(compositeId)
+                                                                : deselectLinkedUserRow(compositeId);
+                                                        }}
                                                     />
                                                 </td>
                                                 <td>{obj?.linked_user?.name}</td>

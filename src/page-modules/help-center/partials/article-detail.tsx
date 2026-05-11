@@ -1,32 +1,68 @@
 import React, { useState, useEffect } from 'react';
+import DOMPurify from 'isomorphic-dompurify';
 import { getFAQItem, ListFAQItems, ListFAQTopics } from '@utils/faqs';
-import { Row, Col, Card, Button, Badge, Form } from 'react-bootstrap';
+import { Row, Col, Card, Button, Badge } from 'react-bootstrap';
 import {
   ChevronLeft,
   ChevronRight,
   ThumbsUp,
   ThumbsDown,
-  Plus,
-  MessageCircle,
   Eye,
   Calendar,
-  List,
   HelpCircle,
-  BookOpen,
-  Folder,
-  Zap,
-  Settings,
-  CreditCard,
-  Lock,
-  Users,
-  FileText,
-  BarChart3,
-  Phone,
-  Bot,
-  Link2,
-  DollarSign,
-  Shield
+  BookOpen
 } from 'lucide-react';
+
+type ArticleStep = {
+  number: number;
+  title: string;
+  description: string;
+  image: string | null;
+};
+
+type ArticleContentView = {
+  intro: string;
+  description?: string;
+  answer?: string;
+  type?: string;
+  topic?: unknown;
+  steps?: ArticleStep[];
+};
+
+type ArticleViewModel = {
+  title: string;
+  updated: string;
+  views: number;
+  content: ArticleContentView;
+};
+
+function readNestedDataDescription(faqEntity: unknown): string | undefined {
+  if (!faqEntity || typeof faqEntity !== 'object') {
+    return undefined;
+  }
+  const data = (faqEntity as Record<string, unknown>).data;
+  if (!data || typeof data !== 'object') {
+    return undefined;
+  }
+  const desc = (data as Record<string, unknown>).description;
+  if (typeof desc === 'string' && desc.trim().length > 0) {
+    return desc;
+  }
+  return undefined;
+}
+
+function getArticleIntroBodyText(content: ArticleContentView): string {
+  const fromIntro = content.intro.trim();
+  if (fromIntro.length > 0) {
+    return fromIntro;
+  }
+  const fromDesc = content.description?.trim();
+  return fromDesc && fromDesc.length > 0 ? fromDesc : '';
+}
+
+function hasArticleIntroSection(content: ArticleContentView): boolean {
+  return getArticleIntroBodyText(content).length > 0;
+}
 
 interface ArticleDetailProps {
   onBack: () => void;
@@ -36,8 +72,163 @@ interface ArticleDetailProps {
   onTopicClick?: (topicId: number) => void;
 }
 
+interface FaqCategorySidebarRowProps {
+  category: any;
+  index: number;
+  totalCategories: number;
+  isSelected: boolean;
+  onSelect: () => void;
+}
+
+function FaqCategorySidebarRow({
+  category,
+  index,
+  totalCategories,
+  isSelected,
+  onSelect
+}: Readonly<FaqCategorySidebarRowProps>) {
+  const handleMouseEnter = (e: React.MouseEvent<HTMLButtonElement>) => {
+    if (!isSelected) {
+      e.currentTarget.style.background = '#f8f9fa';
+    }
+  };
+  const handleMouseLeave = (e: React.MouseEvent<HTMLButtonElement>) => {
+    if (!isSelected) {
+      e.currentTarget.style.background = '#fff';
+    }
+  };
+
+  return (
+    <button
+      type="button"
+      onClick={onSelect}
+      style={{
+        padding: '10px 14px',
+        cursor: 'pointer',
+        background: isSelected ? '#f8f9fa' : '#fff',
+        fontSize: '13px',
+        fontWeight: isSelected ? '500' : '400',
+        color: isSelected ? '#2c3e50' : '#495057',
+        transition: 'all 0.15s ease',
+        display: 'flex',
+        alignItems: 'center',
+        gap: '10px',
+        border: 'none',
+        borderBottom: index < totalCategories - 1 ? '1px solid #f5f5f5' : 'none',
+        width: '100%',
+        textAlign: 'left',
+        fontFamily: 'inherit'
+      }}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
+    >
+      <i
+        className="material-icons-two-tone"
+        style={{
+          fontSize: '18px',
+          color: isSelected ? '#4680ff' : '#6c757d'
+        }}
+      >
+        {category.icon}
+      </i>
+      <span style={{ flex: 1 }}>{category.name}</span>
+      <Badge
+        bg="light"
+        style={{
+          fontSize: '11px',
+          fontWeight: '500',
+          color: '#6c757d',
+          background: isSelected ? '#e3f2fd' : '#f0f0f0',
+          padding: '2px 6px'
+        }}
+      >
+        {category.count}
+      </Badge>
+    </button>
+  );
+}
+
+interface RelatedArticleSidebarRowProps {
+  relatedRow: { id?: number | string | null; title: string };
+  index: number;
+  totalRows: number;
+  relatedArticles: any[];
+  onArticleClick?: (article: any) => void;
+}
+
+function RelatedArticleSidebarRow({
+  relatedRow,
+  index,
+  totalRows,
+  relatedArticles,
+  onArticleClick
+}: Readonly<RelatedArticleSidebarRowProps>) {
+  const handleClick = () => {
+    const resolved = relatedArticles.find((item: any) => item.id === relatedRow.id) ?? relatedRow;
+    onArticleClick?.(resolved);
+  };
+
+  const handleMouseEnter = (e: React.MouseEvent<HTMLButtonElement>) => {
+    e.currentTarget.style.background = '#f9fafb';
+    e.currentTarget.style.paddingLeft = '24px';
+    const chevron = e.currentTarget.querySelector('.chevron');
+    if (chevron instanceof HTMLElement) {
+      chevron.style.color = '#4680ff';
+    }
+  };
+
+  const handleMouseLeave = (e: React.MouseEvent<HTMLButtonElement>) => {
+    e.currentTarget.style.background = '#fff';
+    e.currentTarget.style.paddingLeft = '20px';
+    const chevron = e.currentTarget.querySelector('.chevron');
+    if (chevron instanceof HTMLElement) {
+      chevron.style.color = '#9ca3af';
+    }
+  };
+
+  return (
+    <button
+      type="button"
+      onClick={handleClick}
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        padding: '14px 20px',
+        cursor: 'pointer',
+        transition: 'all 0.2s',
+        background: '#fff',
+        border: 'none',
+        borderBottom: index < totalRows - 1 ? '1px solid #f3f4f6' : 'none',
+        width: '100%',
+        textAlign: 'left',
+        fontFamily: 'inherit'
+      }}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
+    >
+      <span style={{
+        fontSize: '14px',
+        color: '#374151',
+        fontWeight: '500'
+      }}
+      >
+        {relatedRow.title}
+      </span>
+      <ChevronRight
+        aria-hidden
+        size={16}
+        className="chevron"
+        style={{
+          color: '#9ca3af',
+          transition: 'color 0.2s'
+        }}
+      />
+    </button>
+  );
+}
+
 const ArticleDetail: React.FC<ArticleDetailProps> = ({ onBack, articleId, articleData, onArticleClick, onTopicClick }) => {
-  const [commentText, setCommentText] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('');
   const [faqItem, setFaqItem] = useState<any>(articleData || null);
   const [loading, setLoading] = useState<boolean>(false);
@@ -75,7 +266,7 @@ const ArticleDetail: React.FC<ArticleDetailProps> = ({ onBack, articleId, articl
       setLoading(true);
       try {
         const id = Number.parseInt(articleId, 10);
-        if (!isNaN(id)) {
+        if (!Number.isNaN(id)) {
           const item = await getFAQItem(id);
           if (item) {
             setFaqItem(item);
@@ -124,7 +315,7 @@ const ArticleDetail: React.FC<ArticleDetailProps> = ({ onBack, articleId, articl
         });
 
         let items: any[] = [];
-        if (response && response.data) {
+        if (response?.data != null) {
           items = Array.isArray(response.data) ? response.data : [];
         } else if (Array.isArray(response)) {
           items = response;
@@ -154,7 +345,7 @@ const ArticleDetail: React.FC<ArticleDetailProps> = ({ onBack, articleId, articl
       setLoadingTopics(true);
       try {
         const response = await ListFAQTopics({ page: 1, perPage: 100 });
-        if (response && response.data) {
+        if (response?.data != null) {
           setFaqTopics(response.data);
         } else if (Array.isArray(response)) {
           setFaqTopics(response);
@@ -170,13 +361,13 @@ const ArticleDetail: React.FC<ArticleDetailProps> = ({ onBack, articleId, articl
   }, []);
 
   // Transform FAQ item to article format
-  console.log("faqItem", faqItem);
-  const article = faqItem ? {
+  const article: ArticleViewModel = faqItem ? {
     title: faqItem.title || faqItem.question || '',
     updated: formatDate(faqItem.updated_at || faqItem.created_at),
     views: faqItem.view_count || 0,
     content: {
       intro: faqItem.description || '',
+      description: readNestedDataDescription(faqItem),
       answer: faqItem.answer || '',
       type: faqItem.type || '',
       topic: faqItem.topic || null
@@ -225,35 +416,77 @@ const ArticleDetail: React.FC<ArticleDetailProps> = ({ onBack, articleId, articl
     topic: topic
   }));
 
-  const contents = [
-    'Steps to Enable Two-Factor Authentication',
-    'Tips for Using 2FA',
-    'Frequently Asked Questions',
-    'Additional Help for 2FA'
-  ];
-
   // Transform related articles for rendering
-  console.log("relatedArticles", relatedArticles);
   const transformedRelatedArticles = relatedArticles.map((item) => ({
     id: item.id,
     title: item.title || item.question ,
     viewCount: item.view_count || 0
   }));
 
-  const comments = [
-    {
-      user: 'John Doe',
-      avatar: 'https://i.pravatar.cc/150?img=12',
-      time: '1 day ago',
-      comment: 'Thanks for the guide it made setting up 2FA so much easier.'
-    },
-    {
-      user: 'Lisa Smith',
-      avatar: 'https://i.pravatar.cc/150?img=47',
-      time: '5 hours ago',
-      comment: "I've folowed the cops but till having trouble. How can I get futher assistnece"
+  const renderCategoriesBody = (): React.ReactNode => {
+    if (loadingTopics) {
+      return (
+        <div style={{ padding: '20px', textAlign: 'center', color: '#6c757d' }}>
+          Loading categories...
+        </div>
+      );
     }
-  ];
+    if (categories.length === 0) {
+      return (
+        <div style={{ padding: '20px', textAlign: 'center', color: '#6c757d' }}>
+          No categories available
+        </div>
+      );
+    }
+    return categories.map((category, index) => {
+      const isSelected = selectedCategory === category.name ||
+        (faqItem?.topic?.id === category.id || faqItem?.topic_id === category.id);
+      const handleCategorySelect = () => {
+        setSelectedCategory(category.name);
+        if (onTopicClick && category.id) {
+          onTopicClick(category.id);
+        }
+      };
+
+      return (
+        <FaqCategorySidebarRow
+          key={category.id ?? `category-${index}`}
+          category={category}
+          index={index}
+          totalCategories={categories.length}
+          isSelected={isSelected}
+          onSelect={handleCategorySelect}
+        />
+      );
+    });
+  };
+
+  const renderRelatedArticlesBody = (): React.ReactNode => {
+    if (loadingRelated) {
+      return (
+        <div style={{ padding: '20px', textAlign: 'center', color: '#6c757d' }}>
+          Loading related articles...
+        </div>
+      );
+    }
+    if (transformedRelatedArticles.length === 0) {
+      return (
+        <div style={{ padding: '20px', textAlign: 'center', color: '#6c757d' }}>
+          No related articles available
+        </div>
+      );
+    }
+    return transformedRelatedArticles.map((relatedRow, index) => (
+      <RelatedArticleSidebarRow
+        key={relatedRow.id ?? `related-${index}`}
+        relatedRow={relatedRow}
+        index={index}
+        totalRows={transformedRelatedArticles.length}
+        relatedArticles={relatedArticles}
+        onArticleClick={onArticleClick}
+      />
+    ));
+  };
 
   return (
     <div style={{ background: '#f4f7fa', minHeight: '100vh', paddingBottom: '40px' }}>
@@ -272,15 +505,23 @@ const ArticleDetail: React.FC<ArticleDetailProps> = ({ onBack, articleId, articl
             gap: '5px'
           }}
         >
-          <ChevronLeft size={16} /> Help Center
+          <ChevronLeft aria-hidden size={16} /> Help Center
         </Button>
         <span style={{ color: '#6c757d', margin: '0 8px' }}>›</span>
-        <span 
+        <Button
+          type="button"
+          variant="link"
           onClick={onBack}
-          style={{ color: '#6c757d', fontSize: '14px', cursor: 'pointer' }}
+          style={{
+            color: '#6c757d',
+            fontSize: '14px',
+            padding: 0,
+            textDecoration: 'none',
+            verticalAlign: 'baseline'
+          }}
         >
           Knowledge Base
-        </span>
+        </Button>
         <span style={{ color: '#6c757d', margin: '0 8px' }}>›</span>
         <span style={{ color: '#2c3e50', fontWeight: '600', fontSize: '14px' }}>
           {faqItem?.title || faqItem?.question || article.title || 'Article'}
@@ -298,78 +539,7 @@ const ArticleDetail: React.FC<ArticleDetailProps> = ({ onBack, articleId, articl
             overflow: 'hidden'
           }}>
             <div style={{ padding: '0' }}>
-              {loadingTopics ? (
-                <div style={{ padding: '20px', textAlign: 'center', color: '#6c757d' }}>
-                  Loading categories...
-                </div>
-              ) : categories.length > 0 ? (
-                categories.map((category, index) => {
-                  const isSelected = selectedCategory === category.name || 
-                    (faqItem?.topic?.id === category.id || faqItem?.topic_id === category.id);
-                  return (
-                    <div
-                      key={category.id || index}
-                      onClick={() => {
-                        setSelectedCategory(category.name);
-                        // Navigate to knowledge base with this topic
-                        if (onTopicClick && category.id) {
-                          onTopicClick(category.id);
-                        }
-                      }}
-                      style={{
-                        padding: '10px 14px',
-                        cursor: 'pointer',
-                        background: isSelected ? '#f8f9fa' : '#fff',
-                        fontSize: '13px',
-                        fontWeight: isSelected ? '500' : '400',
-                        color: isSelected ? '#2c3e50' : '#495057',
-                        transition: 'all 0.15s ease',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '10px',
-                        borderBottom: index < categories.length - 1 ? '1px solid #f5f5f5' : 'none'
-                      }}
-                      onMouseEnter={(e) => {
-                        if (!isSelected) {
-                          e.currentTarget.style.background = '#f8f9fa';
-                        }
-                      }}
-                      onMouseLeave={(e) => {
-                        if (!isSelected) {
-                          e.currentTarget.style.background = '#fff';
-                        }
-                      }}
-                    >
-                      <i 
-                        className="material-icons-two-tone" 
-                        style={{ 
-                          fontSize: '18px',
-                          color: isSelected ? '#4680ff' : '#6c757d'
-                        }}
-                      >
-                        {category.icon}
-                      </i>
-                      <span style={{ flex: 1 }}>{category.name}</span>
-                      <Badge
-                        bg="light"
-                        style={{
-                          fontSize: '11px',
-                          fontWeight: '500',
-                          color: '#6c757d',
-                          background: isSelected ? '#e3f2fd' : '#f0f0f0',
-                          padding: '2px 6px'
-                        }}
-                      >
-                        {category.count}
-                      </Badge>
-                    </div>
-                  );
-                })
-              ) : (
-                <div style={{ padding: '20px', textAlign: 'center', color: '#6c757d' }}>
-                  No categories available
-                </div>
-              )}
+              {renderCategoriesBody()}
             </div>
           </Card>
         </Col>
@@ -426,7 +596,7 @@ const ArticleDetail: React.FC<ArticleDetailProps> = ({ onBack, articleId, articl
               padding: '6px 12px',
               borderRadius: '6px'
             }}>
-              <Calendar size={14} color="#4680ff" />
+              <Calendar aria-hidden size={14} color="#4680ff" />
               <span>Updated {article.updated}</span>
             </div>
             <div style={{
@@ -437,14 +607,14 @@ const ArticleDetail: React.FC<ArticleDetailProps> = ({ onBack, articleId, articl
               padding: '6px 12px',
               borderRadius: '6px'
             }}>
-              <Eye size={14} color="#4680ff" />
+              <Eye aria-hidden size={14} color="#4680ff" />
               <span>{article.views} views</span>
             </div>
           </div>
         </div>
 
         {/* Description/Introduction */}
-            {(article.content.intro || (article.content as any).description) && (
+            {hasArticleIntroSection(article.content) && (
           <div style={{
             background: '#f9fafb',
             border: '1px solid #e5e7eb',
@@ -459,7 +629,7 @@ const ArticleDetail: React.FC<ArticleDetailProps> = ({ onBack, articleId, articl
               lineHeight: '1.8',
               marginBottom: 0
             }}>
-              {article.content.intro || (article.content as any).description}
+              {getArticleIntroBodyText(article.content)}
             </p>
           </div>
         )}
@@ -491,7 +661,7 @@ const ArticleDetail: React.FC<ArticleDetailProps> = ({ onBack, articleId, articl
                 lineHeight: '1.8',
                 marginBottom: 0
               }}
-              dangerouslySetInnerHTML={{ __html: article.content.answer }}
+              dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(article.content.answer) }}
             />
           </div>
         )}
@@ -519,8 +689,8 @@ const ArticleDetail: React.FC<ArticleDetailProps> = ({ onBack, articleId, articl
 
             {/* Steps */}
             <div style={{ marginBottom: '40px' }}>
-              {article.content.steps.map((step, index) => (
-            <div key={index} style={{ 
+              {article.content.steps.map((step) => (
+            <div key={`faq-sample-step-${step.number}`} style={{ 
               marginBottom: '28px',
               position: 'relative',
               paddingLeft: '40px'
@@ -601,7 +771,7 @@ const ArticleDetail: React.FC<ArticleDetailProps> = ({ onBack, articleId, articl
                 e.currentTarget.style.boxShadow = '0 4px 12px rgba(70, 128, 255, 0.3)';
               }}
             >
-              <ThumbsUp size={16} />
+              <ThumbsUp aria-hidden size={16} />
               Yes, it helped
             </Button>
             <Button
@@ -627,7 +797,7 @@ const ArticleDetail: React.FC<ArticleDetailProps> = ({ onBack, articleId, articl
                 e.currentTarget.style.background = '#fff';
               }}
             >
-              <ThumbsDown size={16} />
+              <ThumbsDown aria-hidden size={16} />
               No, need more help
             </Button>
           </div>
@@ -642,110 +812,10 @@ const ArticleDetail: React.FC<ArticleDetailProps> = ({ onBack, articleId, articl
             gap: '4px'
           }}>
             Still need assistance? Create a ticket 
-            <ChevronRight size={16} />
+            <ChevronRight aria-hidden size={16} />
           </p>
         </div>
 
-        {/* Comments Section */}
-        <div>
-          {/* <div style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            marginBottom: '24px'
-          }}>
-            <h3 style={{
-              fontSize: '20px',
-              fontWeight: '700',
-              color: '#1f2937',
-              margin: 0,
-              display: 'flex',
-              alignItems: 'center',
-              gap: '10px'
-            }}>
-              <MessageCircle size={20} color="#4680ff" />
-              Comments ({comments.length})
-            </h3>
-            <Button
-              variant="link"
-              style={{
-                fontSize: '14px',
-                color: '#4680ff',
-                textDecoration: 'none',
-                padding: '8px 16px',
-                fontWeight: '600',
-                background: '#eff6ff',
-                borderRadius: '8px',
-                border: 'none'
-              }}
-            >
-              <Plus size={16} style={{ marginRight: '4px' }} />
-              Add comment
-            </Button>
-          </div> */}
-
-          {/* Comment List */}
-          {/* <div style={{ marginBottom: '24px' }}>
-            {comments.map((comment, index) => (
-              <div
-                key={index}
-                style={{
-                  display: 'flex',
-                  gap: '14px',
-                  padding: '20px',
-                  borderBottom: index < comments.length - 1 ? '1px solid #f3f4f6' : 'none',
-                  background: index % 2 === 0 ? '#fff' : '#f9fafb',
-                  borderRadius: '8px',
-                  marginBottom: '8px'
-                }}
-              >
-                <img
-                  src={comment.avatar}
-                  alt={comment.user}
-                  style={{
-                    width: '44px',
-                    height: '44px',
-                    borderRadius: '50%',
-                    objectFit: 'cover',
-                    flexShrink: 0,
-                    border: '2px solid #e5e7eb'
-                  }}
-                />
-                <div style={{ flex: 1 }}>
-                  <div style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '10px',
-                    marginBottom: '8px'
-                  }}>
-                    <span style={{
-                      fontSize: '15px',
-                      fontWeight: '700',
-                      color: '#1f2937'
-                    }}>
-                      {comment.user}
-                    </span>
-                    <span style={{
-                      fontSize: '13px',
-                      color: '#9ca3af',
-                      fontWeight: '500'
-                    }}>
-                      • {comment.time}
-                    </span>
-                  </div>
-                  <p style={{
-                    fontSize: '14px',
-                    color: '#6b7280',
-                    lineHeight: '1.7',
-                    marginBottom: 0
-                  }}>
-                    {comment.comment}
-                  </p>
-                </div>
-              </div>
-            ))}
-          </div> */}
-        </div>
           </React.Fragment>
         ) : null}
       </Card.Body>
@@ -754,86 +824,6 @@ const ArticleDetail: React.FC<ArticleDetailProps> = ({ onBack, articleId, articl
 
   {/* Right Sidebar */}
   <Col xs={12} lg={3}>
-    {/* Contents */}
-    {/* <Card style={{
-      background: '#fff',
-      border: '1px solid #e5e7eb',
-      borderRadius: '12px',
-      boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
-      marginBottom: '20px',
-      overflow: 'hidden'
-    }}>
-      <div style={{
-        padding: '18px 20px',
-        background: 'linear-gradient(to right, #f9fafb, #fff)',
-        borderBottom: '1px solid #f3f4f6'
-      }}>
-        <h5 style={{
-          fontSize: '16px',
-          fontWeight: '700',
-          color: '#1f2937',
-          margin: 0,
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px'
-        }}>
-          <List size={18} color="#4680ff" />
-          Contents
-        </h5>
-      </div>
-      <Card.Body style={{ padding: '0' }}>
-        <div style={{
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '0'
-        }}>
-          {contents.map((item, index) => (
-            <div
-              key={index}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                padding: '14px 20px',
-                cursor: 'pointer',
-                borderBottom: index < contents.length - 1 ? '1px solid #f3f4f6' : 'none',
-                transition: 'all 0.2s',
-                background: '#fff'
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.background = '#f9fafb';
-                e.currentTarget.style.paddingLeft = '24px';
-                const chevron = e.currentTarget.querySelector('.chevron');
-                if (chevron) (chevron as HTMLElement).style.color = '#4680ff';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background = '#fff';
-                e.currentTarget.style.paddingLeft = '20px';
-                const chevron = e.currentTarget.querySelector('.chevron');
-                if (chevron) (chevron as HTMLElement).style.color = '#9ca3af';
-              }}
-            >
-              <span style={{
-                fontSize: '14px',
-                color: '#374151',
-                fontWeight: '500'
-              }}>
-                {item}
-              </span>
-              <ChevronRight 
-                size={16} 
-                className="chevron"
-                style={{ 
-                  color: '#9ca3af',
-                  transition: 'color 0.2s'
-                }} 
-              />
-            </div>
-          ))}
-        </div>
-      </Card.Body>
-    </Card> */}
-
     {/* Related Articles */}
     <Card style={{
       background: '#fff',
@@ -857,7 +847,7 @@ const ArticleDetail: React.FC<ArticleDetailProps> = ({ onBack, articleId, articl
           alignItems: 'center',
           gap: '8px'
         }}>
-          <BookOpen size={18} color="#4680ff" />
+          <BookOpen aria-hidden size={18} color="#4680ff" />
           Most Viewed Articles
         </h5>
       </div>
@@ -867,60 +857,7 @@ const ArticleDetail: React.FC<ArticleDetailProps> = ({ onBack, articleId, articl
           flexDirection: 'column',
           gap: '0'
         }}>
-          {loadingRelated ? (
-            <div style={{ padding: '20px', textAlign: 'center', color: '#6c757d' }}>
-              Loading related articles...
-            </div>
-          ) : transformedRelatedArticles.length > 0 ? (
-            transformedRelatedArticles.map((article, index) => (
-              <div
-                key={article.id || index}
-                onClick={() => onArticleClick?.(relatedArticles.find(item => item.id === article.id) || article)}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  padding: '14px 20px',
-                  cursor: 'pointer',
-                  borderBottom: index < transformedRelatedArticles.length - 1 ? '1px solid #f3f4f6' : 'none',
-                  transition: 'all 0.2s',
-                  background: '#fff'
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.background = '#f9fafb';
-                  e.currentTarget.style.paddingLeft = '24px';
-                  const chevron = e.currentTarget.querySelector('.chevron');
-                  if (chevron) (chevron as HTMLElement).style.color = '#4680ff';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.background = '#fff';
-                  e.currentTarget.style.paddingLeft = '20px';
-                  const chevron = e.currentTarget.querySelector('.chevron');
-                  if (chevron) (chevron as HTMLElement).style.color = '#9ca3af';
-                }}
-              >
-                <span style={{
-                  fontSize: '14px',
-                  color: '#374151',
-                  fontWeight: '500'
-                }}>
-                  {article.title}
-                </span>
-                <ChevronRight 
-                  size={16} 
-                  className="chevron"
-                  style={{ 
-                    color: '#9ca3af',
-                    transition: 'color 0.2s'
-                  }} 
-                />
-              </div>
-            ))
-          ) : (
-            <div style={{ padding: '20px', textAlign: 'center', color: '#6c757d' }}>
-              No related articles available
-            </div>
-          )}
+          {renderRelatedArticlesBody()}
         </div>
       </Card.Body>
     </Card>
@@ -945,7 +882,7 @@ const ArticleDetail: React.FC<ArticleDetailProps> = ({ onBack, articleId, articl
           justifyContent: 'center',
           margin: '0 auto 16px'
         }}>
-          <HelpCircle size={24} color="#fff" strokeWidth={2.5} />
+          <HelpCircle aria-hidden size={24} color="#fff" strokeWidth={2.5} />
         </div>
         <h5 style={{
           fontSize: '18px',
@@ -987,129 +924,6 @@ const ArticleDetail: React.FC<ArticleDetailProps> = ({ onBack, articleId, articl
         >
           Create a ticket
         </Button>
-      </Card.Body>
-    </Card>
-
-    {/* Comments Widget */}
-    <Card style={{
-      background: '#fff',
-      border: '1px solid #e5e7eb',
-      borderRadius: '12px',
-      boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
-      overflow: 'hidden',
-      display: 'none'
-    }}>
-      {/* <div style={{
-        padding: '18px 20px',
-        background: 'linear-gradient(to right, #f9fafb, #fff)',
-        borderBottom: '1px solid #f3f4f6'
-      }}>
-        <h5 style={{
-          fontSize: '16px',
-          fontWeight: '700',
-          color: '#1f2937',
-          margin: 0,
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px'
-        }}>
-          <MessageCircle size={18} color="#4680ff" />
-          Recent Comments
-        </h5>
-      </div> */}
-      <Card.Body style={{ padding: '16px' }}>
-        {/* Recent Comments */}
-        {/* <div style={{ marginBottom: '16px' }}>
-          {comments.slice(0, 3).map((comment, index) => (
-            <div
-              key={index}
-              style={{
-                display: 'flex',
-                gap: '12px',
-                padding: '12px',
-                borderBottom: index < 2 ? '1px solid #f3f4f6' : 'none',
-                borderRadius: '8px',
-                transition: 'background 0.2s',
-                cursor: 'pointer'
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.background = '#f9fafb';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background = 'transparent';
-              }}
-            >
-              <img
-                src={comment.avatar}
-                alt={comment.user}
-                style={{
-                  width: '36px',
-                  height: '36px',
-                  borderRadius: '50%',
-                  objectFit: 'cover',
-                  flexShrink: 0,
-                  border: '2px solid #e5e7eb'
-                }}
-              />
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  marginBottom: '4px'
-                }}>
-                  <span style={{
-                    fontSize: '13px',
-                    fontWeight: '700',
-                    color: '#1f2937'
-                  }}>
-                    {comment.user}
-                  </span>
-                  <span style={{
-                    fontSize: '12px',
-                    color: '#9ca3af'
-                  }}>
-                    • {comment.time}
-                  </span>
-                </div>
-                <p style={{
-                  fontSize: '13px',
-                  color: '#6b7280',
-                  lineHeight: '1.5',
-                  marginBottom: 0,
-                  display: '-webkit-box',
-                  WebkitLineClamp: 2,
-                  WebkitBoxOrient: 'vertical',
-                  overflow: 'hidden'
-                }}>
-                  {comment.comment}
-                </p>
-              </div>
-            </div>
-          ))}
-        </div> */}
-
-        {/* <Button
-          variant="link"
-          style={{
-            fontSize: '13px',
-            color: '#4680ff',
-            textDecoration: 'none',
-            padding: '8px 12px',
-            fontWeight: '600',
-            background: '#eff6ff',
-            borderRadius: '8px',
-            border: 'none',
-            width: '100%',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '6px'
-          }}
-        >
-          <Plus size={14} />
-          Add your comment
-        </Button> */}
       </Card.Body>
     </Card>
   </Col>
