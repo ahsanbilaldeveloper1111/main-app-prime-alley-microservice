@@ -158,7 +158,7 @@ export const TicketTypesPageView: React.FC<TicketTypesPageViewProps> = ({
 
             <div className="form-group mb-3">
               <label htmlFor="editTypeDescription" className="fw-semibold d-flex align-items-center gap-2 form-label">
-                Type Description
+                Type Description{" "}
                 <span
                   className="text-muted"
                   title="Enter a description that explains the ticket type"
@@ -187,8 +187,8 @@ export const TicketTypesPageView: React.FC<TicketTypesPageViewProps> = ({
         submitButtonText="Update Type"
         isSubmitDisabled={!selectedTypeName}
         cancelButtonText="Cancel"
-        onSubmit={() => {
-          void onSubmitEditType();
+        onSubmit={async () => {
+          await onSubmitEditType();
         }}
         onCancel={onCloseEditTypeModal}
         submitButtonVariant="primary"
@@ -205,8 +205,8 @@ export const TicketTypesPageView: React.FC<TicketTypesPageViewProps> = ({
         targetName={selectedTypeName}
         confirmButtonText="Delete"
         cancelButtonText="Cancel"
-        onConfirm={() => {
-          void onSubmitDeleteType();
+        onConfirm={async () => {
+          await onSubmitDeleteType();
         }}
         onCancel={onCloseDeleteTypeModal}
       />
@@ -251,7 +251,7 @@ export const TicketTypesPageView: React.FC<TicketTypesPageViewProps> = ({
 
             <div className="form-group mb-3">
               <label htmlFor="newTypeDescription" className="fw-semibold d-flex align-items-center gap-2 form-label">
-                Type Description
+                Type Description{" "}
                 <span
                   className="text-muted"
                   title="Enter a description that explains the ticket type"
@@ -280,8 +280,8 @@ export const TicketTypesPageView: React.FC<TicketTypesPageViewProps> = ({
         submitButtonText="Create Type"
         isSubmitDisabled={!newTypeName}
         cancelButtonText="Cancel"
-        onSubmit={() => {
-          void onSubmitCreateType();
+        onSubmit={async () => {
+          await onSubmitCreateType();
         }}
         onCancel={onCloseCreateTypeModal}
       />

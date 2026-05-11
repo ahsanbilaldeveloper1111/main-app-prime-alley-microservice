@@ -12,10 +12,17 @@ export function useFAQTypesPage() {
     const topics = allTopicsQuery.data ?? [];
     return [
       { value: null as number | null, label: "All Topics" },
-      ...topics.map((t: any) => ({
-        value: t.id as number,
-        label: `${t.name}${t.faq_module ? ` (${t.faq_module.name})` : ""}`,
-      })),
+      ...topics.map((t: any) => {
+        let label = String(t.name);
+        if (t.faq_module) {
+          const moduleLabel = String(t.faq_module.name);
+          label += " (" + moduleLabel + ")";
+        }
+        return {
+          value: t.id as number,
+          label,
+        };
+      }),
     ];
   }, [allTopicsQuery.data]);
 

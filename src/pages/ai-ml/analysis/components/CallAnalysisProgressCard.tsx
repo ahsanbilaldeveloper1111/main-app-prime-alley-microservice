@@ -7,6 +7,37 @@ type Props = Readonly<{
   currentStep: string | null;
 }>;
 
+type StepVisualState = "active" | "done" | "error" | "pending";
+
+function stepVisualStateClass(
+  isActive: boolean,
+  isCompleted: boolean,
+  stepIsError: boolean,
+): StepVisualState {
+  if (isActive) return "active";
+  if (isCompleted) return "done";
+  if (stepIsError) return "error";
+  return "pending";
+}
+
+function stepCircleInner(
+  isCompleted: boolean,
+  stepIsError: boolean,
+  isActive: boolean,
+  stepNumber: number,
+): React.ReactNode {
+  if (isCompleted) {
+    return <i className="ti ti-check" />;
+  }
+  if (stepIsError) {
+    return <i className="ti ti-x" />;
+  }
+  if (isActive) {
+    return <Spinner animation="border" size="sm" variant="light" />;
+  }
+  return <span className="step-number">{stepNumber}</span>;
+}
+
 export function CallAnalysisProgressCard({ steps, currentStep }: Props) {
   return (
     <Row className="mb-3">
@@ -30,6 +61,7 @@ export function CallAnalysisProgressCard({ steps, currentStep }: Props) {
                     const stepIsError = stepEntry.status === "error";
                     const isLast = index === steps.length - 1;
                     const prevCompleted = index > 0 && steps[index - 1]?.status === "done";
+                    const visualState = stepVisualStateClass(isActive, isCompleted, stepIsError);
 
                     return (
                       <React.Fragment key={`${stepEntry.step}-${stepEntry.timestamp}-${index}`}>
@@ -40,26 +72,10 @@ export function CallAnalysisProgressCard({ steps, currentStep }: Props) {
                             maxWidth: `${100 / steps.length}%`,
                           }}
                         >
-                          <div
-                            className={`analysis-progress-step ${
-                              isActive ? "active" : isCompleted ? "done" : stepIsError ? "error" : "pending"
-                            }`}
-                          >
+                          <div className={`analysis-progress-step ${visualState}`}>
                             <div className="step-indicator-wrapper">
-                              <div
-                                className={`step-circle ${
-                                  isActive ? "active" : isCompleted ? "done" : stepIsError ? "error" : "pending"
-                                }`}
-                              >
-                                {isCompleted ? (
-                                  <i className="ti ti-check"></i>
-                                ) : stepIsError ? (
-                                  <i className="ti ti-x"></i>
-                                ) : isActive ? (
-                                  <Spinner animation="border" size="sm" variant="light" />
-                                ) : (
-                                  <span className="step-number">{index + 1}</span>
-                                )}
+                              <div className={`step-circle ${visualState}`}>
+                                {stepCircleInner(isCompleted, stepIsError, isActive, index + 1)}
                               </div>
                               {!isLast && (
                                 <div
@@ -68,10 +84,10 @@ export function CallAnalysisProgressCard({ steps, currentStep }: Props) {
                               )}
                             </div>
                             <div className="step-content">
-                              <div className="step-title">{stepEntry.step.replace(/_/g, " ")}</div>
+                              <div className="step-title">{stepEntry.step.replaceAll("_", " ")}</div>
                               {stepEntry.message && (
                                 <div className="step-message">
-                                  {stepEntry.message || stepEntry.step.replace(/_/g, " ")}
+                                  {stepEntry.message || stepEntry.step.replaceAll("_", " ")}
                                 </div>
                               )}
                             </div>
@@ -81,209 +97,6 @@ export function CallAnalysisProgressCard({ steps, currentStep }: Props) {
                     );
                   })}
                 </div>
-                <style>{`
-                      .analysis-progress-container {
-                        padding: 0.5rem 0;
-                      }
-
-                      .analysis-progress-wrapper {
-                        display: flex;
-                        align-items: flex-start;
-                        gap: 0.25rem;
-                        padding: 0.5rem 0;
-                        width: 100%;
-                      }
-
-                      .analysis-progress-step-wrapper {
-                        flex: 1 1 auto;
-                        padding: 0 0.15rem;
-                        min-width: 0;
-                      }
-
-                      .analysis-progress-step {
-                        display: flex;
-                        flex-direction: column;
-                        align-items: center;
-                        position: relative;
-                        transition: all 0.3s ease;
-                      }
-
-                      .step-indicator-wrapper {
-                        display: flex;
-                        align-items: center;
-                        width: 100%;
-                        position: relative;
-                        margin-bottom: 0.4rem;
-                        min-height: 32px;
-                        justify-content: center;
-                      }
-
-                      .step-circle {
-                        width: 32px;
-                        height: 32px;
-                        border-radius: 50%;
-                        display: flex;
-                        align-items: center;
-                        justify-content: center;
-                        font-weight: bold;
-                        font-size: 0.85rem;
-                        position: relative;
-                        z-index: 2;
-                        transition: all 0.3s ease;
-                        flex-shrink: 0;
-                        margin: 0 auto;
-                      }
-
-                      .step-circle.pending {
-                        background: #e9ecef;
-                        color: #6c757d;
-                        border: 2px solid #ced4da;
-                        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-                      }
-
-                      .step-circle.active {
-                        background: linear-gradient(135deg, #0d6efd 0%, #0056b3 100%);
-                        color: white;
-                        border: 2px solid #0a58ca;
-                        box-shadow: 0 0 0 3px rgba(13, 110, 253, 0.2), 0 2px 8px rgba(13, 110, 253, 0.3);
-                        animation: pulse-ring 2s infinite;
-                      }
-
-                      .step-circle.done {
-                        background: linear-gradient(135deg, #198754 0%, #146c43 100%);
-                        color: white;
-                        border: 2px solid #146c43;
-                        box-shadow: 0 2px 8px rgba(25, 135, 84, 0.25);
-                      }
-
-                      .step-circle.error {
-                        background: linear-gradient(135deg, #dc3545 0%, #b02a37 100%);
-                        color: white;
-                        border: 2px solid #b02a37;
-                        box-shadow: 0 2px 8px rgba(220, 53, 69, 0.25);
-                      }
-
-                      .step-circle i {
-                        font-size: 1rem;
-                      }
-
-                      .step-number {
-                        font-size: 0.9rem;
-                        font-weight: 700;
-                      }
-
-                      .step-connector {
-                        position: absolute;
-                        height: 2px;
-                        width: calc(100% + 0.25rem);
-                        left: calc(50% + 16px);
-                        top: 50%;
-                        transform: translateY(-50%);
-                        background: #dee2e6;
-                        border-radius: 1px;
-                        transition: all 0.3s ease;
-                        z-index: 1;
-                      }
-
-                      .step-connector.completed {
-                        background: linear-gradient(90deg, #198754 0%, #20c997 100%);
-                      }
-
-                      .step-content {
-                        text-align: center;
-                        width: 100%;
-                        padding: 0;
-                      }
-
-                      .step-title {
-                        font-weight: 600;
-                        font-size: 0.75rem;
-                        line-height: 1.2;
-                        margin-bottom: 0.1rem;
-                        text-transform: capitalize;
-                        word-break: break-word;
-                        transition: color 0.3s ease;
-                        overflow: hidden;
-                        text-overflow: ellipsis;
-                        white-space: nowrap;
-                      }
-
-                      .analysis-progress-step.pending .step-title {
-                        color: #6c757d;
-                      }
-
-                      .analysis-progress-step.active .step-title {
-                        color: #0d6efd;
-                        font-weight: 700;
-                      }
-
-                      .analysis-progress-step.done .step-title {
-                        color: #198754;
-                        font-weight: 600;
-                      }
-
-                      .analysis-progress-step.error .step-title {
-                        color: #dc3545;
-                        font-weight: 600;
-                      }
-
-                      .step-message {
-                        font-size: 0.65rem;
-                        color: #6c757d;
-                        line-height: 1.2;
-                        margin-top: 0.1rem;
-                        word-break: break-word;
-                        overflow: hidden;
-                        text-overflow: ellipsis;
-                        white-space: nowrap;
-                      }
-
-                      @keyframes pulse-ring {
-                        0% {
-                          box-shadow: 0 0 0 3px rgba(13, 110, 253, 0.2), 0 2px 8px rgba(13, 110, 253, 0.3);
-                        }
-                        50% {
-                          box-shadow: 0 0 0 6px rgba(13, 110, 253, 0.15), 0 2px 10px rgba(13, 110, 253, 0.4);
-                        }
-                        100% {
-                          box-shadow: 0 0 0 3px rgba(13, 110, 253, 0.2), 0 2px 8px rgba(13, 110, 253, 0.3);
-                        }
-                      }
-
-                      @media (max-width: 768px) {
-                        .step-circle {
-                          width: 28px;
-                          height: 28px;
-                          font-size: 0.75rem;
-                        }
-
-                        .step-circle i {
-                          font-size: 0.85rem;
-                        }
-
-                        .step-title {
-                          font-size: 0.7rem;
-                        }
-
-                        .step-message {
-                          font-size: 0.6rem;
-                        }
-
-                        .step-indicator-wrapper {
-                          min-height: 28px;
-                          margin-bottom: 0.3rem;
-                        }
-                      }
-
-                      @keyframes skeleton-loading {
-                        0% {
-                          background-position: 200% 0;
-                        }
-                        100% {
-                          background-position: -200% 0;
-                        }
-                      }
-                    `}</style>
               </div>
             )}
           </Card.Body>

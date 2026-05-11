@@ -32,7 +32,7 @@ export function useGsmSyncPage() {
       } else {
         toast.error("Sync failed");
       }
-      void queryClient.invalidateQueries({ queryKey: gsmKeys.sync.all() });
+      queryClient.invalidateQueries({ queryKey: gsmKeys.sync.all() });
     },
     onError: () => {
       toast.error("Sync failed. Please try again.");
@@ -46,14 +46,14 @@ export function useGsmSyncPage() {
     }: {
       portIds: (string | number)[];
       gsmId: string | number;
-    }) => SyncPortsMobileNumber(portIds.map((id) => Number(id)), String(gsmId)),
+    }) => SyncPortsMobileNumber(portIds.map(Number), String(gsmId)),
     onSuccess: (response) => {
       if (response) {
         toast.success("Mobile numbers sync completed successfully");
       } else {
         toast.error("Mobile numbers sync failed");
       }
-      void queryClient.invalidateQueries({ queryKey: gsmKeys.sync.all() });
+      queryClient.invalidateQueries({ queryKey: gsmKeys.sync.all() });
     },
     onError: () => {
       toast.error("Mobile numbers sync failed. Please try again.");
@@ -66,7 +66,7 @@ export function useGsmSyncPage() {
     setPortsList([]);
 
     if (selectedOption) {
-      ViewGsm(selectedOption.value)
+      ViewGsm(String(selectedOption.value))
         .then((res: { data?: { id: string | number; port_number: string }[] }) => {
           if (res?.data) {
             const portOptions = res.data.map((port) => ({

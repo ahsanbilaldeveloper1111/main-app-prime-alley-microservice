@@ -22,6 +22,7 @@
     ],
     "baseUrl": ".",
     "paths": {
+      "@pages/partial/*": ["src/components/page-partials/*"],
       "@pages/*": ["src/pages/*"],
       "@planner/*": ["src/planner/*"],
       "@toolkit/*": ["src/toolkit/*"],

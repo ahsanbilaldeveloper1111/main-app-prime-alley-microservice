@@ -7,21 +7,14 @@ import CrmFilters from "@components/filters/CrmFilters";
 import { getOpportunities, deleteOpportunity, markLeadLost, getLostReasons } from "@utils/crm";
 import { GetHierarchyData } from "@utils/users";
 import { Column } from "@components/CustomDataTable";
-import { Button, Modal, Row, Col, Badge, Form } from "react-bootstrap";
+import { Button, Modal, Form } from "react-bootstrap";
 import { toast } from "react-toastify";
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
 import PageHeader from "@components/PageHeader";
-import FormModal from "@components/page-partials/FormModal";
-import ConfirmModal from "@components/page-partials/ConfirmModal";
-import SuccessfulModal from "@components/page-partials/SuccessfulModal";
-import PageSummaryGrid, { SummaryCard } from '@components/PageSummaryGrid';
 import DatatableActionButton from "@components/DatatableActionButton";
 
-
-
 import {
-  FiTarget,
   FiPlus,
   FiEdit,
   FiTrash2,

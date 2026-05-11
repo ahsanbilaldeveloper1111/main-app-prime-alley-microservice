@@ -1,6 +1,6 @@
 import React from "react";
 import { Pencil, Plus, Trash2 } from "lucide-react";
-import { formatJourneyStepStatusForDisplay, formatDueDateForDisplay, type JourneyStepRecord } from "../journeyDomain";
+import { formatJourneyStepStatusForDisplay, type JourneyStepRecord } from "../journeyDomain";
 
 export interface JourneyStepsSidebarSectionProps {
   steps: JourneyStepRecord[];
@@ -61,9 +61,6 @@ const JourneyStepsSidebarSection: React.FC<JourneyStepsSidebarSectionProps> = ({
                     ) : null}
                   </div>
                   {step.description && <div className="journey-page__step-desc">{step.description}</div>}
-                  {step.due_date && (
-                    <div className="journey-page__step-due">Due: {formatDueDateForDisplay(step.due_date)}</div>
-                  )}
                 </div>
                 {!isCompleted && (canEditStep || canDeleteStep) ? (
                   <div className="journey-page__step-actions">
