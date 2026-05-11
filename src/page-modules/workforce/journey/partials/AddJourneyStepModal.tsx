@@ -2,12 +2,10 @@ import React, { useEffect, useState } from "react";
 import { Form, Modal } from "react-bootstrap";
 import { toast } from "react-toastify";
 import { createJourneyStep } from "@utils/staffManagement";
-import { clampDueDateToJourneyMin } from "../journeyDomain";
 
 export interface AddJourneyStepModalProps {
   show: boolean;
   journeyId: number;
-  journeyDueDateMin: string | undefined;
   stepCount: number;
   onHide: () => void;
   onInvalidateJourneyQueries: () => void;
@@ -16,7 +14,6 @@ export interface AddJourneyStepModalProps {
 const AddJourneyStepModal: React.FC<AddJourneyStepModalProps> = ({
   show,
   journeyId,
-  journeyDueDateMin,
   stepCount,
   onHide,
   onInvalidateJourneyQueries,
@@ -32,27 +29,16 @@ const AddJourneyStepModal: React.FC<AddJourneyStepModalProps> = ({
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
-    if (!show || journeyDueDateMin == null) return;
-    setForm((prev) => (prev.due_date < journeyDueDateMin ? { ...prev, due_date: journeyDueDateMin } : prev));
-  }, [show, journeyDueDateMin]);
-
-  useEffect(() => {
-    if (show) {
-      setForm((prev) => ({
-        ...prev,
-        sort_order: stepCount,
-        due_date: clampDueDateToJourneyMin(prev.due_date, journeyDueDateMin),
-      }));
-    }
-  }, [show, stepCount, journeyDueDateMin]);
+    if (!show) return;
+    setForm((prev) => ({
+      ...prev,
+      sort_order: stepCount,
+    }));
+  }, [show, stepCount]);
 
   const handleSubmit = async () => {
     if (form.title.trim() === "") {
       toast.error("Task is required");
-      return;
-    }
-    if (journeyDueDateMin != null && form.due_date !== "" && form.due_date < journeyDueDateMin) {
-      toast.error("Due date cannot be before the journey start date.");
       return;
     }
     setSubmitting(true);
@@ -71,7 +57,7 @@ const AddJourneyStepModal: React.FC<AddJourneyStepModalProps> = ({
         stage: "",
         title: "",
         description: "",
-        due_date: clampDueDateToJourneyMin(new Date().toISOString().slice(0, 10), journeyDueDateMin),
+        due_date: new Date().toISOString().slice(0, 10),
         status: "pending",
         sort_order: stepCount,
       });
@@ -124,14 +110,8 @@ const AddJourneyStepModal: React.FC<AddJourneyStepModalProps> = ({
             <Form.Label>Due Date</Form.Label>
             <Form.Control
               type="date"
-              min={journeyDueDateMin}
               value={form.due_date}
-              onChange={(e) =>
-                setForm((prev) => ({
-                  ...prev,
-                  due_date: clampDueDateToJourneyMin(e.target.value, journeyDueDateMin),
-                }))
-              }
+              onChange={(e) => setForm((prev) => ({ ...prev, due_date: e.target.value }))}
             />
           </Form.Group>
         </div>
