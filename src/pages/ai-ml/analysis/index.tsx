@@ -9,14 +9,14 @@ import "@assets/scss/tabs.scss";
 import "@assets/scss/analysis-new.scss";
 import React, { ReactElement } from "react";
 import { Alert, Col, Row, Tab, Tabs } from "react-bootstrap";
-import { CallAnalysisCustomerInfo } from "./components/CallAnalysisCustomerInfo";
-import { CallAnalysisEmotionsAndTopics } from "./components/CallAnalysisEmotionsAndTopics";
-import { CallAnalysisForm } from "./components/CallAnalysisForm";
-import { CallAnalysisProgressCard } from "./components/CallAnalysisProgressCard";
-import { CallAnalysisStatusBanner } from "./components/CallAnalysisStatusBanner";
-import { CallAnalysisSummaryCards } from "./components/CallAnalysisSummaryCards";
-import { CallAnalysisTranscript } from "./components/CallAnalysisTranscript";
-import { CallAnalysisTranslate } from "./components/CallAnalysisTranslate";
+import { CallAnalysisCustomerInfo } from "@page-modules/ai-ml/analysis/components/CallAnalysisCustomerInfo";
+import { CallAnalysisEmotionsAndTopics } from "@page-modules/ai-ml/analysis/components/CallAnalysisEmotionsAndTopics";
+import { CallAnalysisForm } from "@page-modules/ai-ml/analysis/components/CallAnalysisForm";
+import { CallAnalysisProgressCard } from "@page-modules/ai-ml/analysis/components/CallAnalysisProgressCard";
+import { CallAnalysisStatusBanner } from "@page-modules/ai-ml/analysis/components/CallAnalysisStatusBanner";
+import { CallAnalysisSummaryCards } from "@page-modules/ai-ml/analysis/components/CallAnalysisSummaryCards";
+import { CallAnalysisTranscript } from "@page-modules/ai-ml/analysis/components/CallAnalysisTranscript";
+import { CallAnalysisTranslate } from "@page-modules/ai-ml/analysis/components/CallAnalysisTranslate";
 
 const CallAnalysis = () => {
   const {

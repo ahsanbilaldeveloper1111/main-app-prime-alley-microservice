@@ -37,7 +37,7 @@ export interface FAQItem {
   answer: string;
 }
 
-export interface FAQData {
+export interface FAQData extends Record<string, unknown> {
   id?: number;
   question: string;
   answer: string;

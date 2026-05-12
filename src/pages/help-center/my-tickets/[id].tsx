@@ -3,7 +3,7 @@ import React, { ReactElement } from "react";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 import { useRouter } from "next/router";
-import TicketDetail from "../partials/ticket-details";
+import TicketDetail from "@page-modules/help-center/partials/ticket-details";
 
 const TicketDetailPage = () => {
   const router = useRouter();

@@ -4,7 +4,7 @@ import BreadcrumbItem from "@common/BreadcrumbItem";
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
 import "@assets/scss/datatable-style.scss";
-import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
+import DeleteConfirmationModal from "@components/page-partials/DeleteConfirmationModal";
 import GenericFilterSidebar from "@components/GenericFilterSidebar";
 import { Container } from "react-bootstrap";
 import {

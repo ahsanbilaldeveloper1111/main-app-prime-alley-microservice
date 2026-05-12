@@ -3,7 +3,7 @@ import React, { ReactElement } from "react";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 import { useRouter } from "next/router";
-import ContactSupport from "../partials/contact-support";
+import ContactSupport from "@page-modules/help-center/partials/contact-support";
 
 const ContactSupportPage = () => {
   const router = useRouter();

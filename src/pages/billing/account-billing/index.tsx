@@ -1,7 +1,7 @@
 import { ReactElement } from "react";
 import Layout from "@layout/index";
-import { useAccountBillingPage } from "./useAccountBillingPage";
-import { AccountBillingPageView } from "./components/AccountBillingPageView";
+import { useAccountBillingPage } from "@page-modules/billing/account-billing/useAccountBillingPage";
+import { AccountBillingPageView } from "@page-modules/billing/account-billing/components/AccountBillingPageView";
 
 const AccountBilling = () => {
   const ctx = useAccountBillingPage();

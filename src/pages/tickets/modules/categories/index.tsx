@@ -3,8 +3,8 @@ import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
 import React, { ReactElement } from "react";
 import Layout from "@layout/index";
-import { ModuleCategoriesPageView } from "./components/ModuleCategoriesPageView";
-import { useModuleCategoriesPage } from "./useModuleCategoriesPage";
+import { ModuleCategoriesPageView } from "@page-modules/tickets/modules/categories/components/ModuleCategoriesPageView";
+import { useModuleCategoriesPage } from "@page-modules/tickets/modules/categories/useModuleCategoriesPage";
 
 const ModuleCategories = () => {
   const c = useModuleCategoriesPage();

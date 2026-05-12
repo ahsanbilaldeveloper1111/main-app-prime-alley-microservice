@@ -1,8 +1,8 @@
 import "@assets/scss/datatable-style.scss";
 import React, { ReactElement } from "react";
 import Layout from "@layout/index";
-import { useGsmSyncPage } from "./useGsmSyncPage";
-import { GsmSyncPageView } from "./components/GsmSyncPageView";
+import { useGsmSyncPage } from "@page-modules/gsm/sync/useGsmSyncPage";
+import { GsmSyncPageView } from "@page-modules/gsm/sync/components/GsmSyncPageView";
 
 const GsmSync = () => {
   const ctx = useGsmSyncPage();

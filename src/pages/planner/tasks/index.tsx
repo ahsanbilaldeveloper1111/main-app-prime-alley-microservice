@@ -15,7 +15,7 @@ import moment from "moment";
 import { ChevronDown, Plus } from "lucide-react";
 import { Button, Form, Modal } from "react-bootstrap";
 import GenericTable, { TableColumn, TableAction } from "@components/GenericTable";
-import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
+import DeleteConfirmationModal from "@components/page-partials/DeleteConfirmationModal";
 import CreateTaskSidebar from "@components/CreatePlannerTaskSidebar";
 import {
   listTasks,

@@ -2,7 +2,7 @@ import React from "react";
 import { X } from "lucide-react";
 import { Form, Row, Col, Spinner } from "react-bootstrap";
 import { toast } from "react-toastify";
-import RichTextEditor from "@pages/help-center/partials/RichTextEditor";
+import RichTextEditor from "@page-modules/help-center/partials/RichTextEditor";
 import {
   PROJECT_NAME_MAX_LENGTH,
   todayYmdLocal,

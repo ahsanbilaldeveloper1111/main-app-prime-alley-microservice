@@ -49,13 +49,13 @@ import {
 } from "lucide-react";
 import "@assets/scss/common.scss";
 import DeleteConfirmationModal from "@components/page-partials/DeleteConfirmationModal";
-import type { CrmPageDisplayProps } from "@pages/crm/crmPageDisplayProps";
+import type { CrmPageDisplayProps } from "@page-modules/crm/crmPageDisplayProps";
 import { useIndustriesPage } from "@hooks/crm/useIndustriesPage";
 import {
   DEFAULT_INDUSTRIES_TABLE_COLUMNS,
   INDUSTRIES_TABLE_COLUMN_STORAGE_KEY,
   type ProductFormData,
-} from "@pages/crm/industries/industriesPageModel";
+} from "@page-modules/crm/industries/industriesPageModel";
 
 function IndustryProductsSection({
   industryProducts,

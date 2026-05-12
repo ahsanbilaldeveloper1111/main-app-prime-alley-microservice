@@ -4,31 +4,18 @@ import React, {
   useState,
   useCallback,
   useMemo,
-  useEffect,
 } from "react";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 import GenericListPage from "@components/GenericListPage";
 import { Column } from "@components/CustomDataTable";
-import { Button, Modal, Row, Form } from "react-bootstrap";
-import { Col } from "react-bootstrap";
+import { Button, Modal, Form } from "react-bootstrap";
 import { toast } from "react-toastify";
-import { useTokenService } from "src/hooks/useTokenService";
-import { useSession } from "next-auth/react";
-import moment from "moment";
-import Select from "@components/AppSelect";
-
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
 import PageHeader from "@components/PageHeader";
-import FormModal from "@pages/partial/FormModal";
-import ConfirmModal from "@pages/partial/ConfirmModal";
-import SuccessfulModal from "@pages/partial/SuccessfulModal";
-import PageSummaryGrid, { SummaryCard } from '@components/PageSummaryGrid';
-import DatatableActionButton from "@components/DatatableActionButton";
-import { FiEdit, FiTrash2, FiEye,FiPlus } from "react-icons/fi";
 
-import { ListUsers, UpdateUserTms,getRanks,DeleteUser, UpdatePassword } from "@utils/tms/tmsUserManagement";
+import { ListUsers, UpdateUserTms, DeleteUser, UpdatePassword } from "@utils/tms/tmsUserManagement";
 import { Trash2, Key, Edit } from "lucide-react";
 import { generateComplexId } from "@utils/Helper";
 import { useRouter } from "next/router";
@@ -45,7 +32,6 @@ interface UserTypeOption {
 
 const TmsUserManagement = () => {
   const router = useRouter();
-  const { data: session, status } = useSession();
 
   const [refreshKey, setRefreshKey] = useState<number>(0);
   const [currentFilters, setCurrentFilters] = useState<any>({});

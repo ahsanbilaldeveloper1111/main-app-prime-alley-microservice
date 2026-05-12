@@ -25,7 +25,7 @@ import {
 } from "@hooks/useMainAppLookups";
 import GenericSidebar from "@components/GenericSidebarNew";
 import { JOURNEY_STATUS_OPTIONS } from "@utils/workforce/journeyStatusOptions";
-import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
+import DeleteConfirmationModal from "@components/page-partials/DeleteConfirmationModal";
 import { usePermissions } from "@utils/permissionUtils";
 import { HEADER_CONSTANTS } from "@constants/headerConstants";
 import { getAvatarColor, getInitials } from "@utils/workforceUserAvatar";

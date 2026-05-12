@@ -52,7 +52,7 @@ import {
 import { useCrmSettingsTableState } from "@hooks/useCrmSettingsTableState";
 import { useDebouncedSearchInput } from "@hooks/useDebouncedSearchInput";
 import { HEADER_CONSTANTS } from "@constants/headerConstants";
-import type { CrmPageDisplayProps } from "@pages/crm/crmPageDisplayProps";
+import type { CrmPageDisplayProps } from "@page-modules/crm/crmPageDisplayProps";
 
 const { PERMISSIONS } = HEADER_CONSTANTS;
 

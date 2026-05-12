@@ -58,7 +58,7 @@ import {
   type SmsListItem,
   type SmsListMeta,
 } from "@utils/communication";
-import RichTextEditor from "@pages/help-center/partials/RichTextEditor";
+import RichTextEditor from "@page-modules/help-center/partials/RichTextEditor";
 import {
   formatCrmPreviewDate,
   formatCrmPreviewDateTime,

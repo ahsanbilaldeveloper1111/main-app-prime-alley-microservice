@@ -1,37 +1,18 @@
 import "@assets/scss/datatable-style.scss";
-import React, { ReactElement, useState, useCallback, useMemo } from "react";
+import React, { ReactElement, useState } from "react";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
-import GenericListPage from "@components/GenericListPage";
-import {
-  ListTypes,
-  CreateType,
-  UpdateType,
-  DeleteType,
-} from "@utils/ticket-types";
-import { Column } from "@components/CustomDataTable";
-import { Button, Modal, Row, Accordion, Card } from "react-bootstrap";
-import { Col } from "react-bootstrap";
-import { toast } from "react-toastify";
-import { useTokenService } from "src/hooks/useTokenService";
-import { useSession } from "next-auth/react";
-import moment from "moment";
+import { Button, Row, Accordion, Card, Col } from "react-bootstrap";
 import Link from "next/link";
 
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
 import PageHeader from "@components/PageHeader";
-import FormModal from "@pages/partial/FormModal";
-import ConfirmModal from "@pages/partial/ConfirmModal";
-import SuccessfulModal from "@pages/partial/SuccessfulModal";
-import PageSummaryGrid, { SummaryCard } from '@components/PageSummaryGrid';
-import DatatableActionButton from "@components/DatatableActionButton";
-import { FiEdit, FiTrash2, FiEye, FiPlus, FiChevronDown, FiChevronUp } from "react-icons/fi";
+import { FiChevronDown, FiChevronUp } from "react-icons/fi";
 
 
 
 const Resources = () => {
-  const { data: session, status } = useSession();
   const [activeKey, setActiveKey] = useState<string | null>(null);
 
   const faqData = [

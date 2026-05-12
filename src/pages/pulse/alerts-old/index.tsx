@@ -1,5 +1,6 @@
 import "@assets/scss/datatable-style.scss";
-import '@assets/scss/common.scss';
+import "@assets/scss/common.scss";
+import "@assets/scss/tabs.scss";
 import React, { ReactElement, useState, useCallback } from "react";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
@@ -10,20 +11,10 @@ import { toast } from "react-toastify";
 import { useSession } from "next-auth/react";
 
 import AlertsFilters from "@components/filters/AlertsFilters";
-import {
-  getAlerts,
-  getMonitoringDashboard,
-  resolveAlert,
-  Alert
-} from "@utils/netops";
-import {
-  convertUTCToUserTimezone
-} from "@utils/Helper";
+import { getAlerts, resolveAlert, type Alert } from "@utils/netops";
+import { convertUTCToUserTimezone } from "@utils/Helper";
 
-
-import "@assets/scss/common.scss";
-import "@assets/scss/tabs.scss";
-import PageSummaryGrid, { SummaryCard } from '@components/PageSummaryGrid';
+import PageSummaryGrid, { SummaryCard } from "@components/PageSummaryGrid";
 import DatatableActionButton from "@components/DatatableActionButton";
 import { FiCheck } from "react-icons/fi";
 
@@ -38,7 +29,7 @@ interface Summary {
 }
 
 const Alerts = () => {
-  const { data: session, status } = useSession();
+  const { data: session } = useSession();
 
   const columns: Column[] = [
     {
@@ -308,16 +299,13 @@ const Alerts = () => {
   const fetchAlerts = useCallback(
     async (page = 1, perPage = 15, search = "") => {
       try {
-        const [alertsResponse, dashboardResponse] = await Promise.all([
-          getAlerts({
-            page,
-            perPage,
-            limit: perPage,
-            search,
-            ...currentFilters,
-          }),
-          getMonitoringDashboard(),
-        ]);
+        const alertsResponse = await getAlerts({
+          page,
+          perPage,
+          limit: perPage,
+          search,
+          ...currentFilters,
+        });
 
         // Calculate alert summary from alerts data
         const alerts = (alertsResponse as any)?.alerts ?? [];

@@ -3,7 +3,7 @@ import React, { ReactElement } from "react";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 import { Row, Col } from "react-bootstrap";
-import CreateUserProfile from "./CreateUserProfile";
+import CreateUserProfile from "@page-modules/tms/profiling/user/create/CreateUserProfile";
 
 const UserProfileCreate = () => {
   return (

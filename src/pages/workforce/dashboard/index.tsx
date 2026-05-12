@@ -8,8 +8,10 @@ import BreadcrumbItem from "@common/BreadcrumbItem";
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
 
+import { useSession } from "next-auth/react";
 import { type EmployeeDashboardParams } from "@utils/staffManagement";
 import { useMainAppLookups } from "@hooks/useMainAppLookups";
+import { HEADER_CONSTANTS } from "@constants/headerConstants";
 import {
   DEPARTMENT_CHART_COLORS,
   departmentNameFromLookup,
@@ -27,15 +29,25 @@ import LeaveCalendarModal from "@page-modules/workforce/dashboard/partials/Leave
 import AddEmployeeModal from "@page-modules/workforce/AddEmployeeModal";
 import NewRequestModal from "@page-modules/workforce/NewRequestModal";
 
-import { Plus, Calendar } from "lucide-react";
+import { Plus, Calendar, type LucideIcon } from "lucide-react";
 
 import "@page-modules/workforce/dashboard/employeesDashboard.scss";
 import { workforceKeys } from "../../../query/keys";
 
+const { PERMISSIONS } = HEADER_CONSTANTS;
+
 const EmployeesDashboard = () => {
   const router = useRouter();
   const queryClient = useQueryClient();
+  const { data: session } = useSession();
   const { mainAppUsers, mainAppDepartments, companyIdentifier } = useMainAppLookups();
+
+  const canQuickAddEmployee = Boolean(
+    session?.user?.permissions?.includes(PERMISSIONS.ADD_EMPLOYEE_STAFF_MANAGEMENT),
+  );
+  const canQuickNewRequest = Boolean(
+    session?.user?.permissions?.includes(PERMISSIONS.ADD_APPROVAL_REQUEST_STAFF_MANAGEMENT),
+  );
 
   const refreshDashboardQueries = useCallback(() => {
     queryClient.invalidateQueries({ queryKey: workforceKeys.dashboard.all() });
@@ -191,13 +203,16 @@ const EmployeesDashboard = () => {
     setShowCalendar(true);
   }, []);
 
-  const quickActions = useMemo(
-    () => [
-      { icon: Plus, color: "#6366F1", text: "Add Employee", onClick: handleAddEmployee },
-      { icon: Calendar, color: "#10B981", text: "New Request", onClick: handleNewRequest },
-    ],
-    [handleAddEmployee, handleNewRequest],
-  );
+  const quickActions = useMemo(() => {
+    const items: { icon: LucideIcon; color: string; text: string; onClick: () => void }[] = [];
+    if (canQuickAddEmployee) {
+      items.push({ icon: Plus, color: "#6366F1", text: "Add Employee", onClick: handleAddEmployee });
+    }
+    if (canQuickNewRequest) {
+      items.push({ icon: Calendar, color: "#10B981", text: "New Request", onClick: handleNewRequest });
+    }
+    return items;
+  }, [canQuickAddEmployee, canQuickNewRequest, handleAddEmployee, handleNewRequest]);
 
   return (
     <React.Fragment>
@@ -222,7 +237,7 @@ const EmployeesDashboard = () => {
 
           <DashboardStats onViewCalendar={handleViewCalendar} params={dashboardParams} />
 
-          <DashboardQuickActions actions={quickActions} />
+          {quickActions.length > 0 ? <DashboardQuickActions actions={quickActions} /> : null}
 
           <div className="employees-dashboard__charts-row">
             <DepartmentHeadcountPanel departmentData={departmentData} />

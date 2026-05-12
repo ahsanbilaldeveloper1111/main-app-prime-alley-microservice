@@ -2,8 +2,8 @@ import "@assets/scss/datatable-style.scss";
 import "@assets/scss/common.scss";
 import React, { ReactElement } from "react";
 import Layout from "@layout/index";
-import { FaqModulesPageView } from "./components/FaqModulesPageView";
-import { useFAQModulesPage } from "./useFAQModulesPage";
+import { FaqModulesPageView } from "@page-modules/faqs/modules/components/FaqModulesPageView";
+import { useFAQModulesPage } from "@page-modules/faqs/modules/useFAQModulesPage";
 
 const FAQModules = () => {
   const ctx = useFAQModulesPage();

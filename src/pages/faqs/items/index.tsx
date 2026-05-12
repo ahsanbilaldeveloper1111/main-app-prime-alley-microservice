@@ -3,8 +3,8 @@ import "@assets/css/GenericTable.css";
 import "@assets/scss/common.scss";
 import React, { ReactElement } from "react";
 import Layout from "@layout/index";
-import { FaqItemsPageView } from "./components/FaqItemsPageView";
-import { useFAQItemsPage } from "./useFAQItemsPage";
+import { FaqItemsPageView } from "@page-modules/faqs/items/components/FaqItemsPageView";
+import { useFAQItemsPage } from "@page-modules/faqs/items/useFAQItemsPage";
 
 const FAQItems = () => {
   const ctx = useFAQItemsPage();
