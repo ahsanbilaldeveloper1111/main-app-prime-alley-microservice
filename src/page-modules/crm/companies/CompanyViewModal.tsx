@@ -227,13 +227,13 @@ function getEnrichmentData(
   return (raw as EnrichmentData | undefined) || undefined;
 }
 
-function handleCloseHover(event: React.MouseEvent<HTMLButtonElement>) {
+function handleCloseHover(event: React.SyntheticEvent<HTMLButtonElement>) {
   event.currentTarget.style.borderColor = "#2563eb";
   event.currentTarget.style.color = "#2563eb";
   event.currentTarget.style.background = "#eff6ff";
 }
 
-function handleCloseLeave(event: React.MouseEvent<HTMLButtonElement>) {
+function handleCloseLeave(event: React.SyntheticEvent<HTMLButtonElement>) {
   event.currentTarget.style.borderColor = "#e5e7eb";
   event.currentTarget.style.color = "#6c757d";
   event.currentTarget.style.background = "white";
