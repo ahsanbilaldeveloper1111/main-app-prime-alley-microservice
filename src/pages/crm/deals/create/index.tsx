@@ -45,12 +45,13 @@ function useIndustriesQueryErrorToast(
   }, [isError, error]);
 }
 
+type CampaignIdForDeal = string | number | undefined;
+
 function useCampaignIndustriesFromSourceLead(args: {
-  campaignId: string | number | undefined;
+  campaignId: CampaignIdForDeal;
   campaignData: unknown;
   allIndustries: IndustryData[];
   fetchProductsByIndustry: (industryId: number) => Promise<void>;
-  setCampaign: React.Dispatch<React.SetStateAction<any>>;
   setCampaignIndustries: React.Dispatch<React.SetStateAction<IndustryData[]>>;
   setFormData: React.Dispatch<React.SetStateAction<any>>;
   setSelectedIndustryId: React.Dispatch<React.SetStateAction<number | null>>;
@@ -60,7 +61,6 @@ function useCampaignIndustriesFromSourceLead(args: {
     campaignData,
     allIndustries,
     fetchProductsByIndustry,
-    setCampaign,
     setCampaignIndustries,
     setFormData,
     setSelectedIndustryId,
@@ -74,7 +74,6 @@ function useCampaignIndustriesFromSourceLead(args: {
       industries?: unknown;
       industry_ids?: number[];
     };
-    setCampaign(data);
 
     const industriesData = data.industries;
     const industryIds = data.industry_ids;
@@ -118,7 +117,6 @@ function useCampaignIndustriesFromSourceLead(args: {
     campaignData,
     allIndustries,
     fetchProductsByIndustry,
-    setCampaign,
     setCampaignIndustries,
     setFormData,
     setSelectedIndustryId,
@@ -766,11 +764,113 @@ function getCreateDealProgressWidthPercent(
   return ((visualPosition + 1) / totalVisibleSteps) * 100;
 }
 
-const CreateDeal = () => {
+const CREATE_DEAL_WIZARD_STEP_INDEXES = [0, 1, 2, 3, 4] as const;
+
+function getCreateDealWizardDisplayNumber(
+  step: number,
+  dealTemplate: DealTemplateData | null,
+): number {
+  if (!dealTemplate && step > 2) {
+    return step;
+  }
+  return step + 1;
+}
+
+function getCreateDealWizardStepLabel(step: number): string {
+  switch (step) {
+    case 0:
+      return "Deal Info";
+    case 1:
+      return "Company Info";
+    case 2:
+      return "Characteristics";
+    case 3:
+      return "Progress & Notes";
+    default:
+      return "Estimation";
+  }
+}
+
+function CreateDealWizardTimeline(
+  props: Readonly<{
+    formStep: number;
+    dealTemplate: DealTemplateData | null;
+    setFormStep: React.Dispatch<React.SetStateAction<number>>;
+  }>,
+) {
+  const { formStep, dealTemplate, setFormStep } = props;
+  return (
+    <div className="mb-4">
+      <div className="d-flex align-items-center justify-content-between position-relative">
+        <div
+          className="position-absolute bg-light"
+          style={{
+            left: "0",
+            right: "0",
+            top: "20px",
+            height: "2px",
+            zIndex: 0,
+          }}
+        />
+        <div
+          className="position-absolute bg-primary"
+          style={{
+            left: "0",
+            top: "20px",
+            height: "2px",
+            width: `${getCreateDealProgressWidthPercent(formStep, dealTemplate)}%`,
+            zIndex: 0,
+            transition: "width 0.3s ease",
+          }}
+        />
+
+        {CREATE_DEAL_WIZARD_STEP_INDEXES.map((step) => {
+          if (step === 2 && !dealTemplate) {
+            return null;
+          }
+          const displayNumber = getCreateDealWizardDisplayNumber(
+            step,
+            dealTemplate,
+          );
+          const stepLabel = getCreateDealWizardStepLabel(step);
+          return (
+            <button
+              key={step}
+              type="button"
+              className="text-center position-relative border-0 bg-transparent p-0"
+              style={{ flex: 1, cursor: "pointer" }}
+              onClick={() => {
+                setFormStep(step);
+              }}
+            >
+              <div
+                className={`rounded-circle d-flex align-items-center justify-content-center mx-auto ${formStep >= step ? "bg-primary text-white" : "bg-light text-muted"}`}
+                style={{
+                  width: "40px",
+                  height: "40px",
+                  zIndex: 1,
+                  position: "relative",
+                }}
+              >
+                {formStep > step ? <CheckCircle size={20} /> : displayNumber}
+              </div>
+              <small
+                className={`d-block mt-2 ${formStep === step ? "fw-bold text-primary" : "text-muted"}`}
+              >
+                {stepLabel}
+              </small>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function useCreateDealPageModel() {
   const router = useRouter();
   const [formStep, setFormStep] = useState(0);
   const [loading, setLoading] = useState(false);
-  const [_campaign, setCampaign] = useState<any>(null);
   const [campaignIndustries, setCampaignIndustries] = useState<IndustryData[]>(
     [],
   );
@@ -798,11 +898,6 @@ const CreateDeal = () => {
     qty: 1,
     unit_price: 0,
   });
-  const [taxPercentage, setTaxPercentage] = useState(0);
-  const [standardDiscountPercentage, setStandardDiscountPercentage] =
-    useState(0);
-  const [specialDiscountPercentage, setSpecialDiscountPercentage] =
-    useState(0);
 
   const [formData, setFormData] = useState({
     name: "",
@@ -880,11 +975,10 @@ const CreateDeal = () => {
   );
 
   useCampaignIndustriesFromSourceLead({
-    campaignId: sourceLead?.campaign_id as string | number | undefined,
+    campaignId: sourceLead?.campaign_id as CampaignIdForDeal,
     campaignData: campaignQuery.data,
     allIndustries,
     fetchProductsByIndustry,
-    setCampaign,
     setCampaignIndustries,
     setFormData,
     setSelectedIndustryId,
@@ -933,6 +1027,191 @@ const CreateDeal = () => {
     validateCurrentStep,
   });
 
+  return {
+    router,
+    formStep,
+    setFormStep,
+    loading,
+    setLoading,
+    campaignIndustries,
+    setCampaignIndustries,
+    selectedIndustryId,
+    setSelectedIndustryId,
+    showAllIndustries,
+    setShowAllIndustries,
+    estimationItems,
+    setEstimationItems,
+    showAddItemModal,
+    setShowAddItemModal,
+    editingItemIndex,
+    setEditingItemIndex,
+    itemFormData,
+    setItemFormData,
+    formData,
+    setFormData,
+    sourceLead,
+    setSourceLead,
+    convertingPrice,
+    setConvertingPrice,
+    dealTemplate,
+    setDealTemplate,
+    loadingTemplate,
+    setLoadingTemplate,
+    templateFieldsData,
+    setTemplateFieldsData,
+    leadHydratedIdRef,
+    businessTypeId,
+    setBusinessTypeId,
+    businessTypeOther,
+    setBusinessTypeOther,
+    showOtherBusinessType,
+    setShowOtherBusinessType,
+    stages,
+    extensions,
+    businessTypes,
+    allIndustries,
+    loadingAllIndustries,
+    parsedLeadId,
+    leadQuery,
+    loadingLead,
+    campaignQuery,
+    loadingIndustries,
+    industriesQuery,
+    products,
+    setProducts,
+    loadingProducts,
+    fetchProductsByIndustry,
+    handleIndustryChange,
+    validateStep0,
+    validateStep1,
+    validateStep2,
+    validateStep4,
+    validateCurrentStep,
+    handleNextStep,
+    handleSubmit,
+  };
+}
+
+type CreateDealPageModel = ReturnType<typeof useCreateDealPageModel>;
+
+function CreateDealLeadConversionBanner(
+  props: Readonly<{ sourceLead: any }>,
+) {
+  const { sourceLead } = props;
+  if (!sourceLead) {
+    return null;
+  }
+  return (
+    <Card className="mb-3 border-0 bg-info bg-opacity-10">
+      <Card.Body>
+        <div className="d-flex align-items-center gap-2">
+          <Badge bg="info">Converted from Lead</Badge>
+          <span className="small text-muted">
+            Lead: <strong>{sourceLead.name}</strong>
+            {sourceLead.company_name
+              ? ` • Company: ${sourceLead.company_name}`
+              : ""}
+            {sourceLead.id ? ` • ID: #${sourceLead.id}` : ""}
+          </span>
+        </div>
+      </Card.Body>
+    </Card>
+  );
+}
+
+function CreateDealLoadingLeadCard(props: Readonly<{ loadingLead: boolean }>) {
+  if (!props.loadingLead) {
+    return null;
+  }
+  return (
+    <Card className="mb-3 border-0">
+      <Card.Body className="text-center py-4">
+        <div className="spinner-border text-primary" role="status">
+          <span className="visually-hidden">Loading lead data...</span>
+        </div>
+        <p className="mt-2 text-muted">Loading lead information...</p>
+      </Card.Body>
+    </Card>
+  );
+}
+
+function CreateDealFormHeaderBar(
+  props: Readonly<{ router: ReturnType<typeof useRouter> }>,
+) {
+  const { router } = props;
+  return (
+    <Card.Header>
+      <div className="d-flex justify-content-between align-items-center">
+        <h4 className="mb-0 app-heading">Deal Information</h4>
+        <Button
+          variant="outline-secondary"
+          size="sm"
+          onClick={() => {
+            const w = globalThis.window;
+            if (w !== undefined && w.history.length > 1) {
+              w.history.back();
+            } else {
+              void router.push("/crm/deals");
+            }
+          }}
+        >
+          <ArrowLeft size={16} className="me-2" />
+          Back
+        </Button>
+      </div>
+    </Card.Header>
+  );
+}
+
+function CreateDealView(props: Readonly<CreateDealPageModel>) { // NOSONAR S3776 — wizard step markup; timeline, banners, and header extracted to child components.
+  const {
+    router,
+    formStep,
+    setFormStep,
+    loading,
+    campaignIndustries,
+    selectedIndustryId,
+    setSelectedIndustryId,
+    showAllIndustries,
+    setShowAllIndustries,
+    estimationItems,
+    setEstimationItems,
+    showAddItemModal,
+    setShowAddItemModal,
+    editingItemIndex,
+    setEditingItemIndex,
+    itemFormData,
+    setItemFormData,
+    formData,
+    setFormData,
+    sourceLead,
+    convertingPrice,
+    setConvertingPrice,
+    dealTemplate,
+    loadingTemplate,
+    templateFieldsData,
+    setTemplateFieldsData,
+    businessTypeId,
+    setBusinessTypeId,
+    businessTypeOther,
+    setBusinessTypeOther,
+    showOtherBusinessType,
+    setShowOtherBusinessType,
+    stages,
+    extensions,
+    businessTypes,
+    allIndustries,
+    loadingAllIndustries,
+    loadingLead,
+    loadingIndustries,
+    products,
+    setProducts,
+    loadingProducts,
+    handleIndustryChange,
+    handleNextStep,
+    handleSubmit,
+  } = props;
+
   return (
     <React.Fragment>
       <BreadcrumbItem
@@ -944,114 +1223,18 @@ const CreateDeal = () => {
         {/* Create Deal Form */}
         <div className="row">
           <div className="col-12">
-            {sourceLead && (
-              <Card className="mb-3 border-0 bg-info bg-opacity-10">
-                <Card.Body>
-                  <div className="d-flex align-items-center gap-2">
-                    <Badge bg="info">Converted from Lead</Badge>
-                    <span className="small text-muted">
-                      Lead: <strong>{sourceLead.name}</strong>
-                      {sourceLead.company_name && ` • Company: ${sourceLead.company_name}`}
-                      {sourceLead.id && ` • ID: #${sourceLead.id}`}
-                    </span>
-                  </div>
-                </Card.Body>
-              </Card>
-            )}
-
-            {loadingLead && (
-              <Card className="mb-3 border-0">
-                <Card.Body className="text-center py-4">
-                  <div className="spinner-border text-primary" role="status">
-                    <span className="visually-hidden">Loading lead data...</span>
-                  </div>
-                  <p className="mt-2 text-muted">Loading lead information...</p>
-                </Card.Body>
-              </Card>
-            )}
+            <CreateDealLeadConversionBanner sourceLead={sourceLead} />
+            <CreateDealLoadingLeadCard loadingLead={loadingLead} />
 
             <Card className="border-0 shadow-sm">
-              <Card.Header>
-                <div className="d-flex justify-content-between align-items-center">
-                  <h4 className="mb-0 app-heading">Deal Information</h4>
-                  <Button
-                    variant="outline-secondary"
-                    size="sm"
-                    onClick={() => {
-                      if (typeof window !== "undefined" && window.history.length > 1) {
-                        window.history.back();
-                      } else {
-                        router.push("/crm/deals");
-                      }
-                    }}
-                  >
-                    <ArrowLeft size={16} className="me-2" />
-                    Back
-                  </Button>
-                </div>
-              </Card.Header>
+              <CreateDealFormHeaderBar router={router} />
               <Card.Body>
                 <Form onSubmit={handleSubmit}>
-          {/* Timeline Navigation */}
-          <div className="mb-4">
-            <div className="d-flex align-items-center justify-content-between position-relative">
-              {/* Progress Line */}
-              <div 
-                className="position-absolute bg-light" 
-                style={{ 
-                  left: '0', 
-                  right: '0', 
-                  top: '20px', 
-                  height: '2px', 
-                  zIndex: 0 
-                }}
-              />
-              <div 
-                className="position-absolute bg-primary" 
-                style={{ 
-                  left: '0', 
-                  top: '20px', 
-                  height: '2px', 
-                  width: `${getCreateDealProgressWidthPercent(formStep, dealTemplate)}%`,
-                  zIndex: 0,
-                  transition: 'width 0.3s ease'
-                }}
-              />
-              
-              {/* Steps */}
-              {[0, 1, 2, 3, 4].map((step) => {
-                // Hide step 2 (Characteristics) if no template is available
-                if (step === 2 && !dealTemplate) {
-                  return null;
-                }
-                
-                // Calculate display number: if step 2 is hidden, adjust numbering for steps after it
-                const displayNumber = (!dealTemplate && step > 2) ? step : step + 1;
-                
-                return (
-                  <div 
-                    key={step}
-                    className="text-center position-relative" 
-                    style={{ cursor: 'pointer', flex: 1 }}
-                    onClick={() => {
-                      // Step 2 is already hidden (returns null above), so we can directly set the step
-                      setFormStep(step);
-                    }}
-                  >
-                    <div 
-                      className={`rounded-circle d-flex align-items-center justify-content-center mx-auto ${formStep >= step ? 'bg-primary text-white' : 'bg-light text-muted'}`}
-                      style={{ width: '40px', height: '40px', zIndex: 1, position: 'relative' }}
-                    >
-                      {formStep > step ? <CheckCircle size={20} /> : displayNumber}
-                    </div>
-                    <small className={`d-block mt-2 ${formStep === step ? 'fw-bold text-primary' : 'text-muted'}`}>
-                      {step === 0 ? 'Deal Info' : step === 1 ? 'Company Info' : step === 2 ? 'Characteristics' : step === 3 ? 'Progress & Notes' : 'Estimation'}
-                    </small>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
+                  <CreateDealWizardTimeline
+                    formStep={formStep}
+                    dealTemplate={dealTemplate}
+                    setFormStep={setFormStep}
+                  />
 
           {/* Form Content Based on Step */}
           <div style={{ minHeight: '400px' }}>
@@ -2212,7 +2395,9 @@ const CreateDeal = () => {
       </div>
     </React.Fragment>
   );
-};
+}
+
+const CreateDeal = () => <CreateDealView {...useCreateDealPageModel()} />;
 
 CreateDeal.getLayout = (page: ReactElement) => {
   return <Layout>{page}</Layout>;

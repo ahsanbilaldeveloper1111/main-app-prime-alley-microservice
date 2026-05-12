@@ -158,7 +158,6 @@ function useCampaignIndustriesFromSourceLead(args: {
   campaignData: unknown;
   allIndustries: IndustryData[];
   fetchProductsByIndustry: (industryId: number) => Promise<void>;
-  setCampaign: React.Dispatch<React.SetStateAction<any>>;
   setCampaignIndustries: React.Dispatch<React.SetStateAction<IndustryData[]>>;
   setFormData: React.Dispatch<React.SetStateAction<any>>;
   setSelectedIndustryId: React.Dispatch<React.SetStateAction<number | null>>;
@@ -168,7 +167,6 @@ function useCampaignIndustriesFromSourceLead(args: {
     campaignData,
     allIndustries,
     fetchProductsByIndustry,
-    setCampaign,
     setCampaignIndustries,
     setFormData,
     setSelectedIndustryId,
@@ -182,7 +180,6 @@ function useCampaignIndustriesFromSourceLead(args: {
       industries?: unknown;
       industry_ids?: number[];
     };
-    setCampaign(data);
 
     const industriesData = data.industries;
     const industryIds = data.industry_ids;
@@ -226,7 +223,6 @@ function useCampaignIndustriesFromSourceLead(args: {
     campaignData,
     allIndustries,
     fetchProductsByIndustry,
-    setCampaign,
     setCampaignIndustries,
     setFormData,
     setSelectedIndustryId,
@@ -555,7 +551,6 @@ type EditDealLoadedPhaseIntegrationArgs = Readonly<{
   sourceLead: { campaign_id?: unknown } | null;
   campaignQuery: { data: unknown };
   fetchProductsByIndustry: (industryId: number) => Promise<void>;
-  setCampaign: React.Dispatch<React.SetStateAction<any>>;
   setCampaignIndustries: React.Dispatch<React.SetStateAction<IndustryData[]>>;
   setFormData: React.Dispatch<React.SetStateAction<any>>;
   setSelectedIndustryId: React.Dispatch<React.SetStateAction<number | null>>;
@@ -615,7 +610,6 @@ function useEditDealLoadedPhaseIntegration(a: EditDealLoadedPhaseIntegrationArgs
     campaignData: a.campaignQuery.data,
     allIndustries: a.allIndustries,
     fetchProductsByIndustry: a.fetchProductsByIndustry,
-    setCampaign: a.setCampaign,
     setCampaignIndustries: a.setCampaignIndustries,
     setFormData: a.setFormData,
     setSelectedIndustryId: a.setSelectedIndustryId,
@@ -673,7 +667,6 @@ const EditDeal = () => { // NOSONAR S3776 — wizard markup; logic extracted to 
   const [negotiationBar, setNegotiationBar] = useState(0);
   const [probability, setProbability] = useState(0);
   const isInitialLoad = useRef(true);
-  const [_campaign, setCampaign] = useState<any>(null);
   const [campaignIndustries, setCampaignIndustries] = useState<IndustryData[]>(
     [],
   );
@@ -780,7 +773,6 @@ const EditDeal = () => { // NOSONAR S3776 — wizard markup; logic extracted to 
       sourceLead,
       campaignQuery,
       fetchProductsByIndustry,
-      setCampaign,
       setCampaignIndustries,
       setFormData,
       setSelectedIndustryId,
