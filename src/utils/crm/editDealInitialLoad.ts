@@ -1,5 +1,4 @@
-import type { MutableRefObject } from "react";
-import type { Dispatch, SetStateAction } from "react";
+import type { Dispatch, MutableRefObject, SetStateAction } from "react";
 import type { NextRouter } from "next/router";
 import { toast } from "react-toastify";
 import {
@@ -30,9 +29,6 @@ export type EditDealInitialLoadParams = Readonly<{
   setShowOtherBusinessType: Dispatch<SetStateAction<boolean>>;
   setSourceLead: Dispatch<SetStateAction<unknown>>;
   setDealTemplate: Dispatch<SetStateAction<DealTemplateData | null>>;
-  setInitialTemplateFieldValues: Dispatch<
-    SetStateAction<Record<string, unknown>>
-  >;
   setTemplateFieldsData: Dispatch<SetStateAction<Record<string, unknown>>>;
   setEstimates: Dispatch<SetStateAction<unknown[]>>;
   setAttachments: Dispatch<SetStateAction<unknown[]>>;
@@ -84,7 +80,6 @@ async function applyDealTemplate(
 
   if (!resolved) {
     p.setDealTemplate(null);
-    p.setInitialTemplateFieldValues({});
     p.setTemplateFieldsData({});
     return;
   }
@@ -94,7 +89,6 @@ async function applyDealTemplate(
     stored,
     normalizeDealTemplateDataKey,
   );
-  p.setInitialTemplateFieldValues(hydrated);
   p.setTemplateFieldsData(hydrated);
 }
 
@@ -147,7 +141,7 @@ export async function runEditDealInitialLoad(
     p.setFetching(true);
     const deal = await getDeal(dealIdNum);
 
-    p.setFormData(buildEditDealFormStateFromDeal(deal) as Record<string, any>);
+    p.setFormData(buildEditDealFormStateFromDeal(deal));
     applyBusinessTypeFromDeal(deal, p);
     await tryLoadSourceLead(
       deal.ticket_id ? Number(deal.ticket_id) : null,
@@ -157,8 +151,8 @@ export async function runEditDealInitialLoad(
 
     const sortedEstimates = sortEstimatesByCreatedAtDesc(deal.estimates);
     p.setEstimates(sortedEstimates);
-    p.setAttachments((deal as { attachments?: unknown[] }).attachments || []);
-    p.setHistories((deal as { histories?: unknown[] }).histories || []);
+    p.setAttachments(deal.attachments || []);
+    p.setHistories(deal.histories || []);
     p.setNegotiationBar(deal.negotiation_bar || 0);
     p.setProbability(deal.probability || 0);
 

@@ -5,6 +5,7 @@ import React, {
   useEffect,
   useRef,
   useCallback,
+  useMemo,
 } from "react";
 import { useQuery } from "@tanstack/react-query";
 import Layout from "@layout/index";
@@ -50,7 +51,6 @@ import "react-phone-number-input/style.css";
 import Link from "next/link";
 import { toast } from "react-toastify";
 import { useRouter } from "next/router";
-import { useSession } from "next-auth/react";
 
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
@@ -60,6 +60,7 @@ import { crmAppKeys } from "../../../../query/keys";
 import {
   isDealTemplatePrimitiveValue,
   getNormalizedDealTemplateValue,
+  type EstimationLineItem,
 } from "@utils/crm/editDealFetchHelpers";
 import { runEditDealInitialLoad } from "@utils/crm/editDealInitialLoad";
 import {
@@ -69,99 +70,414 @@ import {
 import { validateEditDealCurrentStep } from "@utils/crm/editDealStepValidators";
 import { EditDealWizardTimeline } from "@page-modules/crm/deals/EditDealWizardTimeline";
 
-const EditDeal = () => {
-  const router = useRouter();
-  const { id } = router.query;
-  const { data: session } = useSession();
-  const [formStep, setFormStep] = useState(0);
-  const [loading, setLoading] = useState(false);
-  const [fetching, setFetching] = useState(true);
-  const [estimates, setEstimates] = useState<any[]>([]);
-  const [attachments, setAttachments] = useState<any[]>([]);
-  const [histories, setHistories] = useState<any[]>([]);
-  const [negotiationBar, setNegotiationBar] = useState(0);
-  const [probability, setProbability] = useState(0);
-  const isInitialLoad = useRef(true);
+function getBusinessTypeSelectValue(
+  showOtherBusinessType: boolean,
+  businessTypeId: number | null,
+): string {
+  if (showOtherBusinessType) return "other";
+  if (businessTypeId) return String(businessTypeId);
+  return "";
+}
+
+function getDealTemplateFieldInputType(
+  fieldType: string | undefined,
+): "date" | "email" | "text" {
+  if (fieldType === "date") return "date";
+  if (fieldType === "email") return "email";
+  return "text";
+}
+
+function resolveAddItemModalAvailableIndustries(
+  showAllIndustries: boolean,
+  formIndustryIds: number[],
+  allIndustries: IndustryData[],
+  campaignIndustries: IndustryData[],
+): IndustryData[] {
+  if (showAllIndustries) return allIndustries;
+  if (formIndustryIds.length > 0) {
+    return allIndustries.filter((ind) => formIndustryIds.includes(ind.id));
+  }
+  return campaignIndustries;
+}
+
+function formatRevisionVersionLabel(
+  version: string | undefined,
+  estimatesLength: number,
+  index: number,
+): string {
+  if (version) return version;
+  const n = estimatesLength - index;
+  return `v${n}.0`;
+}
+
+async function convertEstimationItemsToNewDealCurrency(
+  estimationItems: EstimationLineItem[],
+  products: CrmProduct[],
+  previousDealCurrency: string,
+  newDealCurrency: string,
+): Promise<EstimationLineItem[]> {
+  return Promise.all(
+    estimationItems.map(async (item) => {
+      const product = products.find((p) => p.id === item.product_id);
+      if (!product) return item;
+      const productCurrency = product.currency.toUpperCase();
+      const newDealCur = newDealCurrency.toUpperCase();
+      const oldDealCur = previousDealCurrency.toUpperCase();
+      if (productCurrency === newDealCur) {
+        return {
+          ...item,
+          unit_price: Number.parseFloat(product.price) || item.unit_price,
+        };
+      }
+      if (oldDealCur !== newDealCur) {
+        const convertedPrice = await convertCurrency(
+          item.unit_price,
+          oldDealCur,
+          newDealCur,
+        );
+        return { ...item, unit_price: convertedPrice };
+      }
+      return item;
+    }),
+  );
+}
+
+function useIndustriesQueryErrorToast(
+  isError: boolean,
+  error: unknown,
+): void {
+  useEffect(() => {
+    if (!isError) return;
+    console.error("Failed to fetch industries:", error);
+    toast.error("Failed to fetch industries");
+  }, [isError, error]);
+}
+
+function useCampaignIndustriesFromSourceLead(args: {
+  campaignId: string | number | undefined;
+  campaignData: unknown;
+  allIndustries: IndustryData[];
+  fetchProductsByIndustry: (industryId: number) => Promise<void>;
+  setCampaign: React.Dispatch<React.SetStateAction<any>>;
+  setCampaignIndustries: React.Dispatch<React.SetStateAction<IndustryData[]>>;
+  setFormData: React.Dispatch<React.SetStateAction<any>>;
+  setSelectedIndustryId: React.Dispatch<React.SetStateAction<number | null>>;
+}): void {
+  const {
+    campaignId,
+    campaignData,
+    allIndustries,
+    fetchProductsByIndustry,
+    setCampaign,
+    setCampaignIndustries,
+    setFormData,
+    setSelectedIndustryId,
+  } = args;
+
+  useEffect(() => {
+    if (!campaignId || !campaignData) {
+      return;
+    }
+    const data = campaignData as {
+      industries?: unknown;
+      industry_ids?: number[];
+    };
+    setCampaign(data);
+
+    const industriesData = data.industries;
+    const industryIds = data.industry_ids;
+
+    let campaignIndustryIds: number[] = [];
+    if (industriesData && Array.isArray(industriesData)) {
+      campaignIndustryIds = industriesData.map((ind: unknown) =>
+        typeof ind === "object" && ind !== null && "id" in ind
+          ? (ind as { id: number }).id
+          : (ind as number),
+      );
+    } else if (industryIds && Array.isArray(industryIds)) {
+      campaignIndustryIds = industryIds;
+    }
+
+    if (campaignIndustryIds.length === 0) {
+      return;
+    }
+
+    const filteredIndustries = allIndustries.filter((ind) =>
+      campaignIndustryIds.includes(ind.id),
+    );
+    setCampaignIndustries(filteredIndustries);
+
+    setFormData((prevFormData: { industry_ids?: number[] }) => {
+      if (!prevFormData.industry_ids || prevFormData.industry_ids.length === 0) {
+        return {
+          ...prevFormData,
+          industry_ids: campaignIndustryIds,
+        };
+      }
+      return prevFormData;
+    });
+
+    if (filteredIndustries.length === 1) {
+      setSelectedIndustryId(filteredIndustries[0].id);
+      fetchProductsByIndustry(filteredIndustries[0].id).catch(() => undefined);
+    }
+  }, [
+    campaignId,
+    campaignData,
+    allIndustries,
+    fetchProductsByIndustry,
+    setCampaign,
+    setCampaignIndustries,
+    setFormData,
+    setSelectedIndustryId,
+  ]);
+}
+
+type DealLineItemFormState = {
+  product_id: number | null;
+  product_service: string;
+  description: string;
+  qty: number;
+  unit_price: number;
+};
+
+function useEditDealProductLoading(
+  setSelectedIndustryId: React.Dispatch<React.SetStateAction<number | null>>,
+  setItemFormData: React.Dispatch<
+    React.SetStateAction<DealLineItemFormState>
+  >,
+) {
   const [products, setProducts] = useState<CrmProduct[]>([]);
   const [loadingProducts, setLoadingProducts] = useState(false);
-  const [campaign, setCampaign] = useState<any>(null);
-  const [campaignIndustries, setCampaignIndustries] = useState<IndustryData[]>(
-    [],
-  );
-  const [selectedIndustryId, setSelectedIndustryId] = useState<number | null>(
-    null,
-  );
-  const [sourceLead, setSourceLead] = useState<any>(null);
-  const [dealTemplate, setDealTemplate] = useState<DealTemplateData | null>(
-    null,
-  );
-  const [templateFieldsData, setTemplateFieldsData] = useState<
-    Record<string, any>
-  >({});
-  const [initialTemplateFieldValues, setInitialTemplateFieldValues] = useState<
-    Record<string, any>
-  >({});
 
-  // Business type state
-  const [businessTypeId, setBusinessTypeId] = useState<number | null>(null);
-  const [businessTypeOther, setBusinessTypeOther] = useState<string>("");
-  const [showOtherBusinessType, setShowOtherBusinessType] = useState(false);
-  const [showAllIndustries, setShowAllIndustries] = useState(false);
-  const [estimationItems, setEstimationItems] = useState<
-    Array<{
-      product_id: number;
-      product_service: string;
-      description: string;
-      qty: number;
-      unit_price: number;
-      original_currency: string;
-      original_price: number;
-    }>
-  >([]);
-  const [showAddItemModal, setShowAddItemModal] = useState(false);
-  const [editingItemIndex, setEditingItemIndex] = useState<number | null>(null);
-  const [itemFormData, setItemFormData] = useState({
-    product_id: null as number | null,
-    product_service: "",
-    description: "",
-    qty: 1,
-    unit_price: 0,
-  });
-  const [showRevisionHistoryModal, setShowRevisionHistoryModal] =
-    useState(false);
-  const [convertingPrice, setConvertingPrice] = useState(false);
+  const fetchProductsByIndustry = useCallback(async (industryId: number) => {
+    try {
+      setLoadingProducts(true);
+      const response = await getCrmProducts({
+        per_page: 100,
+        industry_id: industryId,
+      });
+      setProducts(response.data || []);
+    } catch (error) {
+      console.error("Failed to fetch products:", error);
+      toast.error("Failed to fetch products for selected industry");
+    } finally {
+      setLoadingProducts(false);
+    }
+  }, []);
 
-  const [formData, setFormData] = useState({
-    name: "",
-    ticket_id: null as number | null,
-    stage_id: undefined as number | undefined,
-    assigned_to: null as string | null,
-    expected_close_date: "",
-    company_name: "",
-    industry_ids: [] as number[],
-    decision_maker_title: "",
-    decision_maker_name: "",
-    decision_maker_phone_country_code: "",
-    decision_maker_phone: "",
-    decision_maker_email: "",
-    deal_type: "",
-    contract_length: "",
-    contract_length_custom: "",
-    billing_model: "",
-    payment_terms: "",
-    payment_terms_custom: "",
-    risk_level: "",
-    competitors: "",
-    quotation_sent: false,
-    contract_sent: false,
-    contract_received: false,
-    follow_up_date: "",
-    currency: "AED",
-    tax_percentage: "0",
-    standard_discount_percentage: "0",
-    special_discount_percentage: "0",
-  });
+  const handleIndustryChange = useCallback(
+    async (selectedOption: { value?: number | null } | null) => {
+      const industryId = selectedOption?.value ?? null;
+      setSelectedIndustryId(industryId);
+      setItemFormData((prev) => ({
+        ...prev,
+        product_id: null,
+        product_service: "",
+        unit_price: 0,
+      }));
+      if (industryId) {
+        await fetchProductsByIndustry(industryId);
+      } else {
+        setProducts([]);
+      }
+    },
+    [fetchProductsByIndustry, setItemFormData, setSelectedIndustryId],
+  );
 
+  return {
+    products,
+    setProducts,
+    loadingProducts,
+    fetchProductsByIndustry,
+    handleIndustryChange,
+  };
+}
+
+type EditDealFormActionDeps = Readonly<{
+  router: ReturnType<typeof useRouter>;
+  id: string | string[] | undefined;
+  formStep: number;
+  setFormStep: React.Dispatch<React.SetStateAction<number>>;
+  formData: any;
+  dealTemplate: DealTemplateData | null;
+  templateFieldsData: Record<string, any>;
+  businessTypeId: number | null;
+  businessTypeOther: string;
+  negotiationBar: number;
+  probability: number;
+  estimationItems: EstimationLineItem[];
+  setLoading: React.Dispatch<React.SetStateAction<boolean>>;
+  availableTemplates: unknown[];
+}>;
+
+function useEditDealFormActions(deps: EditDealFormActionDeps) {
+  const {
+    router,
+    id,
+    formStep,
+    setFormStep,
+    formData,
+    dealTemplate,
+    templateFieldsData,
+    businessTypeId,
+    businessTypeOther,
+    negotiationBar,
+    probability,
+    estimationItems,
+    setLoading,
+    availableTemplates,
+  } = deps;
+
+  const validateCurrentStep = useCallback(
+    (): boolean =>
+      validateEditDealCurrentStep({
+        formStep,
+        formData,
+        dealTemplate,
+        templateFieldsData,
+      }),
+    [formStep, formData, dealTemplate, templateFieldsData],
+  );
+
+  const handleNextStep = useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault();
+      if (!validateCurrentStep()) return;
+      let nextStep = formStep + 1;
+      if (nextStep === 2 && !dealTemplate && availableTemplates.length === 0) {
+        nextStep = 3;
+      }
+      setFormStep(Math.min(4, nextStep));
+    },
+    [
+      validateCurrentStep,
+      formStep,
+      dealTemplate,
+      availableTemplates.length,
+      setFormStep,
+    ],
+  );
+
+  const handleSubmit = useCallback(
+    async (e: React.FormEvent) => {
+      e.preventDefault();
+      if (
+        advanceEditDealFormStepOnSubmit({
+          formStep,
+          dealTemplate,
+          availableTemplates,
+          setFormStep,
+        })
+      ) {
+        return;
+      }
+
+      await submitUpdatedDealFromEditPage({
+        router,
+        id,
+        formStep,
+        setFormStep,
+        formData,
+        dealTemplate,
+        templateFieldsData,
+        businessTypeId,
+        businessTypeOther,
+        negotiationBar,
+        probability,
+        estimationItems,
+        setLoading,
+        availableTemplates,
+      });
+    },
+    [
+      router,
+      id,
+      formStep,
+      setFormStep,
+      formData,
+      dealTemplate,
+      templateFieldsData,
+      businessTypeId,
+      businessTypeOther,
+      negotiationBar,
+      probability,
+      estimationItems,
+      setLoading,
+      availableTemplates,
+    ],
+  );
+
+  return { handleNextStep, handleSubmit };
+}
+
+function useEditDealInitialLoadOnReady(args: {
+  router: ReturnType<typeof useRouter>;
+  id: string | string[] | undefined;
+  isInitialLoad: React.MutableRefObject<boolean>;
+  setFetching: React.Dispatch<React.SetStateAction<boolean>>;
+  setFormData: React.Dispatch<React.SetStateAction<any>>;
+  setBusinessTypeId: React.Dispatch<React.SetStateAction<number | null>>;
+  setBusinessTypeOther: React.Dispatch<React.SetStateAction<string>>;
+  setShowOtherBusinessType: React.Dispatch<React.SetStateAction<boolean>>;
+  setSourceLead: React.Dispatch<React.SetStateAction<unknown>>;
+  setDealTemplate: React.Dispatch<
+    React.SetStateAction<DealTemplateData | null>
+  >;
+  setTemplateFieldsData: React.Dispatch<React.SetStateAction<Record<string, any>>>;
+  setEstimates: React.Dispatch<React.SetStateAction<unknown[]>>;
+  setAttachments: React.Dispatch<React.SetStateAction<unknown[]>>;
+  setHistories: React.Dispatch<React.SetStateAction<unknown[]>>;
+  setNegotiationBar: React.Dispatch<React.SetStateAction<number>>;
+  setProbability: React.Dispatch<React.SetStateAction<number>>;
+  setEstimationItems: React.Dispatch<
+    React.SetStateAction<EstimationLineItem[]>
+  >;
+}): void {
+  const {
+    router,
+    id,
+    isInitialLoad,
+    setFetching,
+    setFormData,
+    setBusinessTypeId,
+    setBusinessTypeOther,
+    setShowOtherBusinessType,
+    setSourceLead,
+    setDealTemplate,
+    setTemplateFieldsData,
+    setEstimates,
+    setAttachments,
+    setHistories,
+    setNegotiationBar,
+    setProbability,
+    setEstimationItems,
+  } = args;
+
+  useEffect(() => {
+    runEditDealInitialLoad({
+      router,
+      dealIdParam: id,
+      isInitialLoad,
+      setFetching,
+      setFormData,
+      setBusinessTypeId,
+      setBusinessTypeOther,
+      setShowOtherBusinessType,
+      setSourceLead,
+      setDealTemplate,
+      setTemplateFieldsData,
+      setEstimates,
+      setAttachments,
+      setHistories,
+      setNegotiationBar,
+      setProbability,
+      setEstimationItems,
+    }).catch(() => undefined);
+  }, [router.isReady, id, router]);
+}
+
+function useEditDealPageQueries(sourceLead: { campaign_id?: unknown } | null) {
   const stagesQuery = useQuery({
     queryKey: crmAppKeys.crmStages.byType("deal"),
     queryFn: () => getStages("deal"),
@@ -214,114 +530,266 @@ const EditDeal = () => {
   const loadingIndustries =
     Boolean(sourceLead?.campaign_id) && campaignQuery.isFetching;
 
-  useEffect(() => {
-    if (industriesQuery.isError) {
-      console.error("Failed to fetch industries:", industriesQuery.error);
-      toast.error("Failed to fetch industries");
-    }
-  }, [industriesQuery.isError, industriesQuery.error]);
-
-  const fetchProductsByIndustry = useCallback(async (industryId: number) => {
-    try {
-      setLoadingProducts(true);
-      const response = await getCrmProducts({
-        per_page: 100,
-        industry_id: industryId,
-      });
-      setProducts(response.data || []);
-    } catch (error) {
-      console.error("Failed to fetch products:", error);
-      toast.error("Failed to fetch products for selected industry");
-    } finally {
-      setLoadingProducts(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (!sourceLead?.campaign_id || !campaignQuery.data) {
-      return;
-    }
-    const campaignData = campaignQuery.data as any;
-    setCampaign(campaignData);
-
-    const industriesData = campaignData.industries;
-    const industryIds = campaignData.industry_ids;
-
-    let campaignIndustryIds: number[] = [];
-    if (industriesData && Array.isArray(industriesData)) {
-      campaignIndustryIds = industriesData.map((ind: any) =>
-        typeof ind === "object" ? ind.id : ind,
-      );
-    } else if (industryIds && Array.isArray(industryIds)) {
-      campaignIndustryIds = industryIds;
-    }
-
-    if (campaignIndustryIds.length === 0) {
-      return;
-    }
-
-    const filteredIndustries = allIndustries.filter((ind: IndustryData) =>
-      campaignIndustryIds.includes(ind.id),
-    );
-    setCampaignIndustries(filteredIndustries);
-
-    setFormData((prevFormData) => {
-      if (
-        !prevFormData.industry_ids ||
-        prevFormData.industry_ids.length === 0
-      ) {
-        return {
-          ...prevFormData,
-          industry_ids: campaignIndustryIds,
-        };
-      }
-      return prevFormData;
-    });
-
-    if (filteredIndustries.length === 1) {
-      setSelectedIndustryId(filteredIndustries[0].id);
-      fetchProductsByIndustry(filteredIndustries[0].id).catch(() => undefined);
-    }
-  }, [
-    sourceLead?.campaign_id,
-    campaignQuery.data,
+  return {
+    stages,
+    extensions,
+    businessTypes,
     allIndustries,
-    fetchProductsByIndustry,
-  ]);
-
-  // Handle industry selection change
-  const handleIndustryChange = async (selectedOption: any) => {
-    const industryId = selectedOption?.value || null;
-    setSelectedIndustryId(industryId);
-
-    // Reset product selection when industry changes
-    setItemFormData({
-      ...itemFormData,
-      product_id: null,
-      product_service: "",
-      unit_price: 0,
-    });
-
-    if (industryId) {
-      await fetchProductsByIndustry(industryId);
-    } else {
-      setProducts([]);
-    }
+    loadingAllIndustries,
+    availableTemplates,
+    campaignQuery,
+    industriesQuery,
+    loadingIndustries,
   };
+}
 
-  useEffect(() => {
-    runEditDealInitialLoad({
+type EditDealLoadedPhaseIntegrationArgs = Readonly<{
+  router: ReturnType<typeof useRouter>;
+  id: string | string[] | undefined;
+  isInitialLoad: React.MutableRefObject<boolean>;
+  showAllIndustries: boolean;
+  formData: { industry_ids?: number[] };
+  allIndustries: IndustryData[];
+  campaignIndustries: IndustryData[];
+  industriesQuery: { isError: boolean; error: unknown };
+  sourceLead: { campaign_id?: unknown } | null;
+  campaignQuery: { data: unknown };
+  fetchProductsByIndustry: (industryId: number) => Promise<void>;
+  setCampaign: React.Dispatch<React.SetStateAction<any>>;
+  setCampaignIndustries: React.Dispatch<React.SetStateAction<IndustryData[]>>;
+  setFormData: React.Dispatch<React.SetStateAction<any>>;
+  setSelectedIndustryId: React.Dispatch<React.SetStateAction<number | null>>;
+  setFetching: React.Dispatch<React.SetStateAction<boolean>>;
+  setBusinessTypeId: React.Dispatch<React.SetStateAction<number | null>>;
+  setBusinessTypeOther: React.Dispatch<React.SetStateAction<string>>;
+  setShowOtherBusinessType: React.Dispatch<React.SetStateAction<boolean>>;
+  setSourceLead: React.Dispatch<React.SetStateAction<unknown>>;
+  setDealTemplate: React.Dispatch<
+    React.SetStateAction<DealTemplateData | null>
+  >;
+  setTemplateFieldsData: React.Dispatch<
+    React.SetStateAction<Record<string, any>>
+  >;
+  setEstimates: React.Dispatch<React.SetStateAction<unknown[]>>;
+  setAttachments: React.Dispatch<React.SetStateAction<unknown[]>>;
+  setHistories: React.Dispatch<React.SetStateAction<unknown[]>>;
+  setNegotiationBar: React.Dispatch<React.SetStateAction<number>>;
+  setProbability: React.Dispatch<React.SetStateAction<number>>;
+  setEstimationItems: React.Dispatch<
+    React.SetStateAction<EstimationLineItem[]>
+  >;
+  formStep: number;
+  setFormStep: React.Dispatch<React.SetStateAction<number>>;
+  dealTemplate: DealTemplateData | null;
+  templateFieldsData: Record<string, any>;
+  businessTypeId: number | null;
+  businessTypeOther: string;
+  negotiationBar: number;
+  probability: number;
+  estimationItems: EstimationLineItem[];
+  setLoading: React.Dispatch<React.SetStateAction<boolean>>;
+  availableTemplates: unknown[];
+}>;
+
+function useEditDealLoadedPhaseIntegration(a: EditDealLoadedPhaseIntegrationArgs) {
+  const addItemAvailableIndustries = useMemo(
+    () =>
+      resolveAddItemModalAvailableIndustries(
+        a.showAllIndustries,
+        a.formData.industry_ids ?? [],
+        a.allIndustries,
+        a.campaignIndustries,
+      ),
+    [
+      a.showAllIndustries,
+      a.formData.industry_ids,
+      a.allIndustries,
+      a.campaignIndustries,
+    ],
+  );
+
+  useIndustriesQueryErrorToast(a.industriesQuery.isError, a.industriesQuery.error);
+
+  useCampaignIndustriesFromSourceLead({
+    campaignId: a.sourceLead?.campaign_id as string | number | undefined,
+    campaignData: a.campaignQuery.data,
+    allIndustries: a.allIndustries,
+    fetchProductsByIndustry: a.fetchProductsByIndustry,
+    setCampaign: a.setCampaign,
+    setCampaignIndustries: a.setCampaignIndustries,
+    setFormData: a.setFormData,
+    setSelectedIndustryId: a.setSelectedIndustryId,
+  });
+
+  useEditDealInitialLoadOnReady({
+    router: a.router,
+    id: a.id,
+    isInitialLoad: a.isInitialLoad,
+    setFetching: a.setFetching,
+    setFormData: a.setFormData,
+    setBusinessTypeId: a.setBusinessTypeId,
+    setBusinessTypeOther: a.setBusinessTypeOther,
+    setShowOtherBusinessType: a.setShowOtherBusinessType,
+    setSourceLead: a.setSourceLead,
+    setDealTemplate: a.setDealTemplate,
+    setTemplateFieldsData: a.setTemplateFieldsData,
+    setEstimates: a.setEstimates,
+    setAttachments: a.setAttachments,
+    setHistories: a.setHistories,
+    setNegotiationBar: a.setNegotiationBar,
+    setProbability: a.setProbability,
+    setEstimationItems: a.setEstimationItems,
+  });
+
+  const { handleNextStep, handleSubmit } = useEditDealFormActions({
+    router: a.router,
+    id: a.id,
+    formStep: a.formStep,
+    setFormStep: a.setFormStep,
+    formData: a.formData,
+    dealTemplate: a.dealTemplate,
+    templateFieldsData: a.templateFieldsData,
+    businessTypeId: a.businessTypeId,
+    businessTypeOther: a.businessTypeOther,
+    negotiationBar: a.negotiationBar,
+    probability: a.probability,
+    estimationItems: a.estimationItems,
+    setLoading: a.setLoading,
+    availableTemplates: a.availableTemplates,
+  });
+
+  return { addItemAvailableIndustries, handleNextStep, handleSubmit };
+}
+
+const EditDeal = () => { // NOSONAR S3776 — wizard markup; logic extracted to hooks/helpers above.
+  const router = useRouter();
+  const { id } = router.query;
+  const [formStep, setFormStep] = useState(0);
+  const [loading, setLoading] = useState(false);
+  const [fetching, setFetching] = useState(true);
+  const [estimates, setEstimates] = useState<any[]>([]);
+  const [attachments, setAttachments] = useState<any[]>([]);
+  const [histories, setHistories] = useState<any[]>([]);
+  const [negotiationBar, setNegotiationBar] = useState(0);
+  const [probability, setProbability] = useState(0);
+  const isInitialLoad = useRef(true);
+  const [_campaign, setCampaign] = useState<any>(null);
+  const [campaignIndustries, setCampaignIndustries] = useState<IndustryData[]>(
+    [],
+  );
+  const [selectedIndustryId, setSelectedIndustryId] = useState<number | null>(
+    null,
+  );
+  const [sourceLead, setSourceLead] = useState<any>(null);
+  const [dealTemplate, setDealTemplate] = useState<DealTemplateData | null>(
+    null,
+  );
+  const [templateFieldsData, setTemplateFieldsData] = useState<
+    Record<string, any>
+  >({});
+
+  // Business type state
+  const [businessTypeId, setBusinessTypeId] = useState<number | null>(null);
+  const [businessTypeOther, setBusinessTypeOther] = useState<string>("");
+  const [showOtherBusinessType, setShowOtherBusinessType] = useState(false);
+  const [showAllIndustries, setShowAllIndustries] = useState(false);
+  const [estimationItems, setEstimationItems] = useState<
+    Array<{
+      product_id: number;
+      product_service: string;
+      description: string;
+      qty: number;
+      unit_price: number;
+      original_currency: string;
+      original_price: number;
+    }>
+  >([]);
+  const [showAddItemModal, setShowAddItemModal] = useState(false);
+  const [editingItemIndex, setEditingItemIndex] = useState<number | null>(null);
+  const [itemFormData, setItemFormData] = useState({
+    product_id: null as number | null,
+    product_service: "",
+    description: "",
+    qty: 1,
+    unit_price: 0,
+  });
+  const {
+    products,
+    setProducts,
+    loadingProducts,
+    fetchProductsByIndustry,
+    handleIndustryChange,
+  } = useEditDealProductLoading(setSelectedIndustryId, setItemFormData);
+  const [showRevisionHistoryModal, setShowRevisionHistoryModal] =
+    useState(false);
+  const [convertingPrice, setConvertingPrice] = useState(false);
+
+  const [formData, setFormData] = useState({
+    name: "",
+    ticket_id: null as number | null,
+    stage_id: undefined as number | undefined,
+    assigned_to: null as string | null,
+    expected_close_date: "",
+    company_name: "",
+    industry_ids: [] as number[],
+    decision_maker_title: "",
+    decision_maker_name: "",
+    decision_maker_phone_country_code: "",
+    decision_maker_phone: "",
+    decision_maker_email: "",
+    deal_type: "",
+    contract_length: "",
+    contract_length_custom: "",
+    billing_model: "",
+    payment_terms: "",
+    payment_terms_custom: "",
+    risk_level: "",
+    competitors: "",
+    quotation_sent: false,
+    contract_sent: false,
+    contract_received: false,
+    follow_up_date: "",
+    currency: "AED",
+    tax_percentage: "0",
+    standard_discount_percentage: "0",
+    special_discount_percentage: "0",
+  });
+
+  const {
+    stages,
+    extensions,
+    businessTypes,
+    allIndustries,
+    loadingAllIndustries,
+    availableTemplates,
+    campaignQuery,
+    industriesQuery,
+    loadingIndustries,
+  } = useEditDealPageQueries(sourceLead);
+
+  const { addItemAvailableIndustries, handleNextStep, handleSubmit } =
+    useEditDealLoadedPhaseIntegration({
       router,
-      dealIdParam: id,
+      id,
       isInitialLoad,
-      setFetching,
+      showAllIndustries,
+      formData,
+      allIndustries,
+      campaignIndustries,
+      industriesQuery,
+      sourceLead,
+      campaignQuery,
+      fetchProductsByIndustry,
+      setCampaign,
+      setCampaignIndustries,
       setFormData,
+      setSelectedIndustryId,
+      setFetching,
       setBusinessTypeId,
       setBusinessTypeOther,
       setShowOtherBusinessType,
       setSourceLead,
       setDealTemplate,
-      setInitialTemplateFieldValues,
       setTemplateFieldsData,
       setEstimates,
       setAttachments,
@@ -329,48 +797,8 @@ const EditDeal = () => {
       setNegotiationBar,
       setProbability,
       setEstimationItems,
-    }).catch(() => undefined);
-  }, [router.isReady, id, router]);
-
-  const validateCurrentStep = (): boolean =>
-    validateEditDealCurrentStep({
-      formStep,
-      formData,
-      dealTemplate,
-      templateFieldsData,
-    });
-
-  const handleNextStep = (e: React.MouseEvent) => {
-    e.preventDefault();
-    if (validateCurrentStep()) {
-      let nextStep = formStep + 1;
-      // Skip step 2 (Characteristics) if no templates are available
-      if (nextStep === 2 && !dealTemplate && availableTemplates.length === 0) {
-        nextStep = 3;
-      }
-      setFormStep(Math.min(4, nextStep));
-    }
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (
-      advanceEditDealFormStepOnSubmit({
-        formStep,
-        dealTemplate,
-        availableTemplates,
-        setFormStep,
-      })
-    ) {
-      return;
-    }
-
-    await submitUpdatedDealFromEditPage({
-      router,
-      id,
       formStep,
       setFormStep,
-      formData,
       dealTemplate,
       templateFieldsData,
       businessTypeId,
@@ -381,7 +809,6 @@ const EditDeal = () => {
       setLoading,
       availableTemplates,
     });
-  };
 
   if (fetching) {
     return (
@@ -567,56 +994,11 @@ const EditDeal = () => {
                                       try {
                                         setConvertingPrice(true);
                                         const convertedItems =
-                                          await Promise.all(
-                                            estimationItems.map(
-                                              async (item) => {
-                                                const product = products.find(
-                                                  (p) =>
-                                                    p.id === item.product_id,
-                                                );
-                                                if (product) {
-                                                  const productCurrency =
-                                                    product.currency.toUpperCase();
-                                                  const oldDealCurrency =
-                                                    formData.currency.toUpperCase();
-                                                  const newDealCurrency =
-                                                    newCurrency.toUpperCase();
-
-                                                  // If product currency matches new deal currency, use original price
-                                                  if (
-                                                    productCurrency ===
-                                                    newDealCurrency
-                                                  ) {
-                                                    return {
-                                                      ...item,
-                                                      unit_price:
-                                                        Number.parseFloat(
-                                                          product.price,
-                                                        ) || item.unit_price,
-                                                    };
-                                                  }
-
-                                                  // Convert from old deal currency to new deal currency
-                                                  if (
-                                                    oldDealCurrency !==
-                                                    newDealCurrency
-                                                  ) {
-                                                    const convertedPrice =
-                                                      await convertCurrency(
-                                                        item.unit_price,
-                                                        oldDealCurrency,
-                                                        newDealCurrency,
-                                                      );
-                                                    return {
-                                                      ...item,
-                                                      unit_price:
-                                                        convertedPrice,
-                                                    };
-                                                  }
-                                                }
-                                                return item;
-                                              },
-                                            ),
+                                          await convertEstimationItemsToNewDealCurrency(
+                                            estimationItems,
+                                            products,
+                                            formData.currency,
+                                            newCurrency,
                                           );
                                         setEstimationItems(convertedItems);
                                       } catch (error) {
@@ -693,13 +1075,10 @@ const EditDeal = () => {
                                   <span className="text-danger">*</span>
                                 </Form.Label>
                                 <Form.Select
-                                  value={
-                                    showOtherBusinessType
-                                      ? "other"
-                                      : businessTypeId
-                                        ? String(businessTypeId)
-                                        : ""
-                                  }
+                                  value={getBusinessTypeSelectValue(
+                                    showOtherBusinessType,
+                                    businessTypeId,
+                                  )}
                                   onChange={(e) => {
                                     const value = e.target.value;
                                     if (value === "other") {
@@ -850,8 +1229,11 @@ const EditDeal = () => {
                                               decision_maker_phone: value,
                                             }));
                                           }
-                                        } catch (error) {
-                                          // If parsing fails, store full number in phone field
+                                        } catch (error: unknown) {
+                                          console.debug(
+                                            "Phone number parse failed, storing raw value",
+                                            error,
+                                          );
                                           setFormData((prev) => ({
                                             ...prev,
                                             decision_maker_phone_country_code:
@@ -937,6 +1319,78 @@ const EditDeal = () => {
                                         templateFieldsData[field.field_name] ||
                                         "";
 
+                                      let templateFieldInput: React.ReactNode;
+                                      if (field.field_type === "dropdown") {
+                                        templateFieldInput = (
+                                          <Form.Select
+                                            value={fieldValue}
+                                            onChange={(e) =>
+                                              setTemplateFieldsData({
+                                                ...templateFieldsData,
+                                                [field.field_name]:
+                                                  e.target.value,
+                                              })
+                                            }
+                                            required={field.is_required}
+                                          >
+                                            <option value="">
+                                              Select {field.field_name}
+                                            </option>
+                                            {field.options &&
+                                              Array.isArray(field.options) &&
+                                              field.options.map(
+                                                (option: string) => (
+                                                  <option
+                                                    key={`${field.field_name}:${option}`}
+                                                    value={option}
+                                                  >
+                                                    {option}
+                                                  </option>
+                                                ),
+                                              )}
+                                          </Form.Select>
+                                        );
+                                      } else if (
+                                        field.field_type === "text" ||
+                                        !field.field_type
+                                      ) {
+                                        templateFieldInput = (
+                                          <Form.Control
+                                            type="text"
+                                            value={fieldValue}
+                                            onChange={(e) =>
+                                              setTemplateFieldsData({
+                                                ...templateFieldsData,
+                                                [field.field_name]:
+                                                  e.target.value,
+                                              })
+                                            }
+                                            placeholder={`Enter ${field.field_name}`}
+                                            required={field.is_required}
+                                          />
+                                        );
+                                      } else {
+                                        const extraInputType =
+                                          getDealTemplateFieldInputType(
+                                            field.field_type,
+                                          );
+                                        templateFieldInput = (
+                                          <Form.Control
+                                            type={extraInputType}
+                                            value={fieldValue}
+                                            onChange={(e) =>
+                                              setTemplateFieldsData({
+                                                ...templateFieldsData,
+                                                [field.field_name]:
+                                                  e.target.value,
+                                              })
+                                            }
+                                            placeholder={`Enter ${field.field_name}`}
+                                            required={field.is_required}
+                                          />
+                                        );
+                                      }
+
                                       return (
                                         <Col md={6} key={field.field_name}>
                                           <Form.Group className="mb-3">
@@ -949,76 +1403,7 @@ const EditDeal = () => {
                                                 </span>
                                               )}
                                             </Form.Label>
-                                            {field.field_type === "dropdown" ? (
-                                              <Form.Select
-                                                value={fieldValue}
-                                                onChange={(e) =>
-                                                  setTemplateFieldsData({
-                                                    ...templateFieldsData,
-                                                    [field.field_name]:
-                                                      e.target.value,
-                                                  })
-                                                }
-                                                required={field.is_required}
-                                              >
-                                                <option value="">
-                                                  Select {field.field_name}
-                                                </option>
-                                                {field.options &&
-                                                  Array.isArray(
-                                                    field.options,
-                                                  ) &&
-                                                  field.options.map(
-                                                    (
-                                                      option: string,
-                                                      index: number,
-                                                    ) => (
-                                                      <option
-                                                        key={index}
-                                                        value={option}
-                                                      >
-                                                        {option}
-                                                      </option>
-                                                    ),
-                                                  )}
-                                              </Form.Select>
-                                            ) : field.field_type === "text" ||
-                                              !field.field_type ? (
-                                              <Form.Control
-                                                type="text"
-                                                value={fieldValue}
-                                                onChange={(e) =>
-                                                  setTemplateFieldsData({
-                                                    ...templateFieldsData,
-                                                    [field.field_name]:
-                                                      e.target.value,
-                                                  })
-                                                }
-                                                placeholder={`Enter ${field.field_name}`}
-                                                required={field.is_required}
-                                              />
-                                            ) : (
-                                              <Form.Control
-                                                type={
-                                                  field.field_type === "date"
-                                                    ? "date"
-                                                    : field.field_type ===
-                                                        "email"
-                                                      ? "email"
-                                                      : "text"
-                                                }
-                                                value={fieldValue}
-                                                onChange={(e) =>
-                                                  setTemplateFieldsData({
-                                                    ...templateFieldsData,
-                                                    [field.field_name]:
-                                                      e.target.value,
-                                                  })
-                                                }
-                                                placeholder={`Enter ${field.field_name}`}
-                                                required={field.is_required}
-                                              />
-                                            )}
+                                            {templateFieldInput}
                                           </Form.Group>
                                         </Col>
                                       );
@@ -1468,7 +1853,9 @@ const EditDeal = () => {
                                         item.original_price !== item.unit_price;
 
                                       return (
-                                        <tr key={index}>
+                                        <tr
+                                          key={`${item.product_id}-${item.product_service}-${item.unit_price}-${item.qty}`}
+                                        >
                                           <td>{index + 1}</td>
                                           <td
                                             className="fw-semibold"
@@ -1884,9 +2271,9 @@ const EditDeal = () => {
                     >
                       <Modal.Header closeButton>
                         <Modal.Title>
-                          {editingItemIndex !== null
-                            ? "Edit Item"
-                            : "Add New Item"}
+                          {editingItemIndex === null
+                            ? "Add New Item"
+                            : "Edit Item"}
                         </Modal.Title>
                       </Modal.Header>
                       <Form
@@ -1910,12 +2297,12 @@ const EditDeal = () => {
                               ) || itemFormData.unit_price,
                           };
 
-                          if (editingItemIndex !== null) {
+                          if (editingItemIndex === null) {
+                            setEstimationItems([...estimationItems, newItem]);
+                          } else {
                             const updated = [...estimationItems];
                             updated[editingItemIndex] = newItem;
                             setEstimationItems(updated);
-                          } else {
-                            setEstimationItems([...estimationItems, newItem]);
                           }
 
                           setShowAddItemModal(false);
@@ -1960,74 +2347,42 @@ const EditDeal = () => {
                                     }}
                                   />
                                 </div>
-                                {(() => {
-                                  // Determine available industries based on switch
-                                  const availableIndustries = showAllIndustries
-                                    ? allIndustries
-                                    : formData.industry_ids &&
-                                        formData.industry_ids.length > 0
-                                      ? allIndustries.filter((ind) =>
-                                          formData.industry_ids.includes(
-                                            ind.id,
-                                          ),
-                                        )
-                                      : campaignIndustries;
-
-                                  return (
-                                    <Select
-                                      value={
-                                        selectedIndustryId
-                                          ? {
-                                              value: selectedIndustryId,
-                                              label:
-                                                availableIndustries.find(
-                                                  (ind) =>
-                                                    ind.id ===
-                                                    selectedIndustryId,
-                                                )?.name || "",
-                                            }
-                                          : null
-                                      }
-                                      onChange={handleIndustryChange}
-                                      options={availableIndustries.map(
-                                        (industry) => ({
-                                          value: industry.id,
-                                          label: industry.name,
-                                        }),
-                                      )}
-                                      placeholder="Select product group..."
-                                      isSearchable
-                                      isLoading={
-                                        loadingIndustries ||
-                                        loadingAllIndustries
-                                      }
-                                      isDisabled={
-                                        loadingIndustries ||
-                                        loadingAllIndustries
-                                      }
-                                      required
-                                    />
-                                  );
-                                })()}
-                                {(() => {
-                                  const availableIndustries = showAllIndustries
-                                    ? allIndustries
-                                    : formData.industry_ids &&
-                                        formData.industry_ids.length > 0
-                                      ? allIndustries.filter((ind) =>
-                                          formData.industry_ids.includes(
-                                            ind.id,
-                                          ),
-                                        )
-                                      : campaignIndustries;
-
-                                  return availableIndustries.length === 1 &&
-                                    !showAllIndustries ? (
+                                <Select
+                                  value={
+                                    selectedIndustryId
+                                      ? {
+                                          value: selectedIndustryId,
+                                          label:
+                                            addItemAvailableIndustries.find(
+                                              (ind) =>
+                                                ind.id === selectedIndustryId,
+                                            )?.name || "",
+                                        }
+                                      : null
+                                  }
+                                  onChange={handleIndustryChange}
+                                  options={addItemAvailableIndustries.map(
+                                    (industry) => ({
+                                      value: industry.id,
+                                      label: industry.name,
+                                    }),
+                                  )}
+                                  placeholder="Select product group..."
+                                  isSearchable
+                                  isLoading={
+                                    loadingIndustries || loadingAllIndustries
+                                  }
+                                  isDisabled={
+                                    loadingIndustries || loadingAllIndustries
+                                  }
+                                  required
+                                />
+                                {addItemAvailableIndustries.length === 1 &&
+                                  !showAllIndustries && (
                                     <Form.Text className="text-muted">
                                       Only one industry available
                                     </Form.Text>
-                                  ) : null;
-                                })()}
+                                  )}
                               </Form.Group>
                             </Col>
 
@@ -2165,7 +2520,9 @@ const EditDeal = () => {
                                   onChange={(e) =>
                                     setItemFormData({
                                       ...itemFormData,
-                                      qty: parseInt(e.target.value) || 1,
+                                      qty:
+                                        Number.parseInt(e.target.value, 10) ||
+                                        1,
                                     })
                                   }
                                   required
@@ -2181,9 +2538,9 @@ const EditDeal = () => {
                                     <span className="ms-2 text-muted small">
                                       <span
                                         className="spinner-border spinner-border-sm me-1"
-                                        role="status"
                                         aria-hidden="true"
-                                      ></span>
+                                      />
+                                      {" "}
                                       Converting...
                                     </span>
                                   )}
@@ -2311,15 +2668,15 @@ const EditDeal = () => {
                                   ) || itemFormData.unit_price,
                               };
 
-                              if (editingItemIndex !== null) {
-                                const updated = [...estimationItems];
-                                updated[editingItemIndex] = newItem;
-                                setEstimationItems(updated);
-                              } else {
+                              if (editingItemIndex === null) {
                                 setEstimationItems([
                                   ...estimationItems,
                                   newItem,
                                 ]);
+                              } else {
+                                const updated = [...estimationItems];
+                                updated[editingItemIndex] = newItem;
+                                setEstimationItems(updated);
                               }
 
                               setShowAddItemModal(false);
@@ -2334,9 +2691,9 @@ const EditDeal = () => {
                               });
                             }}
                           >
-                            {editingItemIndex !== null
-                              ? "Update Item"
-                              : "Add Item"}
+                            {editingItemIndex === null
+                              ? "Add Item"
+                              : "Update Item"}
                           </Button>
                         </Modal.Footer>
                       </Form>
@@ -2490,8 +2847,14 @@ const EditDeal = () => {
                                                     setShowRevisionHistoryModal(
                                                       false,
                                                     );
+                                                    const loadedVersionLabel =
+                                                      formatRevisionVersionLabel(
+                                                        estimate.version,
+                                                        estimates.length,
+                                                        index,
+                                                      );
                                                     toast.success(
-                                                      `${estimate.version || `v${estimates.length - index}.0`} has been loaded successfully!`,
+                                                      `${loadedVersionLabel} has been loaded successfully!`,
                                                     );
                                                   } else {
                                                     toast.error(

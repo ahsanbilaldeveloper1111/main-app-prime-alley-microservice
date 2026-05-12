@@ -22,91 +22,174 @@ import { GetHierarchyData } from "@utils/users";
 import { Button, Row, Col, Form, Card, Badge, Table, Modal } from "react-bootstrap";
 import { CheckCircle, ChevronLeft, ChevronRight, ArrowLeft, Plus, Edit, Trash2, Package } from "lucide-react";
 import Select from 'react-select';
-import PhoneInput from "react-phone-number-input";
-import { parsePhoneNumber } from "react-phone-number-input";
+import PhoneInput, { parsePhoneNumber } from "react-phone-number-input";
 import "react-phone-number-input/style.css";
-import Link from "next/link";
 import { toast } from "react-toastify";
 import { useRouter } from "next/router";
-import { useSession } from "next-auth/react";
 
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
 import { ModuleSlug, ValidationType, checkRequiredFields } from '@utils/Helper';
 import { convertCurrency, formatCurrency } from '@utils/currency';
 import { crmAppKeys } from "../../../../query/keys";
+import type { UseQueryResult } from "@tanstack/react-query";
 
-const CreateDeal = () => {
-  const router = useRouter();
-  const { data: session } = useSession();
-  const [formStep, setFormStep] = useState(0);
-  const [loading, setLoading] = useState(false);
+function useIndustriesQueryErrorToast(
+  isError: boolean,
+  error: unknown,
+): void {
+  useEffect(() => {
+    if (!isError) return;
+    console.error("Failed to fetch industries:", error);
+    toast.error("Failed to fetch industries");
+  }, [isError, error]);
+}
+
+function useCampaignIndustriesFromSourceLead(args: {
+  campaignId: string | number | undefined;
+  campaignData: unknown;
+  allIndustries: IndustryData[];
+  fetchProductsByIndustry: (industryId: number) => Promise<void>;
+  setCampaign: React.Dispatch<React.SetStateAction<any>>;
+  setCampaignIndustries: React.Dispatch<React.SetStateAction<IndustryData[]>>;
+  setFormData: React.Dispatch<React.SetStateAction<any>>;
+  setSelectedIndustryId: React.Dispatch<React.SetStateAction<number | null>>;
+}): void {
+  const {
+    campaignId,
+    campaignData,
+    allIndustries,
+    fetchProductsByIndustry,
+    setCampaign,
+    setCampaignIndustries,
+    setFormData,
+    setSelectedIndustryId,
+  } = args;
+
+  useEffect(() => {
+    if (!campaignId || !campaignData) {
+      return;
+    }
+    const data = campaignData as {
+      industries?: unknown;
+      industry_ids?: number[];
+    };
+    setCampaign(data);
+
+    const industriesData = data.industries;
+    const industryIds = data.industry_ids;
+
+    let campaignIndustryIds: number[] = [];
+    if (industriesData && Array.isArray(industriesData)) {
+      campaignIndustryIds = industriesData.map((ind: unknown) =>
+        typeof ind === "object" && ind !== null && "id" in ind
+          ? (ind as { id: number }).id
+          : (ind as number),
+      );
+    } else if (industryIds && Array.isArray(industryIds)) {
+      campaignIndustryIds = industryIds;
+    }
+
+    if (campaignIndustryIds.length === 0) {
+      return;
+    }
+
+    const filteredIndustries = allIndustries.filter((ind) =>
+      campaignIndustryIds.includes(ind.id),
+    );
+    setCampaignIndustries(filteredIndustries);
+
+    setFormData((prevFormData: { industry_ids?: number[] }) => {
+      if (!prevFormData.industry_ids || prevFormData.industry_ids.length === 0) {
+        return {
+          ...prevFormData,
+          industry_ids: campaignIndustryIds,
+        };
+      }
+      return prevFormData;
+    });
+
+    if (filteredIndustries.length === 1) {
+      setSelectedIndustryId(filteredIndustries[0].id);
+      fetchProductsByIndustry(filteredIndustries[0].id).catch(() => undefined);
+    }
+  }, [
+    campaignId,
+    campaignData,
+    allIndustries,
+    fetchProductsByIndustry,
+    setCampaign,
+    setCampaignIndustries,
+    setFormData,
+    setSelectedIndustryId,
+  ]);
+}
+
+type CreateDealLineItemFormState = {
+  product_id: number | null;
+  product_service: string;
+  description: string;
+  qty: number;
+  unit_price: number;
+};
+
+function useCreateDealProductLoading(
+  setSelectedIndustryId: React.Dispatch<React.SetStateAction<number | null>>,
+  setItemFormData: React.Dispatch<
+    React.SetStateAction<CreateDealLineItemFormState>
+  >,
+) {
   const [products, setProducts] = useState<CrmProduct[]>([]);
   const [loadingProducts, setLoadingProducts] = useState(false);
-  const [campaign, setCampaign] = useState<any>(null);
-  const [campaignIndustries, setCampaignIndustries] = useState<IndustryData[]>([]);
-  const [selectedIndustryId, setSelectedIndustryId] = useState<number | null>(null);
-  const [showAllIndustries, setShowAllIndustries] = useState(false);
-  const [estimationItems, setEstimationItems] = useState<Array<{
-    product_id: number;
-    product_service: string;
-    description: string;
-    qty: number;
-    unit_price: number;
-    original_currency: string;
-    original_price: number;
-  }>>([]);
-  const [showAddItemModal, setShowAddItemModal] = useState(false);
-  const [editingItemIndex, setEditingItemIndex] = useState<number | null>(null);
-  const [itemFormData, setItemFormData] = useState({
-    product_id: null as number | null,
-    product_service: "",
-    description: "",
-    qty: 1,
-    unit_price: 0,
-  });
-  const [taxPercentage, setTaxPercentage] = useState(0);
-  const [standardDiscountPercentage, setStandardDiscountPercentage] = useState(0);
-  const [specialDiscountPercentage, setSpecialDiscountPercentage] = useState(0);
-  
-  const [formData, setFormData] = useState({
-    name: "",
-    ticket_id: null as number | null,
-    lead_id: null as number | null,
-    stage_id: undefined as number | undefined,
-    assigned_to: null as string | null,
-    expected_close_date: "",
-    company_name: "",
-    company_domain: "",
-    industry_ids: [] as number[],
-    decision_maker_title: "",
-    decision_maker_name: "",
-    decision_maker_phone_country_code: "",
-    decision_maker_phone: "",
-    decision_maker_email: "",
-    deal_type: "",
-    contract_length: "",
-    contract_length_custom: "",
-    billing_model: "",
-    payment_terms: "",
-    payment_terms_custom: "",
-    risk_level: "",
-    competitors: "",
-    quotation_sent: false,
-    contract_sent: false,
-    contract_received: false,
-    follow_up_date: "",
-    currency: "AED",
-    tax_percentage: "0",
-    standard_discount_percentage: "0",
-    special_discount_percentage: "0",
-  });
-  const [sourceLead, setSourceLead] = useState<any>(null);
-  const [convertingPrice, setConvertingPrice] = useState(false);
-  const [dealTemplate, setDealTemplate] = useState<DealTemplateData | null>(null);
-  const [loadingTemplate, setLoadingTemplate] = useState(false);
-  const [templateFieldsData, setTemplateFieldsData] = useState<Record<string, any>>({});
 
+  const fetchProductsByIndustry = useCallback(async (industryId: number) => {
+    try {
+      setLoadingProducts(true);
+      const response = await getCrmProducts({
+        per_page: 100,
+        industry_id: industryId,
+      });
+      setProducts(response.data || []);
+    } catch (error) {
+      console.error("Failed to fetch products:", error);
+      toast.error("Failed to fetch products for selected industry");
+    } finally {
+      setLoadingProducts(false);
+    }
+  }, []);
+
+  const handleIndustryChange = useCallback(
+    async (selectedOption: { value?: number | null } | null) => {
+      const industryId = selectedOption?.value ?? null;
+      setSelectedIndustryId(industryId);
+      setItemFormData((prev) => ({
+        ...prev,
+        product_id: null,
+        product_service: "",
+        unit_price: 0,
+      }));
+      if (industryId) {
+        await fetchProductsByIndustry(industryId);
+      } else {
+        setProducts([]);
+      }
+    },
+    [fetchProductsByIndustry, setItemFormData, setSelectedIndustryId],
+  );
+
+  return {
+    products,
+    setProducts,
+    loadingProducts,
+    fetchProductsByIndustry,
+    handleIndustryChange,
+  };
+}
+
+function useCreateDealPageQueries(
+  router: ReturnType<typeof useRouter>,
+  sourceLead: { campaign_id?: unknown } | null,
+) {
   const stagesQuery = useQuery({
     queryKey: crmAppKeys.crmStages.byType("deal"),
     queryFn: () => getStages("deal"),
@@ -140,10 +223,16 @@ const CreateDeal = () => {
   const loadingAllIndustries = industriesQuery.isPending;
 
   const parsedLeadId = useMemo(() => {
-    if (!router.isReady || router.query.lead_id == null || router.query.lead_id === "") {
+    if (
+      !router.isReady ||
+      router.query.lead_id == null ||
+      router.query.lead_id === ""
+    ) {
       return null;
     }
-    const raw = Array.isArray(router.query.lead_id) ? router.query.lead_id[0] : router.query.lead_id;
+    const raw = Array.isArray(router.query.lead_id)
+      ? router.query.lead_id[0]
+      : router.query.lead_id;
     const n = Number(raw);
     return Number.isFinite(n) && n > 0 ? n : null;
   }, [router.isReady, router.query.lead_id]);
@@ -164,88 +253,55 @@ const CreateDeal = () => {
 
   const loadingLead = leadQuery.isPending && parsedLeadId != null;
 
-  const campaignIdForQuery = sourceLead?.campaign_id ? Number(sourceLead.campaign_id) : 0;
+  const campaignIdForQuery = sourceLead?.campaign_id
+    ? Number(sourceLead.campaign_id)
+    : 0;
   const campaignQuery = useQuery({
     queryKey: crmAppKeys.campaigns.byCampaignId(campaignIdForQuery),
     queryFn: () => getCampaignById(campaignIdForQuery),
     enabled: Boolean(sourceLead?.campaign_id) && campaignIdForQuery > 0,
   });
 
-  const loadingIndustries = Boolean(sourceLead?.campaign_id) && campaignQuery.isFetching;
+  const loadingIndustries =
+    Boolean(sourceLead?.campaign_id) && campaignQuery.isFetching;
 
-  const leadHydratedIdRef = useRef<number | null>(null);
+  return {
+    stages,
+    extensions,
+    businessTypes,
+    allIndustries,
+    loadingAllIndustries,
+    parsedLeadId,
+    leadQuery,
+    loadingLead,
+    campaignQuery,
+    loadingIndustries,
+    industriesQuery,
+  };
+}
 
-  // Business type state
-  const [businessTypeId, setBusinessTypeId] = useState<number | null>(null);
-  const [businessTypeOther, setBusinessTypeOther] = useState<string>("");
-  const [showOtherBusinessType, setShowOtherBusinessType] = useState(false);
-
-  useEffect(() => {
-    if (industriesQuery.isError) {
-      console.error("Failed to fetch industries:", industriesQuery.error);
-      toast.error("Failed to fetch industries");
-    }
-  }, [industriesQuery.isError, industriesQuery.error]);
-
-  // Fetch products by industry
-  const fetchProductsByIndustry = useCallback(async (industryId: number) => {
-    try {
-      setLoadingProducts(true);
-      const response = await getCrmProducts({
-        per_page: 100,
-        industry_id: industryId,
-      });
-      setProducts(response.data || []);
-    } catch (error) {
-      console.error("Failed to fetch products:", error);
-      toast.error("Failed to fetch products for selected industry");
-    } finally {
-      setLoadingProducts(false);
-    }
-  }, []);
-
-  // Sync campaign industries when campaign + master industry list are available
-  useEffect(() => {
-    if (!sourceLead?.campaign_id || !campaignQuery.data) {
-      return;
-    }
-    const campaignData = campaignQuery.data as any;
-    setCampaign(campaignData);
-
-    const industriesData = campaignData.industries;
-    const industryIds = campaignData.industry_ids;
-
-    let campaignIndustryIds: number[] = [];
-    if (industriesData && Array.isArray(industriesData)) {
-      campaignIndustryIds = industriesData.map((ind: any) => (typeof ind === "object" ? ind.id : ind));
-    } else if (industryIds && Array.isArray(industryIds)) {
-      campaignIndustryIds = industryIds;
-    }
-
-    if (campaignIndustryIds.length === 0) {
-      return;
-    }
-
-    const filteredIndustries = allIndustries.filter((ind: IndustryData) =>
-      campaignIndustryIds.includes(ind.id),
-    );
-    setCampaignIndustries(filteredIndustries);
-
-    setFormData((prevFormData) => {
-      if (!prevFormData.industry_ids || prevFormData.industry_ids.length === 0) {
-        return {
-          ...prevFormData,
-          industry_ids: campaignIndustryIds,
-        };
-      }
-      return prevFormData;
-    });
-
-    if (filteredIndustries.length === 1) {
-      setSelectedIndustryId(filteredIndustries[0].id);
-      fetchProductsByIndustry(filteredIndustries[0].id).catch(() => undefined);
-    }
-  }, [sourceLead?.campaign_id, campaignQuery.data, allIndustries, fetchProductsByIndustry]);
+function useCreateDealLeadPipelineEffects(args: {
+  parsedLeadId: number | null;
+  leadQuery: UseQueryResult<unknown, Error>;
+  leadHydratedIdRef: React.MutableRefObject<number | null>;
+  setSourceLead: React.Dispatch<React.SetStateAction<any>>;
+  setFormData: React.Dispatch<React.SetStateAction<any>>;
+  setDealTemplate: React.Dispatch<
+    React.SetStateAction<DealTemplateData | null>
+  >;
+  setTemplateFieldsData: React.Dispatch<React.SetStateAction<Record<string, any>>>;
+  setLoadingTemplate: React.Dispatch<React.SetStateAction<boolean>>;
+}): void {
+  const {
+    parsedLeadId,
+    leadQuery,
+    leadHydratedIdRef,
+    setSourceLead,
+    setFormData,
+    setDealTemplate,
+    setTemplateFieldsData,
+    setLoadingTemplate,
+  } = args;
 
   useEffect(() => {
     if (parsedLeadId == null) {
@@ -291,21 +347,27 @@ const CreateDeal = () => {
     defaultCloseDate.setDate(defaultCloseDate.getDate() + 7);
     const formattedCloseDate = defaultCloseDate.toISOString().split("T")[0];
 
-    setFormData((prev) => ({
+    setFormData((prev: any) => ({
       ...prev,
       lead_id: leadId,
       ticket_id: leadId,
       name: leadData.name || "",
-      assigned_to: leadData.user_extension ? String(leadData.user_extension) : null,
+      assigned_to: leadData.user_extension
+        ? String(leadData.user_extension)
+        : null,
       expected_close_date: formattedCloseDate,
       company_name: leadData.company_name || "",
       company_domain: leadData.company_domain ?? "",
       industry: leadData.industry || "",
-      decision_maker_title: primaryContact.title || leadData.contact_person_title || "",
+      decision_maker_title:
+        primaryContact.title || leadData.contact_person_title || "",
       decision_maker_name: contactPersonName,
       decision_maker_phone_country_code:
-        primaryContact.phone_country_code || leadData.contact_phone_country_code || "",
-      decision_maker_phone: primaryContact.phone || leadData.contact_phone || "",
+        primaryContact.phone_country_code ||
+        leadData.contact_phone_country_code ||
+        "",
+      decision_maker_phone:
+        primaryContact.phone || leadData.contact_phone || "",
       decision_maker_email: primaryContact.email || "",
     }));
 
@@ -342,64 +404,66 @@ const CreateDeal = () => {
       toast.error("Failed to load lead data for conversion");
     }
   }, [leadQuery.isError, leadQuery.error, parsedLeadId]);
+}
 
-  // Handle industry selection change
-  const handleIndustryChange = async (selectedOption: any) => {
-    const industryId = selectedOption?.value || null;
-    setSelectedIndustryId(industryId);
-    
-    // Reset product selection when industry changes
-    setItemFormData({
-      ...itemFormData,
-      product_id: null,
-      product_service: "",
-      unit_price: 0,
-    });
-    
-    if (industryId) {
-      await fetchProductsByIndustry(industryId);
-    } else {
-      setProducts([]);
-    }
-  };
+function useCreateDealStepValidation(args: {
+  formData: Record<string, any>;
+  formStep: number;
+  dealTemplate: DealTemplateData | null;
+  templateFieldsData: Record<string, any>;
+  estimationItems: Array<{
+    product_id: number;
+    product_service: string;
+    description: string;
+    qty: number;
+    unit_price: number;
+    original_currency: string;
+    original_price: number;
+  }>;
+}) {
+  const { formData, formStep, dealTemplate, templateFieldsData, estimationItems } =
+    args;
 
-  // Validation functions for each step
-  const validateStep0 = (): boolean => {
+  const validateStep0 = useCallback((): boolean => {
     const requiredFields = [
-      { field: 'name' as const, name: 'Deal Name' },
-      { field: 'stage_id' as const, name: 'Stage' },
-      { field: 'expected_close_date' as const, name: 'Expected Close Date' },
-      { field: 'assigned_to' as const, name: 'Assigned to' },
-      { field: 'currency' as const, name: 'Currency' },
+      { field: "name" as const, name: "Deal Name" },
+      { field: "stage_id" as const, name: "Stage" },
+      { field: "expected_close_date" as const, name: "Expected Close Date" },
+      { field: "assigned_to" as const, name: "Assigned to" },
+      { field: "currency" as const, name: "Currency" },
     ];
     return checkRequiredFields(formData, requiredFields);
-  };
+  }, [formData]);
 
-  const validateStep1 = (): boolean => {
+  const validateStep1 = useCallback((): boolean => {
     const requiredFields = [
-      { field: 'company_name' as const, name: 'Company Name' },
-      { field: 'decision_maker_name' as const, name: 'Decision Maker Name' },
-      { field: 'decision_maker_email' as const, name: 'Decision Maker Email', type: ValidationType.EMAIL },
-      { field: 'decision_maker_phone' as const, name: 'Decision Maker Phone' },
+      { field: "company_name" as const, name: "Company Name" },
+      { field: "decision_maker_name" as const, name: "Decision Maker Name" },
+      {
+        field: "decision_maker_email" as const,
+        name: "Decision Maker Email",
+        type: ValidationType.EMAIL,
+      },
+      {
+        field: "decision_maker_phone" as const,
+        name: "Decision Maker Phone",
+      },
     ];
-    
-   
-    
     return checkRequiredFields(formData, requiredFields);
-  };
+  }, [formData]);
 
-  const validateStep2 = (): boolean => {
-    // If no template, skip validation (step won't be shown)
+  const validateStep2 = useCallback((): boolean => {
     if (!dealTemplate) {
       return true;
     }
-    
-    // Validate template fields
     if (dealTemplate.fields && dealTemplate.fields.length > 0) {
       for (const field of dealTemplate.fields) {
         if (field.is_required) {
           const fieldValue = templateFieldsData[field.field_name];
-          if (!fieldValue || (typeof fieldValue === 'string' && fieldValue.trim() === '')) {
+          if (
+            !fieldValue ||
+            (typeof fieldValue === "string" && fieldValue.trim() === "")
+          ) {
             toast.error(`${field.field_name} is required`);
             return false;
           }
@@ -407,23 +471,21 @@ const CreateDeal = () => {
       }
     }
     return true;
-  };
+  }, [dealTemplate, templateFieldsData]);
 
-  const validateStep3 = (): boolean => {
-    // Step 3 (Progress & Notes) has no required fields
-    return true;
-  };
+  const validateStep3 = useCallback((): boolean => true, []);
 
-  const validateStep4 = (): boolean => {
-    // Validate that at least one item exists
+  const validateStep4 = useCallback((): boolean => {
     if (!estimationItems || estimationItems.length === 0) {
-      toast.error('Please add at least one product to the estimation chart before creating the deal');
+      toast.error(
+        "Please add at least one product to the estimation chart before creating the deal",
+      );
       return false;
     }
     return true;
-  };
+  }, [estimationItems]);
 
-  const validateCurrentStep = (): boolean => {
+  const validateCurrentStep = useCallback((): boolean => {
     switch (formStep) {
       case 0:
         return validateStep0();
@@ -438,145 +500,438 @@ const CreateDeal = () => {
       default:
         return true;
     }
+  }, [
+    formStep,
+    validateStep0,
+    validateStep1,
+    validateStep2,
+    validateStep3,
+    validateStep4,
+  ]);
+
+  return {
+    validateStep0,
+    validateStep1,
+    validateStep2,
+    validateStep3,
+    validateStep4,
+    validateCurrentStep,
+  };
+}
+
+function buildCreateDealSubmissionPayload(p: {
+  formData: Record<string, any>;
+  businessTypeId: number | null;
+  businessTypeOther: string;
+  dealTemplate: DealTemplateData | null;
+  templateFieldsData: Record<string, any>;
+}): Record<string, any> {
+  const { formData, businessTypeId, businessTypeOther, dealTemplate, templateFieldsData } =
+    p;
+  const payload: Record<string, any> = {
+    name: formData.name,
+    stage_id: formData.stage_id ? String(formData.stage_id) : undefined,
+    assigned_to: formData.assigned_to,
+    expected_close_date: formData.expected_close_date,
+    company_name: formData.company_name,
+    ...(formData.company_domain && {
+      company_domain: formData.company_domain,
+    }),
+    industry_ids: formData.industry_ids,
+    ...(businessTypeId ? { business_type_id: String(businessTypeId) } : {}),
+    ...(businessTypeOther ? { business_type_other: businessTypeOther } : {}),
+    decision_maker_title: formData.decision_maker_title,
+    decision_maker_name: formData.decision_maker_name,
+    decision_maker_phone_country_code: formData.decision_maker_phone_country_code,
+    decision_maker_phone: formData.decision_maker_phone,
+    decision_maker_email: formData.decision_maker_email,
+    deal_type: formData.deal_type,
+    contract_length: formData.contract_length,
+    contract_length_custom: formData.contract_length_custom || "",
+    billing_model: formData.billing_model,
+    payment_terms: formData.payment_terms,
+    payment_terms_custom: formData.payment_terms_custom || "",
+    risk_level: formData.risk_level,
+    competitors: formData.competitors || "",
+    quotation_sent: formData.quotation_sent,
+    contract_sent: formData.contract_sent,
+    contract_received: formData.contract_received,
+    follow_up_date: formData.follow_up_date || "",
+    currency: formData.currency,
+    tax_percentage: formData.tax_percentage || "0",
+    standard_discount_percentage:
+      formData.standard_discount_percentage || "0",
+    special_discount_percentage:
+      formData.special_discount_percentage || "0",
   };
 
-  const handleNextStep = (e: React.MouseEvent) => {
-    e.preventDefault();
-    if (validateCurrentStep()) {
+  if (formData.ticket_id) {
+    payload.ticket_id = formData.ticket_id;
+  } else if (formData.lead_id) {
+    payload.ticket_id = formData.lead_id;
+  }
+
+  if (formData.lead_id) {
+    payload.lead_id = formData.lead_id;
+  }
+
+  if (dealTemplate?.id) {
+    payload.deal_template_id = dealTemplate.id;
+    const filteredTemplateData: Record<string, any> = {};
+    Object.entries(templateFieldsData).forEach(([key, value]) => {
+      if (value !== null && value !== undefined && value !== "") {
+        filteredTemplateData[key] = value;
+      }
+    });
+    if (Object.keys(filteredTemplateData).length > 0) {
+      payload.template_data = filteredTemplateData;
+    }
+  }
+
+  return payload;
+}
+
+async function createEstimateForNewDealIfNeeded(p: {
+  estimationItems: Array<{
+    product_id: number;
+    product_service: string;
+    description: string;
+    qty: number;
+    unit_price: number;
+    original_currency: string;
+    original_price: number;
+  }>;
+  createdDeal: { id?: string | number } | undefined;
+  formData: Record<string, any>;
+}): Promise<void> {
+  const { estimationItems, createdDeal, formData } = p;
+  if (estimationItems.length === 0 || !createdDeal?.id) return;
+  try {
+    const estimatePayload = {
+      deal_id: Number(createdDeal.id),
+      estimation_chart: estimationItems.map((item) => ({
+        product_id: item.product_id,
+        product_service: item.product_service,
+        description: item.description || "",
+        qty: item.qty,
+        unit_price: item.unit_price,
+        original_currency: item.original_currency || formData.currency,
+        original_price: item.original_price || item.unit_price,
+      })),
+      standard_discount_percentage: Number.parseFloat(
+        formData.standard_discount_percentage || "0",
+      ),
+      special_discount_percentage: Number.parseFloat(
+        formData.special_discount_percentage || "0",
+      ),
+      tax_percentage: Number.parseFloat(formData.tax_percentage || "0"),
+      currency: formData.currency,
+    };
+    await createEstimate(estimatePayload, false);
+  } catch (estimateError: unknown) {
+    console.error("Failed to create estimate:", estimateError);
+    toast.warning(
+      "Deal created but failed to save estimation chart. You can add it later.",
+    );
+  }
+}
+
+function useCreateDealSubmitHandlers(args: {
+  router: ReturnType<typeof useRouter>;
+  formStep: number;
+  setFormStep: React.Dispatch<React.SetStateAction<number>>;
+  dealTemplate: DealTemplateData | null;
+  formData: Record<string, any>;
+  templateFieldsData: Record<string, any>;
+  businessTypeId: number | null;
+  businessTypeOther: string;
+  estimationItems: Array<{
+    product_id: number;
+    product_service: string;
+    description: string;
+    qty: number;
+    unit_price: number;
+    original_currency: string;
+    original_price: number;
+  }>;
+  setLoading: React.Dispatch<React.SetStateAction<boolean>>;
+  validateStep0: () => boolean;
+  validateStep1: () => boolean;
+  validateStep2: () => boolean;
+  validateStep4: () => boolean;
+  validateCurrentStep: () => boolean;
+}) {
+  const {
+    router,
+    formStep,
+    setFormStep,
+    dealTemplate,
+    formData,
+    templateFieldsData,
+    businessTypeId,
+    businessTypeOther,
+    estimationItems,
+    setLoading,
+    validateStep0,
+    validateStep1,
+    validateStep2,
+    validateStep4,
+    validateCurrentStep,
+  } = args;
+
+  const handleNextStep = useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault();
+      if (!validateCurrentStep()) return;
       let nextStep = formStep + 1;
-      // Skip step 2 (Characteristics) if no template is available
       if (nextStep === 2 && !dealTemplate) {
         nextStep = 3;
       }
       setFormStep(Math.min(4, nextStep));
-    }
-  };
+    },
+    [validateCurrentStep, formStep, dealTemplate, setFormStep],
+  );
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (formStep < 4) {
-      let nextStep = formStep + 1;
-      // Skip step 2 if no template is available
-      if (nextStep === 2 && !dealTemplate) {
-        nextStep = 3;
-      }
-      setFormStep(nextStep);
-      return;
-    }
-
-    // Validate all required fields before submission
-    if (!validateStep0() || !validateStep1() || !validateStep4()) {
-      return;
-    }
-    // Only validate step 2 if template is available
-    if (dealTemplate && !validateStep2()) {
-      return;
-    }
-
-    setLoading(true);
-    try {
-      const payload: any = {
-        name: formData.name,
-        stage_id: formData.stage_id ? String(formData.stage_id) : undefined,
-        assigned_to: formData.assigned_to,
-        expected_close_date: formData.expected_close_date,
-        company_name: formData.company_name,
-        ...(formData.company_domain && { company_domain: formData.company_domain }),
-        industry_ids: formData.industry_ids,
-        ...(businessTypeId ? { business_type_id: String(businessTypeId) } : {}),
-        ...(businessTypeOther ? { business_type_other: businessTypeOther } : {}),
-        decision_maker_title: formData.decision_maker_title,
-        decision_maker_name: formData.decision_maker_name,
-        decision_maker_phone_country_code: formData.decision_maker_phone_country_code,
-        decision_maker_phone: formData.decision_maker_phone,
-        decision_maker_email: formData.decision_maker_email,
-        deal_type: formData.deal_type,
-        contract_length: formData.contract_length,
-        contract_length_custom: formData.contract_length_custom || "",
-        billing_model: formData.billing_model,
-        payment_terms: formData.payment_terms,
-        payment_terms_custom: formData.payment_terms_custom || "",
-        risk_level: formData.risk_level,
-        competitors: formData.competitors || "",
-        quotation_sent: formData.quotation_sent,
-        contract_sent: formData.contract_sent,
-        contract_received: formData.contract_received,
-        follow_up_date: formData.follow_up_date || "",
-        currency: formData.currency,
-        tax_percentage: formData.tax_percentage || "0",
-        standard_discount_percentage: formData.standard_discount_percentage || "0",
-        special_discount_percentage: formData.special_discount_percentage || "0",
-      };
-
-      // ticket_id is required when converting from lead
-      if (formData.ticket_id) {
-        payload.ticket_id = formData.ticket_id;
-      } else if (formData.lead_id) {
-        // If ticket_id is not set but lead_id is, use lead_id as ticket_id
-        payload.ticket_id = formData.lead_id;
+  const handleSubmit = useCallback(
+    async (e: React.FormEvent) => {
+      e.preventDefault();
+      if (formStep < 4) {
+        let nextStep = formStep + 1;
+        if (nextStep === 2 && !dealTemplate) {
+          nextStep = 3;
+        }
+        setFormStep(nextStep);
+        return;
       }
 
-      if (formData.lead_id) {
-        payload.lead_id = formData.lead_id;
+      if (!validateStep0() || !validateStep1() || !validateStep4()) {
+        return;
+      }
+      if (dealTemplate && !validateStep2()) {
+        return;
       }
 
-      // Add template data if template is available
-      if (dealTemplate && dealTemplate.id) {
-        payload.deal_template_id = dealTemplate.id;
-        // Filter out empty values from template_data
-        const filteredTemplateData: Record<string, any> = {};
-        Object.entries(templateFieldsData).forEach(([key, value]) => {
-          if (value !== null && value !== undefined && value !== '') {
-            filteredTemplateData[key] = value;
-          }
+      setLoading(true);
+      try {
+        const payload = buildCreateDealSubmissionPayload({
+          formData,
+          businessTypeId,
+          businessTypeOther,
+          dealTemplate,
+          templateFieldsData,
         });
-        // Only add template_data if there are non-empty values
-        if (Object.keys(filteredTemplateData).length > 0) {
-          payload.template_data = filteredTemplateData;
-        }
+        const createdDeal = await createDeal(payload).then((res) => res?.data);
+        await createEstimateForNewDealIfNeeded({
+          estimationItems,
+          createdDeal,
+          formData,
+        });
+        router.push("/crm/deals");
+      } catch (error: unknown) {
+        console.error("Failed to create deal:", error);
+      } finally {
+        setLoading(false);
       }
+    },
+    [
+      router,
+      formStep,
+      setFormStep,
+      dealTemplate,
+      formData,
+      templateFieldsData,
+      businessTypeId,
+      businessTypeOther,
+      estimationItems,
+      setLoading,
+      validateStep0,
+      validateStep1,
+      validateStep2,
+      validateStep4,
+    ],
+  );
 
-      // console.log(payload);
-      // return;
-      // Create deal first
-      const createdDeal = await createDeal(payload).then((res => res?.data));
-      
-      // Create/update estimation chart separately if items exist
-      if (estimationItems.length > 0 && createdDeal?.id) {
-        try {
-          const estimatePayload = {
-            deal_id: Number(createdDeal.id),
-            estimation_chart: estimationItems.map(item => ({
-              product_id: item.product_id,
-              product_service: item.product_service,
-              description: item.description || "",
-              qty: item.qty,
-              unit_price: item.unit_price,
-              original_currency: item.original_currency || formData.currency,
-              original_price: item.original_price || item.unit_price,
-            })),
-            standard_discount_percentage: Number.parseFloat(formData.standard_discount_percentage || "0"),
-            special_discount_percentage: Number.parseFloat(formData.special_discount_percentage || "0"),
-            tax_percentage: Number.parseFloat(formData.tax_percentage || "0"),
-            currency: formData.currency,
-          };
+  return { handleNextStep, handleSubmit };
+}
 
-          await createEstimate(estimatePayload, false);
-        } catch (estimateError: any) {
-          console.error("Failed to create estimate:", estimateError);
-          // Don't fail the whole operation if estimate creation fails
-          toast.warning("Deal created but failed to save estimation chart. You can add it later.");
-        }
-      }
-      
-      // toast.success("Deal created successfully!");
-      router.push("/crm/deals");
-    } catch (error: any) {
-      console.error("Failed to create deal:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
+function getCreateDealProgressWidthPercent(
+  formStep: number,
+  dealTemplate: DealTemplateData | null,
+): number {
+  const totalVisibleSteps = dealTemplate ? 5 : 4;
+  let visualPosition = formStep;
+  if (!dealTemplate && formStep > 2) {
+    visualPosition = formStep - 1;
+  }
+  return ((visualPosition + 1) / totalVisibleSteps) * 100;
+}
+
+const CreateDeal = () => {
+  const router = useRouter();
+  const [formStep, setFormStep] = useState(0);
+  const [loading, setLoading] = useState(false);
+  const [_campaign, setCampaign] = useState<any>(null);
+  const [campaignIndustries, setCampaignIndustries] = useState<IndustryData[]>(
+    [],
+  );
+  const [selectedIndustryId, setSelectedIndustryId] = useState<number | null>(
+    null,
+  );
+  const [showAllIndustries, setShowAllIndustries] = useState(false);
+  const [estimationItems, setEstimationItems] = useState<
+    Array<{
+      product_id: number;
+      product_service: string;
+      description: string;
+      qty: number;
+      unit_price: number;
+      original_currency: string;
+      original_price: number;
+    }>
+  >([]);
+  const [showAddItemModal, setShowAddItemModal] = useState(false);
+  const [editingItemIndex, setEditingItemIndex] = useState<number | null>(null);
+  const [itemFormData, setItemFormData] = useState({
+    product_id: null as number | null,
+    product_service: "",
+    description: "",
+    qty: 1,
+    unit_price: 0,
+  });
+  const [taxPercentage, setTaxPercentage] = useState(0);
+  const [standardDiscountPercentage, setStandardDiscountPercentage] =
+    useState(0);
+  const [specialDiscountPercentage, setSpecialDiscountPercentage] =
+    useState(0);
+
+  const [formData, setFormData] = useState({
+    name: "",
+    ticket_id: null as number | null,
+    lead_id: null as number | null,
+    stage_id: undefined as number | undefined,
+    assigned_to: null as string | null,
+    expected_close_date: "",
+    company_name: "",
+    company_domain: "",
+    industry_ids: [] as number[],
+    decision_maker_title: "",
+    decision_maker_name: "",
+    decision_maker_phone_country_code: "",
+    decision_maker_phone: "",
+    decision_maker_email: "",
+    deal_type: "",
+    contract_length: "",
+    contract_length_custom: "",
+    billing_model: "",
+    payment_terms: "",
+    payment_terms_custom: "",
+    risk_level: "",
+    competitors: "",
+    quotation_sent: false,
+    contract_sent: false,
+    contract_received: false,
+    follow_up_date: "",
+    currency: "AED",
+    tax_percentage: "0",
+    standard_discount_percentage: "0",
+    special_discount_percentage: "0",
+  });
+  const [sourceLead, setSourceLead] = useState<any>(null);
+  const [convertingPrice, setConvertingPrice] = useState(false);
+  const [dealTemplate, setDealTemplate] = useState<DealTemplateData | null>(
+    null,
+  );
+  const [loadingTemplate, setLoadingTemplate] = useState(false);
+  const [templateFieldsData, setTemplateFieldsData] = useState<
+    Record<string, any>
+  >({});
+
+  const leadHydratedIdRef = useRef<number | null>(null);
+
+  const [businessTypeId, setBusinessTypeId] = useState<number | null>(null);
+  const [businessTypeOther, setBusinessTypeOther] = useState<string>("");
+  const [showOtherBusinessType, setShowOtherBusinessType] = useState(false);
+
+  const {
+    stages,
+    extensions,
+    businessTypes,
+    allIndustries,
+    loadingAllIndustries,
+    parsedLeadId,
+    leadQuery,
+    loadingLead,
+    campaignQuery,
+    loadingIndustries,
+    industriesQuery,
+  } = useCreateDealPageQueries(router, sourceLead);
+
+  const {
+    products,
+    setProducts,
+    loadingProducts,
+    fetchProductsByIndustry,
+    handleIndustryChange,
+  } = useCreateDealProductLoading(setSelectedIndustryId, setItemFormData);
+
+  useIndustriesQueryErrorToast(
+    industriesQuery.isError,
+    industriesQuery.error,
+  );
+
+  useCampaignIndustriesFromSourceLead({
+    campaignId: sourceLead?.campaign_id as string | number | undefined,
+    campaignData: campaignQuery.data,
+    allIndustries,
+    fetchProductsByIndustry,
+    setCampaign,
+    setCampaignIndustries,
+    setFormData,
+    setSelectedIndustryId,
+  });
+
+  useCreateDealLeadPipelineEffects({
+    parsedLeadId,
+    leadQuery,
+    leadHydratedIdRef,
+    setSourceLead,
+    setFormData,
+    setDealTemplate,
+    setTemplateFieldsData,
+    setLoadingTemplate,
+  });
+
+  const {
+    validateStep0,
+    validateStep1,
+    validateStep2,
+    validateStep4,
+    validateCurrentStep,
+  } = useCreateDealStepValidation({
+    formData,
+    formStep,
+    dealTemplate,
+    templateFieldsData,
+    estimationItems,
+  });
+
+  const { handleNextStep, handleSubmit } = useCreateDealSubmitHandlers({
+    router,
+    formStep,
+    setFormStep,
+    dealTemplate,
+    formData,
+    templateFieldsData,
+    businessTypeId,
+    businessTypeOther,
+    estimationItems,
+    setLoading,
+    validateStep0,
+    validateStep1,
+    validateStep2,
+    validateStep4,
+    validateCurrentStep,
+  });
 
   return (
     <React.Fragment>
@@ -657,19 +1012,7 @@ const CreateDeal = () => {
                   left: '0', 
                   top: '20px', 
                   height: '2px', 
-                  width: `${(() => {
-                    // Calculate progress: if no template, step 2 is skipped
-                    // Map formStep to visual position (accounting for hidden step 2)
-                    const totalVisibleSteps = dealTemplate ? 5 : 4;
-                    let visualPosition = formStep;
-                    // If no template and we're past step 2, adjust visual position
-                    // formStep 0→0, formStep 1→1, formStep 3→2, formStep 4→3
-                    if (!dealTemplate && formStep > 2) {
-                      visualPosition = formStep - 1;
-                    }
-                    // Progress = (current visual position + 1) / total visible steps
-                    return ((visualPosition + 1) / totalVisibleSteps) * 100;
-                  })()}%`,
+                  width: `${getCreateDealProgressWidthPercent(formStep, dealTemplate)}%`,
                   zIndex: 0,
                   transition: 'width 0.3s ease'
                 }}

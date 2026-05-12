@@ -33,9 +33,11 @@ export function useCompaniesAddContactsClickOutside(
 ): void {
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target;
       if (
         addContactsRef.current &&
-        !addContactsRef.current.contains(event.target as Node)
+        target instanceof Node &&
+        !addContactsRef.current.contains(target)
       ) {
         setShowAddContactsDropdown(false);
       }

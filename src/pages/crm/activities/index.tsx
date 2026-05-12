@@ -26,11 +26,7 @@ import { HEADER_CONSTANTS } from "@constants/headerConstants";
 import { ActivityTimelineModalView } from "@page-modules/crm/activities/ActivityTimelineModalView";
 import { ActivityHistorySidebarPanel } from "@page-modules/crm/activities/ActivityHistorySidebarPanel";
 import { getActivityHistoryTableColumns } from "@page-modules/crm/activities/activityHistoryTableColumns";
-import type {
-  ActivityRecord,
-  HistoryPaginationState,
-  HistoryActivityFiltersState,
-} from "@page-modules/crm/activities/activityHistoryPageTypes";
+import type { ActivityRecord } from "@page-modules/crm/activities/activityHistoryPageTypes";
 import { resolveActivityTabFromRouter } from "@page-modules/crm/activities/activityHistoryListParams";
 import { useCrmActivityHistoryPageData } from "@hooks/useCrmActivityHistoryPageData";
 import "@assets/scss/datatable-style.scss";

@@ -64,6 +64,22 @@ export function mergeHistoryPagination(
   };
 }
 
+function tabQueryValueToString(value: unknown): string {
+  if (typeof value === "string") return value;
+  if (Array.isArray(value)) {
+    const first = value[0];
+    if (typeof first === "string") return first;
+    if (typeof first === "number" || typeof first === "bigint") {
+      return first.toString();
+    }
+    return "";
+  }
+  if (typeof value === "number" || typeof value === "bigint") {
+    return value.toString();
+  }
+  return "";
+}
+
 /** Compute the next activity tab to apply when the URL's `tab` query changes. */
 export function resolveActivityTabFromRouter(
   isReady: boolean,
@@ -71,8 +87,9 @@ export function resolveActivityTabFromRouter(
   currentTab: string,
   validTabs: readonly string[],
 ): string | null {
-  if (!isReady || !tabQuery) return null;
-  const tabFromUrl = String(tabQuery);
+  if (!isReady || tabQuery == null) return null;
+  const tabFromUrl = tabQueryValueToString(tabQuery);
+  if (!tabFromUrl) return null;
   const isValidNewTab =
     validTabs.includes(tabFromUrl) && tabFromUrl !== currentTab;
   return isValidNewTab ? tabFromUrl : null;

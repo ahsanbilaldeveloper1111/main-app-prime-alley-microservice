@@ -25,8 +25,7 @@ function toSafeIdString(value: unknown): string {
 }
 
 function toRecordIdString(raw: unknown): string {
-  if (raw === null || raw === undefined) return "";
-  return String(raw);
+  return toSafeIdString(raw);
 }
 
 type UseCrmActivityHistoryPageDataArgs = {
@@ -137,8 +136,8 @@ export function useCrmActivityHistoryPageData({
     selectedActivityRecord &&
       (showActivitySidebar || showActivityTimelineModal),
   );
-  const recordTypeStr = String(
-    (selectedActivityRecord as { type?: unknown })?.type ?? "",
+  const recordTypeStr = toSafeIdString(
+    (selectedActivityRecord as { type?: unknown })?.type,
   ).toLowerCase();
   const recordIdRaw =
     (selectedActivityRecord as { record_id?: unknown; id?: unknown })
@@ -154,10 +153,14 @@ export function useCrmActivityHistoryPageData({
     }),
     queryFn: () => {
       const rid = recordIdRaw;
-      const recordId: string | number =
-        typeof rid === "string" || typeof rid === "number"
-          ? rid
-          : String(rid ?? "");
+      let recordId: string | number;
+      if (typeof rid === "string" || typeof rid === "number") {
+        recordId = rid;
+      } else if (typeof rid === "bigint") {
+        recordId = rid.toString();
+      } else {
+        recordId = "";
+      }
       return fetchCrmActivityHistoryRecordDetail({
         recordType: recordTypeStr,
         recordId,

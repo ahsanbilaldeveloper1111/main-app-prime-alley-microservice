@@ -97,11 +97,13 @@ export function EditDealWizardTimeline({
           );
 
           return (
-            <div
+            <button
               key={step}
-              className="text-center position-relative"
+              type="button"
+              className="text-center position-relative border-0 bg-transparent p-0"
               style={{ cursor: "pointer", flex: 1 }}
               onClick={() => setFormStep(step)}
+              aria-current={formStep === step ? "step" : undefined}
             >
               <div
                 className={`rounded-circle d-flex align-items-center justify-content-center mx-auto ${formStep >= step ? "bg-primary text-white" : "bg-light text-muted"}`}
@@ -123,7 +125,7 @@ export function EditDealWizardTimeline({
               >
                 {editDealWizardStepLabel(step)}
               </small>
-            </div>
+            </button>
           );
         })}
       </div>

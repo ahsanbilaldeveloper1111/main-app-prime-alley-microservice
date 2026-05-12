@@ -28,17 +28,24 @@ export function getActivityHistoryTableColumns(): TableColumn<ActivityRecord>[] 
           <div className="fw-semibold text-dark">{row.customer}</div>
           {row.tags && row.tags.length > 0 && (
             <div className="mt-1">
-              {row.tags.map((tag: string, idx: number) => (
-                <Badge
-                  key={idx}
-                  bg="light"
-                  text="dark"
-                  className="me-1"
-                  style={{ fontSize: "0.7rem" }}
-                >
-                  {tag}
-                </Badge>
-              ))}
+              {(() => {
+                const tagOccurrence = new Map<string, number>();
+                return row.tags.map((tag: string) => {
+                  const next = (tagOccurrence.get(tag) ?? 0) + 1;
+                  tagOccurrence.set(tag, next);
+                  return (
+                    <Badge
+                      key={`${row.id}-${tag}-${next}`}
+                      bg="light"
+                      text="dark"
+                      className="me-1"
+                      style={{ fontSize: "0.7rem" }}
+                    >
+                      {tag}
+                    </Badge>
+                  );
+                });
+              })()}
             </div>
           )}
         </div>

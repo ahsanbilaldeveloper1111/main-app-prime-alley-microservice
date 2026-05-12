@@ -124,7 +124,6 @@ import {
   type CompanyData,
   type EnrichmentData,
 } from "@utils/crm";
-import { CompanyViewEnrichmentBlock } from "@components/crm/CompanyViewEnrichmentBlock";
 import { CompanyViewModal } from "@page-modules/crm/companies/CompanyViewModal";
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
@@ -377,131 +376,6 @@ function buildCompanyAboutFields(
       label: "Updated",
       value: formatDate(c.updated_at),
       type: "date",
-    });
-  }
-  return fields;
-}
-
-interface StructuredCompanyData {
-  official_company_name?: string | null;
-  headquarters?: {
-    address?: string | null;
-    city?: string | null;
-    country?: string | null;
-  } | null;
-  other_locations?: Array<{
-    address?: string | null;
-    city?: string | null;
-    country?: string | null;
-  }> | null;
-  emails?: Array<{ email?: string | null; type?: string | null }> | null;
-  phones?: Array<{ number?: string | null; type?: string | null }> | null;
-  social_links?: Array<{
-    platform?: string | null;
-    url?: string | null;
-  }> | null;
-  llm_confidence?: number | string | null;
-}
-
-function pushCompanyHeadquartersField(
-  fields: SidebarField[],
-  hq: StructuredCompanyData["headquarters"],
-): void {
-  if (!hq) return;
-  if (!hq.address && !hq.city && !hq.country) return;
-  fields.push({
-    label: "Headquarters",
-    value: [hq.address, hq.city, hq.country].filter(Boolean).join(", "),
-  });
-}
-
-function pushCompanyOtherLocationFields(
-  fields: SidebarField[],
-  locations: StructuredCompanyData["other_locations"],
-): void {
-  if (!locations || locations.length === 0) return;
-  locations.forEach((loc, i) => {
-    const line = [loc.address, loc.city, loc.country]
-      .filter(Boolean)
-      .join(", ");
-    if (line) {
-      fields.push({ label: `Other location ${i + 1}`, value: line });
-    }
-  });
-}
-
-function pushCompanyStructEmailFields(
-  fields: SidebarField[],
-  emails: StructuredCompanyData["emails"],
-): void {
-  if (!emails || emails.length === 0) return;
-  const isMulti = emails.length > 1;
-  emails.forEach((e, i) => {
-    if (!e?.email) return;
-    fields.push({
-      label: isMulti ? `Email ${i + 1}` : "Email",
-      value: e.email,
-      type: "email",
-      externalLink: `mailto:${e.email}`,
-    });
-  });
-}
-
-function pushCompanyStructPhoneFields(
-  fields: SidebarField[],
-  phones: StructuredCompanyData["phones"],
-): void {
-  if (!phones || phones.length === 0) return;
-  const isMulti = phones.length > 1;
-  phones.forEach((p, i) => {
-    if (!p?.number) return;
-    fields.push({
-      label: isMulti ? `Phone ${i + 1}` : "Phone",
-      value: p.number,
-      type: "phone",
-      externalLink: `tel:${p.number}`,
-    });
-  });
-}
-
-function pushCompanySocialLinkFields(
-  fields: SidebarField[],
-  socials: StructuredCompanyData["social_links"],
-): void {
-  if (!socials || socials.length === 0) return;
-  socials.forEach((s, i) => {
-    if (!s?.url) return;
-    fields.push({
-      label: s.platform ? String(s.platform) : `Social ${i + 1}`,
-      value: s.url,
-      type: "link",
-      externalLink: s.url,
-    });
-  });
-}
-
-/** Build the "Structured data" fields list from enrichment.structured_data. */
-function buildCompanyStructuredFields(
-  struct: StructuredCompanyData | undefined | null,
-): SidebarField[] {
-  const fields: SidebarField[] = [];
-  if (!struct) return fields;
-
-  if (struct.official_company_name) {
-    fields.push({
-      label: "Official company name",
-      value: struct.official_company_name,
-    });
-  }
-  pushCompanyHeadquartersField(fields, struct.headquarters);
-  pushCompanyOtherLocationFields(fields, struct.other_locations);
-  pushCompanyStructEmailFields(fields, struct.emails);
-  pushCompanyStructPhoneFields(fields, struct.phones);
-  pushCompanySocialLinkFields(fields, struct.social_links);
-  if (struct.llm_confidence != null) {
-    fields.push({
-      label: "LLM confidence",
-      value: String(struct.llm_confidence),
     });
   }
   return fields;
@@ -4582,9 +4456,6 @@ const CrmCompanyManagement = () => {
               selectedCompany,
               websiteUrl,
               formatCrmPreviewDate,
-            );
-            const structuredSectionFields = buildCompanyStructuredFields(
-              enrichment?.structured_data,
             );
 
             const sections = [
