@@ -3961,7 +3961,7 @@ const CrmCompanyManagement = () => {
                               : null
                           }
                           onChange={(selected) => {
-                            const campaignValues = selected
+                            const campaignValues = Array.isArray(selected)
                               ? selected.map((s: any) => s.value)
                               : null;
                             setCompanyFilters((prev) => ({
@@ -4096,7 +4096,7 @@ const CrmCompanyManagement = () => {
                               : null
                           }
                           onChange={(selected) => {
-                            const tagValues = selected
+                            const tagValues = Array.isArray(selected)
                               ? selected.map((s: any) => s.value)
                               : null;
                             setCompanyFilters((prev) => ({
@@ -5703,16 +5703,6 @@ const CrmCompanyManagement = () => {
                 },
               },
             ];
-            // if (structuredSectionFields.length > 0) {
-            //   sections.push({
-            //     id: "enrichment-structured",
-            //     title: "Enrichment (structured data)",
-            //     icon: Layers,
-            //     collapsible: true,
-            //     defaultExpanded: true,
-            //     fields: structuredSectionFields,
-            //   });
-            // }
 
             return (
               <GenericSidebar
