@@ -5,6 +5,7 @@ import React, { ReactElement } from "react";
 import Layout from "@layout/index";
 import { ModuleCategoriesPageView } from "@page-modules/tickets/modules/categories/components/ModuleCategoriesPageView";
 import { useModuleCategoriesPage } from "@page-modules/tickets/modules/categories/useModuleCategoriesPage";
+import type { Column } from "@components/CustomDataTable";
 
 const ModuleCategories = () => {
   const c = useModuleCategoriesPage();
@@ -13,7 +14,7 @@ const ModuleCategories = () => {
     <ModuleCategoriesPageView
       refreshKey={c.refreshKey}
       memoizedFilters={c.memoizedFilters}
-      columns={c.columns}
+      columns={c.columns as unknown as Column<object>[]}
       fetchSubmodules={c.fetchSubmodules}
       showCreateModal={c.showCreateModal}
       onCloseCreateModal={() => c.setShowCreateModal(false)}

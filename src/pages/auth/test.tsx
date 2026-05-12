@@ -8,7 +8,8 @@ import Script from "next/script";
 import dashboard from "@pages/dashboard";
 import { toast } from "react-toastify";
 import { FaSpinner } from "react-icons/fa";
-import "@assets/scss/login.scss";
+// See note on `login.scss` in src/pages/auth/signin.tsx — its global rules
+// override the auth chrome's body and `.btn-primary` styles.
 import Footer from "@components/Footer";
 
 const Signin = () => {

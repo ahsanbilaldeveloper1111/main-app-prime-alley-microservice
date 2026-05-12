@@ -1,13 +1,15 @@
-import axios from 'axios';
+import axios from "axios";
 
-// Prefer same-origin proxy (e.g. /api) to avoid 431; set NEXT_PUBLIC_DIRECT_API_URL only if needed
+/**
+ * Same target as the main axios instance — kept as a separate client only
+ * for callers that need a different default Content-Type (form-urlencoded).
+ */
 const directApi = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_DIRECT_API_URL || '/api',
-  timeout: 1000000,
+  baseURL: import.meta.env.VITE_BACKEND_URL || "http://localhost:3001/api/",
+  timeout: 1_000_000,
   headers: {
-    'Content-Type': 'application/x-www-form-urlencoded',
+    "Content-Type": "application/x-www-form-urlencoded",
   },
-  proxy: false,
 });
 
 export default directApi;

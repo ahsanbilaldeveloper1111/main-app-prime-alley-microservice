@@ -10,6 +10,7 @@ export type AiFaqAttachmentFieldProps = Readonly<{
   haveFiles: boolean;
   fileInputKey: number;
   selectedFiles: File[];
+  accept?: string;
   onFileChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onRemoveFile: (index: number) => void;
 }>;
@@ -18,6 +19,7 @@ export function AiFaqAttachmentField({
   haveFiles,
   fileInputKey,
   selectedFiles,
+  accept,
   onFileChange,
   onRemoveFile,
 }: AiFaqAttachmentFieldProps) {
@@ -32,7 +34,7 @@ export function AiFaqAttachmentField({
         type="file"
         multiple
         onChange={onFileChange}
-        accept={AI_FAQ_ATTACHMENT_ACCEPT}
+        accept={accept ?? AI_FAQ_ATTACHMENT_ACCEPT}
       />
       {selectedFiles.length > 0 ? (
         <div className="mt-2">

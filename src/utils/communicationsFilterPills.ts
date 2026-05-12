@@ -1,5 +1,5 @@
 import type { FilterPill } from "@components/GenericTable";
-import type { ComponentType } from "react";
+import { createElement, type ComponentType } from "react";
 
 type Filters = Record<string, any>;
 type StageFilters = (nextFilters: Filters) => void;
@@ -177,6 +177,12 @@ export function buildTextDropdownFilterPill(
   createTextDropdownContent: CreateTextDropdown,
   placeholder: string,
 ): FilterPill {
+  const DropdownContent = createTextDropdownContent(
+    currentFilters[id] ?? "",
+    (value: string) => setCurrentFilters({ ...currentFilters, [id]: value }),
+    (value: string) => stageFilters({ ...currentFilters, [id]: value }),
+    placeholder,
+  );
   return {
     id,
     label,
@@ -184,12 +190,8 @@ export function buildTextDropdownFilterPill(
     active: Boolean(currentFilters[id]),
     activeLabel: currentFilters[id] ? String(currentFilters[id]) : undefined,
     onClear: () => stageFilters({ ...currentFilters, [id]: "" }),
-    dropdownContent: createTextDropdownContent(
-      currentFilters[id] ?? "",
-      (value: string) => setCurrentFilters({ ...currentFilters, [id]: value }),
-      (value: string) => stageFilters({ ...currentFilters, [id]: value }),
-      placeholder,
-    ),
+    dropdownContent: ({ closeMenu }) =>
+      createElement(DropdownContent, { closeMenu }),
   };
 }
 
@@ -202,6 +204,11 @@ export function buildDateTimeFilterPill(
   formatLabel: FormatLabel,
   createDateTimeDropdownContent: CreateDateTimeDropdown,
 ): FilterPill {
+  const DropdownContent = createDateTimeDropdownContent(
+    currentFilters[id] ?? "",
+    (value: string) => setCurrentFilters({ ...currentFilters, [id]: value }),
+    (value: string) => stageFilters({ ...currentFilters, [id]: value }),
+  );
   return {
     id,
     label,
@@ -209,10 +216,7 @@ export function buildDateTimeFilterPill(
     active: Boolean(currentFilters[id]),
     activeLabel: formatLabel(currentFilters[id]),
     activeLabelOnly: true,
-    dropdownContent: createDateTimeDropdownContent(
-      currentFilters[id] ?? "",
-      (value: string) => setCurrentFilters({ ...currentFilters, [id]: value }),
-      (value: string) => stageFilters({ ...currentFilters, [id]: value }),
-    ),
+    dropdownContent: ({ closeMenu }) =>
+      createElement(DropdownContent, { closeMenu }),
   };
 }

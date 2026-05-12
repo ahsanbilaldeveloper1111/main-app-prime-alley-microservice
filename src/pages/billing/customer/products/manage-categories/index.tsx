@@ -88,7 +88,7 @@ const ManageCategories = () => {
   const { hasPermission } = usePermissions();
   const canViewBillingProducts = hasPermission(PERMISSIONS.VIEW_PRODUCTS_BILLING);
   const canManageProductCategories = hasPermission(
-    PERMISSIONS.MANAGE_PRODUCT_CATEGORIES_BILLING,
+    PERMISSIONS.UPDATE_PRODUCTS_BILLING,
   );
 
   const requestIdRef = useRef(0);

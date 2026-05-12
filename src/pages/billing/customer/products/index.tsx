@@ -27,7 +27,9 @@ import { useRouter } from "next/router";
 import { formatDateTimeGlobal } from "@utils/Helper";
 import moment from "moment";
 import KanbanBoard, { prospectsToKanbanColumns } from "@components/KanbanBoard";
-import ProspectEditSidebar from "@components/ProspectEditSidebar";
+import ProspectEditSidebar, {
+  type ProspectFormState as ProspectSidebarFormState,
+} from "@components/ProspectEditSidebar";
 import CreateProductModal from "@components/CreateModalProduct";
 import {
   FiTrash2,
@@ -345,7 +347,7 @@ const BillingManagement = () => {
   const { hasPermission, hasAnyPermission } = usePermissions();
   const canAccessBillingProducts = hasAnyPermission([
     PERMISSIONS.VIEW_PRODUCTS_BILLING,
-    PERMISSIONS.LIST_CRM_DATA_MANAGEMENT,
+    PERMISSIONS.VIEW_CRM_DATA_MANAGEMENT,
   ]);
   const canCreateBillingProduct = hasPermission(PERMISSIONS.CREATE_PRODUCTS_BILLING);
   const canUpdateBillingProduct = hasPermission(PERMISSIONS.UPDATE_PRODUCTS_BILLING);
@@ -393,27 +395,26 @@ const BillingManagement = () => {
   const [showCreateContactSidebar, setShowCreateContactSidebar] =
     useState(false);
   const addContactsRef = useRef<HTMLDivElement>(null);
-  const [contactForm, setContactForm] = useState({
+  const [contactForm, setContactForm] = useState<ProspectSidebarFormState>({
     firstName: "",
     lastName: "",
     email: "",
     phone_country_code: "",
     phoneNumber: "",
-    campaign_id: null as number | null,
-    contact_owner: null as string | null,
+    campaign_id: null,
+    campaign_name: null,
+    campaign_status: null,
+    contact_owner: null,
     lifecycle_stage: "Lead",
     disposition: "",
-    legal_basis: [] as string[],
+    legal_basis: [],
     company_domain: "",
     scheduled_call_at: "",
-    tags: [] as Array<{ value: string; label: string; id: number }>,
+    tags: [],
     note: "",
     source_file: "",
-    custom_fields: [] as Array<{
-      id: string;
-      field_name: string;
-      field_value: string;
-    }>,
+    source: "",
+    custom_fields: [],
   });
   const [createContactLoading] = useState(false);
   
@@ -604,8 +605,8 @@ const BillingManagement = () => {
       memoizedFilters.created_at_to,
       pagination.currentPage,
       pagination.rowsPerPage,
-      pagination.sortBy,
-      pagination.sortOrder,
+      pagination.sortColumn,
+      pagination.sortDirection,
     ],
   );
 
@@ -1090,7 +1091,7 @@ const BillingManagement = () => {
       ref={addContactsRef}
     >
       {session?.user?.permissions?.includes(
-        PERMISSIONS.MANAGE_PRODUCT_CATEGORIES_BILLING,
+        PERMISSIONS.UPDATE_PRODUCTS_BILLING,
       ) ? (
         <button
           type="button"
@@ -1451,13 +1452,13 @@ const BillingManagement = () => {
                 }}
                 // Sorting
                 sortable={true}
-                defaultSortBy={pagination.sortBy}
-                defaultSortOrder={pagination.sortOrder}
+                defaultSortBy={pagination.sortColumn}
+                defaultSortOrder={pagination.sortDirection}
                 onSort={(column, direction) => {
                   setPagination((prev) => ({
                     ...prev,
-                    sortBy: column,
-                    sortOrder: direction,
+                    sortColumn: column,
+                    sortDirection: direction,
                     currentPage: 1,
                   }));
                 }}

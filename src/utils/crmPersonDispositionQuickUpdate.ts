@@ -27,11 +27,14 @@ export function buildCrmPersonListRowDispositionUpdatePayload(
   const name = String(row.name ?? "").trim();
   const phone = String(row.phone ?? "").trim();
 
-  const tags = Array.isArray((row as { tags?: unknown }).tags)
-    ? ((row as { tags: unknown[] }).tags as { id?: number }[])
-    : [];
+  const rawTags = (row as { tags?: unknown }).tags;
+  const tags = Array.isArray(rawTags) ? rawTags : [];
   const tag_ids = tags
-    .map((t) => t?.id)
+    .map((t) => {
+      if (!t || typeof t !== "object") return undefined;
+      const maybe = t as { id?: unknown };
+      return typeof maybe.id === "number" ? maybe.id : undefined;
+    })
     .filter((id): id is number => typeof id === "number" && id > 0);
 
   const companyFromData =

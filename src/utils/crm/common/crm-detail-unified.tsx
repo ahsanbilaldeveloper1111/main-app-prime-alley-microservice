@@ -507,6 +507,8 @@ const ProspectDetailPage: NextPageWithLayout = () => {
     phone_country_code: "",
     phoneNumber: "",
     campaign_id: null,
+    campaign_name: null,
+    campaign_status: null,
     contact_owner: null,
     lifecycle_stage: "Lead",
     disposition: "",
@@ -516,6 +518,7 @@ const ProspectDetailPage: NextPageWithLayout = () => {
     tags: [],
     note: "",
     source_file: "",
+    source: "",
     custom_fields: [],
   });
 
@@ -669,6 +672,12 @@ const ProspectDetailPage: NextPageWithLayout = () => {
       phone_country_code: phoneCountryCode,
       phoneNumber,
       campaign_id: (item.campaign_id ?? d.campaign_id ?? null) as number | null,
+      campaign_name: (item.campaign_name ?? d.campaign_name ?? null) as
+        | string
+        | null,
+      campaign_status: (item.campaign_status ?? d.campaign_status ?? null) as
+        | string
+        | null,
       contact_owner: (() => {
         const v = item.user_extension ?? d.contact_owner ?? item.contact_owner;
         if (v == null) {
@@ -704,7 +713,8 @@ const ProspectDetailPage: NextPageWithLayout = () => {
       ),
       tags: tagsArray as Array<{ value: string; label: string; id: number }>,
       note: (item.note ?? d.note ?? "") as string,
-      source_file: (item.source_file ?? d.source ?? item.source ?? "") as string,
+      source_file: (item.source_file ?? d.source_file ?? d.source ?? item.source ?? "") as string,
+      source: (item.source_file ?? d.source_file ?? d.source ?? item.source ?? "") as string,
       custom_fields: customFieldsArray,
     });
   }, [showEditContactSidebar, prospect]);

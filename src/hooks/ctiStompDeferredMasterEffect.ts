@@ -461,7 +461,7 @@ if (
       if (screenIdRef.current) {
         params.append("screenId", screenIdRef.current);
       }
-      const sseUrl = `/api/cti-stomp-stream?${params.toString()}`;
+      const sseUrl = `/streaming/cti-stomp-stream?${params.toString()}`;
 
       await closeDeferredMasterActiveDuplicateBeforeNew(currentInstanceId);
 

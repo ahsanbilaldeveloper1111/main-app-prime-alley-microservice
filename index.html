@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/x-icon" href="/favicon.ico" />
+    <!--
+      Vite serves files in `/public` as-is at the project root, so
+      `/favicon.ico` is the production-stable path. The asset is the same
+      `favicon-analisys.ico` Next.js used to inject from `_app.tsx`.
+    -->
+    <link rel="apple-touch-icon" href="/favicon.ico" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, shrink-to-fit=no"
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Lexend+Deca:wght@300;400;500;600;700&display=swap"
+    />
+    <title>Business Workspace AI-Powered</title>
+    <script>
+      // Mirrors the inlined script previously emitted from _document.tsx for Sentry.
+      // Vite injects import.meta.env at build time in src; we leave a small
+      // inline init for legacy reads of `__SENTRY_ENVIRONMENT__`.
+      globalThis.__SENTRY_ENVIRONMENT__ = "production";
+    </script>
+  </head>
+  <body
+    data-pc-preset="preset-1"
+    data-pc-sidebar-theme="light"
+    data-pc-sidebar-caption="true"
+    data-pc-direction="ltr"
+    data-pc-theme="light"
+  >
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

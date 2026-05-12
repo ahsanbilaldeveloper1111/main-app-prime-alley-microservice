@@ -288,7 +288,7 @@ const ManageLostReason: React.FC = () => {
                 </div>
               </div>
 
-              <style jsx>{`
+              <style>{`
                 .reason-dot {
                   width: 8px;
                   height: 8px;

@@ -5,6 +5,7 @@ import React, { ReactElement } from "react";
 import Layout from "@layout/index";
 import { ModuleSubCategoriesPageView } from "@page-modules/tickets/modules/sub-categories/components/ModuleSubCategoriesPageView";
 import { useModuleSubCategoriesPage } from "@page-modules/tickets/modules/sub-categories/useModuleSubCategoriesPage";
+import type { Column } from "@components/CustomDataTable";
 
 const ModuleSubCategories = () => {
   const s = useModuleSubCategoriesPage();
@@ -13,7 +14,7 @@ const ModuleSubCategories = () => {
     <ModuleSubCategoriesPageView
       refreshKey={s.refreshKey}
       memoizedFilters={s.memoizedFilters}
-      columns={s.columns}
+      columns={s.columns as unknown as Column<object>[]}
       fetchSubCategories={s.fetchSubCategories}
       showSubmoduleChildrenModal={s.showSubmoduleChildrenModal}
       onCloseSubCategoryModal={s.closeSubCategoryModal}

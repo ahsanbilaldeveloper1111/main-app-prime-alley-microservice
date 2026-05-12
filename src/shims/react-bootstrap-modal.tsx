@@ -1,30 +1,35 @@
-"use client";
+/**
+ * Default react-bootstrap Modal: static backdrop + no Esc dismiss.
+ * Preserved from the previous webpack NormalModuleReplacementPlugin so
+ * existing modals across the app keep their UX defaults.
+ */
 
 import * as React from "react";
-import type { ModalProps } from "react-bootstrap/esm/Modal";
+import OriginalModal from "react-bootstrap/cjs/Modal";
 
-// Stock Modal from CJS build — only `esm/Modal.js` is replaced with this file (see next.config.ts).
-// Defaults: static backdrop + keyboard off. Pass `backdrop` / `keyboard` explicitly to opt in to stock behavior.
-// eslint-disable-next-line @typescript-eslint/no-require-imports -- avoid recursive ESM replacement in webpack
-const RBModal = require("react-bootstrap/cjs/Modal.js");
+type AnyModalProps = React.ComponentProps<typeof OriginalModal> & {
+  backdrop?: boolean | "static";
+  keyboard?: boolean;
+};
 
-const Modal = React.forwardRef<HTMLDivElement, ModalProps>((props, ref) => (
-  <RBModal
-    ref={ref}
-    {...props}
-    backdrop="static"
-    keyboard={false}
-  />
-));
+const Modal = React.forwardRef<unknown, AnyModalProps>(function PrimeAlleyModal(
+  props,
+  ref,
+) {
+  const { backdrop = "static", keyboard = false, ...rest } = props;
+  return (
+    <OriginalModal
+      ref={ref as never}
+      backdrop={backdrop as never}
+      keyboard={keyboard}
+      {...rest}
+    />
+  );
+}) as unknown as typeof OriginalModal;
 
-Modal.displayName = "Modal";
+const Original = OriginalModal as unknown as Record<string, unknown>;
+for (const key of Object.keys(Original)) {
+  (Modal as unknown as Record<string, unknown>)[key] = Original[key];
+}
 
-export default Object.assign(Modal, {
-  Body: RBModal.Body,
-  Header: RBModal.Header,
-  Title: RBModal.Title,
-  Footer: RBModal.Footer,
-  Dialog: RBModal.Dialog,
-  TRANSITION_DURATION: RBModal.TRANSITION_DURATION,
-  BACKDROP_TRANSITION_DURATION: RBModal.BACKDROP_TRANSITION_DURATION,
-}) as typeof RBModal;
+export default Modal;

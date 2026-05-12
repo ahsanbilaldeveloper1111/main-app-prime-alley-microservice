@@ -95,7 +95,7 @@ export function useModuleCategoriesPage() {
     deleteCategoryMutation.mutate(selectedSubmoduleForDelete);
   }, [selectedSubmoduleForDelete, deleteCategoryMutation]);
 
-  const columns: Column[] = useMemo(
+  const columns: Column<TicketSubmoduleRow>[] = useMemo(
     () => [
       {
         key: "name",

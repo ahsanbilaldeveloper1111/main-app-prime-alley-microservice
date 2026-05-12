@@ -683,7 +683,10 @@ const CrmApprovals = () => {
                         : null
                     }
                     onChange={(selected) => {
-                      const typeValue = selected ? selected.value : null;
+                      const typeValue =
+                        selected && typeof selected === "object"
+                          ? ((selected as { value?: unknown }).value as string | undefined) ?? null
+                          : null;
                       setApprovalsFilters((prev) => ({
                         ...prev,
                         type: typeValue,
@@ -1079,7 +1082,7 @@ const CrmApprovals = () => {
               </div>
             ) : (
               <>
-                <style jsx>{`
+                <style>{`
                   .lead-detail-filter-buttons {
                     display: flex;
                     gap: 12px;
