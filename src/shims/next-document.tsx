@@ -12,11 +12,13 @@ export default function Document() {
   return null;
 }
 
-export function Html({ children }: { children?: ReactNode }) {
+type DocumentChildrenProps = Readonly<{ children?: ReactNode }>;
+
+export function Html({ children }: DocumentChildrenProps) {
   return <>{children}</>;
 }
 
-export function Head({ children }: { children?: ReactNode }) {
+export function Head({ children }: DocumentChildrenProps) {
   return <>{children}</>;
 }
 

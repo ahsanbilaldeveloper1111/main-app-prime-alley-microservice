@@ -71,7 +71,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     );
     refreshTimerRef.current = setTimeout(() => {
       // Fire and forget; the function below handles its own errors.
-      void doRefresh(false);
+      doRefresh(false).catch(() => undefined);
     }, delay);
   }, []);
 
@@ -151,7 +151,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         tokens.accessTokenExpires > 0 &&
         tokens.accessTokenExpires - Date.now() < REFRESH_BUFFER_MS
       ) {
-        void doRefresh(false);
+        doRefresh(false).catch(() => undefined);
       }
     } else {
       setStatus("unauthenticated");

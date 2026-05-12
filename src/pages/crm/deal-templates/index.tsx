@@ -133,7 +133,11 @@ function consumeHandledApiError(error: unknown, source: string): void {
   reportApiErrorFromCatch(error, source, { scope: "DealTemplates" });
 }
 
-const DealTemplatesPage: React.FC<CrmPageDisplayProps> = ({ hideBreadcrumb } = {}) => {
+type NextPageWithLayout<P = {}> = React.FC<P> & {
+  getLayout?: (page: React.ReactElement) => React.ReactElement;
+};
+
+const DealTemplatesPage: NextPageWithLayout<CrmPageDisplayProps> = ({ hideBreadcrumb } = {}) => {
   const { data: session } = useSession();
   // State
   const [templates, setTemplates] = useState<DealTemplateData[]>([]);
@@ -365,7 +369,7 @@ const DealTemplatesPage: React.FC<CrmPageDisplayProps> = ({ hideBreadcrumb } = {
       }));
 
       if (editingTemplate) {
-        const updatePayload: UpdateDealTemplatePayload & { is_default?: string } = {
+        const updatePayload: UpdateDealTemplatePayload & { is_default?: string; industry_id?: number } = {
           industry_id: formData.industry_id ?? undefined,
           name: formData.name.trim(),
           description: formData.description.trim() || undefined,
@@ -374,7 +378,7 @@ const DealTemplatesPage: React.FC<CrmPageDisplayProps> = ({ hideBreadcrumb } = {
         };
         await updateDealTemplate(editingTemplate.id, updatePayload);
       } else {
-        const createPayload: CreateDealTemplatePayload & { is_default?: string } = {
+        const createPayload: CreateDealTemplatePayload & { is_default?: string; industry_id?: number } = {
           industry_id: formData.industry_id ?? undefined,
           name: formData.name.trim(),
           description: formData.description.trim() || undefined,

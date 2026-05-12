@@ -170,17 +170,15 @@ const TicketDetail = () => {
         if (ticket.module_id) {
           try {
             const submoduleData = await GetAllSubmodules();
-            const filteredSubmodules =
-              submoduleData?.filter(
-                (sub: any) => sub.module_id == ticket.module_id
-              ) || [];
+            const filteredSubmodules = (Array.isArray(submoduleData) ? submoduleData : []).filter(
+              (sub: any) => sub.module_id == ticket.module_id,
+            );
 
             if (ticket.submodule_id) {
               const submoduleChildData = await GetAllSubmoduleChildren();
-              const filteredChildren =
-                submoduleChildData?.filter(
-                  (child: any) => child.submodule_id == ticket.submodule_id
-                ) || [];
+              const filteredChildren = (Array.isArray(submoduleChildData) ? submoduleChildData : []).filter(
+                (child: any) => child.submodule_id == ticket.submodule_id,
+              );
 
               // Update ticketData with the fetched submodule information
               setTicketData({

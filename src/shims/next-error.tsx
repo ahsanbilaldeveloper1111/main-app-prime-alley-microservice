@@ -5,10 +5,10 @@
 interface ErrorProps {
   statusCode?: number;
   title?: string;
-  withDarkMode?: boolean;
 }
 
-export default function NextError({ statusCode, title }: ErrorProps) {
+export default function NextError(props: Readonly<ErrorProps>) {
+  const { statusCode, title } = props;
   const heading = title ?? (statusCode ? `Error ${statusCode}` : "An error occurred");
   return (
     <div

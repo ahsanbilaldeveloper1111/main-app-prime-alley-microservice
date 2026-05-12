@@ -107,18 +107,23 @@ export function buildCrmAuditLinesForEntry(
     return entry.description?.trim() || "Record updated";
   }
 
+  const statusChange = changes.status;
+  const isLostChange = changes.is_lost;
+  const stageChange = changes.stage_id;
+  const feedbackChange = changes.lost_feedback;
+
   const isLeadConvertedToLost =
-    isValidChangeValue(changes.status) &&
-    isValidChangeValue(changes.is_lost) &&
-    isValidChangeValue(changes.stage_id) &&
-    isValidChangeValue(changes.lost_feedback) &&
-    changes.is_lost.old === false &&
-    changes.is_lost.new === true &&
-    changes.status.old === "new" &&
-    changes.status.new === "lost";
+    isValidChangeValue(statusChange) &&
+    isValidChangeValue(isLostChange) &&
+    isValidChangeValue(stageChange) &&
+    isValidChangeValue(feedbackChange) &&
+    isLostChange.old === false &&
+    isLostChange.new === true &&
+    statusChange.old === "new" &&
+    statusChange.new === "lost";
 
   if (isLeadConvertedToLost) {
-    const convertedStatus = resolveFieldVal("status", changes.status.new);
+    const convertedStatus = resolveFieldVal("status", statusChange.new);
     return `Lead converted to ${convertedStatus}`;
   }
 

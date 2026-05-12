@@ -87,10 +87,10 @@ const CreateTicket: React.FC<CreateTicketProps> = ({ onBack }) => {
           GetHierarchyData(ModuleSlug.TICKET)
         ]);
         
-        setModules(modulesData || []);
-        setTypes(typesData || []);
-        setStatuses(statusesData || []);
-        setExtensions(hierarchyData?.extensions || []);
+        setModules(Array.isArray(modulesData) ? modulesData : []);
+        setTypes(Array.isArray(typesData) ? typesData : []);
+        setStatuses(Array.isArray(statusesData) ? statusesData : []);
+        setExtensions(Array.isArray(hierarchyData?.extensions) ? hierarchyData.extensions : []);
       } catch (error) {
         console.error('Error fetching data:', error);
       }
@@ -104,7 +104,8 @@ const CreateTicket: React.FC<CreateTicketProps> = ({ onBack }) => {
     if (moduleId) {
       try {
         const submoduleData = await GetAllSubmodules();
-        const filteredSubmodules = submoduleData?.filter((sub: any) => sub.module_id == moduleId) || [];
+        const filteredSubmodules = (Array.isArray(submoduleData) ? submoduleData : [])
+          .filter((sub: any) => sub.module_id == moduleId);
         setSubmodules(filteredSubmodules);
         setNewTicketSubmodule("");
         setNewTicketSubmoduleChild("");
@@ -125,7 +126,8 @@ const CreateTicket: React.FC<CreateTicketProps> = ({ onBack }) => {
     if (submoduleId) {
       try {
         const childrenData = await GetAllSubmoduleChildren();
-        const filteredChildren = childrenData?.filter((child: any) => child.submodule_id == submoduleId) || [];
+        const filteredChildren = (Array.isArray(childrenData) ? childrenData : [])
+          .filter((child: any) => child.submodule_id == submoduleId);
         setSubmoduleChildren(filteredChildren);
         setNewTicketSubmoduleChild("");
       } catch (error) {

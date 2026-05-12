@@ -11,7 +11,9 @@ export interface AppContext {
   router: unknown;
 }
 
-export interface AppProps<P = unknown> {
+export interface AppProps<
+  P extends Record<string, unknown> = Record<string, unknown>,
+> {
   Component: ComponentType<P>;
   pageProps: P;
   router?: unknown;
@@ -29,5 +31,5 @@ export default function App({
   Component,
   pageProps,
 }: Readonly<AppProps>): ReactNode {
-  return <Component {...(pageProps as Record<string, unknown>)} />;
+  return <Component {...pageProps} />;
 }

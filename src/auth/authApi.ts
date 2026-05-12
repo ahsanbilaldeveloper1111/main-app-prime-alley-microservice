@@ -11,12 +11,15 @@
 import axios from "axios";
 import type { AuthTokens, AuthUser } from "./authStorage";
 
+const legacyBackendUrl =
+  typeof process === "undefined"
+    ? undefined
+    : process.env?.NEXT_PUBLIC_BACKEND_URL;
+
 const BACKEND_URL =
   import.meta.env.VITE_BACKEND_URL ||
   // legacy env var fallback during transition
-  (typeof process !== "undefined"
-    ? process.env?.NEXT_PUBLIC_BACKEND_URL
-    : undefined) ||
+  legacyBackendUrl ||
   "http://localhost:3001/api/";
 
 interface BackendTokenShape {

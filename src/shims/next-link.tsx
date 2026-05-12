@@ -31,13 +31,16 @@ function urlToString(url: Url): string {
   const search = new URLSearchParams();
   Object.entries(url.query).forEach(([key, value]) => {
     if (value === undefined || value === null) return;
-    // Only stringify primitives — passing an object/array here would yield
-    // "[object Object]" which is never the caller's intent, so skip silently
-    // (the Next.js Link shim is consumer-driven; pages already pass strings).
-    const t = typeof value;
-    if (t === "string" || t === "number" || t === "boolean" || t === "bigint") {
-      search.append(key, String(value));
+    let primitiveValue: string | null = null;
+    if (typeof value === "string") primitiveValue = value;
+    else if (typeof value === "number") primitiveValue = value.toString();
+    else if (typeof value === "boolean") primitiveValue = value ? "true" : "false";
+    else if (typeof value === "bigint") primitiveValue = value.toString();
+    if (primitiveValue != null) {
+      search.append(key, primitiveValue);
     }
+    // Only stringify primitives — passing an object/array here would yield
+    // "[object Object]" which is never the caller's intent, so skip silently.
   });
   const qs = search.toString();
   return qs ? `${base}?${qs}` : base;

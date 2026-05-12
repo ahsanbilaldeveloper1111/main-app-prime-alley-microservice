@@ -138,8 +138,6 @@ const TopBar = ({ handleOffcanvasToggle, changeThemeMode, toogleSidebarHide, too
     };
 
     return (
-        <React.Fragment>
-
             <header className="pc-header">
                 <div className="header-wrapper">
                     <div className="me-auto pc-mob-drp">
@@ -485,7 +483,6 @@ const TopBar = ({ handleOffcanvasToggle, changeThemeMode, toogleSidebarHide, too
                     </div>
                 </div>
             </header>
-        </React.Fragment>
     );
 };
 

@@ -12,7 +12,6 @@ const Error404 = () => {
     };
 
     return (
-        <>
             <div className="auth-main v1" style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }}>
                 <div className="auth-wrapper">
                     <div className="auth-form">
@@ -139,7 +138,6 @@ const Error404 = () => {
                     }
                 `}</style>
             </div>
-        </>
     )
 }
 

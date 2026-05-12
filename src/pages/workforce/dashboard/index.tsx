@@ -64,8 +64,8 @@ const EmployeesDashboard = () => {
   }, [router.pathname, refreshDashboardQueries]);
 
   useEffect(() => {
-    const onRouteDone = (url: string) => {
-      const path = String(url).split("?")[0];
+    const onRouteDone = (url: unknown) => {
+      const path = String(url ?? "").split("?")[0];
       if (path === "/workforce/dashboard") refreshDashboardQueries();
     };
     router.events.on("routeChangeComplete", onRouteDone);

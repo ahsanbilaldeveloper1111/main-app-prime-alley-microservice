@@ -111,10 +111,10 @@ function rosterEntryToTeamUserRow(e: FinesseRosterAgentPatch): Record<string, un
   };
 }
 
-export function mergeTeamUsersFromRoster<T extends { users?: Array<Record<string, unknown>> }>(
-  prev: T | null,
-  rosterRaw: unknown,
-): T | null {
+export function mergeTeamUsersFromRoster<
+  U extends Record<string, unknown>,
+  T extends { users?: U[] },
+>(prev: T | null | undefined, rosterRaw: unknown): T | null | undefined {
   if (prev == null) return prev;
   const entries = extractRosterAgentEntries(rosterRaw);
   if (entries.length === 0) return prev;
@@ -146,16 +146,16 @@ export function mergeTeamUsersFromRoster<T extends { users?: Array<Record<string
       ...(patch.lastName == null ? {} : { lastName: patch.lastName }),
       ...(patch.extension == null ? {} : { extension: patch.extension }),
     };
-    return next;
+    return next as U;
   });
 
-  const additions: Array<Record<string, unknown>> = [];
+  const additions: U[] = [];
   for (const [, e] of byLogin) {
     const key = rosterLoginKey(e.loginId, e.loginName);
     if (key == null) continue;
     if (existingKeys.has(key)) continue;
     if (!shouldAppendNewTeamUserFromRoster(e)) continue;
-    additions.push(rosterEntryToTeamUserRow(e));
+    additions.push(rosterEntryToTeamUserRow(e) as U);
     existingKeys.add(key);
   }
 

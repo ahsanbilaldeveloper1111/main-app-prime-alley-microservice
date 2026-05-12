@@ -19,11 +19,14 @@ type WindowWithLogoutFlag = Window & { __authLogoutInProgress?: boolean };
  * Direct backend URL — no Next.js proxy involved. The legacy `process.env`
  * fallback keeps any old code paths working during the transition window.
  */
+const legacyBackendUrl =
+  typeof process === "undefined"
+    ? undefined
+    : process.env?.NEXT_PUBLIC_BACKEND_URL;
+
 const BACKEND_URL =
   import.meta.env.VITE_BACKEND_URL ||
-  (typeof process !== "undefined"
-    ? process.env?.NEXT_PUBLIC_BACKEND_URL
-    : undefined) ||
+  legacyBackendUrl ||
   "http://localhost:3001/api/";
 
 const axiosInstance: AxiosInstance = axios.create({
@@ -71,7 +74,9 @@ function performClientSignOut(): void {
   const auth = getAuthSnapshot();
   // Fire-and-forget. AuthProvider clears storage and redirects.
   if (auth) {
-    void auth.signOut({ redirectTo: "/auth/signin?reason=session_expired" });
+    auth
+      .signOut({ redirectTo: "/auth/signin?reason=session_expired" })
+      .catch(() => undefined);
   } else {
     win.sessionStorage.clear();
     win.location.replace("/auth/signin?reason=session_expired");

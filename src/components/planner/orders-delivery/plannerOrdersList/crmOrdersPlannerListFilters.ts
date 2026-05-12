@@ -48,7 +48,14 @@ export function applyActiveFilterState(
   }
 
   if (activeFilter !== "all") {
-    const selectedStage = stages.find((s: any) => s.id.toString() === activeFilter);
+    const selectedStage = stages.find(
+      (s): s is { id: string | number } =>
+        s != null &&
+        typeof s === "object" &&
+        "id" in s &&
+        (s as { id?: unknown }).id != null &&
+        (s as { id: string | number }).id.toString() === activeFilter,
+    );
     if (selectedStage) {
       const stageId = selectedStage.id.toString();
       nextFilters.stage_id = stageId;

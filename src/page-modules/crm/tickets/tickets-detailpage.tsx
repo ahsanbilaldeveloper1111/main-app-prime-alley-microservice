@@ -309,10 +309,8 @@ import React, {
       tags: [],
       note: "",
       source_file: "",
+      source: "",
       custom_fields: [],
-      campaign_name: null,
-      campaign_status: null,
-      source_file: "",
     });
     // Edit Prospect Sidebar States
     const [showEditContactSidebar, setShowEditContactSidebar] = useState(false);
@@ -695,13 +693,17 @@ import React, {
         note: item.note ?? d.note ?? "",
         source_file:
           item.source_file ??
+          d.source_file ??
+          d.source ??
+          item.source ??
+          "",
+        source:
+          item.source_file ??
+          d.source_file ??
           d.source ??
           item.source ??
           "",
         custom_fields: customFieldsArray,
-        campaign_name: item.campaign_name ?? d.campaign_name ?? null,
-        campaign_status: item.campaign_status ?? d.campaign_status ?? null,
-        source_file: item.source_file ?? d.source_file ?? "",
       });
     }, [showEditContactSidebar, prospect]);
   

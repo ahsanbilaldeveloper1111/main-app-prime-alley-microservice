@@ -25,7 +25,10 @@ export async function captureUnderscoreErrorException(
     "err" in contextData &&
     (contextData as { err?: unknown }).err
   ) {
-    SentryReact.captureException((contextData as { err: unknown }).err);
+    const err = (contextData as { err?: unknown }).err;
+    if (err) {
+      SentryReact.captureException(err);
+    }
   }
 }
 
