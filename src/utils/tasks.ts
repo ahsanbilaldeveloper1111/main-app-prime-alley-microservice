@@ -1402,6 +1402,11 @@ export interface MyDayPreferences {
   rollover_shown_date?: string | null;
 }
 
+/**
+ * My Day HTTP paths use the work-planner proxy prefix (`/api/work-planner/my-day/...`).
+ * Laravel may also expose the same handlers under `/api/tasks/my-day/...` (Postman); keep paths in sync with your deployed API.
+ */
+
 export interface MyDayTasksMeta {
   planned_minutes?: number;
   completed_minutes?: number;
@@ -1436,6 +1441,9 @@ export interface MyDayCapacityPayload {
 
 export interface MyDayRolloverPayload {
   tasks: unknown[];
+  /** When true, show first-login rollover UI once; client should POST `rollover/ack` after displaying (Postman §7.2). */
+  show_rollover_prompt?: boolean;
+  tasks_preview?: unknown[];
   prompt_acknowledged_today?: boolean;
 }
 
@@ -1581,8 +1589,17 @@ export const getMyDayRollover = async (
     buildMyDayUrl("work-planner/my-day/rollover", query),
   );
   const payload = parseMyDayResponseData<MyDayRolloverPayload>(response);
+  const tasksList = Array.isArray(payload.tasks) ? payload.tasks : [];
+  const explicitShow = payload.show_rollover_prompt;
+  const showRolloverPrompt =
+    explicitShow === true ||
+    (explicitShow == null &&
+      tasksList.length > 0 &&
+      payload.prompt_acknowledged_today !== true);
   return {
-    tasks: Array.isArray(payload.tasks) ? payload.tasks : [],
+    tasks: tasksList,
+    tasks_preview: Array.isArray(payload.tasks_preview) ? payload.tasks_preview : undefined,
+    show_rollover_prompt: showRolloverPrompt,
     prompt_acknowledged_today: payload.prompt_acknowledged_today === true,
   };
 };
