@@ -101,6 +101,9 @@ jobs:
             npm install --no-audit --no-fund
           fi
 
+          echo "→ Typechecking (TypeScript)"
+          npm run typecheck
+
           echo "→ Building SPA (Vite)"
           npm run build
 
@@ -196,6 +199,9 @@ jobs:
           else
             echo "→ Skipping npm install (STAGE_RUN_NPM=0)"
           fi
+
+          echo "→ Typechecking (TypeScript)"
+          npm run typecheck
 
           echo "→ Building SPA (Vite)"
           npm run build

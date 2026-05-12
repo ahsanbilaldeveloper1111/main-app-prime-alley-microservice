@@ -40,7 +40,18 @@ const eslintConfig = [
     },
   },
   {
-    ignores: ["node_modules/**", "dist/**", ".vite/**", "build/**"],
+    ignores: [
+      "node_modules/**",
+      "dist/**",
+      ".vite/**",
+      "build/**",
+      ".next/**",
+      "coverage/**",
+      "public/**",
+      "scripts/**",
+      "src/assets/js/**",
+      "**/*.min.js",
+    ],
   },
 ];
 

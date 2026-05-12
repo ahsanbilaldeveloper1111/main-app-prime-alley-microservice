@@ -146,7 +146,7 @@ export function mergeTeamUsersFromRoster<
       ...(patch.lastName == null ? {} : { lastName: patch.lastName }),
       ...(patch.extension == null ? {} : { extension: patch.extension }),
     };
-    return next as U;
+    return next;
   });
 
   const additions: U[] = [];
