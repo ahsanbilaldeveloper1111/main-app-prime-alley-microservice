@@ -1,4 +1,5 @@
 import type { HistoryListRecord } from "@utils/crm";
+import { stripTrailingParenthetical } from "@utils/displayName";
 
 export type ActivityRecordRow = {
   id: number;
@@ -35,10 +36,10 @@ export function mapCrmActivityHistoryRecords(
       const extension = extensions.find(
         (ext: any) => ext?.id == agentExtension || ext?.extension == agentExtension,
       );
-      const fullName =
-        extension?.display_name || extension?.name || agentExtension;
-      agentName =
-        String(fullName).replace(/\s*\([^)]*\)\s*$/, "").trim() || String(fullName);
+      const fullName = String(
+        extension?.display_name || extension?.name || agentExtension,
+      );
+      agentName = stripTrailingParenthetical(fullName) || fullName;
     }
 
     return {

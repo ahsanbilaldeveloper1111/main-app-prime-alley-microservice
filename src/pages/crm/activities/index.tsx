@@ -1,62 +1,50 @@
-import React, { ReactElement, useState, useEffect, useCallback, useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
+import React, {
+  ReactElement,
+  useState,
+  useEffect,
+  useCallback,
+  useMemo,
+} from "react";
 import { useRouter } from "next/router";
 import {
   Row,
   Col,
   Button,
-  Badge,
   Form,
   Modal,
-  Spinner,
 } from "react-bootstrap";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 import ProtectedRoute from "@components/ProtectedRoute";
 import {
-  X,
-  Users,
   Target,
   Handshake,
   ShoppingBag,
-  Mail,
-  Phone,
-  FileText,
   AlertCircle,
-  CheckCircle,
-  ArrowRight,
-  Clock,
-  PlusCircle,
-  TrendingUp,
-  History,
 } from "lucide-react";
-import { GetHierarchyData } from "@utils/users";
 import { HEADER_CONSTANTS } from "@constants/headerConstants";
-import { crmAppKeys } from "../../../query/keys";
-import { fetchCrmHistoryList, type FetchCrmHistoryListParams } from "../../../query/fetchCrmHistoryList";
-import { mapCrmActivityHistoryRecords } from "../../../query/mapCrmActivityHistoryRecords";
-import { fetchCrmActivityHistoryRecordDetail } from "../../../query/fetchCrmActivityHistoryRecordDetail";
+import { ActivityTimelineModalView } from "@page-modules/crm/activities/ActivityTimelineModalView";
+import { ActivityHistorySidebarPanel } from "@page-modules/crm/activities/ActivityHistorySidebarPanel";
+import { getActivityHistoryTableColumns } from "@page-modules/crm/activities/activityHistoryTableColumns";
+import type {
+  ActivityRecord,
+  HistoryPaginationState,
+  HistoryActivityFiltersState,
+} from "@page-modules/crm/activities/activityHistoryPageTypes";
+import { resolveActivityTabFromRouter } from "@page-modules/crm/activities/activityHistoryListParams";
+import { useCrmActivityHistoryPageData } from "@hooks/useCrmActivityHistoryPageData";
 import "@assets/scss/datatable-style.scss";
 import "@assets/scss/ticketsnew.scss";
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
 import "@assets/scss/crm-activities-page.scss";
 import "@assets/scss/crm-activity-timeline-modal.scss";
-import {
-  GlobalDateFormat,
-  GlobalTimeFormat,
-  ModuleSlug,
-  convertDateTimeWithOffsetToLocal,
-} from "@utils/Helper";
-import { getInitials, getRandomColor } from "@utils/crmNameAvatar";
-import moment from "moment";
+import { stripTrailingParenthetical } from "@utils/displayName";
 import { toast } from "react-toastify";
 import GenericTable, {
-  TableColumn,
   TabConfig,
   FilterPill,
 } from "@components/GenericTable";
-import GenericSidebar from "@components/GenericSidebarNew";
 import GenericFilterSidebar, {
   FilterField,
 } from "@components/GenericFilterSidebar";
@@ -70,17 +58,36 @@ function toSafeIdString(value: unknown): string {
   return "";
 }
 
-// Types
-interface ActivityRecord {
-  id: number;
-  record_id?: string; // Original record_id from API for history chain calls
-  customer: string;
-  type: string;
-  agent: string;
-  lastActivity: string;
-  stage: string;
-  tags: string[];
-  dateTime: string;
+/** Determine if an activity row matches the current text search. */
+function activitySearchMatches(
+  activity: ActivityRecord,
+  search: string,
+): boolean {
+  if (!search) return true;
+  const searchLower = search.toLowerCase();
+  return (
+    activity.customer.toLowerCase().includes(searchLower) ||
+    activity.agent.toLowerCase().includes(searchLower)
+  );
+}
+
+/** Combine the "All Types" tab with the user's custom tabs, hiding count when inactive. */
+function buildHistoryTabs(
+  customTabs: TabConfig[],
+  activityTypeFilter: string,
+  totalCount: number,
+): TabConfig[] {
+  const allTab: TabConfig = {
+    id: "all",
+    label: "All Types",
+    count: totalCount,
+    removable: false,
+  };
+  const customTabsWithCount = customTabs.map((t) => ({
+    ...t,
+    count: activityTypeFilter === t.id ? totalCount : undefined,
+  }));
+  return [allTab, ...customTabsWithCount];
 }
 
 const HistoryPage = () => {
@@ -110,152 +117,26 @@ const HistoryPage = () => {
   const [showAddTabModal, setShowAddTabModal] = useState(false);
   const [showColumnEditor, setShowColumnEditor] = useState(false);
 
-  const hierarchyQuery = useQuery({
-    queryKey: crmAppKeys.hierarchyExtensions.module(ModuleSlug.CRM_HISTORY),
-    queryFn: async () => {
-      const hierarchyData = await GetHierarchyData(ModuleSlug.CRM_HISTORY);
-      return hierarchyData?.extensions ?? [];
-    },
-  });
-
-  const extensions = hierarchyQuery.data ?? [];
-
-  const extensionsStamp = useMemo(
-    () =>
-      extensions
-        .map(
-          (e: { id?: unknown; extension?: unknown }) =>
-            `${toSafeIdString(e?.id)}:${toSafeIdString(e?.extension)}`,
-        )
-        .join("|"),
-    [extensions],
-  );
-
-  const agentsKey = useMemo(
-    () =>
-      JSON.stringify(
-        [...activityFilters.agents]
-          .map(String)
-          .sort((a, b) => a.localeCompare(b)),
-      ),
-    [activityFilters.agents],
-  );
-
-  const historyListQuery = useQuery({
-    queryKey: crmAppKeys.activityHistory.list({
-      page: pagination.current_page,
-      perPage: pagination.per_page,
-      sortBy: pagination.sort_by,
-      sortOrder: pagination.sort_order,
-      search: activitySearch,
-      typeTab: activityTypeFilter,
-      agentsKey,
-      dateFrom: activityFilters.dateRange.start,
-      dateTo: activityFilters.dateRange.end,
-      extensionsStamp,
-    }),
-    queryFn: async () => {
-      const params: FetchCrmHistoryListParams = {
-        page: pagination.current_page,
-        per_page: pagination.per_page,
-      };
-      if (pagination.sort_by) {
-        params.sort_by = pagination.sort_by;
-        params.sort_order = pagination.sort_order;
-      }
-      if (activitySearch) params.search = activitySearch;
-      if (activityFilters.agents.length > 0) {
-        params.user_extension = activityFilters.agents;
-      }
-      if (activityFilters.dateRange.start) params.from = activityFilters.dateRange.start;
-      if (activityFilters.dateRange.end) params.to = activityFilters.dateRange.end;
-      if (activityTypeFilter !== "all") {
-        const typeMap: Record<string, string> = {
-          leads: "lead",
-          deals: "deal",
-          orders: "order",
-          prospects: "prospect",
-        };
-        const apiType = typeMap[activityTypeFilter];
-        if (apiType) params.type = apiType;
-      }
-      const raw = await fetchCrmHistoryList(params);
-      const rows = mapCrmActivityHistoryRecords(raw.records, extensions);
-      return { rows, pagination: raw.pagination };
-    },
-    enabled: hierarchyQuery.isFetched,
-  });
-
-  const allActivityRecords = historyListQuery.data?.rows ?? [];
-  const loading =
-    hierarchyQuery.isPending ||
-    hierarchyQuery.isFetching ||
-    historyListQuery.isPending ||
-    historyListQuery.isFetching;
-
-  useEffect(() => {
-    const p = historyListQuery.data?.pagination;
-    if (!p) return;
-    setPagination((prev) => {
-      if (
-        prev.current_page === p.current_page &&
-        prev.last_page === p.last_page &&
-        prev.per_page === p.per_page &&
-        prev.total === p.total
-      ) {
-        return prev;
-      }
-      return {
-        ...prev,
-        current_page: p.current_page,
-        last_page: p.last_page,
-        per_page: p.per_page,
-        total: p.total,
-      };
-    });
-  }, [historyListQuery.data?.pagination]);
-
-  useEffect(() => {
-    if (!hierarchyQuery.isFetched) return;
-    setPagination((prev) => ({ ...prev, current_page: 1 }));
-  }, [
-    activityFilters.agents,
-    activityFilters.dateRange.start,
-    activityFilters.dateRange.end,
+  const {
+    extensions,
+    allActivityRecords,
+    loading,
+    historyChain,
+    recordStages,
+    currentStageIndex,
+    crmData,
+    loadingHistory,
+    loadingCrmData,
+  } = useCrmActivityHistoryPageData({
+    pagination,
+    setPagination,
+    activitySearch,
     activityTypeFilter,
-    hierarchyQuery.isFetched,
-  ]);
-
-  const detailOpen = Boolean(
-    selectedActivityRecord && (showActivitySidebar || showActivityTimelineModal),
-  );
-  const recordTypeStr = String(selectedActivityRecord?.type ?? "").toLowerCase();
-  const recordIdRaw = selectedActivityRecord?.record_id ?? selectedActivityRecord?.id;
-  const recordIdStr =
-    recordIdRaw === null || recordIdRaw === undefined
-      ? ""
-      : String(recordIdRaw);
-
-  const detailQuery = useQuery({
-    queryKey: crmAppKeys.activityHistory.recordDetail({
-      recordType: recordTypeStr,
-      recordId: recordIdStr,
-      open: detailOpen,
-    }),
-    queryFn: () =>
-      fetchCrmActivityHistoryRecordDetail({
-        recordType: recordTypeStr,
-        recordId: recordIdRaw!,
-      }),
-    enabled: detailOpen && Boolean(recordIdStr && recordTypeStr),
+    activityFilters,
+    selectedActivityRecord,
+    showActivitySidebar,
+    showActivityTimelineModal,
   });
-
-  const historyChain = detailOpen ? detailQuery.data?.historyChain ?? [] : [];
-  const recordStages = detailOpen ? detailQuery.data?.recordStages ?? [] : [];
-  const currentStageIndex = detailOpen ? detailQuery.data?.currentStageIndex ?? 0 : 0;
-  const crmData = detailOpen ? detailQuery.data?.crmData ?? null : null;
-  const loadingHistory = detailOpen && (detailQuery.isPending || detailQuery.isFetching);
-  const loadingCrmData = detailOpen && (detailQuery.isPending || detailQuery.isFetching);
 
   const defaultSelectedColumns = [
     "customer",
@@ -274,15 +155,13 @@ const HistoryPage = () => {
   const validHistoryFilters = ["all", "leads", "deals", "orders"];
 
   useEffect(() => {
-    if (router.isReady && router.query.tab) {
-      const tabFromUrl = String(router.query.tab);
-      if (
-        validHistoryFilters.includes(tabFromUrl) &&
-        tabFromUrl !== activityTypeFilter
-      ) {
-        setActivityTypeFilter(tabFromUrl);
-      }
-    }
+    const next = resolveActivityTabFromRouter(
+      router.isReady,
+      router.query.tab,
+      activityTypeFilter,
+      validHistoryFilters,
+    );
+    if (next) setActivityTypeFilter(next);
   }, [router.isReady, router.query.tab, activityTypeFilter]);
 
   useEffect(() => {
@@ -309,20 +188,18 @@ const HistoryPage = () => {
   const availableAgents: { value: string; label: string }[] = extensions.map(
     (ext: { id?: unknown; extension?: unknown; display_name?: string; name?: string }) => ({
       value: toSafeIdString(ext.id) || toSafeIdString(ext.extension),
-      label: (ext.display_name || ext.name || toSafeIdString(ext.id) || toSafeIdString(ext.extension))
-        .replace(/\s*\([^)]*\)\s*$/, "")
-        .trim(),
+      label: stripTrailingParenthetical(
+        ext.display_name ||
+          ext.name ||
+          toSafeIdString(ext.id) ||
+          toSafeIdString(ext.extension),
+      ),
     }),
   );
 
-  const filteredActivityRecords = allActivityRecords.filter((activity) => {
-    if (!activitySearch) return true;
-    const searchLower = activitySearch.toLowerCase();
-    return (
-      activity.customer.toLowerCase().includes(searchLower) ||
-      activity.agent.toLowerCase().includes(searchLower)
-    );
-  });
+  const filteredActivityRecords = allActivityRecords.filter((activity) =>
+    activitySearchMatches(activity, activitySearch),
+  );
 
   const typeFilterCounts = {
     all: allActivityRecords.length,
@@ -334,99 +211,10 @@ const HistoryPage = () => {
 
   const { PERMISSIONS } = HEADER_CONSTANTS;
 
-  // Define table columns for GenericTable
-  const tableColumns: TableColumn<ActivityRecord>[] = [
-    {
-      key: "customer",
-      label: "Record Name",
-      type: "multi-field",
-      sortable: true,
-      fields: {
-        primary: "customer",
-        secondary: "tags",
-        secondaryClass: "text-muted small",
-      },
-      render: (row) => (
-        <div>
-          <div className="fw-semibold text-dark">{row.customer}</div>
-          {row.tags && row.tags.length > 0 && (
-            <div className="mt-1">
-              {row.tags.map((tag: any, idx: number) => (
-                <Badge
-                  key={idx}
-                  bg="light"
-                  text="dark"
-                  className="me-1"
-                  style={{ fontSize: "0.7rem" }}
-                >
-                  {tag}
-                </Badge>
-              ))}
-            </div>
-          )}
-        </div>
-      ),
-    },
-    {
-      key: "agent",
-      label: "Agent",
-      type: "avatar",
-      sortable: true,
-      avatar: {
-        getInitials: (row) => getInitials(row.agent),
-        getColor: (row) => getRandomColor(row.agent),
-      },
-      emptyValue: "N/A",
-    },
-    {
-      key: "lastActivity",
-      label: "Last Activity",
-      type: "date",
-      sortable: true,
-      render: (row) => (
-        <div className="small text-uppercase">
-          {row.dateTime ? moment(row.dateTime).format(GlobalDateFormat) : "-"}
-          <div className="text-muted">
-            {row.dateTime
-              ? convertDateTimeWithOffsetToLocal(
-                  row.dateTime,
-                  undefined,
-                  GlobalTimeFormat,
-                )
-              : ""}
-          </div>
-        </div>
-      ),
-    },
-    {
-      key: "type",
-      label: "Type",
-      type: "badge",
-      sortable: true,
-      render: (row) => (
-        <Badge
-          bg={
-            row.type === "Prospect"
-              ? "secondary"
-              : row.type === "Lead"
-                ? "primary"
-                : row.type === "Deal"
-                  ? "success"
-                  : "info"
-          }
-        >
-          {row.type}
-        </Badge>
-      ),
-    },
-    {
-      key: "stage",
-      label: "Stage",
-      type: "text",
-      sortable: false,
-      render: (row) => <div className="small fw-semibold">{row.stage}</div>,
-    },
-  ];
+  const tableColumns = useMemo(
+    () => getActivityHistoryTableColumns(),
+    [],
+  );
 
   // Define filter fields for GenericFilterSidebar
   const filterFields: FilterField[] = [
@@ -473,19 +261,11 @@ const HistoryPage = () => {
     },
   ];
 
-  const historyTabs: TabConfig[] = [
-    {
-      id: "all",
-      label: "All Types",
-      count: typeFilterCounts.all ?? pagination.total ?? 0,
-      removable: false,
-    },
-    ...customTabs.map((t) => ({
-      ...t,
-      // Show count only when this tab is active (API has returned data for this type)
-      count: activityTypeFilter === t.id ? pagination.total : undefined,
-    })),
-  ];
+  const historyTabs: TabConfig[] = buildHistoryTabs(
+    customTabs,
+    activityTypeFilter,
+    typeFilterCounts.all ?? pagination.total ?? 0,
+  );
 
   const handleOpenFiltersSidebar = useCallback(() => {
     setShowFiltersSidebar(true);
@@ -619,1037 +399,17 @@ const HistoryPage = () => {
         />
 
         {/* Activity Timeline Modal */}
-        {selectedActivityRecord && (
-          <Modal
-            show={showActivityTimelineModal}
-            onHide={() => setShowActivityTimelineModal(false)}
-            size="xl"
-            centered
-            className="activity-timeline-modal"
-          >
-            {/* Modern Header with Gradient */}
-            <div
-              style={{
-                background: "#fff",
-                color: "black",
-                padding: "24px 32px",
-                position: "relative",
-                borderTopLeftRadius: "12px",
-                borderTopRightRadius: "12px",
-                boxShadow: "0 4px 6px rgba(0, 0, 0, 0.1)",
-                borderBottom: "1px solid #ccc",
-              }}
-            >
-              <button
-                onClick={() => setShowActivityTimelineModal(false)}
-                style={{
-                  position: "absolute",
-                  top: "16px",
-                  right: "16px",
-                  background: "rgba(255,255,255,0.15)",
-                  backdropFilter: "blur(10px)",
-                  border: "1px solid rgba(255,255,255,0.2)",
-                  color: "black",
-                  width: "32px",
-                  height: "32px",
-                  borderRadius: "8px",
-                  cursor: "pointer",
-                  transition: "all 0.2s ease",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                }}
-                onMouseOver={(e) => {
-                  e.currentTarget.style.background = "rgba(255,255,255,0.25)";
-                  e.currentTarget.style.transform = "scale(1.05)";
-                }}
-                onMouseOut={(e) => {
-                  e.currentTarget.style.background = "rgba(255,255,255,0.15)";
-                  e.currentTarget.style.transform = "scale(1)";
-                }}
-              >
-                <X size={18} />
-              </button>
-
-              {/* Header Content */}
-              <div
-                style={{ display: "flex", alignItems: "center", gap: "16px" }}
-              >
-                <div
-                  style={{
-                    width: "64px",
-                    height: "64px",
-                    borderRadius: "16px",
-                    background: "#8b5cf6",
-                    backdropFilter: "blur(10px)",
-                    border: "2px solid rgba(255,255,255,0.3)",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    fontSize: "28px",
-                    fontWeight: "700",
-                    flexShrink: 0,
-                    color: "#fff",
-                  }}
-                >
-                  {selectedActivityRecord.customer
-                    ? selectedActivityRecord.customer.charAt(0).toUpperCase()
-                    : "A"}
-                </div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <h2
-                    style={{
-                      margin: 0,
-                      fontWeight: 700,
-                      fontSize: "26px",
-                      textShadow: "0 2px 4px rgba(0,0,0,0.1)",
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                      whiteSpace: "nowrap",
-                    }}
-                  >
-                    {selectedActivityRecord.customer}
-                  </h2>
-                  <div
-                    style={{
-                      marginTop: "6px",
-                      opacity: 0.95,
-                      fontSize: "14px",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "12px",
-                      flexWrap: "wrap",
-                      color: "#000",
-                    }}
-                  >
-                    <span
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "6px",
-                      }}
-                    >
-                      <Users size={14} />
-                      Assigned to {selectedActivityRecord.agent}
-                    </span>
-                    <span>•</span>
-                    <span>
-                      {["Prospect", "Lead", "Deal", "Order"][
-                        currentStageIndex
-                      ] || "Unknown"}{" "}
-                      Stage
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <Modal.Body
-              style={{
-                padding: 0,
-                maxHeight: "calc(90vh - 200px)",
-                overflowY: "auto",
-              }}
-            >
-              {/* Main Content Grid */}
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "1fr 360px",
-                  minHeight: "500px",
-                }}
-              >
-                {/* Left Panel - Stage Progress & Timeline */}
-                <div
-                  style={{ padding: "32px", borderRight: "1px solid #e5e7eb" }}
-                >
-                  {/* Enhanced Stage Progress */}
-                  <div style={{ marginBottom: "28px" }}>
-                    <div
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "space-between",
-                        marginBottom: "24px",
-                      }}
-                    >
-                      <h5
-                        style={{
-                          fontSize: "15px",
-                          fontWeight: 700,
-                          color: "#1f2937",
-                          margin: 0,
-                          display: "flex",
-                          alignItems: "center",
-                          gap: "8px",
-                        }}
-                      >
-                        <div
-                          style={{
-                            width: "4px",
-                            height: "18px",
-                            background:
-                              "linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)",
-                            borderRadius: "2px",
-                          }}
-                        />
-                        Stage Progress
-                      </h5>
-                      <Badge
-                        bg="primary"
-                        style={{
-                          padding: "6px 14px",
-                          borderRadius: "20px",
-                          fontSize: "12px",
-                          fontWeight: 600,
-                          backgroundColor: "#8b5cf6",
-                        }}
-                      >
-                        {["Prospect", "Lead", "Deal", "Order"][
-                          currentStageIndex
-                        ] || "Unknown"}
-                      </Badge>
-                    </div>
-
-                    {loadingHistory ? (
-                      <div
-                        style={{
-                          padding: "48px 20px",
-                          textAlign: "center",
-                        }}
-                      >
-                        <Spinner
-                          animation="border"
-                          variant="primary"
-                          size="sm"
-                          style={{ marginBottom: "12px" }}
-                        />
-                        <p
-                          className="mb-0"
-                          style={{ color: "#6b7280", fontSize: "14px" }}
-                        >
-                          Loading stages...
-                        </p>
-                      </div>
-                    ) : (
-                      <div
-                        style={{
-                          background: "#f9fafb",
-                          border: "1px solid #e5e7eb",
-                          borderRadius: "12px",
-                          padding: "40px 20px",
-                          position: "relative",
-                        }}
-                      >
-                        {/* Background Progress Bar */}
-                        <div
-                          style={{
-                            position: "absolute",
-                            top: "50%",
-                            left: "10%",
-                            right: "10%",
-                            height: "4px",
-                            backgroundColor: "#e3e8ef",
-                            borderRadius: "4px",
-                            transform: "translateY(-50%)",
-                            zIndex: 0,
-                          }}
-                        />
-                        {/* Filled Progress Bar */}
-                        <div
-                          className="timeline-progress-bar"
-                          style={{
-                            position: "absolute",
-                            top: "50%",
-                            left: "10%",
-                            width:
-                              currentStageIndex > 0
-                                ? `${(currentStageIndex / 3) * 80}%`
-                                : "0%",
-                            height: "4px",
-                            background:
-                              "linear-gradient(90deg, #8b5cf6 0%, #7c3aed 100%)",
-                            borderRadius: "4px",
-                            transform: "translateY(-50%)",
-                            zIndex: 0,
-                          }}
-                        />
-
-                        {/* Stage Items */}
-                        <div
-                          style={{
-                            display: "flex",
-                            justifyContent: "space-between",
-                            alignItems: "center",
-                            position: "relative",
-                            zIndex: 1,
-                          }}
-                        >
-                          {[
-                            {
-                              name: "Prospect",
-                              icon: <Users size={20} />,
-                              color: "#9c27b0",
-                            },
-                            {
-                              name: "Lead",
-                              icon: <Target size={20} />,
-                              color: "#2196f3",
-                            },
-                            {
-                              name: "Deal",
-                              icon: <TrendingUp size={20} />,
-                              color: "#ff9800",
-                            },
-                            {
-                              name: "Order",
-                              icon: <ShoppingBag size={20} />,
-                              color: "#4caf50",
-                            },
-                          ].map((stage, idx) => {
-                            const isCompleted = idx < currentStageIndex;
-                            const isCurrent = idx === currentStageIndex;
-
-                            return (
-                              <div
-                                key={stage.name}
-                                style={{
-                                  display: "flex",
-                                  flexDirection: "column",
-                                  alignItems: "center",
-                                  flex: 1,
-                                }}
-                              >
-                                {/* Circle */}
-                                <div
-                                  style={{
-                                    width: isCurrent ? "56px" : "48px",
-                                    height: isCurrent ? "56px" : "48px",
-                                    borderRadius: "50%",
-                                    display: "flex",
-                                    alignItems: "center",
-                                    justifyContent: "center",
-                                    marginBottom: "8px",
-                                    background:
-                                      isCompleted || isCurrent
-                                        ? stage.color
-                                        : "#fff",
-                                    border: isCurrent
-                                      ? `3px solid ${stage.color}`
-                                      : `2px solid ${isCompleted ? stage.color : "#dee2e6"}`,
-                                    color:
-                                      isCompleted || isCurrent
-                                        ? "#fff"
-                                        : "#6c757d",
-                                    boxShadow: isCurrent
-                                      ? `0 8px 24px ${stage.color}40`
-                                      : isCompleted
-                                        ? `0 4px 12px ${stage.color}30`
-                                        : "none",
-                                    transition: "all 0.3s ease",
-                                    transform: isCurrent
-                                      ? "scale(1.1)"
-                                      : "scale(1)",
-                                  }}
-                                >
-                                  {isCompleted ? (
-                                    <CheckCircle size={isCurrent ? 24 : 20} />
-                                  ) : (
-                                    stage.icon
-                                  )}
-                                </div>
-
-                                {/* Label */}
-                                <div
-                                  style={{
-                                    textAlign: "center",
-                                    fontSize: isCurrent ? "0.9rem" : "0.8rem",
-                                    fontWeight: isCurrent ? 700 : 600,
-                                    color:
-                                      isCompleted || isCurrent
-                                        ? stage.color
-                                        : "#6c757d",
-                                    transition: "all 0.3s ease",
-                                  }}
-                                >
-                                  {stage.name}
-                                </div>
-
-                                {/* Current indicator */}
-                                {isCurrent && (
-                                  <div
-                                    style={{
-                                      marginTop: "8px",
-                                      padding: "4px 8px",
-                                      borderRadius: "6px",
-                                      backgroundColor: `${stage.color}15`,
-                                      color: stage.color,
-                                      fontSize: "0.7rem",
-                                      fontWeight: 600,
-                                    }}
-                                  >
-                                    Current
-                                  </div>
-                                )}
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Enhanced Activity Timeline */}
-                  <div style={{ marginBottom: "28px" }}>
-                    <h5
-                      style={{
-                        fontSize: "15px",
-                        fontWeight: 700,
-                        color: "#1f2937",
-                        marginBottom: "16px",
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "8px",
-                      }}
-                    >
-                      <div
-                        style={{
-                          width: "4px",
-                          height: "18px",
-                          background:
-                            "linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)",
-                          borderRadius: "2px",
-                        }}
-                      />
-                      Activity Timeline
-                      {!loadingHistory && historyChain.length > 0 && (
-                        <Badge
-                          bg="secondary"
-                          style={{
-                            marginLeft: "8px",
-                            fontSize: "11px",
-                            fontWeight: 600,
-                            padding: "4px 10px",
-                            borderRadius: "6px",
-                          }}
-                        >
-                          {historyChain.length}
-                        </Badge>
-                      )}
-                    </h5>
-
-                    {loadingHistory ? (
-                      <div
-                        style={{
-                          padding: "48px 20px",
-                          textAlign: "center",
-                        }}
-                      >
-                        <Spinner
-                          animation="border"
-                          variant="primary"
-                          size="sm"
-                          style={{ marginBottom: "12px" }}
-                        />
-                        <p
-                          className="mb-0"
-                          style={{ color: "#6b7280", fontSize: "14px" }}
-                        >
-                          Loading activity timeline...
-                        </p>
-                      </div>
-                    ) : historyChain.length === 0 ? (
-                      <div
-                        style={{
-                          padding: "40px",
-                          textAlign: "center",
-                          color: "#6b7280",
-                          background: "#f9fafb",
-                          border: "2px dashed #d1d5db",
-                          borderRadius: "12px",
-                        }}
-                      >
-                        <Clock
-                          size={40}
-                          style={{ marginBottom: "12px", opacity: 0.5 }}
-                        />
-                        <div style={{ fontSize: "14px", fontWeight: 500 }}>
-                          No activity history available
-                        </div>
-                      </div>
-                    ) : (
-                      <div
-                        style={{
-                          background: "white",
-                          border: "1px solid #e5e7eb",
-                          borderRadius: "12px",
-                          padding: "20px",
-                        }}
-                      >
-                        <div
-                          style={{ position: "relative", paddingLeft: "56px" }}
-                        >
-                          {/* Timeline Line */}
-                          <div
-                            style={{
-                              position: "absolute",
-                              left: "30px",
-                              top: "0",
-                              bottom: "20px",
-                              width: "3px",
-                              background:
-                                "linear-gradient(180deg, #8b5cf6 0%, #7c3aed 100%)",
-                              borderRadius: "3px",
-                              opacity: 0.2,
-                            }}
-                          />
-
-                          {historyChain.map((record, index) => {
-                            const dateObj = new Date(record.created_at);
-                            const dateStr = dateObj.toLocaleDateString(
-                              "en-US",
-                              {
-                                month: "short",
-                                day: "numeric",
-                                year: "numeric",
-                              },
-                            );
-                            const timeStr = dateObj.toLocaleTimeString(
-                              "en-US",
-                              {
-                                hour: "2-digit",
-                                minute: "2-digit",
-                                hour12: true,
-                              },
-                            );
-
-                            const userExtension =
-                              record.user_extension_done_by ||
-                              record.user_extension;
-                            const userName = userExtension
-                              ? extensions.find(
-                                  (ext: any) =>
-                                    ext?.id == userExtension ||
-                                    ext?.extension == userExtension,
-                                )?.display_name ||
-                                extensions.find(
-                                  (ext: any) =>
-                                    ext?.id == userExtension ||
-                                    ext?.extension == userExtension,
-                                )?.name ||
-                                userExtension
-                              : "System";
-                            const cleanUserName = userName
-                              .replace(/\s*\([^)]*\)\s*$/, "")
-                              .trim();
-
-                            const getIconForEvent = (
-                              event: string,
-                              action: string | null,
-                            ) => {
-                              if (event === "created") {
-                                return {
-                                  icon: <PlusCircle size={20} />,
-                                  bg: "#10b981",
-                                };
-                              }
-                              if (
-                                action?.toLowerCase().includes("stage") ||
-                                event?.toLowerCase().includes("stage")
-                              ) {
-                                return {
-                                  icon: <ArrowRight size={20} />,
-                                  bg: "#3b82f6",
-                                };
-                              }
-                              if (
-                                action?.toLowerCase().includes("call") ||
-                                event?.toLowerCase().includes("call")
-                              ) {
-                                return {
-                                  icon: <Phone size={20} />,
-                                  bg: "#8b5cf6",
-                                };
-                              }
-                              if (
-                                action?.toLowerCase().includes("email") ||
-                                event?.toLowerCase().includes("email")
-                              ) {
-                                return {
-                                  icon: <Mail size={20} />,
-                                  bg: "#ec4899",
-                                };
-                              }
-                              return {
-                                icon: <FileText size={20} />,
-                                bg: "#f59e0b",
-                              };
-                            };
-
-                            const iconData = getIconForEvent(
-                              record.event,
-                              record.action,
-                            );
-
-                            return (
-                              <div
-                                key={index}
-                                style={{
-                                  position: "relative",
-                                  marginBottom:
-                                    index < historyChain.length - 1
-                                      ? "24px"
-                                      : "0",
-                                }}
-                              >
-                                {/* Timeline Icon */}
-                                <div
-                                  style={{
-                                    width: "60px",
-                                    height: "60px",
-                                    borderRadius: "50%",
-                                    display: "flex",
-                                    alignItems: "center",
-                                    justifyContent: "center",
-                                    position: "absolute",
-                                    left: "-56px",
-                                    top: "0",
-                                    background: iconData.bg,
-                                    border: "4px solid #fff",
-                                    boxShadow: "0 4px 16px rgba(0,0,0,0.12)",
-                                    color: "#fff",
-                                  }}
-                                >
-                                  {iconData.icon}
-                                </div>
-
-                                {/* Timeline Content */}
-                                <div
-                                  style={{
-                                    background: "#f9fafb",
-                                    border: "1px solid #e5e7eb",
-                                    borderLeft: `3px solid ${iconData.bg}`,
-                                    borderRadius: "8px",
-                                    padding: "12px 16px",
-                                  }}
-                                >
-                                  <div
-                                    style={{
-                                      display: "flex",
-                                      justifyContent: "space-between",
-                                      alignItems: "start",
-                                      marginBottom: "8px",
-                                    }}
-                                  >
-                                    <div
-                                      style={{
-                                        fontSize: "14px",
-                                        fontWeight: 600,
-                                        color: "#1f2937",
-                                      }}
-                                    >
-                                      {record.description ||
-                                        record.action_display ||
-                                        "Activity recorded"}
-                                    </div>
-                                    <Badge
-                                      bg="light"
-                                      text="dark"
-                                      style={{
-                                        marginLeft: "8px",
-                                        fontSize: "11px",
-                                        fontWeight: 500,
-                                        padding: "4px 10px",
-                                        borderRadius: "6px",
-                                        whiteSpace: "nowrap",
-                                      }}
-                                    >
-                                      {record.created_at_human || dateStr}
-                                    </Badge>
-                                  </div>
-                                  <div
-                                    style={{
-                                      display: "flex",
-                                      alignItems: "center",
-                                      gap: "8px",
-                                      color: "#6b7280",
-                                      fontSize: "13px",
-                                    }}
-                                  >
-                                    <Users size={14} />
-                                    <span>{cleanUserName}</span>
-                                    <span>•</span>
-                                    <Clock size={14} />
-                                    <span>{timeStr}</span>
-                                  </div>
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* Right Panel - Quick Actions & Info */}
-                <div
-                  style={{
-                    padding: "32px 24px",
-                    background: "#fafbfc",
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: "24px",
-                  }}
-                >
-                  {/* Customer Info */}
-                  <div>
-                    <h6
-                      style={{
-                        fontSize: "13px",
-                        fontWeight: 700,
-                        color: "#6b7280",
-                        textTransform: "uppercase",
-                        letterSpacing: "0.5px",
-                        marginBottom: "14px",
-                      }}
-                    >
-                      Customer Information
-                    </h6>
-                    <div
-                      style={{
-                        background: "white",
-                        border: "1px solid #e5e7eb",
-                        borderRadius: "10px",
-                        padding: "16px",
-                      }}
-                    >
-                      {loadingCrmData ? (
-                        <div
-                          style={{
-                            textAlign: "center",
-                            padding: "20px",
-                          }}
-                        >
-                          <Spinner
-                            animation="border"
-                            size="sm"
-                            variant="primary"
-                          />
-                        </div>
-                      ) : (
-                        <div
-                          style={{
-                            display: "flex",
-                            flexDirection: "column",
-                            gap: "14px",
-                          }}
-                        >
-                          <div
-                            style={{
-                              display: "flex",
-                              justifyContent: "space-between",
-                              alignItems: "center",
-                            }}
-                          >
-                            <span
-                              style={{
-                                fontSize: "13px",
-                                color: "#6b7280",
-                                fontWeight: 500,
-                              }}
-                            >
-                              Name
-                            </span>
-                            <span
-                              style={{
-                                fontSize: "14px",
-                                color: "#1f2937",
-                                fontWeight: 600,
-                              }}
-                            >
-                              {crmData?.name ||
-                                selectedActivityRecord?.customer ||
-                                "N/A"}
-                            </span>
-                          </div>
-                          <div
-                            style={{
-                              display: "flex",
-                              justifyContent: "space-between",
-                              alignItems: "center",
-                            }}
-                          >
-                            <span
-                              style={{
-                                fontSize: "13px",
-                                color: "#6b7280",
-                                fontWeight: 500,
-                              }}
-                            >
-                              Phone
-                            </span>
-                            <span
-                              style={{
-                                fontSize: "13px",
-                                color: "#1f2937",
-                                fontWeight: 500,
-                              }}
-                            >
-                              {crmData?.phone || "N/A"}
-                            </span>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Agent Info */}
-                  <div>
-                    <h6
-                      style={{
-                        fontSize: "13px",
-                        fontWeight: 700,
-                        color: "#6b7280",
-                        textTransform: "uppercase",
-                        letterSpacing: "0.5px",
-                        marginBottom: "14px",
-                      }}
-                    >
-                      Agent Information
-                    </h6>
-                    <div
-                      style={{
-                        background: "white",
-                        border: "1px solid #e5e7eb",
-                        borderRadius: "10px",
-                        padding: "16px",
-                      }}
-                    >
-                      <div
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: "12px",
-                        }}
-                      >
-                        <div
-                          style={{
-                            width: "48px",
-                            height: "48px",
-                            borderRadius: "50%",
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            background:
-                              "linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)",
-                            color: "#fff",
-                            fontWeight: 600,
-                            fontSize: "16px",
-                            flexShrink: 0,
-                          }}
-                        >
-                          {(() => {
-                            const alphabeticChars = (
-                              selectedActivityRecord?.agent || ""
-                            ).replace(/[^a-zA-Z]/g, "");
-                            const splittedArray = alphabeticChars.split(" ");
-                            return (
-                              [
-                                splittedArray[0]?.[0] || "",
-                                splittedArray?.[1]?.[0] || "",
-                              ]
-                                .join("")
-                                .toUpperCase() || "NA"
-                            );
-                          })()}
-                        </div>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div
-                            style={{
-                              fontSize: "14px",
-                              fontWeight: 600,
-                              color: "#1f2937",
-                              overflow: "hidden",
-                              textOverflow: "ellipsis",
-                              whiteSpace: "nowrap",
-                            }}
-                          >
-                            {selectedActivityRecord?.agent || "N/A"}
-                          </div>
-                          <div
-                            style={{
-                              fontSize: "12px",
-                              color: "#6b7280",
-                            }}
-                          >
-                            Assigned Agent
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Stage Summary */}
-                  <div>
-                    <h6
-                      style={{
-                        fontSize: "13px",
-                        fontWeight: 700,
-                        color: "#6b7280",
-                        textTransform: "uppercase",
-                        letterSpacing: "0.5px",
-                        marginBottom: "14px",
-                      }}
-                    >
-                      Stage Summary
-                    </h6>
-                    <div
-                      style={{
-                        background: "white",
-                        border: "1px solid #e5e7eb",
-                        borderRadius: "10px",
-                        padding: "16px",
-                      }}
-                    >
-                      <div
-                        style={{
-                          display: "flex",
-                          flexDirection: "column",
-                          gap: "14px",
-                        }}
-                      >
-                        <div
-                          style={{
-                            display: "flex",
-                            justifyContent: "space-between",
-                            alignItems: "center",
-                          }}
-                        >
-                          <span
-                            style={{
-                              fontSize: "13px",
-                              color: "#6b7280",
-                              fontWeight: 500,
-                            }}
-                          >
-                            Current Stage
-                          </span>
-                          <Badge
-                            style={{
-                              fontSize: "11px",
-                              fontWeight: 600,
-                              padding: "4px 10px",
-                              borderRadius: "6px",
-                              backgroundColor: "#8b5cf6",
-                            }}
-                          >
-                            {["Prospect", "Lead", "Deal", "Order"][
-                              currentStageIndex
-                            ] || "Unknown"}
-                          </Badge>
-                        </div>
-
-                        <div
-                          style={{
-                            display: "flex",
-                            justifyContent: "space-between",
-                            alignItems: "center",
-                          }}
-                        >
-                          <span
-                            style={{
-                              fontSize: "13px",
-                              color: "#6b7280",
-                              fontWeight: 500,
-                            }}
-                          >
-                            Progress
-                          </span>
-                          <span
-                            style={{
-                              fontSize: "14px",
-                              color: "#1f2937",
-                              fontWeight: 600,
-                            }}
-                          >
-                            {currentStageIndex + 1} / 4
-                          </span>
-                        </div>
-
-                        <div
-                          style={{
-                            display: "flex",
-                            justifyContent: "space-between",
-                            alignItems: "center",
-                          }}
-                        >
-                          <span
-                            style={{
-                              fontSize: "13px",
-                              color: "#6b7280",
-                              fontWeight: 500,
-                            }}
-                          >
-                            Activities
-                          </span>
-                          <span
-                            style={{
-                              fontSize: "14px",
-                              color: "#1f2937",
-                              fontWeight: 600,
-                            }}
-                          >
-                            {historyChain.length}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </Modal.Body>
-
-            {/* Footer */}
-            <div
-              style={{
-                padding: "20px 32px",
-                borderTop: "1px solid #e5e7eb",
-                background: "white",
-                borderBottomLeftRadius: "12px",
-                borderBottomRightRadius: "12px",
-                display: "flex",
-                justifyContent: "flex-end",
-                alignItems: "center",
-              }}
-            >
-              <Button
-                variant="outline-secondary"
-                onClick={() => setShowActivityTimelineModal(false)}
-                style={{
-                  padding: "10px 24px",
-                  borderRadius: "8px",
-                  fontWeight: 600,
-                  fontSize: "14px",
-                  border: "2px solid #e5e7eb",
-                  transition: "all 0.2s ease",
-                }}
-                onMouseOver={(e) => {
-                  e.currentTarget.style.borderColor = "#8b5cf6";
-                  e.currentTarget.style.color = "#8b5cf6";
-                  e.currentTarget.style.background = "#f5f3ff";
-                }}
-                onMouseOut={(e) => {
-                  e.currentTarget.style.borderColor = "#e5e7eb";
-                  e.currentTarget.style.color = "#6c757d";
-                  e.currentTarget.style.background = "white";
-                }}
-              >
-                Close
-              </Button>
-            </div>
-          </Modal>
-        )}
+        <ActivityTimelineModalView
+          show={showActivityTimelineModal}
+          onClose={() => setShowActivityTimelineModal(false)}
+          record={selectedActivityRecord}
+          currentStageIndex={currentStageIndex}
+          loadingHistory={loadingHistory}
+          loadingCrmData={loadingCrmData}
+          historyChain={historyChain}
+          crmData={crmData}
+          extensions={extensions}
+        />
 
         {/* Add Tab Modal - add Leads, Deals, Orders as tabs */}
         <Modal show={showAddTabModal} onHide={() => setShowAddTabModal(false)}>
@@ -1794,285 +554,18 @@ const HistoryPage = () => {
           }}
         />
         </div>
-        {/* Activity detail sidebar - opens on the right, table stays visible on left */}
-        {showActivitySidebar && (
-          <GenericSidebar
-            isOpen={showActivitySidebar}
-            onClose={() => setShowActivitySidebar(false)}
-            title={selectedActivityRecord?.customer || "Activity Details"}
-            subtitle={`Assigned to ${selectedActivityRecord?.agent || "N/A"}`}
-            avatar={{
-              initials: getInitials(
-                selectedActivityRecord?.customer || "NA",
-              ),
-              name: selectedActivityRecord?.customer || "NA",
-              gradient: getRandomColor(
-                selectedActivityRecord?.customer || "",
-              ),
-            }}
-            recordType="activity"
-            recordId={
-              selectedActivityRecord?.record_id != null
-                ? Number(selectedActivityRecord.record_id)
-                : selectedActivityRecord?.id != null
-                  ? Number(selectedActivityRecord.id)
-                  : undefined
-            }
-            activityEntityType={
-              selectedActivityRecord?.type
-                ? (String(selectedActivityRecord.type).toLowerCase() as
-                    | "prospect"
-                    | "lead"
-                    | "deal"
-                    | "order")
-                : undefined
-            }
-            resolveUserLabel={(extensionOrId) => {
-              const ext = extensions.find(
-                (e: any) =>
-                  e?.id == extensionOrId || e?.extension == extensionOrId,
-              );
-              return (
-                (ext?.display_name || ext?.name || extensionOrId)?.replace(
-                  /\s*\([^)]*\)\s*$/,
-                  "",
-                )?.trim() || String(extensionOrId)
-              );
-            }}
-            sections={[
-              {
-                id: "stage-progress",
-                title: "Stage Progress",
-                icon: TrendingUp,
-                collapsible: true,
-                defaultExpanded: true,
-                customContent: loadingHistory ? (
-                  <div className="text-center py-4">
-                    <Spinner
-                      animation="border"
-                      variant="primary"
-                      size="sm"
-                      role="status"
-                    >
-                      <span className="visually-hidden">
-                        Loading stages...
-                      </span>
-                    </Spinner>
-                  </div>
-                ) : recordStages.length > 0 ? (
-                  <div
-                    className="position-relative"
-                    style={{ padding: "32px 0" }}
-                  >
-                    <div
-                      style={{
-                        position: "absolute",
-                        top: "50%",
-                        left: "10%",
-                        right: "10%",
-                        height: "4px",
-                        backgroundColor: "#e3e8ef",
-                        borderRadius: "4px",
-                        transform: "translateY(-50%)",
-                        zIndex: 0,
-                      }}
-                    />
-                    <div
-                      style={{
-                        position: "absolute",
-                        top: "50%",
-                        left: "10%",
-                        width:
-                          currentStageIndex > 0
-                            ? `${(currentStageIndex / 3) * 80}%`
-                            : "0%",
-                        height: "4px",
-                        background:
-                          "linear-gradient(90deg, #667eea 0%, #764ba2 100%)",
-                        borderRadius: "4px",
-                        transform: "translateY(-50%)",
-                        zIndex: 0,
-                        transition: "width 0.5s ease",
-                      }}
-                    />
-                    <div
-                      className="d-flex justify-content-between align-items-center position-relative"
-                      style={{ zIndex: 1 }}
-                    >
-                      {[
-                        {
-                          name: "Prospect",
-                          icon: <Users size={20} />,
-                          color: "#9c27b0",
-                        },
-                        {
-                          name: "Lead",
-                          icon: <Target size={20} />,
-                          color: "#2196f3",
-                        },
-                        {
-                          name: "Deal",
-                          icon: <TrendingUp size={20} />,
-                          color: "#ff9800",
-                        },
-                        {
-                          name: "Order",
-                          icon: <ShoppingBag size={20} />,
-                          color: "#4caf50",
-                        },
-                      ].map((stage, idx) => {
-                        const isCompleted = idx < currentStageIndex;
-                        const isCurrent = idx === currentStageIndex;
-                        return (
-                          <div
-                            key={stage.name}
-                            className="d-flex flex-column align-items-center"
-                            style={{ flex: 1 }}
-                          >
-                            <div
-                              className="rounded-circle d-flex align-items-center justify-content-center mb-2"
-                              style={{
-                                width: isCurrent ? 64 : 52,
-                                height: isCurrent ? 64 : 52,
-                                background: isCurrent
-                                  ? `linear-gradient(135deg, ${stage.color} 0%, ${stage.color}dd 100%)`
-                                  : isCompleted
-                                    ? stage.color
-                                    : "#e3e8ef",
-                                color:
-                                  isCurrent || isCompleted
-                                    ? "#fff"
-                                    : "#9ca3af",
-                                transition: "all 0.3s ease",
-                                boxShadow: isCurrent
-                                  ? `0 8px 24px ${stage.color}66`
-                                  : isCompleted
-                                    ? `0 4px 12px ${stage.color}44`
-                                    : "none",
-                              }}
-                            >
-                              {isCompleted && !isCurrent ? (
-                                <CheckCircle size={24} strokeWidth={3} />
-                              ) : (
-                                stage.icon
-                              )}
-                            </div>
-                            <span
-                              className="fw-semibold text-center"
-                              style={{
-                                fontSize: isCurrent ? 15 : 13,
-                                color: isCurrent
-                                  ? stage.color
-                                  : isCompleted
-                                    ? "#374151"
-                                    : "#9ca3af",
-                              }}
-                            >
-                              {stage.name}
-                            </span>
-                            {isCurrent && (
-                              <Badge
-                                className="mt-1"
-                                style={{
-                                  backgroundColor: `${stage.color}22`,
-                                  color: stage.color,
-                                  fontSize: 11,
-                                  padding: "4px 10px",
-                                }}
-                              >
-                                CURRENT
-                              </Badge>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                ) : (
-                  <div className="text-center py-4 text-muted">
-                    <TrendingUp size={48} className="mb-3 opacity-50" />
-                    <div>No stage information available</div>
-                  </div>
-                ),
-              },
-              {
-                id: "recent-activities",
-                title: "Recent activities",
-                icon: History,
-                collapsible: true,
-                defaultExpanded: true,
-                count: historyChain.length,
-                emptyState: {
-                  icon: History,
-                  message: "No recent activities for this record.",
-                  action: {
-                    label: "Log activity",
-                    onClick: () => {
-                      const recordId =
-                        selectedActivityRecord?.record_id ||
-                        selectedActivityRecord?.id;
-                      const type = String(
-                        selectedActivityRecord?.type || "",
-                      ).toLowerCase();
-                      if (!recordId) return;
-                      setShowActivitySidebar(false);
-                      if (type === "prospect")
-                        router.push(
-                          `/crm/detailspage?type=prospect&id=${recordId}&section=activities`,
-                        );
-                      else if (type === "lead")
-                        router.push(
-                          `/crm/detailspage?type=lead&id=${recordId}&section=activities`,
-                        );
-                      else if (type === "deal")
-                        router.push(
-                          `/crm/detailspage?type=deal&id=${recordId}&section=activities`,
-                        );
-                      else if (type === "order")
-                        router.push(
-                          `/crm/detailspage?type=order&id=${recordId}&section=activities`,
-                        );
-                    },
-                  },
-                },
-              },
-              {
-                id: "customer-info",
-                title: "Customer Info",
-                icon: Users,
-                collapsible: true,
-                defaultExpanded: true,
-                fields: [
-                  {
-                    label: "Name",
-                    value:
-                      crmData?.name ||
-                      selectedActivityRecord?.customer ||
-                      "N/A",
-                  },
-                  {
-                    label: "Phone",
-                    value: crmData?.phone || "N/A",
-                    type: "phone",
-                  },
-                ],
-              },
-              {
-                id: "agent-info",
-                title: "Agent Info",
-                icon: Users,
-                collapsible: true,
-                defaultExpanded: true,
-                fields: [
-                  {
-                    label: "Agent Name",
-                    value: selectedActivityRecord?.agent || "N/A",
-                  },
-                ],
-              },
-            ]}
-          />
-        )}  
+        <ActivityHistorySidebarPanel
+          showActivitySidebar={showActivitySidebar}
+          setShowActivitySidebar={setShowActivitySidebar}
+          selectedActivityRecord={selectedActivityRecord}
+          extensions={extensions}
+          loadingHistory={loadingHistory}
+          recordStages={recordStages}
+          currentStageIndex={currentStageIndex}
+          historyChain={historyChain}
+          crmData={crmData}
+          router={router}
+        />
         </div>
       </div>
     </ProtectedRoute>

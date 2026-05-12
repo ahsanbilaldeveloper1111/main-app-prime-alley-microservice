@@ -1,10 +1,14 @@
+import type { CrmDataItem } from "@utils/crm";
+
+type QuoteDataItem = CrmDataItem & Record<string, unknown>;
+
 /** Dummy list payload used by quotes list until wired to real API. */
 export function getCrmQuotesListDummyFetchResult(): {
-  data: Record<string, unknown>[];
+  data: CrmDataItem[];
   pagination: { total: number };
   metrics: Record<string, number>;
 } {
-  const dummyQuotes = [
+  const dummyQuotes: QuoteDataItem[] = [
     {
       id: 1,
       name: "John Smith",

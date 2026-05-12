@@ -110,5 +110,26 @@ These warnings keep reappearing across refactors. Apply the right pattern up-fro
 ### CSS
 - Don't declare the same property twice in a single rule block (e.g. two `font-family` lines). The stylelint/Sonar rule will flag it.
 
+### Regular expressions and ReDoS
+Sonar's `typescript:S5852` rule ("regex which is vulnerable to super-linear runtime due to backtracking") is one of the most common regressions in this codebase. **Avoid hand-rolled regex** for anything that can be expressed with string operations, and when you genuinely need a regex follow the guards below.
+
+- **NEVER write regexes with overlapping `*`/`+` quantifiers around the same character class.** Patterns like:
+  ```ts
+  s.replace(/\s*\([^)]*\)\s*$/, "")   // ReDoS-prone: \s* on both sides + [^)]* in the middle
+  s.match(/^(\w+)+$/)                  // classic catastrophic backtracking
+  s.match(/(a|aa|aaa)*b/)              // alternation with overlap
+  ```
+  are flagged by Sonar (and can hang the thread on adversarial input).
+- **DO prefer non-regex string operations** when the intent is simple:
+  - "Strip the trailing `"(...)"` suffix from a display name" → use `stripTrailingParenthetical` from `@utils/displayName` (linear, uses `lastIndexOf("(")` + `slice`).
+  - "Replace all underscores with spaces" → `value.replaceAll("_", " ")`, not `value.replace(/_/g, " ")`.
+  - "Remove a known prefix" → `value.startsWith(p) ? value.slice(p.length) : value`.
+- **When a regex is genuinely required**, keep it boring and linear:
+  - Use **specific** character classes (`[^()]` instead of `[^)]`) so the engine can't wander.
+  - Anchor on both sides (`^…$`) and prefer **non-overlapping** segments.
+  - Avoid `\s*` on both sides of a quantified group; use a single `\s*` plus a more specific inner pattern.
+  - Cap input length before applying the regex on user-supplied strings.
+- **Reach for the shared helper before adding a regex**: `src/utils/displayName.ts` already exists. If you find yourself writing a regex to clean a display name / agent label / "Name (ext 123)" pattern, import `stripTrailingParenthetical` instead. Add new helpers there (or in `src/utils/`) when you have a new string-cleaning need that two or more call sites share.
+
 ## PR / handoff
 - Describe **what**, **why**, and **how to verify** in complete sentences; link or name tickets when applicable.

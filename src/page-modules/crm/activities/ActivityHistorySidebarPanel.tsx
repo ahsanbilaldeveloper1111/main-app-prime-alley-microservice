@@ -1,0 +1,298 @@
+import React from "react";
+import type { NextRouter } from "next/router";
+import { Badge, Spinner } from "react-bootstrap";
+import GenericSidebar from "@components/GenericSidebarNew";
+import {
+  Users,
+  Target,
+  TrendingUp,
+  ShoppingBag,
+  CheckCircle,
+  History,
+} from "lucide-react";
+import { getInitials, getRandomColor } from "@utils/crmNameAvatar";
+import { stripTrailingParenthetical } from "@utils/displayName";
+import type {
+  CrmDataItem,
+  HistoryChainRecord,
+  StageData,
+} from "@utils/crm";
+import type { ActivityRecord } from "./activityHistoryPageTypes";
+import {
+  buildActivityDetailsRoute,
+  getActivityEntityType,
+  getActivityRecordIdNumber,
+} from "./activityHistoryRouting";
+
+export type ActivityHistorySidebarPanelProps = Readonly<{
+  showActivitySidebar: boolean;
+  setShowActivitySidebar: (open: boolean) => void;
+  selectedActivityRecord: ActivityRecord | null;
+  extensions: ReadonlyArray<{
+    id?: unknown;
+    extension?: unknown;
+    display_name?: string;
+    name?: string;
+  }>;
+  loadingHistory: boolean;
+  recordStages: StageData[];
+  currentStageIndex: number;
+  historyChain: HistoryChainRecord[];
+  crmData: CrmDataItem | null;
+  router: NextRouter;
+}>;
+
+export function ActivityHistorySidebarPanel({
+  showActivitySidebar,
+  setShowActivitySidebar,
+  selectedActivityRecord,
+  extensions,
+  loadingHistory,
+  recordStages,
+  currentStageIndex,
+  historyChain,
+  crmData,
+  router,
+}: ActivityHistorySidebarPanelProps) {
+  if (!showActivitySidebar) return null;
+
+  return (
+    <GenericSidebar
+      isOpen={showActivitySidebar}
+      onClose={() => setShowActivitySidebar(false)}
+      title={selectedActivityRecord?.customer || "Activity Details"}
+      subtitle={`Assigned to ${selectedActivityRecord?.agent || "N/A"}`}
+      avatar={{
+        initials: getInitials(selectedActivityRecord?.customer || "NA"),
+        name: selectedActivityRecord?.customer || "NA",
+        gradient: getRandomColor(selectedActivityRecord?.customer || ""),
+      }}
+      recordType="activity"
+      recordId={getActivityRecordIdNumber(selectedActivityRecord)}
+      activityEntityType={getActivityEntityType(
+        selectedActivityRecord?.type,
+      )}
+      resolveUserLabel={(extensionOrId) => {
+        const ext = extensions.find(
+          (e) => e?.id == extensionOrId || e?.extension == extensionOrId,
+        );
+        const raw = String(
+          ext?.display_name || ext?.name || extensionOrId,
+        );
+        return stripTrailingParenthetical(raw) || String(extensionOrId);
+      }}
+      sections={[
+        {
+          id: "stage-progress",
+          title: "Stage Progress",
+          icon: TrendingUp,
+          collapsible: true,
+          defaultExpanded: true,
+          customContent: loadingHistory ? (
+            <div className="text-center py-4">
+              <Spinner
+                animation="border"
+                variant="primary"
+                size="sm"
+                role="status"
+              >
+                <span className="visually-hidden">Loading stages...</span>
+              </Spinner>
+            </div>
+          ) : recordStages.length > 0 ? (
+            <div className="position-relative" style={{ padding: "32px 0" }}>
+              <div
+                style={{
+                  position: "absolute",
+                  top: "50%",
+                  left: "10%",
+                  right: "10%",
+                  height: "4px",
+                  backgroundColor: "#e3e8ef",
+                  borderRadius: "4px",
+                  transform: "translateY(-50%)",
+                  zIndex: 0,
+                }}
+              />
+              <div
+                style={{
+                  position: "absolute",
+                  top: "50%",
+                  left: "10%",
+                  width:
+                    currentStageIndex > 0
+                      ? `${(currentStageIndex / 3) * 80}%`
+                      : "0%",
+                  height: "4px",
+                  background:
+                    "linear-gradient(90deg, #667eea 0%, #764ba2 100%)",
+                  borderRadius: "4px",
+                  transform: "translateY(-50%)",
+                  zIndex: 0,
+                  transition: "width 0.5s ease",
+                }}
+              />
+              <div
+                className="d-flex justify-content-between align-items-center position-relative"
+                style={{ zIndex: 1 }}
+              >
+                {[
+                  {
+                    name: "Prospect",
+                    icon: <Users size={20} />,
+                    color: "#9c27b0",
+                  },
+                  {
+                    name: "Lead",
+                    icon: <Target size={20} />,
+                    color: "#2196f3",
+                  },
+                  {
+                    name: "Deal",
+                    icon: <TrendingUp size={20} />,
+                    color: "#ff9800",
+                  },
+                  {
+                    name: "Order",
+                    icon: <ShoppingBag size={20} />,
+                    color: "#4caf50",
+                  },
+                ].map((stage, idx) => {
+                  const isCompleted = idx < currentStageIndex;
+                  const isCurrent = idx === currentStageIndex;
+                  return (
+                    <div
+                      key={stage.name}
+                      className="d-flex flex-column align-items-center"
+                      style={{ flex: 1 }}
+                    >
+                      <div
+                        className="rounded-circle d-flex align-items-center justify-content-center mb-2"
+                        style={{
+                          width: isCurrent ? 64 : 52,
+                          height: isCurrent ? 64 : 52,
+                          background: isCurrent
+                            ? `linear-gradient(135deg, ${stage.color} 0%, ${stage.color}dd 100%)`
+                            : isCompleted
+                              ? stage.color
+                              : "#e3e8ef",
+                          color:
+                            isCurrent || isCompleted ? "#fff" : "#9ca3af",
+                          transition: "all 0.3s ease",
+                          boxShadow: isCurrent
+                            ? `0 8px 24px ${stage.color}66`
+                            : isCompleted
+                              ? `0 4px 12px ${stage.color}44`
+                              : "none",
+                        }}
+                      >
+                        {isCompleted && !isCurrent ? (
+                          <CheckCircle size={24} strokeWidth={3} />
+                        ) : (
+                          stage.icon
+                        )}
+                      </div>
+                      <span
+                        className="fw-semibold text-center"
+                        style={{
+                          fontSize: isCurrent ? 15 : 13,
+                          color: isCurrent
+                            ? stage.color
+                            : isCompleted
+                              ? "#374151"
+                              : "#9ca3af",
+                        }}
+                      >
+                        {stage.name}
+                      </span>
+                      {isCurrent && (
+                        <Badge
+                          className="mt-1"
+                          style={{
+                            backgroundColor: `${stage.color}22`,
+                            color: stage.color,
+                            fontSize: 11,
+                            padding: "4px 10px",
+                          }}
+                        >
+                          CURRENT
+                        </Badge>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ) : (
+            <div className="text-center py-4 text-muted">
+              <TrendingUp size={48} className="mb-3 opacity-50" />
+              <div>No stage information available</div>
+            </div>
+          ),
+        },
+        {
+          id: "recent-activities",
+          title: "Recent activities",
+          icon: History,
+          collapsible: true,
+          defaultExpanded: true,
+          count: historyChain.length,
+          emptyState: {
+            icon: History,
+            message: "No recent activities for this record.",
+            action: {
+              label: "Log activity",
+              onClick: () => {
+                const recordId =
+                  selectedActivityRecord?.record_id ||
+                  selectedActivityRecord?.id;
+                if (!recordId) return;
+                const route = buildActivityDetailsRoute(
+                  String(selectedActivityRecord?.type || ""),
+                  recordId,
+                );
+                if (!route) return;
+                setShowActivitySidebar(false);
+                router.push(route);
+              },
+            },
+          },
+        },
+        {
+          id: "customer-info",
+          title: "Customer Info",
+          icon: Users,
+          collapsible: true,
+          defaultExpanded: true,
+          fields: [
+            {
+              label: "Name",
+              value:
+                crmData?.name ||
+                selectedActivityRecord?.customer ||
+                "N/A",
+            },
+            {
+              label: "Phone",
+              value: crmData?.phone || "N/A",
+              type: "phone",
+            },
+          ],
+        },
+        {
+          id: "agent-info",
+          title: "Agent Info",
+          icon: Users,
+          collapsible: true,
+          defaultExpanded: true,
+          fields: [
+            {
+              label: "Agent Name",
+              value: selectedActivityRecord?.agent || "N/A",
+            },
+          ],
+        },
+      ]}
+    />
+  );
+}

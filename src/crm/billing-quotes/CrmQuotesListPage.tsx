@@ -88,7 +88,6 @@ import { getBillingCustomerPortalTabsDropdownItems } from "@utils/billingProduct
 import { billingCustomerRoutes } from "@utils/billingCustomerRoutes";
 import { HEADER_CONSTANTS } from "@constants/headerConstants";
 import { crmAppKeys } from "../../query/keys";
-import type { CrmDataItem } from "@utils/crm";
 import { getCrmQuotesListDummyFetchResult } from "@crm/billing-quotes/crmQuotesListDummyFetchResult";
 
 const { PERMISSIONS } = HEADER_CONSTANTS;
@@ -442,7 +441,7 @@ function CrmQuotesListPageContent({ variant }: Readonly<CrmQuotesListPageProps>)
   useEffect(() => {
     if (!quotesListQuery.data) return;
     const response = quotesListQuery.data;
-    setDataList((response.data || []) as unknown as CrmDataItem[]);
+    setDataList(response.data || []);
     setTotalRecords(response.pagination.total || 0);
     const isAllProspects =
       memoizedFilters.has_scheduled_calls !== true &&
