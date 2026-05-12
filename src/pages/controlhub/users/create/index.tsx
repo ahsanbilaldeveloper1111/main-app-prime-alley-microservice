@@ -5,7 +5,7 @@ import BreadcrumbItem from "@common/BreadcrumbItem";
 import { Row, Col, Button } from "react-bootstrap";
 import { useRouter } from "next/router";
 import { ArrowLeft } from "lucide-react";
-import CreateUserProfile from "@pages/tms/profiling/user/create/CreateUserProfile";
+import CreateUserProfile from "@page-modules/tms/profiling/user/create/CreateUserProfile";
 
 const ControlhubUsersCreate = () => {
   const router = useRouter();

@@ -27,7 +27,7 @@ import {
   INDUSTRIES_TABLE_SELECTABLE_KEYS,
   type IndustryFormData,
   type ProductFormData,
-} from "@pages/crm/industries/industriesPageModel";
+} from "@page-modules/crm/industries/industriesPageModel";
 import { useSession } from "next-auth/react";
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 
@@ -128,19 +128,15 @@ export function useIndustriesPage() {
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
+    const name = formData.name.trim();
+    const description = formData.description.trim() || undefined;
     try {
       setSubmitting(true);
       if (editingIndustry) {
-        const payload: UpdateIndustryPayload = {
-          name: formData.name.trim(),
-          description: formData.description.trim() || undefined,
-        };
+        const payload: UpdateIndustryPayload = { name, description };
         await updateIndustry(editingIndustry.id, payload);
       } else {
-        const payload: CreateIndustryPayload = {
-          name: formData.name.trim(),
-          description: formData.description.trim() || undefined,
-        };
+        const payload: CreateIndustryPayload = { name, description };
         await createIndustry(payload);
       }
       setShowModal(false);
@@ -219,20 +215,25 @@ export function useIndustriesPage() {
 
     try {
       setProductSubmitting(true);
+      const name = productFormData.productName.trim();
       const description = productFormData.description.trim();
+      const sku = productFormData.sku.trim();
       const category = productFormData.category.trim();
       const brand = productFormData.brand.trim();
+      const price = Number.parseFloat(productFormData.price) || 0;
+      const { isActive, currency } = productFormData;
+
       if (editingProduct) {
         const updatePayload: UpdateProductPayload = {
           id: editingProduct.id,
-          name: productFormData.productName.trim(),
+          name,
           description,
-          sku: productFormData.sku.trim(),
-          price: Number.parseFloat(productFormData.price) || 0,
+          sku,
+          price,
           category,
           brand,
-          active: productFormData.isActive,
-          currency: productFormData.currency,
+          active: isActive,
+          currency,
         };
         await updateProduct({
           ...updatePayload,
@@ -240,14 +241,14 @@ export function useIndustriesPage() {
         } as UpdateProductPayload & { industry_id: number });
       } else {
         const createPayload: CreateProductPayload = {
-          name: productFormData.productName.trim(),
+          name,
           description: description || "",
-          sku: productFormData.sku.trim(),
-          price: Number.parseFloat(productFormData.price) || 0,
+          sku,
+          price,
           category,
           brand,
-          active: productFormData.isActive,
-          currency: productFormData.currency,
+          active: isActive,
+          currency,
         };
         await createProduct({
           ...createPayload,

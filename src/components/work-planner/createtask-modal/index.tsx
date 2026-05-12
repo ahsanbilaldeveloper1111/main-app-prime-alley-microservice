@@ -24,7 +24,7 @@ import {
   formatPlannerDueTimeAsUtcIso,
   parseApiDueTimeToTimeInput,
 } from '@utils/plannerTaskDueTime';
-import RichTextEditor from '../../../pages/help-center/partials/RichTextEditor';
+import RichTextEditor from "@page-modules/help-center/partials/RichTextEditor";
 
 const CREATE_TASK_MODAL_THEME = {
   accent: "#4f46e5",

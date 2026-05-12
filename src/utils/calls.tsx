@@ -1,6 +1,7 @@
 import type { AxiosError, AxiosResponse } from "axios";
 import { toast } from "react-toastify";
 import axiosInstance from "./axios";
+import { backendUrl } from "./backendUrl";
 
 interface PaginationParams {
   page?: number;
@@ -316,8 +317,9 @@ export const ExportCallLogs = async (params: PaginationParams = {}) => {
       }
     });
 
-    // Same-origin proxy to avoid 431 and keep same pattern as rest of app
-    const exportUrl = `/api/call-logs/export?${queryParams.toString()}`;
+    const exportUrl = backendUrl(
+      `/api/call-logs/export?${queryParams.toString()}`,
+    );
 
     window.open(exportUrl, "_blank");
 

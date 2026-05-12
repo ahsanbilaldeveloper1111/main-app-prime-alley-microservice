@@ -21,7 +21,7 @@ import {
   type ProductDisplayData,
   type ProductFormData,
   type ProductsPageFilters,
-} from "@pages/crm/products/productsPageModel";
+} from "@page-modules/crm/products/productsPageModel";
 import { formatDateForTable, normalizeSearchQuery } from "@utils/Helper";
 import { useSession } from "next-auth/react";
 import { Form } from "react-bootstrap";

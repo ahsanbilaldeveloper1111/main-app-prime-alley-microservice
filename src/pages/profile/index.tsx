@@ -3,7 +3,7 @@ import Layout from '@layout/index'
 import BreadcrumbItem from '@common/BreadcrumbItem'
 import { Card, Col, Row, Tab, Tabs } from 'react-bootstrap'
 import { useSession } from 'next-auth/react'
-import SuccessfulModal from '@pages/partial/SuccessfulModal'
+import SuccessfulModal from '@components/page-partials/SuccessfulModal'
 
 import { GetUserProfile } from '@utils/users'
 
@@ -12,9 +12,9 @@ import '@assets/scss/common.scss'
 import { getStorageImageUrl } from '@utils/imageUtils'
 
 // Import partial components
-import UserProfileTab from '@pages/controlhub/users/[id]/partials/UserProfileTab'
-import OrganizationalHierarchyTab from '@pages/controlhub/users/[id]/partials/OrganizationalHierarchyTab'
-import RecentActivitiesTab from '@pages/controlhub/users/[id]/partials/RecentActivitiesTab'
+import UserProfileTab from '@page-modules/controlhub/users/[id]/partials/UserProfileTab'
+import OrganizationalHierarchyTab from '@page-modules/controlhub/users/[id]/partials/OrganizationalHierarchyTab'
+import RecentActivitiesTab from '@page-modules/controlhub/users/[id]/partials/RecentActivitiesTab'
 
 const ProfileView = () => {
     const { data: session } = useSession();

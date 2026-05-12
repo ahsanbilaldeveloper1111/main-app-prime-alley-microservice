@@ -1,4 +1,6 @@
-// CRM Products page — static layout (table wrapper, sidebar, view modal, detail tiles).
+@import "./crm-page-shared.scss";
+
+// CRM Products page — static layout (table wrapper, toolbar, sidebar, view modal).
 
 .products-table-wrapper {
   width: 100%;
@@ -147,11 +149,12 @@
   &:focus {
     border-color: #0091ae;
   }
-}
 
-.products-sidebar-input--readonly {
-  background-color: #f7fafc;
-  cursor: not-allowed;
+  &:disabled,
+  &--readonly {
+    background-color: #f7fafc;
+    cursor: not-allowed;
+  }
 }
 
 .products-sidebar-textarea {
@@ -176,7 +179,6 @@
 .products-sidebar-switch {
   font-size: 14px;
 }
-
 .products-sidebar-footer {
   padding: 16px 24px;
   border-top: 1px solid #eaf0f6;
@@ -196,8 +198,7 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  // Darkened from #0091ae so #fff text clears WCAG AA (4.5:1) on the button.
-  background-color: #006d82;
+  background-color: #0091ae;
 
   &:disabled {
     background-color: #cbd5e0;
@@ -205,8 +206,7 @@
   }
 
   &:not(:disabled):hover {
-    // Darker than base so hover state also meets contrast with #fff.
-    background-color: #005566;
+    background-color: #007a94;
   }
 }
 
@@ -373,8 +373,7 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  // Darkened from #4680ff so #fff text clears WCAG AA (4.5:1) on the button.
-  background: #2967ee;
+  background: #4680ff;
   border: none;
   color: #fff;
   cursor: pointer;

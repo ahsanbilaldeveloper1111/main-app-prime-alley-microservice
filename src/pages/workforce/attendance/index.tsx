@@ -9,7 +9,7 @@ import GenericTable, {
   TableColumn,
   ToolbarConfig,
 } from "@components/GenericTable";
-import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
+import DeleteConfirmationModal from "@components/page-partials/DeleteConfirmationModal";
 import {
   attendanceCheckIn,
   attendanceCheckOut,

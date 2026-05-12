@@ -1,6 +1,9 @@
+@import "./crm-page-shared.scss";
+
 // CRM Stages page — static layout only. Dynamic values (e.g. stage colors) stay inline in TSX.
 
 // —— KPI analytics cards ——
+
 .stages-kpi-card {
   transition: all 0.2s ease;
   border: 1px solid #e9ecef;
@@ -195,8 +198,7 @@
   font-size: 14px;
   font-weight: 500;
   cursor: pointer;
-  // Darkened from #0091ae so #fff text clears WCAG AA (4.5:1) on the button.
-  background-color: #006d82;
+  background-color: #0091ae;
 
   &:disabled {
     background-color: #cbd5e0;
@@ -204,8 +206,7 @@
   }
 
   &:not(:disabled):hover {
-    // Darker than base so hover state also meets contrast with #fff.
-    background-color: #005566;
+    background-color: #007a94;
   }
 }
 
@@ -245,8 +246,7 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  // Darkened from #4680ff so #fff text clears WCAG AA (4.5:1) on the button.
-  background: #2967ee;
+  background: #4680ff;
   border: none;
   color: #fff;
   cursor: pointer;
@@ -353,6 +353,12 @@
   background: #f8f9fa;
   padding: 16px;
   border-radius: 10px;
+  transition: all 0.3s;
+
+  &:hover {
+    background: #e5e7eb;
+    transform: translateY(-2px);
+  }
 }
 
 .stages-view-tile-label {
@@ -376,7 +382,7 @@
   gap: 8px;
 }
 
-// Swatch: use with inline style={{ backgroundColor: viewingStage.color }}
+// Color comes from inline style (viewingStage.color)
 .stages-view-color-swatch {
   width: 20px;
   height: 20px;

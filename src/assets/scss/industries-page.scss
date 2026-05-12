@@ -1,3 +1,5 @@
+@import "./crm-page-shared.scss";
+
 // CRM Industries (product groups) page — static layout only.
 
 .industries-form-hint-text {
@@ -23,10 +25,9 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  // Darkened from #4680ff so #fff text clears WCAG AA (4.5:1) on the button.
-  background: #2967ee;
+  background: #2563eb;
   border: none;
-  color: #fff;
+  color: #ffffff;
   cursor: pointer;
 
   &:disabled {

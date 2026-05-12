@@ -14,7 +14,7 @@ export function getInitialCountryChart(): CallDashboardApexBarChart {  return {
         data: [] as number[],
       },
     ],
-    options: {
+    options: ({
       chart: {
         type: 'bar' as const,
         toolbar: {
@@ -58,13 +58,13 @@ export function getInitialCountryChart(): CallDashboardApexBarChart {  return {
           },
         },
       },
-    },
+    } as ApexOptions),
   };
 }
 
 export function getInitialDepartmentChart(): CallDashboardApexBarChart {  return {
     series: [{ name: "Call Count", data: [] as number[] }],
-    options: {
+    options: ({
       chart: {
         type: 'bar' as const,
         toolbar: {
@@ -119,13 +119,13 @@ export function getInitialDepartmentChart(): CallDashboardApexBarChart {  return
       fill: {
         opacity: 1,
       },
-    },
+    } as ApexOptions),
   };
 }
 
 export function getInitialExtensionChart(): CallDashboardApexBarChart {  return {
     series: [{ name: "Call Count", data: [] as number[] }],
-    options: {
+    options: ({
       chart: {
         type: 'bar' as const,
         toolbar: {
@@ -173,6 +173,6 @@ export function getInitialExtensionChart(): CallDashboardApexBarChart {  return 
         horizontalAlign: 'center' as const,
         offsetX: 40,
       },
-    },
+    } as ApexOptions),
   };
 }

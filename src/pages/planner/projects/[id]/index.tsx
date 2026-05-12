@@ -25,7 +25,7 @@ import {
   WORK_PLANNER_TASK_SIDEBAR_EDIT_RELATIONS,
   mapGetTaskResponseToSidebarEditTask,
 } from "@planner/workPlannerProjectRelations";
-import ProjectTabsContent, { ProjectTabsContentRef } from "../partials/ProjectTabsContent";
+import ProjectTabsContent, { ProjectTabsContentRef } from "@page-modules/planner/projects/partials/ProjectTabsContent";
 import { useRouter } from "next/router";
 import { ModuleSlug } from "@utils/Helper";
 import { useHierarchyData } from "@components/filters/useHierarchyData";

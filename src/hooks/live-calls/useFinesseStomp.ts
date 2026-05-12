@@ -6,7 +6,7 @@ import {
   shouldApplyFinesseRemoteLogoutFromStateEvent,
 } from "@utils/finesse";
 
-const FINESSE_SSE_PATH = "/api/finesse-ws-stream";
+const FINESSE_SSE_PATH = "/streaming/finesse-ws-stream";
 
 /** SSE event types emitted by the Finesse stream API */
 const SSE_TYPE = {
@@ -169,7 +169,7 @@ function dispatchSsePayload(
 }
 
 /**
- * Connects to the Finesse STOMP proxy via SSE (/api/finesse-ws-stream).
+ * Connects to the Finesse STOMP proxy via SSE (/streaming/finesse-ws-stream).
  * Subscribes to state and optional preview dialog events; callbacks are
  * invoked with the latest refs so dependencies can be omitted from the effect.
  */

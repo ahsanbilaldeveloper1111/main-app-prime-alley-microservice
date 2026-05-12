@@ -45,7 +45,7 @@ import { reportApiErrorFromCatch } from "@utils/sentryLogger";
 import { formatCrmPreviewDate } from "@utils/Helper";
 import { useStagesManagement } from "@hooks/crm/useStagesManagement";
 import { HEADER_CONSTANTS } from "@constants/headerConstants";
-import type { CrmPageDisplayProps } from "@pages/crm/crmPageDisplayProps";
+import type { CrmPageDisplayProps } from "@page-modules/crm/crmPageDisplayProps";
 import {
   DEFAULT_STAGES_SELECTED_COLUMNS,
   getTypeBadgeColor,
@@ -54,7 +54,7 @@ import {
   type StageFormState,
   type StageRow,
   type StageType,
-} from "@pages/crm/stages/stagesPageModel";
+} from "@page-modules/crm/stages/stagesPageModel";
 
 const { PERMISSIONS } = HEADER_CONSTANTS;
 

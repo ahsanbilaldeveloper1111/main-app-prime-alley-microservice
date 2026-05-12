@@ -13,9 +13,9 @@ import { toast } from "react-toastify";
 import { useSession } from "next-auth/react";
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
-import AddGsmModal from "@pages/gsm/partial/AddGsmModal";
-import ConfirmModal from "@pages/partial/ConfirmModal";
-import SuccessfulModal from "@pages/partial/SuccessfulModal";
+import AddGsmModal from "@components/gsm/partials/AddGsmModal";
+import ConfirmModal from "@components/page-partials/ConfirmModal";
+import SuccessfulModal from "@components/page-partials/SuccessfulModal";
 import { ApexOptions } from "apexcharts";
 import { Server, Activity, Zap, MapPin, AlertTriangle, Settings, Wifi } from "lucide-react";
 

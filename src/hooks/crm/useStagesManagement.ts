@@ -23,7 +23,7 @@ import {
   type StageFormState,
   type StageRow,
   type StageType,
-} from "@pages/crm/stages/stagesPageModel";
+} from "@page-modules/crm/stages/stagesPageModel";
 import { useSession } from "next-auth/react";
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import { toast } from "react-toastify";

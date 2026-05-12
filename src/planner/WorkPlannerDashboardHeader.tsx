@@ -1,7 +1,7 @@
 import React, { useCallback, type RefObject } from "react";
 import { ChevronDown, Folder, LayoutGrid, Plus } from "lucide-react";
 import { Spinner } from "react-bootstrap";
-import type { ProjectTabsContentRef } from "@pages/planner/projects/partials/ProjectTabsContent";
+import type { ProjectTabsContentRef } from "@page-modules/planner/projects/partials/ProjectTabsContent";
 import {
   workPlannerDashboardLayoutStyles as styles,
 } from "./workPlannerDashboardLayoutStyles";

@@ -4307,6 +4307,7 @@ export interface UpdateDealTemplatePayload {
     require_approval?: boolean;
     sort_order: number;
   }>;
+  industry_id?: number;
 }
 
 // Deal Template Management API

@@ -177,7 +177,7 @@ const LostReasonsManagement = () => {
 
 
   // Memoized columns for the table
-  const columns: Column[] = useMemo(
+  const columns: Column<LostReason>[] = useMemo(
     () => [
       {
         key: "name",

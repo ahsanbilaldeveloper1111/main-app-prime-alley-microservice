@@ -96,7 +96,7 @@ export function CrmListViewDataModal({
         <CrmModalCloseButton onClick={onHide} />
 
         <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
-          <CrmModalAvatar name={selectedDataItem.name} fallback="P" background="#2563eb" />
+          <CrmModalAvatar name={selectedDataItem.name ?? undefined} fallback="P" background="#2563eb" />
           <div style={{ flex: 1, minWidth: 0 }}>
             <h2
               style={{

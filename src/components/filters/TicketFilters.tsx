@@ -23,11 +23,11 @@ export default function GroupsFilters({ onFiltersChange, onExport, isVisibleCall
   const { data: session, status } = useSession();
   const [showExport, setShowExport] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
-  const [modules, setModules] = useState([]);
-  const [statuses, setStatuses] = useState([]);
-  const [types, setTypes] = useState([]);
-  const [submodules, setSubmodules] = useState([]);
-  const [submoduleChildren, setSubmoduleChildren] = useState([]);
+  const [modules, setModules] = useState<any[]>([]);
+  const [statuses, setStatuses] = useState<any[]>([]);
+  const [types, setTypes] = useState<any[]>([]);
+  const [submodules, setSubmodules] = useState<any[]>([]);
+  const [submoduleChildren, setSubmoduleChildren] = useState<any[]>([]);
   const [selectedModuleId, setSelectedModuleId] = useState<string | null>(null);
   const [selectedSubmoduleId, setSelectedSubmoduleId] = useState<string | null>(null);
   
@@ -45,9 +45,7 @@ export default function GroupsFilters({ onFiltersChange, onExport, isVisibleCall
     const fetchModules = async () => {
       try {
         const modulesData = await GetAllModules();
-        if (modulesData) {
-          setModules(modulesData);
-        }
+        setModules(Array.isArray(modulesData) ? modulesData : []);
       } catch (error) {
         console.error('Failed to fetch modules:', error);
       }
@@ -63,9 +61,7 @@ export default function GroupsFilters({ onFiltersChange, onExport, isVisibleCall
     const fetchStatuses = async () => {
       try {
         const statusesData = await GetAllStatuses();
-        if (statusesData) {
-          setStatuses(statusesData);
-        }
+        setStatuses(Array.isArray(statusesData) ? statusesData : []);
       } catch (error) {
         console.error('Failed to fetch statuses:', error);
       }
@@ -81,9 +77,7 @@ export default function GroupsFilters({ onFiltersChange, onExport, isVisibleCall
     const fetchTypes = async () => {
       try {
         const typesData = await GetAllTypes();
-        if (typesData) {
-          setTypes(typesData);
-        }
+        setTypes(Array.isArray(typesData) ? typesData : []);
       } catch (error) {
         console.error('Failed to fetch types:', error);
       }
@@ -101,7 +95,8 @@ export default function GroupsFilters({ onFiltersChange, onExport, isVisibleCall
         try {
           console.log('Fetching submodules for module:', selectedModuleId);
           const submodulesData = await GetAllSubmodules();
-          const filteredSubmodules = submodulesData?.filter((sub: any) => sub.module_id == selectedModuleId) || [];
+          const filteredSubmodules = (Array.isArray(submodulesData) ? submodulesData : [])
+            .filter((sub: any) => sub.module_id == selectedModuleId);
           console.log('Filtered submodules:', filteredSubmodules);
           setSubmodules(filteredSubmodules);
         } catch (error) {
@@ -125,7 +120,8 @@ export default function GroupsFilters({ onFiltersChange, onExport, isVisibleCall
         try {
           console.log('Fetching submodule children for submodule:', selectedSubmoduleId);
           const childrenData = await GetAllSubmoduleChildren();
-          const filteredChildren = childrenData?.filter((child: any) => child.submodule_id == selectedSubmoduleId) || [];
+          const filteredChildren = (Array.isArray(childrenData) ? childrenData : [])
+            .filter((child: any) => child.submodule_id == selectedSubmoduleId);
           console.log('Filtered submodule children:', filteredChildren);
           setSubmoduleChildren(filteredChildren);
         } catch (error) {

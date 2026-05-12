@@ -152,84 +152,6 @@ const TicketDetail = () => {
     }
   }, [id]);
 
-  const fetchTicketData = useCallback(async () => {
-    if (!id) return;
-
-    try {
-      setLoading(true);
-      const ticketResponse = await GetTicket(id as string);
-
-      if (ticketResponse && ticketResponse.success === true) {
-        const ticket = ticketResponse.data;
-        setTicketData(ticket);
-
-        // Fetch comments
-        fetchComments(id as string);
-
-        // Fetch submodule and submodule child data if module_id exists
-        if (ticket.module_id) {
-          try {
-            const submoduleData = await GetAllSubmodules();
-            const filteredSubmodules =
-              submoduleData?.filter(
-                (sub: any) => sub.module_id == ticket.module_id
-              ) || [];
-
-            if (ticket.submodule_id) {
-              const submoduleChildData = await GetAllSubmoduleChildren();
-              const filteredChildren =
-                submoduleChildData?.filter(
-                  (child: any) => child.submodule_id == ticket.submodule_id
-                ) || [];
-
-              // Update ticketData with the fetched submodule information
-              setTicketData({
-                ...ticket,
-                submodule: filteredSubmodules.find(
-                  (sub: any) => sub.id == ticket.submodule_id
-                ),
-                submodule_child: filteredChildren.find(
-                  (child: any) => child.id == ticket.submodule_child_id
-                ),
-              });
-            } else {
-              setTicketData({
-                ...ticket,
-                submodule: null,
-                submodule_child: null,
-              });
-            }
-          } catch (error) {
-            console.error("Error fetching submodule data:", error);
-          }
-        }
-
-        // Load images
-        if (ticket.image) {
-          const images = Array.isArray(ticket.image)
-            ? ticket.image
-            : [ticket.image].filter(Boolean);
-          if (images.length > 0) {
-            loadImgs(images);
-          } else {
-            setViewTicketImages([]);
-          }
-        } else {
-          setViewTicketImages([]);
-        }
-      } else {
-        toast.error("Failed to fetch ticket");
-        router.push("/tickets/list");
-      }
-    } catch (error) {
-      console.error("Error fetching ticket:", error);
-      toast.error("Failed to load ticket details");
-      router.push("/tickets/list");
-    } finally {
-      setLoading(false);
-    }
-  }, [id, router]);
-
   function loadImgs(imgPaths: string[] | string) {
     const paths = Array.isArray(imgPaths)
       ? imgPaths
@@ -341,6 +263,94 @@ const TicketDetail = () => {
       setIsLoadingComments(false);
     }
   }, []);
+
+  const fetchTicketData = useCallback(async () => {
+    if (!id) return;
+
+    const ticketId = String(id);
+
+    const handleTicketLoadFailure = (message: string) => {
+      toast.error(message);
+      router.push("/tickets/list");
+    };
+
+    const applyTicketImages = (ticket: any) => {
+      if (!ticket?.image) {
+        setViewTicketImages([]);
+        return;
+      }
+
+      const images = Array.isArray(ticket.image)
+        ? ticket.image
+        : [ticket.image].filter(Boolean);
+
+      if (images.length > 0) {
+        loadImgs(images);
+        return;
+      }
+
+      setViewTicketImages([]);
+    };
+
+    const fetchAndAttachSubmoduleData = async (ticket: any) => {
+      if (!ticket?.module_id) return;
+
+      try {
+        const submoduleData = await GetAllSubmodules();
+        const filteredSubmodules = (Array.isArray(submoduleData)
+          ? submoduleData
+          : []
+        ).filter((sub: any) => sub.module_id == ticket.module_id);
+
+        if (!ticket?.submodule_id) {
+          setTicketData({ ...ticket, submodule: null, submodule_child: null });
+          return;
+        }
+
+        const submoduleChildData = await GetAllSubmoduleChildren();
+        const filteredChildren = (Array.isArray(submoduleChildData)
+          ? submoduleChildData
+          : []
+        ).filter((child: any) => child.submodule_id == ticket.submodule_id);
+
+        setTicketData({
+          ...ticket,
+          submodule: filteredSubmodules.find(
+            (sub: any) => sub.id == ticket.submodule_id,
+          ),
+          submodule_child: filteredChildren.find(
+            (child: any) => child.id == ticket.submodule_child_id,
+          ),
+        });
+      } catch (error) {
+        console.error("Error fetching submodule data:", error);
+      }
+    };
+
+    try {
+      setLoading(true);
+      const ticketResponse = await GetTicket(ticketId);
+
+      if (ticketResponse?.success !== true) {
+        handleTicketLoadFailure("Failed to fetch ticket");
+        return;
+      }
+
+      const ticket = ticketResponse.data;
+      setTicketData(ticket);
+
+      // Fire-and-forget; comment loader has its own error handling.
+      fetchComments(ticketId);
+
+      await fetchAndAttachSubmoduleData(ticket);
+      applyTicketImages(ticket);
+    } catch (error) {
+      console.error("Error fetching ticket:", error);
+      handleTicketLoadFailure("Failed to load ticket details");
+    } finally {
+      setLoading(false);
+    }
+  }, [id, router, fetchComments]);
 
   const handleAddComment = useCallback(
     async (ticketId: string) => {

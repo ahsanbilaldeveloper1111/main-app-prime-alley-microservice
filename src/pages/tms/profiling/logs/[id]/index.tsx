@@ -14,7 +14,7 @@ import '@assets/scss/profiling-error-log.scss';
 
 import ProgressTracker, {
       ProgressStep,
-  } from "./ProgressTracker";
+  } from "@page-modules/tms/profiling/logs/[id]/ProgressTracker";
 
   import { useProgressTracker } from "@hooks/tms/useProgressTracker";
 import { useUserProfile } from "@hooks/tms/UserProfile";

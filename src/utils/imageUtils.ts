@@ -1,35 +1,32 @@
+import { backendUrl } from "./backendUrl";
+
 /**
- * Transforms an image path to use the storage API route
- * Converts paths like "profiles/profile_2936_1765831932.jpg" 
- * to "/api/storage/profiles/profile_2936_1765831932.jpg"
- * 
- * @param imagePath - The image path from the backend (e.g., "profiles/profile_2936_1765831932.jpg")
- * @returns The transformed path using the storage API route
+ * Resolve a backend-served image path to an absolute URL. The backend serves
+ * uploads under `/api/storage/...`; this helper handles already-absolute
+ * URLs, data URIs, and trims any duplicate leading slashes.
+ *
+ * @param imagePath - A path returned by the backend
+ *   (e.g. `profiles/profile_2936.jpg`) or an absolute URL.
+ * @returns A fully qualified image URL, or `null` when the input is empty.
  */
-export const getStorageImageUrl = (imagePath: string | null | undefined): string | null => {
-  if (!imagePath) {
-    return null;
-  }
+export const getStorageImageUrl = (
+  imagePath: string | null | undefined,
+): string | null => {
+  if (!imagePath) return null;
 
-  // If it's already a full URL (http:// or https://), return as is
-  if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
+  if (
+    imagePath.startsWith("http://") ||
+    imagePath.startsWith("https://") ||
+    imagePath.startsWith("data:") ||
+    imagePath.startsWith("blob:")
+  ) {
     return imagePath;
   }
 
-  // If it's already using the storage API route, return as is
-  if (imagePath.startsWith('/api/storage/')) {
-    return imagePath;
-  }
+  const cleaned = imagePath.replace(/^\/+/, "");
+  const storagePath = cleaned.startsWith("api/storage/")
+    ? `/${cleaned}`
+    : `/api/storage/${cleaned}`;
 
-  // If it's a data URL (base64), return as is
-  if (imagePath.startsWith('data:')) {
-    return imagePath;
-  }
-
-  // Remove leading slash if present
-  const cleanPath = imagePath.startsWith('/') ? imagePath.slice(1) : imagePath;
-
-  // Transform to storage API route
-  return `/api/storage/${cleanPath}`;
+  return backendUrl(storagePath);
 };
-

@@ -10,13 +10,14 @@ import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/router';
 import Select, { MultiValue } from 'react-select';
 import SelectCheckBox, { SelectCheckBoxOption } from '@components/SelectCheckBox';
+import { useDebouncedValue } from '@hooks/useDebouncedValue';
 import { getParentUsers, assignRankBulk } from '@utils/users';
 import { Copy, Users } from 'lucide-react';
 
 import '@assets/scss/common.scss';
-import SuccessfulModal from '@pages/partial/SuccessfulModal'
-import FormModal from '@pages/partial/FormModal'
-import ConfirmModal from '@pages/partial/ConfirmModal'
+import SuccessfulModal from '@components/page-partials/SuccessfulModal'
+import FormModal from '@components/page-partials/FormModal'
+import ConfirmModal from '@components/page-partials/ConfirmModal'
 
 import { FiEdit, FiTrash2, FiEye } from 'react-icons/fi';
 import { HEADER_CONSTANTS } from '@constants/headerConstants';
@@ -64,6 +65,7 @@ const Ranks = () => {
     const [rowsPerPage, setRowsPerPage] = useState(15);
     const [totalRows, setTotalRows] = useState(0);
     const [searchValue, setSearchValue] = useState('');
+    const debouncedSearchValue = useDebouncedValue(searchValue, 400);
     const [rowSelectionEnabled, setRowSelectionEnabled] = useState<boolean>(false);
 
     useEffect(() => {
@@ -211,7 +213,7 @@ const Ranks = () => {
     const loadRoles = useCallback(async () => {
         setIsTableLoading(true);
         try {
-            const response = await fetchRoles(currentPage, rowsPerPage, searchValue);
+            const response = await fetchRoles(currentPage, rowsPerPage, debouncedSearchValue);
             setTableData(response?.data ?? response?.dataList ?? []);
             setTotalRows(response?.total ?? 0);
         } catch {
@@ -219,7 +221,7 @@ const Ranks = () => {
         } finally {
             setIsTableLoading(false);
         }
-    }, [currentPage, rowsPerPage, searchValue, fetchRoles]);
+    }, [currentPage, rowsPerPage, debouncedSearchValue, fetchRoles]);
 
     useEffect(() => {
         loadRoles();

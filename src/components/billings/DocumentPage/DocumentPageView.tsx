@@ -3,13 +3,14 @@ import { ExternalLink } from "lucide-react";
 import { Button, Modal } from "react-bootstrap";
 import DeleteConfirmationModal from "@components/page-partials/DeleteConfirmationModal";
 import {
+  documentPageFont,
   getDocumentId,
   getDocumentName,
   getDocumentType,
   getExternalUrl,
   getUpdatedAtDisplay,
 } from "./documentPageHelpers";
-import { documentPageFont, documentPageStyles as s, termsOfServiceUrl } from "./documentPageStyles";
+import { documentPageStyles as s, termsOfServiceUrl } from "./documentPageStyles";
 
 function TermsOfServiceTableRow(): ReactNode {
   return (

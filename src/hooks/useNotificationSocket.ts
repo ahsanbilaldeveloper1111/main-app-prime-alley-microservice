@@ -9,7 +9,16 @@ import { useTokenService } from './useTokenService';
 // Constants
 // -----------------------------------------------------------------------------
 
+// Resolution order mirrors the original Next.js setup:
+//   1. dedicated notification socket URL (preferred)
+//   2. shared WhatsApp/notification socket URL (legacy fallback)
+// `import.meta.env.VITE_*` is the canonical Vite source; `process.env.NEXT_PUBLIC_*`
+// is kept as a fallback for any deployment still using the legacy keys (the Vite
+// config mirrors NEXT_PUBLIC_* onto process.env at build time).
+const viteEnv = (import.meta.env ?? {}) as Record<string, string | undefined>;
 const SOCKET_URL =
+  viteEnv.VITE_NOTIFICATION_SOCKET_URL ||
+  viteEnv.VITE_WHATSAPP_SOCKET_URL ||
   process.env.NEXT_PUBLIC_NOTIFICATION_SOCKET_URL ||
   process.env.NEXT_PUBLIC_WHATSAPP_SOCKET_URL;
 
