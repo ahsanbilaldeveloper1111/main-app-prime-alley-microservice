@@ -309,6 +309,7 @@ import React, {
       tags: [],
       note: "",
       source_file: "",
+      source: "",
       custom_fields: [],
     });
     // Edit Prospect Sidebar States
@@ -692,6 +693,13 @@ import React, {
         note: item.note ?? d.note ?? "",
         source_file:
           item.source_file ??
+          d.source_file ??
+          d.source ??
+          item.source ??
+          "",
+        source:
+          item.source_file ??
+          d.source_file ??
           d.source ??
           item.source ??
           "",

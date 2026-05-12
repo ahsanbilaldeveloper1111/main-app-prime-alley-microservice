@@ -146,5 +146,5 @@ export function mergeAttendanceIntoOrgChartTree(
 }
 
 export function collectUniqueOrgChartUserIdsAsArray(nodes: readonly ApiOrgChartNode[]): string[] {
-  return Array.from(collectOrgChartUserIds(nodes));
+  return Array.from(collectOrgChartUserIds([...nodes]));
 }

@@ -1,29 +1,27 @@
-import { GetServerSideProps } from 'next';
-import { getSession } from 'next-auth/react';
+import { useEffect } from "react";
+import { Navigate } from "react-router-dom";
+import { useAuthContext } from "@auth/AuthProvider";
 
+/**
+ * Root entry — replaces the previous Next.js `getServerSideProps` redirect.
+ * The route renders `<Navigate>` once the auth status is known so the SPA
+ * lands users either on the dashboard or the sign-in page on first load.
+ */
 export default function Home() {
-  // This component won't render anything as we're redirecting
-  return null;
-}
+  const { status } = useAuthContext();
 
-export const getServerSideProps: GetServerSideProps = async (context) => {
-  const session = await getSession(context);
+  useEffect(() => {
+    document.title = "Loading...";
+  }, []);
 
-  if (session) {
-    // User is authenticated, redirect to dashboard
-    return {
-      redirect: {
-        destination: '/dashboard',
-        permanent: false,
-      },
-    };
-  } else {
-    // User is not authenticated, redirect to signin
-    return {
-      redirect: {
-        destination: '/auth/signin',
-        permanent: false,
-      },
-    };
+  if (status === "loading") {
+    return null;
   }
-};
+
+  return (
+    <Navigate
+      to={status === "authenticated" ? "/dashboard" : "/auth/signin"}
+      replace
+    />
+  );
+}

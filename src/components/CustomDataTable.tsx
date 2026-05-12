@@ -4,7 +4,7 @@ import '@assets/scss/custom-datatable.scss';
 import GenericTable, { TableColumn } from '@components/GenericTable';
 
 // Types for better type safety (rows must be objects for GenericTable)
-export interface Column<T extends Record<string, unknown> = Record<string, unknown>> {
+export interface Column<T extends object = object> {
   key: string;
   name: string;
   selector: (row: T) => unknown;

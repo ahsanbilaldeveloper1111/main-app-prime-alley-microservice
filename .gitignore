@@ -13,9 +13,13 @@
 # testing
 /coverage
 
-# next.js
+# next.js (legacy — kept while teams transition)
 /.next/
 /out/
+
+# vite
+/dist
+/.vite
 
 # production
 /build
@@ -29,6 +33,8 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
+# stray local run logs (dev/test ad-hoc captures should never be committed)
+*.log
 # env files (can opt-in for committing if needed)
 .env*
 

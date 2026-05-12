@@ -4,22 +4,34 @@ import axios, {
   type AxiosResponse,
   type InternalAxiosRequestConfig,
 } from "axios";
-import * as Sentry from "@sentry/nextjs";
-import { signOut } from "next-auth/react";
-import { getLogoutCallbackUrl } from "./logoutRedirect";
+import * as Sentry from "@sentry/react";
 import { toast } from "react-toastify";
 import tokenService from "./tokenService";
-import { clearSessionCookiesClient } from "./cookieUtils";
 import { markAxiosUserFacingRejection } from "./axiosUserFacingRejection";
 import { isBenignNetworkFailure } from "./benignNetworkFailure";
+import { getAuthSnapshot } from "../auth/AuthProvider";
 
 type MutableConfig = InternalAxiosRequestConfig & { _retry?: boolean };
 
 type WindowWithLogoutFlag = Window & { __authLogoutInProgress?: boolean };
 
+/**
+ * Direct backend URL — no Next.js proxy involved. The legacy `process.env`
+ * fallback keeps any old code paths working during the transition window.
+ */
+const legacyBackendUrl =
+  typeof process === "undefined"
+    ? undefined
+    : process.env?.NEXT_PUBLIC_BACKEND_URL;
+
+const BACKEND_URL =
+  import.meta.env.VITE_BACKEND_URL ||
+  legacyBackendUrl ||
+  "http://localhost:3001/api/";
+
 const axiosInstance: AxiosInstance = axios.create({
-  baseURL: "/api",
-  timeout: 1000000,
+  baseURL: BACKEND_URL,
+  timeout: 1_000_000,
 });
 
 function getBrowserWindow(): Window | undefined {
@@ -38,7 +50,6 @@ export function getClientBearerAuthorization(): string | null {
   if (serviceToken) {
     return `Bearer ${serviceToken}`;
   }
-
   const storage = getBrowserWindow()?.sessionStorage;
   if (!storage) {
     return null;
@@ -47,12 +58,8 @@ export function getClientBearerAuthorization(): string | null {
   return token ? `Bearer ${token}` : null;
 }
 
-function getToken(): string | null {
-  return getClientBearerAuthorization();
-}
-
 function setAuthorizationHeader(config: InternalAxiosRequestConfig): void {
-  const token = getToken();
+  const token = getClientBearerAuthorization();
   if (token) {
     config.headers.Authorization = token;
   }
@@ -64,18 +71,21 @@ function performClientSignOut(): void {
     return;
   }
   win.__authLogoutInProgress = true;
-  fetch("/api/auth/logout", { method: "POST", credentials: "include" }).catch(() => {});
-  clearSessionCookiesClient(true);
-  win.sessionStorage.clear();
-  const callbackUrl = getLogoutCallbackUrl();
-  signOut({ callbackUrl, redirect: false }).then(() => {
-    win.location.replace(callbackUrl);
-  });
+  const auth = getAuthSnapshot();
+  // Fire-and-forget. AuthProvider clears storage and redirects.
+  if (auth) {
+    auth
+      .signOut({ redirectTo: "/auth/signin?reason=session_expired" })
+      .catch(() => undefined);
+  } else {
+    win.sessionStorage.clear();
+    win.location.replace("/auth/signin?reason=session_expired");
+  }
 }
 
 async function tryRefreshAndRetry(
   error: AxiosError,
-  originalRequest: MutableConfig
+  originalRequest: MutableConfig,
 ): Promise<AxiosResponse> {
   const win = getBrowserWindow() as WindowWithLogoutFlag | undefined;
   if (win?.__authLogoutInProgress) {
@@ -106,7 +116,10 @@ async function tryRefreshAndRetry(
   throw error;
 }
 
-function captureApiErrorToSentry(error: AxiosError, originalRequest?: MutableConfig): void {
+function captureApiErrorToSentry(
+  error: AxiosError,
+  originalRequest?: MutableConfig,
+): void {
   Sentry.captureException(error, {
     extra: {
       url: originalRequest?.url,
@@ -117,7 +130,10 @@ function captureApiErrorToSentry(error: AxiosError, originalRequest?: MutableCon
   });
 }
 
-function captureNetworkErrorToSentry(error: AxiosError, originalRequest?: MutableConfig): void {
+function captureNetworkErrorToSentry(
+  error: AxiosError,
+  originalRequest?: MutableConfig,
+): void {
   if (isBenignNetworkFailure(error)) {
     markAxiosUserFacingRejection(error);
     return;
@@ -131,10 +147,9 @@ function captureNetworkErrorToSentry(error: AxiosError, originalRequest?: Mutabl
   });
 }
 
-/** @returns response when retry succeeds; otherwise throws `error` after side effects / Sentry. */
 async function handleResponseWithBody(
   error: AxiosError,
-  originalRequest: MutableConfig
+  originalRequest: MutableConfig,
 ): Promise<AxiosResponse> {
   const status = error.response?.status;
   if (status === 401 && !originalRequest._retry) {
@@ -155,10 +170,14 @@ async function handleResponseWithBody(
 }
 
 axiosInstance.interceptors.request.use(
-  async (config) => {
+  (config) => {
     setAuthorizationHeader(config);
 
-    if (!config.headers["Content-Type"] && !(config.data instanceof FormData)) {
+    // Don't override Content-Type for FormData — the browser must set the
+    // multipart boundary itself. Same logic the Next proxy used.
+    const isFormData =
+      typeof FormData !== "undefined" && config.data instanceof FormData;
+    if (!config.headers["Content-Type"] && !isFormData) {
       config.headers["Content-Type"] = "application/json";
       if (!config.headers.Accept) {
         config.headers.Accept = "application/json";
@@ -169,7 +188,7 @@ axiosInstance.interceptors.request.use(
   },
   (requestError) => {
     throw requestError;
-  }
+  },
 );
 
 axiosInstance.interceptors.response.use(
@@ -192,7 +211,7 @@ axiosInstance.interceptors.response.use(
 
     captureNetworkErrorToSentry(error, originalRequest);
     throw error;
-  }
+  },
 );
 
 export default axiosInstance;

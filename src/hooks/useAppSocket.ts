@@ -5,7 +5,12 @@ import { io, Socket } from 'socket.io-client';
 import { useTokenService } from './useTokenService';
 import { useSession } from 'next-auth/react';
 
-const SOCKET_URL = process.env.NEXT_PUBLIC_WHATSAPP_SOCKET_URL;
+// Vite-first lookup with a NEXT_PUBLIC_* fallback so deployments that still
+// ship the legacy key keep working.
+const viteEnv = (import.meta.env ?? {}) as Record<string, string | undefined>;
+const SOCKET_URL =
+  viteEnv.VITE_WHATSAPP_SOCKET_URL ||
+  process.env.NEXT_PUBLIC_WHATSAPP_SOCKET_URL;
 
 type ConnectionStateListener = (connected: boolean, error: string | null) => void;
 

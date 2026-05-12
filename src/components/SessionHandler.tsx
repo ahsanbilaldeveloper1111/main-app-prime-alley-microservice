@@ -1,47 +1,36 @@
-import React, { useEffect } from 'react';
-import { useSession } from 'next-auth/react';
-import { useRouter } from 'next/router';
-import tokenService from '../utils/tokenService';
+import { useEffect, type ReactNode } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
+import tokenService from "../utils/tokenService";
+import { useAuthContext } from "../auth/AuthProvider";
 
 interface SessionHandlerProps {
-  children: React.ReactNode;
+  children: ReactNode;
 }
 
-/** Stripe (or other) return URLs: must work without a session (e.g. incognito). */
 function isSessionOptionalPath(pathname: string): boolean {
-  return (
-    pathname.startsWith("/auth/") || pathname.startsWith("/public/payment")
-  );
+  return pathname.startsWith("/auth/") || pathname.startsWith("/public/payment");
 }
 
 const SessionHandler: React.FC<SessionHandlerProps> = ({ children }) => {
-  const { status } = useSession();
-  const router = useRouter();
-  
+  const { status } = useAuthContext();
+  const location = useLocation();
+  const navigate = useNavigate();
+
   useEffect(() => {
-    // Handle session state changes
-    if (status === 'loading') {
-      // Still loading, do nothing
-      return;
-    }
-
-    const { pathname } = router;
-
-    if (isSessionOptionalPath(pathname)) {
-      return;
-    }
-
-    if (status === 'unauthenticated') {
-      // User is not authenticated, clear tokens and redirect
+    if (status === "loading") return;
+    if (isSessionOptionalPath(location.pathname)) return;
+    if (status === "unauthenticated") {
       tokenService.clearTokens();
-      router.push('/auth/signin');
+      navigate("/auth/signin", { replace: true });
     }
-  }, [status, router]);
+  }, [status, location.pathname, navigate]);
 
-  // Show loading state while session is being determined
-  if (status === 'loading') {
+  if (status === "loading") {
     return (
-      <div className="d-flex justify-content-center align-items-center" style={{ height: "100vh" }}>
+      <div
+        className="d-flex justify-content-center align-items-center"
+        style={{ height: "100vh" }}
+      >
         <output
           aria-live="polite"
           className="m-0 border-0 p-0 bg-transparent d-inline-flex align-items-center justify-content-center"
@@ -53,11 +42,11 @@ const SessionHandler: React.FC<SessionHandlerProps> = ({ children }) => {
     );
   }
 
-  if (status === 'unauthenticated' && !isSessionOptionalPath(router.pathname)) {
+  if (status === "unauthenticated" && !isSessionOptionalPath(location.pathname)) {
     return null;
   }
 
   return <>{children}</>;
 };
 
-export default SessionHandler; 
+export default SessionHandler;

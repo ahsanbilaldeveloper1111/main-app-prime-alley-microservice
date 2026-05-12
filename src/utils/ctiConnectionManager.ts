@@ -238,7 +238,7 @@ class CtiConnectionManager {
     params.append('instanceId', 'global-cti-instance');
     params.append('screenId', 'global');
     
-    const sseUrl = `/api/cti-stomp-stream?${params.toString()}`;
+    const sseUrl = `/streaming/cti-stomp-stream?${params.toString()}`;
     
     console.log('[CtiConnectionManager] Creating SSE connection...');
     

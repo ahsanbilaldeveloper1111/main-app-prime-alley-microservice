@@ -362,7 +362,7 @@ const SalesAnalytics: React.FC = () => {
         </Col>
       </Row>
 
-      <style jsx>{`
+      <style>{`
         .chart-container {
           position: relative;
         }

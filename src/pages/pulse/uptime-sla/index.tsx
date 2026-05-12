@@ -391,7 +391,7 @@ const UptimeSLAMonitoring = () => {
         </Col>
       </Row>
 
-      <style jsx global>{`
+      <style>{`
         .uptime-list-body {
           overflow-x: hidden;
         }

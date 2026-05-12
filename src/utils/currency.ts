@@ -2,6 +2,8 @@
  * Currency conversion utilities using Stripe exchange rates
  */
 
+import { backendUrl } from "./backendUrl";
+
 interface ExchangeRateCache {
   [key: string]: {
     rate: number;
@@ -43,7 +45,7 @@ export async function getExchangeRate(
   try {
     // Fetch exchange rate from API
     const response = await fetch(
-      `/api/stripe/exchange-rate?from=${from}&to=${to}`
+      backendUrl(`/api/stripe/exchange-rate?from=${from}&to=${to}`),
     );
     
     if (!response.ok) {

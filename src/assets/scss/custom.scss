@@ -1,6 +1,10 @@
-
+// Lexend Deca is loaded via <link rel="stylesheet"> in index.html so the
+// browser starts the request alongside the initial HTML parse (mirroring how
+// Next.js used to deliver this stylesheet via the page <head>). A Sass
+// `@import url(...)` here would only fire after Vite injects the JS-loaded CSS
+// at runtime, causing a brief wrong-font flash on first paint. The variable is
+// retained for any code that still references the URL programmatically.
 $googleFontsUrl: "https://fonts.googleapis.com/css2?family=Lexend+Deca:wght@300;400;500;600;700&display=swap";
-@import url("https://fonts.googleapis.com/css2?family=Lexend+Deca:wght@300;400;500;600;700&display=swap");
 
 @import "./style.scss";
 @import "./style-preset.scss";

@@ -75,7 +75,7 @@ function parseClientNameFromBuddy(buddyRaw: string): string {
 type ColumnDef = {
   index: number;
   headerRaw: string;
-  kind: ReturnType<typeof classifyContactHeader>;
+  kind: Exclude<ReturnType<typeof classifyContactHeader>, "none">;
 };
 
 function collectColumnDefs(map: Map<string, string>): ColumnDef[] {

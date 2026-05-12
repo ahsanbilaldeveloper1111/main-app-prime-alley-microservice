@@ -1,52 +1,64 @@
-// Environment configuration
+// Build-time environment configuration sourced from Vite. Legacy callers still
+// reach for `process.env.NEXT_PUBLIC_*`, which Vite's `define` block backfills.
+const env = (import.meta.env ?? {}) as Record<string, string | undefined>;
+
+const value = (...keys: string[]) => {
+  for (const key of keys) {
+    const v = env[key];
+    if (v) return v;
+  }
+  return "";
+};
+
 export const config = {
-  // NextAuth configuration
-  nextAuth: {
-    url: process.env.NEXT_PUBLIC_BASE_URL,
-    secret: process.env.NEXTAUTH_SECRET || '',
+  app: {
+    name: "Business Workspace AI-Powered",
+    baseUrl: value("VITE_BASE_URL", "NEXT_PUBLIC_BASE_URL"),
   },
-  
-  // Backend API configuration
+
   backend: {
-    url: process.env.NEXT_PUBLIC_BACKEND_URL || '',
+    url: value("VITE_BACKEND_URL", "NEXT_PUBLIC_BACKEND_URL"),
     timeout: 10000,
   },
-  
-  // Application configuration
-  app: {
-    name: 'Business Workspace AI-Powered',
-    baseUrl: process.env.NEXT_PUBLIC_BASE_URL,
+
+  streaming: {
+    url: value("VITE_STREAMING_URL"),
   },
-  
-  // Firebase configuration
+
   firebase: {
-    apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY || '',
-    authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN || '',
-    projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || '',
-    storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET || '',
-    messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID || '',
-    appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID || '',
-    vapidKey: process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY || '',
+    apiKey: value("VITE_FIREBASE_API_KEY", "NEXT_PUBLIC_FIREBASE_API_KEY"),
+    authDomain: value(
+      "VITE_FIREBASE_AUTH_DOMAIN",
+      "NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN",
+    ),
+    projectId: value(
+      "VITE_FIREBASE_PROJECT_ID",
+      "NEXT_PUBLIC_FIREBASE_PROJECT_ID",
+    ),
+    storageBucket: value(
+      "VITE_FIREBASE_STORAGE_BUCKET",
+      "NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET",
+    ),
+    messagingSenderId: value(
+      "VITE_FIREBASE_MESSAGING_SENDER_ID",
+      "NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID",
+    ),
+    appId: value("VITE_FIREBASE_APP_ID", "NEXT_PUBLIC_FIREBASE_APP_ID"),
+    vapidKey: value(
+      "VITE_FIREBASE_VAPID_KEY",
+      "NEXT_PUBLIC_FIREBASE_VAPID_KEY",
+    ),
   },
 };
 
-// Validate required environment variables
 export const validateEnv = () => {
-  const required = [
-    'NEXTAUTH_SECRET',
-    'NEXT_PUBLIC_BACKEND_URL',
-  ];
-
-  const missing = required.filter(key => !process.env[key]);
-  
-  if (missing.length > 0) {
-    throw new Error(`Missing required environment variables: ${missing.join(', ')}`);
+  if (!config.backend.url) {
+    // Surface configuration issues early rather than failing on first request.
+    // eslint-disable-next-line no-console
+    console.warn(
+      "[config] VITE_BACKEND_URL (or NEXT_PUBLIC_BACKEND_URL) is empty; API calls will fail.",
+    );
   }
 };
 
-// Export environment validation for server-side use
-export const isServer = typeof window === 'undefined';
-
-if (isServer) {
-  validateEnv();
-} 
+validateEnv();
