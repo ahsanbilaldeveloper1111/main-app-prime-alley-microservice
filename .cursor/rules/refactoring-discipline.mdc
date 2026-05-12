@@ -42,5 +42,73 @@ alwaysApply: false
 - **Extract before duplicating**: shared fetch/transform logic belongs in one module (e.g. `fetchXPayload` + thin `useQuery`), not copied between thunk and component.
 - **Sonar-friendly**: avoid huge parameter lists in public APIs—use a single `params` object (query keys, hook options). Keep complexity down with small helpers.
 
+## Recurring Sonar pitfalls to NEVER introduce
+These warnings keep reappearing across refactors. Apply the right pattern up-front so the next agent does not have to clean them up again.
+
+### Promises and the `void` operator
+- **NEVER prefix a promise with `void`** to silence the floating-promise lint. Sonar flags `void promise()` as a code smell.
+- **DO** chain `.catch(() => undefined)` when you genuinely want fire-and-forget behaviour, or `await` the call when inside an `async` function.
+- **TanStack Query invalidation** is the most common offender. Use:
+  ```ts
+  queryClient
+    .invalidateQueries({ queryKey: someKeys.all() })
+    .catch(() => undefined);
+  ```
+  not `void queryClient.invalidateQueries(...)`.
+
+### Type assertions
+- **NEVER add `as SomeType` or `as unknown as SomeType` when the receiver already accepts the source type.** Sonar will flag this on the next scan ("This assertion is unnecessary…").
+- **NEVER use the non-null assertion `value!` as a shortcut to silence TS** when `value` may be `null | undefined`. Prefer:
+  - narrowing inside the function body (`if (value === null) return Promise.reject(...)`), or
+  - changing the upstream type so the value can never be nullable at the call site.
+- For TanStack `useQuery` with `enabled: id !== null`, build the `queryFn` so TS narrows correctly:
+  ```ts
+  queryFn: () => {
+    if (id === null) return Promise.reject(new Error("ID required"));
+    return getById(id);
+  },
+  enabled: id !== null,
+  ```
+
+### Negated conditions in ternaries / `if/else`
+- Sonar's "Unexpected negated condition" rule fires on patterns like `cond != null ? a : b` or `if (!cond) {...} else {...}`. Flip them to the positive form:
+  - `cond == null ? b : a` or `cond === null ? b : a`
+  - `if (cond) {...} else {...}`
+
+### `Array#sort()` without a compare function
+- Always pass an explicit comparator. For strings use `localeCompare`:
+  ```ts
+  arr.sort((a, b) => a.localeCompare(b));   // strings
+  arr.sort((a, b) => a - b);                // numbers
+  ```
+- Even when "the items are obviously strings", Sonar still flags bare `.sort()`.
+
+### Default object stringification (`[object Object]`)
+- Never put a value of type `unknown` (or anything that may be an object) directly into a template literal or call `String(value)` on it. Both produce `"[object Object]"` when the value is a record.
+- Add a small helper (or reuse one) when you need to stringify an id-like field:
+  ```ts
+  function toSafeIdString(v: unknown): string {
+    if (typeof v === "string") return v;
+    if (typeof v === "number" || typeof v === "bigint") return v.toString();
+    return "";
+  }
+  ```
+
+### Nested ternaries
+- Extract any `a ? b : c ? d : e` into a named helper or `useMemo`. Even two-level nesting trips Sonar.
+
+### `replace` vs `replaceAll`
+- Prefer `string.replaceAll("_", " ")` over `string.replace(/_/g, " ")`. Sonar prefers the explicit `replaceAll` API.
+
+### Skip-key arrays
+- When you have a list of "keys to ignore", make it a `Set<string>` at module scope and use `.has(key)`, not `includes`.
+
+### Cognitive complexity caps
+- Aim to keep functions (especially top-level React components and data-fetching helpers) **at or below 15**. If you find yourself adding a fourth `if/else` branch or a third nested loop, **extract a helper**.
+- For React pages, hoist branches into small sub-components (`<TasksSection/>`, `<HeaderActions/>`, etc.) and pull `useQuery` orchestration into a `useXyzPage()` hook in `src/hooks/`.
+
+### CSS
+- Don't declare the same property twice in a single rule block (e.g. two `font-family` lines). The stylelint/Sonar rule will flag it.
+
 ## PR / handoff
 - Describe **what**, **why**, and **how to verify** in complete sentences; link or name tickets when applicable.

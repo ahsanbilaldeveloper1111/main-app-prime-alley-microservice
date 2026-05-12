@@ -1363,14 +1363,16 @@ const CrmCampaigns = ({ hideBreadcrumb }: CrmPageDisplayProps = {}) => { // NOSO
   const campaignFiltersKey = useMemo(
     () =>
       JSON.stringify({
-        status: [...campaignFilters.status].sort(),
+        status: [...campaignFilters.status].sort((a, b) => a.localeCompare(b)),
         dateFrom: campaignFilters.dateFrom,
         dateTo: campaignFilters.dateTo,
         userExtensions: campaignFilters.userExtensions
-          ? [...campaignFilters.userExtensions].sort()
+          ? [...campaignFilters.userExtensions].sort((a, b) => a.localeCompare(b))
           : null,
         hasUnassignedProspects: campaignFilters.hasUnassignedProspects,
-        tags: campaignFilters.tags ? [...campaignFilters.tags].sort() : null,
+        tags: campaignFilters.tags
+          ? [...campaignFilters.tags].sort((a, b) => a.localeCompare(b))
+          : null,
       }),
     [campaignFilters],
   );

@@ -124,7 +124,9 @@ const LostReasonsManagement = () => {
   }, []);
 
   const invalidateLostReasons = useCallback(() => {
-    void queryClient.invalidateQueries({ queryKey: crmAppKeys.lostReasons.all() });
+    queryClient
+      .invalidateQueries({ queryKey: crmAppKeys.lostReasons.all() })
+      .catch(() => undefined);
   }, [queryClient]);
 
   const createMutation = useMutation({

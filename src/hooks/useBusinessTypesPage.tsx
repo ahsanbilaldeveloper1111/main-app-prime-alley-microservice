@@ -120,7 +120,9 @@ export function useBusinessTypesPage() {
   const [formData, setFormData] = useState<BusinessTypeFormState>({ ...EMPTY_FORM });
 
   const invalidateList = useCallback(() => {
-    void queryClient.invalidateQueries({ queryKey: crmAppKeys.businessTypes.all() });
+    queryClient
+      .invalidateQueries({ queryKey: crmAppKeys.businessTypes.all() })
+      .catch(() => undefined);
   }, [queryClient]);
 
   const saveMutation = useMutation({
@@ -129,9 +131,9 @@ export function useBusinessTypesPage() {
       payload: CreateBusinessTypePayload | UpdateBusinessTypePayload;
     }) => {
       if (input.editing) {
-        await updateBusinessType(input.editing.id, input.payload as UpdateBusinessTypePayload);
+        await updateBusinessType(input.editing.id, input.payload);
       } else {
-        await createBusinessType(input.payload as CreateBusinessTypePayload);
+        await createBusinessType(input.payload);
       }
     },
     onSuccess: () => {

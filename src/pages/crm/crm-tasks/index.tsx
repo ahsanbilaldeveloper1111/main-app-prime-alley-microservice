@@ -504,7 +504,9 @@ import {
       const loading = tasksListQuery.isPending;
 
       const refetchTasks = useCallback(() => {
-        void queryClient.invalidateQueries({ queryKey: crmAppKeys.crmTasksListing.all() });
+        queryClient
+          .invalidateQueries({ queryKey: crmAppKeys.crmTasksListing.all() })
+          .catch(() => undefined);
       }, [queryClient]);
     
       // ── Filter sidebar ────────────────────────────────────────────────────────────

@@ -476,7 +476,9 @@ const ConversationList = ({
   const chatsError = chatsQuery.isError ? "Failed to load chats" : null;
 
   const invalidateWhatsAppChats = useCallback(() => {
-    void queryClient.invalidateQueries({ queryKey: crmAppKeys.crmWhatsAppInbox.all() });
+    queryClient
+      .invalidateQueries({ queryKey: crmAppKeys.crmWhatsAppInbox.all() })
+      .catch(() => undefined);
   }, [queryClient]);
 
   const [sortOpen, setSortOpen] = useState(false);

@@ -433,7 +433,9 @@ function CrmQuotesListPageContent({ variant }: Readonly<CrmQuotesListPageProps>)
     quotesListQuery.isPending || quotesListQuery.isFetching;
 
   const refetchQuotesProspectsList = useCallback(() => {
-    void queryClient.invalidateQueries({ queryKey: crmAppKeys.crmQuotesListPage.all() });
+    queryClient
+      .invalidateQueries({ queryKey: crmAppKeys.crmQuotesListPage.all() })
+      .catch(() => undefined);
     setRefreshKey((prev) => prev + 1);
   }, [queryClient, setRefreshKey]);
 
@@ -448,7 +450,7 @@ function CrmQuotesListPageContent({ variant }: Readonly<CrmQuotesListPageProps>)
     if (isAllProspects) {
       setTotalAllQuotes(response.pagination.total || 0);
     }
-    setMetrics(response.metrics as Record<string, number>);
+    setMetrics(response.metrics);
   }, [
     quotesListQuery.data,
     memoizedFilters.has_scheduled_calls,
@@ -873,33 +875,6 @@ function CrmQuotesListPageContent({ variant }: Readonly<CrmQuotesListPageProps>)
                   quickFilters={prospectQuickFilters}
                   activeFilter={activeFilter}
                   onFilterChange={handleFilterChange}
-                  // searchValue={prospectsSearch}
-                  // onSearchChange={(value) => {
-                  //   setProspectsSearch(value);
-                  // }}
-                  // onSearch={() =>
-                  //   handleFiltersChange({
-                  //     ...currentFilters,
-                  //     search: prospectsSearch,
-                  //   })
-                  // }
-                  // searchPlaceholder="Search by name or phone..."
-                  // showAdvancedFilters={showAdvancedFilters}
-                  // onToggleAdvancedFilters={() =>
-                  //   setShowAdvancedFilters(!showAdvancedFilters)
-                  // }
-                  // advancedFilterCount={
-                  //   (prospectsFilters.assignedTo !== null ? 1 : 0) +
-                  //   (prospectsFilters.campaigns !== null &&
-                  //   prospectsFilters.campaigns.length > 0
-                  //     ? 1
-                  //     : 0) +
-                  //   (prospectsFilters.sourceFile !== null ? 1 : 0) +
-                  //   (prospectsFilters.tags !== null &&
-                  //   prospectsFilters.tags.length > 0
-                  //     ? 1
-                  //     : 0)
-                  // }
                 />
               )}
 

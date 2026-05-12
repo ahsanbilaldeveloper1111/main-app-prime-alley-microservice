@@ -260,11 +260,16 @@ const CrmCompanyManagement = () => {
 
   const contactCompanyForFormQuery = useQuery({
     queryKey:
-      editingContactId != null
-        ? crmAppKeys.companies.byId(editingContactId)
-        : ([...crmAppKeys.companies.all(), "byId", "none"] as const),
-    queryFn: () => getCompany(editingContactId!),
-    enabled: showCreateContactSidebar && editingContactId != null,
+      editingContactId === null
+        ? ([...crmAppKeys.companies.all(), "byId", "none"] as const)
+        : crmAppKeys.companies.byId(editingContactId),
+    queryFn: () => {
+      if (editingContactId === null) {
+        return Promise.reject(new Error("Contact id not available"));
+      }
+      return getCompany(editingContactId);
+    },
+    enabled: showCreateContactSidebar && editingContactId !== null,
   });
 
   const [showBulkDeleteModal, setShowBulkDeleteModal] = useState(false);
@@ -316,11 +321,16 @@ const CrmCompanyManagement = () => {
 
   const companyFormEditQuery = useQuery({
     queryKey:
-      editingCompanyId != null
-        ? crmAppKeys.companies.byId(editingCompanyId)
-        : ([...crmAppKeys.companies.all(), "byId", "none"] as const),
-    queryFn: () => getCompany(editingCompanyId!),
-    enabled: showCreateCompanySidebar && editingCompanyId != null,
+      editingCompanyId === null
+        ? ([...crmAppKeys.companies.all(), "byId", "none"] as const)
+        : crmAppKeys.companies.byId(editingCompanyId),
+    queryFn: () => {
+      if (editingCompanyId === null) {
+        return Promise.reject(new Error("Company id not available"));
+      }
+      return getCompany(editingCompanyId);
+    },
+    enabled: showCreateCompanySidebar && editingCompanyId !== null,
   });
 
   // Call recordings state
@@ -696,7 +706,9 @@ const CrmCompanyManagement = () => {
     companiesListQuery.isPending || companiesListQuery.isFetching;
 
   const refreshCompaniesListAndPicklists = useCallback(() => {
-    void queryClient.invalidateQueries({ queryKey: crmAppKeys.companiesPage.all() });
+    queryClient
+      .invalidateQueries({ queryKey: crmAppKeys.companiesPage.all() })
+      .catch(() => undefined);
     setRefreshKey((prev) => prev + 1);
   }, [queryClient, setRefreshKey]);
 

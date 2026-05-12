@@ -61,6 +61,15 @@ import GenericFilterSidebar, {
   FilterField,
 } from "@components/GenericFilterSidebar";
 
+/** Safely stringify an id-like value (string/number) without falling back to `[object Object]`. */
+function toSafeIdString(value: unknown): string {
+  if (typeof value === "string") return value;
+  if (typeof value === "number" || typeof value === "bigint") {
+    return value.toString();
+  }
+  return "";
+}
+
 // Types
 interface ActivityRecord {
   id: number;
@@ -114,13 +123,21 @@ const HistoryPage = () => {
   const extensionsStamp = useMemo(
     () =>
       extensions
-        .map((e: { id?: unknown; extension?: unknown }) => `${e?.id ?? ""}:${e?.extension ?? ""}`)
+        .map(
+          (e: { id?: unknown; extension?: unknown }) =>
+            `${toSafeIdString(e?.id)}:${toSafeIdString(e?.extension)}`,
+        )
         .join("|"),
     [extensions],
   );
 
   const agentsKey = useMemo(
-    () => JSON.stringify([...activityFilters.agents].map(String).sort()),
+    () =>
+      JSON.stringify(
+        [...activityFilters.agents]
+          .map(String)
+          .sort((a, b) => a.localeCompare(b)),
+      ),
     [activityFilters.agents],
   );
 
@@ -214,7 +231,10 @@ const HistoryPage = () => {
   );
   const recordTypeStr = String(selectedActivityRecord?.type ?? "").toLowerCase();
   const recordIdRaw = selectedActivityRecord?.record_id ?? selectedActivityRecord?.id;
-  const recordIdStr = recordIdRaw != null ? String(recordIdRaw) : "";
+  const recordIdStr =
+    recordIdRaw === null || recordIdRaw === undefined
+      ? ""
+      : String(recordIdRaw);
 
   const detailQuery = useQuery({
     queryKey: crmAppKeys.activityHistory.recordDetail({
@@ -288,11 +308,11 @@ const HistoryPage = () => {
 
   const availableAgents: { value: string; label: string }[] = extensions.map(
     (ext: { id?: unknown; extension?: unknown; display_name?: string; name?: string }) => ({
-    value: String(ext.id ?? ext.extension ?? ""),
-    label: String(ext.display_name || ext.name || ext.id || ext.extension)
-      .replace(/\s*\([^)]*\)\s*$/, "")
-      .trim(),
-  }),
+      value: toSafeIdString(ext.id) || toSafeIdString(ext.extension),
+      label: (ext.display_name || ext.name || toSafeIdString(ext.id) || toSafeIdString(ext.extension))
+        .replace(/\s*\([^)]*\)\s*$/, "")
+        .trim(),
+    }),
   );
 
   const filteredActivityRecords = allActivityRecords.filter((activity) => {

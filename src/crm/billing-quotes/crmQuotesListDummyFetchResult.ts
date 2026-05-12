@@ -2,7 +2,7 @@
 export function getCrmQuotesListDummyFetchResult(): {
   data: Record<string, unknown>[];
   pagination: { total: number };
-  metrics: Record<string, number | string>;
+  metrics: Record<string, number>;
 } {
   const dummyQuotes = [
     {

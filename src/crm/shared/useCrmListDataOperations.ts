@@ -17,7 +17,6 @@ import {
   type CrmDataItem,
   type CrmDataMetrics,
   type CrmDataResponse,
-  type PaginationParams,
 } from "@utils/crm";
 import { handleCrmListUploadResponse } from "@crm/shared/crmListUploadResponseUtils";
 import { crmAppKeys } from "../../query/keys";
@@ -152,7 +151,7 @@ export function useCrmListDataOperations({
       refreshKey,
     }),
     queryFn: (): Promise<CrmDataResponse> =>
-      getCrmData(buildCrmDataParams() as PaginationParams),
+      getCrmData(buildCrmDataParams()),
     placeholderData: (previousData) => previousData,
   });
 
@@ -198,16 +197,20 @@ export function useCrmListDataOperations({
   ]);
 
   const bumpEntityListAndPicklists = useCallback(() => {
-    void queryClient.invalidateQueries({
-      queryKey: crmAppKeys.crmDataManagementList.entityRoot(entityName),
-    });
+    queryClient
+      .invalidateQueries({
+        queryKey: crmAppKeys.crmDataManagementList.entityRoot(entityName),
+      })
+      .catch(() => undefined);
     setRefreshKey((prev) => prev + 1);
   }, [entityName, queryClient, setRefreshKey]);
 
   const fetchCrmData = useCallback(() => {
-    void queryClient.invalidateQueries({
-      queryKey: crmAppKeys.crmDataManagementList.entityRoot(entityName),
-    });
+    queryClient
+      .invalidateQueries({
+        queryKey: crmAppKeys.crmDataManagementList.entityRoot(entityName),
+      })
+      .catch(() => undefined);
   }, [entityName, queryClient]);
 
   const fetchCrmDataForExport = useCallback(

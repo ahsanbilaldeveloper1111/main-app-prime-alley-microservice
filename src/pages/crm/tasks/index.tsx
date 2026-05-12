@@ -584,7 +584,9 @@ const CrmTasks = () => {
         notes: [],
       });
       setSelectedUserExtension(null);
-      void queryClient.invalidateQueries({ queryKey: crmAppKeys.tasks.all() });
+      queryClient
+        .invalidateQueries({ queryKey: crmAppKeys.tasks.all() })
+        .catch(() => undefined);
     } catch (error) {
       console.error('Failed to save task:', error);
     }
@@ -597,7 +599,9 @@ const CrmTasks = () => {
       await deleteTask(taskToDelete.id);
       setShowDeleteModal(false);
       setTaskToDelete(null);
-      void queryClient.invalidateQueries({ queryKey: crmAppKeys.tasks.all() });
+      queryClient
+        .invalidateQueries({ queryKey: crmAppKeys.tasks.all() })
+        .catch(() => undefined);
     } catch (error) {
       console.error('Failed to delete task:', error);
     }

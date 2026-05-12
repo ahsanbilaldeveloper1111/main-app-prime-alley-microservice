@@ -150,11 +150,16 @@ const CreateDeal = () => {
 
   const leadQuery = useQuery({
     queryKey:
-      parsedLeadId != null
-        ? crmAppKeys.leads.byId(parsedLeadId)
-        : ([...crmAppKeys.leads.all(), "byId", "none"] as const),
-    queryFn: () => getLead(parsedLeadId!),
-    enabled: parsedLeadId != null,
+      parsedLeadId === null
+        ? ([...crmAppKeys.leads.all(), "byId", "none"] as const)
+        : crmAppKeys.leads.byId(parsedLeadId),
+    queryFn: () => {
+      if (parsedLeadId === null) {
+        return Promise.reject(new Error("Lead ID not available"));
+      }
+      return getLead(parsedLeadId);
+    },
+    enabled: parsedLeadId !== null,
   });
 
   const loadingLead = leadQuery.isPending && parsedLeadId != null;
@@ -238,7 +243,7 @@ const CreateDeal = () => {
 
     if (filteredIndustries.length === 1) {
       setSelectedIndustryId(filteredIndustries[0].id);
-      void fetchProductsByIndustry(filteredIndustries[0].id);
+      fetchProductsByIndustry(filteredIndustries[0].id).catch(() => undefined);
     }
   }, [sourceLead?.campaign_id, campaignQuery.data, allIndustries, fetchProductsByIndustry]);
 
@@ -279,9 +284,8 @@ const CreateDeal = () => {
       contactPersonsArray[0] ||
       {};
 
-    const leadDataAny = leadData as any;
     const contactPersonName =
-      primaryContact.name || leadDataAny.contact_person_name || "";
+      primaryContact.name || leadData.contact_person_name || "";
 
     const defaultCloseDate = new Date();
     defaultCloseDate.setDate(defaultCloseDate.getDate() + 7);
@@ -295,17 +299,17 @@ const CreateDeal = () => {
       assigned_to: leadData.user_extension ? String(leadData.user_extension) : null,
       expected_close_date: formattedCloseDate,
       company_name: leadData.company_name || "",
-      company_domain: (leadData as any).company_domain ?? "",
-      industry: leadData.industry || leadDataAny.industry || "",
-      decision_maker_title: primaryContact.title || leadDataAny.contact_person_title || "",
+      company_domain: leadData.company_domain ?? "",
+      industry: leadData.industry || "",
+      decision_maker_title: primaryContact.title || leadData.contact_person_title || "",
       decision_maker_name: contactPersonName,
       decision_maker_phone_country_code:
-        primaryContact.phone_country_code || leadDataAny.contact_phone_country_code || "",
-      decision_maker_phone: primaryContact.phone || leadDataAny.contact_phone || "",
+        primaryContact.phone_country_code || leadData.contact_phone_country_code || "",
+      decision_maker_phone: primaryContact.phone || leadData.contact_phone || "",
       decision_maker_email: primaryContact.email || "",
     }));
 
-    void (async () => {
+    (async () => {
       try {
         setLoadingTemplate(true);
         const template = await getRelevantDealTemplate({ lead_id: leadId });
@@ -314,11 +318,7 @@ const CreateDeal = () => {
           const initialFieldsData: Record<string, any> = {};
           if (template.fields) {
             template.fields.forEach((field) => {
-              if (field.field_type === "dropdown" && field.options && field.options.length > 0) {
-                initialFieldsData[field.field_name] = "";
-              } else {
-                initialFieldsData[field.field_name] = "";
-              }
+              initialFieldsData[field.field_name] = "";
             });
           }
           setTemplateFieldsData(initialFieldsData);
@@ -333,7 +333,7 @@ const CreateDeal = () => {
       } finally {
         setLoadingTemplate(false);
       }
-    })();
+    })().catch(() => undefined);
   }, [parsedLeadId, leadQuery.isSuccess, leadQuery.data]);
 
   useEffect(() => {

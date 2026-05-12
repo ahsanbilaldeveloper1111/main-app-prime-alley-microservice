@@ -191,7 +191,6 @@ const EditDeal = () => {
   const allIndustries = industriesQuery.data ?? [];
   const loadingAllIndustries = industriesQuery.isPending;
   const availableTemplates = dealTemplatesQuery.data ?? [];
-  const loadingTemplateList = dealTemplatesQuery.isPending;
 
   const campaignIdForQuery = sourceLead?.campaign_id ? Number(sourceLead.campaign_id) : 0;
   const campaignQuery = useQuery({
@@ -263,7 +262,7 @@ const EditDeal = () => {
 
     if (filteredIndustries.length === 1) {
       setSelectedIndustryId(filteredIndustries[0].id);
-      void fetchProductsByIndustry(filteredIndustries[0].id);
+      fetchProductsByIndustry(filteredIndustries[0].id).catch(() => undefined);
     }
   }, [sourceLead?.campaign_id, campaignQuery.data, allIndustries, fetchProductsByIndustry]);
 
@@ -296,7 +295,9 @@ const EditDeal = () => {
       setShowOtherBusinessType(showOther);
     };
 
-    const tryLoadSourceLead = async (ticketId: number | null | undefined) => {
+    const tryLoadSourceLead = async (
+      ticketId: string | number | null | undefined,
+    ) => {
       if (!ticketId) return;
       try {
         const leadData: any = await getLead(Number(ticketId));

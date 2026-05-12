@@ -2888,7 +2888,9 @@ export function CrmDealsListScreenView({
     dealsListQuery.isPending || dealsListQuery.isFetching;
 
   const refreshDealsListAndTabTotals = useCallback(() => {
-    void queryClient.invalidateQueries({ queryKey: crmAppKeys.dealsPage.all() });
+    queryClient
+      .invalidateQueries({ queryKey: crmAppKeys.dealsPage.all() })
+      .catch(() => undefined);
     setRefreshKey((prev) => prev + 1);
   }, [queryClient, setRefreshKey]);
 

@@ -1701,12 +1701,11 @@ function unwrapCrmDashboardFromGetResponse(res: unknown): unknown {
   if (typeof res !== "object" || res === null || !("data" in res)) {
     return res;
   }
-  const outer = res as { data: unknown };
-  const inner = outer.data;
+  const inner = res.data;
   if (typeof inner !== "object" || inner === null || !("data" in inner)) {
     return res;
   }
-  return (inner as { data: unknown }).data;
+  return inner.data;
 }
 
 type CrmDashboardHomeBundle = {
@@ -1798,7 +1797,7 @@ const CrmDashboard = () => {
           size="sm"
           className="ms-3"
           onClick={() => {
-            void dashboardQuery.refetch();
+            dashboardQuery.refetch().catch(() => undefined);
           }}
         >
           Retry

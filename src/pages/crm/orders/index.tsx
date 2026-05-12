@@ -242,7 +242,9 @@ const CrmOrders = () => { // NOSONAR
 
   const queryClient = useQueryClient();
   const invalidateOrdersList = useCallback(() => {
-    void queryClient.invalidateQueries({ queryKey: crmAppKeys.ordersList.all() });
+    queryClient
+      .invalidateQueries({ queryKey: crmAppKeys.ordersList.all() })
+      .catch(() => undefined);
   }, [queryClient]);
 
   const [currentFilters, setCurrentFilters] = useState<Record<string, any>>({});
