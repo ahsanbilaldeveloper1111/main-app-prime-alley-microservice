@@ -384,7 +384,7 @@ const EditDeal = () => {
 
         setFormData(buildEditDealFormStateFromDeal(deal) as any);
         applyBusinessTypeFromDeal(deal);
-        await tryLoadSourceLead(deal.ticket_id);
+        await tryLoadSourceLead(deal.ticket_id ? Number(deal.ticket_id) : null);
         await applyDealTemplate(deal);
 
         const sortedEstimates = sortEstimatesByCreatedAtDesc(deal.estimates);

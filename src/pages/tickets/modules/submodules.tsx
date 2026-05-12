@@ -222,7 +222,7 @@ const SubmodulesPage = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const modulesData = await GetAllModules();
+        const modulesData: any = await GetAllModules();
         if (modulesData) {
           setModules(modulesData);
         }
