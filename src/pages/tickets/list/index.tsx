@@ -1473,7 +1473,7 @@ const TicketList = () => {
   const fetchSubmodules = useCallback(async (moduleId: string) => {
     if (moduleId) {
       try {
-        const submoduleData = await GetAllSubmodules();
+        const submoduleData: any = await GetAllSubmodules();
         // Filter submodules by module_id
         const filteredSubmodules =
           submoduleData?.filter((sub: any) => sub.module_id == moduleId) || [];
@@ -1495,7 +1495,7 @@ const TicketList = () => {
   const fetchSubmoduleChildren = useCallback(async (submoduleId: string) => {
     if (submoduleId) {
       try {
-        const childrenData = await GetAllSubmoduleChildren();
+        const childrenData: any = await GetAllSubmoduleChildren();
         // Filter children by submodule_id
         const filteredChildren =
           childrenData?.filter(
@@ -1559,7 +1559,7 @@ const TicketList = () => {
   useEffect(() => {
     const fetchAllSubmodules = async () => {
       try {
-        const submoduleData = await GetAllSubmodules();
+        const submoduleData: any = await GetAllSubmodules();
         setAllSubmodules(submoduleData || []);
       } catch (error) {
         console.error("Error fetching all submodules:", error);
@@ -1567,7 +1567,7 @@ const TicketList = () => {
     };
     const fetchAllSubmoduleChildren = async () => {
       try {
-        const childrenData = await GetAllSubmoduleChildren();
+        const childrenData: any = await GetAllSubmoduleChildren();
         setAllSubmoduleChildren(childrenData || []);
       } catch (error) {
         console.error("Error fetching all submodule children:", error);

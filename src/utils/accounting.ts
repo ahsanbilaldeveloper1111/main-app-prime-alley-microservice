@@ -4,6 +4,7 @@ import {
   extractAccountingApiData,
   peelAccountingResponseBody,
 } from "./accountingResponseHelpers";
+import { backendUrl } from "./backendUrl";
 
 export interface PaginationParams extends Record<string, any> {
   page?: number;
@@ -527,11 +528,10 @@ export const fetchPublicVerifyCheckoutSession = async <T = PublicVerifyCheckoutS
 
   try {
     const res = await fetch(
-      `/api/accounting/public/payment/verify-checkout-session?session_id=${encodeURIComponent(sessionId)}`,
-      {
-        credentials: "same-origin",
-        headers,
-      },
+      backendUrl(
+        `/api/accounting/public/payment/verify-checkout-session?session_id=${encodeURIComponent(sessionId)}`,
+      ),
+      { headers },
     );
 
     let body: unknown;
@@ -598,12 +598,14 @@ export const fetchPublicCancelCheckout = async <T = PublicCancelCheckoutResult>(
   }
 
   try {
-    const res = await fetch("/api/accounting/public/payment/cancel-checkout", {
-      method: "POST",
-      credentials: "same-origin",
-      headers,
-      body: JSON.stringify(payload),
-    });
+    const res = await fetch(
+      backendUrl("/api/accounting/public/payment/cancel-checkout"),
+      {
+        method: "POST",
+        headers,
+        body: JSON.stringify(payload),
+      },
+    );
 
     let body: unknown;
     try {

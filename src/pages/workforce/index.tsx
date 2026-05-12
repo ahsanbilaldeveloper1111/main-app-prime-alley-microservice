@@ -1,19 +1,6 @@
-import type { GetServerSideProps } from "next";
-import type { ReactElement } from "react";
-import Layout from "@layout/index";
-
-export const getServerSideProps: GetServerSideProps = async () => ({
-  redirect: {
-    destination: "/workforce/dashboard",
-    permanent: false,
-  },
-});
+import { Navigate } from "react-router-dom";
 
 /** `/workforce` is not a separate screen; the dashboard lives at `/workforce/dashboard`. */
-function WorkforceIndex() {
-  return null;
+export default function WorkforceIndex() {
+  return <Navigate to="/workforce/dashboard" replace />;
 }
-
-WorkforceIndex.getLayout = (page: ReactElement) => <Layout>{page}</Layout>;
-
-export default WorkforceIndex;

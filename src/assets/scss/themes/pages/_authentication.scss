@@ -9,7 +9,6 @@
   min-height: 100vh;
   display: flex;
   align-items: center;
-  position: relative;
   .auth-wrapper {
     width: 100%;
     display: flex;
@@ -114,7 +113,11 @@
     }
   }
   &.v2 {
-    background: url('../../../images/authentication/img-auth-bg.jpg');
+    // Absolute path from project root: Vite resolves and hashes this in prod
+    // builds. Relative paths from a nested partial don't survive Sass → Vite's
+    // url() rebasing (Vite resolves from the entry SCSS, not the leaf file —
+    // see https://github.com/vitejs/vite/issues/11012).
+    background: url('/src/assets/images/authentication/img-auth-bg.jpg');
     background-size: cover;
     background-position: center;
     & > * {

@@ -1638,7 +1638,7 @@ const Header = ({ themeMode }: HeaderProps) => {
 
     return (
         <React.Fragment>
-            <style jsx>{`
+            <style>{`
                 .pc-arrow i {
                     transition: all 0.3s ease;
                     display: inline-block;

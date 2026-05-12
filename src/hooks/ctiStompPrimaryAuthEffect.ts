@@ -570,7 +570,7 @@ export function subscribeCtiStompPrimaryAuthEffect(
     if (screenIdRef.current) {
       params.append("screenId", screenIdRef.current);
     }
-    return `/api/cti-stomp-stream?${params.toString()}`;
+    return `/streaming/cti-stomp-stream?${params.toString()}`;
   };
 
   const connectViaSSE = async (

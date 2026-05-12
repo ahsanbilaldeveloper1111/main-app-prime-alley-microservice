@@ -1,0 +1,72 @@
+# =============================================================================
+# mainapp streaming sidecar — systemd unit
+#
+# Runs server/index.js as a long-lived daemon. The sidecar reads VITE_*,
+# NEXT_PUBLIC_* and STREAMING_* values from $APP_DIR/.env.local (preferred)
+# or $APP_DIR/.env, exactly the same files used at build time.
+#
+# Install:
+#   sudo cp deploy/systemd/mainapp-streaming.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now mainapp-streaming
+#
+# Update the [Service] paths/users to match your environment before enabling.
+# See deploy/README.md for the full picture.
+# =============================================================================
+
+[Unit]
+Description=mainapp streaming sidecar (SSE + WebSocket bridge)
+Documentation=file:///var/www/mainapp/current/server/README.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+
+# User/group running the process. Create a dedicated unprivileged account
+# (e.g. `sudo adduser --system --group mainapp`) and update these.
+User=mainapp
+Group=mainapp
+
+# Project root on the deploy target. Should contain server/index.js,
+# .env.local (or .env), and node_modules/.
+WorkingDirectory=/var/www/mainapp/current
+
+# Pull configuration from the same .env files Vite/the SPA build uses, so
+# environment behaviour matches between build time and runtime. The sidecar
+# itself also calls `dotenv/config` defensively, but EnvironmentFile makes
+# the values available to every child process spawned by systemd.
+EnvironmentFile=-/var/www/mainapp/current/.env
+EnvironmentFile=-/var/www/mainapp/current/.env.local
+Environment=NODE_ENV=production
+
+# Use the system Node binary; pin to a specific version with nvm/asdf if you
+# prefer (then point ExecStart at that absolute path).
+ExecStart=/usr/bin/node server/index.js
+
+# Resilience
+Restart=on-failure
+RestartSec=5s
+StartLimitIntervalSec=60s
+StartLimitBurst=10
+
+# Logging — journald captures stdout/stderr.
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=mainapp-streaming
+
+# Hardening (relax if your filesystem layout needs it).
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictRealtime=true
+LockPersonality=true
+
+# Resource limits — bump if you expect many concurrent SSE clients.
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target

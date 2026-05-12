@@ -121,22 +121,24 @@ export const refreshCallDashboardThunk = createAsyncThunk<
   }
 });
 
-export const loadCallDashboardInitialThunk = createAsyncThunk(
-  "callDashboard/loadInitial",
-  async (_, { dispatch }) => {
-    await Promise.all([
-      dispatch(fetchGeneralStatsThunk(undefined)).unwrap(),
-      dispatch(fetchExtensionStatsThunk(undefined)).unwrap(),
-      dispatch(fetchTrendByCountryThunk(undefined)).unwrap(),
-    ]);
-  },
-);
+export const loadCallDashboardInitialThunk = createAsyncThunk<
+  void,
+  void,
+  { state: RootState }
+>("callDashboard/loadInitial", async (_, { dispatch }) => {
+  await Promise.all([
+    dispatch(fetchGeneralStatsThunk(undefined)).unwrap(),
+    dispatch(fetchExtensionStatsThunk(undefined)).unwrap(),
+    dispatch(fetchTrendByCountryThunk(undefined)).unwrap(),
+  ]);
+});
 
-export const applyCallDashboardDateRangeThunk = createAsyncThunk(
-  "callDashboard/applyDateRange",
-  async (_, { dispatch, getState }) => {
-    const { pendingDateStart, pendingDateEnd } = getState().callDashboard;
-    const formatted = formatDateRangeToUtc(pendingDateStart, pendingDateEnd);
-    await dispatch(refreshCallDashboardThunk(formatted)).unwrap();
-  },
-);
+export const applyCallDashboardDateRangeThunk = createAsyncThunk<
+  void,
+  void,
+  { state: RootState }
+>("callDashboard/applyDateRange", async (_, { dispatch, getState }) => {
+  const { pendingDateStart, pendingDateEnd } = getState().callDashboard;
+  const formatted = formatDateRangeToUtc(pendingDateStart, pendingDateEnd);
+  await dispatch(refreshCallDashboardThunk(formatted)).unwrap();
+});

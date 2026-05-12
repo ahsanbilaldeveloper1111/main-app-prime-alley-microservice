@@ -3131,7 +3131,7 @@ const CtiDialer = () => {
         </Col>
       </Row>
 
-      <style jsx>{`
+      <style>{`
         @keyframes ring {
           0% { transform: scale(1); }
           50% { transform: scale(1.1); }

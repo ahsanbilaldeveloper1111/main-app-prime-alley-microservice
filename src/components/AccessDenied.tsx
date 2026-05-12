@@ -16,7 +16,8 @@ const AccessDenied: React.FC<AccessDeniedProps> = ({
     message = "You don't have permission to access this page.",
     buttonText = "Back to Home",
     buttonLink = "/dashboard",
-    icon = 'lock'
+    icon = 'lock',
+    hideCallback = false,
 }) => {
     return (
         <div className="access-denied-wrapper">
@@ -26,12 +27,14 @@ const AccessDenied: React.FC<AccessDeniedProps> = ({
                 </div>
                 <h2>{title}</h2>
                 <p>{message}</p>
-                <Link href={buttonLink} className="back-button">
-                    <FiArrowLeft size={18} />
-                    <span>{buttonText}</span>
-                </Link>
+                {!hideCallback && (
+                    <Link href={buttonLink} className="back-button">
+                        <FiArrowLeft size={18} />
+                        <span>{buttonText}</span>
+                    </Link>
+                )}
             </div>
-            <style jsx>{`
+            <style>{`
                 .access-denied-wrapper {
                     min-height: 80vh;
                     display: flex;

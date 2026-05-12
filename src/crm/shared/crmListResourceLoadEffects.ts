@@ -124,7 +124,7 @@ export function useCrmListCampaignsOnRefreshEffect(
         const statusMap: Record<number, string> = {};
         campaignsResponse.data.forEach((campaign: CampaignData) => {
           campaignsMap[campaign.id] = campaign.name;
-          if (campaign.status != null && campaign.status !== "") {
+          if (campaign.status != null) {
             statusMap[campaign.id] = campaign.status;
           }
         });

@@ -1,26 +1,22 @@
-import { useCallback } from 'react';
-import { useSession } from 'next-auth/react';
-import tokenService from '../utils/tokenService';
+import { useCallback } from "react";
+import tokenService from "../utils/tokenService";
+import { useAuthContext } from "../auth/AuthProvider";
 
 export const useTokenService = () => {
-  const { status } = useSession();
+  const { status } = useAuthContext();
 
-  // Force refresh token
   const forceRefresh = useCallback(async () => {
-    return await tokenService.forceRefresh();
+    return tokenService.forceRefresh();
   }, []);
 
-  // Get current access token
   const getAccessToken = useCallback(() => {
     return tokenService.getAccessToken();
   }, []);
 
-  // Check if user is authenticated
   const isAuthenticated = useCallback(() => {
     return tokenService.isAuthenticated();
   }, []);
 
-  // Clear tokens (for logout)
   const clearTokens = useCallback(() => {
     tokenService.clearTokens();
   }, []);
@@ -30,6 +26,6 @@ export const useTokenService = () => {
     getAccessToken,
     isAuthenticated,
     clearTokens,
-    isInitialized: status !== 'loading',
+    isInitialized: status !== "loading",
   };
-}; 
+};
