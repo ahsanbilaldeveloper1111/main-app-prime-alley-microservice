@@ -1,5 +1,6 @@
 import "@assets/scss/datatable-style.scss";
-import React, { ReactElement, useState, useEffect } from "react";
+import React, { ReactElement, useState, useEffect, useMemo, useCallback, useRef } from "react";
+import { useQuery } from "@tanstack/react-query";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 import {
@@ -12,12 +13,10 @@ import {
   getCampaignById,
   getIndustries,
   CrmProduct,
-  StageData,
   DealTemplateData,
   DealTemplateField,
   IndustryData,
   getBusinessTypes,
-  BusinessTypeData,
 } from "@utils/crm";
 import { GetHierarchyData } from "@utils/users";
 import { Button, Row, Col, Form, Card, Badge, Table, Modal } from "react-bootstrap";
@@ -35,22 +34,18 @@ import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
 import { ModuleSlug, ValidationType, checkRequiredFields } from '@utils/Helper';
 import { convertCurrency, formatCurrency } from '@utils/currency';
+import { crmAppKeys } from "../../../../query/keys";
 
 const CreateDeal = () => {
   const router = useRouter();
   const { data: session } = useSession();
   const [formStep, setFormStep] = useState(0);
   const [loading, setLoading] = useState(false);
-  const [stages, setStages] = useState<StageData[]>([]);
-  const [extensions, setExtensions] = useState<any[]>([]);
   const [products, setProducts] = useState<CrmProduct[]>([]);
   const [loadingProducts, setLoadingProducts] = useState(false);
   const [campaign, setCampaign] = useState<any>(null);
   const [campaignIndustries, setCampaignIndustries] = useState<IndustryData[]>([]);
   const [selectedIndustryId, setSelectedIndustryId] = useState<number | null>(null);
-  const [loadingIndustries, setLoadingIndustries] = useState(false);
-  const [allIndustries, setAllIndustries] = useState<IndustryData[]>([]);
-  const [loadingAllIndustries, setLoadingAllIndustries] = useState(false);
   const [showAllIndustries, setShowAllIndustries] = useState(false);
   const [estimationItems, setEstimationItems] = useState<Array<{
     product_id: number;
@@ -106,60 +101,94 @@ const CreateDeal = () => {
     standard_discount_percentage: "0",
     special_discount_percentage: "0",
   });
-  const [loadingLead, setLoadingLead] = useState(false);
   const [sourceLead, setSourceLead] = useState<any>(null);
   const [convertingPrice, setConvertingPrice] = useState(false);
   const [dealTemplate, setDealTemplate] = useState<DealTemplateData | null>(null);
   const [loadingTemplate, setLoadingTemplate] = useState(false);
   const [templateFieldsData, setTemplateFieldsData] = useState<Record<string, any>>({});
 
+  const stagesQuery = useQuery({
+    queryKey: crmAppKeys.crmStages.byType("deal"),
+    queryFn: () => getStages("deal"),
+  });
+  const extensionsQuery = useQuery({
+    queryKey: crmAppKeys.hierarchyExtensions.module(ModuleSlug.CRM_DEALS),
+    queryFn: async () => {
+      const hierarchyData = await GetHierarchyData(ModuleSlug.CRM_DEALS);
+      return hierarchyData?.extensions ?? [];
+    },
+  });
+  const businessTypesQuery = useQuery({
+    queryKey: crmAppKeys.businessTypes.selectOptions(),
+    queryFn: async () => {
+      const r = await getBusinessTypes({ per_page: 1000 });
+      return r?.data ?? [];
+    },
+  });
+  const industriesQuery = useQuery({
+    queryKey: crmAppKeys.campaigns.industries(),
+    queryFn: async () => {
+      const r = await getIndustries({ per_page: 1000, page: 1 });
+      return r.data ?? [];
+    },
+  });
+
+  const stages = stagesQuery.data ?? [];
+  const extensions = extensionsQuery.data ?? [];
+  const businessTypes = businessTypesQuery.data ?? [];
+  const allIndustries = industriesQuery.data ?? [];
+  const loadingAllIndustries = industriesQuery.isPending;
+
+  const parsedLeadId = useMemo(() => {
+    if (!router.isReady || router.query.lead_id == null || router.query.lead_id === "") {
+      return null;
+    }
+    const raw = Array.isArray(router.query.lead_id) ? router.query.lead_id[0] : router.query.lead_id;
+    const n = Number(raw);
+    return Number.isFinite(n) && n > 0 ? n : null;
+  }, [router.isReady, router.query.lead_id]);
+
+  const leadQuery = useQuery({
+    queryKey:
+      parsedLeadId != null
+        ? crmAppKeys.leads.byId(parsedLeadId)
+        : ([...crmAppKeys.leads.all(), "byId", "none"] as const),
+    queryFn: () => getLead(parsedLeadId!),
+    enabled: parsedLeadId != null,
+  });
+
+  const loadingLead = leadQuery.isPending && parsedLeadId != null;
+
+  const campaignIdForQuery = sourceLead?.campaign_id ? Number(sourceLead.campaign_id) : 0;
+  const campaignQuery = useQuery({
+    queryKey: crmAppKeys.campaigns.byCampaignId(campaignIdForQuery),
+    queryFn: () => getCampaignById(campaignIdForQuery),
+    enabled: Boolean(sourceLead?.campaign_id) && campaignIdForQuery > 0,
+  });
+
+  const loadingIndustries = Boolean(sourceLead?.campaign_id) && campaignQuery.isFetching;
+
+  const leadHydratedIdRef = useRef<number | null>(null);
+
   // Business type state
-  const [businessTypes, setBusinessTypes] = useState<BusinessTypeData[]>([]);
   const [businessTypeId, setBusinessTypeId] = useState<number | null>(null);
   const [businessTypeOther, setBusinessTypeOther] = useState<string>("");
   const [showOtherBusinessType, setShowOtherBusinessType] = useState(false);
 
-  const fetchBusinessTypes = async () => {
-    try {
-      const businessTypesResponse = await getBusinessTypes({ per_page: 1000 });
-      setBusinessTypes(businessTypesResponse?.data || []);
-    } catch (error) {
-      console.error("Failed to fetch business types:", error);
+  useEffect(() => {
+    if (industriesQuery.isError) {
+      console.error("Failed to fetch industries:", industriesQuery.error);
+      toast.error("Failed to fetch industries");
     }
-  };
-
-  useEffect(() => {
-    fetchStages();
-    fetchExtensions();
-    fetchBusinessTypes();
-    // Don't fetch all products initially - wait for industry selection
-  }, []);
-
-  // Fetch all industries
-  useEffect(() => {
-    const fetchAllIndustries = async () => {
-      try {
-        setLoadingAllIndustries(true);
-        const response = await getIndustries({ per_page: 1000 });
-        setAllIndustries(response.data || []);
-      } catch (error) {
-        console.error("Failed to fetch industries:", error);
-        toast.error("Failed to fetch industries");
-      } finally {
-        setLoadingAllIndustries(false);
-      }
-    };
-    
-    fetchAllIndustries();
-  }, []);
+  }, [industriesQuery.isError, industriesQuery.error]);
 
   // Fetch products by industry
-  const fetchProductsByIndustry = async (industryId: number) => {
+  const fetchProductsByIndustry = useCallback(async (industryId: number) => {
     try {
       setLoadingProducts(true);
-      const response = await getCrmProducts({ 
+      const response = await getCrmProducts({
         per_page: 100,
-        industry_id: industryId 
+        industry_id: industryId,
       });
       setProducts(response.data || []);
     } catch (error) {
@@ -168,7 +197,151 @@ const CreateDeal = () => {
     } finally {
       setLoadingProducts(false);
     }
-  };
+  }, []);
+
+  // Sync campaign industries when campaign + master industry list are available
+  useEffect(() => {
+    if (!sourceLead?.campaign_id || !campaignQuery.data) {
+      return;
+    }
+    const campaignData = campaignQuery.data as any;
+    setCampaign(campaignData);
+
+    const industriesData = campaignData.industries;
+    const industryIds = campaignData.industry_ids;
+
+    let campaignIndustryIds: number[] = [];
+    if (industriesData && Array.isArray(industriesData)) {
+      campaignIndustryIds = industriesData.map((ind: any) => (typeof ind === "object" ? ind.id : ind));
+    } else if (industryIds && Array.isArray(industryIds)) {
+      campaignIndustryIds = industryIds;
+    }
+
+    if (campaignIndustryIds.length === 0) {
+      return;
+    }
+
+    const filteredIndustries = allIndustries.filter((ind: IndustryData) =>
+      campaignIndustryIds.includes(ind.id),
+    );
+    setCampaignIndustries(filteredIndustries);
+
+    setFormData((prevFormData) => {
+      if (!prevFormData.industry_ids || prevFormData.industry_ids.length === 0) {
+        return {
+          ...prevFormData,
+          industry_ids: campaignIndustryIds,
+        };
+      }
+      return prevFormData;
+    });
+
+    if (filteredIndustries.length === 1) {
+      setSelectedIndustryId(filteredIndustries[0].id);
+      void fetchProductsByIndustry(filteredIndustries[0].id);
+    }
+  }, [sourceLead?.campaign_id, campaignQuery.data, allIndustries, fetchProductsByIndustry]);
+
+  useEffect(() => {
+    if (parsedLeadId == null) {
+      leadHydratedIdRef.current = null;
+      return;
+    }
+    if (!leadQuery.isSuccess || !leadQuery.data) {
+      return;
+    }
+    if (leadHydratedIdRef.current === parsedLeadId) {
+      return;
+    }
+    leadHydratedIdRef.current = parsedLeadId;
+
+    const leadData: any = leadQuery.data;
+    const leadId = parsedLeadId;
+    setSourceLead(leadData);
+
+    let contactPersonsArray: any[] = [];
+    if (leadData.contact_persons) {
+      if (typeof leadData.contact_persons === "string") {
+        try {
+          contactPersonsArray = JSON.parse(leadData.contact_persons);
+        } catch (e) {
+          console.error("Failed to parse contact_persons:", e);
+          contactPersonsArray = [];
+        }
+      } else if (Array.isArray(leadData.contact_persons)) {
+        contactPersonsArray = leadData.contact_persons;
+      }
+    }
+
+    const primaryContact =
+      contactPersonsArray.find((cp) => cp.email) ||
+      contactPersonsArray.find((cp) => cp.phone) ||
+      contactPersonsArray[0] ||
+      {};
+
+    const leadDataAny = leadData as any;
+    const contactPersonName =
+      primaryContact.name || leadDataAny.contact_person_name || "";
+
+    const defaultCloseDate = new Date();
+    defaultCloseDate.setDate(defaultCloseDate.getDate() + 7);
+    const formattedCloseDate = defaultCloseDate.toISOString().split("T")[0];
+
+    setFormData((prev) => ({
+      ...prev,
+      lead_id: leadId,
+      ticket_id: leadId,
+      name: leadData.name || "",
+      assigned_to: leadData.user_extension ? String(leadData.user_extension) : null,
+      expected_close_date: formattedCloseDate,
+      company_name: leadData.company_name || "",
+      company_domain: (leadData as any).company_domain ?? "",
+      industry: leadData.industry || leadDataAny.industry || "",
+      decision_maker_title: primaryContact.title || leadDataAny.contact_person_title || "",
+      decision_maker_name: contactPersonName,
+      decision_maker_phone_country_code:
+        primaryContact.phone_country_code || leadDataAny.contact_phone_country_code || "",
+      decision_maker_phone: primaryContact.phone || leadDataAny.contact_phone || "",
+      decision_maker_email: primaryContact.email || "",
+    }));
+
+    void (async () => {
+      try {
+        setLoadingTemplate(true);
+        const template = await getRelevantDealTemplate({ lead_id: leadId });
+        if (template) {
+          setDealTemplate(template);
+          const initialFieldsData: Record<string, any> = {};
+          if (template.fields) {
+            template.fields.forEach((field) => {
+              if (field.field_type === "dropdown" && field.options && field.options.length > 0) {
+                initialFieldsData[field.field_name] = "";
+              } else {
+                initialFieldsData[field.field_name] = "";
+              }
+            });
+          }
+          setTemplateFieldsData(initialFieldsData);
+        } else {
+          setDealTemplate(null);
+          setTemplateFieldsData({});
+        }
+      } catch (error) {
+        console.error("Failed to fetch deal template:", error);
+        setDealTemplate(null);
+        setTemplateFieldsData({});
+      } finally {
+        setLoadingTemplate(false);
+      }
+    })();
+  }, [parsedLeadId, leadQuery.isSuccess, leadQuery.data]);
+
+  useEffect(() => {
+    if (leadQuery.isError && parsedLeadId != null) {
+      console.error("Failed to fetch lead:", leadQuery.error);
+      toast.error("Failed to load lead data for conversion");
+    }
+  }, [leadQuery.isError, leadQuery.error, parsedLeadId]);
 
   // Handle industry selection change
   const handleIndustryChange = async (selectedOption: any) => {
@@ -187,193 +360,6 @@ const CreateDeal = () => {
       await fetchProductsByIndustry(industryId);
     } else {
       setProducts([]);
-    }
-  };
-
-  // Fetch campaign and industries when lead is loaded
-  useEffect(() => {
-    const fetchCampaignAndIndustries = async () => {
-      if (sourceLead?.campaign_id) {
-        try {
-          setLoadingIndustries(true);
-          const campaignData = await getCampaignById(sourceLead.campaign_id);
-          setCampaign(campaignData);
-          
-          // Get industries from campaign (could be industries array or industry_ids)
-          const industriesData = (campaignData as any).industries;
-          const industryIds = (campaignData as any).industry_ids;
-          
-          let campaignIndustryIds: number[] = [];
-          if (industriesData && Array.isArray(industriesData)) {
-            campaignIndustryIds = industriesData.map((ind: any) => typeof ind === 'object' ? ind.id : ind);
-          } else if (industryIds && Array.isArray(industryIds)) {
-            campaignIndustryIds = industryIds;
-          }
-          
-          if (campaignIndustryIds.length > 0) {
-            // Fetch all industries and filter to only show campaign industries
-            const allIndustriesResponse = await getIndustries({ per_page: 1000 });
-            const allIndustries = allIndustriesResponse.data || [];
-            const filteredIndustries = allIndustries.filter((ind: IndustryData) => 
-              campaignIndustryIds.includes(ind.id)
-            );
-            setCampaignIndustries(filteredIndustries);
-            
-            // Auto-select campaign industries if formData.industry_ids is empty
-            setFormData((prevFormData) => {
-              if (!prevFormData.industry_ids || prevFormData.industry_ids.length === 0) {
-                return {
-                  ...prevFormData,
-                  industry_ids: campaignIndustryIds,
-                };
-              }
-              return prevFormData;
-            });
-            
-            // If only one industry, auto-select it and fetch products
-            if (filteredIndustries.length === 1) {
-              setSelectedIndustryId(filteredIndustries[0].id);
-              await fetchProductsByIndustry(filteredIndustries[0].id);
-            }
-          }
-        } catch (error) {
-          console.error("Failed to fetch campaign/industries:", error);
-        } finally {
-          setLoadingIndustries(false);
-        }
-      }
-    };
-    
-    if (sourceLead) {
-      fetchCampaignAndIndustries();
-    }
-  }, [sourceLead]);
-
-  const fetchProducts = async () => {
-    // This function is kept for backward compatibility but should not be used
-    // Products should be fetched by industry
-    if (selectedIndustryId) {
-      await fetchProductsByIndustry(selectedIndustryId);
-    }
-  };
-
-  // Fetch lead data if lead_id is in query params
-  useEffect(() => {
-    const fetchLeadData = async () => {
-      if (router.isReady && router.query.lead_id) {
-        try {
-          setLoadingLead(true);
-          const leadId = Number(router.query.lead_id);
-          const leadData: any = await getLead(leadId);
-          setSourceLead(leadData);
-
-          // Parse contact_persons if it's a string
-          let contactPersonsArray: any[] = [];
-          if (leadData.contact_persons) {
-            if (typeof leadData.contact_persons === 'string') {
-              try {
-                contactPersonsArray = JSON.parse(leadData.contact_persons);
-              } catch (e) {
-                console.error("Failed to parse contact_persons:", e);
-                contactPersonsArray = [];
-              }
-            } else if (Array.isArray(leadData.contact_persons)) {
-              contactPersonsArray = leadData.contact_persons;
-            }
-          }
-
-          // Get the best contact person - prioritize one with email, then phone, then first one
-          const primaryContact = contactPersonsArray.find(cp => cp.email) || 
-                                 contactPersonsArray.find(cp => cp.phone) || 
-                                 contactPersonsArray[0] || {};
-
-          // Also check for contact_person_name field in lead data (fallback)
-          const leadDataAny = leadData as any;
-          const contactPersonName = primaryContact.name || 
-                                   leadDataAny.contact_person_name || 
-                                   "";
-
-          // Calculate default expected close date (30 days from now)
-          const defaultCloseDate = new Date();
-          defaultCloseDate.setDate(defaultCloseDate.getDate() + 7);
-          const formattedCloseDate = defaultCloseDate.toISOString().split('T')[0];
-
-          // Auto-fill form data from lead
-          setFormData(prev => ({
-            ...prev,
-            lead_id: leadId,
-            ticket_id: leadId, // ticket_id should be the lead id when converting from lead
-            name: leadData.name || "",
-            assigned_to: leadData.user_extension ? String(leadData.user_extension) : null,
-            expected_close_date: formattedCloseDate,
-            company_name: leadData.company_name || "",
-            company_domain: (leadData as any).company_domain ?? "",
-            industry: leadData.industry || leadDataAny.industry || "",
-            decision_maker_title: primaryContact.title || leadDataAny.contact_person_title || "",
-            decision_maker_name: contactPersonName,
-            decision_maker_phone_country_code: primaryContact.phone_country_code || leadDataAny.contact_phone_country_code || "",
-            decision_maker_phone: primaryContact.phone || leadDataAny.contact_phone || "",
-            decision_maker_email: primaryContact.email || "",
-          }));
-
-          // Fetch relevant deal template for this lead
-          try {
-            setLoadingTemplate(true);
-            const template = await getRelevantDealTemplate({ lead_id: leadId });
-            if (template) {
-              setDealTemplate(template);
-              // Initialize template fields data
-              const initialFieldsData: Record<string, any> = {};
-              if (template.fields) {
-                template.fields.forEach((field) => {
-                  if (field.field_type === 'dropdown' && field.options && field.options.length > 0) {
-                    initialFieldsData[field.field_name] = '';
-                  } else {
-                    initialFieldsData[field.field_name] = '';
-                  }
-                });
-              }
-              setTemplateFieldsData(initialFieldsData);
-            } else {
-              setDealTemplate(null);
-              setTemplateFieldsData({});
-            }
-          } catch (error) {
-            console.error("Failed to fetch deal template:", error);
-            setDealTemplate(null);
-            setTemplateFieldsData({});
-          } finally {
-            setLoadingTemplate(false);
-          }
-        } catch (error) {
-          console.error("Failed to fetch lead:", error);
-          toast.error("Failed to load lead data for conversion");
-        } finally {
-          setLoadingLead(false);
-        }
-      }
-    };
-
-    fetchLeadData();
-  }, [router.isReady, router.query.lead_id]);
-
-  const fetchStages = async () => {
-    try {
-      const stagesData = await getStages('deal');
-      setStages(stagesData || []);
-    } catch (error) {
-      console.error("Failed to fetch stages:", error);
-    }
-  };
-
-  const fetchExtensions = async () => {
-    try {
-      const hierarchyData = await GetHierarchyData(ModuleSlug.CRM_DEALS);
-      if (hierarchyData?.extensions) {
-        setExtensions(hierarchyData.extensions);
-      }
-    } catch (error) {
-      console.error("Failed to fetch extensions:", error);
     }
   };
 

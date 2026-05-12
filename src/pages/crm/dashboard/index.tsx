@@ -1,4 +1,8 @@
-import React, { ReactElement, useState, useEffect, useCallback } from "react";
+import React, {
+  ReactElement,
+  useState,
+  useMemo,
+} from "react";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 import {
@@ -13,9 +17,8 @@ import {
   Modal,
 } from "react-bootstrap";
 import { useSession } from "next-auth/react";
+import { useQuery } from "@tanstack/react-query";
 import { HEADER_CONSTANTS } from "@constants/headerConstants";
-
-const { PERMISSIONS } = HEADER_CONSTANTS;
 import {
   getCrmDashboard,
   getCrmData,
@@ -24,6 +27,7 @@ import {
   DealData,
   CrmDataItem,
   OrderData,
+  type CrmDataResponse,
 } from "@utils/crm";
 import { GetHierarchyData } from "@utils/users";
 import { buildCrmAuditLinesForEntry } from "@utils/crmAuditTrail";
@@ -68,6 +72,10 @@ import {
   formatNumber,
   ModuleSlug,
 } from "@utils/Helper";
+
+import { crmAppKeys } from "../../../query/keys";
+
+const { PERMISSIONS } = HEADER_CONSTANTS;
 
 // Helper functions for badge colors
 const getDealBadgeColor = (deal: DealData): string => {
@@ -1688,71 +1696,86 @@ function CrmDashboardMainView({
 
 }
 
+/** Mirrors legacy `getCrmDashboard().then((res) => res.data.data)` when the client still returns a nested envelope. */
+function unwrapCrmDashboardFromGetResponse(res: unknown): unknown {
+  if (typeof res !== "object" || res === null || !("data" in res)) {
+    return res;
+  }
+  const outer = res as { data: unknown };
+  const inner = outer.data;
+  if (typeof inner !== "object" || inner === null || !("data" in inner)) {
+    return res;
+  }
+  return (inner as { data: unknown }).data;
+}
+
+type CrmDashboardHomeBundle = {
+  dashboard: unknown;
+  crmProspectsResponse: CrmDataResponse;
+};
+
 const CrmDashboard = () => {
   const { data: session } = useSession();
-  const [dashboardData, setDashboardData] = useState<any>(null);
-  const [recentProspects, setRecentProspects] = useState<CrmDataItem[]>([]);
   const [selectedMeeting, setSelectedMeeting] = useState<Record<
     string,
     unknown
   > | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
 
-  // Conversion percentages
-  const [leadToDealPercent, setLeadToDealPercent] = useState(0);
-  const [dealToOrderPercent, setDealToOrderPercent] = useState(0);
-  const [extensions, setExtensions] = useState<any[]>([]);
-
-  const fetchExtensions = useCallback(async () => {
-    try {
-      const hierarchyData = await GetHierarchyData(ModuleSlug.CRM_LEADS);
-      if (hierarchyData?.extensions) {
-        setExtensions(hierarchyData.extensions);
-      }
-    } catch (fetchError) {
-      console.error("Failed to fetch extensions:", fetchError);
-    }
-  }, []);
-  // Fetch all dashboard data
-  const fetchDashboardData = useCallback(async () => {
-    try {
-      setLoading(true);
-      setError(null);
-
-      // Fetch dashboard data and recent items in parallel
+  const dashboardQuery = useQuery({
+    queryKey: crmAppKeys.crmDashboard.home(),
+    queryFn: async (): Promise<CrmDashboardHomeBundle> => {
       const [dashboard, crmProspectsResponse] = await Promise.all([
-        getCrmDashboard().then((res: any) => res.data.data),
+        getCrmDashboard().then(unwrapCrmDashboardFromGetResponse),
         getCrmData({ per_page: 5 }),
       ]);
-      console.log("dashboard data", dashboard);
-      setDashboardData(dashboard);
+      return {
+        dashboard,
+        crmProspectsResponse,
+      };
+    },
+  });
 
-      const apiPayload = dashboard as DashboardApiPayload;
-      const conv = selectConversionRatesLast30Days(apiPayload);
-      setLeadToDealPercent(conv.leadToDeal);
-      setDealToOrderPercent(conv.dealToOrder);
+  const dashboardExtensionsQuery = useQuery({
+    queryKey: crmAppKeys.hierarchyExtensions.module(ModuleSlug.CRM_LEADS),
+    queryFn: async () => {
+      const hierarchyData = await GetHierarchyData(ModuleSlug.CRM_LEADS);
+      return hierarchyData?.extensions ?? [];
+    },
+  });
 
-      setRecentProspects((crmProspectsResponse?.data || []).slice(0, 5));
+  const extensions = dashboardExtensionsQuery.data ?? [];
 
-      setLoading(false);
-    } catch (error: any) {
-      console.error("Failed to fetch dashboard data:", error);
-      setError(error?.message || "Failed to load dashboard data");
-      setLoading(false);
-      toast.error(error?.message || "Failed to load dashboard data");
+  const dashboardData = dashboardQuery.data?.dashboard ?? null;
+  const recentProspects = useMemo((): CrmDataItem[] => {
+    const rows = dashboardQuery.data?.crmProspectsResponse?.data;
+    return (rows || []).slice(0, 5);
+  }, [dashboardQuery.data?.crmProspectsResponse?.data]);
+
+  const { leadToDealPercent, dealToOrderPercent } = useMemo(() => {
+    const dashboard = dashboardQuery.data?.dashboard;
+    if (dashboard == null) {
+      return { leadToDealPercent: 0, dealToOrderPercent: 0 };
     }
-  }, []);
+    const apiPayload = dashboard as DashboardApiPayload;
+    const conv = selectConversionRatesLast30Days(apiPayload);
+    return {
+      leadToDealPercent: conv.leadToDeal,
+      dealToOrderPercent: conv.dealToOrder,
+    };
+  }, [dashboardQuery.data?.dashboard]);
 
-  useEffect(() => {
-    fetchDashboardData();
-  }, [fetchDashboardData]);
+  const loading = dashboardQuery.isLoading;
+  const errorMessage = useMemo(() => {
+    if (!dashboardQuery.isError) return null;
+    if (
+      dashboardQuery.error instanceof Error &&
+      dashboardQuery.error.message.trim().length > 0
+    ) {
+      return dashboardQuery.error.message;
+    }
+    return "Failed to load dashboard data";
+  }, [dashboardQuery.error, dashboardQuery.isError]);
 
-  useEffect(() => {
-    fetchExtensions();
-  }, [fetchExtensions]);
-
-  
   if (loading) {
     return (
       <div
@@ -1766,15 +1789,17 @@ const CrmDashboard = () => {
     );
   }
 
-  if (error) {
+  if (errorMessage) {
     return (
       <div className="alert alert-danger" role="alert">
-        {error}
+        {errorMessage}
         <Button
           variant="outline-danger"
           size="sm"
           className="ms-3"
-          onClick={fetchDashboardData}
+          onClick={() => {
+            void dashboardQuery.refetch();
+          }}
         >
           Retry
         </Button>

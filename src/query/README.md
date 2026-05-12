@@ -2,7 +2,7 @@
 
 ## Scope
 
-- **TanStack Query** owns **server / remote async state**: HTTP reads, cache, background refresh, and mutations that should invalidate or patch that cache.
+- **TanStack Query** owns **async remote I/O** (HTTP and other API-facing promise work): reads, cache, background refresh, uploads, and mutations that should invalidate or patch that cache. Use it whenever data crosses an **API or network boundary** and you want deduplication, retries, loading/error state, or cache invalidation—not only for “server-side” in a narrow sense.
 - **Redux Toolkit** remains for **global client UI state**, wizard flows, Finesse session fields still centralized in storage/slices, and legacy thunks until migrated.
 - **Local React state** for ephemeral UI (modals, dropdowns, form drafts).
 

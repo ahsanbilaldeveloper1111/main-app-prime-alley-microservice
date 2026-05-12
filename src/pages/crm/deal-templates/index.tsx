@@ -1,5 +1,6 @@
 import "@assets/scss/datatable-style.scss";
-import React, { useState, useEffect, useMemo, useCallback } from "react";
+import React, { useState, useMemo, useCallback, useEffect } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 import {
@@ -11,7 +12,6 @@ import {
   DealTemplateData,
   CreateDealTemplatePayload,
   UpdateDealTemplatePayload,
-  IndustryData,
 } from "@utils/crm";
 import { normalizeSearchQuery } from "@utils/Helper";
 import { reportApiErrorFromCatch } from "@utils/sentryLogger";
@@ -53,6 +53,7 @@ import { useCrmSettingsTableState } from "@hooks/useCrmSettingsTableState";
 import { useDebouncedSearchInput } from "@hooks/useDebouncedSearchInput";
 import { HEADER_CONSTANTS } from "@constants/headerConstants";
 import type { CrmPageDisplayProps } from "@page-modules/crm/crmPageDisplayProps";
+import { crmAppKeys } from "../../../query/keys";
 
 const { PERMISSIONS } = HEADER_CONSTANTS;
 
@@ -133,13 +134,9 @@ function consumeHandledApiError(error: unknown, source: string): void {
   reportApiErrorFromCatch(error, source, { scope: "DealTemplates" });
 }
 
-const DealTemplatesPage: React.FC<CrmPageDisplayProps> = ({ hideBreadcrumb } = {}) => {
+function DealTemplatesPage({ hideBreadcrumb }: CrmPageDisplayProps = {}) {
   const { data: session } = useSession();
-  // State
-  const [templates, setTemplates] = useState<DealTemplateData[]>([]);
-  const [totalTemplates, setTotalTemplates] = useState(0);
-  const [loading, setLoading] = useState(true);
-  const [industries, setIndustries] = useState<IndustryData[]>([]);
+  const queryClient = useQueryClient();
   const {
     pagination,
     setPagination,
@@ -176,9 +173,13 @@ const DealTemplatesPage: React.FC<CrmPageDisplayProps> = ({ hideBreadcrumb } = {
   const [fields, setFields] = useState<DealTemplateFieldForm[]>([]);
   const [submitting, setSubmitting] = useState(false);
 
-  const fetchTemplates = useCallback(async () => {
-    setLoading(true);
-    try {
+  const templatesListQuery = useQuery({
+    queryKey: crmAppKeys.dealTemplatesPage.list({
+      page: pagination.currentPage,
+      perPage: pagination.rowsPerPage,
+      search: search || "",
+    }),
+    queryFn: async () => {
       const params: { page: number; per_page: number; search?: string } = {
         page: pagination.currentPage,
         per_page: pagination.rowsPerPage,
@@ -186,37 +187,32 @@ const DealTemplatesPage: React.FC<CrmPageDisplayProps> = ({ hideBreadcrumb } = {
       if (search) {
         params.search = search;
       }
-      const response = await getDealTemplates(params);
-      setTemplates(response.data || []);
-      setTotalTemplates(response.total || 0);
-    } catch (error: unknown) {
-      consumeHandledApiError(error, "DealTemplates.fetchTemplates");
-      setTemplates([]);
-      setTotalTemplates(0);
-    } finally {
-      setLoading(false);
-    }
-  }, [pagination.currentPage, pagination.rowsPerPage, search]);
+      try {
+        return await getDealTemplates(params);
+      } catch (error: unknown) {
+        consumeHandledApiError(error, "DealTemplates.fetchTemplates");
+        throw error;
+      }
+    },
+  });
 
-  useEffect(() => {
-    fetchTemplates();
-  }, [fetchTemplates]);
-
-  useEffect(() => {
-    let cancelled = false;
-    getIndustries({ per_page: 1000, page: 1 })
-      .then((res) => {
-        if (cancelled) return;
-        setIndustries(res?.data || []);
-      })
-      .catch((error: unknown) => {
+  const industriesQuery = useQuery({
+    queryKey: crmAppKeys.campaigns.industries(),
+    queryFn: async () => {
+      try {
+        const res = await getIndustries({ per_page: 1000, page: 1 });
+        return res?.data ?? [];
+      } catch (error: unknown) {
         consumeHandledApiError(error, "DealTemplates.fetchIndustries");
-        setIndustries([]);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+        throw error;
+      }
+    },
+  });
+
+  const templates = templatesListQuery.data?.data ?? [];
+  const totalTemplates = templatesListQuery.data?.total ?? 0;
+  const loading = templatesListQuery.isFetching;
+  const industries = industriesQuery.data ?? [];
 
   useEffect(() => {
     setPagination((prev) =>
@@ -365,33 +361,35 @@ const DealTemplatesPage: React.FC<CrmPageDisplayProps> = ({ hideBreadcrumb } = {
       }));
 
       if (editingTemplate) {
-        const updatePayload: UpdateDealTemplatePayload & { is_default?: string } = {
-          industry_id: formData.industry_id ?? undefined,
-          name: formData.name.trim(),
-          description: formData.description.trim() || undefined,
-          fields: fieldsPayload,
-          is_default: formData.is_default ? "true" : "false",
-        };
-        await updateDealTemplate(editingTemplate.id, updatePayload);
+        await updateDealTemplate(
+          editingTemplate.id,
+          {
+            industry_id: formData.industry_id ?? undefined,
+            name: formData.name.trim(),
+            description: formData.description.trim() || undefined,
+            fields: fieldsPayload,
+            is_default: formData.is_default ? "true" : "false",
+          } as UpdateDealTemplatePayload & { industry_id?: number; is_default?: string },
+        );
       } else {
-        const createPayload: CreateDealTemplatePayload & { is_default?: string } = {
+        await createDealTemplate({
           industry_id: formData.industry_id ?? undefined,
           name: formData.name.trim(),
           description: formData.description.trim() || undefined,
           fields: fieldsPayload,
           is_default: formData.is_default ? "true" : "false",
-        };
-        await createDealTemplate(createPayload);
+        } as CreateDealTemplatePayload & { industry_id?: number; is_default?: string });
       }
       setShowModal(false);
       setEditingTemplate(null);
-      await fetchTemplates();
+      await queryClient.invalidateQueries({ queryKey: crmAppKeys.dealTemplatesPage.all() });
+      await queryClient.invalidateQueries({ queryKey: crmAppKeys.campaigns.dealTemplates() });
     } catch (error: unknown) {
       consumeHandledApiError(error, "DealTemplates.handleSubmit");
     } finally {
       setSubmitting(false);
     }
-  }, [editingTemplate, fields, formData, fetchTemplates]);
+  }, [editingTemplate, fields, formData, queryClient]);
 
   const handleDelete = useCallback(async () => {
     if (!deletingTemplate) return;
@@ -400,13 +398,14 @@ const DealTemplatesPage: React.FC<CrmPageDisplayProps> = ({ hideBreadcrumb } = {
       await deleteDealTemplate(deletingTemplate.id);
       setShowDeleteModal(false);
       setDeletingTemplate(null);
-      await fetchTemplates();
+      await queryClient.invalidateQueries({ queryKey: crmAppKeys.dealTemplatesPage.all() });
+      await queryClient.invalidateQueries({ queryKey: crmAppKeys.campaigns.dealTemplates() });
     } catch (error: unknown) {
       consumeHandledApiError(error, "DealTemplates.handleDelete");
     } finally {
       setDeletingTemplatePending(false);
     }
-  }, [deletingTemplate, fetchTemplates]);
+  }, [deletingTemplate, queryClient]);
 
   const handleView = useCallback((template: DealTemplateData) => {
     setViewingTemplate(template);
@@ -1177,7 +1176,7 @@ const DealTemplatesPage: React.FC<CrmPageDisplayProps> = ({ hideBreadcrumb } = {
       </div>
     </React.Fragment>
   );
-};
+}
 
 DealTemplatesPage.getLayout = (page: React.ReactElement) => {
   return <Layout>{page}</Layout>;

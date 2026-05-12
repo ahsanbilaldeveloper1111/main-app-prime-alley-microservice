@@ -8,6 +8,7 @@ import React, {
   useEffect,
   useRef,
 } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 import GenericTable, {
@@ -179,6 +180,7 @@ import {
 } from "@crm/deals/dealsListScreenTableBuilders";
 import { applyCrmFilterRules, CRM_BASE_FILTER_RULES } from "@crm/shared/crmListFilterHelpers";
 import { HEADER_CONSTANTS } from "@constants/headerConstants";
+import { crmAppKeys } from "../../query/keys";
 
 const { PERMISSIONS } = HEADER_CONSTANTS;
 const ignoredKeys = ["stage_id"];
@@ -2414,7 +2416,35 @@ export function CrmDealsListScreenView({
   }, [session?.user?.permissions, isApprovalsList]);
   const router = useRouter();
   const { dialNumber, isInitialized } = useCti();
-  const [stages, setStages] = useState<any[]>([]);
+
+  const dealStagesBootstrapQuery = useQuery({
+    queryKey: crmAppKeys.crmStages.byType("deal"),
+    queryFn: () => getStages("deal"),
+  });
+  const lostReasonStagesBootstrapQuery = useQuery({
+    queryKey: crmAppKeys.crmStages.byType("lost_reason"),
+    queryFn: () => (getStages as (type: string) => Promise<any[]>)("lost_reason"),
+  });
+  const dealsHierarchyBootstrapQuery = useQuery({
+    queryKey: crmAppKeys.hierarchyExtensions.module(ModuleSlug.CRM_DEALS),
+    queryFn: async () => {
+      const hierarchyData = await GetHierarchyData(ModuleSlug.CRM_DEALS);
+      return hierarchyData?.extensions ?? [];
+    },
+  });
+  const dealsFilterBusinessTypesQuery = useQuery({
+    queryKey: crmAppKeys.businessTypes.selectOptions(),
+    queryFn: async () => {
+      const res = await getBusinessTypes({ per_page: 1000 });
+      return res?.data ?? [];
+    },
+  });
+
+  const stages = dealStagesBootstrapQuery.data ?? [];
+  const lostReasons = lostReasonStagesBootstrapQuery.data ?? [];
+  const extensions = dealsHierarchyBootstrapQuery.data ?? [];
+  const filterBusinessTypes = dealsFilterBusinessTypesQuery.data ?? [];
+
   const [estimationItems, setEstimationItems] = useState<
     Array<{
       product_id: number;
@@ -2439,18 +2469,12 @@ export function CrmDealsListScreenView({
     useState(false);
   const [convertingPrice, setConvertingPrice] = useState(false);
   const [showAllIndustries, setShowAllIndustries] = useState(false);
-  const [lostReasons, setLostReasons] = useState<any[]>([]);
-  const [extensions, setExtensions] = useState<any[]>([]);
-  const [filterBusinessTypes, setFilterBusinessTypes] = useState<
-    BusinessTypeData[]
-  >([]);
   const [refreshKey, setRefreshKey] = useState(0);
   const [currentFilters, setCurrentFilters] = useState<Record<string, any>>(
     () =>
       listVariant === "approvals" ? { approval_status: "pending" } : {},
   );
   const [dealsData, setDealsData] = useState<any[]>([]);
-  const [loading, setLoading] = useState(false);
   const [totalDeals, setTotalDeals] = useState(0);
   const [summaryTiles, setSummaryTiles] = useState<any>(null);
   const [dealsMetrics, setDealsMetrics] = useState<Record<string, number> | null>(
@@ -2475,7 +2499,8 @@ export function CrmDealsListScreenView({
   // Helper function to get name by extension
   function getNameByExtension(extension: string) {
     const extensionData = extensions.find(
-      (ext) => ext.id === extension || ext.extension === extension,
+      (ext: { id?: unknown; extension?: unknown; display_name?: string; name?: string }) =>
+        ext.id === extension || ext.extension === extension,
     );
     return extensionData?.display_name || extensionData?.name || extension;
   }
@@ -2668,14 +2693,6 @@ export function CrmDealsListScreenView({
     hasMeetings: false as boolean,
   });
 
-  // Fetch stages and extensions on component mount
-  useEffect(() => {
-    fetchStages();
-    fetchLostReasons();
-    fetchExtensions(ModuleSlug.CRM_DEALS);
-    fetchFilterBusinessTypes();
-  }, []);
-
   // Handle click outside for Add Deals dropdown
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -2839,50 +2856,77 @@ export function CrmDealsListScreenView({
     return filtersToApply;
   }, [dealsSearch, dealsFilters]);
 
-  // Fetch deals when filters or search change
-  const fetchDeals = useCallback(
-    async (page = 1, perPage = 15) => {
-      setLoading(true);
-      try {
-        const params = buildDealsParams(currentFilters, page, perPage, true);
-
-        const response: any = await getDeals(params);
-        console.log("Raw response from getDeals:", response);
-
-        const dealsArray: any[] = response?.dataList || [];
-        const pagination: any = response?.meta || {};
-        const summary: any = response?.summary_tiles || null;
-        const metricsFromApi: any = response?.metrics || null;
-
-        setDealsData(Array.isArray(dealsArray) ? dealsArray : []);
-        setTotalDeals(pagination?.total || 0);
-        setSummaryTiles(summary);
-        setDealsMetrics(metricsFromApi);
-
-        // Update server pagination meta
-        if (pagination && pagination.total !== undefined) {
-          setServerPaginationMeta({
-            total: pagination.total || 0,
-            current_page: pagination.current_page || 1,
-            per_page: pagination.per_page || 5,
-            last_page: pagination.last_page || 1,
-          });
-
-          // Sync local pagination state with server response
-          setDealsPagination((prev) => ({
-            ...prev,
-            currentPage: pagination.current_page || prev.currentPage,
-            rowsPerPage: pagination.per_page || prev.rowsPerPage,
-          }));
-        }
-
-        return response;
-      } finally {
-        setLoading(false);
-      }
-    },
-    [buildDealsParams, currentFilters],
+  const queryClient = useQueryClient();
+  const dealsListFiltersKey = useMemo(
+    () => JSON.stringify(currentFilters),
+    [currentFilters],
   );
+
+  const dealsListQuery = useQuery({
+    queryKey: crmAppKeys.dealsPage.list({
+      filtersKey: dealsListFiltersKey,
+      activeTab: activeFilter,
+      page: dealsPagination.currentPage,
+      perPage: dealsPagination.rowsPerPage,
+      sortBy: dealsPagination.sortBy,
+      sortOrder: dealsPagination.sortOrder,
+      approvalsVariant: isApprovalsList,
+    }),
+    queryFn: async () => {
+      const params = buildDealsParams(
+        currentFilters,
+        dealsPagination.currentPage,
+        dealsPagination.rowsPerPage,
+        true,
+      );
+      return getDeals(params);
+    },
+    placeholderData: (previousData) => previousData,
+  });
+
+  const dealsListLoading =
+    dealsListQuery.isPending || dealsListQuery.isFetching;
+
+  const refreshDealsListAndTabTotals = useCallback(() => {
+    void queryClient.invalidateQueries({ queryKey: crmAppKeys.dealsPage.all() });
+    setRefreshKey((prev) => prev + 1);
+  }, [queryClient, setRefreshKey]);
+
+  useEffect(() => {
+    if (dealsListQuery.isError) {
+      setDealsData([]);
+      setTotalDeals(0);
+      setSummaryTiles(null);
+      setDealsMetrics(null);
+      return;
+    }
+    if (!dealsListQuery.data || dealsListQuery.isPlaceholderData) return;
+    const response: any = dealsListQuery.data;
+    const dealsArray: any[] = response?.dataList || [];
+    const pagination: any = response?.meta || {};
+    const summary: any = response?.summary_tiles || null;
+    const metricsFromApi: any = response?.metrics || null;
+
+    setDealsData(Array.isArray(dealsArray) ? dealsArray : []);
+    setTotalDeals(pagination?.total || 0);
+    setSummaryTiles(summary);
+    setDealsMetrics(metricsFromApi);
+
+    if (pagination && pagination.total !== undefined) {
+      setServerPaginationMeta({
+        total: pagination.total || 0,
+        current_page: pagination.current_page || 1,
+        per_page: pagination.per_page || 5,
+        last_page: pagination.last_page || 1,
+      });
+
+      setDealsPagination((prev) => ({
+        ...prev,
+        currentPage: pagination.current_page || prev.currentPage,
+        rowsPerPage: pagination.per_page || prev.rowsPerPage,
+      }));
+    }
+  }, [dealsListQuery.data, dealsListQuery.isError, dealsListQuery.isPlaceholderData]);
 
   const tabTotalsBaseFilters = useMemo(() => {
     const baseFilters = { ...currentFilters };
@@ -3071,16 +3115,6 @@ export function CrmDealsListScreenView({
   );
 
   useEffect(() => {
-    fetchDeals(dealsPagination.currentPage, dealsPagination.rowsPerPage);
-  }, [
-    refreshKey,
-    currentFilters,
-    dealsPagination.currentPage,
-    dealsPagination.rowsPerPage,
-    fetchDeals,
-  ]);
-
-  useEffect(() => {
     if (lastTabTotalsRequestKeyRef.current === tabTotalsRequestKey) {
       return;
     }
@@ -3103,48 +3137,9 @@ export function CrmDealsListScreenView({
           ? applyCrmFilterRules(prev, filters, APPROVAL_FILTER_RULES)
           : mergeDealsSidebarFiltersIntoCurrent(prev, filters),
       );
-      setRefreshKey((prev) => prev + 1);
     },
     [isApprovalsList],
   );
-
-  const fetchStages = async () => {
-    try {
-      const stagesData = await getStages("deal");
-      setStages(stagesData || []);
-    } catch (error) {
-      console.error("Failed to fetch stages:", error);
-    }
-  };
-
-  const fetchLostReasons = async () => {
-    try {
-      const lostReasonsData = await (getStages as any)("lost_reason");
-      setLostReasons(lostReasonsData || []);
-    } catch (error) {
-      console.error("Failed to fetch lost reasons:", error);
-    }
-  };
-
-  const fetchExtensions = async (moduleSlug: string = ModuleSlug.CRM_DEALS) => {
-    try {
-      const hierarchyData = await GetHierarchyData(moduleSlug);
-      if (hierarchyData?.extensions) {
-        setExtensions(hierarchyData.extensions);
-      }
-    } catch (error) {
-      console.error("Failed to fetch extensions:", error);
-    }
-  };
-
-  const fetchFilterBusinessTypes = async () => {
-    try {
-      const res = await getBusinessTypes({ per_page: 1000 });
-      setFilterBusinessTypes(res?.data || []);
-    } catch (error) {
-      console.error("Failed to fetch business types:", error);
-    }
-  };
 
   // Handle view deal - open GenericSidebar only (no modal)
   const handleViewDeal = useCallback(async (dealId: number) => {
@@ -3219,7 +3214,7 @@ export function CrmDealsListScreenView({
       localStorageKey: isApprovalsList
         ? "crm-approvals-list-preview-record-id"
         : "crm-deals-list-preview-record-id",
-      listLoading: !isInitialized || loading,
+      listLoading: !isInitialized || dealsListLoading,
       openPreviewByNumericId: openDealPreviewById,
       enableRestore: false,
     });
@@ -3625,11 +3620,11 @@ export function CrmDealsListScreenView({
       setShowSuccessfulModal(true);
       setSuccessModalTitle("Deal Deleted");
       setSuccessModalDescription("Deal has been deleted successfully");
-      setRefreshKey((oldKey) => oldKey + 1);
+      refreshDealsListAndTabTotals();
     } catch (error) {
       console.error("Failed to delete deal:", error);
     }
-  }, [dealToDelete]);
+  }, [dealToDelete, refreshDealsListAndTabTotals]);
 
   // Restore Deal Handler
   const handleRestoreDeal = useCallback(async (dealId: number) => {
@@ -3641,12 +3636,12 @@ export function CrmDealsListScreenView({
       setShowSuccessfulModal(true);
       setSuccessModalTitle("Deal Restored");
       setSuccessModalDescription("Deal has been restored successfully");
-      setRefreshKey((oldKey) => oldKey + 1);
+      refreshDealsListAndTabTotals();
     } catch (error) {
       console.error("Failed to restore deal:", error);
       toast.error("Failed to restore deal");
     }
-  }, []);
+  }, [refreshDealsListAndTabTotals]);
 
   // Mark Deal Lost Modal
   const handleMarkLost = useCallback((deal: any) => {
@@ -3670,11 +3665,11 @@ export function CrmDealsListScreenView({
       setShowSuccessfulModal(true);
       setSuccessModalTitle("Deal Marked as Lost");
       setSuccessModalDescription("Deal has been marked as lost successfully");
-      setRefreshKey((oldKey) => oldKey + 1);
+      refreshDealsListAndTabTotals();
     } catch (error) {
       console.error("Failed to mark deal as lost:", error);
     }
-  }, [dealToMarkLost, lostReasonId, lostFeedback]);
+  }, [dealToMarkLost, lostReasonId, lostFeedback, refreshDealsListAndTabTotals]);
 
   const handleDownloadDeal = useCallback(async (dealId: number) => {
     try {
@@ -3697,7 +3692,7 @@ export function CrmDealsListScreenView({
           await rejectDeal(dealId);
           toast.success("Deal rejected successfully!");
         }
-        setRefreshKey((oldKey) => oldKey + 1);
+        refreshDealsListAndTabTotals();
       } catch (error) {
         console.error(`Failed to ${decision} deal:`, error);
         toast.error(
@@ -3707,7 +3702,7 @@ export function CrmDealsListScreenView({
         );
       }
     },
-    [],
+    [refreshDealsListAndTabTotals],
   );
 
   const handleApproveDeal = useCallback(
@@ -3926,7 +3921,7 @@ export function CrmDealsListScreenView({
     onSearch: () => {},
     currentFilters,
     handleFiltersChange,
-    refresh: () => setRefreshKey((prev) => prev + 1),
+    refresh: () => refreshDealsListAndTabTotals(),
     activeTab: activeFilter,
     onTabChange: handleFilterChange,
     tabs: [
@@ -4201,7 +4196,7 @@ export function CrmDealsListScreenView({
                     handleViewDeal(row.rawData?.id || row.id);
                   }
                 }}
-                loading={loading}
+                loading={dealsListLoading}
                 emptyMessage="No deals found matching your criteria"
                 loadingMessage="Loading deals..."
                 hover={true}
@@ -4230,7 +4225,7 @@ export function CrmDealsListScreenView({
                           updateDeal(Number(deal.id), {
                             stage_id: toCol,
                           }).then(() => {
-                            fetchDeals(dealsPagination.currentPage, dealsPagination.rowsPerPage);
+                            refreshDealsListAndTabTotals();
                           }).catch((err) => {
                             console.error("Failed to update deal stage:", err);
                             toast.error("Failed to update deal stage");
@@ -6241,7 +6236,6 @@ export function CrmDealsListScreenView({
               : buildDealsSidebarFiltersPayload(),
           );
           setDealsPagination({ ...dealsPagination, currentPage: 1 });
-          setRefreshKey((prev) => prev + 1);
           setShowFiltersSidebar(false);
         }}
         onReset={() => {
@@ -6299,7 +6293,6 @@ export function CrmDealsListScreenView({
           }
           setActiveFilter("all");
           setDealsPagination({ ...dealsPagination, currentPage: 1 });
-          setRefreshKey((prev) => prev + 1);
         }}
         showApplyButton={true}
         showResetButton={true}
@@ -6318,7 +6311,7 @@ export function CrmDealsListScreenView({
           }}
           dealId={dealToConvert}
           onSuccess={() => {
-            setRefreshKey((prev) => prev + 1);
+            refreshDealsListAndTabTotals();
           }}
         />
       )}
@@ -6342,7 +6335,7 @@ export function CrmDealsListScreenView({
           }}
           dealId={editingDealIdInSidebar}
           onSuccess={() => {
-            setRefreshKey((oldKey) => oldKey + 1);
+            refreshDealsListAndTabTotals();
           }}
         />
       )}
@@ -6354,7 +6347,7 @@ export function CrmDealsListScreenView({
             setEditingDealIdInSidebar(null);
           }}
           dealId={editingDealIdInSidebar}
-          onSuccess={() => setRefreshKey((prev) => prev + 1)}
+          onSuccess={() => refreshDealsListAndTabTotals()}
         />
       )}
     </React.Fragment>

@@ -1,11 +1,36 @@
-import { useCallback, useEffect, type Dispatch, type RefObject, type SetStateAction } from "react";
-import { HEADER_CONSTANTS } from "@constants/headerConstants";
-
-const { PERMISSIONS } = HEADER_CONSTANTS;
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  type Dispatch,
+  type SetStateAction,
+} from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import type { Session } from "next-auth";
 import { toast } from "react-toastify";
 import moment from "moment";
-import { getCrmData, uploadCrmDataCsv, deleteCrmData, CrmDataItem } from "@utils/crm";
+import { HEADER_CONSTANTS } from "@constants/headerConstants";
+import {
+  getCrmData,
+  uploadCrmDataCsv,
+  deleteCrmData,
+  type CrmDataItem,
+  type CrmDataMetrics,
+  type CrmDataResponse,
+  type PaginationParams,
+} from "@utils/crm";
 import { handleCrmListUploadResponse } from "@crm/shared/crmListUploadResponseUtils";
+import { crmAppKeys } from "../../query/keys";
+
+const { PERMISSIONS } = HEADER_CONSTANTS;
+
+function readAxiosLikeMessage(error: unknown): string | undefined {
+  if (typeof error !== "object" || error === null) return undefined;
+  const response = (error as { response?: { data?: { message?: unknown } } })
+    .response;
+  const message = response?.data?.message;
+  return typeof message === "string" ? message : undefined;
+}
 
 interface CsvValidationResult {
   isValid: boolean;
@@ -19,18 +44,27 @@ interface ExportHeadersResult {
 
 interface UseCrmListDataOperationsParams {
   entityName: string;
-  requestIdRef: RefObject<number>;
-  memoizedFilters: Record<string, any>;
-  buildCrmDataParams: (overrides?: { page?: number; per_page?: number }) => Record<string, any>;
-  buildExportParams: (filters: Record<string, any>, overrides?: { page?: number; per_page?: number }) => Record<string, any>;
+  memoizedFilters: Record<string, unknown>;
+  buildCrmDataParams: (overrides?: {
+    page?: number;
+    per_page?: number;
+  }) => Record<string, unknown>;
+  buildExportParams: (
+    filters: Record<string, unknown>,
+    overrides?: { page?: number; per_page?: number },
+  ) => Record<string, unknown>;
   buildExportHeaders: (data: CrmDataItem[]) => ExportHeadersResult;
-  buildCsvContent: (headers: string[], data: CrmDataItem[], nestedDataKeysSet: Set<string>) => string;
+  buildCsvContent: (
+    headers: string[],
+    data: CrmDataItem[],
+    nestedDataKeysSet: Set<string>,
+  ) => string;
   validateUploadCsvFile: (file: File) => CsvValidationResult;
   setLoading: Dispatch<SetStateAction<boolean>>;
   setDataList: Dispatch<SetStateAction<CrmDataItem[]>>;
   setTotalRecords: Dispatch<SetStateAction<number>>;
   setTotalAll: Dispatch<SetStateAction<number>>;
-  setMetrics: Dispatch<SetStateAction<any>>;
+  setMetrics: Dispatch<SetStateAction<CrmDataMetrics>>;
   setExporting: Dispatch<SetStateAction<boolean>>;
   setShowExportModal: Dispatch<SetStateAction<boolean>>;
   setSelectedFile: Dispatch<SetStateAction<File | null>>;
@@ -45,19 +79,25 @@ interface UseCrmListDataOperationsParams {
   setSuccessModalDescription: Dispatch<SetStateAction<string>>;
   setShowSuccessfulModal: Dispatch<SetStateAction<boolean>>;
   exportFileName: string;
-  exportFilters: Record<string, any>;
+  exportFilters: Record<string, unknown>;
   selectedFile: File | null;
   fieldTags: any;
   itemToDelete: CrmDataItem | null;
-  session: any;
+  session: Session | null;
   refreshKey: number;
+  activeFilter: string;
+  pagination: {
+    currentPage: number;
+    rowsPerPage: number;
+    sortBy: string;
+    sortOrder: string;
+  };
   /** Called after a single record is successfully deleted from the list modal. */
   onSingleRecordDeleted?: (deletedId: number) => void;
 }
 
 export function useCrmListDataOperations({
   entityName,
-  requestIdRef,
   memoizedFilters,
   buildCrmDataParams,
   buildExportParams,
@@ -86,13 +126,92 @@ export function useCrmListDataOperations({
   exportFilters,
   selectedFile,
   fieldTags,
-    itemToDelete,
-    session,
-    refreshKey,
-    onSingleRecordDeleted,
+  itemToDelete,
+  session,
+  refreshKey,
+  activeFilter,
+  pagination,
+  onSingleRecordDeleted,
 }: UseCrmListDataOperationsParams) {
+  const queryClient = useQueryClient();
+
+  const filtersKey = useMemo(
+    () => JSON.stringify(memoizedFilters),
+    [memoizedFilters],
+  );
+
+  const crmListQuery = useQuery({
+    queryKey: crmAppKeys.crmDataManagementList.list({
+      entity: entityName,
+      filtersKey,
+      activeTab: activeFilter,
+      page: pagination.currentPage,
+      perPage: pagination.rowsPerPage,
+      sortBy: pagination.sortBy,
+      sortOrder: pagination.sortOrder,
+      refreshKey,
+    }),
+    queryFn: (): Promise<CrmDataResponse> =>
+      getCrmData(buildCrmDataParams() as PaginationParams),
+    placeholderData: (previousData) => previousData,
+  });
+
+  useEffect(() => {
+    setLoading(crmListQuery.isPending || crmListQuery.isFetching);
+  }, [crmListQuery.isPending, crmListQuery.isFetching, setLoading]);
+
+  useEffect(() => {
+    if (crmListQuery.isError) {
+      setDataList([]);
+      setTotalRecords(0);
+      return;
+    }
+    if (!crmListQuery.data || crmListQuery.isPlaceholderData) return;
+
+    const response = crmListQuery.data;
+    setDataList(response.data || []);
+    setTotalRecords(response.pagination?.total || 0);
+
+    const totalAllFromMetrics = Number(response?.metrics?.total_all_records);
+    if (Number.isFinite(totalAllFromMetrics)) {
+      setTotalAll(totalAllFromMetrics);
+    } else {
+      const isAllTab =
+        memoizedFilters.has_scheduled_calls !== true &&
+        memoizedFilters.has_tickets !== true;
+      if (isAllTab) {
+        setTotalAll(response.pagination?.total || 0);
+      }
+    }
+
+    setMetrics(response.metrics);
+  }, [
+    crmListQuery.data,
+    crmListQuery.isError,
+    crmListQuery.isPlaceholderData,
+    memoizedFilters.has_scheduled_calls,
+    memoizedFilters.has_tickets,
+    setDataList,
+    setMetrics,
+    setTotalAll,
+    setTotalRecords,
+  ]);
+
+  const bumpEntityListAndPicklists = useCallback(() => {
+    void queryClient.invalidateQueries({
+      queryKey: crmAppKeys.crmDataManagementList.entityRoot(entityName),
+    });
+    setRefreshKey((prev) => prev + 1);
+  }, [entityName, queryClient, setRefreshKey]);
+
+  const fetchCrmData = useCallback(() => {
+    void queryClient.invalidateQueries({
+      queryKey: crmAppKeys.crmDataManagementList.entityRoot(entityName),
+    });
+  }, [entityName, queryClient]);
+
   const fetchCrmDataForExport = useCallback(
-    async (filters: Record<string, any>) => {
+    async (filters: Record<string, unknown>) => {
       const PER_PAGE = 100;
       const allData: CrmDataItem[] = [];
       let page = 1;
@@ -138,61 +257,16 @@ export function useCrmListDataOperations({
     } finally {
       setExporting(false);
     }
-  }, [entityName, exportFileName, exportFilters, fetchCrmDataForExport, buildExportHeaders, buildCsvContent]);
-
-  const fetchCrmData = useCallback(async () => {
-    requestIdRef.current += 1;
-    const currentRequestId = requestIdRef.current;
-
-    setLoading(true);
-    try {
-      const response = await getCrmData(buildCrmDataParams());
-
-      if (currentRequestId !== requestIdRef.current) return;
-
-      setDataList(response.data || []);
-      setTotalRecords(response.pagination.total || 0);
-
-      // Prefer backend-provided "All" count (ignores tab params like has_scheduled_calls/has_tickets).
-      // Fallback: only update when the request is the "All" tab (no tab flags applied).
-      const totalAllFromMetrics = Number(response?.metrics?.total_all_records);
-      if (Number.isFinite(totalAllFromMetrics)) {
-        setTotalAll(totalAllFromMetrics);
-      } else {
-        const isAllTab =
-          memoizedFilters.has_scheduled_calls !== true &&
-          memoizedFilters.has_tickets !== true;
-        if (isAllTab) {
-          setTotalAll(response.pagination.total || 0);
-        }
-      }
-
-      setMetrics(response.metrics || {});
-    } catch (error: any) {
-      if (currentRequestId !== requestIdRef.current) return;
-      console.error("Failed to fetch CRM data:", error);
-      setDataList([]);
-      setTotalRecords(0);
-    } finally {
-      if (currentRequestId === requestIdRef.current) {
-        setLoading(false);
-      }
-    }
   }, [
-    buildCrmDataParams,
-    memoizedFilters.has_scheduled_calls,
-    memoizedFilters.has_tickets,
-    requestIdRef,
-    setDataList,
-    setLoading,
-    setMetrics,
-    setTotalAll,
-    setTotalRecords,
+    entityName,
+    exportFileName,
+    exportFilters,
+    fetchCrmDataForExport,
+    buildExportHeaders,
+    buildCsvContent,
+    setExporting,
+    setShowExportModal,
   ]);
-
-  useEffect(() => {
-    fetchCrmData();
-  }, [fetchCrmData, refreshKey]);
 
   const handleFileSelect = useCallback(
     (file: File) => {
@@ -203,7 +277,7 @@ export function useCrmListDataOperations({
         validation.errors.forEach((error) => toast.error(error));
       }
     },
-    [validateUploadCsvFile],
+    [validateUploadCsvFile, setSelectedFile],
   );
 
   const handleFileInputChange = useCallback(
@@ -234,7 +308,7 @@ export function useCrmListDataOperations({
     try {
       const tagValues = Array.from(fieldTags).map((tag: any) => tag.value);
 
-      const response: any = await uploadCrmDataCsv(
+      const response = await uploadCrmDataCsv(
         selectedFile,
         [],
         tagValues,
@@ -251,16 +325,28 @@ export function useCrmListDataOperations({
       setFieldTags([]);
       setShowUploadModal(false);
 
-      setRefreshKey((prev) => prev + 1);
-    } catch (error: any) {
+      bumpEntityListAndPicklists();
+    } catch (error: unknown) {
       console.error("Upload error:", error);
       const errorMessage =
-        error?.response?.data?.message ||
-        error?.message ||
+        readAxiosLikeMessage(error) ||
+        (error instanceof Error ? error.message : "") ||
         "Failed to upload file. Please try again.";
       toast.error(errorMessage);
     }
-  }, [session, selectedFile, fieldTags, entityName]);
+  }, [
+    bumpEntityListAndPicklists,
+    entityName,
+    fieldTags,
+    selectedFile,
+    session?.user?.permissions,
+    setFieldTags,
+    setSelectedFile,
+    setShowSuccessfulModal,
+    setShowUploadModal,
+    setSuccessModalDescription,
+    setSuccessModalTitle,
+  ]);
 
   const confirmDelete = useCallback(async () => {
     if (!itemToDelete) return;
@@ -272,11 +358,18 @@ export function useCrmListDataOperations({
       setDeleteModalMode(null);
       setItemToDelete(null);
       onSingleRecordDeleted?.(deletedId);
-      setRefreshKey((prev) => prev + 1);
-    } catch (error: any) {
+      bumpEntityListAndPicklists();
+    } catch (error: unknown) {
       console.error("Delete error:", error);
     }
-  }, [itemToDelete, onSingleRecordDeleted]);
+  }, [
+    bumpEntityListAndPicklists,
+    itemToDelete,
+    onSingleRecordDeleted,
+    setDeleteModalMode,
+    setItemToDelete,
+    setShowDeleteModal,
+  ]);
 
   return {
     fetchCrmData,

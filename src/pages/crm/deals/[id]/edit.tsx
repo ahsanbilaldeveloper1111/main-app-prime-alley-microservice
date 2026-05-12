@@ -1,5 +1,6 @@
 import "@assets/scss/datatable-style.scss";
-import React, { ReactElement, useState, useEffect, useRef } from "react";
+import React, { ReactElement, useState, useEffect, useRef, useCallback } from "react";
+import { useQuery } from "@tanstack/react-query";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 import {
@@ -14,12 +15,10 @@ import {
   getRelevantDealTemplate,
   getDealTemplates,
   CrmProduct,
-  StageData,
   IndustryData,
   DealTemplateData,
   DealTemplateField,
   getBusinessTypes,
-  BusinessTypeData,
 } from "@utils/crm";
 import { GetHierarchyData } from "@utils/users";
 import { Button, Row, Col, Form, Card, Badge, Table, Modal } from "react-bootstrap";
@@ -37,6 +36,7 @@ import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
 import { ModuleSlug, ValidationType, checkRequiredFields } from '@utils/Helper';
 import { convertCurrency, formatCurrency } from '@utils/currency';
+import { crmAppKeys } from "../../../../query/keys";
 import {
   buildEditDealFormStateFromDeal,
   buildEstimateOverridesPatch,
@@ -79,8 +79,6 @@ const EditDeal = () => {
   const [formStep, setFormStep] = useState(0);
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(true);
-  const [stages, setStages] = useState<StageData[]>([]);
-  const [extensions, setExtensions] = useState<any[]>([]);
   const [estimates, setEstimates] = useState<any[]>([]);
   const [attachments, setAttachments] = useState<any[]>([]);
   const [histories, setHistories] = useState<any[]>([]);
@@ -92,18 +90,12 @@ const EditDeal = () => {
   const [campaign, setCampaign] = useState<any>(null);
   const [campaignIndustries, setCampaignIndustries] = useState<IndustryData[]>([]);
   const [selectedIndustryId, setSelectedIndustryId] = useState<number | null>(null);
-  const [loadingIndustries, setLoadingIndustries] = useState(false);
-  const [allIndustries, setAllIndustries] = useState<IndustryData[]>([]);
-  const [loadingAllIndustries, setLoadingAllIndustries] = useState(false);
   const [sourceLead, setSourceLead] = useState<any>(null);
   const [dealTemplate, setDealTemplate] = useState<DealTemplateData | null>(null);
   const [templateFieldsData, setTemplateFieldsData] = useState<Record<string, any>>({});
-  const [availableTemplates, setAvailableTemplates] = useState<DealTemplateData[]>([]);
-  const [loadingTemplateList, setLoadingTemplateList] = useState(false);
   const [initialTemplateFieldValues, setInitialTemplateFieldValues] = useState<Record<string, any>>({});
 
   // Business type state
-  const [businessTypes, setBusinessTypes] = useState<BusinessTypeData[]>([]);
   const [businessTypeId, setBusinessTypeId] = useState<number | null>(null);
   const [businessTypeOther, setBusinessTypeOther] = useState<string>("");
   const [showOtherBusinessType, setShowOtherBusinessType] = useState(false);
@@ -160,43 +152,69 @@ const EditDeal = () => {
     special_discount_percentage: "0",
   });
 
-  useEffect(() => {
-    fetchStages();
-    fetchExtensions();
-    fetchBusinessTypes();
-    fetchAvailableTemplates();
-    // Don't fetch all products initially - wait for industry selection
-  }, []);
-
-  const fetchAvailableTemplates = async () => {
-    try {
-      setLoadingTemplateList(true);
+  const stagesQuery = useQuery({
+    queryKey: crmAppKeys.crmStages.byType("deal"),
+    queryFn: () => getStages("deal"),
+  });
+  const extensionsQuery = useQuery({
+    queryKey: crmAppKeys.hierarchyExtensions.module(ModuleSlug.CRM_DEALS),
+    queryFn: async () => {
+      const hierarchyData = await GetHierarchyData(ModuleSlug.CRM_DEALS);
+      return hierarchyData?.extensions ?? [];
+    },
+  });
+  const businessTypesQuery = useQuery({
+    queryKey: crmAppKeys.businessTypes.selectOptions(),
+    queryFn: async () => {
+      const r = await getBusinessTypes({ per_page: 1000 });
+      return r?.data ?? [];
+    },
+  });
+  const industriesQuery = useQuery({
+    queryKey: crmAppKeys.campaigns.industries(),
+    queryFn: async () => {
+      const r = await getIndustries({ per_page: 1000, page: 1 });
+      return r.data ?? [];
+    },
+  });
+  const dealTemplatesQuery = useQuery({
+    queryKey: crmAppKeys.campaigns.dealTemplates(),
+    queryFn: async () => {
       const response = await getDealTemplates({ per_page: 1000, page: 1 });
-      setAvailableTemplates(response?.data || []);
-    } catch (error) {
-      console.error("Failed to fetch deal templates:", error);
-      setAvailableTemplates([]);
-    } finally {
-      setLoadingTemplateList(false);
-    }
-  };
+      return response?.data ?? [];
+    },
+  });
 
-  const fetchBusinessTypes = async () => {
-    try {
-      const businessTypesResponse = await getBusinessTypes({ per_page: 1000 });
-      setBusinessTypes(businessTypesResponse?.data || []);
-    } catch (error) {
-      console.error("Failed to fetch business types:", error);
-    }
-  };
+  const stages = stagesQuery.data ?? [];
+  const extensions = extensionsQuery.data ?? [];
+  const businessTypes = businessTypesQuery.data ?? [];
+  const allIndustries = industriesQuery.data ?? [];
+  const loadingAllIndustries = industriesQuery.isPending;
+  const availableTemplates = dealTemplatesQuery.data ?? [];
+  const loadingTemplateList = dealTemplatesQuery.isPending;
 
-  // Fetch products by industry
-  const fetchProductsByIndustry = async (industryId: number) => {
+  const campaignIdForQuery = sourceLead?.campaign_id ? Number(sourceLead.campaign_id) : 0;
+  const campaignQuery = useQuery({
+    queryKey: crmAppKeys.campaigns.byCampaignId(campaignIdForQuery),
+    queryFn: () => getCampaignById(campaignIdForQuery),
+    enabled: Boolean(sourceLead?.campaign_id) && campaignIdForQuery > 0,
+  });
+
+  const loadingIndustries = Boolean(sourceLead?.campaign_id) && campaignQuery.isFetching;
+
+  useEffect(() => {
+    if (industriesQuery.isError) {
+      console.error("Failed to fetch industries:", industriesQuery.error);
+      toast.error("Failed to fetch industries");
+    }
+  }, [industriesQuery.isError, industriesQuery.error]);
+
+  const fetchProductsByIndustry = useCallback(async (industryId: number) => {
     try {
       setLoadingProducts(true);
-      const response = await getCrmProducts({ 
+      const response = await getCrmProducts({
         per_page: 100,
-        industry_id: industryId 
+        industry_id: industryId,
       });
       setProducts(response.data || []);
     } catch (error) {
@@ -205,13 +223,55 @@ const EditDeal = () => {
     } finally {
       setLoadingProducts(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    if (!sourceLead?.campaign_id || !campaignQuery.data) {
+      return;
+    }
+    const campaignData = campaignQuery.data as any;
+    setCampaign(campaignData);
+
+    const industriesData = campaignData.industries;
+    const industryIds = campaignData.industry_ids;
+
+    let campaignIndustryIds: number[] = [];
+    if (industriesData && Array.isArray(industriesData)) {
+      campaignIndustryIds = industriesData.map((ind: any) => (typeof ind === "object" ? ind.id : ind));
+    } else if (industryIds && Array.isArray(industryIds)) {
+      campaignIndustryIds = industryIds;
+    }
+
+    if (campaignIndustryIds.length === 0) {
+      return;
+    }
+
+    const filteredIndustries = allIndustries.filter((ind: IndustryData) =>
+      campaignIndustryIds.includes(ind.id),
+    );
+    setCampaignIndustries(filteredIndustries);
+
+    setFormData((prevFormData) => {
+      if (!prevFormData.industry_ids || prevFormData.industry_ids.length === 0) {
+        return {
+          ...prevFormData,
+          industry_ids: campaignIndustryIds,
+        };
+      }
+      return prevFormData;
+    });
+
+    if (filteredIndustries.length === 1) {
+      setSelectedIndustryId(filteredIndustries[0].id);
+      void fetchProductsByIndustry(filteredIndustries[0].id);
+    }
+  }, [sourceLead?.campaign_id, campaignQuery.data, allIndustries, fetchProductsByIndustry]);
 
   // Handle industry selection change
   const handleIndustryChange = async (selectedOption: any) => {
     const industryId = selectedOption?.value || null;
     setSelectedIndustryId(industryId);
-    
+
     // Reset product selection when industry changes
     setItemFormData({
       ...itemFormData,
@@ -219,96 +279,11 @@ const EditDeal = () => {
       product_service: "",
       unit_price: 0,
     });
-    
+
     if (industryId) {
       await fetchProductsByIndustry(industryId);
     } else {
       setProducts([]);
-    }
-  };
-
-  // Fetch campaign and industries when deal is loaded
-  useEffect(() => {
-    const fetchCampaignAndIndustries = async () => {
-      if (sourceLead?.campaign_id) {
-        try {
-          setLoadingIndustries(true);
-          const campaignData = await getCampaignById(sourceLead.campaign_id);
-          setCampaign(campaignData);
-          
-          // Get industries from campaign (could be industries array or industry_ids)
-          const industriesData = (campaignData as any).industries;
-          const industryIds = (campaignData as any).industry_ids;
-          
-          let campaignIndustryIds: number[] = [];
-          if (industriesData && Array.isArray(industriesData)) {
-            campaignIndustryIds = industriesData.map((ind: any) => typeof ind === 'object' ? ind.id : ind);
-          } else if (industryIds && Array.isArray(industryIds)) {
-            campaignIndustryIds = industryIds;
-          }
-          
-          if (campaignIndustryIds.length > 0) {
-            // Fetch all industries and filter to only show campaign industries
-            const allIndustriesResponse = await getIndustries({ per_page: 1000 });
-            const allIndustries = allIndustriesResponse.data || [];
-            const filteredIndustries = allIndustries.filter((ind: IndustryData) => 
-              campaignIndustryIds.includes(ind.id)
-            );
-            setCampaignIndustries(filteredIndustries);
-            
-            // Auto-select campaign industries if formData.industry_ids is empty
-            setFormData((prevFormData) => {
-              if (!prevFormData.industry_ids || prevFormData.industry_ids.length === 0) {
-                return {
-                  ...prevFormData,
-                  industry_ids: campaignIndustryIds,
-                };
-              }
-              return prevFormData;
-            });
-            
-            // If only one industry, auto-select it and fetch products
-            if (filteredIndustries.length === 1) {
-              setSelectedIndustryId(filteredIndustries[0].id);
-              await fetchProductsByIndustry(filteredIndustries[0].id);
-            }
-          }
-        } catch (error) {
-          console.error("Failed to fetch campaign/industries:", error);
-        } finally {
-          setLoadingIndustries(false);
-        }
-      }
-    };
-    
-    if (sourceLead) {
-      fetchCampaignAndIndustries();
-    }
-  }, [sourceLead]);
-
-  // Fetch all industries
-  useEffect(() => {
-    const fetchAllIndustries = async () => {
-      try {
-        setLoadingAllIndustries(true);
-        const response = await getIndustries({ per_page: 1000 });
-        setAllIndustries(response.data || []);
-      } catch (error) {
-        console.error("Failed to fetch industries:", error);
-        toast.error("Failed to fetch industries");
-      } finally {
-        setLoadingAllIndustries(false);
-      }
-    };
-    
-    fetchAllIndustries();
-  }, []);
-
-  const fetchProducts = async () => {
-    // This function is kept for backward compatibility but should not be used
-    // Products should be fetched by industry
-    if (selectedIndustryId) {
-      await fetchProductsByIndustry(selectedIndustryId);
     }
   };
 
@@ -408,26 +383,6 @@ const EditDeal = () => {
 
     fetchDealData();
   }, [router.isReady, id, router]);
-
-  const fetchStages = async () => {
-    try {
-      const stagesData = await getStages('deal');
-      setStages(stagesData || []);
-    } catch (error) {
-      console.error("Failed to fetch stages:", error);
-    }
-  };
-
-  const fetchExtensions = async () => {
-    try {
-      const hierarchyData = await GetHierarchyData(ModuleSlug.CRM_DEALS);
-      if (hierarchyData?.extensions) {
-        setExtensions(hierarchyData.extensions);
-      }
-    } catch (error) {
-      console.error("Failed to fetch extensions:", error);
-    }
-  };
 
   // Validation functions for each step
   const validateStep0 = (): boolean => {

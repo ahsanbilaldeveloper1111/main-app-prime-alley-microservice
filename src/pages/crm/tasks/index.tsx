@@ -8,6 +8,7 @@ import React, {
   useMemo,
   useEffect,
 } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 import {
@@ -87,12 +88,19 @@ import Link from "next/link";
 import { toast } from "react-toastify";
 import { useSession } from "next-auth/react";
 import { HEADER_CONSTANTS } from "@constants/headerConstants";
-
-const { PERMISSIONS } = HEADER_CONSTANTS;
-
+import { crmAppKeys } from "../../../query/keys";
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
 import DeleteConfirmationModal from "@components/page-partials/DeleteConfirmationModal";
+
+const { PERMISSIONS } = HEADER_CONSTANTS;
+
+type TaskHierarchyExtension = {
+  id?: unknown;
+  extension?: unknown;
+  display_name?: string;
+  name?: string;
+};
 
 // KPI Card Component
 interface KPICardData {
@@ -258,8 +266,7 @@ const FilterBar: React.FC<FilterBarProps> = ({
 const CrmTasks = () => {
   const router = useRouter();
   const { data: session } = useSession();
-  const [tasks, setTasks] = useState<TaskData[]>([]);
-  const [loading, setLoading] = useState(false);
+  const queryClient = useQueryClient();
   const [pagination, setPagination] = useState({
     currentPage: 1,
     rowsPerPage: 10,
@@ -269,6 +276,49 @@ const CrmTasks = () => {
   const [search, setSearch] = useState('');
   const [activeFilter, setActiveFilter] = useState('all');
   const [currentFilters, setCurrentFilters] = useState<Record<string, any>>({});
+  const filtersKey = useMemo(() => JSON.stringify(currentFilters), [currentFilters]);
+
+  const tasksExtensionsQuery = useQuery({
+    queryKey: crmAppKeys.hierarchyExtensions.module(ModuleSlug.CRM_TASKS),
+    queryFn: async () => {
+      const data = await GetHierarchyData(ModuleSlug.CRM_TASKS);
+      return data.extensions || data.users || [];
+    },
+  });
+  const extensions = tasksExtensionsQuery.data ?? [];
+
+  const tasksListQuery = useQuery({
+    queryKey: crmAppKeys.tasks.list({
+      page: pagination.currentPage,
+      perPage: pagination.rowsPerPage,
+      search: normalizeSearchQuery(currentFilters.search ?? ""),
+      activeFilter,
+      filtersKey,
+    }),
+    queryFn: async () => {
+      const params: Record<string, unknown> = {
+        page: pagination.currentPage,
+        per_page: pagination.rowsPerPage,
+      };
+      const searchQuery = normalizeSearchQuery(currentFilters.search);
+      if (searchQuery) {
+        params.search = searchQuery;
+      }
+      if (activeFilter === "med-urgency") {
+        params.urgency = "med";
+      } else if (activeFilter === "high-urgency") {
+        params.urgency = "high";
+      }
+      if (activeFilter === "overdue") {
+        params.overdue = true;
+      }
+      return getTasks(params as any);
+    },
+  });
+
+  const tasks = tasksListQuery.data?.data ?? [];
+  const loading = tasksListQuery.isFetching;
+
   const [showAnalytics, setShowAnalytics] = useState(false);
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   const [selectedTasks, setSelectedTasks] = useState<number[]>([]);
@@ -276,7 +326,6 @@ const CrmTasks = () => {
     const saved = localStorage.getItem('tasksSelectedColumns');
     return saved ? JSON.parse(saved) : ['task', 'assignedTo', 'contact', 'company', 'urgency', 'status', 'dueDate'];
   });
-  const [extensions, setExtensions] = useState<any[]>([]);
   const [showTaskModal, setShowTaskModal] = useState(false);
   const [showTaskViewModal, setShowTaskViewModal] = useState(false);
   const [editingTask, setEditingTask] = useState<TaskData | null>(null);
@@ -331,58 +380,6 @@ const CrmTasks = () => {
       { shallow: true }
     );
   }, [router]);
-
-  // Fetch extensions
-  useEffect(() => {
-    const fetchExtensions = async () => {
-      try {
-        const data = await GetHierarchyData(ModuleSlug.CRM_TASKS);
-        setExtensions(data.extensions || data.users || []);
-      } catch (error) {
-        console.error('Failed to fetch extensions:', error);
-      }
-    };
-    fetchExtensions();
-  }, []);
-
-  // Fetch tasks
-  const fetchTasks = useCallback(async () => {
-    setLoading(true);
-    try {
-      const params: any = {
-        page: pagination.currentPage,
-        per_page: pagination.rowsPerPage,
-      };
-
-      const searchQuery = normalizeSearchQuery(currentFilters.search);
-      if (searchQuery) {
-        params.search = searchQuery;
-      }
-
-      // Add urgency filter
-      if (activeFilter === 'med-urgency') {
-        params.urgency = 'med';
-      } else if (activeFilter === 'high-urgency') {
-        params.urgency = 'high';
-      }
-
-      // Add overdue filter
-      if (activeFilter === 'overdue') {
-        params.overdue = true;
-      }
-
-      const response = await getTasks(params);
-      setTasks(response.data || []);
-    } catch (error) {
-      console.error('Failed to fetch tasks:', error);
-    } finally {
-      setLoading(false);
-    }
-  }, [pagination.currentPage, pagination.rowsPerPage, currentFilters, activeFilter]);
-
-  useEffect(() => {
-    fetchTasks();
-  }, [fetchTasks]);
 
   // Fetch single task
   const fetchTask = useCallback(async (taskId: number) => {
@@ -587,11 +584,11 @@ const CrmTasks = () => {
         notes: [],
       });
       setSelectedUserExtension(null);
-      fetchTasks();
+      void queryClient.invalidateQueries({ queryKey: crmAppKeys.tasks.all() });
     } catch (error) {
       console.error('Failed to save task:', error);
     }
-  }, [taskFormData, editingTask, session, fetchTasks]);
+  }, [taskFormData, editingTask, session, queryClient]);
 
   // Handle delete task
   const handleDeleteTask = useCallback(async () => {
@@ -600,11 +597,11 @@ const CrmTasks = () => {
       await deleteTask(taskToDelete.id);
       setShowDeleteModal(false);
       setTaskToDelete(null);
-      fetchTasks();
+      void queryClient.invalidateQueries({ queryKey: crmAppKeys.tasks.all() });
     } catch (error) {
       console.error('Failed to delete task:', error);
     }
-  }, [taskToDelete, fetchTasks]);
+  }, [taskToDelete, queryClient]);
 
   // Handle create note
   const handleCreateNote = useCallback(async () => {
@@ -744,7 +741,7 @@ const CrmTasks = () => {
 
   // Extension options for select
   const extensionOptions = useMemo(() => {
-    return extensions.map(ext => ({
+    return extensions.map((ext: TaskHierarchyExtension) => ({
       value: ext.id || ext.extension,
       label: ext.display_name || ext.name || ext.id || ext.extension,
     }));
@@ -755,17 +752,17 @@ const CrmTasks = () => {
     if (!userExtension || extensionOptions.length === 0) return null;
     
     // First try direct value match
-    let match = extensionOptions.find(o => String(o.value) === String(userExtension));
+    let match = extensionOptions.find((o: { value: unknown; label: unknown }) => String(o.value) === String(userExtension));
     if (match) return match;
     
     // Then try matching by extension object properties
-    const ext = extensions.find(e => 
+    const ext = extensions.find((e: TaskHierarchyExtension) =>
       String(e.id) === String(userExtension) || 
       String(e.extension) === String(userExtension)
     );
     
     if (ext) {
-      match = extensionOptions.find(o => 
+      match = extensionOptions.find((o: { value: unknown; label: unknown }) =>
         String(o.value) === String(ext.id) || 
         String(o.value) === String(ext.extension)
       );
@@ -1162,7 +1159,7 @@ const CrmTasks = () => {
                                     {selectedColumns.includes('assignedTo') && (
                                       <td>
                                         <Badge bg="success" className="bg-opacity-10 text-dark">
-                                          {extensions.find(e => e.id === task.user_extension)?.display_name || task.user_extension}
+                                          {extensions.find((e: TaskHierarchyExtension) => e.id === task.user_extension)?.display_name || task.user_extension}
                                         </Badge>
                                       </td>
                                     )}
@@ -1614,7 +1611,7 @@ const CrmTasks = () => {
               }}>Assigned To</div>
               <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
                 <User size={14} style={{ color: '#4680ff', marginRight: '6px' }} />
-                {viewingTask && (extensions.find(e => e.id === viewingTask.user_extension)?.display_name || viewingTask.user_extension)}
+                {viewingTask && (extensions.find((e: TaskHierarchyExtension) => e.id === viewingTask.user_extension)?.display_name || viewingTask.user_extension)}
               </div>
             </div>
             <div style={{

@@ -1,4 +1,5 @@
 import "@assets/scss/datatable-style.scss";
+import "@assets/scss/crm-tickets-page.scss";
 import React, { ReactElement, useCallback, useMemo, useState } from "react";
 import { useRouter } from "next/router";
 import { Modal, Form, Button } from "react-bootstrap";
@@ -629,21 +630,6 @@ const CrmTicketsPage = () => {
 
   return (
     <React.Fragment>
-      <style
-        dangerouslySetInnerHTML={{
-          __html: `
-        .tickets-table-wrapper {
-          width: 100%;
-          overflow: hidden;
-        }
-        .tickets-scrollable-content {
-          flex: 1;
-          overflow-y: auto;
-          overflow-x: hidden;
-        }
-      `,
-        }}
-      />
       {/* <div style={{ padding: "12px 16px 0" }}>
         <h4 style={{ margin: 0, fontSize: 20, fontWeight: 600, color: "#111827" }}>Tickets</h4>
       </div> */}

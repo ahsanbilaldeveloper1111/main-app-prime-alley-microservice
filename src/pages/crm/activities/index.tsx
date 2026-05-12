@@ -1,9 +1,9 @@
-import React, { ReactElement, useState, useEffect, useCallback } from "react";
+import React, { ReactElement, useState, useEffect, useCallback, useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "next/router";
 import {
   Row,
   Col,
-  Card,
   Button,
   Badge,
   Form,
@@ -13,49 +13,42 @@ import {
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 import ProtectedRoute from "@components/ProtectedRoute";
-import { X } from "lucide-react";
 import {
-  HistoryListRecord,
-  getHistoryChain,
-  HistoryChainRecord,
-  getStages,
-  StageData,
-  getCrmDataById,
-  CrmDataItem,
-} from "@utils/crm";
-import { GetHierarchyData } from "@utils/users";
-import axiosInstance from "@utils/axios";
-import { HEADER_CONSTANTS } from "@constants/headerConstants";
-import {
+  X,
   Users,
   Target,
   Handshake,
   ShoppingBag,
-  Activity,
   Mail,
   Phone,
   FileText,
   AlertCircle,
   CheckCircle,
   ArrowRight,
-  Eye,
-  Filter,
   Clock,
-  Calendar,
   PlusCircle,
   TrendingUp,
   History,
 } from "lucide-react";
+import { GetHierarchyData } from "@utils/users";
+import { HEADER_CONSTANTS } from "@constants/headerConstants";
+import { crmAppKeys } from "../../../query/keys";
+import { fetchCrmHistoryList, type FetchCrmHistoryListParams } from "../../../query/fetchCrmHistoryList";
+import { mapCrmActivityHistoryRecords } from "../../../query/mapCrmActivityHistoryRecords";
+import { fetchCrmActivityHistoryRecordDetail } from "../../../query/fetchCrmActivityHistoryRecordDetail";
 import "@assets/scss/datatable-style.scss";
 import "@assets/scss/ticketsnew.scss";
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
+import "@assets/scss/crm-activities-page.scss";
+import "@assets/scss/crm-activity-timeline-modal.scss";
 import {
   GlobalDateFormat,
   GlobalTimeFormat,
   ModuleSlug,
   convertDateTimeWithOffsetToLocal,
 } from "@utils/Helper";
+import { getInitials, getRandomColor } from "@utils/crmNameAvatar";
 import moment from "moment";
 import { toast } from "react-toastify";
 import GenericTable, {
@@ -81,36 +74,6 @@ interface ActivityRecord {
   dateTime: string;
 }
 
-// Helpers for avatar columns (match leads/deals UI)
-const getInitials = (name: string): string => {
-  if (!name) return "NA";
-  const words = name.trim().split(/\s+/).slice(0, 2);
-  const hasSecondWord = words.length >= 2 && /[a-z]/i.test(words[1]);
-  if (hasSecondWord) {
-    const a = words[0].match(/[a-z]/i)?.[0];
-    const b = words[1].match(/[a-z]/i)?.[0];
-    if (a && b) return (a + b).toUpperCase();
-  }
-  if (words[0]) {
-    const letters = words[0].match(/[a-z]/gi) || [];
-    if (letters.length >= 2) return (letters[0] + letters[1]).toUpperCase();
-    if (letters.length === 1) return letters[0].toUpperCase();
-  }
-  return "NA";
-};
-
-const getRandomColor = (name: string): string => {
-  if (!name) return "#6c757d";
-  let hash = 0;
-  for (let i = 0; i < name.length; i++) {
-    hash = (name?.codePointAt(i) || 0) + ((hash << 5) - hash);
-  }
-  const hue = Math.abs(hash) % 360;
-  const saturation = 50 + (Math.abs(hash) % 30);
-  const lightness = 40 + (Math.abs(hash) % 20);
-  return `hsla(${hue}, ${saturation}%, ${lightness}%, 0.6)`;
-};
-
 const HistoryPage = () => {
   const router = useRouter();
   // New Activity Tracker States
@@ -125,13 +88,7 @@ const HistoryPage = () => {
     useState(false);
   const [selectedActivityRecord, setSelectedActivityRecord] =
     useState<any>(null);
-    console.log("selectedActivityRecord", selectedActivityRecord);
   const [activitySearch, setActivitySearch] = useState("");
-  const [allActivityRecords, setAllActivityRecords] = useState<
-    ActivityRecord[]
-  >([]);
-  const [loading, setLoading] = useState(false);
-  const [extensions, setExtensions] = useState<any[]>([]);
   const [pagination, setPagination] = useState({
     current_page: 1,
     last_page: 1,
@@ -140,16 +97,146 @@ const HistoryPage = () => {
     sort_by: "",
     sort_order: "asc" as "asc" | "desc",
   });
-  const [historyChain, setHistoryChain] = useState<HistoryChainRecord[]>([]);
-  const [loadingHistory, setLoadingHistory] = useState(false);
-  const [recordStages, setRecordStages] = useState<StageData[]>([]);
-  const [currentStageIndex, setCurrentStageIndex] = useState(0);
-  const [crmData, setCrmData] = useState<CrmDataItem | null>(null);
-  const [loadingCrmData, setLoadingCrmData] = useState(false);
   const [customTabs, setCustomTabs] = useState<TabConfig[]>([]);
   const [showAddTabModal, setShowAddTabModal] = useState(false);
   const [showColumnEditor, setShowColumnEditor] = useState(false);
-  
+
+  const hierarchyQuery = useQuery({
+    queryKey: crmAppKeys.hierarchyExtensions.module(ModuleSlug.CRM_HISTORY),
+    queryFn: async () => {
+      const hierarchyData = await GetHierarchyData(ModuleSlug.CRM_HISTORY);
+      return hierarchyData?.extensions ?? [];
+    },
+  });
+
+  const extensions = hierarchyQuery.data ?? [];
+
+  const extensionsStamp = useMemo(
+    () =>
+      extensions
+        .map((e: { id?: unknown; extension?: unknown }) => `${e?.id ?? ""}:${e?.extension ?? ""}`)
+        .join("|"),
+    [extensions],
+  );
+
+  const agentsKey = useMemo(
+    () => JSON.stringify([...activityFilters.agents].map(String).sort()),
+    [activityFilters.agents],
+  );
+
+  const historyListQuery = useQuery({
+    queryKey: crmAppKeys.activityHistory.list({
+      page: pagination.current_page,
+      perPage: pagination.per_page,
+      sortBy: pagination.sort_by,
+      sortOrder: pagination.sort_order,
+      search: activitySearch,
+      typeTab: activityTypeFilter,
+      agentsKey,
+      dateFrom: activityFilters.dateRange.start,
+      dateTo: activityFilters.dateRange.end,
+      extensionsStamp,
+    }),
+    queryFn: async () => {
+      const params: FetchCrmHistoryListParams = {
+        page: pagination.current_page,
+        per_page: pagination.per_page,
+      };
+      if (pagination.sort_by) {
+        params.sort_by = pagination.sort_by;
+        params.sort_order = pagination.sort_order;
+      }
+      if (activitySearch) params.search = activitySearch;
+      if (activityFilters.agents.length > 0) {
+        params.user_extension = activityFilters.agents;
+      }
+      if (activityFilters.dateRange.start) params.from = activityFilters.dateRange.start;
+      if (activityFilters.dateRange.end) params.to = activityFilters.dateRange.end;
+      if (activityTypeFilter !== "all") {
+        const typeMap: Record<string, string> = {
+          leads: "lead",
+          deals: "deal",
+          orders: "order",
+          prospects: "prospect",
+        };
+        const apiType = typeMap[activityTypeFilter];
+        if (apiType) params.type = apiType;
+      }
+      const raw = await fetchCrmHistoryList(params);
+      const rows = mapCrmActivityHistoryRecords(raw.records, extensions);
+      return { rows, pagination: raw.pagination };
+    },
+    enabled: hierarchyQuery.isFetched,
+  });
+
+  const allActivityRecords = historyListQuery.data?.rows ?? [];
+  const loading =
+    hierarchyQuery.isPending ||
+    hierarchyQuery.isFetching ||
+    historyListQuery.isPending ||
+    historyListQuery.isFetching;
+
+  useEffect(() => {
+    const p = historyListQuery.data?.pagination;
+    if (!p) return;
+    setPagination((prev) => {
+      if (
+        prev.current_page === p.current_page &&
+        prev.last_page === p.last_page &&
+        prev.per_page === p.per_page &&
+        prev.total === p.total
+      ) {
+        return prev;
+      }
+      return {
+        ...prev,
+        current_page: p.current_page,
+        last_page: p.last_page,
+        per_page: p.per_page,
+        total: p.total,
+      };
+    });
+  }, [historyListQuery.data?.pagination]);
+
+  useEffect(() => {
+    if (!hierarchyQuery.isFetched) return;
+    setPagination((prev) => ({ ...prev, current_page: 1 }));
+  }, [
+    activityFilters.agents,
+    activityFilters.dateRange.start,
+    activityFilters.dateRange.end,
+    activityTypeFilter,
+    hierarchyQuery.isFetched,
+  ]);
+
+  const detailOpen = Boolean(
+    selectedActivityRecord && (showActivitySidebar || showActivityTimelineModal),
+  );
+  const recordTypeStr = String(selectedActivityRecord?.type ?? "").toLowerCase();
+  const recordIdRaw = selectedActivityRecord?.record_id ?? selectedActivityRecord?.id;
+  const recordIdStr = recordIdRaw != null ? String(recordIdRaw) : "";
+
+  const detailQuery = useQuery({
+    queryKey: crmAppKeys.activityHistory.recordDetail({
+      recordType: recordTypeStr,
+      recordId: recordIdStr,
+      open: detailOpen,
+    }),
+    queryFn: () =>
+      fetchCrmActivityHistoryRecordDetail({
+        recordType: recordTypeStr,
+        recordId: recordIdRaw!,
+      }),
+    enabled: detailOpen && Boolean(recordIdStr && recordTypeStr),
+  });
+
+  const historyChain = detailOpen ? detailQuery.data?.historyChain ?? [] : [];
+  const recordStages = detailOpen ? detailQuery.data?.recordStages ?? [] : [];
+  const currentStageIndex = detailOpen ? detailQuery.data?.currentStageIndex ?? 0 : 0;
+  const crmData = detailOpen ? detailQuery.data?.crmData ?? null : null;
+  const loadingHistory = detailOpen && (detailQuery.isPending || detailQuery.isFetching);
+  const loadingCrmData = detailOpen && (detailQuery.isPending || detailQuery.isFetching);
+
   const defaultSelectedColumns = [
     "customer",
     "agent",
@@ -164,186 +251,8 @@ const HistoryPage = () => {
     [],
   );
 
-  // Fetch extensions on component mount
-  useEffect(() => {
-    const fetchExtensions = async () => {
-      try {
-        const hierarchyData = await GetHierarchyData(ModuleSlug.CRM_HISTORY);
-        if (hierarchyData?.extensions) {
-          setExtensions(hierarchyData.extensions);
-        }
-      } catch (error) {
-        console.error("Failed to fetch extensions:", error);
-      }
-    };
-    fetchExtensions();
-  }, []);
-
-  // Fetch history data from API
-  const fetchHistoryData = useCallback(
-    async (
-      page: number = 1,
-      perPage?: number,
-      sortBy?: string,
-      sortOrder?: "asc" | "desc",
-    ) => {
-      try {
-        setLoading(true);
-        const currentPerPage = perPage ?? pagination.per_page;
-        const effectiveSortBy = sortBy ?? pagination.sort_by;
-        const effectiveSortOrder = sortOrder ?? pagination.sort_order;
-        const params: any = {
-          page,
-          per_page: currentPerPage,
-        };
-
-        // Add sorting if available
-        if (effectiveSortBy) {
-          params.sort_by = effectiveSortBy;
-          params.sort_order = effectiveSortOrder;
-        }
-
-        // Add search if available
-        if (activitySearch) {
-          params.search = activitySearch;
-        }
-
-        // Add user_extension filter if available
-        if (activityFilters.agents.length > 0) {
-          params.user_extension = activityFilters.agents;
-        }
-
-        // Add date range filters if available
-        if (activityFilters.dateRange.start) {
-          params.from = activityFilters.dateRange.start;
-        }
-        if (activityFilters.dateRange.end) {
-          params.to = activityFilters.dateRange.end;
-        }
-
-        // Add type filter if not 'all'
-        if (activityTypeFilter !== "all") {
-          // Map filter values to API parameter values
-          const typeMap: Record<string, string> = {
-            leads: "lead",
-            deals: "deal",
-            orders: "order",
-            prospects: "prospect",
-          };
-          const apiType = typeMap[activityTypeFilter];
-          if (apiType) {
-            params.type = apiType;
-          }
-        }
-
-        // Make direct API call to get full response with pagination
-        // Since getHistoryList only returns data array, we need the raw response
-        const rawResponse = await axiosInstance.get("/crm/history/list", {
-          params,
-        });
-
-        // Extract data and pagination from the response structure
-        // Response structure: { code: 200, data: { success: true, data: [...], pagination: {...} } }
-        const responseData = rawResponse?.data?.data;
-        const records = responseData?.data || [];
-        const paginationInfo = responseData?.pagination || {};
-
-        // Map API response to ActivityRecord format
-
-        const mappedRecords: ActivityRecord[] = records.map(
-          (record: HistoryListRecord, index: number) => {
-            // Capitalize first letter of record_type
-            const typeCapitalized =
-              record.record_type.charAt(0).toUpperCase() +
-              record.record_type.slice(1);
-
-            // Format date for display
-            const dateObj = new Date(record.updated_at);
-            const dateStr = dateObj.toISOString().split("T")[0];
-            const timeStr = dateObj.toLocaleTimeString("en-US", {
-              hour: "2-digit",
-              minute: "2-digit",
-              hour12: false,
-            });
-            const formattedDate = `${dateStr} ${timeStr}`;
-
-            // Get agent name from extensions
-            const agentExtension = record.assigned_to || record.action_by;
-            let agentName = "N/A";
-            if (agentExtension) {
-              const extension = extensions.find(
-                (ext: any) =>
-                  ext?.id == agentExtension || ext?.extension == agentExtension,
-              );
-              const fullName =
-                extension?.display_name || extension?.name || agentExtension;
-              // Remove extension in parentheses (e.g., "Rizwan Haider (511)" -> "Rizwan Haider")
-              agentName =
-                fullName.replace(/\s*\([^)]*\)\s*$/, "").trim() || fullName;
-            }
-
-            return {
-              id: Number.parseInt(record.record_id) || index + 1,
-              record_id: record.record_id, // Store original record_id for API calls
-              customer: record.record_name,
-              type: typeCapitalized,
-              agent: agentName,
-              lastActivity: formattedDate,
-              dateTime: record.updated_at,
-              stage: record.stage_name || "N/A",
-              tags: [], // Tags not available in API response
-            };
-          },
-        );
-        setAllActivityRecords(mappedRecords || []);
-        setPagination({
-          current_page: paginationInfo.current_page || page,
-          last_page: paginationInfo.last_page || 1,
-          per_page: paginationInfo.per_page || currentPerPage,
-          total: paginationInfo.total || 0,
-          sort_by: effectiveSortBy || "",
-          sort_order: effectiveSortOrder || "asc",
-        });
-      } catch (error) {
-        console.error("Failed to fetch history data:", error);
-        setAllActivityRecords([]);
-      } finally {
-        if (extensions?.length === 0) {
-          return;
-        }
-        setLoading(false);
-      }
-    },
-    [
-      activitySearch,
-      activityFilters.dateRange,
-      activityFilters.agents,
-      pagination.per_page,
-      pagination.sort_by,
-      pagination.sort_order,
-      extensions,
-      activityTypeFilter,
-    ],
-  );
-
-  // Single effect: fetch when filters/tab change. Only fetch once extensions are loaded to avoid duplicate calls on mount.
-  useEffect(() => {
-    if (extensions?.length === 0) return;
-    setPagination((prev) => ({ ...prev, current_page: 1 }));
-    fetchHistoryData(1);
-  }, [
-    activityFilters.agents,
-    activityFilters.dateRange.start,
-    activityFilters.dateRange.end,
-    extensions,
-    activityTypeFilter,
-    fetchHistoryData,
-  ]);
-
-  // Valid filter IDs for history
   const validHistoryFilters = ["all", "leads", "deals", "orders"];
 
-  // Read tab from URL on mount and when router is ready
   useEffect(() => {
     if (router.isReady && router.query.tab) {
       const tabFromUrl = String(router.query.tab);
@@ -356,18 +265,15 @@ const HistoryPage = () => {
     }
   }, [router.isReady, router.query.tab, activityTypeFilter]);
 
-  // Set draft selected columns when column editor is shown
   useEffect(() => {
     if (showColumnEditor) setDraftSelectedColumns([...selectedColumns]);
-  }, [showColumnEditor]);
+  }, [showColumnEditor, selectedColumns]);
 
-  // Handler to update filter and URL
   const handleFilterChange = useCallback(
     (filterId: string) => {
       setActivityTypeFilter(filterId);
       setPagination((prev) => ({ ...prev, current_page: 1 }));
 
-      // Update URL with tab query parameter
       router.push(
         {
           pathname: router.pathname,
@@ -380,17 +286,16 @@ const HistoryPage = () => {
     [router],
   );
 
-  // Get agent options from hierarchy data (extensions)
-  const availableAgents = extensions.map((ext: any) => ({
-    value: ext.id || ext.extension,
-    label: (ext.display_name || ext.name || ext.id || ext.extension)
+  const availableAgents: { value: string; label: string }[] = extensions.map(
+    (ext: { id?: unknown; extension?: unknown; display_name?: string; name?: string }) => ({
+    value: String(ext.id ?? ext.extension ?? ""),
+    label: String(ext.display_name || ext.name || ext.id || ext.extension)
       .replace(/\s*\([^)]*\)\s*$/, "")
       .trim(),
-  }));
+  }),
+  );
 
-  // Filter activities based on search (type filter is now handled by API)
   const filteredActivityRecords = allActivityRecords.filter((activity) => {
-    // Search filter (client-side for instant feedback)
     if (!activitySearch) return true;
     const searchLower = activitySearch.toLowerCase();
     return (
@@ -399,7 +304,6 @@ const HistoryPage = () => {
     );
   });
 
-  // Quick filter counts
   const typeFilterCounts = {
     all: allActivityRecords.length,
     prospects: allActivityRecords.filter((a) => a.type === "Prospect").length,
@@ -407,111 +311,6 @@ const HistoryPage = () => {
     deals: allActivityRecords.filter((a) => a.type === "Deal").length,
     orders: allActivityRecords.filter((a) => a.type === "Order").length,
   };
-
-  // Fetch history chain and stages when modal or sidebar opens
-  useEffect(() => {
-    if (
-      (showActivitySidebar || showActivityTimelineModal) &&
-      selectedActivityRecord
-    ) {
-      const fetchHistoryAndStages = async () => {
-        setLoadingHistory(true);
-        try {
-          // Determine entity type and ID
-          const recordType = selectedActivityRecord.type.toLowerCase();
-          const recordId =
-            selectedActivityRecord.record_id || selectedActivityRecord.id;
-
-          // Map record type to API type
-          const apiType =
-            recordType === "prospect"
-              ? "prospect"
-              : recordType === "lead"
-                ? "lead"
-                : recordType === "deal"
-                  ? "deal"
-                  : recordType === "order"
-                    ? "order"
-                    : "lead";
-
-          // Fetch history chain
-          const chainData = await getHistoryChain(
-            apiType as "prospect" | "lead" | "deal" | "order",
-            recordId,
-          );
-          setHistoryChain(chainData || []);
-
-          // Check for CRM Data record in history chain
-          const crmDataRecord = chainData?.find(
-            (record: HistoryChainRecord) => {
-              const entityType = String(record.entity_type);
-              return entityType === "CRM Data";
-            },
-          );
-          if (crmDataRecord) {
-            // Extract ID from format "crm_data_453" -> 453
-            // Check both id and entity_id fields
-            const idString = String(
-              crmDataRecord.id || crmDataRecord.entity_id || "",
-            );
-            const idMatch = /crm_data_(\d+)/.exec(idString);
-            if (idMatch?.[1]) {
-              const crmDataId = Number.parseInt(idMatch[1]);
-              setLoadingCrmData(true);
-              try {
-                const crmDataItem = await getCrmDataById(crmDataId);
-                setCrmData(crmDataItem);
-              } catch (error) {
-                console.error("Failed to fetch CRM data:", error);
-                setCrmData(null);
-              } finally {
-                setLoadingCrmData(false);
-              }
-            } else {
-              setCrmData(null);
-            }
-          } else {
-            setCrmData(null);
-          }
-
-          // Fetch stages for the record type
-          const stageType = recordType === "prospect" ? "lead" : apiType; // Prospects use lead stages
-          const stagesData = await getStages(
-            stageType as "lead" | "deal" | "order",
-          );
-          const sortedStages = [...stagesData].sort(
-            (a, b) => a.sequence - b.sequence,
-          );
-          setRecordStages(sortedStages);
-
-          // Determine current step index based on record type
-          // The 4 main steps are: Prospect (0), Lead (1), Deal (2), Order (3)
-          const typeToStepIndex: Record<string, number> = {
-            prospect: 0,
-            lead: 1,
-            deal: 2,
-            order: 3,
-          };
-
-          const stepIndex = typeToStepIndex[recordType] ?? 0;
-          setCurrentStageIndex(stepIndex);
-        } catch (error) {
-          console.error("Failed to fetch history chain:", error);
-          setHistoryChain([]);
-          setRecordStages([]);
-        } finally {
-          setLoadingHistory(false);
-        }
-      };
-
-      fetchHistoryAndStages();
-    } else {
-      setHistoryChain([]);
-      setRecordStages([]);
-      setCurrentStageIndex(0);
-      setCrmData(null);
-    }
-  }, [showActivitySidebar, showActivityTimelineModal, selectedActivityRecord]);
 
   const { PERMISSIONS } = HEADER_CONSTANTS;
 
@@ -684,7 +483,6 @@ const HistoryPage = () => {
           onClick: () => {
             setActivityFilters((prev) => ({ ...prev, agents: [] }));
             setPagination((prev) => ({ ...prev, current_page: 1 }));
-            fetchHistoryData(1);
           },
         },
         ...availableAgents.map((agent) => ({
@@ -693,7 +491,6 @@ const HistoryPage = () => {
           onClick: () => {
             setActivityFilters((prev) => ({ ...prev, agents: [agent.value] }));
             setPagination((prev) => ({ ...prev, current_page: 1 }));
-            fetchHistoryData(1);
           },
         })),
       ],
@@ -714,16 +511,9 @@ const HistoryPage = () => {
           subTitle="Activity Management"
         />
         {/* Main flex container: content + sidebar (same layout as prospects) */}
-        <div
-          style={{
-            display: "flex",
-            gap: "12px",
-            height: "calc(100vh)",
-            overflow: "hidden",
-          }}
-        >
+        <div className="crm-activities-layout">
           {/* Main content area - table and modals */}
-          <div style={{ flex: 1, minWidth: 0, overflow: "auto" }}>
+          <div className="crm-activities-main">
         {/* Activities Table */}
         <GenericTable
           data={filteredActivityRecords}
@@ -748,7 +538,6 @@ const HistoryPage = () => {
               current_page: page,
               per_page: rowsPerPage,
             }));
-            fetchHistoryData(page, rowsPerPage);
           }}
           sortable={true}
           defaultSortBy={pagination.sort_by}
@@ -760,7 +549,6 @@ const HistoryPage = () => {
               sort_order: direction,
               current_page: 1,
             }));
-            fetchHistoryData(1, pagination.per_page, column, direction);
           }}
           onPreviewClick={handlePreviewClick}
           onRowClick={(row) => {
@@ -791,7 +579,6 @@ const HistoryPage = () => {
             onSearchChange: (value) => setActivitySearch(value),
             onSearch: () => {
               setPagination((prev) => ({ ...prev, current_page: 1 }));
-              fetchHistoryData(1);
             },
             showTableViewDropdown: true,
             tableViewLabel: "Table view",
@@ -944,12 +731,6 @@ const HistoryPage = () => {
                 overflowY: "auto",
               }}
             >
-              <style>{`
-        .activity-timeline-modal .timeline-progress-bar {
-          transition: width 0.5s ease;
-        }
-      `}</style>
-
               {/* Main Content Grid */}
               <div
                 style={{
@@ -1981,7 +1762,6 @@ const HistoryPage = () => {
           filters={filterFields}
           onApply={() => {
             setPagination((prev) => ({ ...prev, current_page: 1 }));
-            fetchHistoryData(1);
           }}
           onReset={() => {
             setActivityTypeFilter("all");
@@ -1991,7 +1771,6 @@ const HistoryPage = () => {
               dateRange: { start: "", end: "" },
             });
             setPagination((prev) => ({ ...prev, current_page: 1 }));
-            fetchHistoryData(1);
           }}
         />
         </div>

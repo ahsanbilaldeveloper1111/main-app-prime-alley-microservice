@@ -6,6 +6,7 @@ import React, {
   useMemo,
   useEffect,
 } from "react";
+import { useQuery } from "@tanstack/react-query";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 import GenericTable, { TableColumn, ToolbarConfig } from "@components/GenericTable";
@@ -69,6 +70,8 @@ import { GetHierarchyData } from "@utils/users";
 import axiosInstance from "@utils/axios";
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
+import { CRM_CAMPAIGNS_SELECT_STYLES, CAMPAIGN_SIDEBAR_SELECT_STYLES } from "@page-modules/crm/campaigns/crmCampaignSelectStyles";
+import { CampaignFieldTypeOptions } from "@components/crm/campaigns/CampaignFieldTypeOptions";
 
 import DeleteConfirmationModal from "@components/page-partials/DeleteConfirmationModal";
 import { ModuleSlug, checkRequiredFields, formatDateForTable, normalizeSearchQuery } from "@utils/Helper";
@@ -85,6 +88,7 @@ import { useDebouncedSearchInput } from "@hooks/useDebouncedSearchInput";
 import moment from "moment";
 import { HEADER_CONSTANTS } from "@constants/headerConstants";
 import type { CrmPageDisplayProps } from "@page-modules/crm/crmPageDisplayProps";
+import { crmAppKeys } from "../../../query/keys";
 
 const { PERMISSIONS } = HEADER_CONSTANTS;
 
@@ -416,7 +420,7 @@ function deriveEditorStateFromCampaignApi(
 
   const campaignUsers: readonly any[] = campaignData.user_extensions?.length
     ? campaignData.user_extensions.map((ue: { user_extension: unknown }) => {
-        const extension = extensions.find((ext) => sameExtensionId(ext.id, ue.user_extension));
+        const extension = extensions.find((ext: { id?: unknown; extension?: unknown; display_name?: string; name?: string }) => sameExtensionId(ext.id, ue.user_extension));
         return {
           value: ue.user_extension,
           label: extension?.display_name || extension?.name || String(ue.user_extension),
@@ -625,60 +629,12 @@ function getFieldTypeText(fieldType: string): string {
   }
 }
 
-const CRM_CAMPAIGNS_SELECT_STYLES = {
-  control: (provided: any, state: any) => ({
-    ...provided,
-    minHeight: "38px",
-    fontSize: "0.875rem",
-    borderColor: state.isFocused ? "#86b7fe" : "#dee2e6",
-    boxShadow: state.isFocused ? "0 0 0 0.2rem rgba(13, 110, 253, 0.25)" : "none",
-    "&:hover": { borderColor: "#86b7fe" },
-  }),
-  multiValue: (provided: any) => ({
-    ...provided,
-    backgroundColor: "#0d6efd",
-    color: "white",
-    fontSize: "0.813rem",
-  }),
-  multiValueLabel: (provided: any) => ({ ...provided, color: "white", padding: "2px 6px" }),
-  multiValueRemove: (provided: any) => ({
-    ...provided,
-    color: "white",
-    "&:hover": { backgroundColor: "#0b5ed7", color: "white" },
-  }),
-  menu: (provided: any) => ({ ...provided, fontSize: "0.875rem" }),
-};
-
-const CAMPAIGN_SIDEBAR_SELECT_STYLES = {
-  control: (base: any, state: any) => ({
-    ...base,
-    minHeight: "40px",
-    fontSize: "14px",
-    borderColor: state.isFocused ? "#0091ae" : "#8a8a8a",
-    borderRadius: "4px",
-    boxShadow: "none",
-    "&:hover": { borderColor: "#0091ae" },
-  }),
-};
-
 function onCampaignSidebarInputFocus(e: React.FocusEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>): void {
   e.currentTarget.style.borderColor = "#0091ae";
 }
 
 function onCampaignSidebarInputBlur(e: React.FocusEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>): void {
   e.currentTarget.style.borderColor = "#8a8a8a";
-}
-
-function CampaignFieldTypeOptions(): React.ReactElement {
-  return (
-    <>
-      <option value="string">Text</option>
-      <option value="integer">Number</option>
-      <option value="date">Date</option>
-      <option value="email">Email</option>
-      <option value="dropdown">Dropdown</option>
-    </>
-  );
 }
 
 type ToolbarFactoryArgs = {
@@ -1156,171 +1112,6 @@ function CrmAssignmentStatsRow({
   );
 }
 
-function useCrmCampaignBootstrapData(
-  refreshKey: number,
-  setExtensions: React.Dispatch<React.SetStateAction<any[]>>,
-  setDataManagementExtensions: React.Dispatch<React.SetStateAction<any[]>>,
-  setAvailableTags: React.Dispatch<
-    React.SetStateAction<Array<{ value: string; label: string; id: number }>>
-  >,
-  setAvailableCampaignsForUpload: React.Dispatch<
-    React.SetStateAction<Array<{ value: string; label: string; id: number }>>
-  >,
-  setIndustries: React.Dispatch<React.SetStateAction<IndustryData[]>>,
-  setDealTemplates: React.Dispatch<React.SetStateAction<DealTemplateData[]>>,
-) {
-  useEffect(() => {
-    const fetchExtensions = async () => {
-      try {
-        const hierarchyData = await GetHierarchyData(ModuleSlug.CRM_CAMPAIGNS);
-        setExtensions(hierarchyData?.extensions || []);
-      } catch (error: unknown) {
-        consumeHandledApiError(error, "CrmCampaigns.fetchCrmExtensions");
-      }
-    };
-    void fetchExtensions();
-  }, [setExtensions]);
-
-  useEffect(() => {
-    const fetchDataManagementExtensions = async () => {
-      try {
-        const hierarchyData = await GetHierarchyData(ModuleSlug.CRM_DATA_MANAGEMENT);
-        setDataManagementExtensions(hierarchyData?.extensions || []);
-      } catch (error: unknown) {
-        consumeHandledApiError(error, "CrmCampaigns.fetchDataManagementExtensions");
-      }
-    };
-    void fetchDataManagementExtensions();
-  }, [setDataManagementExtensions]);
-
-  useEffect(() => {
-    const loadTags = async () => {
-      try {
-        const tags = await getCrmDataTags();
-        setAvailableTags(tags.map((tag) => ({ value: tag.name, label: tag.name, id: tag.id })));
-      } catch {
-        setAvailableTags([]);
-      }
-    };
-    void loadTags();
-  }, [refreshKey, setAvailableTags]);
-
-  useEffect(() => {
-    const loadCampaignOptions = async () => {
-      try {
-        const campaignsResponse = await getCampaigns({
-          per_page: 1000,
-          filters: CRM_CAMPAIGNS_LIST_ACTIVE_ONLY,
-        });
-        setAvailableCampaignsForUpload(
-          campaignsResponse.data.map((campaign) => ({
-            value: campaign.id.toString(),
-            label: campaign.name,
-            id: campaign.id,
-          })),
-        );
-      } catch {
-        setAvailableCampaignsForUpload([]);
-      }
-    };
-    void loadCampaignOptions();
-  }, [refreshKey, setAvailableCampaignsForUpload]);
-
-  useEffect(() => {
-    const loadIndustries = async () => {
-      try {
-        const response = await getIndustries({ per_page: 1000 });
-        setIndustries(response.data || []);
-      } catch {
-        setIndustries([]);
-      }
-    };
-    void loadIndustries();
-  }, [setIndustries]);
-
-  useEffect(() => {
-    const loadDealTemplates = async () => {
-      try {
-        const response = await getDealTemplates({ per_page: 1000 });
-        setDealTemplates(response.data || []);
-      } catch {
-        setDealTemplates([]);
-      }
-    };
-    void loadDealTemplates();
-  }, [setDealTemplates]);
-}
-
-type CrmCampaignListQueryParams = {
-  refreshKey: number;
-  campaignsPagination: { currentPage: number; rowsPerPage: number; sortBy: string; sortOrder: "asc" | "desc" };
-  memoizedFilters: Record<string, any>;
-  campaignFilters: {
-    status: string[];
-    dateFrom: string | null;
-    dateTo: string | null;
-    userExtensions: string[] | null;
-    hasUnassignedProspects: boolean | null;
-    tags: string[] | null;
-  };
-  activeFilter: string;
-  campaignsSearchQuery: string;
-};
-
-type CrmCampaignListSetters = {
-  setListLoading: React.Dispatch<React.SetStateAction<boolean>>;
-  setCampaignsData: React.Dispatch<React.SetStateAction<any[]>>;
-  setMetrics: React.Dispatch<React.SetStateAction<CampaignMetrics>>;
-  setTotalCampaigns: React.Dispatch<React.SetStateAction<number>>;
-};
-
-function useCrmCampaignListQueryEffect(
-  listPermission: boolean,
-  query: CrmCampaignListQueryParams,
-  setters: CrmCampaignListSetters,
-) {
-  const { refreshKey, campaignsPagination, memoizedFilters, campaignFilters, activeFilter, campaignsSearchQuery } = query;
-  const { setListLoading, setCampaignsData, setMetrics, setTotalCampaigns } = setters;
-  useEffect(() => {
-    const loadCampaigns = async () => {
-      try {
-        setListLoading(true);
-        const filters = buildCrmCampaignListFilters(activeFilter, campaignFilters, memoizedFilters);
-        const response = await getCampaigns({
-          page: campaignsPagination.currentPage,
-          per_page: campaignsPagination.rowsPerPage,
-          search: campaignsSearchQuery || undefined,
-          filters,
-          module_slug: ModuleSlug.CRM_CAMPAIGNS,
-        });
-
-        if (response?.data) {
-          setCampaignsData(response.data);
-          setMetrics(response.metrics);
-          setTotalCampaigns(response.total || response.data.length);
-        }
-      } catch (error: unknown) {
-        consumeHandledApiError(error, "CrmCampaigns.loadCampaigns");
-        toast.error("Failed to load campaigns");
-      } finally {
-        setListLoading(false);
-      }
-    };
-
-    if (listPermission) {
-      void loadCampaigns();
-    }
-  }, [
-    listPermission,
-    refreshKey,
-    campaignsPagination,
-    memoizedFilters,
-    campaignFilters,
-    activeFilter,
-    campaignsSearchQuery,
-  ]);
-}
-
 function useCrmAssignmentCountsRefetch(
   showDataAssignmentModal: boolean,
   assignmentFilterCampaigns: string[],
@@ -1371,13 +1162,6 @@ const CrmCampaigns = ({ hideBreadcrumb }: CrmPageDisplayProps = {}) => { // NOSO
 
   const [refreshKey, setRefreshKey] = useState(0);
   const [currentFilters, setCurrentFilters] = useState<Record<string, any>>({});
-  const [campaignsData, setCampaignsData] = useState<any[]>([]);
-  const [metrics, setMetrics] = useState<CampaignMetrics>({
-    active_campaigns: 0,
-    inactive_campaigns: 0,
-    users_count: 0,
-  });
-  const [totalCampaigns, setTotalCampaigns] = useState(0);
 
   // UI State
   const [showCampaignsAnalytics, setShowCampaignsAnalytics] = useState(false);
@@ -1416,7 +1200,6 @@ const CrmCampaigns = ({ hideBreadcrumb }: CrmPageDisplayProps = {}) => { // NOSO
   const [showViewModal, setShowViewModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [selectedCampaign, setSelectedCampaign] = useState<any>(null);
-  const [listLoading, setListLoading] = useState(false);
   const [loading, setLoading] = useState(false);
 
   // Form data
@@ -1440,12 +1223,9 @@ const CrmCampaigns = ({ hideBreadcrumb }: CrmPageDisplayProps = {}) => { // NOSO
   });
 
   // Extensions and campaign users
-  const [extensions, setExtensions] = useState<any[]>([]);
   const [campaignUsers, setCampaignUsers] = useState<readonly any[]>([]);
 
   // Industries and Deal Templates
-  const [industries, setIndustries] = useState<IndustryData[]>([]);
-  const [dealTemplates, setDealTemplates] = useState<DealTemplateData[]>([]);
   const [selectedIndustries, setSelectedIndustries] = useState<readonly any[]>([]);
   const [selectedDealTemplate, setSelectedDealTemplate] = useState<any>(null);
 
@@ -1455,8 +1235,6 @@ const CrmCampaigns = ({ hideBreadcrumb }: CrmPageDisplayProps = {}) => { // NOSO
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [fieldTags, setFieldTags] = useState<readonly any[]>([]);
   const [uploadSelectedCampaigns, setUploadSelectedCampaigns] = useState<readonly any[]>([]);
-  const [availableTags, setAvailableTags] = useState<Array<{ value: string; label: string; id: number }>>([]);
-  const [availableCampaignsForUpload, setAvailableCampaignsForUpload] = useState<Array<{ value: string; label: string; id: number }>>([]);
   const [autoDistributeToUsers, setAutoDistributeToUsers] = useState(false);
 
   // Data assignment modal states
@@ -1469,7 +1247,6 @@ const CrmCampaigns = ({ hideBreadcrumb }: CrmPageDisplayProps = {}) => { // NOSO
   const [assignToCampaigns, setAssignToCampaigns] = useState<string[]>([]);
   const [recordsToAssign, setRecordsToAssign] = useState<number>(0);
   const [includeAssignedRecords, setIncludeAssignedRecords] = useState<boolean>(false);
-  const [dataManagementExtensions, setDataManagementExtensions] = useState<any[]>([]);
   const [assignmentCounts, setAssignmentCounts] = useState({ total: 0, assigned: 0, unassigned: 0 });
   const [customDistribution, setCustomDistribution] = useState<Record<string, number>>({});
   const [showSuccessfulModal, setShowSuccessfulModal] = useState(false);
@@ -1477,22 +1254,74 @@ const CrmCampaigns = ({ hideBreadcrumb }: CrmPageDisplayProps = {}) => { // NOSO
   const [successModalDescription, setSuccessModalDescription] = useState("");
   const [assigningData, setAssigningData] = useState(false);
 
-  useCrmCampaignBootstrapData(
-    refreshKey,
-    setExtensions,
-    setDataManagementExtensions,
-    setAvailableTags,
-    setAvailableCampaignsForUpload,
-    setIndustries,
-    setDealTemplates,
-  );
+  const crmCampaignsExtensionsQuery = useQuery({
+    queryKey: crmAppKeys.hierarchyExtensions.module(ModuleSlug.CRM_CAMPAIGNS),
+    queryFn: async () => {
+      const hierarchyData = await GetHierarchyData(ModuleSlug.CRM_CAMPAIGNS);
+      return hierarchyData?.extensions ?? [];
+    },
+  });
+
+  const dataManagementExtensionsQuery = useQuery({
+    queryKey: crmAppKeys.hierarchyExtensions.module(ModuleSlug.CRM_DATA_MANAGEMENT),
+    queryFn: async () => {
+      const hierarchyData = await GetHierarchyData(ModuleSlug.CRM_DATA_MANAGEMENT);
+      return hierarchyData?.extensions ?? [];
+    },
+  });
+
+  const campaignTagsQuery = useQuery({
+    queryKey: crmAppKeys.campaigns.tags(refreshKey),
+    queryFn: async () => {
+      const tags = await getCrmDataTags();
+      return tags.map((tag) => ({ value: tag.name, label: tag.name, id: tag.id }));
+    },
+  });
+
+  const uploadCampaignOptionsQuery = useQuery({
+    queryKey: crmAppKeys.campaigns.uploadCampaignOptions(refreshKey),
+    queryFn: async () => {
+      const campaignsResponse = await getCampaigns({
+        per_page: 1000,
+        filters: CRM_CAMPAIGNS_LIST_ACTIVE_ONLY,
+      });
+      return campaignsResponse.data.map((campaign) => ({
+        value: campaign.id.toString(),
+        label: campaign.name,
+        id: campaign.id,
+      }));
+    },
+  });
+
+  const industriesQuery = useQuery({
+    queryKey: crmAppKeys.campaigns.industries(),
+    queryFn: async () => {
+      const response = await getIndustries({ per_page: 1000 });
+      return response.data ?? [];
+    },
+  });
+
+  const dealTemplatesQuery = useQuery({
+    queryKey: crmAppKeys.campaigns.dealTemplates(),
+    queryFn: async () => {
+      const response = await getDealTemplates({ per_page: 1000 });
+      return response.data ?? [];
+    },
+  });
+
+  const extensions = crmCampaignsExtensionsQuery.data ?? [];
+  const dataManagementExtensions = dataManagementExtensionsQuery.data ?? [];
+  const availableTags = campaignTagsQuery.data ?? [];
+  const availableCampaignsForUpload = uploadCampaignOptionsQuery.data ?? [];
+  const industries = industriesQuery.data ?? [];
+  const dealTemplates = dealTemplatesQuery.data ?? [];
 
   const getUserNames = useCallback((userExtensions: { user_extension: unknown }[]) => {
     if (!userExtensions || userExtensions.length === 0) return "No users assigned";
     const maxDisplay = 2;
     const userNames = userExtensions
       .map((ue) => {
-        const extension = extensions.find((ext) => sameExtensionId(ext.id, ue.user_extension));
+        const extension = extensions.find((ext: { id?: unknown; extension?: unknown; display_name?: string; name?: string }) => sameExtensionId(ext.id, ue.user_extension));
         return extension?.display_name || extension?.name || `Extension ${ue.user_extension}`;
       })
       .filter(Boolean);
@@ -1503,7 +1332,8 @@ const CrmCampaigns = ({ hideBreadcrumb }: CrmPageDisplayProps = {}) => { // NOSO
   const getCreatedByName = useCallback((campaign: any) => {
     const createdBy = campaign?.created_by;
     const matchedExtension = extensions.find(
-      (ext) => sameExtensionId(ext.id, createdBy) || sameExtensionId(ext.extension, createdBy),
+      (ext: { id?: unknown; extension?: unknown; display_name?: string; name?: string }) =>
+        sameExtensionId(ext.id, createdBy) || sameExtensionId(ext.extension, createdBy),
     );
     return (
       matchedExtension?.display_name ||
@@ -1530,6 +1360,77 @@ const CrmCampaigns = ({ hideBreadcrumb }: CrmPageDisplayProps = {}) => { // NOSO
 
   const memoizedFilters = useMemo(() => currentFilters, [currentFilters]);
 
+  const campaignFiltersKey = useMemo(
+    () =>
+      JSON.stringify({
+        status: [...campaignFilters.status].sort(),
+        dateFrom: campaignFilters.dateFrom,
+        dateTo: campaignFilters.dateTo,
+        userExtensions: campaignFilters.userExtensions
+          ? [...campaignFilters.userExtensions].sort()
+          : null,
+        hasUnassignedProspects: campaignFilters.hasUnassignedProspects,
+        tags: campaignFilters.tags ? [...campaignFilters.tags].sort() : null,
+      }),
+    [campaignFilters],
+  );
+
+  const listCampaignsPermission = Boolean(
+    session?.user?.permissions?.includes(PERMISSIONS.VIEW_CRM_CAMPAIGNS),
+  );
+
+  const campaignsListQuery = useQuery({
+    queryKey: crmAppKeys.campaigns.list({
+      refreshKey,
+      page: campaignsPagination.currentPage,
+      perPage: campaignsPagination.rowsPerPage,
+      search: campaignsSearchQuery,
+      activeFilter,
+      filtersKey: JSON.stringify(memoizedFilters),
+      campaignFiltersKey,
+    }),
+    queryFn: async () => {
+      try {
+        const filters = buildCrmCampaignListFilters(
+          activeFilter,
+          campaignFilters,
+          memoizedFilters,
+        );
+        const response = await getCampaigns({
+          page: campaignsPagination.currentPage,
+          per_page: campaignsPagination.rowsPerPage,
+          search: campaignsSearchQuery || undefined,
+          filters,
+          module_slug: ModuleSlug.CRM_CAMPAIGNS,
+        });
+        if (!response?.data) {
+          throw new Error("Campaign list response missing data");
+        }
+        return response;
+      } catch (error: unknown) {
+        consumeHandledApiError(error, "CrmCampaigns.loadCampaigns");
+        throw error;
+      }
+    },
+    enabled: listCampaignsPermission,
+  });
+
+  const listLoading = listCampaignsPermission && campaignsListQuery.isFetching;
+  const campaignsData = campaignsListQuery.data?.data ?? [];
+  const metrics: CampaignMetrics = campaignsListQuery.data?.metrics ?? {
+    active_campaigns: 0,
+    inactive_campaigns: 0,
+    users_count: 0,
+  };
+  const totalCampaigns =
+    campaignsListQuery.data?.total ?? campaignsListQuery.data?.data?.length ?? 0;
+
+  useEffect(() => {
+    if (campaignsListQuery.isError) {
+      toast.error("Failed to load campaigns");
+    }
+  }, [campaignsListQuery.isError]);
+
   const handleFiltersChange = useCallback((filters: Record<string, any>) => {
     setCurrentFilters((prev) => {
       const merged = { ...prev, ...filters };
@@ -1543,21 +1444,11 @@ const CrmCampaigns = ({ hideBreadcrumb }: CrmPageDisplayProps = {}) => { // NOSO
     setRefreshKey((prev) => prev + 1);
   }, []);
 
-  const listCampaignsPermission = Boolean(
-    session?.user?.permissions?.includes(PERMISSIONS.VIEW_CRM_CAMPAIGNS),
-  );
-
   useEffect(() => {
     setCampaignsPagination((prev) =>
       prev.currentPage === 1 ? prev : { ...prev, currentPage: 1 },
     );
   }, [campaignsSearchQuery, setCampaignsPagination]);
-
-  useCrmCampaignListQueryEffect(
-    listCampaignsPermission,
-    { refreshKey, campaignsPagination, memoizedFilters, campaignFilters, activeFilter, campaignsSearchQuery },
-    { setListLoading, setCampaignsData, setMetrics, setTotalCampaigns },
-  );
 
   // Modal handlers
   const handleCreateCampaign = useCallback(() => {
@@ -2977,7 +2868,9 @@ const CrmCampaigns = ({ hideBreadcrumb }: CrmPageDisplayProps = {}) => { // NOSO
                       </div>
                       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "12px", marginBottom: "30px" }}>
                         {selectedCampaign.user_extensions.map((ue: { user_extension: unknown }) => {
-                          const ext = extensions.find((e) => sameExtensionId(e.id, ue.user_extension));
+                          const ext = extensions.find((e: { id?: unknown; extension?: unknown; display_name?: string; name?: string }) =>
+                            sameExtensionId(e.id, ue.user_extension),
+                          );
                           return (
                             <div key={`ue-${String(ue.user_extension)}`} style={{ background: "#f8f9fa", padding: "12px", borderRadius: "8px", fontSize: "14px", fontWeight: 500 }}>
                               {ext?.display_name || ext?.name || `Extension ${ue.user_extension}`}

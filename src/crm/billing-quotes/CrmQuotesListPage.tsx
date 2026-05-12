@@ -7,6 +7,7 @@ import React, {
   type Dispatch,
   type SetStateAction,
 } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 import { toast } from "react-toastify";
@@ -67,7 +68,6 @@ import {
   DROPDOWN_ITEM_HOVER,
 } from "@crm/shared/crmListActionButtonStyles";
 import { useCrmQuotesListActiveFilterSync } from "@crm/billing-quotes/useCrmQuotesListActiveFilterSync";
-import { useCrmQuotesListFetchDummyCrmData } from "@crm/billing-quotes/useCrmQuotesListFetchDummyCrmData";
 import { useCrmQuotesListExportHandlers } from "@crm/billing-quotes/useCrmQuotesListExportHandlers";
 import {
   useCrmQuotesListCampaignsEffect,
@@ -87,6 +87,9 @@ import { CrmQuotesListPageQuotesFilterSidebar } from "@crm/billing-quotes/CrmQuo
 import { getBillingCustomerPortalTabsDropdownItems } from "@utils/billingProductsTabs";
 import { billingCustomerRoutes } from "@utils/billingCustomerRoutes";
 import { HEADER_CONSTANTS } from "@constants/headerConstants";
+import { crmAppKeys } from "../../query/keys";
+import type { CrmDataItem } from "@utils/crm";
+import { getCrmQuotesListDummyFetchResult } from "@crm/billing-quotes/crmQuotesListDummyFetchResult";
 
 const { PERMISSIONS } = HEADER_CONSTANTS;
 
@@ -108,7 +111,6 @@ function CrmQuotesListPageContent({ variant }: Readonly<CrmQuotesListPageProps>)
     setRefreshKey,
     currentFilters,
     setCurrentFilters,
-    requestIdRef,
     setUploading,
     selectedFile,
     setSelectedFile,
@@ -284,8 +286,6 @@ function CrmQuotesListPageContent({ variant }: Readonly<CrmQuotesListPageProps>)
     setTotalRecords,
     totalAllQuotes,
     setTotalAllQuotes,
-    loading,
-    setLoading,
     handleFilterChange,
     clearSelectedRows,
     setClearSelectedRows,
@@ -408,20 +408,56 @@ function CrmQuotesListPageContent({ variant }: Readonly<CrmQuotesListPageProps>)
 
   useCrmQuotesListActiveFilterSync(activeFilter, setCurrentFilters);
 
-  const fetchCrmData = useCrmQuotesListFetchDummyCrmData({
-    requestIdRef,
-    memoizedFilters,
-    setLoading,
-    setDataList,
-    setTotalRecords,
-    setTotalAllQuotes,
-    setMetrics,
+  const queryClient = useQueryClient();
+
+  const quotesListFiltersKey = useMemo(
+    () => JSON.stringify(memoizedFilters),
+    [memoizedFilters],
+  );
+
+  const quotesListQuery = useQuery({
+    queryKey: crmAppKeys.crmQuotesListPage.list({
+      variant,
+      filtersKey: quotesListFiltersKey,
+      activeTab: activeFilter,
+      page: pagination.currentPage,
+      perPage: pagination.rowsPerPage,
+      sortBy: pagination.sortBy,
+      sortOrder: pagination.sortOrder,
+      refreshKey,
+    }),
+    queryFn: async () => getCrmQuotesListDummyFetchResult(),
   });
 
-  // Load data when filters or pagination changes
+  const quotesListLoading =
+    quotesListQuery.isPending || quotesListQuery.isFetching;
+
+  const refetchQuotesProspectsList = useCallback(() => {
+    void queryClient.invalidateQueries({ queryKey: crmAppKeys.crmQuotesListPage.all() });
+    setRefreshKey((prev) => prev + 1);
+  }, [queryClient, setRefreshKey]);
+
   useEffect(() => {
-    fetchCrmData();
-  }, [fetchCrmData, refreshKey]);
+    if (!quotesListQuery.data) return;
+    const response = quotesListQuery.data;
+    setDataList((response.data || []) as unknown as CrmDataItem[]);
+    setTotalRecords(response.pagination.total || 0);
+    const isAllProspects =
+      memoizedFilters.has_scheduled_calls !== true &&
+      memoizedFilters.has_tickets !== true;
+    if (isAllProspects) {
+      setTotalAllQuotes(response.pagination.total || 0);
+    }
+    setMetrics(response.metrics as Record<string, number>);
+  }, [
+    quotesListQuery.data,
+    memoizedFilters.has_scheduled_calls,
+    memoizedFilters.has_tickets,
+    setDataList,
+    setMetrics,
+    setTotalAllQuotes,
+    setTotalRecords,
+  ]);
 
   useCrmListClearSelectedRowsEffect(clearSelectedRows, setSelectedItems);
 
@@ -568,7 +604,7 @@ function CrmQuotesListPageContent({ variant }: Readonly<CrmQuotesListPageProps>)
       setShowCreateContactSidebar,
       editingContactId,
       setEditingContactId,
-      fetchCrmData,
+      fetchCrmData: refetchQuotesProspectsList,
       sourceField: "source_file",
       extensions,
       showCreateContactSidebar,
@@ -637,7 +673,7 @@ function CrmQuotesListPageContent({ variant }: Readonly<CrmQuotesListPageProps>)
       setPagination((prev) => ({ ...prev, currentPage: 1 })),
     rightActions: renderCreateQuoteButton(),
     prospectsTabCountOverrides: {
-      loading,
+      loading: quotesListLoading,
       totalRecords,
       activeFilter,
     },
@@ -892,7 +928,7 @@ function CrmQuotesListPageContent({ variant }: Readonly<CrmQuotesListPageProps>)
                   setClearSelectedRows,
                   pagination,
                   setPagination,
-                  loading,
+                  loading: quotesListLoading,
                   totalRecords,
                   emptyMessage: "No prospects found matching your criteria",
                   loadingMessage: "Loading prospects...",

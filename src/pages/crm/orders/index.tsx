@@ -6,8 +6,8 @@ import React, {
   useCallback,
   useMemo,
   useEffect,
-  useRef,
 } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 import GenericTable, {
@@ -135,6 +135,7 @@ import { normalizeGetOrdersListResponse } from "@crm/orders/normalizeGetOrdersLi
 import { useCrmListPreviewPersistence } from "@crm/shared/useCrmListPreviewPersistence";
 import { applyCrmFilterRules, CRM_BASE_FILTER_RULES } from "@crm/shared/crmListFilterHelpers";
 import { HEADER_CONSTANTS } from "@constants/headerConstants";
+import { crmAppKeys } from "../../../query/keys";
 
 const { PERMISSIONS } = HEADER_CONSTANTS;
 
@@ -218,18 +219,34 @@ const CrmOrders = () => { // NOSONAR
   }, [session]);
   // Which edit mode to show: root (full), account, or delivery — three separate modals
 
-  const [stages, setStages] = useState<any[]>([]);
-  const [lostReasons, setLostReasons] = useState<any[]>([]);
-  const [extensions, setExtensions] = useState<any[]>([]);
-  const [refreshKey, setRefreshKey] = useState(0);
+  const stagesQuery = useQuery({
+    queryKey: crmAppKeys.crmStages.byType("order"),
+    queryFn: () => getStages("order"),
+  });
+  const lostReasonStagesQuery = useQuery({
+    queryKey: crmAppKeys.crmStages.byType("lost_reason"),
+    queryFn: () =>
+      (getStages as (stageType: string) => Promise<any[]>)("lost_reason"),
+  });
+  const extensionsQuery = useQuery({
+    queryKey: crmAppKeys.hierarchyExtensions.module(ModuleSlug.CRM_ORDERS),
+    queryFn: async () => {
+      const hierarchyData = await GetHierarchyData(ModuleSlug.CRM_ORDERS);
+      return hierarchyData?.extensions ?? [];
+    },
+  });
+
+  const stages = stagesQuery.data ?? [];
+  const lostReasons = lostReasonStagesQuery.data ?? [];
+  const extensions = extensionsQuery.data ?? [];
+
+  const queryClient = useQueryClient();
+  const invalidateOrdersList = useCallback(() => {
+    void queryClient.invalidateQueries({ queryKey: crmAppKeys.ordersList.all() });
+  }, [queryClient]);
+
   const [currentFilters, setCurrentFilters] = useState<Record<string, any>>({});
-  const [ordersData, setOrdersData] = useState<any[]>([]);
-  const [loading, setLoading] = useState(false);
   const [totalOrders, setTotalOrders] = useState(0);
-  const [summaryTiles, setSummaryTiles] = useState<any>(null);
-  const [ordersMetrics, setOrdersMetrics] = useState<Record<string, number> | null>(
-    null,
-  );
 
   // Delete Modal
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -296,7 +313,6 @@ const CrmOrders = () => { // NOSONAR
     lost: null,
     deleted: null,
   });
-  const activeFilterRef = useRef<string>("all");
 
   // Attachments Modal
   const [showAttachmentModal, setShowAttachmentModal] = useState(false);
@@ -381,12 +397,6 @@ const CrmOrders = () => { // NOSONAR
     dateFrom: null as string | null,
     dateTo: null as string | null,
   });
-  // Fetch stages and extensions on component mount
-  useEffect(() => {
-    fetchStages();
-    fetchLostReasons();
-    fetchExtensions(ModuleSlug.CRM_ORDERS);
-  }, []);
 
   // Sync export modal filters from current table filters when modal opens
   useEffect(() => {
@@ -486,63 +496,6 @@ const CrmOrders = () => { // NOSONAR
     }
   }, [exportFileName, exportFilters, fetchOrdersForExport]);
 
-  // Fetch orders when filters or search change
-  const fetchOrders = useCallback(
-    async (page = 1, perPage = 15) => {
-      setLoading(true);
-      try {
-        const params = buildCrmOrdersListGetOrdersParams({
-          filters: currentFilters,
-          page,
-          perPage,
-          tableSort: ordersPagination,
-          normalizeSearch: true,
-          ownerParamStyle: "user_extension_filter",
-        });
-
-        const response: unknown = await getOrders(params);
-        const normalized = normalizeGetOrdersListResponse(response);
-        const summary: any = normalized.summaryTiles;
-        const metricsFromApi: any = normalized.metrics;
-
-        setOrdersData(normalized.ordersData as any[]);
-        setTotalOrders(normalized.totalOrders);
-        setSummaryTiles(summary);
-        setOrdersMetrics(metricsFromApi);
-        setTabTotals((prev) => ({
-          all:
-            typeof summary?.total_orders === "number"
-              ? summary.total_orders
-              : prev.all,
-          lost:
-            typeof summary?.lost_orders === "number" ? summary.lost_orders : prev.lost,
-          deleted:
-            typeof summary?.deleted_orders === "number"
-              ? summary.deleted_orders
-              : prev.deleted,
-        }));
-
-        const activeTabAtResponse = activeFilterRef.current;
-        if (
-          activeTabAtResponse === "all" ||
-          activeTabAtResponse === "lost" ||
-          activeTabAtResponse === "deleted"
-        ) {
-          setTabTotals((prev) => ({
-            ...prev,
-            [activeTabAtResponse]: normalized.totalOrders,
-          }));
-        }
-
-        return response;
-      } finally {
-        setLoading(false);
-      }
-    },
-    [currentFilters, ordersPagination.sortBy, ordersPagination.sortOrder],
-  );
-
-  // initiate call
   const handleCallClick = useCallback(
     async (order: any) => {
       const phone = order?.customer_phone;
@@ -649,9 +602,74 @@ const CrmOrders = () => { // NOSONAR
     }
   }, [router.isReady, router.query.tab, stages]);
 
+  const ordersListFiltersKey = useMemo(
+    () => JSON.stringify(currentFilters),
+    [currentFilters],
+  );
+
+  const ordersListQuery = useQuery({
+    queryKey: crmAppKeys.ordersList.page({
+      filtersKey: ordersListFiltersKey,
+      activeTab: activeFilter,
+      page: ordersPagination.currentPage,
+      perPage: ordersPagination.rowsPerPage,
+      sortBy: ordersPagination.sortBy,
+      sortOrder: ordersPagination.sortOrder,
+    }),
+    queryFn: async () => {
+      const params = buildCrmOrdersListGetOrdersParams({
+        filters: currentFilters,
+        page: ordersPagination.currentPage,
+        perPage: ordersPagination.rowsPerPage,
+        tableSort: ordersPagination,
+        normalizeSearch: true,
+        ownerParamStyle: "user_extension_filter",
+      });
+      const response: unknown = await getOrders(params);
+      return normalizeGetOrdersListResponse(response);
+    },
+    placeholderData: (previousData) => previousData,
+  });
+
+  const normalizedOrdersList = ordersListQuery.data;
+  const ordersData = (normalizedOrdersList?.ordersData ?? []) as any[];
+  const summaryTiles = (normalizedOrdersList?.summaryTiles ?? null) as Record<
+    string,
+    unknown
+  > | null;
+  const ordersMetrics =
+    (normalizedOrdersList?.metrics as Record<string, number> | null) ?? null;
+
+  const ordersListLoading =
+    ordersListQuery.isPending || ordersListQuery.isFetching;
+
   useEffect(() => {
-    activeFilterRef.current = activeFilter;
-  }, [activeFilter]);
+    if (!normalizedOrdersList || ordersListQuery.isPlaceholderData) return;
+    setTotalOrders(normalizedOrdersList.totalOrders);
+    const summary: any = normalizedOrdersList.summaryTiles;
+    setTabTotals((prev) => {
+      const next = {
+        all:
+          typeof summary?.total_orders === "number"
+            ? summary.total_orders
+            : prev.all,
+        lost:
+          typeof summary?.lost_orders === "number" ? summary.lost_orders : prev.lost,
+        deleted:
+          typeof summary?.deleted_orders === "number"
+            ? summary.deleted_orders
+            : prev.deleted,
+      };
+      if (
+        activeFilter === "all" ||
+        activeFilter === "lost" ||
+        activeFilter === "deleted"
+      ) {
+        return { ...next, [activeFilter]: normalizedOrdersList.totalOrders };
+      }
+      return next;
+    });
+  }, [normalizedOrdersList, activeFilter, ordersListQuery.isPlaceholderData]);
 
   // Handler to update filter and URL
   const handleFilterChange = useCallback(
@@ -690,16 +708,6 @@ const CrmOrders = () => { // NOSONAR
     },
     [router, summaryTiles, tabTotals],
   );
-
-  useEffect(() => {
-    fetchOrders(ordersPagination.currentPage, ordersPagination.rowsPerPage);
-  }, [
-    refreshKey,
-    currentFilters,
-    ordersPagination.currentPage,
-    ordersPagination.rowsPerPage,
-    fetchOrders,
-  ]);
 
   // Fetch attachments when modal opens
   useEffect(() => {
@@ -868,37 +876,7 @@ const CrmOrders = () => { // NOSONAR
   // Handle filter changes
   const handleFiltersChange = useCallback((filters: Record<string, any>) => {
     setCurrentFilters((prev) => applyCrmFilterRules(prev, filters, ORDERS_FILTER_RULES));
-    setRefreshKey((prev) => prev + 1);
   }, []);
-
-  const fetchStages = async () => {
-    try {
-      const stagesData = await getStages("order");
-      setStages(stagesData || []);
-    } catch (error) {
-      console.error("Failed to fetch stages:", error);
-    }
-  };
-
-  const fetchLostReasons = async () => {
-    try {
-      const lostReasonsData = await (getStages as any)("lost_reason");
-      setLostReasons(lostReasonsData || []);
-    } catch (error) {
-      console.error("Failed to fetch lost reasons:", error);
-    }
-  };
-
-  const fetchExtensions = async (moduleSlug: string = ModuleSlug.CRM_LEADS) => {
-    try {
-      const hierarchyData = await GetHierarchyData(moduleSlug);
-      if (hierarchyData?.extensions) {
-        setExtensions(hierarchyData.extensions);
-      }
-    } catch (error) {
-      console.error("Failed to fetch extensions:", error);
-    }
-  };
 
   const fetchOrderDetails = useCallback(async (orderId: number) => {
     setLoadingOrder(true);
@@ -1029,7 +1007,7 @@ const CrmOrders = () => { // NOSONAR
   const { writePreviewIdToStorage, clearPreviewIdFromStorage } =
     useCrmListPreviewPersistence({
       localStorageKey: "crm-orders-list-preview-record-id",
-      listLoading: !isInitialized || loading,
+      listLoading: !isInitialized || ordersListLoading,
       openPreviewByNumericId: openOrderPreviewById,
       enableRestore: false,
     });
@@ -1094,11 +1072,11 @@ const CrmOrders = () => { // NOSONAR
       setShowSuccessfulModal(true);
       setSuccessModalTitle("Order Deleted");
       setSuccessModalDescription("Order has been deleted successfully");
-      setRefreshKey((oldKey) => oldKey + 1);
+      invalidateOrdersList();
     } catch (error) {
       console.error("Failed to delete order:", error);
     }
-  }, [orderToDelete]);
+  }, [orderToDelete, invalidateOrdersList]);
 
   // Restore Order Handler
   const handleRestoreOrder = useCallback(async (orderId: number) => {
@@ -1110,12 +1088,12 @@ const CrmOrders = () => { // NOSONAR
       setShowSuccessfulModal(true);
       setSuccessModalTitle("Order Restored");
       setSuccessModalDescription("Order has been restored successfully");
-      setRefreshKey((oldKey) => oldKey + 1);
+      invalidateOrdersList();
     } catch (error) {
       console.error("Failed to restore order:", error);
       toast.error("Failed to restore order");
     }
-  }, []);
+  }, [invalidateOrdersList]);
 
   // Mark Order Lost Modal
   const handleMarkLost = useCallback((order: any) => {
@@ -1139,11 +1117,11 @@ const CrmOrders = () => { // NOSONAR
       setShowSuccessfulModal(true);
       setSuccessModalTitle("Order Marked as Lost");
       setSuccessModalDescription("Order has been marked as lost successfully");
-      setRefreshKey((oldKey) => oldKey + 1);
+      invalidateOrdersList();
     } catch (error) {
       console.error("Failed to mark order as lost:", error);
     }
-  }, [orderToMarkLost, lostReasonId, lostFeedback]);
+  }, [orderToMarkLost, lostReasonId, lostFeedback, invalidateOrdersList]);
 
   // Helper functions
   const handleSort = (
@@ -1380,15 +1358,27 @@ const CrmOrders = () => { // NOSONAR
   // Calculate filter counts (using summary_tiles if available, otherwise from data)
   const filterCounts = useMemo(() => {
     const transformed = ordersData.map(transformOrderData);
+    const summaryAll =
+      typeof summaryTiles?.total_orders === "number"
+        ? summaryTiles.total_orders
+        : undefined;
+    const summaryLost =
+      typeof summaryTiles?.lost_orders === "number"
+        ? summaryTiles.lost_orders
+        : undefined;
+    const summaryDeleted =
+      typeof summaryTiles?.deleted_orders === "number"
+        ? summaryTiles.deleted_orders
+        : undefined;
     const counts: Record<string, number> = {
-      all: tabTotals.all ?? summaryTiles?.total_orders ?? transformed.length,
+      all: tabTotals.all ?? summaryAll ?? transformed.length,
       lost:
         tabTotals.lost ??
-        summaryTiles?.lost_orders ??
+        summaryLost ??
         transformed.filter((o) => o.rawData?.is_lost).length,
       deleted:
         tabTotals.deleted ??
-        summaryTiles?.deleted_orders ??
+        summaryDeleted ??
         transformed.filter((o) => o.rawData?.is_archived || o.rawData?.deleted_at)
           .length,
     };
@@ -1843,7 +1833,7 @@ const CrmOrders = () => { // NOSONAR
     onSearch: () => {},
     currentFilters,
     handleFiltersChange,
-    refresh: () => setRefreshKey((prev) => prev + 1),
+    refresh: () => invalidateOrdersList(),
     activeTab: activeFilter,
     onTabChange: handleFilterChange,
     tabs: [
@@ -2455,7 +2445,6 @@ const CrmOrders = () => { // NOSONAR
                               ...ordersPagination,
                               currentPage: 1,
                             });
-                            setRefreshKey((prev) => prev + 1);
                           }}
                         >
                           Submit Filters
@@ -2486,7 +2475,6 @@ const CrmOrders = () => { // NOSONAR
                               ...ordersPagination,
                               currentPage: 1,
                             });
-                            setRefreshKey((prev) => prev + 1);
                           }}
                         >
                           Reset
@@ -2564,7 +2552,7 @@ const CrmOrders = () => { // NOSONAR
                     handleViewOrder(row.rawData?.id || row.id);
                   }
                 }}
-                loading={loading}
+                loading={ordersListLoading}
                 emptyMessage="No orders found matching your criteria"
                 loadingMessage="Loading orders..."
                 hover={true}
@@ -2593,10 +2581,7 @@ const CrmOrders = () => { // NOSONAR
                             order_stage_id: toCol,
                           })
                             .then(() => {
-                              fetchOrders(
-                                ordersPagination.currentPage,
-                                ordersPagination.rowsPerPage
-                              );
+                              invalidateOrdersList();
                             })
                             .catch((err) => {
                               console.error("Failed to update order stage:", err);
@@ -3331,7 +3316,6 @@ const CrmOrders = () => { // NOSONAR
 
           handleFiltersChange(filtersToApply);
           setOrdersPagination({ ...ordersPagination, currentPage: 1 });
-          setRefreshKey((prev) => prev + 1);
           setShowFiltersSidebar(false);
         }}
         onReset={() => {
@@ -3354,7 +3338,6 @@ const CrmOrders = () => { // NOSONAR
           setCurrentFilters({});
           setActiveFilter("all");
           setOrdersPagination({ ...ordersPagination, currentPage: 1 });
-          setRefreshKey((prev) => prev + 1);
         }}
         showApplyButton={true}
         showResetButton={true}
@@ -6457,7 +6440,7 @@ const CrmOrders = () => { // NOSONAR
           }}
           orderId={editingOrderIdInSidebar}
           editMode={editOrderModeInSidebar}
-          onSuccess={() => setRefreshKey((prev) => prev + 1)}
+          onSuccess={() => invalidateOrdersList()}
         />
       )}
 

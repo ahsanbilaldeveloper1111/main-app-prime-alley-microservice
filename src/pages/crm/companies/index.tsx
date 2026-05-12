@@ -6,6 +6,7 @@ import React, {
   useCallback,
   useMemo,
 } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 import GenericListPage from "@components/GenericListPage";
@@ -96,6 +97,7 @@ import GenericFilterSidebar, {
   FilterField,
 } from "@components/GenericFilterSidebar";
 import StatsCards, { StatsCardData } from "@components/GenericStatsCards";
+import { crmAppKeys } from "../../../query/keys";
 import {
   getCrmData,
   getCrmDataById,
@@ -122,6 +124,7 @@ import {
   type CompanyData,
   type EnrichmentData,
 } from "@utils/crm";
+import { CompanyViewEnrichmentBlock } from "@components/crm/CompanyViewEnrichmentBlock";
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
 import DeleteConfirmationModal from "@components/page-partials/DeleteConfirmationModal";
@@ -182,263 +185,6 @@ type CompanyAssignedToSelectOption = {
 
 type CompanySourceFileSelectOption = { value: string; label: string };
 
-const labelKey = (key: string) =>
-  key.replace(/_/g, " ").replace(/\b\w/g, (l) => l.toUpperCase());
-const hasVal = (v: unknown) => v !== null && v !== undefined && v !== "";
-
-/** Renders enrichment_data: top-level fields, then all structured_data fields (no raw_data). */
-const CompanyViewEnrichmentBlock = ({ data }: { data: EnrichmentData }) => {
-  const isObj = (v: unknown): v is Record<string, unknown> =>
-    typeof v === "object" && v !== null && !Array.isArray(v);
-  const topLevel: Array<{ key: string; value: unknown }> = [];
-  const skipKeys = ["raw_data", "structured_data", "validation_data"];
-  Object.entries(data).forEach(([k, v]) => {
-    if (skipKeys.includes(k) || !hasVal(v)) return;
-    topLevel.push({ key: k, value: v });
-  });
-
-  const struct = data.structured_data;
-  const grid = {
-    display: "grid" as const,
-    gridTemplateColumns: "160px 1fr",
-    gap: "12px 24px",
-    alignItems: "baseline",
-  };
-  const labelStyle = {
-    fontSize: "12px",
-    fontWeight: 700,
-    color: "#6b7280",
-    textTransform: "uppercase" as const,
-    letterSpacing: "0.5px",
-  };
-  const valueStyle = {
-    fontSize: "14px",
-    color: "#1f2937",
-    fontWeight: 500,
-    wordBreak: "break-word" as const,
-  };
-  const linkStyle = {
-    ...valueStyle,
-    color: "#2563eb",
-    textDecoration: "underline",
-  };
-
-  return (
-    <div style={{ marginBottom: "24px" }}>
-      <h5
-        style={{
-          fontSize: "15px",
-          fontWeight: 700,
-          color: "#1f2937",
-          marginBottom: "16px",
-          display: "flex",
-          alignItems: "center",
-          gap: "8px",
-        }}
-      >
-        <div
-          style={{
-            width: "4px",
-            height: "18px",
-            background: "linear-gradient(135deg, #2563eb 0%, #764ba2 100%)",
-            borderRadius: "2px",
-          }}
-        />
-        Enrichment data
-      </h5>
-      <div
-        style={{
-          background: "#f9fafb",
-          border: "1px solid #e5e7eb",
-          borderRadius: "12px",
-          padding: "20px",
-        }}
-      >
-        {topLevel.length > 0 && (
-          <div style={{ ...grid, marginBottom: struct ? "20px" : 0 }}>
-            {topLevel.map(({ key, value }) => (
-              <React.Fragment key={key}>
-                <div style={labelStyle}>{labelKey(key)}</div>
-                <div style={valueStyle}>
-                  {Array.isArray(value)
-                    ? value.join(", ")
-                    : typeof value === "object"
-                      ? JSON.stringify(value)
-                      : String(value)}
-                </div>
-              </React.Fragment>
-            ))}
-          </div>
-        )}
-        {struct && isObj(struct) && (
-          <div
-            style={{
-              paddingTop: topLevel.length > 0 ? "20px" : 0,
-              borderTop: topLevel.length > 0 ? "1px solid #e5e7eb" : "none",
-            }}
-          >
-            <div
-              style={{
-                fontSize: "12px",
-                fontWeight: 700,
-                color: "#6b7280",
-                marginBottom: "12px",
-              }}
-            >
-              Structured data (all fields)
-            </div>
-            <div style={grid}>
-              {hasVal(struct.official_company_name) && (
-                <>
-                  <div style={labelStyle}>Official company name</div>
-                  <div style={valueStyle}>
-                    {String(struct.official_company_name)}
-                  </div>
-                </>
-              )}
-              {struct.headquarters &&
-                (struct.headquarters.address ||
-                  struct.headquarters.city ||
-                  struct.headquarters.country) && (
-                  <>
-                    <div style={labelStyle}>Headquarters</div>
-                    <div style={valueStyle}>
-                      {[
-                        struct.headquarters.address,
-                        struct.headquarters.city,
-                        struct.headquarters.country,
-                      ]
-                        .filter(Boolean)
-                        .join(", ")}
-                    </div>
-                  </>
-                )}
-              {struct.other_locations &&
-                struct.other_locations.length > 0 &&
-                struct.other_locations.map((loc: any, i: number) => {
-                  const line = [loc?.address, loc?.city, loc?.country]
-                    .filter(Boolean)
-                    .join(", ");
-                  if (!line) return null;
-                  return (
-                    <React.Fragment key={i}>
-                      <div style={labelStyle}>Other location {i + 1}</div>
-                      <div style={valueStyle}>{line}</div>
-                    </React.Fragment>
-                  );
-                })}
-              {struct.emails &&
-                struct.emails.length > 0 &&
-                struct.emails.map((e: any, i: number) => {
-                  if (!hasVal(e?.email)) return null;
-                  return (
-                    <React.Fragment key={i}>
-                      <div style={labelStyle}>
-                        {struct.emails!.length > 1 ? `Email ${i + 1}` : "Email"}
-                      </div>
-                      <div style={valueStyle}>
-                        <a
-                          href={`mailto:${e.email}`}
-                          style={linkStyle}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                        >
-                          {e.email}
-                        </a>
-                      </div>
-                    </React.Fragment>
-                  );
-                })}
-              {struct.phones &&
-                struct.phones.length > 0 &&
-                struct.phones.map((p: any, i: number) => {
-                  if (!hasVal(p?.number)) return null;
-                  return (
-                    <React.Fragment key={i}>
-                      <div style={labelStyle}>
-                        {struct.phones!.length > 1 ? `Phone ${i + 1}` : "Phone"}
-                      </div>
-                      <div style={valueStyle}>
-                        <a
-                          href={`tel:${p.number}`}
-                          style={linkStyle}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                        >
-                          {p.number}
-                        </a>
-                      </div>
-                    </React.Fragment>
-                  );
-                })}
-              {struct.social_links &&
-                struct.social_links.length > 0 &&
-                struct.social_links.map((s: any, i: number) => {
-                  if (!hasVal(s?.url)) return null;
-                  const linkLabel = s?.platform
-                    ? String(s.platform)
-                    : `Social ${i + 1}`;
-                  return (
-                    <React.Fragment key={i}>
-                      <div style={labelStyle}>{linkLabel}</div>
-                      <div style={valueStyle}>
-                        <a
-                          href={s.url}
-                          style={linkStyle}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                        >
-                          {s.url}
-                        </a>
-                      </div>
-                    </React.Fragment>
-                  );
-                })}
-              {struct.llm_confidence != null && (
-                <>
-                  <div style={labelStyle}>LLM confidence</div>
-                  <div style={valueStyle}>{String(struct.llm_confidence)}</div>
-                </>
-              )}
-            </div>
-          </div>
-        )}
-        {data.validation_data && isObj(data.validation_data) && (
-          <div
-            style={{
-              marginTop: "20px",
-              paddingTop: "20px",
-              borderTop: "1px solid #e5e7eb",
-            }}
-          >
-            <div
-              style={{
-                fontSize: "12px",
-                fontWeight: 700,
-                color: "#6b7280",
-                marginBottom: "12px",
-              }}
-            >
-              Validation data
-            </div>
-            <div style={grid}>
-              {Object.entries(data.validation_data).map(([k, v]) => {
-                if (!hasVal(v)) return null;
-                return (
-                  <React.Fragment key={k}>
-                    <div style={labelStyle}>{labelKey(k)}</div>
-                    <div style={valueStyle}>{String(v)}</div>
-                  </React.Fragment>
-                );
-              })}
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-};
-
 const CrmCompanyManagement = () => {
   const {
     session,
@@ -449,7 +195,6 @@ const CrmCompanyManagement = () => {
     setRefreshKey,
     currentFilters,
     setCurrentFilters,
-    requestIdRef,
     setUploading,
     selectedFile,
     setSelectedFile,
@@ -513,6 +258,15 @@ const CrmCompanyManagement = () => {
     contactFormLoading, setContactFormLoading,
   } = useCrmListAssignmentContactSidebarState();
 
+  const contactCompanyForFormQuery = useQuery({
+    queryKey:
+      editingContactId != null
+        ? crmAppKeys.companies.byId(editingContactId)
+        : ([...crmAppKeys.companies.all(), "byId", "none"] as const),
+    queryFn: () => getCompany(editingContactId!),
+    enabled: showCreateContactSidebar && editingContactId != null,
+  });
+
   const [showBulkDeleteModal, setShowBulkDeleteModal] = useState(false);
   const [contactForm, setContactForm] = useState({
     firstName: "",
@@ -559,6 +313,15 @@ const CrmCompanyManagement = () => {
   const [editingCompanyId, setEditingCompanyId] = useState<number | null>(null);
   const [editingCompanyData, setEditingCompanyData] =
     useState<CompanyFormPayload | null>(null);
+
+  const companyFormEditQuery = useQuery({
+    queryKey:
+      editingCompanyId != null
+        ? crmAppKeys.companies.byId(editingCompanyId)
+        : ([...crmAppKeys.companies.all(), "byId", "none"] as const),
+    queryFn: () => getCompany(editingCompanyId!),
+    enabled: showCreateCompanySidebar && editingCompanyId != null,
+  });
 
   // Call recordings state
   const [callRecordings, setCallRecordings] = useState<any[]>([]);
@@ -611,91 +374,90 @@ const CrmCompanyManagement = () => {
     }
   }, [showAddContactsDropdown]);
 
-  // Load company into form when sidebar opens in edit mode
   useEffect(() => {
     if (!showCreateContactSidebar || !editingContactId) {
       setContactFormLoadError(null);
       setContactFormLoading(false);
       return;
     }
-    let cancelled = false;
-    setContactFormLoadError(null);
-    setContactFormLoading(true);
-    getCompany(editingContactId)
-      .then((company: CompanyData) => {
-        if (cancelled) return;
-        const nameParts = (company.name || "").trim().split(/\s+/);
-        const firstName = nameParts[0] || "";
-        const lastName = nameParts.slice(1).join(" ") || "";
-        setContactForm({
-          firstName,
-          lastName,
-          email: company.email ?? "",
-          phoneNumber: company.phone ?? "",
-          campaign_id: null,
-          contact_owner: null,
-          lifecycle_stage: "Lead",
-          disposition: "",
-          legal_basis: [],
-          last_called: "",
-          last_call_status: "",
-          next_call: "",
-          scheduled_call_at: "",
-          tags: [],
-          note: "",
-          is_viewed: false,
-        });
-        if (!cancelled) setContactFormLoading(false);
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setContactFormLoadError("Failed to load company");
-          setContactFormLoading(false);
-        }
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [showCreateContactSidebar, editingContactId]);
+    setContactFormLoading(contactCompanyForFormQuery.isFetching);
+    if (contactCompanyForFormQuery.isError) {
+      setContactFormLoadError("Failed to load company");
+    } else {
+      setContactFormLoadError(null);
+    }
+  }, [
+    showCreateContactSidebar,
+    editingContactId,
+    contactCompanyForFormQuery.isFetching,
+    contactCompanyForFormQuery.isError,
+    setContactFormLoadError,
+    setContactFormLoading,
+  ]);
 
-  // Load company into Create Company sidebar when opening for edit
+  useEffect(() => {
+    if (!showCreateContactSidebar || !editingContactId || !contactCompanyForFormQuery.data) {
+      return;
+    }
+    const company = contactCompanyForFormQuery.data;
+    const nameParts = (company.name || "").trim().split(/\s+/);
+    const firstName = nameParts[0] || "";
+    const lastName = nameParts.slice(1).join(" ") || "";
+    setContactForm({
+      firstName,
+      lastName,
+      email: company.email ?? "",
+      phoneNumber: company.phone ?? "",
+      campaign_id: null,
+      contact_owner: null,
+      lifecycle_stage: "Lead",
+      disposition: "",
+      legal_basis: [],
+      last_called: "",
+      last_call_status: "",
+      next_call: "",
+      scheduled_call_at: "",
+      tags: [],
+      note: "",
+      is_viewed: false,
+    });
+  }, [
+    showCreateContactSidebar,
+    editingContactId,
+    contactCompanyForFormQuery.data,
+  ]);
+
   useEffect(() => {
     if (!showCreateCompanySidebar) return;
     if (editingCompanyId == null) {
       setEditingCompanyData(null);
       return;
     }
-    let cancelled = false;
-    getCompany(editingCompanyId)
-      .then((company: CompanyData) => {
-        if (cancelled) return;
-        setEditingCompanyData({
-          name: company.name ?? "",
-          phone: company.phone ?? undefined,
-          city: company.city ?? undefined,
-          country: company.country ?? undefined,
-          industry: company.industry ?? undefined,
-          domain: company.domain ?? undefined,
-          email: company.email ?? undefined,
-        });
-      })
-      .catch(() => {
-        if (!cancelled) setEditingCompanyData(null);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [showCreateCompanySidebar, editingCompanyId]);
+    const company = companyFormEditQuery.data;
+    if (!company) return;
+    setEditingCompanyData({
+      name: company.name ?? "",
+      phone: company.phone ?? undefined,
+      city: company.city ?? undefined,
+      country: company.country ?? undefined,
+      industry: company.industry ?? undefined,
+      domain: company.domain ?? undefined,
+      email: company.email ?? undefined,
+    });
+  }, [showCreateCompanySidebar, editingCompanyId, companyFormEditQuery.data]);
+
+  useEffect(() => {
+    if (!showCreateCompanySidebar || editingCompanyId == null) return;
+    if (companyFormEditQuery.isError) {
+      setEditingCompanyData(null);
+    }
+  }, [showCreateCompanySidebar, editingCompanyId, companyFormEditQuery.isError]);
 
   // Handler to update filter and URL
   const handleFilterChange = useCallback(
     (filterId: string) => {
       setActiveFilter(filterId);
       setPagination((prev) => ({ ...prev, currentPage: 1 }));
-      // Prevent showing stale totalRecords on "Convert to Leads" tab until new data loads
-      if (filterId === "has_leads") {
-        setLoading(true);
-      }
 
       // Update URL with tab query parameter
       router.push(
@@ -756,7 +518,6 @@ const CrmCompanyManagement = () => {
   const [totalRecords, setTotalRecords] = useState(0);
   /** Total count of all companies (unchanged when switching to Scheduled / Convert to Leads tab) */
   const [totalAllCompanies, setTotalAllCompanies] = useState(0);
-  const [loading, setLoading] = useState(false);
   const [clearSelectedRows, setClearSelectedRows] = useState(false);
   const [metrics, setMetrics] = useState<CrmDataMetrics>({
     assigned_records: 0,
@@ -912,6 +673,33 @@ const CrmCompanyManagement = () => {
     ],
   );
 
+  const queryClient = useQueryClient();
+  const companiesListFiltersKey = useMemo(
+    () => JSON.stringify(memoizedFilters),
+    [memoizedFilters],
+  );
+
+  const companiesListQuery = useQuery({
+    queryKey: crmAppKeys.companiesPage.list({
+      filtersKey: companiesListFiltersKey,
+      activeTab: activeFilter,
+      page: pagination.currentPage,
+      perPage: pagination.rowsPerPage,
+      sortBy: pagination.sortBy,
+      sortOrder: pagination.sortOrder,
+    }),
+    queryFn: () => getCompanies(buildCrmDataParams()),
+    placeholderData: (previousData) => previousData,
+  });
+
+  const companiesListLoading =
+    companiesListQuery.isPending || companiesListQuery.isFetching;
+
+  const refreshCompaniesListAndPicklists = useCallback(() => {
+    void queryClient.invalidateQueries({ queryKey: crmAppKeys.companiesPage.all() });
+    setRefreshKey((prev) => prev + 1);
+  }, [queryClient, setRefreshKey]);
+
   // Extract unique source_file values from dataList for creatable select
   const uniqueSources = useMemo(() => {
     const sources = new Set<string>();
@@ -954,12 +742,11 @@ const CrmCompanyManagement = () => {
   // Handle filter changes
   const handleFiltersChange = useCallback((filters: Record<string, any>) => {
     setCurrentFilters(filters);
-    setRefreshKey((prev) => prev + 1);
   }, []);
   const companyFilterPills = useCompanyFilterPills({
     currentFilters,
     handleFiltersChange,
-    refresh: () => setRefreshKey((prev) => prev + 1),
+    refresh: () => refreshCompaniesListAndPicklists(),
     extensions,
   });
 
@@ -995,43 +782,30 @@ const CrmCompanyManagement = () => {
     } as CrmDataItem;
   }, []);
 
-  // Fetch companies data (Companies API)
-  const fetchCrmData = useCallback(async () => {
-    requestIdRef.current += 1;
-    const currentRequestId = requestIdRef.current;
-    setLoading(true);
-    try {
-      const response = await getCompanies(buildCrmDataParams());
-      if (currentRequestId !== requestIdRef.current) return;
-
-      const rows = (response.data || []).map(mapCompanyToRow);
-      setDataList(rows);
-      setTotalRecords(response.total ?? 0);
-      setTotalAllCompanies(response.total ?? 0);
-      setMetrics((prev) => ({
-        ...prev,
-        assigned_records: response.total ?? 0,
-        unassigned_records: 0,
-      }));
-    } catch (error: any) {
-      if (currentRequestId !== requestIdRef.current) return;
+  useEffect(() => {
+    if (companiesListQuery.isError) {
       setDataList([]);
       setTotalRecords(0);
       setTotalAllCompanies(0);
-    } finally {
-      if (currentRequestId === requestIdRef.current) {
-        setLoading(false);
-      }
+      return;
     }
+    if (!companiesListQuery.data || companiesListQuery.isPlaceholderData) return;
+    const response = companiesListQuery.data;
+    const rows = (response.data || []).map(mapCompanyToRow);
+    setDataList(rows);
+    setTotalRecords(response.total ?? 0);
+    setTotalAllCompanies(response.total ?? 0);
+    setMetrics((prev) => ({
+      ...prev,
+      assigned_records: response.total ?? 0,
+      unassigned_records: 0,
+    }));
   }, [
-    buildCrmDataParams,
+    companiesListQuery.data,
+    companiesListQuery.isError,
+    companiesListQuery.isPlaceholderData,
     mapCompanyToRow,
   ]);
-
-  // Load data when filters or pagination changes
-  useEffect(() => {
-    fetchCrmData();
-  }, [fetchCrmData, refreshKey]);
 
   // Clear selection after bulk delete or when clearSelectedRows changes
   useEffect(() => {
@@ -1166,7 +940,7 @@ const CrmCompanyManagement = () => {
       setUploadProgress(0);
 
       // Refresh data
-      setRefreshKey((prev) => prev + 1);
+      refreshCompaniesListAndPicklists();
     } catch (error: any) {
       console.error("Upload error:", error);
       const errorMessage =
@@ -1276,7 +1050,7 @@ const CrmCompanyManagement = () => {
       await deleteCompany(itemToDelete.id);
       setShowDeleteModal(false);
       setItemToDelete(null);
-      setRefreshKey((prev) => prev + 1);
+      refreshCompaniesListAndPicklists();
     } catch (error: any) {
       console.error("Delete error:", error);
     }
@@ -1442,7 +1216,7 @@ const CrmCompanyManagement = () => {
       setSuccessModalTitle("Data Assignment Successful!");
       setSuccessModalDescription("The data has been successfully assigned.");
 
-      setRefreshKey((prev) => prev + 1);
+      refreshCompaniesListAndPicklists();
     } catch (error: any) {
       console.error("Assign error:", error);
     }
@@ -1458,7 +1232,7 @@ const CrmCompanyManagement = () => {
   const handleMarkAsViewed = useCallback(async (item: CrmDataItem) => {
     try {
       await markCrmDataAsViewed(item.id);
-      setRefreshKey((prev) => prev + 1);
+      refreshCompaniesListAndPicklists();
     } catch (error: any) {
       console.error("Mark as viewed error:", error);
     }
@@ -1654,7 +1428,7 @@ const CrmCompanyManagement = () => {
     try {
       const userExtension = (session?.user as any)?.extension || "default";
       await unscheduleCall(entryToUnschedule.id, userExtension);
-      setRefreshKey((prev) => prev + 1);
+      refreshCompaniesListAndPicklists();
       setShowUnscheduleModal(false);
       setEntryToUnschedule(null);
       toast.success("Call unscheduled successfully");
@@ -1697,7 +1471,7 @@ const CrmCompanyManagement = () => {
         userExtension,
         scheduleData.notes,
       );
-      setRefreshKey((prev) => prev + 1);
+      refreshCompaniesListAndPicklists();
       handleScheduleModalClose();
       setShowSuccessfulModal(true);
       setSuccessModalTitle(
@@ -1736,7 +1510,7 @@ const CrmCompanyManagement = () => {
     try {
       await bulkDeleteCrmData(selectedItems);
       setShowBulkDeleteModal(false);
-      setRefreshKey((prev) => prev + 1);
+      refreshCompaniesListAndPicklists();
       setSelectedItems([]);
       setClearSelectedRows(!clearSelectedRows);
     } catch (error: any) {
@@ -1790,7 +1564,7 @@ const CrmCompanyManagement = () => {
   const { writePreviewIdToStorage, clearPreviewIdFromStorage } =
     useCrmListPreviewPersistence({
       localStorageKey: "crm-companies-list-preview-record-id",
-      listLoading: loading,
+      listLoading: companiesListLoading,
       openPreviewByNumericId: openCompanyPreviewById,
     });
 
@@ -2486,7 +2260,7 @@ const CrmCompanyManagement = () => {
           industry: (contactForm as any).industry ?? undefined,
           domain: (contactForm as any).domain ?? undefined,
         });
-        fetchCrmData();
+        refreshCompaniesListAndPicklists();
         setContactForm({
           firstName: "",
           lastName: "",
@@ -2514,7 +2288,7 @@ const CrmCompanyManagement = () => {
         setCreateContactLoading(false);
       }
     },
-    [contactForm, fetchCrmData],
+    [contactForm, refreshCompaniesListAndPicklists],
   );
 
   const handleUpdateContactSubmit = useCallback(async () => {
@@ -2538,7 +2312,7 @@ const CrmCompanyManagement = () => {
         industry: (contactForm as any).industry ?? undefined,
         domain: (contactForm as any).domain ?? undefined,
       });
-      fetchCrmData();
+      refreshCompaniesListAndPicklists();
       setShowCreateContactSidebar(false);
       setEditingContactId(null);
     } catch {
@@ -2546,7 +2320,7 @@ const CrmCompanyManagement = () => {
     } finally {
       setCreateContactLoading(false);
     }
-  }, [editingContactId, contactForm, fetchCrmData]);
+  }, [editingContactId, contactForm, refreshCompaniesListAndPicklists]);
 
   // Render Create Contact Sidebar
   const renderCreateContactSidebar = () => {
@@ -4210,7 +3984,7 @@ const CrmCompanyManagement = () => {
                                 ...prev,
                                 currentPage: 1,
                               }));
-                              setRefreshKey((prev) => prev + 1);
+                              refreshCompaniesListAndPicklists();
                             }}
                           >
                             Submit Filters
@@ -4236,7 +4010,7 @@ const CrmCompanyManagement = () => {
                                 ...prev,
                                 currentPage: 1,
                               }));
-                              setRefreshKey((prev) => prev + 1);
+                              refreshCompaniesListAndPicklists();
                             }}
                           >
                             Reset Filters
@@ -4343,7 +4117,7 @@ const CrmCompanyManagement = () => {
                   }
                 }}
                 // Loading & styling
-                loading={loading}
+                loading={companiesListLoading}
                 emptyMessage="No companies found matching your criteria"
                 loadingMessage="Loading companies..."
                 hover={true}
@@ -4369,7 +4143,7 @@ const CrmCompanyManagement = () => {
                         ? {
                             ...tab,
                             count:
-                              activeFilter === "has_leads" && !loading
+                              activeFilter === "has_leads" && !companiesListLoading
                                 ? totalRecords
                                 : undefined,
                           }
@@ -4397,7 +4171,7 @@ const CrmCompanyManagement = () => {
                       const newFilters = { ...currentFilters };
                       delete newFilters.search;
                       handleFiltersChange(newFilters);
-                      setRefreshKey((prev) => prev + 1);
+                      refreshCompaniesListAndPicklists();
                     }
                   },
                   onSearch: () => {
@@ -4406,7 +4180,7 @@ const CrmCompanyManagement = () => {
                         ...currentFilters,
                         search: companySearch,
                       });
-                      setRefreshKey((prev) => prev + 1);
+                      refreshCompaniesListAndPicklists();
                     }
                   },
 
@@ -5970,7 +5744,7 @@ const CrmCompanyManagement = () => {
               ...prev,
               currentPage: 1,
             }));
-            setRefreshKey((prev) => prev + 1);
+            refreshCompaniesListAndPicklists();
             setShowFiltersSidebar(false);
           }}
           onReset={() => {
@@ -5991,7 +5765,7 @@ const CrmCompanyManagement = () => {
               ...prev,
               currentPage: 1,
             }));
-            setRefreshKey((prev) => prev + 1);
+            refreshCompaniesListAndPicklists();
           }}
         />
       </div>{" "}
@@ -6006,7 +5780,7 @@ const CrmCompanyManagement = () => {
           }}
           prospectId={convertingToLeadCrmRecordId}
           onSuccess={() => {
-            setRefreshKey((prev) => prev + 1);
+            refreshCompaniesListAndPicklists();
             toast.success("Company converted to lead successfully!");
           }}
         />
@@ -6250,7 +6024,7 @@ const CrmCompanyManagement = () => {
             } else {
               await createCompany(data);
             }
-            await fetchCrmData();
+            refreshCompaniesListAndPicklists();
             setShowCreateCompanySidebar(false);
             setEditingCompanyId(null);
             setEditingCompanyData(null);

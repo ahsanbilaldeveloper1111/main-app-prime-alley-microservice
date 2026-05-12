@@ -1,9 +1,11 @@
 "use client";
 
-import React, { useState, useRef, useEffect, useCallback, ReactElement } from "react";
+import React, { useState, useRef, useEffect, useCallback, useMemo, ReactElement } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import Layout from "@layout/index";
 import '../../../app/generic-style.css';
 import { getChats, getWhatsAppChatMessages, sendWhatsApp, getWhatsAppTemplates, type WhatsAppTemplateItem } from "@utils/communication";
+import { crmAppKeys } from "../../../query/keys";
 import { useWhatsAppSocket, type WhatsAppSocketPayload } from "@hooks/useWhatsAppSocket";
 import { useRouter } from "next/router";
 import parsePhoneNumber from "libphonenumber-js";
@@ -84,7 +86,11 @@ const Avatar = ({
       overflow: "hidden",
     }}
   >
-    {src ? <img src={src} alt="" style={{ width: "100%", height: "100%" }} /> : initials}
+    {src ? (
+      <img src={src} alt={initials ? `Avatar ${initials}` : "Avatar"} style={{ width: "100%", height: "100%" }} />
+    ) : (
+      initials
+    )}
   </div>
 );
 
@@ -454,9 +460,25 @@ const ConversationList = ({
   refreshChatsRef: RefreshChatsRef;
   compactMode?: "desktop" | "tablet" | "mobile";
 }) => {
-  const [chats, setChats] = useState<WhatsAppChatItem[]>([]);
-  const [chatsLoading, setChatsLoading] = useState(true);
-  const [chatsError, setChatsError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
+  const chatsQuery = useQuery({
+    queryKey: crmAppKeys.crmWhatsAppInbox.chats(),
+    queryFn: () => getChats(),
+  });
+
+  const chats = useMemo(() => {
+    const res = chatsQuery.data as { data?: WhatsAppChatItem[] } | undefined;
+    const data = res?.data;
+    return Array.isArray(data) ? data : [];
+  }, [chatsQuery.data]);
+
+  const chatsLoading = chatsQuery.isPending || chatsQuery.isFetching;
+  const chatsError = chatsQuery.isError ? "Failed to load chats" : null;
+
+  const invalidateWhatsAppChats = useCallback(() => {
+    void queryClient.invalidateQueries({ queryKey: crmAppKeys.crmWhatsAppInbox.all() });
+  }, [queryClient]);
+
   const [sortOpen, setSortOpen] = useState(false);
   const sortRef = useRef<HTMLDivElement>(null);
   const [didAutoSelectFromUrl, setDidAutoSelectFromUrl] = useState(false);
@@ -483,30 +505,9 @@ const ConversationList = ({
     initialPhoneFromUrl.current = rawPhone ? String(rawPhone).trim() : null;
   }, []);
 
-  const fetchWhatsAppChats = useCallback(() => {
-    setChatsLoading(true);
-    setChatsError(null);
-    getChats()
-      .then((res: unknown) => {
-        const data = (res as { data?: WhatsAppChatItem[] })?.data;
-        setChats(Array.isArray(data) ? data : []);
-        setChatsError(null);
-      })
-      .catch((e) => {
-        console.error("Failed to fetch WhatsApp chats", e);
-        setChats([]);
-        setChatsError("Failed to load chats");
-      })
-      .finally(() => setChatsLoading(false));
-  }, []);
-
   useEffect(() => {
-    fetchWhatsAppChats();
-  }, [fetchWhatsAppChats]);
-
-  useEffect(() => {
-    refreshChatsRef.current = fetchWhatsAppChats;
-  }, [refreshChatsRef, fetchWhatsAppChats]);
+    refreshChatsRef.current = invalidateWhatsAppChats;
+  }, [refreshChatsRef, invalidateWhatsAppChats]);
 
   useEffect(() => {
     if (didAutoSelectFromUrl) return;
