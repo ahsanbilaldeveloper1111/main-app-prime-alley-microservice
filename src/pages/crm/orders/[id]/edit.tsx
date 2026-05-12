@@ -1,12 +1,12 @@
 import "@assets/scss/datatable-style.scss";
 import React, { ReactElement, useState, useEffect, useRef } from "react";
+import { useQuery } from "@tanstack/react-query";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 import {
   updateOrder,
   getOrder,
   getStages,
-  StageData,
   getCrmProducts,
   CrmProduct,
 } from "@utils/crm";
@@ -26,6 +26,7 @@ import "@assets/scss/tabs.scss";
 import { ModuleSlug, ValidationType, checkRequiredFields } from '@utils/Helper';
 import { convertCurrency, formatCurrency } from '@utils/currency';
 import { GetHierarchyData } from "@utils/users";
+import { crmAppKeys } from "../../../../query/keys";
 
 interface OrderItem {
   id?: number;
@@ -46,9 +47,6 @@ const EditOrder = () => {
   const [formStep, setFormStep] = useState(0);
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(true);
-  const [stages, setStages] = useState<StageData[]>([]);
-  const [products, setProducts] = useState<CrmProduct[]>([]);
-  const [loadingProducts, setLoadingProducts] = useState(false);
   const [showAddItemModal, setShowAddItemModal] = useState(false);
   const [editingItemIndex, setEditingItemIndex] = useState<number | null>(null);
   const [itemFormData, setItemFormData] = useState({
@@ -60,6 +58,29 @@ const EditOrder = () => {
   });
   const isInitialLoad = useRef(true);
   const [convertingPrice, setConvertingPrice] = useState(false);
+
+  const stagesQuery = useQuery({
+    queryKey: crmAppKeys.crmStages.byType("order"),
+    queryFn: () => getStages("order"),
+  });
+  const extensionsQuery = useQuery({
+    queryKey: crmAppKeys.hierarchyExtensions.module(ModuleSlug.CRM_ORDERS),
+    queryFn: async () => {
+      const hierarchyData = await GetHierarchyData(ModuleSlug.CRM_ORDERS);
+      return hierarchyData?.extensions ?? [];
+    },
+  });
+  const productsQuery = useQuery({
+    queryKey: crmAppKeys.orderFormBootstrap.productsPicklist(),
+    queryFn: async () => {
+      const response = await getCrmProducts({ per_page: 100 });
+      return response.data ?? [];
+    },
+  });
+  const stages = stagesQuery.data ?? [];
+  const extensions = extensionsQuery.data ?? [];
+  const products = productsQuery.data ?? [];
+  const loadingProducts = productsQuery.isPending;
   
   const [formData, setFormData] = useState({
     customer_name: "",
@@ -82,27 +103,6 @@ const EditOrder = () => {
     items: [] as OrderItem[],
   });
 
-  useEffect(() => {
-    fetchStages();
-    fetchProducts();
-  }, []);
-
-  const [extensions, setExtensions] = useState<any[]>([]);
-
-  const fetchExtensions = async () => {
-    try {
-      const hierarchyData = await GetHierarchyData(ModuleSlug.CRM_ORDERS);
-      if (hierarchyData?.extensions) {
-        setExtensions(hierarchyData.extensions);
-      }
-    } catch (error) {
-      console.error("Failed to fetch extensions:", error);
-    }
-  };
-
-  useEffect(() => {
-    fetchExtensions();
-  }, []);
   useEffect(() => {
     const fetchOrderData = async () => {
       if (!router.isReady || !id || isInitialLoad.current === false) return;
@@ -201,27 +201,6 @@ const EditOrder = () => {
 
     fetchOrderData();
   }, [router.isReady, id, router]);
-
-  const fetchStages = async () => {
-    try {
-      const stagesData = await getStages('order');
-      setStages(stagesData || []);
-    } catch (error) {
-      console.error("Failed to fetch stages:", error);
-    }
-  };
-
-  const fetchProducts = async () => {
-    try {
-      setLoadingProducts(true);
-      const response = await getCrmProducts({ per_page: 100 });
-      setProducts(response.data || []);
-    } catch (error) {
-      console.error("Failed to fetch products:", error);
-    } finally {
-      setLoadingProducts(false);
-    }
-  };
 
   const calculateTotals = () => {
     const grandTotal = formData.items.reduce((sum, item) => {

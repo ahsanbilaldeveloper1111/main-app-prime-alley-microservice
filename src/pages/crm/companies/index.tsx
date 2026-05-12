@@ -6,6 +6,7 @@ import React, {
   useCallback,
   useMemo,
 } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 import GenericListPage from "@components/GenericListPage";
@@ -96,6 +97,7 @@ import GenericFilterSidebar, {
   FilterField,
 } from "@components/GenericFilterSidebar";
 import StatsCards, { StatsCardData } from "@components/GenericStatsCards";
+import { crmAppKeys } from "../../../query/keys";
 import {
   getCrmData,
   getCrmDataById,
@@ -122,6 +124,7 @@ import {
   type CompanyData,
   type EnrichmentData,
 } from "@utils/crm";
+import { CompanyViewModal } from "@page-modules/crm/companies/CompanyViewModal";
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
 import DeleteConfirmationModal from "@components/page-partials/DeleteConfirmationModal";
@@ -172,6 +175,14 @@ import { crmListPageReactSelectStyles as customSelectStyles } from "@utils/crmLi
 import { getDatetimeLocalMinNow } from "@utils/datetimeLocalInput";
 import { useCrmListPreviewPersistence } from "@crm/shared/useCrmListPreviewPersistence";
 import { HEADER_CONSTANTS } from "@constants/headerConstants";
+import {
+  useCompaniesActiveFilterFromUrl,
+  useCompaniesAddContactsClickOutside,
+  useCompaniesContactFormLoadFlagsEffect,
+  useCompaniesContactFormPrefillFromCompanyEffect,
+  useCompaniesEditCompanySidebarDataEffect,
+  useCompaniesEditCompanySidebarErrorEffect,
+} from "@hooks/useCompaniesPageBootstrapEffects";
 
 const { PERMISSIONS } = HEADER_CONSTANTS;
 
@@ -182,262 +193,230 @@ type CompanyAssignedToSelectOption = {
 
 type CompanySourceFileSelectOption = { value: string; label: string };
 
-const labelKey = (key: string) =>
-  key.replace(/_/g, " ").replace(/\b\w/g, (l) => l.toUpperCase());
-const hasVal = (v: unknown) => v !== null && v !== undefined && v !== "";
+interface CompaniesPaginationState {
+  currentPage: number;
+  rowsPerPage: number;
+  sortBy: string;
+  sortOrder: "asc" | "desc";
+}
 
-/** Renders enrichment_data: top-level fields, then all structured_data fields (no raw_data). */
-const CompanyViewEnrichmentBlock = ({ data }: { data: EnrichmentData }) => {
-  const isObj = (v: unknown): v is Record<string, unknown> =>
-    typeof v === "object" && v !== null && !Array.isArray(v);
-  const topLevel: Array<{ key: string; value: unknown }> = [];
-  const skipKeys = ["raw_data", "structured_data", "validation_data"];
-  Object.entries(data).forEach(([k, v]) => {
-    if (skipKeys.includes(k) || !hasVal(v)) return;
-    topLevel.push({ key: k, value: v });
-  });
-
-  const struct = data.structured_data;
-  const grid = {
-    display: "grid" as const,
-    gridTemplateColumns: "160px 1fr",
-    gap: "12px 24px",
-    alignItems: "baseline",
-  };
-  const labelStyle = {
-    fontSize: "12px",
-    fontWeight: 700,
-    color: "#6b7280",
-    textTransform: "uppercase" as const,
-    letterSpacing: "0.5px",
-  };
-  const valueStyle = {
-    fontSize: "14px",
-    color: "#1f2937",
-    fontWeight: 500,
-    wordBreak: "break-word" as const,
-  };
-  const linkStyle = {
-    ...valueStyle,
-    color: "#2563eb",
-    textDecoration: "underline",
+/** Build the params object for the GET /companies list API from page state. */
+function buildCompaniesListParams(
+  filters: Record<string, any>,
+  pagination: CompaniesPaginationState,
+  overrides: { page?: number; per_page?: number } = {},
+): Record<string, any> {
+  const params: Record<string, any> = {
+    page: pagination.currentPage,
+    per_page: pagination.rowsPerPage,
+    ...overrides,
   };
 
-  return (
-    <div style={{ marginBottom: "24px" }}>
-      <h5
-        style={{
-          fontSize: "15px",
-          fontWeight: 700,
-          color: "#1f2937",
-          marginBottom: "16px",
-          display: "flex",
-          alignItems: "center",
-          gap: "8px",
-        }}
-      >
-        <div
-          style={{
-            width: "4px",
-            height: "18px",
-            background: "linear-gradient(135deg, #2563eb 0%, #764ba2 100%)",
-            borderRadius: "2px",
-          }}
-        />
-        Enrichment data
-      </h5>
-      <div
-        style={{
-          background: "#f9fafb",
-          border: "1px solid #e5e7eb",
-          borderRadius: "12px",
-          padding: "20px",
-        }}
-      >
-        {topLevel.length > 0 && (
-          <div style={{ ...grid, marginBottom: struct ? "20px" : 0 }}>
-            {topLevel.map(({ key, value }) => (
-              <React.Fragment key={key}>
-                <div style={labelStyle}>{labelKey(key)}</div>
-                <div style={valueStyle}>
-                  {Array.isArray(value)
-                    ? value.join(", ")
-                    : typeof value === "object"
-                      ? JSON.stringify(value)
-                      : String(value)}
-                </div>
-              </React.Fragment>
-            ))}
-          </div>
-        )}
-        {struct && isObj(struct) && (
-          <div
-            style={{
-              paddingTop: topLevel.length > 0 ? "20px" : 0,
-              borderTop: topLevel.length > 0 ? "1px solid #e5e7eb" : "none",
-            }}
-          >
-            <div
-              style={{
-                fontSize: "12px",
-                fontWeight: 700,
-                color: "#6b7280",
-                marginBottom: "12px",
-              }}
-            >
-              Structured data (all fields)
-            </div>
-            <div style={grid}>
-              {hasVal(struct.official_company_name) && (
-                <>
-                  <div style={labelStyle}>Official company name</div>
-                  <div style={valueStyle}>
-                    {String(struct.official_company_name)}
-                  </div>
-                </>
-              )}
-              {struct.headquarters &&
-                (struct.headquarters.address ||
-                  struct.headquarters.city ||
-                  struct.headquarters.country) && (
-                  <>
-                    <div style={labelStyle}>Headquarters</div>
-                    <div style={valueStyle}>
-                      {[
-                        struct.headquarters.address,
-                        struct.headquarters.city,
-                        struct.headquarters.country,
-                      ]
-                        .filter(Boolean)
-                        .join(", ")}
-                    </div>
-                  </>
-                )}
-              {struct.other_locations &&
-                struct.other_locations.length > 0 &&
-                struct.other_locations.map((loc: any, i: number) => {
-                  const line = [loc?.address, loc?.city, loc?.country]
-                    .filter(Boolean)
-                    .join(", ");
-                  if (!line) return null;
-                  return (
-                    <React.Fragment key={i}>
-                      <div style={labelStyle}>Other location {i + 1}</div>
-                      <div style={valueStyle}>{line}</div>
-                    </React.Fragment>
-                  );
-                })}
-              {struct.emails &&
-                struct.emails.length > 0 &&
-                struct.emails.map((e: any, i: number) => {
-                  if (!hasVal(e?.email)) return null;
-                  return (
-                    <React.Fragment key={i}>
-                      <div style={labelStyle}>
-                        {struct.emails!.length > 1 ? `Email ${i + 1}` : "Email"}
-                      </div>
-                      <div style={valueStyle}>
-                        <a
-                          href={`mailto:${e.email}`}
-                          style={linkStyle}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                        >
-                          {e.email}
-                        </a>
-                      </div>
-                    </React.Fragment>
-                  );
-                })}
-              {struct.phones &&
-                struct.phones.length > 0 &&
-                struct.phones.map((p: any, i: number) => {
-                  if (!hasVal(p?.number)) return null;
-                  return (
-                    <React.Fragment key={i}>
-                      <div style={labelStyle}>
-                        {struct.phones!.length > 1 ? `Phone ${i + 1}` : "Phone"}
-                      </div>
-                      <div style={valueStyle}>
-                        <a
-                          href={`tel:${p.number}`}
-                          style={linkStyle}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                        >
-                          {p.number}
-                        </a>
-                      </div>
-                    </React.Fragment>
-                  );
-                })}
-              {struct.social_links &&
-                struct.social_links.length > 0 &&
-                struct.social_links.map((s: any, i: number) => {
-                  if (!hasVal(s?.url)) return null;
-                  const linkLabel = s?.platform
-                    ? String(s.platform)
-                    : `Social ${i + 1}`;
-                  return (
-                    <React.Fragment key={i}>
-                      <div style={labelStyle}>{linkLabel}</div>
-                      <div style={valueStyle}>
-                        <a
-                          href={s.url}
-                          style={linkStyle}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                        >
-                          {s.url}
-                        </a>
-                      </div>
-                    </React.Fragment>
-                  );
-                })}
-              {struct.llm_confidence != null && (
-                <>
-                  <div style={labelStyle}>LLM confidence</div>
-                  <div style={valueStyle}>{String(struct.llm_confidence)}</div>
-                </>
-              )}
-            </div>
-          </div>
-        )}
-        {data.validation_data && isObj(data.validation_data) && (
-          <div
-            style={{
-              marginTop: "20px",
-              paddingTop: "20px",
-              borderTop: "1px solid #e5e7eb",
-            }}
-          >
-            <div
-              style={{
-                fontSize: "12px",
-                fontWeight: 700,
-                color: "#6b7280",
-                marginBottom: "12px",
-              }}
-            >
-              Validation data
-            </div>
-            <div style={grid}>
-              {Object.entries(data.validation_data).map(([k, v]) => {
-                if (!hasVal(v)) return null;
-                return (
-                  <React.Fragment key={k}>
-                    <div style={labelStyle}>{labelKey(k)}</div>
-                    <div style={valueStyle}>{String(v)}</div>
-                  </React.Fragment>
-                );
-              })}
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-};
+  const assignWhenTruthy = (sourceKey: string, targetKey = sourceKey) => {
+    const value = filters[sourceKey];
+    if (value) params[targetKey] = value;
+  };
+
+  const assignArrayWhenNotEmpty = (
+    sourceKey: string,
+    targetKey = sourceKey,
+  ) => {
+    const value = filters[sourceKey];
+    if (Array.isArray(value) && value.length > 0) {
+      params[targetKey] = value;
+    }
+  };
+
+  assignWhenTruthy("search");
+  assignArrayWhenNotEmpty("campaign_id", "campaign_ids");
+  assignArrayWhenNotEmpty("tags");
+  assignWhenTruthy("assignment_status");
+
+  applyOwnerFilter(params, filters);
+  applyIsViewedFilter(params, filters);
+
+  assignWhenTruthy("created_at_from", "date_from");
+  assignWhenTruthy("created_at_to", "date_to");
+  assignWhenTruthy("last_called_at_from");
+  assignWhenTruthy("last_called_at_to");
+  applyHasScheduledCallsFilter(params, filters);
+  applyHasTicketsFilter(params, filters);
+  assignWhenTruthy("scheduled_call_status");
+  assignWhenTruthy("scheduled_call_from");
+  assignWhenTruthy("scheduled_call_to");
+  assignWhenTruthy("source_file");
+  assignArrayWhenNotEmpty("tag_ids");
+  assignWhenTruthy("disposition");
+
+  if (pagination.sortBy) {
+    params.sort_by = pagination.sortBy;
+    params.sort_order = pagination.sortOrder;
+  }
+  params.module_slug = ModuleSlug.CRM_DATA_MANAGEMENT;
+  return params;
+}
+
+function applyOwnerFilter(
+  params: Record<string, any>,
+  filters: Record<string, any>,
+): void {
+  if (!filters.user_extension?.length) return;
+  const ownerValues = Array.isArray(filters.user_extension)
+    ? filters.user_extension
+    : [filters.user_extension];
+  params.user_extensions = ownerValues;
+  if (ownerValues[0]) {
+    params.assigned_to = ownerValues[0];
+  }
+}
+
+function applyIsViewedFilter(
+  params: Record<string, any>,
+  filters: Record<string, any>,
+): void {
+  if (filters.is_viewed === undefined || filters.is_viewed === "") return;
+  params.is_viewed = filters.is_viewed;
+}
+
+function applyHasScheduledCallsFilter(
+  params: Record<string, any>,
+  filters: Record<string, any>,
+): void {
+  if (filters.has_scheduled_calls === undefined) return;
+  params.has_scheduled_calls = filters.has_scheduled_calls;
+}
+
+function applyHasTicketsFilter(
+  params: Record<string, any>,
+  filters: Record<string, any>,
+): void {
+  if (filters.has_tickets === undefined) return;
+  params.has_tickets = filters.has_tickets;
+}
+
+/** Resolve the website URL for a company from enrichment + bare domain. */
+function buildCompanyWebsiteUrl(
+  enrichment: EnrichmentData | undefined,
+  domain: string | undefined,
+): string | null {
+  if (enrichment?.discovered_website) return enrichment.discovered_website;
+  if (!domain) return null;
+  return domain.startsWith("http") ? domain : `https://${domain}`;
+}
+
+interface CompanyAboutSource {
+  name?: string | null;
+  phone?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+  data?: {
+    email?: string | null;
+    city?: string | null;
+    country?: string | null;
+    industry?: string | null;
+    domain?: string | null;
+  };
+}
+
+/** Build the "About this company" fields list, skipping empty values. */
+function buildCompanyAboutFields(
+  selectedCompany: CompanyAboutSource | null | undefined,
+  websiteUrl: string | null,
+  formatDate: (date: string) => string,
+): SidebarField[] {
+  const fields: SidebarField[] = [];
+  if (!selectedCompany) return fields;
+  const c = selectedCompany;
+  if (c.name) {
+    fields.push({ label: "Name", value: c.name, copyable: true });
+  }
+  if (c.phone) {
+    fields.push({
+      label: "Phone",
+      value: c.phone,
+      type: "phone",
+      copyable: true,
+      externalLink: `tel:${c.phone}`,
+    });
+  }
+  if (c.data?.email) {
+    fields.push({
+      label: "Email",
+      value: c.data.email,
+      type: "email",
+      copyable: true,
+      externalLink: `mailto:${c.data.email}`,
+    });
+  }
+  if (c.data?.city) fields.push({ label: "City", value: c.data.city });
+  if (c.data?.country) {
+    fields.push({ label: "Country", value: c.data.country });
+  }
+  if (c.data?.industry) {
+    fields.push({ label: "Industry", value: c.data.industry });
+  }
+  if (c.data?.domain) fields.push({ label: "Domain", value: c.data.domain });
+  if (websiteUrl) {
+    fields.push({
+      label: "Website",
+      value: websiteUrl,
+      type: "link",
+      externalLink: websiteUrl,
+    });
+  }
+  if (c.created_at) {
+    fields.push({
+      label: "Created",
+      value: formatDate(c.created_at),
+      type: "date",
+    });
+  }
+  if (c.updated_at) {
+    fields.push({
+      label: "Updated",
+      value: formatDate(c.updated_at),
+      type: "date",
+    });
+  }
+  return fields;
+}
+
+interface CsvFileValidationResult {
+  isValid: boolean;
+  errors: string[];
+}
+
+const CSV_MAX_SIZE_BYTES = 2 * 1024 * 1024;
+
+/** Validate the user-selected CSV file for the upload modal. */
+function validateCsvFile(file: File): CsvFileValidationResult {
+  const errors: string[] = [];
+  const isCsv =
+    file.type.includes("csv") || file.name.toLowerCase().endsWith(".csv");
+  if (!isCsv) errors.push("File must be a CSV file");
+  if (file.size > CSV_MAX_SIZE_BYTES) {
+    errors.push("File size must be less than 2MB");
+  }
+  if (file.size === 0) errors.push("File cannot be empty");
+  return { isValid: errors.length === 0, errors };
+}
+
+/** Translate a `dragenter`/`dragleave`/`dragover` event to drag-active state. */
+function getScheduleModalTitle(isEditingSchedule: boolean): string {
+  return isEditingSchedule ? "Edit Scheduled Call" : "Schedule Call";
+}
+
+function getScheduleModalDescription(isEditingSchedule: boolean): string {
+  return isEditingSchedule
+    ? "Please update the details below to modify the scheduled call."
+    : "Please fill the details below to schedule a call.";
+}
+
+function resolveDragActiveState(eventType: string): boolean | null {
+  if (eventType === "dragenter" || eventType === "dragover") return true;
+  if (eventType === "dragleave") return false;
+  return null;
+}
 
 const CrmCompanyManagement = () => {
   const {
@@ -449,7 +428,6 @@ const CrmCompanyManagement = () => {
     setRefreshKey,
     currentFilters,
     setCurrentFilters,
-    requestIdRef,
     setUploading,
     selectedFile,
     setSelectedFile,
@@ -513,6 +491,20 @@ const CrmCompanyManagement = () => {
     contactFormLoading, setContactFormLoading,
   } = useCrmListAssignmentContactSidebarState();
 
+  const contactCompanyForFormQuery = useQuery({
+    queryKey:
+      editingContactId === null
+        ? ([...crmAppKeys.companies.all(), "byId", "none"] as const)
+        : crmAppKeys.companies.byId(editingContactId),
+    queryFn: () => {
+      if (editingContactId === null) {
+        return Promise.reject(new Error("Contact id not available"));
+      }
+      return getCompany(editingContactId);
+    },
+    enabled: showCreateContactSidebar && editingContactId !== null,
+  });
+
   const [showBulkDeleteModal, setShowBulkDeleteModal] = useState(false);
   const [contactForm, setContactForm] = useState({
     firstName: "",
@@ -560,6 +552,20 @@ const CrmCompanyManagement = () => {
   const [editingCompanyData, setEditingCompanyData] =
     useState<CompanyFormPayload | null>(null);
 
+  const companyFormEditQuery = useQuery({
+    queryKey:
+      editingCompanyId === null
+        ? ([...crmAppKeys.companies.all(), "byId", "none"] as const)
+        : crmAppKeys.companies.byId(editingCompanyId),
+    queryFn: () => {
+      if (editingCompanyId === null) {
+        return Promise.reject(new Error("Company id not available"));
+      }
+      return getCompany(editingCompanyId);
+    },
+    enabled: showCreateCompanySidebar && editingCompanyId !== null,
+  });
+
   // Call recordings state
   const [callRecordings, setCallRecordings] = useState<any[]>([]);
   const [callRecordingsLoading, setCallRecordingsLoading] = useState(false);
@@ -583,119 +589,43 @@ const CrmCompanyManagement = () => {
   // Initialize activeFilter state
   const [activeFilter, setActiveFilter] = useState("all");
 
-  // Read tab from URL on mount and when router is ready
-  useEffect(() => {
-    if (router.isReady && router.query.tab) {
-      const tabFromUrl = String(router.query.tab);
-      if (validFilters.includes(tabFromUrl)) {
-        setActiveFilter(tabFromUrl);
-      }
-    }
-  }, [router.isReady, router.query.tab]);
-
-  // Close Add Contacts dropdown when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (
-        addContactsRef.current &&
-        !addContactsRef.current.contains(event.target as Node)
-      ) {
-        setShowAddContactsDropdown(false);
-      }
-    };
-
-    if (showAddContactsDropdown) {
-      document.addEventListener("mousedown", handleClickOutside);
-      return () =>
-        document.removeEventListener("mousedown", handleClickOutside);
-    }
-  }, [showAddContactsDropdown]);
-
-  // Load company into form when sidebar opens in edit mode
-  useEffect(() => {
-    if (!showCreateContactSidebar || !editingContactId) {
-      setContactFormLoadError(null);
-      setContactFormLoading(false);
-      return;
-    }
-    let cancelled = false;
-    setContactFormLoadError(null);
-    setContactFormLoading(true);
-    getCompany(editingContactId)
-      .then((company: CompanyData) => {
-        if (cancelled) return;
-        const nameParts = (company.name || "").trim().split(/\s+/);
-        const firstName = nameParts[0] || "";
-        const lastName = nameParts.slice(1).join(" ") || "";
-        setContactForm({
-          firstName,
-          lastName,
-          email: company.email ?? "",
-          phoneNumber: company.phone ?? "",
-          campaign_id: null,
-          contact_owner: null,
-          lifecycle_stage: "Lead",
-          disposition: "",
-          legal_basis: [],
-          last_called: "",
-          last_call_status: "",
-          next_call: "",
-          scheduled_call_at: "",
-          tags: [],
-          note: "",
-          is_viewed: false,
-        });
-        if (!cancelled) setContactFormLoading(false);
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setContactFormLoadError("Failed to load company");
-          setContactFormLoading(false);
-        }
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [showCreateContactSidebar, editingContactId]);
-
-  // Load company into Create Company sidebar when opening for edit
-  useEffect(() => {
-    if (!showCreateCompanySidebar) return;
-    if (editingCompanyId == null) {
-      setEditingCompanyData(null);
-      return;
-    }
-    let cancelled = false;
-    getCompany(editingCompanyId)
-      .then((company: CompanyData) => {
-        if (cancelled) return;
-        setEditingCompanyData({
-          name: company.name ?? "",
-          phone: company.phone ?? undefined,
-          city: company.city ?? undefined,
-          country: company.country ?? undefined,
-          industry: company.industry ?? undefined,
-          domain: company.domain ?? undefined,
-          email: company.email ?? undefined,
-        });
-      })
-      .catch(() => {
-        if (!cancelled) setEditingCompanyData(null);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [showCreateCompanySidebar, editingCompanyId]);
+  useCompaniesActiveFilterFromUrl(router, validFilters, setActiveFilter);
+  useCompaniesAddContactsClickOutside(
+    showAddContactsDropdown,
+    addContactsRef,
+    setShowAddContactsDropdown,
+  );
+  useCompaniesContactFormLoadFlagsEffect(
+    showCreateContactSidebar,
+    editingContactId,
+    contactCompanyForFormQuery,
+    setContactFormLoadError,
+    setContactFormLoading,
+  );
+  useCompaniesContactFormPrefillFromCompanyEffect(
+    showCreateContactSidebar,
+    editingContactId,
+    contactCompanyForFormQuery,
+    setContactForm,
+  );
+  useCompaniesEditCompanySidebarDataEffect(
+    showCreateCompanySidebar,
+    editingCompanyId,
+    companyFormEditQuery,
+    setEditingCompanyData,
+  );
+  useCompaniesEditCompanySidebarErrorEffect(
+    showCreateCompanySidebar,
+    editingCompanyId,
+    companyFormEditQuery,
+    setEditingCompanyData,
+  );
 
   // Handler to update filter and URL
   const handleFilterChange = useCallback(
     (filterId: string) => {
       setActiveFilter(filterId);
       setPagination((prev) => ({ ...prev, currentPage: 1 }));
-      // Prevent showing stale totalRecords on "Convert to Leads" tab until new data loads
-      if (filterId === "has_leads") {
-        setLoading(true);
-      }
 
       // Update URL with tab query parameter
       router.push(
@@ -709,7 +639,6 @@ const CrmCompanyManagement = () => {
     },
     [router],
   );
-  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   const [companySearch, setCompanySearch] = useState("");
   const [companiesViewMode, setCompaniesViewMode] = useState<"table" | "board">(
     "table",
@@ -756,7 +685,6 @@ const CrmCompanyManagement = () => {
   const [totalRecords, setTotalRecords] = useState(0);
   /** Total count of all companies (unchanged when switching to Scheduled / Convert to Leads tab) */
   const [totalAllCompanies, setTotalAllCompanies] = useState(0);
-  const [loading, setLoading] = useState(false);
   const [clearSelectedRows, setClearSelectedRows] = useState(false);
   const [metrics, setMetrics] = useState<CrmDataMetrics>({
     assigned_records: 0,
@@ -841,68 +769,8 @@ const CrmCompanyManagement = () => {
   const memoizedFilters = useMemo(() => currentFilters, [currentFilters]);
 
   const buildCrmDataParams = useCallback(
-    (overrides: { page?: number; per_page?: number } = {}) => {
-      const params: any = {
-        page: pagination.currentPage,
-        per_page: pagination.rowsPerPage,
-        ...overrides,
-      };
-      const assignWhenTruthy = (sourceKey: string, targetKey = sourceKey) => {
-        const value = memoizedFilters[sourceKey];
-        if (value) {
-          params[targetKey] = value;
-        }
-      };
-
-      const assignArrayWhenNotEmpty = (sourceKey: string, targetKey = sourceKey) => {
-        const value = memoizedFilters[sourceKey];
-        if (Array.isArray(value) && value.length > 0) {
-          params[targetKey] = value;
-        }
-      };
-
-      assignWhenTruthy("search");
-      assignArrayWhenNotEmpty("campaign_id", "campaign_ids");
-      assignArrayWhenNotEmpty("tags");
-      assignWhenTruthy("assignment_status");
-      if (memoizedFilters.user_extension?.length) {
-        const ownerValues = Array.isArray(memoizedFilters.user_extension)
-          ? memoizedFilters.user_extension
-          : [memoizedFilters.user_extension];
-        params.user_extensions = ownerValues;
-        // Companies endpoint can use a single owner filter in some environments.
-        if (ownerValues[0]) {
-          params.assigned_to = ownerValues[0];
-        }
-      }
-      if (
-        memoizedFilters.is_viewed !== undefined &&
-        memoizedFilters.is_viewed !== ""
-      )
-        params.is_viewed = memoizedFilters.is_viewed;
-      assignWhenTruthy("created_at_from", "date_from");
-      assignWhenTruthy("created_at_to", "date_to");
-      assignWhenTruthy("last_called_at_from");
-      assignWhenTruthy("last_called_at_to");
-      if (memoizedFilters.has_scheduled_calls !== undefined) {
-        params.has_scheduled_calls = memoizedFilters.has_scheduled_calls;
-      }
-      if (memoizedFilters.has_tickets !== undefined) {
-        params.has_tickets = memoizedFilters.has_tickets;
-      }
-      assignWhenTruthy("scheduled_call_status");
-      assignWhenTruthy("scheduled_call_from");
-      assignWhenTruthy("scheduled_call_to");
-      assignWhenTruthy("source_file");
-      assignArrayWhenNotEmpty("tag_ids");
-      assignWhenTruthy("disposition");
-      if (pagination.sortBy) {
-        params.sort_by = pagination.sortBy;
-        params.sort_order = pagination.sortOrder;
-      }
-      params.module_slug = ModuleSlug.CRM_DATA_MANAGEMENT;
-      return params;
-    },
+    (overrides: { page?: number; per_page?: number } = {}) =>
+      buildCompaniesListParams(memoizedFilters, pagination, overrides),
     [
       memoizedFilters,
       pagination.currentPage,
@@ -911,6 +779,35 @@ const CrmCompanyManagement = () => {
       pagination.sortOrder,
     ],
   );
+
+  const queryClient = useQueryClient();
+  const companiesListFiltersKey = useMemo(
+    () => JSON.stringify(memoizedFilters),
+    [memoizedFilters],
+  );
+
+  const companiesListQuery = useQuery({
+    queryKey: crmAppKeys.companiesPage.list({
+      filtersKey: companiesListFiltersKey,
+      activeTab: activeFilter,
+      page: pagination.currentPage,
+      perPage: pagination.rowsPerPage,
+      sortBy: pagination.sortBy,
+      sortOrder: pagination.sortOrder,
+    }),
+    queryFn: () => getCompanies(buildCrmDataParams()),
+    placeholderData: (previousData) => previousData,
+  });
+
+  const companiesListLoading =
+    companiesListQuery.isPending || companiesListQuery.isFetching;
+
+  const refreshCompaniesListAndPicklists = useCallback(() => {
+    queryClient
+      .invalidateQueries({ queryKey: crmAppKeys.companiesPage.all() })
+      .catch(() => undefined);
+    setRefreshKey((prev) => prev + 1);
+  }, [queryClient, setRefreshKey]);
 
   // Extract unique source_file values from dataList for creatable select
   const uniqueSources = useMemo(() => {
@@ -954,12 +851,11 @@ const CrmCompanyManagement = () => {
   // Handle filter changes
   const handleFiltersChange = useCallback((filters: Record<string, any>) => {
     setCurrentFilters(filters);
-    setRefreshKey((prev) => prev + 1);
   }, []);
   const companyFilterPills = useCompanyFilterPills({
     currentFilters,
     handleFiltersChange,
-    refresh: () => setRefreshKey((prev) => prev + 1),
+    refresh: () => refreshCompaniesListAndPicklists(),
     extensions,
   });
 
@@ -995,43 +891,30 @@ const CrmCompanyManagement = () => {
     } as CrmDataItem;
   }, []);
 
-  // Fetch companies data (Companies API)
-  const fetchCrmData = useCallback(async () => {
-    requestIdRef.current += 1;
-    const currentRequestId = requestIdRef.current;
-    setLoading(true);
-    try {
-      const response = await getCompanies(buildCrmDataParams());
-      if (currentRequestId !== requestIdRef.current) return;
-
-      const rows = (response.data || []).map(mapCompanyToRow);
-      setDataList(rows);
-      setTotalRecords(response.total ?? 0);
-      setTotalAllCompanies(response.total ?? 0);
-      setMetrics((prev) => ({
-        ...prev,
-        assigned_records: response.total ?? 0,
-        unassigned_records: 0,
-      }));
-    } catch (error: any) {
-      if (currentRequestId !== requestIdRef.current) return;
+  useEffect(() => {
+    if (companiesListQuery.isError) {
       setDataList([]);
       setTotalRecords(0);
       setTotalAllCompanies(0);
-    } finally {
-      if (currentRequestId === requestIdRef.current) {
-        setLoading(false);
-      }
+      return;
     }
+    if (!companiesListQuery.data || companiesListQuery.isPlaceholderData) return;
+    const response = companiesListQuery.data;
+    const rows = (response.data || []).map(mapCompanyToRow);
+    setDataList(rows);
+    setTotalRecords(response.total ?? 0);
+    setTotalAllCompanies(response.total ?? 0);
+    setMetrics((prev) => ({
+      ...prev,
+      assigned_records: response.total ?? 0,
+      unassigned_records: 0,
+    }));
   }, [
-    buildCrmDataParams,
+    companiesListQuery.data,
+    companiesListQuery.isError,
+    companiesListQuery.isPlaceholderData,
     mapCompanyToRow,
   ]);
-
-  // Load data when filters or pagination changes
-  useEffect(() => {
-    fetchCrmData();
-  }, [fetchCrmData, refreshKey]);
 
   // Clear selection after bulk delete or when clearSelectedRows changes
   useEffect(() => {
@@ -1040,57 +923,22 @@ const CrmCompanyManagement = () => {
     }
   }, [clearSelectedRows]);
 
-  // CSV validation function
-  const validateCsvFile = (
-    file: File,
-  ): { isValid: boolean; errors: string[] } => {
-    const errors: string[] = [];
-
-    // Check file type
-    if (
-      !file.type.includes("csv") &&
-      !file.name.toLowerCase().endsWith(".csv")
-    ) {
-      errors.push("File must be a CSV file");
-    }
-
-    // Check file size (2MB max)
-    const maxSize = 2 * 1024 * 1024; // 2MB in bytes
-    if (file.size > maxSize) {
-      errors.push("File size must be less than 2MB");
-    }
-
-    // Check if file is empty
-    if (file.size === 0) {
-      errors.push("File cannot be empty");
-    }
-
-    return {
-      isValid: errors.length === 0,
-      errors,
-    };
-  };
-
   // Handle file selection
   const handleFileSelect = (file: File) => {
     const validation = validateCsvFile(file);
-
     if (validation.isValid) {
       setSelectedFile(file);
-    } else {
-      validation.errors.forEach((error) => toast.error(error));
+      return;
     }
+    validation.errors.forEach((error) => toast.error(error));
   };
 
   // Handle drag and drop
   const handleDrag = (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    if (e.type === "dragenter" || e.type === "dragover") {
-      setDragActive(true);
-    } else if (e.type === "dragleave") {
-      setDragActive(false);
-    }
+    const nextActive = resolveDragActiveState(e.type);
+    if (nextActive !== null) setDragActive(nextActive);
   };
 
   const handleDrop = (e: React.DragEvent) => {
@@ -1166,7 +1014,7 @@ const CrmCompanyManagement = () => {
       setUploadProgress(0);
 
       // Refresh data
-      setRefreshKey((prev) => prev + 1);
+      refreshCompaniesListAndPicklists();
     } catch (error: any) {
       console.error("Upload error:", error);
       const errorMessage =
@@ -1276,7 +1124,7 @@ const CrmCompanyManagement = () => {
       await deleteCompany(itemToDelete.id);
       setShowDeleteModal(false);
       setItemToDelete(null);
-      setRefreshKey((prev) => prev + 1);
+      refreshCompaniesListAndPicklists();
     } catch (error: any) {
       console.error("Delete error:", error);
     }
@@ -1442,7 +1290,7 @@ const CrmCompanyManagement = () => {
       setSuccessModalTitle("Data Assignment Successful!");
       setSuccessModalDescription("The data has been successfully assigned.");
 
-      setRefreshKey((prev) => prev + 1);
+      refreshCompaniesListAndPicklists();
     } catch (error: any) {
       console.error("Assign error:", error);
     }
@@ -1458,7 +1306,7 @@ const CrmCompanyManagement = () => {
   const handleMarkAsViewed = useCallback(async (item: CrmDataItem) => {
     try {
       await markCrmDataAsViewed(item.id);
-      setRefreshKey((prev) => prev + 1);
+      refreshCompaniesListAndPicklists();
     } catch (error: any) {
       console.error("Mark as viewed error:", error);
     }
@@ -1654,7 +1502,7 @@ const CrmCompanyManagement = () => {
     try {
       const userExtension = (session?.user as any)?.extension || "default";
       await unscheduleCall(entryToUnschedule.id, userExtension);
-      setRefreshKey((prev) => prev + 1);
+      refreshCompaniesListAndPicklists();
       setShowUnscheduleModal(false);
       setEntryToUnschedule(null);
       toast.success("Call unscheduled successfully");
@@ -1697,7 +1545,7 @@ const CrmCompanyManagement = () => {
         userExtension,
         scheduleData.notes,
       );
-      setRefreshKey((prev) => prev + 1);
+      refreshCompaniesListAndPicklists();
       handleScheduleModalClose();
       setShowSuccessfulModal(true);
       setSuccessModalTitle(
@@ -1736,7 +1584,7 @@ const CrmCompanyManagement = () => {
     try {
       await bulkDeleteCrmData(selectedItems);
       setShowBulkDeleteModal(false);
-      setRefreshKey((prev) => prev + 1);
+      refreshCompaniesListAndPicklists();
       setSelectedItems([]);
       setClearSelectedRows(!clearSelectedRows);
     } catch (error: any) {
@@ -1790,7 +1638,7 @@ const CrmCompanyManagement = () => {
   const { writePreviewIdToStorage, clearPreviewIdFromStorage } =
     useCrmListPreviewPersistence({
       localStorageKey: "crm-companies-list-preview-record-id",
-      listLoading: loading,
+      listLoading: companiesListLoading,
       openPreviewByNumericId: openCompanyPreviewById,
     });
 
@@ -2386,6 +2234,56 @@ const CrmCompanyManagement = () => {
     ],
   );
 
+  const renderCompaniesCustomBody = () => {
+    if (companiesViewMode !== "board") return undefined;
+    return (
+      <KanbanBoard
+        columns={prospectsToKanbanColumns(
+          dataList,
+          getInitials,
+          getRandomColor,
+        )}
+        onCardClick={(card) => handleViewData(card.raw)}
+        onCardMove={(cardId, _fromCol, toCol) => {
+          const company = dataList.find((entry) => entry.id === cardId);
+          if (!company) return;
+          updateCrmData(Number(cardId), {
+            name: company.name || "",
+            phone: company.phone || "",
+            campaign_id: company.campaign_id,
+            data: { ...company.data, lifecycle_stage: toCol },
+            scheduled_call_at: company.scheduled_call_at || undefined,
+            company_domain: company.data?.company_domain || undefined,
+            company_name: company.data?.company_name || undefined,
+            source:
+              company.data?.source_file ||
+              company.data?.source ||
+              undefined,
+          });
+        }}
+        searchValue={companySearch}
+      />
+    );
+  };
+
+  const renderConvertToLeadModalContent = () => {
+    if (!convertingToLeadCrmRecordId) return null;
+    return (
+      <ConvertToLeadModal
+        show={showConvertToLeadModal}
+        onHide={() => {
+          setShowConvertToLeadModal(false);
+          setConvertingToLeadCrmRecordId(null);
+        }}
+        prospectId={convertingToLeadCrmRecordId}
+        onSuccess={() => {
+          refreshCompaniesListAndPicklists();
+          toast.success("Company converted to lead successfully!");
+        }}
+      />
+    );
+  };
+
   // Render Add Companies Button with bulk delete action
   const renderAddContactsButton = () => (
     <div
@@ -2486,7 +2384,7 @@ const CrmCompanyManagement = () => {
           industry: (contactForm as any).industry ?? undefined,
           domain: (contactForm as any).domain ?? undefined,
         });
-        fetchCrmData();
+        refreshCompaniesListAndPicklists();
         setContactForm({
           firstName: "",
           lastName: "",
@@ -2514,7 +2412,7 @@ const CrmCompanyManagement = () => {
         setCreateContactLoading(false);
       }
     },
-    [contactForm, fetchCrmData],
+    [contactForm, refreshCompaniesListAndPicklists],
   );
 
   const handleUpdateContactSubmit = useCallback(async () => {
@@ -2538,7 +2436,7 @@ const CrmCompanyManagement = () => {
         industry: (contactForm as any).industry ?? undefined,
         domain: (contactForm as any).domain ?? undefined,
       });
-      fetchCrmData();
+      refreshCompaniesListAndPicklists();
       setShowCreateContactSidebar(false);
       setEditingContactId(null);
     } catch {
@@ -2546,7 +2444,7 @@ const CrmCompanyManagement = () => {
     } finally {
       setCreateContactLoading(false);
     }
-  }, [editingContactId, contactForm, fetchCrmData]);
+  }, [editingContactId, contactForm, refreshCompaniesListAndPicklists]);
 
   // Render Create Contact Sidebar
   const renderCreateContactSidebar = () => {
@@ -3759,39 +3657,6 @@ const CrmCompanyManagement = () => {
 
           <div className="container-fluid">
             {/* Summary stats removed – company list only */}
-            {false && showCompanyAnalytics && (
-              <>
-                <Row className="mb-2">
-                  <Col xl={3} lg={4} md={6} className="mb-3">
-                    <KPICard
-                      title="Total Companies"
-                      value={totalRecords}
-                      icon={<Users size={24} />}
-                      color="primary"
-                    />
-                  </Col>
-                </Row>
-                <div className="text-center mb-4">
-                  <Button
-                    variant="link"
-                    onClick={() => setShowAllCompanyStats(!showAllCompanyStats)}
-                    className="text-decoration-none"
-                  >
-                    {showAllCompanyStats ? (
-                      <>
-                        <ArrowUp size={16} className="me-1" />
-                        Show Less
-                      </>
-                    ) : (
-                      <>
-                        <ArrowDown size={16} className="me-1" />
-                        Show More Stats
-                      </>
-                    )}
-                  </Button>
-                </div>
-              </>
-            )}
 
             {/* Filter Bar */}
             {showFilterBar &&
@@ -3852,401 +3717,6 @@ const CrmCompanyManagement = () => {
                 />
               )}
 
-            {/* Advanced Filters */}
-            {showAdvancedFilters &&
-              session?.user?.permissions?.includes(
-                PERMISSIONS.VIEW_CRM_DATA_MANAGEMENT,
-              ) && (
-                <Card className="border-0 shadow-sm mb-4">
-                  <Card.Body>
-                    <Row className="g-3 align-items-end">
-                      <Col md={4}>
-                        <Form.Label className="small fw-bold mb-2">
-                          Search
-                        </Form.Label>
-                        <Form.Control
-                          type="text"
-                          placeholder="Search by name or phone..."
-                          value={companySearch}
-                          onChange={(e) => setCompanySearch(e.target.value)}
-                        />
-                      </Col>
-                      <Col md={4}>
-                        <Form.Label className="small fw-bold mb-2">
-                          Assigned To
-                        </Form.Label>
-                        <Select<CompanyAssignedToSelectOption>
-                          options={extensions.map((ext: any) => ({
-                            value: ext.id || ext.extension,
-                            label:
-                              ext.display_name ||
-                              ext.name ||
-                              ext.id ||
-                              ext.extension,
-                          }))}
-                          value={
-                            companyFilters.assignedTo
-                              ? (() => {
-                                  const assignedToId =
-                                    companyFilters.assignedTo;
-                                  const ext = extensions.find(
-                                    (e: any) =>
-                                      (e.id || e.extension) === assignedToId,
-                                  );
-                                  return ext
-                                    ? {
-                                        value: assignedToId,
-                                        label:
-                                          ext.display_name ||
-                                          ext.name ||
-                                          assignedToId,
-                                      }
-                                    : {
-                                        value: assignedToId,
-                                        label: assignedToId,
-                                      };
-                                })()
-                              : null
-                          }
-                          onChange={(selected) => {
-                            const assignedToValue = selected
-                              ? String(selected.value)
-                              : null;
-                            setCompanyFilters((prev) => ({
-                              ...prev,
-                              assignedTo: assignedToValue,
-                            }));
-                            // Reset to all when assigned filter changes
-                            setActiveFilter("all");
-                          }}
-                          placeholder="Select user..."
-                          styles={
-                            customSelectStyles as StylesConfig<
-                              CompanyAssignedToSelectOption,
-                              false,
-                              GroupBase<CompanyAssignedToSelectOption>
-                            >
-                          }
-                          isClearable
-                        />
-                      </Col>
-                      <Col md={4}>
-                        <Form.Label className="small fw-bold mb-2">
-                          Campaigns
-                        </Form.Label>
-                        <Select
-                          isMulti
-                          options={availableCampaigns.map((c) => ({
-                            value: c.value,
-                            label: c.label,
-                          }))}
-                          value={
-                            companyFilters.campaigns
-                              ? companyFilters.campaigns.map(
-                                  (campaignId: string) => {
-                                    const campaign = availableCampaigns.find(
-                                      (c: any) => c.value === campaignId,
-                                    );
-                                    return campaign
-                                      ? {
-                                          value: campaignId,
-                                          label: campaign.label,
-                                        }
-                                      : {
-                                          value: campaignId,
-                                          label: campaignId,
-                                        };
-                                  },
-                                )
-                              : null
-                          }
-                          onChange={(selected) => {
-                            const campaignValues = Array.isArray(selected)
-                              ? selected.map((s: any) => s.value)
-                              : null;
-                            setCompanyFilters((prev) => ({
-                              ...prev,
-                              campaigns: campaignValues,
-                            }));
-                            // Reset to all when campaign filter changes
-                            setActiveFilter("all");
-                          }}
-                          placeholder="Select campaigns..."
-                          styles={customSelectStyles}
-                          isClearable
-                        />
-                      </Col>
-                      <Col md={4}>
-                        <Form.Label className="small fw-bold mb-2">
-                          Next Call Scheduled
-                        </Form.Label>
-                        <Form.Select
-                          value={companyFilters.nextCallScheduled || ""}
-                          onChange={(e) => {
-                            const value = e.target.value || null;
-                            setCompanyFilters((prev) => ({
-                              ...prev,
-                              nextCallScheduled: value,
-                              nextCallDateFrom: null,
-                              nextCallDateTo: null,
-                            }));
-                            setActiveFilter("all");
-                          }}
-                        >
-                          <option value="">Select option...</option>
-                          <option value="today">Today</option>
-                          <option value="tomorrow">Tomorrow</option>
-                          <option value="this_week">This Week</option>
-                          <option value="next_week">Next Week</option>
-                          <option value="overdue">Overdue Calls</option>
-                          <option value="custom">Custom Date Range</option>
-                        </Form.Select>
-                      </Col>
-                      {companyFilters.nextCallScheduled === "custom" && (
-                        <>
-                          <Col md={4}>
-                            <Form.Label className="small fw-bold mb-2">
-                              Next Call Date From
-                            </Form.Label>
-                            <Form.Control
-                              type="date"
-                              value={companyFilters.nextCallDateFrom || ""}
-                              onChange={(e) => {
-                                const dateValue = e.target.value || null;
-                                setCompanyFilters((prev) => ({
-                                  ...prev,
-                                  nextCallDateFrom: dateValue,
-                                }));
-                              }}
-                            />
-                          </Col>
-                          <Col md={4}>
-                            <Form.Label className="small fw-bold mb-2">
-                              Next Call Date To
-                            </Form.Label>
-                            <Form.Control
-                              type="date"
-                              value={companyFilters.nextCallDateTo || ""}
-                              onChange={(e) => {
-                                const dateValue = e.target.value || null;
-                                setCompanyFilters((prev) => ({
-                                  ...prev,
-                                  nextCallDateTo: dateValue,
-                                }));
-                              }}
-                            />
-                          </Col>
-                        </>
-                      )}
-                      <Col md={4}>
-                        <Form.Label className="small fw-bold mb-2">
-                          Source Name
-                        </Form.Label>
-                        <CreatableSelect<CompanySourceFileSelectOption>
-                          options={uniqueSources}
-                          value={
-                            companyFilters.sourceFile
-                              ? {
-                                  value: companyFilters.sourceFile,
-                                  label: companyFilters.sourceFile,
-                                }
-                              : null
-                          }
-                          onChange={(selected) => {
-                            const sourceValue = selected
-                              ? selected.value
-                              : null;
-                            setCompanyFilters((prev) => ({
-                              ...prev,
-                              sourceFile: sourceValue,
-                            }));
-                            setActiveFilter("all");
-                          }}
-                          placeholder="Select or create source..."
-                          styles={
-                            customSelectStyles as StylesConfig<
-                              CompanySourceFileSelectOption,
-                              false,
-                              GroupBase<CompanySourceFileSelectOption>
-                            >
-                          }
-                          isClearable
-                        />
-                      </Col>
-                      <Col md={4}>
-                        <Form.Label className="small fw-bold mb-2">
-                          Tags
-                        </Form.Label>
-                        <Select
-                          isMulti
-                          options={availableTags.map((tag) => ({
-                            value: tag.value,
-                            label: tag.label,
-                          }))}
-                          value={
-                            companyFilters.tags
-                              ? companyFilters.tags.map((tagValue: string) => {
-                                  const tag = availableTags.find(
-                                    (t: any) => t.value === tagValue,
-                                  );
-                                  return tag
-                                    ? { value: tagValue, label: tag.label }
-                                    : { value: tagValue, label: tagValue };
-                                })
-                              : null
-                          }
-                          onChange={(selected) => {
-                            const tagValues = Array.isArray(selected)
-                              ? selected.map((s: any) => s.value)
-                              : null;
-                            setCompanyFilters((prev) => ({
-                              ...prev,
-                              tags: tagValues,
-                            }));
-                            setActiveFilter("all");
-                          }}
-                          placeholder="Select tags..."
-                          styles={customSelectStyles}
-                          isClearable
-                        />
-                      </Col>
-                      <Col md={4}>
-                        <div className="d-flex gap-2">
-                          <Button
-                            variant="outline-secondary"
-                            className="d-flex align-items-center justify-content-center"
-                            onClick={() => {
-                              // Map companyFilters to the format expected by handleFiltersChange
-                              const filtersToApply: Record<string, any> = {};
-
-                              if (companySearch) {
-                                filtersToApply.search = companySearch;
-                              }
-                              if (companyFilters.assignedTo) {
-                                filtersToApply.user_extension = [
-                                  companyFilters.assignedTo,
-                                ];
-                              }
-                              if (
-                                companyFilters.campaigns &&
-                                companyFilters.campaigns.length > 0
-                              ) {
-                                filtersToApply.campaign_id =
-                                  companyFilters.campaigns;
-                              }
-                              if (companyFilters.sourceFile) {
-                                filtersToApply.source_file =
-                                  companyFilters.sourceFile;
-                              }
-                              if (
-                                companyFilters.tags &&
-                                companyFilters.tags.length > 0
-                              ) {
-                                filtersToApply.tags = companyFilters.tags;
-                              }
-
-                              // Handle next call scheduled filters
-                              const now = moment();
-                              if (
-                                companyFilters.nextCallScheduled === "today"
-                              ) {
-                                const today = now.format("YYYY-MM-DD");
-                                filtersToApply.scheduled_call_from = today;
-                                filtersToApply.scheduled_call_to = today;
-                              } else if (
-                                companyFilters.nextCallScheduled === "tomorrow"
-                              ) {
-                                const tomorrow = moment()
-                                  .add(1, "day")
-                                  .format("YYYY-MM-DD");
-                                filtersToApply.scheduled_call_from = tomorrow;
-                                filtersToApply.scheduled_call_to = tomorrow;
-                              } else if (
-                                companyFilters.nextCallScheduled === "this_week"
-                              ) {
-                                const startOfWeek = moment()
-                                  .startOf("week")
-                                  .format("YYYY-MM-DD");
-                                const endOfWeek = moment()
-                                  .endOf("week")
-                                  .format("YYYY-MM-DD");
-                                filtersToApply.scheduled_call_from =
-                                  startOfWeek;
-                                filtersToApply.scheduled_call_to = endOfWeek;
-                              } else if (
-                                companyFilters.nextCallScheduled === "next_week"
-                              ) {
-                                const nextWeekStart = moment()
-                                  .add(1, "week")
-                                  .startOf("week")
-                                  .format("YYYY-MM-DD");
-                                const nextWeekEnd = moment()
-                                  .add(1, "week")
-                                  .endOf("week")
-                                  .format("YYYY-MM-DD");
-                                filtersToApply.scheduled_call_from =
-                                  nextWeekStart;
-                                filtersToApply.scheduled_call_to = nextWeekEnd;
-                              } else if (
-                                companyFilters.nextCallScheduled === "overdue"
-                              ) {
-                                filtersToApply.scheduled_call_status =
-                                  "overdue";
-                              } else if (
-                                companyFilters.nextCallScheduled === "custom"
-                              ) {
-                                if (companyFilters.nextCallDateFrom) {
-                                  filtersToApply.scheduled_call_from =
-                                    companyFilters.nextCallDateFrom;
-                                }
-                                if (companyFilters.nextCallDateTo) {
-                                  filtersToApply.scheduled_call_to =
-                                    companyFilters.nextCallDateTo;
-                                }
-                              }
-
-                              handleFiltersChange(filtersToApply);
-                              setPagination((prev) => ({
-                                ...prev,
-                                currentPage: 1,
-                              }));
-                              setRefreshKey((prev) => prev + 1);
-                            }}
-                          >
-                            Submit Filters
-                          </Button>
-                          <Button
-                            variant="outline-secondary"
-                            className="d-flex align-items-center justify-content-center"
-                            onClick={() => {
-                              setCompanySearch("");
-                              setCompanyFilters({
-                                assignedTo: null,
-                                campaigns: null,
-                                nextCallScheduled: null,
-                                nextCallDateFrom: null,
-                                nextCallDateTo: null,
-                                sourceFile: null,
-                                tags: null,
-                              });
-                              handleFiltersChange({});
-                              setCurrentFilters({});
-                              setActiveFilter("all");
-                              setPagination((prev) => ({
-                                ...prev,
-                                currentPage: 1,
-                              }));
-                              setRefreshKey((prev) => prev + 1);
-                            }}
-                          >
-                            Reset Filters
-                          </Button>
-                        </div>
-                      </Col>
-                    </Row>
-                  </Card.Body>
-                </Card>
-              )}
 
             {/* Bulk Actions */}
             {/* {selectedItems.length > 0 &&
@@ -4343,7 +3813,7 @@ const CrmCompanyManagement = () => {
                   }
                 }}
                 // Loading & styling
-                loading={loading}
+                loading={companiesListLoading}
                 emptyMessage="No companies found matching your criteria"
                 loadingMessage="Loading companies..."
                 hover={true}
@@ -4369,7 +3839,7 @@ const CrmCompanyManagement = () => {
                         ? {
                             ...tab,
                             count:
-                              activeFilter === "has_leads" && !loading
+                              activeFilter === "has_leads" && !companiesListLoading
                                 ? totalRecords
                                 : undefined,
                           }
@@ -4397,7 +3867,7 @@ const CrmCompanyManagement = () => {
                       const newFilters = { ...currentFilters };
                       delete newFilters.search;
                       handleFiltersChange(newFilters);
-                      setRefreshKey((prev) => prev + 1);
+                      refreshCompaniesListAndPicklists();
                     }
                   },
                   onSearch: () => {
@@ -4406,7 +3876,7 @@ const CrmCompanyManagement = () => {
                         ...currentFilters,
                         search: companySearch,
                       });
-                      setRefreshKey((prev) => prev + 1);
+                      refreshCompaniesListAndPicklists();
                     }
                   },
 
@@ -4437,39 +3907,7 @@ const CrmCompanyManagement = () => {
                 }}
                 // Stats cards for metrics
                 statsCards={companyStatsCards}
-                customBody={
-                  companiesViewMode === "board" ? (
-                    <KanbanBoard
-                      columns={prospectsToKanbanColumns(
-                        dataList,
-                        getInitials,
-                        getRandomColor,
-                      )}
-                      onCardClick={(card) => handleViewData(card.raw)}
-                      onCardMove={(cardId, _fromCol, toCol) => {
-                        const company = dataList.find((entry) => entry.id === cardId);
-                        if (!company) return;
-
-                        updateCrmData(Number(cardId), {
-                          name: company.name || "",
-                          phone: company.phone || "",
-                          campaign_id: company.campaign_id,
-                          data: { ...company.data, lifecycle_stage: toCol },
-                          scheduled_call_at:
-                            company.scheduled_call_at || undefined,
-                          company_domain:
-                            company.data?.company_domain || undefined,
-                          company_name: company.data?.company_name || undefined,
-                          source:
-                            company.data?.source_file ||
-                            company.data?.source ||
-                            undefined,
-                        });
-                      }}
-                      searchValue={companySearch}
-                    />
-                  ) : undefined
-                }
+                customBody={renderCompaniesCustomBody()}
               />
             </div>
           </div>
@@ -4597,432 +4035,12 @@ const CrmCompanyManagement = () => {
           )}
 
           {/* View Data Modal - Redesigned */}
-          {selectedDataItem && showViewModal && (
-            <Modal
-              show={showViewModal}
-              onHide={() => setShowViewModal(false)}
-              size="xl"
-              centered
-              className="prospect-view-modal"
-            >
-              {/* Modern Header with Gradient */}
-              <div
-                style={{
-                  background: "#fff",
-                  color: "black",
-                  padding: "24px 32px",
-                  position: "relative",
-                  borderTopLeftRadius: "12px",
-                  borderTopRightRadius: "12px",
-                  boxShadow: "0 4px 6px rgba(0, 0, 0, 0.1)",
-                  borderBottom: "1px solid #ccc",
-                }}
-              >
-                <button
-                  onClick={() => setShowViewModal(false)}
-                  style={{
-                    position: "absolute",
-                    top: "16px",
-                    right: "16px",
-                    background: "rgba(255,255,255,0.15)",
-                    backdropFilter: "blur(10px)",
-                    border: "1px solid rgba(255,255,255,0.2)",
-                    color: "black",
-                    width: "32px",
-                    height: "32px",
-                    borderRadius: "8px",
-                    cursor: "pointer",
-                    transition: "all 0.2s ease",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                  }}
-                  onMouseOver={(e) => {
-                    e.currentTarget.style.background = "rgba(255,255,255,0.25)";
-                    e.currentTarget.style.transform = "scale(1.05)";
-                  }}
-                  onMouseOut={(e) => {
-                    e.currentTarget.style.background = "rgba(255,255,255,0.15)";
-                    e.currentTarget.style.transform = "scale(1)";
-                  }}
-                >
-                  <X size={18} />
-                </button>
-
-                {/* Header Content */}
-                <div
-                  style={{ display: "flex", alignItems: "center", gap: "16px" }}
-                >
-                  <div
-                    style={{
-                      width: "64px",
-                      height: "64px",
-                      borderRadius: "16px",
-                      background: "#2563eb",
-                      backdropFilter: "blur(10px)",
-                      border: "2px solid rgba(255,255,255,0.3)",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      fontSize: "28px",
-                      fontWeight: "700",
-                      flexShrink: 0,
-                      color: "#fff",
-                    }}
-                  >
-                    {selectedDataItem.name
-                      ? selectedDataItem.name.charAt(0).toUpperCase()
-                      : "P"}
-                  </div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <h2
-                      style={{
-                        margin: 0,
-                        fontWeight: 700,
-                        fontSize: "26px",
-                        textShadow: "0 2px 4px rgba(0,0,0,0.1)",
-                        overflow: "hidden",
-                        textOverflow: "ellipsis",
-                        whiteSpace: "nowrap",
-                      }}
-                    >
-                      {selectedDataItem.name ||
-                        `Company #${selectedDataItem.id}`}
-                    </h2>
-                    <div
-                      style={{
-                        marginTop: "6px",
-                        opacity: 0.95,
-                        fontSize: "14px",
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "12px",
-                        flexWrap: "wrap",
-                        color: "#000",
-                      }}
-                    >
-                      {selectedDataItem.phone && (
-                        <>
-                          <span
-                            style={{
-                              display: "flex",
-                              alignItems: "center",
-                              gap: "6px",
-                            }}
-                          >
-                            <PhoneIcon size={14} />
-                            {selectedDataItem.phone}
-                          </span>
-                          <span>•</span>
-                        </>
-                      )}
-                      <span>
-                        Added{" "}
-                        {selectedDataItem.created_at
-                          ? formatCrmPreviewDate(selectedDataItem.created_at) ||
-                            "N/A"
-                          : "N/A"}
-                      </span>
-                      {(selectedDataItem.data as any)?.enrichment_status && (
-                        <>
-                          <span>•</span>
-                          <Badge
-                            bg={
-                              (selectedDataItem.data as any)
-                                .enrichment_status === "success"
-                                ? "success"
-                                : (selectedDataItem.data as any)
-                                      .enrichment_status === "failed"
-                                  ? "danger"
-                                  : "secondary"
-                            }
-                            style={{ fontWeight: 500 }}
-                          >
-                            {(selectedDataItem.data as any).enrichment_status}
-                          </Badge>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <Modal.Body
-                style={{
-                  padding: 0,
-                  maxHeight: "calc(90vh - 200px)",
-                  overflowY: "auto",
-                }}
-              >
-                <div style={{ padding: "32px" }}>
-                  {/* Company information – only fields that have values */}
-                  <div
-                    style={{
-                      background: "#f9fafb",
-                      border: "1px solid #e5e7eb",
-                      borderRadius: "12px",
-                      padding: "20px",
-                      marginBottom: "24px",
-                    }}
-                  >
-                    <div
-                      style={{
-                        display: "grid",
-                        gridTemplateColumns: "140px 1fr",
-                        gap: "12px 24px",
-                        alignItems: "baseline",
-                      }}
-                    >
-                      {selectedDataItem.name && (
-                        <>
-                          <div
-                            style={{
-                              fontSize: "12px",
-                              fontWeight: 700,
-                              color: "#6b7280",
-                              textTransform: "uppercase",
-                              letterSpacing: "0.5px",
-                            }}
-                          >
-                            Name
-                          </div>
-                          <div
-                            style={{
-                              fontSize: "15px",
-                              color: "#1f2937",
-                              fontWeight: 500,
-                            }}
-                          >
-                            {selectedDataItem.name}
-                          </div>
-                        </>
-                      )}
-                      {selectedDataItem.phone && (
-                        <>
-                          <div
-                            style={{
-                              fontSize: "12px",
-                              fontWeight: 700,
-                              color: "#6b7280",
-                              textTransform: "uppercase",
-                              letterSpacing: "0.5px",
-                            }}
-                          >
-                            Phone
-                          </div>
-                          <div
-                            style={{
-                              fontSize: "15px",
-                              color: "#1f2937",
-                              fontWeight: 500,
-                            }}
-                          >
-                            {selectedDataItem.phone}
-                          </div>
-                        </>
-                      )}
-                      {(selectedDataItem.data as any)?.email && (
-                        <>
-                          <div
-                            style={{
-                              fontSize: "12px",
-                              fontWeight: 700,
-                              color: "#6b7280",
-                              textTransform: "uppercase",
-                              letterSpacing: "0.5px",
-                            }}
-                          >
-                            Email
-                          </div>
-                          <div
-                            style={{
-                              fontSize: "15px",
-                              color: "#1f2937",
-                              fontWeight: 500,
-                            }}
-                          >
-                            {(selectedDataItem.data as any).email}
-                          </div>
-                        </>
-                      )}
-                      {(selectedDataItem.data as any)?.city && (
-                        <>
-                          <div
-                            style={{
-                              fontSize: "12px",
-                              fontWeight: 700,
-                              color: "#6b7280",
-                              textTransform: "uppercase",
-                              letterSpacing: "0.5px",
-                            }}
-                          >
-                            City
-                          </div>
-                          <div
-                            style={{
-                              fontSize: "15px",
-                              color: "#1f2937",
-                              fontWeight: 500,
-                            }}
-                          >
-                            {(selectedDataItem.data as any).city}
-                          </div>
-                        </>
-                      )}
-                      {(selectedDataItem.data as any)?.country && (
-                        <>
-                          <div
-                            style={{
-                              fontSize: "12px",
-                              fontWeight: 700,
-                              color: "#6b7280",
-                              textTransform: "uppercase",
-                              letterSpacing: "0.5px",
-                            }}
-                          >
-                            Country
-                          </div>
-                          <div
-                            style={{
-                              fontSize: "15px",
-                              color: "#1f2937",
-                              fontWeight: 500,
-                            }}
-                          >
-                            {(selectedDataItem.data as any).country}
-                          </div>
-                        </>
-                      )}
-                      {(selectedDataItem.data as any)?.industry && (
-                        <>
-                          <div
-                            style={{
-                              fontSize: "12px",
-                              fontWeight: 700,
-                              color: "#6b7280",
-                              textTransform: "uppercase",
-                              letterSpacing: "0.5px",
-                            }}
-                          >
-                            Industry
-                          </div>
-                          <div
-                            style={{
-                              fontSize: "15px",
-                              color: "#1f2937",
-                              fontWeight: 500,
-                            }}
-                          >
-                            {(selectedDataItem.data as any).industry}
-                          </div>
-                        </>
-                      )}
-                      {(selectedDataItem.data as any)?.domain && (
-                        <>
-                          <div
-                            style={{
-                              fontSize: "12px",
-                              fontWeight: 700,
-                              color: "#6b7280",
-                              textTransform: "uppercase",
-                              letterSpacing: "0.5px",
-                            }}
-                          >
-                            Domain
-                          </div>
-                          <div
-                            style={{
-                              fontSize: "15px",
-                              color: "#1f2937",
-                              fontWeight: 500,
-                            }}
-                          >
-                            {(selectedDataItem.data as any).domain}
-                          </div>
-                        </>
-                      )}
-                      {selectedDataItem.created_at && (
-                        <>
-                          <div
-                            style={{
-                              fontSize: "12px",
-                              fontWeight: 700,
-                              color: "#6b7280",
-                              textTransform: "uppercase",
-                              letterSpacing: "0.5px",
-                            }}
-                          >
-                            Created
-                          </div>
-                          <div
-                            style={{
-                              fontSize: "15px",
-                              color: "#1f2937",
-                              fontWeight: 500,
-                            }}
-                          >
-                            {formatCrmPreviewDate(selectedDataItem.created_at)}
-                          </div>
-                        </>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Enrichment data – only present keys, no static fields */}
-                  {(selectedDataItem.data as any)?.enrichment_data && (
-                    <CompanyViewEnrichmentBlock
-                      data={
-                        (selectedDataItem.data as any)
-                          .enrichment_data as EnrichmentData
-                      }
-                    />
-                  )}
-                </div>
-              </Modal.Body>
-
-              {/* Footer */}
-              <div
-                style={{
-                  padding: "20px 32px",
-                  borderTop: "1px solid #e5e7eb",
-                  background: "white",
-                  borderBottomLeftRadius: "12px",
-                  borderBottomRightRadius: "12px",
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                }}
-              >
-                <div style={{ fontSize: "13px", color: "#6b7280" }}>
-                  Company ID: <strong>#{selectedDataItem.id}</strong>
-                </div>
-                <Button
-                  variant="outline-secondary"
-                  onClick={() => setShowViewModal(false)}
-                  style={{
-                    padding: "10px 24px",
-                    borderRadius: "8px",
-                    fontWeight: 600,
-                    fontSize: "14px",
-                    border: "2px solid #e5e7eb",
-                    transition: "all 0.2s ease",
-                  }}
-                  onMouseOver={(e) => {
-                    e.currentTarget.style.borderColor = "#2563eb";
-                    e.currentTarget.style.color = "#2563eb";
-                    e.currentTarget.style.background = "#eff6ff";
-                  }}
-                  onMouseOut={(e) => {
-                    e.currentTarget.style.borderColor = "#e5e7eb";
-                    e.currentTarget.style.color = "#6c757d";
-                    e.currentTarget.style.background = "white";
-                  }}
-                >
-                  Close
-                </Button>
-              </div>
-            </Modal>
-          )}
+          <CompanyViewModal
+            show={showViewModal}
+            selectedDataItem={selectedDataItem}
+            onClose={() => setShowViewModal(false)}
+            formatCrmPreviewDate={formatCrmPreviewDate}
+          />
 
           {/* Delete Confirmation Modal */}
           <DeleteConfirmationModal
@@ -5252,12 +4270,8 @@ const CrmCompanyManagement = () => {
           <FormModal
             show={showScheduleModal}
             onHide={() => setShowScheduleModal(false)}
-            title={isEditingSchedule ? "Edit Scheduled Call" : "Schedule Call"}
-            desc={
-              isEditingSchedule
-                ? "Please update the details below to modify the scheduled call."
-                : "Please fill the details below to schedule a call."
-            }
+            title={getScheduleModalTitle(isEditingSchedule)}
+            desc={getScheduleModalDescription(isEditingSchedule)}
             size="lg"
             formHtml={
               <>
@@ -5437,195 +4451,12 @@ const CrmCompanyManagement = () => {
               | EnrichmentData
               | undefined;
             const domain = selectedCompany?.data?.domain as string | undefined;
-            const websiteUrl =
-              enrichment?.discovered_website ||
-              (domain
-                ? domain.startsWith("http")
-                  ? domain
-                  : `https://${domain}`
-                : null);
-            const struct = enrichment?.structured_data;
-            const companyQuickActions: QuickAction[] = [
-              { id: "note", label: "Note", icon: ClipboardList, onClick: companyActivityModals.openNote },
-              { id: "email", label: "Email", icon: Mail, onClick: companyActivityModals.openEmail },
-              {
-                id: "call",
-                label: "Call",
-                icon: Phone,
-                disabled: !companySidebarPhone,
-                onClick: () =>
-                  companySidebarPhone &&
-                  handleCallClick({
-                    ...selectedCompany,
-                    phone: companySidebarPhone,
-                    name: selectedCompany?.name,
-                  }),
-              },
-              { id: "task", label: "Task", icon: ClipboardList, onClick: companyActivityModals.openTask },
-              { id: "meeting", label: "Meeting", icon: Calendar, onClick: companyActivityModals.openMeeting },
-            ];
-            const aboutFields: SidebarField[] = [];
-            if (selectedCompany?.name)
-              aboutFields.push({
-                label: "Name",
-                value: selectedCompany.name,
-                copyable: true,
-              });
-            if (selectedCompany?.phone)
-              aboutFields.push({
-                label: "Phone",
-                value: selectedCompany.phone,
-                type: "phone",
-                copyable: true,
-                externalLink: `tel:${selectedCompany.phone}`,
-              });
-            if (selectedCompany?.data?.email)
-              aboutFields.push({
-                label: "Email",
-                value: selectedCompany.data.email,
-                type: "email",
-                copyable: true,
-                externalLink: `mailto:${selectedCompany.data.email}`,
-              });
-            if (selectedCompany?.data?.city)
-              aboutFields.push({
-                label: "City",
-                value: selectedCompany.data.city,
-              });
-            if (selectedCompany?.data?.country)
-              aboutFields.push({
-                label: "Country",
-                value: selectedCompany.data.country,
-              });
-            if (selectedCompany?.data?.industry)
-              aboutFields.push({
-                label: "Industry",
-                value: selectedCompany.data.industry,
-              });
-            if (selectedCompany?.data?.domain)
-              aboutFields.push({
-                label: "Domain",
-                value: selectedCompany.data.domain,
-              });
-            if (websiteUrl)
-              aboutFields.push({
-                label: "Website",
-                value: websiteUrl,
-                type: "link",
-                externalLink: websiteUrl,
-              });
-            if (selectedCompany?.created_at)
-              aboutFields.push({
-                label: "Created",
-                value: formatCrmPreviewDate(selectedCompany.created_at),
-                type: "date",
-              });
-            if (selectedCompany?.updated_at)
-              aboutFields.push({
-                label: "Updated",
-                value: formatCrmPreviewDate(selectedCompany.updated_at),
-                type: "date",
-              });
-
-            const structuredSectionFields: SidebarField[] = [];
-            if (struct) {
-              if (struct.official_company_name)
-                structuredSectionFields.push({
-                  label: "Official company name",
-                  value: struct.official_company_name,
-                });
-              const hq = struct.headquarters;
-              if (hq && (hq.address || hq.city || hq.country)) {
-                structuredSectionFields.push({
-                  label: "Headquarters",
-                  value: [hq.address, hq.city, hq.country]
-                    .filter(Boolean)
-                    .join(", "),
-                });
-              }
-              const otherLoc = struct.other_locations;
-              if (otherLoc && otherLoc.length > 0) {
-                otherLoc.forEach(
-                  (
-                    loc: {
-                      address?: string | null;
-                      city?: string | null;
-                      country?: string | null;
-                    },
-                    i: number,
-                  ) => {
-                    const line = [loc.address, loc.city, loc.country]
-                      .filter(Boolean)
-                      .join(", ");
-                    if (line)
-                      structuredSectionFields.push({
-                        label: `Other location ${i + 1}`,
-                        value: line,
-                      });
-                  },
-                );
-              }
-              const structEmails = struct.emails;
-              if (structEmails && structEmails.length > 0) {
-                structEmails.forEach(
-                  (
-                    e: { email?: string | null; type?: string | null },
-                    i: number,
-                  ) => {
-                    if (e?.email)
-                      structuredSectionFields.push({
-                        label:
-                          structEmails!.length > 1 ? `Email ${i + 1}` : "Email",
-                        value: e.email,
-                        type: "email",
-                        externalLink: `mailto:${e.email}`,
-                      });
-                  },
-                );
-              }
-              const structPhones = struct.phones;
-              if (structPhones && structPhones.length > 0) {
-                structPhones.forEach(
-                  (
-                    p: { number?: string | null; type?: string | null },
-                    i: number,
-                  ) => {
-                    if (p?.number)
-                      structuredSectionFields.push({
-                        label:
-                          structPhones!.length > 1 ? `Phone ${i + 1}` : "Phone",
-                        value: p.number,
-                        type: "phone",
-                        externalLink: `tel:${p.number}`,
-                      });
-                  },
-                );
-              }
-              const structSocialLinks = struct.social_links;
-              if (structSocialLinks && structSocialLinks.length > 0) {
-                structSocialLinks.forEach(
-                  (
-                    s: { platform?: string | null; url?: string | null },
-                    i: number,
-                  ) => {
-                    if (s?.url)
-                      structuredSectionFields.push({
-                        label: s.platform
-                          ? String(s.platform)
-                          : `Social ${i + 1}`,
-                        value: s.url,
-                        type: "link",
-                        externalLink: s.url,
-                      });
-                  },
-                );
-              }
-              if (struct.llm_confidence != null)
-                structuredSectionFields.push({
-                  label: "LLM confidence",
-                  value: String(struct.llm_confidence),
-                });
-            }
+            const websiteUrl = buildCompanyWebsiteUrl(enrichment, domain);
+            const aboutFields = buildCompanyAboutFields(
+              selectedCompany,
+              websiteUrl,
+              formatCrmPreviewDate,
+            );
 
             const sections = [
               {
@@ -5960,7 +4791,7 @@ const CrmCompanyManagement = () => {
               ...prev,
               currentPage: 1,
             }));
-            setRefreshKey((prev) => prev + 1);
+            refreshCompaniesListAndPicklists();
             setShowFiltersSidebar(false);
           }}
           onReset={() => {
@@ -5981,26 +4812,13 @@ const CrmCompanyManagement = () => {
               ...prev,
               currentPage: 1,
             }));
-            setRefreshKey((prev) => prev + 1);
+            refreshCompaniesListAndPicklists();
           }}
         />
       </div>{" "}
       {/* End flex container */}
       {/* Convert to Lead Modal */}
-      {convertingToLeadCrmRecordId && (
-        <ConvertToLeadModal
-          show={showConvertToLeadModal}
-          onHide={() => {
-            setShowConvertToLeadModal(false);
-            setConvertingToLeadCrmRecordId(null);
-          }}
-          prospectId={convertingToLeadCrmRecordId}
-          onSuccess={() => {
-            setRefreshKey((prev) => prev + 1);
-            toast.success("Company converted to lead successfully!");
-          }}
-        />
-      )}
+      {renderConvertToLeadModalContent()}
       {/* Column Editor Modal */}
       <Modal
         show={showColumnEditor}
@@ -6240,7 +5058,7 @@ const CrmCompanyManagement = () => {
             } else {
               await createCompany(data);
             }
-            await fetchCrmData();
+            refreshCompaniesListAndPicklists();
             setShowCreateCompanySidebar(false);
             setEditingCompanyId(null);
             setEditingCompanyData(null);

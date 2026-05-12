@@ -1,0 +1,207 @@
+import React from "react";
+import { Badge, Button } from "react-bootstrap";
+import { Edit, Eye, Trash2 } from "lucide-react";
+import type { TableColumn } from "@components/GenericTable";
+import { CrmTruncatedDescriptionCell } from "@components/crm/crmTruncatedDescriptionCell";
+import type { ProductDisplayData } from "@page-modules/crm/products/productsPageModel";
+
+export interface BuildProductsTableColumnsParams {
+  selectedColumns: string[];
+  canEdit: boolean;
+  canDelete: boolean;
+  onView: (product: ProductDisplayData) => void;
+  onEdit: (product: ProductDisplayData) => void;
+  onDelete: (product: ProductDisplayData) => void;
+}
+
+function buildProductNameColumn(): TableColumn<ProductDisplayData> {
+  return {
+    key: "productName",
+    label: "Product Name",
+    sortable: true,
+    type: "custom",
+    render: (product) => (
+      <span className="fw-semibold">{product.productName}</span>
+    ),
+  };
+}
+
+function buildSkuColumn(): TableColumn<ProductDisplayData> {
+  return {
+    key: "sku",
+    label: "SKU",
+    sortable: true,
+    type: "custom",
+    render: (product) => (
+      <Badge bg="light" text="dark" className="font-monospace">
+        {product.sku}
+      </Badge>
+    ),
+  };
+}
+
+function buildPriceColumn(): TableColumn<ProductDisplayData> {
+  return {
+    key: "price",
+    label: "Price",
+    sortable: true,
+    type: "custom",
+    render: (product) => (
+      <span className="fw-semibold text-success">
+        {product.currency} {product.price.toFixed(2)}
+      </span>
+    ),
+  };
+}
+
+function buildCurrencyColumn(): TableColumn<ProductDisplayData> {
+  return {
+    key: "currency",
+    label: "Currency",
+    sortable: true,
+  };
+}
+
+function buildCategoryColumn(): TableColumn<ProductDisplayData> {
+  return {
+    key: "category",
+    label: "Category",
+    sortable: true,
+    type: "custom",
+    render: (product) => (
+      <Badge bg="info" className="bg-opacity-10 text-dark">
+        {product.category || "N/A"}
+      </Badge>
+    ),
+  };
+}
+
+function buildBrandColumn(): TableColumn<ProductDisplayData> {
+  return {
+    key: "brand",
+    label: "Brand",
+    sortable: true,
+    type: "custom",
+    render: (product) => <span>{product.brand || "N/A"}</span>,
+  };
+}
+
+function buildStatusColumn(): TableColumn<ProductDisplayData> {
+  return {
+    key: "status",
+    label: "Status",
+    sortable: true,
+    type: "custom",
+    render: (product) => (
+      <Badge bg={product.status === "Active" ? "success" : "secondary"}>
+        {product.status}
+      </Badge>
+    ),
+  };
+}
+
+function buildDescriptionColumn(): TableColumn<ProductDisplayData> {
+  return {
+    key: "description",
+    label: "Description",
+    sortable: false,
+    type: "custom",
+    width: "260px",
+    render: (product) => (
+      <CrmTruncatedDescriptionCell
+        text={product.description}
+        emptyDisplay="N/A"
+      />
+    ),
+  };
+}
+
+function buildCreatedColumn(): TableColumn<ProductDisplayData> {
+  return {
+    key: "created",
+    label: "Created",
+    sortable: true,
+    type: "custom",
+    render: (product) => (
+      <span className="text-muted">{product.created}</span>
+    ),
+  };
+}
+
+function buildActionsColumn(
+  params: Omit<BuildProductsTableColumnsParams, "selectedColumns">,
+): TableColumn<ProductDisplayData> {
+  const { canEdit, canDelete, onView, onEdit, onDelete } = params;
+  return {
+    key: "actions",
+    label: "Actions",
+    sortable: false,
+    type: "custom",
+    render: (product) => (
+      <div className="d-flex gap-1">
+        <Button
+          variant="link"
+          size="sm"
+          className="p-1"
+          title="View"
+          onClick={() => onView(product)}
+        >
+          <Eye size={16} />
+        </Button>
+        {canEdit && (
+          <Button
+            variant="link"
+            size="sm"
+            className="p-1"
+            title="Edit"
+            onClick={() => onEdit(product)}
+          >
+            <Edit size={16} />
+          </Button>
+        )}
+        {canDelete && (
+          <Button
+            variant="link"
+            size="sm"
+            className="p-1 text-danger"
+            title="Delete"
+            onClick={() => onDelete(product)}
+          >
+            <Trash2 size={16} />
+          </Button>
+        )}
+      </div>
+    ),
+  };
+}
+
+const COLUMN_BUILDERS: Record<string, () => TableColumn<ProductDisplayData>> = {
+  productName: buildProductNameColumn,
+  sku: buildSkuColumn,
+  price: buildPriceColumn,
+  currency: buildCurrencyColumn,
+  category: buildCategoryColumn,
+  brand: buildBrandColumn,
+  status: buildStatusColumn,
+  description: buildDescriptionColumn,
+  created: buildCreatedColumn,
+};
+
+/** Builds the dynamic column list for the products table based on selected columns and permissions. */
+export function buildProductsTableColumns(
+  params: BuildProductsTableColumnsParams,
+): TableColumn<ProductDisplayData>[] {
+  const { selectedColumns, ...rest } = params;
+  const cols: TableColumn<ProductDisplayData>[] = [];
+
+  for (const key of selectedColumns) {
+    if (key === "actions") continue;
+    const builder = COLUMN_BUILDERS[key];
+    if (builder) cols.push(builder());
+  }
+
+  if (selectedColumns.includes("actions")) {
+    cols.push(buildActionsColumn(rest));
+  }
+  return cols;
+}

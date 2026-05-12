@@ -1,3 +1,5 @@
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { crmAppKeys } from "../../../query/keys";
 import React, {
     ReactElement,
     useState,
@@ -473,16 +475,39 @@ import {
         setPager(p => ({ ...p, page: 1 }));
         router.push({ pathname: router.pathname, query: { ...router.query, tab: id } }, undefined, { shallow: true });
       }, [router]);
-    
-      // ── Data ──────────────────────────────────────────────────────────────────────
-      const [tasks, setTasks]           = useState<Task[]>([]);
-      const [total, setTotal]           = useState(0);
-      const [loading, setLoading]       = useState(false);
-      const [filters, setFilters]       = useState<Record<string, any>>({});
-      const [search, setSearch]         = useState("");
-      const [hoveredId, setHoveredId]   = useState<number | null>(null);
-    
+
+      const [filters, setFilters] = useState<Record<string, unknown>>({});
+      const [search, setSearch] = useState("");
+      const [hoveredId, setHoveredId] = useState<number | null>(null);
+
       const { pager, setPager } = useTasksListingPager();
+
+      const queryClient = useQueryClient();
+      const listParams = useMemo(
+        () =>
+          buildCrmTasksListQueryParams({
+            page: pager.page,
+            perPage: pager.perPage,
+            filters,
+            activeTab,
+          }),
+        [pager.page, pager.perPage, filters, activeTab],
+      );
+
+      const tasksListQuery = useQuery({
+        queryKey: crmAppKeys.crmTasksListing.list(listParams),
+        queryFn: () => getTasks(listParams),
+      });
+
+      const tasks = tasksListQuery.data?.data ?? [];
+      const total = tasksListQuery.data?.pagination?.total ?? 0;
+      const loading = tasksListQuery.isPending;
+
+      const refetchTasks = useCallback(() => {
+        queryClient
+          .invalidateQueries({ queryKey: crmAppKeys.crmTasksListing.all() })
+          .catch(() => undefined);
+      }, [queryClient]);
     
       // ── Filter sidebar ────────────────────────────────────────────────────────────
       const [showSidebar, setShowSidebar]   = useState(false);
@@ -511,26 +536,6 @@ import {
       const [showSuccess, setShowSuccess] = useState(false);
       const [successMsg, setSuccessMsg]   = useState({ title: "", desc: "" });
     
-      // ── Fetch ─────────────────────────────────────────────────────────────────────
-      const fetchTasks = useCallback(async () => {
-        setLoading(true);
-        try {
-          const p = buildCrmTasksListQueryParams({
-            page: pager.page,
-            perPage: pager.perPage,
-            filters,
-            activeTab,
-          });
-    
-          const res = await getTasks(p);
-          setTasks(res.data || []);
-          setTotal(res.pagination?.total || 0);
-        } catch { setTasks([]); setTotal(0); }
-        finally  { setLoading(false); }
-      }, [pager.page, pager.perPage, filters, activeTab]);
-    
-      useEffect(() => { fetchTasks(); }, [fetchTasks]);
-    
       // ── Helpers ───────────────────────────────────────────────────────────────────
       const resetForm = () => setForm({
         title: "", task_type: "todo", assigned_to: null, priority: "medium",
@@ -554,7 +559,7 @@ import {
         try {
           editId ? await updateTask(editId, form) : await createTask(form);
           toast.success(editId ? "Task updated" : "Task created");
-          fetchTasks();
+          refetchTasks();
           if (!addAnother) { setShowCreate(false); setEditId(null); resetForm(); }
           else resetForm();
         } catch { toast.error("Failed to save task"); }
@@ -566,7 +571,7 @@ import {
         try {
           await deleteTask(toDelete.id);
           setShowDelete(false); setToDelete(null);
-          fetchTasks(); toast.success("Task deleted");
+          refetchTasks(); toast.success("Task deleted");
         } catch { toast.error("Failed to delete"); }
       };
     
@@ -582,7 +587,7 @@ import {
                 e.stopPropagation();
                 try {
                   await markTaskComplete(row.id);
-                  fetchTasks();
+                  refetchTasks();
                 } catch {
                   toast.error("Failed to update");
                 }
@@ -679,7 +684,7 @@ import {
           key: "repeat_status", label: "Repeat Status", sortable: false, type: "custom",
           render: (row) => <span style={TASK_LIST_CELL}>{row.repeat_status || "—"}</span>,
         },
-      ], [hoveredId, fetchTasks, router]);
+      ], [hoveredId, refetchTasks, router]);
     
       const actions: TableAction<Task>[] = useMemo(() => [], []);
     
@@ -1175,7 +1180,7 @@ import {
               // TODO: Call API to create/update task here
               // await createTask(formData) or await updateTask(editId, formData)
               toast.success(editId ? "Task updated" : "Task created");
-              fetchTasks();
+              refetchTasks();
               if (!addAnother) { setShowCreate(false); setEditId(null); }
             }}
             taskId={editId}

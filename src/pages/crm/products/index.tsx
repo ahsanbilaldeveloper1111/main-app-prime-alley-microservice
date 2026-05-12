@@ -1,24 +1,12 @@
 import "@assets/scss/datatable-style.scss";
 import "@assets/scss/products-page.scss";
+import "@assets/scss/common.scss";
 import React, { useMemo } from "react";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
-import GenericTable, {
-  type TableColumn,
-  type ToolbarConfig,
-} from "@components/GenericTable";
-import { CrmTruncatedDescriptionCell } from "@components/crm/crmTruncatedDescriptionCell";
-import { Button, Badge } from "react-bootstrap";
-import {
-  PlusCircle,
-  Eye,
-  Edit,
-  Trash2,
-  Package,
-  X,
-  CheckCircle,
-} from "lucide-react";
-import "@assets/scss/common.scss";
+import GenericTable, { type ToolbarConfig } from "@components/GenericTable";
+import { Button } from "react-bootstrap";
+import { CheckCircle, Package, PlusCircle, X } from "lucide-react";
 import DeleteConfirmationModal from "@components/page-partials/DeleteConfirmationModal";
 import { HEADER_CONSTANTS } from "@constants/headerConstants";
 import type { CrmSettingsTablePaginationState } from "@hooks/useCrmSettingsTableState";
@@ -33,6 +21,7 @@ import {
 } from "@page-modules/crm/products/productsPageModel";
 import ProductsFormSidebar from "@page-modules/crm/products/ProductsFormSidebar";
 import ProductsViewModal from "@page-modules/crm/products/ProductsViewModal";
+import { buildProductsTableColumns } from "@page-modules/crm/products/productsTableColumns";
 
 const { PERMISSIONS } = HEADER_CONSTANTS;
 
@@ -87,176 +76,25 @@ function ProductsPage(props: CrmPageDisplayProps = {}) {
   const canCreateProduct =
     session?.user?.permissions?.includes(PERMISSIONS.CREATE_CRM_PRODUCTS) ?? false;
 
-  const productsTableColumns = useMemo<TableColumn<ProductDisplayData>[]>(() => {
-    const cols: TableColumn<ProductDisplayData>[] = [];
-
-    if (selectedProductsColumns.includes("productName")) {
-      cols.push({
-        key: "productName",
-        label: "Product Name",
-        sortable: true,
-        type: "custom",
-        render: (product) => (
-          <span className="fw-semibold">{product.productName}</span>
-        ),
-      });
-    }
-
-    if (selectedProductsColumns.includes("sku")) {
-      cols.push({
-        key: "sku",
-        label: "SKU",
-        sortable: true,
-        type: "custom",
-        render: (product) => (
-          <Badge bg="light" text="dark" className="font-monospace">
-            {product.sku}
-          </Badge>
-        ),
-      });
-    }
-
-    if (selectedProductsColumns.includes("price")) {
-      cols.push({
-        key: "price",
-        label: "Price",
-        sortable: true,
-        type: "custom",
-        render: (product) => (
-          <span className="fw-semibold text-success">
-            {product.currency} {product.price.toFixed(2)}
-          </span>
-        ),
-      });
-    }
-
-    if (selectedProductsColumns.includes("currency")) {
-      cols.push({
-        key: "currency",
-        label: "Currency",
-        sortable: true,
-      });
-    }
-
-    if (selectedProductsColumns.includes("category")) {
-      cols.push({
-        key: "category",
-        label: "Category",
-        sortable: true,
-        type: "custom",
-        render: (product) => (
-          <Badge bg="info" className="bg-opacity-10 text-dark">
-            {product.category || "N/A"}
-          </Badge>
-        ),
-      });
-    }
-
-    if (selectedProductsColumns.includes("brand")) {
-      cols.push({
-        key: "brand",
-        label: "Brand",
-        sortable: true,
-        type: "custom",
-        render: (product) => <span>{product.brand || "N/A"}</span>,
-      });
-    }
-
-    if (selectedProductsColumns.includes("status")) {
-      cols.push({
-        key: "status",
-        label: "Status",
-        sortable: true,
-        type: "custom",
-        render: (product) => (
-          <Badge bg={product.status === "Active" ? "success" : "secondary"}>
-            {product.status}
-          </Badge>
-        ),
-      });
-    }
-
-    if (selectedProductsColumns.includes("description")) {
-      cols.push({
-        key: "description",
-        label: "Description",
-        sortable: false,
-        type: "custom",
-        width: "260px",
-        render: (product) => (
-          <CrmTruncatedDescriptionCell
-            text={product.description}
-            emptyDisplay="N/A"
-          />
-        ),
-      });
-    }
-
-    if (selectedProductsColumns.includes("created")) {
-      cols.push({
-        key: "created",
-        label: "Created",
-        sortable: true,
-        type: "custom",
-        render: (product) => (
-          <span className="text-muted">{product.created}</span>
-        ),
-      });
-    }
-
-    if (selectedProductsColumns.includes("actions")) {
-      cols.push({
-        key: "actions",
-        label: "Actions",
-        sortable: false,
-        type: "custom",
-        render: (product) => (
-          <div className="d-flex gap-1">
-            <Button
-              variant="link"
-              size="sm"
-              className="p-1"
-              title="View"
-              onClick={() => openProductView(product)}
-            >
-              <Eye size={16} />
-            </Button>
-            {canEditProduct && (
-              <Button
-                variant="link"
-                size="sm"
-                className="p-1"
-                title="Edit"
-                onClick={() => handleOpenProductModal(product)}
-              >
-                <Edit size={16} />
-              </Button>
-            )}
-            {canDeleteProduct && (
-              <Button
-                variant="link"
-                size="sm"
-                className="p-1 text-danger"
-                title="Delete"
-                onClick={() => requestDeleteProduct(product)}
-              >
-                <Trash2 size={16} />
-              </Button>
-            )}
-          </div>
-        ),
-      });
-    }
-
-    return cols;
-  }, [
-    selectedProductsColumns,
-    canEditProduct,
-    canDeleteProduct,
-    openProductView,
-    handleOpenProductModal,
-    requestDeleteProduct,
-  ]);
+  const productsTableColumns = useMemo(
+    () =>
+      buildProductsTableColumns({
+        selectedColumns: selectedProductsColumns,
+        canEdit: canEditProduct,
+        canDelete: canDeleteProduct,
+        onView: openProductView,
+        onEdit: handleOpenProductModal,
+        onDelete: requestDeleteProduct,
+      }),
+    [
+      selectedProductsColumns,
+      canEditProduct,
+      canDeleteProduct,
+      openProductView,
+      handleOpenProductModal,
+      requestDeleteProduct,
+    ],
+  );
 
   const productsToolbarConfig = useMemo<ToolbarConfig>(
     () => ({

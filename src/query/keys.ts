@@ -538,3 +538,347 @@ export const gsmKeys = {
     gsmSelectOptions: () => [...gsmKeys.sync.all(), "gsmSelectOptions"] as const,
   },
 };
+
+/** CRM app pages: business types, activity history, campaigns list/bootstrap, company-by-id, etc. */
+export const crmAppKeys = {
+  root: ["crmApp"] as const,
+
+  hierarchyExtensions: {
+    all: () => [...crmAppKeys.root, "hierarchyExtensions"] as const,
+    /** `GetHierarchyData` — pass stable module slug string (e.g. `ModuleSlug.CRM_HISTORY`). */
+    module: (moduleSlug: string) =>
+      [...crmAppKeys.hierarchyExtensions.all(), moduleSlug] as const,
+  },
+
+  /** CRM main dashboard (`src/pages/crm/dashboard` — dashboard payload + recent prospects). */
+  crmDashboard: {
+    all: () => [...crmAppKeys.root, "crmDashboard"] as const,
+    home: () => [...crmAppKeys.crmDashboard.all(), "home"] as const,
+  },
+
+  activityHistory: {
+    all: () => [...crmAppKeys.root, "activityHistory"] as const,
+    list: (params: {
+      page: number;
+      perPage: number;
+      sortBy: string;
+      sortOrder: string;
+      search: string;
+      typeTab: string;
+      agentsKey: string;
+      dateFrom: string;
+      dateTo: string;
+      extensionsStamp: string;
+    }) =>
+      [
+        ...crmAppKeys.activityHistory.all(),
+        "list",
+        params.page,
+        params.perPage,
+        params.sortBy,
+        params.sortOrder,
+        params.search,
+        params.typeTab,
+        params.agentsKey,
+        params.dateFrom,
+        params.dateTo,
+        params.extensionsStamp,
+      ] as const,
+    recordDetail: (params: { recordType: string; recordId: string; open: boolean }) =>
+      [
+        ...crmAppKeys.activityHistory.all(),
+        "recordDetail",
+        params.recordType,
+        params.recordId,
+        params.open,
+      ] as const,
+  },
+
+  businessTypes: {
+    all: () => [...crmAppKeys.root, "businessTypes"] as const,
+    list: (params: { page: number; perPage: number; search: string }) =>
+      paginatedListKey(crmAppKeys.businessTypes.all(), params),
+    /** Unpaginated picklist for filters and deal forms (`getBusinessTypes` large `per_page`). */
+    selectOptions: () => [...crmAppKeys.businessTypes.all(), "selectOptions"] as const,
+  },
+
+  companies: {
+    all: () => [...crmAppKeys.root, "companies"] as const,
+    byId: (id: number) => [...crmAppKeys.companies.all(), "byId", id] as const,
+  },
+
+  /** Companies list grid (`/crm/companies` on `src/pages/crm/companies`). */
+  companiesPage: {
+    all: () => [...crmAppKeys.root, "companiesPage"] as const,
+    list: (params: {
+      filtersKey: string;
+      activeTab: string;
+      page: number;
+      perPage: number;
+      sortBy: string;
+      sortOrder: string;
+    }) =>
+      [
+        ...crmAppKeys.companiesPage.all(),
+        "list",
+        params.filtersKey,
+        params.activeTab,
+        params.page,
+        params.perPage,
+        params.sortBy,
+        params.sortOrder,
+      ] as const,
+  },
+
+  leads: {
+    all: () => [...crmAppKeys.root, "leads"] as const,
+    byId: (id: number) => [...crmAppKeys.leads.all(), "byId", id] as const,
+  },
+
+  deals: {
+    all: () => [...crmAppKeys.root, "deals"] as const,
+    byId: (id: number) => [...crmAppKeys.deals.all(), "byId", id] as const,
+  },
+
+  /** CRM deals / approvals list (`getDeals` on `CrmDealsListScreen`). */
+  dealsPage: {
+    all: () => [...crmAppKeys.root, "dealsPage"] as const,
+    list: (params: {
+      filtersKey: string;
+      activeTab: string;
+      page: number;
+      perPage: number;
+      sortBy: string;
+      sortOrder: string;
+      approvalsVariant: boolean;
+    }) =>
+      [
+        ...crmAppKeys.dealsPage.all(),
+        "list",
+        params.filtersKey,
+        params.activeTab,
+        params.page,
+        params.perPage,
+        params.sortBy,
+        params.sortOrder,
+        params.approvalsVariant ? "approvals" : "deals",
+      ] as const,
+  },
+
+  /** CRM quotes list dummy/real list (`CrmQuotesListPage`). */
+  crmQuotesListPage: {
+    all: () => [...crmAppKeys.root, "crmQuotesListPage"] as const,
+    list: (params: {
+      variant: "billing" | "crm";
+      filtersKey: string;
+      activeTab: string;
+      page: number;
+      perPage: number;
+      sortBy: string;
+      sortOrder: string;
+      refreshKey: number;
+    }) =>
+      [
+        ...crmAppKeys.crmQuotesListPage.all(),
+        "list",
+        params.variant,
+        params.filtersKey,
+        params.activeTab,
+        params.page,
+        params.perPage,
+        params.sortBy,
+        params.sortOrder,
+        params.refreshKey,
+      ] as const,
+  },
+
+  /**
+   * CRM prospects/contacts data-management list (`getCrmData` via
+   * `useCrmListDataOperations`).
+   */
+  crmDataManagementList: {
+    all: () => [...crmAppKeys.root, "crmDataManagementList"] as const,
+    entityRoot: (entity: string) =>
+      [...crmAppKeys.crmDataManagementList.all(), entity] as const,
+    list: (params: {
+      entity: string;
+      filtersKey: string;
+      activeTab: string;
+      page: number;
+      perPage: number;
+      sortBy: string;
+      sortOrder: string;
+      refreshKey: number;
+    }) =>
+      [
+        ...crmAppKeys.crmDataManagementList.entityRoot(params.entity),
+        "list",
+        params.filtersKey,
+        params.activeTab,
+        params.page,
+        params.perPage,
+        params.sortBy,
+        params.sortOrder,
+        params.refreshKey,
+      ] as const,
+  },
+
+  /** CRM WhatsApp inbox (`src/pages/crm/inbox`) — chat directory. */
+  crmWhatsAppInbox: {
+    all: () => [...crmAppKeys.root, "crmWhatsAppInbox"] as const,
+    chats: () => [...crmAppKeys.crmWhatsAppInbox.all(), "chats"] as const,
+  },
+
+  campaigns: {
+    all: () => [...crmAppKeys.root, "campaigns"] as const,
+    list: (params: {
+      refreshKey: number;
+      page: number;
+      perPage: number;
+      search: string;
+      activeFilter: string;
+      filtersKey: string;
+      campaignFiltersKey: string;
+    }) =>
+      [
+        ...crmAppKeys.campaigns.all(),
+        "list",
+        params.refreshKey,
+        params.page,
+        params.perPage,
+        params.search,
+        params.activeFilter,
+        params.filtersKey,
+        params.campaignFiltersKey,
+      ] as const,
+    tags: (refreshKey: number) =>
+      [...crmAppKeys.campaigns.all(), "tags", refreshKey] as const,
+    uploadCampaignOptions: (refreshKey: number) =>
+      [...crmAppKeys.campaigns.all(), "uploadCampaignOptions", refreshKey] as const,
+    industries: () => [...crmAppKeys.campaigns.all(), "industries"] as const,
+    dealTemplates: () => [...crmAppKeys.campaigns.all(), "dealTemplates"] as const,
+    /** `getCampaignById` — used by deal create/edit when sourcing campaign industries. */
+    byCampaignId: (campaignId: number) =>
+      [...crmAppKeys.campaigns.all(), "byCampaignId", campaignId] as const,
+  },
+
+  /** `getStages` by CRM stage type (`deal`, `lost_reason`, etc.). */
+  crmStages: {
+    all: () => [...crmAppKeys.root, "crmStages"] as const,
+    byType: (type: string) => [...crmAppKeys.crmStages.all(), type] as const,
+  },
+
+  /** CRM tasks list (`src/pages/crm/tasks`). */
+  tasks: {
+    all: () => [...crmAppKeys.root, "tasks"] as const,
+    list: (params: {
+      page: number;
+      perPage: number;
+      search: string;
+      activeFilter: string;
+      filtersKey: string;
+    }) =>
+      [
+        ...crmAppKeys.tasks.all(),
+        "list",
+        params.page,
+        params.perPage,
+        params.search,
+        params.activeFilter,
+        params.filtersKey,
+      ] as const,
+    detail: (taskId: number) => [...crmAppKeys.tasks.all(), "detail", taskId] as const,
+  },
+
+  /** Deal templates admin page — paginated list (`src/pages/crm/deal-templates`). */
+  dealTemplatesPage: {
+    all: () => [...crmAppKeys.root, "dealTemplatesPage"] as const,
+    list: (params: { page: number; perPage: number; search: string }) =>
+      paginatedListKey(crmAppKeys.dealTemplatesPage.all(), params),
+  },
+
+  /** CRM lost reasons list (`getLostReasons`) — `src/pages/crm/lost-reasons`. */
+  lostReasons: {
+    all: () => [...crmAppKeys.root, "lostReasons"] as const,
+    list: () => [...crmAppKeys.lostReasons.all(), "list"] as const,
+  },
+
+  /** Industries admin table (`src/pages/crm/industries`, `useIndustriesPage`). */
+  industriesPage: {
+    all: () => [...crmAppKeys.root, "industriesPage"] as const,
+    list: (params: { page: number; perPage: number; search: string }) =>
+      [
+        ...crmAppKeys.industriesPage.all(),
+        "list",
+        params.page,
+        params.perPage,
+        params.search,
+      ] as const,
+    productsByIndustry: (industryId: number) =>
+      [...crmAppKeys.industriesPage.all(), "products", industryId] as const,
+  },
+
+  /** CRM products table (`useCrmProductsPage`). */
+  crmProductsPage: {
+    all: () => [...crmAppKeys.root, "crmProductsPage"] as const,
+    list: (params: {
+      page: number;
+      perPage: number;
+      search: string;
+      activeFilter: string;
+      industryId: number | null;
+      category: string | null;
+      brandKey: string;
+    }) =>
+      [
+        ...crmAppKeys.crmProductsPage.all(),
+        "list",
+        params.page,
+        params.perPage,
+        params.search,
+        params.activeFilter,
+        params.industryId ?? "none",
+        params.category ?? "none",
+        params.brandKey,
+      ] as const,
+  },
+
+  /** Order create/edit shared picklists (`getStages('order')`, hierarchy, products slice). */
+  orderFormBootstrap: {
+    all: () => [...crmAppKeys.root, "orderFormBootstrap"] as const,
+    stages: () => [...crmAppKeys.orderFormBootstrap.all(), "stages"] as const,
+    hierarchy: () => [...crmAppKeys.orderFormBootstrap.all(), "hierarchy"] as const,
+    productsPicklist: () =>
+      [...crmAppKeys.orderFormBootstrap.all(), "productsPicklist"] as const,
+  },
+
+  /** CRM orders main list (`getOrders` on `src/pages/crm/orders`). */
+  ordersList: {
+    all: () => [...crmAppKeys.root, "ordersList"] as const,
+    page: (params: {
+      filtersKey: string;
+      activeTab: string;
+      page: number;
+      perPage: number;
+      sortBy: string;
+      sortOrder: string;
+    }) =>
+      [
+        ...crmAppKeys.ordersList.all(),
+        "page",
+        params.filtersKey,
+        params.activeTab,
+        params.page,
+        params.perPage,
+        params.sortBy,
+        params.sortOrder,
+      ] as const,
+  },
+
+  /** CRM Tasks listing page (`src/pages/crm/crm-tasks`) — mock or real list API. */
+  crmTasksListing: {
+    all: () => [...crmAppKeys.root, "crmTasksListing"] as const,
+    list: (params: Record<string, unknown>) =>
+      [...crmAppKeys.crmTasksListing.all(), "list", JSON.stringify(params)] as const,
+  },
+};

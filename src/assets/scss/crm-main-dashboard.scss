@@ -1,0 +1,338 @@
+.crm-md-page {
+  font-family: "Lexend Deca", Helvetica, Arial, sans-serif;
+  background-color: #f5f5f5;
+  min-height: 100vh;
+  color: #141414;
+}
+
+.crm-md-header {
+  background-color: #ffffff;
+  border-bottom: 1px solid #e5e5e5;
+  padding: 0 24px;
+}
+
+.crm-md-headerTop {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 16px;
+  padding-bottom: 0;
+}
+
+.crm-md-headerTitle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  font-size: 18px;
+  color: #141414;
+}
+
+.crm-md-headerDivider {
+  color: #bbb;
+  font-weight: 300;
+  font-size: 20px;
+}
+
+.crm-md-headerUser {
+  font-weight: 400;
+  font-size: 18px;
+  color: #141414;
+}
+
+.crm-md-helpBtn {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 1px solid #e0e0e0;
+  background-color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: #666;
+}
+
+.crm-md-nav {
+  display: flex;
+  gap: 0;
+  margin-top: 8px;
+}
+
+.crm-md-navTab {
+  font-weight: 400;
+  font-size: 14px;
+  color: #141414;
+  white-space: nowrap;
+  padding: 10px 16px;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  text-decoration: none;
+  display: block;
+}
+
+.crm-md-navTab--active {
+  border-bottom: 2px solid #006162;
+  font-weight: 600;
+  color: #006162;
+}
+
+.crm-md-content {
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.crm-md-section {
+  background-color: #ffffff;
+  border-radius: 8px;
+  border: 1px solid #e5e5e5;
+  overflow: hidden;
+}
+
+.crm-md-sectionHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+}
+
+.crm-md-sectionTitle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 15px;
+  font-weight: 600;
+  color: #141414;
+}
+
+.crm-md-sectionActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.crm-md-gripIcon {
+  color: #bbb;
+  cursor: grab;
+  display: flex;
+  align-items: center;
+}
+
+.crm-md-sectionTitle-chevron {
+  display: flex;
+  align-items: center;
+  transition: transform 0.2s ease;
+}
+
+button.crm-md-sectionTitle-chevron {
+  background: none;
+  border: 0;
+  padding: 0;
+  color: inherit;
+}
+
+.crm-md-sectionTitle-chevron--clickable {
+  cursor: pointer;
+}
+
+.crm-md-sectionTitle-chevron--collapsed {
+  transform: rotate(-90deg);
+}
+
+.crm-md-viewAllLink {
+  font-size: 13px;
+  color: #006162;
+  text-decoration: none;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  cursor: pointer;
+  font-weight: 400;
+}
+
+button.crm-md-viewAllLink {
+  background: none;
+  border: 0;
+  padding: 0;
+}
+
+.crm-md-btn {
+  cursor: pointer;
+  transition: 150ms ease-out;
+  display: inline-block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  background-color: #ffffff;
+  border-color: rgb(138, 138, 138);
+  color: #141414;
+  text-decoration: none;
+  border-radius: 4px;
+  border-width: 1px;
+  border-style: solid;
+  vertical-align: middle;
+  padding-block: 8px;
+  padding-inline: 16px;
+  max-width: 100%;
+  font-family: "Lexend Deca", Helvetica, Arial, sans-serif;
+  font-size: 12px;
+  font-weight: 300;
+  letter-spacing: 0;
+  line-height: 14px;
+  text-underline-offset: 24%;
+}
+
+.crm-md-btn--primary {
+  background-color: #bfc9d4;
+  border-color: #bfc9d4;
+  color: #000000;
+}
+
+.crm-md-btnInner {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.crm-md-taskFilters {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 16px;
+  flex-wrap: wrap;
+}
+
+.crm-md-taskFiltersActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.crm-md-taskFiltersContainer {
+  display: flex;
+  border: 1px solid rgb(138, 138, 138);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.crm-md-taskFilterBtn {
+  cursor: pointer;
+  display: inline-block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  background-color: #ffffff;
+  color: #141414;
+  border: none;
+  border-right: 1px solid rgb(138, 138, 138);
+  padding: 8px 16px;
+  font-family: "Lexend Deca", Helvetica, Arial, sans-serif;
+  font-size: 12px;
+  font-weight: 300;
+  line-height: 14px;
+}
+
+.crm-md-taskFilterBtn:last-child {
+  border-right: none;
+}
+
+.crm-md-taskFilterBtn--active {
+  background-color: #e6e6e6;
+}
+
+.crm-md-statsGrid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  padding: 0 15px 15px 15px;
+}
+
+.crm-md-statCard {
+  padding: 20px;
+  border: 1px solid #ccc;
+  border-radius: 10px;
+  margin: 0 5px;
+}
+
+.crm-md-statLabel {
+  font-size: 14px;
+  font-style: unset;
+  font-weight: 600;
+  text-transform: unset;
+  font-family: "Lexend Deca", Helvetica, Arial, sans-serif;
+  letter-spacing: 0;
+  line-height: 18px;
+  color: #141414;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.crm-md-statValue {
+  font-size: 22px;
+  font-weight: 700;
+  color: #006162;
+  margin-top: 4px;
+  cursor: pointer;
+}
+
+.crm-md-statValue--zero {
+  color: #141414;
+  font-weight: 400;
+}
+
+.crm-md-statDoneBadge {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background-color: #22c55e;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.crm-md-sectionBodyPad {
+  padding: 12px 16px 16px;
+}
+
+.crm-md-emptyState {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 24px;
+  text-align: center;
+}
+
+.crm-md-emptyTitle {
+  font-size: 14px;
+  font-weight: 600;
+  color: #141414;
+  margin-bottom: 6px;
+}
+
+.crm-md-emptyText {
+  font-size: 13px;
+  color: #666;
+  margin-bottom: 12px;
+  max-width: 400px;
+}
+
+.crm-md-feedbackFab {
+  appearance: none;
+  font: inherit;
+  position: fixed;
+  bottom: 16px;
+  right: 16px;
+  background-color: #ffffff;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  padding: 8px 14px;
+  font-size: 12px;
+  color: #141414;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  font-family: "Lexend Deca", Helvetica, Arial, sans-serif;
+}

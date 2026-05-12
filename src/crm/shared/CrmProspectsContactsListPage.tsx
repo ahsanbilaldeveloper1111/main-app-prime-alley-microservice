@@ -137,7 +137,6 @@ export function CrmProspectsContactsListPage({
     setRefreshKey,
     currentFilters,
     setCurrentFilters,
-    requestIdRef,
     selectedFile,
     setSelectedFile,
     showUploadModal,
@@ -656,7 +655,6 @@ export function CrmProspectsContactsListPage({
     confirmDelete,
   } = useCrmListDataOperations({
     entityName: config.operationsEntityName,
-    requestIdRef,
     memoizedFilters,
     buildCrmDataParams,
     buildExportParams,
@@ -688,6 +686,8 @@ export function CrmProspectsContactsListPage({
     itemToDelete,
     session,
     refreshKey,
+    activeFilter,
+    pagination,
     onSingleRecordDeleted: (deletedId) =>
       afterProspectsRemovedRef.current([deletedId]),
   });
@@ -709,10 +709,7 @@ export function CrmProspectsContactsListPage({
           row as CrmDataItem & Record<string, unknown>,
           dispositionValue,
         );
-        await updateCrmData(
-          id,
-          payload as unknown as Parameters<typeof updateCrmData>[1],
-        );
+        await updateCrmData(id, payload);
         fetchCrmData();
       } catch {
         // Errors are surfaced by updateCrmData

@@ -36,9 +36,11 @@ import {
   type FormEvent,
   type SetStateAction,
 } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "react-toastify";
 import type { Session } from "next-auth";
 import type { FilterPill } from "@components/GenericTable";
+import { crmAppKeys } from "../../query/keys";
 
 type SelectStyles = Record<string, any>;
 
@@ -108,9 +110,7 @@ function getErrorMessageFromUnknown(error: unknown, fallback: string): string {
 
 export function useCrmProductsPage(): UseCrmProductsPageResult {
   const { data: session } = useSession();
-  const [products, setProducts] = useState<CrmProduct[]>([]);
-  const [totalProducts, setTotalProducts] = useState(0);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
   const {
     inputValue: productsSearch,
     queryValue: productsSearchQuery,
@@ -146,8 +146,6 @@ export function useCrmProductsPage(): UseCrmProductsPageResult {
   const [productFormData, setProductFormData] = useState<ProductFormData>({
     ...EMPTY_PRODUCT_FORM,
   });
-  const [industries, setIndustries] = useState<IndustryData[]>([]);
-  const [loadingIndustries, setLoadingIndustries] = useState(false);
   const [deletingProduct, setDeletingProduct] =
     useState<ProductDisplayData | null>(null);
   const [showProductDeleteModal, setShowProductDeleteModal] = useState(false);
@@ -201,23 +199,24 @@ export function useCrmProductsPage(): UseCrmProductsPageResult {
     [],
   );
 
-  const fetchIndustries = useCallback(async () => {
-    try {
-      setLoadingIndustries(true);
-      const response = await getIndustries({ per_page: 1000 });
-      setIndustries(response.data ?? []);
-    } catch (error: unknown) {
-      toast.error(
-        getErrorMessageFromUnknown(error, "Failed to load industries"),
-      );
-    } finally {
-      setLoadingIndustries(false);
-    }
-  }, []);
+  const industriesQuery = useQuery({
+    queryKey: crmAppKeys.campaigns.industries(),
+    queryFn: async () => {
+      const response = await getIndustries({ per_page: 1000, page: 1 });
+      return response.data ?? [];
+    },
+  });
+
+  const industries = industriesQuery.data ?? [];
+  const loadingIndustries = industriesQuery.isPending;
 
   useEffect(() => {
-    fetchIndustries().catch(() => undefined);
-  }, [fetchIndustries]);
+    if (industriesQuery.isError) {
+      toast.error(
+        getErrorMessageFromUnknown(industriesQuery.error, "Failed to load industries"),
+      );
+    }
+  }, [industriesQuery.isError, industriesQuery.error]);
 
   const convertToDisplayData = useCallback(
     (product: CrmProduct): ProductDisplayData => {
@@ -247,9 +246,23 @@ export function useCrmProductsPage(): UseCrmProductsPageResult {
     [],
   );
 
-  const fetchProducts = useCallback(async () => {
-    try {
-      setLoading(true);
+  const listSearch = normalizeSearchQuery(currentFilters.search);
+  const brandKey = useMemo(
+    () => [...productsFilters.brand].map(String).sort((a, b) => a.localeCompare(b)).join(","),
+    [productsFilters.brand],
+  );
+
+  const productsListQuery = useQuery({
+    queryKey: crmAppKeys.crmProductsPage.list({
+      page: productsPagination.currentPage,
+      perPage: productsPagination.rowsPerPage,
+      search: listSearch,
+      activeFilter,
+      industryId: productsFilters.industry_id,
+      category: productsFilters.category,
+      brandKey,
+    }),
+    queryFn: async () => {
       const params: {
         page: number;
         per_page: number;
@@ -263,9 +276,8 @@ export function useCrmProductsPage(): UseCrmProductsPageResult {
         per_page: productsPagination.rowsPerPage,
       };
 
-      const searchQuery = normalizeSearchQuery(currentFilters.search);
-      if (searchQuery) {
-        params.search = searchQuery;
+      if (listSearch) {
+        params.search = listSearch;
       }
 
       if (activeFilter === "active") {
@@ -287,26 +299,29 @@ export function useCrmProductsPage(): UseCrmProductsPageResult {
       }
 
       const response = await getCrmProducts(params);
-      setTotalProducts(response.total);
-      setProducts(response.data);
-    } catch (error: unknown) {
-      toast.error(
-        getErrorMessageFromUnknown(error, "Failed to fetch products"),
-      );
-    } finally {
-      setLoading(false);
-    }
-  }, [
-    productsPagination.currentPage,
-    productsPagination.rowsPerPage,
-    currentFilters,
-    activeFilter,
-    productsFilters,
-  ]);
+      return {
+        data: response.data ?? [],
+        total: response.total ?? 0,
+      };
+    },
+    placeholderData: (previousData) => previousData,
+  });
+
+  const products = productsListQuery.data?.data ?? [];
+  const totalProducts = productsListQuery.data?.total ?? 0;
+  const loading = productsListQuery.isPending;
 
   useEffect(() => {
-    fetchProducts().catch(() => undefined);
-  }, [fetchProducts]);
+    if (productsListQuery.isError) {
+      toast.error(
+        getErrorMessageFromUnknown(productsListQuery.error, "Failed to fetch products"),
+      );
+    }
+  }, [productsListQuery.isError, productsListQuery.error]);
+
+  const fetchProducts = useCallback(async () => {
+    await queryClient.invalidateQueries({ queryKey: crmAppKeys.crmProductsPage.all() });
+  }, [queryClient]);
 
   useEffect(() => {
     setCurrentFilters((prev) =>
