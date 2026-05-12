@@ -1126,9 +1126,9 @@ function CreateDealLoadingLeadCard(props: Readonly<{ loadingLead: boolean }>) {
   return (
     <Card className="mb-3 border-0">
       <Card.Body className="text-center py-4">
-        <div className="spinner-border text-primary" role="status">
+        <output className="spinner-border text-primary d-inline-block" aria-live="polite">
           <span className="visually-hidden">Loading lead data...</span>
-        </div>
+        </output>
         <p className="mt-2 text-muted">Loading lead information...</p>
       </Card.Body>
     </Card>
