@@ -1,11 +1,12 @@
 import React, { ReactElement } from "react";
 import Layout from "@layout/index";
+import MyDayTasksPage from "@components/planner/MyDayTasksPage";
 
-type NextPageWithLayout<P = {}> = React.FC<P> & {
+type NextPageWithLayout = React.FC & {
   getLayout?: (page: ReactElement) => ReactElement;
 };
 
-const PlannerMyTasksPage: React.FC = () => <MyDayTasksPage />;
+const PlannerMyTasksPage: NextPageWithLayout = () => <MyDayTasksPage />;  
 
 PlannerMyTasksPage.getLayout = (page: ReactElement) => <Layout>{page}</Layout>;
 
