@@ -2,6 +2,7 @@ import '@assets/scss/datatable-style.scss';
 import React, { ReactElement, useState, useCallback, useMemo, useEffect } from 'react';
 import Layout from '@layout/index';
 import BreadcrumbItem from '@common/BreadcrumbItem';
+import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import GenericTable, { TableAction, TableColumn } from '@components/GenericTable';
 import { ListRoles, updateRole,deleteRole,addRole,BulkDeleteRoles, getUserTypes, getModules, getPermissionsByModule, updateSeverityLevel, cloneRank } from '@utils/roles';
 import { Button, Row, Col, Form, OverlayTrigger, Tooltip, Modal } from 'react-bootstrap';
@@ -11,6 +12,7 @@ import { useRouter } from 'next/router';
 import Select, { MultiValue } from 'react-select';
 import SelectCheckBox, { SelectCheckBoxOption } from '@components/SelectCheckBox';
 import { useDebouncedValue } from '@hooks/useDebouncedValue';
+import { controlhubKeys } from '../../../query/keys';
 import { getParentUsers, assignRankBulk } from '@utils/users';
 import { Copy, Users } from 'lucide-react';
 
@@ -53,20 +55,51 @@ interface RankRow {
 const Ranks = () => {
     const { data: session } = useSession();
     const router = useRouter();
-    
+    const queryClient = useQueryClient();
+
     // We don't need the redirect effect anymore since we're showing the message on page
 
-    const [refreshKey, setRefreshKey] = useState<number>(0);
     const [currentFilters] = useState({});
     const [selectedRows, setSelectedRows] = useState<any[]>([]);
-    const [tableData, setTableData] = useState<RankRow[]>([]);
-    const [isTableLoading, setIsTableLoading] = useState(false);
     const [currentPage, setCurrentPage] = useState(1);
     const [rowsPerPage, setRowsPerPage] = useState(15);
-    const [totalRows, setTotalRows] = useState(0);
     const [searchValue, setSearchValue] = useState('');
     const debouncedSearchValue = useDebouncedValue(searchValue, 400);
     const [rowSelectionEnabled, setRowSelectionEnabled] = useState<boolean>(false);
+
+    const filtersListKey = JSON.stringify(currentFilters);
+    const ranksListQuery = useQuery({
+        queryKey: controlhubKeys.ranks.list({
+            page: currentPage,
+            perPage: rowsPerPage,
+            search: debouncedSearchValue,
+            filtersKey: filtersListKey,
+        }),
+        queryFn: async () => {
+            try {
+                const response = await ListRoles({
+                    page: currentPage,
+                    perPage: rowsPerPage,
+                    search: debouncedSearchValue,
+                    filters: currentFilters,
+                });
+                const rows = response?.data ?? response?.dataList ?? [];
+                const total = response?.total ?? 0;
+                return { data: Array.isArray(rows) ? rows : [], total };
+            } catch {
+                toast.error('Failed to load ranks');
+                throw new Error('Failed to load ranks');
+            }
+        },
+        placeholderData: keepPreviousData,
+    });
+    const tableData = ranksListQuery.data?.data ?? [];
+    const totalRows = ranksListQuery.data?.total ?? 0;
+    const isTableLoading = ranksListQuery.isPending || ranksListQuery.isFetching;
+
+    const invalidateRanksList = useCallback(() => {
+        queryClient.invalidateQueries({ queryKey: controlhubKeys.ranks.all() }).then(() => undefined);
+    }, [queryClient]);
 
     useEffect(() => {
         if(session?.user?.permissions?.includes('bulk-delete-ranks')){
@@ -203,30 +236,6 @@ const Ranks = () => {
         ];
     }, [session?.user?.is_admin]);
 
-    const fetchRoles = useCallback(
-        async (page = 1, perPage = 15, search = '') => {
-            return await ListRoles({ page, perPage, search, filters: currentFilters });
-        },
-        [currentFilters],
-    );
-
-    const loadRoles = useCallback(async () => {
-        setIsTableLoading(true);
-        try {
-            const response = await fetchRoles(currentPage, rowsPerPage, debouncedSearchValue);
-            setTableData(response?.data ?? response?.dataList ?? []);
-            setTotalRows(response?.total ?? 0);
-        } catch {
-            toast.error('Failed to load ranks');
-        } finally {
-            setIsTableLoading(false);
-        }
-    }, [currentPage, rowsPerPage, debouncedSearchValue, fetchRoles]);
-
-    useEffect(() => {
-        loadRoles();
-    }, [loadRoles, refreshKey]);
-
     const [selectedRank, setSelectedRank] = useState<any>(null);
     const [selectedRankName, setSelectedRankName] = useState<any>(null);
     const [selectedRankUserTypeId, setSelectedRankUserTypeId] = useState<number | null>(null);
@@ -275,7 +284,7 @@ const Ranks = () => {
               setShowSuccessfulModal(true);
               console.log('Modal state updated:', true);
             }, 100);
-            setRefreshKey(prev => prev + 1); // Trigger refresh
+            invalidateRanksList();
         }
 
         
@@ -316,7 +325,7 @@ const Ranks = () => {
               setShowSuccessfulModal(true);
               console.log('Modal state updated:', true);
             }, 100);
-            setRefreshKey(prev => prev + 1); // Trigger refresh
+            invalidateRanksList();
         }
     };
 
@@ -332,7 +341,7 @@ const Ranks = () => {
               setShowSuccessfulModal(true);
               console.log('Modal state updated:', true);
             }, 100);
-            setRefreshKey(prev => prev + 1); // Trigger refresh
+            invalidateRanksList();
         }
     };
 
@@ -349,14 +358,14 @@ const Ranks = () => {
                 setShowBulkDeleteModal(false);
                 setSelectedRows([]);
 
-                setRefreshKey(prev => prev + 1);
+                invalidateRanksList();
             }else{
                 toast.error('Failed to delete ranks');
             }
 
             setSelectedRows([]);
             setShowBulkDeleteModal(false);
-            setRefreshKey(prev => prev + 1); // Trigger refresh
+            invalidateRanksList();
         } catch (error) {
             console.error('Bulk delete error:', error);
             toast.error('An error occurred during bulk delete');
@@ -453,7 +462,7 @@ const Ranks = () => {
                 setTimeout(() => {
                     setShowSuccessfulModal(true);
                 }, 100);
-                setRefreshKey(prev => prev + 1);
+                invalidateRanksList();
             }
         } catch (error) {
             console.error('Error assigning ranks:', error);
@@ -504,7 +513,7 @@ const Ranks = () => {
               setShowSuccessfulModal(true);
               console.log('Modal state updated:', true);
             }, 100);
-            setRefreshKey(prev => prev + 1); // Trigger refresh
+            invalidateRanksList();
         }
     };
 

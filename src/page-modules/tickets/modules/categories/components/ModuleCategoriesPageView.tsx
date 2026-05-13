@@ -7,13 +7,13 @@ import PageHeader from "@components/PageHeader";
 import React from "react";
 import { Button } from "react-bootstrap";
 import { Info } from "lucide-react";
+import type { GenericListPageQueryParams, GenericListPageQueryOptions } from "@components/GenericListPage";
 import type { TicketModulePickerRow } from "../moduleCategoriesTypes";
 
 export type ModuleCategoriesPageViewProps = Readonly<{
-  refreshKey: number;
   memoizedFilters: { search: string };
   columns: Column[];
-  fetchSubmodules: (page?: number, perPage?: number, search?: string) => Promise<unknown>;
+  getListQueryOptions: (params: GenericListPageQueryParams) => GenericListPageQueryOptions;
   showCreateModal: boolean;
   onCloseCreateModal: () => void;
   onOpenCreateModal: () => void;
@@ -31,10 +31,9 @@ export type ModuleCategoriesPageViewProps = Readonly<{
 }>;
 
 export const ModuleCategoriesPageView: React.FC<ModuleCategoriesPageViewProps> = ({
-  refreshKey,
   memoizedFilters,
   columns,
-  fetchSubmodules,
+  getListQueryOptions,
   showCreateModal,
   onCloseCreateModal,
   onOpenCreateModal,
@@ -64,12 +63,11 @@ export const ModuleCategoriesPageView: React.FC<ModuleCategoriesPageViewProps> =
 
       <GenericListPage
         columns={columns}
-        fetchData={fetchSubmodules}
+        getListQueryOptions={getListQueryOptions}
         title="Submodules"
         searchPlaceholder="Search submodules..."
         defaultPageSize={15}
         filters={memoizedFilters}
-        refreshKey={refreshKey}
         search={true}
         tableStyle="table-style-2"
       />

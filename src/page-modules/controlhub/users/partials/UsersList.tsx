@@ -15,6 +15,8 @@ interface UsersListProps {
   customFieldColumns: Column[];
   currentFilters: any;
   handleFiltersChange: (filters: any) => void;
+  /** When incremented, refetches the current page (e.g. after parent invalidates TanStack cache). */
+  listRefreshToken?: number;
   hasPermission: boolean;
   showFilters: boolean;
 }
@@ -60,6 +62,7 @@ const UsersList: React.FC<UsersListProps> = ({
   customFieldColumns,
   currentFilters,
   handleFiltersChange,
+  listRefreshToken = 0,
   hasPermission,
   showFilters,
 }) => {
@@ -155,7 +158,7 @@ const UsersList: React.FC<UsersListProps> = ({
     } finally {
       setLoading(false);
     }
-  }, [fetchData, pagination.currentPage, pagination.rowsPerPage, currentFilters]);
+  }, [fetchData, pagination.currentPage, pagination.rowsPerPage, currentFilters, listRefreshToken]);
 
   useEffect(() => {
     fetchAndSetData();

@@ -11,6 +11,8 @@ interface OverviewTabProps {
     customFieldColumns: Column[];
     currentFilters: any;
     handleFiltersChange: (filters: any) => void;
+    /** Bumps when parent invalidates the users list cache (e.g. after status change). */
+    listRefreshToken?: number;
     hasListPermission: boolean;
     showFilters?: boolean;
 }
@@ -21,6 +23,7 @@ const OverviewTab: React.FC<OverviewTabProps> = ({
     customFieldColumns,
     currentFilters,
     handleFiltersChange,
+    listRefreshToken = 0,
     hasListPermission,
     showFilters = true,
 }) => {
@@ -38,6 +41,7 @@ const OverviewTab: React.FC<OverviewTabProps> = ({
                 customFieldColumns={customFieldColumns}
                 currentFilters={currentFilters}
                 handleFiltersChange={handleFiltersChange}
+                listRefreshToken={listRefreshToken}
                 hasPermission={hasListPermission}
                 showFilters={canShowFilters}
             />

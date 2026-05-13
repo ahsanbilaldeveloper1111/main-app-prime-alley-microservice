@@ -16,9 +16,8 @@ export type AIFaqsTenantPageViewProps = Readonly<{
 export function AIFaqsTenantPageView({ ctx }: AIFaqsTenantPageViewProps) {
   const {
     router,
-    refreshKey,
     columns,
-    fetchData,
+    getListQueryOptions,
     stableFilters,
     companies,
     companiesLoading,
@@ -105,12 +104,11 @@ export function AIFaqsTenantPageView({ ctx }: AIFaqsTenantPageViewProps) {
 
       <GenericListPage
         columns={columns}
-        fetchData={fetchData}
+        getListQueryOptions={getListQueryOptions}
         title="Tenant FAQs"
         searchPlaceholder="Search FAQs..."
         defaultPageSize={15}
         filters={stableFilters}
-        refreshKey={refreshKey}
         search={true}
         tableStyle="table-style-2"
       />

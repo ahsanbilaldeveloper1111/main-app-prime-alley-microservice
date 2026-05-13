@@ -1,13 +1,15 @@
+import { chatKeys } from "../../../../query/keys";
 import {
   type CreateTenantFAQPayload,
   type FAQData,
-  type FAQItem,
   createGlobalFAQ,
   deleteGlobalFAQ,
   getGlobalFAQs,
 } from "@utils/chat";
+import type { GenericListPageQueryParams } from "@components/GenericListPage";
+import { useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/router";
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { toast } from "react-toastify";
 
 import { useAiFaqListColumns } from "../aiFaqListColumns";
@@ -20,26 +22,9 @@ import {
 } from "../faqItemDraft";
 import { useAiFaqDraftFormState } from "../hooks/useAiFaqDraftFormState";
 
-type AiFaqDraftItem = FAQItem & Readonly<{ draftId: string }>;
-
-let aiFaqGlobalDraftIdSeq = 0;
-
-function nextDraftRow(question = "", answer = ""): AiFaqDraftItem {
-  const c = globalThis.crypto;
-  const draftId =
-    c !== undefined && typeof c.randomUUID === "function"
-      ? c.randomUUID()
-      : `draft_${Date.now()}_${(++aiFaqGlobalDraftIdSeq).toString(36)}`;
-  return {
-    question,
-    answer,
-    draftId,
-  };
-}
-
 export function useAIFaqsGlobalPage() {
   const router = useRouter();
-  const [refreshKey, setRefreshKey] = useState(0);
+  const queryClient = useQueryClient();
 
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -106,11 +91,11 @@ export function useAIFaqsGlobalPage() {
       setShowAddModal(false);
       setShowEditModal(false);
       setSelectedFAQ(null);
-      setRefreshKey((k) => k + 1);
+      await queryClient.invalidateQueries({ queryKey: chatKeys.aiFaqs.global.all() });
     } catch (error) {
       console.error("Failed to save FAQs:", error);
     }
-  }, [faqItems, haveFiles, selectedFiles, resetForm]);
+  }, [faqItems, haveFiles, selectedFiles, resetForm, queryClient]);
 
   const handleConfirmDelete = useCallback(async () => {
     if (!selectedFAQ?.id) return;
@@ -119,28 +104,42 @@ export function useAIFaqsGlobalPage() {
       await deleteGlobalFAQ(selectedFAQ.id);
       setShowDeleteModal(false);
       setSelectedFAQ(null);
-      setRefreshKey((k) => k + 1);
+      await queryClient.invalidateQueries({ queryKey: chatKeys.aiFaqs.global.all() });
     } catch (error) {
       console.error("Failed to delete FAQ:", error);
     }
-  }, [selectedFAQ]);
+  }, [selectedFAQ, queryClient]);
 
-  const fetchData = useCallback(async (page = 1, perPage = 15, search = "") => {
-    try {
-      const allFAQs = await getGlobalFAQs(search || undefined);
-      const { slice, total, last_page } = paginateArrayForTable(allFAQs, page, perPage);
+  const stableFilters = useMemo(() => ({}), []);
 
-      return {
-        data: slice,
-        total,
-        page,
-        per_page: perPage,
-        last_page,
-      };
-    } catch (error) {
-      console.error("Error fetching FAQs:", error);
-      return emptyFaqListPage(perPage);
-    }
+  const getListQueryOptions = useCallback((params: GenericListPageQueryParams) => {
+    return {
+      queryKey: chatKeys.aiFaqs.global.list({
+        page: params.page,
+        perPage: params.perPage,
+        search: params.search,
+      }),
+      queryFn: async () => {
+        try {
+          const allFAQs = await getGlobalFAQs(params.search || undefined);
+          const { slice, total, last_page } = paginateArrayForTable(
+            allFAQs,
+            params.page,
+            params.perPage,
+          );
+          return {
+            data: slice,
+            total,
+            page: params.page,
+            per_page: params.perPage,
+            last_page,
+          };
+        } catch (error) {
+          console.error("Error fetching FAQs:", error);
+          return emptyFaqListPage(params.perPage);
+        }
+      },
+    };
   }, []);
 
   const columns = useAiFaqListColumns({
@@ -152,9 +151,9 @@ export function useAIFaqsGlobalPage() {
 
   return {
     router,
-    refreshKey,
     columns,
-    fetchData,
+    getListQueryOptions,
+    stableFilters,
     showAddModal,
     setShowAddModal,
     showEditModal,

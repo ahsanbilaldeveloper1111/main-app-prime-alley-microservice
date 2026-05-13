@@ -7,6 +7,8 @@ import React, {
   useEffect,
   useRef,
 } from "react";
+import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
+import { crmAppKeys } from "../../query/keys";
 import type {
   TableColumn,
   TableAction,
@@ -300,10 +302,8 @@ export function useCrmLeadsPageModel() {
   const [filterBusinessTypes, setFilterBusinessTypes] = useState<
     BusinessTypeData[]
   >([]);
-  const [refreshKey, setRefreshKey] = useState(0);
   const [currentFilters, setCurrentFilters] = useState<Record<string, any>>({});
   const [leadsData, setLeadsData] = useState<any[]>([]);
-  const [loading, setLoading] = useState(false);
   const [totalLeads, setTotalLeads] = useState(0);
   const [summaryTiles, setSummaryTiles] = useState<any>(null);
   const [leadMetrics, setLeadMetrics] = useState<Record<string, number> | null>(
@@ -588,58 +588,81 @@ export function useCrmLeadsPageModel() {
     return Number(response?.data?.pagination?.total) || 0;
   }, []);
 
-  // Fetch leads when filters or search change
-  const fetchLeads = useCallback(
-    async (page = 1, perPage = 15, search = "") => {
-      setLoading(true);
-      try {
-        const params = buildLeadsParams(currentFilters, page, perPage, search, true);
+  const queryClient = useQueryClient();
 
-        const response = await getLeads(params);
-        console.log("Raw response from getLeads:", response);
+  const refreshLeadsList = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: crmAppKeys.leadsPage.all() }).then(() => undefined);
+  }, [queryClient]);
 
-        const {
-          leadsArray: leadsArrayRaw,
-          pagination,
-          summary,
-          metrics: metricsFromApi,
-        } = parseLeadsListApiEnvelope(response);
-        const leadsArray = leadsArrayRaw;
+  const leadsListFiltersKey = useMemo(
+    () => JSON.stringify(currentFilters),
+    [currentFilters],
+  );
 
-        // Set leads data, total, and summary tiles
-        setLeadsData(Array.isArray(leadsArray) ? leadsArray : []);
-        setTotalLeads(
-          pagination?.total ||
+  const leadsListQuery = useQuery({
+    queryKey: crmAppKeys.leadsPage.list({
+      filtersKey: leadsListFiltersKey,
+      page: leadsPagination.currentPage,
+      perPage: leadsPagination.rowsPerPage,
+      sortBy: leadsPagination.sortBy,
+      sortOrder: leadsPagination.sortOrder,
+    }),
+    queryFn: async () => {
+      const params = buildLeadsParams(
+        currentFilters,
+        leadsPagination.currentPage,
+        leadsPagination.rowsPerPage,
+        leadsSearch,
+        true,
+      );
+      const response = await getLeads(params);
+      const {
+        leadsArray: leadsArrayRaw,
+        pagination,
+        summary,
+        metrics: metricsFromApi,
+      } = parseLeadsListApiEnvelope(response);
+      const leadsArray = leadsArrayRaw;
+      return {
+        dataList: Array.isArray(leadsArray) ? leadsArray : [],
+        meta: {
+          total:
+            pagination?.total ||
             (Array.isArray(leadsArray) ? leadsArray.length : 0) ||
             0,
-        );
-        setSummaryTiles(summary);
-        setLeadMetrics(metricsFromApi);
-
-        // Transform to GenericListPage expected format
-        const transformedData = {
-          dataList: Array.isArray(leadsArray) ? leadsArray : [],
-          meta: {
-            total:
-              pagination?.total ||
-              (Array.isArray(leadsArray) ? leadsArray.length : 0) ||
-              0,
-            current_page: pagination?.current_page || page,
-            per_page: pagination?.per_page || perPage,
-            last_page: pagination?.last_page || 1,
-          },
-        };
-        console.log("Transformed data:", transformedData);
-        return transformedData;
-      } finally {
-        setLoading(false);
-      }
+          current_page:
+            pagination?.current_page || leadsPagination.currentPage,
+          per_page: pagination?.per_page || leadsPagination.rowsPerPage,
+          last_page: pagination?.last_page || 1,
+        },
+        summary,
+        metrics: metricsFromApi,
+      };
     },
-    [
-      buildLeadsParams,
-      currentFilters,
-    ],
-  );
+    placeholderData: keepPreviousData,
+  });
+
+  useEffect(() => {
+    if (leadsListQuery.isError) {
+      setLeadsData([]);
+      setTotalLeads(0);
+      setSummaryTiles(null);
+      setLeadMetrics(null);
+      return;
+    }
+    if (!leadsListQuery.data || leadsListQuery.isPlaceholderData) return;
+    const payload = leadsListQuery.data;
+    setLeadsData(Array.isArray(payload.dataList) ? payload.dataList : []);
+    setTotalLeads(payload.meta?.total ?? 0);
+    setSummaryTiles(payload.summary ?? null);
+    setLeadMetrics(payload.metrics ?? null);
+  }, [
+    leadsListQuery.data,
+    leadsListQuery.isError,
+    leadsListQuery.isPlaceholderData,
+  ]);
+
+  const loading = leadsListQuery.isPending || leadsListQuery.isFetching;
 
   // Handle activeFilter changes to update currentFilters and stage dropdown
   useEffect(() => {
@@ -760,61 +783,66 @@ export function useCrmLeadsPageModel() {
       }),
     [stages, tabTotalsBaseFilters],
   );
-  const lastTabTotalsRequestKeyRef = useRef<string>("");
 
-  const fetchTabTotals = useCallback(
-    async (baseFilters: Record<string, any>) => {
-      try {
-        const [allResp, lostResp, deletedResp, ...stageResponses] = await Promise.all([
+  const tabTotalsQuery = useQuery({
+    queryKey: crmAppKeys.leadsPage.tabTotals(tabTotalsRequestKey),
+    queryFn: async (): Promise<Record<string, number>> => {
+      const baseFilters = tabTotalsBaseFilters;
+      const [allResp, lostResp, deletedResp, ...stageResponses] =
+        await Promise.all([
           getLeads(buildLeadsParams(baseFilters, 1, 1, "", false)),
-          getLeads(buildLeadsParams({ ...baseFilters, include_lost: true }, 1, 1, "", false)),
-          getLeads(buildLeadsParams({ ...baseFilters, include_archived: true }, 1, 1, "", false)),
+          getLeads(
+            buildLeadsParams(
+              { ...baseFilters, include_lost: true },
+              1,
+              1,
+              "",
+              false,
+            ),
+          ),
+          getLeads(
+            buildLeadsParams(
+              { ...baseFilters, include_archived: true },
+              1,
+              1,
+              "",
+              false,
+            ),
+          ),
           ...stages.map((stage: any) =>
-            getLeads(buildLeadsParams({ ...baseFilters, stage_id: stage.id }, 1, 1, "", false)),
+            getLeads(
+              buildLeadsParams(
+                { ...baseFilters, stage_id: stage.id },
+                1,
+                1,
+                "",
+                false,
+              ),
+            ),
           ),
         ]);
 
-        const nextTotals: Record<string, number> = {
-          all: getLeadsTotalFromResponse(allResp),
-          lost: getLeadsTotalFromResponse(lostResp),
-          deleted: getLeadsTotalFromResponse(deletedResp),
-        };
+      const nextTotals: Record<string, number> = {
+        all: getLeadsTotalFromResponse(allResp),
+        lost: getLeadsTotalFromResponse(lostResp),
+        deleted: getLeadsTotalFromResponse(deletedResp),
+      };
 
-        stages.forEach((stage: any, index) => {
-          nextTotals[stage.id] = getLeadsTotalFromResponse(stageResponses[index]);
-        });
+      stages.forEach((stage: any, index: number) => {
+        nextTotals[stage.id] = getLeadsTotalFromResponse(
+          stageResponses[index],
+        );
+      });
 
-        setTabTotals(nextTotals);
-      } catch (error) {
-        console.error("Failed to fetch lead tab totals:", error);
-      }
+      return nextTotals;
     },
-    [buildLeadsParams, getLeadsTotalFromResponse, stages],
-  );
+  });
 
   useEffect(() => {
-    fetchLeads(
-      leadsPagination.currentPage,
-      leadsPagination.rowsPerPage,
-      leadsSearch,
-    );
-  }, [
-    refreshKey,
-    currentFilters,
-    leadsPagination.currentPage,
-    leadsPagination.rowsPerPage,
-    fetchLeads,
-  ]);
-
-  useEffect(() => {
-    if (lastTabTotalsRequestKeyRef.current === tabTotalsRequestKey) {
-      return;
+    if (tabTotalsQuery.isSuccess && tabTotalsQuery.data) {
+      setTabTotals(tabTotalsQuery.data);
     }
-    lastTabTotalsRequestKeyRef.current = tabTotalsRequestKey;
-    fetchTabTotals(tabTotalsBaseFilters).catch((error) => {
-      console.error("Failed to fetch tab totals:", error);
-    });
-  }, [fetchTabTotals, tabTotalsBaseFilters, tabTotalsRequestKey]);
+  }, [tabTotalsQuery.isSuccess, tabTotalsQuery.data]);
 
   // Initialize export filters when export modal opens
   useEffect(() => {
@@ -848,8 +876,9 @@ export function useCrmLeadsPageModel() {
 
   // Handle filter changes
   const handleFiltersChange = useCallback((filters: Record<string, any>) => {
-    setCurrentFilters((prev) => applyCrmFilterRules(prev, filters, LEADS_FILTER_RULES));
-    setRefreshKey((prev) => prev + 1);
+    setCurrentFilters((prev) =>
+      applyCrmFilterRules(prev, filters, LEADS_FILTER_RULES),
+    );
   }, []);
 
   const clearLeadsWidgetFiltersPatch = useMemo(
@@ -1396,11 +1425,11 @@ export function useCrmLeadsPageModel() {
       setShowSuccessfulModal(true);
       setSuccessModalTitle("Lead Deleted");
       setSuccessModalDescription("Lead has been deleted successfully");
-      setRefreshKey((oldKey) => oldKey + 1);
+      refreshLeadsList();
     } catch (error) {
       console.error("Failed to delete lead:", error);
     }
-  }, [leadToDelete]);
+  }, [leadToDelete, refreshLeadsList]);
 
   // Restore Lead Handler
   const handleRestoreLead = useCallback(async (leadId: number) => {
@@ -1412,12 +1441,12 @@ export function useCrmLeadsPageModel() {
       setShowSuccessfulModal(true);
       setSuccessModalTitle("Lead Restored");
       setSuccessModalDescription("Lead has been restored successfully");
-      setRefreshKey((oldKey) => oldKey + 1);
+      refreshLeadsList();
     } catch (error) {
       console.error("Failed to restore lead:", error);
       toast.error("Failed to restore lead");
     }
-  }, []);
+  }, [refreshLeadsList]);
 
   // Convert Lead Modal
   const [showConvertModal, setShowConvertModal] = useState(false);
@@ -1492,15 +1521,14 @@ export function useCrmLeadsPageModel() {
       setLeadToChangeStage(null);
       setSelectedStageId(null);
       toast.success("Lead stage updated successfully!");
-      // Refresh the list
-      setRefreshKey((oldKey) => oldKey + 1);
+      refreshLeadsList();
     } catch (error) {
       console.error("Failed to update lead stage:", error);
       toast.error("Failed to update lead stage");
     } finally {
       setLoadingChangeStage(false);
     }
-  }, [leadToChangeStage, selectedStageId]);
+  }, [leadToChangeStage, selectedStageId, refreshLeadsList]);
 
   const [showSuccessfulModal, setShowSuccessfulModal] = useState(false);
   const [successModalTitle, setSuccessModalTitle] = useState("");
@@ -1535,11 +1563,11 @@ export function useCrmLeadsPageModel() {
       setShowSuccessfulModal(true);
       setSuccessModalTitle("Lead Marked as Lost");
       setSuccessModalDescription("Lead has been marked as lost successfully");
-      setRefreshKey((oldKey) => oldKey + 1);
+      refreshLeadsList();
     } catch (error) {
       console.error("Failed to mark lead as lost:", error);
     }
-  }, [leadToMarkLost, lostReasonId, lostFeedback]);
+  }, [leadToMarkLost, lostReasonId, lostFeedback, refreshLeadsList]);
 
   // Handle view lead - open GenericSidebar only (no modal)
   const handleViewLead = useCallback(async (leadId: number) => {
@@ -1821,7 +1849,7 @@ export function useCrmLeadsPageModel() {
         await updateLead(editingLead.id, payload);
         toast.success("Lead updated successfully");
         setShowEditModal(false);
-        fetchLeads(); // Refresh the list
+        refreshLeadsList();
       }
     } catch (error: any) {
       console.error("Failed to update lead:", error);
@@ -1958,8 +1986,7 @@ export function useCrmLeadsPageModel() {
         await handleViewLead(followUpToDelete.leadId);
       }
 
-      // Refresh leads list
-      setRefreshKey((oldKey) => oldKey + 1);
+      refreshLeadsList();
 
       setShowDeleteFollowUpModal(false);
       setFollowUpToDelete(null);
@@ -1967,7 +1994,7 @@ export function useCrmLeadsPageModel() {
       console.error("Failed to delete follow-up:", error);
       toast.error("Failed to delete follow-up");
     }
-  }, [followUpToDelete, viewingLead, handleViewLead]);
+  }, [followUpToDelete, viewingLead, handleViewLead, refreshLeadsList]);
 
   const resetMeetingForm = useCallback(() => {
     setShowAddMeetingModal(false);
@@ -2543,7 +2570,7 @@ export function useCrmLeadsPageModel() {
     onSearch: () => {},
     currentFilters,
     handleFiltersChange,
-    refresh: () => setRefreshKey((prev) => prev + 1),
+    refresh: refreshLeadsList,
     activeTab: activeFilter,
     onTabChange: handleFilterChange,
     tabs: [
@@ -2639,14 +2666,11 @@ export function useCrmLeadsPageModel() {
     setCampaigns,
     filterBusinessTypes,
     setFilterBusinessTypes,
-    refreshKey,
-    setRefreshKey,
     currentFilters,
     setCurrentFilters,
     leadsData,
     setLeadsData,
     loading,
-    setLoading,
     totalLeads,
     setTotalLeads,
     summaryTiles,
@@ -2781,12 +2805,9 @@ export function useCrmLeadsPageModel() {
     fetchFilterBusinessTypes,
     buildLeadsParams,
     getLeadsTotalFromResponse,
-    fetchLeads,
+    refreshLeadsList,
     handleFilterChange,
     tabTotalsBaseFilters,
-    tabTotalsRequestKey,
-    lastTabTotalsRequestKeyRef,
-    fetchTabTotals,
     handleFiltersChange,
     buildLeadsExportParams,
     fetchLeadsForExport,
