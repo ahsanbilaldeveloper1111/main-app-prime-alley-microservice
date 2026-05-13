@@ -13,7 +13,7 @@ export const FINESSE_TOKEN_KEY = "finesseToken";
 export const FINESSE_SELECTED_TEAM_ID_KEY = "finesseSelectedTeamId";
 
 const NEXT_PUBLIC_FINESSED_DEFAULT_TEAM_ID =
-  process.env.NEXT_PUBLIC_FINESSED_DEFAULT_TEAM_ID || "2";
+  process.env.VITE_PUBLIC_FINESSED_DEFAULT_TEAM_ID || "2";
 const DEFAULT_TEAM_ID = Number(NEXT_PUBLIC_FINESSED_DEFAULT_TEAM_ID);
 
 export const getStoredTeamId = (): number => {
