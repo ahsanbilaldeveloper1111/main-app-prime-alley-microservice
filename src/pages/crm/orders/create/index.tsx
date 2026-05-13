@@ -1,11 +1,11 @@
 import "@assets/scss/datatable-style.scss";
 import React, { ReactElement, useState, useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 import {
   createOrder,
   getStages,
-  StageData,
   getCrmProducts,
   CrmProduct,
   getDeal,
@@ -27,6 +27,7 @@ import "@assets/scss/tabs.scss";
 import { convertCurrency, formatCurrency } from '@utils/currency';
 import { ModuleSlug, ValidationType, checkRequiredFields } from "@utils/Helper";
 import { GetHierarchyData } from "@utils/users";
+import { crmAppKeys } from "../../../../query/keys";
 
 interface OrderItem {
   id?: number;
@@ -45,9 +46,6 @@ const CreateOrder = () => {
   const { deal_id } = router.query;
   const [formStep, setFormStep] = useState(0);
   const [loading, setLoading] = useState(false);
-  const [stages, setStages] = useState<StageData[]>([]);
-  const [products, setProducts] = useState<CrmProduct[]>([]);
-  const [loadingProducts, setLoadingProducts] = useState(false);
   const [showAddItemModal, setShowAddItemModal] = useState(false);
   const [editingItemIndex, setEditingItemIndex] = useState<number | null>(null);
   const [itemFormData, setItemFormData] = useState({
@@ -57,22 +55,28 @@ const CreateOrder = () => {
     quantity: 1,
     unit_price: 0,
   });
-  const [extensions, setExtensions] = useState<any[]>([]);
-
-  const fetchExtensions = async () => {
-    try {
+  const stagesQuery = useQuery({
+    queryKey: crmAppKeys.crmStages.byType("order"),
+    queryFn: () => getStages("order"),
+  });
+  const extensionsQuery = useQuery({
+    queryKey: crmAppKeys.hierarchyExtensions.module(ModuleSlug.CRM_ORDERS),
+    queryFn: async () => {
       const hierarchyData = await GetHierarchyData(ModuleSlug.CRM_ORDERS);
-      if (hierarchyData?.extensions) {
-        setExtensions(hierarchyData.extensions);
-      }
-    } catch (error) {
-      console.error("Failed to fetch extensions:", error);
-    }
-  };
-
-  useEffect(() => {
-    fetchExtensions();
-  }, []);
+      return hierarchyData?.extensions ?? [];
+    },
+  });
+  const productsQuery = useQuery({
+    queryKey: crmAppKeys.orderFormBootstrap.productsPicklist(),
+    queryFn: async () => {
+      const response = await getCrmProducts({ per_page: 100 });
+      return response.data ?? [];
+    },
+  });
+  const stages = stagesQuery.data ?? [];
+  const extensions = extensionsQuery.data ?? [];
+  const products = productsQuery.data ?? [];
+  const loadingProducts = productsQuery.isPending;
 
   const [sourceDeal, setSourceDeal] = useState<DealData | null>(null);
   const [loadingDeal, setLoadingDeal] = useState(false);
@@ -94,11 +98,6 @@ const CreateOrder = () => {
     industry: "",
     items: [] as OrderItem[],
   });
-
-  useEffect(() => {
-    fetchStages();
-    fetchProducts();
-  }, []);
 
   useEffect(() => {
     const fetchDealData = async () => {
@@ -218,27 +217,6 @@ const CreateOrder = () => {
 
     fetchDealData();
   }, [router.isReady, deal_id, router]);
-
-  const fetchStages = async () => {
-    try {
-      const stagesData = await getStages('order');
-      setStages(stagesData || []);
-    } catch (error) {
-      console.error("Failed to fetch stages:", error);
-    }
-  };
-
-  const fetchProducts = async () => {
-    try {
-      setLoadingProducts(true);
-      const response = await getCrmProducts({ per_page: 100 });
-      setProducts(response.data || []);
-    } catch (error) {
-      console.error("Failed to fetch products:", error);
-    } finally {
-      setLoadingProducts(false);
-    }
-  };
 
   const handleEstimateChange = async (estimateId: number | null) => {
     if (!sourceDeal || !estimateId) return;

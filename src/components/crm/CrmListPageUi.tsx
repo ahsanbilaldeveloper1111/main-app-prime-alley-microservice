@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from "react";
+import React, { useMemo, useState } from "react";
 import parsePhoneNumber from "libphonenumber-js";
 import {
   Badge,
@@ -27,9 +27,14 @@ export type ParsedPhoneForDisplay = {
   countryCode: string;
 };
 
+const EMPTY_PARSED_PHONE: ParsedPhoneForDisplay = {
+  phone: "N/A",
+  countryCode: "",
+};
+
 export function parsePhoneForDisplay(phone: string): ParsedPhoneForDisplay {
   if (!phone) {
-    return { phone: "N/A", countryCode: "" };
+    return EMPTY_PARSED_PHONE;
   }
   try {
     const parsedPhone = parsePhoneNumber(phone);
@@ -47,15 +52,27 @@ export function flagImgSrcForCountry(countryCode: string): string {
   return `https://flagcdn.com/w20/${countryCode.toLowerCase()}.png`;
 }
 
+interface CrmPhoneFlagAndTextProps {
+  readonly parsed: ParsedPhoneForDisplay;
+}
+
+function CrmPhoneFlagAndText({ parsed }: CrmPhoneFlagAndTextProps) {
+  const flagSrc = flagImgSrcForCountry(parsed.countryCode);
+  return (
+    <>
+      {parsed.countryCode ? (
+        <img src={flagSrc} alt={parsed.countryCode} />
+      ) : null}
+      {parsed.phone}
+    </>
+  );
+}
+
 export const CrmPhoneDisplay: React.FC<{ phone: string }> = ({ phone }) => {
-  const phoneNumber = useMemo(() => parsePhoneForDisplay(phone), [phone]);
-  const flagSrc = flagImgSrcForCountry(phoneNumber.countryCode);
+  const parsed = useMemo(() => parsePhoneForDisplay(phone), [phone]);
   return (
     <div className="d-flex align-items-center gap-2">
-      {phoneNumber.countryCode ? (
-        <img src={flagSrc} alt={phoneNumber.countryCode} />
-      ) : null}
-      {phoneNumber.phone}
+      <CrmPhoneFlagAndText parsed={parsed} />
     </div>
   );
 };
@@ -66,14 +83,10 @@ export const CrmPhoneContainer: React.FC<{
 }> = ({ phone, onClick }) => {
   const [showPopover, setShowPopover] = useState(false);
 
-  const parsePhone = useCallback((raw: string) => parsePhoneForDisplay(raw), []);
-
-  const phoneNumber = useMemo(
-    () => (phone ? parsePhone(phone) : { phone: "N/A", countryCode: "" }),
-    [phone, parsePhone],
+  const parsed = useMemo(
+    () => (phone ? parsePhoneForDisplay(phone) : EMPTY_PARSED_PHONE),
+    [phone],
   );
-
-  const flagImgSrc = flagImgSrcForCountry(phoneNumber.countryCode);
 
   const phoneBadge = (
     <Badge
@@ -84,10 +97,7 @@ export const CrmPhoneContainer: React.FC<{
       onMouseLeave={() => setShowPopover(false)}
     >
       <div className="d-flex align-items-center gap-2">
-        {phoneNumber.countryCode ? (
-          <img src={flagImgSrc} alt={phoneNumber.countryCode} />
-        ) : null}
-        {phoneNumber.phone}
+        <CrmPhoneFlagAndText parsed={parsed} />
       </div>
     </Badge>
   );

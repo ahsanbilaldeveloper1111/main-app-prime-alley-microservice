@@ -1,5 +1,6 @@
 import "@assets/scss/datatable-style.scss";
 import React, { ReactElement, useState, useCallback, useMemo } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 import GenericListPage from "@components/GenericListPage";
@@ -11,8 +12,8 @@ import {
   deleteLostReason,
 } from "@utils/crm";
 import { Column } from "@components/CustomDataTable";
-import { Button, Modal, Row, Col, Badge, Form, Alert } from "react-bootstrap";
-import { FiEdit, FiTrash2, FiPlus, FiSave, FiEdit2 } from "react-icons/fi";
+import { Button, Row, Col, Form } from "react-bootstrap";
+import { FiTrash2, FiPlus, FiEdit2 } from "react-icons/fi";
 import { toast } from "react-toastify";
 
 import "@assets/scss/common.scss";
@@ -21,11 +22,11 @@ import PageHeader from "@components/PageHeader";
 import FormModal from "@components/page-partials/FormModal";
 import ConfirmModal from "@components/page-partials/ConfirmModal";
 import SuccessfulModal from "@components/page-partials/SuccessfulModal";
-import PageSummaryGrid, { SummaryCard } from '@components/PageSummaryGrid';
 import DatatableActionButton from "@components/DatatableActionButton";
 import { useSession } from "next-auth/react";
 import { formatDateForTable, normalizeSearchQuery } from "@utils/Helper";
 import { HEADER_CONSTANTS } from "@constants/headerConstants";
+import { crmAppKeys } from "../../../query/keys";
 
 const { PERMISSIONS } = HEADER_CONSTANTS;
 
@@ -41,13 +42,18 @@ interface LostReason {
 
 const LostReasonsManagement = () => {
   const { data: session } = useSession();
+  const queryClient = useQueryClient();
+
+  const lostReasonsQuery = useQuery({
+    queryKey: crmAppKeys.lostReasons.list(),
+    queryFn: () => getLostReasons(),
+  });
 
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showUpdateModal, setShowUpdateModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [reasonToUpdate, setReasonToUpdate] = useState<LostReason | null>(null);
   const [reasonToDelete, setReasonToDelete] = useState<LostReason | null>(null);
-  const [refreshKey, setRefreshKey] = useState<number>(0);
   const [currentFilters, setCurrentFilters] = useState({ search: "" });
   const [formData, setFormData] = useState({
     name: "",
@@ -55,15 +61,20 @@ const LostReasonsManagement = () => {
     color: "#dc3545",
   });
 
-
-  const handleFiltersChange = (filters: any) => {
-    setCurrentFilters(filters);
+  const handleFiltersChange = (filters: { search?: string }) => {
+    setCurrentFilters({ search: filters.search ?? "" });
   };
 
   const fetchLostReasonsForTable = useCallback(
     async (page = 1, perPage = 15, search = "") => {
       try {
-        const reasonsData = await getLostReasons();
+        const rawList =
+          lostReasonsQuery.data ??
+          (await queryClient.fetchQuery({
+            queryKey: crmAppKeys.lostReasons.list(),
+            queryFn: () => getLostReasons(),
+          }));
+        const reasonsData = rawList ?? [];
         const searchTerm = normalizeSearchQuery(
           currentFilters.search || search,
         );
@@ -97,78 +108,98 @@ const LostReasonsManagement = () => {
         };
       }
     },
-    [currentFilters]
+    [currentFilters.search, lostReasonsQuery.data, queryClient],
   );
 
   const [showSuccessfulModal, setShowSuccessfulModal] = useState(false);
   const [successModalTitle, setSuccessModalTitle] = useState("");
   const [successModalDescription, setSuccessModalDescription] = useState("");
 
-  const handleCreateSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const resetForm = useCallback(() => {
+    setFormData({
+      name: "",
+      description: "",
+      color: "#dc3545",
+    });
+  }, []);
 
-    try {
-      await createLostReason(formData);
+  const invalidateLostReasons = useCallback(() => {
+    queryClient
+      .invalidateQueries({ queryKey: crmAppKeys.lostReasons.all() })
+      .catch(() => undefined);
+  }, [queryClient]);
+
+  const createMutation = useMutation({
+    mutationFn: (payload: { name: string; description: string; color: string }) =>
+      createLostReason(payload),
+    onSuccess: () => {
       toast.success("Lost reason created successfully!");
       setShowCreateModal(false);
-      setFormData({
-        name: "",
-        description: "",
-        color: "#dc3545",
-      });
+      resetForm();
       setShowSuccessfulModal(true);
       setSuccessModalTitle("Lost Reason Created");
       setSuccessModalDescription("Lost reason created successfully!");
-      setRefreshKey((oldKey) => oldKey + 1);
-    } catch (error) {
+      invalidateLostReasons();
+    },
+    onError: (error) => {
       toast.error("Failed to create lost reason");
       console.error("Create lost reason error:", error);
-    }
-  };
+    },
+  });
 
-  const handleUpdateReason = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!reasonToUpdate) return;
-
-    try {
-      await updateLostReason(reasonToUpdate.id, formData);
+  const updateMutation = useMutation({
+    mutationFn: (args: { id: number; payload: { name: string; description: string; color: string } }) =>
+      updateLostReason(args.id, args.payload),
+    onSuccess: () => {
       toast.success("Lost reason updated successfully!");
       setShowUpdateModal(false);
       setReasonToUpdate(null);
-      setFormData({
-        name: "",
-        description: "",
-        color: "#dc3545",
-      });
+      resetForm();
       setShowSuccessfulModal(true);
       setSuccessModalTitle("Lost Reason Updated");
       setSuccessModalDescription("Lost reason updated successfully!");
-      setRefreshKey((oldKey) => oldKey + 1);
-    } catch (error) {
+      invalidateLostReasons();
+    },
+    onError: (error) => {
       toast.error("Failed to update lost reason");
       console.error("Update lost reason error:", error);
-    }
-  };
+    },
+  });
 
-  const handleDeleteReason = async () => {
-    if (!reasonToDelete) return;
-
-    try {
-      await deleteLostReason(reasonToDelete.id);
+  const deleteMutation = useMutation({
+    mutationFn: (id: number) => deleteLostReason(id),
+    onSuccess: () => {
       toast.success("Lost reason deleted successfully!");
       setShowDeleteModal(false);
       setReasonToDelete(null);
       setShowSuccessfulModal(true);
       setSuccessModalTitle("Lost Reason Deleted");
       setSuccessModalDescription("Lost reason deleted successfully!");
-      setRefreshKey((oldKey) => oldKey + 1);
-    } catch (error) {
+      invalidateLostReasons();
+    },
+    onError: (error) => {
       toast.error("Failed to delete lost reason");
       console.error("Delete lost reason error:", error);
-    }
+    },
+  });
+
+  const handleCreateSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    createMutation.mutate(formData);
   };
 
-  const handleInputChange = (field: string, value: any) => {
+  const handleUpdateReason = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!reasonToUpdate) return;
+    updateMutation.mutate({ id: reasonToUpdate.id, payload: formData });
+  };
+
+  const handleDeleteReason = () => {
+    if (!reasonToDelete) return;
+    deleteMutation.mutate(reasonToDelete.id);
+  };
+
+  const handleInputChange = (field: string, value: string) => {
     setFormData((prev) => ({
       ...prev,
       [field]: value,
@@ -177,8 +208,9 @@ const LostReasonsManagement = () => {
 
 
   // Memoized columns for the table
-  const columns: Column<LostReason>[] = useMemo(
-    () => [
+  const columns = useMemo(
+    () =>
+      [
       {
         key: "name",
         name: "Reason",
@@ -262,8 +294,8 @@ const LostReasonsManagement = () => {
       },
       ] : []),
 
-    ],
-    []
+    ] as unknown as Column[],
+    [session],
   );
 
   const filters = useMemo(() => ({}), []);
@@ -299,30 +331,6 @@ const LostReasonsManagement = () => {
    
 
       <div className="container-fluid">
-        {/* Header */}
-        {/* <div className="row mb-4">
-          <div className="col-12">
-            <div className="d-flex justify-content-between align-items-center">
-              <div>
-                <h1 className="h3 mb-0">Lost Reasons Management</h1>
-                <p className="text-muted">
-                  Manage reasons why leads are marked as lost
-                </p>
-              </div>
-              <div>
-                <Button
-                  variant="primary"
-                  onClick={() => setShowCreateModal(true)}
-                >
-                  <FiPlus className="me-2" />
-                  New Lost Reason
-                </Button>
-              </div>
-            </div>
-          </div>
-        </div> */}
-
-        {/* Lost Reasons List */}
         <div className="row">
           <div className="col-12">
             <GenericListPage
@@ -331,7 +339,7 @@ const LostReasonsManagement = () => {
               title="Lost Reasons"
               searchPlaceholder="Search lost reasons..."
               defaultPageSize={15}
-              refreshKey={refreshKey}
+              refreshKey={lostReasonsQuery.dataUpdatedAt}
               filters={filters}
               search={false}
               pagination={false}

@@ -188,3 +188,39 @@ export function buildHydratedTemplateFieldValues(
   }
   return hydrated;
 }
+
+/** Normalize a deal template field key for legacy value lookup. */
+export function normalizeDealTemplateDataKey(key: string): string {
+  const normalizedKey = key
+    .trim()
+    .toLowerCase()
+    .replaceAll(/[^a-z0-9]+/g, "_");
+  let start = 0;
+  let end = normalizedKey.length;
+
+  while (start < end && normalizedKey[start] === "_") {
+    start += 1;
+  }
+
+  while (end > start && normalizedKey[end - 1] === "_") {
+    end -= 1;
+  }
+
+  return normalizedKey.slice(start, end);
+}
+
+export function isDealTemplatePrimitiveValue(
+  value: unknown,
+): value is string | number | boolean {
+  return (
+    typeof value === "string" ||
+    typeof value === "number" ||
+    typeof value === "boolean"
+  );
+}
+
+export function getNormalizedDealTemplateValue(
+  value: string | number | boolean,
+): string {
+  return typeof value === "string" ? value.trim() : String(value);
+}

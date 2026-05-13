@@ -7,7 +7,6 @@ import {
   getStages,
   restoreStage,
   updateStage,
-  type StageData,
 } from "@utils/crm";
 import { normalizeSearchQuery } from "@utils/Helper";
 import { reportApiErrorFromCatch } from "@utils/sentryLogger";
@@ -26,7 +25,9 @@ import {
 } from "@page-modules/crm/stages/stagesPageModel";
 import { useSession } from "next-auth/react";
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { toast } from "react-toastify";
+import { crmAppKeys } from "../../query/keys";
 
 const { PERMISSIONS } = HEADER_CONSTANTS;
 
@@ -82,9 +83,47 @@ export function useStagesManagement() {
     initialPagination: { rowsPerPage: 15 },
     normalizeSelectedColumns: normalizeSelectedStageColumns,
   });
-  const [stagesData, setStagesData] = useState<StageData[]>([]);
-  const [allStagesData, setAllStagesData] = useState<StageData[]>([]);
-  const [loadingStages, setLoadingStages] = useState(false);
+  const filteredStagesQuery = useQuery({
+    queryKey: [
+      ...crmAppKeys.crmStages.all(),
+      "filteredList",
+      refreshKey,
+      activeFilter,
+    ] as const,
+    queryFn: async () => {
+      const includeArchived = activeFilter === "deleted";
+      const typeFilter =
+        activeFilter === "all" || activeFilter === "deleted"
+          ? undefined
+          : (activeFilter as StageType);
+      try {
+        return await getStages(
+          typeFilter,
+          includeArchived ? { include_archived: true } : undefined,
+        );
+      } catch (error: unknown) {
+        consumeHandledApiError(error, "StagesManagement.fetchStages");
+        throw error;
+      }
+    },
+  });
+
+  const allStagesQuery = useQuery({
+    queryKey: [...crmAppKeys.crmStages.all(), "allForCounts", refreshKey] as const,
+    queryFn: async () => {
+      try {
+        return await getStages();
+      } catch (error: unknown) {
+        consumeHandledApiError(error, "StagesManagement.fetchAllStagesForCounts");
+        throw error;
+      }
+    },
+  });
+
+  const stagesData = filteredStagesQuery.data ?? [];
+  const allStagesData = allStagesQuery.data ?? [];
+  const loadingStages = filteredStagesQuery.isFetching;
+
   const [showRestoreModal, setShowRestoreModal] = useState(false);
   const [stageToRestore, setStageToRestore] = useState<StageRow | null>(null);
   const [restoring, setRestoring] = useState(false);
@@ -92,50 +131,6 @@ export function useStagesManagement() {
   const handleCloseSuccessfulModal = useCallback(() => {
     setShowSuccessfulModal(false);
   }, []);
-
-  const fetchStages = useCallback(
-    async (type?: string, includeArchived?: boolean) => {
-      setLoadingStages(true);
-      try {
-        const stageType = type ? (type as StageType) : undefined;
-        const params = includeArchived ? { include_archived: true } : undefined;
-        const stages = await getStages(stageType, params);
-        setStagesData(stages);
-      } catch (error: unknown) {
-        consumeHandledApiError(error, "StagesManagement.fetchStages");
-        setStagesData([]);
-      } finally {
-        setLoadingStages(false);
-      }
-    },
-    [],
-  );
-
-  const fetchAllStagesForCounts = useCallback(async () => {
-    try {
-      const all = await getStages();
-      setAllStagesData(all);
-    } catch (error: unknown) {
-      consumeHandledApiError(error, "StagesManagement.fetchAllStagesForCounts");
-      setAllStagesData([]);
-    }
-  }, []);
-
-  useEffect(() => {
-    const includeArchived = activeFilter === "deleted";
-    const typeFilter =
-      activeFilter === "all" || activeFilter === "deleted"
-        ? undefined
-        : activeFilter;
-    fetchStages(
-      typeFilter as StageType | undefined,
-      includeArchived,
-    ).catch(() => undefined);
-  }, [fetchStages, refreshKey, activeFilter]);
-
-  useEffect(() => {
-    fetchAllStagesForCounts().catch(() => undefined);
-  }, [fetchAllStagesForCounts, refreshKey]);
 
   useEffect(() => {
     setCurrentFilters((prev) =>

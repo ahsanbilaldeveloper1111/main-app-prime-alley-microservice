@@ -1,0 +1,12 @@
+.crm-activities-layout {
+  display: flex;
+  gap: 12px;
+  height: calc(100vh);
+  overflow: hidden;
+}
+
+.crm-activities-main {
+  flex: 1;
+  min-width: 0;
+  overflow: auto;
+}

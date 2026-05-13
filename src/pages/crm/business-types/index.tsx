@@ -1,325 +1,51 @@
 import "@assets/scss/datatable-style.scss";
-import React, { useState, useEffect, useMemo, useCallback, ReactElement } from "react";
+import React, { ReactElement } from "react";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
-import {
-  getBusinessTypes,
-  createBusinessType,
-  updateBusinessType,
-  deleteBusinessType,
-  BusinessTypeData,
-  CreateBusinessTypePayload,
-  UpdateBusinessTypePayload,
-} from "@utils/crm";
-import { reportApiErrorFromCatch } from "@utils/sentryLogger";
-import { formatDateTimeToLocal, GlobalDateFormat, normalizeSearchQuery } from "@utils/Helper";
-import GenericTable, {
-  TableColumn,
-  ToolbarConfig,
-} from "@components/GenericTable";
-import {
-  Button,
-  Form,
-  Modal,
-  Spinner,
-} from "react-bootstrap";
-import {
-  AlertCircle,
-  PlusCircle,
-  Edit,
-  Trash2,
-  Check,
-} from "lucide-react";
+import GenericTable from "@components/GenericTable";
+import { Button, Form, Modal, Spinner } from "react-bootstrap";
+import { AlertCircle, Check } from "lucide-react";
 import "@assets/scss/common.scss";
 import DeleteConfirmationModal from "@components/page-partials/DeleteConfirmationModal";
-import { CrmTruncatedDescriptionCell } from "@components/crm/crmTruncatedDescriptionCell";
 import {
   CRM_DIALOG_FOOTER_ACTIONS_ROW_STYLE,
   CRM_DIALOG_PRIMARY_BUTTON_STYLE,
   CRM_DIALOG_SECONDARY_BUTTON_STYLE,
 } from "@components/crm/crmDialogActionButtonStyles";
-import { useSession } from "next-auth/react";
-import { useCrmSettingsTableState } from "@hooks/useCrmSettingsTableState";
-import { useDebouncedSearchInput } from "@hooks/useDebouncedSearchInput";
-import { HEADER_CONSTANTS } from "@constants/headerConstants";
+import {
+  DEFAULT_BUSINESS_TYPES_TABLE_COLUMNS,
+  modalTitle,
+  primarySubmitLabel,
+  useBusinessTypesPage,
+} from "@hooks/useBusinessTypesPage";
 import type { CrmPageDisplayProps } from "@page-modules/crm/crmPageDisplayProps";
-
-const { PERMISSIONS } = HEADER_CONSTANTS;
-const BUSINESS_TYPES_TABLE_COLUMN_STORAGE_KEY =
-  "businessTypesSelectedColumns";
-const BUSINESS_TYPES_TABLE_SELECTABLE_KEYS = [
-  "name",
-  "description",
-  "created_at",
-  "actions",
-] as const;
-const DEFAULT_BUSINESS_TYPES_TABLE_COLUMNS = [
-  "name",
-  "description",
-  "created_at",
-  "actions",
-];
-
-function consumeHandledApiError(error: unknown, source: string): void {
-  reportApiErrorFromCatch(error, source, { scope: "BusinessTypes" });
-}
-
-type BusinessTypeFormState = {
-  name: string;
-  description: string;
-};
-
-const EMPTY_FORM: BusinessTypeFormState = {
-  name: "",
-  description: "",
-};
-
-function modalTitle(editing: BusinessTypeData | null): string {
-  return editing ? "Edit Business Type" : "Add New Business Type";
-}
-
-function primarySubmitLabel(submitting: boolean, editing: BusinessTypeData | null): string {
-  if (submitting) return editing ? "Updating..." : "Creating...";
-  return editing ? "Update" : "Create";
-}
+import type { BusinessTypeData } from "@utils/crm";
 
 const BusinessTypes = ({ hideBreadcrumb }: CrmPageDisplayProps = {}) => {
-  const { data: session } = useSession();
-  // State
-  const [businessTypes, setBusinessTypes] = useState<BusinessTypeData[]>([]);
-  const [totalBusinessTypes, setTotalBusinessTypes] = useState(0);
-  const [loading, setLoading] = useState(true);
   const {
+    businessTypes,
+    totalBusinessTypes,
+    loading,
     pagination,
-    setPagination,
     selectedColumns,
     setSelectedColumns,
     handlePaginationChange,
-  } = useCrmSettingsTableState({
-    defaultSelectedColumns: DEFAULT_BUSINESS_TYPES_TABLE_COLUMNS,
-    selectableColumnKeys: BUSINESS_TYPES_TABLE_SELECTABLE_KEYS,
-    columnStorageKey: BUSINESS_TYPES_TABLE_COLUMN_STORAGE_KEY,
-  });
-  const {
-    inputValue: searchInput,
-    queryValue: search,
-    handleInputChange: handleSearchChange,
-    submitQuery: submitSearch,
-  } = useDebouncedSearchInput({ normalize: normalizeSearchQuery });
-  const [showModal, setShowModal] = useState(false);
-  const [editingBusinessType, setEditingBusinessType] = useState<BusinessTypeData | null>(null);
-  const [deletingBusinessType, setDeletingBusinessType] = useState<BusinessTypeData | null>(null);
-  const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [deletingBusinessTypePending, setDeletingBusinessTypePending] = useState(false);
-  const [formData, setFormData] = useState<BusinessTypeFormState>({ ...EMPTY_FORM });
-  const [submitting, setSubmitting] = useState(false);
-
-  const fetchBusinessTypes = useCallback(async () => {
-    setLoading(true);
-    try {
-      const params: { page: number; per_page: number; search?: string } = {
-        page: pagination.currentPage,
-        per_page: pagination.rowsPerPage,
-      };
-      if (search) {
-        params.search = search;
-      }
-      const response = await getBusinessTypes(params);
-      setBusinessTypes(response?.data || []);
-      setTotalBusinessTypes(response.total || 0);
-    } catch (error: unknown) {
-      consumeHandledApiError(error, "BusinessTypes.fetchBusinessTypes");
-      setBusinessTypes([]);
-      setTotalBusinessTypes(0);
-    } finally {
-      setLoading(false);
-    }
-  }, [pagination.currentPage, pagination.rowsPerPage, search]);
-
-  useEffect(() => {
-    fetchBusinessTypes().catch((error: unknown) => {
-      consumeHandledApiError(error, "BusinessTypes.useEffect");
-    });
-  }, [fetchBusinessTypes]);
-
-  useEffect(() => {
-    setPagination((prev) =>
-      prev.currentPage === 1 ? prev : { ...prev, currentPage: 1 },
-    );
-  }, [search, setPagination]);
-  
-
-  const handleOpenModal = useCallback((businessType?: BusinessTypeData) => {
-    if (businessType) {
-      setEditingBusinessType(businessType);
-      setFormData({
-        name: businessType.name || "",
-        description: businessType.description || "",
-      });
-    } else {
-      setEditingBusinessType(null);
-      setFormData({ ...EMPTY_FORM });
-    }
-    setShowModal(true);
-  }, []);
-
-  const openDeleteModal = useCallback((bt: BusinessTypeData) => {
-    setDeletingBusinessType(bt);
-    setShowDeleteModal(true);
-  }, []);
-
-  const handleSubmit = useCallback(
-    async (e: React.FormEvent) => {
-      e.preventDefault();
-      try {
-        setSubmitting(true);
-        if (editingBusinessType) {
-          const payload: UpdateBusinessTypePayload = {
-            name: formData.name.trim(),
-            description: formData.description.trim() || "",
-          };
-          await updateBusinessType(editingBusinessType.id, payload);
-        } else {
-          const payload: CreateBusinessTypePayload = {
-            name: formData.name.trim(),
-            description: formData.description.trim() || "",
-          };
-          await createBusinessType(payload);
-        }
-        setShowModal(false);
-        setEditingBusinessType(null);
-        setFormData({ ...EMPTY_FORM });
-        await fetchBusinessTypes();
-      } catch (error: unknown) {
-        consumeHandledApiError(error, "BusinessTypes.handleSubmit");
-      } finally {
-        setSubmitting(false);
-      }
-    },
-    [editingBusinessType, formData, fetchBusinessTypes],
-  );
-
-  const handleDelete = useCallback(async () => {
-    if (!deletingBusinessType) return;
-    try {
-      setDeletingBusinessTypePending(true);
-      await deleteBusinessType(deletingBusinessType.id);
-      setShowDeleteModal(false);
-      setDeletingBusinessType(null);
-      await fetchBusinessTypes();
-    } catch (error: unknown) {
-      consumeHandledApiError(error, "BusinessTypes.handleDelete");
-    } finally {
-      setDeletingBusinessTypePending(false);
-    }
-  }, [deletingBusinessType, fetchBusinessTypes]);
-
-  const businessTableColumns = useMemo<TableColumn<BusinessTypeData>[]>(
-    () => [
-      {
-        key: "name",
-        label: "Name",
-        sortable: true,
-        type: "custom",
-        width: "260px",
-        render: (bt) => <div className="fw-semibold">{bt.name}</div>,
-      },
-      {
-        key: "description",
-        label: "Description",
-        sortable: false,
-        type: "custom",
-        width: "420px",
-        render: (bt) => <CrmTruncatedDescriptionCell text={bt.description} />,
-      },
-      {
-        key: "created_at",
-        label: "Created At",
-        sortable: true,
-        type: "custom",
-        width: "200px",
-        render: (bt) => (
-          <div className="text-muted small">
-            {bt.created_at
-              ? formatDateTimeToLocal(bt.created_at, GlobalDateFormat)
-              : "—"}
-          </div>
-        ),
-      },
-      {
-        key: "actions",
-        label: "Actions",
-        sortable: false,
-        align: "right",
-        type: "custom",
-        width: "160px",
-        render: (bt) => (
-          <div className="d-flex justify-content-end gap-2">
-            {session?.user?.permissions?.includes(PERMISSIONS.EDIT_CRM_BUSINESS_TYPES) && (
-              <Button
-                variant="outline-primary"
-                size="sm"
-                onClick={() => handleOpenModal(bt)}
-                aria-label={"Edit business type " + (bt.name ?? "")}
-              >
-                <Edit size={14} aria-hidden />
-              </Button>
-            )}
-            {session?.user?.permissions?.includes(PERMISSIONS.DELETE_CRM_BUSINESS_TYPES) && (
-              <Button
-                variant="outline-danger"
-                size="sm"
-                onClick={() => openDeleteModal(bt)}
-                aria-label={"Delete business type " + (bt.name ?? "")}
-              >
-                <Trash2 size={14} aria-hidden />
-              </Button>
-            )}
-          </div>
-        ),
-      },
-    ],
-    [session?.user?.permissions, handleOpenModal, openDeleteModal],
-  );
-
-  const handleToolbarSearch = useCallback(() => {
-    submitSearch();
-    setPagination((prev) => ({ ...prev, currentPage: 1 }));
-  }, [setPagination, submitSearch]);
-
-  const businessToolbarConfig = useMemo<ToolbarConfig>(
-    () => ({
-      showSearch: true,
-      searchValue: searchInput,
-      searchPlaceholder: "Search business types by name or description...",
-      onSearchChange: handleSearchChange,
-      onSearch: handleToolbarSearch,
-      rightActions: (
-        <div className="d-flex gap-2">
-          {session?.user?.permissions?.includes(
-            PERMISSIONS.CREATE_CRM_BUSINESS_TYPES,
-          ) && (
-            <Button
-              variant="primary"
-              size="sm"
-              onClick={() => handleOpenModal()}
-              className="d-flex align-items-center gap-2"
-            >
-              <PlusCircle size={16} aria-hidden />
-              Add Business Type
-            </Button>
-          )}
-        </div>
-      ),
-    }),
-    [
-      handleOpenModal,
-      handleSearchChange,
-      handleToolbarSearch,
-      searchInput,
-      session?.user?.permissions,
-    ],
-  );
+    showModal,
+    setShowModal,
+    editingBusinessType,
+    deletingBusinessType,
+    showDeleteModal,
+    closeDeleteModal,
+    deletingBusinessTypePending,
+    formData,
+    setFormData,
+    submitting,
+    handleSubmit,
+    handleDelete,
+    businessTableColumns,
+    businessToolbarConfig,
+    columnStorageKey,
+  } = useBusinessTypesPage();
 
   return (
     <React.Fragment>
@@ -343,7 +69,7 @@ const BusinessTypes = ({ hideBreadcrumb }: CrmPageDisplayProps = {}) => {
           selectedColumns={selectedColumns}
           defaultSelectedColumns={DEFAULT_BUSINESS_TYPES_TABLE_COLUMNS}
           onColumnChange={setSelectedColumns}
-          columnStorageKey={BUSINESS_TYPES_TABLE_COLUMN_STORAGE_KEY}
+          columnStorageKey={columnStorageKey}
           loading={loading}
           emptyMessage={
             <div className="text-center p-5">
@@ -354,7 +80,6 @@ const BusinessTypes = ({ hideBreadcrumb }: CrmPageDisplayProps = {}) => {
           showToolbarActions={false}
         />
 
-        {/* Create/Edit Modal */}
         <Modal
           show={showModal}
           onHide={() => {
@@ -437,13 +162,9 @@ const BusinessTypes = ({ hideBreadcrumb }: CrmPageDisplayProps = {}) => {
           </Form>
         </Modal>
 
-        {/* Delete Confirmation Modal */}
         <DeleteConfirmationModal
           show={showDeleteModal}
-          onHide={() => {
-            setShowDeleteModal(false);
-            setDeletingBusinessType(null);
-          }}
+          onHide={closeDeleteModal}
           onConfirm={handleDelete}
           itemName={deletingBusinessType?.name}
           itemType="business type"

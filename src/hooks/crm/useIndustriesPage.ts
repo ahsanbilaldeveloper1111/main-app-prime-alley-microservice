@@ -30,6 +30,8 @@ import {
 } from "@page-modules/crm/industries/industriesPageModel";
 import { useSession } from "next-auth/react";
 import { useCallback, useEffect, useState, type FormEvent } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { crmAppKeys } from "../../query/keys";
 
 const { PERMISSIONS } = HEADER_CONSTANTS;
 
@@ -39,9 +41,7 @@ function consumeHandledApiError(error: unknown, source: string): void {
 
 export function useIndustriesPage() {
   const { data: session } = useSession();
-  const [industries, setIndustries] = useState<IndustryData[]>([]);
-  const [totalIndustries, setTotalIndustries] = useState(0);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
   const {
     pagination,
     setPagination,
@@ -68,8 +68,6 @@ export function useIndustriesPage() {
   const [viewingIndustry, setViewingIndustry] = useState<IndustryData | null>(null);
   const [formData, setFormData] = useState<IndustryFormData>({ ...EMPTY_INDUSTRY_FORM });
   const [submitting, setSubmitting] = useState(false);
-  const [industryProducts, setIndustryProducts] = useState<CrmProduct[]>([]);
-  const [loadingProducts, setLoadingProducts] = useState(false);
 
   const [showProductModal, setShowProductModal] = useState(false);
   const [editingProduct, setEditingProduct] = useState<CrmProduct | null>(null);
@@ -83,34 +81,54 @@ export function useIndustriesPage() {
     ...EMPTY_PRODUCT_FORM,
   });
 
-  const fetchIndustries = useCallback(async () => {
-    setLoading(true);
-    try {
+  const industriesListQuery = useQuery({
+    queryKey: crmAppKeys.industriesPage.list({
+      page: pagination.currentPage,
+      perPage: pagination.rowsPerPage,
+      search: search || "",
+    }),
+    queryFn: async () => {
       const params: { page: number; per_page: number; search?: string } = {
         page: pagination.currentPage,
         per_page: pagination.rowsPerPage,
       };
       if (search) params.search = search;
-      const response = await getIndustries(params);
-      setIndustries(response?.data || []);
-      setTotalIndustries(response.total || 0);
-    } catch {
-      setIndustries([]);
-      setTotalIndustries(0);
-    } finally {
-      setLoading(false);
-    }
-  }, [pagination.currentPage, pagination.rowsPerPage, search]);
+      return getIndustries(params);
+    },
+    placeholderData: (previousData) => previousData,
+  });
 
-  useEffect(() => {
-    fetchIndustries().catch(() => undefined);
-  }, [fetchIndustries]);
+  const industries = industriesListQuery.data?.data ?? [];
+  const totalIndustries = industriesListQuery.data?.total ?? 0;
+  const loading = industriesListQuery.isPending;
+
+  const industryIdForProducts = viewingIndustry?.id ?? 0;
+  const industryProductsQuery = useQuery({
+    queryKey: crmAppKeys.industriesPage.productsByIndustry(industryIdForProducts),
+    queryFn: async () => {
+      const response = await getCrmProducts({
+        page: 1,
+        per_page: 100,
+        industry_id: industryIdForProducts,
+      });
+      return response.data ?? [];
+    },
+    enabled: industryIdForProducts > 0 && showViewModal,
+  });
+
+  const industryProducts = industryProductsQuery.data ?? [];
+  const loadingProducts = industryProductsQuery.isPending;
 
   useEffect(() => {
     setPagination((prev) =>
       prev.currentPage === 1 ? prev : { ...prev, currentPage: 1 },
     );
   }, [search, setPagination]);
+
+  const fetchIndustries = useCallback(async () => {
+    await queryClient.invalidateQueries({ queryKey: crmAppKeys.industriesPage.all() });
+    await queryClient.invalidateQueries({ queryKey: crmAppKeys.campaigns.industries() });
+  }, [queryClient]);
 
   const handleOpenModal = useCallback((industry?: IndustryData) => {
     if (industry) {
@@ -164,30 +182,10 @@ export function useIndustriesPage() {
     }
   };
 
-  const fetchIndustryProducts = useCallback(async (industryId: number) => {
-    setLoadingProducts(true);
-    try {
-      const response = await getCrmProducts({
-        page: 1,
-        per_page: 100,
-        industry_id: industryId,
-      });
-      setIndustryProducts(response.data || []);
-    } catch {
-      setIndustryProducts([]);
-    } finally {
-      setLoadingProducts(false);
-    }
+  const handleView = useCallback((industry: IndustryData) => {
+    setViewingIndustry(industry);
+    setShowViewModal(true);
   }, []);
-
-  const handleView = useCallback(
-    async (industry: IndustryData) => {
-      setViewingIndustry(industry);
-      setShowViewModal(true);
-      await fetchIndustryProducts(industry.id);
-    },
-    [fetchIndustryProducts],
-  );
 
   const handleOpenProductModal = useCallback((product?: CrmProduct) => {
     if (product) {
@@ -257,7 +255,9 @@ export function useIndustriesPage() {
       }
       setShowProductModal(false);
       setEditingProduct(null);
-      await fetchIndustryProducts(viewingIndustry.id);
+      await queryClient.invalidateQueries({
+        queryKey: crmAppKeys.industriesPage.productsByIndustry(viewingIndustry.id),
+      });
     } catch (error: unknown) {
       consumeHandledApiError(error, "IndustriesPage.handleProductSubmit");
     } finally {
@@ -272,7 +272,9 @@ export function useIndustriesPage() {
       await deleteProduct(deletingProduct.id);
       setShowProductDeleteModal(false);
       setDeletingProduct(null);
-      await fetchIndustryProducts(viewingIndustry.id);
+      await queryClient.invalidateQueries({
+        queryKey: crmAppKeys.industriesPage.productsByIndustry(viewingIndustry.id),
+      });
     } catch (error: unknown) {
       consumeHandledApiError(error, "IndustriesPage.handleDeleteProduct");
     } finally {
