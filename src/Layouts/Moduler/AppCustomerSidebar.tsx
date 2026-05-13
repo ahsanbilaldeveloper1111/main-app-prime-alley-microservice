@@ -708,7 +708,7 @@ const ApplicationCustomerSidebar: React.FC = () => {
           title: "Tasks",
           icon: <Clock size={16} />,
           url: "/planner/tasks",
-          permission: PERMISSIONS.VIEW_TASKSLIST_WORK_PLANNER,
+          permission: PERMISSIONS.VIEW_MY_DAY_TASKS_WORK_PLANNER,
         },
         ...(showMyDayInPlannerSidebar
           ? [
