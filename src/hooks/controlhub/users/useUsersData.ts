@@ -36,7 +36,7 @@ export const useUsersData = (
   });
 
   const invalidateUsersList = useCallback(() => {
-    void queryClient.invalidateQueries({ queryKey: controlhubKeys.users.all() });
+    queryClient.invalidateQueries({ queryKey: controlhubKeys.users.all() }).then(() => undefined);
   }, [queryClient]);
 
   const fetchUsers = useCallback(

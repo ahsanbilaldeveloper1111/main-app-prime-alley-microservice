@@ -591,7 +591,7 @@ export function useCrmLeadsPageModel() {
   const queryClient = useQueryClient();
 
   const refreshLeadsList = useCallback(() => {
-    void queryClient.invalidateQueries({ queryKey: crmAppKeys.leadsPage.all() });
+    queryClient.invalidateQueries({ queryKey: crmAppKeys.leadsPage.all() }).then(() => undefined);
   }, [queryClient]);
 
   const leadsListFiltersKey = useMemo(

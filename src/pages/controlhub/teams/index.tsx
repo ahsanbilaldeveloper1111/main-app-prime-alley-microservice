@@ -316,7 +316,7 @@ const Teams = () => {
     const [isLoadingRemoveModule, setIsLoadingRemoveModule] = useState(false);
 
     const triggerRefresh = useCallback(() => {
-        void queryClient.invalidateQueries({ queryKey: controlhubKeys.teams.all() });
+        queryClient.invalidateQueries({ queryKey: controlhubKeys.teams.all() }).then(() => undefined);
     }, [queryClient]);
 
     const showSuccess = useCallback((title: string, description: string) => {

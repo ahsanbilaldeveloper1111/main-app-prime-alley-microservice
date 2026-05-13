@@ -98,7 +98,7 @@ const Ranks = () => {
     const isTableLoading = ranksListQuery.isPending || ranksListQuery.isFetching;
 
     const invalidateRanksList = useCallback(() => {
-        void queryClient.invalidateQueries({ queryKey: controlhubKeys.ranks.all() });
+        queryClient.invalidateQueries({ queryKey: controlhubKeys.ranks.all() }).then(() => undefined);
     }, [queryClient]);
 
     useEffect(() => {

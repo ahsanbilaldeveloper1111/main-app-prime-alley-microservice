@@ -49,10 +49,10 @@ export type GenericListPageProps = GenericListPagePropsBase &
     (
         | {
               fetchData: (page: number, perPage: number, search: string) => Promise<any>;
-              getListQueryOptions?: undefined;
+              getListQueryOptions?: never;
           }
         | {
-              fetchData?: undefined;
+              fetchData?: never;
               getListQueryOptions: (params: GenericListPageQueryParams) => GenericListPageQueryOptions;
           }
     );
@@ -117,8 +117,9 @@ const GenericListPage: React.FC<GenericListPageProps> = (props) => {
         searchDebounceMs = 400,
     } = props;
 
-    const isQueryMode = 'getListQueryOptions' in props && props.getListQueryOptions != null;
-    const fetchData = !isQueryMode ? props.fetchData : undefined;
+    const isQueryMode =
+        'getListQueryOptions' in props && typeof props.getListQueryOptions === 'function';
+    const fetchData = isQueryMode ? undefined : props.fetchData;
     const getListQueryOptions = isQueryMode ? props.getListQueryOptions : undefined;
 
     const [listPage, setListPage] = useState(1);
@@ -220,7 +221,7 @@ const GenericListPage: React.FC<GenericListPageProps> = (props) => {
         const searchChanged = debouncedSearchTerm !== prevDebouncedSearchRef.current;
 
         const pageToFetch = filtersChanged || searchChanged ? 1 : paginationInfo.currentPage;
-        void fetchAndSetData(pageToFetch, paginationInfo.perPage, debouncedSearchTerm);
+        fetchAndSetData(pageToFetch, paginationInfo.perPage, debouncedSearchTerm).then(() => undefined);
 
         prevFiltersRef.current = filters;
         prevDebouncedSearchRef.current = debouncedSearchTerm;
@@ -244,7 +245,7 @@ const GenericListPage: React.FC<GenericListPageProps> = (props) => {
             setListPage(page);
             return;
         }
-        void fetchAndSetData(page, paginationInfo.perPage, debouncedSearchTerm);
+        fetchAndSetData(page, paginationInfo.perPage, debouncedSearchTerm).then(() => undefined);
     };
 
     const handlePerPageChange = (perPage: number) => {
@@ -253,7 +254,7 @@ const GenericListPage: React.FC<GenericListPageProps> = (props) => {
             setListPage(1);
             return;
         }
-        void fetchAndSetData(1, perPage, debouncedSearchTerm);
+        fetchAndSetData(1, perPage, debouncedSearchTerm).then(() => undefined);
     };
 
     const handleSearch = (nextSearch: string) => {

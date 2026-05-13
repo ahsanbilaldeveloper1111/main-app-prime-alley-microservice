@@ -92,7 +92,7 @@ const Groups = () => {
     const isTableLoading = groupsListQuery.isPending || groupsListQuery.isFetching;
 
     const invalidateGroupsList = useCallback(() => {
-        void queryClient.invalidateQueries({ queryKey: controlhubKeys.groups.all() });
+        queryClient.invalidateQueries({ queryKey: controlhubKeys.groups.all() }).then(() => undefined);
     }, [queryClient]);
 
 
