@@ -454,6 +454,13 @@ export const accountBillingKeys = {
 export const ticketsKeys = {
   root: ["tickets"] as const,
 
+  /** `DashboardData(filters)` — `/tickets` summary + module charts. */
+  dashboard: {
+    all: () => [...ticketsKeys.root, "dashboard"] as const,
+    byFilters: (filtersKey: string) =>
+      [...ticketsKeys.dashboard.all(), filtersKey] as const,
+  },
+
   statuses: {
     all: () => [...ticketsKeys.root, "statuses"] as const,
     list: (params: { page: number; perPage: number; search: string }) =>
@@ -479,6 +486,44 @@ export const ticketsKeys = {
     all: () => [...ticketsKeys.root, "ticketTypes"] as const,
     list: (params: { page: number; perPage: number; search: string }) =>
       paginatedListKey(ticketsKeys.types.all(), params),
+  },
+
+  /** `ListSubmodules` — ticket module categories (submodules) tab. */
+  submodulesList: {
+    all: () => [...ticketsKeys.root, "submodulesList"] as const,
+    list: (params: {
+      page: number;
+      perPage: number;
+      search: string;
+      filtersKey: string;
+    }) =>
+      [
+        ...ticketsKeys.submodulesList.all(),
+        "list",
+        params.page,
+        params.perPage,
+        params.search,
+        params.filtersKey,
+      ] as const,
+  },
+
+  /** `ListSubmoduleChildren` — ticket sub-categories tab. */
+  submoduleChildrenList: {
+    all: () => [...ticketsKeys.root, "submoduleChildrenList"] as const,
+    list: (params: {
+      page: number;
+      perPage: number;
+      search: string;
+      filtersKey: string;
+    }) =>
+      [
+        ...ticketsKeys.submoduleChildrenList.all(),
+        "list",
+        params.page,
+        params.perPage,
+        params.search,
+        params.filtersKey,
+      ] as const,
   },
 };
 
@@ -528,6 +573,41 @@ export const chatKeys = {
   companies: {
     all: () => [...chatKeys.root, "companies"] as const,
   },
+
+  /** AI Chat FAQs — client-side paginated lists (`getGlobalFAQs` / `getTenantFAQs`). */
+  aiFaqs: {
+    global: {
+      all: () => [...chatKeys.root, "aiFaqs", "global"] as const,
+      list: (params: { page: number; perPage: number; search: string }) =>
+        [
+          ...chatKeys.aiFaqs.global.all(),
+          "list",
+          params.page,
+          params.perPage,
+          params.search,
+        ] as const,
+    },
+    tenant: {
+      all: () => [...chatKeys.root, "aiFaqs", "tenant"] as const,
+      list: (params: {
+        tenantId: string;
+        page: number;
+        perPage: number;
+        search: string;
+      }) =>
+        [
+          ...chatKeys.aiFaqs.tenant.all(),
+          "list",
+          params.tenantId,
+          params.page,
+          params.perPage,
+          params.search,
+        ] as const,
+    },
+  },
+
+  /** Tools executor config (`getToolsExecutor`). */
+  toolsExecutor: () => [...chatKeys.tools.all(), "executor"] as const,
 };
 
 /** GSM / Telco gateway (`src/pages/gsm/*`). */
@@ -633,6 +713,44 @@ export const crmAppKeys = {
   leads: {
     all: () => [...crmAppKeys.root, "leads"] as const,
     byId: (id: number) => [...crmAppKeys.leads.all(), "byId", id] as const,
+  },
+
+  /** CRM leads list (`useCrmLeadsPageModel` / `src/pages/crm/leads`). */
+  leadsPage: {
+    all: () => [...crmAppKeys.root, "leadsPage"] as const,
+    list: (params: {
+      filtersKey: string;
+      page: number;
+      perPage: number;
+      sortBy: string;
+      sortOrder: string;
+    }) =>
+      [
+        ...crmAppKeys.leadsPage.all(),
+        "list",
+        params.filtersKey,
+        params.page,
+        params.perPage,
+        params.sortBy,
+        params.sortOrder,
+      ] as const,
+    tabTotals: (requestKey: string) =>
+      [...crmAppKeys.leadsPage.all(), "tabTotals", requestKey] as const,
+  },
+
+  /** Lead / opportunity create form (`src/pages/crm/leads/create`). */
+  leadCreateForm: {
+    all: () => [...crmAppKeys.root, "leadCreateForm"] as const,
+    hierarchy: (moduleSlug: string) =>
+      [...crmAppKeys.leadCreateForm.all(), "hierarchy", moduleSlug] as const,
+    activeCampaignsPicklist: () =>
+      [...crmAppKeys.leadCreateForm.all(), "activeCampaignsPicklist"] as const,
+    crmDataPicklist100: () =>
+      [...crmAppKeys.leadCreateForm.all(), "crmDataPicklist100"] as const,
+    industriesPicklist1000: () =>
+      [...crmAppKeys.leadCreateForm.all(), "industriesPicklist1000"] as const,
+    crmRecordById: (id: number) =>
+      [...crmAppKeys.leadCreateForm.all(), "crmRecordById", id] as const,
   },
 
   deals: {
@@ -880,5 +998,82 @@ export const crmAppKeys = {
     all: () => [...crmAppKeys.root, "crmTasksListing"] as const,
     list: (params: Record<string, unknown>) =>
       [...crmAppKeys.crmTasksListing.all(), "list", JSON.stringify(params)] as const,
+  },
+};
+
+/** Control Hub lists (`src/pages/controlhub/*`). */
+export const controlhubKeys = {
+  root: ["controlhub"] as const,
+
+  users: {
+    all: () => [...controlhubKeys.root, "users"] as const,
+    list: (params: {
+      page: number;
+      perPage: number;
+      search: string;
+      filtersKey: string;
+    }) =>
+      [
+        ...controlhubKeys.users.all(),
+        "list",
+        params.page,
+        params.perPage,
+        params.search,
+        params.filtersKey,
+      ] as const,
+  },
+
+  teams: {
+    all: () => [...controlhubKeys.root, "teams"] as const,
+    list: (params: {
+      page: number;
+      perPage: number;
+      search: string;
+      filtersKey: string;
+    }) =>
+      [
+        ...controlhubKeys.teams.all(),
+        "list",
+        params.page,
+        params.perPage,
+        params.search,
+        params.filtersKey,
+      ] as const,
+  },
+
+  groups: {
+    all: () => [...controlhubKeys.root, "groups"] as const,
+    list: (params: {
+      page: number;
+      perPage: number;
+      search: string;
+      filtersKey: string;
+    }) =>
+      [
+        ...controlhubKeys.groups.all(),
+        "list",
+        params.page,
+        params.perPage,
+        params.search,
+        params.filtersKey,
+      ] as const,
+  },
+
+  ranks: {
+    all: () => [...controlhubKeys.root, "ranks"] as const,
+    list: (params: {
+      page: number;
+      perPage: number;
+      search: string;
+      filtersKey: string;
+    }) =>
+      [
+        ...controlhubKeys.ranks.all(),
+        "list",
+        params.page,
+        params.perPage,
+        params.search,
+        params.filtersKey,
+      ] as const,
   },
 };

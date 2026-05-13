@@ -8,7 +8,8 @@ import {
   ListSubmoduleChildren,
 } from "@utils/ticket-module";
 import { Column } from "@components/CustomDataTable";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import type { GenericListPageQueryParams } from "@components/GenericListPage";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useMemo, useState } from "react";
 import { toast } from "react-toastify";
 import { Button } from "react-bootstrap";
@@ -33,7 +34,6 @@ export function useModuleSubCategoriesPage() {
 
   const modules: TicketModulePickerRow[] = modulesQuery.data ?? [];
 
-  const [refreshKey, setRefreshKey] = useState(0);
   const [currentFilters] = useState({ search: "" });
   const memoizedFilters = useMemo(() => currentFilters, [currentFilters]);
 
@@ -43,33 +43,48 @@ export function useModuleSubCategoriesPage() {
   const [newChildUserExtension] = useState<string | null>(null);
   const [newChildSubmoduleId, setNewChildSubmoduleId] = useState("");
   const [newChildModuleId, setNewChildModuleId] = useState("");
-  const [submodules, setSubmodules] = useState<TicketSubmoduleRow[]>([]);
+
+  const submodulesByModuleQuery = useQuery({
+    queryKey: ticketsKeys.modules.submodulesByModule(newChildModuleId || "none"),
+    queryFn: async () => {
+      const res = await ListSubmodules({ filters: { module_id: newChildModuleId } });
+      return (res?.data as TicketSubmoduleRow[]) ?? [];
+    },
+    enabled: Boolean(newChildModuleId),
+  });
+  const submodules = submodulesByModuleQuery.data ?? [];
 
   const [selectedSubcategoryForDelete, setSelectedSubcategoryForDelete] = useState<string | null>(null);
   const [showSubmoduleDeleteModal, setShowSubmoduleDeleteModal] = useState(false);
 
-  const bumpRefresh = useCallback(() => setRefreshKey((k) => k + 1), []);
-
-  const handleChangeModule = useCallback(async (moduleId: string) => {
-    setSubmodules([]);
+  const handleChangeModule = useCallback((moduleId: string) => {
     setNewChildModuleId(moduleId);
-    const res = await ListSubmodules({ filters: { module_id: moduleId } });
-    if (res?.data) {
-      setSubmodules(res.data as TicketSubmoduleRow[]);
-    }
+    setNewChildSubmoduleId("");
   }, []);
 
-  const fetchSubCategories = useCallback(
-    async (page = 1, perPage = 15, search = "") => {
-      const { search: _, ...filtersWithoutSearch } = memoizedFilters;
-      return await ListSubmoduleChildren({
-        page,
-        perPage,
-        search: search || memoizedFilters.search || "",
-        filters: filtersWithoutSearch,
-      });
+  const getListQueryOptions = useCallback(
+    (params: GenericListPageQueryParams) => {
+      const { search: _omit, ...filtersWithoutSearch } = (params.filters || {}) as {
+        search?: string;
+      };
+      return {
+        queryKey: ticketsKeys.submoduleChildrenList.list({
+          page: params.page,
+          perPage: params.perPage,
+          search: params.search,
+          filtersKey: JSON.stringify(filtersWithoutSearch),
+        }),
+        queryFn: () =>
+          ListSubmoduleChildren({
+            page: params.page,
+            perPage: params.perPage,
+            search:
+              params.search || (params.filters as { search?: string })?.search || "",
+            filters: filtersWithoutSearch,
+          }),
+      };
     },
-    [memoizedFilters],
+    [],
   );
 
   const createSubCategoryMutation = useMutation({
@@ -88,7 +103,7 @@ export function useModuleSubCategoriesPage() {
       setNewChildSubmoduleId("");
       setNewChildModuleId("");
       setShowSubmoduleChildrenModal(false);
-      bumpRefresh();
+      await queryClient.invalidateQueries({ queryKey: ticketsKeys.submoduleChildrenList.all() });
       await queryClient.invalidateQueries({ queryKey: ticketsKeys.modules.all() });
     },
     onError: () => toast.error("Failed to create subcategory"),
@@ -98,9 +113,9 @@ export function useModuleSubCategoriesPage() {
     mutationFn: (id: string) => DeleteSubmoduleChild(id),
     onSuccess: async (ok) => {
       if (!ok) return;
-      bumpRefresh();
       setSelectedSubcategoryForDelete(null);
       setShowSubmoduleDeleteModal(false);
+      await queryClient.invalidateQueries({ queryKey: ticketsKeys.submoduleChildrenList.all() });
       await queryClient.invalidateQueries({ queryKey: ticketsKeys.modules.all() });
     },
   });
@@ -124,7 +139,6 @@ export function useModuleSubCategoriesPage() {
     setNewChildDescription("");
     setNewChildSubmoduleId("");
     setNewChildModuleId("");
-    setSubmodules([]);
   }, []);
 
   const columns = useMemo<Column<SubCategoryRow>[]>(
@@ -206,10 +220,9 @@ export function useModuleSubCategoriesPage() {
   );
 
   return {
-    refreshKey,
     memoizedFilters,
     columns,
-    fetchSubCategories,
+    getListQueryOptions,
     showSubmoduleChildrenModal,
     setShowSubmoduleChildrenModal,
     closeSubCategoryModal,

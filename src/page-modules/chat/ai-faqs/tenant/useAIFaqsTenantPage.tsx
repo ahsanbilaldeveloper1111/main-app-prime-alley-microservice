@@ -1,12 +1,14 @@
+import { chatKeys } from "../../../../query/keys";
 import { useChatCompaniesQuery } from "@page-modules/chat/useChatCompaniesQuery";
 import {
   type CreateTenantFAQPayload,
   type FAQData,
-  type FAQItem,
   createTenantFAQ,
   deleteTenantFAQ,
   getTenantFAQs,
 } from "@utils/chat";
+import type { GenericListPageQueryParams } from "@components/GenericListPage";
+import { useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/router";
 import { useSession } from "next-auth/react";
 import { useCallback, useMemo, useState } from "react";
@@ -22,31 +24,14 @@ import {
 } from "../faqItemDraft";
 import { useAiFaqDraftFormState } from "../hooks/useAiFaqDraftFormState";
 
-type AiFaqDraftItem = FAQItem & Readonly<{ draftId: string }>;
-
-let aiFaqTenantDraftIdSeq = 0;
-
-function nextDraftRow(question = "", answer = ""): AiFaqDraftItem {
-  const c = globalThis.crypto;
-  const draftId =
-    c !== undefined && typeof c.randomUUID === "function"
-      ? c.randomUUID()
-      : `draft_${Date.now()}_${(++aiFaqTenantDraftIdSeq).toString(36)}`;
-  return {
-    question,
-    answer,
-    draftId,
-  };
-}
-
 export function useAIFaqsTenantPage() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const { data: session } = useSession();
   const companiesQuery = useChatCompaniesQuery(true);
   const companies = companiesQuery.data ?? [];
-  const companiesLoading = companiesQuery.isFetching;
+  const companiesLoading = companiesQuery.isPending;
 
-  const [refreshKey, setRefreshKey] = useState(0);
   const [tenantId, setTenantId] = useState("");
   const [selectedCompanyForFilter, setSelectedCompanyForFilter] = useState("");
   const [filterTenantId, setFilterTenantId] = useState("");
@@ -125,11 +110,11 @@ export function useAIFaqsTenantPage() {
       setShowAddModal(false);
       setShowEditModal(false);
       setSelectedFAQ(null);
-      setRefreshKey((k) => k + 1);
+      await queryClient.invalidateQueries({ queryKey: chatKeys.aiFaqs.tenant.all() });
     } catch (error) {
       console.error("Failed to save FAQs:", error);
     }
-  }, [faqItems, getTenantId, haveFiles, resetForm, selectedFiles]);
+  }, [faqItems, getTenantId, haveFiles, resetForm, selectedFiles, queryClient]);
 
   const handleConfirmDelete = useCallback(async () => {
     if (!selectedFAQ?.id) return;
@@ -146,32 +131,46 @@ export function useAIFaqsTenantPage() {
 
       setShowDeleteModal(false);
       setSelectedFAQ(null);
-      setRefreshKey((k) => k + 1);
+      await queryClient.invalidateQueries({ queryKey: chatKeys.aiFaqs.tenant.all() });
     } catch (error) {
       console.error("Failed to delete FAQ:", error);
     }
-  }, [getTenantId, selectedFAQ]);
+  }, [getTenantId, selectedFAQ, queryClient]);
 
-  const fetchData = useCallback(
-    async (page = 1, perPage = 15, search = "") => {
-      if (!filterTenantId?.trim()) {
-        return emptyFaqListPage(perPage);
-      }
-      try {
-        const allFAQs = await getTenantFAQs(filterTenantId.trim(), search || undefined);
-        const { slice, total, last_page } = paginateArrayForTable(allFAQs, page, perPage);
-
-        return {
-          data: slice,
-          total,
-          page,
-          per_page: perPage,
-          last_page,
-        };
-      } catch (error) {
-        console.error("Error fetching FAQs:", error);
-        return emptyFaqListPage(perPage);
-      }
+  const getListQueryOptions = useCallback(
+    (params: GenericListPageQueryParams) => {
+      const tenant = filterTenantId.trim();
+      return {
+        queryKey: chatKeys.aiFaqs.tenant.list({
+          tenantId: tenant || "__none__",
+          page: params.page,
+          perPage: params.perPage,
+          search: params.search,
+        }),
+        queryFn: async () => {
+          if (!tenant) {
+            return emptyFaqListPage(params.perPage);
+          }
+          try {
+            const allFAQs = await getTenantFAQs(tenant, params.search || undefined);
+            const { slice, total, last_page } = paginateArrayForTable(
+              allFAQs,
+              params.page,
+              params.perPage,
+            );
+            return {
+              data: slice,
+              total,
+              page: params.page,
+              per_page: params.perPage,
+              last_page,
+            };
+          } catch (error) {
+            console.error("Error fetching FAQs:", error);
+            return emptyFaqListPage(params.perPage);
+          }
+        },
+      };
     },
     [filterTenantId],
   );
@@ -182,7 +181,6 @@ export function useAIFaqsTenantPage() {
       return;
     }
     setFilterTenantId(selectedCompanyForFilter.trim());
-    setRefreshKey((k) => k + 1);
   }, [selectedCompanyForFilter]);
 
   const stableFilters = useMemo(() => ({}), []);
@@ -200,9 +198,8 @@ export function useAIFaqsTenantPage() {
 
   return {
     router,
-    refreshKey,
     columns,
-    fetchData,
+    getListQueryOptions,
     stableFilters,
     companies,
     companiesLoading,

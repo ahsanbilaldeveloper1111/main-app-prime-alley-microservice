@@ -9,7 +9,7 @@ export function useFaqProfilesPage() {
   const router = useRouter();
   const companiesQuery = useChatCompaniesQuery(true);
   const companies = companiesQuery.data ?? [];
-  const companiesLoading = companiesQuery.isFetching;
+  const companiesLoading = companiesQuery.isPending;
 
   const [showCompanyModal, setShowCompanyModal] = useState(false);
   const [showTrainingModal, setShowTrainingModal] = useState(false);

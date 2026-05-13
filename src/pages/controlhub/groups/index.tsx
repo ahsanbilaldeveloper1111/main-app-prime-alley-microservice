@@ -1,7 +1,8 @@
 import '@assets/scss/datatable-style.scss';
-import React, { ReactElement, useState, useCallback, useMemo, useRef, useEffect } from 'react';
+import React, { ReactElement, useState, useCallback, useMemo, useRef } from 'react';
 import Layout from '@layout/index';
 import BreadcrumbItem from '@common/BreadcrumbItem';
+import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import GenericTable, { TableAction, TableColumn } from '@components/GenericTable';
 import {ListGroups, updateGroup,deleteGroup,addGroup, addTeamsToGroup, removeTeamsFromGroup, getGroupTeams, addModulesToGroup, removeModulesFromGroup, getGroupModules } from '@utils/groups';
 import { Button, Form, Modal, Row, Col, Card } from 'react-bootstrap';
@@ -18,6 +19,7 @@ import { useModuleSelection } from '@hooks/useModuleSelection';
 import { Module } from '@typings/controlhub/users';
 import SelectCheckBox, { SelectCheckBoxOption } from '@components/SelectCheckBox';
 import { useDebouncedValue } from '@hooks/useDebouncedValue';
+import { controlhubKeys } from '../../../query/keys';
 
 interface GroupRow {
     id: number;
@@ -36,21 +38,19 @@ interface GroupsApiResponse {
 
 const Groups = () => {
     const { data: session } = useSession();
-    const [tableData, setTableData] = useState<GroupRow[]>([]);
-    const [isTableLoading, setIsTableLoading] = useState(false);
+    const queryClient = useQueryClient();
+
     const [currentPage, setCurrentPage] = useState(1);
     const [rowsPerPage, setRowsPerPage] = useState(15);
-    const [totalRows, setTotalRows] = useState(0);
     const [searchValue, setSearchValue] = useState('');
     const debouncedSearchValue = useDebouncedValue(searchValue, 400);
 
-    const [refreshKey, setRefreshKey] = useState<number>(0);
     const [currentFilters] = useState({});
 
     // Memoize filters to prevent unnecessary re-renders when object reference changes but values are the same
     const prevFiltersStringRef = useRef<string>('');
     const prevFiltersRef = useRef<any>({});
-    
+
     const memoizedFilters = useMemo(() => {
         const filtersString = JSON.stringify(currentFilters || {});
         // Only update if the stringified filters actually changed
@@ -63,30 +63,37 @@ const Groups = () => {
         return prevFiltersRef.current;
     }, [currentFilters]);
 
-    const loadGroups = useCallback(
-        async (page: number, perPage: number, search: string) => {
-            setIsTableLoading(true);
+    const filtersListKey = JSON.stringify(memoizedFilters);
+    const groupsListQuery = useQuery({
+        queryKey: controlhubKeys.groups.list({
+            page: currentPage,
+            perPage: rowsPerPage,
+            search: debouncedSearchValue,
+            filtersKey: filtersListKey,
+        }),
+        queryFn: async () => {
             try {
                 const response = (await ListGroups({
-                    page,
-                    perPage,
-                    search,
+                    page: currentPage,
+                    perPage: rowsPerPage,
+                    search: debouncedSearchValue,
                     filters: memoizedFilters,
                 })) as GroupsApiResponse;
-                setTableData(response?.data ?? []);
-                setTotalRows(response?.total ?? 0);
+                return { data: response?.data ?? [], total: response?.total ?? 0 };
             } catch {
                 toast.error('Failed to load groups');
-            } finally {
-                setIsTableLoading(false);
+                throw new Error('Failed to load groups');
             }
         },
-        [memoizedFilters],
-    );
+        placeholderData: keepPreviousData,
+    });
+    const tableData = groupsListQuery.data?.data ?? [];
+    const totalRows = groupsListQuery.data?.total ?? 0;
+    const isTableLoading = groupsListQuery.isPending || groupsListQuery.isFetching;
 
-    useEffect(() => {
-        loadGroups(currentPage, rowsPerPage, debouncedSearchValue);
-    }, [currentPage, rowsPerPage, debouncedSearchValue, refreshKey, loadGroups]);
+    const invalidateGroupsList = useCallback(() => {
+        void queryClient.invalidateQueries({ queryKey: controlhubKeys.groups.all() });
+    }, [queryClient]);
 
 
     
@@ -111,7 +118,7 @@ const Groups = () => {
             setSelectedGroup(null);
             setSelectedGroupName(null);
             setShowEditGroupModal(false);
-            setRefreshKey(prev => prev + 1); // Trigger refresh
+            invalidateGroupsList();
         }
 
         
@@ -136,7 +143,7 @@ const Groups = () => {
             setTimeout(() => {
                 setShowSuccessfulModal(true);
             }, 100);
-            setRefreshKey(prev => prev + 1); 
+            invalidateGroupsList(); 
         }
     };
 
@@ -149,7 +156,7 @@ const Groups = () => {
             setNewGroupName("");
             setShowCreateGroupModal(false);
 
-            setRefreshKey(prev => prev + 1); 
+            invalidateGroupsList(); 
         }
     };
 
@@ -219,7 +226,7 @@ const Groups = () => {
         if (response) {
             setSelectedTeamsToAssign([]);
             await fetchGroupTeams(selectedGroup);
-            setRefreshKey(prev => prev + 1);
+            invalidateGroupsList();
         }
     };
 
@@ -250,7 +257,7 @@ const Groups = () => {
             setSelectedTeamsToRemove([]);
             setShowRemoveTeamsConfirmModal(false);
             await fetchGroupTeams(selectedGroup);
-            setRefreshKey(prev => prev + 1);
+            invalidateGroupsList();
         }
     };
 
@@ -343,7 +350,7 @@ const Groups = () => {
         if (response) {
             resetModules();
             await fetchGroupModules(selectedGroup);
-            setRefreshKey(prev => prev + 1);
+            invalidateGroupsList();
         }
     };
 
@@ -373,7 +380,7 @@ const Groups = () => {
             setSelectedModulesToRemove([]);
             setShowRemoveModulesConfirmModal(false);
             await fetchGroupModules(selectedGroup);
-            setRefreshKey(prev => prev + 1);
+            invalidateGroupsList();
         }
     };
 

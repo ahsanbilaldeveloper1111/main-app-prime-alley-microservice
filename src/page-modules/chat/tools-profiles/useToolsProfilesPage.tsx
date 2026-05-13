@@ -11,7 +11,7 @@ import {
   type Tool,
   type ToolPayload,
 } from "@utils/tools";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useState } from "react";
 import { toast } from "react-toastify";
 import {
@@ -26,7 +26,7 @@ export function useToolsProfilesPage() {
   const queryClient = useQueryClient();
   const toolsQuery = useToolsListQuery();
   const tools = toolsQuery.data ?? [];
-  const loading = toolsQuery.isFetching;
+  const loading = toolsQuery.isPending;
 
   const invalidateTools = useCallback(async () => {
     await queryClient.invalidateQueries({ queryKey: chatKeys.tools.all() });
@@ -35,9 +35,15 @@ export function useToolsProfilesPage() {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showTestModal, setShowTestModal] = useState(false);
   const [showExecutorModal, setShowExecutorModal] = useState(false);
-  const [executorConfig, setExecutorConfig] = useState<unknown>(null);
-  const [executorLoading, setExecutorLoading] = useState(false);
   const [reloadExecutorLoading, setReloadExecutorLoading] = useState(false);
+
+  const executorQuery = useQuery({
+    queryKey: chatKeys.toolsExecutor(),
+    queryFn: getToolsExecutor,
+    enabled: showExecutorModal,
+  });
+  const executorConfig = executorQuery.data ?? null;
+  const executorLoading = showExecutorModal && (executorQuery.isPending || executorQuery.isFetching);
 
   const [selectedTool, setSelectedTool] = useState<Tool | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -188,28 +194,17 @@ export function useToolsProfilesPage() {
       await reloadToolsExecutor();
       toast.success("Executor reloaded. Enabled tools are now in sync.");
       await invalidateTools();
+      await queryClient.invalidateQueries({ queryKey: chatKeys.toolsExecutor() });
     } catch (e) {
       console.error(e);
       toast.error("Failed to reload executor");
     } finally {
       setReloadExecutorLoading(false);
     }
-  }, [invalidateTools]);
+  }, [invalidateTools, queryClient]);
 
-  const handleViewExecutor = useCallback(async () => {
-    setExecutorLoading(true);
+  const handleViewExecutor = useCallback(() => {
     setShowExecutorModal(true);
-    setExecutorConfig(null);
-    try {
-      const config = await getToolsExecutor();
-      setExecutorConfig(config);
-    } catch (e) {
-      console.error(e);
-      toast.error("Failed to load executor config");
-      setExecutorConfig(undefined);
-    } finally {
-      setExecutorLoading(false);
-    }
   }, []);
 
   return {
@@ -223,6 +218,7 @@ export function useToolsProfilesPage() {
     setShowExecutorModal,
     executorConfig,
     executorLoading,
+    executorFetchError: executorQuery.isError,
     reloadExecutorLoading,
     selectedTool,
     setSelectedTool,

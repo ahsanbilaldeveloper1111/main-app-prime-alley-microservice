@@ -527,18 +527,6 @@ export function useCdrRecordsPage(): CdrRecordsPageViewModel {
       },
       { key: "time", label: "TIME (MS)", type: "text", sortable: false },
       {
-        key: "allowLocalDNCL",
-        label: "ALLOW LOCAL DNCL",
-        type: "text",
-        sortable: false,
-      },
-      {
-        key: "allowApiDNCLCalls",
-        label: "ALLOW API DNCL",
-        type: "text",
-        sortable: false,
-      },
-      {
         key: "allowRepetition",
         label: "ALLOW REPETITIVE",
         type: "text",

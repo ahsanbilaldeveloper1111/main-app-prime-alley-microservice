@@ -1,7 +1,8 @@
 import '@assets/scss/datatable-style.scss';
-import React, { ReactElement, useState, useCallback, useMemo, useRef, useEffect } from 'react';
+import React, { ReactElement, useState, useCallback, useMemo, useRef } from 'react';
 import Layout from '@layout/index';
 import BreadcrumbItem from '@common/BreadcrumbItem';
+import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import {
     updateTeam,
     deleteTeam,
@@ -30,6 +31,7 @@ import { HEADER_CONSTANTS } from '@constants/headerConstants';
 import SelectCheckBox, { SelectCheckBoxOption } from '@components/SelectCheckBox';
 import GenericTable, { TableColumn, TableAction } from '@components/GenericTable';
 import { useDebouncedValue } from '@hooks/useDebouncedValue';
+import { controlhubKeys } from '../../../query/keys';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -215,16 +217,53 @@ function TeamMembersTable({
 
 const Teams = () => {
     const { data: session } = useSession();
+    const queryClient = useQueryClient();
 
     // ── Pagination & search state ──
     const [currentPage, setCurrentPage] = useState(1);
     const [rowsPerPage, setRowsPerPage] = useState(15);
     const [searchValue, setSearchValue] = useState('');
     const debouncedSearchValue = useDebouncedValue(searchValue, 400);
-    const [totalRows, setTotalRows] = useState(0);
-    const [tableData, setTableData] = useState<TeamRow[]>([]);
-    const [isTableLoading, setIsTableLoading] = useState(false);
-    const [refreshKey, setRefreshKey] = useState(0);
+
+    // ── Stable empty-filters ref (no filters on this page) ──
+    const prevFiltersStringRef = useRef<string>('');
+    const prevFiltersRef = useRef<Record<string, unknown>>({});
+    const currentFilters = useMemo<Record<string, unknown>>(() => {
+        const str = JSON.stringify({});
+        if (str !== prevFiltersStringRef.current) {
+            prevFiltersStringRef.current = str;
+            prevFiltersRef.current = {};
+        }
+        return prevFiltersRef.current;
+    }, []);
+
+    const filtersListKey = JSON.stringify(currentFilters);
+    const teamsListQuery = useQuery({
+        queryKey: controlhubKeys.teams.list({
+            page: currentPage,
+            perPage: rowsPerPage,
+            search: debouncedSearchValue,
+            filtersKey: filtersListKey,
+        }),
+        queryFn: async () => {
+            try {
+                const response = (await ListTeams({
+                    page: currentPage,
+                    perPage: rowsPerPage,
+                    search: debouncedSearchValue,
+                    filters: currentFilters,
+                })) as TeamsApiResponse;
+                return { data: response?.data ?? [], total: response?.total ?? 0 };
+            } catch {
+                toast.error('Failed to load teams');
+                throw new Error('Failed to load teams');
+            }
+        },
+        placeholderData: keepPreviousData,
+    });
+    const tableData = teamsListQuery.data?.data ?? [];
+    const totalRows = teamsListQuery.data?.total ?? 0;
+    const isTableLoading = teamsListQuery.isPending || teamsListQuery.isFetching;
 
     // ── Success modal ──
     const [showSuccessfulModal, setShowSuccessfulModal] = useState(false);
@@ -276,45 +315,9 @@ const Teams = () => {
     const [isLoadingAssignModules, setIsLoadingAssignModules] = useState(false);
     const [isLoadingRemoveModule, setIsLoadingRemoveModule] = useState(false);
 
-    // ── Stable empty-filters ref (no filters on this page) ──
-    const prevFiltersStringRef = useRef<string>('');
-    const prevFiltersRef = useRef<Record<string, unknown>>({});
-    const currentFilters = useMemo<Record<string, unknown>>(() => {
-        const str = JSON.stringify({});
-        if (str !== prevFiltersStringRef.current) {
-            prevFiltersStringRef.current = str;
-            prevFiltersRef.current = {};
-        }
-        return prevFiltersRef.current;
-    }, []);
-
-    // ── Data fetching ──
-    const loadTeams = useCallback(
-        async (page: number, perPage: number, search: string) => {
-            setIsTableLoading(true);
-            try {
-                const response = (await ListTeams({
-                    page,
-                    perPage,
-                    search,
-                    filters: currentFilters,
-                })) as TeamsApiResponse;
-                setTableData(response?.data ?? []);
-                setTotalRows(response?.total ?? 0);
-            } catch {
-                toast.error('Failed to load teams');
-            } finally {
-                setIsTableLoading(false);
-            }
-        },
-        [currentFilters],
-    );
-
-    useEffect(() => {
-        loadTeams(currentPage, rowsPerPage, debouncedSearchValue);
-    }, [currentPage, rowsPerPage, debouncedSearchValue, refreshKey, loadTeams]);
-
-    const triggerRefresh = useCallback(() => setRefreshKey((prev) => prev + 1), []);
+    const triggerRefresh = useCallback(() => {
+        void queryClient.invalidateQueries({ queryKey: controlhubKeys.teams.all() });
+    }, [queryClient]);
 
     const showSuccess = useCallback((title: string, description: string) => {
         setSuccessModalTitle(title);

@@ -12,10 +12,9 @@ const ModuleCategories = () => {
 
   return (
     <ModuleCategoriesPageView
-      refreshKey={c.refreshKey}
       memoizedFilters={c.memoizedFilters}
       columns={c.columns as unknown as Column<object>[]}
-      fetchSubmodules={c.fetchSubmodules}
+      getListQueryOptions={c.getListQueryOptions}
       showCreateModal={c.showCreateModal}
       onCloseCreateModal={() => c.setShowCreateModal(false)}
       onOpenCreateModal={() => c.setShowCreateModal(true)}
