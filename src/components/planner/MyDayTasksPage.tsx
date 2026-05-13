@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import moment from "moment";
 import { Button, Form, Modal } from "react-bootstrap";
 import { Circle, CircleCheckBig, Plus, Search, Trash2 } from "lucide-react";
@@ -6,6 +6,7 @@ import BreadcrumbItem from "@common/BreadcrumbItem";
 import GenericTable, { type TableColumn } from "@components/GenericTable";
 import CreateTaskSidebar from "@components/CreatePlannerTaskSidebar";
 import {
+  ackMyDayRolloverPrompt,
   addTaskToMyDay,
   getMyDayCapacity,
   getMyDayPreferences,
@@ -53,8 +54,8 @@ type SuggestedTask = MyDayTask & {
   categoryLabel: string;
 };
 
-const ESTIMATE_REQUIRED_STORAGE_KEY = "planner-settings-require-estimate-for-my-day";
-const ESTIMATE_PRESETS = [15, 30, 60, 90, 120, 180] as const;
+/** Spec §3.6: lead with 30m / 1h / 2h chips; extra presets for custom flows. */
+const ESTIMATE_PRESETS = [30, 60, 120, 15, 90, 180] as const;
 
 function swallowAsyncError(promise: Promise<unknown>): void {
   promise.catch(() => undefined);
@@ -140,6 +141,8 @@ const MyDayTasksPage: React.FC = () => {
   const [pendingEstimateTask, setPendingEstimateTask] = useState<MyDayTask | null>(null);
   const [plannedMinutes, setPlannedMinutes] = useState(0);
   const [completedMinutes, setCompletedMinutes] = useState(0);
+  const [rolloverShowPrompt, setRolloverShowPrompt] = useState(false);
+  const rolloverAckSentRef = useRef(false);
 
   const today = useMemo(() => moment().format("YYYY-MM-DD"), []);
   const todayStart = useMemo(() => moment().startOf("day"), []);
@@ -179,6 +182,7 @@ const MyDayTasksPage: React.FC = () => {
         mapApiTaskToMyDayTask(toApiTask(row), todayStart),
       );
       setRolloverTasks(rollover);
+      setRolloverShowPrompt(rolloverPayload.show_rollover_prompt === true);
 
       const flattenedSuggestions: SuggestedTask[] = [];
       (Object.keys(CATEGORY_LABELS) as MyDaySuggestionCategory[]).forEach((category) => {
@@ -199,6 +203,7 @@ const MyDayTasksPage: React.FC = () => {
       setTasks([]);
       setSuggestedTasks([]);
       setRolloverTasks([]);
+      setRolloverShowPrompt(false);
     } finally {
       setLoading(false);
     }
@@ -212,6 +217,21 @@ const MyDayTasksPage: React.FC = () => {
     () => rolloverTasks.filter((t) => !t.isCompleted),
     [rolloverTasks],
   );
+
+  useEffect(() => {
+    if (!rolloverShowPrompt) {
+      rolloverAckSentRef.current = false;
+      return;
+    }
+    if (carryOverTasks.length === 0 || carryOverMode !== "pending") {
+      return;
+    }
+    if (rolloverAckSentRef.current) return;
+    rolloverAckSentRef.current = true;
+    void ackMyDayRolloverPrompt().catch(() => {
+      rolloverAckSentRef.current = false;
+    });
+  }, [rolloverShowPrompt, carryOverTasks.length, carryOverMode]);
 
   useEffect(() => {
     if (carryOverTasks.length === 0) {
@@ -303,9 +323,8 @@ const MyDayTasksPage: React.FC = () => {
   const handleAddSuggestedTask = useCallback(
     async (task: SuggestedTask) => {
       if (task.alreadyInMyDay) return;
-      const requireEstimate =
-        globalThis.window?.localStorage.getItem(ESTIMATE_REQUIRED_STORAGE_KEY) === "true";
-      if (requireEstimate && task.estimateMinutes <= 0) {
+      // Spec §3.6: no estimate → prompt before add (unestimated still allowed via Skip).
+      if (task.estimateMinutes <= 0) {
         setPendingEstimateTask(task);
         setEstimateInput("");
         setShowEstimateModal(true);
@@ -320,6 +339,22 @@ const MyDayTasksPage: React.FC = () => {
     },
     [fetchMyDayData, today],
   );
+
+  const skipEstimateAndAddToMyDay = useCallback(async () => {
+    if (pendingEstimateTask == null) return;
+    try {
+      await addTaskToMyDay({
+        task_id: pendingEstimateTask.id,
+        plan_date: today,
+      });
+      setShowEstimateModal(false);
+      setPendingEstimateTask(null);
+      setEstimateInput("");
+      fetchMyDayData().catch(() => undefined);
+    } catch {
+      toast.error("Failed to add task to My Day");
+    }
+  }, [fetchMyDayData, pendingEstimateTask, today]);
 
   const handleSaveCapacity = useCallback(async () => {
     try {
@@ -605,8 +640,7 @@ const MyDayTasksPage: React.FC = () => {
           <Button
             variant="secondary"
             onClick={() => {
-              setShowEstimateModal(false);
-              setPendingEstimateTask(null);
+              skipEstimateAndAddToMyDay().catch(() => undefined);
             }}
           >
             Skip
