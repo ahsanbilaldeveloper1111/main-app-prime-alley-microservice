@@ -1,4 +1,4 @@
-import { defineConfig, loadEnv } from "vite";
+import { defineConfig, loadEnv, type ProxyOptions } from "vite";
 import react from "@vitejs/plugin-react";
 import tsconfigPaths from "vite-tsconfig-paths";
 import path from "node:path";
@@ -62,15 +62,24 @@ export default defineConfig(({ mode }) => {
     }
   }
 
-  const proxy = env.APPLY_PROXY_TO_API ? {
-    "/api": {
+  const streamingProxy: ProxyOptions = {
+    target: env.VITE_STREAMING_URL || "http://localhost:3100",
+    changeOrigin: true,
+    ws: true,
+    rewrite: (path) => path.replace(/^\/streaming/, ""),
+  };
+
+  const serverProxy: Record<string, string | ProxyOptions> = {
+    "/streaming": streamingProxy,
+  };
+
+  if (env.APPLY_PROXY_TO_API) {
+    serverProxy["/api"] = {
       target: resolveDevApiProxyTarget(env),
       changeOrigin: true,
       secure: false,
-    }
-  } : {};
-
-  console.log("proxy", proxy);
+    };
+  }
 
   return {
   plugins: [react(), tsconfigPaths(), nextImageCompatPlugin()],
@@ -117,23 +126,7 @@ export default defineConfig(({ mode }) => {
   server: {
     port: 3000,
     host: true,
-    proxy: {
-      // Streaming endpoints are served by the Express sidecar (see server/index.ts).
-      // Front-end keeps calling /streaming/* during dev; the prefix is stripped
-      // before hitting the sidecar (which mounts handlers at the root). Prod
-      // can put the sidecar behind the same origin via reverse proxy.
-      "/streaming": {
-        target: env.VITE_STREAMING_URL || "http://localhost:3100",
-        changeOrigin: true,
-        ws: true,
-        rewrite: (path) => path.replace(/^\/streaming/, ""),
-      },
-      /**
-       * When `VITE_BACKEND_URL=/api/`, the browser calls same-origin `/api/*`. Vite must
-       * forward to Laravel; without this, POST `/api/auth/login` returns 404 from Vite.
-       */
-      ...proxy,
-    },
+    proxy: serverProxy,
   },
 
   build: {
