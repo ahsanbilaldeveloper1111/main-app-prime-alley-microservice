@@ -32,6 +32,23 @@ const nextShimAliases = {
   "@sentry/nextjs": path.resolve(__dirname, "src/shims/sentry-nextjs.ts"),
 };
 
+/** Upstream origin for dev `server.proxy['/api']` (parsed from absolute backend URLs in env). */
+function resolveDevApiProxyTarget(env: Record<string, string>): string {
+  const explicit = (env.VITE_DEV_API_PROXY_TARGET || "").trim().replace(/\/+$/, "");
+  if (explicit.length > 0) return explicit;
+  for (const key of ["NEXT_PUBLIC_BACKEND_URL", "VITE_BACKEND_URL"] as const) {
+    const raw = (env[key] || "").trim();
+    if (raw.startsWith("http://") || raw.startsWith("https://")) {
+      try {
+        return new URL(raw).origin;
+      } catch {
+        /* ignore */
+      }
+    }
+  }
+  return "http://127.0.0.1:3001";
+}
+
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
 
@@ -44,6 +61,16 @@ export default defineConfig(({ mode }) => {
       exposedEnv[`process.env.${key}`] = JSON.stringify(value ?? "");
     }
   }
+
+  const proxy = env.APPLY_PROXY_TO_API ? {
+    "/api": {
+      target: resolveDevApiProxyTarget(env),
+      changeOrigin: true,
+      secure: false,
+    }
+  } : {};
+
+  console.log("proxy", proxy);
 
   return {
   plugins: [react(), tsconfigPaths(), nextImageCompatPlugin()],
@@ -101,6 +128,11 @@ export default defineConfig(({ mode }) => {
         ws: true,
         rewrite: (path) => path.replace(/^\/streaming/, ""),
       },
+      /**
+       * When `VITE_BACKEND_URL=/api/`, the browser calls same-origin `/api/*`. Vite must
+       * forward to Laravel; without this, POST `/api/auth/login` returns 404 from Vite.
+       */
+      ...proxy,
     },
   },
 
