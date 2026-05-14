@@ -91,6 +91,8 @@ interface ImportMetaEnv {
   readonly BASE_URL: string;
   readonly VITE_BASE_URL: string;
   readonly VITE_BACKEND_URL: string;
+  /** Optional: override dev `/api` proxy target (origin only, e.g. http://192.168.30.150:3001). */
+  readonly VITE_DEV_API_PROXY_TARGET?: string;
   readonly VITE_BACKEND_STORAGE_URL: string;
   readonly VITE_STREAMING_URL: string;
   readonly VITE_ENCODING_SECRET_KEY: string;
