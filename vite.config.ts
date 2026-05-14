@@ -81,6 +81,7 @@ export default defineConfig(({ mode }) => {
     };
   }
 
+  console.log("serverProxy", serverProxy);
   return {
   plugins: [react(), tsconfigPaths(), nextImageCompatPlugin()],
 
