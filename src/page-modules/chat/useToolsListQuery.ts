@@ -1,5 +1,5 @@
 import { getTools, type Tool } from "@utils/tools";
-import { chatKeys } from "../../query/keys";
+import { chatKeys } from "@query/keys";
 import { useArrayListQuery } from "../_shared/listQuery";
 
 export function useToolsListQuery() {

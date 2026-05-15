@@ -1,5 +1,4 @@
 import React, { useState, useRef, useEffect } from "react";
-import { useSession } from "next-auth/react";
 import {
   X,
   Maximize2,
@@ -14,7 +13,11 @@ import {
   ChevronDown,
   Trash2,
 } from "lucide-react";
-import { sendChatMessage } from "@utils/chat";
+import {
+  getChatThread,
+  mapChatThreadMessagesToUi,
+  sendChatMessage,
+} from "@utils/chat";
 
 // ============================================================================
 // TYPE DEFINITIONS
@@ -85,6 +88,51 @@ function removeStoredThread(threadId: string) {
   } catch {
     // ignore
   }
+}
+
+const BREEZE_ERROR_REPLY =
+  "Sorry, something went wrong. Please try again.";
+
+function createBreezeErrorMessage(): BreezeMessage {
+  return {
+    id: `error-${Date.now()}`,
+    role: "assistant",
+    content: BREEZE_ERROR_REPLY,
+    timestamp: new Date(),
+  };
+}
+
+async function requestAssistantReply(
+  text: string,
+  threadId: string,
+  onSendMessage?: (message: string) => Promise<string>,
+): Promise<{ reply: string; newThreadId: string }> {
+  if (onSendMessage) {
+    return { reply: await onSendMessage(text), newThreadId: threadId };
+  }
+  const response = await sendChatMessage({
+    message: text,
+    thread_id: threadId || undefined,
+  });
+  return {
+    reply: response.response || "No response received",
+    newThreadId: response.thread_id || threadId,
+  };
+}
+
+function persistMessagesAfterReply(
+  prev: BreezeMessage[],
+  userMsg: BreezeMessage,
+  assistantMsg: BreezeMessage,
+  newThreadId: string,
+  persist: (tid: string, title: string, msgs: BreezeMessage[]) => void,
+): BreezeMessage[] {
+  const next = [...prev, assistantMsg];
+  if (newThreadId) {
+    const firstUser = prev.find((m) => m.role === "user") ?? userMsg;
+    persist(newThreadId, firstUser.content?.slice(0, 80) || "New Chat", next);
+  }
+  return next;
 }
 
 export interface BreezeAssistantSidebarProps {
@@ -1230,23 +1278,20 @@ const BreezeAssistantSidebar: React.FC<BreezeAssistantSidebarProps> = ({
   isMaximized: isMaximizedProp,
   onMaximizeChange,
 }) => {
-  const { data: session } = useSession();
   const [internalMaximized, setInternalMaximized] = useState(false);
-  const isMaximized = isMaximizedProp !== undefined ? isMaximizedProp : internalMaximized;
+  const isMaximized = isMaximizedProp ?? internalMaximized;
   const setMaximized = (v: boolean) => { setInternalMaximized(v); onMaximizeChange?.(v); };
 
   const [messages,     setMessages]     = useState<BreezeMessage[]>([]);
   const [inputValue,   setInputValue]   = useState("");
-  const [isLoading,    setIsLoading]    = useState(false);
+  const [isLoading,       setIsLoading]       = useState(false);
+  const [isLoadingThread, setIsLoadingThread] = useState(false);
   const [showMoreMenu, setShowMoreMenu] = useState(false);
   const [activeChatId, setActiveChatId] = useState("new");
   const [threadId,     setThreadId]     = useState("");
   const [chatHistory,  setChatHistory]  = useState<BreezeChatHistory[]>(() =>
     getStoredThreads().map((t) => ({ ...t, timestamp: new Date(t.timestamp), threadId: t.threadId }))
   );
-
-  const getTenantId = (): string =>
-    (session?.user as { tenant_id?: string })?.tenant_id ?? "tenant_123";
 
   // current view — "chat" | "chatHistory" | "prompts" | "addPrompt"
   const [view, setView] = useState<BreezeView>("chat");
@@ -1278,6 +1323,7 @@ const BreezeAssistantSidebar: React.FC<BreezeAssistantSidebarProps> = ({
   const moreMenuRef    = useRef<HTMLDivElement>(null);
 
   const hasMessages = messages.length > 0;
+  const chatBusy = isLoading || isLoadingThread;
 
   useEffect(() => {
     if (messagesEndRef.current && hasMessages)
@@ -1298,37 +1344,43 @@ const BreezeAssistantSidebar: React.FC<BreezeAssistantSidebarProps> = ({
   // ── Send: used by Send button click and Enter key; calls sendChatMessage API (or onSendMessage prop) ──
   const handleSend = async () => {
     const text = inputValue.trim();
-    if (!text || isLoading) return;
-    const userMsg: BreezeMessage = { id: `user-${Date.now()}`, role: "user", content: text, timestamp: new Date() };
+    if (!text || chatBusy) return;
+    const userMsg: BreezeMessage = {
+      id: `user-${Date.now()}`,
+      role: "user",
+      content: text,
+      timestamp: new Date(),
+    };
     setMessages((prev) => [...prev, userMsg]);
     setInputValue("");
     setIsLoading(true);
     try {
-      let reply: string;
-      let newThreadId = threadId;
-      if (onSendMessage) {
-        reply = await onSendMessage(text);
-      } else {
-        const response = await sendChatMessage({
-          message: text,
-          tenant_id: getTenantId(),
-          thread_id: threadId || undefined,
-        });
-        reply = response?.response ?? response?.message ?? "No response received";
-        newThreadId = response?.thread_id ?? threadId;
-        if (newThreadId && newThreadId !== threadId) setThreadId(newThreadId);
+      const { reply, newThreadId } = await requestAssistantReply(
+        text,
+        threadId,
+        onSendMessage,
+      );
+      if (newThreadId && newThreadId !== threadId) {
+        setThreadId(newThreadId);
       }
-      const assistantMsg: BreezeMessage = { id: `assistant-${Date.now()}`, role: "assistant", content: reply, timestamp: new Date() };
-      setMessages((prev) => {
-        const next = [...prev, assistantMsg];
-        if (newThreadId) {
-          const firstUser = prev.find((m) => m.role === "user") ?? userMsg;
-          persistThreadToHistory(newThreadId, firstUser.content?.slice(0, 80) || "New Chat", next);
-        }
-        return next;
-      });
-    } catch {
-      setMessages((prev) => [...prev, { id: `error-${Date.now()}`, role: "assistant", content: "Sorry, something went wrong. Please try again.", timestamp: new Date() }]);
+      const assistantMsg: BreezeMessage = {
+        id: `assistant-${Date.now()}`,
+        role: "assistant",
+        content: reply,
+        timestamp: new Date(),
+      };
+      setMessages((prev) =>
+        persistMessagesAfterReply(
+          prev,
+          userMsg,
+          assistantMsg,
+          newThreadId,
+          persistThreadToHistory,
+        ),
+      );
+    } catch (error: unknown) {
+      console.error("AI Assistant send failed:", error);
+      setMessages((prev) => [...prev, createBreezeErrorMessage()]);
     } finally {
       setIsLoading(false);
     }
@@ -1337,16 +1389,31 @@ const BreezeAssistantSidebar: React.FC<BreezeAssistantSidebarProps> = ({
   const handleChipClick = (label: string) => { setInputValue(label + " "); textareaRef.current?.focus(); };
   const handleNewConversation = () => { setMessages([]); setInputValue(""); setThreadId(""); setActiveChatId("new"); setShowMoreMenu(false); setView("chat"); };
 
-  const handleSelectThread = (item: BreezeChatHistory) => {
+  const handleSelectThread = async (item: BreezeChatHistory) => {
     if (item.id === "new" || !item.threadId) {
       handleNewConversation();
       return;
     }
     setThreadId(item.threadId);
     setActiveChatId(item.id);
-    setMessages(getStoredMessages(item.threadId));
     setShowMoreMenu(false);
     setView("chat");
+    setIsLoadingThread(true);
+    try {
+      const thread = await getChatThread(item.threadId);
+      const loaded = mapChatThreadMessagesToUi(thread.messages);
+      setMessages(loaded);
+      persistThreadToHistory(
+        thread.thread_id,
+        thread.title || item.title,
+        loaded,
+      );
+    } catch (error: unknown) {
+      console.error("AI Assistant thread load failed:", error);
+      setMessages(getStoredMessages(item.threadId));
+    } finally {
+      setIsLoadingThread(false);
+    }
   };
 
   const handleSaveCurrentChat = () => {
@@ -1614,7 +1681,7 @@ const BreezeAssistantSidebar: React.FC<BreezeAssistantSidebarProps> = ({
                 inputValue={inputValue}
                 onInputChange={setInputValue}
                 onSend={handleSend}
-                isLoading={isLoading}
+                isLoading={chatBusy}
                 textareaRef={textareaRef}
                 messagesEndRef={messagesEndRef}
               />

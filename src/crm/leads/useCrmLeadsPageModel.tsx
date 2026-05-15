@@ -8,7 +8,7 @@ import React, {
   useRef,
 } from "react";
 import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
-import { crmAppKeys } from "../../query/keys";
+import { crmAppKeys } from "@query/keys";
 import type {
   TableColumn,
   TableAction,

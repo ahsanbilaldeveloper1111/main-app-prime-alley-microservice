@@ -14,7 +14,7 @@ import {
   PostCompanyDocuments,
 } from "@utils/accounting";
 import { HEADER_CONSTANTS, type PermissionName } from "@constants/headerConstants";
-import { accountBillingKeys } from "../../../query/keys";
+import { accountBillingKeys } from "@query/keys";
 import { useAccountBillingCompanyDocumentsQuery } from "@page-modules/billing/account-billing/useAccountBillingCompanyDocumentsQuery";
 import {
   buildCompanyDocumentsFormData,

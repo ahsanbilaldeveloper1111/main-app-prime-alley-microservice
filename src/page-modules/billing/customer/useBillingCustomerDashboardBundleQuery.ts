@@ -1,6 +1,6 @@
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 
-import { billingCustomerKeys } from "../../../query/keys";
+import { billingCustomerKeys } from "@query/keys";
 import { fetchBillingCustomerDashboardBundle } from "./billingCustomerDashboardModel";
 
 export function useBillingCustomerDashboardBundleQuery(

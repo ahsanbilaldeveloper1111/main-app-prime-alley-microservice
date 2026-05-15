@@ -26,7 +26,7 @@ import { useMainAppLookups } from "@hooks/useMainAppLookups";
 import { Pencil, Trash2, List, Plus, ChevronUp, ChevronDown } from "lucide-react";
 import GenericTable from "@components/GenericTable";
 import DeleteConfirmationModal from "@components/page-partials/DeleteConfirmationModal";
-import { workforceKeys } from "../../../query/keys";
+import { workforceKeys } from "@query/keys";
 import { consumeHandledApiError } from "@page-modules/workforce/request-categories/requestCategoriesDomain";
 import {
   useRequestCategoryFieldsQuery,

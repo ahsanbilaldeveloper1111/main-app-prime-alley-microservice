@@ -2,20 +2,18 @@ import type { Column } from "@components/CustomDataTable";
 import type { FAQData } from "@utils/chat";
 import { useMemo } from "react";
 import { Button } from "react-bootstrap";
-import { Edit, Eye, Trash2 } from "lucide-react";
+import { Eye, Trash2 } from "lucide-react";
 
 type Row = FAQData & Record<string, unknown>;
 
 type TenantHandlers = Readonly<{
   variant: "tenant";
-  onEdit: (faq: FAQData) => void;
   onDelete: (faq: FAQData) => void;
 }>;
 
 type GlobalHandlers = Readonly<{
   variant: "global";
   onView: (faq: FAQData) => void;
-  onEdit: (faq: FAQData) => void;
   onDelete: (faq: FAQData) => void;
 }>;
 
@@ -31,10 +29,9 @@ function answerPreviewCell(answer: string, maxLen: number) {
 function FaqRowActions(props: Readonly<{
   row: Row;
   onView?: (faq: FAQData) => void;
-  onEdit: (faq: FAQData) => void;
   onDelete: (faq: FAQData) => void;
 }>) {
-  const { row, onView, onEdit, onDelete } = props;
+  const { row, onView, onDelete } = props;
   return (
     <div className="d-flex gap-2">
       {onView ? (
@@ -48,15 +45,6 @@ function FaqRowActions(props: Readonly<{
           <Eye size={16} />
         </Button>
       ) : null}
-      <Button
-        variant="light"
-        className="btn-action-style-2 p-1 text-primary"
-        title="Edit"
-        type="button"
-        onClick={() => onEdit(row)}
-      >
-        <Edit size={16} />
-      </Button>
       <Button
         variant="light"
         className="btn-action-style-2 p-1 text-danger"
@@ -74,7 +62,6 @@ export function useAiFaqListColumns(params: AiFaqListColumnsParams): Column<Row>
   const variant = params.variant;
   const isGlobal = variant === "global";
   const onView = isGlobal ? params.onView : undefined;
-  const onEdit = params.onEdit;
   const onDelete = params.onDelete;
 
   return useMemo(() => {
@@ -121,10 +108,10 @@ export function useAiFaqListColumns(params: AiFaqListColumnsParams): Column<Row>
       selector: (row) => row.id,
       sortable: false,
       cell: (row) => (
-        <FaqRowActions row={row} onView={onView} onEdit={onEdit} onDelete={onDelete} />
+        <FaqRowActions row={row} onView={onView} onDelete={onDelete} />
       ),
     });
 
     return base;
-  }, [variant, isGlobal, onView, onEdit, onDelete]);
+  }, [variant, isGlobal, onView, onDelete]);
 }

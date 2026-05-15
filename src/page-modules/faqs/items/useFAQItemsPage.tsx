@@ -1,7 +1,7 @@
 import type { TableAction, TableColumn } from "@components/GenericTable";
 import { useAllFAQTopicsQuery } from "@page-modules/faqs/useAllFAQTopicsQuery";
 import { useFAQItemsListQuery } from "@page-modules/faqs/useFAQItemsListQuery";
-import { faqsKeys } from "../../../query/keys";
+import { faqsKeys } from "@query/keys";
 import { createFAQItem, deleteFAQItem, updateFAQItem } from "@utils/faqs";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import type { ChangeEvent } from "react";

@@ -7,7 +7,7 @@ import type {
 } from "@components/GenericTable";
 import { useQuery } from "@tanstack/react-query";
 import { fetchComplianceCdrList } from "../../../query/fetchComplianceCdrList";
-import { complianceKeys } from "../../../query/keys";
+import { complianceKeys } from "@query/keys";
 import React, { useCallback, useMemo, useState } from "react";
 
 import { CdrDatetimeFilterField } from "./CdrDatetimeFilterField";

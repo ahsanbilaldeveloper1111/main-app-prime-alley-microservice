@@ -28,7 +28,7 @@ export interface ChartDonutProps {
   showLegend?: boolean;
   legendPosition?: "top" | "bottom" | "left" | "right";
   showDataLabels?: boolean;
-  dataLabelsFormatter?: (value: number) => string;
+  dataLabelsFormatter?: (value: number, opts?: unknown) => string;
   donutWidth?: string;
   strokeWidth?: number;
   customColors?: boolean;
@@ -98,9 +98,12 @@ const ChartDonut: React.FC<ChartDonutProps> = ({
   };
 
   // Default data labels formatter
-  const getDefaultDataLabelsFormatter = (value: number): string => {
+  const getDefaultDataLabelsFormatter = (
+    value: number,
+    opts?: unknown,
+  ): string => {
     if (dataLabelsFormatter) {
-      return dataLabelsFormatter(value);
+      return dataLabelsFormatter(value, opts);
     }
 
     switch (dataType) {
@@ -178,8 +181,8 @@ const ChartDonut: React.FC<ChartDonutProps> = ({
       dropShadow: {
         enabled: false,
       },
-      formatter: function (val: number) {
-        return getDefaultDataLabelsFormatter(val);
+      formatter: function (val: number, opts?: unknown) {
+        return getDefaultDataLabelsFormatter(val, opts);
       },
     },
     tooltip: {

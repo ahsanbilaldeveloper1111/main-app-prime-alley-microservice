@@ -20,8 +20,6 @@ export function AIFaqsGlobalPageView({ ctx }: AIFaqsGlobalPageViewProps) {
     stableFilters,
     showAddModal,
     setShowAddModal,
-    showEditModal,
-    setShowEditModal,
     showDeleteModal,
     setShowDeleteModal,
     selectedFAQ,
@@ -79,8 +77,6 @@ export function AIFaqsGlobalPageView({ ctx }: AIFaqsGlobalPageViewProps) {
         scopeLabel="Global"
         showAddModal={showAddModal}
         setShowAddModal={setShowAddModal}
-        showEditModal={showEditModal}
-        setShowEditModal={setShowEditModal}
         showDeleteModal={showDeleteModal}
         setShowDeleteModal={setShowDeleteModal}
         selectedFAQ={selectedFAQ}

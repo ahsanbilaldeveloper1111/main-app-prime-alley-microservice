@@ -1,5 +1,5 @@
 import type { TableAction, TableColumn } from "@components/GenericTable";
-import { ticketsKeys } from "../../../query/keys";
+import { ticketsKeys } from "@query/keys";
 import { useTicketStatusesListQuery } from "@page-modules/tickets/useTicketStatusesListQuery";
 import { CreateStatus, DeleteStatus, UpdateStatus } from "@utils/ticket-statuses";
 import { GlobalDateTimeFormat } from "@utils/Helper";

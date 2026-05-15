@@ -1,7 +1,7 @@
 import type { TableAction, TableColumn } from "@components/GenericTable";
 import { useTicketHierarchyExtensionsQuery } from "@page-modules/tickets/useTicketHierarchyExtensionsQuery";
 import { useTicketModulesListQuery } from "@page-modules/tickets/useTicketModulesListQuery";
-import { ticketsKeys } from "../../../query/keys";
+import { ticketsKeys } from "@query/keys";
 import {
   CreateModule,
   DeleteModule,

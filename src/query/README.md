@@ -14,7 +14,7 @@
 
 ## Query keys
 
-- Use **namespaced factories** in `src/query/keys.ts` (e.g. `communicationsKeys`). Avoid raw string keys scattered in components.
+- Use **namespaced factories** from `@query/keys` (`src/query/keys.ts`, e.g. `communicationsKeys`). Avoid raw string keys scattered in components.
 - List queries should include **stable serializations** of filter objects (e.g. `JSON.stringify(appliedFilters)`) and explicit **refresh tokens** where Redux still owns filter commit (`refreshKey`).
 
 ## Mutations and staleness

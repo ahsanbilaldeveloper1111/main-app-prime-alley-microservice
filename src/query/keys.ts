@@ -608,6 +608,42 @@ export const chatKeys = {
 
   /** Tools executor config (`getToolsExecutor`). */
   toolsExecutor: () => [...chatKeys.tools.all(), "executor"] as const,
+
+  /** Chat bot training (`postChatTraining`, `getChatTrainingStatus`). */
+  training: {
+    all: () => [...chatKeys.root, "training"] as const,
+    status: (tenantId: string) =>
+      [...chatKeys.training.all(), "status", tenantId] as const,
+    submit: (tenantId: string) =>
+      [...chatKeys.training.all(), "submit", tenantId] as const,
+  },
+
+  /** Tenant analytics dashboard (`GET /chat/tenant/dashboard`). */
+  tenantDashboard: {
+    all: () => [...chatKeys.root, "tenantDashboard"] as const,
+    detail: (tenantId: string) =>
+      [...chatKeys.tenantDashboard.all(), tenantId || "__current__"] as const,
+  },
+
+  /** Admin analytics dashboard (`GET /chat/admin/dashboard`). */
+  adminDashboard: {
+    all: () => [...chatKeys.root, "adminDashboard"] as const,
+    detail: () => [...chatKeys.adminDashboard.all(), "detail"] as const,
+  },
+
+  /** Tenant chat settings (`GET /chat/tenant/settings`). */
+  tenantSettings: {
+    all: () => [...chatKeys.root, "tenantSettings"] as const,
+    detail: (tenantId: string) =>
+      [...chatKeys.tenantSettings.all(), tenantId || "__current__"] as const,
+  },
+
+  /** AI assistant popup thread (`GET/POST /chat/`). */
+  assistant: {
+    all: () => [...chatKeys.root, "assistant"] as const,
+    thread: (threadId: string) =>
+      [...chatKeys.assistant.all(), "thread", threadId] as const,
+  },
 };
 
 /** GSM / Telco gateway (`src/pages/gsm/*`). */

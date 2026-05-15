@@ -4,7 +4,7 @@ import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import { DashboardData } from '@utils/tickets';
 import ChartDonut from '@components/ChartDonut';
 import TicketsFilters from '@components/filters/TicketFilters';
-import { ticketsKeys } from '../../query/keys';
+import { ticketsKeys } from "@query/keys";
 import { toast } from 'react-toastify';
 
 import "@assets/scss/common.scss";

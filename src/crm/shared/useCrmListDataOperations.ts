@@ -19,7 +19,7 @@ import {
   type CrmDataResponse,
 } from "@utils/crm";
 import { handleCrmListUploadResponse } from "@crm/shared/crmListUploadResponseUtils";
-import { crmAppKeys } from "../../query/keys";
+import { crmAppKeys } from "@query/keys";
 
 const { PERMISSIONS } = HEADER_CONSTANTS;
 

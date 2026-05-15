@@ -4,6 +4,7 @@ import FaqProfiles from '@pages/chat/faq-profiles'
 import AIChatFAQsTenant from '@pages/chat/ai-faqs/tenant'
 import AIChatFAQsGlobal from '@pages/chat/ai-faqs/global'
 import React from 'react'
+import { AIChatbotSettings } from '../ai-chatbot-settings/AIChatbotSettings'
 import type { ControlledTabsProps, Tab } from '../types'
 import { SettingsSectionTabShell } from './SettingsSectionTabShell'
 import { useSettingsSectionTabs } from './useSettingsSectionTabs'
@@ -15,6 +16,7 @@ const aiChatTabs: Tab[] = [
   { id: 'faq-profiles', label: 'FAQ Profiles', permission: PERMISSIONS.VIEW_AI_CHAT },
   { id: 'tenant-profile', label: 'Tenant Profile', permission: PERMISSIONS.VIEW_AI_CHAT },
   { id: 'global-faqs', label: 'Global FAQs', permission: PERMISSIONS.VIEW_AI_CHAT },
+  { id: 'ai-chatbot-settings', label: 'AI Chatbot Settings', permission: PERMISSIONS.VIEW_AI_CHAT },
 ]
 
 function AIChatTabPanel({ activeTab }: Readonly<{ activeTab: string }>) {
@@ -27,6 +29,8 @@ function AIChatTabPanel({ activeTab }: Readonly<{ activeTab: string }>) {
       return <AIChatFAQsTenant />
     case 'global-faqs':
       return <AIChatFAQsGlobal />
+    case 'ai-chatbot-settings':
+      return <AIChatbotSettings />
     default:
       return null
   }
@@ -44,7 +48,13 @@ export const AIChatPage: React.FC<ControlledTabsProps> = ({
   )
 
   return (
-    <SettingsSectionTabShell title="AI Chat" allowedTabs={allowedTabs} activeTab={activeTab} onSelectTab={selectTab}>
+    <SettingsSectionTabShell
+      title="AI Chat"
+      allowedTabs={allowedTabs}
+      activeTab={activeTab}
+      onSelectTab={selectTab}
+      dense={activeTab === 'ai-chatbot-settings'}
+    >
       <AIChatTabPanel activeTab={activeTab} />
     </SettingsSectionTabShell>
   )

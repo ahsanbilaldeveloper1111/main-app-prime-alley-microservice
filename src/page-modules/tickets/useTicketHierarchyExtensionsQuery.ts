@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { ticketsKeys } from "../../query/keys";
+import { ticketsKeys } from "@query/keys";
 import { ModuleSlug } from "@utils/Helper";
 import { GetHierarchyData } from "@utils/users";
 

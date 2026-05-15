@@ -9,7 +9,7 @@ import {
   type UserRequestCategory,
   type UserRequestCategoryField,
 } from "@utils/staffManagement";
-import { workforceKeys } from "../../../query/keys";
+import { workforceKeys } from "@query/keys";
 import {
   buildUserRequestsListApiParams,
   serializeApprovalRequestsListFiltersKey,

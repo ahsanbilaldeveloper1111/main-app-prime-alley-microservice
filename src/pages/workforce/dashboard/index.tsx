@@ -32,7 +32,7 @@ import NewRequestModal from "@page-modules/workforce/NewRequestModal";
 import { Plus, Calendar, type LucideIcon } from "lucide-react";
 
 import "@page-modules/workforce/dashboard/employeesDashboard.scss";
-import { workforceKeys } from "../../../query/keys";
+import { workforceKeys } from "@query/keys";
 
 const { PERMISSIONS } = HEADER_CONSTANTS;
 

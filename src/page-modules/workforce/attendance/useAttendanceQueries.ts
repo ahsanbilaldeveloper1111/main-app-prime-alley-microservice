@@ -5,7 +5,7 @@ import {
   type AttendanceRecord,
   type AttendanceStatusData,
 } from "@utils/staffManagement";
-import { workforceKeys } from "../../../query/keys";
+import { workforceKeys } from "@query/keys";
 import { planTeamAttendanceListQuery } from "@utils/workforce/attendanceTeamScope";
 import {
   buildAttendanceListRequestParams,

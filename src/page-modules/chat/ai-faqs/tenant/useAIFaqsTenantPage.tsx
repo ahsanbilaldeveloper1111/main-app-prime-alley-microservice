@@ -1,4 +1,4 @@
-import { chatKeys } from "../../../../query/keys";
+import { chatKeys } from "@query/keys";
 import { useChatCompaniesQuery } from "@page-modules/chat/useChatCompaniesQuery";
 import {
   type CreateTenantFAQPayload,
@@ -11,18 +11,18 @@ import type { GenericListPageQueryParams } from "@components/GenericListPage";
 import { useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/router";
 import { useSession } from "next-auth/react";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "react-toastify";
 
 import { useAiFaqListColumns } from "../aiFaqListColumns";
 import {
-  buildAiFaqSubmitFields,
   emptyFaqListPage,
-  faqToDraft,
   getValidFaqItemsForSubmit,
   paginateArrayForTable,
 } from "../faqItemDraft";
 import { useAiFaqDraftFormState } from "../hooks/useAiFaqDraftFormState";
+import { resolveTenantIdFromSession } from "../../shared/resolveTenantIdFromSession";
+import { useChatTrainBot } from "../../shared/useChatTrainBot";
 
 export function useAIFaqsTenantPage() {
   const router = useRouter();
@@ -36,19 +36,35 @@ export function useAIFaqsTenantPage() {
   const [selectedCompanyForFilter, setSelectedCompanyForFilter] = useState("");
   const [filterTenantId, setFilterTenantId] = useState("");
 
+  const sessionTenantId = useMemo(
+    () => resolveTenantIdFromSession(session?.user),
+    [session?.user],
+  );
+
+  const listTenantId = useMemo(() => {
+    const fromFilter = filterTenantId.trim();
+    if (fromFilter) return fromFilter;
+    const fromSelect = selectedCompanyForFilter.trim();
+    if (fromSelect) return fromSelect;
+    return sessionTenantId;
+  }, [filterTenantId, selectedCompanyForFilter, sessionTenantId]);
+
+  useEffect(() => {
+    if (!sessionTenantId) return;
+    setSelectedCompanyForFilter((prev) => prev || sessionTenantId);
+    setFilterTenantId((prev) => prev || sessionTenantId);
+  }, [sessionTenantId]);
+
   const [showAddModal, setShowAddModal] = useState(false);
-  const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [selectedFAQ, setSelectedFAQ] = useState<FAQData | null>(null);
 
   const {
     faqItems,
-    setFaqItems,
     haveFiles,
     selectedFiles,
     fileInputKey,
     resetForm,
-    clearAttachments,
     handleAddFAQItem,
     handleRemoveFAQItem,
     handleUpdateFAQItem,
@@ -60,21 +76,10 @@ export function useAIFaqsTenantPage() {
     if (tenantId?.trim()) return tenantId.trim();
     if (filterTenantId?.trim()) return filterTenantId.trim();
     if (selectedCompanyForFilter?.trim()) return selectedCompanyForFilter.trim();
-    const u = session?.user as { tenant_id?: string } | undefined;
-    if (u?.tenant_id) return String(u.tenant_id);
-    return "";
+    return resolveTenantIdFromSession(session?.user);
   }, [tenantId, filterTenantId, selectedCompanyForFilter, session?.user]);
 
-  const handleEditFAQ = useCallback(
-    (faq: FAQData) => {
-      setSelectedFAQ(faq);
-      setFaqItems([faqToDraft({ question: faq.question, answer: faq.answer })]);
-      clearAttachments();
-      setTenantId(filterTenantId || selectedCompanyForFilter || tenantId || "");
-      setShowEditModal(true);
-    },
-    [clearAttachments, filterTenantId, selectedCompanyForFilter, setFaqItems, tenantId],
-  );
+  const trainBot = useChatTrainBot(getTenantId);
 
   const handleDeleteFAQ = useCallback((faq: FAQData) => {
     setSelectedFAQ(faq);
@@ -83,9 +88,10 @@ export function useAIFaqsTenantPage() {
 
   const handleSubmit = useCallback(async () => {
     const validFAQs = getValidFaqItemsForSubmit(faqItems);
+    const hasFiles = haveFiles && selectedFiles.length > 0;
 
-    if (validFAQs.length === 0) {
-      toast.error("Please add at least one FAQ with both question and answer");
+    if (validFAQs.length === 0 && !hasFiles) {
+      toast.error("Add at least one FAQ (question and answer) or attach a PDF/TXT file");
       return;
     }
 
@@ -96,19 +102,17 @@ export function useAIFaqsTenantPage() {
         return;
       }
 
-      const fields = buildAiFaqSubmitFields(validFAQs, haveFiles, selectedFiles);
+      const faqsJson = JSON.stringify(validFAQs);
       const payload: CreateTenantFAQPayload = {
         tenant_id: tenantForPayload,
-        faqs: fields.faqs,
-        have_files: fields.have_files,
-        files: fields.files,
+        faqs: faqsJson,
+        ...(hasFiles ? { files: selectedFiles } : {}),
       };
 
       await createTenantFAQ(payload);
 
       resetForm();
       setShowAddModal(false);
-      setShowEditModal(false);
       setSelectedFAQ(null);
       await queryClient.invalidateQueries({ queryKey: chatKeys.aiFaqs.tenant.all() });
     } catch (error) {
@@ -118,16 +122,8 @@ export function useAIFaqsTenantPage() {
 
   const handleConfirmDelete = useCallback(async () => {
     if (!selectedFAQ?.id) return;
-    const tenantForDelete = getTenantId();
-    if (!tenantForDelete) {
-      toast.error("Please select a tenant (company) first");
-      return;
-    }
     try {
-      await deleteTenantFAQ({
-        tenant_id: tenantForDelete,
-        faq_id: selectedFAQ.id,
-      });
+      await deleteTenantFAQ({ faq_id: selectedFAQ.id });
 
       setShowDeleteModal(false);
       setSelectedFAQ(null);
@@ -135,11 +131,17 @@ export function useAIFaqsTenantPage() {
     } catch (error) {
       console.error("Failed to delete FAQ:", error);
     }
-  }, [getTenantId, selectedFAQ, queryClient]);
+  }, [selectedFAQ, queryClient]);
+
+  const handleCompanyFilterChange = useCallback((companyId: string) => {
+    const id = companyId.trim();
+    setSelectedCompanyForFilter(id);
+    setFilterTenantId(id);
+  }, []);
 
   const getListQueryOptions = useCallback(
     (params: GenericListPageQueryParams) => {
-      const tenant = filterTenantId.trim();
+      const tenant = listTenantId;
       return {
         queryKey: chatKeys.aiFaqs.tenant.list({
           tenantId: tenant || "__none__",
@@ -172,7 +174,7 @@ export function useAIFaqsTenantPage() {
         },
       };
     },
-    [filterTenantId],
+    [listTenantId],
   );
 
   const handleApplyFilter = useCallback(() => {
@@ -180,8 +182,8 @@ export function useAIFaqsTenantPage() {
       toast.info("Please select a company first");
       return;
     }
-    setFilterTenantId(selectedCompanyForFilter.trim());
-  }, [selectedCompanyForFilter]);
+    handleCompanyFilterChange(selectedCompanyForFilter);
+  }, [handleCompanyFilterChange, selectedCompanyForFilter]);
 
   const stableFilters = useMemo(() => ({}), []);
 
@@ -192,7 +194,6 @@ export function useAIFaqsTenantPage() {
 
   const columns = useAiFaqListColumns({
     variant: "tenant",
-    onEdit: handleEditFAQ,
     onDelete: handleDeleteFAQ,
   });
 
@@ -206,13 +207,12 @@ export function useAIFaqsTenantPage() {
     tenantId,
     setTenantId,
     selectedCompanyForFilter,
-    setSelectedCompanyForFilter,
+    handleCompanyFilterChange,
     filterTenantId,
+    listTenantId,
     handleApplyFilter,
     showAddModal,
     setShowAddModal,
-    showEditModal,
-    setShowEditModal,
     showDeleteModal,
     setShowDeleteModal,
     selectedFAQ,
@@ -230,5 +230,6 @@ export function useAIFaqsTenantPage() {
     handleSubmit,
     handleConfirmDelete,
     openAddModalWithTenant,
+    ...trainBot,
   };
 }

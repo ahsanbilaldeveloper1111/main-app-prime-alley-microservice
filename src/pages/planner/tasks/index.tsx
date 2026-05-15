@@ -44,7 +44,7 @@ import { ModuleSlug } from "@utils/Helper";
 import { useTasksListingPager } from "@hooks/useTasksListingPager";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { fetchPlannerProjectFilterDirectory } from "../../../query/fetchPlannerProjectFilterDirectory";
-import { plannerKeys } from "../../../query/keys";
+import { plannerKeys } from "@query/keys";
 import {
   ALL_STATUS_VALUE,
   applyPlannerTaskFiltersToListParams,

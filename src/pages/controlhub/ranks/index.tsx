@@ -12,7 +12,7 @@ import { useRouter } from 'next/router';
 import Select, { MultiValue } from 'react-select';
 import SelectCheckBox, { SelectCheckBoxOption } from '@components/SelectCheckBox';
 import { useDebouncedValue } from '@hooks/useDebouncedValue';
-import { controlhubKeys } from '../../../query/keys';
+import { controlhubKeys } from "@query/keys";
 import { getParentUsers, assignRankBulk } from '@utils/users';
 import { Copy, Users } from 'lucide-react';
 

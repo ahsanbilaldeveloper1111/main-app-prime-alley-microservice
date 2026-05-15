@@ -1,6 +1,6 @@
-import { chatKeys } from "../../../../query/keys";
+import { chatKeys } from "@query/keys";
 import {
-  type CreateTenantFAQPayload,
+  type CreateGlobalFAQPayload,
   type FAQData,
   createGlobalFAQ,
   deleteGlobalFAQ,
@@ -16,7 +16,6 @@ import { useAiFaqListColumns } from "../aiFaqListColumns";
 import {
   buildAiFaqSubmitFields,
   emptyFaqListPage,
-  faqToDraft,
   getValidFaqItemsForSubmit,
   paginateArrayForTable,
 } from "../faqItemDraft";
@@ -27,18 +26,15 @@ export function useAIFaqsGlobalPage() {
   const queryClient = useQueryClient();
 
   const [showAddModal, setShowAddModal] = useState(false);
-  const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [selectedFAQ, setSelectedFAQ] = useState<FAQData | null>(null);
 
   const {
     faqItems,
-    setFaqItems,
     haveFiles,
     selectedFiles,
     fileInputKey,
     resetForm,
-    clearAttachments,
     handleAddFAQItem,
     handleRemoveFAQItem,
     handleUpdateFAQItem,
@@ -54,16 +50,6 @@ export function useAIFaqsGlobalPage() {
     setShowViewModal(true);
   }, []);
 
-  const handleEditFAQ = useCallback(
-    (faq: FAQData) => {
-      setSelectedFAQ(faq);
-      setFaqItems([faqToDraft({ question: faq.question, answer: faq.answer })]);
-      clearAttachments();
-      setShowEditModal(true);
-    },
-    [clearAttachments, setFaqItems],
-  );
-
   const handleDeleteFAQ = useCallback((faq: FAQData) => {
     setSelectedFAQ(faq);
     setShowDeleteModal(true);
@@ -71,25 +57,24 @@ export function useAIFaqsGlobalPage() {
 
   const handleSubmit = useCallback(async () => {
     const validFAQs = getValidFaqItemsForSubmit(faqItems);
+    const hasFiles = haveFiles && selectedFiles.length > 0;
 
-    if (validFAQs.length === 0) {
-      toast.error("Please add at least one FAQ with both question and answer");
+    if (validFAQs.length === 0 && !hasFiles) {
+      toast.error("Add at least one FAQ (question and answer) or attach a file");
       return;
     }
 
     try {
       const fields = buildAiFaqSubmitFields(validFAQs, haveFiles, selectedFiles);
-      const payload: Omit<CreateTenantFAQPayload, "tenant_id"> = {
+      const payload: CreateGlobalFAQPayload = {
         faqs: fields.faqs,
-        have_files: fields.have_files,
-        files: fields.files,
+        ...(fields.files?.length ? { files: fields.files } : {}),
       };
 
       await createGlobalFAQ(payload);
 
       resetForm();
       setShowAddModal(false);
-      setShowEditModal(false);
       setSelectedFAQ(null);
       await queryClient.invalidateQueries({ queryKey: chatKeys.aiFaqs.global.all() });
     } catch (error) {
@@ -101,7 +86,7 @@ export function useAIFaqsGlobalPage() {
     if (!selectedFAQ?.id) return;
 
     try {
-      await deleteGlobalFAQ(selectedFAQ.id);
+      await deleteGlobalFAQ({ faq_id: selectedFAQ.id });
       setShowDeleteModal(false);
       setSelectedFAQ(null);
       await queryClient.invalidateQueries({ queryKey: chatKeys.aiFaqs.global.all() });
@@ -145,7 +130,6 @@ export function useAIFaqsGlobalPage() {
   const columns = useAiFaqListColumns({
     variant: "global",
     onView: handleViewFAQ,
-    onEdit: handleEditFAQ,
     onDelete: handleDeleteFAQ,
   });
 
@@ -156,8 +140,6 @@ export function useAIFaqsGlobalPage() {
     stableFilters,
     showAddModal,
     setShowAddModal,
-    showEditModal,
-    setShowEditModal,
     showDeleteModal,
     setShowDeleteModal,
     selectedFAQ,

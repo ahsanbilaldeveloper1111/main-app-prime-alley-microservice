@@ -87,7 +87,7 @@ import { CrmQuotesListPageQuotesFilterSidebar } from "@crm/billing-quotes/CrmQuo
 import { getBillingCustomerPortalTabsDropdownItems } from "@utils/billingProductsTabs";
 import { billingCustomerRoutes } from "@utils/billingCustomerRoutes";
 import { HEADER_CONSTANTS } from "@constants/headerConstants";
-import { crmAppKeys } from "../../query/keys";
+import { crmAppKeys } from "@query/keys";
 import { getCrmQuotesListDummyFetchResult } from "@crm/billing-quotes/crmQuotesListDummyFetchResult";
 
 const { PERMISSIONS } = HEADER_CONSTANTS;

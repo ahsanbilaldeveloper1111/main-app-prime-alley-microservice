@@ -43,7 +43,7 @@ import { useRouter } from "next/router";
 
 import PageHeader from "@components/PageHeader";
 import { ValidationType, checkRequiredFields } from "@utils/Helper";
-import { crmAppKeys } from "../../../../query/keys";
+import { crmAppKeys } from "@query/keys";
 import {
   useLeadCreateBootstrapQueries,
   useLeadCreateStagesQuery,

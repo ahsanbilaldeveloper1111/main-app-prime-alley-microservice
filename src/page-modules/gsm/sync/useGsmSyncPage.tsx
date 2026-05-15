@@ -3,7 +3,7 @@ import { SyncPorts, ViewGsm, SyncPortsMobileNumber } from "@utils/GsmAssign";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useState } from "react";
 import { toast } from "react-toastify";
-import { gsmKeys } from "../../../query/keys";
+import { gsmKeys } from "@query/keys";
 
 const TYPE_OPTIONS = [
   { value: "imei", label: "IMEI" },

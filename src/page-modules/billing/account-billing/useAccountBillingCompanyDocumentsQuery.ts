@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 
-import { accountBillingKeys } from "../../../query/keys";
+import { accountBillingKeys } from "@query/keys";
 import { normalizeCompanyDocumentsResponse } from "@components/billings/DocumentPage/documentPageHelpers";
 import { GetCompanyDocuments } from "@utils/accounting";
 

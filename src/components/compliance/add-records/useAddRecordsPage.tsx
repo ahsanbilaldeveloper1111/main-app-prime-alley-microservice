@@ -38,7 +38,7 @@ import {
   type AddRecordsFetchParams,
 } from "./addRecordsDomain";
 
-import { complianceKeys } from "../../../query/keys";
+import { complianceKeys } from "@query/keys";
 
 import "./addRecordsPage.scss";
 

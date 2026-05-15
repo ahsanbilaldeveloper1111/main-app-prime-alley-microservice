@@ -1,5 +1,5 @@
 import { ListFAQItems } from "@utils/faqs";
-import { faqsKeys } from "../../query/keys";
+import { faqsKeys } from "@query/keys";
 import {
   makePaginatedListFetcher,
   usePaginatedListQuery,

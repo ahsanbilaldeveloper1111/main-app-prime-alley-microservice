@@ -1,5 +1,5 @@
 import { GetCompanies } from "@utils/users";
-import { chatKeys } from "../../query/keys";
+import { chatKeys } from "@query/keys";
 import { useArrayListQuery } from "../_shared/listQuery";
 
 export interface ChatCompanyOption {

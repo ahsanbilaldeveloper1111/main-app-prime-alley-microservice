@@ -29,7 +29,7 @@ import {
   resetCallLogsFiltersThunk,
 } from "../../toolkit/callLogsList/thunks";
 import { fetchCallLogsListPayload } from "../../toolkit/callLogsList/fetchCallLogsListPayload";
-import { communicationsKeys } from "../../query/keys";
+import { communicationsKeys } from "@query/keys";
 
 const { PERMISSIONS } = HEADER_CONSTANTS;
 

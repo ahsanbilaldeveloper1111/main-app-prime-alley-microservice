@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { getUserProfilesOrgChartTree } from "@utils/staffManagement";
-import { workforceKeys } from "../../../query/keys";
+import { workforceKeys } from "@query/keys";
 import {
   buildOrgChartTreeRequestParams,
   parseOrgChartTreeResponse,

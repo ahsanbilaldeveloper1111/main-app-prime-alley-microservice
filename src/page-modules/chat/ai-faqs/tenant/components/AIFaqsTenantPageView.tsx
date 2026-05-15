@@ -7,6 +7,8 @@ import { ArrowLeft, Filter, Plus } from "lucide-react";
 import Select from "react-select";
 import React from "react";
 
+import { ChatTrainBotButton } from "@page-modules/chat/shared/ChatTrainBotButton";
+import { ChatTrainingResultModal } from "@page-modules/chat/shared/ChatTrainingResultModal";
 import { useAIFaqsTenantPage } from "../useAIFaqsTenantPage";
 
 export type AIFaqsTenantPageViewProps = Readonly<{
@@ -24,12 +26,10 @@ export function AIFaqsTenantPageView({ ctx }: AIFaqsTenantPageViewProps) {
     tenantId,
     setTenantId,
     selectedCompanyForFilter,
-    setSelectedCompanyForFilter,
+    handleCompanyFilterChange,
     handleApplyFilter,
     showAddModal,
     setShowAddModal,
-    showEditModal,
-    setShowEditModal,
     showDeleteModal,
     setShowDeleteModal,
     selectedFAQ,
@@ -47,6 +47,11 @@ export function AIFaqsTenantPageView({ ctx }: AIFaqsTenantPageViewProps) {
     handleSubmit,
     handleConfirmDelete,
     openAddModalWithTenant,
+    handleTrainBotClick,
+    trainingLoading,
+    showTrainingModal,
+    trainingResponse,
+    closeTrainingModal,
   } = ctx;
 
   const companyOptions = companies.map((c) => ({
@@ -63,6 +68,10 @@ export function AIFaqsTenantPageView({ ctx }: AIFaqsTenantPageViewProps) {
         showSearch={false}
         buttons={
           <>
+            <ChatTrainBotButton
+              onClick={handleTrainBotClick}
+              loading={trainingLoading}
+            />
             <Button variant="primary" onClick={openAddModalWithTenant}>
               <Plus size={16} className="me-2" />
               Add FAQs
@@ -91,7 +100,7 @@ export function AIFaqsTenantPageView({ ctx }: AIFaqsTenantPageViewProps) {
                   }
                 : null
             }
-            onChange={(opt) => setSelectedCompanyForFilter(opt?.value ?? "")}
+            onChange={(opt) => handleCompanyFilterChange(opt?.value ?? "")}
             placeholder="Select company..."
             isClearable
           />
@@ -113,12 +122,17 @@ export function AIFaqsTenantPageView({ ctx }: AIFaqsTenantPageViewProps) {
         tableStyle="table-style-2"
       />
 
+      <ChatTrainingResultModal
+        show={showTrainingModal}
+        response={trainingResponse}
+        onClose={closeTrainingModal}
+      />
+
       <AiFaqPageModals
         scopeLabel="Tenant"
+        faqAttachmentAccept=".pdf,.txt,application/pdf,text/plain"
         showAddModal={showAddModal}
         setShowAddModal={setShowAddModal}
-        showEditModal={showEditModal}
-        setShowEditModal={setShowEditModal}
         showDeleteModal={showDeleteModal}
         setShowDeleteModal={setShowDeleteModal}
         selectedFAQ={selectedFAQ}
