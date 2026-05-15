@@ -26,13 +26,17 @@ function asRecord(value: unknown): Record<string, unknown> | null {
 }
 
 function isTenantChatSettingsShape(
-  value: Record<string, unknown>,
+  value: unknown,
 ): value is TenantChatSettingsResponse {
+  const record = asRecord(value);
+  if (!record) {
+    return false;
+  }
   return (
-    "defaults" in value ||
-    "overrides" in value ||
-    "budget" in value ||
-    "rate_limits" in value
+    "defaults" in record ||
+    "overrides" in record ||
+    "budget" in record ||
+    "rate_limits" in record
   );
 }
 
@@ -42,9 +46,8 @@ export function normalizeTenantChatSettingsPayload(
   const payload = asRecord(raw);
   if (!payload) return null;
 
-  const data = asRecord(payload.data);
-  if (data && isTenantChatSettingsShape(data)) {
-    return data;
+  if (isTenantChatSettingsShape(payload.data)) {
+    return payload.data;
   }
 
   if (isTenantChatSettingsShape(payload)) {
