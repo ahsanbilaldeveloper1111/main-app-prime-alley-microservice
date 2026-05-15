@@ -9,17 +9,43 @@ const TENANT_FAQS_API_PATH = "/chat/tenant-faqs";
 /** AI assistant thread API (`GET/POST /api/chat/` when `BACKEND_URL` ends with `/api/`). */
 const CHAT_ASSISTANT_API_PATH = "/chat/";
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function httpErrorStatus(error: unknown): number | undefined {
+  if (!isRecord(error)) {
+    return undefined;
+  }
+  const response = error.response;
+  if (!isRecord(response)) {
+    return undefined;
+  }
+  const status = response.status;
+  return typeof status === "number" ? status : undefined;
+}
+
 function chatApiErrorMessage(error: unknown, fallback: string): string {
-  const err = error as {
-    response?: { data?: { error?: string; message?: string } };
-    message?: string;
-  };
-  const msg =
-    err.response?.data?.error ||
-    err.response?.data?.message ||
-    err.message ||
-    fallback;
-  return typeof msg === "string" ? msg : fallback;
+  if (typeof error === "string" && error.trim()) {
+    return error;
+  }
+  if (!isRecord(error)) {
+    return fallback;
+  }
+  const response = error.response;
+  if (isRecord(response) && isRecord(response.data)) {
+    const { error: apiError, message: apiMessage } = response.data;
+    if (typeof apiError === "string" && apiError) {
+      return apiError;
+    }
+    if (typeof apiMessage === "string" && apiMessage) {
+      return apiMessage;
+    }
+  }
+  if (typeof error.message === "string" && error.message) {
+    return error.message;
+  }
+  return fallback;
 }
 
 // AI assistant chat thread (GET/POST `/api/chat/`)
@@ -439,11 +465,11 @@ function tenantFaqsListQuery(tenantId?: string, search?: string): string {
 export const getTenantFAQsList = async (
   tenantId?: string,
   search?: string,
-): Promise<TenantFaqListResponse | FAQData[]> => {
+): Promise<TenantFaqGetBody> => {
   const response = await axiosInstance.get<TenantFaqGetBody>(
     tenantFaqsListQuery(tenantId, search),
   );
-  return response.data as TenantFaqListResponse | FAQData[];
+  return response.data;
 };
 
 /**
@@ -499,14 +525,10 @@ export const createTenantFAQ = async (
       response.data?.message?.trim() || "Tenant FAQs created successfully"
     );
     return response.data;
-  } catch (error: any) {
-    const errorMsg = 
-      error.response?.data?.error || 
-      error.response?.data?.message || 
-      error.message || 
-      'Failed to create tenant FAQs. Please try again.';
-    
-    toast.error(errorMsg);
+  } catch (error: unknown) {
+    toast.error(
+      chatApiErrorMessage(error, "Failed to create tenant FAQs. Please try again."),
+    );
     throw error;
   }
 };
@@ -1077,6 +1099,41 @@ export interface TenantChatSettingsResponse {
   pricing?: TenantChatSettingsDefaults["pricing"];
 }
 
+function isTenantChatSettingsResponse(
+  value: unknown,
+): value is TenantChatSettingsResponse {
+  if (!isRecord(value)) {
+    return false;
+  }
+  return (
+    "defaults" in value ||
+    "overrides" in value ||
+    "budget" in value ||
+    "rate_limits" in value
+  );
+}
+
+function unwrapTenantChatSettingsBody(
+  data: unknown,
+): TenantChatSettingsResponse | null {
+  if (data == null) {
+    return null;
+  }
+  if (isTenantChatSettingsResponse(data)) {
+    return data;
+  }
+  if (!isRecord(data)) {
+    return null;
+  }
+  for (const key of ["data", "settings", "result"] as const) {
+    const nested = data[key];
+    if (isTenantChatSettingsResponse(nested)) {
+      return nested;
+    }
+  }
+  return null;
+}
+
 /**
  * Tenant chat settings (GET `/api/chat/tenant/settings` when `BACKEND_URL` ends with `/api/`).
  * Returns `null` when the API responds with 404 or an empty body — callers apply defaults.
@@ -1102,17 +1159,9 @@ export const getTenantChatSettings = async (
       return null;
     }
 
-    const body = response.data as Record<string, unknown>;
-    const nested =
-      (body.data as TenantChatSettingsResponse | undefined) ??
-      (body.settings as TenantChatSettingsResponse | undefined) ??
-      (body.result as TenantChatSettingsResponse | undefined);
-
-    return nested ?? (response.data as TenantChatSettingsResponse);
+    return unwrapTenantChatSettingsBody(response.data);
   } catch (error: unknown) {
-    const status = (error as { response?: { status?: number } })?.response
-      ?.status;
-    if (status === 404) return null;
+    if (httpErrorStatus(error) === 404) return null;
     throw new Error(
       chatApiErrorMessage(
         error,
@@ -1121,17 +1170,6 @@ export const getTenantChatSettings = async (
     );
   }
 };
-
-function unwrapTenantChatSettingsBody(
-  data: TenantChatSettingsResponse,
-): TenantChatSettingsResponse {
-  const body = data as unknown as Record<string, unknown>;
-  const nested =
-    (body.data as TenantChatSettingsResponse | undefined) ??
-    (body.settings as TenantChatSettingsResponse | undefined) ??
-    (body.result as TenantChatSettingsResponse | undefined);
-  return nested ?? data;
-}
 
 /**
  * Save tenant chat overrides (PUT `/api/chat/tenant/settings` when `BACKEND_URL` ends with `/api/`).
@@ -1155,7 +1193,11 @@ export const updateTenantChatSettings = async (
       throw new Error("Failed to save chat settings");
     }
 
-    return unwrapTenantChatSettingsBody(response.data);
+    const settings = unwrapTenantChatSettingsBody(response.data);
+    if (!settings) {
+      throw new Error("Failed to save chat settings");
+    }
+    return settings;
   } catch (error: unknown) {
     throw new Error(
       chatApiErrorMessage(

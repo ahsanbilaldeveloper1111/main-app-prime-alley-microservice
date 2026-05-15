@@ -4,30 +4,14 @@ import { useQuery } from "@tanstack/react-query";
 import { useSession } from "next-auth/react";
 import { useMemo } from "react";
 
-import { mapTenantDashboardApi } from "./mapTenantDashboardApi";
+import { resolveTenantIdFromSession } from "../shared/resolveTenantIdFromSession";
 
-function resolveTenantIdFromSession(
-  user: Record<string, unknown> | undefined,
-): string {
-  if (!user) return "";
-  const candidates = [
-    user.company_identifier,
-    user.tenant_id,
-    user.tenant,
-  ];
-  for (const c of candidates) {
-    if (typeof c === "string" && c.trim()) return c.trim();
-  }
-  return "";
-}
+import { mapTenantDashboardApi } from "./mapTenantDashboardApi";
 
 export function useChatTenantDashboardQuery() {
   const { data: session, status: sessionStatus } = useSession();
   const tenantId = useMemo(
-    () =>
-      resolveTenantIdFromSession(
-        session?.user as Record<string, unknown> | undefined,
-      ),
+    () => resolveTenantIdFromSession(session?.user),
     [session?.user],
   );
 

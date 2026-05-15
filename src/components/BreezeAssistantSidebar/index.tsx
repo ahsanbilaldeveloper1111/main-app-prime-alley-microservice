@@ -90,6 +90,51 @@ function removeStoredThread(threadId: string) {
   }
 }
 
+const BREEZE_ERROR_REPLY =
+  "Sorry, something went wrong. Please try again.";
+
+function createBreezeErrorMessage(): BreezeMessage {
+  return {
+    id: `error-${Date.now()}`,
+    role: "assistant",
+    content: BREEZE_ERROR_REPLY,
+    timestamp: new Date(),
+  };
+}
+
+async function requestAssistantReply(
+  text: string,
+  threadId: string,
+  onSendMessage?: (message: string) => Promise<string>,
+): Promise<{ reply: string; newThreadId: string }> {
+  if (onSendMessage) {
+    return { reply: await onSendMessage(text), newThreadId: threadId };
+  }
+  const response = await sendChatMessage({
+    message: text,
+    thread_id: threadId || undefined,
+  });
+  return {
+    reply: response.response || "No response received",
+    newThreadId: response.thread_id || threadId,
+  };
+}
+
+function persistMessagesAfterReply(
+  prev: BreezeMessage[],
+  userMsg: BreezeMessage,
+  assistantMsg: BreezeMessage,
+  newThreadId: string,
+  persist: (tid: string, title: string, msgs: BreezeMessage[]) => void,
+): BreezeMessage[] {
+  const next = [...prev, assistantMsg];
+  if (newThreadId) {
+    const firstUser = prev.find((m) => m.role === "user") ?? userMsg;
+    persist(newThreadId, firstUser.content?.slice(0, 80) || "New Chat", next);
+  }
+  return next;
+}
+
 export interface BreezeAssistantSidebarProps {
   isOpen: boolean;
   onClose: () => void;
@@ -1234,7 +1279,7 @@ const BreezeAssistantSidebar: React.FC<BreezeAssistantSidebarProps> = ({
   onMaximizeChange,
 }) => {
   const [internalMaximized, setInternalMaximized] = useState(false);
-  const isMaximized = isMaximizedProp !== undefined ? isMaximizedProp : internalMaximized;
+  const isMaximized = isMaximizedProp ?? internalMaximized;
   const setMaximized = (v: boolean) => { setInternalMaximized(v); onMaximizeChange?.(v); };
 
   const [messages,     setMessages]     = useState<BreezeMessage[]>([]);
@@ -1300,35 +1345,42 @@ const BreezeAssistantSidebar: React.FC<BreezeAssistantSidebarProps> = ({
   const handleSend = async () => {
     const text = inputValue.trim();
     if (!text || chatBusy) return;
-    const userMsg: BreezeMessage = { id: `user-${Date.now()}`, role: "user", content: text, timestamp: new Date() };
+    const userMsg: BreezeMessage = {
+      id: `user-${Date.now()}`,
+      role: "user",
+      content: text,
+      timestamp: new Date(),
+    };
     setMessages((prev) => [...prev, userMsg]);
     setInputValue("");
     setIsLoading(true);
     try {
-      let reply: string;
-      let newThreadId = threadId;
-      if (onSendMessage) {
-        reply = await onSendMessage(text);
-      } else {
-        const response = await sendChatMessage({
-          message: text,
-          thread_id: threadId || undefined,
-        });
-        reply = response.response || "No response received";
-        newThreadId = response?.thread_id ?? threadId;
-        if (newThreadId && newThreadId !== threadId) setThreadId(newThreadId);
+      const { reply, newThreadId } = await requestAssistantReply(
+        text,
+        threadId,
+        onSendMessage,
+      );
+      if (newThreadId && newThreadId !== threadId) {
+        setThreadId(newThreadId);
       }
-      const assistantMsg: BreezeMessage = { id: `assistant-${Date.now()}`, role: "assistant", content: reply, timestamp: new Date() };
-      setMessages((prev) => {
-        const next = [...prev, assistantMsg];
-        if (newThreadId) {
-          const firstUser = prev.find((m) => m.role === "user") ?? userMsg;
-          persistThreadToHistory(newThreadId, firstUser.content?.slice(0, 80) || "New Chat", next);
-        }
-        return next;
-      });
-    } catch {
-      setMessages((prev) => [...prev, { id: `error-${Date.now()}`, role: "assistant", content: "Sorry, something went wrong. Please try again.", timestamp: new Date() }]);
+      const assistantMsg: BreezeMessage = {
+        id: `assistant-${Date.now()}`,
+        role: "assistant",
+        content: reply,
+        timestamp: new Date(),
+      };
+      setMessages((prev) =>
+        persistMessagesAfterReply(
+          prev,
+          userMsg,
+          assistantMsg,
+          newThreadId,
+          persistThreadToHistory,
+        ),
+      );
+    } catch (error: unknown) {
+      console.error("AI Assistant send failed:", error);
+      setMessages((prev) => [...prev, createBreezeErrorMessage()]);
     } finally {
       setIsLoading(false);
     }
@@ -1356,7 +1408,8 @@ const BreezeAssistantSidebar: React.FC<BreezeAssistantSidebarProps> = ({
         thread.title || item.title,
         loaded,
       );
-    } catch {
+    } catch (error: unknown) {
+      console.error("AI Assistant thread load failed:", error);
       setMessages(getStoredMessages(item.threadId));
     } finally {
       setIsLoadingThread(false);

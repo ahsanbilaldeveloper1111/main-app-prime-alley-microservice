@@ -21,18 +21,8 @@ import {
   paginateArrayForTable,
 } from "../faqItemDraft";
 import { useAiFaqDraftFormState } from "../hooks/useAiFaqDraftFormState";
+import { resolveTenantIdFromSession } from "../../shared/resolveTenantIdFromSession";
 import { useChatTrainBot } from "../../shared/useChatTrainBot";
-
-function resolveTenantIdFromSession(
-  user: Record<string, unknown> | undefined,
-): string {
-  if (!user) return "";
-  const candidates = [user.company_identifier, user.tenant_id, user.tenant];
-  for (const c of candidates) {
-    if (typeof c === "string" && c.trim()) return c.trim();
-  }
-  return "";
-}
 
 export function useAIFaqsTenantPage() {
   const router = useRouter();
@@ -47,10 +37,7 @@ export function useAIFaqsTenantPage() {
   const [filterTenantId, setFilterTenantId] = useState("");
 
   const sessionTenantId = useMemo(
-    () =>
-      resolveTenantIdFromSession(
-        session?.user as Record<string, unknown> | undefined,
-      ),
+    () => resolveTenantIdFromSession(session?.user),
     [session?.user],
   );
 
@@ -89,13 +76,7 @@ export function useAIFaqsTenantPage() {
     if (tenantId?.trim()) return tenantId.trim();
     if (filterTenantId?.trim()) return filterTenantId.trim();
     if (selectedCompanyForFilter?.trim()) return selectedCompanyForFilter.trim();
-    const u = session?.user as
-      | { tenant_id?: string; company_identifier?: string; tenant?: string }
-      | undefined;
-    if (u?.company_identifier?.trim()) return u.company_identifier.trim();
-    if (u?.tenant_id?.trim()) return u.tenant_id.trim();
-    if (typeof u?.tenant === "string" && u.tenant.trim()) return u.tenant.trim();
-    return "";
+    return resolveTenantIdFromSession(session?.user);
   }, [tenantId, filterTenantId, selectedCompanyForFilter, session?.user]);
 
   const trainBot = useChatTrainBot(getTenantId);
