@@ -127,6 +127,62 @@ export const plannerKeys = {
         projectId ?? "global",
       ] as const,
   },
+
+  workload: {
+    all: () => [...plannerKeys.root, "workload"] as const,
+    summary: (params: {
+      ext: string;
+      range: string;
+      match: string;
+      start?: string;
+      end?: string;
+    }) =>
+      [
+        ...plannerKeys.workload.all(),
+        "summary",
+        params.ext,
+        params.range,
+        params.match,
+        params.start ?? "",
+        params.end ?? "",
+      ] as const,
+    grid: (params: {
+      ext: string;
+      range: string;
+      match: string;
+      start?: string;
+      end?: string;
+    }) =>
+      [
+        ...plannerKeys.workload.all(),
+        "grid",
+        params.ext,
+        params.range,
+        params.match,
+        params.start ?? "",
+        params.end ?? "",
+      ] as const,
+    board: (params: {
+      ext: string;
+      range: string;
+      match: string;
+      start?: string;
+      end?: string;
+    }) =>
+      [
+        ...plannerKeys.workload.all(),
+        "board",
+        params.ext,
+        params.range,
+        params.match,
+        params.start ?? "",
+        params.end ?? "",
+      ] as const,
+    day: (params: { ext: string; date: string; match: string }) =>
+      [...plannerKeys.workload.all(), "day", params.ext, params.date, params.match] as const,
+    unassigned: (ext: string) =>
+      [...plannerKeys.workload.all(), "unassigned", ext] as const,
+  },
 };
 
 /** DNCR / compliance module list reads (`src/pages/compliance/*`). */

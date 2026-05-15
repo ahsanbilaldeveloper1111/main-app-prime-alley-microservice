@@ -710,6 +710,13 @@ const ApplicationCustomerSidebar: React.FC = () => {
           url: "/planner/tasks",
           permission: PERMISSIONS.VIEW_TASKSLIST_WORK_PLANNER,
         },
+        {
+          id: "planner-workload",
+          title: "Workload",
+          icon: <BarChart3 size={16} />,
+          url: "/planner/workload",
+          permission: PERMISSIONS.VIEW_TASKSLIST_WORK_PLANNER,
+        },
         ...(showMyDayInPlannerSidebar
           ? [
               {
