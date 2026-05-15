@@ -2,13 +2,16 @@ import { chatKeys } from "@query/keys";
 import { useChatCompaniesQuery } from "@page-modules/chat/useChatCompaniesQuery";
 import {
   getChatTrainingStatus,
-  submitChatTraining,
+  postChatTraining,
   type ChatTrainingResponse,
 } from "@utils/chat";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/router";
 import { useCallback, useState } from "react";
 import { toast } from "react-toastify";
+
+const TRAINING_CHUNK_SIZE = 1000;
+const TRAINING_CHUNK_OVERLAP = 200;
 
 export function useFaqProfilesPage() {
   const router = useRouter();
@@ -34,22 +37,27 @@ export function useFaqProfilesPage() {
 
   const trainingMutation = useMutation({
     mutationFn: (tenantId: string) =>
-      submitChatTraining({
+      postChatTraining({
         tenant_id: tenantId,
-        chunk_size: 1000,
-        chunk_overlap: 200,
+        chunk_size: TRAINING_CHUNK_SIZE,
+        chunk_overlap: TRAINING_CHUNK_OVERLAP,
       }),
     onSuccess: (response, tenantId) => {
       setTrainingResponse(response);
       setShowTrainingModal(true);
       const id = tenantId.trim();
       setStatusTenantId(id);
-      void queryClient.invalidateQueries({
-        queryKey: chatKeys.training.status(id),
-      });
+      queryClient
+        .invalidateQueries({
+          queryKey: chatKeys.training.status(id),
+        })
+        .catch(() => undefined);
+      toast.success(response.message?.trim() || "Bot training completed.");
     },
-    onError: () => {
-      // submitChatTraining already surfaces toast
+    onError: (error: unknown) => {
+      const message =
+        error instanceof Error ? error.message : "Failed to train bot.";
+      toast.error(message);
     },
   });
 
@@ -77,7 +85,7 @@ export function useFaqProfilesPage() {
       toast.info("Select a company above to load training status");
       return;
     }
-    void trainingStatusQuery.refetch();
+    trainingStatusQuery.refetch().catch(() => undefined);
   }, [statusTenantTrimmed, trainingStatusQuery]);
 
   const trainingStatusErrorMessage =
