@@ -42,7 +42,7 @@ export function getValidFaqItemsForSubmit(items: FAQItemDraft[]): FAQItem[] {
 export type AiFaqSubmitFieldPayload = {
   faqs: string;
   have_files: string;
-  files: string[] | undefined;
+  files: File[] | undefined;
 };
 
 export function buildAiFaqSubmitFields(
@@ -51,11 +51,11 @@ export function buildAiFaqSubmitFields(
   selectedFiles: File[],
 ): AiFaqSubmitFieldPayload {
   const faqsJson = JSON.stringify(validFAQs);
-  const filePaths = selectedFiles.map((file) => file.name);
+  const hasFiles = haveFiles && selectedFiles.length > 0;
   return {
     faqs: faqsJson,
-    have_files: haveFiles && selectedFiles.length > 0 ? "true" : "false",
-    files: filePaths.length > 0 ? filePaths : undefined,
+    have_files: hasFiles ? "true" : "false",
+    files: hasFiles ? selectedFiles : undefined,
   };
 }
 

@@ -1,6 +1,6 @@
 import { useTicketHierarchyExtensionsQuery } from "@page-modules/tickets/useTicketHierarchyExtensionsQuery";
 import { useTicketModulesAllQuery } from "@page-modules/tickets/useTicketModulesAllQuery";
-import { ticketsKeys } from "../../../../query/keys";
+import { ticketsKeys } from "@query/keys";
 import { CreateSubmodule, DeleteSubmodule, ListSubmodules } from "@utils/ticket-module";
 import type { GenericListPageQueryParams } from "@components/GenericListPage";
 import { Column } from "@components/CustomDataTable";

@@ -73,7 +73,7 @@ import {
   ModuleSlug,
 } from "@utils/Helper";
 
-import { crmAppKeys } from "../../../query/keys";
+import { crmAppKeys } from "@query/keys";
 
 const { PERMISSIONS } = HEADER_CONSTANTS;
 

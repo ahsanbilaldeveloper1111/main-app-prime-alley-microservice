@@ -97,7 +97,7 @@ import GenericFilterSidebar, {
   FilterField,
 } from "@components/GenericFilterSidebar";
 import StatsCards, { StatsCardData } from "@components/GenericStatsCards";
-import { crmAppKeys } from "../../../query/keys";
+import { crmAppKeys } from "@query/keys";
 import {
   getCrmData,
   getCrmDataById,

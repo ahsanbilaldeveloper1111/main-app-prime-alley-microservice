@@ -13,7 +13,7 @@ import { usePermissions } from "@utils/permissionUtils";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useMemo, useState } from "react";
 import { toast } from "react-toastify";
-import { plannerKeys } from "../../../query/keys";
+import { plannerKeys } from "@query/keys";
 
 const { PERMISSIONS } = HEADER_CONSTANTS;
 

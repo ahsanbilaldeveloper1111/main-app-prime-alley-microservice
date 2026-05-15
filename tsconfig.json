@@ -60,6 +60,7 @@
       "next-i18next": ["src/shims/next-i18next.tsx"],
       "next-redux-wrapper": ["src/shims/next-redux-wrapper.tsx"],
       "@page-modules/*": ["src/page-modules/*"],
+      "@query/keys": ["src/query/keys.ts"],
       "@sentry/nextjs": ["src/shims/sentry-nextjs.ts"]
     }
   },

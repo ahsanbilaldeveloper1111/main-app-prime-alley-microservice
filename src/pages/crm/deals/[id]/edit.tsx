@@ -56,7 +56,7 @@ import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
 import { ModuleSlug } from "@utils/Helper";
 import { convertCurrency, formatCurrency } from "@utils/currency";
-import { crmAppKeys } from "../../../../query/keys";
+import { crmAppKeys } from "@query/keys";
 import {
   isDealTemplatePrimitiveValue,
   getNormalizedDealTemplateValue,

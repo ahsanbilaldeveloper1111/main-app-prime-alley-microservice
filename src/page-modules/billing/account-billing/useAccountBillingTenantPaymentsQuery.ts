@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 
-import { accountBillingKeys } from "../../../query/keys";
+import { accountBillingKeys } from "@query/keys";
 import { GetPayments } from "@utils/accounting";
 
 export function useAccountBillingTenantPaymentsQuery(

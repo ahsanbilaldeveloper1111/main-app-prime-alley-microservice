@@ -24,7 +24,7 @@ import {
   mainAppUserRowKeyForSelection,
   normalizeOrgChartUserKey,
 } from "@utils/workforce/orgChartMainAppUserMatch";
-import { workforceKeys } from "../../../query/keys";
+import { workforceKeys } from "@query/keys";
 import {
   findOrgChartEmployeeParent,
   type OrgChartEmployee,

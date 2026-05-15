@@ -1,6 +1,6 @@
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 
-import { billingCustomerKeys } from "../../../query/keys";
+import { billingCustomerKeys } from "@query/keys";
 import { getCustomerProductPricingList } from "@utils/accounts";
 import { getErrorMessage } from "@utils/errors";
 import { toast } from "react-toastify";

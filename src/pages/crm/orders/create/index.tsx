@@ -27,7 +27,7 @@ import "@assets/scss/tabs.scss";
 import { convertCurrency, formatCurrency } from '@utils/currency';
 import { ModuleSlug, ValidationType, checkRequiredFields } from "@utils/Helper";
 import { GetHierarchyData } from "@utils/users";
-import { crmAppKeys } from "../../../../query/keys";
+import { crmAppKeys } from "@query/keys";
 
 interface OrderItem {
   id?: number;

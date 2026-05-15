@@ -1,5 +1,5 @@
 import { ListGsmManagement } from "@utils/GsmManagement";
-import { gsmKeys } from "../../query/keys";
+import { gsmKeys } from "@query/keys";
 import { useArrayListQuery } from "../_shared/listQuery";
 
 export type GsmSyncSelectOption = {

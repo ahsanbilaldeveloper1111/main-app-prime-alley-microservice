@@ -33,7 +33,7 @@ import { WorkforceUserMultiSelectDropdown } from "@components/workforce/Workforc
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "react-toastify";
-import { workforceKeys } from "../../../query/keys";
+import { workforceKeys } from "@query/keys";
 
 import { hierarchyLabel } from "@page-modules/workforce/employees/employeesDomain";
 import {

@@ -1,6 +1,6 @@
 import type { TableAction, TableColumn } from "@components/GenericTable";
 import { useTicketTypesListQuery } from "@page-modules/tickets/useTicketTypesListQuery";
-import { ticketsKeys } from "../../../query/keys";
+import { ticketsKeys } from "@query/keys";
 import { CreateType, DeleteType, UpdateType } from "@utils/ticket-types";
 import { GlobalDateTimeFormat } from "@utils/Helper";
 import { useMutation, useQueryClient } from "@tanstack/react-query";

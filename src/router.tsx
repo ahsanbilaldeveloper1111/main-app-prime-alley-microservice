@@ -86,7 +86,9 @@ function fileToRoutePath(filePath: string): {
   isCatchAll: boolean;
 } {
   // ./pages/foo/bar/[id].tsx → /foo/bar/:id
+  // Normalize `\` (Windows) so glob keys always match the `./pages/` prefix.
   let relative = filePath
+    .replaceAll("\\", "/")
     .replace(/^\.\/pages\//, "/")
     .replace(/\.(tsx|jsx)$/, "");
 
@@ -302,9 +304,17 @@ function buildRouter() {
   ]);
 }
 
-let cachedRouter: ReturnType<typeof buildRouter> | null = null;
+function getPageGlobSignature(): string {
+  return Object.keys(pageGlob)
+    .map((k) => k.replaceAll("\\", "/"))
+    .sort((a, b) => a.localeCompare(b))
+    .join("\0");
+}
 
 export function AppRouter() {
-  cachedRouter ??= buildRouter();
-  return <RouterProvider router={cachedRouter} />;
+  const pageGlobSignature = getPageGlobSignature();
+  const router = useMemo(() => buildRouter(), [pageGlobSignature]);
+  return (
+    <RouterProvider router={router} key={pageGlobSignature} />
+  );
 }

@@ -59,7 +59,7 @@ import type { PlannerTaskActivityRow } from "@components/planner/plannerTaskDeta
 import type { TaskCommentRow } from "@components/planner/plannerTaskDetail/PlannerTaskCommentsTabPanel";
 import type { TaskDocumentRow } from "@components/planner/plannerTaskDetail/PlannerTaskDocumentsTabPanel";
 import "@components/planner/plannerTaskDetail/plannerTaskDetail.scss";
-import { plannerKeys } from "../../../../query/keys";
+import { plannerKeys } from "@query/keys";
 
 const { PERMISSIONS } = HEADER_CONSTANTS;
 

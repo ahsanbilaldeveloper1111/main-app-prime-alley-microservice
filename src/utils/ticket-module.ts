@@ -1,5 +1,5 @@
 import axiosInstance from "./axios";
-import { ticketsKeys } from "../query/keys";
+import { ticketsKeys } from "@query/keys";
 import {
   fetchTicketResourcePage,
   handleFetchOneOrAllResponse,

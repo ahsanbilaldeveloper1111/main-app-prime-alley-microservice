@@ -19,7 +19,7 @@ import { useCrmSettingsTableState } from "@hooks/useCrmSettingsTableState";
 import { useDebouncedSearchInput } from "@hooks/useDebouncedSearchInput";
 import { HEADER_CONSTANTS } from "@constants/headerConstants";
 import { CrmTruncatedDescriptionCell } from "@components/crm/crmTruncatedDescriptionCell";
-import { crmAppKeys } from "../query/keys";
+import { crmAppKeys } from "@query/keys";
 
 const { PERMISSIONS } = HEADER_CONSTANTS;
 

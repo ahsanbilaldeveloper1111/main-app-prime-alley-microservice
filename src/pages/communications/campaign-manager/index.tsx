@@ -74,7 +74,7 @@ import { useFinesseCapabilities } from "@hooks/live-calls/useFinesseCapabilities
 import { useFinesseStomp } from "@hooks/live-calls/useFinesseStomp";
 import { useFinesseCampaignPreview } from "@hooks/live-calls/useFinesseCampaignPreview";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { communicationsKeys } from "../../../query/keys";
+import { communicationsKeys } from "@query/keys";
 
 import {
   CAMPAIGN_MANAGER_CONTACT_HEADER_VALUE_OPTIONS,

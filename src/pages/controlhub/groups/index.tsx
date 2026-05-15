@@ -19,7 +19,7 @@ import { useModuleSelection } from '@hooks/useModuleSelection';
 import { Module } from '@typings/controlhub/users';
 import SelectCheckBox, { SelectCheckBoxOption } from '@components/SelectCheckBox';
 import { useDebouncedValue } from '@hooks/useDebouncedValue';
-import { controlhubKeys } from '../../../query/keys';
+import { controlhubKeys } from "@query/keys";
 
 interface GroupRow {
     id: number;

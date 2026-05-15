@@ -22,7 +22,7 @@ import {
   validateEmployeeModalCoreRequiredFields,
   type DepartmentUserRow,
 } from "@utils/workforce/employeeModalShared";
-import { workforceKeys } from "../../query/keys";
+import { workforceKeys } from "@query/keys";
 import "@assets/scss/workforceEmployeeModalSidebar.scss";
 import { useEmployeeModalDepartmentUsersQuery } from "./employeeModalQueries";
 

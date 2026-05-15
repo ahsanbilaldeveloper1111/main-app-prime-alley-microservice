@@ -30,6 +30,7 @@ const nextShimAliases = {
     "src/shims/next-redux-wrapper.tsx",
   ),
   "@sentry/nextjs": path.resolve(__dirname, "src/shims/sentry-nextjs.ts"),
+  "@query/keys": path.resolve(__dirname, "src/query/keys.ts"),
 };
 
 export default defineConfig(({ mode }) => {

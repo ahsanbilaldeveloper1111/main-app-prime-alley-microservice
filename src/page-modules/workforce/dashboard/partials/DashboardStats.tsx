@@ -1,7 +1,7 @@
 import React from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Users, CheckCircle, MessageSquare, Send, AlertTriangle, Circle } from "lucide-react";
-import { workforceKeys } from "../../../../query/keys";
+import { workforceKeys } from "@query/keys";
 import { getEmployeeDashboardCounters, type EmployeeDashboardParams } from "@utils/staffManagement";
 import {
   serializeEmployeeDashboardParamsKey,

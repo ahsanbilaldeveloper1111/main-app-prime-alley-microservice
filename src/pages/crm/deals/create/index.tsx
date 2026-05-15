@@ -31,7 +31,7 @@ import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
 import { ModuleSlug, ValidationType, checkRequiredFields } from '@utils/Helper';
 import { convertCurrency, formatCurrency } from '@utils/currency';
-import { crmAppKeys } from "../../../../query/keys";
+import { crmAppKeys } from "@query/keys";
 import type { UseQueryResult } from "@tanstack/react-query";
 
 function useIndustriesQueryErrorToast(

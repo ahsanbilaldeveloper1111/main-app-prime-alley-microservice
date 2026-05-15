@@ -1,4 +1,4 @@
-import { chatKeys } from "../../../query/keys";
+import { chatKeys } from "@query/keys";
 import { useToolsListQuery } from "@page-modules/chat/useToolsListQuery";
 import {
   createTool,

@@ -24,7 +24,7 @@ import {
   type LocalDNDBlockRecord,
 } from "./localDndCallBlockDomain";
 
-import { complianceKeys } from "../../../query/keys";
+import { complianceKeys } from "@query/keys";
 
 import "./localDndCallBlockPage.scss";
 

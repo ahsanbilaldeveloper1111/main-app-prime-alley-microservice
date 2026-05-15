@@ -3,7 +3,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { getAllUsers } from "@utils/users";
 import { Column } from "@components/CustomDataTable";
 import { SummaryCard } from "@components/PageSummaryGrid";
-import { controlhubKeys } from "../../../query/keys";
+import { controlhubKeys } from "@query/keys";
 
 interface Summary {
   users: number;

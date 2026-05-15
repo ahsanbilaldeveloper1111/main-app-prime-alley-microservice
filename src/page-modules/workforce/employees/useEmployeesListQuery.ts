@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { workforceKeys } from "../../../query/keys";
+import { workforceKeys } from "@query/keys";
 import { getUserProfiles } from "@utils/staffManagement";
 import type { ApiPagination, UserProfile } from "@utils/staffManagement";
 import {

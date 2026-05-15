@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 
-import type { AccountBillingInvoiceHistoryListParams } from "../../../query/keys";
-import { accountBillingKeys } from "../../../query/keys";
+import type { AccountBillingInvoiceHistoryListParams } from "@query/keys";
+import { accountBillingKeys } from "@query/keys";
 import { getInvoices } from "@utils/accounts";
 
 export function buildAccountBillingInvoiceHistoryRequest(

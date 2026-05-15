@@ -14,6 +14,8 @@ export type SettingsSectionTabShellProps = Readonly<{
   activeTab: string
   onSelectTab: (tabId: string) => void
   children: React.ReactNode
+  /** Tighter tab row + content spacing (e.g. compact settings forms). */
+  dense?: boolean
 }>
 
 export const SettingsSectionTabShell: React.FC<SettingsSectionTabShellProps> = ({
@@ -22,10 +24,28 @@ export const SettingsSectionTabShell: React.FC<SettingsSectionTabShellProps> = (
   activeTab,
   onSelectTab,
   children,
+  dense = false,
 }) => (
-  <div style={settingsSectionShellStyle}>
-    <h1 style={settingsSectionTitleStyle}>{title}</h1>
-    <div style={settingsSectionTabRowStyle}>
+  <div
+    style={{
+      ...settingsSectionShellStyle,
+      ...(dense ? { padding: "20px 40px 24px" } : null),
+    }}
+  >
+    <h1
+      style={{
+        ...settingsSectionTitleStyle,
+        ...(dense ? { marginBottom: 12 } : null),
+      }}
+    >
+      {title}
+    </h1>
+    <div
+      style={{
+        ...settingsSectionTabRowStyle,
+        ...(dense ? { marginBottom: 16 } : null),
+      }}
+    >
       {allowedTabs.map((tab, index) => {
         const isActive = activeTab === tab.id
         const isLast = index === allowedTabs.length - 1

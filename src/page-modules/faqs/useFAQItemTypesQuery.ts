@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { getFAQTypes } from "@utils/faqs";
-import { faqsKeys } from "../../query/keys";
+import { faqsKeys } from "@query/keys";
 
 export function useFAQItemTypesQuery(topicId: number | null) {
   return useQuery({

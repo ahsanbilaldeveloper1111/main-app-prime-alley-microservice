@@ -16,16 +16,13 @@ export type AiFaqAttachmentFieldProps = Readonly<{
 }>;
 
 export function AiFaqAttachmentField({
-  haveFiles,
+  haveFiles: _haveFilesEnabled,
   fileInputKey,
   selectedFiles,
   accept,
   onFileChange,
   onRemoveFile,
 }: AiFaqAttachmentFieldProps) {
-  if (!haveFiles) {
-    return null;
-  }
   return (
     <div className="mb-3">
       <Form.Label>Files</Form.Label>

@@ -31,7 +31,7 @@ import { HEADER_CONSTANTS } from '@constants/headerConstants';
 import SelectCheckBox, { SelectCheckBoxOption } from '@components/SelectCheckBox';
 import GenericTable, { TableColumn, TableAction } from '@components/GenericTable';
 import { useDebouncedValue } from '@hooks/useDebouncedValue';
-import { controlhubKeys } from '../../../query/keys';
+import { controlhubKeys } from "@query/keys";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 

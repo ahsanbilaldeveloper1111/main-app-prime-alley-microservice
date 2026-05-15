@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { fetchPlannerProjectFilterDirectory } from "../query/fetchPlannerProjectFilterDirectory";
-import { plannerKeys } from "../query/keys";
+import { plannerKeys } from "@query/keys";
 import type { DashboardProjectRow } from "./workPlannerDashboardTypes";
 
 export function useWorkPlannerDashboardProjects(canViewProjects: boolean) {

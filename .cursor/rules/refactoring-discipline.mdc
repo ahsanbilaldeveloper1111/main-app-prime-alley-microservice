@@ -22,7 +22,7 @@ alwaysApply: false
 
 ## Data fetching, side effects, and state (this codebase)
 - **TanStack Query** owns **async remote I/O and API work** (HTTP/HTTPS and any other promise-based backend calls), including reads, writes, uploads, and derived refetches. Treat it as the home for **side effects that hit an API or external service**—not only “server-side” in a narrow sense: if it goes over the network or async boundary and should be cached, deduped, retried, or invalidated, prefer **`useQuery` / `useMutation`**. Put follow-up cache work (`invalidateQueries`, `setQueryData`, `refetch`) in **`onSuccess` / `onSettled`** or dedicated small hooks—not ad‑hoc `useEffect` fetch chains when a query or mutation fits.
-- Use **query keys** from `src/query/keys.ts` (e.g. `communicationsKeys`, `plannerKeys`, `crmAppKeys`); follow `src/query/README.md`.
+- Use **query keys** from `@query/keys` (maps to `src/query/keys.ts`; e.g. `communicationsKeys`, `plannerKeys`, `crmAppKeys`); follow `src/query/README.md`.
 - **Redux** is for **local and global client/UI state** (modals, wizard steps, ephemeral selections, features not yet migrated). **Do not** add new Redux thunks solely for CRUD/list reads or other API I/O—use RQ. During migration, avoid duplicating the same remote list in Redux and RQ; document temporary overlap in the PR.
 
 ## Structure: components and hooks

@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { crmAppKeys } from "../../../query/keys";
+import { crmAppKeys } from "@query/keys";
 import { GetHierarchyData } from "@utils/users";
 import { ModuleSlug } from "@utils/Helper";
 import {

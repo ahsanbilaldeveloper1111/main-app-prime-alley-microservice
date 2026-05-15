@@ -28,7 +28,7 @@ import { GlobalDateTimeFormat } from "@utils/Helper";
 import { formatPhoneForDisplay } from "@utils/phoneDisplay";
 import { HEADER_CONSTANTS } from "@constants/headerConstants";
 
-import { workforceKeys } from "../../../query/keys";
+import { workforceKeys } from "@query/keys";
 import {
   EMPLOYEE_STATUS_OPTIONS,
   EMPLOYMENT_TYPES,

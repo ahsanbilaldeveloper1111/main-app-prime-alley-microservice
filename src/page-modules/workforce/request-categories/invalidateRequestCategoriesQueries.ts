@@ -1,5 +1,5 @@
 import type { QueryClient } from "@tanstack/react-query";
-import { workforceKeys } from "../../../query/keys";
+import { workforceKeys } from "@query/keys";
 import { consumeHandledApiError } from "./requestCategoriesDomain";
 
 export function invalidateAllUserRequestCategories(queryClient: QueryClient): void {

@@ -45,6 +45,8 @@ import {
   ChevronLeft,
   House,
   Book,
+  Bot,
+  Building2,
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/router";
@@ -478,6 +480,7 @@ const ApplicationCustomerSidebar: React.FC = () => {
     "finance",
     "compliance",
     "workforce",
+    "chatbots",
     "unified-reports",
     "audit-logs",
   ]);
@@ -891,6 +894,35 @@ const ApplicationCustomerSidebar: React.FC = () => {
     },
     //workforce services end
 
+    //chatbots start
+    {
+      id: "chatbots",
+      key: "chatbots",
+      permission: PERMISSIONS.VIEW_AI_CHAT_AI_CHAT,
+      icon: <Bot size={16} />,
+      color: MENU_COLORS.AI_INSIGHTS,
+      title: "Chatbots",
+      label: "Chatbots",
+      url: "",
+      subItems: [
+        {
+          id: "chatbots-admin-dashboard",
+          title: "Admin Dashboard",
+          icon: <LayoutDashboard size={16} />,
+          permission: PERMISSIONS.MANAGE_GLOBAL_FAQS_AI_CHAT,
+          url: "/chat/admin-dashboard",
+        },
+        {
+          id: "chatbots-tenant-dashboard",
+          title: "Tenant Dashboard",
+          icon: <Building2 size={16} />,
+          permission: PERMISSIONS.MANAGE_TENANT_PROFILE_AI_CHAT,
+          url: "/chat/tenant-dashboard",
+        },
+      ].filter((item) => !item.permission || hasPermission(item.permission)),
+    },
+    //chatbots end
+
     //finance services start
     {
       id: "finance",
@@ -1031,6 +1063,7 @@ const ApplicationCustomerSidebar: React.FC = () => {
     //settings services end
   ].filter((item) => {
     if (!ENABLED_MODULE_IDS.has(item.id)) return false;
+    if (item.subItems?.length === 0) return false;
     if (!item.permission || hasPermission(item.permission)) return true;
     return false;
   });

@@ -2,7 +2,7 @@ import { useEffect, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { GetHierarchyData } from "@utils/users";
 import { ModuleSlug } from "@utils/Helper";
-import { crmAppKeys } from "../query/keys";
+import { crmAppKeys } from "@query/keys";
 import { fetchCrmHistoryList } from "../query/fetchCrmHistoryList";
 import { mapCrmActivityHistoryRecords } from "../query/mapCrmActivityHistoryRecords";
 import { fetchCrmActivityHistoryRecordDetail } from "../query/fetchCrmActivityHistoryRecordDetail";
