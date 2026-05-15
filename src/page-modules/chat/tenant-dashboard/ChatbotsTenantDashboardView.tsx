@@ -73,6 +73,14 @@ function rateLimitPercent(remaining: number, limit: number): number {
   return Math.min(100, Math.max(0, (remaining / limit) * 100));
 }
 
+function rateLimitProgressVariant(
+  pct: number,
+): "danger" | "warning" | "success" {
+  if (pct < 20) return "danger";
+  if (pct < 40) return "warning";
+  return "success";
+}
+
 function RateLimitRow(props: Readonly<{
   label: string;
   remaining: number;
@@ -91,7 +99,7 @@ function RateLimitRow(props: Readonly<{
       </div>
       <ProgressBar
         now={pct}
-        variant={pct < 20 ? "danger" : pct < 40 ? "warning" : "success"}
+        variant={rateLimitProgressVariant(pct)}
         className="mb-0"
         style={{ height: 8 }}
         aria-label={`${label}: ${intFmt.format(remaining)} remaining`}

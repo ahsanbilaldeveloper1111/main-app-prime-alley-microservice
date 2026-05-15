@@ -11,16 +11,12 @@ import {
   mapTenantChatSettingsToFormValues,
   normalizeTenantChatSettingsPayload,
 } from "./mapTenantChatSettings";
-import type { TenantChatPricingTable } from "./mapTenantChatSettings";
 import { resolveChatTenantIdFromSession } from "./resolveChatTenantId";
 
 export function useChatTenantSettingsQuery() {
   const { data: session, status: sessionStatus } = useSession();
   const tenantId = useMemo(
-    () =>
-      resolveChatTenantIdFromSession(
-        session?.user as Record<string, unknown> | undefined,
-      ),
+    () => resolveChatTenantIdFromSession(session?.user),
     [session?.user],
   );
 

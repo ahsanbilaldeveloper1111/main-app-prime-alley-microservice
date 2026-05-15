@@ -308,7 +308,9 @@ export const AIChatbotSettings: React.FC = () => {
           Could not load settings. Using defaults.{" "}
           <button
             type="button"
-            onClick={() => void refetch()}
+            onClick={() => {
+              refetch().catch(() => undefined);
+            }}
             style={{
               border: "none",
               background: "none",

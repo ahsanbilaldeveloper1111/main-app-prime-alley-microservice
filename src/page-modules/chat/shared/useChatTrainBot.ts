@@ -25,12 +25,16 @@ export function useChatTrainBot(resolveTenantId: () => string) {
       setTrainingResponse(response);
       setShowTrainingModal(true);
       const id = tenantId.trim();
-      void queryClient.invalidateQueries({
-        queryKey: chatKeys.training.status(id),
-      });
-      void queryClient.invalidateQueries({
-        queryKey: chatKeys.tenantDashboard.detail(id),
-      });
+      queryClient
+        .invalidateQueries({
+          queryKey: chatKeys.training.status(id),
+        })
+        .catch(() => undefined);
+      queryClient
+        .invalidateQueries({
+          queryKey: chatKeys.tenantDashboard.detail(id),
+        })
+        .catch(() => undefined);
       toast.success(response.message?.trim() || "Bot training completed.");
     },
     onError: (error: unknown) => {

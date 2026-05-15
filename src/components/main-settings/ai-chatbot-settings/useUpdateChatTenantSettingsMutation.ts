@@ -13,10 +13,7 @@ export function useUpdateChatTenantSettingsMutation() {
   const queryClient = useQueryClient();
   const { data: session } = useSession();
   const tenantId = useMemo(
-    () =>
-      resolveChatTenantIdFromSession(
-        session?.user as Record<string, unknown> | undefined,
-      ),
+    () => resolveChatTenantIdFromSession(session?.user),
     [session?.user],
   );
 
@@ -27,9 +24,11 @@ export function useUpdateChatTenantSettingsMutation() {
     },
     onSuccess: (data) => {
       queryClient.setQueryData(chatKeys.tenantSettings.detail(tenantId), data);
-      void queryClient.invalidateQueries({
-        queryKey: chatKeys.tenantSettings.all(),
-      });
+      queryClient
+        .invalidateQueries({
+          queryKey: chatKeys.tenantSettings.all(),
+        })
+        .catch(() => undefined);
       toast.success("AI Chatbot settings saved.");
     },
     onError: (error: unknown) => {

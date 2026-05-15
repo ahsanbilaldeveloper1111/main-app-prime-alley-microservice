@@ -107,7 +107,7 @@ export function useChatbotsTenantDashboard(): ChatbotsTenantDashboardCtx {
     isError,
     error: error ?? null,
     refetch: () => {
-      void refetch();
+      refetch().catch(() => undefined);
     },
     dailyCostQueriesChart,
   };

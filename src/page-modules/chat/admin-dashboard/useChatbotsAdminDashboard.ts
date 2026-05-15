@@ -105,7 +105,7 @@ export function useChatbotsAdminDashboard(): ChatbotsAdminDashboardCtx {
     isError,
     error: error ?? null,
     refetch: () => {
-      void refetch();
+      refetch().catch(() => undefined);
     },
     costQueriesChart,
   };

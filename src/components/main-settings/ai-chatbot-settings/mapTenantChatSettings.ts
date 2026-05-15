@@ -25,6 +25,17 @@ function asRecord(value: unknown): Record<string, unknown> | null {
   return null;
 }
 
+function isTenantChatSettingsShape(
+  value: Record<string, unknown>,
+): value is TenantChatSettingsResponse {
+  return (
+    "defaults" in value ||
+    "overrides" in value ||
+    "budget" in value ||
+    "rate_limits" in value
+  );
+}
+
 export function normalizeTenantChatSettingsPayload(
   raw: unknown,
 ): TenantChatSettingsResponse | null {
@@ -32,9 +43,15 @@ export function normalizeTenantChatSettingsPayload(
   if (!payload) return null;
 
   const data = asRecord(payload.data);
-  if (data) return data as TenantChatSettingsResponse;
+  if (data && isTenantChatSettingsShape(data)) {
+    return data;
+  }
 
-  return payload as TenantChatSettingsResponse;
+  if (isTenantChatSettingsShape(payload)) {
+    return payload;
+  }
+
+  return null;
 }
 
 function parseLimitValue(raw: unknown): number | null {
