@@ -183,7 +183,9 @@ const WorkloadPlannerPage: React.FC = () => {
   }, [gridQuery.data?.members, gridQuery.data?.extension_numbers, boardQuery.data?.columns]);
 
   const invalidateWorkload = useCallback(() => {
-    void queryClient.invalidateQueries({ queryKey: plannerKeys.workload.all() });
+    queryClient
+      .invalidateQueries({ queryKey: plannerKeys.workload.all() })
+      .catch(() => undefined);
   }, [queryClient]);
 
   const assignMutation = useMutation({
@@ -194,7 +196,7 @@ const WorkloadPlannerPage: React.FC = () => {
     onSuccess: () => {
       toast.success("Task assigned");
       invalidateWorkload();
-      void unassignedQuery.refetch();
+      unassignedQuery.refetch().catch(() => undefined);
     },
     onError: (err: unknown) => {
       toast.error(workloadErrorMessage(err));
@@ -210,7 +212,7 @@ const WorkloadPlannerPage: React.FC = () => {
       setRescheduleTask(null);
       setOverloadSecondStep(false);
       invalidateWorkload();
-      void dayQuery.refetch();
+      dayQuery.refetch().catch(() => undefined);
     },
     onError: (err: unknown) => {
       toast.error(workloadErrorMessage(err));
@@ -361,7 +363,7 @@ const WorkloadPlannerPage: React.FC = () => {
           overloadSecondStep={overloadSecondStep}
           isSaving={rescheduleMutation.isPending}
           onSubmit={() => {
-            void submitReschedule();
+            submitReschedule().catch(() => undefined);
           }}
         />
       </Container>
