@@ -15,8 +15,12 @@ import {
   Spinner,
 } from "react-bootstrap";
 import Select from "react-select";
-import React from "react";
+import React, { useMemo } from "react";
 import type { ChatTrainingStatusResponse } from "@utils/chat";
+import {
+  findChatCompanySelectOption,
+  mapChatCompaniesToSelectOptions,
+} from "@page-modules/chat/shared/chatCompanySelectOptions";
 
 function formatTrainingLastUpdated(value: string | null): string {
   if (value == null || value === "") {
@@ -131,6 +135,11 @@ export function FaqProfilesPageView({ ctx }: FaqProfilesPageViewProps) {
     refetchTrainingStatus,
   } = ctx;
 
+  const companyOptions = useMemo(
+    () => mapChatCompaniesToSelectOptions(companies),
+    [companies],
+  );
+
   return (
     <React.Fragment>
       <BreadcrumbItem mainTitle="" mainLink="" subTitle="" />
@@ -188,20 +197,8 @@ export function FaqProfilesPageView({ ctx }: FaqProfilesPageViewProps) {
               <Form.Label>Company (tenant)</Form.Label>
               <Select
                 isLoading={companiesLoading}
-                options={companies.map((c) => ({
-                  value: c.identifier,
-                  label: c.name ?? c.identifier,
-                }))}
-                value={
-                  statusTenantId
-                    ? {
-                        value: statusTenantId,
-                        label:
-                          companies.find((c) => c.identifier === statusTenantId)?.name ??
-                          statusTenantId,
-                      }
-                    : null
-                }
+                options={companyOptions}
+                value={findChatCompanySelectOption(companies, statusTenantId)}
                 onChange={(opt) => setStatusTenantId(opt?.value ?? "")}
                 placeholder="Select company to load status..."
                 isClearable
@@ -332,20 +329,8 @@ export function FaqProfilesPageView({ ctx }: FaqProfilesPageViewProps) {
             <Form.Label>Select Company</Form.Label>
             <Select
               isLoading={companiesLoading}
-              options={companies.map((c) => ({
-                value: c.identifier,
-                label: c.name ?? c.identifier,
-              }))}
-              value={
-                selectedCompanyId
-                  ? {
-                      value: selectedCompanyId,
-                      label:
-                        companies.find((c) => c.identifier === selectedCompanyId)?.name ??
-                        selectedCompanyId,
-                    }
-                  : null
-              }
+              options={companyOptions}
+              value={findChatCompanySelectOption(companies, selectedCompanyId)}
               onChange={(opt) => setSelectedCompanyId(opt?.value ?? "")}
               placeholder="Select company..."
               isClearable
