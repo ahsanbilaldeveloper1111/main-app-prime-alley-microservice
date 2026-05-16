@@ -4,9 +4,11 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "react-toastify";
 
 import {
-  resolveChatTenantIdFromSession,
+  findChatCompanySelectOption,
+  mapChatCompaniesToSelectOptions,
   resolveTenantIdFromCompany,
-} from "./resolveChatTenantId";
+} from "@page-modules/chat/shared/chatCompanySelectOptions";
+import { resolveChatTenantIdFromSession } from "./resolveChatTenantId";
 import { useChatTenantSettingsQuery } from "./useChatTenantSettingsQuery";
 import { useUpdateChatTenantSettingsMutation } from "./useUpdateChatTenantSettingsMutation";
 
@@ -34,25 +36,14 @@ export function useAIChatbotSettingsPage() {
   const saveMutation = useUpdateChatTenantSettingsMutation(appliedTenantId);
 
   const companyOptions = useMemo(
-    () =>
-      companies
-        .map((company) => {
-          const tenantId = resolveTenantIdFromCompany(company);
-          if (!tenantId) return null;
-          return {
-            value: tenantId,
-            label: company.name ?? tenantId,
-          };
-        })
-        .filter((opt): opt is { value: string; label: string } => opt != null),
+    () => mapChatCompaniesToSelectOptions(companies),
     [companies],
   );
 
   const selectedCompanyOption = useMemo(() => {
     if (!selectedCompanyId) return null;
-    const match = companyOptions.find((opt) => opt.value === selectedCompanyId);
-    return match ?? { value: selectedCompanyId, label: selectedCompanyId };
-  }, [companyOptions, selectedCompanyId]);
+    return findChatCompanySelectOption(companies, selectedCompanyId);
+  }, [companies, selectedCompanyId]);
 
   const appliedCompanyLabel = useMemo(() => {
     if (!appliedTenantId) return "";

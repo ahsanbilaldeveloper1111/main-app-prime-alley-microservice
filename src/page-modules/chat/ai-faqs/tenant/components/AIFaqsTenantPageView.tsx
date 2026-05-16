@@ -9,6 +9,10 @@ import React from "react";
 
 import { ChatTrainBotButton } from "@page-modules/chat/shared/ChatTrainBotButton";
 import { ChatTrainingResultModal } from "@page-modules/chat/shared/ChatTrainingResultModal";
+import {
+  findChatCompanySelectOption,
+  mapChatCompaniesToSelectOptions,
+} from "@page-modules/chat/shared/chatCompanySelectOptions";
 import { useAIFaqsTenantPage } from "../useAIFaqsTenantPage";
 
 export type AIFaqsTenantPageViewProps = Readonly<{
@@ -54,10 +58,7 @@ export function AIFaqsTenantPageView({ ctx }: AIFaqsTenantPageViewProps) {
     closeTrainingModal,
   } = ctx;
 
-  const companyOptions = companies.map((c) => ({
-    value: c.identifier,
-    label: c.name ?? c.identifier,
-  }));
+  const companyOptions = mapChatCompaniesToSelectOptions(companies);
 
   return (
     <React.Fragment>
@@ -89,17 +90,10 @@ export function AIFaqsTenantPageView({ ctx }: AIFaqsTenantPageViewProps) {
           <Select
             isLoading={companiesLoading}
             options={companyOptions}
-            value={
-              selectedCompanyForFilter
-                ? {
-                    value: selectedCompanyForFilter,
-                    label:
-                      companies.find(
-                        (c) => c.identifier === selectedCompanyForFilter,
-                      )?.name ?? selectedCompanyForFilter,
-                  }
-                : null
-            }
+            value={findChatCompanySelectOption(
+              companies,
+              selectedCompanyForFilter,
+            )}
             onChange={(opt) => handleCompanyFilterChange(opt?.value ?? "")}
             placeholder="Select company..."
             isClearable
@@ -155,16 +149,7 @@ export function AIFaqsTenantPageView({ ctx }: AIFaqsTenantPageViewProps) {
             <Select
               isLoading={companiesLoading}
               options={companyOptions}
-              value={
-                tenantId
-                  ? {
-                      value: tenantId,
-                      label:
-                        companies.find((c) => c.identifier === tenantId)
-                          ?.name ?? tenantId,
-                    }
-                  : null
-              }
+              value={findChatCompanySelectOption(companies, tenantId)}
               onChange={(opt) => {
                 if (opt) setTenantId(opt.value);
               }}
