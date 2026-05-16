@@ -10,8 +10,31 @@ import {
   Users,
 } from "lucide-react";
 import dynamic from "next/dynamic";
-import React from "react";
-import { Alert, Button, Card, Col, Container, Row, Table } from "react-bootstrap";
+import React, { useMemo } from "react";
+import {
+  Alert,
+  Button,
+  Card,
+  Col,
+  Container,
+  Row,
+  Table,
+} from "react-bootstrap";
+
+import "../shared/chatbotsDashboard.scss";
+import {
+  buildResponsiveLineChartOptions,
+  resolveDonutChartHeight,
+  resolveLineChartHeight,
+} from "../shared/chatbotsDashboardChart";
+import {
+  chatbotsDashboardPrimaryCellClass,
+  chatbotsDashboardTableClass,
+  chatbotsDashboardTdClass,
+  chatbotsDashboardThClass,
+} from "../shared/chatbotsDashboardTable";
+import { DashboardTableCard } from "../shared/DashboardTableCard";
+import { useMediaQuery } from "../shared/useMediaQuery";
 
 import type { ChatbotsAdminDashboardCtx } from "./useChatbotsAdminDashboard";
 
@@ -58,12 +81,14 @@ function donutSliceRawValue(
   return labeledValue;
 }
 
-function StatCard(props: Readonly<{
-  title: string;
-  value: string;
-  icon: React.ReactNode;
-  accent: string;
-}>) {
+function StatCard(
+  props: Readonly<{
+    title: string;
+    value: string;
+    icon: React.ReactNode;
+    accent: string;
+  }>,
+) {
   const { title, value, icon, accent } = props;
   return (
     <Col>
@@ -101,7 +126,10 @@ function DashboardLoading() {
       className="d-flex justify-content-center align-items-center py-5"
       style={{ minHeight: 280 }}
     >
-      <output className="spinner-border text-primary" aria-label="Loading dashboard">
+      <output
+        className="spinner-border text-primary"
+        aria-label="Loading dashboard"
+      >
         <span className="visually-hidden">Loading…</span>
       </output>
     </div>
@@ -119,20 +147,36 @@ export function ChatbotsAdminDashboardView({
 
       <PageHeader title="Admin Dashboard" showSearch={false} />
 
-      <Container fluid className="px-0 pb-4">
+      <Container
+        fluid
+        className="px-2 px-sm-3 px-lg-4 pb-4 chatbots-dashboard"
+      >
         {isLoading && <DashboardLoading />}
 
         {isError && !isLoading && (
-          <Alert variant="danger" className="d-flex align-items-center justify-content-between">
-            <span>{error?.message ?? "Failed to load admin dashboard."}</span>
-            <Button variant="outline-danger" size="sm" onClick={refetch}>
+          <Alert
+            variant="danger"
+            className="d-flex flex-column flex-sm-row align-items-stretch align-items-sm-center gap-2 gap-sm-3"
+          >
+            <span className="flex-grow-1">
+              {error?.message ?? "Failed to load admin dashboard."}
+            </span>
+            <Button
+              variant="outline-danger"
+              size="sm"
+              className="align-self-stretch align-self-sm-center flex-shrink-0"
+              onClick={refetch}
+            >
               Retry
             </Button>
           </Alert>
         )}
 
         {!isLoading && !isError && model && (
-          <AdminDashboardContent model={model} costQueriesChart={costQueriesChart} />
+          <AdminDashboardContent
+            model={model}
+            costQueriesChart={costQueriesChart}
+          />
         )}
       </Container>
     </React.Fragment>
@@ -147,6 +191,16 @@ function AdminDashboardContent({
   costQueriesChart: ChatbotsAdminDashboardViewProps["ctx"]["costQueriesChart"];
 }>) {
   const { summary } = model;
+  const isMobile = useMediaQuery("(max-width: 767.98px)");
+  const isTablet = useMediaQuery("(max-width: 991.98px)");
+
+  const lineChartHeight = resolveLineChartHeight(isMobile, isTablet, 340);
+  const donutChartHeight = resolveDonutChartHeight(isMobile, isTablet, 320);
+
+  const chartOptions = useMemo(
+    () => buildResponsiveLineChartOptions(costQueriesChart.options, isMobile),
+    [costQueriesChart.options, isMobile],
+  );
 
   const modelDonutSeries = model.modelCostThisMonth.map((s) => s.value);
   const modelDonutLabels = model.modelCostThisMonth.map((s) => s.label);
@@ -156,252 +210,300 @@ function AdminDashboardContent({
 
   return (
     <>
-        <Row xs={1} md={3} className="g-3 mb-4">
-          <StatCard
-            title="Queries today"
-            value={float3.format(summary.queriesToday)}
-            icon={<Hash size={20} />}
-            accent="#2563eb"
-          />
-          <StatCard
-            title="Cost today"
-            value={usd3.format(summary.costTodayUsd)}
-            icon={<DollarSign size={20} />}
-            accent="#059669"
-          />
-          <StatCard
-            title="Cost this month"
-            value={usd3.format(summary.costMonthUsd)}
-            icon={<CalendarRange size={20} />}
-            accent="#7c3aed"
-          />
-          <StatCard
-            title="Tenants"
-            value={float3.format(summary.tenants)}
-            icon={<Building2 size={20} />}
-            accent="#ea580c"
-          />
-          <StatCard
-            title="Users"
-            value={float3.format(summary.users)}
-            icon={<Users size={20} />}
-            accent="#0891b2"
-          />
-          <StatCard
-            title="Failures today"
-            value={float3.format(summary.failuresToday)}
-            icon={<AlertTriangle size={20} />}
-            accent="#dc2626"
-          />
-        </Row>
+      <Row xs={1} sm={2} md={3} xl={6} className="g-3 mb-4">
+        <StatCard
+          title="Queries today"
+          value={float3.format(summary.queriesToday)}
+          icon={<Hash size={20} />}
+          accent="#2563eb"
+        />
+        <StatCard
+          title="Cost today"
+          value={usd3.format(summary.costTodayUsd)}
+          icon={<DollarSign size={20} />}
+          accent="#059669"
+        />
+        <StatCard
+          title="Cost this month"
+          value={usd3.format(summary.costMonthUsd)}
+          icon={<CalendarRange size={20} />}
+          accent="#7c3aed"
+        />
+        <StatCard
+          title="Tenants"
+          value={float3.format(summary.tenants)}
+          icon={<Building2 size={20} />}
+          accent="#ea580c"
+        />
+        <StatCard
+          title="Users"
+          value={float3.format(summary.users)}
+          icon={<Users size={20} />}
+          accent="#0891b2"
+        />
+        <StatCard
+          title="Failures today"
+          value={float3.format(summary.failuresToday)}
+          icon={<AlertTriangle size={20} />}
+          accent="#dc2626"
+        />
+      </Row>
 
-        <Row className="mb-3">
-          <Col xs={12}>
-            <Card className="border-0 shadow-sm">
-              <Card.Body>
-                <h5 className="mb-3 fw-semibold">
-                  Cost &amp; queries — last 30 days (all tenants)
-                </h5>
-                <ReactApexChart
-                  options={costQueriesChart.options}
-                  series={costQueriesChart.series}
-                  type="line"
-                  height={340}
-                />
-              </Card.Body>
-            </Card>
-          </Col>
-        </Row>
+      <Row className="mb-3">
+        <Col xs={12} className="min-w-0">
+          <Card className="border-0 shadow-sm">
+            <Card.Body className="chatbots-dashboard__chart">
+              <h5 className="mb-3 fw-semibold">
+                Cost &amp; queries — last 30 days (all tenants)
+              </h5>
+              <ReactApexChart
+                options={chartOptions}
+                series={costQueriesChart.series}
+                type="line"
+                height={lineChartHeight}
+              />
+            </Card.Body>
+          </Card>
+        </Col>
+      </Row>
 
-        <Row className="mb-3">
-          <Col lg={6} className="mb-3 mb-lg-0">
-            <Card className="h-100 border-0 shadow-sm">
-              <Card.Body>
-                <h5 className="mb-3 fw-semibold">
-                  Top companies (this month)
-                </h5>
-                <div className="table-responsive">
-                  <Table hover size="sm" className="align-middle mb-0">
-                    <thead className="table-light">
-                      <tr>
-                        <th>Company</th>
-                        <th className="text-end">Queries</th>
-                        <th className="text-end">Cost</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {model.topCompaniesThisMonth.map((row) => (
-                        <tr key={row.company}>
-                          <td className="fw-medium">{row.company}</td>
-                          <td className="text-end">
-                            {intFmt.format(row.queries)}
-                          </td>
-                          <td className="text-end">
-                            {usd3.format(row.costUsd)}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </Table>
-                </div>
-              </Card.Body>
-            </Card>
-          </Col>
-          <Col lg={6}>
-            <Card className="h-100 border-0 shadow-sm">
-              <Card.Body>
-                <h5 className="mb-3 fw-semibold">Top users (this month)</h5>
-                <div className="table-responsive">
-                  <Table hover size="sm" className="align-middle mb-0">
-                    <thead className="table-light">
-                      <tr>
-                        <th>User</th>
-                        <th>Company</th>
-                        <th className="text-end">Cost</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {model.topUsersThisMonth.map((row) => (
-                        <tr key={`${row.user}-${row.company}`}>
-                          <td className="fw-medium">{row.user}</td>
-                          <td className="text-muted">{row.company}</td>
-                          <td className="text-end">
-                            {usd3.format(row.costUsd)}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </Table>
-                </div>
-              </Card.Body>
-            </Card>
-          </Col>
-        </Row>
+      <Row className="mb-3 g-3">
+        <Col xs={12} lg={6}>
+          <DashboardTableCard title="Top companies (this month)">
+            <Table hover size="sm" className={chatbotsDashboardTableClass}>
+              <colgroup>
+                <col style={{ width: "50%" }} />
+                <col style={{ width: "25%" }} />
+                <col style={{ width: "25%" }} />
+              </colgroup>
+              <thead className="table-light">
+                <tr>
+                  <th className={chatbotsDashboardThClass}>Company</th>
+                  <th className={`${chatbotsDashboardThClass} text-md-center`}>
+                    Queries
+                  </th>
+                  <th className={`${chatbotsDashboardThClass} text-md-center`}>
+                    Cost
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {model.topCompaniesThisMonth.map((row) => (
+                  <tr key={row.company}>
+                    <td
+                      data-label="Company"
+                      className={`${chatbotsDashboardTdClass} ${chatbotsDashboardPrimaryCellClass} fw-medium`}
+                    >
+                      {row.company}
+                    </td>
+                    <td
+                      data-label="Queries"
+                      className={`${chatbotsDashboardTdClass} text-md-center text-nowrap`}
+                    >
+                      {intFmt.format(row.queries)}
+                    </td>
+                    <td
+                      data-label="Cost"
+                      className={`${chatbotsDashboardTdClass} text-md-center text-nowrap`}
+                    >
+                      {usd3.format(row.costUsd)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </Table>
+          </DashboardTableCard>
+        </Col>
+        <Col xs={12} lg={6}>
+          <DashboardTableCard title="Top users (this month)">
+            <Table hover size="sm" className={chatbotsDashboardTableClass}>
+              <colgroup>
+                <col style={{ width: "34%" }} />
+                <col style={{ width: "40%" }} />
+                <col style={{ width: "26%" }} />
+              </colgroup>
+              <thead className="table-light">
+                <tr>
+                  <th className={chatbotsDashboardThClass}>User</th>
+                  <th className={chatbotsDashboardThClass}>Company</th>
+                  <th className={`${chatbotsDashboardThClass} text-md-center`}>
+                    Cost
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {model.topUsersThisMonth.map((row) => (
+                  <tr key={`${row.user}-${row.company}`}>
+                    <td
+                      data-label="User"
+                      className={`${chatbotsDashboardTdClass} ${chatbotsDashboardPrimaryCellClass} fw-medium`}
+                    >
+                      {row.user}
+                    </td>
+                    <td
+                      data-label="Company"
+                      className={`${chatbotsDashboardTdClass} text-muted`}
+                    >
+                      {row.company}
+                    </td>
+                    <td
+                      data-label="Cost"
+                      className={`${chatbotsDashboardTdClass} text-md-center text-nowrap`}
+                    >
+                      {usd3.format(row.costUsd)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </Table>
+          </DashboardTableCard>
+        </Col>
+      </Row>
 
-        <Row>
-          <Col lg={6} className="mb-3 mb-lg-0">
-            <Card className="h-100 border-0 shadow-sm">
-              <Card.Body>
-                <h5 className="mb-2 fw-semibold">
-                  Model cost usage (this month)
-                </h5>
-                <p className="text-muted small mb-3">
-                  Share of spend by model (all tenants).
-                </p>
-                <ChartDonut
-                  series={modelDonutSeries}
-                  labels={modelDonutLabels}
-                  height={320}
-                  dataType="cost"
-                  legendPosition="bottom"
-                  showDataLabels
-                />
-              </Card.Body>
-            </Card>
-          </Col>
-          <Col lg={6}>
-            <Card className="h-100 border-0 shadow-sm">
-              <Card.Body>
-                <h5 className="mb-2 fw-semibold">
-                  Call types usage (this month)
-                </h5>
-                <p className="text-muted small mb-3">
-                  Query volume by channel (all tenants).
-                </p>
-                <ChartDonut
-                  series={callTypeSeries}
-                  labels={callTypeLabels}
-                  height={320}
-                  dataType="custom"
-                  customTooltipFormatter={(value) =>
-                    `${Number(value).toFixed(3)} queries`
-                  }
-                  dataLabelsFormatter={(val, opts) =>
-                    `${donutSliceRawValue(val, opts, callTypeSeries).toFixed(3)}`
-                  }
-                  legendPosition="bottom"
-                  showDataLabels
-                />
-              </Card.Body>
-            </Card>
-          </Col>
-        </Row>
+      <Row className="g-3 mb-3">
+        <Col xs={12} lg={6}>
+          <Card className="h-100 border-0 shadow-sm">
+            <Card.Body className="chatbots-dashboard__chart">
+              <h5 className="mb-2 fw-semibold">Model cost usage (this month)</h5>
+              <p className="text-muted small mb-3">
+                Share of spend by model (all tenants).
+              </p>
+              <ChartDonut
+                series={modelDonutSeries}
+                labels={modelDonutLabels}
+                height={donutChartHeight}
+                dataType="cost"
+                legendPosition="bottom"
+                showDataLabels
+              />
+            </Card.Body>
+          </Card>
+        </Col>
+        <Col xs={12} lg={6}>
+          <Card className="h-100 border-0 shadow-sm">
+            <Card.Body className="chatbots-dashboard__chart">
+              <h5 className="mb-2 fw-semibold">Call types usage (this month)</h5>
+              <p className="text-muted small mb-3">
+                Query volume by channel (all tenants).
+              </p>
+              <ChartDonut
+                series={callTypeSeries}
+                labels={callTypeLabels}
+                height={donutChartHeight}
+                dataType="custom"
+                customTooltipFormatter={(value) =>
+                  `${Number(value).toFixed(3)} queries`
+                }
+                dataLabelsFormatter={(val, opts) =>
+                  `${donutSliceRawValue(val, opts, callTypeSeries).toFixed(3)}`
+                }
+                legendPosition="bottom"
+                showDataLabels
+              />
+            </Card.Body>
+          </Card>
+        </Col>
+      </Row>
 
-        <Row className="mb-2">
-          <Col xs={12}>
-            <Card className="border-0 shadow-sm">
-              <Card.Body className="py-2 px-3">
-                <h5 className="mb-2 fw-semibold fs-6">All companies</h5>
-                <div className="table-responsive mb-0">
-                  <Table hover size="sm" className="align-middle mb-0">
-                    <thead className="table-light">
-                      <tr>
-                        <th className="text-nowrap">Company</th>
-                        <th className="text-end text-nowrap">Month queries</th>
-                        <th className="text-end text-nowrap">Month cost</th>
-                        <th className="text-nowrap">Last activity</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {model.allCompanies.map((row) => (
-                        <tr key={row.company}>
-                          <td className="fw-medium text-truncate" title={row.company}>
-                            {row.company}
-                          </td>
-                          <td className="text-end text-nowrap">
-                            {intFmt.format(row.monthQueries)}
-                          </td>
-                          <td className="text-end text-nowrap">
-                            {usd3.format(row.monthCostUsd)}
-                          </td>
-                          <td
-                            className="text-muted small text-truncate"
-                            style={{ maxWidth: "9.5rem" }}
-                            title={row.lastActivity}
-                          >
-                            {row.lastActivity}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </Table>
-                </div>
-              </Card.Body>
-            </Card>
-          </Col>
-        </Row>
+      <Row className="mb-3">
+        <Col xs={12}>
+          <DashboardTableCard title="All companies" compact>
+            <Table hover size="sm" className={chatbotsDashboardTableClass}>
+              <colgroup>
+                <col style={{ width: "36%" }} />
+                <col style={{ width: "22%" }} />
+                <col style={{ width: "22%" }} />
+                <col style={{ width: "20%" }} />
+              </colgroup>
+              <thead className="table-light">
+                <tr>
+                  <th className={chatbotsDashboardThClass}>Company</th>
+                  <th className={`${chatbotsDashboardThClass} text-md-center`}>
+                    Month queries
+                  </th>
+                  <th className={`${chatbotsDashboardThClass} text-md-center`}>
+                    Month cost
+                  </th>
+                  <th className={`${chatbotsDashboardThClass} text-md-center`}>
+                    Last activity
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {model.allCompanies.map((row) => (
+                  <tr key={row.company}>
+                    <td
+                      data-label="Company"
+                      className={`${chatbotsDashboardTdClass} ${chatbotsDashboardPrimaryCellClass} fw-medium`}
+                      title={row.company}
+                    >
+                      {row.company}
+                    </td>
+                    <td
+                      data-label="Month queries"
+                      className={`${chatbotsDashboardTdClass} text-md-center text-nowrap`}
+                    >
+                      {intFmt.format(row.monthQueries)}
+                    </td>
+                    <td
+                      data-label="Month cost"
+                      className={`${chatbotsDashboardTdClass} text-md-center text-nowrap`}
+                    >
+                      {usd3.format(row.monthCostUsd)}
+                    </td>
+                    <td
+                      data-label="Last activity"
+                      className={`${chatbotsDashboardTdClass} text-muted small text-md-center`}
+                      title={row.lastActivity}
+                    >
+                      {row.lastActivity}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </Table>
+          </DashboardTableCard>
+        </Col>
+      </Row>
 
-        <Row>
-          <Col xs={12}>
-            <Card className="border-0 shadow-sm">
-              <Card.Body>
-                <h5 className="mb-3 fw-semibold">
-                  Top Q&amp;As across the companies
-                </h5>
-                <div className="table-responsive">
-                  <Table hover size="sm" className="align-middle mb-0">
-                    <thead className="table-light">
-                      <tr>
-                        <th>Question</th>
-                        <th className="text-end">Asked</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {model.topQasAcrossCompanies.map((row) => (
-                        <tr key={row.question}>
-                          <td className="fw-medium">{row.question}</td>
-                          <td className="text-end">
-                            {intFmt.format(row.asked)}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </Table>
-                </div>
-              </Card.Body>
-            </Card>
-          </Col>
-        </Row>
+      <Row>
+        <Col xs={12}>
+          <DashboardTableCard title="Top Q&amp;As across the companies">
+            <Table hover size="sm" className={chatbotsDashboardTableClass}>
+              <colgroup>
+                <col style={{ width: "80%" }} />
+                <col style={{ width: "20%" }} />
+              </colgroup>
+              <thead className="table-light">
+                <tr>
+                  <th className={chatbotsDashboardThClass}>Question</th>
+                  <th className={`${chatbotsDashboardThClass} text-md-center`}>
+                    Asked
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {model.topQasAcrossCompanies.map((row) => (
+                  <tr key={row.question}>
+                    <td
+                      data-label="Question"
+                      className={`${chatbotsDashboardTdClass} ${chatbotsDashboardPrimaryCellClass} fw-medium`}
+                    >
+                      {row.question}
+                    </td>
+                    <td
+                      data-label="Asked"
+                      className={`${chatbotsDashboardTdClass} text-md-center text-nowrap`}
+                    >
+                      {intFmt.format(row.asked)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </Table>
+          </DashboardTableCard>
+        </Col>
+      </Row>
     </>
   );
 }

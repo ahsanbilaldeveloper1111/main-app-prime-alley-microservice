@@ -16,7 +16,11 @@ const aiChatTabs: Tab[] = [
   { id: 'faq-profiles', label: 'FAQ Profiles', permission: PERMISSIONS.VIEW_AI_CHAT },
   { id: 'tenant-profile', label: 'Tenant Profile', permission: PERMISSIONS.VIEW_AI_CHAT },
   { id: 'global-faqs', label: 'Global FAQs', permission: PERMISSIONS.VIEW_AI_CHAT },
-  { id: 'ai-chatbot-settings', label: 'AI Chatbot Settings', permission: PERMISSIONS.VIEW_AI_CHAT },
+  {
+    id: 'ai-chatbot-settings',
+    label: 'AI Chatbot Settings',
+    permission: PERMISSIONS.VIEW_TENANT_SETTING_AI_CHAT,
+  },
 ]
 
 function AIChatTabPanel({ activeTab }: Readonly<{ activeTab: string }>) {

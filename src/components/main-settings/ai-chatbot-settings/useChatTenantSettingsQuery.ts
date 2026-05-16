@@ -2,7 +2,6 @@ import { chatKeys } from "@query/keys";
 import { getTenantChatSettings } from "@utils/chat";
 import { useQuery } from "@tanstack/react-query";
 import { useSession } from "next-auth/react";
-import { useMemo } from "react";
 
 import {
   mapTenantChatSettingsBudget,
@@ -11,19 +10,16 @@ import {
   mapTenantChatSettingsToFormValues,
   normalizeTenantChatSettingsPayload,
 } from "./mapTenantChatSettings";
-import { resolveChatTenantIdFromSession } from "./resolveChatTenantId";
 
-export function useChatTenantSettingsQuery() {
-  const { data: session, status: sessionStatus } = useSession();
-  const tenantId = useMemo(
-    () => resolveChatTenantIdFromSession(session?.user),
-    [session?.user],
-  );
+/** Loads settings for the applied company only (`tenant_id` query param). */
+export function useChatTenantSettingsQuery(appliedTenantId: string) {
+  const { status: sessionStatus } = useSession();
+  const tenantId = appliedTenantId.trim();
 
   const query = useQuery({
     queryKey: chatKeys.tenantSettings.detail(tenantId),
-    queryFn: () => getTenantChatSettings(tenantId || undefined),
-    enabled: sessionStatus === "authenticated",
+    queryFn: () => getTenantChatSettings(tenantId),
+    enabled: sessionStatus === "authenticated" && Boolean(tenantId),
     staleTime: 60_000,
     select: (raw) => {
       const data = normalizeTenantChatSettingsPayload(raw);
@@ -41,6 +37,7 @@ export function useChatTenantSettingsQuery() {
   return {
     ...query,
     tenantId,
+    dataUpdatedAt: query.dataUpdatedAt,
     formValues: query.data?.formValues ?? null,
     budget: query.data?.budget ?? null,
     modelOptions: query.data?.modelOptions ?? [],

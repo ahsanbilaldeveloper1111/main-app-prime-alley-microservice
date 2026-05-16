@@ -33,6 +33,7 @@ function buildCostQueriesChart(
       type: "line",
       toolbar: { show: true },
       zoom: { enabled: false },
+      redrawOnParentResize: true,
     },
     stroke: { width: [3, 3], curve: "smooth" },
     colors: ["#2563eb", "#059669"],

@@ -29,7 +29,12 @@ export const SettingsSectionTabShell: React.FC<SettingsSectionTabShellProps> = (
   <div
     style={{
       ...settingsSectionShellStyle,
-      ...(dense ? { padding: "20px 40px 24px" } : null),
+      ...(dense
+        ? {
+            padding:
+              "clamp(12px, 3vw, 20px) clamp(12px, 4vw, 40px) clamp(16px, 3vw, 24px)",
+          }
+        : null),
     }}
   >
     <h1
@@ -43,7 +48,7 @@ export const SettingsSectionTabShell: React.FC<SettingsSectionTabShellProps> = (
     <div
       style={{
         ...settingsSectionTabRowStyle,
-        ...(dense ? { marginBottom: 16 } : null),
+        ...(dense ? { marginBottom: 16, overflowX: "auto" } : null),
       }}
     >
       {allowedTabs.map((tab, index) => {

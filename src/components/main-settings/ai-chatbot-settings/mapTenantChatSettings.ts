@@ -1,4 +1,7 @@
-import type { TenantChatSettingsResponse } from "@utils/chat";
+import type {
+  TenantChatSettingsResponse,
+  TenantChatSettingsUpdateRequest,
+} from "@utils/chat";
 
 import { AI_CHATBOT_DEFAULT_RATE_LIMITS } from "./constants";
 import type {
@@ -103,6 +106,30 @@ function readEffectiveModelName(root: Record<string, unknown>): string {
   );
 }
 
+function readEffectiveMonthlyBudgetUsd(root: Record<string, unknown>): string {
+  const overrides = asRecord(root.overrides);
+  const fromOverride = readStringValue(overrides?.monthly_budget_usd);
+  if (fromOverride) return fromOverride;
+
+  const budget = asRecord(root.budget);
+  if (budget?.is_unlimited === true) return "";
+  return readStringValue(budget?.budget);
+}
+
+function readEffectiveThresholdPct(root: Record<string, unknown>): string {
+  const overrides = asRecord(root.overrides);
+  if (typeof overrides?.threshold_pct === "number" && Number.isFinite(overrides.threshold_pct)) {
+    return String(overrides.threshold_pct);
+  }
+
+  const budget = asRecord(root.budget);
+  if (typeof budget?.threshold_pct === "number" && Number.isFinite(budget.threshold_pct)) {
+    return String(budget.threshold_pct);
+  }
+
+  return "";
+}
+
 export function mapTenantChatSettingsPricingTable(
   data: TenantChatSettingsResponse | null | undefined,
 ): TenantChatPricingTable {
@@ -200,6 +227,7 @@ export function mapTenantChatSettingsToFormValues(
       ),
       perTenantPerDay: String(AI_CHATBOT_DEFAULT_RATE_LIMITS.tenant_per_day),
     },
+    budget: { monthlyBudgetUsd: "", alertThresholdPct: "" },
     openAiModel: "",
     pricing: { inputCostPerMillion: "", outputCostPerMillion: "" },
   };
@@ -214,6 +242,10 @@ export function mapTenantChatSettingsToFormValues(
       perUserPerDay: String(readEffectiveLimit(root, "user_per_day")),
       perTenantPerMinute: String(readEffectiveLimit(root, "tenant_per_minute")),
       perTenantPerDay: String(readEffectiveLimit(root, "tenant_per_day")),
+    },
+    budget: {
+      monthlyBudgetUsd: readEffectiveMonthlyBudgetUsd(root),
+      alertThresholdPct: readEffectiveThresholdPct(root),
     },
     openAiModel: modelName,
     pricing: {
@@ -242,71 +274,90 @@ export function resolvePricingForModel(
   };
 }
 
-function parseNonNegativeInt(raw: string, label: string): number {
+function toPayloadString(raw: string): string {
+  return raw.trim();
+}
+
+function validateOptionalNonNegativeInt(raw: string, label: string): void {
   const trimmed = raw.trim();
-  if (!trimmed) {
-    throw new Error(`${label} is required.`);
-  }
+  if (!trimmed) return;
   const value = Number.parseInt(trimmed, 10);
   if (!Number.isFinite(value) || value < 0) {
     throw new Error(`${label} must be a valid non-negative integer.`);
   }
-  return value;
 }
 
-function parseOptionalCostString(raw: string): string | null {
+function validateOptionalNonNegativeNumber(raw: string, label: string): void {
   const trimmed = raw.trim();
-  if (!trimmed) return null;
+  if (!trimmed) return;
   const value = Number.parseFloat(trimmed);
   if (!Number.isFinite(value) || value < 0) {
-    throw new Error("Pricing values must be valid non-negative numbers.");
+    throw new Error(`${label} must be a valid non-negative number.`);
   }
-  return trimmed;
 }
 
-/** Body for PUT `/chat/tenant/settings` — tenant overrides only. */
+function validateOptionalThresholdPct(raw: string): void {
+  const trimmed = raw.trim();
+  if (!trimmed) return;
+  const value = Number.parseFloat(trimmed);
+  if (!Number.isFinite(value) || value < 0 || value > 100) {
+    throw new Error("Alert threshold (%) must be between 0 and 100.");
+  }
+}
+
+/** Flat PUT body for `/chat/tenant/settings` (string fields, empty string when unset). */
 export function mapFormValuesToTenantSettingsUpdate(
   values: AIChatbotSettingsFormValues,
-): { overrides: NonNullable<TenantChatSettingsResponse["overrides"]> } {
+  tenantId: string,
+): TenantChatSettingsUpdateRequest {
+  const id = tenantId.trim();
+  if (!id) {
+    throw new Error("Please select a company first");
+  }
+
   const modelName = values.openAiModel.trim();
   if (!modelName) {
     throw new Error("Please select an OpenAI model.");
   }
 
+  const userPerMinute = toPayloadString(values.rateLimits.perUserPerMinute);
+  const userPerDay = toPayloadString(values.rateLimits.perUserPerDay);
+  const tenantPerMinute = toPayloadString(values.rateLimits.perTenantPerMinute);
+  const tenantPerDay = toPayloadString(values.rateLimits.perTenantPerDay);
+  const inputCost = toPayloadString(values.pricing.inputCostPerMillion);
+  const outputCost = toPayloadString(values.pricing.outputCostPerMillion);
+  const monthlyBudget = toPayloadString(values.budget.monthlyBudgetUsd);
+  const thresholdPct = toPayloadString(values.budget.alertThresholdPct);
+
+  validateOptionalNonNegativeInt(userPerMinute, "User per minute");
+  validateOptionalNonNegativeInt(userPerDay, "User per day");
+  validateOptionalNonNegativeInt(tenantPerMinute, "Tenant per minute");
+  validateOptionalNonNegativeInt(tenantPerDay, "Tenant per day");
+  validateOptionalNonNegativeNumber(inputCost, "Input cost per million");
+  validateOptionalNonNegativeNumber(outputCost, "Output cost per million");
+  validateOptionalNonNegativeNumber(monthlyBudget, "Monthly budget");
+  validateOptionalThresholdPct(thresholdPct);
+
   return {
-    overrides: {
-      user_per_minute: parseNonNegativeInt(
-        values.rateLimits.perUserPerMinute,
-        "User per minute",
-      ),
-      user_per_day: parseNonNegativeInt(
-        values.rateLimits.perUserPerDay,
-        "User per day",
-      ),
-      tenant_per_minute: parseNonNegativeInt(
-        values.rateLimits.perTenantPerMinute,
-        "Tenant per minute",
-      ),
-      tenant_per_day: parseNonNegativeInt(
-        values.rateLimits.perTenantPerDay,
-        "Tenant per day",
-      ),
-      model_name: modelName,
-      input_cost_per_million: parseOptionalCostString(
-        values.pricing.inputCostPerMillion,
-      ),
-      output_cost_per_million: parseOptionalCostString(
-        values.pricing.outputCostPerMillion,
-      ),
-    },
+    tenant_id: id,
+    user_per_minute: userPerMinute,
+    user_per_day: userPerDay,
+    tenant_per_minute: tenantPerMinute,
+    tenant_per_day: tenantPerDay,
+    input_cost_per_million: inputCost,
+    output_cost_per_million: outputCost,
+    monthly_budget_usd: monthlyBudget,
+    threshold_pct: thresholdPct,
+    model_name: modelName,
   };
 }
 
 export function validateAIChatbotSettingsForm(
   values: AIChatbotSettingsFormValues,
+  tenantId: string,
 ): string | null {
   try {
-    mapFormValuesToTenantSettingsUpdate(values);
+    mapFormValuesToTenantSettingsUpdate(values, tenantId);
     return null;
   } catch (error: unknown) {
     return error instanceof Error ? error.message : "Invalid settings.";

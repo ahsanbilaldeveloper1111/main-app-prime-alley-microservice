@@ -12,8 +12,14 @@ export interface AIChatbotPricingFields {
   outputCostPerMillion: string;
 }
 
+export interface AIChatbotBudgetFields {
+  monthlyBudgetUsd: string;
+  alertThresholdPct: string;
+}
+
 export interface AIChatbotSettingsFormValues {
   rateLimits: AIChatbotRateLimitFields;
+  budget: AIChatbotBudgetFields;
   openAiModel: string;
   pricing: AIChatbotPricingFields;
 }
@@ -42,6 +48,10 @@ export const defaultAIChatbotSettingsFormValues =
         AI_CHATBOT_DEFAULT_RATE_LIMITS.tenant_per_minute,
       ),
       perTenantPerDay: String(AI_CHATBOT_DEFAULT_RATE_LIMITS.tenant_per_day),
+    },
+    budget: {
+      monthlyBudgetUsd: "",
+      alertThresholdPct: "",
     },
     openAiModel: "",
     pricing: {

@@ -11,8 +11,12 @@ import type { GenericListPageQueryParams } from "@components/GenericListPage";
 import { useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/router";
 import { useSession } from "next-auth/react";
+import { HEADER_CONSTANTS } from "@constants/headerConstants";
+import { usePermissions } from "@utils/permissionUtils";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "react-toastify";
+
+const { PERMISSIONS } = HEADER_CONSTANTS;
 
 import { useAiFaqListColumns } from "../aiFaqListColumns";
 import {
@@ -28,6 +32,8 @@ export function useAIFaqsTenantPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const { data: session } = useSession();
+  const { hasPermission } = usePermissions();
+  const canDeleteFaq = hasPermission(PERMISSIONS.DELETE_TENANT_FAQS_AI_CHAT);
   const companiesQuery = useChatCompaniesQuery(true);
   const companies = companiesQuery.data ?? [];
   const companiesLoading = companiesQuery.isPending;
@@ -81,10 +87,17 @@ export function useAIFaqsTenantPage() {
 
   const trainBot = useChatTrainBot(getTenantId);
 
-  const handleDeleteFAQ = useCallback((faq: FAQData) => {
-    setSelectedFAQ(faq);
-    setShowDeleteModal(true);
-  }, []);
+  const handleDeleteFAQ = useCallback(
+    (faq: FAQData) => {
+      if (!canDeleteFaq) {
+        toast.error("You do not have permission to delete tenant FAQs.");
+        return;
+      }
+      setSelectedFAQ(faq);
+      setShowDeleteModal(true);
+    },
+    [canDeleteFaq],
+  );
 
   const handleSubmit = useCallback(async () => {
     const validFAQs = getValidFaqItemsForSubmit(faqItems);
@@ -122,6 +135,10 @@ export function useAIFaqsTenantPage() {
 
   const handleConfirmDelete = useCallback(async () => {
     if (!selectedFAQ?.id) return;
+    if (!canDeleteFaq) {
+      toast.error("You do not have permission to delete tenant FAQs.");
+      return;
+    }
     try {
       await deleteTenantFAQ({ faq_id: selectedFAQ.id });
 
@@ -131,7 +148,7 @@ export function useAIFaqsTenantPage() {
     } catch (error) {
       console.error("Failed to delete FAQ:", error);
     }
-  }, [selectedFAQ, queryClient]);
+  }, [canDeleteFaq, selectedFAQ, queryClient]);
 
   const handleCompanyFilterChange = useCallback((companyId: string) => {
     const id = companyId.trim();
@@ -195,6 +212,7 @@ export function useAIFaqsTenantPage() {
   const columns = useAiFaqListColumns({
     variant: "tenant",
     onDelete: handleDeleteFAQ,
+    canDelete: canDeleteFaq,
   });
 
   return {

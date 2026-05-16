@@ -11,8 +11,22 @@ import {
   Users,
 } from "lucide-react";
 import dynamic from "next/dynamic";
-import React from "react";
+import React, { useMemo } from "react";
 import { Alert, Button, Card, Col, Container, ProgressBar, Row, Table } from "react-bootstrap";
+
+import "../shared/chatbotsDashboard.scss";
+import {
+  buildResponsiveLineChartOptions,
+  resolveLineChartHeight,
+} from "../shared/chatbotsDashboardChart";
+import {
+  chatbotsDashboardPrimaryCellClass,
+  chatbotsDashboardTableClass,
+  chatbotsDashboardTdClass,
+  chatbotsDashboardThClass,
+} from "../shared/chatbotsDashboardTable";
+import { DashboardTableCard } from "../shared/DashboardTableCard";
+import { useMediaQuery } from "../shared/useMediaQuery";
 
 import type { RateLimitUsage, TenantKnowledgeBaseStats } from "./types";
 import type { ChatbotsTenantDashboardCtx } from "./useChatbotsTenantDashboard";
@@ -91,9 +105,9 @@ function RateLimitRow(props: Readonly<{
   const pct = rateLimitPercent(remaining, limit);
   return (
     <div className="mb-3">
-      <div className="d-flex justify-content-between align-items-center mb-1">
+      <div className="d-flex flex-column flex-sm-row flex-sm-wrap gap-1 gap-sm-2 justify-content-sm-between align-items-sm-center mb-1">
         <span className="fw-medium">{label}</span>
-        <span className="text-muted small">
+        <span className="text-muted small text-sm-end">
           {intFmt.format(remaining)} remaining of {intFmt.format(limit)}
         </span>
       </div>
@@ -159,7 +173,7 @@ function KnowledgeBaseCard({ kb }: Readonly<{ kb: TenantKnowledgeBaseStats }>) {
           <BookOpen size={18} className="text-primary" aria-hidden />
           Knowledge base
         </h5>
-        <Row xs={2} md={4} className="g-3">
+        <Row xs={1} sm={2} md={4} className="g-3">
           {items.map((item) => (
             <Col key={item.label}>
               <div className="border rounded-3 p-3 h-100 bg-light bg-opacity-50">
@@ -175,24 +189,6 @@ function KnowledgeBaseCard({ kb }: Readonly<{ kb: TenantKnowledgeBaseStats }>) {
             </Col>
           ))}
         </Row>
-      </Card.Body>
-    </Card>
-  );
-}
-
-function DashboardTableCard(props: Readonly<{
-  title: string;
-  children: React.ReactNode;
-  compact?: boolean;
-}>) {
-  const { title, children, compact } = props;
-  return (
-    <Card className="h-100 border-0 shadow-sm">
-      <Card.Body className={compact ? "py-2 px-3" : undefined}>
-        <h5 className={`fw-semibold ${compact ? "mb-2 fs-6" : "mb-3"}`}>
-          {title}
-        </h5>
-        <div className="table-responsive mb-0">{children}</div>
       </Card.Body>
     </Card>
   );
@@ -238,13 +234,26 @@ export function ChatbotsTenantDashboardView({
 
       <PageHeader title="Tenant Dashboard" showSearch={false} />
 
-      <Container fluid className="px-0 pb-4">
+      <Container
+        fluid
+        className="px-2 px-sm-3 px-lg-4 pb-4 chatbots-dashboard"
+      >
         {isLoading && <DashboardLoading />}
 
         {isError && !isLoading && (
-          <Alert variant="danger" className="d-flex align-items-center justify-content-between">
-            <span>{error?.message ?? "Failed to load tenant dashboard."}</span>
-            <Button variant="outline-danger" size="sm" onClick={refetch}>
+          <Alert
+            variant="danger"
+            className="d-flex flex-column flex-sm-row align-items-stretch align-items-sm-center gap-2 gap-sm-3"
+          >
+            <span className="flex-grow-1">
+              {error?.message ?? "Failed to load tenant dashboard."}
+            </span>
+            <Button
+              variant="outline-danger"
+              size="sm"
+              className="align-self-stretch align-self-sm-center flex-shrink-0"
+              onClick={refetch}
+            >
               Retry
             </Button>
           </Alert>
@@ -269,10 +278,23 @@ function TenantDashboardContent({
   dailyCostQueriesChart: ChatbotsTenantDashboardViewProps["ctx"]["dailyCostQueriesChart"];
 }>) {
   const { summary, rateLimit, knowledgeBase } = model;
+  const isMobile = useMediaQuery("(max-width: 767.98px)");
+  const isTablet = useMediaQuery("(max-width: 991.98px)");
+
+  const chartHeight = resolveLineChartHeight(isMobile, isTablet);
+
+  const chartOptions = useMemo(
+    () =>
+      buildResponsiveLineChartOptions(
+        dailyCostQueriesChart.options,
+        isMobile,
+      ),
+    [dailyCostQueriesChart.options, isMobile],
+  );
 
   return (
     <>
-        <Row xs={1} sm={2} lg={5} className="g-3 mb-3">
+        <Row xs={1} sm={2} md={3} xl={5} className="g-3 mb-3">
           <StatCard
             title="Queries today"
             value={float3.format(summary.queriesToday)}
@@ -309,46 +331,66 @@ function TenantDashboardContent({
           <Col xs={12} lg={4}>
             <RateLimitUsageCard rateLimit={rateLimit} />
           </Col>
-          <Col xs={12} lg={8} className="mt-3 mt-lg-0">
+          <Col xs={12} lg={8} className="mt-3 mt-lg-0 min-w-0">
             <Card className="h-100 border-0 shadow-sm">
-              <Card.Body>
+              <Card.Body className="chatbots-dashboard__chart">
                 <h5 className="mb-3 fw-semibold">
                   Daily cost &amp; queries — last 30 days
                 </h5>
                 <ReactApexChart
-                  options={dailyCostQueriesChart.options}
+                  options={chartOptions}
                   series={dailyCostQueriesChart.series}
                   type="line"
-                  height={280}
+                  height={chartHeight}
                 />
               </Card.Body>
             </Card>
           </Col>
         </Row>
 
-        <Row className="mb-3">
-          <Col lg={6} className="mb-3 mb-lg-0">
+        <Row className="mb-3 g-3">
+          <Col xs={12} lg={6}>
             <DashboardTableCard title="Top users (this month)">
-              <Table hover size="sm" className="align-middle mb-0">
+              <Table hover size="sm" className={chatbotsDashboardTableClass}>
+                <colgroup>
+                  <col style={{ width: "46%" }} />
+                  <col style={{ width: "18%" }} />
+                  <col style={{ width: "18%" }} />
+                  <col style={{ width: "18%" }} />
+                </colgroup>
                 <thead className="table-light">
                   <tr>
-                    <th className="text-nowrap">User</th>
-                    <th className="text-end text-nowrap">Queries</th>
-                    <th className="text-end text-nowrap">Tokens</th>
-                    <th className="text-end text-nowrap">Cost</th>
+                    <th className={chatbotsDashboardThClass}>User</th>
+                    <th className={`${chatbotsDashboardThClass} text-md-center`}>Queries</th>
+                    <th className={`${chatbotsDashboardThClass} text-md-center`}>Tokens</th>
+                    <th className={`${chatbotsDashboardThClass} text-md-center`}>Cost</th>
                   </tr>
                 </thead>
                 <tbody>
                   {model.topUsersThisMonth.map((row) => (
                     <tr key={row.user}>
-                      <td className="fw-medium">{row.user}</td>
-                      <td className="text-end text-nowrap">
+                      <td
+                        data-label="User"
+                        className={`${chatbotsDashboardTdClass} ${chatbotsDashboardPrimaryCellClass} fw-medium`}
+                      >
+                        {row.user}
+                      </td>
+                      <td
+                        data-label="Queries"
+                        className={`${chatbotsDashboardTdClass} text-md-center text-nowrap`}
+                      >
                         {intFmt.format(row.queries)}
                       </td>
-                      <td className="text-end text-nowrap">
+                      <td
+                        data-label="Tokens"
+                        className={`${chatbotsDashboardTdClass} text-md-center text-nowrap`}
+                      >
                         {intFmt.format(row.tokens)}
                       </td>
-                      <td className="text-end text-nowrap">
+                      <td
+                        data-label="Cost"
+                        className={`${chatbotsDashboardTdClass} text-md-center text-nowrap`}
+                      >
                         {usd3.format(row.costUsd)}
                       </td>
                     </tr>
@@ -357,24 +399,40 @@ function TenantDashboardContent({
               </Table>
             </DashboardTableCard>
           </Col>
-          <Col lg={6}>
+          <Col xs={12} lg={6}>
             <DashboardTableCard title="Top questions (7d)">
-              <Table hover size="sm" className="align-middle mb-0">
+              <Table hover size="sm" className={chatbotsDashboardTableClass}>
+                <colgroup>
+                  <col style={{ width: "70%" }} />
+                  <col style={{ width: "15%" }} />
+                  <col style={{ width: "15%" }} />
+                </colgroup>
                 <thead className="table-light">
                   <tr>
-                    <th>Question</th>
-                    <th className="text-end text-nowrap">Asks</th>
-                    <th className="text-end text-nowrap">Users</th>
+                    <th className={chatbotsDashboardThClass}>Question</th>
+                    <th className={`${chatbotsDashboardThClass} text-md-center`}>Asks</th>
+                    <th className={`${chatbotsDashboardThClass} text-md-center`}>Users</th>
                   </tr>
                 </thead>
                 <tbody>
                   {model.topQuestions7d.map((row) => (
                     <tr key={row.question}>
-                      <td className="fw-medium">{row.question}</td>
-                      <td className="text-end text-nowrap">
+                      <td
+                        data-label="Question"
+                        className={`${chatbotsDashboardTdClass} ${chatbotsDashboardPrimaryCellClass} fw-medium`}
+                      >
+                        {row.question}
+                      </td>
+                      <td
+                        data-label="Asks"
+                        className={`${chatbotsDashboardTdClass} text-md-center text-nowrap`}
+                      >
                         {intFmt.format(row.asks)}
                       </td>
-                      <td className="text-end text-nowrap">
+                      <td
+                        data-label="Users"
+                        className={`${chatbotsDashboardTdClass} text-md-center text-nowrap`}
+                      >
                         {intFmt.format(row.users)}
                       </td>
                     </tr>
@@ -394,18 +452,26 @@ function TenantDashboardContent({
         <Row>
           <Col xs={12}>
             <DashboardTableCard title="Recent conversations" compact>
-              <Table hover size="sm" className="align-middle mb-0">
+              <Table hover size="sm" className={chatbotsDashboardTableClass}>
+                <colgroup>
+                  <col style={{ width: "40%" }} />
+                  <col style={{ width: "30%" }} />
+                  <col style={{ width: "30%" }} />
+                </colgroup>
                 <thead className="table-light">
                   <tr>
-                    <th className="text-nowrap">Thread</th>
-                    <th className="text-nowrap">User</th>
-                    <th className="text-nowrap">Last activity</th>
+                    <th className={chatbotsDashboardThClass}>Thread</th>
+                    <th className={chatbotsDashboardThClass}>User</th>
+                    <th className={chatbotsDashboardThClass}>Last activity</th>
                   </tr>
                 </thead>
                 <tbody>
                   {model.recentConversations.map((row) => (
                     <tr key={`${row.thread}-${row.user}`}>
-                      <td className="fw-medium">
+                      <td
+                        data-label="Thread"
+                        className={`${chatbotsDashboardTdClass} ${chatbotsDashboardPrimaryCellClass} fw-medium`}
+                      >
                         <span className="d-inline-flex align-items-center gap-1">
                           <MessageSquare
                             size={14}
@@ -415,10 +481,15 @@ function TenantDashboardContent({
                           {row.thread}
                         </span>
                       </td>
-                      <td className="text-nowrap">{row.user}</td>
                       <td
-                        className="text-muted small text-nowrap"
-                        style={{ maxWidth: "9.5rem" }}
+                        data-label="User"
+                        className={`${chatbotsDashboardTdClass} text-nowrap`}
+                      >
+                        {row.user}
+                      </td>
+                      <td
+                        data-label="Last activity"
+                        className={`${chatbotsDashboardTdClass} text-muted small text-nowrap`}
                         title={row.lastActivity}
                       >
                         <span className="d-inline-flex align-items-center gap-1">
