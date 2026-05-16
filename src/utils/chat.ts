@@ -339,22 +339,30 @@ export interface ChatTrainingStatusResponse {
 /**
  * Load an existing assistant thread (GET `/api/chat/?thread_id=…`).
  */
-export const getChatThread = async (threadId: string): Promise<ChatThreadResponse> => {
+export const getChatThread = async (
+  threadId: string,
+): Promise<ChatThreadResponse> => {
   const id = threadId.trim();
   if (!id) {
     throw new Error("Thread id is required");
   }
   try {
-    const response = await axiosInstance.get<ChatThreadResponse>(CHAT_ASSISTANT_API_PATH, {
-      params: { thread_id: id },
-    });
+    const response = await axiosInstance.get<ChatThreadResponse>(
+      CHAT_ASSISTANT_API_PATH,
+      {
+        params: { thread_id: id },
+      },
+    );
     if (response.data?.error) {
       throw new Error(response.data.error || "Failed to load chat thread");
     }
     return response.data;
   } catch (error: unknown) {
     toast.error(
-      chatApiErrorMessage(error, "Failed to load conversation. Please try again."),
+      chatApiErrorMessage(
+        error,
+        "Failed to load conversation. Please try again.",
+      ),
     );
     throw error;
   }
@@ -401,19 +409,22 @@ export const sendChatMessage = async (
  * @returns Promise with survey response
  */
 export const submitChatSurvey = async (
-  payload: ChatSurveyPayload
+  payload: ChatSurveyPayload,
 ): Promise<ChatSurveyResponse> => {
   try {
-    const response = await axiosInstance.post<ChatSurveyResponse>('/chat/survey', payload);
-    
+    const response = await axiosInstance.post<ChatSurveyResponse>(
+      "/chat/survey",
+      payload,
+    );
+
     // Check if response contains an error
     if (response.data?.error) {
-      throw new Error(response.data.error || 'An error occurred');
+      throw new Error(response.data.error || "An error occurred");
     }
-    
+
     return response.data;
   } catch (error: any) {
-    console.error('Survey submission error:', error);
+    console.error("Survey submission error:", error);
     // Don't show toast for survey errors to avoid interrupting user flow
     throw error;
   }
@@ -424,7 +435,9 @@ type TenantFaqGetBody =
   | FAQData[]
   | { data?: FAQData[]; error?: string };
 
-function faqsArrayFromTenantGetBody(body: TenantFaqGetBody | null | undefined): FAQData[] {
+function faqsArrayFromTenantGetBody(
+  body: TenantFaqGetBody | null | undefined,
+): FAQData[] {
   if (body == null) {
     return [];
   }
@@ -437,7 +450,7 @@ function faqsArrayFromTenantGetBody(body: TenantFaqGetBody | null | undefined): 
   const o = body as { error?: unknown; faqs?: unknown; data?: unknown };
   if (o.error) {
     throw new Error(
-      typeof o.error === "string" ? o.error : "Failed to fetch tenant FAQs"
+      typeof o.error === "string" ? o.error : "Failed to fetch tenant FAQs",
     );
   }
   if (Array.isArray(o.faqs)) {
@@ -480,13 +493,19 @@ export const getTenantFAQsList = async (
  * @param search - Optional search term to filter FAQs (sent as query param for server-side search)
  * @returns Promise with list of tenant FAQs
  */
-export const getTenantFAQs = async (tenantId?: string, search?: string): Promise<FAQData[]> => {
+export const getTenantFAQs = async (
+  tenantId?: string,
+  search?: string,
+): Promise<FAQData[]> => {
   try {
     const body = await getTenantFAQsList(tenantId, search);
     return faqsArrayFromTenantGetBody(body);
   } catch (error: unknown) {
     toast.error(
-      chatApiErrorMessage(error, "Failed to fetch tenant FAQs. Please try again."),
+      chatApiErrorMessage(
+        error,
+        "Failed to fetch tenant FAQs. Please try again.",
+      ),
     );
     throw error;
   }
@@ -498,7 +517,7 @@ export const getTenantFAQs = async (tenantId?: string, search?: string): Promise
  * and/or `files[]` (PDF or TXT).
  */
 export const createTenantFAQ = async (
-  payload: CreateTenantFAQPayload
+  payload: CreateTenantFAQPayload,
 ): Promise<CreateTenantFAQResponse> => {
   try {
     const formData = new FormData();
@@ -513,7 +532,7 @@ export const createTenantFAQ = async (
 
     const response = await axiosInstance.post<CreateTenantFAQResponse>(
       TENANT_FAQS_API_PATH,
-      formData
+      formData,
     );
 
     // Check if response contains an error
@@ -522,12 +541,15 @@ export const createTenantFAQ = async (
     }
 
     toast.success(
-      response.data?.message?.trim() || "Tenant FAQs created successfully"
+      response.data?.message?.trim() || "Tenant FAQs created successfully",
     );
     return response.data;
   } catch (error: unknown) {
     toast.error(
-      chatApiErrorMessage(error, "Failed to create tenant FAQs. Please try again."),
+      chatApiErrorMessage(
+        error,
+        "Failed to create tenant FAQs. Please try again.",
+      ),
     );
     throw error;
   }
@@ -535,7 +557,7 @@ export const createTenantFAQ = async (
 
 function faqSideDeleteSuccessMessage(
   side: "Tenant" | "Global",
-  params: DeleteTenantFAQParams | DeleteGlobalFAQParams
+  params: DeleteTenantFAQParams | DeleteGlobalFAQParams,
 ): string {
   if ("scope" in params && params.scope === "all") {
     return `${side} FAQs and files deleted successfully`;
@@ -547,7 +569,7 @@ function faqSideDeleteSuccessMessage(
 }
 
 function buildFaqSideDeleteBody(
-  params: DeleteTenantFAQParams | DeleteGlobalFAQParams
+  params: DeleteTenantFAQParams | DeleteGlobalFAQParams,
 ): Record<string, never> | { faq_id: number } | { filename: string } {
   if ("scope" in params && params.scope === "all") {
     return {};
@@ -592,7 +614,10 @@ export const deleteTenantFAQ = async (
     return response.data;
   } catch (error: unknown) {
     toast.error(
-      chatApiErrorMessage(error, "Failed to delete tenant FAQ. Please try again."),
+      chatApiErrorMessage(
+        error,
+        "Failed to delete tenant FAQ. Please try again.",
+      ),
     );
     throw error;
   }
@@ -603,7 +628,9 @@ type GlobalFaqGetBody =
   | FAQData[]
   | { data?: FAQData[]; error?: string };
 
-function faqsArrayFromGlobalGetBody(body: GlobalFaqGetBody | null | undefined): FAQData[] {
+function faqsArrayFromGlobalGetBody(
+  body: GlobalFaqGetBody | null | undefined,
+): FAQData[] {
   if (body == null) {
     return [];
   }
@@ -616,7 +643,7 @@ function faqsArrayFromGlobalGetBody(body: GlobalFaqGetBody | null | undefined): 
   const o = body as { error?: unknown; faqs?: unknown; data?: unknown };
   if (o.error) {
     throw new Error(
-      typeof o.error === "string" ? o.error : "Failed to fetch global FAQs"
+      typeof o.error === "string" ? o.error : "Failed to fetch global FAQs",
     );
   }
   if (Array.isArray(o.faqs)) {
@@ -660,7 +687,7 @@ export const getGlobalFAQs = async (search?: string): Promise<FAQData[]> => {
  * Body: `multipart/form-data` with `faqs` (JSON string) and/or `files[]`. No `tenant_id`.
  */
 export const createGlobalFAQ = async (
-  payload: CreateGlobalFAQPayload
+  payload: CreateGlobalFAQPayload,
 ): Promise<CreateGlobalFAQResponse> => {
   try {
     const formData = new FormData();
@@ -674,7 +701,7 @@ export const createGlobalFAQ = async (
 
     const response = await axiosInstance.post<CreateGlobalFAQResponse>(
       "/chat/global-faqs",
-      formData
+      formData,
     );
 
     if (response.data?.error) {
@@ -682,7 +709,7 @@ export const createGlobalFAQ = async (
     }
 
     toast.success(
-      response.data?.message?.trim() || "Global FAQs created successfully"
+      response.data?.message?.trim() || "Global FAQs created successfully",
     );
     return response.data;
   } catch (error: any) {
@@ -701,7 +728,9 @@ export const createGlobalFAQ = async (
  * Delete global FAQs and/or files (DELETE `/api/chat/global-faqs` when `BACKEND_URL` ends with `/api/`).
  * JSON body: `{"faq_id"}`, `{"filename"}`, or `{}` for delete-all (use `{ scope: "all" }` in params).
  */
-export const deleteGlobalFAQ = async (params: DeleteGlobalFAQParams): Promise<void> => {
+export const deleteGlobalFAQ = async (
+  params: DeleteGlobalFAQParams,
+): Promise<void> => {
   try {
     const body = buildFaqSideDeleteBody(params);
     const response = await axiosInstance.delete("/chat/global-faqs", {
@@ -792,7 +821,7 @@ export const submitChatTraining = async (
  * Sends `tenant_id` as a query parameter.
  */
 export const getChatTrainingStatus = async (
-  tenantId: string
+  tenantId: string,
 ): Promise<ChatTrainingStatusResponse> => {
   const id = tenantId.trim();
   if (!id) {
@@ -803,14 +832,14 @@ export const getChatTrainingStatus = async (
       "/training/status/",
       {
         params: { tenant_id: id },
-      }
+      },
     );
 
     if (response.data?.error) {
       throw new Error(
         typeof response.data.error === "string"
           ? response.data.error
-          : "Failed to fetch training status"
+          : "Failed to fetch training status",
       );
     }
 
@@ -831,7 +860,9 @@ export const getChatTrainingStatus = async (
       "Failed to fetch training status. Please try again.";
 
     throw new Error(
-      typeof errorMsg === "string" ? errorMsg : "Failed to fetch training status. Please try again."
+      typeof errorMsg === "string"
+        ? errorMsg
+        : "Failed to fetch training status. Please try again.",
     );
   }
 };
@@ -1070,15 +1101,22 @@ export interface TenantChatSettingsDefaults {
     input_cost_per_million?: string;
     output_cost_per_million?: string;
   };
-  pricing_table?: Record<
-    string,
-    { input?: string; output?: string }
-  >;
+  pricing_table?: Record<string, { input?: string; output?: string }>;
   available_models?: string[];
 }
 
+/** Flat PUT body for `/chat/tenant/settings` (all override fields as strings). */
 export interface TenantChatSettingsUpdateRequest {
-  overrides: TenantChatSettingsOverrides;
+  tenant_id: string;
+  user_per_minute: string;
+  user_per_day: string;
+  tenant_per_minute: string;
+  tenant_per_day: string;
+  input_cost_per_million: string;
+  output_cost_per_million: string;
+  monthly_budget_usd: string;
+  threshold_pct: string;
+  model_name: string;
 }
 
 export interface TenantChatSettingsResponse {
@@ -1173,20 +1211,15 @@ export const getTenantChatSettings = async (
 
 /**
  * Save tenant chat overrides (PUT `/api/chat/tenant/settings` when `BACKEND_URL` ends with `/api/`).
+ * `tenant_id` and override fields are sent in the JSON body as strings.
  */
 export const updateTenantChatSettings = async (
   payload: TenantChatSettingsUpdateRequest,
-  tenantId?: string,
 ): Promise<TenantChatSettingsResponse> => {
   try {
-    const params: Record<string, string> = {};
-    const id = tenantId?.trim();
-    if (id) params.tenant_id = id;
-
     const response = await axiosInstance.put<TenantChatSettingsResponse>(
       "/chat/tenant/settings",
       payload,
-      { params },
     );
 
     if (response.data == null) {
@@ -1208,23 +1241,24 @@ export const updateTenantChatSettings = async (
   }
 };
 
-export const getAdminChatDashboard = async (): Promise<AdminChatDashboardResponse> => {
-  try {
-    const response = await axiosInstance.get<AdminChatDashboardResponse>(
-      "/chat/admin/dashboard",
-    );
+export const getAdminChatDashboard =
+  async (): Promise<AdminChatDashboardResponse> => {
+    try {
+      const response = await axiosInstance.get<AdminChatDashboardResponse>(
+        "/chat/admin/dashboard",
+      );
 
-    if (response.data == null) {
-      throw new Error("Failed to load admin dashboard");
+      if (response.data == null) {
+        throw new Error("Failed to load admin dashboard");
+      }
+
+      return response.data;
+    } catch (error: unknown) {
+      throw new Error(
+        chatApiErrorMessage(
+          error,
+          "Failed to load admin dashboard. Please try again.",
+        ),
+      );
     }
-
-    return response.data;
-  } catch (error: unknown) {
-    throw new Error(
-      chatApiErrorMessage(
-        error,
-        "Failed to load admin dashboard. Please try again.",
-      ),
-    );
-  }
-};
+  };

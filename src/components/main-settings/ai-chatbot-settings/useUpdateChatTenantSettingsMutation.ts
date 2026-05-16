@@ -1,26 +1,22 @@
 import { chatKeys } from "@query/keys";
 import { updateTenantChatSettings } from "@utils/chat";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useSession } from "next-auth/react";
-import { useMemo } from "react";
 import { toast } from "react-toastify";
 
 import { mapFormValuesToTenantSettingsUpdate } from "./mapTenantChatSettings";
-import { resolveChatTenantIdFromSession } from "./resolveChatTenantId";
 import type { AIChatbotSettingsFormValues } from "./types";
 
-export function useUpdateChatTenantSettingsMutation() {
+export function useUpdateChatTenantSettingsMutation(appliedTenantId: string) {
   const queryClient = useQueryClient();
-  const { data: session } = useSession();
-  const tenantId = useMemo(
-    () => resolveChatTenantIdFromSession(session?.user),
-    [session?.user],
-  );
+  const tenantId = appliedTenantId.trim();
 
   return useMutation({
     mutationFn: async (values: AIChatbotSettingsFormValues) => {
-      const payload = mapFormValuesToTenantSettingsUpdate(values);
-      return updateTenantChatSettings(payload, tenantId || undefined);
+      if (!tenantId) {
+        throw new Error("Please select a company first");
+      }
+      const payload = mapFormValuesToTenantSettingsUpdate(values, tenantId);
+      return updateTenantChatSettings(payload);
     },
     onSuccess: (data) => {
       queryClient.setQueryData(chatKeys.tenantSettings.detail(tenantId), data);

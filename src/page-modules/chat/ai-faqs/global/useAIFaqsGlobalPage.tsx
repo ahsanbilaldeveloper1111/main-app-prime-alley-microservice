@@ -9,10 +9,14 @@ import {
 import type { GenericListPageQueryParams } from "@components/GenericListPage";
 import { useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/router";
+import { HEADER_CONSTANTS } from "@constants/headerConstants";
+import { usePermissions } from "@utils/permissionUtils";
 import { useCallback, useMemo, useState } from "react";
 import { toast } from "react-toastify";
 
 import { useAiFaqListColumns } from "../aiFaqListColumns";
+
+const { PERMISSIONS } = HEADER_CONSTANTS;
 import {
   buildAiFaqSubmitFields,
   emptyFaqListPage,
@@ -24,6 +28,8 @@ import { useAiFaqDraftFormState } from "../hooks/useAiFaqDraftFormState";
 export function useAIFaqsGlobalPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
+  const { hasPermission } = usePermissions();
+  const canDeleteFaq = hasPermission(PERMISSIONS.DELETE_GLOBAL_FAQS_AI_CHAT);
 
   const [showAddModal, setShowAddModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -50,10 +56,17 @@ export function useAIFaqsGlobalPage() {
     setShowViewModal(true);
   }, []);
 
-  const handleDeleteFAQ = useCallback((faq: FAQData) => {
-    setSelectedFAQ(faq);
-    setShowDeleteModal(true);
-  }, []);
+  const handleDeleteFAQ = useCallback(
+    (faq: FAQData) => {
+      if (!canDeleteFaq) {
+        toast.error("You do not have permission to delete global FAQs.");
+        return;
+      }
+      setSelectedFAQ(faq);
+      setShowDeleteModal(true);
+    },
+    [canDeleteFaq],
+  );
 
   const handleSubmit = useCallback(async () => {
     const validFAQs = getValidFaqItemsForSubmit(faqItems);
@@ -84,6 +97,10 @@ export function useAIFaqsGlobalPage() {
 
   const handleConfirmDelete = useCallback(async () => {
     if (!selectedFAQ?.id) return;
+    if (!canDeleteFaq) {
+      toast.error("You do not have permission to delete global FAQs.");
+      return;
+    }
 
     try {
       await deleteGlobalFAQ({ faq_id: selectedFAQ.id });
@@ -93,7 +110,7 @@ export function useAIFaqsGlobalPage() {
     } catch (error) {
       console.error("Failed to delete FAQ:", error);
     }
-  }, [selectedFAQ, queryClient]);
+  }, [canDeleteFaq, selectedFAQ, queryClient]);
 
   const stableFilters = useMemo(() => ({}), []);
 
@@ -131,6 +148,7 @@ export function useAIFaqsGlobalPage() {
     variant: "global",
     onView: handleViewFAQ,
     onDelete: handleDeleteFAQ,
+    canDelete: canDeleteFaq,
   });
 
   return {

@@ -3,7 +3,8 @@ import { chatKeys } from "@query/keys";
 import { useArrayListQuery } from "../_shared/listQuery";
 
 export interface ChatCompanyOption {
-  identifier: string;
+  tenant_id?: string;
+  identifier?: string;
   name?: string;
   [key: string]: unknown;
 }

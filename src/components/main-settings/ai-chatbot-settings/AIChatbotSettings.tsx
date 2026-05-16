@@ -1,5 +1,14 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { Button } from "react-bootstrap";
+import { Filter } from "lucide-react";
+import Select from "react-select";
+import { HEADER_CONSTANTS } from "@constants/headerConstants";
+import { usePermissions } from "@utils/permissionUtils";
 import { toast } from "react-toastify";
+
+import "./aiChatbotSettings.scss";
+
+const { PERMISSIONS } = HEADER_CONSTANTS;
 
 import type {
   AIChatbotModelOption,
@@ -11,8 +20,59 @@ import {
   resolvePricingForModel,
   validateAIChatbotSettingsForm,
 } from "./mapTenantChatSettings";
-import { useChatTenantSettingsQuery } from "./useChatTenantSettingsQuery";
-import { useUpdateChatTenantSettingsMutation } from "./useUpdateChatTenantSettingsMutation";
+import { AI_CHATBOT_FIELD_PLACEHOLDERS } from "./constants";
+import { useAIChatbotSettingsPage } from "./useAIChatbotSettingsPage";
+
+type CompanySelectOption = { value: string; label: string };
+
+function CompanyFilterBar(props: Readonly<{
+  companiesLoading: boolean;
+  companyOptions: CompanySelectOption[];
+  selectedCompanyOption: CompanySelectOption | null;
+  onCompanySelect: (companyId: string) => void;
+  onApplyFilter: () => void;
+  appliedCompanyLabel?: string;
+}>) {
+  const {
+    companiesLoading,
+    companyOptions,
+    selectedCompanyOption,
+    onCompanySelect,
+    onApplyFilter,
+    appliedCompanyLabel,
+  } = props;
+
+  return (
+    <div className="ai-chatbot-settings__company-filter">
+      <div className="ai-chatbot-settings__company-select">
+        <span className="ai-chatbot-settings__field-label">Company</span>
+        <Select<CompanySelectOption>
+          isLoading={companiesLoading}
+          options={companyOptions}
+          value={selectedCompanyOption}
+          onChange={(opt) => onCompanySelect(opt?.value ?? "")}
+          placeholder="Select company..."
+          isClearable
+          classNamePrefix="ai-chatbot-company"
+        />
+      </div>
+      <Button
+        type="button"
+        variant="primary"
+        className="ai-chatbot-settings__filter-btn"
+        onClick={onApplyFilter}
+      >
+        <Filter size={16} className="me-2" aria-hidden />
+        Filter
+      </Button>
+      {appliedCompanyLabel ? (
+        <p className="ai-chatbot-settings__company-active">
+          Viewing: <strong>{appliedCompanyLabel}</strong>
+        </p>
+      ) : null}
+    </div>
+  );
+}
 
 function buildModelSelectOptions(
   apiOptions: AIChatbotModelOption[],
@@ -39,137 +99,51 @@ function buildModelSelectOptions(
   return options;
 }
 
-const SECTION_GAP = "1.5rem";
-
-const formStyle: React.CSSProperties = {
-  width: "100%",
-  boxSizing: "border-box",
-  display: "flex",
-  flexDirection: "column",
-  gap: SECTION_GAP,
-};
-
-const rowLabelStyle: React.CSSProperties = {
-  fontSize: "12px",
-  fontWeight: 600,
-  color: "#6b7280",
-  margin: 0,
-  lineHeight: 1.2,
-};
-
-const fieldLabelStyle: React.CSSProperties = {
-  display: "block",
-  marginBottom: "2px",
-  fontSize: "12px",
-  fontWeight: 500,
-  color: "#374151",
-  lineHeight: 1.2,
-};
-
-const inputStyle: React.CSSProperties = {
-  width: "100%",
-  padding: "4px 8px",
-  border: "1px solid #d1d5db",
-  borderRadius: "4px",
-  fontSize: "13px",
-  outline: "none",
-  lineHeight: 1.35,
-};
-
-const selectStyle: React.CSSProperties = {
-  ...inputStyle,
-  background: "#fff",
-};
-
-const gridFourColStyle: React.CSSProperties = {
-  display: "grid",
-  gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
-  gap: "8px 12px",
-};
-
-const gridThreeColStyle: React.CSSProperties = {
-  display: "grid",
-  gridTemplateColumns: "minmax(180px, 1fr) repeat(2, minmax(0, 1fr))",
-  gap: "8px 12px",
-  alignItems: "end",
-};
-
-const formSectionStyle: React.CSSProperties = {
-  display: "flex",
-  flexDirection: "column",
-  gap: "0.5rem",
-};
-
-const saveButtonStyle: React.CSSProperties = {
-  border: "1px solid #111827",
-  background: "#111827",
-  color: "#ffffff",
-  borderRadius: "4px",
-  padding: "5px 14px",
-  fontSize: "13px",
-  cursor: "pointer",
-  alignSelf: "flex-start",
-};
-
-const hintTextStyle: React.CSSProperties = {
-  margin: 0,
-  fontSize: "12px",
-  color: "#6b7280",
-  lineHeight: 1.35,
-};
-
-const statusTextStyle: React.CSSProperties = {
-  margin: 0,
-  fontSize: "12px",
-  lineHeight: 1.35,
-  color: "#991b1b",
-};
-
-const budgetRowStyle: React.CSSProperties = {
-  display: "flex",
-  flexWrap: "wrap",
-  gap: "4px 14px",
-  alignItems: "baseline",
-  fontSize: "12px",
-  color: "#374151",
-  margin: 0,
-  lineHeight: 1.35,
-};
-
-const budgetStrongStyle: React.CSSProperties = {
-  fontWeight: 600,
-  color: "#111827",
-};
-
-const progressTrackStyle: React.CSSProperties = {
-  height: "4px",
-  borderRadius: "2px",
-  background: "#e5e7eb",
-  overflow: "hidden",
-};
-
 function NumberField(props: Readonly<{
   label: string;
   value: string;
   onChange: (value: string) => void;
+  placeholder?: string;
   min?: number;
+  max?: number;
   step?: number | string;
   disabled?: boolean;
 }>) {
-  const { label, value, onChange, min = 0, step = 1, disabled = false } = props;
+  const {
+    label,
+    value,
+    onChange,
+    placeholder,
+    min = 0,
+    max,
+    step = 1,
+    disabled = false,
+  } = props;
   return (
-    <label style={{ margin: 0 }}>
-      <span style={fieldLabelStyle}>{label}</span>
+    <label className="ai-chatbot-settings__field">
+      <span className="ai-chatbot-settings__field-label">{label}</span>
       <input
         type="number"
+        className="ai-chatbot-settings__input"
         min={min}
+        max={max}
         step={step}
         value={value}
+        placeholder={placeholder}
         disabled={disabled}
         onChange={(e) => onChange(e.target.value)}
-        style={inputStyle}
       />
     </label>
+  );
+}
+
+function ReadonlyField(props: Readonly<{ label: string; value: string }>) {
+  const { label, value } = props;
+  return (
+    <div className="ai-chatbot-settings__field">
+      <span className="ai-chatbot-settings__field-label">{label}</span>
+      <p className="ai-chatbot-settings__readonly-value">{value}</p>
+    </div>
   );
 }
 
@@ -184,58 +158,83 @@ function formatResetsOn(iso: string): string {
   });
 }
 
-function BudgetLine(props: Readonly<{ budget: AIChatbotSettingsBudgetView }>) {
+function formatSpendUsd(spend: string): string {
+  const trimmed = spend.trim();
+  if (!trimmed) return "—";
+  return trimmed.startsWith("$") ? trimmed : `$${trimmed}`;
+}
+
+function LiveSpendSection(props: Readonly<{
+  budget: AIChatbotSettingsBudgetView | null;
+}>) {
   const { budget } = props;
-  const usedPct = Math.min(100, Math.max(0, budget.usedPct));
+  const spendDisplay = budget ? formatSpendUsd(budget.spend) : "—";
+  const resetsDisplay = budget ? formatResetsOn(budget.resetsOn) : "—";
+
+  const usedPct = budget
+    ? Math.min(100, Math.max(0, budget.usedPct))
+    : 0;
   let barColor = "#059669";
-  if (budget.isExhausted) {
+  if (budget?.isExhausted) {
     barColor = "#dc2626";
-  } else if (usedPct >= budget.thresholdPct) {
+  } else if (budget && usedPct >= budget.thresholdPct) {
     barColor = "#d97706";
   }
 
-  let budgetLabel = "—";
-  if (budget.isUnlimited) {
-    budgetLabel = "Unlimited";
-  } else if (budget.budget != null) {
-    budgetLabel = `$${budget.budget}`;
-  }
-
   return (
-    <div style={formSectionStyle}>
-      <p style={budgetRowStyle}>
-        <span style={rowLabelStyle}>Budget:</span>{" "}
-        MTD <span style={budgetStrongStyle}>${budget.spend}</span>
-        {" · "}
-        Cap <span style={budgetStrongStyle}>{budgetLabel}</span>
-        {" · "}
-        Used <span style={budgetStrongStyle}>{usedPct.toFixed(1)}%</span>
-        {" · "}
-        Resets <span style={budgetStrongStyle}>{formatResetsOn(budget.resetsOn)}</span>
-        {budget.isExhausted && (
-          <>
-            {" · "}
-            <span style={{ color: "#dc2626", fontWeight: 600 }}>Exhausted</span>
-          </>
-        )}
-      </p>
-      {!budget.isUnlimited && (
-        <div style={progressTrackStyle} aria-hidden>
-          <div
-            style={{
-              height: "100%",
-              width: `${usedPct}%`,
-              background: barColor,
-            }}
-          />
-        </div>
+    <div className="ai-chatbot-settings__section">
+      <p className="ai-chatbot-settings__row-label">Live spend (Month-to-date)</p>
+      <div className="ai-chatbot-settings__grid-2">
+        <ReadonlyField label="Spend" value={spendDisplay} />
+        <ReadonlyField label="Reset on" value={resetsDisplay} />
+      </div>
+      {budget && !budget.isUnlimited && (
+        <>
+          <p className="ai-chatbot-settings__live-spend-meta">
+            <span>{usedPct.toFixed(1)}% of monthly cap used</span>
+            {budget.isExhausted && (
+              <span className="ai-chatbot-settings__live-spend-exhausted">
+                · Budget exhausted
+              </span>
+            )}
+          </p>
+          <div className="ai-chatbot-settings__progress-track" aria-hidden>
+            <div
+              style={{
+                height: "100%",
+                width: `${usedPct}%`,
+                background: barColor,
+              }}
+            />
+          </div>
+        </>
+      )}
+      {budget?.isUnlimited && (
+        <p className="ai-chatbot-settings__hint">No monthly cap configured.</p>
       )}
     </div>
   );
 }
 
 export const AIChatbotSettings: React.FC = () => {
+  const { hasPermission } = usePermissions();
+  const canEditSettings = hasPermission(PERMISSIONS.EDIT_TENANT_SETTINGS_AI_CHAT);
+
   const {
+    companiesLoading,
+    companyOptions,
+    selectedCompanyOption,
+    appliedCompanyLabel,
+    appliedTenantId,
+    handleCompanySelect,
+    handleApplyFilter,
+    settingsQuery,
+    saveMutation,
+  } = useAIChatbotSettingsPage();
+
+  const {
+    tenantId: queryTenantId,
+    dataUpdatedAt,
     formValues: fetchedFormValues,
     budget,
     modelOptions,
@@ -243,28 +242,49 @@ export const AIChatbotSettings: React.FC = () => {
     isLoading,
     isError,
     refetch,
-    isFetching,
     hasApiData,
-  } = useChatTenantSettingsQuery();
+  } = settingsQuery;
 
   const [values, setValues] = useState<AIChatbotSettingsFormValues>(
     defaultAIChatbotSettingsFormValues(),
   );
   const [formHydrated, setFormHydrated] = useState(false);
-  const saveMutation = useUpdateChatTenantSettingsMutation();
 
   useEffect(() => {
-    if (isLoading || isFetching) return;
+    setValues(defaultAIChatbotSettingsFormValues());
+    setFormHydrated(false);
+  }, [appliedTenantId]);
+
+  useEffect(() => {
+    if (!appliedTenantId || queryTenantId !== appliedTenantId || isLoading) {
+      return;
+    }
     const next = fetchedFormValues ?? defaultAIChatbotSettingsFormValues();
     setValues(next);
     setFormHydrated(true);
-  }, [fetchedFormValues, isLoading, isFetching]);
+  }, [
+    appliedTenantId,
+    queryTenantId,
+    dataUpdatedAt,
+    fetchedFormValues,
+    isLoading,
+  ]);
 
   const updateRateLimit = useCallback(
     (key: keyof AIChatbotSettingsFormValues["rateLimits"], next: string) => {
       setValues((prev) => ({
         ...prev,
         rateLimits: { ...prev.rateLimits, [key]: next },
+      }));
+    },
+    [],
+  );
+
+  const updateBudget = useCallback(
+    (key: keyof AIChatbotSettingsFormValues["budget"], next: string) => {
+      setValues((prev) => ({
+        ...prev,
+        budget: { ...prev.budget, [key]: next },
       }));
     },
     [],
@@ -281,44 +301,81 @@ export const AIChatbotSettings: React.FC = () => {
   );
 
   const handleSave = useCallback(() => {
-    const validationError = validateAIChatbotSettingsForm(values);
+    if (!canEditSettings) {
+      toast.error("You do not have permission to edit tenant settings.");
+      return;
+    }
+    const validationError = validateAIChatbotSettingsForm(values, appliedTenantId);
     if (validationError) {
       toast.error(validationError);
       return;
     }
     saveMutation.mutate(values);
-  }, [saveMutation, values]);
+  }, [appliedTenantId, canEditSettings, saveMutation, values]);
 
   const isSaving = saveMutation.isPending;
-  const fieldsDisabled = isLoading || !formHydrated || isSaving;
+  const fieldsDisabled =
+    isLoading || !formHydrated || isSaving || !canEditSettings;
 
   const modelSelectOptions = useMemo(
     () => buildModelSelectOptions(modelOptions, values.openAiModel),
     [modelOptions, values.openAiModel],
   );
 
+  if (!appliedTenantId) {
+    return (
+      <div className="ai-chatbot-settings">
+        <CompanyFilterBar
+          companiesLoading={companiesLoading}
+          companyOptions={companyOptions}
+          selectedCompanyOption={selectedCompanyOption}
+          onCompanySelect={handleCompanySelect}
+          onApplyFilter={handleApplyFilter}
+        />
+        <p className="ai-chatbot-settings__hint">Select a company to load settings.</p>
+      </div>
+    );
+  }
+
   if (isLoading && !formHydrated) {
-    return <p style={hintTextStyle}>Loading AI Chatbot settings…</p>;
+    return (
+      <div className="ai-chatbot-settings">
+        <CompanyFilterBar
+          companiesLoading={companiesLoading}
+          companyOptions={companyOptions}
+          selectedCompanyOption={selectedCompanyOption}
+          onCompanySelect={handleCompanySelect}
+          onApplyFilter={handleApplyFilter}
+          appliedCompanyLabel={appliedCompanyLabel}
+        />
+        <p className="ai-chatbot-settings__hint">Loading AI Chatbot settings…</p>
+      </div>
+    );
   }
 
   return (
-    <form style={formStyle} onSubmit={(e) => e.preventDefault()}>
+    <form
+      key={appliedTenantId}
+      className="ai-chatbot-settings"
+      onSubmit={(e) => e.preventDefault()}
+    >
+      <CompanyFilterBar
+        companiesLoading={companiesLoading}
+        companyOptions={companyOptions}
+        selectedCompanyOption={selectedCompanyOption}
+        onCompanySelect={handleCompanySelect}
+        onApplyFilter={handleApplyFilter}
+        appliedCompanyLabel={appliedCompanyLabel}
+      />
+
       {isError && (
-        <p style={statusTextStyle}>
+        <p className="ai-chatbot-settings__status">
           Could not load settings. Using defaults.{" "}
           <button
             type="button"
+            className="ai-chatbot-settings__retry"
             onClick={() => {
               refetch().catch(() => undefined);
-            }}
-            style={{
-              border: "none",
-              background: "none",
-              color: "#991b1b",
-              textDecoration: "underline",
-              cursor: "pointer",
-              padding: 0,
-              font: "inherit",
             }}
           >
             Retry
@@ -327,47 +384,85 @@ export const AIChatbotSettings: React.FC = () => {
       )}
 
       {!isError && !hasApiData && formHydrated && (
-        <p style={hintTextStyle}>No settings returned — using built-in defaults.</p>
+        <p className="ai-chatbot-settings__hint">
+          No settings returned — using built-in defaults.
+        </p>
       )}
 
-      {budget && <BudgetLine budget={budget} />}
-
-      <div style={formSectionStyle}>
-        <p style={rowLabelStyle}>Rate limits</p>
-        <div style={gridFourColStyle}>
+      <div className="ai-chatbot-settings__section">
+        <p className="ai-chatbot-settings__row-label">Rate limits</p>
+        <div className="ai-chatbot-settings__grid-4">
           <NumberField
             label="User / min"
             value={values.rateLimits.perUserPerMinute}
             onChange={(v) => updateRateLimit("perUserPerMinute", v)}
+            placeholder={AI_CHATBOT_FIELD_PLACEHOLDERS.rateLimits.perUserPerMinute}
             disabled={fieldsDisabled}
           />
           <NumberField
             label="User / day"
             value={values.rateLimits.perUserPerDay}
             onChange={(v) => updateRateLimit("perUserPerDay", v)}
+            placeholder={AI_CHATBOT_FIELD_PLACEHOLDERS.rateLimits.perUserPerDay}
             disabled={fieldsDisabled}
           />
           <NumberField
             label="Tenant / min"
             value={values.rateLimits.perTenantPerMinute}
             onChange={(v) => updateRateLimit("perTenantPerMinute", v)}
+            placeholder={
+              AI_CHATBOT_FIELD_PLACEHOLDERS.rateLimits.perTenantPerMinute
+            }
             disabled={fieldsDisabled}
           />
           <NumberField
             label="Tenant / day"
             value={values.rateLimits.perTenantPerDay}
             onChange={(v) => updateRateLimit("perTenantPerDay", v)}
+            placeholder={AI_CHATBOT_FIELD_PLACEHOLDERS.rateLimits.perTenantPerDay}
             disabled={fieldsDisabled}
           />
         </div>
       </div>
 
-      <div style={formSectionStyle}>
-        <p style={rowLabelStyle}>Model & pricing</p>
-        <div style={gridThreeColStyle}>
-          <label style={{ margin: 0 }}>
-            <span style={fieldLabelStyle}>OpenAI model</span>
+      <div className="ai-chatbot-settings__section">
+        <p className="ai-chatbot-settings__row-label">Budget (USD)</p>
+        <div className="ai-chatbot-settings__grid-2">
+          <NumberField
+            label="Monthly Budget (USD)"
+            value={values.budget.monthlyBudgetUsd}
+            onChange={(v) => updateBudget("monthlyBudgetUsd", v)}
+            placeholder={AI_CHATBOT_FIELD_PLACEHOLDERS.budget.monthlyBudgetUsd}
+            step="0.01"
+            min={0}
+            disabled={fieldsDisabled}
+          />
+          <NumberField
+            label="Alert threshold (%)"
+            value={values.budget.alertThresholdPct}
+            onChange={(v) => updateBudget("alertThresholdPct", v)}
+            placeholder={AI_CHATBOT_FIELD_PLACEHOLDERS.budget.alertThresholdPct}
+            min={0}
+            max={100}
+            step="1"
+            disabled={fieldsDisabled}
+          />
+        </div>
+        <p className="ai-chatbot-settings__hint">
+          Alert threshold triggers when spend reaches this percentage of the
+          monthly cap.
+        </p>
+      </div>
+
+      <LiveSpendSection budget={budget} />
+
+      <div className="ai-chatbot-settings__section">
+        <p className="ai-chatbot-settings__row-label">Model & pricing</p>
+        <div className="ai-chatbot-settings__grid-3">
+          <label className="ai-chatbot-settings__field">
+            <span className="ai-chatbot-settings__field-label">OpenAI model</span>
             <select
+              className="ai-chatbot-settings__select"
               value={values.openAiModel}
               disabled={fieldsDisabled}
               onChange={(e) => {
@@ -386,7 +481,6 @@ export const AIChatbotSettings: React.FC = () => {
                     : prev.pricing,
                 }));
               }}
-              style={selectStyle}
             >
               <option value="">Select model…</option>
               {modelSelectOptions.map((opt) => (
@@ -400,6 +494,7 @@ export const AIChatbotSettings: React.FC = () => {
             label="Input $ / 1M tokens"
             value={values.pricing.inputCostPerMillion}
             onChange={(v) => updatePricing("inputCostPerMillion", v)}
+            placeholder={AI_CHATBOT_FIELD_PLACEHOLDERS.pricing.inputCostPerMillion}
             step="0.000001"
             min={0}
             disabled={fieldsDisabled}
@@ -408,6 +503,7 @@ export const AIChatbotSettings: React.FC = () => {
             label="Output $ / 1M tokens"
             value={values.pricing.outputCostPerMillion}
             onChange={(v) => updatePricing("outputCostPerMillion", v)}
+            placeholder={AI_CHATBOT_FIELD_PLACEHOLDERS.pricing.outputCostPerMillion}
             step="0.000001"
             min={0}
             disabled={fieldsDisabled}
@@ -415,18 +511,20 @@ export const AIChatbotSettings: React.FC = () => {
         </div>
       </div>
 
-      <button
-        type="button"
-        onClick={handleSave}
-        disabled={isSaving || fieldsDisabled}
-        style={{
-          ...saveButtonStyle,
-          opacity: isSaving || fieldsDisabled ? 0.65 : 1,
-          cursor: isSaving || fieldsDisabled ? "not-allowed" : "pointer",
-        }}
-      >
-        {isSaving ? "Saving…" : "Save"}
-      </button>
+      {canEditSettings ? (
+        <button
+          type="button"
+          className="ai-chatbot-settings__save"
+          onClick={handleSave}
+          disabled={isSaving || fieldsDisabled}
+        >
+          {isSaving ? "Saving…" : "Save"}
+        </button>
+      ) : (
+        <p className="ai-chatbot-settings__hint">
+          You have view-only access to tenant settings.
+        </p>
+      )}
     </form>
   );
 };

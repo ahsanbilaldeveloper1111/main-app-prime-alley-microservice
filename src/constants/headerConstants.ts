@@ -476,6 +476,12 @@ export const HEADER_CONSTANTS = {
     MANAGE_TENANT_PROFILE_AI_CHAT: "view-tenant-profile-ai-chat",
     MANAGE_GLOBAL_FAQS_AI_CHAT: "manage-global-faqs-ai-chat",
     VIEW_AI_CHAT_AI_CHAT: "view-ai-chat-ai-chat",
+    VIEW_ADMIN_DASHBOARD_AI_CHAT: "view-admin-dashboard-ai-chat",
+    VIEW_TENANT_DASHBOARD_AI_CHAT: "view-tenant-dashboard-ai-chat",
+    VIEW_TENANT_SETTING_AI_CHAT: "view-tenant-setting-ai-chat",
+    EDIT_TENANT_SETTINGS_AI_CHAT: "edit-tenant-settings-ai-chat",
+    DELETE_GLOBAL_FAQS_AI_CHAT: "delete-global-faqs-ai-chat",
+    DELETE_TENANT_FAQS_AI_CHAT: "delete-tenant-faqs-ai-chat",
     //AI chat permissions end
 
     TRANSCRIPTION_ANALYSIS_AIML: "transcriptions-analysis-aiml",
