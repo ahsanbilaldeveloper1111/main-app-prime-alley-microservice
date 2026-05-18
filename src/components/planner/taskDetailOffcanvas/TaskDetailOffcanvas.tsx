@@ -1,5 +1,11 @@
 import React, { useCallback, useMemo, useRef, useState } from "react";
+import { useSession } from "next-auth/react";
+import { getSessionPhoneOrExtension } from "@planner/projectMemberRole";
 import { Button, Modal, Nav, Offcanvas } from "react-bootstrap";
+import { PlannerAddToMyDayEstimateModal } from "@components/planner/plannerTasksListing/PlannerAddToMyDayEstimateModal";
+import { PlannerAddToMyDayHeaderButton } from "@components/planner/plannerTasksListing/PlannerAddToMyDayHeaderButton";
+import { toPlannerAddToMyDayTarget } from "@components/planner/plannerTasksListing/plannerTasksListingMyDay";
+import { usePlannerAddToMyDay } from "@components/planner/plannerTasksListing/usePlannerAddToMyDay";
 import { Edit, Trash2 } from "lucide-react";
 import {
   getTaskActivities,
@@ -49,9 +55,32 @@ const TaskDetailOffcanvas: React.FC<TaskDetailOffcanvasProps> = ({
   getStatusVariant,
   getPriorityVariant,
 }) => {
+  const { data: session } = useSession();
   const { hasPermission } = usePermissions();
+  const extensionNumber = useMemo(() => getSessionPhoneOrExtension(session), [session]);
   const canEditPlannerTask = hasPermission(PERMISSIONS.EDIT_TASKS_WORK_PLANNER);
   const canDeletePlannerTask = hasPermission(PERMISSIONS.DELETE_TASKS_WORK_PLANNER);
+  const canUseMyDay = hasPermission(PERMISSIONS.VIEW_MY_DAY_TASKS_WORK_PLANNER);
+
+  const addToMyDayTarget = useMemo(() => {
+    if (!selectedTask?.rawData?.id) return null;
+    const rawId = selectedTask.rawData.id;
+    const id = typeof rawId === "number" ? rawId : Number(rawId);
+    if (!Number.isFinite(id) || id <= 0) return null;
+    return toPlannerAddToMyDayTarget(id, selectedTask.title, selectedTask.rawData);
+  }, [selectedTask]);
+
+  const {
+    pendingTask: addToMyDayPendingTask,
+    estimateInput: addToMyDayEstimateInput,
+    setEstimateInput: setAddToMyDayEstimateInput,
+    closeEstimateModal: closeAddToMyDayEstimateModal,
+    requestAddTaskToMyDay,
+    skipEstimateAndAdd: skipAddToMyDayEstimate,
+    confirmEstimateAndAdd: confirmAddToMyDayEstimate,
+    canAddTaskToMyDay,
+    isTaskInMyDay,
+  } = usePlannerAddToMyDay({ canUseMyDay, extensionNumber });
 
   const [showAllActivitiesModal, setShowAllActivitiesModal] = useState(false);
   const [allActivities, setAllActivities] = useState<TaskActivityItem[]>([]);
@@ -182,6 +211,14 @@ const TaskDetailOffcanvas: React.FC<TaskDetailOffcanvasProps> = ({
             <span className="fw-bold">{selectedTask?.title} </span>
           </Offcanvas.Title>
           <div className="d-flex align-items-center gap-1 flex-shrink-0">
+            <PlannerAddToMyDayHeaderButton
+              show={canUseMyDay && addToMyDayTarget != null}
+              canAdd={addToMyDayTarget != null && canAddTaskToMyDay(addToMyDayTarget)}
+              alreadyInMyDay={addToMyDayTarget != null && isTaskInMyDay(addToMyDayTarget)}
+              onClick={() => {
+                if (addToMyDayTarget) requestAddTaskToMyDay(addToMyDayTarget);
+              }}
+            />
             {canEditPlannerTask ? (
               <Button variant="link" className="text-primary p-0" onClick={onEditTask} title="Edit Task">
                 <Edit size={20} />
@@ -311,6 +348,16 @@ const TaskDetailOffcanvas: React.FC<TaskDetailOffcanvasProps> = ({
           </Button>
         </Modal.Footer>
       </Modal>
+
+      <PlannerAddToMyDayEstimateModal
+        show={addToMyDayPendingTask != null}
+        taskTitle={addToMyDayPendingTask?.title ?? ""}
+        estimateInput={addToMyDayEstimateInput}
+        onEstimateInputChange={setAddToMyDayEstimateInput}
+        onClose={closeAddToMyDayEstimateModal}
+        onSkip={skipAddToMyDayEstimate}
+        onConfirm={confirmAddToMyDayEstimate}
+      />
     </>
   );
 };
