@@ -1,6 +1,6 @@
 import React from "react";
 import { Dropdown } from "react-bootstrap";
-import { MoreVertical, Settings, Trash2 } from "lucide-react";
+import { MoreVertical, Settings, Sun, Trash2 } from "lucide-react";
 import {
   TaskCompleteCircleButton,
   TaskListingAssigneeCell,
@@ -15,6 +15,7 @@ import {
   formatRepeatStatusLabel,
   taskStatusColumnLabel,
 } from "./plannerTasksListingDomain";
+import { plannerAddToMyDayDisabledTitle } from "./plannerTasksListingMyDay";
 import "./plannerTasksListing.scss";
 
 function plannerPriorityDotModifier(priority: string): "low" | "medium" | "normal" | "high" | "urgent" {
@@ -113,11 +114,16 @@ export function PlannerTaskNotesCell({ row }: PlannerTaskNotesCellProps) {
 export type PlannerTaskRowActionsMenuProps = Readonly<{
   row: Task;
   isOpen: boolean;
+  showAddToMyDay: boolean;
+  canAddToMyDay: boolean;
+  alreadyInMyDay: boolean;
   canEditRow: boolean;
   canDeleteRow: boolean;
+  addToMyDayTitle?: string | null;
   editTitle?: string | null;
   deleteTitle?: string | null;
   setOpenTaskActionsId: React.Dispatch<React.SetStateAction<number | null>>;
+  onAddToMyDay: () => void;
   onEdit: () => void;
   onDelete: () => void;
 }>;
@@ -125,11 +131,16 @@ export type PlannerTaskRowActionsMenuProps = Readonly<{
 export function PlannerTaskRowActionsMenu({
   row,
   isOpen,
+  showAddToMyDay,
+  canAddToMyDay,
+  alreadyInMyDay,
   canEditRow,
   canDeleteRow,
+  addToMyDayTitle,
   editTitle,
   deleteTitle,
   setOpenTaskActionsId,
+  onAddToMyDay,
   onEdit,
   onDelete,
 }: PlannerTaskRowActionsMenuProps) {
@@ -149,6 +160,28 @@ export function PlannerTaskRowActionsMenu({
         <MoreVertical size={16} />
       </Dropdown.Toggle>
       <Dropdown.Menu align="end">
+        {showAddToMyDay ? (
+          <>
+            <Dropdown.Item
+              as="button"
+              type="button"
+              aria-disabled={!canAddToMyDay}
+              className={`dropdown-item ptl-dropdown-item ${canAddToMyDay ? "" : "ptl-dropdown-item--disabled text-muted"}`}
+              title={
+                addToMyDayTitle ?? plannerAddToMyDayDisabledTitle(showAddToMyDay, alreadyInMyDay)
+              }
+              onClick={() => {
+                if (!canAddToMyDay) return;
+                setOpenTaskActionsId(null);
+                onAddToMyDay();
+              }}
+            >
+              <Sun size={14} className="me-2" />
+              {alreadyInMyDay ? "Already in My Day" : "Add to My Day"}
+            </Dropdown.Item>
+            <Dropdown.Divider />
+          </>
+        ) : null}
         <Dropdown.Item
           as="button"
           type="button"

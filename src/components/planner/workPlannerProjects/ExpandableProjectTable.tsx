@@ -91,7 +91,7 @@ function projectOverviewMenuClickHandler(
 ): () => void {
   return () => {
     setOpenProjectActionsId(null);
-    window.open(`/planner/projects/${project.id}`, "_blank");
+    globalThis.window?.open(`/planner/projects/${project.id}`, "_blank");
   };
 }
 

@@ -113,6 +113,8 @@ export function getVisibleDropdownOptions<T>(
 
 export interface TableAction<T = any> {
   label: string;
+  /** Context-menu label when `disabled(row)` is true (e.g. "Already in My Day"). */
+  disabledLabel?: string;
   icon?: React.ReactNode;
   onClick?: (row: T) => void;
   variant?: string;
@@ -194,8 +196,12 @@ function buildClickActionContextMenuItem<T>(
   row: T,
 ): TableContextMenuItem<T> {
   const isDisabled = action.disabled?.(row);
+  const label =
+    isDisabled && action.disabledLabel?.trim()
+      ? action.disabledLabel.trim()
+      : action.label;
   return {
-    label: action.label,
+    label,
     icon: action.icon,
     onClick: action.onClick,
     divider: false,
@@ -287,7 +293,7 @@ function renderGtContextMenuItemRow(
               aria-hidden
             />
           </div>
-          <div className="gt-context-submenu" role="menu">
+          <div className="gt-context-submenu" role="menu" tabIndex={-1}>
             {item.submenu.map((sub, subIdx) =>
               renderGtContextMenuItemRow(sub, subIdx, `${key}-sub`, onClose),
             )}
@@ -2263,6 +2269,8 @@ const GenericTable = <T extends Record<string, any>>({
           className="gt-context-menu"
           style={{ left: contextMenu.x, top: contextMenu.y }}
           role="menu"
+          tabIndex={-1}
+          onMouseDown={(e) => e.stopPropagation()}
         >
           <GtContextMenuItemList
             items={getBoundContextMenuItems(contextMenu.row)}
