@@ -21,6 +21,7 @@ import {
   validateAIChatbotSettingsForm,
 } from "./mapTenantChatSettings";
 import { AI_CHATBOT_FIELD_PLACEHOLDERS } from "./constants";
+import { ModelPricingDefaultsTable } from "./ModelPricingDefaultsTable";
 import { useAIChatbotSettingsPage } from "./useAIChatbotSettingsPage";
 
 type CompanySelectOption = { value: string; label: string };
@@ -238,6 +239,7 @@ export const AIChatbotSettings: React.FC = () => {
     formValues: fetchedFormValues,
     budget,
     modelOptions,
+    pricingTable,
     rawSettings,
     isLoading,
     isError,
@@ -510,6 +512,8 @@ export const AIChatbotSettings: React.FC = () => {
           />
         </div>
       </div>
+
+      <ModelPricingDefaultsTable pricingTable={pricingTable} />
 
       {canEditSettings ? (
         <button

@@ -286,7 +286,8 @@ export const HEADER_CONSTANTS = {
     CRM_SERVICES: "crm-services",
     COMMUNICATIONS_SERVICES: "communications-services-services",
     WORK_PLANNER_SERVICES: "work-planner-services",
-    CONVERT_TO_RECURRING_TASK_WORK_PLANNER: "convert-to-recurring-task-work-planner",
+    CONVERT_TO_RECURRING_TASK_WORK_PLANNER:
+      "convert-to-recurring-task-work-planner",
     PULSE_SERVICES: "pulse-services",
     DNCR_SERVICES: "dncr-services",
     ACCOUNTS_SERVICES: "accounts-services",
@@ -478,7 +479,7 @@ export const HEADER_CONSTANTS = {
     VIEW_AI_CHAT_AI_CHAT: "view-ai-chat-ai-chat",
     VIEW_ADMIN_DASHBOARD_AI_CHAT: "view-admin-dashboard-ai-chat",
     VIEW_TENANT_DASHBOARD_AI_CHAT: "view-tenant-dashboard-ai-chat",
-    VIEW_TENANT_SETTING_AI_CHAT: "view-tenant-setting-ai-chat",
+    VIEW_TENANT_SETTING_AI_CHAT: "view-tenant-settings-ai-chat",
     EDIT_TENANT_SETTINGS_AI_CHAT: "edit-tenant-settings-ai-chat",
     DELETE_GLOBAL_FAQS_AI_CHAT: "delete-global-faqs-ai-chat",
     DELETE_TENANT_FAQS_AI_CHAT: "delete-tenant-faqs-ai-chat",

@@ -249,7 +249,8 @@ const Sidebar: React.FC<SidebarProps> = ({ activeSection, onNavigate }) => {
         const permissionFilteredItems = group.items.filter((item) => {
           const required = item.permission
           if (!required) return true
-          return hasPermission(required)
+          if (typeof required === 'string') return hasPermission(required)
+          return required.some((perm) => hasPermission(perm))
         })
         const filteredItems = searchQuery.trim()
           ? permissionFilteredItems.filter((item) =>

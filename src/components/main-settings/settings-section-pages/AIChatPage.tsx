@@ -1,4 +1,4 @@
-import { HEADER_CONSTANTS } from '@constants/headerConstants'
+import { AI_CHAT_SETTINGS_TAB_PERMISSIONS } from '@config/aiChatPermissions'
 import ToolProfiles from '@pages/chat/tools-profiles'
 import FaqProfiles from '@pages/chat/faq-profiles'
 import AIChatFAQsTenant from '@pages/chat/ai-faqs/tenant'
@@ -9,17 +9,31 @@ import type { ControlledTabsProps, Tab } from '../types'
 import { SettingsSectionTabShell } from './SettingsSectionTabShell'
 import { useSettingsSectionTabs } from './useSettingsSectionTabs'
 
-const { PERMISSIONS } = HEADER_CONSTANTS
-
 const aiChatTabs: Tab[] = [
-  { id: 'tools-profiles', label: 'Tools Profiles', permission: PERMISSIONS.VIEW_AI_CHAT },
-  { id: 'faq-profiles', label: 'FAQ Profiles', permission: PERMISSIONS.VIEW_AI_CHAT },
-  { id: 'tenant-profile', label: 'Tenant Profile', permission: PERMISSIONS.VIEW_AI_CHAT },
-  { id: 'global-faqs', label: 'Global FAQs', permission: PERMISSIONS.VIEW_AI_CHAT },
+  {
+    id: 'tools-profiles',
+    label: 'Tools Profiles',
+    permission: AI_CHAT_SETTINGS_TAB_PERMISSIONS.toolsProfiles,
+  },
+  {
+    id: 'faq-profiles',
+    label: 'FAQ Profiles',
+    permission: AI_CHAT_SETTINGS_TAB_PERMISSIONS.faqProfiles,
+  },
+  {
+    id: 'tenant-profile',
+    label: 'Tenant Profile',
+    permission: AI_CHAT_SETTINGS_TAB_PERMISSIONS.tenantProfile,
+  },
+  {
+    id: 'global-faqs',
+    label: 'Global FAQs',
+    permission: AI_CHAT_SETTINGS_TAB_PERMISSIONS.globalFaqs,
+  },
   {
     id: 'ai-chatbot-settings',
     label: 'AI Chatbot Settings',
-    permission: PERMISSIONS.VIEW_TENANT_SETTING_AI_CHAT,
+    permission: AI_CHAT_SETTINGS_TAB_PERMISSIONS.chatbotSettings,
   },
 ]
 
