@@ -1,4 +1,5 @@
 import { HEADER_CONSTANTS } from '@constants/headerConstants'
+import { AI_CHAT_SETTINGS_SECTION_PERMISSIONS } from '@config/aiChatPermissions'
 
 const { PERMISSIONS } = HEADER_CONSTANTS
 
@@ -7,7 +8,8 @@ export type SidebarItem = {
   label: string
   badge?: string
   externalLink?: boolean
-  permission?: string
+  /** Single permission or any-of list for section visibility. */
+  permission?: string | readonly string[]
 }
 
 export type SidebarGroup = {
@@ -37,7 +39,7 @@ export const sidebarGroups: SidebarGroup[] = [
       { id: 'billing', label: 'Billing', permission: PERMISSIONS.ACCOUNTS_SERVICES },
       { id: 'tickets', label: 'Tickets', permission: PERMISSIONS.TICKETS_SERVICES },
       { id: 'help-center', label: 'Help Center', permission: PERMISSIONS.FOR_VIEW_HELP_CENTER_SERVICES },
-      { id: 'ai-chat', label: 'AI Chat', permission: PERMISSIONS.AI_ML_SERVICES },
+      { id: 'ai-chat', label: 'AI Chat', permission: AI_CHAT_SETTINGS_SECTION_PERMISSIONS },
     ],
   },
 ]

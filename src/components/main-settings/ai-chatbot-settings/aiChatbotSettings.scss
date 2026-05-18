@@ -225,6 +225,58 @@
     width: 100%;
   }
 
+  &__pricing-reference-scroll {
+    width: 100%;
+    overflow-x: auto;
+    border: 1px solid #e5e7eb;
+    border-radius: 4px;
+    background: #fff;
+  }
+
+  &__pricing-reference-table {
+    width: 100%;
+    min-width: 420px;
+    border-collapse: collapse;
+    font-size: 13px;
+    line-height: 1.35;
+
+    thead th {
+      padding: 10px 12px;
+      text-align: left;
+      font-weight: 600;
+      color: #374151;
+      background: #f3f4f6;
+      border-bottom: 1px solid #e5e7eb;
+      white-space: nowrap;
+    }
+
+    tbody td {
+      padding: 10px 12px;
+      border-bottom: 1px solid #e5e7eb;
+      color: #111827;
+      vertical-align: middle;
+    }
+
+    tbody tr:last-child td {
+      border-bottom: none;
+    }
+  }
+
+  &__pricing-ref-num {
+    text-align: right;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+  }
+
+  &__pricing-ref-model {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+      "Liberation Mono", "Courier New", monospace;
+    font-size: 12px;
+    color: #111827;
+    background: transparent;
+    padding: 0;
+  }
+
   &__save {
     border: 1px solid #111827;
     background: #111827;

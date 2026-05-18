@@ -1,0 +1,30 @@
+import { HEADER_CONSTANTS } from "@constants/headerConstants";
+
+const { PERMISSIONS } = HEADER_CONSTANTS;
+
+/** Granular permissions for each AI Chat settings tab (matches `src/config/permissions.ts` routes). */
+export const AI_CHAT_SETTINGS_TAB_PERMISSIONS = {
+  toolsProfiles: PERMISSIONS.VIEW_TOOLS_PROFILE_AI_CHAT,
+  faqProfiles: PERMISSIONS.VIEW_FAQS_PROFILE_AI_CHAT,
+  tenantProfile: PERMISSIONS.MANAGE_TENANT_PROFILE_AI_CHAT,
+  globalFaqs: PERMISSIONS.MANAGE_GLOBAL_FAQS_AI_CHAT,
+  chatbotSettings: PERMISSIONS.VIEW_TENANT_SETTING_AI_CHAT,
+} as const;
+
+/**
+ * Show Main Settings → AI Chat when the user has the service flag or any chatbot feature permission.
+ */
+export const AI_CHAT_SETTINGS_SECTION_PERMISSIONS: readonly string[] = [
+  PERMISSIONS.AI_ML_SERVICES,
+  PERMISSIONS.VIEW_AI_CHAT_AI_CHAT,
+  AI_CHAT_SETTINGS_TAB_PERMISSIONS.toolsProfiles,
+  AI_CHAT_SETTINGS_TAB_PERMISSIONS.faqProfiles,
+  AI_CHAT_SETTINGS_TAB_PERMISSIONS.tenantProfile,
+  AI_CHAT_SETTINGS_TAB_PERMISSIONS.globalFaqs,
+  AI_CHAT_SETTINGS_TAB_PERMISSIONS.chatbotSettings,
+  PERMISSIONS.VIEW_ADMIN_DASHBOARD_AI_CHAT,
+  PERMISSIONS.VIEW_TENANT_DASHBOARD_AI_CHAT,
+  PERMISSIONS.EDIT_TENANT_SETTINGS_AI_CHAT,
+  PERMISSIONS.DELETE_TENANT_FAQS_AI_CHAT,
+  PERMISSIONS.DELETE_GLOBAL_FAQS_AI_CHAT,
+];
