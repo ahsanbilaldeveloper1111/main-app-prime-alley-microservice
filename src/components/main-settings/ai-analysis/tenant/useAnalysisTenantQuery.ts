@@ -1,5 +1,8 @@
 import { aiAnalyticsKeys } from "@query/keys";
-import { getAnalysisTenant } from "@utils/aiAnalytics";
+import {
+  getAnalysisTenant,
+  type AnalysisTenantRecord,
+} from "@utils/aiAnalytics";
 import { useQuery } from "@tanstack/react-query";
 import { useSession } from "next-auth/react";
 import { useMemo } from "react";
@@ -10,7 +13,7 @@ export function useAnalysisTenantQuery(appliedTenantId: string) {
   const { status: sessionStatus } = useSession();
   const tenantId = appliedTenantId.trim();
 
-  const query = useQuery({
+  const query = useQuery<AnalysisTenantRecord | null>({
     queryKey: aiAnalyticsKeys.tenants.detail(tenantId),
     queryFn: () => getAnalysisTenant(tenantId),
     enabled: sessionStatus === "authenticated" && Boolean(tenantId),

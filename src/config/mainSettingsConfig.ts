@@ -7,7 +7,7 @@ export type SidebarItem = {
   label: string;
   badge?: string;
   externalLink?: boolean;
-  permission?: string;
+  permission?: string | readonly string[];
 };
 
 export type SidebarGroup = {
