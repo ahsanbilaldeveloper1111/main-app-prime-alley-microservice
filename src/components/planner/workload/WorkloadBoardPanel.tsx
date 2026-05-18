@@ -128,23 +128,16 @@ export function WorkloadBoardPanel({
             hierarchyExtensions,
             col,
           );
+          const isDropTarget = dropHighlight === col.extension_number;
           return (
             <section
               key={col.extension_number}
-              className={`workload-board__column ${
-                dropHighlight === col.extension_number
-                  ? "workload-board__column--drop-target"
-                  : ""
-              }`}
+              className={`workload-board__column ${isDropTarget ? "workload-board__column--drop-target" : ""}`}
               aria-label={`${columnLabel} workload column`}
-              tabIndex={0}
               onDragOver={allowDrop}
               onDragEnter={() => setDropHighlight(col.extension_number)}
               onDragLeave={() => setDropHighlight(null)}
               onDrop={(e) => handleDrop(e, col.extension_number, null)}
-              onKeyDown={(event) => {
-                if (event.key === "Escape") event.currentTarget.blur();
-              }}
             >
               <div className="workload-board__column-head">
                 <WorkloadMemberIdentity

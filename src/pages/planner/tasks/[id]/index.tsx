@@ -178,7 +178,7 @@ const TaskDetailPage = () => {
     canUseMyDay: sessionCanUseMyDay,
     extensionNumber: sessionUserPhoneOrExtension,
     onAdded: () => {
-      void refetchTask();
+      refetchTask().catch(() => undefined);
     },
   });
 

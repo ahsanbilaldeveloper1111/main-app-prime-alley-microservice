@@ -49,7 +49,9 @@ export function workloadMemberAvatarColor(extensionNumber: string): string {
   const ext = extensionNumber.trim();
   let hash = 0;
   for (let i = 0; i < ext.length; i += 1) {
-    hash = Math.trunc(hash * 31 + ext.charCodeAt(i));
+    const codePoint = ext.codePointAt(i) ?? 0;
+    hash = Math.trunc(hash * 31 + codePoint);
+    if (codePoint > 0xffff) i += 1;
   }
   const idx = Math.abs(hash) % WORKLOAD_AVATAR_PALETTE.length;
   return WORKLOAD_AVATAR_PALETTE[idx];
@@ -377,8 +379,6 @@ export function listWorkloadDaysInRange(start: string, end: string): string[] {
 }
 
 export type WorkloadProjectFilterValue = "all" | "none" | number;
-
-export type WorkloadMemberFilterValue = "all" | string;
 
 export type WorkloadPriorityFilterValue =
   | "all"

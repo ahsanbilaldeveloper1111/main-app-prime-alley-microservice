@@ -223,6 +223,14 @@ function mapApiTaskToMyDayTask(
   };
 }
 
+function readMyDaySuggestionProject(
+  project: unknown,
+): { name?: string | null } | null {
+  if (project == null || typeof project !== "object") return null;
+  const name = (project as Record<string, unknown>).name;
+  return { name: typeof name === "string" ? name : null };
+}
+
 function toApiTask(input: unknown): ApiTask {
   if (input == null || typeof input !== "object") return { id: 0 };
   const row = input as Record<string, unknown>;
@@ -244,10 +252,7 @@ function toApiTask(input: unknown): ApiTask {
         : null,
     estimated_minutes: typeof row.estimated_minutes === "number" ? row.estimated_minutes : null,
     already_in_my_day: row.already_in_my_day === true,
-    project:
-      row.project != null && typeof row.project === "object"
-        ? (row.project as { name?: string | null })
-        : null,
+    project: readMyDaySuggestionProject(row.project),
   };
 }
 
@@ -330,6 +335,37 @@ function MyDaySuggestedItemButton({
   );
 }
 
+function MyDayTaskEstimateSlot({
+  task,
+  onEditEstimate,
+}: Readonly<{
+  task: MyDayTask;
+  onEditEstimate?: (task: MyDayTask) => void;
+}>) {
+  if (task.estimateMinutes > 0) {
+    return (
+      <span className="myday-tag myday-tag--estimate">
+        {toMinutesDisplay(task.estimateMinutes)}
+      </span>
+    );
+  }
+  if (task.isCompleted) {
+    return <span className="myday-tag myday-tag--estimate">No estimate</span>;
+  }
+  if (onEditEstimate) {
+    return (
+      <button
+        type="button"
+        className="myday-edit-estimate-btn"
+        onClick={() => onEditEstimate(task)}
+      >
+        Edit Estimate
+      </button>
+    );
+  }
+  return <span className="myday-tag myday-tag--estimate">No estimate</span>;
+}
+
 type MyDayTaskCardProps = Readonly<{
   task: MyDayTask;
   onToggleComplete: (task: MyDayTask) => void;
@@ -366,23 +402,7 @@ function MyDayTaskCard({ task, onToggleComplete, onRemove, onEditEstimate }: MyD
             {task.isFlexibleTask ? (
               <span className="myday-tag myday-tag--flexible">Flexible Task</span>
             ) : null}
-            {task.estimateMinutes > 0 ? (
-              <span className="myday-tag myday-tag--estimate">
-                {toMinutesDisplay(task.estimateMinutes)}
-              </span>
-            ) : task.isCompleted ? (
-              <span className="myday-tag myday-tag--estimate">No estimate</span>
-            ) : onEditEstimate ? (
-              <button
-                type="button"
-                className="myday-edit-estimate-btn"
-                onClick={() => onEditEstimate(task)}
-              >
-                Edit Estimate
-              </button>
-            ) : (
-              <span className="myday-tag myday-tag--estimate">No estimate</span>
-            )}
+            <MyDayTaskEstimateSlot task={task} onEditEstimate={onEditEstimate} />
           </div>
         </div>
       </div>
@@ -415,7 +435,6 @@ const MyDayTasksPage: React.FC = () => {
   const [estimateInput, setEstimateInput] = useState("");
   const [pendingEstimateTask, setPendingEstimateTask] = useState<MyDayTask | null>(null);
   const [plannedMinutes, setPlannedMinutes] = useState(0);
-  const [completedMinutes, setCompletedMinutes] = useState(0);
   const [rolloverShowPrompt, setRolloverShowPrompt] = useState(false);
   const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [planDate, setPlanDate] = useState("");
@@ -512,9 +531,6 @@ const MyDayTasksPage: React.FC = () => {
       setCapacityMinutes(resolvedCapacity);
       setPlannedMinutes(
         Number(capacityPayload.planned_minutes ?? taskPayload.meta?.planned_minutes ?? 0),
-      );
-      setCompletedMinutes(
-        Number(capacityPayload.completed_minutes ?? taskPayload.meta?.completed_minutes ?? 0),
       );
 
       const rollover = (rolloverPayload.tasks ?? []).map((row) =>
@@ -673,7 +689,8 @@ const MyDayTasksPage: React.FC = () => {
     if (isNew) {
       setTasksMeta((prev) => ({
         ...prev,
-        active_count: prev.active_count != null ? prev.active_count + 1 : prev.active_count,
+        active_count:
+          prev.active_count == null ? prev.active_count : prev.active_count + 1,
       }));
     }
     setSuggestedTasks((prev) =>
@@ -684,7 +701,7 @@ const MyDayTasksPage: React.FC = () => {
   const applyOptimisticMyDayRemove = useCallback((taskId: number) => {
     setTasks((prev) => {
       const removed = prev.find((row) => row.id === taskId);
-      if (!removed) return prev;
+      if (removed === undefined) return prev;
 
       const minutes = Math.max(0, removed.estimateMinutes);
       if (minutes > 0) {
@@ -692,21 +709,21 @@ const MyDayTasksPage: React.FC = () => {
         setTasksMeta((meta) => ({
           ...meta,
           planned_minutes:
-            meta.planned_minutes != null
-              ? Math.max(0, meta.planned_minutes - minutes)
-              : meta.planned_minutes,
+            meta.planned_minutes == null
+              ? meta.planned_minutes
+              : Math.max(0, meta.planned_minutes - minutes),
         }));
       }
       setTasksMeta((meta) => ({
         ...meta,
         active_count:
-          !removed.isCompleted && meta.active_count != null
-            ? Math.max(0, meta.active_count - 1)
-            : meta.active_count,
+          removed.isCompleted || meta.active_count == null
+            ? meta.active_count
+            : Math.max(0, meta.active_count - 1),
         completed_count:
-          removed.isCompleted && meta.completed_count != null
-            ? Math.max(0, meta.completed_count - 1)
-            : meta.completed_count,
+          removed.isCompleted === false || meta.completed_count == null
+            ? meta.completed_count
+            : Math.max(0, meta.completed_count - 1),
       }));
       return prev.filter((row) => row.id !== taskId);
     });

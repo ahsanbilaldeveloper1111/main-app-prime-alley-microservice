@@ -3,7 +3,6 @@ import { Badge, Button, Card, Col, Form, Nav, Row } from "react-bootstrap";
 import { Download, LayoutGrid, ListTodo, RefreshCw } from "lucide-react";
 import type { AssigneeMatch, WorkloadRangePreset } from "@utils/tasks";
 import type {
-  WorkloadMemberFilterValue,
   WorkloadPriorityFilterValue,
   WorkloadProjectFilterValue,
 } from "@page-modules/planner/workload/workloadDomain";
@@ -77,8 +76,8 @@ type WorkloadPlannerFiltersCardProps = Readonly<{
   projectFilter: WorkloadProjectFilterValue;
   onProjectFilterChange: (value: WorkloadProjectFilterValue) => void;
   projectOptions: WorkloadProjectOption[];
-  memberFilter: WorkloadMemberFilterValue;
-  onMemberFilterChange: (value: WorkloadMemberFilterValue) => void;
+  memberFilter: string;
+  onMemberFilterChange: (value: string) => void;
   memberExtensions: string[];
   hierarchyExtensions?: unknown[] | null;
   priorityFilter: WorkloadPriorityFilterValue;
@@ -179,7 +178,7 @@ export function WorkloadPlannerFiltersCard({
             <Form.Select
               size="sm"
               value={memberFilter}
-              onChange={(e) => onMemberFilterChange(e.target.value as WorkloadMemberFilterValue)}
+              onChange={(e) => onMemberFilterChange(e.target.value)}
               disabled={!enabled}
             >
               <option value="all">All members</option>

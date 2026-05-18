@@ -35,7 +35,6 @@ import {
   workloadProjectFilterQuery,
   writeWorkloadMainViewPreference,
   workloadCellKey,
-  type WorkloadMemberFilterValue,
   type WorkloadPriorityFilterValue,
   type WorkloadProjectFilterValue,
 } from "@page-modules/planner/workload/workloadDomain";
@@ -110,7 +109,7 @@ const WorkloadPlannerPage: React.FC = () => {
   const [rescheduleDate, setRescheduleDate] = useState("");
   const [overloadSecondStep, setOverloadSecondStep] = useState(false);
   const [projectFilter, setProjectFilter] = useState<WorkloadProjectFilterValue>("all");
-  const [memberFilter, setMemberFilter] = useState<WorkloadMemberFilterValue>("all");
+  const [memberFilter, setMemberFilter] = useState("all");
   const [priorityFilter, setPriorityFilter] = useState<WorkloadPriorityFilterValue>("all");
   const [boardDropIntent, setBoardDropIntent] = useState<WorkloadBoardDropIntent | null>(null);
   const [boardDropOverload, setBoardDropOverload] = useState(false);
