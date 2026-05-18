@@ -1,0 +1,86 @@
+.settings-section-shell {
+  box-sizing: border-box;
+  flex: 1;
+  min-width: 0;
+  width: 100%;
+  padding: clamp(12px, 3vw, 20px) clamp(12px, 4vw, 40px) clamp(16px, 3vw, 32px);
+
+  &--dense {
+    padding: clamp(12px, 3vw, 20px) clamp(12px, 4vw, 40px) clamp(16px, 3vw, 24px);
+  }
+
+  &__title {
+    margin: 0 0 clamp(12px, 2.5vw, 24px);
+    font-family: Lexend Deca, Helvetica, Arial, sans-serif;
+    font-size: clamp(1.125rem, 2.5vw, 1.5rem);
+    font-weight: 700;
+    color: #141414;
+    letter-spacing: 0;
+    line-height: 1.25;
+    word-break: break-word;
+  }
+
+  &--dense &__title {
+    margin-bottom: 12px;
+  }
+
+  &__tab-row {
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 0;
+    margin-bottom: clamp(16px, 3vw, 32px);
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+
+    &::-webkit-scrollbar {
+      height: 6px;
+    }
+
+    &::-webkit-scrollbar-thumb {
+      background: #d1d5db;
+      border-radius: 3px;
+    }
+  }
+
+  &--dense &__tab-row {
+    margin-bottom: 16px;
+  }
+
+  &__tab-btn {
+    flex: 0 0 auto;
+    padding: clamp(8px, 2vw, 12px) clamp(12px, 3vw, 28px);
+    background: whitesmoke;
+    border: 1px solid #e0e0e0;
+    border-right: none;
+    border-bottom: 2px solid #e0e0e0;
+    cursor: pointer;
+    font-family: Lexend Deca, Helvetica, Arial, sans-serif;
+    font-size: clamp(0.75rem, 2vw, 0.875rem);
+    font-weight: 300;
+    color: #141414;
+    white-space: nowrap;
+    transition: background 0.15s;
+    position: relative;
+    top: 1px;
+
+    &:last-child {
+      border-right: 1px solid #e0e0e0;
+    }
+
+    &--active {
+      background: #ffffff;
+      border-bottom: 2px solid #ffffff;
+    }
+  }
+
+  &__content {
+    min-width: 0;
+    width: 100%;
+  }
+
+  &__no-permission {
+    color: #6b7280;
+  }
+}

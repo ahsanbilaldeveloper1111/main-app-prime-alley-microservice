@@ -1,12 +1,6 @@
 import React from 'react'
 import type { Tab } from '../types'
-import {
-  settingsSectionNoPermissionStyle,
-  settingsSectionShellStyle,
-  settingsSectionTabButtonStyle,
-  settingsSectionTabRowStyle,
-  settingsSectionTitleStyle,
-} from './settingsSectionPageStyles'
+import './settingsSectionTabShell.scss'
 
 export type SettingsSectionTabShellProps = Readonly<{
   title: string
@@ -27,30 +21,15 @@ export const SettingsSectionTabShell: React.FC<SettingsSectionTabShellProps> = (
   dense = false,
 }) => (
   <div
-    style={{
-      ...settingsSectionShellStyle,
-      ...(dense
-        ? {
-            padding:
-              "clamp(12px, 3vw, 20px) clamp(12px, 4vw, 40px) clamp(16px, 3vw, 24px)",
-          }
-        : null),
-    }}
+    className={[
+      'settings-section-shell',
+      dense ? 'settings-section-shell--dense' : '',
+    ]
+      .filter(Boolean)
+      .join(' ')}
   >
-    <h1
-      style={{
-        ...settingsSectionTitleStyle,
-        ...(dense ? { marginBottom: 12 } : null),
-      }}
-    >
-      {title}
-    </h1>
-    <div
-      style={{
-        ...settingsSectionTabRowStyle,
-        ...(dense ? { marginBottom: 16, overflowX: "auto" } : null),
-      }}
-    >
+    <h1 className="settings-section-shell__title">{title}</h1>
+    <div className="settings-section-shell__tab-row" role="tablist">
       {allowedTabs.map((tab, index) => {
         const isActive = activeTab === tab.id
         const isLast = index === allowedTabs.length - 1
@@ -58,17 +37,27 @@ export const SettingsSectionTabShell: React.FC<SettingsSectionTabShellProps> = (
           <button
             key={tab.id}
             type="button"
+            role="tab"
+            aria-selected={isActive}
             onClick={() => onSelectTab(tab.id)}
-            style={settingsSectionTabButtonStyle(isActive, isLast)}
+            className={[
+              'settings-section-shell__tab-btn',
+              isActive ? 'settings-section-shell__tab-btn--active' : '',
+            ]
+              .filter(Boolean)
+              .join(' ')}
+            style={isLast ? { borderRight: '1px solid #e0e0e0' } : undefined}
           >
             {tab.label}
           </button>
         )
       })}
     </div>
-    <div>
+    <div className="settings-section-shell__content">
       {allowedTabs.length === 0 ? (
-        <div style={settingsSectionNoPermissionStyle}>You don&apos;t have permission to view this section.</div>
+        <div className="settings-section-shell__no-permission">
+          You don&apos;t have permission to view this section.
+        </div>
       ) : (
         children
       )}

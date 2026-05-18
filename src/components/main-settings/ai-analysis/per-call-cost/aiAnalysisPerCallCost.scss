@@ -1,0 +1,12 @@
+@import "../shared/ai-analysis-shared";
+
+.ai-analysis-per-call-cost {
+  &__table td {
+    @media (min-width: 992px) {
+      max-width: 200px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+  }
+}
