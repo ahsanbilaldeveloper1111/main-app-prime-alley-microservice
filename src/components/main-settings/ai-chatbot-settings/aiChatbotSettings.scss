@@ -277,6 +277,68 @@
     padding: 0;
   }
 
+  &__skeleton-form {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+    min-width: 0;
+  }
+
+  &__skeleton {
+    border-radius: 4px;
+    background: linear-gradient(90deg, #f3f4f6 25%, #e9ecef 50%, #f3f4f6 75%);
+    background-size: 200% 100%;
+    animation: ai-chatbot-settings-shimmer 1.2s ease-in-out infinite;
+  }
+
+  &__skeleton--label {
+    height: 12px;
+    width: 55%;
+    margin-bottom: 6px;
+  }
+
+  &__skeleton--input {
+    height: 36px;
+    width: 100%;
+
+    @media (min-width: 768px) {
+      height: 30px;
+    }
+  }
+
+  &__skeleton--row-label {
+    height: 14px;
+    max-width: 200px;
+    margin-bottom: 4px;
+  }
+
+  &__skeleton--hint {
+    height: 12px;
+    width: 85%;
+    max-width: 420px;
+  }
+
+  &__skeleton--progress {
+    height: 4px;
+    width: 100%;
+    border-radius: 2px;
+  }
+
+  &__skeleton--table {
+    height: 120px;
+    width: 100%;
+  }
+
+  &__skeleton--save {
+    height: 40px;
+    width: 96px;
+    max-width: 100%;
+
+    @media (max-width: 575.98px) {
+      width: 100%;
+    }
+  }
+
   &__save {
     border: 1px solid #111827;
     background: #111827;
@@ -297,5 +359,15 @@
       opacity: 0.65;
       cursor: not-allowed;
     }
+  }
+}
+
+@keyframes ai-chatbot-settings-shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+
+  100% {
+    background-position: -200% 0;
   }
 }
