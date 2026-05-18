@@ -21,6 +21,7 @@ import {
   validateAIChatbotSettingsForm,
 } from "./mapTenantChatSettings";
 import { AI_CHATBOT_FIELD_PLACEHOLDERS } from "./constants";
+import { AIChatbotSettingsFormSkeleton } from "./AIChatbotSettingsFormSkeleton";
 import { ModelPricingDefaultsTable } from "./ModelPricingDefaultsTable";
 import { useAIChatbotSettingsPage } from "./useAIChatbotSettingsPage";
 
@@ -324,6 +325,10 @@ export const AIChatbotSettings: React.FC = () => {
     [modelOptions, values.openAiModel],
   );
 
+  const showFormSkeleton =
+    Boolean(appliedTenantId) &&
+    (isLoading || !formHydrated || queryTenantId !== appliedTenantId);
+
   if (!appliedTenantId) {
     return (
       <div className="ai-chatbot-settings">
@@ -335,22 +340,6 @@ export const AIChatbotSettings: React.FC = () => {
           onApplyFilter={handleApplyFilter}
         />
         <p className="ai-chatbot-settings__hint">Select a company to load settings.</p>
-      </div>
-    );
-  }
-
-  if (isLoading && !formHydrated) {
-    return (
-      <div className="ai-chatbot-settings">
-        <CompanyFilterBar
-          companiesLoading={companiesLoading}
-          companyOptions={companyOptions}
-          selectedCompanyOption={selectedCompanyOption}
-          onCompanySelect={handleCompanySelect}
-          onApplyFilter={handleApplyFilter}
-          appliedCompanyLabel={appliedCompanyLabel}
-        />
-        <p className="ai-chatbot-settings__hint">Loading AI Chatbot settings…</p>
       </div>
     );
   }
@@ -370,6 +359,10 @@ export const AIChatbotSettings: React.FC = () => {
         appliedCompanyLabel={appliedCompanyLabel}
       />
 
+      {showFormSkeleton ? (
+        <AIChatbotSettingsFormSkeleton />
+      ) : (
+        <>
       {isError && (
         <p className="ai-chatbot-settings__status">
           Could not load settings. Using defaults.{" "}
@@ -528,6 +521,8 @@ export const AIChatbotSettings: React.FC = () => {
         <p className="ai-chatbot-settings__hint">
           You have view-only access to tenant settings.
         </p>
+      )}
+        </>
       )}
     </form>
   );

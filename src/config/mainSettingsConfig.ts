@@ -96,16 +96,16 @@ export const sidebarGroups: SidebarGroup[] = [
 ];
 
 export const defaultSubTabBySection: Record<string, string | undefined> = {
-  "general-prefs": "profile",
-  "account-defaults": "general",
-  "users-teams": "user-directory",
-  "smart-crm": "stages",
-  communications: "manage-extensions",
-  planner: "general",
-  workforce: "request-categories",
-  billing: "payment-methods",
-  tickets: "statuses",
-  "help-center": "modules",
-  "ai-chat": "ai-chatbot-settings",
-  pulse: "assign-devices",
-};
+  'general-prefs': 'profile',
+  'account-defaults': 'general',
+  'users-teams': 'user-directory',
+  'smart-crm': 'stages',
+  communications: 'manage-extensions',
+  planner: 'general',
+  workforce: 'request-categories',
+  billing: 'payment-methods',
+  tickets: 'statuses',
+  'help-center': 'modules',
+  'ai-chat': 'ai-chatbot-settings',
+  pulse: 'assign-devices',
+}

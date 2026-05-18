@@ -35,7 +35,9 @@ const nextShimAliases = {
 
 /** Upstream origin for dev `server.proxy['/api']` (parsed from absolute backend URLs in env). */
 function resolveDevApiProxyTarget(env: Record<string, string>): string {
-  const explicit = (env.VITE_DEV_API_PROXY_TARGET || "").trim().replace(/\/+$/, "");
+  const explicit = (env.VITE_DEV_API_PROXY_TARGET || "")
+    .trim()
+    .replace(/\/+$/, "");
   if (explicit.length > 0) return explicit;
   for (const key of ["NEXT_PUBLIC_BACKEND_URL", "VITE_BACKEND_URL"] as const) {
     const raw = (env[key] || "").trim();
@@ -82,63 +84,62 @@ export default defineConfig(({ mode }) => {
     };
   }
 
-  console.log("serverProxy", serverProxy);
   return {
-  plugins: [react(), tsconfigPaths(), nextImageCompatPlugin()],
+    plugins: [react(), tsconfigPaths(), nextImageCompatPlugin()],
 
-  resolve: {
-    alias: {
-      ...nextShimAliases,
-      "~bootstrap": path.resolve(__dirname, "node_modules/bootstrap"),
-      // Default react-bootstrap Modal: static backdrop + no Esc dismiss
-      // (preserved from the previous webpack NormalModuleReplacementPlugin).
-      "react-bootstrap/esm/Modal.js": path.resolve(
-        __dirname,
-        "src/shims/react-bootstrap-modal.tsx",
-      ),
-    },
-  },
-
-  css: {
-    preprocessorOptions: {
-      scss: {
-        // Replicate the Webpack `resolve.modules` behavior the previous Next
-        // build relied on: `@import 'node_modules/bootstrap/scss/...'`
-        // resolves from the project root, while `@import 'partials/...'`
-        // resolves from `src/assets/scss`.
-        loadPaths: [
+    resolve: {
+      alias: {
+        ...nextShimAliases,
+        "~bootstrap": path.resolve(__dirname, "node_modules/bootstrap"),
+        // Default react-bootstrap Modal: static backdrop + no Esc dismiss
+        // (preserved from the previous webpack NormalModuleReplacementPlugin).
+        "react-bootstrap/esm/Modal.js": path.resolve(
           __dirname,
-          path.join(__dirname, "src/assets/scss"),
-          path.join(__dirname, "node_modules"),
-        ],
-        quietDeps: true,
-        silenceDeprecations: ["legacy-js-api", "import", "global-builtin"],
+          "src/shims/react-bootstrap-modal.tsx",
+        ),
       },
     },
-  },
 
-  define: {
-    // Vite normally only inlines import.meta.env.*. Backfill process.env.* for
-    // any legacy module still reading from process.env, so the rewrite stays
-    // minimal during the migration.
-    "process.env.NODE_ENV": JSON.stringify(mode),
-    ...exposedEnv,
-  },
+    css: {
+      preprocessorOptions: {
+        scss: {
+          // Replicate the Webpack `resolve.modules` behavior the previous Next
+          // build relied on: `@import 'node_modules/bootstrap/scss/...'`
+          // resolves from the project root, while `@import 'partials/...'`
+          // resolves from `src/assets/scss`.
+          loadPaths: [
+            __dirname,
+            path.join(__dirname, "src/assets/scss"),
+            path.join(__dirname, "node_modules"),
+          ],
+          quietDeps: true,
+          silenceDeprecations: ["legacy-js-api", "import", "global-builtin"],
+        },
+      },
+    },
 
-  server: {
-    port: 3000,
-    host: true,
-    proxy: serverProxy,
-  },
+    define: {
+      // Vite normally only inlines import.meta.env.*. Backfill process.env.* for
+      // any legacy module still reading from process.env, so the rewrite stays
+      // minimal during the migration.
+      "process.env.NODE_ENV": JSON.stringify(mode),
+      ...exposedEnv,
+    },
 
-  build: {
-    outDir: "dist",
-    sourcemap: true,
-    chunkSizeWarningLimit: 2000,
-  },
+    server: {
+      port: 3000,
+      host: true,
+      proxy: serverProxy,
+    },
 
-  optimizeDeps: {
-    include: ["react", "react-dom", "react-router-dom", "axios"],
-  },
+    build: {
+      outDir: "dist",
+      sourcemap: true,
+      chunkSizeWarningLimit: 2000,
+    },
+
+    optimizeDeps: {
+      include: ["react", "react-dom", "react-router-dom", "axios"],
+    },
   };
 });
