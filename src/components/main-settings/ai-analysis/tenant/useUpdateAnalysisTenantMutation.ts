@@ -1,5 +1,8 @@
 import { aiAnalyticsKeys } from "@query/keys";
-import { updateAnalysisTenant } from "@utils/aiAnalytics";
+import {
+  updateAnalysisTenant,
+  type AnalysisTenantRecord,
+} from "@utils/aiAnalytics";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "react-toastify";
 
@@ -16,7 +19,7 @@ export function useUpdateAnalysisTenantMutation(appliedTenantId: string) {
         throw new Error("Please select a tenant first");
       }
       const original =
-        queryClient.getQueryData(
+        queryClient.getQueryData<AnalysisTenantRecord | null>(
           aiAnalyticsKeys.tenants.detail(tenantId),
         ) ?? null;
       const payload = mapFormValuesToAnalysisTenantUpdate(values, original);
