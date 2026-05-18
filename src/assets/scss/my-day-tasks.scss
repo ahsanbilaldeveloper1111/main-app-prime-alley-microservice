@@ -148,7 +148,7 @@
   .myday-capacity-units {
     font-size: 11px;
     font-weight: 400;
-    color: #9ca3af;
+    color: #6b7280;
   }
 
   .myday-progress-track {
@@ -249,7 +249,7 @@
 
   .myday-task-card.is-completed .myday-task-card__title {
     text-decoration: line-through;
-    color: #9ca3af;
+    color: #6b7280;
   }
 
   .myday-task-card__tags {
@@ -264,7 +264,7 @@
     right: 8px;
     border: none;
     background: #f3f4f6;
-    color: #6b7280;
+    color: #4b5563;
     border-radius: 6px;
     width: 24px;
     height: 24px;
@@ -285,56 +285,58 @@
     font-size: 10px;
     font-weight: 600;
     line-height: 1.4;
+    background-color: #f3f4f6;
+    color: #1f2937;
   }
 
   .myday-tag--project {
-    background: #dbeafe;
-    color: #1e40af;
+    background-color: #dbeafe;
+    color: #1e3a8a;
   }
 
   .myday-tag--personal {
-    background: #ede9fe;
-    color: #5b21b6;
+    background-color: #ede9fe;
+    color: #4c1d95;
   }
 
   .myday-tag--priority {
-    background: #f3f4f6;
-    color: #374151;
+    background-color: #f3f4f6;
+    color: #1f2937;
     text-transform: capitalize;
+  }
 
-    &.priority-high,
-    &.priority-urgent {
-      background: #fee2e2;
-      color: #b91c1c;
-    }
+  .myday-tag--priority.priority-high,
+  .myday-tag--priority.priority-urgent {
+    background-color: #fee2e2;
+    color: #991b1b;
+  }
 
-    &.priority-medium,
-    &.priority-normal {
-      background: #fef3c7;
-      color: #92400e;
-    }
+  .myday-tag--priority.priority-medium,
+  .myday-tag--priority.priority-normal {
+    background-color: #fef3c7;
+    color: #78350f;
+  }
 
-    &.priority-low {
-      background: #ecfdf5;
-      color: #047857;
-    }
+  .myday-tag--priority.priority-low {
+    background-color: #ecfdf5;
+    color: #065f46;
   }
 
   .myday-tag--estimate {
-    background: #f3f4f6;
-    color: #4b5563;
+    background-color: #f3f4f6;
+    color: #374151;
   }
 
   .myday-tag--flexible {
-    background: #e0f2fe;
-    color: #0c4a6e;
+    background-color: #e0f2fe;
+    color: #082f49;
   }
 
   .myday-edit-estimate-btn {
     border: 1px solid #d1d5db;
     border-radius: 999px;
     background: #fff;
-    color: #1d4ed8;
+    color: #1e40af;
     font-size: 10px;
     font-weight: 600;
     padding: 2px 8px;
@@ -444,7 +446,7 @@
 
     &.is-completed .myday-task-title {
       text-decoration: line-through;
-      color: #9ca3af;
+      color: #6b7280;
     }
   }
 
