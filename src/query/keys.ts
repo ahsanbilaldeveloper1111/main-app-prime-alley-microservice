@@ -701,6 +701,55 @@ export const chatKeys = {
   },
 };
 
+/** AI Analysis cost & analytics (`/ai-analytics/*`). */
+export const aiAnalyticsKeys = {
+  root: ["aiAnalytics"] as const,
+  costPricing: {
+    all: () => [...aiAnalyticsKeys.root, "costPricing"] as const,
+    detail: (tenantId: string) =>
+      [...aiAnalyticsKeys.costPricing.all(), tenantId || "__none__"] as const,
+  },
+  tenants: {
+    all: () => [...aiAnalyticsKeys.root, "tenants"] as const,
+    detail: (tenantId: string) =>
+      [...aiAnalyticsKeys.tenants.all(), tenantId || "__none__"] as const,
+  },
+  costMonthly: {
+    all: () => [...aiAnalyticsKeys.root, "costMonthly"] as const,
+    list: (filters: {
+      tenant_id?: string;
+      year?: number;
+      month?: number;
+    }) =>
+      [
+        ...aiAnalyticsKeys.costMonthly.all(),
+        filters.tenant_id ?? "",
+        filters.year ?? "",
+        filters.month ?? "",
+      ] as const,
+  },
+  costCalls: {
+    all: () => [...aiAnalyticsKeys.root, "costCalls"] as const,
+    list: (filters: {
+      tenant_id?: string;
+      date_from?: string;
+      date_to?: string;
+      status?: string;
+      limit?: number;
+      offset?: number;
+    }) =>
+      [
+        ...aiAnalyticsKeys.costCalls.all(),
+        filters.tenant_id ?? "",
+        filters.date_from ?? "",
+        filters.date_to ?? "",
+        filters.status ?? "",
+        filters.limit ?? 100,
+        filters.offset ?? 0,
+      ] as const,
+  },
+};
+
 /** GSM / Telco gateway (`src/pages/gsm/*`). */
 export const gsmKeys = {
   root: ["gsm"] as const,
