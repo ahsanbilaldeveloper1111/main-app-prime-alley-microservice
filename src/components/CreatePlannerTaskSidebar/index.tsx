@@ -31,6 +31,7 @@ import {
 } from "@utils/plannerTaskDueTime";
 import RichTextEditor from "@page-modules/help-center/partials/RichTextEditor";
 import TaskSecondaryTabs from "@components/planner/workPlannerPagePartials/TaskSecondaryTabs";
+import { PlannerAddToMyDayHeaderButton } from "@components/planner/plannerTasksListing/PlannerAddToMyDayHeaderButton";
 import type { PlannerTaskEditScope } from "@planner/taskRowPermissions";
 
 // ─── Types (from createtask-modal) ─────────────────────────────────────────────
@@ -141,6 +142,11 @@ interface CreateTaskSidebarProps {
    * When opening edit for a to-do or regular task, seed the form as recurring so the user can save a conversion in one step.
    */
   openAsRecurringConversion?: boolean;
+  /** When editing, show Add to My Day in the sidebar header (planner tasks). */
+  showAddToMyDay?: boolean;
+  canAddToMyDay?: boolean;
+  alreadyInMyDay?: boolean;
+  onAddToMyDay?: () => void;
 }
 
 /** Minimal task shape used when editing in the sidebar (API / normalized task). */
@@ -2849,6 +2855,10 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
   lockProjectSelection = false,
   taskEditScope = "full",
   openAsRecurringConversion = false,
+  showAddToMyDay = false,
+  canAddToMyDay = false,
+  alreadyInMyDay = false,
+  onAddToMyDay,
 }) => {
   const normalizedTaskTypeOptions =
     useNormalizedPlannerTaskTypeOptions(taskTypeChoices);
@@ -3348,6 +3358,13 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
             <ListTodo size={20} color={PLANNER_TASK_SIDEBAR.textMuted} strokeWidth={2} />
             {getSidebarTitle(formData.taskType, isEdit, isRecurringConversionMode)}
           </h2>
+          <div className="d-flex align-items-center gap-2">
+            <PlannerAddToMyDayHeaderButton
+              show={Boolean(isEdit && showAddToMyDay && editTask?.id != null)}
+              canAdd={canAddToMyDay}
+              alreadyInMyDay={alreadyInMyDay}
+              onClick={() => onAddToMyDay?.()}
+            />
           <button
             type="button"
             onClick={onClose}
@@ -3377,6 +3394,7 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
           >
             <X size={20} strokeWidth={2} />
           </button>
+          </div>
         </div>
 
         {/* Body: main form scrolls; existing task shows Activities / Comments / Documents above footer */}

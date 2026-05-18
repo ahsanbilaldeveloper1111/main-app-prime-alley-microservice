@@ -130,58 +130,57 @@ export const plannerKeys = {
 
   workload: {
     all: () => [...plannerKeys.root, "workload"] as const,
+    listParams: (params: {
+      ext: string;
+      range: string;
+      match: string;
+      start?: string;
+      end?: string;
+      member?: string;
+      project?: string;
+    }) =>
+      [
+        ...plannerKeys.workload.all(),
+        params.ext,
+        params.range,
+        params.match,
+        params.start ?? "",
+        params.end ?? "",
+        params.member ?? "all",
+        params.project ?? "all",
+      ] as const,
     summary: (params: {
       ext: string;
       range: string;
       match: string;
       start?: string;
       end?: string;
+      member?: string;
+      project?: string;
     }) =>
-      [
-        ...plannerKeys.workload.all(),
-        "summary",
-        params.ext,
-        params.range,
-        params.match,
-        params.start ?? "",
-        params.end ?? "",
-      ] as const,
+      [...plannerKeys.workload.listParams(params), "summary"] as const,
     grid: (params: {
       ext: string;
       range: string;
       match: string;
       start?: string;
       end?: string;
-    }) =>
-      [
-        ...plannerKeys.workload.all(),
-        "grid",
-        params.ext,
-        params.range,
-        params.match,
-        params.start ?? "",
-        params.end ?? "",
-      ] as const,
+      member?: string;
+      project?: string;
+    }) => [...plannerKeys.workload.listParams(params), "grid"] as const,
     board: (params: {
       ext: string;
       range: string;
       match: string;
       start?: string;
       end?: string;
-    }) =>
-      [
-        ...plannerKeys.workload.all(),
-        "board",
-        params.ext,
-        params.range,
-        params.match,
-        params.start ?? "",
-        params.end ?? "",
-      ] as const,
+      member?: string;
+      project?: string;
+    }) => [...plannerKeys.workload.listParams(params), "board"] as const,
     day: (params: { ext: string; date: string; match: string }) =>
       [...plannerKeys.workload.all(), "day", params.ext, params.date, params.match] as const,
-    unassigned: (ext: string) =>
-      [...plannerKeys.workload.all(), "unassigned", ext] as const,
+    unassigned: (ext: string, projectKey = "all") =>
+      [...plannerKeys.workload.all(), "unassigned", ext, projectKey] as const,
   },
 };
 

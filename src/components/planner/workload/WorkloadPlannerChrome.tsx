@@ -2,6 +2,14 @@ import React from "react";
 import { Badge, Button, Card, Col, Form, Nav, Row } from "react-bootstrap";
 import { Download, LayoutGrid, ListTodo, RefreshCw } from "lucide-react";
 import type { AssigneeMatch, WorkloadRangePreset } from "@utils/tasks";
+import type {
+  WorkloadMemberFilterValue,
+  WorkloadPriorityFilterValue,
+  WorkloadProjectFilterValue,
+} from "@page-modules/planner/workload/workloadDomain";
+import { formatWorkloadMemberLabel } from "@page-modules/planner/workload/workloadDomain";
+
+export type WorkloadProjectOption = Readonly<{ id: number; name: string }>;
 
 type MainView = "grid" | "board";
 
@@ -63,6 +71,15 @@ type WorkloadPlannerFiltersCardProps = Readonly<{
   onAssigneeMatchChange: (value: AssigneeMatch) => void;
   mainView: MainView;
   onMainViewChange: (view: MainView) => void;
+  projectFilter: WorkloadProjectFilterValue;
+  onProjectFilterChange: (value: WorkloadProjectFilterValue) => void;
+  projectOptions: WorkloadProjectOption[];
+  memberFilter: WorkloadMemberFilterValue;
+  onMemberFilterChange: (value: WorkloadMemberFilterValue) => void;
+  memberExtensions: string[];
+  hierarchyExtensions?: unknown[] | null;
+  priorityFilter: WorkloadPriorityFilterValue;
+  onPriorityFilterChange: (value: WorkloadPriorityFilterValue) => void;
   enabled: boolean;
 }>;
 
@@ -78,6 +95,15 @@ export function WorkloadPlannerFiltersCard({
   onAssigneeMatchChange,
   mainView,
   onMainViewChange,
+  projectFilter,
+  onProjectFilterChange,
+  projectOptions,
+  memberFilter,
+  onMemberFilterChange,
+  memberExtensions,
+  hierarchyExtensions,
+  priorityFilter,
+  onPriorityFilterChange,
   enabled,
 }: WorkloadPlannerFiltersCardProps) {
   return (
@@ -123,6 +149,66 @@ export function WorkloadPlannerFiltersCard({
               </Col>
             </>
           ) : null}
+          <Col xs={12} md="auto">
+            <Form.Label className="small text-muted mb-1">Project</Form.Label>
+            <Form.Select
+              size="sm"
+              value={
+                projectFilter === "all"
+                  ? "all"
+                  : projectFilter === "none"
+                    ? "none"
+                    : String(projectFilter)
+              }
+              onChange={(e) => {
+                const v = e.target.value;
+                if (v === "all") onProjectFilterChange("all");
+                else if (v === "none") onProjectFilterChange("none");
+                else onProjectFilterChange(Number.parseInt(v, 10));
+              }}
+              disabled={!enabled}
+            >
+              <option value="all">All projects</option>
+              <option value="none">No project (org)</option>
+              {projectOptions.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                </option>
+              ))}
+            </Form.Select>
+          </Col>
+          <Col xs={12} md="auto">
+            <Form.Label className="small text-muted mb-1">Member</Form.Label>
+            <Form.Select
+              size="sm"
+              value={memberFilter}
+              onChange={(e) => onMemberFilterChange(e.target.value as WorkloadMemberFilterValue)}
+              disabled={!enabled}
+            >
+              <option value="all">All members</option>
+              {memberExtensions.map((ext) => (
+                <option key={ext} value={ext}>
+                  {formatWorkloadMemberLabel(ext, hierarchyExtensions)}
+                </option>
+              ))}
+            </Form.Select>
+          </Col>
+          <Col xs={12} md="auto">
+            <Form.Label className="small text-muted mb-1">Priority</Form.Label>
+            <Form.Select
+              size="sm"
+              value={priorityFilter}
+              onChange={(e) =>
+                onPriorityFilterChange(e.target.value as WorkloadPriorityFilterValue)
+              }
+              disabled={!enabled}
+            >
+              <option value="all">All priorities</option>
+              <option value="critical">Critical only</option>
+              <option value="high_plus">High+</option>
+              <option value="medium_plus">Medium+</option>
+            </Form.Select>
+          </Col>
           <Col xs={12} md="auto">
             <Form.Label className="small text-muted mb-1">Assignee match</Form.Label>
             <Form.Select

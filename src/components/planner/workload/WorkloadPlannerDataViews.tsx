@@ -1,8 +1,15 @@
 import React from "react";
 import { Alert, Spinner } from "react-bootstrap";
-import type { WorkloadBoardData, WorkloadGridCell, WorkloadGridData, WorkloadSummaryData } from "@utils/tasks";
+import type {
+  WorkloadBoardData,
+  WorkloadGridCell,
+  WorkloadGridData,
+  WorkloadSummaryData,
+} from "@utils/tasks";
+import type { WorkloadPriorityFilterValue } from "@page-modules/planner/workload/workloadDomain";
+import { WorkloadBoardPanel } from "./WorkloadBoardPanel";
+import type { WorkloadBoardDropIntent } from "./WorkloadBoardPanel";
 import {
-  WorkloadBoardColumns,
   WorkloadGridPanel,
   WorkloadLegendRow,
   WorkloadSummaryCardsRow,
@@ -18,7 +25,14 @@ type WorkloadPlannerDataViewsProps = Readonly<{
   gridData: WorkloadGridData | undefined;
   boardData: WorkloadBoardData | undefined;
   cellMap: Map<string, WorkloadGridCell>;
+  hierarchyExtensions?: unknown[] | null;
+  priorityFilter: WorkloadPriorityFilterValue;
+  boardDragSaving: boolean;
+  onBoardDropIntent: (intent: WorkloadBoardDropIntent) => void;
   onSelectCell: (extension: string, date: string) => void;
+  unassignedCount?: number;
+  completedCount?: number;
+  onOpenUnassigned?: () => void;
 }>;
 
 export function WorkloadPlannerDataViews({
@@ -29,7 +43,14 @@ export function WorkloadPlannerDataViews({
   gridData,
   boardData,
   cellMap,
+  hierarchyExtensions,
+  priorityFilter,
+  boardDragSaving,
+  onBoardDropIntent,
   onSelectCell,
+  unassignedCount,
+  completedCount,
+  onOpenUnassigned,
 }: WorkloadPlannerDataViewsProps) {
   if (loadingMain && enabled) {
     return (
@@ -42,7 +63,18 @@ export function WorkloadPlannerDataViews({
   return (
     <>
       {!loadingMain && enabled && summaryData ? (
-        <WorkloadSummaryCardsRow data={summaryData} />
+        <WorkloadSummaryCardsRow
+          data={summaryData}
+          unassignedCount={unassignedCount}
+          completedCount={completedCount}
+          onUnassignedClick={onOpenUnassigned}
+        />
+      ) : null}
+
+      {mainView === "board" && priorityFilter !== "all" ? (
+        <p className="small text-muted mb-2">
+          Priority filter applies to board task cards. Grid totals are unchanged.
+        </p>
       ) : null}
 
       {!loadingMain && enabled && mainView === "grid" && gridData?.empty_team ? (
@@ -55,7 +87,12 @@ export function WorkloadPlannerDataViews({
       {!loadingMain && enabled && mainView === "grid" && gridData && !gridData.empty_team ? (
         <>
           <WorkloadLegendRow />
-          <WorkloadGridPanel gridData={gridData} cellMap={cellMap} onSelectCell={onSelectCell} />
+          <WorkloadGridPanel
+            gridData={gridData}
+            cellMap={cellMap}
+            hierarchyExtensions={hierarchyExtensions}
+            onSelectCell={onSelectCell}
+          />
         </>
       ) : null}
 
@@ -67,7 +104,13 @@ export function WorkloadPlannerDataViews({
       ) : null}
 
       {!loadingMain && enabled && mainView === "board" && boardData && !boardData.empty_team ? (
-        <WorkloadBoardColumns columns={boardData.columns} />
+        <WorkloadBoardPanel
+          boardData={boardData}
+          hierarchyExtensions={hierarchyExtensions}
+          priorityFilter={priorityFilter}
+          dragSaving={boardDragSaving}
+          onDropIntent={onBoardDropIntent}
+        />
       ) : null}
     </>
   );

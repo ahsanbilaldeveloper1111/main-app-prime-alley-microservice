@@ -1427,6 +1427,8 @@ export type MyDaySuggestionCategory =
   | "due_today"
   | "high_priority"
   | "assigned_to_me"
+  | "organizational_tasks"
+  | "personal_tasks"
   | "flexible_upcoming";
 
 export type MyDaySuggestionsPayload = Partial<Record<MyDaySuggestionCategory, unknown[]>>;
@@ -1553,7 +1555,15 @@ export const addTaskToMyDay = async (
   const query = buildMyDayQuery({ extension_number: extensionNumber });
   const url = buildMyDayUrl("work-planner/my-day/add", query);
   const response = await axiosInstance.post(url, payload);
-  return parseMyDayResponseData(response);
+  const parsed = parseMyDayResponseData<{
+    added?: boolean;
+    already_in_my_day?: boolean;
+    task?: unknown;
+  }>(response);
+  if (typeof parsed === "object" && parsed !== null) {
+    return parsed;
+  }
+  return { added: true };
 };
 
 export const removeTaskFromMyDay = async (
@@ -1658,6 +1668,8 @@ export interface WorkloadSummaryData {
 
 export interface WorkloadGridMember {
   extension_number: string;
+  name?: string | null;
+  display_name?: string | null;
   is_owner?: boolean;
   role?: string | null;
 }
@@ -1707,6 +1719,8 @@ export interface WorkloadTaskCard {
 
 export interface WorkloadBoardColumn {
   extension_number: string;
+  name?: string | null;
+  display_name?: string | null;
   is_owner?: boolean;
   role?: string | null;
   estimated_minutes: number;
@@ -1778,6 +1792,10 @@ export interface WorkloadQueryBase {
   start?: string;
   end?: string;
   extension_numbers?: string[];
+  /** When set, scopes grid/board/summary to one project (server-supported). */
+  project_id?: number;
+  /** When true, scope to organization tasks with no project (server-supported). */
+  no_project?: boolean;
 }
 
 function appendWorkloadQueryParams(
@@ -1789,6 +1807,12 @@ function appendWorkloadQueryParams(
   if (q.range) params.set("range", q.range);
   if (q.start) params.set("start", q.start);
   if (q.end) params.set("end", q.end);
+  if (q.project_id != null) {
+    params.set("project_id", String(q.project_id));
+  }
+  if (q.no_project === true) {
+    params.set("no_project", "1");
+  }
   if (Array.isArray(q.extension_numbers)) {
     for (const ext of q.extension_numbers) {
       if (ext) params.append("extension_numbers[]", ext);

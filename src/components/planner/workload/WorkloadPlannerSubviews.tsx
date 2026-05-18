@@ -4,19 +4,88 @@ import type {
   WorkloadBoardColumn,
   WorkloadGridCell,
   WorkloadGridData,
+  WorkloadGridMember,
   WorkloadSummaryData,
 } from "@utils/tasks";
 import {
   formatWorkloadDayHeader,
+  formatWorkloadMemberLabel,
   formatWorkloadMinutes,
   formatWorkloadPercent,
   isSameCalendarDay,
-  memberInitials,
   workloadCellBandClass,
+  workloadMemberAvatarColor,
   workloadCellKey,
   workloadLoadBandLabel,
+  workloadMemberInitials,
   WORKLOAD_LOAD_BANDS,
 } from "@page-modules/planner/workload/workloadDomain";
+
+const WORKLOAD_BOARD_LEGEND = [
+  { label: "On Track", color: "#22c55e" },
+  { label: "At Risk", color: "#eab308" },
+  { label: "Overdue", color: "#ef4444" },
+  { label: "In Progress", color: "#3b82f6" },
+  { label: "Done", color: "#38bdf8" },
+  { label: "Unassigned", color: "#9ca3af" },
+] as const;
+
+type WorkloadMemberIdentityProps = Readonly<{
+  extensionNumber: string;
+  hierarchyExtensions?: unknown[] | null;
+  member?: Pick<WorkloadGridMember, "name" | "display_name"> | null;
+  isOwner?: boolean;
+  displayMode?: "stacked" | "inline";
+}>;
+
+export function WorkloadMemberIdentity({
+  extensionNumber,
+  hierarchyExtensions,
+  member,
+  isOwner,
+  displayMode = "stacked",
+}: WorkloadMemberIdentityProps) {
+  const ext = extensionNumber.trim();
+  const avatarColor = workloadMemberAvatarColor(ext);
+  const initials = workloadMemberInitials(ext, hierarchyExtensions, member);
+
+  if (displayMode === "inline") {
+    const label = formatWorkloadMemberLabel(ext, hierarchyExtensions, member);
+    return (
+      <div className="workload-member-cell workload-member-cell--inline">
+        <span className="workload-member-cell__avatar" style={{ backgroundColor: avatarColor }}>
+          {initials}
+        </span>
+        <div className="workload-member-cell__inline-text">
+          <span className="workload-member-cell__name">{label}</span>
+          {isOwner ? (
+            <Badge bg="secondary" className="workload-member-cell__badge ms-1">
+              Owner
+            </Badge>
+          ) : null}
+        </div>
+      </div>
+    );
+  }
+
+  const label = formatWorkloadMemberLabel(ext, hierarchyExtensions, member);
+
+  return (
+    <div className="workload-member-cell">
+      <span className="workload-member-cell__avatar" style={{ backgroundColor: avatarColor }}>
+        {initials}
+      </span>
+      <div>
+        <div className="workload-member-cell__name">{label}</div>
+        {isOwner ? (
+          <Badge bg="secondary" className="workload-member-cell__badge">
+            Owner
+          </Badge>
+        ) : null}
+      </div>
+    </div>
+  );
+}
 
 function legendSwatchColor(band: string): string {
   switch (band) {
@@ -35,14 +104,24 @@ function legendSwatchColor(band: string): string {
   }
 }
 
-type WorkloadSummaryCardsProps = Readonly<{ data: WorkloadSummaryData }>;
+type WorkloadSummaryCardsProps = Readonly<{
+  data: WorkloadSummaryData;
+  unassignedCount?: number;
+  completedCount?: number;
+  onUnassignedClick?: () => void;
+}>;
 
-export function WorkloadSummaryCardsRow({ data }: WorkloadSummaryCardsProps) {
+export function WorkloadSummaryCardsRow({
+  data,
+  unassignedCount = 0,
+  completedCount = 0,
+  onUnassignedClick,
+}: WorkloadSummaryCardsProps) {
   return (
-    <Row className="g-3 mb-3">
+    <Row className="g-3 mb-3 workload-summary-row">
       <Col xs={6} lg={3}>
         <div className="workload-summary-card">
-          <div className="workload-summary-card__label">Total tasks in range</div>
+          <div className="workload-summary-card__label">Total workload</div>
           <div className="workload-summary-card__value">{data.total_tasks_in_range}</div>
         </div>
       </Col>
@@ -55,22 +134,45 @@ export function WorkloadSummaryCardsRow({ data }: WorkloadSummaryCardsProps) {
         </div>
       </Col>
       <Col xs={6} lg={3}>
-        <div className="workload-summary-card">
-          <div className="workload-summary-card__label">Under-allocated cells</div>
+        <button
+          type="button"
+          className="workload-summary-card workload-summary-card--action"
+          onClick={onUnassignedClick}
+          disabled={!onUnassignedClick}
+        >
+          <div className="workload-summary-card__label">Unassigned tasks</div>
           <div className="workload-summary-card__value workload-summary-card__value--warning">
-            {data.under_allocated_cells}
+            {unassignedCount}
           </div>
-        </div>
+        </button>
       </Col>
       <Col xs={6} lg={3}>
         <div className="workload-summary-card">
-          <div className="workload-summary-card__label">Over-allocated cells</div>
-          <div className="workload-summary-card__value workload-summary-card__value--danger">
-            {data.over_allocated_cells}
+          <div className="workload-summary-card__label">Completed tasks</div>
+          <div className="workload-summary-card__value workload-summary-card__value--success">
+            {completedCount}
           </div>
         </div>
       </Col>
     </Row>
+  );
+}
+
+export function WorkloadBoardLegendBar() {
+  return (
+    <div className="workload-board-toolbar mb-3">
+      <div className="workload-board-toolbar__legend">
+        {WORKLOAD_BOARD_LEGEND.map((item) => (
+          <span key={item.label} className="workload-board-toolbar__legend-item">
+            <span
+              className="workload-board-toolbar__swatch"
+              style={{ backgroundColor: item.color }}
+            />
+            {item.label}
+          </span>
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -91,10 +193,16 @@ export function WorkloadLegendRow() {
 type WorkloadGridPanelProps = Readonly<{
   gridData: WorkloadGridData;
   cellMap: Map<string, WorkloadGridCell>;
+  hierarchyExtensions?: unknown[] | null;
   onSelectCell: (extension: string, date: string) => void;
 }>;
 
-export function WorkloadGridPanel({ gridData, cellMap, onSelectCell }: WorkloadGridPanelProps) {
+export function WorkloadGridPanel({
+  gridData,
+  cellMap,
+  hierarchyExtensions,
+  onSelectCell,
+}: WorkloadGridPanelProps) {
   return (
     <div className="workload-grid-wrap">
       <Table bordered responsive className="workload-grid-table mb-0">
@@ -115,19 +223,12 @@ export function WorkloadGridPanel({ gridData, cellMap, onSelectCell }: WorkloadG
           {gridData.members.map((member) => (
             <tr key={member.extension_number}>
               <td>
-                <div className="workload-member-cell">
-                  <div className="workload-member-cell__avatar">
-                    {memberInitials(member.extension_number)}
-                  </div>
-                  <div>
-                    <div className="workload-member-cell__ext">{member.extension_number}</div>
-                    {member.is_owner ? (
-                      <Badge bg="secondary" className="workload-member-cell__badge">
-                        Owner
-                      </Badge>
-                    ) : null}
-                  </div>
-                </div>
+                <WorkloadMemberIdentity
+                  extensionNumber={member.extension_number}
+                  hierarchyExtensions={hierarchyExtensions}
+                  member={member}
+                  isOwner={member.is_owner}
+                />
               </td>
               {gridData.days.map((day) => {
                 const cell = cellMap.get(workloadCellKey(member.extension_number, day));
@@ -237,7 +338,13 @@ export function WorkloadPlannerAlertStack({
   );
 }
 
-export function WorkloadBoardColumns({ columns }: Readonly<{ columns: WorkloadBoardColumn[] }>) {
+export function WorkloadBoardColumns({
+  columns,
+  hierarchyExtensions,
+}: Readonly<{
+  columns: WorkloadBoardColumn[];
+  hierarchyExtensions?: unknown[] | null;
+}>) {
   return (
     <div className="workload-board">
       {columns.map((col) => {
@@ -245,10 +352,12 @@ export function WorkloadBoardColumns({ columns }: Readonly<{ columns: WorkloadBo
         return (
           <div key={col.extension_number} className="workload-board__column">
             <div className="workload-board__column-head">
-              <div className="d-flex align-items-center gap-2 mb-1">
-                <div className="workload-member-cell__avatar">{memberInitials(col.extension_number)}</div>
-                <strong>{col.extension_number}</strong>
-              </div>
+              <WorkloadMemberIdentity
+                extensionNumber={col.extension_number}
+                hierarchyExtensions={hierarchyExtensions}
+                member={col}
+                isOwner={col.is_owner}
+              />
               <div className="small text-muted mb-1">
                 {col.task_count} tasks · {formatWorkloadMinutes(col.estimated_minutes)} ·{" "}
                 {formatWorkloadPercent(col.load_percent)}

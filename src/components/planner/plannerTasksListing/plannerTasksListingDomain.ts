@@ -49,6 +49,11 @@ export interface ApiTask {
   extension_numbers?: string[];
   is_completed?: boolean;
   type?: string;
+  estimated_duration_minutes?: number | null;
+  estimated_minutes?: number | null;
+  already_in_my_day?: boolean;
+  is_in_my_day?: boolean;
+  in_my_day?: boolean;
 }
 
 export interface TasksListingPageProps {
@@ -100,6 +105,10 @@ export type HierarchyExtension = {
   id?: string;
   extension_number?: string;
   name?: string;
+  user?: {
+    name?: string | null;
+    display_name?: string | null;
+  } | null;
 };
 
 export function lookupHierarchyExtensionDisplayName(
@@ -117,7 +126,10 @@ export function lookupHierarchyExtensionDisplayName(
       item.extension_number == null ? "" : String(item.extension_number).trim();
     return id === trimmed || en === trimmed;
   }) as HierarchyExtension | undefined;
-  const name = ext?.name?.trim();
+  const name =
+    ext?.user?.name?.trim() ||
+    ext?.user?.display_name?.trim() ||
+    ext?.name?.trim();
   return name && name.length > 0 ? name : trimmed;
 }
 

@@ -18,6 +18,10 @@ import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 import { Container, Card, Button, Spinner, Modal } from "react-bootstrap";
 import { ArrowLeft, Edit, Trash2 } from "lucide-react";
+import { PlannerAddToMyDayEstimateModal } from "@components/planner/plannerTasksListing/PlannerAddToMyDayEstimateModal";
+import { PlannerAddToMyDayHeaderButton } from "@components/planner/plannerTasksListing/PlannerAddToMyDayHeaderButton";
+import { toPlannerAddToMyDayTarget } from "@components/planner/plannerTasksListing/plannerTasksListingMyDay";
+import { usePlannerAddToMyDay } from "@components/planner/plannerTasksListing/usePlannerAddToMyDay";
 import {
   getTask,
   deleteTask,
@@ -145,6 +149,37 @@ const TaskDetailPage = () => {
     () => hasPermission(PERMISSIONS.DELETE_TASKS_WORK_PLANNER),
     [hasPermission],
   );
+  const sessionCanUseMyDay = useMemo(
+    () => hasPermission(PERMISSIONS.VIEW_MY_DAY_TASKS_WORK_PLANNER),
+    [hasPermission],
+  );
+
+  const addToMyDayTarget = useMemo(() => {
+    if (task?.id == null) return null;
+    return toPlannerAddToMyDayTarget(
+      task.id,
+      plannerDetailScalarString(task.title),
+      task,
+    );
+  }, [task]);
+
+  const {
+    pendingTask: addToMyDayPendingTask,
+    estimateInput: addToMyDayEstimateInput,
+    setEstimateInput: setAddToMyDayEstimateInput,
+    closeEstimateModal: closeAddToMyDayEstimateModal,
+    requestAddTaskToMyDay,
+    skipEstimateAndAdd: skipAddToMyDayEstimate,
+    confirmEstimateAndAdd: confirmAddToMyDayEstimate,
+    canAddTaskToMyDay,
+    isTaskInMyDay,
+  } = usePlannerAddToMyDay({
+    canUseMyDay: sessionCanUseMyDay,
+    extensionNumber: sessionUserPhoneOrExtension,
+    onAdded: () => {
+      void refetchTask();
+    },
+  });
 
   const taskDetailPermissions = useMemo(
     () =>
@@ -360,8 +395,20 @@ const TaskDetailPage = () => {
             <ArrowLeft size={16} />
             Back to list
           </Button>
-          {(taskDetailPermissions.canOpenTaskEdit || taskDetailPermissions.canDeleteTask) && (
+          {(sessionCanUseMyDay ||
+            taskDetailPermissions.canOpenTaskEdit ||
+            taskDetailPermissions.canDeleteTask) && (
             <div className="d-flex align-items-center gap-1">
+              <PlannerAddToMyDayHeaderButton
+                show={sessionCanUseMyDay && addToMyDayTarget != null}
+                canAdd={addToMyDayTarget != null && canAddTaskToMyDay(addToMyDayTarget)}
+                alreadyInMyDay={
+                  addToMyDayTarget != null && isTaskInMyDay(addToMyDayTarget)
+                }
+                onClick={() => {
+                  if (addToMyDayTarget) requestAddTaskToMyDay(addToMyDayTarget);
+                }}
+              />
               {taskDetailPermissions.canOpenTaskEdit && (
                 <Button
                   variant="link"
@@ -528,6 +575,24 @@ const TaskDetailPage = () => {
         isEdit={Boolean(showEditModal && task)}
         lockProjectSelection={false}
         taskEditScope={task ? taskDetailPermissions.taskEditScope : "full"}
+        showAddToMyDay={sessionCanUseMyDay}
+        canAddToMyDay={
+          addToMyDayTarget != null && canAddTaskToMyDay(addToMyDayTarget)
+        }
+        alreadyInMyDay={addToMyDayTarget != null && isTaskInMyDay(addToMyDayTarget)}
+        onAddToMyDay={() => {
+          if (addToMyDayTarget) requestAddTaskToMyDay(addToMyDayTarget);
+        }}
+      />
+
+      <PlannerAddToMyDayEstimateModal
+        show={addToMyDayPendingTask != null}
+        taskTitle={addToMyDayPendingTask?.title ?? ""}
+        estimateInput={addToMyDayEstimateInput}
+        onEstimateInputChange={setAddToMyDayEstimateInput}
+        onClose={closeAddToMyDayEstimateModal}
+        onSkip={skipAddToMyDayEstimate}
+        onConfirm={confirmAddToMyDayEstimate}
       />
 
       <DeleteConfirmationModal

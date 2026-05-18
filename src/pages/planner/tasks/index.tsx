@@ -63,6 +63,9 @@ import {
   PlannerTaskTypeCell,
   PlannerTaskWorkflowStatusCell,
 } from "@components/planner/plannerTasksListing/PlannerTaskListCells";
+import { PlannerAddToMyDayEstimateModal } from "@components/planner/plannerTasksListing/PlannerAddToMyDayEstimateModal";
+import { usePlannerAddToMyDay } from "@components/planner/plannerTasksListing/usePlannerAddToMyDay";
+import { listingTaskToAddToMyDayTarget } from "@components/planner/plannerTasksListing/plannerTasksListingMyDay";
 import { PlannerTasksEditColumnsDropdown } from "@components/planner/plannerTasksListing/PlannerTasksEditColumnsDropdown";
 import {
   type ApiTask,
@@ -170,6 +173,10 @@ const TasksListingPage = ({
         hasPermission(
           HEADER_CONSTANTS.PERMISSIONS.CONVERT_TO_RECURRING_TASK_WORK_PLANNER,
         ),
+      [hasPermission],
+    );
+    const sessionCanUseMyDay = useMemo(
+      () => hasPermission(HEADER_CONSTANTS.PERMISSIONS.VIEW_MY_DAY_TASKS_WORK_PLANNER),
       [hasPermission],
     );
     const isProjectScopedEmbed = Boolean(sidebarProject?.id);
@@ -589,6 +596,23 @@ const TasksListingPage = ({
       queryClient.invalidateQueries({ queryKey: plannerKeys.tasks.all() });
     }, [queryClient]);
 
+    const {
+      pendingTask: addToMyDayPendingTask,
+      estimateInput: addToMyDayEstimateInput,
+      setEstimateInput: setAddToMyDayEstimateInput,
+      closeEstimateModal: closeAddToMyDayEstimateModal,
+      requestAddTaskToMyDay,
+      skipEstimateAndAdd: skipAddToMyDayEstimate,
+      confirmEstimateAndAdd: confirmAddToMyDayEstimate,
+      canAddTaskToMyDay,
+      isTaskInMyDay,
+      addToMyDayTableAction,
+    } = usePlannerAddToMyDay({
+      canUseMyDay: sessionCanUseMyDay,
+      extensionNumber: sessionUserPhoneOrExtension,
+      onAdded: invalidateTaskLists,
+    });
+
     const resolveProjectForMemberCheck = useCallback(
       (row: Task): unknown => {
         const raw = row.rawData as { project?: Record<string, unknown> | null } | undefined;
@@ -807,11 +831,15 @@ const TasksListingPage = ({
             <PlannerTaskRowActionsMenu
               row={row}
               isOpen={openTaskActionsId === row.id}
+              showAddToMyDay={sessionCanUseMyDay}
+              canAddToMyDay={canAddTaskToMyDay(row)}
+              alreadyInMyDay={isTaskInMyDay(listingTaskToAddToMyDayTarget(row))}
               canEditRow={canEditRow}
               canDeleteRow={canDeleteRow}
               editTitle={plannerTaskRowEditDeniedTitle(canEditRow)}
               deleteTitle={plannerTaskRowDeleteDeniedTitle(perms)}
               setOpenTaskActionsId={setOpenTaskActionsId}
+              onAddToMyDay={() => requestAddTaskToMyDay(listingTaskToAddToMyDayTarget(row))}
               onEdit={() => openEdit(row)}
               onDelete={() => openDeleteConfirm(row)}
             />
@@ -828,6 +856,10 @@ const TasksListingPage = ({
       openTaskActionsId,
       hierarchyDataExtensions,
       sessionCanConvertToRecurringPlannerTask,
+      sessionCanUseMyDay,
+      canAddTaskToMyDay,
+      isTaskInMyDay,
+      requestAddTaskToMyDay,
     ]);
 
     const tableColumnsForGrid = useMemo(() => {
@@ -864,7 +896,13 @@ const TasksListingPage = ({
       persistVisibleTaskColumnKeys(next);
     }, []);
   
-    const actions: TableAction<Task>[] = useMemo(() => [], []);
+    const actions: TableAction<Task>[] = useMemo(() => {
+      const list: TableAction<Task>[] = [];
+      if (sessionCanUseMyDay) {
+        list.push(addToMyDayTableAction);
+      }
+      return list;
+    }, [addToMyDayTableAction, sessionCanUseMyDay]);
   
     // Filter options for Project, Assignee, Status
     const projectOptions = useMemo(() => [
@@ -1754,7 +1792,6 @@ const TasksListingPage = ({
               defaultSortBy={pager.sortCol}
               defaultSortOrder={pager.sortDir}
               onSort={(col, dir) => setPager(p => ({ ...p, sortCol: col, sortDir: dir }))}
-              onFirstColumnClick={row => router.push(`/planner/tasks/task-detail?id=${row.id}`)}
               loading={loading}
               emptyMessage="No tasks found"
               loadingMessage="Loading tasks..."
@@ -1805,9 +1842,31 @@ const TasksListingPage = ({
           lockProjectSelection={Boolean(sidebarProject)}
           taskEditScope={editingTask ? editingTaskEditScope : "full"}
           openAsRecurringConversion={openAsRecurringConversion}
+          showAddToMyDay={sessionCanUseMyDay}
+          canAddToMyDay={
+            editingTask != null && canAddTaskToMyDay(listingTaskToAddToMyDayTarget(editingTask))
+          }
+          alreadyInMyDay={
+            editingTask != null && isTaskInMyDay(listingTaskToAddToMyDayTarget(editingTask))
+          }
+          onAddToMyDay={() => {
+            if (editingTask) {
+              requestAddTaskToMyDay(listingTaskToAddToMyDayTarget(editingTask));
+            }
+          }}
         />
   
         {/* ── Delete confirmation ── */}
+        <PlannerAddToMyDayEstimateModal
+          show={addToMyDayPendingTask != null}
+          taskTitle={addToMyDayPendingTask?.title ?? ""}
+          estimateInput={addToMyDayEstimateInput}
+          onEstimateInputChange={setAddToMyDayEstimateInput}
+          onClose={closeAddToMyDayEstimateModal}
+          onSkip={skipAddToMyDayEstimate}
+          onConfirm={confirmAddToMyDayEstimate}
+        />
+
         <DeleteConfirmationModal
           show={showDelete}
           onHide={() => { setShowDelete(false); setToDelete(null); }}
