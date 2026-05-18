@@ -397,10 +397,8 @@ const WorkloadPlannerPage: React.FC = () => {
     },
   });
 
-  const handleBoardDropIntent = useCallback(
-    (intent: WorkloadBoardDropIntent) => {
-      setBoardDropIntent(intent);
-      setBoardDropOverload(false);
+  const checkBoardDropOverload = useCallback(
+    async (intent: WorkloadBoardDropIntent) => {
       const targetDate =
         intent.toDate ??
         intent.task.due_date?.slice(0, 10) ??
@@ -410,19 +408,25 @@ const WorkloadPlannerPage: React.FC = () => {
       if (!targetDate || !intent.toExtension) {
         return;
       }
-      getWorkloadOverloadCheck({
+      const check = await getWorkloadOverloadCheck({
         extension_number: intent.toExtension,
         date: targetDate,
         additional_estimated_minutes: minutes,
         exclude_task_id: intent.task.id,
         assignee_match: assigneeMatch,
-      })
-        .then((check) => {
-          if (check.overloaded) setBoardDropOverload(true);
-        })
-        .catch(() => undefined);
+      });
+      if (check.overloaded) setBoardDropOverload(true);
     },
     [assigneeMatch, boardQuery.data?.range.start],
+  );
+
+  const handleBoardDropIntent = useCallback(
+    (intent: WorkloadBoardDropIntent) => {
+      setBoardDropIntent(intent);
+      setBoardDropOverload(false);
+      checkBoardDropOverload(intent).catch(() => undefined);
+    },
+    [checkBoardDropOverload],
   );
 
   const confirmBoardDrop = useCallback(() => {

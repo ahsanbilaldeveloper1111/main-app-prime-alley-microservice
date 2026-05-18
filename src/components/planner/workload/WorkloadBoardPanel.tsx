@@ -1,6 +1,7 @@
 import React, { useCallback, useMemo, useState } from "react";
 import type { WorkloadBoardColumn, WorkloadBoardData, WorkloadTaskCard } from "@utils/tasks";
 import {
+  formatWorkloadMemberLabel,
   formatWorkloadMinutes,
   formatWorkloadPercent,
   listWorkloadDaysInRange,
@@ -122,18 +123,28 @@ export function WorkloadBoardPanel({
           const tasks = filterColumnTasks(col, priorityFilter);
           const barPct = Math.min(100, Math.max(0, col.load_percent));
           const periodCapacity = col.effective_capacity_minutes_period;
+          const columnLabel = formatWorkloadMemberLabel(
+            col.extension_number,
+            hierarchyExtensions,
+            col,
+          );
           return (
-            <div
+            <section
               key={col.extension_number}
               className={`workload-board__column ${
                 dropHighlight === col.extension_number
                   ? "workload-board__column--drop-target"
                   : ""
               }`}
+              aria-label={`${columnLabel} workload column`}
+              tabIndex={0}
               onDragOver={allowDrop}
               onDragEnter={() => setDropHighlight(col.extension_number)}
               onDragLeave={() => setDropHighlight(null)}
               onDrop={(e) => handleDrop(e, col.extension_number, null)}
+              onKeyDown={(event) => {
+                if (event.key === "Escape") event.currentTarget.blur();
+              }}
             >
               <div className="workload-board__column-head">
                 <WorkloadMemberIdentity
@@ -182,7 +193,7 @@ export function WorkloadBoardPanel({
                   ))
                 )}
               </div>
-            </div>
+            </section>
           );
         })}
       </div>

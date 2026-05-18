@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from "react";
 import Link from "next/link";
 import { Button, Collapse, Form } from "react-bootstrap";
-import { Calendar, ChevronDown, FolderKanban } from "lucide-react";
+import { Calendar, ChevronDown, FolderKanban, GripVertical } from "lucide-react";
 import type { WorkloadTaskCard } from "@utils/tasks";
 import {
   formatWorkloadBoardMoveLabel,
@@ -66,11 +66,21 @@ export function WorkloadBoardTaskCard({
       className={`workload-board-task-card workload-board-task-card--${accent} ${
         isDragging ? "workload-board-task-card--dragging" : ""
       } ${task.is_completed ? "workload-board-task-card--completed" : ""}`}
-      draggable={!dragSaving}
-      onDragStart={(e) => onDragStart(e, task)}
-      onDragEnd={onDragEnd}
     >
-      <div className="workload-board-task-card__title">{task.title}</div>
+      <div className="workload-board-task-card__header">
+        <button
+          type="button"
+          className="workload-board-task-card__drag-handle"
+          draggable={!dragSaving}
+          aria-label={`Drag ${task.title}`}
+          disabled={dragSaving}
+          onDragStart={(e) => onDragStart(e, task)}
+          onDragEnd={onDragEnd}
+        >
+          <GripVertical size={14} aria-hidden />
+        </button>
+        <div className="workload-board-task-card__title">{task.title}</div>
+      </div>
 
       <div className="workload-board-task-card__project">
         <FolderKanban size={14} className="workload-board-task-card__project-icon" aria-hidden />

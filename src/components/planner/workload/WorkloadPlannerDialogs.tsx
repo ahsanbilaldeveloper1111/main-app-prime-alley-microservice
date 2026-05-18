@@ -69,6 +69,38 @@ type WorkloadDayTaskCardProps = Readonly<{
   isSavingEstimate: boolean;
 }>;
 
+function resolveRescheduleCurrentLabel(
+  currentDate: string | undefined,
+  task: WorkloadTaskCard | null,
+): string {
+  if (currentDate) return formatWorkloadDayDetailDate(currentDate);
+  const dueSlice = task?.due_date?.slice(0, 10);
+  if (dueSlice) return formatWorkloadDayDetailDate(dueSlice);
+  return "—";
+}
+
+function WorkloadDayTaskMarkDoneButton({
+  task,
+  isMarkingDone,
+  onMarkDone,
+}: Readonly<{
+  task: WorkloadTaskCard;
+  isMarkingDone: boolean;
+  onMarkDone: (taskId: number) => void;
+}>) {
+  if (task.is_completed) return null;
+  return (
+    <Button
+      size="sm"
+      variant="outline-success"
+      disabled={isMarkingDone}
+      onClick={() => onMarkDone(task.id)}
+    >
+      {isMarkingDone ? "Saving…" : "Mark done"}
+    </Button>
+  );
+}
+
 function WorkloadDayTaskCard({
   task,
   onReassign,
@@ -158,7 +190,7 @@ function WorkloadDayTaskCard({
             <Button
               size="sm"
               variant="warning"
-              disabled={isSavingEstimate || !estimateDraft.trim()}
+              disabled={isSavingEstimate || estimateDraft.trim() === ""}
               onClick={handleSaveEstimate}
             >
               {isSavingEstimate ? "Saving…" : "Save"}
@@ -174,16 +206,11 @@ function WorkloadDayTaskCard({
         <Button size="sm" variant="outline-secondary" onClick={() => onReschedule(task)}>
           Reschedule
         </Button>
-        {!task.is_completed ? (
-          <Button
-            size="sm"
-            variant="outline-success"
-            disabled={isMarkingDone}
-            onClick={() => onMarkDone(task.id)}
-          >
-            {isMarkingDone ? "Saving…" : "Mark done"}
-          </Button>
-        ) : null}
+        <WorkloadDayTaskMarkDoneButton
+          task={task}
+          isMarkingDone={isMarkingDone}
+          onMarkDone={onMarkDone}
+        />
       </div>
     </div>
   );
@@ -418,11 +445,7 @@ export function WorkloadRescheduleModal({
   isSaving,
   onSubmit,
 }: WorkloadRescheduleModalProps) {
-  const currentLabel = currentDate
-    ? formatWorkloadDayDetailDate(currentDate)
-    : task?.due_date
-      ? formatWorkloadDayDetailDate(task.due_date.slice(0, 10))
-      : "—";
+  const currentLabel = resolveRescheduleCurrentLabel(currentDate, task);
 
   return (
     <Modal show={Boolean(task)} onHide={onClose} centered className="workload-reschedule-modal">

@@ -43,6 +43,7 @@ import {
   PLANNER_TASK_DETAIL_WITH_RELATIONS,
   buildPlannerTaskDetailViewModel,
   plannerDetailScalarString,
+  resolvePlannerTaskParentRef,
   type PlannerTaskDetailApiTask,
 } from "@components/planner/plannerTaskDetail/plannerTaskDetailDomain";
 import { usePlannerTaskActivitiesPreview } from "@components/planner/plannerTaskDetail/usePlannerTaskActivitiesPreview";
@@ -375,6 +376,7 @@ const TaskDetailPage = () => {
     title?: string;
     reference?: string;
   }> | undefined;
+  const parentTask = resolvePlannerTaskParentRef(task.parent);
 
   return (
     <>
@@ -464,13 +466,8 @@ const TaskDetailPage = () => {
 
             <PlannerTaskDetailProjectBlock projectName={projectName} />
 
-            {typeof task.parent === "object" &&
-            task.parent != null &&
-            (task.parent as { id?: number }).id != null ? (
-              <PlannerTaskDetailParentBlock
-                parent={task.parent as { id: number; title?: string; reference?: string }}
-                router={router}
-              />
+            {parentTask ? (
+              <PlannerTaskDetailParentBlock parent={parentTask} router={router} />
             ) : null}
 
             <PlannerTaskDetailLabelsBlock labels={labels ?? []} />

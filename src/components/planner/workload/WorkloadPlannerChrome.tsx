@@ -7,7 +7,10 @@ import type {
   WorkloadPriorityFilterValue,
   WorkloadProjectFilterValue,
 } from "@page-modules/planner/workload/workloadDomain";
-import { formatWorkloadMemberLabel } from "@page-modules/planner/workload/workloadDomain";
+import {
+  formatWorkloadMemberLabel,
+  workloadProjectFilterSelectValue,
+} from "@page-modules/planner/workload/workloadDomain";
 
 export type WorkloadProjectOption = Readonly<{ id: number; name: string }>;
 
@@ -153,13 +156,7 @@ export function WorkloadPlannerFiltersCard({
             <Form.Label className="small text-muted mb-1">Project</Form.Label>
             <Form.Select
               size="sm"
-              value={
-                projectFilter === "all"
-                  ? "all"
-                  : projectFilter === "none"
-                    ? "none"
-                    : String(projectFilter)
-              }
+              value={workloadProjectFilterSelectValue(projectFilter)}
               onChange={(e) => {
                 const v = e.target.value;
                 if (v === "all") onProjectFilterChange("all");

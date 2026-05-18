@@ -157,7 +157,7 @@ export function usePlannerAddToMyDay({
   );
 
   const canAddTaskToMyDay = useCallback(
-    (row: PlannerAddToMyDayTarget) => canUseMyDay && !isTaskInMyDay(row),
+    (row: PlannerAddToMyDayTarget) => canUseMyDay && isTaskInMyDay(row) === false,
     [canUseMyDay, isTaskInMyDay],
   );
 
@@ -167,7 +167,7 @@ export function usePlannerAddToMyDay({
       disabledLabel: "Already in My Day",
       icon: <Sun size={14} />,
       show: () => canUseMyDay,
-      disabled: (row) => !canAddTaskToMyDay(listingTaskToAddToMyDayTarget(row)),
+      disabled: (row) => canAddTaskToMyDay(listingTaskToAddToMyDayTarget(row)) === false,
       disabledTitle: "Task is already on My Day",
       disabledClassName: "text-muted",
       onClick: (row) => requestAddTaskToMyDay(listingTaskToAddToMyDayTarget(row)),

@@ -49,7 +49,7 @@ export function workloadMemberAvatarColor(extensionNumber: string): string {
   const ext = extensionNumber.trim();
   let hash = 0;
   for (let i = 0; i < ext.length; i += 1) {
-    hash = (hash * 31 + ext.charCodeAt(i)) | 0;
+    hash = Math.trunc(hash * 31 + ext.charCodeAt(i));
   }
   const idx = Math.abs(hash) % WORKLOAD_AVATAR_PALETTE.length;
   return WORKLOAD_AVATAR_PALETTE[idx];
@@ -166,14 +166,14 @@ const WORKLOAD_VIEW_STORAGE_KEY = "planner.workload.mainView";
 export type WorkloadMainView = "grid" | "board";
 
 export function readWorkloadMainViewPreference(): WorkloadMainView {
-  if (typeof window === "undefined") return "grid";
-  const raw = window.localStorage.getItem(WORKLOAD_VIEW_STORAGE_KEY);
+  if (globalThis.window === undefined) return "grid";
+  const raw = globalThis.window.localStorage.getItem(WORKLOAD_VIEW_STORAGE_KEY);
   return raw === "board" ? "board" : "grid";
 }
 
 export function writeWorkloadMainViewPreference(view: WorkloadMainView): void {
-  if (typeof window === "undefined") return;
-  window.localStorage.setItem(WORKLOAD_VIEW_STORAGE_KEY, view);
+  if (globalThis.window === undefined) return;
+  globalThis.window.localStorage.setItem(WORKLOAD_VIEW_STORAGE_KEY, view);
 }
 
 export function isWorkloadTaskUnestimated(task: {
@@ -400,6 +400,14 @@ export function workloadPassesPriorityFilter(
     default:
       return true;
   }
+}
+
+export function workloadProjectFilterSelectValue(
+  projectFilter: WorkloadProjectFilterValue,
+): string {
+  if (projectFilter === "all") return "all";
+  if (projectFilter === "none") return "none";
+  return String(projectFilter);
 }
 
 export function workloadProjectFilterQuery(projectFilter: WorkloadProjectFilterValue): {

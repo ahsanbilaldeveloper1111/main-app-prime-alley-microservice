@@ -293,7 +293,7 @@ function renderGtContextMenuItemRow(
               aria-hidden
             />
           </div>
-          <div className="gt-context-submenu" role="menu">
+          <div className="gt-context-submenu" role="menu" tabIndex={-1}>
             {item.submenu.map((sub, subIdx) =>
               renderGtContextMenuItemRow(sub, subIdx, `${key}-sub`, onClose),
             )}
@@ -2269,6 +2269,7 @@ const GenericTable = <T extends Record<string, any>>({
           className="gt-context-menu"
           style={{ left: contextMenu.x, top: contextMenu.y }}
           role="menu"
+          tabIndex={-1}
           onMouseDown={(e) => e.stopPropagation()}
         >
           <GtContextMenuItemList
