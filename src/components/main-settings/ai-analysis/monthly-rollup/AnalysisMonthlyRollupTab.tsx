@@ -163,11 +163,7 @@ export const AnalysisMonthlyRollupTab: React.FC = () => {
         </Button>
       </div>
 
-      {!filtersApplied ? (
-        <p className="ai-analysis-monthly-rollup__hint">
-          Apply filters to load monthly rollup data.
-        </p>
-      ) : (
+      {filtersApplied ? (
         <RollupTable
           rows={rows}
           isLoading={rollupQuery.isPending}
@@ -176,6 +172,10 @@ export const AnalysisMonthlyRollupTab: React.FC = () => {
             rollupQuery.refetch().catch(() => undefined);
           }}
         />
+      ) : (
+        <p className="ai-analysis-monthly-rollup__hint">
+          Apply filters to load monthly rollup data.
+        </p>
       )}
     </div>
   );

@@ -1,6 +1,7 @@
 import React from "react";
 
 export type AnalysisFormSkeletonField = {
+  id: string;
   wide?: boolean;
   tall?: boolean;
 };
@@ -13,9 +14,9 @@ export function AnalysisFormSkeleton(props: Readonly<{
 
   return (
     <div className="ai-analysis-skeleton__form-grid" aria-busy="true" aria-label="Loading form">
-      {fields.map((field, index) => (
+      {fields.map((field) => (
         <div
-          key={`field-${index}`}
+          key={field.id}
           className={[
             "ai-analysis-skeleton__form-field",
             field.wide ? "ai-analysis-skeleton__form-field--wide" : "",
@@ -23,35 +24,35 @@ export function AnalysisFormSkeleton(props: Readonly<{
             .filter(Boolean)
             .join(" ")}
         >
-          <div
-            className="ai-analysis-skeleton__label"
-            style={{ animationDelay: `${index * 0.06}s` }}
-          />
+          <div className="ai-analysis-skeleton__label" />
           <div
             className={
               field.tall
                 ? "ai-analysis-skeleton__textarea"
                 : "ai-analysis-skeleton__input"
             }
-            style={{ animationDelay: `${index * 0.06 + 0.03}s` }}
           />
         </div>
       ))}
-      {showSave ? (
-        <div
-          className="ai-analysis-skeleton__save"
-          style={{ animationDelay: `${fields.length * 0.06}s` }}
-        />
-      ) : null}
+      {showSave ? <div className="ai-analysis-skeleton__save" /> : null}
     </div>
   );
 }
+
+const FILTER_SLOT_IDS = [
+  "filter-slot-a",
+  "filter-slot-b",
+  "filter-slot-c",
+  "filter-slot-d",
+  "filter-slot-e",
+] as const;
 
 export function AnalysisFilterBarSkeleton(props: Readonly<{
   filterCount?: number;
   showCompany?: boolean;
 }>) {
   const { filterCount = 2, showCompany = true } = props;
+  const slots = FILTER_SLOT_IDS.slice(0, filterCount);
 
   return (
     <div className="ai-analysis-skeleton__filter-bar" aria-busy="true" aria-label="Loading filters">
@@ -61,24 +62,23 @@ export function AnalysisFilterBarSkeleton(props: Readonly<{
           <div className="ai-analysis-skeleton__input" />
         </div>
       ) : null}
-      {Array.from({ length: filterCount }, (_, index) => (
-        <div key={`filter-${index}`} className="ai-analysis-skeleton__filter-field">
-          <div
-            className="ai-analysis-skeleton__label"
-            style={{ animationDelay: `${(index + 1) * 0.06}s` }}
-          />
-          <div
-            className="ai-analysis-skeleton__input ai-analysis-skeleton__input--short"
-            style={{ animationDelay: `${(index + 1) * 0.06 + 0.03}s` }}
-          />
+      {slots.map((slotId) => (
+        <div key={slotId} className="ai-analysis-skeleton__filter-field">
+          <div className="ai-analysis-skeleton__label" />
+          <div className="ai-analysis-skeleton__input ai-analysis-skeleton__input--short" />
         </div>
       ))}
-      <div
-        className="ai-analysis-skeleton__button"
-        style={{ animationDelay: `${(filterCount + 1) * 0.06}s` }}
-      />
+      <div className="ai-analysis-skeleton__button" />
     </div>
   );
+}
+
+function tableCellKey(rowIndex: number, colIndex: number): string {
+  return `row-${rowIndex}-col-${colIndex}`;
+}
+
+function tableHeaderKey(colIndex: number): string {
+  return `header-col-${colIndex}`;
 }
 
 export function AnalysisTableSkeleton(props: Readonly<{
@@ -86,32 +86,30 @@ export function AnalysisTableSkeleton(props: Readonly<{
   cols?: number;
 }>) {
   const { rows = 3, cols = 5 } = props;
+  const rowIndices = Array.from({ length: rows }, (_, row) => row);
+  const colIndices = Array.from({ length: cols }, (_, col) => col);
 
   return (
     <div className="ai-analysis-skeleton__table-wrap" aria-busy="true" aria-label="Loading table">
       <table className="table table-sm mb-0 w-100">
         <thead>
           <tr>
-            {Array.from({ length: cols }, (_, colIndex) => (
-              <th key={`h-${colIndex}`}>
-                <div
-                  className="ai-analysis-skeleton__table-header"
-                  style={{ animationDelay: `${colIndex * 0.05}s` }}
-                />
+            {colIndices.map((colIndex) => (
+              <th key={tableHeaderKey(colIndex)}>
+                <div className="ai-analysis-skeleton__table-header" />
               </th>
             ))}
           </tr>
         </thead>
         <tbody>
-          {Array.from({ length: rows }, (_, rowIndex) => (
-            <tr key={`r-${rowIndex}`}>
-              {Array.from({ length: cols }, (_, colIndex) => (
-                <td key={`c-${rowIndex}-${colIndex}`}>
+          {rowIndices.map((rowIndex) => (
+            <tr key={tableCellKey(rowIndex, 0)}>
+              {colIndices.map((colIndex) => (
+                <td key={tableCellKey(rowIndex, colIndex)}>
                   <div
                     className="ai-analysis-skeleton__table-cell"
                     style={{
                       width: colIndex === cols - 1 ? "60%" : "80%",
-                      animationDelay: `${(rowIndex * cols + colIndex) * 0.05}s`,
                     }}
                   />
                 </td>
@@ -125,9 +123,28 @@ export function AnalysisTableSkeleton(props: Readonly<{
 }
 
 export function pricingFormSkeletonFields(): AnalysisFormSkeletonField[] {
-  return [{}, {}, {}, {}, { wide: true, tall: true }];
+  return [
+    { id: "pricing-cost-per-call" },
+    { id: "pricing-input-tokens" },
+    { id: "pricing-output-tokens" },
+    { id: "pricing-currency" },
+    { id: "pricing-notes", wide: true, tall: true },
+  ];
 }
 
+const TENANT_FORM_FIELD_IDS = [
+  "tenant-id",
+  "tenant-industry",
+  "tenant-language",
+  "tenant-monthly-limit",
+  "tenant-alert",
+  "tenant-cost-limit",
+  "tenant-per-call",
+  "tenant-input-tokens",
+  "tenant-output-tokens",
+] as const;
+
 export function tenantFormSkeletonFields(): AnalysisFormSkeletonField[] {
-  return Array.from({ length: 9 }, () => ({}));
+  return TENANT_FORM_FIELD_IDS.map((id) => ({ id }));
 }
+

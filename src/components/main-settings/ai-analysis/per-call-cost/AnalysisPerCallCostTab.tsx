@@ -204,11 +204,7 @@ export const AnalysisPerCallCostTab: React.FC = () => {
         </Button>
       </div>
 
-      {!filtersApplied ? (
-        <p className="ai-analysis-per-call-cost__hint">
-          Apply filters to load per-call cost data.
-        </p>
-      ) : (
+      {filtersApplied ? (
         <>
           <p className="ai-analysis-per-call-cost__meta">
             {total === 0
@@ -248,6 +244,10 @@ export const AnalysisPerCallCostTab: React.FC = () => {
             </div>
           ) : null}
         </>
+      ) : (
+        <p className="ai-analysis-per-call-cost__hint">
+          Apply filters to load per-call cost data.
+        </p>
       )}
     </div>
   );

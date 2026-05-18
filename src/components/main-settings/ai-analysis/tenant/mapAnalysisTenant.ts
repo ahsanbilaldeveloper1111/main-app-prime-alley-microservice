@@ -9,6 +9,11 @@ import { defaultAnalysisTenantFormValues } from "./types";
 const TOKENS_PER_MILLION = 1_000_000;
 const OMIT = Symbol("omit");
 
+type OmitSentinel = typeof OMIT;
+type TriStateString = string | OmitSentinel;
+type TriStateNumber = number | OmitSentinel;
+type TriStateNullableNumber = number | null | OmitSentinel;
+
 function numberToInputString(value: number | null | undefined): string {
   if (value == null || !Number.isFinite(value)) {
     return "";
@@ -30,7 +35,7 @@ function numbersEqual(a: number, b: number): boolean {
 function resolveOptionalString(
   raw: string,
   original: string | null,
-): string | typeof OMIT {
+): TriStateString {
   const trimmed = raw.trim();
   const originalTrimmed = original?.trim() ?? "";
   if (trimmed === originalTrimmed) {
@@ -43,7 +48,7 @@ function resolveOptionalFloat(
   raw: string,
   original: number,
   label: string,
-): number | typeof OMIT {
+): TriStateNumber {
   const trimmed = raw.trim();
   if (!trimmed) {
     throw new Error(`${label} is required.`);
@@ -62,7 +67,7 @@ function resolveNullableInt(
   raw: string,
   original: number | null,
   label: string,
-): number | null | typeof OMIT {
+): TriStateNullableNumber {
   const trimmed = raw.trim();
   if (!trimmed) {
     if (original == null) {
@@ -83,7 +88,7 @@ function resolveNullableInt(
 function resolveAlertThresholdPct(
   raw: string,
   original: number,
-): number | typeof OMIT {
+): TriStateNumber {
   const trimmed = raw.trim();
   if (!trimmed) {
     if (original === 0) {
@@ -105,7 +110,7 @@ function resolveTriStateUsd(
   raw: string,
   original: number | null,
   label: string,
-): number | null | typeof OMIT {
+): TriStateNullableNumber {
   const trimmed = raw.trim();
   if (!trimmed) {
     if (original == null) {
@@ -127,7 +132,7 @@ function resolveTriStatePerTokenFromPerMillion(
   rawPerMillion: string,
   originalPerToken: number | null,
   label: string,
-): number | null | typeof OMIT {
+): TriStateNullableNumber {
   const trimmed = rawPerMillion.trim();
   if (!trimmed) {
     if (originalPerToken == null) {
@@ -149,7 +154,7 @@ function resolveTriStatePerTokenFromPerMillion(
 function assignIfChanged<K extends keyof AnalysisTenantUpdateRequest>(
   payload: AnalysisTenantUpdateRequest,
   key: K,
-  value: AnalysisTenantUpdateRequest[K] | typeof OMIT,
+  value: AnalysisTenantUpdateRequest[K] | OmitSentinel,
 ): void {
   if (value !== OMIT) {
     payload[key] = value;

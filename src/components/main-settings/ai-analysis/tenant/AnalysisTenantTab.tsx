@@ -225,6 +225,7 @@ export const AnalysisTenantTab: React.FC = () => {
     formValues: fetchedFormValues,
     isLoading: tenantLoading,
     isError: tenantError,
+    isSuccess: tenantLoaded,
     refetch: refetchTenant,
     dataUpdatedAt,
     tenantId: queryTenantId,
@@ -298,13 +299,13 @@ export const AnalysisTenantTab: React.FC = () => {
         appliedCompanyLabel={appliedCompanyLabel}
       />
 
-      {!appliedTenantId ? (
+      {appliedTenantId ? null : (
         <p className="ai-analysis-tenant__hint">
           Select a company or table row to edit tenant settings.
         </p>
-      ) : null}
+      )}
 
-      {appliedTenantId && tenantLoading && !formHydrated ? (
+      {appliedTenantId && tenantLoading && formHydrated === false ? (
         <AnalysisFormSkeleton fields={tenantFormSkeletonFields()} />
       ) : null}
 
@@ -323,13 +324,13 @@ export const AnalysisTenantTab: React.FC = () => {
         </p>
       ) : null}
 
-      {appliedTenantId && !tenantError && formHydrated ? (
+      {appliedTenantId && tenantLoaded && formHydrated ? (
         <>
-          {!hasApiData ? (
+          {hasApiData ? null : (
             <p className="ai-analysis-tenant__hint">
               No tenant settings returned — enter values and save to create settings.
             </p>
-          ) : null}
+          )}
 
           <div key={appliedTenantId} className="ai-analysis-tenant__grid">
             <TenantField

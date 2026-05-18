@@ -139,7 +139,7 @@
 
     &:disabled {
       background: #f3f4f6;
-      color: #6b7280;
+      color: #4b5563;
     }
   }
 
@@ -264,6 +264,13 @@
       width: auto;
       flex-shrink: 0;
     }
+  }
+
+  .ai-analysis-pricing-company__menu,
+  .ai-analysis-tenant-company__menu,
+  .ai-analysis-monthly-rollup-company__menu,
+  .ai-analysis-per-call-cost-company__menu {
+    z-index: 5;
   }
 }
 
@@ -399,19 +406,5 @@
     height: 12px;
     width: 80%;
     @include ai-analysis-skeleton-block(12px, 4px);
-  }
-}
-
-// react-select menu portal z-index / width
-.ai-analysis-section,
-.ai-analysis-pricing,
-.ai-analysis-tenant,
-.ai-analysis-monthly-rollup,
-.ai-analysis-per-call-cost {
-  .ai-analysis-pricing-company__menu,
-  .ai-analysis-tenant-company__menu,
-  .ai-analysis-monthly-rollup-company__menu,
-  .ai-analysis-per-call-cost-company__menu {
-    z-index: 5;
   }
 }

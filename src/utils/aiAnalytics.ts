@@ -131,6 +131,16 @@ function coerceNullableFiniteNumber(value: unknown): number | null {
   return null;
 }
 
+function coerceStringId(value: unknown): string {
+  if (typeof value === "string") {
+    return value;
+  }
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return String(value);
+  }
+  return "";
+}
+
 function normalizeTenantRecord(
   value: Record<string, unknown> | AnalysisTenantRecord,
 ): AnalysisTenantRecord {
@@ -139,7 +149,7 @@ function normalizeTenantRecord(
     ("alert_threshold" in value ? value.alert_threshold : undefined);
 
   return {
-    tenant_id: String(value.tenant_id ?? ""),
+    tenant_id: coerceStringId(value.tenant_id),
     industry_type:
       typeof value.industry_type === "string" ? value.industry_type : null,
     primary_language:
@@ -335,7 +345,7 @@ function normalizeMonthlyRollupRow(
   value: Record<string, unknown> | AnalysisMonthlyRollupRow,
 ): AnalysisMonthlyRollupRow {
   return {
-    tenant_id: String(value.tenant_id ?? ""),
+    tenant_id: coerceStringId(value.tenant_id),
     year: coerceFiniteNumber(value.year),
     month: coerceFiniteNumber(value.month),
     total_calls: coerceFiniteNumber(value.total_calls),
@@ -472,8 +482,8 @@ function normalizePerCallCostRow(
 ): AnalysisPerCallCostRow {
   return {
     id: coerceRowId(value),
-    call_id: String(value.call_id ?? ""),
-    tenant_id: String(value.tenant_id ?? ""),
+    call_id: coerceStringId(value.call_id),
+    tenant_id: coerceStringId(value.tenant_id),
     agent_id: coerceOptionalString(value.agent_id),
     call_date: coerceOptionalString(value.call_date),
     call_datetime: coerceOptionalString(value.call_datetime),
