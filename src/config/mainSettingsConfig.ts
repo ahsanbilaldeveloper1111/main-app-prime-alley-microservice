@@ -55,6 +55,6 @@ export const defaultSubTabBySection: Record<string, string | undefined> = {
   billing: 'payment-methods',
   tickets: 'statuses',
   'help-center': 'modules',
-  'ai-chat': 'tools-profiles',
+  'ai-chat': 'ai-chatbot-settings',
   pulse: 'assign-devices',
 }
