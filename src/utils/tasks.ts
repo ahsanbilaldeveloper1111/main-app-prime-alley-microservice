@@ -194,6 +194,9 @@ interface CreateRecurringTaskData {
   recurring_create_next_if_previous_incomplete?: boolean;
 }
 
+/** Parent task reference for update payloads; `null` detaches the parent. */
+type TaskParentId = number | string | null;
+
 interface UpdateTaskData {
   title?: string;
   description?: string;
@@ -210,7 +213,7 @@ interface UpdateTaskData {
   watchers?: string[];
   label_ids?: number[];
   /** Send `null` to detach parent when updating. */
-  parent_task_id?: number | string | null;
+  parent_task_id?: TaskParentId;
   estimated_duration_minutes?: number | null;
 }
 
@@ -232,7 +235,7 @@ interface UpdateRecurringTaskData {
   extension_numbers?: string[];
   label_ids?: number[];
   is_active?: boolean;
-  parent_task_id?: number | string | null;
+  parent_task_id?: TaskParentId;
   timezone?: string;
   time_zone?: string;
   reminder_minutes?: number | null;
