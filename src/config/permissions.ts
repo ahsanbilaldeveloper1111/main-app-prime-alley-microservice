@@ -57,13 +57,24 @@ export const routePermissions: RoutePermission[] = [
             { path: '/billing', permissions: [PERMISSIONS.ACCOUNTS_SERVICES] },
             { path: '/tickets', permissions: [PERMISSIONS.TICKETS_SERVICES] },
             { path: '/help-center', permissions: [PERMISSIONS.MANAGE_HELP_CENTER] },
-            { path: '/ai-chat', permissions: [PERMISSIONS.VIEW_AI_CHAT_AI_CHAT] },
+            {
+                path: '/ai-chat',
+                permissions: [PERMISSIONS.VIEW_AI_CHAT_AI_CHAT],
+                children: [
+                    {
+                        path: '/ai-chatbot-settings',
+                        permissions: [PERMISSIONS.VIEW_TENANT_SETTING_AI_CHAT],
+                    },
+                ],
+            },
         ]
     },
     { path: '/chat', permissions: [PERMISSIONS.VIEW_AI_CHAT_AI_CHAT] },
     
     {path:'/chat/ai-faqs/tenant',permissions: [PERMISSIONS.MANAGE_TENANT_PROFILE_AI_CHAT]},
+    { path: '/chat/tenant-dashboard', permissions: [PERMISSIONS.VIEW_TENANT_DASHBOARD_AI_CHAT] },
     { path: '/chat/ai-faqs/global', permissions: [PERMISSIONS.MANAGE_GLOBAL_FAQS_AI_CHAT] },
+    { path: '/chat/admin-dashboard', permissions: [PERMISSIONS.VIEW_ADMIN_DASHBOARD_AI_CHAT] },
     { path: '/chat/faq-profiles', permissions: [PERMISSIONS.VIEW_FAQS_PROFILE_AI_CHAT] },
     { path: '/chat/faq-profiles/tenant', permissions: [PERMISSIONS.MANAGE_TENANT_PROFILE_AI_CHAT] },
     { path: '/chat/faq-profiles/global', permissions: [PERMISSIONS.MANAGE_GLOBAL_FAQS_AI_CHAT] },
@@ -224,6 +235,7 @@ export const routePermissions: RoutePermission[] = [
                 ]
              },
             { path: '/my-tasks', permissions: [PERMISSIONS.VIEW_TASKSLIST_WORK_PLANNER] },
+            { path: '/workload', permissions: [PERMISSIONS.VIEW_TASKSLIST_WORK_PLANNER] },
             { path: '/calendar', permissions: [PERMISSIONS.VIEW_CALENDAR_WORK_PLANNER] },
             {
                 path: '/projects', permissions: [PERMISSIONS.VIEW_PROJECTS_WORK_PLANNER],

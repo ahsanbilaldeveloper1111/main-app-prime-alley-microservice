@@ -18,7 +18,7 @@ import { toast } from "react-toastify";
 import router from "next/router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 
-import { billingCustomerKeys } from "../../query/keys";
+import { billingCustomerKeys } from "@query/keys";
 
 import {
   GetPaymentMethods,

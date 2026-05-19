@@ -194,6 +194,9 @@ interface CreateRecurringTaskData {
   recurring_create_next_if_previous_incomplete?: boolean;
 }
 
+/** Parent task reference for update payloads; `null` detaches the parent. */
+type TaskParentId = number | string | null;
+
 interface UpdateTaskData {
   title?: string;
   description?: string;
@@ -210,7 +213,7 @@ interface UpdateTaskData {
   watchers?: string[];
   label_ids?: number[];
   /** Send `null` to detach parent when updating. */
-  parent_task_id?: number | string | null;
+  parent_task_id?: TaskParentId;
   estimated_duration_minutes?: number | null;
 }
 
@@ -232,7 +235,7 @@ interface UpdateRecurringTaskData {
   extension_numbers?: string[];
   label_ids?: number[];
   is_active?: boolean;
-  parent_task_id?: number | string | null;
+  parent_task_id?: TaskParentId;
   timezone?: string;
   time_zone?: string;
   reminder_minutes?: number | null;
@@ -1402,6 +1405,11 @@ export interface MyDayPreferences {
   rollover_shown_date?: string | null;
 }
 
+/**
+ * My Day HTTP paths use the work-planner proxy prefix (`/api/work-planner/my-day/...`).
+ * Laravel may also expose the same handlers under `/api/tasks/my-day/...` (Postman); keep paths in sync with your deployed API.
+ */
+
 export interface MyDayTasksMeta {
   planned_minutes?: number;
   completed_minutes?: number;
@@ -1422,6 +1430,8 @@ export type MyDaySuggestionCategory =
   | "due_today"
   | "high_priority"
   | "assigned_to_me"
+  | "organizational_tasks"
+  | "personal_tasks"
   | "flexible_upcoming";
 
 export type MyDaySuggestionsPayload = Partial<Record<MyDaySuggestionCategory, unknown[]>>;
@@ -1436,6 +1446,9 @@ export interface MyDayCapacityPayload {
 
 export interface MyDayRolloverPayload {
   tasks: unknown[];
+  /** When true, show first-login rollover UI once; client should POST `rollover/ack` after displaying (Postman §7.2). */
+  show_rollover_prompt?: boolean;
+  tasks_preview?: unknown[];
   prompt_acknowledged_today?: boolean;
 }
 
@@ -1545,7 +1558,15 @@ export const addTaskToMyDay = async (
   const query = buildMyDayQuery({ extension_number: extensionNumber });
   const url = buildMyDayUrl("work-planner/my-day/add", query);
   const response = await axiosInstance.post(url, payload);
-  return parseMyDayResponseData(response);
+  const parsed = parseMyDayResponseData<{
+    added?: boolean;
+    already_in_my_day?: boolean;
+    task?: unknown;
+  }>(response);
+  if (typeof parsed === "object" && parsed !== null) {
+    return parsed;
+  }
+  return { added: true };
 };
 
 export const removeTaskFromMyDay = async (
@@ -1581,8 +1602,17 @@ export const getMyDayRollover = async (
     buildMyDayUrl("work-planner/my-day/rollover", query),
   );
   const payload = parseMyDayResponseData<MyDayRolloverPayload>(response);
+  const tasksList = Array.isArray(payload.tasks) ? payload.tasks : [];
+  const explicitShow = payload.show_rollover_prompt;
+  const showRolloverPrompt =
+    explicitShow === true ||
+    (explicitShow == null &&
+      tasksList.length > 0 &&
+      payload.prompt_acknowledged_today !== true);
   return {
-    tasks: Array.isArray(payload.tasks) ? payload.tasks : [],
+    tasks: tasksList,
+    tasks_preview: Array.isArray(payload.tasks_preview) ? payload.tasks_preview : undefined,
+    show_rollover_prompt: showRolloverPrompt,
     prompt_acknowledged_today: payload.prompt_acknowledged_today === true,
   };
 };
@@ -1625,4 +1655,290 @@ export const getMyDayPastDaySnapshot = async (
   };
 };
 
+// ==================== Workload (team capacity / planner) ====================
+/** Same handlers as `/api/tasks/workload` when routed under the work-planner group. */
+const workloadTasksPath = `${prefix}/tasks/workload`;
+
+export type WorkloadRangePreset = "this_week" | "next_week" | "custom";
+export type AssigneeMatch = "primary" | "any";
+
+export interface WorkloadSummaryData {
+  total_tasks_in_range: number;
+  overdue_tasks: number;
+  under_allocated_cells: number;
+  over_allocated_cells: number;
+}
+
+export interface WorkloadGridMember {
+  extension_number: string;
+  name?: string | null;
+  display_name?: string | null;
+  is_owner?: boolean;
+  role?: string | null;
+}
+
+export interface WorkloadGridCell {
+  extension_number: string;
+  date: string;
+  estimated_minutes: number;
+  unestimated_count: number;
+  task_count: number;
+  effective_capacity_minutes: number;
+  load_percent: number;
+  load_band: string;
+  has_unestimated: boolean;
+}
+
+export interface WorkloadGridData {
+  extension_numbers: string[];
+  assignee_match: AssigneeMatch;
+  timezone: string;
+  range: { start: string; end: string };
+  members: WorkloadGridMember[];
+  days: string[];
+  cells: WorkloadGridCell[];
+  empty_team: boolean;
+  empty_team_message: string | null;
+}
+
+export interface WorkloadTaskCard {
+  id: number;
+  task_id: string;
+  title: string;
+  priority: number;
+  due_date: string | null;
+  is_overdue: boolean;
+  estimated_duration_minutes?: number | null;
+  /** Some workload endpoints return this instead of `estimated_duration_minutes`. */
+  estimated_minutes?: number | null;
+  estimated_hours?: number | string | null;
+  project_id: number | null;
+  project_name: string | null;
+  status_id: number;
+  status_name: string | null;
+  status_color: string | null;
+  is_completed: boolean;
+  type: string;
+  phase: string;
+  primary_assignee_extension: string | null;
+}
+
+export interface WorkloadBoardColumn {
+  extension_number: string;
+  name?: string | null;
+  display_name?: string | null;
+  is_owner?: boolean;
+  role?: string | null;
+  estimated_minutes: number;
+  unestimated_count: number;
+  task_count: number;
+  effective_capacity_minutes_per_day: number;
+  effective_capacity_minutes_period: number;
+  range_day_count: number;
+  load_percent: number;
+  load_band: string;
+  tasks: WorkloadTaskCard[];
+}
+
+export interface WorkloadBoardData {
+  extension_numbers: string[];
+  assignee_match: AssigneeMatch;
+  range: { start: string; end: string };
+  columns: WorkloadBoardColumn[];
+  empty_team: boolean;
+  empty_team_message: string | null;
+}
+
+export interface WorkloadDayData {
+  heading_extension: string;
+  date: string;
+  tasks: WorkloadTaskCard[];
+  summary: {
+    estimated_minutes: number;
+    unestimated_task_count: number;
+    task_count: number;
+  };
+}
+
+export interface WorkloadUnassignedData {
+  count: number;
+  tasks: WorkloadTaskCard[];
+}
+
+export interface WorkloadOverloadCheckData {
+  overloaded: boolean;
+  current_estimated_minutes: number;
+  after_estimated_minutes: number;
+  effective_capacity_minutes: number;
+}
+
+function parseWorkloadPlannerResponseData<T>(response: { data?: unknown }): T {
+  const body = response?.data;
+  if (body == null || typeof body !== "object") {
+    throw new Error("Invalid workload response");
+  }
+  const wrapped = body as {
+    success?: boolean;
+    message?: string;
+    data?: T;
+  };
+  if (wrapped.success === false) {
+    throw new Error(wrapped.message || "Workload request failed");
+  }
+  if (wrapped.data === undefined || wrapped.data === null) {
+    throw new Error(wrapped.message || "Workload response missing data");
+  }
+  return wrapped.data;
+}
+
+export interface WorkloadQueryBase {
+  extension_number: string;
+  assignee_match?: AssigneeMatch;
+  range?: WorkloadRangePreset;
+  start?: string;
+  end?: string;
+  extension_numbers?: string[];
+  /** When set, scopes grid/board/summary to one project (server-supported). */
+  project_id?: number;
+  /** When true, scope to organization tasks with no project (server-supported). */
+  no_project?: boolean;
+}
+
+function appendWorkloadQueryParams(
+  params: URLSearchParams,
+  q: WorkloadQueryBase,
+): void {
+  params.set("extension_number", q.extension_number);
+  if (q.assignee_match) params.set("assignee_match", q.assignee_match);
+  if (q.range) params.set("range", q.range);
+  if (q.start) params.set("start", q.start);
+  if (q.end) params.set("end", q.end);
+  if (q.project_id != null) {
+    params.set("project_id", String(q.project_id));
+  }
+  if (q.no_project === true) {
+    params.set("no_project", "1");
+  }
+  if (Array.isArray(q.extension_numbers)) {
+    for (const ext of q.extension_numbers) {
+      if (ext) params.append("extension_numbers[]", ext);
+    }
+  }
+}
+
+export async function getWorkloadSummary(
+  q: WorkloadQueryBase,
+): Promise<WorkloadSummaryData> {
+  const params = new URLSearchParams();
+  appendWorkloadQueryParams(params, q);
+  const response = await axiosInstance.get(
+    `${workloadTasksPath}/summary?${params.toString()}`,
+  );
+  return parseWorkloadPlannerResponseData<WorkloadSummaryData>(response);
+}
+
+export async function getWorkloadGrid(
+  q: WorkloadQueryBase,
+): Promise<WorkloadGridData> {
+  const params = new URLSearchParams();
+  appendWorkloadQueryParams(params, q);
+  const response = await axiosInstance.get(
+    `${workloadTasksPath}/grid?${params.toString()}`,
+  );
+  return parseWorkloadPlannerResponseData<WorkloadGridData>(response);
+}
+
+export async function getWorkloadBoard(
+  q: WorkloadQueryBase,
+): Promise<WorkloadBoardData> {
+  const params = new URLSearchParams();
+  appendWorkloadQueryParams(params, q);
+  const response = await axiosInstance.get(
+    `${workloadTasksPath}/board?${params.toString()}`,
+  );
+  return parseWorkloadPlannerResponseData<WorkloadBoardData>(response);
+}
+
+export async function getWorkloadDay(params: {
+  extension_number: string;
+  date: string;
+  assignee_match?: AssigneeMatch;
+}): Promise<WorkloadDayData> {
+  const search = new URLSearchParams();
+  search.set("extension_number", params.extension_number);
+  search.set("date", params.date);
+  if (params.assignee_match) {
+    search.set("assignee_match", params.assignee_match);
+  }
+  const response = await axiosInstance.get(
+    `${workloadTasksPath}/day?${search.toString()}`,
+  );
+  return parseWorkloadPlannerResponseData<WorkloadDayData>(response);
+}
+
+export async function getWorkloadUnassigned(params: {
+  extension_number: string;
+  limit?: number;
+  project_id?: number;
+}): Promise<WorkloadUnassignedData> {
+  const search = new URLSearchParams();
+  search.set("extension_number", params.extension_number);
+  if (params.limit != null) search.set("limit", String(params.limit));
+  if (params.project_id != null) {
+    search.set("project_id", String(params.project_id));
+  }
+  const response = await axiosInstance.get(
+    `${workloadTasksPath}/unassigned?${search.toString()}`,
+  );
+  return parseWorkloadPlannerResponseData<WorkloadUnassignedData>(response);
+}
+
+export async function getWorkloadOverloadCheck(params: {
+  extension_number: string;
+  date: string;
+  additional_estimated_minutes: number;
+  exclude_task_id?: number | null;
+  assignee_match?: AssigneeMatch;
+}): Promise<WorkloadOverloadCheckData> {
+  const search = new URLSearchParams();
+  search.set("extension_number", params.extension_number);
+  search.set("date", params.date);
+  search.set(
+    "additional_estimated_minutes",
+    String(params.additional_estimated_minutes),
+  );
+  if (params.exclude_task_id != null) {
+    search.set("exclude_task_id", String(params.exclude_task_id));
+  }
+  if (params.assignee_match) {
+    search.set("assignee_match", params.assignee_match);
+  }
+  const response = await axiosInstance.get(
+    `${workloadTasksPath}/overload-check?${search.toString()}`,
+  );
+  return parseWorkloadPlannerResponseData<WorkloadOverloadCheckData>(response);
+}
+
+export interface PatchWorkloadTaskBody {
+  due_date?: string | null;
+  extension_numbers?: string[];
+  is_completed?: boolean;
+  /** Planner task priority string (`low`, `normal`, `high`, `urgent`). */
+  priority?: string;
+  estimated_duration_minutes?: number;
+}
+
+export async function patchWorkloadTask(
+  taskId: number | string,
+  extension_number: string,
+  body: PatchWorkloadTaskBody,
+): Promise<unknown> {
+  const search = new URLSearchParams();
+  search.set("extension_number", extension_number);
+  const response = await axiosInstance.patch(
+    `${workloadTasksPath}/${taskId}?${search.toString()}`,
+    body,
+  );
+  return parseWorkloadPlannerResponseData<unknown>(response);
+}
 

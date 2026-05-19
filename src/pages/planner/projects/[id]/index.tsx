@@ -33,7 +33,7 @@ import { Plus, LayoutGrid } from "lucide-react";
 import { toast } from "react-toastify";
 import CreateTaskSidebar from "@components/CreatePlannerTaskSidebar";
 import { useQuery } from "@tanstack/react-query";
-import { plannerKeys } from "../../../../query/keys";
+import { plannerKeys } from "@query/keys";
 
 const { PERMISSIONS } = HEADER_CONSTANTS;
 

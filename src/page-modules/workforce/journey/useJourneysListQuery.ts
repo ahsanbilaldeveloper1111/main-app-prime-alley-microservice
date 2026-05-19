@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { workforceKeys } from "../../../query/keys";
+import { workforceKeys } from "@query/keys";
 import { getJourneys } from "@utils/staffManagement";
 import {
   buildGetJourneysRequestParams,

@@ -286,7 +286,8 @@ export const HEADER_CONSTANTS = {
     CRM_SERVICES: "crm-services",
     COMMUNICATIONS_SERVICES: "communications-services-services",
     WORK_PLANNER_SERVICES: "work-planner-services",
-    CONVERT_TO_RECURRING_TASK_WORK_PLANNER: "convert-to-recurring-task-work-planner",
+    CONVERT_TO_RECURRING_TASK_WORK_PLANNER:
+      "convert-to-recurring-task-work-planner",
     PULSE_SERVICES: "pulse-services",
     DNCR_SERVICES: "dncr-services",
     ACCOUNTS_SERVICES: "accounts-services",
@@ -320,6 +321,8 @@ export const HEADER_CONSTANTS = {
 
     //Work Planner permissions start
     VIEW_TASKSLIST_WORK_PLANNER: "view-tasks-work-planner",
+    VIEW_WORKLOAD_WORK_PLANNER: "view-workload-work-planner",
+    VIEW_MY_DAY_TASKS_WORK_PLANNER: "view-my-day-tasks-work-planner",
     VIEW_PROJECTS_WORK_PLANNER: "view-projects-work-planner",
     VIEW_PROJECTS_DASHBOARD_WORK_PLANNER:
       "view-projects-dashboard-work-planner",
@@ -475,6 +478,12 @@ export const HEADER_CONSTANTS = {
     MANAGE_TENANT_PROFILE_AI_CHAT: "view-tenant-profile-ai-chat",
     MANAGE_GLOBAL_FAQS_AI_CHAT: "manage-global-faqs-ai-chat",
     VIEW_AI_CHAT_AI_CHAT: "view-ai-chat-ai-chat",
+    VIEW_ADMIN_DASHBOARD_AI_CHAT: "view-admin-dashboard-ai-chat",
+    VIEW_TENANT_DASHBOARD_AI_CHAT: "view-tenant-dashboard-ai-chat",
+    VIEW_TENANT_SETTING_AI_CHAT: "view-tenant-settings-ai-chat",
+    EDIT_TENANT_SETTINGS_AI_CHAT: "edit-tenant-settings-ai-chat",
+    DELETE_GLOBAL_FAQS_AI_CHAT: "delete-global-faqs-ai-chat",
+    DELETE_TENANT_FAQS_AI_CHAT: "delete-tenant-faqs-ai-chat",
     //AI chat permissions end
 
     TRANSCRIPTION_ANALYSIS_AIML: "transcriptions-analysis-aiml",

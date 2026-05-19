@@ -1,4 +1,4 @@
-import { billingCustomerKeys } from "../../../../query/keys";
+import { billingCustomerKeys } from "@query/keys";
 import { useBillingStripePortalPaymentMethodsQuery } from "@page-modules/billing/customer/useBillingStripePortalPaymentMethodsQuery";
 import {
   deletePaymentMethod,

@@ -30,8 +30,11 @@ import {
 } from '@components/communications/wallboards-live/wallboardEventParsing'
 import {
   categorizeDns as categorizeDnsHelper,
+  dnHasActiveCallForWallboard,
   isDnInActiveCall as isDnInActiveCallHelper,
 } from '@components/live-calls/utils/helpers'
+import type { MonitoringTeardownHint } from '@components/live-calls/utils/types'
+import { resolveWallboardDisplayCall } from '@components/communications/wallboards-live/wallboardEventParsing'
 import { CUSTOM_STYLES } from '@components/live-calls/utils/constants'
 import { useMonitoring } from '@components/live-calls/utils/useMonitoring'
 import {
@@ -50,7 +53,6 @@ const WallboardsLiveView: React.FC = () => {
     error,
     isInitialized,
     isReconnecting,
-    hasActiveCalls,
     getDnCallState,
     getCallStateForDevice,
     getCallStatesForDn,
@@ -117,6 +119,7 @@ const WallboardsLiveView: React.FC = () => {
   // Refs
   /** Stale CTI snapshots may still list a session after stop; skip refilling until map drops it or key changes. */
   const suppressedMonitoringRefillKeyRef = useRef<string | null>(null)
+  const [monitoringTeardown, setMonitoringTeardown] = useState<MonitoringTeardownHint | null>(null)
   /** First hydration from server when React state is still empty (refresh / SSE before events). */
   const monitoringSnapshotAppliedRef = useRef(false)
   const activeMonitoringRef = useRef(activeMonitoring)
@@ -153,6 +156,42 @@ const WallboardsLiveView: React.FC = () => {
     activeMonitoring
   )
   
+  const getWallboardCallForDn = useCallback(
+    (dn: string) =>
+      resolveWallboardDisplayCall(
+        dn,
+        activeMonitoring,
+        monitoringTeardown,
+        getDnCallState,
+        getCallStateForDevice,
+        getCallStatesForDn,
+      ),
+    [
+      activeMonitoring,
+      monitoringTeardown,
+      getDnCallState,
+      getCallStateForDevice,
+      getCallStatesForDn,
+    ],
+  )
+
+  useEffect(() => {
+    if (activeMonitoring.dn && activeMonitoring.type) {
+      setMonitoringTeardown(null)
+    }
+  }, [activeMonitoring.dn, activeMonitoring.type])
+
+  const wallboardHasActiveCalls = useCallback(
+    (dn: string) =>
+      dnHasActiveCallForWallboard(
+        dn,
+        getCallStatesForDn,
+        activeMonitoring,
+        monitoringTeardown,
+      ),
+    [getCallStatesForDn, activeMonitoring, monitoringTeardown],
+  )
+
   // Helper function to categorize DNs into sections (wrapper for imported helper)
   const categorizeDns = useCallback(
     (dn: string, devices: CtiDevice[], call: unknown, active: boolean) => {
@@ -165,9 +204,16 @@ const WallboardsLiveView: React.FC = () => {
         getCallStateForDevice,
         getCallStatesForDn,
         userAddress,
+        monitoringTeardown,
       })
     },
-    [activeMonitoring, getCallStateForDevice, getCallStatesForDn, userAddress]
+    [
+      activeMonitoring,
+      getCallStateForDevice,
+      getCallStatesForDn,
+      userAddress,
+      monitoringTeardown,
+    ],
   )
   
   // Fullscreen state
@@ -214,15 +260,15 @@ const WallboardsLiveView: React.FC = () => {
       
       dnsList.forEach(({ dn, devices }: { dn: string; devices?: Record<string, CtiDevice> }) => {
         const deviceList = Object.values(devices ?? {})
-        const call = getDnCallState(dn)
-        const active = hasActiveCalls(dn)
+        const call = getWallboardCallForDn(dn)
+        const active = wallboardHasActiveCalls(dn)
         const section = categorizeDns(dn, deviceList, call, active)
         initialSections[dn] = section
       })
       
       previousSectionsRef.current = initialSections
     }
-  }, [isInitialized, dnsMap, userAddress, getDnCallState, hasActiveCalls, categorizeDns])
+  }, [isInitialized, dnsMap, userAddress, getWallboardCallForDn, wallboardHasActiveCalls, categorizeDns])
 
   // FLIP Animation function
   const animateCardMove = useCallback((dn: string, fromSection: string, toSection: string) => {
@@ -277,13 +323,21 @@ const WallboardsLiveView: React.FC = () => {
     
       dnsList.forEach(({ dn, devices }: { dn: string; devices?: Record<string, CtiDevice> }) => {
         const deviceList = Object.values(devices ?? {})
-        const call = getDnCallState(dn)
-        const active = hasActiveCalls(dn)
+        const call = getWallboardCallForDn(dn)
+        const active = wallboardHasActiveCalls(dn)
         result[dn] = categorizeDns(dn, deviceList, call, active)
       })
     
     return result
-  }, [dnsMap, isInitialized, hasActiveCalls, getDnCallState, categorizeDns, activeMonitoring, eventLog])
+  }, [
+    dnsMap,
+    isInitialized,
+    wallboardHasActiveCalls,
+    getWallboardCallForDn,
+    categorizeDns,
+    activeMonitoring,
+    eventLog,
+  ])
 
   // Calculate counts from categorizedDns
   const supervisionCount = useMemo(() => {
@@ -505,6 +559,10 @@ const WallboardsLiveView: React.FC = () => {
       ? `${snap.monitor}:${monitoredDn}`
       : `*:${monitoredDn}`
     monitoringSnapshotAppliedRef.current = false
+    setMonitoringTeardown({
+      monitorDn: snap.monitor,
+      monitoredDn,
+    })
     setActiveMonitoring({ dn: null, type: null, deviceName: null, monitor: undefined })
     setMonitoringStartTime(prev => {
       const newState = { ...prev }
@@ -640,6 +698,7 @@ const WallboardsLiveView: React.FC = () => {
       console.log('[Monitoring] Setting monitoring state from callStateMap (ongoing_calls / refresh)', {
         ...payload,
       })
+      setMonitoringTeardown(null)
       setActiveMonitoring({
         dn: payload.monitoredDn,
         type: payload.monitoringType,
@@ -714,6 +773,7 @@ const WallboardsLiveView: React.FC = () => {
         callId: monitoringEvent.callId,
         sequence: monitoringEvent.sequence,
       })
+      setMonitoringTeardown(null)
       setActiveMonitoring({
         dn: payload.monitoredDn,
         type: payload.monitoringType,
@@ -787,6 +847,14 @@ const WallboardsLiveView: React.FC = () => {
 
     clearMonitoringState(monitoredDn, 'call ended')
   }, [activeMonitoring, dnsMap, isInitialized, getCallStateForDevice, getDnCallState, clearMonitoringState])
+
+  useEffect(() => {
+    if (!monitoringTeardown) {
+      return
+    }
+    const timer = setTimeout(() => setMonitoringTeardown(null), 12000)
+    return () => clearTimeout(timer)
+  }, [monitoringTeardown])
 
   // Handle FLIP animations when cards change sections
   useEffect(() => {
@@ -898,12 +966,22 @@ const WallboardsLiveView: React.FC = () => {
     if (ok) {
       suppressedMonitoringRefillKeyRef.current = sessionKey
       monitoringSnapshotAppliedRef.current = false
+      setMonitoringTeardown({
+        monitorDn: snap.monitor,
+        monitoredDn: dn,
+      })
     }
     return ok
   }
 
   const isDnInActiveCall = (dn: string) => {
-    return isDnInActiveCallHelper(dn, getDnCallState)
+    return isDnInActiveCallHelper(
+      dn,
+      getWallboardCallForDn,
+      getCallStatesForDn,
+      activeMonitoring,
+      monitoringTeardown,
+    )
   }
 
 
@@ -981,8 +1059,8 @@ const WallboardsLiveView: React.FC = () => {
       <SectionsRenderer
         dnsMap={dnsMap}
         summaryData={summaryData}
-        getDnCallState={getDnCallState}
-        hasActiveCalls={hasActiveCalls}
+        getDnCallState={getWallboardCallForDn}
+        hasActiveCalls={wallboardHasActiveCalls}
         categorizeDns={categorizeDns}
         animatingCards={animatingCards}
         cardAnimations={cardAnimations}

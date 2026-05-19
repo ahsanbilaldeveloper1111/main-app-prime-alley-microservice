@@ -3,7 +3,7 @@ import {
   getUserRequestCategories,
   type UserRequestCategory,
 } from "@utils/staffManagement";
-import { workforceKeys } from "../../query/keys";
+import { workforceKeys } from "@query/keys";
 
 export type NewRequestCategoryWithChildren = UserRequestCategory & {
   children?: Array<{ id: number; name?: string | null; code?: string | null; is_active?: boolean }>;

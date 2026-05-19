@@ -4,15 +4,18 @@ import PageHeader from "@components/PageHeader";
 import FormModal from "@components/page-partials/FormModal";
 import ConfirmModal from "@components/page-partials/ConfirmModal";
 import type { Column } from "@components/CustomDataTable";
+import type {
+  GenericListPageQueryOptions,
+  GenericListPageQueryParams,
+} from "@components/GenericListPage";
 import React from "react";
 import { Button } from "react-bootstrap";
 import type { TicketModulePickerRow, TicketSubmoduleRow } from "../../categories/moduleCategoriesTypes";
 
 export type ModuleSubCategoriesPageViewProps = Readonly<{
-  refreshKey: number;
   memoizedFilters: { search: string };
   columns: Column[];
-  fetchSubCategories: (page?: number, perPage?: number, search?: string) => Promise<unknown>;
+  getListQueryOptions: (params: GenericListPageQueryParams) => GenericListPageQueryOptions;
   showSubmoduleChildrenModal: boolean;
   onCloseSubCategoryModal: () => void;
   onOpenNewSubcategoryModal: () => void;
@@ -33,10 +36,9 @@ export type ModuleSubCategoriesPageViewProps = Readonly<{
 }>;
 
 export const ModuleSubCategoriesPageView: React.FC<ModuleSubCategoriesPageViewProps> = ({
-  refreshKey,
   memoizedFilters,
   columns,
-  fetchSubCategories,
+  getListQueryOptions,
   showSubmoduleChildrenModal,
   onCloseSubCategoryModal,
   onOpenNewSubcategoryModal,
@@ -69,12 +71,11 @@ export const ModuleSubCategoriesPageView: React.FC<ModuleSubCategoriesPageViewPr
 
     <GenericListPage
       columns={columns}
-      fetchData={fetchSubCategories}
+      getListQueryOptions={getListQueryOptions}
       title="Submodules"
       searchPlaceholder="Search submodules..."
       defaultPageSize={15}
       filters={memoizedFilters}
-      refreshKey={refreshKey}
       search={true}
       tableStyle="table-style-2"
     />

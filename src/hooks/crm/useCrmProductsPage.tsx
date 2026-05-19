@@ -40,11 +40,11 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "react-toastify";
 import type { Session } from "next-auth";
 import type { FilterPill } from "@components/GenericTable";
-import { crmAppKeys } from "../../query/keys";
 import {
   CRM_REACT_SELECT_MENU_PORTAL_Z_INDEX,
   getCrmReactSelectBodyMenuPortalProps,
 } from "@utils/crmReactSelectMenuPortalProps";
+import { crmAppKeys } from "@query/keys";
 
 type SelectStyles = Record<string, any>;
 

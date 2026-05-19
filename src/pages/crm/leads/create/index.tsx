@@ -1,27 +1,20 @@
 import "@crm/leads/leadFullPageStyles";
 import React, { ReactElement, useState, useEffect, useRef } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { Layout, BreadcrumbItem } from "@crm/leads/leadFullPageFrame";
 import {
   createLead,
-  getStages,
-  StageData,
   CRM_CAMPAIGNS_LIST_ACTIVE_ONLY,
-  getCampaigns,
   getCampaignById,
   CampaignData,
-  getCrmData,
-  getCrmDataById,
   CrmDataItem,
-  getBusinessTypes,
   BusinessTypeData,
   getDealTemplate,
   DealTemplateData,
-  getIndustries,
   IndustryData,
   getCrmProducts,
   CrmProduct,
 } from "@utils/crm";
-import { GetHierarchyData } from "@utils/users";
 import { Button, Row, Col, Form, Card, Badge, Modal } from "react-bootstrap";
 import Select from "react-select";
 import {
@@ -49,10 +42,20 @@ import { toast } from "react-toastify";
 import { useRouter } from "next/router";
 
 import PageHeader from "@components/PageHeader";
-import { ModuleSlug, ValidationType, checkRequiredFields } from "@utils/Helper";
+import { ValidationType, checkRequiredFields } from "@utils/Helper";
+import { crmAppKeys } from "@query/keys";
+import {
+  useLeadCreateBootstrapQueries,
+  useLeadCreateStagesQuery,
+  leadCreateCrmRecordByIdQueryOptions,
+} from "@page-modules/crm/leads/useLeadCreateFormQueries";
 
 const CreateLead = () => {
   const router = useRouter();
+  const queryClient = useQueryClient();
+  const { data: session } = useSession();
+  const bootstrap = useLeadCreateBootstrapQueries();
+
   const [formStep, setFormStep] = useState(0);
   const [formData, setFormData] = useState({
     name: "",
@@ -98,16 +101,15 @@ const CreateLead = () => {
     }>,
   });
 
-  const [stages, setStages] = useState<StageData[]>([]);
-
-  const [extensions, setExtensions] = useState<any[]>([]);
-  const [extensionsOpportunities, setExtensionsOpportunities] = useState<any[]>(
-    []
-  );
-
-  const [campaigns, setCampaigns] = useState<CampaignData[]>([]);
-  const [crmData, setCrmData] = useState<CrmDataItem[]>([]);
-  const [businessTypes, setBusinessTypes] = useState<BusinessTypeData[]>([]);
+  const stagesQuery = useLeadCreateStagesQuery(formData.type, router.isReady);
+  const extensions = (bootstrap.leadsHierarchy.data ?? []) as any[];
+  const extensionsOpportunities = (bootstrap.opportunitiesHierarchy.data ??
+    []) as any[];
+  const campaigns = bootstrap.campaigns.data ?? [];
+  const crmData = bootstrap.crmDataPicklist.data ?? [];
+  const businessTypes = bootstrap.businessTypes.data ?? [];
+  const allIndustries = bootstrap.industries.data ?? [];
+  const stages = stagesQuery.data ?? [];
   const [selectedCrmData, setSelectedCrmData] = useState<CrmDataItem | null>(
     null
   );
@@ -116,7 +118,6 @@ const CreateLead = () => {
   );
   const [loading, setLoading] = useState(false);
   const [isOpportunity, setIsOpportunity] = useState(false);
-  const isInitialLoad = useRef(true);
 
   // Business type state
   const [businessTypeId, setBusinessTypeId] = useState<number | null>(null);
@@ -130,7 +131,6 @@ const CreateLead = () => {
 
   // Industries and estimation state
   const [campaignIndustries, setCampaignIndustries] = useState<IndustryData[]>([]);
-  const [allIndustries, setAllIndustries] = useState<IndustryData[]>([]);
   const [showOtherIndustries, setShowOtherIndustries] = useState(false);
   const [selectedIndustryId, setSelectedIndustryId] = useState<number | null>(null);
   const [estimationItems, setEstimationItems] = useState<Array<{
@@ -309,52 +309,39 @@ const CreateLead = () => {
     selectedCity,
   ]);
 
-  // Fetch stages and extensions on component mount
   useEffect(() => {
-    fetchExtensions();
-    fetchCampaigns();
-    fetchCrmData();
-    fetchBusinessTypes();
-    fetchAllIndustries();
-  }, []);
+    if (!router.isReady) return;
+    if (router.query.crm_data_id) return;
+    const ext = (session?.user as { extension?: string })?.extension;
+    if (ext == null || ext === "") return;
+    setFormData((prev) => {
+      if (prev.user_extension != null && String(prev.user_extension).trim() !== "") {
+        return prev;
+      }
+      return { ...prev, user_extension: String(ext) };
+    });
+  }, [router.isReady, router.query.crm_data_id, session?.user]);
 
-  const fetchAllIndustries = async () => {
-    try {
-      const industriesResponse = await getIndustries({ per_page: 1000 });
-      setAllIndustries(industriesResponse?.data || []);
-    } catch (error) {
-      console.error("Failed to fetch all industries:", error);
-    }
-  };
-
-  // Set initial type and fetch stages when router is ready
+  // Set initial type from URL when router is ready (stages load via TanStack Query by `formData.type`)
   useEffect(() => {
     if (router.isReady) {
-      const isOpportunity = router.query?.type === "opportunity";
-      setIsOpportunity(isOpportunity);
-
+      const nextIsOpportunity = router.query?.type === "opportunity";
+      setIsOpportunity(nextIsOpportunity);
       setFormData((prev) => ({
         ...prev,
-        type: isOpportunity ? "opportunity" : "lead",
+        type: nextIsOpportunity ? "opportunity" : "lead",
       }));
-
-      // Fetch stages with the correct type
-      fetchStages(isOpportunity ? "opportunity" : "lead");
-      isInitialLoad.current = false;
     }
   }, [router.isReady, router.query?.type]);
 
-  // Refetch stages when type changes (but not on initial load)
+  const previousFormTypeRef = useRef<"lead" | "opportunity">(formData.type);
   useEffect(() => {
-    // Only refetch if this is not the initial load
-    if (!isInitialLoad.current) {
-      fetchStages(formData.type);
-      // Clear selected stage when type changes as it might not be valid for new type
-      setFormData((prev) => ({
-        ...prev,
-        stage_id: undefined,
-      }));
-    }
+    if (previousFormTypeRef.current === formData.type) return;
+    previousFormTypeRef.current = formData.type;
+    setFormData((prev) => ({
+      ...prev,
+      stage_id: undefined,
+    }));
   }, [formData.type]);
 
   // Fetch specific CRM data record if crm_data_id is in URL
@@ -363,7 +350,9 @@ const CreateLead = () => {
       if (router.isReady && router.query.crm_data_id) {
         try {
           const crmDataId = Number(router.query.crm_data_id);
-          const crmDataRecord = await getCrmDataById(crmDataId);
+          const crmDataRecord = await queryClient.fetchQuery(
+            leadCreateCrmRecordByIdQueryOptions(crmDataId),
+          );
           setSelectedCrmData(crmDataRecord);
 
           // Extract prospect name for lead name
@@ -491,15 +480,21 @@ const CreateLead = () => {
     };
 
     fetchCrmDataRecord();
-  }, [router.isReady, router.query.crm_data_id]);
+  }, [router.isReady, router.query.crm_data_id, queryClient]);
 
   // Auto-select campaign and pre-fill fields when CRM data is available
   useEffect(() => {
     const fetchCampaignAndPreFill = async () => {
-      if (selectedCrmData && selectedCrmData.campaign_id) {
+      const campaignIdForFetch = selectedCrmData?.campaign_id;
+      if (selectedCrmData && campaignIdForFetch != null) {
         try {
           // Fetch campaign details with fields
-          const campaign = await getCampaignById(selectedCrmData.campaign_id);
+          const campaign = await queryClient.fetchQuery({
+            queryKey: crmAppKeys.campaigns.byCampaignId(
+              Number(campaignIdForFetch),
+            ),
+            queryFn: () => getCampaignById(Number(campaignIdForFetch)),
+          });
 
           setSelectedCampaign(campaign);
 
@@ -576,83 +571,7 @@ const CreateLead = () => {
     };
 
     fetchCampaignAndPreFill();
-  }, [selectedCrmData]);
-
-  const opportunityRef = useRef<"lead" | "opportunity">(
-    isOpportunity ? "opportunity" : "lead"
-  );
-  useEffect(() => {
-    if (opportunityRef.current !== formData.type) {
-      opportunityRef.current = formData.type;
-      fetchStages(formData.type);
-    }
-  }, [formData.type]);
-
-  const fetchStages = async (type: any) => {
-    try {
-      const stagesData = await getStages(type);
-      if (type === opportunityRef.current) {
-        setStages(stagesData || []);
-      }
-    } catch (error) {
-      console.error("Failed to fetch stages:", error);
-    }
-  };
-
-  const { data: session } = useSession();
-  const fetchExtensions = async () => {
-    try {
-      const hierarchyData = await GetHierarchyData(ModuleSlug.CRM_LEADS);
-      if (hierarchyData?.extensions) {
-        setExtensions(hierarchyData.extensions);
-      }
-      if (!router.query.crm_data_id) {
-        setFormData((prev) => ({
-          ...formData,
-          user_extension: (session?.user as any)?.extension,
-        }));
-      }
-
-      const hierarchyDataOpportunities = await GetHierarchyData(
-        ModuleSlug.CRM_OPPORTUNITIES
-      );
-      if (hierarchyDataOpportunities?.extensions) {
-        setExtensionsOpportunities(hierarchyDataOpportunities.extensions);
-      }
-    } catch (error) {
-      console.error("Failed to fetch extensions:", error);
-    }
-  };
-
-  const fetchCampaigns = async () => {
-    try {
-      const campaignsData = await getCampaigns({
-        per_page: 100,
-        filters: CRM_CAMPAIGNS_LIST_ACTIVE_ONLY,
-      });
-      setCampaigns(campaignsData?.data || []);
-    } catch (error) {
-      console.error("Failed to fetch campaigns:", error);
-    }
-  };
-
-  const fetchCrmData = async () => {
-    try {
-      const crmDataResponse = await getCrmData({ per_page: 100 });
-      setCrmData(crmDataResponse?.data || []);
-    } catch (error) {
-      console.error("Failed to fetch CRM data:", error);
-    }
-  };
-
-  const fetchBusinessTypes = async () => {
-    try {
-      const businessTypesResponse = await getBusinessTypes({ per_page: 1000 });
-      setBusinessTypes(businessTypesResponse?.data || []);
-    } catch (error) {
-      console.error("Failed to fetch business types:", error);
-    }
-  };
+  }, [selectedCrmData, queryClient]);
 
   const loadProductsForIndustry = async (industryId: number) => {
     setLoadingProducts(true);
@@ -956,8 +875,11 @@ const CreateLead = () => {
     }
 
     try {
-      // Fetch campaign details with fields
-      const campaign = await getCampaignById(campaignId);
+      // Fetch campaign details with fields (cached via TanStack Query)
+      const campaign = await queryClient.fetchQuery({
+        queryKey: crmAppKeys.campaigns.byCampaignId(Number(campaignId)),
+        queryFn: () => getCampaignById(campaignId),
+      });
 
       // Pre-fill campaign fields with CRM data (excluding dropdown fields)
       const preFilledFields: Record<string, any> = {};
@@ -1041,7 +963,9 @@ const CreateLead = () => {
     }
 
     try {
-      const crmDataRecord = await getCrmDataById(crmDataId);
+      const crmDataRecord = await queryClient.fetchQuery(
+        leadCreateCrmRecordByIdQueryOptions(Number(crmDataId)),
+      );
       setSelectedCrmData(crmDataRecord);
 
       // Extract prospect name for lead name

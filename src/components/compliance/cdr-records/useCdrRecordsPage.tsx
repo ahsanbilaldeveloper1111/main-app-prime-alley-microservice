@@ -7,7 +7,7 @@ import type {
 } from "@components/GenericTable";
 import { useQuery } from "@tanstack/react-query";
 import { fetchComplianceCdrList } from "../../../query/fetchComplianceCdrList";
-import { complianceKeys } from "../../../query/keys";
+import { complianceKeys } from "@query/keys";
 import React, { useCallback, useMemo, useState } from "react";
 
 import { CdrDatetimeFilterField } from "./CdrDatetimeFilterField";
@@ -526,18 +526,6 @@ export function useCdrRecordsPage(): CdrRecordsPageViewModel {
         ),
       },
       { key: "time", label: "TIME (MS)", type: "text", sortable: false },
-      {
-        key: "allowLocalDNCL",
-        label: "ALLOW LOCAL DNCL",
-        type: "text",
-        sortable: false,
-      },
-      {
-        key: "allowApiDNCLCalls",
-        label: "ALLOW API DNCL",
-        type: "text",
-        sortable: false,
-      },
       {
         key: "allowRepetition",
         label: "ALLOW REPETITIVE",

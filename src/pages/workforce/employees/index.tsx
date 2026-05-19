@@ -28,7 +28,7 @@ import { GlobalDateTimeFormat } from "@utils/Helper";
 import { formatPhoneForDisplay } from "@utils/phoneDisplay";
 import { HEADER_CONSTANTS } from "@constants/headerConstants";
 
-import { workforceKeys } from "../../../query/keys";
+import { workforceKeys } from "@query/keys";
 import {
   EMPLOYEE_STATUS_OPTIONS,
   EMPLOYMENT_TYPES,
@@ -234,15 +234,21 @@ const Employees = () => {
     });
   }, []);
 
-  const handleProfileClick = useCallback(async (profile: UserProfile) => {
-    try {
-      const fullProfile = await getUserProfile(profile.id);
-      setSelectedProfile(fullProfile);
-    } catch (err) {
-      console.error("[Employees] getUserProfile error", err);
-      setSelectedProfile(profile);
-    }
-  }, []);
+  const handleProfileClick = useCallback(
+    async (profile: UserProfile) => {
+      try {
+        const fullProfile = await queryClient.fetchQuery({
+          queryKey: workforceKeys.employees.profileDetail(profile.id),
+          queryFn: () => getUserProfile(profile.id),
+        });
+        setSelectedProfile(fullProfile);
+      } catch (err) {
+        console.error("[Employees] getUserProfile error", err);
+        setSelectedProfile(profile);
+      }
+    },
+    [queryClient],
+  );
 
   const closeSidebar = useCallback(() => {
     setSelectedProfile(null);

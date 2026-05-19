@@ -31,7 +31,8 @@ export function ManageExtensionsResultTable({
   }, [data.all_extensions, extensionOptions]);
 
   return (
-    <Table responsive bordered hover className="mb-0">
+    <div className="table-responsive">
+      <Table bordered hover className="mb-0">
       <thead>
         <tr>
           <th>Total Nodes</th>
@@ -43,9 +44,9 @@ export function ManageExtensionsResultTable({
       </thead>
       <tbody>
         <tr>
-          <td className="text-center">{data.nodes_processed ?? "—"}</td>
-          <td className="text-center">{data.total_unique_extensions ?? "—"}</td>
-          <td>
+          <td className="text-center" data-label="Total Nodes">{data.nodes_processed ?? "—"}</td>
+          <td className="text-center" data-label="Total Extensions">{data.total_unique_extensions ?? "—"}</td>
+          <td data-label="All Extensions">
             {allExtensionsDisplay.length ? (
               <span className="d-flex flex-wrap gap-1 align-items-center">
                 {allExtensionsDisplay}
@@ -54,7 +55,7 @@ export function ManageExtensionsResultTable({
               "—"
             )}
           </td>
-          <td>
+          <td data-label="Nodes Used">
             {data.nodes_used?.length ? (
               <span className="d-flex flex-wrap gap-1 align-items-center">
                 {data.nodes_used.map((node) => (
@@ -72,7 +73,7 @@ export function ManageExtensionsResultTable({
               "—"
             )}
           </td>
-          <td>
+          <td data-label="Actions">
             <Button
               variant="outline-primary"
               size="sm"
@@ -86,5 +87,6 @@ export function ManageExtensionsResultTable({
         </tr>
       </tbody>
     </Table>
+    </div>
   );
 }

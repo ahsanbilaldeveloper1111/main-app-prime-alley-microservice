@@ -11,8 +11,8 @@ export type AiFaqPageModalsProps = Readonly<{
   scopeLabel: string;
   showAddModal: boolean;
   setShowAddModal: (v: boolean) => void;
-  showEditModal: boolean;
-  setShowEditModal: (v: boolean) => void;
+  showEditModal?: boolean;
+  setShowEditModal?: (v: boolean) => void;
   showDeleteModal: boolean;
   setShowDeleteModal: (v: boolean) => void;
   selectedFAQ: FAQData | null;
@@ -33,6 +33,9 @@ export type AiFaqPageModalsProps = Readonly<{
 
   /** Rendered inside the add modal body before FAQ draft cards (e.g. tenant picker). */
   addModalBodyPrefix?: React.ReactNode;
+
+  /** Optional `accept` for the attachment file input (e.g. tenant API allows PDF/TXT only). */
+  faqAttachmentAccept?: string;
 
   viewModal?: Readonly<{
     show: boolean;
@@ -65,6 +68,7 @@ export function AiFaqPageModals(props: AiFaqPageModalsProps) {
     handleSubmit,
     handleConfirmDelete,
     addModalBodyPrefix,
+    faqAttachmentAccept,
     viewModal,
   } = props;
 
@@ -96,6 +100,7 @@ export function AiFaqPageModals(props: AiFaqPageModalsProps) {
               haveFiles={haveFiles}
               fileInputKey={fileInputKey}
               selectedFiles={selectedFiles}
+              accept={faqAttachmentAccept}
               onFileChange={handleFileChange}
               onRemoveFile={handleRemoveFile}
             />
@@ -122,57 +127,60 @@ export function AiFaqPageModals(props: AiFaqPageModalsProps) {
         </Modal.Footer>
       </Modal>
 
-      <Modal
-        show={showEditModal}
-        onHide={() => {
-          setShowEditModal(false);
-          setSelectedFAQ(null);
-          resetForm();
-        }}
-        size="lg"
-        centered
-      >
-        <Modal.Header closeButton>
-          <Modal.Title>{`Edit ${scopeLabel} FAQ`}</Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-          <Form>
-            <AiFaqDraftItemCards
-              variant="single"
-              faqItems={faqItems}
-              onRemoveItem={handleRemoveFAQItem}
-              onUpdateItem={handleUpdateFAQItem}
-            />
-            <AiFaqAttachmentField
-              haveFiles={haveFiles}
-              fileInputKey={fileInputKey}
-              selectedFiles={selectedFiles}
-              onFileChange={handleFileChange}
-              onRemoveFile={handleRemoveFile}
-            />
-          </Form>
-        </Modal.Body>
-        <Modal.Footer>
-          <Button
-            variant="secondary"
-            onClick={() => {
-              setShowEditModal(false);
-              setSelectedFAQ(null);
-              resetForm();
-            }}
-          >
-            Cancel
-          </Button>
-          <Button
-            variant="primary"
-            onClick={() => {
-              void handleSubmit();
-            }}
-          >
-            Update FAQ
-          </Button>
-        </Modal.Footer>
-      </Modal>
+      {showEditModal !== undefined && setShowEditModal ? (
+        <Modal
+          show={showEditModal}
+          onHide={() => {
+            setShowEditModal(false);
+            setSelectedFAQ(null);
+            resetForm();
+          }}
+          size="lg"
+          centered
+        >
+          <Modal.Header closeButton>
+            <Modal.Title>{`Edit ${scopeLabel} FAQ`}</Modal.Title>
+          </Modal.Header>
+          <Modal.Body>
+            <Form>
+              <AiFaqDraftItemCards
+                variant="single"
+                faqItems={faqItems}
+                onRemoveItem={handleRemoveFAQItem}
+                onUpdateItem={handleUpdateFAQItem}
+              />
+              <AiFaqAttachmentField
+                haveFiles={haveFiles}
+                fileInputKey={fileInputKey}
+                selectedFiles={selectedFiles}
+                accept={faqAttachmentAccept}
+                onFileChange={handleFileChange}
+                onRemoveFile={handleRemoveFile}
+              />
+            </Form>
+          </Modal.Body>
+          <Modal.Footer>
+            <Button
+              variant="secondary"
+              onClick={() => {
+                setShowEditModal(false);
+                setSelectedFAQ(null);
+                resetForm();
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="primary"
+              onClick={() => {
+                void handleSubmit();
+              }}
+            >
+              Update FAQ
+            </Button>
+          </Modal.Footer>
+        </Modal>
+      ) : null}
 
       {showDeleteModal ? (
         <ConfirmModal

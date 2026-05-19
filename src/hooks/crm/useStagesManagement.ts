@@ -27,7 +27,7 @@ import { useSession } from "next-auth/react";
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { toast } from "react-toastify";
-import { crmAppKeys } from "../../query/keys";
+import { crmAppKeys } from "@query/keys";
 
 const { PERMISSIONS } = HEADER_CONSTANTS;
 

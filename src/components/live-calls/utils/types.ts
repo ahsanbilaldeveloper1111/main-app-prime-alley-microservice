@@ -23,6 +23,12 @@ export interface ActiveMonitoring {
   deviceName?: string | null
 }
 
+/** After stop-monitoring, ignore stale supervisor↔agent legs briefly so cards return to idle. */
+export interface MonitoringTeardownHint {
+  monitorDn?: string
+  monitoredDn: string
+}
+
 export interface ShowPopup {
   dn: string
   deviceName: string

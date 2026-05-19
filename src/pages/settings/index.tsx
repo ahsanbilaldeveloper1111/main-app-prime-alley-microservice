@@ -98,7 +98,7 @@ import AIChatFAQsGlobal from "@pages/chat/ai-faqs/global";
 import ManageExtensions from "@pages/ai-ml/manage-extensions";
 import BackendOperations from "@pages/ai-ml/backend-operations";
 import ManualAnalysis from "@pages/ai-ml/analysis";
-
+import { AI_CHAT_SETTINGS_TAB_PERMISSIONS } from "@config/aiChatPermissions";
 import { HEADER_CONSTANTS} from "@constants/headerConstants";
 
 // Destructure constants for easier use
@@ -1757,10 +1757,10 @@ const Settings = () => {
       { key: "statuses", title: "Statuses", icon: CalendarCheck, color: "#26a69a", permission: PERMISSIONS.WORK_PLANNER_SERVICES }
     ],
     "ai-chat": [
-      { key: "tools-profiles", title: "Tools Profiles", icon: Wrench, color: "#7c4dff", permission: PERMISSIONS.AI_ML_SERVICES },
-      { key: "faq-profiles", title: "FAQ Profiles", icon: MessageCircle, color: "#7c4dff", permission: PERMISSIONS.AI_ML_SERVICES },
-      { key: "tenant-profile", title: "Tenant Profile", icon: Building2, color: "#7c4dff", permission: PERMISSIONS.AI_ML_SERVICES },
-      { key: "global-faqs", title: "Global FAQs", icon: Globe, color: "#7c4dff", permission: PERMISSIONS.AI_ML_SERVICES }
+      { key: "tools-profiles", title: "Tools Profiles", icon: Wrench, color: "#7c4dff", permission: AI_CHAT_SETTINGS_TAB_PERMISSIONS.toolsProfiles },
+      { key: "faq-profiles", title: "FAQ Profiles", icon: MessageCircle, color: "#7c4dff", permission: AI_CHAT_SETTINGS_TAB_PERMISSIONS.faqProfiles },
+      { key: "tenant-profile", title: "Tenant Profile", icon: Building2, color: "#7c4dff", permission: AI_CHAT_SETTINGS_TAB_PERMISSIONS.tenantProfile },
+      { key: "global-faqs", title: "Global FAQs", icon: Globe, color: "#7c4dff", permission: AI_CHAT_SETTINGS_TAB_PERMISSIONS.globalFaqs },
     ],
     "ai-analysis": [
       { key: "manage-extensions", title: "Manage Extensions", icon: SettingsCogIcon, color: "#00bcd4", permission: PERMISSIONS.MANAGE_EXTENSIONS_AIML },

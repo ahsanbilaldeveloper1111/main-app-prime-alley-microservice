@@ -1,10 +1,112 @@
 import BreadcrumbItem from "@common/BreadcrumbItem";
 import PageHeader from "@components/PageHeader";
 import { useFaqProfilesPage } from "../useFaqProfilesPage";
-import { Building2, Bot, ChevronRight, Globe, X } from "lucide-react";
-import { Button, Container, Form, Modal, Row, Col, Card, Spinner } from "react-bootstrap";
+import { Building2, Bot, ChevronRight, Globe, RefreshCw, X } from "lucide-react";
+import {
+  Alert,
+  Badge,
+  Button,
+  Card,
+  Col,
+  Container,
+  Form,
+  Modal,
+  Row,
+  Spinner,
+} from "react-bootstrap";
 import Select from "react-select";
-import React from "react";
+import React, { useMemo } from "react";
+import type { ChatTrainingStatusResponse } from "@utils/chat";
+import {
+  findChatCompanySelectOption,
+  mapChatCompaniesToSelectOptions,
+} from "@page-modules/chat/shared/chatCompanySelectOptions";
+
+function formatTrainingLastUpdated(value: string | null): string {
+  if (value == null || value === "") {
+    return "—";
+  }
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return value;
+  }
+  return parsed.toLocaleString();
+}
+
+type FaqTrainingStatusDetailsProps = Readonly<{
+  tenantId: string;
+  loading: boolean;
+  errorMessage: string | null;
+  status: ChatTrainingStatusResponse | null;
+}>;
+
+function FaqTrainingStatusDetails({
+  tenantId,
+  loading,
+  errorMessage,
+  status,
+}: FaqTrainingStatusDetailsProps) {
+  if (errorMessage) {
+    return (
+      <Alert variant="danger" className="mb-0">
+        {errorMessage}
+      </Alert>
+    );
+  }
+  const tenantTrimmed = tenantId.trim();
+  if (tenantTrimmed === "") {
+    return <p className="text-muted small mb-0">Choose a company to load training status.</p>;
+  }
+  if (loading && status == null) {
+    return (
+      <div className="d-flex align-items-center gap-2 text-muted">
+        <Spinner animation="border" size="sm" />
+        <span>Loading status…</span>
+      </div>
+    );
+  }
+  if (status == null) {
+    return null;
+  }
+  return (
+    <div className="row g-3 small">
+      <div className="col-md-6 col-lg-4">
+        <div className="text-muted text-uppercase" style={{ fontSize: "0.7rem" }}>
+          Trained
+        </div>
+        <div className="mt-1">
+          {status.is_trained ? (
+            <Badge bg="success">Yes</Badge>
+          ) : (
+            <Badge bg="secondary">Not yet</Badge>
+          )}
+        </div>
+      </div>
+      <div className="col-md-6 col-lg-4">
+        <div className="text-muted text-uppercase" style={{ fontSize: "0.7rem" }}>
+          Last updated
+        </div>
+        <div className="mt-1 fw-medium">{formatTrainingLastUpdated(status.last_updated)}</div>
+      </div>
+      <div className="col-md-6 col-lg-4">
+        <div className="text-muted text-uppercase" style={{ fontSize: "0.7rem" }}>
+          Processed files / FAQs
+        </div>
+        <div className="mt-1 fw-medium">
+          {status.processed_files} / {status.processed_faqs}
+        </div>
+      </div>
+      <div className="col-12">
+        <div className="text-muted text-uppercase" style={{ fontSize: "0.7rem" }}>
+          Vector store path
+        </div>
+        <div className="mt-1 font-monospace text-break small">
+          {status.vector_store_path ?? "—"}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export type FaqProfilesPageViewProps = Readonly<{
   ctx: ReturnType<typeof useFaqProfilesPage>;
@@ -25,7 +127,18 @@ export function FaqProfilesPageView({ ctx }: FaqProfilesPageViewProps) {
     handleCompanySubmit,
     closeTrainingModal,
     trainingLoading,
+    statusTenantId,
+    setStatusTenantId,
+    trainingStatus,
+    trainingStatusLoading,
+    trainingStatusErrorMessage,
+    refetchTrainingStatus,
   } = ctx;
+
+  const companyOptions = useMemo(
+    () => mapChatCompaniesToSelectOptions(companies),
+    [companies],
+  );
 
   return (
     <React.Fragment>
@@ -50,6 +163,57 @@ export function FaqProfilesPageView({ ctx }: FaqProfilesPageViewProps) {
           </Button>
         }
       />
+
+      <Container fluid className="mb-4">
+        <Card className="shadow-sm border-0" style={{ border: "1px solid #e9ecef" }}>
+          <Card.Body>
+            <div className="d-flex flex-wrap align-items-start justify-content-between gap-3 mb-3">
+              <div>
+                <h5 className="mb-1" style={{ color: "#263238", fontWeight: 600 }}>
+                  Bot training status
+                </h5>
+                <p className="text-muted small mb-0">
+                  Select a company to see whether the bot has been trained and when data was last
+                  processed.
+                </p>
+              </div>
+              <div className="d-flex flex-wrap align-items-center gap-2">
+                <Button
+                  variant="outline-secondary"
+                  size="sm"
+                  onClick={() => refetchTrainingStatus()}
+                  disabled={trainingStatusLoading || !statusTenantId.trim()}
+                >
+                  {trainingStatusLoading ? (
+                    <Spinner animation="border" size="sm" className="me-1" />
+                  ) : (
+                    <RefreshCw size={14} className="me-1" />
+                  )}
+                  Refresh
+                </Button>
+              </div>
+            </div>
+            <Form.Group className="mb-3" style={{ maxWidth: "420px" }}>
+              <Form.Label>Company (tenant)</Form.Label>
+              <Select
+                isLoading={companiesLoading}
+                options={companyOptions}
+                value={findChatCompanySelectOption(companies, statusTenantId)}
+                onChange={(opt) => setStatusTenantId(opt?.value ?? "")}
+                placeholder="Select company to load status..."
+                isClearable
+              />
+            </Form.Group>
+
+            <FaqTrainingStatusDetails
+              tenantId={statusTenantId}
+              loading={trainingStatusLoading}
+              errorMessage={trainingStatusErrorMessage}
+              status={trainingStatus}
+            />
+          </Card.Body>
+        </Card>
+      </Container>
 
       <Container fluid className="">
         <Row className="g-4">
@@ -165,20 +329,8 @@ export function FaqProfilesPageView({ ctx }: FaqProfilesPageViewProps) {
             <Form.Label>Select Company</Form.Label>
             <Select
               isLoading={companiesLoading}
-              options={companies.map((c) => ({
-                value: c.identifier,
-                label: (c.name ?? c.identifier) as string,
-              }))}
-              value={
-                selectedCompanyId
-                  ? {
-                      value: selectedCompanyId,
-                      label:
-                        (companies.find((c) => c.identifier === selectedCompanyId)?.name ??
-                          selectedCompanyId) as string,
-                    }
-                  : null
-              }
+              options={companyOptions}
+              value={findChatCompanySelectOption(companies, selectedCompanyId)}
               onChange={(opt) => setSelectedCompanyId(opt?.value ?? "")}
               placeholder="Select company..."
               isClearable
@@ -237,9 +389,9 @@ export function FaqProfilesPageView({ ctx }: FaqProfilesPageViewProps) {
                 }}
               >
                 {(() => {
-                  const tenantFiles = trainingResponse.tenant_documents?.files ?? 0;
-                  const globalFiles = trainingResponse.global_documents?.files ?? 0;
-                  const totalChunks = trainingResponse.total_chunks ?? 0;
+                  const tenantFiles = trainingResponse.tenant_documents.files;
+                  const globalFiles = trainingResponse.global_documents.files;
+                  const totalChunks = trainingResponse.total_chunks;
                   return `Training completed successfully! Processed ${tenantFiles} tenant files and ${globalFiles} global files. Total chunks: ${totalChunks}`;
                 })()}
               </p>

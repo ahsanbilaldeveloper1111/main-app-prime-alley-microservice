@@ -88,7 +88,7 @@ import Link from "next/link";
 import { toast } from "react-toastify";
 import { useSession } from "next-auth/react";
 import { HEADER_CONSTANTS } from "@constants/headerConstants";
-import { crmAppKeys } from "../../../query/keys";
+import { crmAppKeys } from "@query/keys";
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
 import DeleteConfirmationModal from "@components/page-partials/DeleteConfirmationModal";

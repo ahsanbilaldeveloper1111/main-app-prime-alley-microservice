@@ -1,28 +1,34 @@
-import { HEADER_CONSTANTS } from '@constants/headerConstants'
-import ToolProfiles from '@pages/chat/tools-profiles'
-import FaqProfiles from '@pages/chat/faq-profiles'
+import { AI_CHAT_SETTINGS_TAB_PERMISSIONS } from '@config/aiChatPermissions'
 import AIChatFAQsTenant from '@pages/chat/ai-faqs/tenant'
 import AIChatFAQsGlobal from '@pages/chat/ai-faqs/global'
 import React from 'react'
+import { AIChatbotSettings } from '../ai-chatbot-settings/AIChatbotSettings'
 import type { ControlledTabsProps, Tab } from '../types'
 import { SettingsSectionTabShell } from './SettingsSectionTabShell'
 import { useSettingsSectionTabs } from './useSettingsSectionTabs'
 
-const { PERMISSIONS } = HEADER_CONSTANTS
-
 const aiChatTabs: Tab[] = [
-  { id: 'tools-profiles', label: 'Tools Profiles', permission: PERMISSIONS.VIEW_AI_CHAT },
-  { id: 'faq-profiles', label: 'FAQ Profiles', permission: PERMISSIONS.VIEW_AI_CHAT },
-  { id: 'tenant-profile', label: 'Tenant Profile', permission: PERMISSIONS.VIEW_AI_CHAT },
-  { id: 'global-faqs', label: 'Global FAQs', permission: PERMISSIONS.VIEW_AI_CHAT },
+  {
+    id: 'ai-chatbot-settings',
+    label: 'AI Chatbot Settings',
+    permission: AI_CHAT_SETTINGS_TAB_PERMISSIONS.chatbotSettings,
+  },
+  {
+    id: 'tenant-profile',
+    label: 'Tenant Profile',
+    permission: AI_CHAT_SETTINGS_TAB_PERMISSIONS.tenantProfile,
+  },
+  {
+    id: 'global-faqs',
+    label: 'Global FAQs',
+    permission: AI_CHAT_SETTINGS_TAB_PERMISSIONS.globalFaqs,
+  },
 ]
 
 function AIChatTabPanel({ activeTab }: Readonly<{ activeTab: string }>) {
   switch (activeTab) {
-    case 'tools-profiles':
-      return <ToolProfiles />
-    case 'faq-profiles':
-      return <FaqProfiles />
+    case 'ai-chatbot-settings':
+      return <AIChatbotSettings />
     case 'tenant-profile':
       return <AIChatFAQsTenant />
     case 'global-faqs':
@@ -40,11 +46,17 @@ export const AIChatPage: React.FC<ControlledTabsProps> = ({
     routeActiveTab,
     onTabChange,
     aiChatTabs,
-    'tools-profiles'
+    'ai-chatbot-settings'
   )
 
   return (
-    <SettingsSectionTabShell title="AI Chat" allowedTabs={allowedTabs} activeTab={activeTab} onSelectTab={selectTab}>
+    <SettingsSectionTabShell
+      title="AI Chat"
+      allowedTabs={allowedTabs}
+      activeTab={activeTab}
+      onSelectTab={selectTab}
+      dense={activeTab === 'ai-chatbot-settings'}
+    >
       <AIChatTabPanel activeTab={activeTab} />
     </SettingsSectionTabShell>
   )

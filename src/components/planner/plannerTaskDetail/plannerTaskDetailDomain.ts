@@ -294,6 +294,33 @@ function resolvePlannerDetailProjectName(proj: unknown): string {
   return "No Project";
 }
 
+export function resolvePlannerDetailDateDisplay(
+  primary: string | null | undefined,
+  fallback: unknown,
+): string | null {
+  if (typeof primary === "string" && primary.trim() !== "") return primary;
+  if (typeof fallback === "string" && fallback.trim() !== "") return fallback;
+  return null;
+}
+
+export type PlannerTaskParentRef = Readonly<{
+  id: number;
+  title?: string;
+  reference?: string;
+}>;
+
+export function resolvePlannerTaskParentRef(parent: unknown): PlannerTaskParentRef | null {
+  if (typeof parent !== "object" || parent == null) return null;
+  const id = (parent as { id?: unknown }).id;
+  if (typeof id !== "number" || !Number.isFinite(id)) return null;
+  const row = parent as { title?: unknown; reference?: unknown };
+  return {
+    id,
+    title: typeof row.title === "string" ? row.title : undefined,
+    reference: typeof row.reference === "string" ? row.reference : undefined,
+  };
+}
+
 function resolvePlannerDetailWatchers(
   watchersRaw: unknown,
   watcherNumbers: string[] | undefined,
@@ -326,15 +353,9 @@ export function buildPlannerTaskDetailViewModel(task: PlannerTaskDetailApiTask):
     nextRunAt != null ||
     (typeof freqScalar === "string" && freqScalar.trim() !== "");
   const pickedStartDate = pickScalar("start_date");
-  const startDateDisplay =
-    (typeof task.start_date === "string" && task.start_date.trim() !== ""
-      ? task.start_date
-      : null) ??
-    (typeof pickedStartDate === "string" && pickedStartDate.trim() !== "" ? pickedStartDate : null);
+  const startDateDisplay = resolvePlannerDetailDateDisplay(task.start_date, pickedStartDate);
   const pickedEndDate = pickScalar("end_date");
-  const endDateDisplay =
-    (typeof task.due_date === "string" && task.due_date.trim() !== "" ? task.due_date : null) ??
-    (typeof pickedEndDate === "string" && pickedEndDate.trim() !== "" ? pickedEndDate : null);
+  const endDateDisplay = resolvePlannerDetailDateDisplay(task.due_date, pickedEndDate);
   const dueTimeDetailLabel = formatDueTimeForDetail(task.due_time);
 
   return {

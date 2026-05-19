@@ -17,7 +17,7 @@ import { getErrorMessage } from "@utils/errors";
 import { useEnsureCustomerForCrmCompany } from "@hooks/billing/useEnsureCustomerForCrmCompany";
 import { useMinifiedCompaniesSendAll } from "@hooks/billing/useMinifiedCompaniesSendAll";
 import { useQueryClient } from "@tanstack/react-query";
-import { accountBillingKeys } from "../../../query/keys";
+import { accountBillingKeys } from "@query/keys";
 import { useAccountBillingInvoiceHistoryQuery } from "@page-modules/billing/account-billing/useAccountBillingInvoiceHistoryQuery";
 
 const font = BILLING_FONT;

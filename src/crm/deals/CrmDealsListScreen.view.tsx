@@ -180,7 +180,7 @@ import {
 } from "@crm/deals/dealsListScreenTableBuilders";
 import { applyCrmFilterRules, CRM_BASE_FILTER_RULES } from "@crm/shared/crmListFilterHelpers";
 import { HEADER_CONSTANTS } from "@constants/headerConstants";
-import { crmAppKeys } from "../../query/keys";
+import { crmAppKeys } from "@query/keys";
 
 const { PERMISSIONS } = HEADER_CONSTANTS;
 const ignoredKeys = ["stage_id"];

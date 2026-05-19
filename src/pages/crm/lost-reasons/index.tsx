@@ -26,7 +26,7 @@ import DatatableActionButton from "@components/DatatableActionButton";
 import { useSession } from "next-auth/react";
 import { formatDateForTable, normalizeSearchQuery } from "@utils/Helper";
 import { HEADER_CONSTANTS } from "@constants/headerConstants";
-import { crmAppKeys } from "../../../query/keys";
+import { crmAppKeys } from "@query/keys";
 
 const { PERMISSIONS } = HEADER_CONSTANTS;
 

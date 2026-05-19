@@ -1,4 +1,4 @@
-import { defineConfig, loadEnv } from "vite";
+import { defineConfig, loadEnv, type ProxyOptions } from "vite";
 import react from "@vitejs/plugin-react";
 import tsconfigPaths from "vite-tsconfig-paths";
 import path from "node:path";
@@ -30,7 +30,27 @@ const nextShimAliases = {
     "src/shims/next-redux-wrapper.tsx",
   ),
   "@sentry/nextjs": path.resolve(__dirname, "src/shims/sentry-nextjs.ts"),
+  "@query/keys": path.resolve(__dirname, "src/query/keys.ts"),
 };
+
+/** Upstream origin for dev `server.proxy['/api']` (parsed from absolute backend URLs in env). */
+function resolveDevApiProxyTarget(env: Record<string, string>): string {
+  const explicit = (env.VITE_DEV_API_PROXY_TARGET || "")
+    .trim()
+    .replace(/\/+$/, "");
+  if (explicit.length > 0) return explicit;
+  for (const key of ["NEXT_PUBLIC_BACKEND_URL", "VITE_BACKEND_URL"] as const) {
+    const raw = (env[key] || "").trim();
+    if (raw.startsWith("http://") || raw.startsWith("https://")) {
+      try {
+        return new URL(raw).origin;
+      } catch {
+        /* ignore */
+      }
+    }
+  }
+  return "http://127.0.0.1:3001";
+}
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
@@ -45,73 +65,81 @@ export default defineConfig(({ mode }) => {
     }
   }
 
+  const streamingProxy: ProxyOptions = {
+    target: env.VITE_STREAMING_URL || "http://localhost:3100",
+    changeOrigin: true,
+    ws: true,
+    rewrite: (path) => path.replace(/^\/streaming/, ""),
+  };
+
+  const serverProxy: Record<string, string | ProxyOptions> = {
+    "/streaming": streamingProxy,
+  };
+
+  if (env.APPLY_PROXY_TO_API) {
+    serverProxy["/api"] = {
+      target: resolveDevApiProxyTarget(env),
+      changeOrigin: true,
+      secure: false,
+    };
+  }
+
   return {
-  plugins: [react(), tsconfigPaths(), nextImageCompatPlugin()],
+    plugins: [react(), tsconfigPaths(), nextImageCompatPlugin()],
 
-  resolve: {
-    alias: {
-      ...nextShimAliases,
-      "~bootstrap": path.resolve(__dirname, "node_modules/bootstrap"),
-      // Default react-bootstrap Modal: static backdrop + no Esc dismiss
-      // (preserved from the previous webpack NormalModuleReplacementPlugin).
-      "react-bootstrap/esm/Modal.js": path.resolve(
-        __dirname,
-        "src/shims/react-bootstrap-modal.tsx",
-      ),
-    },
-  },
-
-  css: {
-    preprocessorOptions: {
-      scss: {
-        // Replicate the Webpack `resolve.modules` behavior the previous Next
-        // build relied on: `@import 'node_modules/bootstrap/scss/...'`
-        // resolves from the project root, while `@import 'partials/...'`
-        // resolves from `src/assets/scss`.
-        loadPaths: [
+    resolve: {
+      alias: {
+        ...nextShimAliases,
+        "~bootstrap": path.resolve(__dirname, "node_modules/bootstrap"),
+        // Default react-bootstrap Modal: static backdrop + no Esc dismiss
+        // (preserved from the previous webpack NormalModuleReplacementPlugin).
+        "react-bootstrap/esm/Modal.js": path.resolve(
           __dirname,
-          path.join(__dirname, "src/assets/scss"),
-          path.join(__dirname, "node_modules"),
-        ],
-        quietDeps: true,
-        silenceDeprecations: ["legacy-js-api", "import", "global-builtin"],
+          "src/shims/react-bootstrap-modal.tsx",
+        ),
       },
     },
-  },
 
-  define: {
-    // Vite normally only inlines import.meta.env.*. Backfill process.env.* for
-    // any legacy module still reading from process.env, so the rewrite stays
-    // minimal during the migration.
-    "process.env.NODE_ENV": JSON.stringify(mode),
-    ...exposedEnv,
-  },
-
-  server: {
-    port: 3000,
-    host: true,
-    proxy: {
-      // Streaming endpoints are served by the Express sidecar (see server/index.ts).
-      // Front-end keeps calling /streaming/* during dev; the prefix is stripped
-      // before hitting the sidecar (which mounts handlers at the root). Prod
-      // can put the sidecar behind the same origin via reverse proxy.
-      "/streaming": {
-        target: env.VITE_STREAMING_URL || "http://localhost:3100",
-        changeOrigin: true,
-        ws: true,
-        rewrite: (path) => path.replace(/^\/streaming/, ""),
+    css: {
+      preprocessorOptions: {
+        scss: {
+          // Replicate the Webpack `resolve.modules` behavior the previous Next
+          // build relied on: `@import 'node_modules/bootstrap/scss/...'`
+          // resolves from the project root, while `@import 'partials/...'`
+          // resolves from `src/assets/scss`.
+          loadPaths: [
+            __dirname,
+            path.join(__dirname, "src/assets/scss"),
+            path.join(__dirname, "node_modules"),
+          ],
+          quietDeps: true,
+          silenceDeprecations: ["legacy-js-api", "import", "global-builtin"],
+        },
       },
     },
-  },
 
-  build: {
-    outDir: "dist",
-    sourcemap: true,
-    chunkSizeWarningLimit: 2000,
-  },
+    define: {
+      // Vite normally only inlines import.meta.env.*. Backfill process.env.* for
+      // any legacy module still reading from process.env, so the rewrite stays
+      // minimal during the migration.
+      "process.env.NODE_ENV": JSON.stringify(mode),
+      ...exposedEnv,
+    },
 
-  optimizeDeps: {
-    include: ["react", "react-dom", "react-router-dom", "axios"],
-  },
+    server: {
+      port: 3000,
+      host: true,
+      proxy: serverProxy,
+    },
+
+    build: {
+      outDir: "dist",
+      sourcemap: true,
+      chunkSizeWarningLimit: 2000,
+    },
+
+    optimizeDeps: {
+      include: ["react", "react-dom", "react-router-dom", "axios"],
+    },
   };
 });

@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 
 import type { PaymentMethodLike } from "@components/billings/shared/paymentMethods";
 import { normalizePaymentMethods } from "@components/billings/shared/paymentMethods";
-import { billingCustomerKeys } from "../../../query/keys";
+import { billingCustomerKeys } from "@query/keys";
 import { GetPaymentMethods } from "@utils/accounting";
 import { getErrorMessage } from "@utils/errors";
 import { toast } from "react-toastify";

@@ -15,13 +15,11 @@ export type AIFaqsGlobalPageViewProps = Readonly<{
 export function AIFaqsGlobalPageView({ ctx }: AIFaqsGlobalPageViewProps) {
   const {
     router,
-    refreshKey,
     columns,
-    fetchData,
+    getListQueryOptions,
+    stableFilters,
     showAddModal,
     setShowAddModal,
-    showEditModal,
-    setShowEditModal,
     showDeleteModal,
     setShowDeleteModal,
     selectedFAQ,
@@ -66,12 +64,11 @@ export function AIFaqsGlobalPageView({ ctx }: AIFaqsGlobalPageViewProps) {
 
       <GenericListPage
         columns={columns}
-        fetchData={fetchData}
+        getListQueryOptions={getListQueryOptions}
         title="Global FAQs"
         searchPlaceholder="Search FAQs..."
         defaultPageSize={15}
-        filters={{}}
-        refreshKey={refreshKey}
+        filters={stableFilters}
         search={true}
         tableStyle="table-style-2"
       />
@@ -80,8 +77,6 @@ export function AIFaqsGlobalPageView({ ctx }: AIFaqsGlobalPageViewProps) {
         scopeLabel="Global"
         showAddModal={showAddModal}
         setShowAddModal={setShowAddModal}
-        showEditModal={showEditModal}
-        setShowEditModal={setShowEditModal}
         showDeleteModal={showDeleteModal}
         setShowDeleteModal={setShowDeleteModal}
         selectedFAQ={selectedFAQ}

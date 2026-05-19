@@ -244,12 +244,10 @@ export default function ChatbotWidget() {
     try {
       const response = await sendChatMessage({
         message: messageText,
-        tenant_id: getTenantId(),
-        thread_id: threadId || '',
+        ...(threadId ? { thread_id: threadId } : {}),
       });
 
-      // Extract AI response and thread_id from response
-      const aiResponseText = response?.response || response?.message || 'No response received';
+      const aiResponseText = response.response || 'No response received';
       const newThreadId = response?.thread_id || threadId;
 
       // Update thread_id if we got a new one

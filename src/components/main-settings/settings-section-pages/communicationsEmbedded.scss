@@ -1,0 +1,154 @@
+@import "../ai-analysis/shared/ai-analysis-shared";
+
+// Embedded legacy AIML pages inside Communications → Main Settings.
+
+.communications-tab-panel {
+  min-width: 0;
+  width: 100%;
+  box-sizing: border-box;
+
+  // Manage Extensions
+  &__embed--manage-extensions {
+    min-width: 0;
+
+    nav.breadcrumb,
+    .breadcrumb {
+      @media (max-width: 575.98px) {
+        font-size: 0.75rem;
+      }
+    }
+
+    .card {
+      border: 1px solid #e5e7eb;
+      overflow: hidden;
+    }
+
+    .card-header h5 {
+      font-size: clamp(0.95rem, 2.5vw, 1.1rem);
+      word-break: break-word;
+    }
+
+    .d-flex.flex-wrap.align-items-end {
+      gap: 0.75rem !important;
+
+      .form-group,
+      > .mb-0 {
+        flex: 1 1 100% !important;
+        min-width: 0 !important;
+        width: 100%;
+      }
+
+      @media (min-width: 576px) {
+        .form-group,
+        > .mb-0 {
+          flex: 1 1 200px !important;
+        }
+      }
+
+      .d-flex.gap-2 {
+        flex: 1 1 100%;
+        width: 100%;
+
+        .btn {
+          width: 100%;
+        }
+
+        @media (min-width: 576px) {
+          flex: 0 0 auto;
+          width: auto;
+
+          .btn {
+            width: auto;
+          }
+        }
+      }
+    }
+
+    .table-responsive {
+      margin: 0 -0.25rem;
+    }
+
+    table {
+      @include ai-analysis-stacked-table(767.98px);
+    }
+  }
+
+  // Manual Analysis (Call Analysis)
+  &__embed--manual-analysis {
+    min-width: 0;
+
+    nav.breadcrumb,
+    .breadcrumb {
+      @media (max-width: 575.98px) {
+        font-size: 0.75rem;
+      }
+    }
+
+    .page-header-title h2 {
+      font-size: clamp(1.1rem, 3vw, 1.5rem);
+    }
+
+    .page-header-title .row {
+      flex-direction: column;
+      align-items: flex-start !important;
+      gap: 0.5rem;
+    }
+
+    .card {
+      overflow: hidden;
+    }
+
+    .analysis-container .nav-tabs {
+      flex-wrap: nowrap;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: thin;
+      border-bottom: 1px solid #dee2e6;
+
+      .nav-link {
+        white-space: nowrap;
+        font-size: clamp(0.8125rem, 2vw, 0.875rem);
+      }
+    }
+
+    // Form: full-width fields on phones; Bootstrap sm/lg breakpoints above 576px / 992px
+    form .row > [class*="col-"] {
+      min-width: 0;
+    }
+
+    form .d-flex.justify-content-end {
+      flex-direction: column;
+      align-items: stretch !important;
+      gap: 0.5rem;
+
+      .btn {
+        width: 100%;
+        margin: 0 !important;
+      }
+
+      @media (min-width: 576px) {
+        flex-direction: row;
+        justify-content: flex-end !important;
+        flex-wrap: wrap;
+
+        .btn {
+          width: auto;
+        }
+      }
+    }
+
+    // Summary / transcript grids
+    .row {
+      margin-left: 0;
+      margin-right: 0;
+    }
+
+    [class*="col-md-"],
+    [class*="col-lg-"] {
+      @media (max-width: 991.98px) {
+        flex: 0 0 100%;
+        max-width: 100%;
+      }
+    }
+  }
+}

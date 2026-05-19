@@ -9,6 +9,19 @@ type SidebarProps = {
   onNavigate: (sectionId: string, subTabId?: string) => void
 }
 
+function sidebarItemPermissionAllowed(
+  required: SidebarItem["permission"],
+  hasPermission: (permission: string) => boolean,
+): boolean {
+  if (!required) {
+    return true;
+  }
+  if (typeof required === "string") {
+    return hasPermission(required);
+  }
+  return required.some((permission) => hasPermission(permission));
+}
+
 function navRowBackground(isActive: boolean, isHovered: boolean): string {
   if (isActive) {
     return 'whitesmoke'
@@ -246,11 +259,9 @@ const Sidebar: React.FC<SidebarProps> = ({ activeSection, onNavigate }) => {
 
       {/* Groups */}
       {sidebarGroups.map((group) => {
-        const permissionFilteredItems = group.items.filter((item) => {
-          const required = item.permission
-          if (!required) return true
-          return hasPermission(required)
-        })
+        const permissionFilteredItems = group.items.filter((item) =>
+          sidebarItemPermissionAllowed(item.permission, hasPermission),
+        )
         const filteredItems = searchQuery.trim()
           ? permissionFilteredItems.filter((item) =>
               item.label.toLowerCase().includes(searchQuery.toLowerCase())

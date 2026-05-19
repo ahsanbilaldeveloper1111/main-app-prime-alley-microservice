@@ -59,7 +59,7 @@ import {
   useStagedFiltersActions,
 } from "@utils/communicationsStagedFilters";
 import { HEADER_CONSTANTS } from "@constants/headerConstants";
-import { communicationsKeys } from "../../query/keys";
+import { communicationsKeys } from "@query/keys";
 import type { RootState } from "@toolkit/index";
 import { useAppDispatch, useAppSelector } from "@toolkit/hooks";
 import {

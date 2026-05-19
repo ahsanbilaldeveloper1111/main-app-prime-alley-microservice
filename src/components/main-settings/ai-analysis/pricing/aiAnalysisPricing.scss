@@ -1,0 +1,20 @@
+@import "../shared/ai-analysis-shared";
+
+.ai-analysis-pricing {
+  &__notes {
+    grid-column: 1 / -1;
+  }
+
+  &__textarea {
+    min-height: 5rem;
+    resize: vertical;
+  }
+
+  &__save {
+    background: #141414;
+
+    &:hover:not(:disabled) {
+      background: #2d2d2d;
+    }
+  }
+}

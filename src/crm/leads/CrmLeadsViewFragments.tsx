@@ -2107,7 +2107,7 @@ export function CrmLeadsViewFragment02() {
     contactEmail,
     contactPhone,
     extensions,
-    fetchLeads,
+    refreshLeadsList,
     filterBusinessTypes,
     filterCounts,
     filteredLeads,
@@ -2151,7 +2151,6 @@ export function CrmLeadsViewFragment02() {
     setLeadsFilters,
     setLeadsPagination,
     setLeadsSearch,
-    setRefreshKey,
     setSelectedLeadsColumns,
     setShowAddFollowupModal,
     setShowConvertToDealModal,
@@ -2596,7 +2595,6 @@ export function CrmLeadsViewFragment02() {
                                 ...leadsPagination,
                                 currentPage: 1,
                               });
-                              setRefreshKey((prev) => prev + 1);
                             }}
                           >
                             Submit Filters
@@ -2626,7 +2624,6 @@ export function CrmLeadsViewFragment02() {
                                 ...leadsPagination,
                                 currentPage: 1,
                               });
-                              setRefreshKey((prev) => prev + 1);
                             }}
                           >
                             Reset Filters
@@ -2732,10 +2729,7 @@ export function CrmLeadsViewFragment02() {
                             stage_id: Number(toCol),
                           })
                             .then(() => {
-                              fetchLeads(
-                                leadsPagination.currentPage,
-                                leadsPagination.rowsPerPage
-                              );
+                              refreshLeadsList();
                             })
                             .catch((err) => {
                               console.error("Failed to update lead stage:", err);
@@ -5771,7 +5765,7 @@ export function CrmLeadsViewFragment10() {
     exportFilters,
     exporting,
     extensions,
-    fetchLeads,
+    refreshLeadsList,
     filterBusinessTypes,
     filterCounts,
     handleAddCustomTab,
@@ -5791,7 +5785,6 @@ export function CrmLeadsViewFragment10() {
     setLeadsFilters,
     setLeadsPagination,
     setLeadsSearch,
-    setRefreshKey,
     setSelectedLeadsColumns,
     setShowColumnEditor,
     setShowConvertToDealModal,
@@ -6086,7 +6079,6 @@ export function CrmLeadsViewFragment10() {
 
           handleFiltersChange(filtersToApply);
           setLeadsPagination((prev) => ({ ...prev, currentPage: 1 }));
-          setRefreshKey((prev) => prev + 1);
           setShowFiltersSidebar(false);
         }}
         onReset={() => {
@@ -6120,7 +6112,6 @@ export function CrmLeadsViewFragment10() {
             date_to: undefined,
           });
           setActiveFilter("all");
-          setRefreshKey((prev) => prev + 1);
         }}
       />
 
@@ -6133,7 +6124,7 @@ export function CrmLeadsViewFragment10() {
           }}
           leadId={convertingLeadId}
           onSuccess={() => {
-            setRefreshKey((prev) => prev + 1);
+            refreshLeadsList();
             toast.success("Lead converted to deal successfully!");
           }}
         />
@@ -6411,7 +6402,7 @@ export function CrmLeadsViewFragment10() {
         onSuccess={() => {
           setShowCreateLeadModal(false);
           setEditLeadIdForSidebar(null);
-          fetchLeads();
+          refreshLeadsList();
         }}
         type="lead"
         editLeadId={editLeadIdForSidebar}

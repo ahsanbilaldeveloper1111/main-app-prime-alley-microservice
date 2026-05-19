@@ -7,6 +7,12 @@ import { ArrowLeft, Filter, Plus } from "lucide-react";
 import Select from "react-select";
 import React from "react";
 
+import { ChatTrainBotButton } from "@page-modules/chat/shared/ChatTrainBotButton";
+import { ChatTrainingResultModal } from "@page-modules/chat/shared/ChatTrainingResultModal";
+import {
+  findChatCompanySelectOption,
+  mapChatCompaniesToSelectOptions,
+} from "@page-modules/chat/shared/chatCompanySelectOptions";
 import { useAIFaqsTenantPage } from "../useAIFaqsTenantPage";
 
 export type AIFaqsTenantPageViewProps = Readonly<{
@@ -16,21 +22,18 @@ export type AIFaqsTenantPageViewProps = Readonly<{
 export function AIFaqsTenantPageView({ ctx }: AIFaqsTenantPageViewProps) {
   const {
     router,
-    refreshKey,
     columns,
-    fetchData,
+    getListQueryOptions,
     stableFilters,
     companies,
     companiesLoading,
     tenantId,
     setTenantId,
     selectedCompanyForFilter,
-    setSelectedCompanyForFilter,
+    handleCompanyFilterChange,
     handleApplyFilter,
     showAddModal,
     setShowAddModal,
-    showEditModal,
-    setShowEditModal,
     showDeleteModal,
     setShowDeleteModal,
     selectedFAQ,
@@ -48,12 +51,14 @@ export function AIFaqsTenantPageView({ ctx }: AIFaqsTenantPageViewProps) {
     handleSubmit,
     handleConfirmDelete,
     openAddModalWithTenant,
+    handleTrainBotClick,
+    trainingLoading,
+    showTrainingModal,
+    trainingResponse,
+    closeTrainingModal,
   } = ctx;
 
-  const companyOptions = companies.map((c) => ({
-    value: c.identifier,
-    label: c.name ?? c.identifier,
-  }));
+  const companyOptions = mapChatCompaniesToSelectOptions(companies);
 
   return (
     <React.Fragment>
@@ -64,6 +69,10 @@ export function AIFaqsTenantPageView({ ctx }: AIFaqsTenantPageViewProps) {
         showSearch={false}
         buttons={
           <>
+            <ChatTrainBotButton
+              onClick={handleTrainBotClick}
+              loading={trainingLoading}
+            />
             <Button variant="primary" onClick={openAddModalWithTenant}>
               <Plus size={16} className="me-2" />
               Add FAQs
@@ -81,18 +90,11 @@ export function AIFaqsTenantPageView({ ctx }: AIFaqsTenantPageViewProps) {
           <Select
             isLoading={companiesLoading}
             options={companyOptions}
-            value={
-              selectedCompanyForFilter
-                ? {
-                    value: selectedCompanyForFilter,
-                    label:
-                      companies.find(
-                        (c) => c.identifier === selectedCompanyForFilter,
-                      )?.name ?? selectedCompanyForFilter,
-                  }
-                : null
-            }
-            onChange={(opt) => setSelectedCompanyForFilter(opt?.value ?? "")}
+            value={findChatCompanySelectOption(
+              companies,
+              selectedCompanyForFilter,
+            )}
+            onChange={(opt) => handleCompanyFilterChange(opt?.value ?? "")}
             placeholder="Select company..."
             isClearable
           />
@@ -105,22 +107,26 @@ export function AIFaqsTenantPageView({ ctx }: AIFaqsTenantPageViewProps) {
 
       <GenericListPage
         columns={columns}
-        fetchData={fetchData}
+        getListQueryOptions={getListQueryOptions}
         title="Tenant FAQs"
         searchPlaceholder="Search FAQs..."
         defaultPageSize={15}
         filters={stableFilters}
-        refreshKey={refreshKey}
         search={true}
         tableStyle="table-style-2"
       />
 
+      <ChatTrainingResultModal
+        show={showTrainingModal}
+        response={trainingResponse}
+        onClose={closeTrainingModal}
+      />
+
       <AiFaqPageModals
         scopeLabel="Tenant"
+        faqAttachmentAccept=".pdf,.txt,application/pdf,text/plain"
         showAddModal={showAddModal}
         setShowAddModal={setShowAddModal}
-        showEditModal={showEditModal}
-        setShowEditModal={setShowEditModal}
         showDeleteModal={showDeleteModal}
         setShowDeleteModal={setShowDeleteModal}
         selectedFAQ={selectedFAQ}
@@ -143,16 +149,7 @@ export function AIFaqsTenantPageView({ ctx }: AIFaqsTenantPageViewProps) {
             <Select
               isLoading={companiesLoading}
               options={companyOptions}
-              value={
-                tenantId
-                  ? {
-                      value: tenantId,
-                      label:
-                        companies.find((c) => c.identifier === tenantId)
-                          ?.name ?? tenantId,
-                    }
-                  : null
-              }
+              value={findChatCompanySelectOption(companies, tenantId)}
               onChange={(opt) => {
                 if (opt) setTenantId(opt.value);
               }}

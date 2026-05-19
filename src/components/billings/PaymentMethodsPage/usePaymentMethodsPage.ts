@@ -4,7 +4,7 @@ import { deletePaymentMethod, setDefaultPaymentMethod } from "@utils/accounting"
 import { toast } from "react-toastify";
 import { usePermissions } from "@utils/permissionUtils";
 import { HEADER_CONSTANTS } from "@constants/headerConstants";
-import { billingCustomerKeys } from "../../../query/keys";
+import { billingCustomerKeys } from "@query/keys";
 import { useBillingStripePortalPaymentMethodsQuery } from "@page-modules/billing/customer/useBillingStripePortalPaymentMethodsQuery";
 
 const { PERMISSIONS } = HEADER_CONSTANTS;

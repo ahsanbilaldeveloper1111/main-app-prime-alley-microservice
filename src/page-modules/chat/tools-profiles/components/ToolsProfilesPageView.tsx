@@ -25,6 +25,7 @@ export function ToolsProfilesPageView({ ctx }: ToolsProfilesPageViewProps) {
     setShowExecutorModal,
     executorConfig,
     executorLoading,
+    executorFetchError,
     reloadExecutorLoading,
     selectedTool,
     setSelectedTool,
@@ -108,6 +109,9 @@ export function ToolsProfilesPageView({ ctx }: ToolsProfilesPageViewProps) {
   };
 
   const renderExecutorContent = () => {
+    if (executorFetchError) {
+      return <p className="text-danger mb-0">Failed to load executor config.</p>;
+    }
     if (executorLoading) {
       return (
         <div className="text-center py-4">

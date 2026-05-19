@@ -595,7 +595,7 @@ export const deleteCrmNote = async (noteId: number): Promise<void> => {
 
 // Stage Management
 export const getStages = async (
-  type?: "lead" | "lost_reason" | "deal" | "order",
+  type?: "lead" | "opportunity" | "lost_reason" | "deal" | "order",
   params?: { include_archived?: boolean },
 ): Promise<StageData[]> => {
   try {

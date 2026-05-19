@@ -397,6 +397,7 @@ export default function useCtiStomp(
         scheduleRefreshAfterCallEndRef,
         publishStompMessageRef,
         handleCallEventRef,
+        handleOngoingCallsRef,
         groupDevicesByDnAndDeviceNameRef,
         updateSummaryDataRef,
       }),
@@ -516,7 +517,6 @@ export default function useCtiStomp(
         updateSummaryDataRef,
       }),
     [
-      isMasterTab,
       isGlobalInstance,
       isAuthenticated,
       authInitialized,

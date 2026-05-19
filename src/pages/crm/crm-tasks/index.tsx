@@ -1,5 +1,5 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { crmAppKeys } from "../../../query/keys";
+import { crmAppKeys } from "@query/keys";
 import React, {
     ReactElement,
     useState,

@@ -14,6 +14,7 @@
     display: flex;
     justify-content: space-between;
     align-items: flex-start;
+    gap: 12px;
     margin-bottom: 12px;
 
     h2 {
@@ -29,6 +30,49 @@
       font-size: 12px;
       color: #6b7280;
     }
+
+    .myday-header__date {
+      font-size: 13px;
+      font-weight: 600;
+      color: #374151;
+    }
+
+    .myday-header__meta {
+      max-width: 42rem;
+    }
+
+    .myday-header__actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+  }
+
+  .myday-history-list {
+    display: grid;
+    gap: 8px;
+    max-height: 360px;
+    overflow-y: auto;
+  }
+
+  .myday-history-item {
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    padding: 10px 12px;
+    background: #fafafa;
+  }
+
+  .myday-history-item__title {
+    font-size: 13px;
+    font-weight: 600;
+    color: #111827;
+    margin-bottom: 4px;
+  }
+
+  .myday-history-item__meta {
+    font-size: 11px;
+    color: #6b7280;
   }
 
   .myday-capacity-card,
@@ -54,8 +98,22 @@
   }
 
   .myday-capacity-title {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
     font-size: 14px;
     color: #111827;
+  }
+
+  .myday-capacity-label {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    color: #6b7280;
+  }
+
+  .myday-capacity-values {
+    font-size: 14px;
   }
 
   .myday-capacity-input {
@@ -66,7 +124,7 @@
     color: #6b7280;
 
     input {
-      width: 96px;
+      width: 120px;
       border: 1px solid #d1d5db;
       border-radius: 6px;
       padding: 4px 8px;
@@ -74,24 +132,215 @@
     }
   }
 
+  .myday-capacity-edit-btn {
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    background: #fff;
+    color: #374151;
+    width: 32px;
+    height: 32px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+  }
+
+  .myday-capacity-units {
+    font-size: 11px;
+    font-weight: 400;
+    color: #6b7280;
+  }
+
   .myday-progress-track {
+    position: relative;
     height: 9px;
     border-radius: 999px;
     background: #f3f4f6;
     overflow: hidden;
     margin-bottom: 8px;
+
+    &--capacity {
+      margin-bottom: 8px;
+    }
+  }
+
+  .myday-capacity-pct {
+    position: absolute;
+    right: 6px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 10px;
+    font-weight: 700;
+    color: #374151;
+    z-index: 1;
+    pointer-events: none;
   }
 
   .myday-progress-fill {
     height: 100%;
+    transition: width 0.2s ease, background-color 0.2s ease;
 
-    &.planned {
-      background: #fb923c;
-    }
-
-    &.done {
+    &--low {
       background: #22c55e;
     }
+
+    &--medium {
+      background: #eab308;
+    }
+
+    &--high {
+      background: #ef4444;
+    }
+  }
+
+  .myday-empty-state {
+    margin: 0;
+    padding: 12px 10px;
+    font-size: 12px;
+    color: #6b7280;
+  }
+
+  .myday-task-card-list {
+    display: grid;
+    gap: 8px;
+    padding: 4px 6px 8px;
+  }
+
+  .myday-task-card {
+    position: relative;
+    border: 1px solid #e5e7eb;
+    border-radius: 10px;
+    background: #fff;
+    padding: 10px 36px 10px 10px;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+
+    &:hover {
+      border-color: #cbd5e1;
+      box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
+
+      .myday-task-card__remove {
+        opacity: 1;
+        pointer-events: auto;
+      }
+    }
+
+    &.is-completed {
+      opacity: 0.85;
+    }
+  }
+
+  .myday-task-card__main {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .myday-task-card__body {
+    min-width: 0;
+    flex: 1;
+  }
+
+  .myday-task-card__title {
+    font-size: 14px;
+    font-weight: 700;
+    color: #111827;
+    margin-bottom: 6px;
+  }
+
+  .myday-task-card.is-completed .myday-task-card__title {
+    text-decoration: line-through;
+    color: #6b7280;
+  }
+
+  .myday-task-card__tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .myday-task-card__remove {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    border: none;
+    background: #f3f4f6;
+    color: #4b5563;
+    border-radius: 6px;
+    width: 24px;
+    height: 24px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.15s ease;
+    padding: 0;
+  }
+
+  .myday-tag {
+    display: inline-flex;
+    align-items: center;
+    border-radius: 999px;
+    padding: 2px 8px;
+    font-size: 10px;
+    font-weight: 600;
+    line-height: 1.4;
+    background-color: #f3f4f6;
+    color: #1f2937;
+  }
+
+  .myday-tag--project {
+    background-color: #dbeafe;
+    color: #1e3a8a;
+  }
+
+  .myday-tag--personal {
+    background-color: #ede9fe;
+    color: #4c1d95;
+  }
+
+  .myday-tag--priority {
+    background-color: #f3f4f6;
+    color: #1f2937;
+    text-transform: capitalize;
+  }
+
+  .myday-tag--priority.priority-high,
+  .myday-tag--priority.priority-urgent {
+    background-color: #fee2e2;
+    color: #991b1b;
+  }
+
+  .myday-tag--priority.priority-medium,
+  .myday-tag--priority.priority-normal {
+    background-color: #fef3c7;
+    color: #78350f;
+  }
+
+  .myday-tag--priority.priority-low {
+    background-color: #ecfdf5;
+    color: #065f46;
+  }
+
+  .myday-tag--estimate {
+    background-color: #f3f4f6;
+    color: #374151;
+  }
+
+  .myday-tag--flexible {
+    background-color: #e0f2fe;
+    color: #082f49;
+  }
+
+  .myday-edit-estimate-btn {
+    border: 1px solid #d1d5db;
+    border-radius: 999px;
+    background: #fff;
+    color: #1e40af;
+    font-size: 10px;
+    font-weight: 600;
+    padding: 2px 8px;
+    line-height: 1.4;
   }
 
   .myday-carry-card {
@@ -155,13 +404,25 @@
     margin-bottom: 12px;
   }
 
+  .myday-section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 8px 10px 4px;
+  }
+
   .myday-section-title {
-    padding: 8px 10px;
+    padding: 0;
     font-size: 12px;
     font-weight: 700;
     color: #374151;
     text-transform: uppercase;
     letter-spacing: 0.04em;
+  }
+
+  .myday-section-header .myday-section-title {
+    padding: 0;
   }
 
   .myday-completed-card {
@@ -185,7 +446,7 @@
 
     &.is-completed .myday-task-title {
       text-decoration: line-through;
-      color: #9ca3af;
+      color: #6b7280;
     }
   }
 
@@ -205,6 +466,8 @@
 
   .myday-suggested {
     padding: 12px;
+    max-height: calc(100vh - 180px);
+    overflow-y: auto;
 
     h4 {
       margin: 0 0 10px;
@@ -212,6 +475,20 @@
       font-weight: 700;
       color: #141414;
     }
+  }
+
+  .myday-suggested-groups {
+    display: grid;
+    gap: 14px;
+  }
+
+  .myday-suggested-group__title {
+    margin: 0 0 6px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: #6b7280;
   }
 
   .myday-search-wrap {
@@ -238,22 +515,37 @@
   }
 
   .myday-suggested-item {
+    width: 100%;
     border: 1px solid #e5e7eb;
     border-radius: 8px;
     background: #fff;
     padding: 8px 10px;
     text-align: left;
 
+    &.is-added,
+    &:disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+      background: #f9fafb;
+    }
+
+    .myday-added-label {
+      font-size: 10px;
+      font-weight: 600;
+      color: #6b7280;
+    }
+
     .title {
       font-size: 12px;
       font-weight: 600;
       color: #111827;
-      margin-bottom: 2px;
+      margin-bottom: 6px;
     }
 
     .meta {
-      font-size: 11px;
-      color: #6b7280;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
     }
   }
 

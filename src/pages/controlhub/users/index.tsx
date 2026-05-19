@@ -22,11 +22,12 @@ import { useUsersData } from '@hooks/controlhub/users/useUsersData';
 import { useLdapSync } from '@hooks/controlhub/users/useLdapSync';
 import { useUserModal } from '@hooks/controlhub/users/useUserModal';
 
-
 const Users = () => {
     const { data: session } = useSession();
     const router = useRouter();
     const roleId = router.query.role_id as string | undefined;
+
+    const [listRefreshToken, setListRefreshToken] = useState(0);
 
     // Reset password modal state
     const [showResetPasswordModal, setShowResetPasswordModal] = useState(false);
@@ -56,13 +57,15 @@ const Users = () => {
         customFieldColumns,
         currentFilters,
         fetchUsers,
-        handleFiltersChange
+        handleFiltersChange,
+        invalidateUsersList,
     } = useUsersData(session, baseColumns, roleId);
 
-    // Refresh list after status change
+    // Refresh list after status change (invalidate cache + bump token so UsersList refetches)
     const handleAfterStatusChange = useCallback(() => {
-        fetchUsers();
-    }, [fetchUsers]);
+        invalidateUsersList();
+        setListRefreshToken((t) => t + 1);
+    }, [invalidateUsersList]);
 
     const handleStatusOptionSelect = useCallback((row: any, status: string) => {
         setChangeStatusRow(row);
@@ -112,6 +115,7 @@ const Users = () => {
                                 customFieldColumns={customFieldColumns}
                                 currentFilters={currentFilters}
                                 handleFiltersChange={handleFiltersChange}
+                                listRefreshToken={listRefreshToken}
                                 hasListPermission={session?.user?.permissions?.includes('list-users') || false}
                             />
                         </div>

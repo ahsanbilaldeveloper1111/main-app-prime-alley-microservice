@@ -29,7 +29,7 @@ import { WorkforceUserMultiSelectDropdown } from "@components/workforce/Workforc
 import { canViewAllEmployeesAttendance } from "@utils/workforce/canViewAllEmployeesAttendance";
 import { parseTeamUsersResponseForAttendanceScope } from "@utils/workforce/attendanceTeamScope";
 import { getTeamUsers } from "@utils/teams";
-import { workforceKeys } from "../../../query/keys";
+import { workforceKeys } from "@query/keys";
 import {
   ATTENDANCE_DATE_PRESETS,
   ATTENDANCE_ITEMS_PER_PAGE,

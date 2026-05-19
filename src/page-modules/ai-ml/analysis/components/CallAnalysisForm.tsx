@@ -65,7 +65,7 @@ export function CallAnalysisForm({
           <Card.Body>
             <Form onSubmit={onSubmit}>
               <Row>
-                <Col md={4}>
+                <Col xs={12} sm={6} lg={4}>
                   <Form.Group className="mb-3">
                     <Form.Label>UUID</Form.Label>
                     <Form.Control
@@ -78,7 +78,7 @@ export function CallAnalysisForm({
                     />
                   </Form.Group>
                 </Col>
-                <Col md={2}>
+                <Col xs={12} sm={6} lg={2}>
                   <Form.Group className="mb-3">
                     <Form.Label>Date</Form.Label>
                     <Form.Control
@@ -90,7 +90,7 @@ export function CallAnalysisForm({
                     />
                   </Form.Group>
                 </Col>
-                <Col md={2}>
+                <Col xs={12} sm={6} lg={2}>
                   <Form.Group className="mb-3">
                     <Form.Label>Username</Form.Label>
                     <Form.Control
@@ -102,7 +102,7 @@ export function CallAnalysisForm({
                     />
                   </Form.Group>
                 </Col>
-                <Col md={2}>
+                <Col xs={12} sm={6} lg={2}>
                   <Form.Group className="mb-3">
                     <Form.Label>Extension</Form.Label>
                     <Form.Control
@@ -114,7 +114,7 @@ export function CallAnalysisForm({
                     />
                   </Form.Group>
                 </Col>
-                <Col md={2}>
+                <Col xs={12} sm={6} lg={2}>
                   <Form.Group className="mb-3">
                     <Form.Label>Node</Form.Label>
                     <Form.Control

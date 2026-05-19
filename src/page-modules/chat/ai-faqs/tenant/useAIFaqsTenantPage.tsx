@@ -1,69 +1,76 @@
+import { chatKeys } from "@query/keys";
 import { useChatCompaniesQuery } from "@page-modules/chat/useChatCompaniesQuery";
 import {
   type CreateTenantFAQPayload,
   type FAQData,
-  type FAQItem,
   createTenantFAQ,
   deleteTenantFAQ,
   getTenantFAQs,
 } from "@utils/chat";
+import type { GenericListPageQueryParams } from "@components/GenericListPage";
+import { useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/router";
 import { useSession } from "next-auth/react";
-import { useCallback, useMemo, useState } from "react";
+import { HEADER_CONSTANTS } from "@constants/headerConstants";
+import { usePermissions } from "@utils/permissionUtils";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "react-toastify";
+
+const { PERMISSIONS } = HEADER_CONSTANTS;
 
 import { useAiFaqListColumns } from "../aiFaqListColumns";
 import {
-  buildAiFaqSubmitFields,
   emptyFaqListPage,
-  faqToDraft,
   getValidFaqItemsForSubmit,
   paginateArrayForTable,
 } from "../faqItemDraft";
 import { useAiFaqDraftFormState } from "../hooks/useAiFaqDraftFormState";
-
-type AiFaqDraftItem = FAQItem & Readonly<{ draftId: string }>;
-
-let aiFaqTenantDraftIdSeq = 0;
-
-function nextDraftRow(question = "", answer = ""): AiFaqDraftItem {
-  const c = globalThis.crypto;
-  const draftId =
-    c !== undefined && typeof c.randomUUID === "function"
-      ? c.randomUUID()
-      : `draft_${Date.now()}_${(++aiFaqTenantDraftIdSeq).toString(36)}`;
-  return {
-    question,
-    answer,
-    draftId,
-  };
-}
+import { resolveTenantIdFromSession } from "../../shared/resolveTenantIdFromSession";
+import { useChatTrainBot } from "../../shared/useChatTrainBot";
 
 export function useAIFaqsTenantPage() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const { data: session } = useSession();
+  const { hasPermission } = usePermissions();
+  const canDeleteFaq = hasPermission(PERMISSIONS.DELETE_TENANT_FAQS_AI_CHAT);
   const companiesQuery = useChatCompaniesQuery(true);
   const companies = companiesQuery.data ?? [];
-  const companiesLoading = companiesQuery.isFetching;
+  const companiesLoading = companiesQuery.isPending;
 
-  const [refreshKey, setRefreshKey] = useState(0);
   const [tenantId, setTenantId] = useState("");
   const [selectedCompanyForFilter, setSelectedCompanyForFilter] = useState("");
   const [filterTenantId, setFilterTenantId] = useState("");
 
+  const sessionTenantId = useMemo(
+    () => resolveTenantIdFromSession(session?.user),
+    [session?.user],
+  );
+
+  const listTenantId = useMemo(() => {
+    const fromFilter = filterTenantId.trim();
+    if (fromFilter) return fromFilter;
+    const fromSelect = selectedCompanyForFilter.trim();
+    if (fromSelect) return fromSelect;
+    return sessionTenantId;
+  }, [filterTenantId, selectedCompanyForFilter, sessionTenantId]);
+
+  useEffect(() => {
+    if (!sessionTenantId) return;
+    setSelectedCompanyForFilter((prev) => prev || sessionTenantId);
+    setFilterTenantId((prev) => prev || sessionTenantId);
+  }, [sessionTenantId]);
+
   const [showAddModal, setShowAddModal] = useState(false);
-  const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [selectedFAQ, setSelectedFAQ] = useState<FAQData | null>(null);
 
   const {
     faqItems,
-    setFaqItems,
     haveFiles,
     selectedFiles,
     fileInputKey,
     resetForm,
-    clearAttachments,
     handleAddFAQItem,
     handleRemoveFAQItem,
     handleUpdateFAQItem,
@@ -75,32 +82,29 @@ export function useAIFaqsTenantPage() {
     if (tenantId?.trim()) return tenantId.trim();
     if (filterTenantId?.trim()) return filterTenantId.trim();
     if (selectedCompanyForFilter?.trim()) return selectedCompanyForFilter.trim();
-    const u = session?.user as { tenant_id?: string } | undefined;
-    if (u?.tenant_id) return String(u.tenant_id);
-    return "";
+    return resolveTenantIdFromSession(session?.user);
   }, [tenantId, filterTenantId, selectedCompanyForFilter, session?.user]);
 
-  const handleEditFAQ = useCallback(
-    (faq: FAQData) => {
-      setSelectedFAQ(faq);
-      setFaqItems([faqToDraft({ question: faq.question, answer: faq.answer })]);
-      clearAttachments();
-      setTenantId(filterTenantId || selectedCompanyForFilter || tenantId || "");
-      setShowEditModal(true);
-    },
-    [clearAttachments, filterTenantId, selectedCompanyForFilter, setFaqItems, tenantId],
-  );
+  const trainBot = useChatTrainBot(getTenantId);
 
-  const handleDeleteFAQ = useCallback((faq: FAQData) => {
-    setSelectedFAQ(faq);
-    setShowDeleteModal(true);
-  }, []);
+  const handleDeleteFAQ = useCallback(
+    (faq: FAQData) => {
+      if (!canDeleteFaq) {
+        toast.error("You do not have permission to delete tenant FAQs.");
+        return;
+      }
+      setSelectedFAQ(faq);
+      setShowDeleteModal(true);
+    },
+    [canDeleteFaq],
+  );
 
   const handleSubmit = useCallback(async () => {
     const validFAQs = getValidFaqItemsForSubmit(faqItems);
+    const hasFiles = haveFiles && selectedFiles.length > 0;
 
-    if (validFAQs.length === 0) {
-      toast.error("Please add at least one FAQ with both question and answer");
+    if (validFAQs.length === 0 && !hasFiles) {
+      toast.error("Add at least one FAQ (question and answer) or attach a PDF/TXT file");
       return;
     }
 
@@ -111,69 +115,83 @@ export function useAIFaqsTenantPage() {
         return;
       }
 
-      const fields = buildAiFaqSubmitFields(validFAQs, haveFiles, selectedFiles);
+      const faqsJson = JSON.stringify(validFAQs);
       const payload: CreateTenantFAQPayload = {
         tenant_id: tenantForPayload,
-        faqs: fields.faqs,
-        have_files: fields.have_files,
-        files: fields.files,
+        faqs: faqsJson,
+        ...(hasFiles ? { files: selectedFiles } : {}),
       };
 
       await createTenantFAQ(payload);
 
       resetForm();
       setShowAddModal(false);
-      setShowEditModal(false);
       setSelectedFAQ(null);
-      setRefreshKey((k) => k + 1);
+      await queryClient.invalidateQueries({ queryKey: chatKeys.aiFaqs.tenant.all() });
     } catch (error) {
       console.error("Failed to save FAQs:", error);
     }
-  }, [faqItems, getTenantId, haveFiles, resetForm, selectedFiles]);
+  }, [faqItems, getTenantId, haveFiles, resetForm, selectedFiles, queryClient]);
 
   const handleConfirmDelete = useCallback(async () => {
     if (!selectedFAQ?.id) return;
-    const tenantForDelete = getTenantId();
-    if (!tenantForDelete) {
-      toast.error("Please select a tenant (company) first");
+    if (!canDeleteFaq) {
+      toast.error("You do not have permission to delete tenant FAQs.");
       return;
     }
     try {
-      await deleteTenantFAQ({
-        tenant_id: tenantForDelete,
-        faq_id: selectedFAQ.id,
-      });
+      await deleteTenantFAQ({ faq_id: selectedFAQ.id });
 
       setShowDeleteModal(false);
       setSelectedFAQ(null);
-      setRefreshKey((k) => k + 1);
+      await queryClient.invalidateQueries({ queryKey: chatKeys.aiFaqs.tenant.all() });
     } catch (error) {
       console.error("Failed to delete FAQ:", error);
     }
-  }, [getTenantId, selectedFAQ]);
+  }, [canDeleteFaq, selectedFAQ, queryClient]);
 
-  const fetchData = useCallback(
-    async (page = 1, perPage = 15, search = "") => {
-      if (!filterTenantId?.trim()) {
-        return emptyFaqListPage(perPage);
-      }
-      try {
-        const allFAQs = await getTenantFAQs(filterTenantId.trim(), search || undefined);
-        const { slice, total, last_page } = paginateArrayForTable(allFAQs, page, perPage);
+  const handleCompanyFilterChange = useCallback((companyId: string) => {
+    const id = companyId.trim();
+    setSelectedCompanyForFilter(id);
+    setFilterTenantId(id);
+  }, []);
 
-        return {
-          data: slice,
-          total,
-          page,
-          per_page: perPage,
-          last_page,
-        };
-      } catch (error) {
-        console.error("Error fetching FAQs:", error);
-        return emptyFaqListPage(perPage);
-      }
+  const getListQueryOptions = useCallback(
+    (params: GenericListPageQueryParams) => {
+      const tenant = listTenantId;
+      return {
+        queryKey: chatKeys.aiFaqs.tenant.list({
+          tenantId: tenant || "__none__",
+          page: params.page,
+          perPage: params.perPage,
+          search: params.search,
+        }),
+        queryFn: async () => {
+          if (!tenant) {
+            return emptyFaqListPage(params.perPage);
+          }
+          try {
+            const allFAQs = await getTenantFAQs(tenant, params.search || undefined);
+            const { slice, total, last_page } = paginateArrayForTable(
+              allFAQs,
+              params.page,
+              params.perPage,
+            );
+            return {
+              data: slice,
+              total,
+              page: params.page,
+              per_page: params.perPage,
+              last_page,
+            };
+          } catch (error) {
+            console.error("Error fetching FAQs:", error);
+            return emptyFaqListPage(params.perPage);
+          }
+        },
+      };
     },
-    [filterTenantId],
+    [listTenantId],
   );
 
   const handleApplyFilter = useCallback(() => {
@@ -181,9 +199,8 @@ export function useAIFaqsTenantPage() {
       toast.info("Please select a company first");
       return;
     }
-    setFilterTenantId(selectedCompanyForFilter.trim());
-    setRefreshKey((k) => k + 1);
-  }, [selectedCompanyForFilter]);
+    handleCompanyFilterChange(selectedCompanyForFilter);
+  }, [handleCompanyFilterChange, selectedCompanyForFilter]);
 
   const stableFilters = useMemo(() => ({}), []);
 
@@ -194,28 +211,26 @@ export function useAIFaqsTenantPage() {
 
   const columns = useAiFaqListColumns({
     variant: "tenant",
-    onEdit: handleEditFAQ,
     onDelete: handleDeleteFAQ,
+    canDelete: canDeleteFaq,
   });
 
   return {
     router,
-    refreshKey,
     columns,
-    fetchData,
+    getListQueryOptions,
     stableFilters,
     companies,
     companiesLoading,
     tenantId,
     setTenantId,
     selectedCompanyForFilter,
-    setSelectedCompanyForFilter,
+    handleCompanyFilterChange,
     filterTenantId,
+    listTenantId,
     handleApplyFilter,
     showAddModal,
     setShowAddModal,
-    showEditModal,
-    setShowEditModal,
     showDeleteModal,
     setShowDeleteModal,
     selectedFAQ,
@@ -233,5 +248,6 @@ export function useAIFaqsTenantPage() {
     handleSubmit,
     handleConfirmDelete,
     openAddModalWithTenant,
+    ...trainBot,
   };
 }

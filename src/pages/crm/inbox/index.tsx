@@ -5,7 +5,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import Layout from "@layout/index";
 import '../../../app/generic-style.css';
 import { getChats, getWhatsAppChatMessages, sendWhatsApp, getWhatsAppTemplates, type WhatsAppTemplateItem } from "@utils/communication";
-import { crmAppKeys } from "../../../query/keys";
+import { crmAppKeys } from "@query/keys";
 import { useWhatsAppSocket, type WhatsAppSocketPayload } from "@hooks/useWhatsAppSocket";
 import { useRouter } from "next/router";
 import parsePhoneNumber from "libphonenumber-js";
