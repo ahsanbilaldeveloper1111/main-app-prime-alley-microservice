@@ -1,6 +1,7 @@
 /** Pure helpers for wallboard live dashboard eventLog / dnsMap parsing (Sonar: lowers index.tsx complexity). */
 
 import { pickMostRecentCall } from "@hooks/ctiStompHelpers";
+import type { ActiveMonitoring, MonitoringTeardownHint } from "@components/live-calls/utils/types";
 
 export type RegisteredDeviceEntry = {
   deviceName: string;
@@ -781,7 +782,51 @@ type LooseWallboardCall = {
   callId?: string;
 };
 
-function callHasLiveSupervisorAndAgentParties(
+function partyIsLiveForWallboard(p: {
+  callStatus?: string;
+}): boolean {
+  return p.callStatus !== "DROPPED" && p.callStatus !== "DISCONNECTED";
+}
+
+export function isBargeInMonitoringType(
+  monitoringType: string | null | undefined,
+): boolean {
+  const normalized = String(monitoringType ?? "")
+    .trim()
+    .toUpperCase()
+    .replaceAll("-", "_");
+  return normalized === "BARGE_IN" || normalized === "BARGEIN";
+}
+
+/**
+ * True when the agent has a live leg with someone other than the supervisor (e.g. customer).
+ * Barge-in joins the supervisor onto the agent's call, so those calls must not be treated as observation-only.
+ */
+export function callHasLiveAgentPartyWithNonSupervisor(
+  call: LooseWallboardCall,
+  agentDn: string,
+  supervisorDn: string,
+): boolean {
+  const agent = String(agentDn);
+  const supervisor = String(supervisorDn);
+  if (!call.parties?.length) {
+    return false;
+  }
+  return call.parties.some((p) => {
+    if (!partyIsLiveForWallboard(p)) {
+      return false;
+    }
+    const callingAddress = String(p.callingAddress ?? "");
+    const calledAddress = String(p.calledAddress ?? "");
+    if (callingAddress !== agent && calledAddress !== agent) {
+      return false;
+    }
+    const otherParty = callingAddress === agent ? calledAddress : callingAddress;
+    return otherParty !== supervisor && otherParty !== agent;
+  });
+}
+
+export function callHasLiveSupervisorAndAgentParties(
   call: LooseWallboardCall,
   supervisorDn: string,
   agentDn: string,
@@ -792,7 +837,7 @@ function callHasLiveSupervisorAndAgentParties(
     return false;
   }
   return call.parties.some((p) => {
-    if (p.callStatus === "DROPPED" || p.callStatus === "DISCONNECTED") {
+    if (!partyIsLiveForWallboard(p)) {
       return false;
     }
     const callingAddress = String(p.callingAddress ?? "");
@@ -802,6 +847,95 @@ function callHasLiveSupervisorAndAgentParties(
       (callingAddress === agent || calledAddress === agent)
     );
   });
+}
+
+function callIsDedicatedSupervisorAgentObservationLeg(
+  call: LooseWallboardCall,
+  dn: string,
+  supervisorDn: string,
+  agentDn: string,
+  monitoringType: string | null | undefined,
+): boolean {
+  if (
+    !callHasLiveSupervisorAndAgentParties(call, supervisorDn, agentDn) ||
+    (String(dn) !== String(agentDn) && String(dn) !== String(supervisorDn))
+  ) {
+    return false;
+  }
+  if (isBargeInMonitoringType(monitoringType)) {
+    return !callHasLiveAgentPartyWithNonSupervisor(call, agentDn, supervisorDn);
+  }
+  return true;
+}
+
+/**
+ * Whether a call should be ignored for wallboard active-count / display (not the agent's handled call).
+ */
+export function shouldExcludeCallFromWallboardContext(
+  call: LooseWallboardCall,
+  dn: string,
+  activeMonitoring: ActiveMonitoring,
+  monitoringTeardown: MonitoringTeardownHint | null | undefined,
+): boolean {
+  if (call.isTerminating) {
+    return true;
+  }
+
+  const monitorDn = activeMonitoring.monitor;
+  const agentDn = activeMonitoring.dn;
+  const monitoringType = activeMonitoring.type;
+
+  if (call.isMonitoring === true) {
+    if (
+      monitorDn &&
+      agentDn &&
+      String(dn) === String(agentDn) &&
+      isBargeInMonitoringType(monitoringType) &&
+      callHasLiveAgentPartyWithNonSupervisor(
+        call,
+        String(agentDn),
+        String(monitorDn),
+      )
+    ) {
+      return false;
+    }
+    return true;
+  }
+
+  if (monitorDn && agentDn) {
+    if (
+      callIsDedicatedSupervisorAgentObservationLeg(
+        call,
+        dn,
+        String(monitorDn),
+        String(agentDn),
+        monitoringType,
+      )
+    ) {
+      return true;
+    }
+  }
+
+  if (monitoringTeardown && String(dn) === String(monitoringTeardown.monitoredDn)) {
+    const teardownMonitor = monitoringTeardown.monitorDn;
+    if (
+      teardownMonitor &&
+      callHasLiveSupervisorAndAgentParties(
+        call,
+        String(teardownMonitor),
+        String(monitoringTeardown.monitoredDn),
+      ) &&
+      !callHasLiveAgentPartyWithNonSupervisor(
+        call,
+        String(monitoringTeardown.monitoredDn),
+        String(teardownMonitor),
+      )
+    ) {
+      return true;
+    }
+  }
+
+  return false;
 }
 
 function shapeCallLikeGetDnCallState(
@@ -842,18 +976,24 @@ export function pickMonitoredAgentWallboardCall(
   getCallStatesForDn: (dn: string) => unknown[],
   getCallStateForDevice: (dn: string, deviceName: string) => unknown,
   deviceName: string | null | undefined,
+  monitoringType?: string | null,
 ): unknown {
   const calls = getCallStatesForDn(monitoredDn) as LooseWallboardCall[];
   const withoutObservationLeg = calls.filter((c) => {
     if (c.isTerminating) {
       return false;
     }
-    if (c.isMonitoring === true) {
-      return false;
-    }
     if (
-      monitorDn &&
-      callHasLiveSupervisorAndAgentParties(c, monitorDn, monitoredDn)
+      shouldExcludeCallFromWallboardContext(
+        c,
+        monitoredDn,
+        {
+          dn: monitoredDn,
+          type: monitoringType ?? null,
+          monitor: monitorDn,
+        },
+        null,
+      )
     ) {
       return false;
     }
@@ -881,13 +1021,14 @@ export function pickMonitoredAgentWallboardCall(
   return null;
 }
 
+/**
+ * Resolve the call snapshot shown on a wallboard card — skips monitoring / observation legs
+ * even after {@link ActiveMonitoring} is cleared (stale CTI rows after stop silent monitor).
+ */
 export function resolveWallboardDisplayCall(
   dn: string,
-  activeMonitoring: {
-    dn?: string | null;
-    monitor?: string;
-    deviceName?: string | null;
-  },
+  activeMonitoring: ActiveMonitoring,
+  monitoringTeardown: MonitoringTeardownHint | null | undefined,
   getDnCallState: (d: string) => unknown,
   getCallStateForDevice: (d: string, deviceName: string) => unknown,
   getCallStatesForDn: (d: string) => unknown[],
@@ -900,10 +1041,42 @@ export function resolveWallboardDisplayCall(
       getCallStatesForDn,
       getCallStateForDevice,
       activeMonitoring.deviceName,
+      activeMonitoring.type,
     );
     if (picked) {
       return picked;
     }
   }
-  return getDnCallState(dn);
+
+  const calls = getCallStatesForDn(dn) as LooseWallboardCall[];
+  const customerCalls = calls.filter(
+    (c) =>
+      !shouldExcludeCallFromWallboardContext(
+        c,
+        dn,
+        activeMonitoring,
+        monitoringTeardown,
+      ),
+  );
+  if (customerCalls.length > 0) {
+    const mostRecent = pickMostRecentCall(customerCalls);
+    const shaped = shapeCallLikeGetDnCallState(dn, mostRecent);
+    if (shaped) {
+      return shaped;
+    }
+  }
+
+  const fallback = getDnCallState(dn) as LooseWallboardCall | null;
+  if (
+    fallback &&
+    !shouldExcludeCallFromWallboardContext(
+      fallback,
+      dn,
+      activeMonitoring,
+      monitoringTeardown,
+    )
+  ) {
+    return fallback;
+  }
+  return null;
 }

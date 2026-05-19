@@ -1,5 +1,6 @@
 import type { Dispatch, SetStateAction } from "react";
 import type { CrossTabCtiManager } from "../utils/crossTabCtiManager";
+import { devicesArrayFromCompleteStatePayload } from "./ctiStompHelpers";
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -60,6 +61,7 @@ export interface PrimarySseDispatchCtx {
     current: ((dest: string, body?: string) => Promise<boolean>) | null;
   };
   handleCallEventRef: { current: ((e: unknown) => void) | null };
+  handleOngoingCallsRef: { current: ((data: unknown) => void) | null };
   groupDevicesByDnAndDeviceNameRef: {
     current: ((devices: unknown[]) => unknown) | null;
   };
@@ -84,7 +86,8 @@ function handleCompleteState(
     const groupFn = ctx.groupDevicesByDnAndDeviceNameRef.current;
     const summaryFn = ctx.updateSummaryDataRef.current;
     if (!groupFn || !summaryFn) return;
-    const grouped = groupFn(data.data as unknown[]) as DnsMapState;
+    const devices = devicesArrayFromCompleteStatePayload(data.data);
+    const grouped = groupFn(devices) as DnsMapState;
     ctx.setDnsMap(grouped);
     summaryFn(grouped);
     ctx.setEventLog((prev) => [
@@ -158,6 +161,21 @@ function handleCallEvents(
   }
 }
 
+function handleOngoingCalls(
+  data: UnknownRecord,
+  ctx: PrimarySseDispatchCtx,
+): void {
+  const { currentInstanceId } = ctx;
+  try {
+    ctx.handleOngoingCallsRef.current?.(data.data);
+  } catch (err) {
+    console.error(
+      `[${currentInstanceId}] ❌ Failed to process ongoing calls`,
+      err,
+    );
+  }
+}
+
 function handleStompConnected(ctx: PrimarySseDispatchCtx): void {
   ctx.setIsInitialized(true);
   ctx.setError(null);
@@ -165,6 +183,7 @@ function handleStompConnected(ctx: PrimarySseDispatchCtx): void {
   if (!ctx.hasRequestedInitialStateRef.current && publishInitial) {
     ctx.hasRequestedInitialStateRef.current = true;
     publishInitial("/app/request/initial-state", "");
+    publishInitial("/app/request/ongoing-calls", "");
   }
 }
 
@@ -222,6 +241,7 @@ const PRIMARY_HANDLERS: Record<
   complete_state: handleCompleteState,
   dns_states: handleDnsStates,
   call_events: handleCallEvents,
+  ongoing_calls: handleOngoingCalls,
   stomp_connected: (_d, ctx) => handleStompConnected(ctx),
   stomp_error: handleStompError,
   connection: handleConnectionMessage,

@@ -397,6 +397,7 @@ export default function useCtiStomp(
         scheduleRefreshAfterCallEndRef,
         publishStompMessageRef,
         handleCallEventRef,
+        handleOngoingCallsRef,
         groupDevicesByDnAndDeviceNameRef,
         updateSummaryDataRef,
       }),

@@ -1,5 +1,6 @@
 import type { Dispatch, SetStateAction } from "react";
 import type { CtiEvent, CrossTabCtiManager } from "../utils/crossTabCtiManager";
+import { devicesArrayFromCompleteStatePayload } from "./ctiStompHelpers";
 
 type DnsMapState = Record<
   string,
@@ -26,7 +27,7 @@ function applyCompleteStateFromMaster(
     const groupFn = ctx.groupDevicesByDnAndDeviceNameRef.current;
     const summaryFn = ctx.updateSummaryDataRef.current;
     if (!groupFn || !summaryFn) return;
-    const grouped = groupFn(rawData) as Record<
+    const grouped = groupFn(devicesArrayFromCompleteStatePayload(rawData)) as Record<
       string,
       { dn: string; devices: Record<string, Record<string, unknown>> }
     >;

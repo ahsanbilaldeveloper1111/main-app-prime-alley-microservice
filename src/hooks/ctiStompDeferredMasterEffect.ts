@@ -1,6 +1,7 @@
 import type { Dispatch, SetStateAction } from "react";
 import type { CrossTabCtiManager } from "../utils/crossTabCtiManager";
 import type { CtiDevice, CtiCallEvent } from "./ctiStompHookTypes";
+import { devicesArrayFromCompleteStatePayload } from "./ctiStompHelpers";
 
 type DnsMapState = Record<
   string,
@@ -220,7 +221,8 @@ const handleDeferredMasterCompleteStateMessage = (rawData: unknown) => {
   if (!groupFn || !updateFn) {
     return;
   }
-  const grouped = groupFn(rawData as CtiDevice[]);
+  const devices = devicesArrayFromCompleteStatePayload(rawData) as CtiDevice[];
+  const grouped = groupFn(devices);
   setDnsMap(grouped);
   updateFn(grouped);
   setEventLog((prev) => [
