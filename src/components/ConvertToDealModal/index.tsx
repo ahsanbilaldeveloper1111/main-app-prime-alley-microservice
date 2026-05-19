@@ -1521,7 +1521,7 @@ const ConvertToDealModal: React.FC<ConvertToDealModalProps> = ({
                           
                           return availableIndustries.length === 1 && !showAllIndustries ? (
                             <Form.Text className="text-muted">
-                              Only one industry available
+                              Only one product group available
                             </Form.Text>
                           ) : null;
                         })()}
@@ -1591,7 +1591,7 @@ const ConvertToDealModal: React.FC<ConvertToDealModalProps> = ({
                               label: `${product.name} (${product.sku}) - ${productCurrency} ${originalPrice.toFixed(2)}`,
                             };
                           })}
-                          placeholder={selectedIndustryId ? "Select a product" : "Please select an industry first"}
+                          placeholder={selectedIndustryId ? "Select a product" : "Please select a product group first"}
                           isSearchable
                           isLoading={loadingProducts}
                           isDisabled={editingItemIndex !== null || !selectedIndustryId || loadingProducts}

@@ -8,8 +8,12 @@ import {
   Paperclip,
   Sparkles,
 } from "lucide-react";
+import { toast } from "react-toastify";
 import { generateEmail } from "@utils/communication";
-import { buildFollowUpTaskFields } from "@utils/crmFollowUpTaskDue";
+import {
+  buildFollowUpTaskFields,
+  buildIn3BusinessDaysLabel,
+} from "@utils/crmFollowUpTaskDue";
 
 /** Normalize recipient to array (single string or array of strings). */
 function normalizeRecipientEmails(v?: string | string[]): string[] {
@@ -84,8 +88,8 @@ const EmailModal: React.FC<EmailModalProps> = ({
   const [sendValidationMessage, setSendValidationMessage] = useState("");
   const [confirmSendWithoutSubject, setConfirmSendWithoutSubject] =
     useState(false);
-  const [activityDate, setActivityDate] = useState(
-    "In 3 business days (Friday)",
+  const [activityDate, setActivityDate] = useState(() =>
+    buildIn3BusinessDaysLabel(),
   );
   const [activityTime, setActivityTime] = useState(() =>
     new Date().toTimeString().slice(0, 5),
@@ -132,7 +136,7 @@ const EmailModal: React.FC<EmailModalProps> = ({
   const dateOptions = [
     "Today",
     "Tomorrow",
-    "In 3 business days (Friday)",
+    buildIn3BusinessDaysLabel(),
     "In 1 week",
     "In 2 weeks",
     "In 1 month",
@@ -220,7 +224,7 @@ const EmailModal: React.FC<EmailModalProps> = ({
       const now = new Date();
       const today = now.toISOString().slice(0, 10);
       const timeStr = now.toTimeString().slice(0, 5);
-      setActivityDate("In 3 business days (Friday)");
+      setActivityDate(buildIn3BusinessDaysLabel());
       setActivityTime(timeStr);
       setCustomDate(today);
       setCustomTime(timeStr);
@@ -507,13 +511,15 @@ const EmailModal: React.FC<EmailModalProps> = ({
   };
   const handleLink = () => {
     bodyEditorRef.current?.focus();
-    const url = window.prompt("Enter URL:", "https://") ?? "https://";
+    const url =
+      globalThis.window?.prompt?.("Enter URL:", "https://") ?? "https://";
     document.execCommand("createLink", false, url);
     syncBodyFromEditor();
   };
   const handleImage = () => {
     bodyEditorRef.current?.focus();
-    const url = window.prompt("Enter image URL:", "https://") ?? "https://";
+    const url =
+      globalThis.window?.prompt?.("Enter image URL:", "https://") ?? "https://";
     document.execCommand("insertImage", false, url);
     syncBodyFromEditor();
   };
@@ -526,7 +532,7 @@ const EmailModal: React.FC<EmailModalProps> = ({
     const el = bodyEditorRef.current;
     if (!el) return;
     el.focus();
-    const sel = window.getSelection();
+    const sel = globalThis.window?.getSelection?.();
     const range = sel?.rangeCount ? sel.getRangeAt(0) : null;
     const selectedText = range?.toString() || "code";
     document.execCommand("insertHTML", false, `<code>${selectedText}</code>`);
@@ -542,7 +548,35 @@ const EmailModal: React.FC<EmailModalProps> = ({
     if (!files.length) {
       return;
     }
-    setAttachments((prev) => [...prev, ...files]);
+    const blockedExt = new Set([
+      ".exe",
+      ".msi",
+      ".bat",
+      ".cmd",
+      ".com",
+      ".ps1",
+      ".vbs",
+      ".js",
+      ".jar",
+    ]);
+    const allowed: File[] = [];
+    const blocked: File[] = [];
+    for (const f of files) {
+      const name = String(f?.name ?? "");
+      const dot = name.lastIndexOf(".");
+      const ext = dot >= 0 ? name.slice(dot).toLowerCase() : "";
+      if (ext && blockedExt.has(ext)) {
+        blocked.push(f);
+      } else {
+        allowed.push(f);
+      }
+    }
+    if (blocked.length > 0) {
+      toast.error("Executable/script files are not allowed for upload.");
+    }
+    if (allowed.length > 0) {
+      setAttachments((prev) => [...prev, ...allowed]);
+    }
     e.target.value = "";
   };
 
@@ -599,7 +633,7 @@ const EmailModal: React.FC<EmailModalProps> = ({
       const now = new Date();
       const today = now.toISOString().slice(0, 10);
       const timeStr = now.toTimeString().slice(0, 5);
-      setActivityDate("In 3 business days (Friday)");
+      setActivityDate(buildIn3BusinessDaysLabel());
       setActivityTime(timeStr);
       setCustomDate(today);
       setCustomTime(timeStr);
@@ -617,9 +651,9 @@ const EmailModal: React.FC<EmailModalProps> = ({
     <div
       style={{
         position: "fixed",
-        inset: isMaximized ? "60px 20px 20px 20px" : "auto 15vh 7.5vh auto",
-        height: isMaximized ? "auto" : "550px",
-        width: isMaximized ? "auto" : "650px",
+        ...(isMaximized
+          ? { top: "60px", right: "20px", bottom: "20px", left: "20px" }
+          : { right: "15vh", bottom: "7.5vh", width: "650px", height: "550px" }),
         backgroundColor: "#ffffff",
         zIndex: 1000,
         display: "flex",
@@ -627,7 +661,7 @@ const EmailModal: React.FC<EmailModalProps> = ({
         boxShadow: "0 4px 24px rgba(0, 0, 0, 0.15)",
         borderRadius: "8px",
         border: "1px solid #cbd5e0",
-        overflow: "visible",
+        overflow: "hidden",
         animation: "slideInUp 0.3s ease-out",
       }}
     >
@@ -1275,6 +1309,7 @@ const EmailModal: React.FC<EmailModalProps> = ({
             contentEditable
             suppressContentEditableWarning
             role="textbox"
+            tabIndex={0}
             aria-multiline="true"
             aria-label="Email body"
             data-placeholder="Type your email here or use Generate above, edit this content and it will be sent as the email body."

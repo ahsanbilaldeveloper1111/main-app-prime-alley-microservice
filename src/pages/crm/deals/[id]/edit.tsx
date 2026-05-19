@@ -148,8 +148,8 @@ function useIndustriesQueryErrorToast(
 ): void {
   useEffect(() => {
     if (!isError) return;
-    console.error("Failed to fetch industries:", error);
-    toast.error("Failed to fetch industries");
+    console.error("Failed to fetch product groups:", error);
+    toast.error("Failed to fetch product groups");
   }, [isError, error]);
 }
 
@@ -256,7 +256,7 @@ function useEditDealProductLoading(
       setProducts(response.data || []);
     } catch (error) {
       console.error("Failed to fetch products:", error);
-      toast.error("Failed to fetch products for selected industry");
+      toast.error("Failed to fetch products for selected product group");
     } finally {
       setLoadingProducts(false);
     }
@@ -410,7 +410,7 @@ function useEditDealFormActions(deps: EditDealFormActionDeps) {
 function useEditDealInitialLoadOnReady(args: {
   router: ReturnType<typeof useRouter>;
   id: string | string[] | undefined;
-  isInitialLoad: React.MutableRefObject<boolean>;
+  isInitialLoad: { current: boolean };
   setFetching: React.Dispatch<React.SetStateAction<boolean>>;
   setFormData: React.Dispatch<React.SetStateAction<any>>;
   setBusinessTypeId: React.Dispatch<React.SetStateAction<number | null>>;
@@ -542,7 +542,7 @@ function useEditDealPageQueries(sourceLead: { campaign_id?: unknown } | null) {
 type EditDealLoadedPhaseIntegrationArgs = Readonly<{
   router: ReturnType<typeof useRouter>;
   id: string | string[] | undefined;
-  isInitialLoad: React.MutableRefObject<boolean>;
+  isInitialLoad: { current: boolean };
   showAllIndustries: boolean;
   formData: { industry_ids?: number[] };
   allIndustries: IndustryData[];
@@ -828,7 +828,10 @@ const EditDeal = () => { // NOSONAR S3776 — wizard markup; logic extracted to 
         {/* Edit Deal Form */}
         <div className="row">
           <div className="col-12">
-            <Card className="border-0 shadow-sm">
+            <Card
+              className="border-0 shadow-sm"
+              data-attachment-count={attachments.length}
+            >
               <Card.Header>
                 <div className="d-flex justify-content-between align-items-center">
                   <h4 className="mb-0 app-heading">Edit Deal Information</h4>
@@ -2372,7 +2375,7 @@ const EditDeal = () => { // NOSONAR S3776 — wizard markup; logic extracted to 
                                 {addItemAvailableIndustries.length === 1 &&
                                   !showAllIndustries && (
                                     <Form.Text className="text-muted">
-                                      Only one industry available
+                                      Only one product group available
                                     </Form.Text>
                                   )}
                               </Form.Group>
@@ -2469,7 +2472,7 @@ const EditDeal = () => { // NOSONAR S3776 — wizard markup; logic extracted to 
                                   placeholder={
                                     selectedIndustryId
                                       ? "Select a product"
-                                      : "Please select an industry first"
+                                      : "Please select a product group first"
                                   }
                                   isSearchable
                                   isLoading={loadingProducts}

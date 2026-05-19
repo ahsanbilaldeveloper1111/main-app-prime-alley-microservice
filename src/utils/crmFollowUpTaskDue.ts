@@ -12,6 +12,26 @@ export type FollowUpTaskFields = {
   followUpTaskDueTime: string | null;
 };
 
+function addBusinessDays(base: Date, days: number): Date {
+  const d = new Date(base);
+  // Normalize so DST transitions are less likely to shift the day
+  d.setHours(12, 0, 0, 0);
+  let remaining = Math.max(0, days);
+  while (remaining > 0) {
+    d.setDate(d.getDate() + 1);
+    const dow = d.getDay(); // 0=Sun, 6=Sat
+    const isBusinessDay = dow !== 0 && dow !== 6;
+    if (isBusinessDay) remaining -= 1;
+  }
+  return d;
+}
+
+export function buildIn3BusinessDaysLabel(baseDate: Date = new Date()): string {
+  const target = addBusinessDays(baseDate, 3);
+  const weekday = target.toLocaleDateString(undefined, { weekday: "long" });
+  return `In 3 business days (${weekday})`;
+}
+
 /**
  * Resolves activity date dropdown values to YYYY-MM-DD.
  * Use `customYmd` when the picker value is "Custom...".
@@ -40,17 +60,19 @@ export function resolveFollowUpDueDateYmd(
     t.setDate(t.getDate() + n);
     return t.toISOString().slice(0, 10);
   };
+  const addBizDays = (n: number) =>
+    addBusinessDays(today, n).toISOString().slice(0, 10);
   if (trimmed === "Tomorrow") return addDays(1);
   if (
     activityDateLabel.includes("3 business") ||
     activityDateLabel.includes("Friday") ||
     activityDateLabel.includes("Wednesday")
   )
-    return addDays(3);
+    return addBizDays(3);
   if (trimmed === "In 1 week") return addDays(7);
   if (trimmed === "In 2 weeks") return addDays(14);
   if (trimmed === "In 1 month") return addDays(30);
-  return addDays(3);
+  return addBizDays(3);
 }
 
 function normalizeFollowUpTimeHHmm(timeHHmm: string): string | null {

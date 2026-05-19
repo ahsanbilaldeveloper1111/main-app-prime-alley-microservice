@@ -9,7 +9,7 @@ const { PERMISSIONS } = HEADER_CONSTANTS
 
 const smartCrmTabs: Tab[] = [
   { id: 'stages', label: 'Stages', permission: PERMISSIONS.VIEW_CRM_STAGES },
-  { id: 'industries', label: 'Industries', permission: PERMISSIONS.VIEW_CRM_INDUSTRIES },
+  { id: 'industries', label: 'Product Groups', permission: PERMISSIONS.VIEW_CRM_INDUSTRIES },
   { id: 'products', label: 'Products', permission: PERMISSIONS.VIEW_CRM_PRODUCTS },
   { id: 'deal-templates', label: 'Deal Templates', permission: PERMISSIONS.VIEW_CRM_DEAL_TEMPLATES },
   { id: 'business-types', label: 'Business Types', permission: PERMISSIONS.VIEW_CRM_BUSINESS_TYPES },

@@ -361,7 +361,7 @@ function campaignFieldRowKey(
     const idStr =
       typeof field.id === "object"
         ? JSON.stringify(field.id)
-        : String(field.id as string | number | boolean | bigint);
+        : String(field.id);
     return `campaign-field-${idStr}`;
   }
   // IMPORTANT: do not derive React keys from editable text; it causes remounts and input focus loss while typing.
@@ -434,13 +434,13 @@ function deriveEditorStateFromCampaignApi(
   if (industriesData?.length) {
     selectedIndustries = industriesData.map((ind: any) => ({
       value: ind.id.toString(),
-      label: ind.name || `Industry ${ind.id}`,
+      label: ind.name || `Product group ${ind.id}`,
       id: ind.id,
     }));
   } else if (industryIds?.length) {
     selectedIndustries = industryIds.map((id: number) => {
       const industry = industries.find((ind) => ind.id === id);
-      return { value: id.toString(), label: industry?.name || `Industry ${id}`, id };
+      return { value: id.toString(), label: industry?.name || `Product group ${id}`, id };
     });
   }
 
@@ -493,7 +493,10 @@ function buildCrmCampaignListFilters(
   if (campaignFilters.dateTo) filters.date_to = campaignFilters.dateTo;
   if (campaignFilters.userExtensions?.length) filters.user_extensions = campaignFilters.userExtensions;
   if (campaignFilters.hasUnassignedProspects !== null) {
+    // Backend naming is inconsistent across endpoints; send common aliases.
     filters.has_unassigned_prospects = campaignFilters.hasUnassignedProspects;
+    filters.hasUnassignedProspects = campaignFilters.hasUnassignedProspects;
+    filters.has_unassigned_records = campaignFilters.hasUnassignedProspects;
   }
   if (campaignFilters.tags?.length) filters.tags = campaignFilters.tags;
   return filters;
@@ -602,7 +605,7 @@ function buildCampaignSavePayload(
     description: formData.description.trim() || null,
     start_date: formData.start_date || undefined,
     end_date: formData.end_date || undefined,
-    status: formData.status as "active" | "inactive",
+    status: formData.status === "inactive" ? "inactive" : "active",
     fields: cleanedFields,
     campaign_users: campaignUsers.map((user) => user.value),
     industry_ids: selectedIndustries.map((ind: any) => Number.parseInt(String(ind.value || ind.id), 10)),
@@ -1891,6 +1894,8 @@ const CrmCampaigns = ({ hideBreadcrumb }: CrmPageDisplayProps = {}) => { // NOSO
             display: "-webkit-box",
             WebkitLineClamp: 2,
             WebkitBoxOrient: "vertical",
+            lineHeight: 1.35,
+            paddingBottom: "2px",
           }}
         >
           {campaign.name || "Unnamed Campaign"}
@@ -1904,11 +1909,13 @@ const CrmCampaigns = ({ hideBreadcrumb }: CrmPageDisplayProps = {}) => { // NOSO
       type: "custom",
       width: "34%",
       render: (campaign: any) => (
-        <CrmTruncatedDescriptionCell
-          text={campaign.description}
-          emptyDisplay="No description"
-          className="small text-muted"
-        />
+        <div style={{ minWidth: 0, width: "100%", paddingTop: "2px" }}>
+          <CrmTruncatedDescriptionCell
+            text={campaign.description}
+            emptyDisplay="No description"
+            className="small text-muted"
+          />
+        </div>
       ),
     },
     {
@@ -2834,9 +2841,9 @@ const CrmCampaigns = ({ hideBreadcrumb }: CrmPageDisplayProps = {}) => { // NOSO
                       { label: "Campaign Name", value: selectedCampaign.name },
                       { label: "Status", value: <Badge bg={selectedCampaign.status === "active" ? "success" : "secondary"} style={{ padding: "6px 14px", borderRadius: "20px", fontSize: "12px", fontWeight: 600 }}>{selectedCampaign.status?.charAt(0).toUpperCase() + selectedCampaign.status?.slice(1) || "Inactive"}</Badge> },
                     ].map((item) => (
-                      <div key={item.label} style={{ background: "#f8f9fa", padding: "16px", borderRadius: "10px" }}>
+                      <div key={item.label} style={{ background: "#f8f9fa", padding: "16px", borderRadius: "10px", minWidth: 0 }}>
                         <div style={{ fontSize: "12px", fontWeight: 600, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "6px" }}>{item.label}</div>
-                        <div style={{ fontSize: "15px", color: "#1f2937", fontWeight: 500 }}>{item.value}</div>
+                        <div style={{ fontSize: "15px", color: "#1f2937", fontWeight: 500, minWidth: 0, overflowWrap: "anywhere", wordBreak: "break-word" }}>{item.value}</div>
                       </div>
                     ))}
                   </div>

@@ -40,8 +40,8 @@ function useIndustriesQueryErrorToast(
 ): void {
   useEffect(() => {
     if (!isError) return;
-    console.error("Failed to fetch industries:", error);
-    toast.error("Failed to fetch industries");
+    console.error("Failed to fetch product groups:", error);
+    toast.error("Failed to fetch product groups");
   }, [isError, error]);
 }
 
@@ -150,7 +150,7 @@ function useCreateDealProductLoading(
       setProducts(response.data || []);
     } catch (error) {
       console.error("Failed to fetch products:", error);
-      toast.error("Failed to fetch products for selected industry");
+      toast.error("Failed to fetch products for selected product group");
     } finally {
       setLoadingProducts(false);
     }
@@ -2135,7 +2135,7 @@ function CreateDealView(props: Readonly<CreateDealPageModel>) { // NOSONAR S3776
                           
                           return availableIndustries.length === 1 && !showAllIndustries ? (
                             <Form.Text className="text-muted">
-                              Only one industry available
+                              Only one product group available
                             </Form.Text>
                           ) : null;
                         })()}
@@ -2205,7 +2205,7 @@ function CreateDealView(props: Readonly<CreateDealPageModel>) { // NOSONAR S3776
                               label: `${product.name} (${product.sku}) - ${productCurrency} ${originalPrice.toFixed(2)}`,
                             };
                           })}
-                          placeholder={selectedIndustryId ? "Select a product" : "Please select an industry first"}
+                          placeholder={selectedIndustryId ? "Select a product" : "Please select a product group first"}
                           isSearchable
                           isLoading={loadingProducts}
                           isDisabled={editingItemIndex !== null || !selectedIndustryId || loadingProducts}

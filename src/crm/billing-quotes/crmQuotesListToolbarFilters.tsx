@@ -7,6 +7,7 @@ import Select from "react-select";
 import type { SingleValue, StylesConfig } from "react-select";
 import type { CrmFilterBarQuickFilter } from "@components/crm/CrmListPageUi";
 import type { FilterPill } from "@components/GenericTable";
+import { getCrmReactSelectBodyMenuPortalProps } from "@utils/crmReactSelectMenuPortalProps";
 
 /** Memoize at call site: `useMemo(() => getCrmQuotesListProspectQuickFilters(), [])`. */
 export function getCrmQuotesListProspectQuickFilters(): CrmFilterBarQuickFilter[] {
@@ -93,6 +94,7 @@ export function buildCrmQuotesListQuoteToolbarFilterPills(
             placeholder="Select status..."
             styles={customSelectStyles}
             isClearable
+            {...getCrmReactSelectBodyMenuPortalProps()}
           />
           <div className="d-flex justify-content-end mt-2">
             <Button
@@ -198,6 +200,7 @@ export function buildCrmQuotesListQuoteToolbarFilterPills(
             placeholder="Select owner..."
             styles={customSelectStyles}
             isClearable
+            {...getCrmReactSelectBodyMenuPortalProps()}
           />
           <div className="d-flex justify-content-end mt-2">
             <Button
@@ -248,6 +251,7 @@ export function buildCrmQuotesListQuoteToolbarFilterPills(
             placeholder="Select signing status..."
             styles={customSelectStyles}
             isClearable
+            {...getCrmReactSelectBodyMenuPortalProps()}
           />
           <div className="d-flex justify-content-end mt-2">
             <Button

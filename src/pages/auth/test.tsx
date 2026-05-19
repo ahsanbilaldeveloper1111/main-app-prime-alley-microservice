@@ -1,17 +1,13 @@
 import NonLayout from "@layout/NonLayout";
-import Image from "next/image";
 import React, { ReactElement, useState, useEffect } from "react";
 import { signIn, useSession } from "next-auth/react";
 import { useRouter } from "next/router";
 import Head from "next/head";
 import Script from "next/script";
-import dashboard from "@pages/dashboard";
 import { toast } from "react-toastify";
 import { FaSpinner } from "react-icons/fa";
 // See note on `login.scss` in src/pages/auth/signin.tsx — its global rules
 // override the auth chrome's body and `.btn-primary` styles.
-import Footer from "@components/Footer";
-
 const Signin = () => {
   const [credentials, setCredentials] = useState({
     email: "",
@@ -69,7 +65,9 @@ const Signin = () => {
 
         // Small delay to ensure session is established, then redirect
         setTimeout(() => {
-          window.location.href = redirectUrl;
+          if (globalThis.window) {
+            globalThis.window.location.href = redirectUrl;
+          }
         }, 100);
       }
     } catch (error) {
@@ -106,15 +104,12 @@ const Signin = () => {
   // Cleanup particles on component unmount
   useEffect(() => {
     return () => {
-      if (typeof window !== "undefined" && window.pJSDom) {
-        window.pJSDom.forEach((pJS) => {
-          if (
-            pJS.pJS &&
-            pJS.pJS.fn &&
-            pJS.pJS.fn.vendors &&
-            pJS.pJS.fn.vendors.destroy
-          ) {
-            pJS.pJS.fn.vendors.destroy();
+      const w = globalThis.window;
+      if (w?.pJSDom) {
+        w.pJSDom.forEach((pJS) => {
+          const vendors = pJS.pJS?.fn?.vendors;
+          if (vendors?.destroy) {
+            vendors.destroy();
           }
         });
       }
@@ -131,8 +126,8 @@ const Signin = () => {
         strategy="afterInteractive"
         onLoad={() => {
           // Initialize particles after script loads
-          if (typeof window !== "undefined" && window.particlesJS) {
-            window.particlesJS("particles-js", {
+          if (globalThis.window?.particlesJS) {
+            globalThis.window.particlesJS("particles-js", {
               particles: {
                 number: {
                   value: 40,
@@ -242,6 +237,12 @@ const Signin = () => {
 
                   <p className="login-subtitle">Sign in to your account</p>
 
+                  {error ? (
+                    <p className="text-danger small mb-2" role="alert">
+                      {error}
+                    </p>
+                  ) : null}
+
                   <form
                     className="login-form"
                     id="loginForm"
@@ -272,12 +273,16 @@ const Signin = () => {
                       />
 
                       <label htmlFor="password">Password</label>
-                      <span
-                        className="toggle-password"
+                      <button
+                        type="button"
+                        className="toggle-password border-0 bg-transparent p-0"
                         onClick={() => setShowPassword((prev) => !prev)}
+                        aria-label={
+                          showPassword ? "Hide password" : "Show password"
+                        }
                       >
                         <i className="fas fa-eye" id="passwordToggleIcon"></i>
-                      </span>
+                      </button>
                       <small className="form-error" id="passwordError">
                         Password must be at least 6 characters.
                       </small>
@@ -298,6 +303,7 @@ const Signin = () => {
                       {!loading && (
                         <span className="icon-text">
                           <i className="fas fa-sign-in-alt"></i>
+                          {" "}
                           Sign in
                         </span>
                       )}

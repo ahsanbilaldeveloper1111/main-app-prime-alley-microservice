@@ -507,15 +507,13 @@ export const CreateDealSidebar: React.FC<CreateDealSidebarProps> = ({
   const [editRevisionProducts, setEditRevisionProducts] = useState<
     RevisionProductRow[]
   >([]);
-  const [editRevisionFormData, setEditRevisionFormData] = useState({
+  const [editRevisionFormData] = useState({
     tax_percentage: "0",
     standard_discount_percentage: "0",
     special_discount_percentage: "0",
   });
-  const [editRevisionProductsCatalog, setEditRevisionProductsCatalog] =
-    useState<CrmProduct[]>([]);
-  const [editRevisionLoadingProducts, setEditRevisionLoadingProducts] =
-    useState(false);
+  const [editRevisionProductsCatalog] = useState<CrmProduct[]>([]);
+  const [editRevisionLoadingProducts] = useState(false);
   const [editRevisionSelectedProductIds, setEditRevisionSelectedProductIds] =
     useState<Array<{ value: number; label: string }>>([]);
 
@@ -1291,9 +1289,9 @@ export const CreateDealSidebar: React.FC<CreateDealSidebarProps> = ({
                 />
               </div>
 
-              {/* Industries */}
+              {/* Product groups (CRM) */}
               <div style={fieldWrap}>
-                {fieldLabel("Industries")}
+                {fieldLabel("Product Groups")}
                 <Select
                   isMulti
                   value={allIndustries
@@ -1311,7 +1309,7 @@ export const CreateDealSidebar: React.FC<CreateDealSidebarProps> = ({
                     value: ind.id,
                     label: ind.name,
                   }))}
-                  placeholder="Select industries..."
+                  placeholder="Select product groups..."
                   isSearchable
                 />
               </div>

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
+import { buildIn3BusinessDaysLabel } from "@utils/crmFollowUpTaskDue";
 
 type Option = { value: string; label: string };
 type SelectOption = string | Option;
@@ -87,7 +88,7 @@ const REMINDER_OPTIONS = [
 const DUE_DATE_OPTIONS = [
   "Today",
   "Tomorrow",
-  "In 3 business days (Friday)",
+  buildIn3BusinessDaysLabel(),
   "In 1 week",
   "Custom date",
 ];
@@ -99,7 +100,7 @@ const INITIAL_FORM = {
   associatedRecords: [],
   assignedTo: null,
   queue: "None",
-  dueDateOption: "In 3 business days (Friday)",
+  dueDateOption: buildIn3BusinessDaysLabel(),
   dueTime: "08:00",
   setToRepeat: false,
   reminder: "No reminder",

@@ -2,6 +2,10 @@ import React from 'react';
 import { Button, Form } from 'react-bootstrap';
 import { X, RefreshCw, Check } from 'lucide-react';
 import Select from 'react-select';
+import {
+  CRM_REACT_SELECT_MENU_PORTAL_Z_INDEX,
+  getCrmReactSelectBodyMenuPortalProps,
+} from "@utils/crmReactSelectMenuPortalProps";
 
 export interface FilterOption {
   readonly value: any;
@@ -90,7 +94,11 @@ const GenericFilterSidebar: React.FC<GenericFilterSidebarProps> = ({
       }),
       menu: (base: any) => ({
         ...base,
-        zIndex: 9999
+        zIndex: CRM_REACT_SELECT_MENU_PORTAL_Z_INDEX
+      }),
+      menuPortal: (base: any) => ({
+        ...base,
+        zIndex: CRM_REACT_SELECT_MENU_PORTAL_Z_INDEX
       }),
       option: (base: any, state: any) => ({
         ...base,
@@ -141,6 +149,7 @@ const GenericFilterSidebar: React.FC<GenericFilterSidebarProps> = ({
             placeholder={filter.placeholder || 'Select...'}
             styles={selectStyles}
             isClearable={filter.isClearable !== false}
+            {...getCrmReactSelectBodyMenuPortalProps()}
           />
         );
 
@@ -154,6 +163,7 @@ const GenericFilterSidebar: React.FC<GenericFilterSidebarProps> = ({
             placeholder={filter.placeholder || 'Select...'}
             styles={selectStyles}
             isClearable={filter.isClearable !== false}
+            {...getCrmReactSelectBodyMenuPortalProps()}
           />
         );
 

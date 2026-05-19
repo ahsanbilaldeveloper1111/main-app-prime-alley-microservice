@@ -42,10 +42,10 @@ import {
   Image as ImageIcon,
   List,
   Paperclip,
-  Plus,
   MessageSquare,
   Sparkles,
 } from 'lucide-react';
+import { buildIn3BusinessDaysLabel } from '@utils/crmFollowUpTaskDue';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -161,7 +161,7 @@ const LogCallModal: React.FC<LogCallModalProps> = ({
       callDirection,
       activityDate,
       createTask,
-      taskDueDate: createTask ? 'In 3 business days (Wednesday)' : undefined,
+      taskDueDate: createTask ? buildIn3BusinessDaysLabel() : undefined,
       attachments,
     });
     resetForm();
@@ -708,7 +708,7 @@ const LogCallModal: React.FC<LogCallModalProps> = ({
                     fontFamily: 'inherit', textDecoration: 'underline',
                   }}
                 >
-                  In 3 business days (Wednesday)
+                  {buildIn3BusinessDaysLabel()}
                 </button>
                 <ChevronDown size={13} style={{ marginLeft: '3px', verticalAlign: 'middle' }} />
               </span>

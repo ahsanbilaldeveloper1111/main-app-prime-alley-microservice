@@ -1,7 +1,6 @@
 import { toast } from "react-toastify";
 import { reportApiError } from "./sentryLogger";
 import axiosInstance from "./axios";
-import tokenService from "./tokenService";
 import { ModuleSlug } from "./Helper";
 
 // API Response Structure from Controlhub
@@ -250,8 +249,6 @@ export const getCrmDashboardOverview = async () => {
   try {
     const response = await axiosInstance.get("/crm/dashboard/overview");
     if (
-      response &&
-      response?.data &&
       response?.data?.code === 200 &&
       response?.data?.data?.success === true
     ) {
@@ -2474,9 +2471,23 @@ export const getCrmProducts = async (
   params: PaginationParams = {},
 ): Promise<PaginationWrapper<CrmProduct>> => {
   try {
+    const effectiveParams: Record<string, unknown> = { ...params };
+    // Some endpoints expect `perPage` while others expect `per_page`.
+    if (
+      effectiveParams.per_page !== undefined &&
+      effectiveParams.perPage === undefined
+    ) {
+      effectiveParams.perPage = effectiveParams.per_page;
+    } else if (
+      effectiveParams.perPage !== undefined &&
+      effectiveParams.per_page === undefined
+    ) {
+      effectiveParams.per_page = effectiveParams.perPage;
+    }
+
     // Configure paramsSerializer to send arrays with brackets: industry_ids=[1,2,3]
     const response = await axiosInstance.get("/crm/products", {
-      params,
+      params: effectiveParams,
       paramsSerializer: (params: any) => {
         const searchParams = new URLSearchParams();
         Object.keys(params).forEach((key) => {
@@ -4188,7 +4199,7 @@ export const getIndustries = async (
     toast.error(
       error?.response?.data?.message ||
         error?.message ||
-        "Failed to fetch industries",
+        "Failed to fetch product groups",
     );
     throw error;
   }
@@ -4721,7 +4732,7 @@ export const downloadApprovalPdf = async (id: number): Promise<void> => {
       const filenameMatch = contentDisposition.match(
         /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/,
       );
-      if (filenameMatch && filenameMatch[1]) {
+      if (filenameMatch?.[1]) {
         filename = filenameMatch[1].replace(/['"]/g, "");
       }
     }
@@ -4729,15 +4740,15 @@ export const downloadApprovalPdf = async (id: number): Promise<void> => {
     // response.data is already a blob when responseType is "blob"
     const blob = response.data;
 
-    const url = window.URL.createObjectURL(blob);
+    const url = globalThis.URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
     link.download = filename;
     link.style.display = "none";
     document.body.appendChild(link);
     link.click();
-    document.body.removeChild(link);
-    window.URL.revokeObjectURL(url);
+    link.remove();
+    globalThis.URL.revokeObjectURL(url);
 
     toast.success("PDF downloaded successfully");
   } catch (error: any) {

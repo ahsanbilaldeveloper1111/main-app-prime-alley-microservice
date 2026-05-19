@@ -71,7 +71,7 @@ function ProductActionsCell({
   );
 }
 
-/** Renders the list of products belonging to an industry inside the detail modal. */
+/** Renders the list of products belonging to a product group inside the detail modal. */
 export function IndustryProductsSection({
   industryProducts,
   loadingProducts,
@@ -114,7 +114,7 @@ export function IndustryProductsSection({
       {!loadingProducts && industryProducts.length === 0 && (
         <div className="text-center py-3 border rounded">
           <p className="text-muted small mb-0">
-            No products found for this industry
+            No products found for this product group
           </p>
         </div>
       )}

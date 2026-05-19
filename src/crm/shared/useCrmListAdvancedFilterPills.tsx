@@ -5,6 +5,7 @@ import CreatableSelect from "react-select/creatable";
 import Select from "react-select";
 import type { FilterPill } from "@components/GenericTable";
 import type { StylesConfig } from "react-select";
+import { CRM_REACT_SELECT_MENU_PORTAL_Z_INDEX } from "@utils/crmReactSelectMenuPortalProps";
 
 /** Sidebar filter slice advanced pills read/write (matches useCrmListFiltersMetricsHistoryState pageFilters). */
 export type CrmListPageSidebarFilters = {
@@ -68,7 +69,10 @@ function withMenuPortalStyles<T>(
 ): StylesConfig<T, boolean> {
   return {
     ...(base as StylesConfig<T, boolean>),
-    menuPortal: (provided) => ({ ...provided, zIndex: 1400 }),
+    menuPortal: (provided) => ({
+      ...provided,
+      zIndex: CRM_REACT_SELECT_MENU_PORTAL_Z_INDEX,
+    }),
   };
 }
 
@@ -128,6 +132,7 @@ export function useCrmListAdvancedFilterPills({
                 applyTableFiltersPatch({ campaign_id: values });
               }}
               placeholder="Select campaigns..."
+              menuPosition="fixed"
               menuPortalTarget={ADVANCED_FILTER_MENU_PORTAL ?? undefined}
               styles={withMenuPortalStyles<CampaignOption>(
                 customSelectStyles,
@@ -174,6 +179,7 @@ export function useCrmListAdvancedFilterPills({
                 applyTableFiltersPatch({ source_file: v });
               }}
               placeholder="Select or type a source..."
+              menuPosition="fixed"
               menuPortalTarget={ADVANCED_FILTER_MENU_PORTAL ?? undefined}
               styles={withMenuPortalStyles<SourceOption>(
                 customSelectStyles,
@@ -228,6 +234,7 @@ export function useCrmListAdvancedFilterPills({
                 applyTableFiltersPatch({ tags: values });
               }}
               placeholder="Select tags..."
+              menuPosition="fixed"
               menuPortalTarget={ADVANCED_FILTER_MENU_PORTAL ?? undefined}
               styles={withMenuPortalStyles<TagOption>(
                 customSelectStyles,

@@ -6,6 +6,7 @@ import { GetHierarchyData } from '@utils/users';
 import {
   buildFollowUpTaskFields,
   type FollowUpTaskFields,
+  buildIn3BusinessDaysLabel,
 } from '@utils/crmFollowUpTaskDue';
 
 // ============================================================================
@@ -398,7 +399,7 @@ const TaskModal: React.FC<TaskModalProps> = ({ // NOSONAR
   onSave,
 }) => {
   const [title, setTitle] = useState('');
-  const [activityDate, setActivityDate] = useState('In 3 business days (Friday)');
+  const [activityDate, setActivityDate] = useState(() => buildIn3BusinessDaysLabel());
   const [activityTime, setActivityTime] = useState(() =>
     new Date().toTimeString().slice(0, 5),
   );
@@ -600,7 +601,7 @@ const TaskModal: React.FC<TaskModalProps> = ({ // NOSONAR
     const today = now.toISOString().slice(0, 10);
     const timeStr = now.toTimeString().slice(0, 5);
     setTitle('');
-    setActivityDate('In 3 business days (Friday)');
+    setActivityDate(buildIn3BusinessDaysLabel());
     setActivityTime(timeStr);
     setCustomDate(today);
     setCustomTime(timeStr);
@@ -667,7 +668,7 @@ const TaskModal: React.FC<TaskModalProps> = ({ // NOSONAR
   const dateOptions = [
     'Today',
     'Tomorrow',
-    'In 3 business days (Friday)',
+    buildIn3BusinessDaysLabel(),
     'In 1 week',
     'In 2 weeks',
     'In 1 month',
