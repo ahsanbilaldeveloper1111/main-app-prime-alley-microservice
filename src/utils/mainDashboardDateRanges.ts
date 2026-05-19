@@ -36,9 +36,12 @@ export function formatMainDashboardDisplayDate(date: Date): string {
 }
 
 export function displayDateToApiDate(displayDate: string): string | null {
-  const parts = displayDate.split("/").map((p) => Number(p));
+  const parts = displayDate.split("/");
   if (parts.length !== 3) return null;
-  const [day, month, year] = parts;
+  const [dayStr, monthStr, yearStr] = parts;
+  const day = Number(dayStr);
+  const month = Number(monthStr);
+  const year = Number(yearStr);
   if (!day || !month || !year) return null;
   return formatMainDashboardApiDate(new Date(year, month - 1, day));
 }

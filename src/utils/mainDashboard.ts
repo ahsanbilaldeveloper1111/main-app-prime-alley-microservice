@@ -180,6 +180,33 @@ export interface CrmCreatedCountsBundle {
   deals: CrmCreatedCountRow[];
 }
 
+function toStableStringKey(value: unknown): string | null {
+  if (value == null) return null;
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (!trimmed) return null;
+    return trimmed;
+  }
+  if (typeof value === "number") return Number.isFinite(value) ? String(value) : null;
+  if (typeof value === "bigint") return String(value);
+  return null;
+}
+
+function normalizeUserExtension(value: unknown): string | null {
+  const primitive = toStableStringKey(value);
+  if (primitive) return primitive;
+  if (value && typeof value === "object") {
+    const record = value as Record<string, unknown>;
+    return (
+      toStableStringKey(record.user_extension) ??
+      toStableStringKey(record.extension) ??
+      toStableStringKey(record.id) ??
+      toStableStringKey(record.value)
+    );
+  }
+  return null;
+}
+
 /** CRM created-counts: `{ code, data: { success, data: [{ user_extension, count }] } }`. */
 export function parseCrmCreatedCountsResponse(body: unknown): CrmCreatedCountRow[] {
   if (body == null || typeof body !== "object") return [];
@@ -202,10 +229,10 @@ export function parseCrmCreatedCountsResponse(body: unknown): CrmCreatedCountRow
     .map((row) => {
       if (row == null || typeof row !== "object") return null;
       const record = row as Record<string, unknown>;
-      const userExtension = record.user_extension;
-      if (userExtension == null || userExtension === "") return null;
+      const userExtension = normalizeUserExtension(record.user_extension);
+      if (userExtension == null) return null;
       return {
-        user_extension: String(userExtension),
+        user_extension: userExtension,
         count: Number(record.count) || 0,
       };
     })

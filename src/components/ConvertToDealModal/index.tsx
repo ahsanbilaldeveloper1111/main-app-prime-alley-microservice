@@ -1,9 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { Modal, Button, Form, Row, Col, Card, Badge, Table } from "react-bootstrap";
 import Select from 'react-select';
-import PhoneInput from "react-phone-number-input";
-import { parsePhoneNumber } from "react-phone-number-input";
-import { CheckCircle, ChevronLeft, ChevronRight, Plus, Edit, Trash2, Package, X } from "lucide-react";
+import PhoneInput, { parsePhoneNumber } from "react-phone-number-input";
+import { CheckCircle, ChevronLeft, ChevronRight, Plus, Edit, Trash2, Package } from "lucide-react";
 import { toast } from "react-toastify";
 import {
   createDeal,
@@ -32,7 +31,6 @@ import {
   validateConvertDealStep4,
 } from "@utils/crm/convertToDealShared";
 import { convertCurrency, formatCurrency } from '@utils/currency';
-import { useSession } from "next-auth/react";
 
 interface ConvertToDealModalProps {
   show: boolean;
@@ -41,13 +39,235 @@ interface ConvertToDealModalProps {
   onSuccess?: () => void;
 }
 
+type EstimationItem = Readonly<{
+  product_id: number;
+  product_service: string;
+  description: string;
+  qty: number;
+  unit_price: number;
+  original_currency: string;
+  original_price: number;
+  tax_percentage: string;
+  standard_discount_percentage: string;
+  special_discount_percentage: string;
+}>;
+
+function getNextConvertDealStep(current: number, hasTemplate: boolean): number {
+  const next = current + 1;
+  if (!hasTemplate && next === 2) return 3;
+  return Math.min(4, next);
+}
+
+function getPrevConvertDealStep(current: number, hasTemplate: boolean): number {
+  const prev = current - 1;
+  if (!hasTemplate && prev === 2) return 1;
+  return Math.max(0, prev);
+}
+
+function isConvertDealStepVisible(step: number, hasTemplate: boolean): boolean {
+  return hasTemplate || step !== 2;
+}
+
+function getConvertDealDisplayNumber(step: number, hasTemplate: boolean): number {
+  return !hasTemplate && step > 2 ? step : step + 1;
+}
+
+function getConvertDealStepLabel(step: number): string {
+  switch (step) {
+    case 0:
+      return "Deal Info";
+    case 1:
+      return "Company Info";
+    case 2:
+      return "Characteristics";
+    case 3:
+      return "Progress";
+    case 4:
+      return "Estimation";
+    default:
+      return "";
+  }
+}
+
+function getConvertDealTimelineProgressPercent(formStep: number, hasTemplate: boolean): number {
+  const totalVisibleSteps = hasTemplate ? 5 : 4;
+  const visualPosition = !hasTemplate && formStep > 2 ? formStep - 1 : formStep;
+  return ((visualPosition + 1) / totalVisibleSteps) * 100;
+}
+
+function filterNonEmptyTemplateFields(
+  templateFieldsData: Record<string, unknown>,
+): Record<string, unknown> | null {
+  const filtered: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(templateFieldsData)) {
+    if (value !== null && value !== undefined && value !== "") {
+      filtered[key] = value;
+    }
+  }
+  return Object.keys(filtered).length > 0 ? filtered : null;
+}
+
+function toNumber(value: unknown, fallback = 0): number {
+  const parsed = Number.parseFloat(String(value));
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function buildEstimatePayload(args: {
+  dealId: number;
+  estimationItems: readonly EstimationItem[];
+  currency: string;
+  standardDiscountPct: string;
+  specialDiscountPct: string;
+  taxPct: string;
+}) {
+  return {
+    deal_id: args.dealId,
+    estimation_chart: args.estimationItems.map((item) => ({
+      product_id: item.product_id,
+      product_service: item.product_service,
+      description: item.description || "",
+      qty: item.qty,
+      unit_price: item.unit_price,
+      original_currency: item.original_currency || args.currency,
+      original_price: item.original_price ?? item.unit_price,
+      tax_percentage: toNumber(item.tax_percentage ?? "0"),
+      standard_discount_percentage: toNumber(item.standard_discount_percentage ?? "0"),
+      special_discount_percentage: toNumber(item.special_discount_percentage ?? "0"),
+    })),
+    standard_discount_percentage: toNumber(args.standardDiscountPct || "0"),
+    special_discount_percentage: toNumber(args.specialDiscountPct || "0"),
+    tax_percentage: toNumber(args.taxPct || "0"),
+    currency: args.currency,
+  };
+}
+
+function buildDealCreatePayload(args: {
+  formData: {
+    name: string;
+    stage_id?: number;
+    assigned_to: string | null;
+    expected_close_date: string;
+    company_name: string;
+    company_domain: string;
+    industry_ids: number[];
+    decision_maker_title: string;
+    decision_maker_name: string;
+    decision_maker_phone_country_code: string;
+    decision_maker_phone: string;
+    decision_maker_email: string;
+    deal_type: string;
+    contract_length: string;
+    contract_length_custom: string;
+    billing_model: string;
+    payment_terms: string;
+    payment_terms_custom: string;
+    risk_level: string;
+    competitors: string;
+    quotation_sent: boolean;
+    contract_sent: boolean;
+    contract_received: boolean;
+    follow_up_date: string;
+    currency: string;
+    tax_percentage: string;
+    standard_discount_percentage: string;
+    special_discount_percentage: string;
+    ticket_id: number | null;
+    lead_id: number | null;
+  };
+  businessTypeId: number | null;
+  businessTypeOther: string;
+  dealTemplate: DealTemplateData | null;
+  templateFieldsData: Record<string, unknown>;
+}): Record<string, unknown> {
+  const payload: Record<string, unknown> = {
+    name: args.formData.name,
+    stage_id: args.formData.stage_id ? String(args.formData.stage_id) : undefined,
+    assigned_to: args.formData.assigned_to,
+    expected_close_date: args.formData.expected_close_date,
+    company_name: args.formData.company_name,
+    industry_ids: args.formData.industry_ids,
+    decision_maker_title: args.formData.decision_maker_title,
+    decision_maker_name: args.formData.decision_maker_name,
+    decision_maker_phone_country_code: args.formData.decision_maker_phone_country_code,
+    decision_maker_phone: args.formData.decision_maker_phone,
+    decision_maker_email: args.formData.decision_maker_email,
+    deal_type: args.formData.deal_type,
+    contract_length: args.formData.contract_length,
+    contract_length_custom: args.formData.contract_length_custom || "",
+    billing_model: args.formData.billing_model,
+    payment_terms: args.formData.payment_terms,
+    payment_terms_custom: args.formData.payment_terms_custom || "",
+    risk_level: args.formData.risk_level,
+    competitors: args.formData.competitors || "",
+    quotation_sent: args.formData.quotation_sent,
+    contract_sent: args.formData.contract_sent,
+    contract_received: args.formData.contract_received,
+    follow_up_date: args.formData.follow_up_date || "",
+    currency: args.formData.currency,
+    tax_percentage: args.formData.tax_percentage || "0",
+    standard_discount_percentage: args.formData.standard_discount_percentage || "0",
+    special_discount_percentage: args.formData.special_discount_percentage || "0",
+    ticket_id: args.formData.ticket_id || args.formData.lead_id,
+    lead_id: args.formData.lead_id,
+  };
+
+  if (args.formData.company_domain) {
+    payload.company_domain = args.formData.company_domain;
+  }
+
+  if (args.businessTypeId) {
+    payload.business_type_id = String(args.businessTypeId);
+  }
+
+  if (args.businessTypeOther) {
+    payload.business_type_other = args.businessTypeOther;
+  }
+
+  const templateId = args.dealTemplate?.id;
+  if (templateId) {
+    payload.deal_template_id = templateId;
+    const filteredTemplateData = filterNonEmptyTemplateFields(args.templateFieldsData);
+    if (filteredTemplateData) payload.template_data = filteredTemplateData;
+  }
+
+  return payload;
+}
+
+async function convertEstimationItemsForNewCurrency(args: {
+  estimationItems: readonly EstimationItem[];
+  products: readonly CrmProduct[];
+  oldDealCurrency: string;
+  newDealCurrency: string;
+}): Promise<EstimationItem[]> {
+  if (args.estimationItems.length === 0) return [];
+  const oldCcy = args.oldDealCurrency.toUpperCase();
+  const newCcy = args.newDealCurrency.toUpperCase();
+  if (!oldCcy || !newCcy || oldCcy === newCcy) return [...args.estimationItems];
+
+  return Promise.all(
+    args.estimationItems.map(async (item) => {
+      const product = args.products.find((p) => p.id === item.product_id);
+      const productCurrency = String(product?.currency ?? "").toUpperCase();
+
+      if (product && productCurrency && productCurrency === newCcy) {
+        return {
+          ...item,
+          unit_price: toNumber(product.price, item.unit_price),
+        };
+      }
+
+      const convertedPrice = await convertCurrency(item.unit_price, oldCcy, newCcy);
+      return { ...item, unit_price: convertedPrice };
+    }),
+  );
+}
+
 const ConvertToDealModal: React.FC<ConvertToDealModalProps> = ({
   show,
   onHide,
   leadId,
   onSuccess
 }) => {
-  const { data: session } = useSession();
   const [formStep, setFormStep] = useState(0);
   const [loading, setLoading] = useState(false);
   const [loadingLead, setLoadingLead] = useState(false);
@@ -55,7 +275,6 @@ const ConvertToDealModal: React.FC<ConvertToDealModalProps> = ({
   const [extensions, setExtensions] = useState<any[]>([]);
   const [products, setProducts] = useState<CrmProduct[]>([]);
   const [loadingProducts, setLoadingProducts] = useState(false);
-  const [campaign, setCampaign] = useState<any>(null);
   const [campaignIndustries, setCampaignIndustries] = useState<IndustryData[]>([]);
   const [selectedIndustryId, setSelectedIndustryId] = useState<number | null>(null);
   const [loadingIndustries, setLoadingIndustries] = useState(false);
@@ -72,18 +291,7 @@ const ConvertToDealModal: React.FC<ConvertToDealModalProps> = ({
   const [businessTypeOther, setBusinessTypeOther] = useState<string>("");
   const [showOtherBusinessType, setShowOtherBusinessType] = useState(false);
 
-  const [estimationItems, setEstimationItems] = useState<Array<{
-    product_id: number;
-    product_service: string;
-    description: string;
-    qty: number;
-    unit_price: number;
-    original_currency: string;
-    original_price: number;
-    tax_percentage: string;
-    standard_discount_percentage: string;
-    special_discount_percentage: string;
-  }>>([]);
+  const [estimationItems, setEstimationItems] = useState<EstimationItem[]>([]);
   
   const [showAddItemModal, setShowAddItemModal] = useState(false);
   const [editingItemIndex, setEditingItemIndex] = useState<number | null>(null);
@@ -186,7 +394,6 @@ const ConvertToDealModal: React.FC<ConvertToDealModalProps> = ({
         try {
           setLoadingIndustries(true);
           const ctx = await loadCampaignIndustryContext(Number(leadData.campaign_id));
-          setCampaign(ctx.campaignData);
           if (ctx.campaignIndustryIds.length > 0) {
             setCampaignIndustries(ctx.filteredIndustries);
             setFormData((prev) => ({
@@ -287,6 +494,32 @@ const ConvertToDealModal: React.FC<ConvertToDealModalProps> = ({
     }
   };
 
+  const handleDealCurrencyChange = async (
+    e: React.ChangeEvent<HTMLSelectElement>,
+  ) => {
+    const newCurrency = e.target.value;
+    const oldCurrency = formData.currency;
+    setFormData((prev) => ({ ...prev, currency: newCurrency }));
+
+    if (estimationItems.length === 0) return;
+
+    try {
+      setConvertingPrice(true);
+      const convertedItems = await convertEstimationItemsForNewCurrency({
+        estimationItems,
+        products,
+        oldDealCurrency: oldCurrency,
+        newDealCurrency: newCurrency,
+      });
+      setEstimationItems(convertedItems);
+    } catch (error) {
+      console.error("Failed to convert existing items:", error);
+      toast.error("Failed to convert prices to new currency");
+    } finally {
+      setConvertingPrice(false);
+    }
+  };
+
   const validateStep0 = (): boolean =>
     validateConvertDealStep0(formData, "Assigned to");
   const validateStep1 = (): boolean => validateConvertDealStep1(formData);
@@ -294,6 +527,8 @@ const ConvertToDealModal: React.FC<ConvertToDealModalProps> = ({
     validateConvertDealStep2(dealTemplate, templateFieldsData);
   const validateStep3 = (): boolean => true;
   const validateStep4 = (): boolean => validateConvertDealStep4(estimationItems);
+
+  const hasTemplate = Boolean(dealTemplate);
 
   const validateCurrentStep = (): boolean => {
     switch (formStep) {
@@ -309,107 +544,56 @@ const ConvertToDealModal: React.FC<ConvertToDealModalProps> = ({
   const handleNextStep = (e: React.MouseEvent) => {
     e.preventDefault();
     if (validateCurrentStep()) {
-      let nextStep = formStep + 1;
-      if (nextStep === 2 && !dealTemplate) {
-        nextStep = 3;
-      }
-      setFormStep(Math.min(4, nextStep));
+      setFormStep(getNextConvertDealStep(formStep, hasTemplate));
     }
+  };
+
+  const handleBackOrCancel = (e: React.MouseEvent) => {
+    e.preventDefault();
+    if (formStep > 0) {
+      setFormStep(getPrevConvertDealStep(formStep, hasTemplate));
+      return;
+    }
+    onHide();
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (formStep < 4) {
-      let nextStep = formStep + 1;
-      if (nextStep === 2 && !dealTemplate) {
-        nextStep = 3;
-      }
-      setFormStep(nextStep);
+      setFormStep(getNextConvertDealStep(formStep, hasTemplate));
       return;
     }
 
-    if (!validateStep0() || !validateStep1() || !validateStep4()) {
-      return;
-    }
-    if (dealTemplate && !validateStep2()) {
-      return;
-    }
+    const canSubmit =
+      validateStep0() &&
+      validateStep1() &&
+      validateStep4() &&
+      (!dealTemplate || validateStep2());
+    if (!canSubmit) return;
 
     setLoading(true);
     try {
-      const payload: any = {
-        name: formData.name,
-        stage_id: formData.stage_id ? String(formData.stage_id) : undefined,
-        assigned_to: formData.assigned_to,
-        expected_close_date: formData.expected_close_date,
-        company_name: formData.company_name,
-        ...(formData.company_domain && { company_domain: formData.company_domain }),
-        industry_ids: formData.industry_ids,
-        ...(businessTypeId ? { business_type_id: String(businessTypeId) } : {}),
-        ...(businessTypeOther ? { business_type_other: businessTypeOther } : {}),
-        decision_maker_title: formData.decision_maker_title,
-        decision_maker_name: formData.decision_maker_name,
-        decision_maker_phone_country_code: formData.decision_maker_phone_country_code,
-        decision_maker_phone: formData.decision_maker_phone,
-        decision_maker_email: formData.decision_maker_email,
-        deal_type: formData.deal_type,
-        contract_length: formData.contract_length,
-        contract_length_custom: formData.contract_length_custom || "",
-        billing_model: formData.billing_model,
-        payment_terms: formData.payment_terms,
-        payment_terms_custom: formData.payment_terms_custom || "",
-        risk_level: formData.risk_level,
-        competitors: formData.competitors || "",
-        quotation_sent: formData.quotation_sent,
-        contract_sent: formData.contract_sent,
-        contract_received: formData.contract_received,
-        follow_up_date: formData.follow_up_date || "",
-        currency: formData.currency,
-        tax_percentage: formData.tax_percentage || "0",
-        standard_discount_percentage: formData.standard_discount_percentage || "0",
-        special_discount_percentage: formData.special_discount_percentage || "0",
-        ticket_id: formData.ticket_id || formData.lead_id,
-        lead_id: formData.lead_id,
-      };
-
-      if (dealTemplate && dealTemplate.id) {
-        payload.deal_template_id = dealTemplate.id;
-        const filteredTemplateData: Record<string, any> = {};
-        Object.entries(templateFieldsData).forEach(([key, value]) => {
-          if (value !== null && value !== undefined && value !== '') {
-            filteredTemplateData[key] = value;
-          }
-        });
-        if (Object.keys(filteredTemplateData).length > 0) {
-          payload.template_data = filteredTemplateData;
-        }
-      }
+      const payload = buildDealCreatePayload({
+        formData,
+        businessTypeId,
+        businessTypeOther,
+        dealTemplate,
+        templateFieldsData,
+      });
 
       const createdDeal = await createDeal(payload).then((res) => res?.data);
       
       if (estimationItems.length > 0 && createdDeal?.id) {
         try {
-          const estimatePayload = {
-            deal_id: Number(createdDeal.id),
-            estimation_chart: estimationItems.map(item => ({
-              product_id: item.product_id,
-              product_service: item.product_service,
-              description: item.description || "",
-              qty: item.qty,
-              unit_price: item.unit_price,
-              original_currency: item.original_currency || formData.currency,
-              original_price: item.original_price ?? item.unit_price,
-              tax_percentage: parseFloat(String(item.tax_percentage ?? "0")),
-              standard_discount_percentage: parseFloat(String(item.standard_discount_percentage ?? "0")),
-              special_discount_percentage: parseFloat(String(item.special_discount_percentage ?? "0")),
-            })),
-            standard_discount_percentage: parseFloat(formData.standard_discount_percentage || "0"),
-            special_discount_percentage: parseFloat(formData.special_discount_percentage || "0"),
-            tax_percentage: parseFloat(formData.tax_percentage || "0"),
+          const estimatePayload = buildEstimatePayload({
+            dealId: Number(createdDeal.id),
+            estimationItems,
             currency: formData.currency,
-          };
-
+            standardDiscountPct: formData.standard_discount_percentage,
+            specialDiscountPct: formData.special_discount_percentage,
+            taxPct: formData.tax_percentage,
+          });
           await createEstimate(estimatePayload, false);
         } catch (estimateError: any) {
           console.error("Failed to create estimate:", estimateError);
@@ -474,29 +658,28 @@ const ConvertToDealModal: React.FC<ConvertToDealModalProps> = ({
                       left: '0', 
                       top: '20px', 
                       height: '2px', 
-                      width: `${(() => {
-                        const totalVisibleSteps = dealTemplate ? 5 : 4;
-                        let visualPosition = formStep;
-                        if (!dealTemplate && formStep > 2) {
-                          visualPosition = formStep - 1;
-                        }
-                        return ((visualPosition + 1) / totalVisibleSteps) * 100;
-                      })()}%`,
+                      width: `${getConvertDealTimelineProgressPercent(formStep, hasTemplate)}%`,
                       zIndex: 0,
                       transition: 'width 0.3s ease'
                     }}
                   />
                   
                   {[0, 1, 2, 3, 4].map((step) => {
-                    if (step === 2 && !dealTemplate) return null;
-                    
-                    const displayNumber = (!dealTemplate && step > 2) ? step : step + 1;
+                    if (!isConvertDealStepVisible(step, hasTemplate)) return null;
+                    const displayNumber = getConvertDealDisplayNumber(step, hasTemplate);
                     
                     return (
-                      <div 
+                      <button
+                        type="button"
                         key={step}
                         className="text-center position-relative" 
-                        style={{ cursor: 'pointer', flex: 1 }}
+                        style={{
+                          cursor: 'pointer',
+                          flex: 1,
+                          background: 'transparent',
+                          border: 'none',
+                          padding: 0,
+                        }}
                         onClick={() => setFormStep(step)}
                       >
                         <div 
@@ -506,9 +689,9 @@ const ConvertToDealModal: React.FC<ConvertToDealModalProps> = ({
                           {formStep > step ? <CheckCircle size={20} /> : displayNumber}
                         </div>
                         <small className={`d-block mt-2 ${formStep === step ? 'fw-bold text-primary' : 'text-muted'}`}>
-                          {step === 0 ? 'Deal Info' : step === 1 ? 'Company Info' : step === 2 ? 'Characteristics' : step === 3 ? 'Progress' : 'Estimation'}
+                          {getConvertDealStepLabel(step)}
                         </small>
-                      </div>
+                      </button>
                     );
                   })}
                 </div>
@@ -589,55 +772,7 @@ const ConvertToDealModal: React.FC<ConvertToDealModalProps> = ({
                         <Form.Label>Currency <span className="text-danger">*</span></Form.Label>
                         <Form.Select 
                           value={formData.currency}
-                          onChange={async (e) => {
-                            const newCurrency = e.target.value;
-                            setFormData({ ...formData, currency: newCurrency });
-                            
-                            // Convert all existing estimation items to new currency
-                            if (estimationItems.length > 0) {
-                              try {
-                                setConvertingPrice(true);
-                                const convertedItems = await Promise.all(
-                                  estimationItems.map(async (item) => {
-                                    const product = products.find(p => p.id === item.product_id);
-                                    if (product) {
-                                      const productCurrency = product.currency.toUpperCase();
-                                      const oldDealCurrency = formData.currency.toUpperCase();
-                                      const newDealCurrency = newCurrency.toUpperCase();
-                                      
-                                      // If product currency matches new deal currency, use original price
-                                      if (productCurrency === newDealCurrency) {
-                                        return {
-                                          ...item,
-                                          unit_price: parseFloat(product.price) || item.unit_price,
-                                        };
-                                      }
-                                      
-                                      // Convert from old deal currency to new deal currency
-                                      if (oldDealCurrency !== newDealCurrency) {
-                                        const convertedPrice = await convertCurrency(
-                                          item.unit_price,
-                                          oldDealCurrency,
-                                          newDealCurrency
-                                        );
-                                        return {
-                                          ...item,
-                                          unit_price: convertedPrice,
-                                        };
-                                      }
-                                    }
-                                    return item;
-                                  })
-                                );
-                                setEstimationItems(convertedItems);
-                              } catch (error) {
-                                console.error('Failed to convert existing items:', error);
-                                toast.error('Failed to convert prices to new currency');
-                              } finally {
-                                setConvertingPrice(false);
-                              }
-                            }
-                          }}
+                          onChange={handleDealCurrencyChange}
                           required
                         >
                          
@@ -1359,18 +1494,7 @@ const ConvertToDealModal: React.FC<ConvertToDealModalProps> = ({
         <Modal.Footer>
           <Button 
             variant="secondary" 
-            onClick={(e) => {
-              e.preventDefault();
-              if (formStep > 0) {
-                let prevStep = formStep - 1;
-                if (prevStep === 2 && !dealTemplate) {
-                  prevStep = 1;
-                }
-                setFormStep(prevStep);
-              } else {
-                onHide();
-              }
-            }}
+            onClick={handleBackOrCancel}
           >
             {formStep > 0 ? <><ChevronLeft size={16} className="me-1" /> Previous</> : 'Cancel'}
           </Button>

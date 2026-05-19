@@ -353,17 +353,23 @@ function getZeroUserCampaignNamesFromAssignmentResult(
   });
 }
 
+function toStableStringKey(value: unknown): string | null {
+  if (value == null) return null;
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    return trimmed ? trimmed : null;
+  }
+  if (typeof value === "number") return Number.isFinite(value) ? String(value) : null;
+  if (typeof value === "bigint") return String(value);
+  return null;
+}
+
 function campaignFieldRowKey(
   field: { id?: unknown; field_name?: string; field_type?: string; sort_order?: number },
   index: number,
 ): string {
-  if (field.id != null && field.id !== "") {
-    const idStr =
-      typeof field.id === "object"
-        ? JSON.stringify(field.id)
-        : String(field.id);
-    return `campaign-field-${idStr}`;
-  }
+  const idStr = toStableStringKey(field.id);
+  if (idStr) return `campaign-field-${idStr}`;
   // IMPORTANT: do not derive React keys from editable text; it causes remounts and input focus loss while typing.
   return `campaign-field-idx-${index}`;
 }

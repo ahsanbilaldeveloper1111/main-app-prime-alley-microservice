@@ -5,12 +5,26 @@ export type CrmExtensionLookup = Readonly<{
   name?: string;
 }>;
 
+function toStableStringKey(value: unknown): string | null {
+  if (value == null) return null;
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    return trimmed ? trimmed : null;
+  }
+  if (typeof value === "number") return Number.isFinite(value) ? String(value) : null;
+  if (typeof value === "bigint") return String(value);
+  return null;
+}
+
 function findExtensionByUserExtension(
   extensions: readonly CrmExtensionLookup[],
   userExtension: string,
 ) {
   return extensions.find(
-    (ext) => ext.id != null && String(ext.id) === userExtension,
+    (ext) => {
+      const key = toStableStringKey(ext.id) ?? toStableStringKey(ext.extension);
+      return key != null && key === userExtension;
+    },
   );
 }
 
