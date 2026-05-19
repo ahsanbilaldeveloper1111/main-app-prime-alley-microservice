@@ -1705,7 +1705,10 @@ export interface WorkloadTaskCard {
   priority: number;
   due_date: string | null;
   is_overdue: boolean;
-  estimated_duration_minutes: number | null;
+  estimated_duration_minutes?: number | null;
+  /** Some workload endpoints return this instead of `estimated_duration_minutes`. */
+  estimated_minutes?: number | null;
+  estimated_hours?: number | string | null;
   project_id: number | null;
   project_name: string | null;
   status_id: number;
@@ -1917,6 +1920,9 @@ export interface PatchWorkloadTaskBody {
   due_date?: string | null;
   extension_numbers?: string[];
   is_completed?: boolean;
+  /** Planner task priority string (`low`, `normal`, `high`, `urgent`). */
+  priority?: string;
+  estimated_duration_minutes?: number;
 }
 
 export async function patchWorkloadTask(

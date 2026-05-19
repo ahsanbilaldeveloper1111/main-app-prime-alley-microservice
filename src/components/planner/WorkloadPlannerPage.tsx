@@ -20,7 +20,6 @@ import {
   patchWorkloadTask,
   updateTask,
   type AssigneeMatch,
-  type PatchWorkloadTaskBody,
   type WorkloadGridCell,
   type WorkloadRangePreset,
   type WorkloadGridMember,
@@ -34,7 +33,10 @@ import {
   readWorkloadMainViewPreference,
   workloadProjectFilterQuery,
   writeWorkloadMainViewPreference,
+  buildWorkloadTaskPatchBody,
+  resolveWorkloadTaskEstimateMinutes,
   workloadCellKey,
+  workloadPriorityToApiString,
   type WorkloadPriorityFilterValue,
   type WorkloadProjectFilterValue,
 } from "@page-modules/planner/workload/workloadDomain";
@@ -272,9 +274,19 @@ const WorkloadPlannerPage: React.FC = () => {
   }, [queryClient]);
 
   const assignMutation = useMutation({
-    mutationFn: async ({ taskId, toExtension }: { taskId: number; toExtension: string }) => {
+    mutationFn: async ({
+      task,
+      toExtension,
+    }: {
+      task: WorkloadTaskCard;
+      toExtension: string;
+    }) => {
       if (!toExtension) throw new Error("Choose a team member.");
-      await patchWorkloadTask(taskId, extension, { extension_numbers: [toExtension] });
+      await patchWorkloadTask(
+        task.id,
+        extension,
+        buildWorkloadTaskPatchBody(task, { extension_numbers: [toExtension] }),
+      );
     },
     onSuccess: () => {
       toast.success("Task assigned");
@@ -290,11 +302,14 @@ const WorkloadPlannerPage: React.FC = () => {
   });
 
   const estimateMutation = useMutation({
-    mutationFn: async ({ taskId, minutes }: { taskId: number; minutes: number }) => {
+    mutationFn: async ({ task, minutes }: { task: WorkloadTaskCard; minutes: number }) => {
       if (!Number.isFinite(minutes) || minutes <= 0) {
         throw new Error("Enter a valid estimate in minutes.");
       }
-      await updateTask(taskId, { estimated_duration_minutes: minutes });
+      await updateTask(task.id, {
+        estimated_duration_minutes: minutes,
+        priority: workloadPriorityToApiString(task.priority),
+      });
     },
     onSuccess: () => {
       invalidateWorkload();
@@ -306,8 +321,12 @@ const WorkloadPlannerPage: React.FC = () => {
   });
 
   const markDoneMutation = useMutation({
-    mutationFn: async (taskId: number) => {
-      await patchWorkloadTask(taskId, extension, { is_completed: true });
+    mutationFn: async (task: WorkloadTaskCard) => {
+      await patchWorkloadTask(
+        task.id,
+        extension,
+        buildWorkloadTaskPatchBody(task, { is_completed: true }),
+      );
     },
     onSuccess: () => {
       toast.success("Task marked done");
@@ -320,8 +339,12 @@ const WorkloadPlannerPage: React.FC = () => {
   });
 
   const rescheduleMutation = useMutation({
-    mutationFn: async (payload: { taskId: number; dueDate: string }) => {
-      await patchWorkloadTask(payload.taskId, extension, { due_date: payload.dueDate });
+    mutationFn: async (payload: { task: WorkloadTaskCard; dueDate: string }) => {
+      await patchWorkloadTask(
+        payload.task.id,
+        extension,
+        buildWorkloadTaskPatchBody(payload.task, { due_date: payload.dueDate }),
+      );
     },
     onSuccess: () => {
       toast.success("Task rescheduled");
@@ -345,10 +368,10 @@ const WorkloadPlannerPage: React.FC = () => {
   const submitReassign = useCallback(async () => {
     if (!reassignTask || !reassignTarget || !selectedCell) return;
     if (reassignOverloadConfirm) {
-      assignMutation.mutate({ taskId: reassignTask.id, toExtension: reassignTarget });
+      assignMutation.mutate({ task: reassignTask, toExtension: reassignTarget });
       return;
     }
-    const minutes = reassignTask.estimated_duration_minutes ?? 0;
+    const minutes = resolveWorkloadTaskEstimateMinutes(reassignTask);
     try {
       const check = await getWorkloadOverloadCheck({
         extension_number: reassignTarget,
@@ -361,7 +384,7 @@ const WorkloadPlannerPage: React.FC = () => {
         setReassignOverloadConfirm(true);
         return;
       }
-      assignMutation.mutate({ taskId: reassignTask.id, toExtension: reassignTarget });
+      assignMutation.mutate({ task: reassignTask, toExtension: reassignTarget });
     } catch (err) {
       toast.error(workloadErrorMessage(err));
     }
@@ -376,14 +399,14 @@ const WorkloadPlannerPage: React.FC = () => {
 
   const boardDragMutation = useMutation({
     mutationFn: async (intent: WorkloadBoardDropIntent) => {
-      const body: PatchWorkloadTaskBody = {};
-      if (intent.toExtension) {
-        body.extension_numbers = [intent.toExtension];
-      }
-      if (intent.toDate) {
-        body.due_date = intent.toDate;
-      }
-      await patchWorkloadTask(intent.task.id, extension, body);
+      await patchWorkloadTask(
+        intent.task.id,
+        extension,
+        buildWorkloadTaskPatchBody(intent.task, {
+          ...(intent.toExtension ? { extension_numbers: [intent.toExtension] } : {}),
+          ...(intent.toDate ? { due_date: intent.toDate } : {}),
+        }),
+      );
     },
     onSuccess: () => {
       toast.success("Task updated");
@@ -403,7 +426,7 @@ const WorkloadPlannerPage: React.FC = () => {
         intent.task.due_date?.slice(0, 10) ??
         boardQuery.data?.range.start ??
         "";
-      const minutes = intent.task.estimated_duration_minutes ?? 0;
+      const minutes = resolveWorkloadTaskEstimateMinutes(intent.task);
       if (!targetDate || !intent.toExtension) {
         return;
       }
@@ -436,10 +459,10 @@ const WorkloadPlannerPage: React.FC = () => {
   const submitReschedule = useCallback(async () => {
     if (!rescheduleTask || !rescheduleDate) return;
     if (overloadSecondStep) {
-      rescheduleMutation.mutate({ taskId: rescheduleTask.id, dueDate: rescheduleDate });
+      rescheduleMutation.mutate({ task: rescheduleTask, dueDate: rescheduleDate });
       return;
     }
-    const minutes = rescheduleTask.estimated_duration_minutes ?? 0;
+    const minutes = resolveWorkloadTaskEstimateMinutes(rescheduleTask);
     try {
       const check = await getWorkloadOverloadCheck({
         extension_number: rescheduleTask.primary_assignee_extension ?? extension,
@@ -452,7 +475,7 @@ const WorkloadPlannerPage: React.FC = () => {
         setOverloadSecondStep(true);
         return;
       }
-      rescheduleMutation.mutate({ taskId: rescheduleTask.id, dueDate: rescheduleDate });
+      rescheduleMutation.mutate({ task: rescheduleTask, dueDate: rescheduleDate });
     } catch (err) {
       toast.error(workloadErrorMessage(err));
     }
@@ -565,17 +588,17 @@ const WorkloadPlannerPage: React.FC = () => {
             setReassignOverloadConfirm(false);
           }}
           onReschedule={openReschedule}
-          onMarkDone={(taskId) => {
-            markDoneMutation.mutate(taskId);
+          onMarkDone={(task) => {
+            markDoneMutation.mutate(task);
           }}
           markDoneTaskId={
-            markDoneMutation.isPending ? (markDoneMutation.variables ?? null) : null
+            markDoneMutation.isPending ? (markDoneMutation.variables?.id ?? null) : null
           }
-          onSaveEstimate={(taskId, minutes) => {
-            estimateMutation.mutate({ taskId, minutes });
+          onSaveEstimate={(task, minutes) => {
+            estimateMutation.mutate({ task, minutes });
           }}
           estimateSavingTaskId={
-            estimateMutation.isPending ? (estimateMutation.variables?.taskId ?? null) : null
+            estimateMutation.isPending ? (estimateMutation.variables?.task.id ?? null) : null
           }
           formatError={workloadErrorMessage}
           hierarchyExtensions={hierarchyDataExtensions}

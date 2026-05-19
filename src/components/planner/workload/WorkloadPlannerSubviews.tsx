@@ -11,6 +11,7 @@ import {
   formatWorkloadDayHeader,
   formatWorkloadMemberLabel,
   formatWorkloadMinutes,
+  formatWorkloadTaskEstimate,
   formatWorkloadPercent,
   isSameCalendarDay,
   workloadCellBandClass,
@@ -374,7 +375,7 @@ export function WorkloadBoardColumns({
                 <div key={task.id} className="workload-task-card">
                   <div className="workload-task-card__title">{task.title}</div>
                   <div className="small text-muted">
-                    {task.due_date ?? "—"} · {formatWorkloadMinutes(task.estimated_duration_minutes ?? 0)}
+                    {task.due_date ?? "—"} · {formatWorkloadTaskEstimate(task)}
                   </div>
                 </div>
               ))}

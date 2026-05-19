@@ -137,7 +137,7 @@ export function WorkloadBoardTaskCard({
         </Link>
       </div>
 
-      <Collapse in={showMove}>
+      <Collapse in={showMove} unmountOnExit>
         <div className="workload-board-task-card__move-panel">
           <Form.Select
             size="sm"
