@@ -4,10 +4,7 @@ import SectionContainer from './SectionContainer'
 import { SECTION_ORDER } from '@components/live-calls/utils/constants'
 import { getCallSortDurationMs } from '@components/live-calls/utils/helpers'
 import { CtiDevice } from '@components/live-calls/utils/types'
-import {
-  resolveWallboardDisplayCall,
-  parseWallboardTimestampToMs,
-} from '@components/communications/wallboards-live/wallboardEventParsing'
+import { parseWallboardTimestampToMs } from '@components/communications/wallboards-live/wallboardEventParsing'
 
 const SECTION_STATUS_MAP: Record<string, string> = {
   supervision: 'supervision',
@@ -325,13 +322,7 @@ const SectionsRenderer: React.FC<SectionsRendererProps> = ({
   dnsList.forEach((entry: { dn: string; devices: unknown }) => {
     const { dn, devices } = entry
     const deviceList = devicesObjectToList(devices)
-    const call = resolveWallboardDisplayCall(
-      dn,
-      activeMonitoring,
-      getDnCallState,
-      getCallStateForDevice,
-      getCallStatesForDn
-    )
+    const call = getDnCallState(dn)
     const active = hasActiveCalls(dn)
     const section = categorizeDns(dn, deviceList, call, active)
 

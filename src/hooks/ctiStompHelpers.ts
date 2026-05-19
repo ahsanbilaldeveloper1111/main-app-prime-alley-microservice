@@ -749,6 +749,32 @@ export function resolveOngoingCallCurrentState(
   return currentState || "UNKNOWN";
 }
 
+/**
+ * Normalize CTI complete-state payload (array, nested `.data`, or DN-keyed map) into a flat device list.
+ */
+export function devicesArrayFromCompleteStatePayload(data: unknown): unknown[] {
+  if (!data) {
+    return [];
+  }
+  if (Array.isArray(data)) {
+    return data;
+  }
+  if (
+    typeof data === "object" &&
+    data !== null &&
+    "data" in data &&
+    Array.isArray((data as { data: unknown[] }).data)
+  ) {
+    return (data as { data: unknown[] }).data;
+  }
+  if (typeof data === "object" && data !== null) {
+    return Object.values(
+      data as Record<string, { devices?: Record<string, unknown> }>,
+    ).flatMap((dnData) => Object.values(dnData.devices || {}));
+  }
+  return [];
+}
+
 /** Keys to ignore when detecting a flat call-id → call-state map from ongoing-calls payloads. */
 const ONGOING_CALLS_PAYLOAD_METADATA_KEYS = new Set([
   "type",

@@ -11,6 +11,7 @@ import {
   buildPrimarySseDispatchCtx,
   type PrimarySseDispatchCtxFactoryArgs,
 } from "./ctiStompSsePrimaryDispatch";
+import { shouldCloseCtiSseOnCrossTabDemotion } from "./ctiStompCrossTabDemotion";
 
 type DnsMapState = Record<
   string,
@@ -154,6 +155,7 @@ export type CtiStompPrimaryAuthEffectDeps = {
     | null
   >;
   handleCallEventRef: Ref<((evt: CtiCallEvent) => void) | null>;
+  handleOngoingCallsRef: Ref<((data: unknown) => void) | null>;
   groupDevicesByDnAndDeviceNameRef: Ref<
     ((deviceArray: CtiDevice[]) => DnsMapState) | null
   >;
@@ -199,6 +201,7 @@ export function subscribeCtiStompPrimaryAuthEffect(
     scheduleRefreshAfterCallEndRef,
     publishStompMessageRef,
     handleCallEventRef,
+    handleOngoingCallsRef,
     groupDevicesByDnAndDeviceNameRef,
     updateSummaryDataRef,
   } = deps;
@@ -684,15 +687,11 @@ export function subscribeCtiStompPrimaryAuthEffect(
       instanceIdForLog: string,
       manager: CrossTabCtiManager,
     ): boolean => {
-      if (
-        !isGlobalInstance ||
-        !manager.isCrossTabSupported() ||
-        manager.isMasterTab()
-      ) {
+      if (!shouldCloseCtiSseOnCrossTabDemotion(isGlobalInstance, manager)) {
         return false;
       }
       console.log(
-        `[${instanceIdForLog}] ⚠️ No longer master tab, closing connection...`,
+        `[${instanceIdForLog}] ⚠️ Follower tab with active remote master, closing local SSE...`,
       );
       if (eventSourceRef.current) {
         try {
@@ -804,6 +803,7 @@ export function subscribeCtiStompPrimaryAuthEffect(
             hasRequestedInitialStateRef,
             publishStompMessageRef,
             handleCallEventRef,
+            handleOngoingCallsRef,
             groupDevicesByDnAndDeviceNameRef,
             updateSummaryDataRef,
           } as PrimarySseDispatchCtxFactoryArgs),

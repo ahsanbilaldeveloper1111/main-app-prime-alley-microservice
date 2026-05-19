@@ -1,5 +1,7 @@
 import type { Dispatch, SetStateAction } from "react";
 import type { CrossTabCtiManager } from "../utils/crossTabCtiManager";
+import { devicesArrayFromCompleteStatePayload } from "./ctiStompHelpers";
+import { touchCtiSseLastMessageTime } from "./ctiStompSseLiveness";
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -60,6 +62,7 @@ export interface PrimarySseDispatchCtx {
     current: ((dest: string, body?: string) => Promise<boolean>) | null;
   };
   handleCallEventRef: { current: ((e: unknown) => void) | null };
+  handleOngoingCallsRef: { current: ((data: unknown) => void) | null };
   groupDevicesByDnAndDeviceNameRef: {
     current: ((devices: unknown[]) => unknown) | null;
   };
@@ -70,9 +73,7 @@ function touchLastMessageTime(
   data: UnknownRecord,
   lastMessageTimeRef: { current: number | null },
 ): void {
-  if (data.type !== "ping" && data.type !== "test") {
-    lastMessageTimeRef.current = Date.now();
-  }
+  touchCtiSseLastMessageTime(data, lastMessageTimeRef);
 }
 
 function handleCompleteState(
@@ -84,7 +85,8 @@ function handleCompleteState(
     const groupFn = ctx.groupDevicesByDnAndDeviceNameRef.current;
     const summaryFn = ctx.updateSummaryDataRef.current;
     if (!groupFn || !summaryFn) return;
-    const grouped = groupFn(data.data as unknown[]) as DnsMapState;
+    const devices = devicesArrayFromCompleteStatePayload(data.data);
+    const grouped = groupFn(devices) as DnsMapState;
     ctx.setDnsMap(grouped);
     summaryFn(grouped);
     ctx.setEventLog((prev) => [
@@ -158,6 +160,21 @@ function handleCallEvents(
   }
 }
 
+function handleOngoingCalls(
+  data: UnknownRecord,
+  ctx: PrimarySseDispatchCtx,
+): void {
+  const { currentInstanceId } = ctx;
+  try {
+    ctx.handleOngoingCallsRef.current?.(data.data);
+  } catch (err) {
+    console.error(
+      `[${currentInstanceId}] ❌ Failed to process ongoing calls`,
+      err,
+    );
+  }
+}
+
 function handleStompConnected(ctx: PrimarySseDispatchCtx): void {
   ctx.setIsInitialized(true);
   ctx.setError(null);
@@ -165,6 +182,7 @@ function handleStompConnected(ctx: PrimarySseDispatchCtx): void {
   if (!ctx.hasRequestedInitialStateRef.current && publishInitial) {
     ctx.hasRequestedInitialStateRef.current = true;
     publishInitial("/app/request/initial-state", "");
+    publishInitial("/app/request/ongoing-calls", "");
   }
 }
 
@@ -195,6 +213,12 @@ function handleConnectionMessage(
   console.log(
     `[${ctx.getInstanceId()}] 🔄 Received reconnecting status from server`,
   );
+  if (data.preserveState === true) {
+    // STOMP/WebSocket is reconnecting; keep the SSE stream open (tearing it down causes reconnect loops).
+    ctx.isReconnectingRef.current = true;
+    ctx.setIsReconnecting(true);
+    return;
+  }
   if (ctx.isReconnectingRef.current) {
     console.log(
       `[${ctx.getInstanceId()}] ⚠️ Reconnection already in progress, ignoring duplicate message`,
@@ -205,7 +229,7 @@ function handleConnectionMessage(
   ctx.isReconnectingRef.current = true;
   ctx.setIsReconnecting(true);
   console.log(
-    `[${currentInstanceId}] 🔄 Server reconnecting, starting reconnection with retry logic...`,
+    `[${currentInstanceId}] 🔄 Server reconnecting, starting full SSE reconnection...`,
   );
   ctx.attemptReconnection();
 }
@@ -222,6 +246,7 @@ const PRIMARY_HANDLERS: Record<
   complete_state: handleCompleteState,
   dns_states: handleDnsStates,
   call_events: handleCallEvents,
+  ongoing_calls: handleOngoingCalls,
   stomp_connected: (_d, ctx) => handleStompConnected(ctx),
   stomp_error: handleStompError,
   connection: handleConnectionMessage,

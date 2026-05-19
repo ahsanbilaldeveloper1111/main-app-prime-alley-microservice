@@ -1,6 +1,9 @@
 import type { Dispatch, SetStateAction } from "react";
 import type { CrossTabCtiManager } from "../utils/crossTabCtiManager";
 import type { CtiDevice, CtiCallEvent } from "./ctiStompHookTypes";
+import { devicesArrayFromCompleteStatePayload } from "./ctiStompHelpers";
+import { touchCtiSseLastMessageTime } from "./ctiStompSseLiveness";
+import { shouldCloseCtiSseOnCrossTabDemotion } from "./ctiStompCrossTabDemotion";
 
 type DnsMapState = Record<
   string,
@@ -220,7 +223,8 @@ const handleDeferredMasterCompleteStateMessage = (rawData: unknown) => {
   if (!groupFn || !updateFn) {
     return;
   }
-  const grouped = groupFn(rawData as CtiDevice[]);
+  const devices = devicesArrayFromCompleteStatePayload(rawData) as CtiDevice[];
+  const grouped = groupFn(devices);
   setDnsMap(grouped);
   updateFn(grouped);
   setEventLog((prev) => [
@@ -262,9 +266,7 @@ const handleDeferredMasterSseParsedMessage = (data: {
   type?: string;
   data?: unknown;
 }) => {
-  if (data.type !== "ping" && data.type !== "test") {
-    lastMessageTimeRef.current = Date.now();
-  }
+  touchCtiSseLastMessageTime(data, lastMessageTimeRef);
   switch (data.type) {
     case "complete_state":
       handleDeferredMasterCompleteStateMessage(data.data);
@@ -311,11 +313,11 @@ const closeDeferredMasterIfDemoted = (
   instanceId: string,
   mgr: CrossTabCtiManager,
 ): boolean => {
-  if (!isGlobalInstance || !mgr.isCrossTabSupported() || mgr.isMasterTab()) {
+  if (!shouldCloseCtiSseOnCrossTabDemotion(isGlobalInstance, mgr)) {
     return false;
   }
   console.log(
-    `[${instanceId}] ⚠️ No longer master tab, closing connection...`,
+    `[${instanceId}] ⚠️ Follower tab with active remote master, closing local SSE...`,
   );
   if (eventSourceRef.current) {
     try {

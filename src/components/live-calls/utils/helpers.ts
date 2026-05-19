@@ -1,6 +1,9 @@
-import { CtiDevice, ActiveMonitoring } from './types'
+import { CtiDevice, ActiveMonitoring, MonitoringTeardownHint } from './types'
 import { SECTION_CONFIG } from './constants'
+import { shouldExcludeCallFromWallboardContext } from '@components/communications/wallboards-live/wallboardEventParsing'
 import moment from 'moment'
+
+export type { MonitoringTeardownHint } from './types'
 
 /** Wallboard: inputs for {@link categorizeDns} (single object keeps Sonar param count and complexity down). */
 export type CategorizeDnsParams = {
@@ -12,6 +15,7 @@ export type CategorizeDnsParams = {
   getCallStateForDevice: (dn: string, deviceName: string) => unknown
   getCallStatesForDn: (dn: string) => unknown[]
   userAddress?: string | null
+  monitoringTeardown?: MonitoringTeardownHint | null
 }
 
 type CallParty = {
@@ -24,6 +28,7 @@ type CallParty = {
 
 type LooseCall = {
   isTerminating?: boolean
+  isMonitoring?: boolean
   parties?: CallParty[]
   currentState?: string
 }
@@ -67,9 +72,11 @@ function monitoredCallHasActiveParties(monitoredCall: LooseCall | null | undefin
 function resolveSupervisionSection(p: CategorizeDnsParams): string | null {
   const { dn, activeMonitoring, getCallStatesForDn, getCallStateForDevice } = p
   const agentDn = activeMonitoring.dn
+  const monitorDn = activeMonitoring.monitor
+  // Live Coaching section is for the supervisor (monitor) DN only; the monitored agent stays in Live Calls.
   if (
-    !activeMonitoring.monitor ||
-    activeMonitoring.monitor !== dn ||
+    !monitorDn ||
+    String(dn) !== String(monitorDn) ||
     !activeMonitoring.type ||
     !agentDn
   ) {
@@ -93,10 +100,25 @@ function resolveSupervisionSection(p: CategorizeDnsParams): string | null {
   return null
 }
 
-function dnHasActiveCallForWallboard(dn: string, getCallStatesForDn: (dn: string) => unknown[]): boolean {
+export function dnHasActiveCallForWallboard(
+  dn: string,
+  getCallStatesForDn: (dn: string) => unknown[],
+  activeMonitoring: ActiveMonitoring,
+  monitoringTeardown?: MonitoringTeardownHint | null,
+): boolean {
   const allCallsForDn = getCallStatesForDn(dn) as LooseCall[]
   for (const callState of allCallsForDn) {
     if (callState.isTerminating) {
+      continue
+    }
+    if (
+      shouldExcludeCallFromWallboardContext(
+        callState,
+        dn,
+        activeMonitoring,
+        monitoringTeardown,
+      )
+    ) {
       continue
     }
     if (callState.currentState === 'RINGING') {
@@ -106,7 +128,7 @@ function dnHasActiveCallForWallboard(dn: string, getCallStatesForDn: (dn: string
       continue
     }
     const dnParties = callState.parties.filter(
-      (party) => partyInvolvesDn(party, dn) && partyIsLive(party)
+      (party) => partyInvolvesDn(party, dn) && partyIsLive(party),
     )
     if (dnParties.length > 0) {
       return true
@@ -137,7 +159,14 @@ export const categorizeDns = (params: CategorizeDnsParams): string => {
     return supervision
   }
 
-  if (dnHasActiveCallForWallboard(dn, params.getCallStatesForDn)) {
+  if (
+    dnHasActiveCallForWallboard(
+      dn,
+      params.getCallStatesForDn,
+      params.activeMonitoring,
+      params.monitoringTeardown,
+    )
+  ) {
     return 'onCall'
   }
 
@@ -389,7 +418,21 @@ export const getText = (
 /**
  * Check if DN is in active call
  */
-export const isDnInActiveCall = (dn: string, getDnCallState: (dn: string) => unknown): boolean => {
+export const isDnInActiveCall = (
+  dn: string,
+  getDnCallState: (dn: string) => unknown,
+  getCallStatesForDn?: (dn: string) => unknown[],
+  activeMonitoring?: ActiveMonitoring,
+  monitoringTeardown?: MonitoringTeardownHint | null,
+): boolean => {
+  if (getCallStatesForDn && activeMonitoring) {
+    return dnHasActiveCallForWallboard(
+      dn,
+      getCallStatesForDn,
+      activeMonitoring,
+      monitoringTeardown,
+    )
+  }
   const call = getDnCallState(dn) as { parties?: CallParty[] } | null | undefined
   if (!call?.parties) return false
   const activeParticipants = call.parties.filter(
