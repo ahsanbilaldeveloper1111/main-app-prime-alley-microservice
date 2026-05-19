@@ -1,6 +1,7 @@
 import type { Dispatch, SetStateAction } from "react";
 import type { CrossTabCtiManager } from "../utils/crossTabCtiManager";
 import { devicesArrayFromCompleteStatePayload } from "./ctiStompHelpers";
+import { touchCtiSseLastMessageTime } from "./ctiStompSseLiveness";
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -72,9 +73,7 @@ function touchLastMessageTime(
   data: UnknownRecord,
   lastMessageTimeRef: { current: number | null },
 ): void {
-  if (data.type !== "ping" && data.type !== "test") {
-    lastMessageTimeRef.current = Date.now();
-  }
+  touchCtiSseLastMessageTime(data, lastMessageTimeRef);
 }
 
 function handleCompleteState(
@@ -214,6 +213,12 @@ function handleConnectionMessage(
   console.log(
     `[${ctx.getInstanceId()}] 🔄 Received reconnecting status from server`,
   );
+  if (data.preserveState === true) {
+    // STOMP/WebSocket is reconnecting; keep the SSE stream open (tearing it down causes reconnect loops).
+    ctx.isReconnectingRef.current = true;
+    ctx.setIsReconnecting(true);
+    return;
+  }
   if (ctx.isReconnectingRef.current) {
     console.log(
       `[${ctx.getInstanceId()}] ⚠️ Reconnection already in progress, ignoring duplicate message`,
@@ -224,7 +229,7 @@ function handleConnectionMessage(
   ctx.isReconnectingRef.current = true;
   ctx.setIsReconnecting(true);
   console.log(
-    `[${currentInstanceId}] 🔄 Server reconnecting, starting reconnection with retry logic...`,
+    `[${currentInstanceId}] 🔄 Server reconnecting, starting full SSE reconnection...`,
   );
   ctx.attemptReconnection();
 }

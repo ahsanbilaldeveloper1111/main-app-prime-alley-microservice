@@ -12,12 +12,20 @@ const MASTER_TAB_TIMEOUT = 5000; // 5 seconds - if master doesn't heartbeat, ele
 const HEARTBEAT_INTERVAL = 2000; // 2 seconds - master tab sends heartbeat
 const BROADCAST_CHANNEL_NAME = 'cti-broadcast-channel';
 
-// Helper function to safely access localStorage (works in Next.js SSR)
+// Helper function to safely access localStorage (works in Next.js SSR + private browsing)
 const safeLocalStorage = {
   getItem: (key: string): string | null => {
     if (typeof window === 'undefined') return null;
     try {
-      return localStorage.getItem(key);
+      const fromLocal = localStorage.getItem(key);
+      if (fromLocal != null) {
+        return fromLocal;
+      }
+    } catch {
+      // fall through to sessionStorage
+    }
+    try {
+      return sessionStorage.getItem(key);
     } catch {
       return null;
     }
@@ -26,8 +34,14 @@ const safeLocalStorage = {
     if (typeof window === 'undefined') return;
     try {
       localStorage.setItem(key, value);
+      return;
     } catch {
-      // Ignore errors (e.g., quota exceeded)
+      // fall through to sessionStorage (common in strict private mode / quota)
+    }
+    try {
+      sessionStorage.setItem(key, value);
+    } catch {
+      // Ignore errors (e.g., quota exceeded, storage disabled)
     }
   },
   removeItem: (key: string): void => {
@@ -35,7 +49,12 @@ const safeLocalStorage = {
     try {
       localStorage.removeItem(key);
     } catch {
-      // Ignore errors
+      // ignore
+    }
+    try {
+      sessionStorage.removeItem(key);
+    } catch {
+      // ignore
     }
   }
 };
@@ -59,6 +78,8 @@ export class CrossTabCtiManager {
   private actionListeners: Set<(event: CtiEvent) => void> = new Set();
   private pendingActions: Map<string, { resolve: (value: any) => void; reject: (error: any) => void }> = new Map();
   private isSupported: boolean;
+  /** When persistent storage is blocked, master liveness is tracked in-memory for this tab. */
+  private lastLocalHeartbeatAt: number | null = null;
 
   constructor() {
     this.tabId = this.generateTabId();
@@ -181,6 +202,7 @@ export class CrossTabCtiManager {
 
   private becomeMaster(): void {
     this.isMaster = true;
+    this.lastLocalHeartbeatAt = Date.now();
     safeLocalStorage.setItem(MASTER_TAB_KEY, this.tabId);
     safeLocalStorage.setItem(`${MASTER_TAB_KEY}_heartbeat`, Date.now().toString());
     
@@ -201,6 +223,7 @@ export class CrossTabCtiManager {
 
     this.heartbeatInterval = setInterval(() => {
       if (this.isMaster) {
+        this.lastLocalHeartbeatAt = Date.now();
         safeLocalStorage.setItem(`${MASTER_TAB_KEY}_heartbeat`, Date.now().toString());
         
         this.broadcast({
@@ -281,6 +304,36 @@ export class CrossTabCtiManager {
 
   private getMasterTabId(): string | null {
     return safeLocalStorage.getItem(MASTER_TAB_KEY);
+  }
+
+  private getLastHeartbeatMs(): number | null {
+    const stored = safeLocalStorage.getItem(`${MASTER_TAB_KEY}_heartbeat`);
+    if (stored) {
+      const parsed = Number.parseInt(stored, 10);
+      if (Number.isFinite(parsed)) {
+        return parsed;
+      }
+    }
+    return this.lastLocalHeartbeatAt;
+  }
+
+  /**
+   * True when another tab is the active CTI master (fresh heartbeat, different tab id).
+   * Used to avoid closing SSE on transient demotion in private/single-tab edge cases.
+   */
+  public hasActiveRemoteMasterTab(): boolean {
+    if (!this.isSupported || this.isMaster) {
+      return false;
+    }
+    const masterId = this.getMasterTabId();
+    if (!masterId || masterId === this.tabId) {
+      return false;
+    }
+    const heartbeatMs = this.getLastHeartbeatMs();
+    if (heartbeatMs == null) {
+      return false;
+    }
+    return Date.now() - heartbeatMs <= MASTER_TAB_TIMEOUT;
   }
 
   private broadcast(event: CtiEvent): void {

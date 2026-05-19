@@ -517,7 +517,6 @@ export default function useCtiStomp(
         updateSummaryDataRef,
       }),
     [
-      isMasterTab,
       isGlobalInstance,
       isAuthenticated,
       authInitialized,

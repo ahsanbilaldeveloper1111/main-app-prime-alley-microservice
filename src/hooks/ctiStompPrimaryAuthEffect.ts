@@ -11,6 +11,7 @@ import {
   buildPrimarySseDispatchCtx,
   type PrimarySseDispatchCtxFactoryArgs,
 } from "./ctiStompSsePrimaryDispatch";
+import { shouldCloseCtiSseOnCrossTabDemotion } from "./ctiStompCrossTabDemotion";
 
 type DnsMapState = Record<
   string,
@@ -686,15 +687,11 @@ export function subscribeCtiStompPrimaryAuthEffect(
       instanceIdForLog: string,
       manager: CrossTabCtiManager,
     ): boolean => {
-      if (
-        !isGlobalInstance ||
-        !manager.isCrossTabSupported() ||
-        manager.isMasterTab()
-      ) {
+      if (!shouldCloseCtiSseOnCrossTabDemotion(isGlobalInstance, manager)) {
         return false;
       }
       console.log(
-        `[${instanceIdForLog}] ⚠️ No longer master tab, closing connection...`,
+        `[${instanceIdForLog}] ⚠️ Follower tab with active remote master, closing local SSE...`,
       );
       if (eventSourceRef.current) {
         try {
