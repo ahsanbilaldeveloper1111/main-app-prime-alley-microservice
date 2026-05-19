@@ -357,7 +357,8 @@ function toStableStringKey(value: unknown): string | null {
   if (value == null) return null;
   if (typeof value === "string") {
     const trimmed = value.trim();
-    return trimmed ? trimmed : null;
+    if (!trimmed) return null;
+    return trimmed;
   }
   if (typeof value === "number") return Number.isFinite(value) ? String(value) : null;
   if (typeof value === "bigint") return String(value);

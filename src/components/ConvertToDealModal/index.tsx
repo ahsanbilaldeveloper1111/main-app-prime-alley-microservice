@@ -262,6 +262,126 @@ async function convertEstimationItemsForNewCurrency(args: {
   );
 }
 
+type SetState<T> = React.Dispatch<React.SetStateAction<T>>;
+
+async function fetchProductsByIndustryImpl(args: {
+  industryId: number;
+  setLoadingProducts: SetState<boolean>;
+  setProducts: SetState<CrmProduct[]>;
+}): Promise<void> {
+  try {
+    args.setLoadingProducts(true);
+    const response = await getCrmProducts({
+      per_page: 100,
+      industry_id: args.industryId,
+    });
+    args.setProducts(response.data || []);
+  } catch (error) {
+    console.error("Failed to fetch products:", error);
+    toast.error("Failed to fetch products");
+  } finally {
+    args.setLoadingProducts(false);
+  }
+}
+
+async function loadLeadTemplateImpl(args: {
+  leadId: number;
+  setLoadingTemplate: SetState<boolean>;
+  setDealTemplate: SetState<DealTemplateData | null>;
+  setTemplateFieldsData: SetState<Record<string, any>>;
+}): Promise<void> {
+  try {
+    args.setLoadingTemplate(true);
+    const { template, templateFieldsData: initialFields } =
+      await loadDealTemplateForLead(args.leadId);
+    if (template) {
+      args.setDealTemplate(template);
+      args.setTemplateFieldsData(initialFields);
+    }
+  } catch (error) {
+    console.error("Failed to fetch deal template:", error);
+  } finally {
+    args.setLoadingTemplate(false);
+  }
+}
+
+async function loadCampaignIndustryContextImpl(args: {
+  campaignId: number;
+  setLoadingIndustries: SetState<boolean>;
+  setCampaignIndustries: SetState<IndustryData[]>;
+  setFormData: SetState<any>;
+  setSelectedIndustryId: SetState<number | null>;
+  fetchProductsByIndustry: (industryId: number) => Promise<void>;
+}): Promise<void> {
+  try {
+    args.setLoadingIndustries(true);
+    const ctx = await loadCampaignIndustryContext(args.campaignId);
+    if (ctx.campaignIndustryIds.length === 0) return;
+
+    args.setCampaignIndustries(ctx.filteredIndustries);
+    args.setFormData((prev: any) => ({
+      ...prev,
+      industry_ids: ctx.campaignIndustryIds,
+    }));
+
+    if (ctx.filteredIndustries.length === 1) {
+      const industryId = ctx.filteredIndustries[0].id;
+      args.setSelectedIndustryId(industryId);
+      await args.fetchProductsByIndustry(industryId);
+    }
+  } catch (error) {
+    console.error("Failed to fetch campaign/industries:", error);
+  } finally {
+    args.setLoadingIndustries(false);
+  }
+}
+
+async function fetchLeadDataImpl(args: {
+  leadId: number;
+  setLoadingLead: SetState<boolean>;
+  setSourceLead: SetState<any>;
+  setFormData: SetState<any>;
+  setLoadingTemplate: SetState<boolean>;
+  setDealTemplate: SetState<DealTemplateData | null>;
+  setTemplateFieldsData: SetState<Record<string, any>>;
+  setLoadingIndustries: SetState<boolean>;
+  setCampaignIndustries: SetState<IndustryData[]>;
+  setSelectedIndustryId: SetState<number | null>;
+  fetchProductsByIndustry: (industryId: number) => Promise<void>;
+}): Promise<void> {
+  try {
+    args.setLoadingLead(true);
+    const leadData: any = await getLead(args.leadId);
+    args.setSourceLead(leadData);
+
+    const leadRecord = leadData as Record<string, unknown>;
+    args.setFormData(buildConvertDealFormStateFromLead(leadRecord, args.leadId));
+
+    await loadLeadTemplateImpl({
+      leadId: args.leadId,
+      setLoadingTemplate: args.setLoadingTemplate,
+      setDealTemplate: args.setDealTemplate,
+      setTemplateFieldsData: args.setTemplateFieldsData,
+    });
+
+    const campaignId = leadData?.campaign_id;
+    if (!campaignId) return;
+    await loadCampaignIndustryContextImpl({
+      campaignId: Number(campaignId),
+      setLoadingIndustries: args.setLoadingIndustries,
+      setCampaignIndustries: args.setCampaignIndustries,
+      setFormData: args.setFormData,
+      setSelectedIndustryId: args.setSelectedIndustryId,
+      fetchProductsByIndustry: args.fetchProductsByIndustry,
+    });
+  } catch (error) {
+    console.error("Failed to fetch lead:", error);
+    toast.error("Failed to load lead data");
+  } finally {
+    args.setLoadingLead(false);
+  }
+}
+
 const ConvertToDealModal: React.FC<ConvertToDealModalProps> = ({
   show,
   onHide,
@@ -369,54 +489,19 @@ const ConvertToDealModal: React.FC<ConvertToDealModalProps> = ({
   }, [show, leadId]);
 
   const fetchLeadData = async () => {
-    try {
-      setLoadingLead(true);
-      const leadData: any = await getLead(leadId);
-      setSourceLead(leadData);
-
-      const leadRecord = leadData as Record<string, unknown>;
-      setFormData(buildConvertDealFormStateFromLead(leadRecord, leadId));
-
-      try {
-        setLoadingTemplate(true);
-        const { template, templateFieldsData: initialFields } = await loadDealTemplateForLead(leadId);
-        if (template) {
-          setDealTemplate(template);
-          setTemplateFieldsData(initialFields);
-        }
-      } catch (error) {
-        console.error("Failed to fetch deal template:", error);
-      } finally {
-        setLoadingTemplate(false);
-      }
-
-      if (leadData.campaign_id) {
-        try {
-          setLoadingIndustries(true);
-          const ctx = await loadCampaignIndustryContext(Number(leadData.campaign_id));
-          if (ctx.campaignIndustryIds.length > 0) {
-            setCampaignIndustries(ctx.filteredIndustries);
-            setFormData((prev) => ({
-              ...prev,
-              industry_ids: ctx.campaignIndustryIds,
-            }));
-            if (ctx.filteredIndustries.length === 1) {
-              setSelectedIndustryId(ctx.filteredIndustries[0].id);
-              await fetchProductsByIndustry(ctx.filteredIndustries[0].id);
-            }
-          }
-        } catch (error) {
-          console.error("Failed to fetch campaign/industries:", error);
-        } finally {
-          setLoadingIndustries(false);
-        }
-      }
-    } catch (error) {
-      console.error("Failed to fetch lead:", error);
-      toast.error("Failed to load lead data");
-    } finally {
-      setLoadingLead(false);
-    }
+    await fetchLeadDataImpl({
+      leadId,
+      setLoadingLead,
+      setSourceLead,
+      setFormData,
+      setLoadingTemplate,
+      setDealTemplate,
+      setTemplateFieldsData,
+      setLoadingIndustries,
+      setCampaignIndustries,
+      setSelectedIndustryId,
+      fetchProductsByIndustry,
+    });
   };
 
   const fetchStages = async () => {
@@ -461,19 +546,11 @@ const ConvertToDealModal: React.FC<ConvertToDealModalProps> = ({
   };
 
   const fetchProductsByIndustry = async (industryId: number) => {
-    try {
-      setLoadingProducts(true);
-      const response = await getCrmProducts({ 
-        per_page: 100,
-        industry_id: industryId 
-      });
-      setProducts(response.data || []);
-    } catch (error) {
-      console.error("Failed to fetch products:", error);
-      toast.error("Failed to fetch products");
-    } finally {
-      setLoadingProducts(false);
-    }
+    await fetchProductsByIndustryImpl({
+      industryId,
+      setLoadingProducts,
+      setProducts,
+    });
   };
 
   const handleIndustryChange = async (selectedOption: any) => {
