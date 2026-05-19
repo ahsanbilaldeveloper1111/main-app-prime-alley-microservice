@@ -24,6 +24,7 @@ import {
   formatWorkloadMinutes,
   formatWorkloadPercent,
   isWorkloadOrganizationTask,
+  formatWorkloadTaskEstimate,
   isWorkloadTaskUnestimated,
   workloadDayCapacityMinutes,
   workloadMemberBaseName,
@@ -51,9 +52,9 @@ type WorkloadDayOffcanvasProps = Readonly<{
   dayQuery: DayQuerySlice;
   onReassign: (task: WorkloadTaskCard) => void;
   onReschedule: (task: WorkloadTaskCard) => void;
-  onMarkDone: (taskId: number) => void;
+  onMarkDone: (task: WorkloadTaskCard) => void;
   markDoneTaskId: number | null;
-  onSaveEstimate: (taskId: number, minutes: number) => void;
+  onSaveEstimate: (task: WorkloadTaskCard, minutes: number) => void;
   estimateSavingTaskId: number | null;
   formatError: (err: unknown) => string;
   hierarchyExtensions?: unknown[] | null;
@@ -63,9 +64,9 @@ type WorkloadDayTaskCardProps = Readonly<{
   task: WorkloadTaskCard;
   onReassign: (task: WorkloadTaskCard) => void;
   onReschedule: (task: WorkloadTaskCard) => void;
-  onMarkDone: (taskId: number) => void;
+  onMarkDone: (task: WorkloadTaskCard) => void;
   isMarkingDone: boolean;
-  onSaveEstimate: (taskId: number, minutes: number) => void;
+  onSaveEstimate: (task: WorkloadTaskCard, minutes: number) => void;
   isSavingEstimate: boolean;
 }>;
 
@@ -86,7 +87,7 @@ function WorkloadDayTaskMarkDoneButton({
 }: Readonly<{
   task: WorkloadTaskCard;
   isMarkingDone: boolean;
-  onMarkDone: (taskId: number) => void;
+  onMarkDone: (task: WorkloadTaskCard) => void;
 }>) {
   if (task.is_completed) return null;
   return (
@@ -94,7 +95,7 @@ function WorkloadDayTaskMarkDoneButton({
       size="sm"
       variant="outline-success"
       disabled={isMarkingDone}
-      onClick={() => onMarkDone(task.id)}
+      onClick={() => onMarkDone(task)}
     >
       {isMarkingDone ? "Saving…" : "Mark done"}
     </Button>
@@ -120,7 +121,7 @@ function WorkloadDayTaskCard({
   const handleSaveEstimate = () => {
     const minutes = Number.parseInt(estimateDraft.trim(), 10);
     if (!Number.isFinite(minutes) || minutes <= 0) return;
-    onSaveEstimate(task.id, minutes);
+    onSaveEstimate(task, minutes);
     setEstimateDraft("");
   };
 
@@ -169,7 +170,7 @@ function WorkloadDayTaskCard({
         ) : (
           <span className="workload-day-task-card__tag">
             <Clock size={12} aria-hidden />
-            {formatWorkloadMinutes(task.estimated_duration_minutes ?? 0)}
+            {formatWorkloadTaskEstimate(task)}
           </span>
         )}
       </div>

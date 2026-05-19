@@ -6,6 +6,7 @@ import {
   formatWorkloadMemberAssignOption,
   formatWorkloadMinutes,
   formatWorkloadShortDueDate,
+  formatWorkloadTaskEstimate,
   isWorkloadTaskUnestimated,
   workloadPriorityLabel,
   workloadPriorityTone,
@@ -57,7 +58,7 @@ function WorkloadUnassignedTaskRow({
         ) : (
           <span className="workload-unassigned-task__tag">
             <Clock size={12} aria-hidden />
-            {formatWorkloadMinutes(task.estimated_duration_minutes ?? 0)}
+            {formatWorkloadTaskEstimate(task)}
           </span>
         )}
         <span className="workload-unassigned-task__tag">
@@ -103,7 +104,7 @@ export type WorkloadUnassignedSidebarProps = Readonly<{
   setAssignTargets: React.Dispatch<React.SetStateAction<Record<number, string>>>;
   assignMutation: Readonly<{
     isPending: boolean;
-    mutate: (vars: { taskId: number; toExtension: string }) => void;
+    mutate: (vars: { task: WorkloadTaskCard; toExtension: string }) => void;
   }>;
   formatError: (err: unknown) => string;
 }>;
@@ -166,7 +167,7 @@ export function WorkloadUnassignedSidebar({
             onAssign={() => {
               const toExtension = assignTargets[task.id] ?? "";
               if (!toExtension) return;
-              assignMutation.mutate({ taskId: task.id, toExtension });
+              assignMutation.mutate({ task, toExtension });
             }}
             isAssigning={assignMutation.isPending}
           />

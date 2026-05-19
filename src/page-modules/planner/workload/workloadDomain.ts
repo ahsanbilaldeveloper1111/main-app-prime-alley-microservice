@@ -178,11 +178,45 @@ export function writeWorkloadMainViewPreference(view: WorkloadMainView): void {
   globalThis.window.localStorage.setItem(WORKLOAD_VIEW_STORAGE_KEY, view);
 }
 
-export function isWorkloadTaskUnestimated(task: {
-  estimated_duration_minutes?: number | null;
-}): boolean {
-  const est = task.estimated_duration_minutes;
-  return est == null || !Number.isFinite(est) || est <= 0;
+type WorkloadTaskEstimateSource = Readonly<{
+  estimated_minutes?: number | string | null;
+  estimated_duration_minutes?: number | string | null;
+  estimated_hours?: number | string | null;
+  estimate_minutes?: number | string | null;
+  duration_minutes?: number | string | null;
+}>;
+
+function parsePositiveMinutes(value: unknown): number | null {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed <= 0) return null;
+  return Math.round(parsed);
+}
+
+/** Resolve task estimate minutes from API fields (names vary by endpoint). */
+export function resolveWorkloadTaskEstimateMinutes(task: WorkloadTaskEstimateSource): number {
+  const candidates = [
+    task.estimated_minutes,
+    task.estimated_duration_minutes,
+    task.estimate_minutes,
+    task.duration_minutes,
+  ];
+  for (const value of candidates) {
+    const minutes = parsePositiveMinutes(value);
+    if (minutes != null) return minutes;
+  }
+  const hoursFloat = Number(task.estimated_hours);
+  if (Number.isFinite(hoursFloat) && hoursFloat > 0) {
+    return Math.round(hoursFloat * 60);
+  }
+  return 0;
+}
+
+export function isWorkloadTaskUnestimated(task: WorkloadTaskEstimateSource): boolean {
+  return resolveWorkloadTaskEstimateMinutes(task) <= 0;
+}
+
+export function formatWorkloadTaskEstimate(task: WorkloadTaskEstimateSource): string {
+  return formatWorkloadMinutes(resolveWorkloadTaskEstimateMinutes(task));
 }
 
 export function isSameCalendarDay(isoDate: string, now = new Date()): boolean {
@@ -200,6 +234,32 @@ export function workloadPriorityLabel(priority: number): string {
   if (priority >= 2) return "High";
   if (priority === 1) return "Medium";
   return "Low";
+}
+
+/** Map workload numeric priority to planner task API string values. */
+export function workloadPriorityToApiString(priority: number): string {
+  if (priority >= 3) return "urgent";
+  if (priority >= 2) return "high";
+  if (priority === 1) return "normal";
+  return "low";
+}
+
+export type WorkloadTaskPatchFields = Readonly<{
+  due_date?: string | null;
+  extension_numbers?: string[];
+  is_completed?: boolean;
+  estimated_duration_minutes?: number;
+}>;
+
+/** Always include priority so partial updates do not clear it server-side. */
+export function buildWorkloadTaskPatchBody(
+  task: Readonly<{ priority: number }>,
+  fields: WorkloadTaskPatchFields,
+): WorkloadTaskPatchFields & { priority: string } {
+  return {
+    ...fields,
+    priority: workloadPriorityToApiString(task.priority),
+  };
 }
 
 /** API `load_band` values (TaskWorkloadController). */
