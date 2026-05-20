@@ -354,8 +354,8 @@ export function parseCrmDailyCreationCountsResponse(
 
   return {
     period: {
-      start_date: String(periodRecord.start_date ?? ""),
-      end_date: String(periodRecord.end_date ?? ""),
+      start_date: toStableStringKey(periodRecord.start_date) ?? "",
+      end_date: toStableStringKey(periodRecord.end_date) ?? "",
       days: Number(periodRecord.days) || days.length,
     },
     days,

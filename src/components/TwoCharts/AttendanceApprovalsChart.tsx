@@ -16,7 +16,6 @@ import { useMainDashboardCrmDailyCreationCounts } from "@hooks/useMainDashboardC
 import {
   DAILY_CREATION_LINE_SERIES,
   buildDailyCreationLineChartRows,
-  type DailyCreationRangePill,
 } from "@utils/mainDashboardChartData";
 import {
   getMainDashboardDateRange,
