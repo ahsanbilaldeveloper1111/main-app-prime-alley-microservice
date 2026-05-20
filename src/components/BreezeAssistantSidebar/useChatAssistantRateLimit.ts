@@ -64,7 +64,7 @@ export function useChatAssistantRateLimit(enabled: boolean) {
   );
 
   const refreshRateLimit = useCallback(() => {
-    void queryClient.invalidateQueries({
+    return queryClient.invalidateQueries({
       queryKey: chatKeys.assistant.rateLimit(),
     });
   }, [queryClient]);
