@@ -236,6 +236,10 @@ export const mainDashboardKeys = {
     [...mainDashboardKeys.root, "attendanceActivity", startDate, endDate] as const,
   crmCreatedCounts: (startDate: string, endDate: string) =>
     [...mainDashboardKeys.root, "crmCreatedCounts", startDate, endDate] as const,
+  crmCreatedCountsMine: (startDate: string, endDate: string) =>
+    [...mainDashboardKeys.root, "crmCreatedCountsMine", startDate, endDate] as const,
+  crmDailyCreationCounts: (startDate: string, endDate: string) =>
+    [...mainDashboardKeys.root, "crmDailyCreationCounts", startDate, endDate] as const,
 };
 
 export const workforceKeys = {

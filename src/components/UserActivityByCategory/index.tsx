@@ -13,10 +13,11 @@ import {
 } from "recharts";
 import { MainDashboardChartLoader } from "@components/salesDashboard/MainDashboardChartLoader";
 import { MainDashboardDateField } from "@components/salesDashboard/MainDashboardDateField";
+import { useMainDashboardAttendanceActivity } from "@hooks/useMainDashboardAttendanceActivity";
 import { useMainDashboardCrmListCounts } from "@hooks/useMainDashboardCrmListCounts";
 import {
   CRM_ACTIVITY_LEGEND_ITEMS,
-  buildCrmActivityCategoryRows,
+  buildUserActivityByCategoryRows,
 } from "@utils/mainDashboardChartData";
 import { getDefaultCrmActivityDateRange } from "@utils/mainDashboardDateRanges";
 
@@ -104,14 +105,26 @@ export default function UserActivityByCategory({ scale = 1 }: Readonly<{ scale?:
   const crmQuery = useMainDashboardCrmListCounts(
     apiRange ?? { start_date: "", end_date: "" },
   );
+  const attendanceQuery = useMainDashboardAttendanceActivity(
+    apiRange ?? { start_date: "", end_date: "" },
+  );
 
   const effectiveCategories = useMemo(
-    () => buildCrmActivityCategoryRows(crmQuery.data ?? null, scale),
-    [crmQuery.data, scale],
+    () =>
+      buildUserActivityByCategoryRows(
+        crmQuery.data ?? null,
+        attendanceQuery.data ?? null,
+        scale,
+      ),
+    [crmQuery.data, attendanceQuery.data, scale],
   );
 
   const maxCount = Math.max(1, ...effectiveCategories.map((c) => c.count));
-  const isChartLoading = crmQuery.isPending || crmQuery.isFetching;
+  const isChartLoading =
+    crmQuery.isPending ||
+    crmQuery.isFetching ||
+    attendanceQuery.isPending ||
+    attendanceQuery.isFetching;
 
   return (
     <MainDashboardChartLoader isLoading={isChartLoading}>

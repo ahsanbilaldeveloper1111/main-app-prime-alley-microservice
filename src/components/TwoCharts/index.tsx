@@ -15,6 +15,7 @@ import { Info } from "lucide-react";
 import { MainDashboardChartLoader } from "@components/salesDashboard/MainDashboardChartLoader";
 import { useCrmDataManagementExtensions } from "@hooks/useCrmDataManagementExtensions";
 import { useMainDashboardCrmCreatedCounts } from "@hooks/useMainDashboardCrmCreatedCounts";
+import { useMainDashboardCrmDailyCreationCountsDefault } from "@hooks/useMainDashboardCrmDailyCreationCounts";
 import { buildTopActivitiesLeaderboardRows } from "@utils/mainDashboardChartData";
 import { AttendanceApprovalsChart } from "./AttendanceApprovalsChart";
 const FONT = "'Lexend Deca', Helvetica, Arial, sans-serif";
@@ -97,6 +98,7 @@ const LeaderboardTooltip = ({ active, payload, label }: any) => {
 
 function ActivityLeaderboard({ scale }: Readonly<{ scale: number }>) {
   const createdCountsQuery = useMainDashboardCrmCreatedCounts();
+  useMainDashboardCrmDailyCreationCountsDefault();
   const extensionsQuery = useCrmDataManagementExtensions();
 
   const chartData = useMemo(
@@ -247,7 +249,7 @@ export default function ChartsRow({ scale = 1 }: Readonly<{ scale?: number }>) {
       }}
     >
       <ActivityLeaderboard scale={scale} />
-      <AttendanceApprovalsChart />
+      <AttendanceApprovalsChart scale={scale} />
     </div>
   );
 }
