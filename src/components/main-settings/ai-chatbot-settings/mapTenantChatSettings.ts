@@ -3,6 +3,10 @@ import type {
   TenantChatSettingsUpdateRequest,
 } from "@utils/chat";
 
+import {
+  formatDecimalInputValue,
+  readDecimalStringValue,
+} from "./aiChatbotDecimalFormat";
 import { AI_CHATBOT_DEFAULT_RATE_LIMITS } from "./constants";
 import type {
   AIChatbotModelOption,
@@ -76,6 +80,23 @@ function readStringValue(raw: unknown): string {
   return "";
 }
 
+/** Effective per-user caps from tenant chat settings (for assistant UI fallback). */
+export function getEffectiveUserRateLimitsFromSettings(
+  data: TenantChatSettingsResponse | null | undefined,
+): { perMinuteLimit: number; perDayLimit: number } {
+  const root = asRecord(normalizeTenantChatSettingsPayload(data));
+  if (!root) {
+    return {
+      perMinuteLimit: AI_CHATBOT_DEFAULT_RATE_LIMITS.user_per_minute,
+      perDayLimit: AI_CHATBOT_DEFAULT_RATE_LIMITS.user_per_day,
+    };
+  }
+  return {
+    perMinuteLimit: readEffectiveLimit(root, "user_per_minute"),
+    perDayLimit: readEffectiveLimit(root, "user_per_day"),
+  };
+}
+
 function readEffectiveLimit(
   root: Record<string, unknown>,
   key: RateLimitKey,
@@ -108,26 +129,21 @@ function readEffectiveModelName(root: Record<string, unknown>): string {
 
 function readEffectiveMonthlyBudgetUsd(root: Record<string, unknown>): string {
   const overrides = asRecord(root.overrides);
-  const fromOverride = readStringValue(overrides?.monthly_budget_usd);
+  const fromOverride = readDecimalStringValue(overrides?.monthly_budget_usd);
   if (fromOverride) return fromOverride;
 
   const budget = asRecord(root.budget);
   if (budget?.is_unlimited === true) return "";
-  return readStringValue(budget?.budget);
+  return readDecimalStringValue(budget?.budget);
 }
 
 function readEffectiveThresholdPct(root: Record<string, unknown>): string {
   const overrides = asRecord(root.overrides);
-  if (typeof overrides?.threshold_pct === "number" && Number.isFinite(overrides.threshold_pct)) {
-    return String(overrides.threshold_pct);
-  }
+  const fromOverride = readDecimalStringValue(overrides?.threshold_pct);
+  if (fromOverride) return fromOverride;
 
   const budget = asRecord(root.budget);
-  if (typeof budget?.threshold_pct === "number" && Number.isFinite(budget.threshold_pct)) {
-    return String(budget.threshold_pct);
-  }
-
-  return "";
+  return readDecimalStringValue(budget?.threshold_pct);
 }
 
 export function mapTenantChatSettingsPricingTable(
@@ -144,8 +160,8 @@ export function mapTenantChatSettingsPricingTable(
   for (const [model, row] of Object.entries(table)) {
     const pricing = asRecord(row);
     if (!pricing) continue;
-    const input = readStringValue(pricing.input);
-    const output = readStringValue(pricing.output);
+    const input = readDecimalStringValue(pricing.input);
+    const output = readDecimalStringValue(pricing.output);
     if (!input && !output) continue;
     result[model] = { input, output };
   }
@@ -158,8 +174,8 @@ function readPricingForModel(
   pricingTable: TenantChatPricingTable,
 ): { input: string; output: string } {
   const overrides = asRecord(root.overrides);
-  const overrideInput = readStringValue(overrides?.input_cost_per_million);
-  const overrideOutput = readStringValue(overrides?.output_cost_per_million);
+  const overrideInput = readDecimalStringValue(overrides?.input_cost_per_million);
+  const overrideOutput = readDecimalStringValue(overrides?.output_cost_per_million);
   if (overrideInput || overrideOutput) {
     return {
       input: overrideInput,
@@ -173,8 +189,8 @@ function readPricingForModel(
   const defaults = asRecord(root.defaults);
   const pricing = asRecord(defaults?.pricing);
   return {
-    input: readStringValue(pricing?.input_cost_per_million),
-    output: readStringValue(pricing?.output_cost_per_million),
+    input: readDecimalStringValue(pricing?.input_cost_per_million),
+    output: readDecimalStringValue(pricing?.output_cost_per_million),
   };
 }
 
@@ -278,6 +294,12 @@ function toPayloadString(raw: string): string {
   return raw.trim();
 }
 
+function toPayloadDecimalString(raw: string): string {
+  const trimmed = raw.trim();
+  if (!trimmed) return "";
+  return formatDecimalInputValue(trimmed);
+}
+
 function validateOptionalNonNegativeInt(raw: string, label: string): void {
   const trimmed = raw.trim();
   if (!trimmed) return;
@@ -324,10 +346,10 @@ export function mapFormValuesToTenantSettingsUpdate(
   const userPerDay = toPayloadString(values.rateLimits.perUserPerDay);
   const tenantPerMinute = toPayloadString(values.rateLimits.perTenantPerMinute);
   const tenantPerDay = toPayloadString(values.rateLimits.perTenantPerDay);
-  const inputCost = toPayloadString(values.pricing.inputCostPerMillion);
-  const outputCost = toPayloadString(values.pricing.outputCostPerMillion);
-  const monthlyBudget = toPayloadString(values.budget.monthlyBudgetUsd);
-  const thresholdPct = toPayloadString(values.budget.alertThresholdPct);
+  const inputCost = toPayloadDecimalString(values.pricing.inputCostPerMillion);
+  const outputCost = toPayloadDecimalString(values.pricing.outputCostPerMillion);
+  const monthlyBudget = toPayloadDecimalString(values.budget.monthlyBudgetUsd);
+  const thresholdPct = toPayloadDecimalString(values.budget.alertThresholdPct);
 
   validateOptionalNonNegativeInt(userPerMinute, "User per minute");
   validateOptionalNonNegativeInt(userPerDay, "User per day");

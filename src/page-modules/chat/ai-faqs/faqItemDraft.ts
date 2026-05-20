@@ -39,6 +39,42 @@ export function getValidFaqItemsForSubmit(items: FAQItemDraft[]): FAQItem[] {
     .map(({ question, answer }) => ({ question, answer }));
 }
 
+export type AiFaqDraftSubmitValidation =
+  | { ok: true; validFAQs: FAQItem[]; hasFiles: boolean }
+  | { ok: false; message: string };
+
+export function validateAiFaqDraftSubmit(
+  items: FAQItemDraft[],
+  haveFiles: boolean,
+  selectedFiles: File[],
+  options?: Readonly<{ filesOnlyHint?: string }>,
+): AiFaqDraftSubmitValidation {
+  const validFAQs = getValidFaqItemsForSubmit(items);
+  const hasFiles = haveFiles && selectedFiles.length > 0;
+
+  if (validFAQs.length > 0 || hasFiles) {
+    return { ok: true, validFAQs, hasFiles };
+  }
+
+  const hasPartialRow = items.some((item) => {
+    const hasQuestion = Boolean(item.question.trim());
+    const hasAnswer = Boolean(item.answer.trim());
+    return hasQuestion !== hasAnswer;
+  });
+  if (hasPartialRow) {
+    return {
+      ok: false,
+      message: "Each FAQ needs both a question and an answer before you can save.",
+    };
+  }
+
+  const emptyFallback =
+    options?.filesOnlyHint ??
+    "Add at least one FAQ (question and answer) or attach a file";
+
+  return { ok: false, message: emptyFallback };
+}
+
 export type AiFaqSubmitFieldPayload = {
   faqs: string;
   have_files: string;

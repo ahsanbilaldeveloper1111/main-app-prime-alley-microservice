@@ -15,7 +15,7 @@ export const AI_CHATBOT_FIELD_PLACEHOLDERS = {
     perTenantPerDay: "Default: 20000",
   },
   budget: {
-    monthlyBudgetUsd: "50.0 (blank = unlimited)",
+    monthlyBudgetUsd: "50.00 (blank = unlimited)",
     alertThresholdPct: "Default: 80",
   },
   pricing: {

@@ -20,8 +20,8 @@ const { PERMISSIONS } = HEADER_CONSTANTS;
 import {
   buildAiFaqSubmitFields,
   emptyFaqListPage,
-  getValidFaqItemsForSubmit,
   paginateArrayForTable,
+  validateAiFaqDraftSubmit,
 } from "../faqItemDraft";
 import { useAiFaqDraftFormState } from "../hooks/useAiFaqDraftFormState";
 
@@ -68,19 +68,25 @@ export function useAIFaqsGlobalPage() {
     [canDeleteFaq],
   );
 
-  const handleSubmit = useCallback(async () => {
-    const validFAQs = getValidFaqItemsForSubmit(faqItems);
-    const hasFiles = haveFiles && selectedFiles.length > 0;
+  const openAddModal = useCallback(() => {
+    resetForm();
+    setShowAddModal(true);
+  }, [resetForm]);
 
-    if (validFAQs.length === 0 && !hasFiles) {
-      toast.error("Add at least one FAQ (question and answer) or attach a file");
+  const handleSubmit = useCallback(async () => {
+    const validation = validateAiFaqDraftSubmit(faqItems, haveFiles, selectedFiles);
+    if (!validation.ok) {
+      toast.error(validation.message);
       return;
     }
+
+    const { validFAQs } = validation;
 
     try {
       const fields = buildAiFaqSubmitFields(validFAQs, haveFiles, selectedFiles);
       const payload: CreateGlobalFAQPayload = {
         faqs: fields.faqs,
+        have_files: fields.have_files,
         ...(fields.files?.length ? { files: fields.files } : {}),
       };
 
@@ -158,6 +164,7 @@ export function useAIFaqsGlobalPage() {
     stableFilters,
     showAddModal,
     setShowAddModal,
+    openAddModal,
     showDeleteModal,
     setShowDeleteModal,
     selectedFAQ,

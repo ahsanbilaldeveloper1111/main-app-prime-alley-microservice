@@ -21,6 +21,10 @@ import {
   validateAIChatbotSettingsForm,
 } from "./mapTenantChatSettings";
 import { AI_CHATBOT_FIELD_PLACEHOLDERS } from "./constants";
+import {
+  AI_CHATBOT_DECIMAL_PLACES,
+  formatDecimalInputValue,
+} from "./aiChatbotDecimalFormat";
 import { AIChatbotSettingsFormSkeleton } from "./AIChatbotSettingsFormSkeleton";
 import { ModelPricingDefaultsTable } from "./ModelPricingDefaultsTable";
 import { useAIChatbotSettingsPage } from "./useAIChatbotSettingsPage";
@@ -109,6 +113,7 @@ function NumberField(props: Readonly<{
   min?: number;
   max?: number;
   step?: number | string;
+  decimalPlaces?: number;
   disabled?: boolean;
 }>) {
   const {
@@ -119,8 +124,17 @@ function NumberField(props: Readonly<{
     min = 0,
     max,
     step = 1,
+    decimalPlaces,
     disabled = false,
   } = props;
+
+  const handleBlur = () => {
+    if (decimalPlaces == null || !value.trim()) {
+      return;
+    }
+    onChange(formatDecimalInputValue(value, decimalPlaces));
+  };
+
   return (
     <label className="ai-chatbot-settings__field">
       <span className="ai-chatbot-settings__field-label">{label}</span>
@@ -134,6 +148,7 @@ function NumberField(props: Readonly<{
         placeholder={placeholder}
         disabled={disabled}
         onChange={(e) => onChange(e.target.value)}
+        onBlur={handleBlur}
       />
     </label>
   );
@@ -163,6 +178,15 @@ function formatResetsOn(iso: string): string {
 function formatSpendUsd(spend: string): string {
   const trimmed = spend.trim();
   if (!trimmed) return "—";
+  const numeric = Number.parseFloat(trimmed.replace(/^\$/, ""));
+  if (Number.isFinite(numeric)) {
+    return new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: "USD",
+      minimumFractionDigits: AI_CHATBOT_DECIMAL_PLACES,
+      maximumFractionDigits: AI_CHATBOT_DECIMAL_PLACES,
+    }).format(numeric);
+  }
   return trimmed.startsWith("$") ? trimmed : `$${trimmed}`;
 }
 
@@ -193,7 +217,7 @@ function LiveSpendSection(props: Readonly<{
       {budget && !budget.isUnlimited && (
         <>
           <p className="ai-chatbot-settings__live-spend-meta">
-            <span>{usedPct.toFixed(1)}% of monthly cap used</span>
+            <span>{usedPct.toFixed(AI_CHATBOT_DECIMAL_PLACES)}% of monthly cap used</span>
             {budget.isExhausted && (
               <span className="ai-chatbot-settings__live-spend-exhausted">
                 · Budget exhausted
@@ -429,6 +453,7 @@ export const AIChatbotSettings: React.FC = () => {
             onChange={(v) => updateBudget("monthlyBudgetUsd", v)}
             placeholder={AI_CHATBOT_FIELD_PLACEHOLDERS.budget.monthlyBudgetUsd}
             step="0.01"
+            decimalPlaces={AI_CHATBOT_DECIMAL_PLACES}
             min={0}
             disabled={fieldsDisabled}
           />
@@ -439,7 +464,8 @@ export const AIChatbotSettings: React.FC = () => {
             placeholder={AI_CHATBOT_FIELD_PLACEHOLDERS.budget.alertThresholdPct}
             min={0}
             max={100}
-            step="1"
+            step="0.01"
+            decimalPlaces={AI_CHATBOT_DECIMAL_PLACES}
             disabled={fieldsDisabled}
           />
         </div>
@@ -490,7 +516,8 @@ export const AIChatbotSettings: React.FC = () => {
             value={values.pricing.inputCostPerMillion}
             onChange={(v) => updatePricing("inputCostPerMillion", v)}
             placeholder={AI_CHATBOT_FIELD_PLACEHOLDERS.pricing.inputCostPerMillion}
-            step="0.000001"
+            step="0.01"
+            decimalPlaces={AI_CHATBOT_DECIMAL_PLACES}
             min={0}
             disabled={fieldsDisabled}
           />
@@ -499,7 +526,8 @@ export const AIChatbotSettings: React.FC = () => {
             value={values.pricing.outputCostPerMillion}
             onChange={(v) => updatePricing("outputCostPerMillion", v)}
             placeholder={AI_CHATBOT_FIELD_PLACEHOLDERS.pricing.outputCostPerMillion}
-            step="0.000001"
+            step="0.01"
+            decimalPlaces={AI_CHATBOT_DECIMAL_PLACES}
             min={0}
             disabled={fieldsDisabled}
           />

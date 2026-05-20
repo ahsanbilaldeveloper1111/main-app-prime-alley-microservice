@@ -709,6 +709,7 @@ export const chatKeys = {
     all: () => [...chatKeys.root, "assistant"] as const,
     thread: (threadId: string) =>
       [...chatKeys.assistant.all(), "thread", threadId] as const,
+    rateLimit: () => [...chatKeys.assistant.all(), "rateLimit"] as const,
   },
 };
 

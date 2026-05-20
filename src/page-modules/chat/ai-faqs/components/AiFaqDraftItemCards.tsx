@@ -23,9 +23,9 @@ export function AiFaqDraftItemCards({
       <div className="d-flex justify-content-between align-items-center mb-3">
         <h6>{variant === "single" ? "FAQ Item" : "FAQ Items"}</h6>
         {variant === "multi" && onAddItem ? (
-          <Button variant="outline-primary" size="sm" onClick={onAddItem}>
+          <Button variant="outline-primary" size="sm" type="button" onClick={onAddItem}>
             <Plus size={14} className="me-1" />
-            Add FAQ
+            Add another FAQ
           </Button>
         ) : null}
       </div>

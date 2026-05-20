@@ -7,6 +7,9 @@ import type { FAQItemDraft } from "../faqItemDraft";
 import { AiFaqAttachmentField } from "./AiFaqAttachmentField";
 import { AiFaqDraftItemCards } from "./AiFaqDraftItemCards";
 
+const ADD_FAQ_FORM_ID = "ai-faq-add-form";
+const EDIT_FAQ_FORM_ID = "ai-faq-edit-form";
+
 export type AiFaqPageModalsProps = Readonly<{
   scopeLabel: string;
   showAddModal: boolean;
@@ -87,7 +90,13 @@ export function AiFaqPageModals(props: AiFaqPageModalsProps) {
           <Modal.Title>{`Add ${scopeLabel} FAQs`}</Modal.Title>
         </Modal.Header>
         <Modal.Body>
-          <Form>
+          <Form
+            id={ADD_FAQ_FORM_ID}
+            onSubmit={(e) => {
+              e.preventDefault();
+              void handleSubmit();
+            }}
+          >
             {addModalBodyPrefix}
             <AiFaqDraftItemCards
               variant="multi"
@@ -109,6 +118,7 @@ export function AiFaqPageModals(props: AiFaqPageModalsProps) {
         <Modal.Footer>
           <Button
             variant="secondary"
+            type="button"
             onClick={() => {
               setShowAddModal(false);
               resetForm();
@@ -116,12 +126,7 @@ export function AiFaqPageModals(props: AiFaqPageModalsProps) {
           >
             Cancel
           </Button>
-          <Button
-            variant="primary"
-            onClick={() => {
-              void handleSubmit();
-            }}
-          >
+          <Button variant="primary" type="submit" form={ADD_FAQ_FORM_ID}>
             Create FAQs
           </Button>
         </Modal.Footer>
@@ -142,7 +147,13 @@ export function AiFaqPageModals(props: AiFaqPageModalsProps) {
             <Modal.Title>{`Edit ${scopeLabel} FAQ`}</Modal.Title>
           </Modal.Header>
           <Modal.Body>
-            <Form>
+            <Form
+              id={EDIT_FAQ_FORM_ID}
+              onSubmit={(e) => {
+                e.preventDefault();
+                void handleSubmit();
+              }}
+            >
               <AiFaqDraftItemCards
                 variant="single"
                 faqItems={faqItems}
@@ -162,6 +173,7 @@ export function AiFaqPageModals(props: AiFaqPageModalsProps) {
           <Modal.Footer>
             <Button
               variant="secondary"
+              type="button"
               onClick={() => {
                 setShowEditModal(false);
                 setSelectedFAQ(null);
@@ -170,12 +182,7 @@ export function AiFaqPageModals(props: AiFaqPageModalsProps) {
             >
               Cancel
             </Button>
-            <Button
-              variant="primary"
-              onClick={() => {
-                void handleSubmit();
-              }}
-            >
+            <Button variant="primary" type="submit" form={EDIT_FAQ_FORM_ID}>
               Update FAQ
             </Button>
           </Modal.Footer>

@@ -20,9 +20,10 @@ const { PERMISSIONS } = HEADER_CONSTANTS;
 
 import { useAiFaqListColumns } from "../aiFaqListColumns";
 import {
+  buildAiFaqSubmitFields,
   emptyFaqListPage,
-  getValidFaqItemsForSubmit,
   paginateArrayForTable,
+  validateAiFaqDraftSubmit,
 } from "../faqItemDraft";
 import { useAiFaqDraftFormState } from "../hooks/useAiFaqDraftFormState";
 import { resolveTenantIdFromSession } from "../../shared/resolveTenantIdFromSession";
@@ -100,13 +101,16 @@ export function useAIFaqsTenantPage() {
   );
 
   const handleSubmit = useCallback(async () => {
-    const validFAQs = getValidFaqItemsForSubmit(faqItems);
-    const hasFiles = haveFiles && selectedFiles.length > 0;
-
-    if (validFAQs.length === 0 && !hasFiles) {
-      toast.error("Add at least one FAQ (question and answer) or attach a PDF/TXT file");
+    const validation = validateAiFaqDraftSubmit(faqItems, haveFiles, selectedFiles, {
+      filesOnlyHint:
+        "Add at least one FAQ (question and answer) or attach a PDF/TXT file",
+    });
+    if (!validation.ok) {
+      toast.error(validation.message);
       return;
     }
+
+    const { validFAQs } = validation;
 
     try {
       const tenantForPayload = getTenantId();
@@ -115,11 +119,12 @@ export function useAIFaqsTenantPage() {
         return;
       }
 
-      const faqsJson = JSON.stringify(validFAQs);
+      const fields = buildAiFaqSubmitFields(validFAQs, haveFiles, selectedFiles);
       const payload: CreateTenantFAQPayload = {
         tenant_id: tenantForPayload,
-        faqs: faqsJson,
-        ...(hasFiles ? { files: selectedFiles } : {}),
+        faqs: fields.faqs,
+        have_files: fields.have_files,
+        ...(fields.files?.length ? { files: fields.files } : {}),
       };
 
       await createTenantFAQ(payload);
@@ -205,9 +210,10 @@ export function useAIFaqsTenantPage() {
   const stableFilters = useMemo(() => ({}), []);
 
   const openAddModalWithTenant = useCallback(() => {
+    resetForm();
     setTenantId(filterTenantId || selectedCompanyForFilter || "");
     setShowAddModal(true);
-  }, [filterTenantId, selectedCompanyForFilter]);
+  }, [filterTenantId, resetForm, selectedCompanyForFilter]);
 
   const columns = useAiFaqListColumns({
     variant: "tenant",

@@ -17,7 +17,11 @@ import {
   getChatThread,
   mapChatThreadMessagesToUi,
   sendChatMessage,
+  type ChatRateLimit,
 } from "@utils/chat";
+
+import { AssistantRateLimitBar } from "./AssistantRateLimitBar";
+import { useChatAssistantRateLimit } from "./useChatAssistantRateLimit";
 
 // ============================================================================
 // TYPE DEFINITIONS
@@ -106,7 +110,7 @@ async function requestAssistantReply(
   text: string,
   threadId: string,
   onSendMessage?: (message: string) => Promise<string>,
-): Promise<{ reply: string; newThreadId: string }> {
+): Promise<{ reply: string; newThreadId: string; rateLimit?: ChatRateLimit }> {
   if (onSendMessage) {
     return { reply: await onSendMessage(text), newThreadId: threadId };
   }
@@ -117,6 +121,7 @@ async function requestAssistantReply(
   return {
     reply: response.response || "No response received",
     newThreadId: response.thread_id || threadId,
+    rateLimit: response.rate_limit,
   };
 }
 
@@ -1325,6 +1330,19 @@ const BreezeAssistantSidebar: React.FC<BreezeAssistantSidebarProps> = ({
   const hasMessages = messages.length > 0;
   const chatBusy = isLoading || isLoadingThread;
 
+  const {
+    rateLimit,
+    isLoading: isRateLimitLoading,
+    applyRateLimitFromSend,
+    refreshRateLimit,
+  } = useChatAssistantRateLimit(isOpen);
+
+  useEffect(() => {
+    if (isOpen) {
+      refreshRateLimit();
+    }
+  }, [isOpen, refreshRateLimit]);
+
   useEffect(() => {
     if (messagesEndRef.current && hasMessages)
       messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
@@ -1355,11 +1373,9 @@ const BreezeAssistantSidebar: React.FC<BreezeAssistantSidebarProps> = ({
     setInputValue("");
     setIsLoading(true);
     try {
-      const { reply, newThreadId } = await requestAssistantReply(
-        text,
-        threadId,
-        onSendMessage,
-      );
+      const { reply, newThreadId, rateLimit: sendRateLimit } =
+        await requestAssistantReply(text, threadId, onSendMessage);
+      applyRateLimitFromSend(sendRateLimit);
       if (newThreadId && newThreadId !== threadId) {
         setThreadId(newThreadId);
       }
@@ -1402,6 +1418,7 @@ const BreezeAssistantSidebar: React.FC<BreezeAssistantSidebarProps> = ({
     try {
       const thread = await getChatThread(item.threadId);
       const loaded = mapChatThreadMessagesToUi(thread.messages);
+      applyRateLimitFromSend(thread.rate_limit);
       setMessages(loaded);
       persistThreadToHistory(
         thread.thread_id,
@@ -1551,6 +1568,22 @@ const BreezeAssistantSidebar: React.FC<BreezeAssistantSidebarProps> = ({
           <X size={18} />
         </button>
       </div>
+    </div>
+  );
+
+  const RateLimitStrip = (
+    <div
+      style={{
+        padding: "8px 14px",
+        borderBottom: "1px solid #e8edf2",
+        backgroundColor: "#f7fafc",
+        flexShrink: 0,
+      }}
+    >
+      <AssistantRateLimitBar
+        rateLimit={rateLimit}
+        isLoading={isRateLimitLoading}
+      />
     </div>
   );
 
@@ -1733,6 +1766,7 @@ const BreezeAssistantSidebar: React.FC<BreezeAssistantSidebarProps> = ({
             />
             <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
               {TopBar}
+              {view === "chat" ? RateLimitStrip : null}
               <div
                 className="breeze-scroll"
                 style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}
@@ -1778,6 +1812,7 @@ const BreezeAssistantSidebar: React.FC<BreezeAssistantSidebarProps> = ({
         }}
       >
         {TopBar}
+        {view === "chat" ? RateLimitStrip : null}
         {BodyContent}
         {FooterBar}
       </div>
