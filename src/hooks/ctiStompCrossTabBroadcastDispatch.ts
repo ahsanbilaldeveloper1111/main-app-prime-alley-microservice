@@ -1,10 +1,11 @@
 import type { Dispatch, SetStateAction } from "react";
 import type { CtiEvent, CrossTabCtiManager } from "../utils/crossTabCtiManager";
 import { devicesArrayFromCompleteStatePayload } from "./ctiStompHelpers";
+import type { CtiDevice } from "./ctiStompHookTypes";
 
-type DnsMapState = Record<
+export type CtiDnsMapGrouped = Record<
   string,
-  { dn: string; devices: Record<string, Record<string, unknown>> }
+  { dn: string; devices: Record<string, CtiDevice> }
 >;
 
 export interface CrossTabBroadcastCtx {
@@ -13,9 +14,13 @@ export interface CrossTabBroadcastCtx {
   manager: CrossTabCtiManager;
   userDataExtensionsRef: { current: unknown };
   handleCallEvent: (evt: unknown) => void;
-  groupDevicesByDnAndDeviceNameRef: { current: ((data: unknown) => unknown) | null };
-  updateSummaryDataRef: { current: ((grouped: unknown) => void) | null };
-  setDnsMap: Dispatch<SetStateAction<DnsMapState>>;
+  groupDevicesByDnAndDeviceNameRef: {
+    current: ((deviceArray: CtiDevice[]) => CtiDnsMapGrouped) | null;
+  };
+  updateSummaryDataRef: {
+    current: ((grouped: CtiDnsMapGrouped) => void) | null;
+  };
+  setDnsMap: Dispatch<SetStateAction<CtiDnsMapGrouped>>;
   setEventLog: Dispatch<SetStateAction<unknown[]>>;
 }
 
@@ -27,10 +32,9 @@ function applyCompleteStateFromMaster(
     const groupFn = ctx.groupDevicesByDnAndDeviceNameRef.current;
     const summaryFn = ctx.updateSummaryDataRef.current;
     if (!groupFn || !summaryFn) return;
-    const grouped = groupFn(devicesArrayFromCompleteStatePayload(rawData)) as Record<
-      string,
-      { dn: string; devices: Record<string, Record<string, unknown>> }
-    >;
+    const grouped = groupFn(
+      devicesArrayFromCompleteStatePayload(rawData) as CtiDevice[],
+    );
     ctx.setDnsMap(grouped);
     summaryFn(grouped);
     ctx.setEventLog((prev) => [

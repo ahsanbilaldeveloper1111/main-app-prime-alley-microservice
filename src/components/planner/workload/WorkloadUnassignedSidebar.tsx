@@ -44,7 +44,16 @@ function WorkloadUnassignedTaskRow({
 
   return (
     <div className="workload-unassigned-task">
-      <p className="workload-unassigned-task__title">{task.title}</p>
+      <p className="workload-unassigned-task__title">
+        {task.title}
+        {unestimated ? (
+          <span
+            className="workload-unestimated-dot ms-1"
+            title="No estimate"
+            aria-label="No estimate"
+          />
+        ) : null}
+      </p>
       <div className="workload-unassigned-task__tags">
         <span className={`workload-priority-badge workload-priority-badge--${priorityTone}`}>
           {workloadPriorityLabel(task.priority)}

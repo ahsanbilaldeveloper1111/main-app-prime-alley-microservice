@@ -21,9 +21,13 @@ import {
   devicePayloadFromDnsStateEvent,
   devicesArrayFromCompleteStateEvent,
   findLatestMonitoringEventFromLog,
+  findTerminalMonitoringClearInRecentLog,
   isCompleteStateLikeEvent,
   monitoringPayloadDiffersFromActive,
   pickBestMonitoringPayloadFromCallStateMap,
+  isWallboardRemoteSupervisionSessionActive,
+  resolveEffectiveWallboardMonitoring,
+  shouldBlockMonitoringRefillDueToSuppression,
   registeredEntriesFromDevices,
   type RegisteredDeviceEntry,
   parseWallboardTimestampToMs,
@@ -119,9 +123,12 @@ const WallboardsLiveView: React.FC = () => {
   // Refs
   /** Stale CTI snapshots may still list a session after stop; skip refilling until map drops it or key changes. */
   const suppressedMonitoringRefillKeyRef = useRef<string | null>(null)
+  const [suppressedMonitoringKey, setSuppressedMonitoringKey] = useState<string | null>(null)
   const [monitoringTeardown, setMonitoringTeardown] = useState<MonitoringTeardownHint | null>(null)
   /** First hydration from server when React state is still empty (refresh / SSE before events). */
   const monitoringSnapshotAppliedRef = useRef(false)
+  /** After stop-barge, ignore monitoring SSE at or below this sequence until a newer session starts. */
+  const monitoringStopBarrierSequenceRef = useRef<number | null>(null)
   const activeMonitoringRef = useRef(activeMonitoring)
   useEffect(() => {
     activeMonitoringRef.current = activeMonitoring
@@ -131,8 +138,43 @@ const WallboardsLiveView: React.FC = () => {
   const [animatingCards, setAnimatingCards] = useState<Set<string>>(new Set())
   const cardPositionsRef = useRef<{ [dn: string]: { x: number; y: number; width: number; height: number } }>({})
   const previousSectionsRef = useRef<{ [dn: string]: string }>({})
-  
-  // Monitoring hook
+
+  useEffect(() => {
+    if (activeMonitoring.dn && activeMonitoring.type) {
+      setMonitoringTeardown(null)
+    }
+  }, [activeMonitoring.dn, activeMonitoring.type])
+
+  /** Same barge/supervision session for every wallboard viewer (not only the supervisor who barged). */
+  const effectiveMonitoring = useMemo(
+    () =>
+      resolveEffectiveWallboardMonitoring(
+        activeMonitoring,
+        callStateMap as Record<string, unknown>,
+        dnsMap,
+        eventLog,
+        {
+          suppressedSessionKey: suppressedMonitoringKey,
+          monitoringTeardown,
+          eventLog,
+        },
+      ),
+    [
+      activeMonitoring,
+      callStateMap,
+      dnsMap,
+      eventLog,
+      suppressedMonitoringKey,
+      monitoringTeardown,
+    ],
+  )
+
+  const effectiveMonitoringRef = useRef(effectiveMonitoring)
+  useEffect(() => {
+    effectiveMonitoringRef.current = effectiveMonitoring
+  }, [effectiveMonitoring])
+
+  // Monitoring hook — stop uses effectiveMonitoring (SSE-hydrated) so devices survive transfer/barge
   const {
     showDeviceSelectionModal,
     setShowDeviceSelectionModal,
@@ -141,7 +183,7 @@ const WallboardsLiveView: React.FC = () => {
     pendingMonitoringData,
     setPendingMonitoringData,
     startMonitoringLocal,
-    stopMonitoring: stopMonitoringFromHook
+    stopMonitoring: stopMonitoringFromHook,
   } = useMonitoring(
     userAddress,
     dnsMap,
@@ -153,21 +195,22 @@ const WallboardsLiveView: React.FC = () => {
     setSelectedTone,
     setTempMonitorSelection,
     setShowPopup,
-    activeMonitoring
+    effectiveMonitoring,
+    getCallStatesForDn,
   )
-  
+
   const getWallboardCallForDn = useCallback(
     (dn: string) =>
       resolveWallboardDisplayCall(
         dn,
-        activeMonitoring,
+        effectiveMonitoring,
         monitoringTeardown,
         getDnCallState,
         getCallStateForDevice,
         getCallStatesForDn,
       ),
     [
-      activeMonitoring,
+      effectiveMonitoring,
       monitoringTeardown,
       getDnCallState,
       getCallStateForDevice,
@@ -175,21 +218,15 @@ const WallboardsLiveView: React.FC = () => {
     ],
   )
 
-  useEffect(() => {
-    if (activeMonitoring.dn && activeMonitoring.type) {
-      setMonitoringTeardown(null)
-    }
-  }, [activeMonitoring.dn, activeMonitoring.type])
-
   const wallboardHasActiveCalls = useCallback(
     (dn: string) =>
       dnHasActiveCallForWallboard(
         dn,
         getCallStatesForDn,
-        activeMonitoring,
+        effectiveMonitoring,
         monitoringTeardown,
       ),
-    [getCallStatesForDn, activeMonitoring, monitoringTeardown],
+    [getCallStatesForDn, effectiveMonitoring, monitoringTeardown],
   )
 
   // Helper function to categorize DNs into sections (wrapper for imported helper)
@@ -200,7 +237,7 @@ const WallboardsLiveView: React.FC = () => {
         devices,
         call,
         active,
-        activeMonitoring,
+        activeMonitoring: effectiveMonitoring,
         getCallStateForDevice,
         getCallStatesForDn,
         userAddress,
@@ -208,7 +245,7 @@ const WallboardsLiveView: React.FC = () => {
       })
     },
     [
-      activeMonitoring,
+      effectiveMonitoring,
       getCallStateForDevice,
       getCallStatesForDn,
       userAddress,
@@ -335,7 +372,7 @@ const WallboardsLiveView: React.FC = () => {
     wallboardHasActiveCalls,
     getWallboardCallForDn,
     categorizeDns,
-    activeMonitoring,
+    effectiveMonitoring,
     eventLog,
   ])
 
@@ -555,9 +592,11 @@ const WallboardsLiveView: React.FC = () => {
   const clearMonitoringState = useCallback((monitoredDn: string, reason: string = 'call ended') => {
     console.log('[Monitoring] clearMonitoringState called', { monitoredDn, reason })
     const snap = activeMonitoringRef.current
-    suppressedMonitoringRefillKeyRef.current = snap.monitor
+    const sessionKey = snap.monitor
       ? `${snap.monitor}:${monitoredDn}`
       : `*:${monitoredDn}`
+    suppressedMonitoringRefillKeyRef.current = sessionKey
+    setSuppressedMonitoringKey(sessionKey)
     monitoringSnapshotAppliedRef.current = false
     setMonitoringTeardown({
       monitorDn: snap.monitor,
@@ -590,89 +629,6 @@ const WallboardsLiveView: React.FC = () => {
     })
   }, [setActiveMonitoring, setMonitoringStartTime, setSelectedMonitor, setSelectedTone, setTempMonitorSelection, setNotification])
 
-  // Listen for terminal monitoring events and clear monitoring state immediately.
-  // stopBargeInMonitoringAPI can emit DROPPED while the underlying customer call remains active,
-  // so do not require hasActiveParticipants === false for the monitoring leg itself.
-  useEffect(() => {
-    if (!activeMonitoring.dn || !eventLog?.length) return
-
-    const monitoredDn = activeMonitoring.dn
-    const monitoredDeviceName = activeMonitoring.deviceName
-    const supervisorDn = activeMonitoring.monitor // Supervisor's DN (e.g., 107)
-
-    const lastEvent = eventLog.at(-1)
-    if (!lastEvent?.parties?.length) return
-
-    const isTerminatedParty = (party: any) =>
-      party?.callStatus === 'DROPPED' ||
-      party?.callStatus === 'DISCONNECTED' ||
-      party?.callStatus === 'ENDED'
-    const involvesDn = (party: any, dn: string) => party?.callingAddress === dn || party?.calledAddress === dn
-    const terminalEventType =
-      lastEvent.eventType === 'DROPPED' ||
-      lastEvent.eventType === 'DISCONNECTED' ||
-      lastEvent.eventType === 'ENDED'
-
-    // Case 1: Explicit observation end event (CTI-specific).
-    if (
-      lastEvent.eventName === 'CallObservationEndedEvImpl' &&
-      terminalEventType &&
-      supervisorDn &&
-      lastEvent.parties.some((party: any) => involvesDn(party, supervisorDn) && involvesDn(party, monitoredDn))
-    ) {
-      console.log('[Monitoring] Clearing monitoring state - CallObservationEndedEvImpl detected', {
-        supervisorDn,
-        monitoredDn,
-        eventType: lastEvent.eventType,
-        eventName: lastEvent.eventName,
-        callId: lastEvent.callId,
-      })
-      clearMonitoringState(monitoredDn, 'monitoring call ended')
-      return
-    }
-
-    // Case 2: Terminal event on the supervisor<->agent monitoring leg.
-    if (
-      terminalEventType &&
-      supervisorDn &&
-      lastEvent.parties.some(
-        (party: any) => isTerminatedParty(party) && involvesDn(party, supervisorDn) && involvesDn(party, monitoredDn)
-      )
-    ) {
-      console.log('[Monitoring] Clearing monitoring state - monitoring leg terminated', {
-        supervisorDn,
-        monitoredDn,
-        eventType: lastEvent.eventType,
-        eventName: lastEvent.eventName,
-        callId: lastEvent.callId,
-      })
-      clearMonitoringState(monitoredDn, 'monitoring call ended')
-      return
-    }
-
-    // Case 3: Monitored device itself has terminal status in this event.
-    if (
-      terminalEventType &&
-      lastEvent.parties.some((party: any) => {
-        if (!isTerminatedParty(party) || !involvesDn(party, monitoredDn)) {
-          return false
-        }
-        if (!monitoredDeviceName) {
-          return true
-        }
-        return party?.callingDeviceName === monitoredDeviceName || party?.calledDeviceName === monitoredDeviceName
-      })
-    ) {
-      console.log('[Monitoring] Clearing monitoring state - monitored party terminated', {
-        monitoredDn,
-        monitoredDeviceName,
-        eventType: lastEvent.eventType,
-        callId: lastEvent.callId,
-      })
-      clearMonitoringState(monitoredDn, 'call dropped')
-    }
-  }, [eventLog, activeMonitoring.dn, activeMonitoring.deviceName, activeMonitoring.monitor, clearMonitoringState])
-
   // Refill activeMonitoring after refresh from callStateMap (SSE ongoing_calls merge) when eventLog has not replayed yet
   useEffect(() => {
     if (!isInitialized || !dnsMap || !callStateMap) {
@@ -685,12 +641,35 @@ const WallboardsLiveView: React.FC = () => {
     )
     if (!payload) {
       suppressedMonitoringRefillKeyRef.current = null
+      setSuppressedMonitoringKey(null)
       return
     }
 
     const sessionKey = `${payload.monitorDn}:${payload.monitoredDn}`
-    const sup = suppressedMonitoringRefillKeyRef.current
-    if (sup === sessionKey || sup === `*:${payload.monitoredDn}`) {
+    if (
+      shouldBlockMonitoringRefillDueToSuppression(
+        suppressedMonitoringRefillKeyRef.current,
+        sessionKey,
+        payload.monitoredDn,
+        activeMonitoring.type,
+        payload.monitoringType,
+      )
+    ) {
+      return
+    }
+
+    if (
+      !isWallboardRemoteSupervisionSessionActive(
+        payload,
+        callStateMap as Record<string, unknown>,
+        eventLog,
+        {
+          suppressedSessionKey: suppressedMonitoringRefillKeyRef.current,
+          monitoringTeardown,
+          eventLog,
+        },
+      )
+    ) {
       return
     }
 
@@ -698,7 +677,6 @@ const WallboardsLiveView: React.FC = () => {
       console.log('[Monitoring] Setting monitoring state from callStateMap (ongoing_calls / refresh)', {
         ...payload,
       })
-      setMonitoringTeardown(null)
       setActiveMonitoring({
         dn: payload.monitoredDn,
         type: payload.monitoringType,
@@ -713,10 +691,7 @@ const WallboardsLiveView: React.FC = () => {
     }
 
     if (!activeMonitoring.dn && !activeMonitoring.type) {
-      if (!monitoringSnapshotAppliedRef.current) {
-        monitoringSnapshotAppliedRef.current = true
-        applyPayload()
-      }
+      applyPayload()
       return
     }
 
@@ -730,6 +705,8 @@ const WallboardsLiveView: React.FC = () => {
     dnsMap,
     isInitialized,
     activeMonitoring,
+    eventLog,
+    monitoringTeardown,
     setActiveMonitoring,
     setMonitoringStartTime,
   ])
@@ -760,8 +737,30 @@ const WallboardsLiveView: React.FC = () => {
     if (!payload) return
 
     const sessionKey = `${payload.monitorDn}:${payload.monitoredDn}`
-    const sup = suppressedMonitoringRefillKeyRef.current
-    if (sup === sessionKey || sup === `*:${payload.monitoredDn}`) {
+    if (
+      shouldBlockMonitoringRefillDueToSuppression(
+        suppressedMonitoringRefillKeyRef.current,
+        sessionKey,
+        payload.monitoredDn,
+        activeMonitoring.type,
+        payload.monitoringType,
+      )
+    ) {
+      return
+    }
+
+    if (
+      !isWallboardRemoteSupervisionSessionActive(
+        payload,
+        callStateMap as Record<string, unknown>,
+        eventLog,
+        {
+          suppressedSessionKey: suppressedMonitoringRefillKeyRef.current,
+          monitoringTeardown,
+          eventLog,
+        },
+      )
+    ) {
       return
     }
 
@@ -773,7 +772,6 @@ const WallboardsLiveView: React.FC = () => {
         callId: monitoringEvent.callId,
         sequence: monitoringEvent.sequence,
       })
-      setMonitoringTeardown(null)
       setActiveMonitoring({
         dn: payload.monitoredDn,
         type: payload.monitoringType,
@@ -791,10 +789,7 @@ const WallboardsLiveView: React.FC = () => {
     }
 
     if (!activeMonitoring.dn && !activeMonitoring.type) {
-      if (!monitoringSnapshotAppliedRef.current) {
-        monitoringSnapshotAppliedRef.current = true
-        applyPayload()
-      }
+      applyPayload()
       return
     }
 
@@ -803,12 +798,34 @@ const WallboardsLiveView: React.FC = () => {
     applyPayload()
   }, [
     eventLog,
+    callStateMap,
     dnsMap,
     isInitialized,
     activeMonitoring,
+    monitoringTeardown,
     setActiveMonitoring,
     setMonitoringStartTime,
   ])
+
+  // Terminal monitoring clears — runs after monitoring start effects so a stale DROPPED leg
+  // from before BARGE_IN does not clear the session on the same eventLog update.
+  useEffect(() => {
+    if (!activeMonitoring.dn || !eventLog?.length) return
+
+    const monitoredDn = activeMonitoring.dn
+    const clearReason = findTerminalMonitoringClearInRecentLog(eventLog, {
+      dn: activeMonitoring.dn,
+      monitor: activeMonitoring.monitor,
+      deviceName: activeMonitoring.deviceName,
+    })
+    if (clearReason) {
+      console.log('[Monitoring] Clearing monitoring state from recent eventLog', {
+        monitoredDn,
+        clearReason,
+      })
+      clearMonitoringState(monitoredDn, clearReason)
+    }
+  }, [eventLog, activeMonitoring.dn, activeMonitoring.deviceName, activeMonitoring.monitor, clearMonitoringState])
 
   // Auto-clear monitoring state when call ends
   useEffect(() => {
@@ -855,6 +872,42 @@ const WallboardsLiveView: React.FC = () => {
     const timer = setTimeout(() => setMonitoringTeardown(null), 12000)
     return () => clearTimeout(timer)
   }, [monitoringTeardown])
+
+  // Re-barge: only lift suppression when CTI reports monitoring **newer** than the stop the user requested.
+  useEffect(() => {
+    if (!eventLog?.length || !suppressedMonitoringKey) {
+      return
+    }
+    const barrier = monitoringStopBarrierSequenceRef.current
+    if (barrier == null) {
+      return
+    }
+    const latest = findLatestMonitoringEventFromLog(eventLog)
+    const m = latest?.monitoring
+    if (!latest?.isMonitoring || !m?.monitorDn || !m?.monitoredDn) {
+      return
+    }
+    if (
+      latest.sequence === undefined ||
+      latest.sequence <= barrier
+    ) {
+      return
+    }
+    const sessionKey = `${m.monitorDn}:${m.monitoredDn}`
+    if (
+      suppressedMonitoringKey === sessionKey ||
+      suppressedMonitoringKey === `*:${m.monitoredDn}`
+    ) {
+      console.log('[Monitoring] Lifting stop suppression — newer monitoring session in log', {
+        sequence: latest.sequence,
+        barrier,
+        sessionKey,
+      })
+      monitoringStopBarrierSequenceRef.current = null
+      suppressedMonitoringRefillKeyRef.current = null
+      setSuppressedMonitoringKey(null)
+    }
+  }, [eventLog, suppressedMonitoringKey])
 
   // Handle FLIP animations when cards change sections
   useEffect(() => {
@@ -960,15 +1013,36 @@ const WallboardsLiveView: React.FC = () => {
   }
 
   const stopMonitoring = async (dn: string, type: string) => {
-    const snap = activeMonitoringRef.current
+    const snap = effectiveMonitoringRef.current
     const sessionKey = snap.monitor ? `${snap.monitor}:${dn}` : `*:${dn}`
+
+    const latestEvt = eventLog?.length ? findLatestMonitoringEventFromLog(eventLog) : null
+    if (latestEvt?.sequence !== undefined) {
+      monitoringStopBarrierSequenceRef.current = latestEvt.sequence
+    }
+
+    suppressedMonitoringRefillKeyRef.current = sessionKey
+    setSuppressedMonitoringKey(sessionKey)
+    setMonitoringTeardown({
+      monitorDn: snap.monitor,
+      monitoredDn: dn,
+    })
+    monitoringSnapshotAppliedRef.current = false
+
+    console.log('[Monitoring] Stop requested — suppression active before API', {
+      dn,
+      type,
+      sessionKey,
+      barrierSequence: monitoringStopBarrierSequenceRef.current,
+      snap,
+    })
+
     const ok = await stopMonitoringFromHook(dn, type)
-    if (ok) {
-      suppressedMonitoringRefillKeyRef.current = sessionKey
-      monitoringSnapshotAppliedRef.current = false
-      setMonitoringTeardown({
-        monitorDn: snap.monitor,
-        monitoredDn: dn,
+    if (!ok) {
+      console.warn('[Monitoring] Stop API failed; keeping suppression to block stale SSE refill', {
+        dn,
+        type,
+        sessionKey,
       })
     }
     return ok
@@ -979,7 +1053,7 @@ const WallboardsLiveView: React.FC = () => {
       dn,
       getWallboardCallForDn,
       getCallStatesForDn,
-      activeMonitoring,
+      effectiveMonitoring,
       monitoringTeardown,
     )
   }
@@ -1064,7 +1138,7 @@ const WallboardsLiveView: React.FC = () => {
         categorizeDns={categorizeDns}
         animatingCards={animatingCards}
         cardAnimations={cardAnimations}
-        activeMonitoring={activeMonitoring}
+        activeMonitoring={effectiveMonitoring}
         showPopup={showPopup}
         session={session}
         getUserDataExtensions={getUserDataExtensions}

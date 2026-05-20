@@ -1,7 +1,10 @@
 /** Pure helpers for wallboard live dashboard eventLog / dnsMap parsing (Sonar: lowers index.tsx complexity). */
 
 import { pickMostRecentCall } from "@hooks/ctiStompHelpers";
+import { normalizeConferenceFlagsForLiveParties } from "@utils/ctiCallDisplay";
+import { normalizeCtiApiMonitoringDeviceType } from "@utils/ctiApiDeviceType";
 import type { ActiveMonitoring, MonitoringTeardownHint } from "@components/live-calls/utils/types";
+import { ctiAddressesEquivalent } from "@utils/ctiAddressMatching";
 
 export type RegisteredDeviceEntry = {
   deviceName: string;
@@ -420,9 +423,37 @@ function normalizeMonitoringTypeForWallboardCompare(
 
 /**
  * True when `active` should be updated to match `payload`.
- * When local monitoring was cleared (dn/type empty), returns false so stale callStateMap / eventLog
- * does not immediately re-apply the session the user just stopped (avoids setState + rerender loops).
+ * When local monitoring was cleared (dn/type empty), returns true so viewers can hydrate from
+ * callStateMap; {@link WallboardsLiveView} uses suppressedMonitoringRefillKeyRef after explicit stop.
  */
+/**
+ * After stop-barge, refill is suppressed for the same supervisor:agent key. Allow refill again when
+ * CTI reports a different supervision channel (e.g. WHISPER after BARGE_IN ended).
+ */
+export function shouldBlockMonitoringRefillDueToSuppression(
+  suppressedKey: string | null,
+  sessionKey: string,
+  monitoredDn: string,
+  activeType: string | null | undefined,
+  incomingType: string,
+): boolean {
+  if (!suppressedKey) {
+    return false;
+  }
+  const matchesSuppressedSession =
+    suppressedKey === sessionKey || suppressedKey === `*:${monitoredDn}`;
+  if (!matchesSuppressedSession) {
+    return false;
+  }
+  const activeNorm = normalizeMonitoringTypeForWallboardCompare(activeType);
+  const incomingNorm = normalizeMonitoringTypeForWallboardCompare(incomingType);
+  if (!activeNorm) {
+    // Explicit stop cleared local state — block stale SSE/callStateMap barge refill.
+    return incomingNorm === "BARGE_IN" || incomingNorm === "BARGEIN";
+  }
+  return activeNorm === incomingNorm;
+}
+
 export function monitoringPayloadDiffersFromActive(
   active: {
     dn: string | null;
@@ -437,7 +468,7 @@ export function monitoringPayloadDiffersFromActive(
   }
 
   if (!active.dn || !active.type) {
-    return false;
+    return true;
   }
 
   const typeMatches =
@@ -450,6 +481,44 @@ export function monitoringPayloadDiffersFromActive(
       active.deviceName !== payload.monitoredDeviceName) ||
     (active.monitor ?? undefined) !== (payload.monitorDn ?? undefined) ||
     !typeMatches
+  );
+}
+
+type WallboardLogEventSlice = {
+  eventType?: string;
+  eventName?: string;
+  parties?: Party[];
+  callId?: string;
+  isMonitoring?: boolean;
+  monitoring?: {
+    monitorDn?: string;
+    monitoredDn?: string;
+    monitoringType?: string;
+  };
+};
+
+function wallboardLogEventIsSupervisionSnapshot(
+  evt: WallboardLogEventSlice,
+): boolean {
+  if (
+    !evt.monitoring?.monitorDn ||
+    !evt.monitoring?.monitoredDn ||
+    !evt.parties?.length
+  ) {
+    return false;
+  }
+  if (evt.isMonitoring === true) {
+    return true;
+  }
+  const mt = String(evt.monitoring.monitoringType ?? "")
+    .trim()
+    .toUpperCase()
+    .replaceAll("-", "_");
+  return (
+    mt === "SILENT" ||
+    mt === "WHISPER" ||
+    mt === "BARGE_IN" ||
+    mt === "BARGEIN"
   );
 }
 
@@ -474,16 +543,8 @@ export function findLatestMonitoringEventFromLog(
     if (!raw || typeof raw !== "object") {
       continue;
     }
-    const evt = raw as {
-      isMonitoring?: boolean;
-      monitoring?: {
-        monitorDn?: string;
-        monitoredDn?: string;
-        monitoringType?: string;
-      };
-      parties?: Party[];
-    };
-    if (evt.isMonitoring && evt.monitoring && evt.parties?.length) {
+    const evt = raw as WallboardLogEventSlice;
+    if (wallboardLogEventIsSupervisionSnapshot(evt)) {
       return raw as {
         isMonitoring?: boolean;
         monitoring?: {
@@ -499,6 +560,206 @@ export function findLatestMonitoringEventFromLog(
       };
     }
   }
+  return null;
+}
+
+export type WallboardActiveMonitoringSnapshot = {
+  dn: string | null;
+  monitor?: string;
+  deviceName?: string | null;
+};
+
+/** CTI often keeps a stale DROPPED supervisor↔agent party on conference barge events while isMonitoring stays true. */
+function wallboardEventClaimsActiveMonitoringForPair(
+  evt: WallboardLogEventSlice,
+  monitorDn: string,
+  monitoredDn: string,
+): boolean {
+  if (!evt.isMonitoring || !evt.monitoring?.monitorDn || !evt.monitoring?.monitoredDn) {
+    return false;
+  }
+  return (
+    ctiAddressesEquivalent(evt.monitoring.monitorDn, monitorDn) &&
+    ctiAddressesEquivalent(evt.monitoring.monitoredDn, monitoredDn)
+  );
+}
+
+function involvesDnOnParty(party: Party, dn: string): boolean {
+  return (
+    ctiAddressesEquivalent(party.callingAddress, dn) ||
+    ctiAddressesEquivalent(party.calledAddress, dn)
+  );
+}
+
+function isTerminatedWallboardParty(party: Party): boolean {
+  const s = party.callStatus ?? "";
+  return s === "DROPPED" || s === "DISCONNECTED" || s === "ENDED";
+}
+
+function isWallboardLogEventSlice(raw: unknown): raw is WallboardLogEventSlice {
+  return raw !== null && typeof raw === "object";
+}
+
+function parseWallboardLogEvent(raw: unknown): WallboardLogEventSlice | null {
+  return isWallboardLogEventSlice(raw) ? raw : null;
+}
+
+function isMonitoringSessionStartForActive(
+  evt: WallboardLogEventSlice,
+  active: WallboardActiveMonitoringSnapshot,
+): boolean {
+  const m = evt.monitoring;
+  if (!evt.isMonitoring || !m?.monitorDn || !m?.monitoredDn || !active.monitor || !active.dn) {
+    return false;
+  }
+  return (
+    ctiAddressesEquivalent(m.monitorDn, active.monitor) &&
+    ctiAddressesEquivalent(m.monitoredDn, active.dn)
+  );
+}
+
+/**
+ * Index of the latest BARGE_IN / monitoring start for this supervisor↔agent pair in the scan window.
+ * Terminal clears must only consider events **after** this index (older DROPPED legs from prior sessions
+ * or setup must not clear a session that just started).
+ */
+export function findLatestMonitoringSessionStartLogIndex(
+  eventLog: readonly unknown[],
+  active: WallboardActiveMonitoringSnapshot,
+  scanDepth = 40,
+): number {
+  if (!active.dn || !active.monitor || !eventLog.length) {
+    return -1;
+  }
+  const start = Math.max(0, eventLog.length - scanDepth);
+  for (let i = eventLog.length - 1; i >= start; i -= 1) {
+    const evt = parseWallboardLogEvent(eventLog[i]);
+    if (evt && isMonitoringSessionStartForActive(evt, active)) {
+      return i;
+    }
+  }
+  return -1;
+}
+
+type TerminalMonitoringClearContext = {
+  monitoredDn: string;
+  supervisorDn?: string;
+  monitoredDeviceName?: string | null;
+};
+
+function isTerminalWallboardEventType(eventType: string | undefined): boolean {
+  return (
+    eventType === "DROPPED" ||
+    eventType === "DISCONNECTED" ||
+    eventType === "ENDED"
+  );
+}
+
+function isSupervisorMonitoredTerminalDrop(
+  evt: WallboardLogEventSlice,
+  ctx: TerminalMonitoringClearContext,
+): boolean {
+  const { supervisorDn, monitoredDn } = ctx;
+  if (!supervisorDn || !evt.parties?.length) {
+    return false;
+  }
+  if (!isTerminalWallboardEventType(evt.eventType)) {
+    return false;
+  }
+  return evt.parties.some(
+    (party) =>
+      isTerminatedWallboardParty(party) &&
+      involvesDnOnParty(party, supervisorDn) &&
+      involvesDnOnParty(party, monitoredDn),
+  );
+}
+
+function terminalClearReasonFromLogEvent(
+  evt: WallboardLogEventSlice,
+  ctx: TerminalMonitoringClearContext,
+): string | null {
+  if (
+    ctx.supervisorDn &&
+    wallboardEventClaimsActiveMonitoringForPair(
+      evt,
+      ctx.supervisorDn,
+      ctx.monitoredDn,
+    )
+  ) {
+    return null;
+  }
+
+  if (
+    evt.eventName === "CallObservationEndedEvImpl" &&
+    isSupervisorMonitoredTerminalDrop(evt, ctx)
+  ) {
+    return "monitoring call ended";
+  }
+
+  if (isSupervisorMonitoredTerminalDrop(evt, ctx)) {
+    return "monitoring call ended";
+  }
+
+  if (!isTerminalWallboardEventType(evt.eventType) || !evt.parties?.length) {
+    return null;
+  }
+
+  const monitoredDrop = evt.parties.some((party) => {
+    if (!isTerminatedWallboardParty(party) || !involvesDnOnParty(party, ctx.monitoredDn)) {
+      return false;
+    }
+    if (!ctx.monitoredDeviceName) {
+      return true;
+    }
+    return (
+      party.callingDeviceName === ctx.monitoredDeviceName ||
+      party.calledDeviceName === ctx.monitoredDeviceName
+    );
+  });
+
+  return monitoredDrop ? "call dropped" : null;
+}
+
+/**
+ * Scans recent eventLog (not only the tail) for terminal supervision / barge events
+ * so monitoring UI clears when a middle event ended the session but a later non-call
+ * entry (e.g. initial-state) became eventLog.at(-1).
+ */
+export function findTerminalMonitoringClearInRecentLog(
+  eventLog: readonly unknown[],
+  active: WallboardActiveMonitoringSnapshot,
+  scanDepth = 40,
+): string | null {
+  const monitoredDn = active.dn;
+  if (!monitoredDn || !eventLog.length) {
+    return null;
+  }
+  const ctx: TerminalMonitoringClearContext = {
+    monitoredDn,
+    supervisorDn: active.monitor,
+    monitoredDeviceName: active.deviceName,
+  };
+  const start = Math.max(0, eventLog.length - scanDepth);
+  const sessionStartIndex = findLatestMonitoringSessionStartLogIndex(
+    eventLog,
+    active,
+    scanDepth,
+  );
+
+  for (let i = eventLog.length - 1; i >= start; i -= 1) {
+    if (sessionStartIndex >= 0 && i <= sessionStartIndex) {
+      break;
+    }
+    const evt = parseWallboardLogEvent(eventLog[i]);
+    if (!evt?.parties?.length) {
+      continue;
+    }
+    const reason = terminalClearReasonFromLogEvent(evt, ctx);
+    if (reason) {
+      return reason;
+    }
+  }
+
   return null;
 }
 
@@ -559,7 +820,10 @@ function buildMonitoringPayloadFromPartiesAndDns(
     monitoringType,
     monitoredDeviceName: monitoredDeviceName || undefined,
     monitorDeviceName,
-    monitorDeviceType,
+    monitorDeviceType:
+      monitorDeviceType != null && String(monitorDeviceType).trim() !== ""
+        ? normalizeCtiApiMonitoringDeviceType(monitorDeviceType)
+        : undefined,
   };
 }
 
@@ -598,7 +862,8 @@ export function buildWallboardMonitoringPayloadFromEvent(
   return buildMonitoringPayloadFromPartiesAndDns(parties, monitoring, dnsMap);
 }
 
-type MonitoringCallStateSlice = {
+/** Shared shape for call-state and loose wallboard call party checks. */
+type WallboardCallPartiesSlice = {
   parties?: Party[];
   monitoring?: {
     monitorDn?: string;
@@ -607,6 +872,9 @@ type MonitoringCallStateSlice = {
   };
   isMonitoring?: boolean;
   isTerminating?: boolean;
+};
+
+type MonitoringCallStateSlice = WallboardCallPartiesSlice & {
   hasActiveParticipants?: boolean;
   eventTime?: string;
 };
@@ -619,6 +887,24 @@ function parseEventTimeMsForMonitoringPick(
   }
   const ms = new Date(eventTime).getTime();
   return Number.isFinite(ms) ? ms : 0;
+}
+
+function supervisionMonitoringPartiesAllTerminal(
+  parties: Party[],
+  monitorDn: string,
+  monitoredDn: string,
+): boolean {
+  const relevant = parties.filter(
+    (p) =>
+      (ctiAddressesEquivalent(p.callingAddress, monitorDn) ||
+        ctiAddressesEquivalent(p.calledAddress, monitorDn)) &&
+      (ctiAddressesEquivalent(p.callingAddress, monitoredDn) ||
+        ctiAddressesEquivalent(p.calledAddress, monitoredDn)),
+  );
+  if (relevant.length === 0) {
+    return false;
+  }
+  return relevant.every((p) => !partyIsLiveForWallboard(p));
 }
 
 function isWallboardMonitoringCallStateCandidate(
@@ -635,10 +921,28 @@ function isWallboardMonitoringCallStateCandidate(
   }
   const m = call.monitoring;
   if (m?.monitorDn && m?.monitoredDn) {
+    if (
+      supervisionMonitoringPartiesAllTerminal(
+        call.parties,
+        m.monitorDn,
+        m.monitoredDn,
+      )
+    ) {
+      return callHasLiveAgentPartyWithNonSupervisor(
+        call,
+        m.monitoredDn,
+        m.monitorDn,
+      );
+    }
     return true;
   }
-  // Ongoing-calls / replay snapshots may omit the monitoring block but keep isMonitoring.
-  return call.isMonitoring === true;
+  if (call.isMonitoring !== true) {
+    return false;
+  }
+  if (call.parties.every((p) => !partyIsLiveForWallboard(p))) {
+    return false;
+  }
+  return true;
 }
 
 /**
@@ -724,6 +1028,35 @@ function tryBuildWallboardMonitoringPayloadFromCallStateSlice(
   );
 }
 
+type ScoredMonitoringPayload = {
+  payload: MonitoringPayload;
+  eventTimeMs: number;
+  sequence?: number;
+};
+
+function pickNewerScoredMonitoringPayload(
+  mapScored: ScoredMonitoringPayload | null,
+  logScored: ScoredMonitoringPayload | null,
+): MonitoringPayload | null {
+  if (!mapScored && !logScored) {
+    return null;
+  }
+  if (!mapScored) {
+    return logScored?.payload ?? null;
+  }
+  if (!logScored) {
+    return mapScored.payload;
+  }
+  if (logScored.eventTimeMs !== mapScored.eventTimeMs) {
+    return logScored.eventTimeMs > mapScored.eventTimeMs
+      ? logScored.payload
+      : mapScored.payload;
+  }
+  const logSeq = logScored.sequence ?? 0;
+  const mapSeq = mapScored.sequence ?? 0;
+  return logSeq >= mapSeq ? logScored.payload : mapScored.payload;
+}
+
 /**
  * After reload, `eventLog` may be empty while `callStateMap` already includes ongoing_calls merge.
  * Picks the latest active supervision session (by eventTime) for wallboard UI — same for every viewer.
@@ -732,17 +1065,27 @@ export function pickBestMonitoringPayloadFromCallStateMap(
   callStateMap: Record<string, unknown>,
   dnsMap: Record<string, { devices?: Record<string, DnsDevice> } | undefined>,
 ): MonitoringPayload | null {
+  return (
+    pickBestScoredMonitoringPayloadFromCallStateMap(callStateMap, dnsMap)?.payload ??
+    null
+  );
+}
+
+function pickBestScoredMonitoringPayloadFromCallStateMap(
+  callStateMap: Record<string, unknown>,
+  dnsMap: Record<string, { devices?: Record<string, DnsDevice> } | undefined>,
+): ScoredMonitoringPayload | null {
   if (!callStateMap || typeof callStateMap !== "object") {
     return null;
   }
 
-  const scored: { payload: MonitoringPayload; eventTimeMs: number }[] = [];
+  const bestBySession = new Map<string, ScoredMonitoringPayload>();
 
   for (const call of Object.values(callStateMap)) {
     if (!call || typeof call !== "object") {
       continue;
     }
-    const c = call as MonitoringCallStateSlice;
+    const c = call as MonitoringCallStateSlice & { sequence?: number };
     if (!isWallboardMonitoringCallStateCandidate(c)) {
       continue;
     }
@@ -757,30 +1100,357 @@ export function pickBestMonitoringPayloadFromCallStateMap(
     if (!payload) {
       continue;
     }
-    scored.push({
+    const scored: ScoredMonitoringPayload = {
       payload,
       eventTimeMs: parseEventTimeMsForMonitoringPick(c.eventTime),
-    });
+      sequence: c.sequence,
+    };
+    const sessionKey = `${payload.monitorDn}:${payload.monitoredDn}`;
+    const prev = bestBySession.get(sessionKey);
+    if (!prev || scored.eventTimeMs >= prev.eventTimeMs) {
+      bestBySession.set(sessionKey, scored);
+    }
   }
 
-  if (scored.length === 0) {
-    return null;
+  let best: ScoredMonitoringPayload | null = null;
+  for (const entry of bestBySession.values()) {
+    if (!best || entry.eventTimeMs >= best.eventTimeMs) {
+      best = entry;
+    }
   }
-  scored.sort((a, b) => b.eventTimeMs - a.eventTimeMs);
-  return scored[0]?.payload ?? null;
+  return best;
 }
 
-type LooseWallboardCall = {
-  isTerminating?: boolean;
-  isMonitoring?: boolean;
-  parties?: Array<{
-    callingAddress?: string;
-    calledAddress?: string;
-    callStatus?: string;
-  }>;
+/** Latest supervision metadata from the shared CTI event log (whisper after barge, etc.). */
+export function pickScoredMonitoringPayloadFromEventLog(
+  eventLog: readonly unknown[] | undefined,
+  dnsMap: Record<string, { devices?: Record<string, DnsDevice> } | undefined>,
+): ScoredMonitoringPayload | null {
+  const monitoringEvent = findLatestMonitoringEventFromLog(eventLog ?? []);
+  if (!monitoringEvent?.parties?.length || !monitoringEvent.monitoring) {
+    return null;
+  }
+  const payload = buildWallboardMonitoringPayloadFromEvent(
+    monitoringEvent.parties,
+    monitoringEvent.monitoring,
+    dnsMap,
+  );
+  if (!payload) {
+    return null;
+  }
+  const eventTimeMs = parseEventTimeMsForMonitoringPick(
+    (monitoringEvent as { eventTime?: string }).eventTime,
+  );
+  return {
+    payload,
+    eventTimeMs,
+    sequence: monitoringEvent.sequence,
+  };
+}
+
+function wallboardMonitoringSessionMatches(
+  active: ActiveMonitoring,
+  payload: MonitoringPayload,
+): boolean {
+  if (!active.dn || !active.monitor) {
+    return false;
+  }
+  return (
+    ctiAddressesEquivalent(active.monitor, payload.monitorDn) &&
+    ctiAddressesEquivalent(active.dn, payload.monitoredDn)
+  );
+}
+
+function activeMonitoringFromPayload(
+  payload: MonitoringPayload,
+): ActiveMonitoring & {
+  monitorDeviceName?: string;
+  monitorDeviceType?: string;
+} {
+  return {
+    dn: payload.monitoredDn,
+    type: payload.monitoringType,
+    monitor: payload.monitorDn,
+    deviceName: payload.monitoredDeviceName ?? null,
+    monitorDeviceName: payload.monitorDeviceName,
+    monitorDeviceType: payload.monitorDeviceType,
+  };
+}
+
+export const CLEARED_WALLBOARD_MONITORING: ActiveMonitoring = {
+  dn: null,
+  type: null,
+  deviceName: null,
+  monitor: undefined,
+};
+
+export type ResolveEffectiveWallboardMonitoringOptions = {
+  suppressedSessionKey?: string | null;
+  monitoringTeardown?: MonitoringTeardownHint | null;
+  eventLog?: readonly unknown[];
+};
+
+function isRemoteSupervisionSessionSuppressed(
+  payload: MonitoringPayload,
+  options?: ResolveEffectiveWallboardMonitoringOptions,
+): boolean {
+  const sessionKey = `${payload.monitorDn}:${payload.monitoredDn}`;
+  if (
+    shouldBlockMonitoringRefillDueToSuppression(
+      options?.suppressedSessionKey ?? null,
+      sessionKey,
+      payload.monitoredDn,
+      null,
+      payload.monitoringType,
+    )
+  ) {
+    return true;
+  }
+  const teardown = options?.monitoringTeardown;
+  if (!teardown) {
+    return false;
+  }
+  if (!ctiAddressesEquivalent(teardown.monitoredDn, payload.monitoredDn)) {
+    return false;
+  }
+  if (
+    teardown.monitorDn &&
+    !ctiAddressesEquivalent(teardown.monitorDn, payload.monitorDn)
+  ) {
+    return false;
+  }
+  return true;
+}
+
+function monitoringCallMatchesSupervisionPair(
+  call: MonitoringCallStateSlice,
+  monitorDn: string,
+  monitoredDn: string,
+): boolean {
+  const m = call.monitoring;
+  if (m?.monitorDn && m?.monitoredDn) {
+    return (
+      ctiAddressesEquivalent(m.monitorDn, monitorDn) &&
+      ctiAddressesEquivalent(m.monitoredDn, monitoredDn)
+    );
+  }
+  if (call.isMonitoring !== true || !call.parties?.length) {
+    return false;
+  }
+  return call.parties.some(
+    (p) =>
+      partyIsLiveForWallboard(p) &&
+      (ctiAddressesEquivalent(p.callingAddress, monitorDn) ||
+        ctiAddressesEquivalent(p.calledAddress, monitorDn)) &&
+      (ctiAddressesEquivalent(p.callingAddress, monitoredDn) ||
+        ctiAddressesEquivalent(p.calledAddress, monitoredDn)),
+  );
+}
+
+/**
+ * At least one non-terminating call in shared SSE state still has `isMonitoring: true` for this pair.
+ * Other wallboard viewers (User B) rely on this when User A stops barge — they do not have local stop suppression.
+ */
+export function callStateMapHasActiveMonitoringForPair(
+  callStateMap: Record<string, unknown>,
+  monitorDn: string,
+  monitoredDn: string,
+): boolean {
+  for (const call of Object.values(callStateMap)) {
+    if (!call || typeof call !== "object") {
+      continue;
+    }
+    const c = call as MonitoringCallStateSlice;
+    if (c.isTerminating) {
+      continue;
+    }
+    if (
+      c.isMonitoring === true &&
+      monitoringCallMatchesSupervisionPair(c, monitorDn, monitoredDn)
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/** True when a live supervisor↔agent observation leg still exists in call state (barge not ended). */
+export function supervisionSessionHasLiveSupervisorAgentLeg(
+  callStateMap: Record<string, unknown>,
+  payload: MonitoringPayload,
+): boolean {
+  const monitorDn = payload.monitorDn;
+  const monitoredDn = payload.monitoredDn;
+
+  for (const call of Object.values(callStateMap)) {
+    if (!call || typeof call !== "object") {
+      continue;
+    }
+    const c = call as MonitoringCallStateSlice;
+    if (c.isTerminating || !c.parties?.length) {
+      continue;
+    }
+
+    if (!monitoringCallMatchesSupervisionPair(c, monitorDn, monitoredDn)) {
+      continue;
+    }
+
+    const hasLiveObservationLeg = c.parties.some(
+      (p) =>
+        partyIsLiveForWallboard(p) &&
+        (ctiAddressesEquivalent(p.callingAddress, monitorDn) ||
+          ctiAddressesEquivalent(p.calledAddress, monitorDn)) &&
+        (ctiAddressesEquivalent(p.callingAddress, monitoredDn) ||
+          ctiAddressesEquivalent(p.calledAddress, monitoredDn)),
+    );
+    if (hasLiveObservationLeg) {
+      return true;
+    }
+
+    // Conference re-barge: supervisor leg may stay DROPPED until consult merges; agent+customer still live.
+    if (
+      isBargeInMonitoringType(payload.monitoringType) &&
+      c.isMonitoring === true &&
+      callHasLiveAgentPartyWithNonSupervisor(c, monitoredDn, monitorDn)
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * Whether SSE/log still describes an active supervision session (not stopped barge, not torn down).
+ */
+export function isWallboardRemoteSupervisionSessionActive(
+  payload: MonitoringPayload,
+  callStateMap: Record<string, unknown> | undefined,
+  eventLog: readonly unknown[] | undefined,
+  options?: ResolveEffectiveWallboardMonitoringOptions,
+): boolean {
+  if (isRemoteSupervisionSessionSuppressed(payload, { ...options, eventLog })) {
+    return false;
+  }
+
+  const terminalClear = findTerminalMonitoringClearInRecentLog(eventLog ?? [], {
+    dn: payload.monitoredDn,
+    monitor: payload.monitorDn,
+    deviceName: payload.monitoredDeviceName,
+  });
+  if (terminalClear) {
+    return false;
+  }
+
+  if (isBargeInMonitoringType(payload.monitoringType)) {
+    if (!callStateMap) {
+      return false;
+    }
+    if (
+      !callStateMapHasActiveMonitoringForPair(
+        callStateMap,
+        payload.monitorDn,
+        payload.monitoredDn,
+      )
+    ) {
+      return false;
+    }
+    return supervisionSessionHasLiveSupervisorAgentLeg(callStateMap, payload);
+  }
+
+  return true;
+}
+
+/**
+ * Wallboard supervision context for every viewer — merges local UI state with the latest
+ * session from SSE ({@link callStateMap} + {@link eventLog}). Refreshes monitoring **type**
+ * when the supervisor switches channel (e.g. BARGE_IN → WHISPER) so other users are not stuck
+ * on a stale barge badge. Returns cleared state when barge ended but customer call remains.
+ */
+export function resolveEffectiveWallboardMonitoring(
+  activeMonitoring: ActiveMonitoring,
+  callStateMap: Record<string, unknown> | undefined,
+  dnsMap:
+    | Record<string, { devices?: Record<string, DnsDevice> } | undefined>
+    | undefined,
+  eventLog?: readonly unknown[],
+  options?: ResolveEffectiveWallboardMonitoringOptions,
+): ActiveMonitoring & {
+  monitorDeviceName?: string;
+  monitorDeviceType?: string;
+} {
+  if (!dnsMap) {
+    return activeMonitoring;
+  }
+
+  const mapScored = callStateMap
+    ? pickBestScoredMonitoringPayloadFromCallStateMap(callStateMap, dnsMap)
+    : null;
+  const logScored = pickScoredMonitoringPayloadFromEventLog(eventLog, dnsMap);
+  const remotePayload = pickNewerScoredMonitoringPayload(mapScored, logScored);
+
+  if (
+    remotePayload &&
+    !isWallboardRemoteSupervisionSessionActive(
+      remotePayload,
+      callStateMap,
+      eventLog,
+      options,
+    )
+  ) {
+    return CLEARED_WALLBOARD_MONITORING;
+  }
+
+  if (!remotePayload) {
+    if (!activeMonitoring.dn && !activeMonitoring.type) {
+      return CLEARED_WALLBOARD_MONITORING;
+    }
+    return activeMonitoring;
+  }
+
+  if (!activeMonitoring.dn || !activeMonitoring.monitor) {
+    return activeMonitoringFromPayload(remotePayload);
+  }
+
+  if (wallboardMonitoringSessionMatches(activeMonitoring, remotePayload)) {
+    const typeChanged =
+      normalizeMonitoringTypeForWallboardCompare(activeMonitoring.type) !==
+      normalizeMonitoringTypeForWallboardCompare(remotePayload.monitoringType);
+    if (typeChanged) {
+      return activeMonitoringFromPayload(remotePayload);
+    }
+    return {
+      ...activeMonitoring,
+      type: remotePayload.monitoringType,
+      deviceName:
+        remotePayload.monitoredDeviceName ?? activeMonitoring.deviceName ?? null,
+      monitorDeviceName: remotePayload.monitorDeviceName,
+      monitorDeviceType: remotePayload.monitorDeviceType,
+    };
+  }
+
+  return activeMonitoringFromPayload(remotePayload);
+}
+
+type LooseWallboardCall = WallboardCallPartiesSlice & {
   eventTime?: string;
   callId?: string;
 };
+
+function wallboardMonitoringContextForCall(
+  call: LooseWallboardCall,
+  activeMonitoring: ActiveMonitoring,
+): {
+  monitorDn?: string;
+  agentDn?: string;
+  monitoringType: string | null;
+} {
+  const m = call.monitoring;
+  return {
+    monitorDn: activeMonitoring.monitor ?? m?.monitorDn,
+    agentDn: activeMonitoring.dn ?? m?.monitoredDn,
+    monitoringType: activeMonitoring.type ?? m?.monitoringType ?? null,
+  };
+}
 
 function partyIsLiveForWallboard(p: {
   callStatus?: string;
@@ -798,12 +1468,22 @@ export function isBargeInMonitoringType(
   return normalized === "BARGE_IN" || normalized === "BARGEIN";
 }
 
+export function isSilentOrWhisperMonitoringType(
+  monitoringType: string | null | undefined,
+): boolean {
+  const normalized = String(monitoringType ?? "")
+    .trim()
+    .toUpperCase()
+    .replaceAll("-", "_");
+  return normalized === "SILENT" || normalized === "WHISPER";
+}
+
 /**
  * True when the agent has a live leg with someone other than the supervisor (e.g. customer).
  * Barge-in joins the supervisor onto the agent's call, so those calls must not be treated as observation-only.
  */
 export function callHasLiveAgentPartyWithNonSupervisor(
-  call: LooseWallboardCall,
+  call: WallboardCallPartiesSlice,
   agentDn: string,
   supervisorDn: string,
 ): boolean {
@@ -881,15 +1561,14 @@ export function shouldExcludeCallFromWallboardContext(
     return true;
   }
 
-  const monitorDn = activeMonitoring.monitor;
-  const agentDn = activeMonitoring.dn;
-  const monitoringType = activeMonitoring.type;
+  const { monitorDn, agentDn, monitoringType } =
+    wallboardMonitoringContextForCall(call, activeMonitoring);
 
   if (call.isMonitoring === true) {
     if (
       monitorDn &&
       agentDn &&
-      String(dn) === String(agentDn) &&
+      ctiAddressesEquivalent(dn, agentDn) &&
       isBargeInMonitoringType(monitoringType) &&
       callHasLiveAgentPartyWithNonSupervisor(
         call,
@@ -957,12 +1636,12 @@ function shapeCallLikeGetDnCallState(
   if (!matchedParty) {
     return null;
   }
-  return {
+  return normalizeConferenceFlagsForLiveParties({
     ...call,
     parties: activeParties,
     role: String(matchedParty.callingAddress) === dnStr ? "calling" : "called",
     isActive: true,
-  };
+  });
 }
 
 /**

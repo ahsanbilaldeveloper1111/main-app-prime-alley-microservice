@@ -8,13 +8,17 @@ import type {
   WorkloadSummaryData,
 } from "@utils/tasks";
 import {
-  formatWorkloadDayHeader,
+  formatWorkloadGridDayHeader,
   formatWorkloadMemberLabel,
   formatWorkloadMinutes,
   formatWorkloadTaskEstimate,
   formatWorkloadPercent,
   isSameCalendarDay,
   workloadCellBandClass,
+  workloadCellBarFillClass,
+  workloadCellHasUnestimated,
+  workloadGridCellPercentLabel,
+  workloadGridCellVisualVariant,
   workloadMemberAvatarColor,
   workloadCellKey,
   workloadLoadBandLabel,
@@ -34,7 +38,7 @@ const WORKLOAD_BOARD_LEGEND = [
 type WorkloadMemberIdentityProps = Readonly<{
   extensionNumber: string;
   hierarchyExtensions?: unknown[] | null;
-  member?: Pick<WorkloadGridMember, "name" | "display_name"> | null;
+  member?: Pick<WorkloadGridMember, "name" | "display_name" | "role"> | null;
   isOwner?: boolean;
   displayMode?: "stacked" | "inline";
 }>;
@@ -70,14 +74,16 @@ export function WorkloadMemberIdentity({
   }
 
   const label = formatWorkloadMemberLabel(ext, hierarchyExtensions, member);
+  const roleLabel = member?.role?.trim();
 
   return (
     <div className="workload-member-cell">
       <span className="workload-member-cell__avatar" style={{ backgroundColor: avatarColor }}>
         {initials}
       </span>
-      <div>
+      <div className="workload-member-cell__text">
         <div className="workload-member-cell__name">{label}</div>
+        {roleLabel ? <div className="workload-member-cell__role">{roleLabel}</div> : null}
         {isOwner ? (
           <Badge bg="secondary" className="workload-member-cell__badge">
             Owner
@@ -191,6 +197,62 @@ export function WorkloadLegendRow() {
   );
 }
 
+type WorkloadGridCellButtonProps = Readonly<{
+  cell: WorkloadGridCell | undefined;
+  band: string;
+  onSelect: () => void;
+}>;
+
+function WorkloadGridCellButton({ cell, band, onSelect }: WorkloadGridCellButtonProps) {
+  const variant = workloadGridCellVisualVariant(cell);
+  const estimatedMinutes = cell?.estimated_minutes ?? 0;
+  const barPct = Math.min(100, Math.max(0, cell?.load_percent ?? 0));
+  const showUnestimatedDot =
+    cell != null && variant !== "empty" && workloadCellHasUnestimated(cell);
+  const barFillClass = workloadCellBarFillClass(band);
+  const percentLabel = workloadGridCellPercentLabel(barPct, variant);
+
+  return (
+    <button
+      type="button"
+      className={`workload-cell-btn ${workloadCellBandClass(band)} workload-cell-btn--${variant}`}
+      onClick={onSelect}
+    >
+      <span className={`workload-cell-card workload-cell-card--${variant}`}>
+        {variant === "empty" ? (
+          <span className="workload-cell-empty">—</span>
+        ) : (
+          <>
+            <div className="workload-cell__top">
+              <span
+                className={`workload-cell__time workload-cell__time--${variant}`}
+              >
+                {formatWorkloadMinutes(estimatedMinutes)}
+              </span>
+              {showUnestimatedDot ? (
+                <span
+                  className="workload-unestimated-dot workload-cell__unest-dot--inline"
+                  title={`${cell.unestimated_count} task${cell.unestimated_count === 1 ? "" : "s"} without estimate`}
+                  aria-label={`${cell.unestimated_count} unestimated tasks`}
+                />
+              ) : null}
+            </div>
+            <div className={`workload-cell__pct workload-cell__pct--${variant}`}>
+              {percentLabel}
+            </div>
+            <div className="workload-cell__bar">
+              <div
+                className={`workload-cell__bar-fill ${barFillClass}`}
+                style={{ width: `${barPct}%` }}
+              />
+            </div>
+          </>
+        )}
+      </span>
+    </button>
+  );
+}
+
 type WorkloadGridPanelProps = Readonly<{
   gridData: WorkloadGridData;
   cellMap: Map<string, WorkloadGridCell>;
@@ -209,21 +271,27 @@ export function WorkloadGridPanel({
       <Table bordered responsive className="workload-grid-table mb-0">
         <thead>
           <tr>
-            <th>Members</th>
-            {gridData.days.map((d) => (
-              <th
-                key={d}
-                className={isSameCalendarDay(d) ? "workload-grid-table__day--today" : undefined}
-              >
-                {formatWorkloadDayHeader(d)}
-              </th>
-            ))}
+            <th className="workload-grid-table__people">PEOPLE</th>
+            {gridData.days.map((d) => {
+              const { weekday, dateLabel } = formatWorkloadGridDayHeader(d);
+              return (
+                <th
+                  key={d}
+                  className={`workload-grid-table__day ${
+                    isSameCalendarDay(d) ? "workload-grid-table__day--today" : ""
+                  }`}
+                >
+                  <span className="workload-grid-table__weekday">{weekday}</span>
+                  <span className="workload-grid-table__date">{dateLabel}</span>
+                </th>
+              );
+            })}
           </tr>
         </thead>
         <tbody>
           {gridData.members.map((member) => (
             <tr key={member.extension_number}>
-              <td>
+              <td className="workload-grid-table__people">
                 <WorkloadMemberIdentity
                   extensionNumber={member.extension_number}
                   hierarchyExtensions={hierarchyExtensions}
@@ -234,37 +302,17 @@ export function WorkloadGridPanel({
               {gridData.days.map((day) => {
                 const cell = cellMap.get(workloadCellKey(member.extension_number, day));
                 const band = cell?.load_band ?? "available";
-                const barPct = Math.min(100, Math.max(0, cell?.load_percent ?? 0));
-                const showUnestLine =
-                  cell &&
-                  cell.task_count > 0 &&
-                  (cell.has_unestimated || band === "incomplete_data");
+                const isToday = isSameCalendarDay(day);
                 return (
-                  <td key={`${member.extension_number}-${day}`} className="p-0 align-middle">
-                    <button
-                      type="button"
-                      className={`workload-cell-btn ${workloadCellBandClass(band)}`}
-                      onClick={() => onSelectCell(member.extension_number, day)}
-                    >
-                      {cell ? (
-                        <>
-                          <div className="workload-cell__time">
-                            {showUnestLine
-                              ? `${formatWorkloadMinutes(cell.estimated_minutes)} + ${cell.unestimated_count} unest.`
-                              : formatWorkloadMinutes(cell.estimated_minutes)}
-                          </div>
-                          <div className="workload-cell__meta">
-                            {cell.task_count} task{cell.task_count === 1 ? "" : "s"} ·{" "}
-                            {formatWorkloadPercent(cell.load_percent)}
-                          </div>
-                          <div className="workload-cell__bar">
-                            <div className="workload-cell__bar-fill" style={{ width: `${barPct}%` }} />
-                          </div>
-                        </>
-                      ) : (
-                        <span className="text-muted">—</span>
-                      )}
-                    </button>
+                  <td
+                    key={`${member.extension_number}-${day}`}
+                    className={`workload-grid-table__slot ${isToday ? "workload-grid-table__slot--today" : ""}`}
+                  >
+                    <WorkloadGridCellButton
+                      cell={cell}
+                      band={band}
+                      onSelect={() => onSelectCell(member.extension_number, day)}
+                    />
                   </td>
                 );
               })}

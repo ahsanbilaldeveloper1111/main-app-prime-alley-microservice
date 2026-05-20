@@ -1,5 +1,6 @@
 import type { CSSProperties, Dispatch, SetStateAction } from 'react'
 import type { ActiveMonitoring, ShowPopup } from '@components/live-calls/utils/types'
+import { isDisplayConferenceCall } from '@utils/ctiCallDisplay'
 
 /** Pure helpers for UserCard — keeps Sonar cognitive complexity out of the main component. */
 
@@ -323,8 +324,7 @@ export function computeUserCardCallStatus(
     return undefined
   }
 
-  const isConferenceCall =
-    (call.isConference && !call.isOneToOne) || (call.parties && call.parties.length > 2)
+  const isConferenceCall = isDisplayConferenceCall(call)
 
   if (call.parties && call.parties.length > 0) {
     const filtered = call.parties.filter(

@@ -1,39 +1,17 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import moment from "moment";
 import { Button, Form, Modal, Spinner } from "react-bootstrap";
-import { getMyDayPastDaySnapshot } from "@utils/tasks";
+import { MyDayPastDayStatsPanel } from "@components/planner/my-day/MyDayPastDayStatsPanel";
+import {
+  formatPastDayStatsLine,
+  loadMyDayHistoryForDate,
+  type MyDayHistoryLoadResult,
+  type MyDayHistoryTaskRow,
+} from "@page-modules/planner/my-day/myDayHistoryDomain";
 import { formatDateGlobal } from "@utils/Helper";
+import { listMyDayDailyLogs } from "@utils/tasks";
 
-export type MyDayHistoryTaskRow = Readonly<{
-  id: number;
-  title: string;
-  status: "Active" | "Completed";
-  estimateLabel: string;
-  projectName: string;
-}>;
-
-function mapHistoryTaskRow(row: unknown, status: "Active" | "Completed"): MyDayHistoryTaskRow | null {
-  if (row == null || typeof row !== "object") return null;
-  const o = row as Record<string, unknown>;
-  const id = Number(o.id);
-  if (!Number.isFinite(id) || id <= 0) return null;
-  const title =
-    typeof o.title === "string" && o.title.trim() ? o.title.trim() : `Task #${id}`;
-  const est = Number(o.estimated_minutes ?? o.estimated_duration_minutes ?? 0);
-  const estimateLabel =
-    Number.isFinite(est) && est > 0 ? `${Math.round(est)}m` : "No estimate";
-  const project =
-    o.project != null && typeof o.project === "object"
-      ? (o.project as { name?: string | null }).name
-      : null;
-  return {
-    id,
-    title,
-    status,
-    estimateLabel,
-    projectName: project?.trim() || "No project",
-  };
-}
+export type { MyDayHistoryTaskRow } from "@page-modules/planner/my-day/myDayHistoryDomain";
 
 export type MyDayHistoryModalProps = Readonly<{
   show: boolean;
@@ -42,7 +20,12 @@ export type MyDayHistoryModalProps = Readonly<{
 }>;
 
 export function MyDayHistoryModal({ show, todayIso, onClose }: MyDayHistoryModalProps) {
-  const pastDateOptions = useMemo(() => {
+  const yesterdayIso = useMemo(
+    () => moment(todayIso, "YYYY-MM-DD").subtract(1, "day").format("YYYY-MM-DD"),
+    [todayIso],
+  );
+
+  const defaultPastDates = useMemo(() => {
     const options: string[] = [];
     const base = moment(todayIso, "YYYY-MM-DD");
     for (let i = 1; i <= 14; i += 1) {
@@ -51,35 +34,23 @@ export function MyDayHistoryModal({ show, todayIso, onClose }: MyDayHistoryModal
     return options;
   }, [todayIso]);
 
-  const defaultHistoryDate = pastDateOptions[0] ?? todayIso;
-
-  const [selectedDate, setSelectedDate] = useState(defaultHistoryDate);
+  const [selectedDate, setSelectedDate] = useState(yesterdayIso);
+  const [dateOptions, setDateOptions] = useState<string[]>(defaultPastDates);
   const [loading, setLoading] = useState(false);
   const [rows, setRows] = useState<MyDayHistoryTaskRow[]>([]);
+  const [historyResult, setHistoryResult] = useState<MyDayHistoryLoadResult | null>(null);
   const [metaLine, setMetaLine] = useState("");
 
   const loadHistory = useCallback(async (date: string) => {
     setLoading(true);
     try {
-      const payload = await getMyDayPastDaySnapshot(date);
-      const active = (payload.active ?? [])
-        .map((row) => mapHistoryTaskRow(row, "Active"))
-        .filter((r): r is MyDayHistoryTaskRow => r != null);
-      const completed = (payload.completed ?? [])
-        .map((row) => mapHistoryTaskRow(row, "Completed"))
-        .filter((r): r is MyDayHistoryTaskRow => r != null);
-      setRows([...active, ...completed]);
-
-      const meta = payload.meta ?? {};
-      const activeCount = meta.active_count ?? active.length;
-      const completedCount = meta.completed_count ?? completed.length;
-      const planned = Number(meta.planned_minutes ?? 0);
-      const done = Number(meta.completed_minutes ?? 0);
-      setMetaLine(
-        `${activeCount} active • ${completedCount} completed • ${done}m done of ${planned}m planned`,
-      );
+      const result = await loadMyDayHistoryForDate(date);
+      setRows(result.rows);
+      setHistoryResult(result);
+      setMetaLine(formatPastDayStatsLine(result.stats));
     } catch {
       setRows([]);
+      setHistoryResult(null);
       setMetaLine("Unable to load history for this date.");
     } finally {
       setLoading(false);
@@ -88,13 +59,32 @@ export function MyDayHistoryModal({ show, todayIso, onClose }: MyDayHistoryModal
 
   useEffect(() => {
     if (!show) return;
-    setSelectedDate(defaultHistoryDate);
-  }, [defaultHistoryDate, show]);
+    setSelectedDate(yesterdayIso);
+  }, [show, yesterdayIso]);
+
+  useEffect(() => {
+    if (!show) return;
+    listMyDayDailyLogs({ limit: 90 })
+      .then((logs) => {
+        const fromLogs = logs
+          .map((log) => log.log_date ?? log.plan_date)
+          .filter((d): d is string => typeof d === "string" && d.length > 0);
+        const merged = [...new Set([...defaultPastDates, ...fromLogs])].sort((a, b) =>
+          b.localeCompare(a),
+        );
+        setDateOptions(merged);
+      })
+      .catch(() => setDateOptions(defaultPastDates));
+  }, [defaultPastDates, show]);
 
   useEffect(() => {
     if (!show || !selectedDate) return;
     loadHistory(selectedDate).catch(() => undefined);
   }, [loadHistory, selectedDate, show]);
+
+  const historySourceLabel = historyResult?.historySourceLabel ?? "";
+  const deletedCount = historyResult?.deletedCount ?? 0;
+  const isReadOnly = historyResult?.readOnly === true;
 
   return (
     <Modal show={show} onHide={onClose} size="lg" centered scrollable>
@@ -103,24 +93,35 @@ export function MyDayHistoryModal({ show, todayIso, onClose }: MyDayHistoryModal
       </Modal.Header>
       <Modal.Body>
         <p className="small text-muted mb-3">
-          Read-only snapshot of tasks and activities from a previous day.
+          Read-only past day view. After midnight reset, data is rebuilt from end-of-day logs and
+          includes deleted tasks when the server provides them.
         </p>
         <Form.Group className="mb-3">
-          <Form.Label className="small fw-semibold">Date</Form.Label>
+          <Form.Label className="small fw-semibold">Past day</Form.Label>
           <Form.Select
             value={selectedDate}
             onChange={(e) => setSelectedDate(e.target.value)}
             disabled={loading}
           >
-            {pastDateOptions.map((iso) => (
+            {dateOptions.map((iso) => (
               <option key={iso} value={iso}>
                 {formatDateGlobal(iso)}
+                {iso === yesterdayIso ? " (yesterday)" : ""}
               </option>
             ))}
           </Form.Select>
         </Form.Group>
 
-        <p className="small text-muted mb-2">{metaLine}</p>
+        {historyResult?.stats ? <MyDayPastDayStatsPanel stats={historyResult.stats} /> : null}
+
+        <p className="small text-muted my-3 mb-2">{metaLine}</p>
+        {historySourceLabel ? (
+          <p className="small text-muted mb-2" style={{ fontSize: "11px" }}>
+            Data source: {historySourceLabel}
+            {isReadOnly ? " · Read-only" : ""}
+            {deletedCount > 0 ? ` · ${deletedCount} deleted` : ""}
+          </p>
+        ) : null}
 
         {loading ? (
           <div className="text-center py-4">
@@ -135,8 +136,13 @@ export function MyDayHistoryModal({ show, todayIso, onClose }: MyDayHistoryModal
         {!loading && rows.length > 0 ? (
           <div className="myday-history-list">
             {rows.map((row) => (
-              <div key={`${selectedDate}-${row.id}-${row.status}`} className="myday-history-item">
-                <div className="myday-history-item__title">{row.title}</div>
+              <div key={`${selectedDate}-${row.rowKey}`} className="myday-history-item">
+                <div className="myday-history-item__title">
+                  {row.title}
+                  {row.isDeleted ? (
+                    <span className="myday-tag myday-tag--deleted ms-2">Deleted</span>
+                  ) : null}
+                </div>
                 <div className="myday-history-item__meta">
                   {row.status} • {row.projectName} • {row.estimateLabel}
                 </div>

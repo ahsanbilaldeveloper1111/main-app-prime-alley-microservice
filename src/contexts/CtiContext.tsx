@@ -90,6 +90,13 @@ function localStatusFromCallStateRecord(callState: {
     if (anyLegHeld) {
       return 'onHold';
     }
+    const hasConnectedLeg = parties.some((p) => {
+      const s = (p.callStatus ?? '').toUpperCase();
+      return s === 'CONNECTED' || s === 'ANSWERED' || s === 'RETRIEVED';
+    });
+    if (hasConnectedLeg) {
+      return 'connected';
+    }
   }
   const cs = (callState.currentState ?? '').toUpperCase();
   if (cs === 'HELD' || cs === 'ON_HOLD') {
@@ -1119,6 +1126,11 @@ export const CtiProvider: React.FC<CtiProviderProps> = ({ children }) => {
       ctiStomp.userAddress,
       callEntry.callingAddress,
       callEntry.calledAddress,
+      ctiStomp.callStateMap as Record<
+        string,
+        { parties?: Array<{ callingAddress?: string; calledAddress?: string }> }
+      >,
+      params.callId,
     ) || params.transferAddress
     return await transferCallsAPI({
       callId: params.callId,
@@ -1129,7 +1141,7 @@ export const CtiProvider: React.FC<CtiProviderProps> = ({ children }) => {
       targetAddress: params.targetAddress,
       mode: 'CONSULT',
     });
-  }, [ctiStomp.userAddress, ctiStomp.dnsMap, activeCalls]);
+  }, [ctiStomp.userAddress, ctiStomp.dnsMap, ctiStomp.callStateMap, activeCalls]);
   
   // Device helper functions
   const getCallingDeviceInfoHelper = useCallback(() => {

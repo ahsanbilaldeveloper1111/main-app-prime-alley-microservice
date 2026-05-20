@@ -128,7 +128,16 @@ function WorkloadDayTaskCard({
   return (
     <div className="workload-day-task-card">
       <div className="workload-day-task-card__title-row">
-        <div className="workload-day-task-card__title">{task.title}</div>
+        <div className="workload-day-task-card__title-wrap">
+          <div className="workload-day-task-card__title">{task.title}</div>
+          {unestimated ? (
+            <span
+              className="workload-unestimated-dot"
+              title="No estimate"
+              aria-label="No estimate"
+            />
+          ) : null}
+        </div>
         {showOrgBadge ? (
           <Badge bg="light" text="dark" className="workload-day-task-card__org border">
             Org

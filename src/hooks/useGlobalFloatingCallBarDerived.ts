@@ -5,11 +5,12 @@ import {
   canUserResumeHoldOnFloatingBar,
   computeFloatingBarConnectedElapsedSeconds,
   pickFloatingBarCall,
+  resolveFloatingBarHoldOrientForUser,
   type FloatingBarCallStateEntry,
   type FloatingBarCtiCall,
   type FloatingBarDnsMap,
-  type FloatingBarEventLogEntry,
 } from "@components/globalFloatingCallBarHelpers";
+import { ctiAddressMatchesUser } from "@utils/ctiAddressMatching";
 
 type UserDataExtensionsGetter = (() => Record<string, Record<string, unknown>>) | undefined;
 
@@ -17,7 +18,6 @@ export type UseGlobalFloatingCallBarDerivedParams = {
   activeCalls: Map<string, FloatingBarCtiCall>;
   userAddress: string | null | undefined;
   callStateMap: Record<string, FloatingBarCallStateEntry> | undefined;
-  eventLog: FloatingBarEventLogEntry[] | undefined;
   dnsMap: FloatingBarDnsMap | undefined;
   formatDuration: (seconds: number) => string;
   getUserDataExtensions: UserDataExtensionsGetter;
@@ -27,7 +27,6 @@ export function useGlobalFloatingCallBarDerived({
   activeCalls,
   userAddress,
   callStateMap,
-  eventLog,
   dnsMap,
   formatDuration,
   getUserDataExtensions,
@@ -38,9 +37,8 @@ export function useGlobalFloatingCallBarDerived({
         activeCalls,
         userAddress,
         callStateMap,
-        eventLog,
       ),
-    [activeCalls, userAddress, callStateMap, eventLog],
+    [activeCalls, userAddress, callStateMap],
   );
 
   const canCurrentUserResumeCall = useMemo(() => {
@@ -48,10 +46,20 @@ export function useGlobalFloatingCallBarDerived({
       return false;
     }
     const callState = callStateMap?.[activeCall.callId];
-    return canUserResumeHoldOnFloatingBar(userAddress, callState, dnsMap, {
-      callingAddress: activeCall.callingAddress,
-      calledAddress: activeCall.calledAddress,
-    });
+    const orient = resolveFloatingBarHoldOrientForUser(
+      callState,
+      userAddress,
+      {
+        callingAddress: activeCall.callingAddress,
+        calledAddress: activeCall.calledAddress,
+      },
+    );
+    return canUserResumeHoldOnFloatingBar(
+      userAddress,
+      callState,
+      dnsMap,
+      orient,
+    );
   }, [activeCall, userAddress, callStateMap, dnsMap]);
 
   const [currentDuration, setCurrentDuration] = useState<number | null>(null);
@@ -88,10 +96,10 @@ export function useGlobalFloatingCallBarDerived({
     if (!activeCall || !userAddress) {
       return activeCall?.number ?? null;
     }
-    if (activeCall.callingAddress === userAddress && activeCall.calledAddress) {
+    if (ctiAddressMatchesUser(activeCall.callingAddress, userAddress) && activeCall.calledAddress) {
       return activeCall.calledAddress;
     }
-    if (activeCall.calledAddress === userAddress && activeCall.callingAddress) {
+    if (ctiAddressMatchesUser(activeCall.calledAddress, userAddress) && activeCall.callingAddress) {
       return activeCall.callingAddress;
     }
     return activeCall.number || null;

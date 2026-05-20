@@ -21,7 +21,15 @@ export const useMonitoring = (
   setSelectedTone: React.Dispatch<React.SetStateAction<Record<string, string>>>,
   setTempMonitorSelection: React.Dispatch<React.SetStateAction<Record<string, string | null>>>,
   setShowPopup: React.Dispatch<React.SetStateAction<ShowPopup | null>>,
-  activeMonitoring?: { dn: string | null; type: string | null; monitor?: string; deviceName?: string | null; monitorDeviceType?: string; monitorDeviceName?: string }
+  monitoringSession?: {
+    dn: string | null
+    type: string | null
+    monitor?: string
+    deviceName?: string | null
+    monitorDeviceType?: string
+    monitorDeviceName?: string
+  },
+  getCallStatesForDn?: (dn: string) => unknown[],
 ) => {
   const [showDeviceSelectionModal, setShowDeviceSelectionModal] = useState(false)
   const [availableDevices, setAvailableDevices] = useState<AvailableDevice[]>([])
@@ -92,7 +100,8 @@ export const useMonitoring = (
       setTempMonitorSelection,
       setNotification,
       setShowPopup,
-      activeMonitoring
+      monitoringSession,
+      getCallStatesForDn,
     )
   }
 

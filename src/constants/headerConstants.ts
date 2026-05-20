@@ -322,6 +322,7 @@ export const HEADER_CONSTANTS = {
     //Work Planner permissions start
     VIEW_TASKSLIST_WORK_PLANNER: "view-tasks-work-planner",
     VIEW_WORKLOAD_WORK_PLANNER: "view-workload-work-planner",
+    VIEW_REPORTS_WORK_PLANNER: "view-reports-work-planner",
     VIEW_MY_DAY_TASKS_WORK_PLANNER: "view-my-day-tasks-work-planner",
     VIEW_PROJECTS_WORK_PLANNER: "view-projects-work-planner",
     VIEW_PROJECTS_DASHBOARD_WORK_PLANNER:

@@ -1,6 +1,12 @@
 import { CtiDevice, ActiveMonitoring, MonitoringTeardownHint } from './types'
 import { SECTION_CONFIG } from './constants'
-import { shouldExcludeCallFromWallboardContext } from '@components/communications/wallboards-live/wallboardEventParsing'
+import {
+  callHasLiveAgentPartyWithNonSupervisor,
+  isBargeInMonitoringType,
+  isSilentOrWhisperMonitoringType,
+  shouldExcludeCallFromWallboardContext,
+} from '@components/communications/wallboards-live/wallboardEventParsing'
+import { isDisplayConferenceCall } from '@utils/ctiCallDisplay'
 import moment from 'moment'
 
 export type { MonitoringTeardownHint } from './types'
@@ -31,6 +37,19 @@ type LooseCall = {
   isMonitoring?: boolean
   parties?: CallParty[]
   currentState?: string
+}
+
+function agentCallHasConferenceBargeWithCustomer(
+  agentCalls: LooseCall[],
+  agentDn: string,
+  supervisorDn: string
+): boolean {
+  return agentCalls.some((c) => {
+    if (c.isTerminating || !c.parties?.length || c.isMonitoring !== true) {
+      return false
+    }
+    return callHasLiveAgentPartyWithNonSupervisor(c, agentDn, supervisorDn)
+  })
 }
 
 function partyInvolvesDn(p: CallParty, dn: string): boolean {
@@ -88,11 +107,37 @@ function resolveSupervisionSection(p: CategorizeDnsParams): string | null {
     return 'supervision'
   }
 
+  const agentCalls = getCallStatesForDn(agentDn) as LooseCall[]
+
+  if (isBargeInMonitoringType(activeMonitoring.type)) {
+    if (agentCallHasConferenceBargeWithCustomer(agentCalls, agentDn, dn)) {
+      return 'supervision'
+    }
+    if (hasSupervisorAgentActiveMonitoringCall(agentCalls, dn, agentDn)) {
+      return 'supervision'
+    }
+    return null
+  }
+
+  // SILENT / WHISPER: CTI often attaches the supervision leg only on the agent's call object.
+  if (hasSupervisorAgentActiveMonitoringCall(agentCalls, dn, agentDn)) {
+    return 'supervision'
+  }
+
+  // Listen-only: supervisor card should appear when the session is active (API / effectiveMonitoring),
+  // not only after SSE adds a live sup↔agent party (often 5–10s after CTI connects).
+  if (isSilentOrWhisperMonitoringType(activeMonitoring.type)) {
+    return 'supervision'
+  }
+
   if (!activeMonitoring.deviceName) {
     return 'supervision'
   }
 
-  const monitoredCall = getCallStateForDevice(agentDn, activeMonitoring.deviceName) as LooseCall
+  const monitoredCall = getCallStateForDevice(
+    agentDn,
+    activeMonitoring.deviceName,
+  ) as LooseCall
   if (monitoredCallHasActiveParties(monitoredCall)) {
     return 'supervision'
   }
@@ -328,7 +373,9 @@ export const getIcon = (
   const effectiveState = deriveEffectiveCallStateFromParty(state, allDropped, activeParty)
 
   if ((effectiveState === 'DROPPED' || effectiveState === 'DISCONNECTED') && allDropped) return null
-  if (conf && !isOneToOne) return 'material-icons-two-tone'
+  if (isDisplayConferenceCall({ isConference: conf, isOneToOne, parties })) {
+    return 'material-icons-two-tone'
+  }
 
   const icons: Record<string, string> = {
     RINGING: 'phone',
@@ -362,7 +409,12 @@ export const getColor = (
     return colorForTerminalWhenNoParties(terminalState)
   }
 
-  if (conf && !isOneToOne && !allDropped) return '#6f42c1'
+  if (
+    isDisplayConferenceCall({ isConference: conf, isOneToOne, parties }) &&
+    !allDropped
+  ) {
+    return '#6f42c1'
+  }
   if (state === 'HELD') return '#2563eb'
 
   const activeParty = filtered.find((p) => p.callStatus !== 'DROPPED') ?? filtered[0]
@@ -389,7 +441,12 @@ export const getText = (
     return dn
   }
 
-  if (isConference && !isOneToOne && !allDropped) return 'Conference'
+  if (
+    isDisplayConferenceCall({ isConference, isOneToOne, parties }) &&
+    !allDropped
+  ) {
+    return 'Conference'
+  }
   if (state === 'HELD') return 'On Hold'
 
   const activeParty = filtered.find((p) => p.callStatus !== 'DROPPED') ?? filtered[0]

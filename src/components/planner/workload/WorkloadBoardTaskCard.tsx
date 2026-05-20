@@ -79,7 +79,16 @@ export function WorkloadBoardTaskCard({
         >
           <GripVertical size={14} aria-hidden />
         </button>
-        <div className="workload-board-task-card__title">{task.title}</div>
+        <div className="workload-board-task-card__title-wrap">
+          <div className="workload-board-task-card__title">{task.title}</div>
+          {unestimated ? (
+            <span
+              className="workload-unestimated-dot"
+              title="No estimate"
+              aria-label="No estimate"
+            />
+          ) : null}
+        </div>
       </div>
 
       <div className="workload-board-task-card__project">
@@ -105,7 +114,7 @@ export function WorkloadBoardTaskCard({
         ) : null}
         {unestimated ? (
           <span className="workload-board-task-card__tag workload-board-task-card__tag--warn">
-            No estimate
+            Unestimated
           </span>
         ) : null}
       </div>

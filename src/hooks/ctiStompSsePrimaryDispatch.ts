@@ -2,6 +2,7 @@ import type { Dispatch, SetStateAction } from "react";
 import type { CrossTabCtiManager } from "../utils/crossTabCtiManager";
 import { devicesArrayFromCompleteStatePayload } from "./ctiStompHelpers";
 import { touchCtiSseLastMessageTime } from "./ctiStompSseLiveness";
+import type { CtiStreamMissedEventRecovery } from "./ctiStreamMissedEventRecovery";
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -63,6 +64,7 @@ export interface PrimarySseDispatchCtx {
   };
   handleCallEventRef: { current: ((e: unknown) => void) | null };
   handleOngoingCallsRef: { current: ((data: unknown) => void) | null };
+  streamGapRecoveryRef?: { current: CtiStreamMissedEventRecovery | null };
   groupDevicesByDnAndDeviceNameRef: {
     current: ((devices: unknown[]) => unknown) | null;
   };
@@ -166,6 +168,7 @@ function handleOngoingCalls(
 ): void {
   const { currentInstanceId } = ctx;
   try {
+    ctx.streamGapRecoveryRef?.current?.markOngoingCallsReceived();
     ctx.handleOngoingCallsRef.current?.(data.data);
   } catch (err) {
     console.error(
@@ -176,6 +179,7 @@ function handleOngoingCalls(
 }
 
 function handleStompConnected(ctx: PrimarySseDispatchCtx): void {
+  ctx.streamGapRecoveryRef?.current?.markStompConnected();
   ctx.setIsInitialized(true);
   ctx.setError(null);
   const publishInitial = ctx.publishStompMessageRef.current;
@@ -267,6 +271,10 @@ export function dispatchPrimaryCtiSsePayload(
   touchLastMessageTime(data, ctx.lastMessageTimeRef);
 
   const type = typeof data.type === "string" ? data.type : "";
+  if (type === "ping" || type === "test") {
+    ctx.streamGapRecoveryRef?.current?.markPingReceived();
+  }
+
   const handler = PRIMARY_HANDLERS[type];
   if (handler) {
     handler(data, ctx);

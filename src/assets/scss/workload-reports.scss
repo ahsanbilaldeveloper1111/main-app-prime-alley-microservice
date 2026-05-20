@@ -1,0 +1,337 @@
+.workload-reports-page {
+  padding-bottom: 2rem;
+  background: #f4f6f9;
+  min-height: 100%;
+  border-radius: 0.5rem;
+
+  .workload-reports-page__header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-bottom: 1rem;
+  }
+
+  .workload-reports-page__title {
+    font-size: 1.35rem;
+    font-weight: 600;
+    margin: 0 0 0.25rem;
+  }
+
+  .workload-reports-filters {
+    border: 1px solid var(--bs-border-color, #e5e7eb);
+    border-radius: 0.65rem;
+    background: #fff;
+    padding: 0.85rem 1rem;
+    margin-bottom: 1rem;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+  }
+
+  .reports-kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+    gap: 0.85rem;
+    margin-bottom: 1rem;
+  }
+
+  .reports-kpi-card {
+    background: #fff;
+    border: 1px solid var(--bs-border-color, #e5e7eb);
+    border-radius: 0.65rem;
+    padding: 1rem 1.1rem;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+    border-top: 3px solid var(--reports-kpi-accent, #3b82f6);
+  }
+
+  .reports-kpi-card--completed {
+    --reports-kpi-accent: #22c55e;
+  }
+
+  .reports-kpi-card--overdue {
+    --reports-kpi-accent: #ef4444;
+  }
+
+  .reports-kpi-card--pending {
+    --reports-kpi-accent: #f59e0b;
+  }
+
+  .reports-kpi-card__label {
+    font-size: 0.78rem;
+    color: #6b7280;
+    margin-bottom: 0.25rem;
+  }
+
+  .reports-kpi-card__value {
+    font-size: 1.75rem;
+    font-weight: 700;
+    line-height: 1.1;
+    color: #111827;
+  }
+
+  .reports-kpi-card__sub {
+    font-size: 0.72rem;
+    color: #9ca3af;
+    margin-top: 0.35rem;
+  }
+
+  .reports-kpi-card__delta {
+    font-size: 0.72rem;
+    margin-top: 0.25rem;
+    font-weight: 600;
+  }
+
+  .reports-kpi-card__delta--up {
+    color: #16a34a;
+  }
+
+  .reports-kpi-card__delta--down {
+    color: #dc2626;
+  }
+
+  .reports-panel {
+    background: #fff;
+    border: 1px solid var(--bs-border-color, #e5e7eb);
+    border-radius: 0.65rem;
+    padding: 1rem 1.1rem;
+    margin-bottom: 1rem;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+    height: 100%;
+  }
+
+  .reports-panel__title {
+    font-size: 0.95rem;
+    font-weight: 700;
+    margin: 0 0 0.2rem;
+    color: #111827;
+  }
+
+  .reports-panel__subtitle {
+    font-size: 0.78rem;
+    color: #6b7280;
+    margin-bottom: 0.85rem;
+  }
+
+  .reports-status-row {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    margin-bottom: 0.65rem;
+  }
+
+  .reports-status-row__icon {
+    width: 1.75rem;
+    height: 1.75rem;
+    border-radius: 0.35rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.7rem;
+    font-weight: 700;
+    flex-shrink: 0;
+    color: #fff;
+  }
+
+  .reports-status-row__meta {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .reports-status-row__name {
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: #374151;
+  }
+
+  .reports-status-row__count {
+    font-size: 0.72rem;
+    color: #6b7280;
+  }
+
+  .reports-status-row__bar {
+    flex: 1;
+    min-width: 4rem;
+    max-width: 8rem;
+    height: 0.45rem;
+    background: #e5e7eb;
+    border-radius: 999px;
+    overflow: hidden;
+  }
+
+  .reports-status-row__bar-fill {
+    height: 100%;
+    border-radius: 999px;
+  }
+
+  .reports-status-row__pct {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #374151;
+    min-width: 2.5rem;
+    text-align: right;
+  }
+
+  .reports-assignee-row {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    padding: 0.45rem 0;
+    border-bottom: 1px solid #f3f4f6;
+
+    &:last-child {
+      border-bottom: none;
+    }
+  }
+
+  .reports-assignee-row__avatar {
+    width: 2rem;
+    height: 2rem;
+    border-radius: 50%;
+    background: #0f766e;
+    color: #fff;
+    font-size: 0.65rem;
+    font-weight: 700;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  .reports-assignee-row__name {
+    flex: 1;
+    min-width: 0;
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: #111827;
+  }
+
+  .reports-assignee-row__count {
+    font-size: 0.78rem;
+    color: #6b7280;
+    white-space: nowrap;
+  }
+
+  .reports-task-row {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.5rem;
+    padding: 0.55rem 0;
+    border-bottom: 1px solid #f3f4f6;
+
+    &:last-child {
+      border-bottom: none;
+    }
+  }
+
+  .reports-task-row__title {
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: #111827;
+    margin-bottom: 0.15rem;
+  }
+
+  .reports-task-row__meta {
+    font-size: 0.72rem;
+    color: #6b7280;
+  }
+
+  .reports-task-row__tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.3rem;
+    justify-content: flex-end;
+  }
+
+  .reports-priority,
+  .reports-status-tag {
+    font-size: 0.68rem;
+    font-weight: 600;
+    padding: 0.12rem 0.4rem;
+    border-radius: 0.25rem;
+    border: 1px solid transparent;
+  }
+
+  .reports-priority--high {
+    background: #fee2e2;
+    color: #b91c1c;
+  }
+
+  .reports-priority--medium {
+    background: #dbeafe;
+    color: #1d4ed8;
+  }
+
+  .reports-priority--low {
+    background: #ecfdf5;
+    color: #065f46;
+  }
+
+  .reports-priority--default {
+    background: #f3f4f6;
+    color: #4b5563;
+  }
+
+  .reports-member-table {
+    width: 100%;
+    font-size: 0.8rem;
+
+    th {
+      font-weight: 600;
+      color: #6b7280;
+      border-bottom: 1px solid #e5e7eb;
+      padding: 0.5rem 0.4rem;
+      white-space: nowrap;
+    }
+
+    td {
+      padding: 0.55rem 0.4rem;
+      border-bottom: 1px solid #f3f4f6;
+      vertical-align: middle;
+    }
+
+    .reports-member-table__name {
+      display: flex;
+      align-items: center;
+      gap: 0.45rem;
+      font-weight: 600;
+      color: #111827;
+    }
+  }
+
+  .reports-count-pill {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 1.35rem;
+    padding: 0.1rem 0.35rem;
+    border-radius: 999px;
+    font-size: 0.72rem;
+    font-weight: 600;
+  }
+
+  .reports-count-pill--todo {
+    background: #dbeafe;
+    color: #1d4ed8;
+  }
+
+  .reports-count-pill--progress {
+    background: #ffedd5;
+    color: #c2410c;
+  }
+
+  .reports-count-pill--done {
+    background: #dcfce7;
+    color: #15803d;
+  }
+
+  .reports-count-pill--overdue {
+    background: #fee2e2;
+    color: #b91c1c;
+  }
+
+  .reports-trend-chart {
+    width: 100%;
+    height: 220px;
+  }
+}
