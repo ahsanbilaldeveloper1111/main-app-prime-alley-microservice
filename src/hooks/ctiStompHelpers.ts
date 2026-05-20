@@ -2,6 +2,9 @@
  * Pure helpers for useCtiStomp — keeps the hook under Sonar cognitive-complexity limits.
  */
 
+import { normalizeCtiAddressDigits } from "../utils/ctiAddressMatching";
+import { normalizeConferenceFlagsForLiveParties } from "../utils/ctiCallDisplay";
+
 const LOAD_PERSIST_ACTIVE_STATUSES = new Set([
   "CONNECTED",
   "RETRIEVED",
@@ -401,12 +404,55 @@ export function applyStaleDroppedPartyCleanup(
   }
 }
 
+function partyLegKey(p: {
+  callingAddress?: string;
+  calledAddress?: string;
+}): string {
+  return `${normalizeCtiAddressDigits(p.callingAddress)}:${normalizeCtiAddressDigits(p.calledAddress)}`;
+}
+
+function isTerminalPartyStatus(status: string | undefined): boolean {
+  return status === "DROPPED" || status === "DISCONNECTED" || status === "ENDED";
+}
+
+/**
+ * Merges incremental `evt.parties` into the stored snapshot so a dropped consult leg
+ * does not replace (and erase) the held customer leg on the same callId.
+ */
+export function mergeCallEventParties(
+  baseParties: any[] | undefined,
+  evtParties: any[] | undefined,
+): any[] {
+  if (!evtParties?.length) {
+    return baseParties ? baseParties.map((p) => ({ ...p })) : [];
+  }
+  if (!baseParties?.length) {
+    return evtParties.map((p) => ({ ...p }));
+  }
+  const merged = new Map<string, any>();
+  for (const p of baseParties) {
+    merged.set(partyLegKey(p), { ...p });
+  }
+  for (const p of evtParties) {
+    const key = partyLegKey(p);
+    const prev = merged.get(key);
+    merged.set(key, prev ? { ...prev, ...p } : { ...p });
+  }
+  return Array.from(merged.values());
+}
+
 function tryRemoveCallOnEarlyExit(
   updated: Record<string, any>,
   callId: string,
   evt: any,
+  base: any,
   saveCallStatesToStorage: (m: Record<string, any>) => void,
 ): Record<string, any> | null {
+  const mergedParties = mergeCallEventParties(base.parties, evt.parties);
+  const activeMerged = mergedParties.filter(
+    (p: any) => !isTerminalPartyStatus(p.callStatus),
+  );
+
   if (evt.isTerminating) {
     recordTerminatedCallForRebirthGuard(
       callId,
@@ -418,13 +464,13 @@ function tryRemoveCallOnEarlyExit(
     return rest;
   }
   if (evt.eventType === "DISCONNECTED" && evt.parties) {
-    const allPartiesDroppedEarly =
-      evt.parties.length > 0 &&
-      evt.parties.every(
-        (p: any) =>
-          p.callStatus === "DROPPED" || p.callStatus === "DISCONNECTED",
-      );
-    if (allPartiesDroppedEarly || evt.hasActiveParticipants === false) {
+    const allMergedTerminal =
+      mergedParties.length > 0 &&
+      mergedParties.every((p: any) => isTerminalPartyStatus(p.callStatus));
+    const shouldRemove =
+      (allMergedTerminal && activeMerged.length === 0) ||
+      (evt.hasActiveParticipants === false && activeMerged.length === 0);
+    if (shouldRemove) {
       recordTerminatedCallForRebirthGuard(
         callId,
         evt,
@@ -606,6 +652,7 @@ export function applyCallEventToCallStateMap(
     updated,
     callId,
     evt,
+    base,
     saveCallStatesToStorage,
   );
   if (early) {
@@ -617,7 +664,7 @@ export function applyCallEventToCallStateMap(
     return updated;
   }
 
-  const partiesToProcess = evt.parties || base.parties || [];
+  const partiesToProcess = mergeCallEventParties(base.parties, evt.parties);
   const processedParties = partiesToProcess.map((party: any) => {
     enrichPartyCallingDeviceType(party, dnsMap);
     return party;
@@ -661,7 +708,24 @@ export function applyCallEventToCallStateMap(
     dnsMap,
   );
 
-  updated[callId] = {
+  const monitoringKeyPresent = Object.hasOwn(evt, "monitoring");
+  let nextMonitoring: typeof base.monitoring;
+  if (monitoringKeyPresent) {
+    nextMonitoring =
+      evt.monitoring === undefined ? base.monitoring : evt.monitoring;
+  } else {
+    nextMonitoring = base.monitoring;
+  }
+  let nextIsMonitoring: boolean;
+  if (typeof evt.isMonitoring === "boolean") {
+    nextIsMonitoring = evt.isMonitoring;
+  } else if (monitoringKeyPresent && evt.monitoring === null) {
+    nextIsMonitoring = false;
+  } else {
+    nextIsMonitoring = Boolean(base.isMonitoring);
+  }
+
+  updated[callId] = normalizeConferenceFlagsForLiveParties({
     ...base,
     callId,
     currentState: effectiveCurrentState,
@@ -678,9 +742,9 @@ export function applyCallEventToCallStateMap(
     eventName: evt.eventName || base.eventName,
     heldByAddress,
     // Supervision metadata must follow each event; otherwise refresh/ongoing merge loses monitoring on the next event.
-    isMonitoring: evt.isMonitoring ?? base.isMonitoring,
-    monitoring: evt.monitoring ?? base.monitoring,
-  };
+    isMonitoring: nextIsMonitoring,
+    monitoring: nextMonitoring,
+  });
 
   if (shouldTerminate) {
     notifyCallIdsRemoved?.([callId]);
@@ -922,7 +986,7 @@ export function mergeOngoingCallsIntoCallStateMap(
       heldByAddress = undefined;
     }
 
-    updated[callId] = {
+    updated[callId] = normalizeConferenceFlagsForLiveParties({
       ...callData,
       callId,
       currentState: currentState || "UNKNOWN",
@@ -931,7 +995,7 @@ export function mergeOngoingCallsIntoCallStateMap(
       isTerminating: callData.isTerminating === true,
       eventTime: callData.eventTime ?? existingCall?.eventTime ?? "",
       heldByAddress,
-    };
+    });
   });
 
   return updated;

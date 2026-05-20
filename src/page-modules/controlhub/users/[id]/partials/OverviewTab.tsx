@@ -8,12 +8,27 @@ import RecentActivitiesTab from './RecentActivitiesTab';
 import UserProfileTab from './UserProfileTab';
 import OrganizationalHierarchyTab from './OrganizationalHierarchyTab';
 import { getStorageImageUrl } from '@utils/imageUtils';
+import { useAuthContext } from '@auth/AuthProvider';
+
+/** Slugs from auth/login `permissions[]` that allow changing a user's rank (assignRank API). */
+const RANK_EDIT_PERMISSION_SLUGS = [
+    'edit-users',
+    'assign-rank-users',
+    'bulk-assign-ranks',
+] as const;
+
+/** Slugs that allow changing a user's group (assignGroup API). */
+const GROUP_EDIT_PERMISSION_SLUGS = ['edit-users', 'assign-group-users'] as const;
 
 function buildRoleDropdownValue(
     updatedRole: string,
     roles: Role[],
 ): { value: number; label: string } | null {
-    const role = roles.find((r) => r.id.toString() === updatedRole);
+    const normalized = String(updatedRole ?? '').trim();
+    if (!normalized) {
+        return null;
+    }
+    const role = roles.find((r) => String(r.id) === normalized);
     if (role) {
         return { value: role.id, label: role.name };
     }
@@ -55,6 +70,8 @@ const OverviewTab: React.FC<OverviewTabProps> = ({
     onUserUpdate,
     onSuccess
 }) => {
+    const { hasAnyPermission } = useAuthContext();
+
     const [showChangeGroupModal, setShowChangeGroupModal] = useState(false);
     const [showChangeRoleModal, setShowChangeRoleModal] = useState(false);
     const [showChangeCompanyAdminModal, setShowChangeCompanyAdminModal] = useState(false);
@@ -104,8 +121,20 @@ const OverviewTab: React.FC<OverviewTabProps> = ({
     const [profilePicture, setProfilePicture] = useState<string>('');
     React.useEffect(() => {
         if (currentUser) {
-            setUpdatedGroup(currentUser.group_id || '');
-            setUpdatedRole(currentUser.role_id || '');
+            setUpdatedGroup(
+                currentUser.group_id !== undefined &&
+                    currentUser.group_id !== null &&
+                    String(currentUser.group_id).trim() !== ''
+                    ? String(currentUser.group_id)
+                    : '',
+            );
+            setUpdatedRole(
+                currentUser.role_id !== undefined &&
+                    currentUser.role_id !== null &&
+                    String(currentUser.role_id).trim() !== ''
+                    ? String(currentUser.role_id)
+                    : '',
+            );
             setIsCompanyAdmin(currentUser.is_company_admin === "1");
             setProfilePicture(currentUser.profile?.profile_picture || '');
         }
@@ -132,6 +161,19 @@ const OverviewTab: React.FC<OverviewTabProps> = ({
 
     const roleSelectValue =
         updatedRole === '' ? null : buildRoleDropdownValue(updatedRole, roles);
+
+    /**
+     * Rank/group edits: use AuthProvider (same source as axios) + admin bypass.
+     * Note: edit controls sit on the light right-hand card — use `text-primary`, not `text-white`.
+     */
+    const canAssignRank =
+        isSessionAdmin || hasAnyPermission([...RANK_EDIT_PERMISSION_SLUGS]);
+
+    const canAssignGroup =
+        isSessionAdmin || hasAnyPermission([...GROUP_EDIT_PERMISSION_SLUGS]);
+
+    const canMarkCompanyAdmin =
+        isSessionAdmin || hasAnyPermission(['mark-company-admin-users']);
 
     return (
         <>
@@ -182,10 +224,10 @@ const OverviewTab: React.FC<OverviewTabProps> = ({
                                     <p className="mb-0 small text-primary"><b>Rank</b></p>
                                     <p className="mb-2 text-capitalize d-flex justify-content-between">
                                         {currentUser?.role?.name || 'Rank not assigned'}
-                                        {session?.user?.permissions?.includes('assign-rank-users') && (
+                                        {canAssignRank && (
                                             <button
                                                 type="button"
-                                                className="p-0 border-0 bg-transparent d-inline-flex align-items-center text-white"
+                                                className="p-0 border-0 bg-transparent d-inline-flex align-items-center text-primary"
                                                 aria-label="Change rank"
                                                 onClick={() => setShowChangeRoleModal(true)}
                                             >
@@ -196,10 +238,10 @@ const OverviewTab: React.FC<OverviewTabProps> = ({
                                     <p className="mb-0 small text-primary"><b>Group</b></p>
                                     <p className="mb-2 text-capitalize d-flex justify-content-between">
                                         {currentUser?.group?.name || 'Group not assigned'}
-                                        {session?.user?.permissions?.includes('assign-group-users') && (
+                                        {canAssignGroup && (
                                             <button
                                                 type="button"
-                                                className="p-0 border-0 bg-transparent d-inline-flex align-items-center text-white"
+                                                className="p-0 border-0 bg-transparent d-inline-flex align-items-center text-primary"
                                                 aria-label="Change group"
                                                 onClick={() => setShowChangeGroupModal(true)}
                                             >
@@ -207,14 +249,14 @@ const OverviewTab: React.FC<OverviewTabProps> = ({
                                             </button>
                                         )}
                                     </p>
-                                    {session?.user?.permissions?.includes('mark-company-admin-users') && (
+                                    {canMarkCompanyAdmin && (
                                         <div>
                                             <p className="mb-0 small text-primary"><b>Company Admin</b></p>
                                             <p className="mb-0 text-capitalize d-flex justify-content-between">
                                                 {currentUser?.is_company_admin === "1" ? "Yes" : "No"}
                                                 <button
                                                     type="button"
-                                                    className="p-0 border-0 bg-transparent d-inline-flex align-items-center text-white"
+                                                    className="p-0 border-0 bg-transparent d-inline-flex align-items-center text-primary"
                                                     aria-label="Change company admin"
                                                     onClick={() => setShowChangeCompanyAdminModal(true)}
                                                 >
@@ -289,8 +331,18 @@ const OverviewTab: React.FC<OverviewTabProps> = ({
                             classNamePrefix="select"
                             isClearable={true}
                             isSearchable={true}
-                            onChange={(selectedOption: any) => {
-                                setUpdatedRole(selectedOption ? selectedOption.value.toString() : '');
+                            menuPortalTarget={
+                                typeof document === 'undefined' ? null : document.body
+                            }
+                            menuPosition="fixed"
+                            styles={{
+                                menuPortal: (base) => ({ ...base, zIndex: 1000001 }),
+                                menu: (base) => ({ ...base, zIndex: 1000001 }),
+                            }}
+                            onChange={(selectedOption: { value: number } | null) => {
+                                setUpdatedRole(
+                                    selectedOption ? String(selectedOption.value) : '',
+                                );
                             }}
                             value={roleSelectValue}
                             options={roleSelectOptions}

@@ -64,8 +64,9 @@ function matchesTeamSelection(
 ): boolean {
   const extensionData = getExtensionRecord(userDataExtensions, dn)
   const teamNames = extensionData?.team_name ?? []
+  // Include users when team metadata is missing — do not hide them from the wallboard.
   if (teamNames.length === 0) {
-    return false
+    return true
   }
   const selectedTeamStr = String(selectedTeam).toLowerCase().trim()
   return teamNames.some((teamName: string) => {

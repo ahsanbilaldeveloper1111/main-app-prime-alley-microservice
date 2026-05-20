@@ -1,4 +1,3 @@
-import { Client } from "@stomp/stompjs";
 import { useCallback, useEffect, useRef, useState } from "react";
 import axiosInstance from "@utils/axios";
 import { getCrossTabCtiManager } from "../utils/crossTabCtiManager";
@@ -9,20 +8,21 @@ import tokenService from "@utils/tokenService";
 import {
   mergeOngoingCallsIntoCallStateMap,
   extractCallsByDnFromOngoingCallsPayload,
-  mergeRemoteEventLogWithPrevious,
 } from "./ctiStompHelpers";
 import { fetchCtiConnectToken, waitForConcurrentCtiToken } from "./ctiStompAuth";
 import { subscribeCtiStompDeferredMasterEffect } from "./ctiStompDeferredMasterEffect";
 import { subscribeCtiStompPrimaryAuthEffect } from "./ctiStompPrimaryAuthEffect";
-import {
-  dispatchCrossTabCtiBroadcastEvent,
-  type CrossTabBroadcastCtx,
-} from "./ctiStompCrossTabBroadcastDispatch";
 import type { CtiDevice, CtiCallEvent, SummaryData } from "./ctiStompHookTypes";
 import { CTI_CALL_STATES } from "./ctiStompHookConstants";
 import { generateCtiStompInstanceId } from "./ctiStompInstanceId";
 import { subscribeMasterTabStatusPoll } from "./ctiStompMasterTabPoll";
-import { globalConnectionRefs } from "./ctiStompGlobalConnectionRefs";
+import { useCtiStompConnectionRefs } from "./useCtiStompConnectionRefs";
+import {
+  broadcastCtiStompMasterLatestEvent,
+  broadcastCtiStompMasterState,
+  requestUserDataExtensionsFromMaster,
+  subscribeCtiStompCrossTabListeners,
+} from "./ctiStompCrossTabIntegration";
 import {
   loadPersistedCallStateMap,
   saveCallStateMapToLocalStorage,
@@ -40,6 +40,7 @@ import {
 import { handleIncomingCtiCallEvent } from "./ctiStompIncomingCallEvent";
 import { publishCtiStompStreamMessageWithRetry } from "./ctiStompPublishRetry";
 import { syncPersistedCtiCallStatesToStomp } from "./ctiStompPersistedCallSync";
+import { createCtiStreamMissedEventRecovery } from "./ctiStreamMissedEventRecovery";
 
 /**
  * Custom hook for CTI STOMP WebSocket connection via SSE
@@ -107,54 +108,36 @@ export default function useCtiStomp(
   >(undefined);
   onCallIdsRemovedFromMapRef.current = onCallIdsRemovedFromMap;
 
-  // Always call useRef unconditionally (React Hook rules requirement)
-  // Then conditionally use either global or local refs
-  const localClientRef = useRef<Client | null>(null);
-  const localEventSourceRef = useRef<EventSource | null>(null);
-  const localTokenRef = useRef<string | null>(null);
-  const localUserAddressRef = useRef<string | null>(null);
-  const localUserTeamsRef = useRef<any>(null);
-  const localUserDataExtensionsRef = useRef<any>(null);
-  const localIsConnectingRef = useRef(false);
-  const localIsInitializedRef = useRef(false);
-  const localConnectionStartTimeRef = useRef<number | null>(null);
-  const localReconnectionTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const localIsReconnectingRef = useRef(false);
-  const localIsGettingTokenRef = useRef(false);
-  const localReconnectionAttemptsRef = useRef(0);
-  const localLastMessageTimeRef = useRef<number | null>(null);
-  const localHealthCheckIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  const localHasRequestedInitialStateRef = useRef(false);
-  const localPendingRefreshAfterCallEndRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const localLastRefreshAfterCallEndRef = useRef(0);
+  const {
+    clientRef,
+    eventSourceRef,
+    tokenRef,
+    userAddressRef,
+    userTeamsRef,
+    userDataExtensionsRef,
+    isConnectingRef,
+    isInitializedRef,
+    connectionStartTimeRef,
+    reconnectionTimerRef,
+    isReconnectingRef,
+    isGettingTokenRef,
+    reconnectionAttemptsRef,
+    lastMessageTimeRef,
+    healthCheckIntervalRef,
+    hasRequestedInitialStateRef,
+    pendingRefreshAfterCallEndRef,
+    lastRefreshAfterCallEndRef,
+    streamGapRecoveryRef,
+  } = useCtiStompConnectionRefs(isGlobalInstance);
 
-  // Use shared refs for global instance, individual refs for other instances
-  const clientRef = isGlobalInstance ? globalConnectionRefs.clientRef : localClientRef;
-  const eventSourceRef = isGlobalInstance ? globalConnectionRefs.eventSourceRef : localEventSourceRef;
-  const tokenRef = isGlobalInstance ? globalConnectionRefs.tokenRef : localTokenRef;
-  const userAddressRef = isGlobalInstance ? globalConnectionRefs.userAddressRef : localUserAddressRef;
-  const userTeamsRef = isGlobalInstance ? globalConnectionRefs.userTeamsRef : localUserTeamsRef;
-  const userDataExtensionsRef = isGlobalInstance ? globalConnectionRefs.userDataExtensionsRef : localUserDataExtensionsRef;
   const screenIdRef = useRef<string | undefined>(screenId);
-  const isConnectingRef = isGlobalInstance ? globalConnectionRefs.isConnectingRef : localIsConnectingRef;
-  const isInitializedRef = isGlobalInstance ? globalConnectionRefs.isInitializedRef : localIsInitializedRef;
-  const connectionStartTimeRef = isGlobalInstance ? globalConnectionRefs.connectionStartTimeRef : localConnectionStartTimeRef;
-  const reconnectionTimerRef = isGlobalInstance ? globalConnectionRefs.reconnectionTimerRef : localReconnectionTimerRef;
-  const isReconnectingRef = isGlobalInstance ? globalConnectionRefs.isReconnectingRef : localIsReconnectingRef;
-  const isGettingTokenRef = isGlobalInstance ? globalConnectionRefs.isGettingTokenRef : localIsGettingTokenRef;
-  const reconnectionAttemptsRef = isGlobalInstance ? globalConnectionRefs.reconnectionAttemptsRef : localReconnectionAttemptsRef;
-  const lastMessageTimeRef = isGlobalInstance ? globalConnectionRefs.lastMessageTimeRef : localLastMessageTimeRef;
-  const healthCheckIntervalRef = isGlobalInstance ? globalConnectionRefs.healthCheckIntervalRef : localHealthCheckIntervalRef;
-  const hasRequestedInitialStateRef = isGlobalInstance ? globalConnectionRefs.hasRequestedInitialStateRef : localHasRequestedInitialStateRef;
-  const pendingRefreshAfterCallEndRef = isGlobalInstance ? globalConnectionRefs.pendingRefreshAfterCallEndRef : localPendingRefreshAfterCallEndRef;
-  const lastRefreshAfterCallEndRef = isGlobalInstance ? globalConnectionRefs.lastRefreshAfterCallEndRef : localLastRefreshAfterCallEndRef;
 
   // Store attemptReconnection function in a ref so it can be accessed from multiple useEffects
   const attemptReconnectionRef = useRef<((maxAttempts?: number) => Promise<void>) | null>(null);
 
   // Store latest callback functions in refs to avoid stale closures
   // These will be initialized after the functions are defined
-  const handleCallEventRef = useRef<typeof handleCallEvent | null>(null);
+  const handleCallEventRef = useRef<((evt: unknown) => void) | null>(null);
   const handleOngoingCallsRef = useRef<((data: any) => void) | null>(null);
   const groupDevicesByDnAndDeviceNameRef = useRef<
     typeof groupDevicesByDnAndDeviceName | null
@@ -177,9 +160,22 @@ export default function useCtiStomp(
     [],
   );
 
+  useEffect(() => {
+    if (!streamGapRecoveryRef.current) {
+      streamGapRecoveryRef.current = createCtiStreamMissedEventRecovery({
+        publish: (destination, body) => {
+          const pub = publishStompMessageRef.current;
+          return pub ? pub(destination, body) : Promise.resolve(false);
+        },
+        logPrefix: `[${instanceIdRef.current}] [CtiStreamMissedEvent]`,
+      });
+    }
+  }, [streamGapRecoveryRef]);
+
   // Handle incoming call events
   const handleCallEvent = useCallback(
     (evt: CtiCallEvent) => {
+      streamGapRecoveryRef.current?.inspectCallEvent(evt);
       handleIncomingCtiCallEvent(evt, {
         isGlobalInstance,
         crossTabManagerRef,
@@ -191,7 +187,7 @@ export default function useCtiStomp(
         setCallStateMap,
       });
     },
-    [saveCallStatesToStorage, dnsMap, isGlobalInstance],
+    [saveCallStatesToStorage, dnsMap, isGlobalInstance, streamGapRecoveryRef],
   );
 
   // Handle ongoing calls response (shape may be { callsByDn } or a flat call-id map from CTI)
@@ -292,7 +288,7 @@ export default function useCtiStomp(
 
   // Update refs when callbacks change (after all functions are defined)
   useEffect(() => {
-    handleCallEventRef.current = handleCallEvent;
+    handleCallEventRef.current = (evt) => handleCallEvent(evt as CtiCallEvent);
     handleOngoingCallsRef.current = handleOngoingCalls;
     groupDevicesByDnAndDeviceNameRef.current = groupDevicesByDnAndDeviceName;
     updateSummaryDataRef.current = updateSummaryData;
@@ -400,6 +396,7 @@ export default function useCtiStomp(
         handleOngoingCallsRef,
         groupDevicesByDnAndDeviceNameRef,
         updateSummaryDataRef,
+        streamGapRecoveryRef,
       }),
     [isAuthenticated, authInitialized, router.pathname],
   );
@@ -465,14 +462,7 @@ export default function useCtiStomp(
 
     const unsubscribePoll = subscribeMasterTabStatusPoll(onPollTick);
 
-    // Request userDataExtensions from master tab if not available
-    if (!userDataExtensionsRef.current && manager.isCrossTabSupported() && !manager.isMasterTab()) {
-      // Request data from master tab
-      manager.broadcastCtiEvent({
-        type: 'request_user_data_extensions',
-        data: null
-      });
-    }
+    requestUserDataExtensionsFromMaster(manager, userDataExtensionsRef);
 
     return unsubscribePoll;
   }, []);
@@ -515,6 +505,7 @@ export default function useCtiStomp(
         handleOngoingCallsRef,
         groupDevicesByDnAndDeviceNameRef,
         updateSummaryDataRef,
+        streamGapRecoveryRef,
       }),
     [
       isGlobalInstance,
@@ -524,123 +515,52 @@ export default function useCtiStomp(
     ],
   );
 
-  // Cross-tab integration: Listen to events from master tab
-  useEffect(() => {
-    const manager = crossTabManagerRef.current;
-
-    if (!manager.isCrossTabSupported()) {
-      return; // Fallback to normal behavior if not supported
-    }
-
-    // Listen to CTI events from master tab
-    const unsubscribeCtiEvents = manager.onCtiEvent((event) => {
-      dispatchCrossTabCtiBroadcastEvent(event, {
+  // Cross-tab integration: listen to master tab (events, state, action requests)
+  useEffect(
+    () =>
+      subscribeCtiStompCrossTabListeners({
         instanceIdRef,
         isGlobalInstance,
-        manager,
+        crossTabManagerRef,
         userDataExtensionsRef,
-        handleCallEvent: handleCallEvent as (evt: unknown) => void,
-        groupDevicesByDnAndDeviceNameRef:
-          groupDevicesByDnAndDeviceNameRef as CrossTabBroadcastCtx["groupDevicesByDnAndDeviceNameRef"],
-        updateSummaryDataRef:
-          updateSummaryDataRef as CrossTabBroadcastCtx["updateSummaryDataRef"],
-        setDnsMap: setDnsMap as unknown as CrossTabBroadcastCtx["setDnsMap"],
+        handleCallEventRef,
+        groupDevicesByDnAndDeviceNameRef,
+        updateSummaryDataRef,
+        setDnsMap,
         setEventLog,
-      });
-    });
+        setCallStateMap,
+        setSummaryData,
+        setUserAddress,
+        setIsInitialized,
+        setError,
+        saveCallStatesToStorage,
+        publishStompMessageRef,
+      }),
+    [isGlobalInstance, saveCallStatesToStorage],
+  );
 
-    // Listen to state updates from master tab
-    const unsubscribeStateUpdates = manager.onStateUpdate((state) => {
-      if (state.dnsMap) {
-        setDnsMap(state.dnsMap);
-      }
-      if (state.callStateMap) {
-        setCallStateMap(state.callStateMap);
-        saveCallStatesToStorage(state.callStateMap);
-      }
-      if (state.summaryData) {
-        setSummaryData(state.summaryData);
-      }
-      if (state.userAddress) {
-        setUserAddress(state.userAddress);
-      }
-      // CRITICAL: Sync eventLog from master tab so non-master tabs have full event history
-      // This ensures components like GlobalFloatingCallBar can detect incoming calls
-      if (state.eventLog && Array.isArray(state.eventLog)) {
-        setEventLog((prev) => mergeRemoteEventLogWithPrevious(prev, state.eventLog));
-      }
-      // Always set initialized to true when we receive state from master
-      // This ensures non-master tabs appear as initialized
-      setIsInitialized(true);
-      setError(null);
-    });
-
-    // Listen to action requests from non-master tabs (master tab only)
-    const unsubscribeActionRequests = manager.onActionRequest(async (event) => {
-      if (!manager.isMasterTab()) {
-        return; // Only master tab handles action requests
-      }
-
-      if (event.data?.actionType === 'requestInitialState') {
-        // Publish request for initial state
-        if (publishStompMessageRef.current) {
-          publishStompMessageRef.current(
-            "/app/request/initial-state",
-            ""
-          );
-          console.log(`[${instanceIdRef.current}] Master tab: Requested initial state for non-master tab`);
-        }
-        // Send success response
-        manager.sendActionResponse(event.actionId || '', { success: true });
-      }
-    });
-
-    return () => {
-      unsubscribeCtiEvents();
-      unsubscribeStateUpdates();
-      unsubscribeActionRequests();
-    };
-  }, [handleCallEvent, saveCallStatesToStorage]);
-
-  // Cross-tab integration: Broadcast state updates when master tab
+  // Cross-tab integration: master tab pushes full state to other tabs
   useEffect(() => {
-    const manager = crossTabManagerRef.current;
-
-    if (!manager.isMasterTab() || !manager.isCrossTabSupported()) {
-      return;
-    }
-
-    // Broadcast state updates to other tabs (including eventLog for full sync)
-    manager.broadcastStateUpdate({
+    broadcastCtiStompMasterState({
+      crossTabManagerRef,
       dnsMap,
       callStateMap,
       summaryData,
       userAddress,
-      eventLog, // Include eventLog so non-master tabs have full event history
-      isInitialized: true, // Always true for master
+      eventLog,
     });
   }, [dnsMap, callStateMap, summaryData, userAddress, eventLog]);
 
-  // Cross-tab integration: Broadcast CTI events when master tab
+  // Cross-tab integration: master tab pushes latest call event in real time
   useEffect(() => {
-    const manager = crossTabManagerRef.current;
-
-    if (!manager.isMasterTab() || !manager.isCrossTabSupported()) {
-      return;
-    }
-
-    // Broadcast latest call events to other tabs
-    // This ensures non-master tabs receive events in real-time
-    if (eventLog && eventLog.length > 0) {
-      const latestEvent = eventLog.at(-1);
-      // Broadcast all events, not just those with callId (some events like complete_state don't have callId)
-      if (latestEvent) {
-        manager.broadcastCtiEvent({
-          type: 'call_event',
-          event: latestEvent
-        });
-      }
-    }
+    broadcastCtiStompMasterLatestEvent({
+      crossTabManagerRef,
+      dnsMap,
+      callStateMap,
+      summaryData,
+      userAddress,
+      eventLog,
+    });
   }, [eventLog]);
 
   // Sync call states when WebSocket reconnects

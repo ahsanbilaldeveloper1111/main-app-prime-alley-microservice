@@ -1,5 +1,7 @@
 import axiosInstance from './axios'
 import { toast } from 'react-toastify'
+import { ctiAddressMatchesUser } from './ctiAddressMatching'
+import { normalizeCtiApiMonitoringDeviceType } from './ctiApiDeviceType'
 
 // CTI API Endpoints
 export const CTI_ENDPOINTS = {
@@ -154,6 +156,12 @@ interface StopBargeInMonitoringParams {
   monitorDeviceType: string
   monitorDeviceName: string
   monitor: string
+  monitoredDeviceType?: string
+  monitoredDeviceName?: string
+  monitoredDeviceDn?: string
+  type?: string
+  tone?: string
+  callId?: string
 }
 
 
@@ -381,9 +389,25 @@ export const transferCalls = async (params: TransferCallParams): Promise<DialRes
   }
 }
 
+function normalizeMonitoringApiParams<P extends Record<string, unknown>>(params: P): P {
+  const out = { ...params } as Record<string, unknown>
+  if (Object.hasOwn(out, "monitorDeviceType")) {
+    out.monitorDeviceType = normalizeCtiApiMonitoringDeviceType(
+      out.monitorDeviceType as string | null | undefined,
+    )
+  }
+  if (Object.hasOwn(out, "monitoredDeviceType")) {
+    out.monitoredDeviceType = normalizeCtiApiMonitoringDeviceType(
+      out.monitoredDeviceType as string | null | undefined,
+    )
+  }
+  return out as P
+}
+
 export const startMonitoring = async (params: any): Promise<any> => {
   try {
-    const response = await axiosInstance.post(CTI_ENDPOINTS.START_MONITORING, params);
+    const body = normalizeMonitoringApiParams(params as Record<string, unknown>)
+    const response = await axiosInstance.post(CTI_ENDPOINTS.START_MONITORING, body);
 
     return validateResponse(response, CTI_ENDPOINTS.START_MONITORING);
   } catch (error) {
@@ -397,7 +421,8 @@ export const startMonitoring = async (params: any): Promise<any> => {
 
 export const stopMonitoring = async (params: StopMonitoringParams): Promise<any> => {
   try {
-    const response = await axiosInstance.post(CTI_ENDPOINTS.STOP_MONITORING, params);
+    const body = normalizeMonitoringApiParams(params as unknown as Record<string, unknown>)
+    const response = await axiosInstance.post(CTI_ENDPOINTS.STOP_MONITORING, body);
     return validateResponse(response, CTI_ENDPOINTS.STOP_MONITORING);
   } catch (error) {
     console.error('Error calling stop-monitoring API:', error)
@@ -410,10 +435,10 @@ export const stopMonitoring = async (params: StopMonitoringParams): Promise<any>
 
 export const startBargeInMonitoring = async (params: StartBargeInMonitoringParams): Promise<any> => {
   try {
-    const response = await axiosInstance.post(CTI_ENDPOINTS.START_BARGE_IN, params);
+    const body = normalizeMonitoringApiParams(params as unknown as Record<string, unknown>)
+    const response = await axiosInstance.post(CTI_ENDPOINTS.START_BARGE_IN, body);
     return validateResponse(response, CTI_ENDPOINTS.START_BARGE_IN);
   } catch (error) {
-    console.error('Error calling start-barge-in-monitoring API:', error)
     console.error('Error calling start-barge-in-monitoring API:', error)
     return {
       success: false,
@@ -424,7 +449,8 @@ export const startBargeInMonitoring = async (params: StartBargeInMonitoringParam
 
 export const stopBargeInMonitoring = async (params: StopBargeInMonitoringParams): Promise<any> => {
   try {
-    const response = await axiosInstance.post(CTI_ENDPOINTS.STOP_BARGE_IN, params);
+    const body = normalizeMonitoringApiParams(params as unknown as Record<string, unknown>)
+    const response = await axiosInstance.post(CTI_ENDPOINTS.STOP_BARGE_IN, body);
     return validateResponse(response, CTI_ENDPOINTS.STOP_BARGE_IN);
   } catch (error) {
     console.error('Error calling stop-barge-in-monitoring API:', error)
@@ -463,25 +489,67 @@ export const GetOngoingCall = async (params: any): Promise<any> => {
 }
 
 /**
+ * Other party on any leg where `userAddress` appears (multi-party / post-transfer).
+ */
+export function getRemotePartyDnFromCallParties(
+  userAddress: string | null | undefined,
+  parties: Array<{ callingAddress?: string; calledAddress?: string }> | undefined,
+): string | undefined {
+  if (!userAddress || !parties?.length) {
+    return undefined;
+  }
+  for (const p of parties) {
+    const callA = String(p.callingAddress ?? "");
+    const callB = String(p.calledAddress ?? "");
+    if (
+      ctiAddressMatchesUser(callA, userAddress) &&
+      callB &&
+      !ctiAddressMatchesUser(callB, userAddress)
+    ) {
+      return callB;
+    }
+    if (
+      ctiAddressMatchesUser(callB, userAddress) &&
+      callA &&
+      !ctiAddressMatchesUser(callA, userAddress)
+    ) {
+      return callA;
+    }
+  }
+  return undefined;
+}
+
+/**
  * Other party's DN on the active call (for transfer/hold APIs that must not use self).
  * Inbound: user is callee → remote is {@link callingAddress}.
  * Outbound: user is caller → remote is {@link calledAddress}.
+ * When `callStateMap` + `callId` are provided, scans all party rows (post-transfer / conference).
  */
 export function getRemotePartyDnForTransfer(
   userAddress: string | null | undefined,
   callingAddress: string | null | undefined,
   calledAddress: string | null | undefined,
+  callStateMap?: Record<string, { parties?: Array<{ callingAddress?: string; calledAddress?: string }> }> | null,
+  callId?: string | null,
 ): string {
-  const userAddr = String(userAddress ?? "") 
-  const callingAddr = String(callingAddress ?? "") 
-  const calledAddr = String(calledAddress ?? "")
-  if (userAddr && calledAddr === userAddr && callingAddr) {
-    return callingAddr
+  if (callStateMap && callId) {
+    const state = callStateMap[callId] as
+      | { parties?: Array<{ callingAddress?: string; calledAddress?: string }> }
+      | undefined;
+    const fromParties = getRemotePartyDnFromCallParties(userAddress, state?.parties);
+    if (fromParties) {
+      return fromParties;
+    }
   }
-  if (userAddr && callingAddr === userAddr && calledAddr) {
-    return calledAddr
+  const callingAddr = String(callingAddress ?? "");
+  const calledAddr = String(calledAddress ?? "");
+  if (userAddress && ctiAddressMatchesUser(calledAddr, userAddress) && callingAddr) {
+    return callingAddr;
   }
-  return calledAddr || callingAddr
+  if (userAddress && ctiAddressMatchesUser(callingAddr, userAddress) && calledAddr) {
+    return calledAddr;
+  }
+  return calledAddr || callingAddr;
 }
 
 /**
