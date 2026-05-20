@@ -255,6 +255,22 @@ export async function getCrmCreatedCounts(
   }
 }
 
+/** GET /crm/created-counts/{entity}/mine — current user only, same row shape as created-counts. */
+export async function getCrmCreatedCountsMine(
+  entity: CrmCreatedCountsEntity,
+  range: MainDashboardDateRange,
+): Promise<CrmCreatedCountRow[]> {
+  try {
+    const response = await axiosInstance.get(`/crm/created-counts/${entity}/mine`, {
+      params: buildDateParams(range),
+    });
+    return parseCrmCreatedCountsResponse(response.data);
+  } catch (error: unknown) {
+    console.error(`[mainDashboard] crm/created-counts/${entity}/mine failed`, error);
+    return [];
+  }
+}
+
 export async function fetchCrmCreatedCountsBundle(
   range: MainDashboardDateRange,
 ): Promise<CrmCreatedCountsBundle> {
@@ -264,4 +280,99 @@ export async function fetchCrmCreatedCountsBundle(
     getCrmCreatedCounts("deals", range),
   ]);
   return { prospects, leads, deals };
+}
+
+export async function fetchCrmCreatedCountsMineBundle(
+  range: MainDashboardDateRange,
+): Promise<CrmCreatedCountsBundle> {
+  const [prospects, leads, deals] = await Promise.all([
+    getCrmCreatedCountsMine("prospects", range),
+    getCrmCreatedCountsMine("leads", range),
+    getCrmCreatedCountsMine("deals", range),
+  ]);
+  return { prospects, leads, deals };
+}
+
+export interface CrmDailyCreationDay {
+  date: string;
+  leads: number;
+  deals: number;
+  orders: number;
+}
+
+export interface CrmDailyCreationCounts {
+  period: {
+    start_date: string;
+    end_date: string;
+    days: number;
+  };
+  days: CrmDailyCreationDay[];
+}
+
+/** CRM daily-creation-counts: `{ code, data: { success, data: { period, days } } }`. */
+export function parseCrmDailyCreationCountsResponse(
+  body: unknown,
+): CrmDailyCreationCounts | null {
+  if (body == null || typeof body !== "object") return null;
+
+  let node: unknown = body;
+  const outer = body as { data?: unknown };
+  if (outer.data != null && typeof outer.data === "object") {
+    node = outer.data;
+  }
+
+  if (node != null && typeof node === "object" && "data" in node) {
+    const inner = node as StaffApiEnvelope<CrmDailyCreationCounts>;
+    if (inner.success === false) return null;
+    node = inner.data;
+  }
+
+  if (node == null || typeof node !== "object") return null;
+
+  const payload = node as Record<string, unknown>;
+  const periodRaw = payload.period;
+  const daysRaw = payload.days;
+  if (periodRaw == null || typeof periodRaw !== "object" || !Array.isArray(daysRaw)) {
+    return null;
+  }
+
+  const periodRecord = periodRaw as Record<string, unknown>;
+  const days = daysRaw
+    .map((row) => {
+      if (row == null || typeof row !== "object") return null;
+      const record = row as Record<string, unknown>;
+      const date = typeof record.date === "string" ? record.date : null;
+      if (!date) return null;
+      return {
+        date,
+        leads: Number(record.leads) || 0,
+        deals: Number(record.deals) || 0,
+        orders: Number(record.orders) || 0,
+      };
+    })
+    .filter((row): row is CrmDailyCreationDay => row != null);
+
+  return {
+    period: {
+      start_date: toStableStringKey(periodRecord.start_date) ?? "",
+      end_date: toStableStringKey(periodRecord.end_date) ?? "",
+      days: Number(periodRecord.days) || days.length,
+    },
+    days,
+  };
+}
+
+/** GET /crm/daily-creation-counts */
+export async function getCrmDailyCreationCounts(
+  range: MainDashboardDateRange,
+): Promise<CrmDailyCreationCounts | null> {
+  try {
+    const response = await axiosInstance.get("/crm/daily-creation-counts", {
+      params: buildDateParams(range),
+    });
+    return parseCrmDailyCreationCountsResponse(response.data);
+  } catch (error: unknown) {
+    console.error("[mainDashboard] crm/daily-creation-counts failed", error);
+    return null;
+  }
 }
