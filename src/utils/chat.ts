@@ -1073,6 +1073,51 @@ function parseLimitNumber(value: unknown): number | null {
   return null;
 }
 
+function parseRateLimitFromNestedField(
+  data: Record<string, unknown>,
+  field: "rate_limit",
+): ChatRateLimitParseResult | null {
+  const nested = data[field];
+  if (!isRecord(nested)) {
+    return null;
+  }
+  return parseChatRateLimitRecord(nested);
+}
+
+function parseRateLimitFromMetadata(
+  data: Record<string, unknown>,
+): ChatRateLimitParseResult | null {
+  const metadata = data.metadata;
+  if (!isRecord(metadata)) {
+    return null;
+  }
+
+  const fromMetadata = parseChatRateLimitRecord(metadata);
+  if (fromMetadata) {
+    return fromMetadata;
+  }
+
+  return parseRateLimitFromNestedField(metadata, "rate_limit");
+}
+
+const RATE_LIMIT_WRAPPER_KEYS = ["data", "result"] as const;
+
+function parseRateLimitFromWrapperKeys(
+  data: Record<string, unknown>,
+): ChatRateLimitParseResult | null {
+  for (const key of RATE_LIMIT_WRAPPER_KEYS) {
+    const wrapped = data[key];
+    if (!isRecord(wrapped)) {
+      continue;
+    }
+    const parsed = parseChatRateLimitPayload(wrapped);
+    if (parsed) {
+      return parsed;
+    }
+  }
+  return null;
+}
+
 /** Normalizes `rate_limit` from API bodies (nested or flat). */
 export function parseChatRateLimitPayload(
   data: unknown,
@@ -1081,32 +1126,22 @@ export function parseChatRateLimitPayload(
     return null;
   }
 
-  if (isRecord(data.rate_limit)) {
-    const nested = parseChatRateLimitRecord(data.rate_limit);
-    if (nested) return nested;
+  const fromNested = parseRateLimitFromNestedField(data, "rate_limit");
+  if (fromNested) {
+    return fromNested;
   }
 
-  if (isRecord(data.metadata)) {
-    const fromMetadata = parseChatRateLimitRecord(data.metadata);
-    if (fromMetadata) return fromMetadata;
-    if (isRecord(data.metadata.rate_limit)) {
-      const nestedMeta = parseChatRateLimitRecord(data.metadata.rate_limit);
-      if (nestedMeta) return nestedMeta;
-    }
+  const fromMetadata = parseRateLimitFromMetadata(data);
+  if (fromMetadata) {
+    return fromMetadata;
   }
 
   const direct = parseChatRateLimitRecord(data);
-  if (direct) return direct;
-
-  for (const key of ["data", "result"] as const) {
-    const wrapped = data[key];
-    if (isRecord(wrapped)) {
-      const parsed = parseChatRateLimitPayload(wrapped);
-      if (parsed) return parsed;
-    }
+  if (direct) {
+    return direct;
   }
 
-  return null;
+  return parseRateLimitFromWrapperKeys(data);
 }
 
 export interface TenantChatDashboardResponse {
