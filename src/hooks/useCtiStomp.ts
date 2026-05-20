@@ -40,6 +40,10 @@ import {
 import { handleIncomingCtiCallEvent } from "./ctiStompIncomingCallEvent";
 import { publishCtiStompStreamMessageWithRetry } from "./ctiStompPublishRetry";
 import { syncPersistedCtiCallStatesToStomp } from "./ctiStompPersistedCallSync";
+import {
+  createCtiStreamMissedEventRecovery,
+  type CtiStreamMissedEventRecovery,
+} from "./ctiStreamMissedEventRecovery";
 
 /**
  * Custom hook for CTI STOMP WebSocket connection via SSE
@@ -148,6 +152,12 @@ export default function useCtiStomp(
   const hasRequestedInitialStateRef = isGlobalInstance ? globalConnectionRefs.hasRequestedInitialStateRef : localHasRequestedInitialStateRef;
   const pendingRefreshAfterCallEndRef = isGlobalInstance ? globalConnectionRefs.pendingRefreshAfterCallEndRef : localPendingRefreshAfterCallEndRef;
   const lastRefreshAfterCallEndRef = isGlobalInstance ? globalConnectionRefs.lastRefreshAfterCallEndRef : localLastRefreshAfterCallEndRef;
+  const localStreamGapRecoveryRef = useRef<CtiStreamMissedEventRecovery | null>(
+    null,
+  );
+  const streamGapRecoveryRef = isGlobalInstance
+    ? globalConnectionRefs.streamGapRecoveryRef
+    : localStreamGapRecoveryRef;
 
   // Store attemptReconnection function in a ref so it can be accessed from multiple useEffects
   const attemptReconnectionRef = useRef<((maxAttempts?: number) => Promise<void>) | null>(null);
@@ -177,9 +187,22 @@ export default function useCtiStomp(
     [],
   );
 
+  useEffect(() => {
+    if (!streamGapRecoveryRef.current) {
+      streamGapRecoveryRef.current = createCtiStreamMissedEventRecovery({
+        publish: (destination, body) => {
+          const pub = publishStompMessageRef.current;
+          return pub ? pub(destination, body) : Promise.resolve(false);
+        },
+        logPrefix: `[${instanceIdRef.current}] [CtiStreamMissedEvent]`,
+      });
+    }
+  }, [streamGapRecoveryRef]);
+
   // Handle incoming call events
   const handleCallEvent = useCallback(
     (evt: CtiCallEvent) => {
+      streamGapRecoveryRef.current?.inspectCallEvent(evt);
       handleIncomingCtiCallEvent(evt, {
         isGlobalInstance,
         crossTabManagerRef,
@@ -191,7 +214,7 @@ export default function useCtiStomp(
         setCallStateMap,
       });
     },
-    [saveCallStatesToStorage, dnsMap, isGlobalInstance],
+    [saveCallStatesToStorage, dnsMap, isGlobalInstance, streamGapRecoveryRef],
   );
 
   // Handle ongoing calls response (shape may be { callsByDn } or a flat call-id map from CTI)
@@ -400,6 +423,7 @@ export default function useCtiStomp(
         handleOngoingCallsRef,
         groupDevicesByDnAndDeviceNameRef,
         updateSummaryDataRef,
+        streamGapRecoveryRef,
       }),
     [isAuthenticated, authInitialized, router.pathname],
   );
@@ -515,6 +539,7 @@ export default function useCtiStomp(
         handleOngoingCallsRef,
         groupDevicesByDnAndDeviceNameRef,
         updateSummaryDataRef,
+        streamGapRecoveryRef,
       }),
     [
       isGlobalInstance,

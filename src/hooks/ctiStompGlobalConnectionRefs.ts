@@ -1,4 +1,5 @@
 import type { Client } from "@stomp/stompjs";
+import type { CtiStreamMissedEventRecovery } from "./ctiStreamMissedEventRecovery";
 
 /**
  * Shared connection refs for global instance (singleton).
@@ -25,4 +26,7 @@ export const globalConnectionRefs = {
     current: null as ReturnType<typeof setTimeout> | null,
   },
   lastRefreshAfterCallEndRef: { current: 0 },
+  streamGapRecoveryRef: {
+    current: null as CtiStreamMissedEventRecovery | null,
+  },
 };

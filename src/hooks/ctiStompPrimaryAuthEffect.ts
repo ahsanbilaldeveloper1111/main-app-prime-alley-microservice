@@ -160,6 +160,9 @@ export type CtiStompPrimaryAuthEffectDeps = {
     ((deviceArray: CtiDevice[]) => DnsMapState) | null
   >;
   updateSummaryDataRef: Ref<((grouped: DnsMapState) => void) | null>;
+  streamGapRecoveryRef: Ref<
+    import("./ctiStreamMissedEventRecovery").CtiStreamMissedEventRecovery | null
+  >;
 };
 
 export function subscribeCtiStompPrimaryAuthEffect(
@@ -204,6 +207,7 @@ export function subscribeCtiStompPrimaryAuthEffect(
     handleOngoingCallsRef,
     groupDevicesByDnAndDeviceNameRef,
     updateSummaryDataRef,
+    streamGapRecoveryRef,
   } = deps;
 
   // Wait for authentication to be initialized before attempting connection
@@ -806,6 +810,7 @@ export function subscribeCtiStompPrimaryAuthEffect(
             handleOngoingCallsRef,
             groupDevicesByDnAndDeviceNameRef,
             updateSummaryDataRef,
+            streamGapRecoveryRef,
           } as PrimarySseDispatchCtxFactoryArgs),
         );
       } catch (error) {

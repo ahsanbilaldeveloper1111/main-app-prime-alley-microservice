@@ -1,5 +1,10 @@
 import moment from "moment-timezone";
 import { parseCallAnswerStartTimeUtc } from "@components/live-calls/utils/helpers";
+import {
+  ctiAddressMatchesUser,
+  ctiAddressesEquivalent,
+  normalizeCtiAddressDigits,
+} from "@utils/ctiAddressMatching";
 
 /** Shape of entries in CTI `activeCalls` Map (floating bar). */
 export type FloatingBarCtiCall = {
@@ -12,6 +17,7 @@ export type FloatingBarCtiCall = {
   calledAddress?: string;
   callingDeviceName?: string;
   callingDeviceType?: string;
+  calledDeviceName?: string;
   duration?: number;
 };
 
@@ -19,11 +25,19 @@ export type FloatingBarCallStateParty = {
   callStatus?: string;
   callingAddress?: string;
   calledAddress?: string;
+  callingDeviceName?: string;
+  calledDeviceName?: string;
+  callingDeviceType?: string;
+  calledDeviceType?: string;
 };
 
 export type FloatingBarCallStateEntry = {
   isMonitoring?: boolean;
-  monitoring?: { monitorDn?: string };
+  monitoring?: {
+    monitorDn?: string;
+    monitoredDn?: string;
+    monitoringType?: string;
+  };
   heldByAddress?: string;
   parties?: Array<FloatingBarCallStateParty>;
 };
@@ -51,23 +65,8 @@ function partyStatusRaw(status: string | undefined): string {
   return status ?? "";
 }
 
-function normalizeAddressForComparison(address?: string): string {
-  if (!address) return "";
-  const digitsOnly = address.replaceAll(/\D/g, "");
-  if (!digitsOnly) return "";
-  return digitsOnly.length > 10 ? digitsOnly.slice(-10) : digitsOnly;
-}
-
-function addressesEquivalent(
-  a: string | undefined,
-  b: string | undefined,
-): boolean {
-  if (!a || !b) return false;
-  if (a === b) return true;
-  const na = normalizeAddressForComparison(a);
-  const nb = normalizeAddressForComparison(b);
-  return na !== "" && na === nb;
-}
+const normalizeAddressForComparison = normalizeCtiAddressDigits;
+const addressesEquivalent = ctiAddressesEquivalent;
 
 /**
  * True when CTI party list indicates the dialog is over (same rules as active-call map rebuild).
@@ -134,6 +133,66 @@ export type FloatingBarHoldOrientation = {
   calledAddress?: string;
 };
 
+function userParticipatingLiveParties(
+  parties: FloatingBarCallStateParty[],
+  userAddress: string,
+): FloatingBarCallStateParty[] {
+  return parties.filter(
+    (p) =>
+      partyIsLiveForFloatingBarInclusion(p) &&
+      (addressesEquivalent(p.callingAddress, userAddress) ||
+        addressesEquivalent(p.calledAddress, userAddress)),
+  );
+}
+
+/** After transfer/consult, prefer the user's held leg over the first matching party row. */
+function pickPrimaryUserPartyForHoldResume(
+  parties: FloatingBarCallStateParty[],
+  userAddress: string,
+): FloatingBarCallStateParty | undefined {
+  const mine = userParticipatingLiveParties(parties, userAddress);
+  if (mine.length === 0) {
+    return undefined;
+  }
+  const held = mine.find((p) => {
+    const s = partyStatusRaw(p.callStatus).toUpperCase();
+    return s === "ON_HOLD" || s === "HELD";
+  });
+  return held ?? mine[0];
+}
+
+function userHasHeldLiveLeg(
+  parties: FloatingBarCallStateParty[],
+  userAddress: string,
+): boolean {
+  return userParticipatingLiveParties(parties, userAddress).some((p) => {
+    const s = partyStatusRaw(p.callStatus).toUpperCase();
+    return s === "ON_HOLD" || s === "HELD";
+  });
+}
+
+/** Hold/resume orient from the user's party row (not stale `parties[0]` / activeCalls top-level). */
+export function resolveFloatingBarHoldOrientForUser(
+  callState: FloatingBarCallStateEntry | undefined,
+  userAddress: string | undefined,
+  fallback?: FloatingBarHoldOrientation,
+): FloatingBarHoldOrientation | undefined {
+  if (!userAddress || !callState?.parties?.length) {
+    return fallback;
+  }
+  const party = pickPrimaryUserPartyForHoldResume(
+    callState.parties,
+    userAddress,
+  );
+  if (!party) {
+    return fallback;
+  }
+  return {
+    callingAddress: party.callingAddress,
+    calledAddress: party.calledAddress,
+  };
+}
+
 /** When one leg is internal and one external, only the internal extension can hold/resume. */
 function inferResumeAllowedFromDnsForParty(
   userAddress: string,
@@ -152,6 +211,17 @@ function inferResumeAllowedFromDnsForParty(
     return callerKnown
       ? addressesEquivalent(userAddress, ourParty.callingAddress)
       : addressesEquivalent(userAddress, ourParty.calledAddress);
+  }
+  // Both internal (consult / transfer / conference): if our leg is held, allow resume for either
+  // participant on that leg — otherwise internal–internal holds show no Resume (Scenario 2).
+  if (callerKnown && calleeKnown) {
+    const status = partyStatusRaw(ourParty.callStatus).toUpperCase();
+    if (status === "ON_HOLD" || status === "HELD") {
+      return (
+        addressesEquivalent(userAddress, ourParty.callingAddress) ||
+        addressesEquivalent(userAddress, ourParty.calledAddress)
+      );
+    }
   }
   return false;
 }
@@ -316,14 +386,15 @@ function evaluateStrictCalleeHoldResumePolicy(
 }
 
 function computeLegHoldFlags(
-  ourParty: FloatingBarCallStateParty,
   parties: FloatingBarCallStateParty[],
+  userAddress: string,
 ): { myLegHeld: boolean; anyLegHeld: boolean } {
-  const myStatusUpper = (ourParty.callStatus ?? "").toUpperCase();
-  const myLegHeld =
-    myStatusUpper === "ON_HOLD" || myStatusUpper === "HELD";
+  const myLegHeld = userHasHeldLiveLeg(parties, userAddress);
   const anyLegHeld = parties.some((p) => {
-    const s = (p.callStatus ?? "").toUpperCase();
+    if (!partyIsLiveForFloatingBarInclusion(p)) {
+      return false;
+    }
+    const s = partyStatusRaw(p.callStatus).toUpperCase();
     return s === "ON_HOLD" || s === "HELD";
   });
   return { myLegHeld, anyLegHeld };
@@ -368,14 +439,16 @@ export function canUserResumeHoldOnFloatingBar(
   }
 
   const parties = callState.parties ?? [];
-  const ourParty = parties.find(
-    (p) =>
-      addressesEquivalent(p.callingAddress, userAddress) ||
-      addressesEquivalent(p.calledAddress, userAddress),
-  );
+  const ourParty = pickPrimaryUserPartyForHoldResume(parties, userAddress);
   if (!ourParty) {
     return false;
   }
+
+  const effectiveOrient: FloatingBarHoldOrientation = {
+    callingAddress:
+      orient?.callingAddress ?? ourParty.callingAddress,
+    calledAddress: orient?.calledAddress ?? ourParty.calledAddress,
+  };
 
   const heldByAddress = callState.heldByAddress ?? "";
   const heldByNonEmpty =
@@ -389,11 +462,20 @@ export function canUserResumeHoldOnFloatingBar(
         addressesEquivalent(p.calledAddress, heldByAddress),
     );
 
-  const { myLegHeld, anyLegHeld } = computeLegHoldFlags(ourParty, parties);
+  const { myLegHeld, anyLegHeld } = computeLegHoldFlags(parties, userAddress);
+
+  if (
+    heldByNonEmpty &&
+    heldByOnCall &&
+    addressesEquivalent(userAddress, heldByAddress) &&
+    (myLegHeld || anyLegHeld)
+  ) {
+    return true;
+  }
 
   const strictCalleeDecision = evaluateStrictCalleeHoldResumePolicy(
     userAddress,
-    orient,
+    effectiveOrient,
     anyLegHeld,
     myLegHeld,
     heldByNonEmpty,
@@ -422,7 +504,7 @@ export function canUserResumeHoldOnFloatingBar(
     heldByAddress,
     parties,
     dnsMap,
-    orient,
+    effectiveOrient,
   );
 
   if (holderDn) {
@@ -499,53 +581,23 @@ export function getInitialsFromNameForFloatingBar(name: string): string {
   return "";
 }
 
-function isMonitoringCallForFloatingBar(
-  call: FloatingBarCtiCall,
-  userAddress: string | null | undefined,
-  callStateMap: Record<string, FloatingBarCallStateEntry> | undefined,
-  eventLog: FloatingBarEventLogEntry[] | undefined,
+function partyIsLiveForFloatingBarInclusion(
+  party: FloatingBarCallStateParty,
 ): boolean {
-  if (!userAddress) return false;
-
-  if (call.callId && callStateMap?.[call.callId]) {
-    const callState = callStateMap[call.callId];
-    if (
-      callState.isMonitoring === true ||
-      callState.monitoring?.monitorDn === userAddress
-    ) {
-      return true;
-    }
-  }
-
-  if (eventLog?.length) {
-    return eventLogImpliesMonitoringCall(
-      call,
-      userAddress,
-      eventLog.slice(-50),
-    );
-  }
-
-  return false;
+  const s = (party.callStatus ?? "").toUpperCase();
+  return (
+    s !== "DROPPED" && s !== "DISCONNECTED" && s !== "ENDED"
+  );
 }
 
-function eventLogImpliesMonitoringCall(
-  call: FloatingBarCtiCall,
-  userAddress: string,
-  recent: FloatingBarEventLogEntry[],
+function isBargeInMonitoringTypeForFloatingBar(
+  monitoringType: string | null | undefined,
 ): boolean {
-  for (const evt of recent) {
-    if (!evt.isMonitoring || !evt.monitoring || !evt.parties?.length) continue;
-    const { monitorDn, monitoredDn } = evt.monitoring;
-    if (monitorDn !== userAddress || !monitoredDn) continue;
-    const callInvolvesSupervisor =
-      call.callingAddress === userAddress || call.calledAddress === userAddress;
-    const callInvolvesMonitoredAgent =
-      call.callingAddress === monitoredDn || call.calledAddress === monitoredDn;
-    if (callInvolvesSupervisor && callInvolvesMonitoredAgent) {
-      return true;
-    }
-  }
-  return false;
+  const normalized = String(monitoringType ?? "")
+    .trim()
+    .toUpperCase()
+    .replaceAll("-", "_");
+  return normalized === "BARGE_IN" || normalized === "BARGEIN";
 }
 
 function isPartyStatusRingingForCallee(
@@ -595,12 +647,37 @@ export function isInboundAwaitingUserAnswerForFloatingBar(
   return call.status === "ringing" || call.status === "dialing";
 }
 
-/** Eligible calls for the floating bar for this signed-in extension (monitoring calls excluded). */
+/** True if the user appears on any party row for this call (transfer/consult may not use parties[0]). */
+export function floatingBarCallInvolvesUserFromState(
+  call: FloatingBarCtiCall,
+  userAddress: string | null | undefined,
+  callStateMap: Record<string, FloatingBarCallStateEntry> | undefined,
+): boolean {
+  if (!userAddress) {
+    return false;
+  }
+  const parties = call.callId
+    ? callStateMap?.[call.callId]?.parties
+    : undefined;
+  if (parties?.length) {
+    return parties.some(
+      (p) =>
+        partyIsLiveForFloatingBarInclusion(p) &&
+        (addressesEquivalent(p.callingAddress, userAddress) ||
+          addressesEquivalent(p.calledAddress, userAddress)),
+    );
+  }
+  return (
+    addressesEquivalent(call.callingAddress, userAddress) ||
+    addressesEquivalent(call.calledAddress, userAddress)
+  );
+}
+
+/** Eligible calls for the floating bar for this signed-in extension (includes silent/whisper/barge legs). */
 export function shouldIncludeCallOnFloatingBar(
   call: FloatingBarCtiCall,
   userAddress: string | null | undefined,
   callStateMap: Record<string, FloatingBarCallStateEntry> | undefined,
-  eventLog: FloatingBarEventLogEntry[] | undefined,
 ): boolean {
   const parties = call.callId
     ? callStateMap?.[call.callId]?.parties
@@ -618,21 +695,30 @@ export function shouldIncludeCallOnFloatingBar(
   ) {
     return false;
   }
-  const involvesUser = !!(
-    userAddress &&
-    (addressesEquivalent(call.callingAddress, userAddress) ||
-      addressesEquivalent(call.calledAddress, userAddress))
+  const involvesUser = floatingBarCallInvolvesUserFromState(
+    call,
+    userAddress,
+    callStateMap,
   );
   const hasValidStatus = ["connected", "ringing", "dialing", "onHold"].includes(
     call.status,
   );
-  if (!involvesUser || !hasValidStatus) return false;
-  return !isMonitoringCallForFloatingBar(
-    call,
-    userAddress,
-    callStateMap,
-    eventLog,
-  );
+  if (!involvesUser || !hasValidStatus) {
+    return false;
+  }
+  if (call.callId && userAddress && callStateMap?.[call.callId]) {
+    const cs = callStateMap[call.callId];
+    const m = cs.monitoring;
+    if (
+      cs.isMonitoring === true &&
+      m?.monitorDn &&
+      ctiAddressMatchesUser(m.monitorDn, userAddress) &&
+      isBargeInMonitoringTypeForFloatingBar(m.monitoringType)
+    ) {
+      return false;
+    }
+  }
+  return true;
 }
 
 export function compareFloatingBarCalls(
@@ -711,14 +797,13 @@ function applyPartyStatusesToCall(
     hasRingingParty &&
     hasEquivalentConnectedParty(ringingParties, connectedParties);
 
-  if (
-    hasConnectedParty &&
-    (!hasRingingParty || hasEquivalentConnectedAndRinging)
-  ) {
+  if (hasConnectedParty) {
     call.status = "connected";
-  } else if (
+    return;
+  }
+  if (
     hasRingingParty &&
-    addressesEquivalent(call.calledAddress, userAddress ?? undefined)
+    ctiAddressMatchesUser(call.calledAddress, userAddress)
   ) {
     call.status = "ringing";
   }
@@ -802,31 +887,39 @@ function readUserDevicesFromDnsMap(
   });
 }
 
-export function getFloatingBarControllerDeviceInfo(
-  call: FloatingBarCtiCall | null | undefined,
-  userAddress: string | undefined,
-  dnsMap: FloatingBarDnsMap | undefined,
-): FloatingBarControllerDevice | null {
-  if (!call || !userAddress || !dnsMap) {
-    return null;
-  }
+function pickUserPartyForFloatingBarController(
+  parties: NonNullable<FloatingBarCallStateEntry["parties"]>,
+  userAddress: string,
+): FloatingBarCallStateParty | undefined {
+  const nonTerminal = parties.filter(
+    (p) => !CTI_TERMINAL_PARTY_STATUSES.has(partyStatusRaw(p.callStatus)),
+  );
+  const pool = nonTerminal.length > 0 ? nonTerminal : parties;
+  return pool.find(
+    (p) =>
+      ctiAddressMatchesUser(p.callingAddress, userAddress) ||
+      ctiAddressMatchesUser(p.calledAddress, userAddress),
+  );
+}
 
-  const isCaller = call.callingAddress === userAddress;
-  const isCalled = call.calledAddress === userAddress;
-
-  if (!isCaller && !isCalled) {
-    return null;
-  }
-
-  const userDevices = readUserDevicesFromDnsMap(dnsMap, userAddress);
-  if (userDevices.length === 0) {
-    return null;
-  }
-
+function resolveFloatingBarControllerFromTopLeg(
+  call: FloatingBarCtiCall,
+  userAddress: string,
+  userDevices: FloatingBarDnsDeviceLike[],
+  isCaller: boolean,
+  isCalled: boolean,
+): FloatingBarControllerDevice {
   let activeDevice =
     isCaller && call.callingDeviceName
       ? userDevices.find(
           (device) => device.deviceName === call.callingDeviceName,
+        )
+      : undefined;
+
+  activeDevice ??=
+    isCalled && call.calledDeviceName
+      ? userDevices.find(
+          (device) => device.deviceName === call.calledDeviceName,
         )
       : undefined;
 
@@ -839,6 +932,85 @@ export function getFloatingBarControllerDeviceInfo(
     controllerDeviceName: activeDevice.deviceName || "WebCTI",
     controllerDeviceType: activeDevice.deviceType || "SOFT_HARD",
   };
+}
+
+function resolveFloatingBarControllerFromPartyLeg(
+  party: FloatingBarCallStateParty,
+  userAddress: string,
+  userDevices: FloatingBarDnsDeviceLike[],
+): FloatingBarControllerDevice {
+  const onCallingSide = ctiAddressMatchesUser(
+    party.callingAddress,
+    userAddress,
+  );
+  let activeDevice =
+    onCallingSide && party.callingDeviceName
+      ? userDevices.find((d) => d.deviceName === party.callingDeviceName)
+      : undefined;
+  activeDevice ??=
+    !onCallingSide && party.calledDeviceName
+      ? userDevices.find((d) => d.deviceName === party.calledDeviceName)
+      : undefined;
+  activeDevice ??=
+    userDevices.find((d) => d.terminalState === "REGISTERED") ||
+    userDevices[0];
+
+  const preferredType = onCallingSide
+    ? party.callingDeviceType
+    : party.calledDeviceType;
+
+  return {
+    controllerAddress: userAddress,
+    controllerDeviceName: activeDevice.deviceName || "WebCTI",
+    controllerDeviceType:
+      activeDevice.deviceType || preferredType || "SOFT_HARD",
+  };
+}
+
+export function getFloatingBarControllerDeviceInfo(
+  call: FloatingBarCtiCall | null | undefined,
+  userAddress: string | undefined,
+  dnsMap: FloatingBarDnsMap | undefined,
+  callStateMap?: Record<string, FloatingBarCallStateEntry> | undefined,
+): FloatingBarControllerDevice | null {
+  if (!call || !userAddress || !dnsMap) {
+    return null;
+  }
+
+  const userDevices = readUserDevicesFromDnsMap(dnsMap, userAddress);
+  if (userDevices.length === 0) {
+    return null;
+  }
+
+  const isCaller = ctiAddressMatchesUser(call.callingAddress, userAddress);
+  const isCalled = ctiAddressMatchesUser(call.calledAddress, userAddress);
+
+  if (isCaller || isCalled) {
+    return resolveFloatingBarControllerFromTopLeg(
+      call,
+      userAddress,
+      userDevices,
+      isCaller,
+      isCalled,
+    );
+  }
+
+  const parties =
+    call.callId && callStateMap?.[call.callId]?.parties?.length
+      ? callStateMap[call.callId].parties
+      : undefined;
+  const party = parties
+    ? pickUserPartyForFloatingBarController(parties, userAddress)
+    : undefined;
+  if (!party) {
+    return null;
+  }
+
+  return resolveFloatingBarControllerFromPartyLeg(
+    party,
+    userAddress,
+    userDevices,
+  );
 }
 
 /** Live elapsed seconds for a connected floating-bar call (falls back to `call.duration`). */
@@ -871,11 +1043,10 @@ export function pickFloatingBarCall(
   activeCalls: Map<string, FloatingBarCtiCall>,
   userAddress: string | null | undefined,
   callStateMap: Record<string, FloatingBarCallStateEntry> | undefined,
-  eventLog: FloatingBarEventLogEntry[] | undefined,
 ): FloatingBarCtiCall | undefined {
   const list = Array.from(activeCalls.values())
     .filter((c) =>
-      shouldIncludeCallOnFloatingBar(c, userAddress, callStateMap, eventLog),
+      shouldIncludeCallOnFloatingBar(c, userAddress, callStateMap),
     )
     .sort(compareFloatingBarCalls);
   const call = list[0];

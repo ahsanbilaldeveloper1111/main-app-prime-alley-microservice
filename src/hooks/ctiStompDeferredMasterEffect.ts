@@ -4,6 +4,7 @@ import type { CtiDevice, CtiCallEvent } from "./ctiStompHookTypes";
 import { devicesArrayFromCompleteStatePayload } from "./ctiStompHelpers";
 import { touchCtiSseLastMessageTime } from "./ctiStompSseLiveness";
 import { shouldCloseCtiSseOnCrossTabDemotion } from "./ctiStompCrossTabDemotion";
+import type { CtiStreamMissedEventRecovery } from "./ctiStreamMissedEventRecovery";
 
 type DnsMapState = Record<
   string,
@@ -49,6 +50,7 @@ export type CtiStompDeferredMasterEffectDeps = {
     ((deviceArray: CtiDevice[]) => DnsMapState) | null
   >;
   updateSummaryDataRef: Ref<((grouped: DnsMapState) => void) | null>;
+  streamGapRecoveryRef: Ref<CtiStreamMissedEventRecovery | null>;
 };
 
 export function subscribeCtiStompDeferredMasterEffect(
@@ -87,6 +89,7 @@ export function subscribeCtiStompDeferredMasterEffect(
     handleOngoingCallsRef,
     groupDevicesByDnAndDeviceNameRef,
     updateSummaryDataRef,
+    streamGapRecoveryRef,
   } = deps;
 
   if (!isGlobalInstance || !crossTabManagerRef.current.isCrossTabSupported()) {
@@ -195,6 +198,9 @@ const runDeferredMasterHealthCheckTick = () => {
     return;
   }
   const now = Date.now();
+  if (streamGapRecoveryRef.current?.runPingStaleCheck(now)) {
+    return;
+  }
   const lastMessageTime =
     lastMessageTimeRef.current || connectionStartTimeRef.current || now;
   const elapsed = now - lastMessageTime;
@@ -267,6 +273,9 @@ const handleDeferredMasterSseParsedMessage = (data: {
   data?: unknown;
 }) => {
   touchCtiSseLastMessageTime(data, lastMessageTimeRef);
+  if (data.type === "ping" || data.type === "test") {
+    streamGapRecoveryRef.current?.markPingReceived();
+  }
   switch (data.type) {
     case "complete_state":
       handleDeferredMasterCompleteStateMessage(data.data);
@@ -291,6 +300,7 @@ const handleDeferredMasterSseParsedMessage = (data: {
       break;
     }
     case "stomp_connected": {
+      streamGapRecoveryRef.current?.markStompConnected();
       setIsInitialized(true);
       setError(null);
       const publishMaster = publishStompMessageRef.current;
@@ -302,6 +312,7 @@ const handleDeferredMasterSseParsedMessage = (data: {
       break;
     }
     case "ongoing_calls":
+      streamGapRecoveryRef.current?.markOngoingCallsReceived();
       handleOngoingCallsRef.current?.(data.data);
       break;
     default:

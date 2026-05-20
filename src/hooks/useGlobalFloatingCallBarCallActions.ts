@@ -1,7 +1,10 @@
 import { useCallback, useMemo, useState } from "react";
+import { toast } from "react-toastify";
 import { getRemotePartyDnForTransfer } from "@utils/dialer";
+import { getErrorMessage } from "@utils/errors";
 import {
   getFloatingBarControllerDeviceInfo,
+  type FloatingBarCallStateEntry,
   type FloatingBarCtiCall,
 } from "@components/globalFloatingCallBarHelpers";
 import {
@@ -16,6 +19,8 @@ export type UseGlobalFloatingCallBarCallActionsParams = {
   activeCall: FloatingBarCtiCall | undefined;
   userAddress: string | null | undefined;
   dnsMap: Record<string, unknown> | undefined;
+  /** Full CTI call state (party rows, monitoring) for transfer + floating-bar device resolution. */
+  callStateMap?: Record<string, FloatingBarCallStateEntry> | null;
   activeCalls: Map<string, FloatingBarCtiCall>;
   getAvailableExtensions: () => string[];
   endCall: (params: Record<string, unknown>) => Promise<FloatingBarCtiActionResult>;
@@ -36,6 +41,7 @@ export function useGlobalFloatingCallBarCallActions({
   activeCall,
   userAddress,
   dnsMap,
+  callStateMap,
   activeCalls,
   getAvailableExtensions,
   endCall,
@@ -70,7 +76,12 @@ export function useGlobalFloatingCallBarCallActions({
     if (!activeCall?.callId) {
       return;
     }
-    const controllerDevice = getFloatingBarControllerDeviceInfo(activeCall, userAddr, dnsMap);
+    const controllerDevice = getFloatingBarControllerDeviceInfo(
+      activeCall,
+      userAddr,
+      dnsMap,
+      callStateMap ?? undefined,
+    );
     if (!controllerDevice) {
       return;
     }
@@ -86,7 +97,12 @@ export function useGlobalFloatingCallBarCallActions({
     if (!activeCall?.callId) {
       return;
     }
-    const controllerDevice = getFloatingBarControllerDeviceInfo(activeCall, userAddr, dnsMap);
+    const controllerDevice = getFloatingBarControllerDeviceInfo(
+      activeCall,
+      userAddr,
+      dnsMap,
+      callStateMap ?? undefined,
+    );
     if (!controllerDevice) {
       return;
     }
@@ -102,7 +118,12 @@ export function useGlobalFloatingCallBarCallActions({
     if (!activeCall?.callId) {
       return;
     }
-    const controllerDevice = getFloatingBarControllerDeviceInfo(activeCall, userAddr, dnsMap);
+    const controllerDevice = getFloatingBarControllerDeviceInfo(
+      activeCall,
+      userAddr,
+      dnsMap,
+      callStateMap ?? undefined,
+    );
     if (!controllerDevice) {
       return;
     }
@@ -118,8 +139,17 @@ export function useGlobalFloatingCallBarCallActions({
     if (!activeCall?.callId || !transferTarget.trim()) {
       return;
     }
-    const controllerDevice = getFloatingBarControllerDeviceInfo(activeCall, userAddr, dnsMap);
+    const controllerDevice = getFloatingBarControllerDeviceInfo(
+      activeCall,
+      userAddr,
+      dnsMap,
+      callStateMap ?? undefined,
+    );
     if (!controllerDevice) {
+      toast.error(
+        "Cannot transfer: no registered CTI device for your extension. Check phone registration.",
+        { toastId: "floating_bar_transfer_no_device" },
+      );
       return;
     }
     if (isExtensionBusyOnCalls(transferTarget, activeCalls)) {
@@ -129,7 +159,13 @@ export function useGlobalFloatingCallBarCallActions({
     setIsTransferringCall(true);
     try {
       const transferAddress =
-        getRemotePartyDnForTransfer(userAddr, activeCall.callingAddress, activeCall.calledAddress) ||
+        getRemotePartyDnForTransfer(
+          userAddr,
+          activeCall.callingAddress,
+          activeCall.calledAddress,
+          callStateMap ?? undefined,
+          activeCall.callId,
+        ) ||
         activeCall.calledAddress ||
         activeCall.number;
       const result = await transferCall({
@@ -145,9 +181,16 @@ export function useGlobalFloatingCallBarCallActions({
       if (result.success) {
         closeTransferModal();
       } else {
+        const errMsg =
+          (typeof result.error === "string" ? result.error : undefined) ||
+          "Transfer failed. Please try again.";
+        toast.error(errMsg, { toastId: "floating_bar_transfer_failed" });
         console.error("[GlobalFloatingCallBar] transferCall failed:", result.error);
       }
     } catch (error) {
+      toast.error(`Transfer failed: ${getErrorMessage(error)}`, {
+        toastId: "floating_bar_transfer_error",
+      });
       console.error("[GlobalFloatingCallBar] transferCall error:", error);
     } finally {
       setIsTransferringCall(false);
