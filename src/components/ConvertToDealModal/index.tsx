@@ -409,11 +409,27 @@ function buildEmptyEstimationItemFormData(): EstimationItemFormData {
   };
 }
 
-function ConvertDealTimelineNav(props: {
+function getAddItemAvailableIndustries(
+  showAllIndustries: boolean,
+  allIndustries: IndustryData[],
+  formData: { industry_ids?: number[] },
+  campaignIndustries: IndustryData[],
+): IndustryData[] {
+  if (showAllIndustries) {
+    return allIndustries;
+  }
+  const industryIds = formData.industry_ids;
+  if (industryIds && industryIds.length > 0) {
+    return allIndustries.filter((ind) => industryIds.includes(ind.id));
+  }
+  return campaignIndustries;
+}
+
+function ConvertDealTimelineNav(props: Readonly<{
   formStep: number;
   hasTemplate: boolean;
   onStepClick: (step: number) => void;
-}) {
+}>) {
   return (
     <div className="mb-4">
       <div className="d-flex align-items-center justify-content-between position-relative">
@@ -474,14 +490,14 @@ function ConvertDealTimelineNav(props: {
   );
 }
 
-function ConvertDealFooter(props: {
+function ConvertDealFooter(props: Readonly<{
   formStep: number;
   loading: boolean;
   estimationItemsCount: number;
   onBackOrCancel: (e: React.MouseEvent) => void;
   onNext: (e: React.MouseEvent) => void;
   onSubmit: (e: React.FormEvent | React.MouseEvent) => void;
-}) {
+}>) {
   return (
     <Modal.Footer>
       <Button variant="secondary" onClick={props.onBackOrCancel}>
@@ -507,6 +523,7 @@ function ConvertDealFooter(props: {
           {props.loading ? (
             <>
               <span className="spinner-border spinner-border-sm me-2" />
+              {" "}
               Creating...
             </>
           ) : (
@@ -518,13 +535,13 @@ function ConvertDealFooter(props: {
   );
 }
 
-function DealInformationStep(props: {
+function DealInformationStep(props: Readonly<{
   formData: any;
   setFormData: SetState<any>;
   stages: StageData[];
   extensions: any[];
   handleDealCurrencyChange: (e: React.ChangeEvent<HTMLSelectElement>) => void;
-}) {
+}>) {
   return (
     <Card className="mb-3 border-0 bg-light">
       <Card.Body>
@@ -630,7 +647,7 @@ function DealInformationStep(props: {
   );
 }
 
-function CompanyInformationStep(props: {
+function CompanyInformationStep(props: Readonly<{
   formData: any;
   setFormData: SetState<any>;
   businessTypes: BusinessTypeData[];
@@ -640,7 +657,14 @@ function CompanyInformationStep(props: {
   setBusinessTypeOther: SetState<string>;
   showOtherBusinessType: boolean;
   setShowOtherBusinessType: SetState<boolean>;
-}) {
+}>) {
+  let businessTypeSelectValue = "";
+  if (props.showOtherBusinessType) {
+    businessTypeSelectValue = "other";
+  } else if (props.businessTypeId) {
+    businessTypeSelectValue = String(props.businessTypeId);
+  }
+
   return (
     <Card className="mb-3 border-0 bg-light">
       <Card.Body>
@@ -677,13 +701,7 @@ function CompanyInformationStep(props: {
                 Select Business Type <span className="text-danger">*</span>
               </Form.Label>
               <Form.Select
-                value={
-                  props.showOtherBusinessType
-                    ? "other"
-                    : props.businessTypeId
-                      ? String(props.businessTypeId)
-                      : ""
-                }
+                value={businessTypeSelectValue}
                 onChange={(e) => {
                   const value = e.target.value;
                   if (value === "other") {
@@ -813,6 +831,7 @@ function CompanyInformationStep(props: {
                           }));
                         }
                       } catch (error) {
+                        console.error("Failed to parse phone number:", error);
                         props.setFormData((prev: any) => ({
                           ...prev,
                           decision_maker_phone_country_code: "",
@@ -838,12 +857,12 @@ function CompanyInformationStep(props: {
   );
 }
 
-function DealCharacteristicsStep(props: {
+function DealCharacteristicsStep(props: Readonly<{
   dealTemplate: DealTemplateData | null;
   loadingTemplate: boolean;
   templateFieldsData: Record<string, any>;
   setTemplateFieldsData: SetState<Record<string, any>>;
-}) {
+}>) {
   const template = props.dealTemplate;
   if (!template) return null;
 
@@ -851,6 +870,98 @@ function DealCharacteristicsStep(props: {
   const sortedFields = [...fields].sort(
     (a, b) => (a.sort_order || 0) - (b.sort_order || 0),
   );
+
+  const renderTemplateFieldControl = (field: DealTemplateField) => {
+    const fieldValue = props.templateFieldsData[field.field_name] || "";
+    const updateField = (value: string) => {
+      props.setTemplateFieldsData({
+        ...props.templateFieldsData,
+        [field.field_name]: value,
+      });
+    };
+
+    if (field.field_type === "dropdown") {
+      return (
+        <Form.Select
+          value={fieldValue}
+          onChange={(e) => updateField(e.target.value)}
+          required={field.is_required}
+        >
+          <option value="">Select {field.field_name}</option>
+          {field.options?.map((option: string, index: number) => (
+            <option key={index} value={option}>
+              {option}
+            </option>
+          ))}
+        </Form.Select>
+      );
+    }
+
+    if (field.field_type === "text" || !field.field_type) {
+      return (
+        <Form.Control
+          type="text"
+          value={fieldValue}
+          onChange={(e) => updateField(e.target.value)}
+          placeholder={`Enter ${field.field_name}`}
+          required={field.is_required}
+        />
+      );
+    }
+
+    let inputType: "date" | "email" | "text" = "text";
+    if (field.field_type === "date") {
+      inputType = "date";
+    } else if (field.field_type === "email") {
+      inputType = "email";
+    }
+
+    return (
+      <Form.Control
+        type={inputType}
+        value={fieldValue}
+        onChange={(e) => updateField(e.target.value)}
+        placeholder={`Enter ${field.field_name}`}
+        required={field.is_required}
+      />
+    );
+  };
+
+  let templateMainContent: React.ReactNode;
+  if (props.loadingTemplate) {
+    templateMainContent = (
+      <div className="text-center py-4">
+        <output className="d-inline-block" aria-live="polite">
+          <div className="spinner-border text-primary">
+            <span className="visually-hidden">Loading template...</span>
+          </div>
+        </output>
+        <p className="mt-2 text-muted">Loading template fields...</p>
+      </div>
+    );
+  } else if (sortedFields.length > 0) {
+    templateMainContent = (
+      <Row>
+        {sortedFields.map((field: DealTemplateField) => (
+          <Col md={6} key={field.field_name}>
+            <Form.Group className="mb-3">
+              <Form.Label>
+                {field.field_name}
+                {field.is_required && <span className="text-danger"> *</span>}
+              </Form.Label>
+              {renderTemplateFieldControl(field)}
+            </Form.Group>
+          </Col>
+        ))}
+      </Row>
+    );
+  } else {
+    templateMainContent = (
+      <div className="text-center py-4 text-muted">
+        <p>No fields defined in this template.</p>
+      </div>
+    );
+  }
 
   return (
     <Card className="mb-3 border-0 bg-light">
@@ -869,93 +980,13 @@ function DealCharacteristicsStep(props: {
           </div>
         )}
 
-        {props.loadingTemplate ? (
-          <div className="text-center py-4">
-            <div className="spinner-border text-primary" role="status">
-              <span className="visually-hidden">Loading template...</span>
-            </div>
-            <p className="mt-2 text-muted">Loading template fields...</p>
-          </div>
-        ) : sortedFields.length > 0 ? (
-          <Row>
-            {sortedFields.map((field: DealTemplateField) => {
-              const fieldValue = props.templateFieldsData[field.field_name] || "";
-
-              return (
-                <Col md={6} key={field.field_name}>
-                  <Form.Group className="mb-3">
-                    <Form.Label>
-                      {field.field_name}
-                      {field.is_required && <span className="text-danger"> *</span>}
-                    </Form.Label>
-                    {field.field_type === "dropdown" ? (
-                      <Form.Select
-                        value={fieldValue}
-                        onChange={(e) =>
-                          props.setTemplateFieldsData({
-                            ...props.templateFieldsData,
-                            [field.field_name]: e.target.value,
-                          })
-                        }
-                        required={field.is_required}
-                      >
-                        <option value="">Select {field.field_name}</option>
-                        {field.options &&
-                          field.options.map((option: string, index: number) => (
-                            <option key={index} value={option}>
-                              {option}
-                            </option>
-                          ))}
-                      </Form.Select>
-                    ) : field.field_type === "text" || !field.field_type ? (
-                      <Form.Control
-                        type="text"
-                        value={fieldValue}
-                        onChange={(e) =>
-                          props.setTemplateFieldsData({
-                            ...props.templateFieldsData,
-                            [field.field_name]: e.target.value,
-                          })
-                        }
-                        placeholder={`Enter ${field.field_name}`}
-                        required={field.is_required}
-                      />
-                    ) : (
-                      <Form.Control
-                        type={
-                          field.field_type === "date"
-                            ? "date"
-                            : field.field_type === "email"
-                              ? "email"
-                              : "text"
-                        }
-                        value={fieldValue}
-                        onChange={(e) =>
-                          props.setTemplateFieldsData({
-                            ...props.templateFieldsData,
-                            [field.field_name]: e.target.value,
-                          })
-                        }
-                        placeholder={`Enter ${field.field_name}`}
-                        required={field.is_required}
-                      />
-                    )}
-                  </Form.Group>
-                </Col>
-              );
-            })}
-          </Row>
-        ) : (
-          <div className="text-center py-4 text-muted">
-            <p>No fields defined in this template.</p>
-          </div>
-        )}
+        {templateMainContent}
       </Card.Body>
     </Card>
   );
 }
 
-function NegotiationProgressStep(props: { formData: any; setFormData: SetState<any> }) {
+function NegotiationProgressStep(props: Readonly<{ formData: any; setFormData: SetState<any> }>) {
   return (
     <Card className="mb-3 border-0 bg-light">
       <Card.Body>
@@ -1001,7 +1032,7 @@ function NegotiationProgressStep(props: { formData: any; setFormData: SetState<a
   );
 }
 
-function EstimationChartStep(props: {
+function EstimationChartStep(props: Readonly<{
   formData: any;
   products: CrmProduct[];
   estimationItems: EstimationItem[];
@@ -1010,7 +1041,7 @@ function EstimationChartStep(props: {
   setEditingItemIndex: SetState<number | null>;
   setShowAllIndustries: SetState<boolean>;
   setItemFormData: SetState<EstimationItemFormData>;
-}) {
+}>) {
   return (
     <Card className="mb-3 border-0 bg-light">
       <Card.Body>
@@ -1166,9 +1197,9 @@ function EstimationChartStep(props: {
                       product.currency.toUpperCase() !== props.formData.currency.toUpperCase() &&
                       item.original_currency &&
                       item.original_price !== item.unit_price;
-                    const taxPct = parseFloat(String(item.tax_percentage ?? "0")) || 0;
-                    const stdPct = parseFloat(String(item.standard_discount_percentage ?? "0")) || 0;
-                    const specPct = parseFloat(String(item.special_discount_percentage ?? "0")) || 0;
+                    const taxPct = Number.parseFloat(String(item.tax_percentage ?? "0")) || 0;
+                    const stdPct = Number.parseFloat(String(item.standard_discount_percentage ?? "0")) || 0;
+                    const specPct = Number.parseFloat(String(item.special_discount_percentage ?? "0")) || 0;
                     const discPct = stdPct + specPct;
                     const lineDisc = (subtotal * discPct) / 100;
                     const lineAfterDisc = subtotal - lineDisc;
@@ -1202,7 +1233,7 @@ function EstimationChartStep(props: {
                         <td style={{ textAlign: "right", whiteSpace: "nowrap" }}>
                           <div style={{ fontWeight: 500 }}>
                             {props.formData.currency || "AED"}{" "}
-                            {parseFloat(String(item.unit_price || "0")).toLocaleString(undefined, {
+                            {Number.parseFloat(String(item.unit_price || "0")).toLocaleString(undefined, {
                               minimumFractionDigits: 2,
                               maximumFractionDigits: 2,
                             })}
@@ -1299,9 +1330,9 @@ function EstimationChartStep(props: {
                     let totalTaxSum = 0;
                     props.estimationItems.forEach((item) => {
                       const st = item.qty * item.unit_price;
-                      const stdPct = parseFloat(String(item.standard_discount_percentage ?? "0")) || 0;
-                      const specPct = parseFloat(String(item.special_discount_percentage ?? "0")) || 0;
-                      const taxPct = parseFloat(String(item.tax_percentage ?? "0")) || 0;
+                      const stdPct = Number.parseFloat(String(item.standard_discount_percentage ?? "0")) || 0;
+                      const specPct = Number.parseFloat(String(item.special_discount_percentage ?? "0")) || 0;
+                      const taxPct = Number.parseFloat(String(item.tax_percentage ?? "0")) || 0;
                       const disc = (st * (stdPct + specPct)) / 100;
                       const afterDisc = st - disc;
                       totalDiscountSum += disc;
@@ -1395,7 +1426,7 @@ function EstimationChartStep(props: {
   );
 }
 
-function ConvertDealStepSwitcher(props: {
+function ConvertDealStepSwitcher(props: Readonly<{
   formStep: number;
   formData: any;
   setFormData: SetState<any>;
@@ -1420,7 +1451,7 @@ function ConvertDealStepSwitcher(props: {
   setEditingItemIndex: SetState<number | null>;
   setShowAllIndustries: SetState<boolean>;
   setItemFormData: SetState<EstimationItemFormData>;
-}) {
+}>) {
   switch (props.formStep) {
     case 0:
       return (
@@ -1475,7 +1506,7 @@ function ConvertDealStepSwitcher(props: {
   }
 }
 
-function AddEstimationItemModal(props: {
+function AddEstimationItemModal(props: Readonly<{
   show: boolean;
   onHide: () => void;
   editingItemIndex: number | null;
@@ -1499,7 +1530,7 @@ function AddEstimationItemModal(props: {
   itemFormData: EstimationItemFormData;
   setItemFormData: SetState<EstimationItemFormData>;
   handleIndustryChange: (selectedOption: any) => Promise<void>;
-}) {
+}>) {
   const closeAndReset = () => {
     props.onHide();
     props.setEditingItemIndex(null);
@@ -1507,10 +1538,20 @@ function AddEstimationItemModal(props: {
     props.setItemFormData(buildEmptyEstimationItemFormData());
   };
 
+  const availableIndustries = getAddItemAvailableIndustries(
+    props.showAllIndustries,
+    props.allIndustries,
+    props.formData,
+    props.campaignIndustries,
+  );
+
+  const isProductSelectDisabled =
+    props.editingItemIndex === null ? !props.selectedIndustryId || props.loadingProducts : true;
+
   return (
     <Modal show={props.show} onHide={closeAndReset} size="lg" centered>
       <Modal.Header closeButton>
-        <Modal.Title>{props.editingItemIndex !== null ? "Edit Item" : "Add New Item"}</Modal.Title>
+        <Modal.Title>{props.editingItemIndex === null ? "Add New Item" : "Edit Item"}</Modal.Title>
       </Modal.Header>
       <Form
         onSubmit={(e) => {
@@ -1524,18 +1565,18 @@ function AddEstimationItemModal(props: {
             qty: props.itemFormData.qty,
             unit_price: props.itemFormData.unit_price,
             original_currency: selectedProduct?.currency || props.formData.currency,
-            original_price: parseFloat(selectedProduct?.price || "0") || props.itemFormData.unit_price,
+            original_price: Number.parseFloat(selectedProduct?.price || "0") || props.itemFormData.unit_price,
             tax_percentage: props.itemFormData.tax_percentage || "0",
             standard_discount_percentage: props.itemFormData.standard_discount_percentage || "0",
             special_discount_percentage: props.itemFormData.special_discount_percentage || "0",
           };
 
-          if (props.editingItemIndex !== null) {
+          if (props.editingItemIndex === null) {
+            props.setEstimationItems([...props.estimationItems, newItem]);
+          } else {
             const updated = [...props.estimationItems];
             updated[props.editingItemIndex] = newItem;
             props.setEstimationItems(updated);
-          } else {
-            props.setEstimationItems([...props.estimationItems, newItem]);
           }
 
           closeAndReset();
@@ -1568,49 +1609,30 @@ function AddEstimationItemModal(props: {
                     }}
                   />
                 </div>
-                {(() => {
-                  const availableIndustries = props.showAllIndustries
-                    ? props.allIndustries
-                    : props.formData.industry_ids && props.formData.industry_ids.length > 0
-                      ? props.allIndustries.filter((ind: any) => props.formData.industry_ids.includes(ind.id))
-                      : props.campaignIndustries;
-
-                  return (
-                    <Select
-                      value={
-                        props.selectedIndustryId
-                          ? {
-                              value: props.selectedIndustryId,
-                              label:
-                                availableIndustries.find((ind: any) => ind.id === props.selectedIndustryId)?.name ||
-                                "",
-                            }
-                          : null
-                      }
-                      onChange={props.handleIndustryChange}
-                      options={availableIndustries.map((industry: any) => ({
-                        value: industry.id,
-                        label: industry.name,
-                      }))}
-                      placeholder="Select product group..."
-                      isSearchable
-                      isLoading={props.loadingIndustries || props.loadingAllIndustries}
-                      isDisabled={props.loadingIndustries || props.loadingAllIndustries}
-                      required
-                    />
-                  );
-                })()}
-                {(() => {
-                  const availableIndustries = props.showAllIndustries
-                    ? props.allIndustries
-                    : props.formData.industry_ids && props.formData.industry_ids.length > 0
-                      ? props.allIndustries.filter((ind: any) => props.formData.industry_ids.includes(ind.id))
-                      : props.campaignIndustries;
-
-                  return availableIndustries.length === 1 && !props.showAllIndustries ? (
-                    <Form.Text className="text-muted">Only one product group available</Form.Text>
-                  ) : null;
-                })()}
+                <Select
+                  value={
+                    props.selectedIndustryId
+                      ? {
+                          value: props.selectedIndustryId,
+                          label:
+                            availableIndustries.find((ind) => ind.id === props.selectedIndustryId)?.name || "",
+                        }
+                      : null
+                  }
+                  onChange={props.handleIndustryChange}
+                  options={availableIndustries.map((industry) => ({
+                    value: industry.id,
+                    label: industry.name,
+                  }))}
+                  placeholder="Select product group..."
+                  isSearchable
+                  isLoading={props.loadingIndustries || props.loadingAllIndustries}
+                  isDisabled={props.loadingIndustries || props.loadingAllIndustries}
+                  required
+                />
+                {props.showAllIndustries === false && availableIndustries.length === 1 ? (
+                  <Form.Text className="text-muted">Only one product group available</Form.Text>
+                ) : null}
               </Form.Group>
             </Col>
 
@@ -1634,7 +1656,7 @@ function AddEstimationItemModal(props: {
                   onChange={async (selectedOption: any) => {
                     const product = props.products.find((p) => p.id === selectedOption?.value);
                     if (product) {
-                      const originalPrice = parseFloat(product.price) || 0;
+                      const originalPrice = Number.parseFloat(product.price) || 0;
                       const productCurrency = product.currency.toUpperCase();
                       const dealCurrency = props.formData.currency.toUpperCase();
 
@@ -1663,7 +1685,7 @@ function AddEstimationItemModal(props: {
                   options={props.products.map((product) => {
                     const productCurrency = product.currency.toUpperCase();
                     const dealCurrency = props.formData.currency.toUpperCase();
-                    const originalPrice = parseFloat(product.price) || 0;
+                    const originalPrice = Number.parseFloat(product.price) || 0;
 
                     if (productCurrency !== dealCurrency) {
                       return {
@@ -1682,11 +1704,7 @@ function AddEstimationItemModal(props: {
                   placeholder={props.selectedIndustryId ? "Select a product" : "Please select a product group first"}
                   isSearchable
                   isLoading={props.loadingProducts}
-                  isDisabled={
-                    props.editingItemIndex !== null ||
-                    !props.selectedIndustryId ||
-                    props.loadingProducts
-                  }
+                  isDisabled={isProductSelectDisabled}
                 />
               </Form.Group>
             </Col>
@@ -1716,7 +1734,7 @@ function AddEstimationItemModal(props: {
                   onChange={(e) =>
                     props.setItemFormData({
                       ...props.itemFormData,
-                      qty: parseInt(e.target.value) || 1,
+                      qty: Number.parseInt(e.target.value, 10) || 1,
                     })
                   }
                   required
@@ -1728,14 +1746,11 @@ function AddEstimationItemModal(props: {
                 <Form.Label>
                   Unit Price <span className="text-danger">*</span>
                   {props.convertingPrice && (
-                    <span className="ms-2 text-muted small">
-                      <span
-                        className="spinner-border spinner-border-sm me-1"
-                        role="status"
-                        aria-hidden="true"
-                      ></span>
+                    <output className="ms-2 text-muted small d-inline-flex align-items-center" aria-live="polite">
+                      <span className="spinner-border spinner-border-sm me-1" aria-hidden="true" />
+                      {" "}
                       Converting...
-                    </span>
+                    </output>
                   )}
                 </Form.Label>
                 <Form.Control
@@ -1747,7 +1762,7 @@ function AddEstimationItemModal(props: {
                   onChange={(e) =>
                     props.setItemFormData({
                       ...props.itemFormData,
-                      unit_price: parseFloat(e.target.value) || 0,
+                      unit_price: Number.parseFloat(e.target.value) || 0,
                     })
                   }
                   required
@@ -1759,7 +1774,7 @@ function AddEstimationItemModal(props: {
                     if (selectedProduct) {
                       const productCurrency = selectedProduct.currency.toUpperCase();
                       const dealCurrency = props.formData.currency.toUpperCase();
-                      const originalPrice = parseFloat(selectedProduct.price) || 0;
+                      const originalPrice = Number.parseFloat(selectedProduct.price) || 0;
 
                       if (productCurrency !== dealCurrency && props.itemFormData.unit_price !== originalPrice) {
                         return (
@@ -1863,24 +1878,24 @@ function AddEstimationItemModal(props: {
                 qty: props.itemFormData.qty,
                 unit_price: props.itemFormData.unit_price,
                 original_currency: selectedProduct?.currency || props.formData.currency,
-                original_price: parseFloat(selectedProduct?.price || "0") || props.itemFormData.unit_price,
+                original_price: Number.parseFloat(selectedProduct?.price || "0") || props.itemFormData.unit_price,
                 tax_percentage: props.itemFormData.tax_percentage || "0",
                 standard_discount_percentage: props.itemFormData.standard_discount_percentage || "0",
                 special_discount_percentage: props.itemFormData.special_discount_percentage || "0",
               };
 
-              if (props.editingItemIndex !== null) {
+              if (props.editingItemIndex === null) {
+                props.setEstimationItems([...props.estimationItems, newItem]);
+              } else {
                 const updated = [...props.estimationItems];
                 updated[props.editingItemIndex] = newItem;
                 props.setEstimationItems(updated);
-              } else {
-                props.setEstimationItems([...props.estimationItems, newItem]);
               }
 
               closeAndReset();
             }}
           >
-            {props.editingItemIndex !== null ? "Update Item" : "Add Item"}
+            {props.editingItemIndex === null ? "Add Item" : "Update Item"}
           </Button>
         </Modal.Footer>
       </Form>
@@ -2214,9 +2229,11 @@ const ConvertToDealModal: React.FC<ConvertToDealModalProps> = ({
         <Modal.Body style={{ maxHeight: 'calc(90vh - 200px)', overflowY: 'auto' }}>
           {loadingLead ? (
             <div className="text-center py-5">
-              <div className="spinner-border text-primary" role="status">
-                <span className="visually-hidden">Loading...</span>
-              </div>
+              <output className="d-inline-block" aria-live="polite">
+                <div className="spinner-border text-primary">
+                  <span className="visually-hidden">Loading...</span>
+                </div>
+              </output>
               <p className="mt-3">Loading lead data...</p>
             </div>
           ) : (
