@@ -1193,354 +1193,314 @@ function useMyDayTasksPageController() {
     handleSuggestedAddClick,
     onTaskToggleCompleteClick,
     onTaskRemoveClick,
+    formatCapacityDurationInput,
   };
 }
 
-type MyDayTasksPageViewModel = ReturnType<typeof useMyDayTasksPageController>;
+export type MyDayTasksPageViewModel = ReturnType<typeof useMyDayTasksPageController>;
 
-function MyDayTasksPageView(vm: MyDayTasksPageViewModel) {
-  const {
-    managerExtension,
-    reporteeExtensions,
-    hierarchyDataExtensions,
-    loading,
-    capacityMinutes,
-    showCreateSidebar,
-    setShowCreateSidebar,
-    carryOverMode,
-    carryOverTasks,
-    selectedCarryOverIds,
-    suggestedSearch,
-    setSuggestedSearch,
-    showEstimateModal,
-    setShowEstimateModal,
-    estimateInput,
-    setEstimateInput,
-    pendingEstimateTask,
-    setPendingEstimateTask,
-    rolloverShowPrompt,
-    showHistoryModal,
-    setShowHistoryModal,
-    planDate,
-    isEditingCapacity,
-    setIsEditingCapacity,
-    capacityDraft,
-    setCapacityDraft,
-    suggestionsLoading,
-    defaultCapacityMinutes,
-    showDefaultCapacityModal,
-    setShowDefaultCapacityModal,
-    defaultCapacityDraft,
-    setDefaultCapacityDraft,
-    showScheduleLaterModal,
-    setShowScheduleLaterModal,
-    scheduleLaterDate,
-    setScheduleLaterDate,
-    isEmptyByDesign,
-    suggestionsPanelRef,
-    today,
-    myDayTaskIds,
-    activeTasks,
-    organizationalActiveTasks,
-    standardActiveTasks,
-    unestimatedActiveCount,
-    completedTasks,
-    completedTasksCount,
-    summary,
-    capacityOverageMessage,
-    groupedSuggestions,
-    headerDateLabel,
-    headerMetaLine,
-    rolloverPromptCopy,
-    refreshMyDayPage,
-    toggleCarryOverSelection,
-    handleOpenEstimateModal,
-    scrollToSuggestions,
-    confirmEstimateAndAdd,
-    skipEstimateAndAddToMyDay,
-    handleSaveDefaultCapacity,
-    handleSaveCapacityDraft,
-    handleStartCapacityEdit,
-    handleCarryOverApply,
-    handleCarryOverSkip,
-    handleCarryOverScheduleLater,
-    handleSuggestedAddClick,
-    onTaskToggleCompleteClick,
-    onTaskRemoveClick,
-  } = vm;
+type MyDayTasksPageViewProps = Readonly<{ vm: MyDayTasksPageViewModel }>;
 
+function formatUnestimatedActiveLabel(count: number): string {
+  if (count === 1) return "1 task without an estimate";
+  return `${count} tasks without an estimate`;
+}
+
+function resolveTodayEmptyMessage(isEmptyByDesign: boolean): string {
+  if (isEmptyByDesign) {
+    return "My Day starts empty each morning. Add tasks from suggestions or create a new task.";
+  }
+  return "No active tasks in My Day";
+}
+
+function MyDayPageHeader({ vm }: MyDayTasksPageViewProps) {
   return (
-    <div className="myday-page-shell">
-      <BreadcrumbItem mainTitle="Planner" mainLink="/planner/dashboard" subTitle="My Day" />
-      <div className="myday-layout">
-        <div className="myday-main">
-          <div className="myday-header">
-            <div className="myday-header__text">
-              <h2>My Day</h2>
-              <p className="myday-header__date">{headerDateLabel}</p>
-              <p className="myday-header__meta">{headerMetaLine}</p>
-            </div>
-            <div className="myday-header__actions">
-              <Button
-                variant="outline-secondary"
-                size="sm"
-                onClick={() => setShowHistoryModal(true)}
-              >
-                <History size={14} className="me-1" />
-                History
-              </Button>
-              <Button size="sm" onClick={() => setShowCreateSidebar(true)}>
-                <Plus size={14} className="me-1" />
-                Add Task
-              </Button>
-            </div>
-          </div>
+    <div className="myday-header">
+      <div className="myday-header__text">
+        <h2>My Day</h2>
+        <p className="myday-header__date">{vm.headerDateLabel}</p>
+        <p className="myday-header__meta">{vm.headerMetaLine}</p>
+      </div>
+      <div className="myday-header__actions">
+        <Button variant="outline-secondary" size="sm" onClick={() => vm.setShowHistoryModal(true)}>
+          <History size={14} className="me-1" />
+          History
+        </Button>
+        <Button size="sm" onClick={() => vm.setShowCreateSidebar(true)}>
+          <Plus size={14} className="me-1" />
+          Add Task
+        </Button>
+      </div>
+    </div>
+  );
+}
 
-          <div className="myday-capacity-card">
-            <div className="myday-capacity-top">
-              <div className="myday-capacity-title">
-                <span className="myday-capacity-label">CAPACITY</span>
-                <span className="myday-capacity-values">
-                  <strong>{toMinutesDisplay(summary.planned)}</strong> /{" "}
-                  {toMinutesDisplay(capacityMinutes)}
-                  <span className="myday-capacity-units"> (hours &amp; minutes)</span>
-                </span>
-              </div>
-              <div className="myday-capacity-side">
-                <span className="myday-capacity-pct-inline">{summary.plannedPct}%</span>
-                <button
-                  type="button"
-                  className="btn btn-link btn-sm myday-default-capacity-btn"
-                  onClick={() => {
-                    setDefaultCapacityDraft(formatCapacityDurationInput(defaultCapacityMinutes));
-                    setShowDefaultCapacityModal(true);
-                  }}
-                >
-                  Default capacity
-                </button>
-              </div>
-              <div className="myday-capacity-input">
-                {isEditingCapacity ? (
-                  <>
-                    <input
-                      type="text"
-                      value={capacityDraft}
-                      placeholder="8h or 2h 30m"
-                      onChange={(e) => setCapacityDraft(e.target.value)}
-                    />
-                    <button
-                      type="button"
-                      className="btn btn-sm btn-outline-secondary"
-                      onClick={() => handleSaveCapacityDraft()}
-                    >
-                      Save
-                    </button>
-                    <button
-                      type="button"
-                      className="btn btn-sm btn-link"
-                      onClick={() => setIsEditingCapacity(false)}
-                    >
-                      Cancel
-                    </button>
-                  </>
-                ) : (
-                  <button
-                    type="button"
-                    className="myday-capacity-edit-btn"
-                    aria-label="Edit capacity"
-                    onClick={handleStartCapacityEdit}
-                  >
-                    <Pencil size={14} />
-                  </button>
-                )}
-              </div>
-            </div>
-            <div className="myday-progress-track myday-progress-track--capacity">
-              <div
-                className={`myday-progress-fill myday-progress-fill--${summary.capacityTone}`}
-                style={{ width: `${Math.min(100, summary.plannedPct)}%` }}
+function MyDayCapacitySection({ vm }: MyDayTasksPageViewProps) {
+  const showUnestimated = vm.unestimatedActiveCount > 0;
+  return (
+    <div className="myday-capacity-card">
+      <div className="myday-capacity-top">
+        <div className="myday-capacity-title">
+          <span className="myday-capacity-label">CAPACITY</span>
+          <span className="myday-capacity-values">
+            <strong>{toMinutesDisplay(vm.summary.planned)}</strong> /{" "}
+            {toMinutesDisplay(vm.capacityMinutes)}
+            <span className="myday-capacity-units"> (hours &amp; minutes)</span>
+          </span>
+        </div>
+        <div className="myday-capacity-side">
+          <span className="myday-capacity-pct-inline">{vm.summary.plannedPct}%</span>
+          <button
+            type="button"
+            className="btn btn-link btn-sm myday-default-capacity-btn"
+            onClick={() => {
+              vm.setDefaultCapacityDraft(
+                vm.formatCapacityDurationInput(vm.defaultCapacityMinutes),
+              );
+              vm.setShowDefaultCapacityModal(true);
+            }}
+          >
+            Default capacity
+          </button>
+        </div>
+        <div className="myday-capacity-input">
+          {vm.isEditingCapacity ? (
+            <>
+              <input
+                type="text"
+                value={vm.capacityDraft}
+                placeholder="8h or 2h 30m"
+                onChange={(e) => vm.setCapacityDraft(e.target.value)}
               />
-            </div>
-            {capacityOverageMessage ? (
-              <output className="myday-capacity-alert">{capacityOverageMessage}</output>
-            ) : null}
-            {unestimatedActiveCount > 0 ? (
-              <p className="myday-unestimated-count">
-                {unestimatedActiveCount === 1
-                  ? "1 task without an estimate"
-                  : `${unestimatedActiveCount} tasks without an estimate`}
-              </p>
-            ) : null}
-          </div>
+              <button
+                type="button"
+                className="btn btn-sm btn-outline-secondary"
+                onClick={() => vm.handleSaveCapacityDraft()}
+              >
+                Save
+              </button>
+              <button
+                type="button"
+                className="btn btn-sm btn-link"
+                onClick={() => vm.setIsEditingCapacity(false)}
+              >
+                Cancel
+              </button>
+            </>
+          ) : (
+            <button
+              type="button"
+              className="myday-capacity-edit-btn"
+              aria-label="Edit capacity"
+              onClick={vm.handleStartCapacityEdit}
+            >
+              <Pencil size={14} />
+            </button>
+          )}
+        </div>
+      </div>
+      <div className="myday-progress-track myday-progress-track--capacity">
+        <div
+          className={`myday-progress-fill myday-progress-fill--${vm.summary.capacityTone}`}
+          style={{ width: `${Math.min(100, vm.summary.plannedPct)}%` }}
+        />
+      </div>
+      {vm.capacityOverageMessage ? (
+        <output className="myday-capacity-alert">{vm.capacityOverageMessage}</output>
+      ) : null}
+      {showUnestimated ? (
+        <p className="myday-unestimated-count">
+          {formatUnestimatedActiveLabel(vm.unestimatedActiveCount)}
+        </p>
+      ) : null}
+    </div>
+  );
+}
 
-          {carryOverTasks.length > 0 && carryOverMode === "pending" && rolloverShowPrompt ? (
-            <div className="myday-carry-card">
-              <h4>Missed yesterday</h4>
-              <p className="myday-carry-copy">{rolloverPromptCopy}</p>
-              <div className="myday-carry-list">
-                {carryOverTasks.slice(0, 5).map((task) => (
-                  <button
-                    key={task.id}
-                    type="button"
-                    className={`myday-carry-item ${selectedCarryOverIds.includes(task.id) ? "selected" : ""}`}
-                    onClick={() => toggleCarryOverSelection(task.id)}
-                  >
-                    <span>{task.title}</span>
-                    <span>{task.estimateMinutes > 0 ? `${task.estimateMinutes}m` : "--"}</span>
-                  </button>
-                ))}
-              </div>
-              <div className="myday-carry-actions">
-                <button type="button" onClick={handleCarryOverApply}>
-                  Add to today
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setScheduleLaterDate(moment().add(1, "day").format("YYYY-MM-DD"));
-                    setShowScheduleLaterModal(true);
-                  }}
-                >
-                  Schedule later
-                </button>
-                <button type="button" onClick={handleCarryOverSkip}>
-                  Handle later
-                </button>
-              </div>
-            </div>
-          ) : null}
+function MyDayRolloverSection({ vm }: MyDayTasksPageViewProps) {
+  const showCard =
+    vm.carryOverTasks.length > 0 && vm.carryOverMode === "pending" && vm.rolloverShowPrompt;
+  if (!showCard) return null;
+  return (
+    <div className="myday-carry-card">
+      <h4>Missed yesterday</h4>
+      <p className="myday-carry-copy">{vm.rolloverPromptCopy}</p>
+      <div className="myday-carry-list">
+        {vm.carryOverTasks.slice(0, 5).map((task) => (
+          <button
+            key={task.id}
+            type="button"
+            className={`myday-carry-item ${vm.selectedCarryOverIds.includes(task.id) ? "selected" : ""}`}
+            onClick={() => vm.toggleCarryOverSelection(task.id)}
+          >
+            <span>{task.title}</span>
+            <span>{task.estimateMinutes > 0 ? `${task.estimateMinutes}m` : "--"}</span>
+          </button>
+        ))}
+      </div>
+      <div className="myday-carry-actions">
+        <button type="button" onClick={vm.handleCarryOverApply}>
+          Add to today
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            vm.setScheduleLaterDate(moment().add(1, "day").format("YYYY-MM-DD"));
+            vm.setShowScheduleLaterModal(true);
+          }}
+        >
+          Schedule later
+        </button>
+        <button type="button" onClick={vm.handleCarryOverSkip}>
+          Handle later
+        </button>
+      </div>
+    </div>
+  );
+}
 
-          <div className="myday-table-card">
-            <div className="myday-section-header">
-              <div className="myday-section-title">Today&apos;s Tasks</div>
-              <Button variant="outline-primary" size="sm" onClick={scrollToSuggestions}>
-                Add to My Day
-              </Button>
-            </div>
-            {loading && activeTasks.length === 0 ? (
-              <p className="myday-empty-state">Loading My Day tasks...</p>
-            ) : null}
-            {!loading && activeTasks.length === 0 ? (
-              <p className="myday-empty-state">
-                {isEmptyByDesign
-                  ? "My Day starts empty each morning. Add tasks from suggestions or create a new task."
-                  : "No active tasks in My Day"}
-              </p>
-            ) : null}
-            <div className="myday-task-card-list">
-              {standardActiveTasks.map((task) => (
-                <MyDayTaskCard
-                  key={task.id}
+type MyDayTaskListHandlers = Readonly<{
+  onToggleComplete: (task: MyDayTask) => void;
+  onRemove: (taskId: number) => void;
+  onEditEstimate: (task: MyDayTask) => void;
+}>;
+
+function MyDayTaskList({
+  tasks,
+  handlers,
+  keyPrefix = "",
+}: Readonly<{
+  tasks: MyDayTask[];
+  handlers: MyDayTaskListHandlers;
+  keyPrefix?: string;
+}>) {
+  return (
+    <div className="myday-task-card-list">
+      {tasks.map((task) => (
+        <MyDayTaskCard
+          key={keyPrefix ? `${keyPrefix}${task.id}` : task.id}
+          task={task}
+          onToggleComplete={handlers.onToggleComplete}
+          onRemove={handlers.onRemove}
+          onEditEstimate={handlers.onEditEstimate}
+        />
+      ))}
+    </div>
+  );
+}
+
+function MyDayTodayTasksSection({ vm }: MyDayTasksPageViewProps) {
+  const handlers: MyDayTaskListHandlers = {
+    onToggleComplete: vm.onTaskToggleCompleteClick,
+    onRemove: vm.onTaskRemoveClick,
+    onEditEstimate: vm.handleOpenEstimateModal,
+  };
+  const showLoading = vm.loading && vm.activeTasks.length === 0;
+  const showEmpty = !vm.loading && vm.activeTasks.length === 0;
+  return (
+    <div className="myday-table-card">
+      <div className="myday-section-header">
+        <div className="myday-section-title">Today&apos;s Tasks</div>
+        <Button variant="outline-primary" size="sm" onClick={vm.scrollToSuggestions}>
+          Add to My Day
+        </Button>
+      </div>
+      {showLoading ? <p className="myday-empty-state">Loading My Day tasks...</p> : null}
+      {showEmpty ? (
+        <p className="myday-empty-state">{resolveTodayEmptyMessage(vm.isEmptyByDesign)}</p>
+      ) : null}
+      <MyDayTaskList tasks={vm.standardActiveTasks} handlers={handlers} />
+      {vm.organizationalActiveTasks.length > 0 ? (
+        <>
+          <div className="myday-section-title myday-section-title--nested">Organizational Tasks</div>
+          <MyDayTaskList
+            tasks={vm.organizationalActiveTasks}
+            handlers={handlers}
+            keyPrefix="org-"
+          />
+        </>
+      ) : null}
+    </div>
+  );
+}
+
+function MyDayCompletedSection({ vm }: MyDayTasksPageViewProps) {
+  if (vm.completedTasks.length === 0) return null;
+  const handlers: MyDayTaskListHandlers = {
+    onToggleComplete: vm.onTaskToggleCompleteClick,
+    onRemove: vm.onTaskRemoveClick,
+    onEditEstimate: vm.handleOpenEstimateModal,
+  };
+  return (
+    <div className="myday-table-card myday-completed-card">
+      <div className="myday-section-title">
+        <span>Completed Tasks</span>
+        <span className="myday-section-count">({vm.completedTasksCount})</span>
+      </div>
+      <MyDayTaskList tasks={vm.completedTasks} handlers={handlers} />
+    </div>
+  );
+}
+
+function MyDaySuggestionsPanel({ vm }: MyDayTasksPageViewProps) {
+  const showEmptySuggestions = !vm.suggestionsLoading && vm.groupedSuggestions.length === 0;
+  return (
+    <aside ref={vm.suggestionsPanelRef} id="myday-suggestions-panel" className="myday-suggested">
+      <h4>Suggested for Today</h4>
+      <div className="myday-search-wrap">
+        <Search size={14} />
+        <input
+          type="text"
+          placeholder="Search tasks..."
+          value={vm.suggestedSearch}
+          onChange={(e) => vm.setSuggestedSearch(e.target.value)}
+        />
+      </div>
+      {vm.suggestionsLoading ? (
+        <p className="myday-empty-state">Searching suggestions...</p>
+      ) : null}
+      <div className="myday-suggested-groups">
+        {showEmptySuggestions ? (
+          <p className="myday-empty-state">No suggestions match your search.</p>
+        ) : null}
+        {vm.groupedSuggestions.map((group) => (
+          <section key={group.category} className="myday-suggested-group">
+            <h5 className="myday-suggested-group__title">{group.label}</h5>
+            <div className="myday-suggested-list">
+              {group.items.map((task) => (
+                <MyDaySuggestedItemButton
+                  key={`${group.category}-${task.id}`}
                   task={task}
-                  onToggleComplete={onTaskToggleCompleteClick}
-                  onRemove={onTaskRemoveClick}
-                  onEditEstimate={handleOpenEstimateModal}
+                  groupCategory={group.category}
+                  inMyDay={isSuggestionInMyDay(task, vm.myDayTaskIds)}
+                  onAdd={vm.handleSuggestedAddClick}
                 />
               ))}
             </div>
-            {organizationalActiveTasks.length > 0 ? (
-              <>
-                <div className="myday-section-title myday-section-title--nested">
-                  Organizational Tasks
-                </div>
-                <div className="myday-task-card-list">
-                  {organizationalActiveTasks.map((task) => (
-                    <MyDayTaskCard
-                      key={`org-${task.id}`}
-                      task={task}
-                      onToggleComplete={onTaskToggleCompleteClick}
-                      onRemove={onTaskRemoveClick}
-                      onEditEstimate={handleOpenEstimateModal}
-                    />
-                  ))}
-                </div>
-              </>
-            ) : null}
-          </div>
-
-          {reporteeExtensions.length > 0 ? (
-            <MyDayTeamSection
-              planDate={planDate || today}
-              managerExtension={managerExtension}
-              reporteeExtensions={reporteeExtensions}
-              hierarchyExtensions={hierarchyDataExtensions}
-            />
-          ) : null}
-
-          {completedTasks.length > 0 ? (
-            <div className="myday-table-card myday-completed-card">
-              <div className="myday-section-title">
-                <span>Completed Tasks</span>
-                <span className="myday-section-count">({completedTasksCount})</span>
-              </div>
-              <div className="myday-task-card-list">
-                {completedTasks.map((task) => (
-                  <MyDayTaskCard
-                    key={task.id}
-                    task={task}
-                    onToggleComplete={onTaskToggleCompleteClick}
-                    onRemove={onTaskRemoveClick}
-                    onEditEstimate={handleOpenEstimateModal}
-                  />
-                ))}
-              </div>
-            </div>
-          ) : null}
-        </div>
-
-        <aside ref={suggestionsPanelRef} id="myday-suggestions-panel" className="myday-suggested">
-          <h4>Suggested for Today</h4>
-          <div className="myday-search-wrap">
-            <Search size={14} />
-            <input
-              type="text"
-              placeholder="Search tasks..."
-              value={suggestedSearch}
-              onChange={(e) => setSuggestedSearch(e.target.value)}
-            />
-          </div>
-          {suggestionsLoading ? (
-            <p className="myday-empty-state">Searching suggestions...</p>
-          ) : null}
-          <div className="myday-suggested-groups">
-            {!suggestionsLoading && groupedSuggestions.length === 0 ? (
-              <p className="myday-empty-state">No suggestions match your search.</p>
-            ) : null}
-            {groupedSuggestions.map((group) => (
-              <section key={group.category} className="myday-suggested-group">
-                <h5 className="myday-suggested-group__title">{group.label}</h5>
-                <div className="myday-suggested-list">
-                  {group.items.map((task) => (
-                    <MyDaySuggestedItemButton
-                      key={`${group.category}-${task.id}`}
-                      task={task}
-                      groupCategory={group.category}
-                      inMyDay={isSuggestionInMyDay(task, myDayTaskIds)}
-                      onAdd={handleSuggestedAddClick}
-                    />
-                  ))}
-                </div>
-              </section>
-            ))}
-          </div>
-        </aside>
+          </section>
+        ))}
       </div>
+    </aside>
+  );
+}
 
+function MyDayTasksPageModals({ vm }: MyDayTasksPageViewProps) {
+  return (
+    <>
       <CreateTaskSidebar
-        isOpen={showCreateSidebar}
-        onClose={() => setShowCreateSidebar(false)}
+        isOpen={vm.showCreateSidebar}
+        onClose={() => vm.setShowCreateSidebar(false)}
         onCreate={async () => {
-          setShowCreateSidebar(false);
-          await refreshMyDayPage();
+          vm.setShowCreateSidebar(false);
+          await vm.refreshMyDayPage();
         }}
-        extensions={hierarchyDataExtensions as any}
+        extensions={vm.hierarchyDataExtensions as never}
       />
-
       <Modal
-        show={showEstimateModal}
+        show={vm.showEstimateModal}
         onHide={() => {
-          setShowEstimateModal(false);
-          setPendingEstimateTask(null);
+          vm.setShowEstimateModal(false);
+          vm.setPendingEstimateTask(null);
         }}
         centered
       >
@@ -1548,13 +1508,13 @@ function MyDayTasksPageView(vm: MyDayTasksPageViewModel) {
           <Modal.Title>Quick estimate</Modal.Title>
         </Modal.Header>
         <Modal.Body>
-          <div className="mb-2">{pendingEstimateTask?.title}</div>
+          <div className="mb-2">{vm.pendingEstimateTask?.title}</div>
           <div className="d-flex flex-wrap gap-2 mb-3">
             {ESTIMATE_PRESETS.map((preset) => (
               <button
                 key={preset}
                 type="button"
-                onClick={() => setEstimateInput(String(preset))}
+                onClick={() => vm.setEstimateInput(String(preset))}
                 className="myday-estimate-chip"
               >
                 {preset}m
@@ -1565,38 +1525,36 @@ function MyDayTasksPageView(vm: MyDayTasksPageViewModel) {
             type="number"
             min={1}
             placeholder="Custom minutes"
-            value={estimateInput}
-            onChange={(e) => setEstimateInput(e.target.value)}
+            value={vm.estimateInput}
+            onChange={(e) => vm.setEstimateInput(e.target.value)}
           />
         </Modal.Body>
         <Modal.Footer>
           <Button
             variant="secondary"
             onClick={() => {
-              skipEstimateAndAddToMyDay().catch(() => undefined);
+              vm.skipEstimateAndAddToMyDay().catch(() => undefined);
             }}
           >
             Skip
           </Button>
           <Button
             onClick={() => {
-              confirmEstimateAndAdd().catch(() => undefined);
+              vm.confirmEstimateAndAdd().catch(() => undefined);
             }}
           >
             Add to My Day
           </Button>
         </Modal.Footer>
       </Modal>
-
       <MyDayHistoryModal
-        show={showHistoryModal}
-        todayIso={today}
-        onClose={() => setShowHistoryModal(false)}
+        show={vm.showHistoryModal}
+        todayIso={vm.today}
+        onClose={() => vm.setShowHistoryModal(false)}
       />
-
       <Modal
-        show={showDefaultCapacityModal}
-        onHide={() => setShowDefaultCapacityModal(false)}
+        show={vm.showDefaultCapacityModal}
+        onHide={() => vm.setShowDefaultCapacityModal(false)}
         centered
       >
         <Modal.Header closeButton>
@@ -1609,27 +1567,26 @@ function MyDayTasksPageView(vm: MyDayTasksPageViewModel) {
           <Form.Control
             type="text"
             placeholder="8h or 2h 30m"
-            value={defaultCapacityDraft}
-            onChange={(e) => setDefaultCapacityDraft(e.target.value)}
+            value={vm.defaultCapacityDraft}
+            onChange={(e) => vm.setDefaultCapacityDraft(e.target.value)}
           />
         </Modal.Body>
         <Modal.Footer>
-          <Button variant="secondary" onClick={() => setShowDefaultCapacityModal(false)}>
+          <Button variant="secondary" onClick={() => vm.setShowDefaultCapacityModal(false)}>
             Cancel
           </Button>
           <Button
             onClick={() => {
-              handleSaveDefaultCapacity().catch(() => undefined);
+              vm.handleSaveDefaultCapacity().catch(() => undefined);
             }}
           >
             Save default
           </Button>
         </Modal.Footer>
       </Modal>
-
       <Modal
-        show={showScheduleLaterModal}
-        onHide={() => setShowScheduleLaterModal(false)}
+        show={vm.showScheduleLaterModal}
+        onHide={() => vm.setShowScheduleLaterModal(false)}
         centered
       >
         <Modal.Header closeButton>
@@ -1639,30 +1596,54 @@ function MyDayTasksPageView(vm: MyDayTasksPageViewModel) {
           <Form.Label>Schedule for</Form.Label>
           <Form.Control
             type="date"
-            min={today}
-            value={scheduleLaterDate}
-            onChange={(e) => setScheduleLaterDate(e.target.value)}
+            min={vm.today}
+            value={vm.scheduleLaterDate}
+            onChange={(e) => vm.setScheduleLaterDate(e.target.value)}
           />
         </Modal.Body>
         <Modal.Footer>
-          <Button variant="secondary" onClick={() => setShowScheduleLaterModal(false)}>
+          <Button variant="secondary" onClick={() => vm.setShowScheduleLaterModal(false)}>
             Cancel
           </Button>
-          <Button
-            onClick={() => {
-              handleCarryOverScheduleLater();
-            }}
-          >
+          <Button type="button" onClick={vm.handleCarryOverScheduleLater}>
             Schedule later
           </Button>
         </Modal.Footer>
       </Modal>
+    </>
+  );
+}
+
+function MyDayTasksPageView({ vm }: MyDayTasksPageViewProps) {
+  const showTeam = vm.reporteeExtensions.length > 0;
+  return (
+    <div className="myday-page-shell">
+      <BreadcrumbItem mainTitle="Planner" mainLink="/planner/dashboard" subTitle="My Day" />
+      <div className="myday-layout">
+        <div className="myday-main">
+          <MyDayPageHeader vm={vm} />
+          <MyDayCapacitySection vm={vm} />
+          <MyDayRolloverSection vm={vm} />
+          <MyDayTodayTasksSection vm={vm} />
+          {showTeam ? (
+            <MyDayTeamSection
+              planDate={vm.planDate || vm.today}
+              managerExtension={vm.managerExtension}
+              reporteeExtensions={vm.reporteeExtensions}
+              hierarchyExtensions={vm.hierarchyDataExtensions}
+            />
+          ) : null}
+          <MyDayCompletedSection vm={vm} />
+        </div>
+        <MyDaySuggestionsPanel vm={vm} />
+      </div>
+      <MyDayTasksPageModals vm={vm} />
     </div>
   );
 }
 
 const MyDayTasksPage: React.FC = () => (
-  <MyDayTasksPageView {...useMyDayTasksPageController()} />
+  <MyDayTasksPageView vm={useMyDayTasksPageController()} />
 );
 
 export default MyDayTasksPage;
