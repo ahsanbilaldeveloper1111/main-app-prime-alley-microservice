@@ -15,10 +15,7 @@ import { Info } from "lucide-react";
 import { MainDashboardChartLoader } from "@components/salesDashboard/MainDashboardChartLoader";
 import { useCrmDataManagementExtensions } from "@hooks/useCrmDataManagementExtensions";
 import { useMainDashboardCrmCreatedCounts } from "@hooks/useMainDashboardCrmCreatedCounts";
-import {
-  buildTopActivitiesLeaderboardRows,
-  type TopActivitiesLeaderboardRow,
-} from "@utils/mainDashboardChartData";
+import { buildTopActivitiesLeaderboardRows } from "@utils/mainDashboardChartData";
 import { AttendanceApprovalsChart } from "./AttendanceApprovalsChart";
 const FONT = "'Lexend Deca', Helvetica, Arial, sans-serif";
 
@@ -112,13 +109,22 @@ function ActivityLeaderboard({ scale }: Readonly<{ scale: number }>) {
     [createdCountsQuery.data, extensionsQuery.data, scale],
   );
 
+  const chartRowsWithTotal = useMemo(
+    () =>
+      chartData.map((row) => ({
+        ...row,
+        total: row.prospects + row.leads + row.deals,
+      })),
+    [chartData],
+  );
+
   const maxStackTotal = useMemo(() => {
-    const peak = chartData.reduce(
-      (max, row) => Math.max(max, row.prospects + row.leads + row.deals),
+    const peak = chartRowsWithTotal.reduce(
+      (max, row) => Math.max(max, row.total),
       0,
     );
     return Math.max(1, peak);
-  }, [chartData]);
+  }, [chartRowsWithTotal]);
 
   const isChartLoading =
     createdCountsQuery.isPending ||
@@ -163,7 +169,7 @@ function ActivityLeaderboard({ scale }: Readonly<{ scale: number }>) {
       {/* Chart */}
       <ResponsiveContainer width="100%" height={280}>
         <BarChart
-          data={chartData}
+          data={chartRowsWithTotal}
           layout="vertical"
           margin={{ top: 8, right: 36, left: 0, bottom: 28 }}
           barCategoryGap="5%"
@@ -202,9 +208,7 @@ function ActivityLeaderboard({ scale }: Readonly<{ scale: number }>) {
             maxBarSize={60}
           >
             <LabelList
-              dataKey={(entry: TopActivitiesLeaderboardRow) =>
-                entry.prospects + entry.leads + entry.deals
-              }
+              dataKey="total"
               position="right"
               style={{
                 fontFamily: FONT,

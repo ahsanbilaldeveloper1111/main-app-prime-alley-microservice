@@ -382,7 +382,7 @@ const NotesModal: React.FC<NotesModalProps> = ({
               Attachments ({attachments.length})
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-              {attachments.map((file) => (
+              {attachments.map((file, index) => (
                 <div
                   key={`${file.name}-${file.size}-${file.lastModified}`}
                   style={{
