@@ -68,13 +68,21 @@ function readString(value: unknown): string | undefined {
   return undefined;
 }
 
+function parsePeriodDeltaDirection(
+  value: unknown,
+): TaskReportsPeriodDelta["direction"] {
+  const raw = readString(value);
+  if (raw === "up" || raw === "down" || raw === "flat") return raw;
+  return undefined;
+}
+
 function normalizePeriodDelta(raw: unknown): TaskReportsPeriodDelta | undefined {
   if (raw == null || typeof raw !== "object") return undefined;
   const row = raw as Record<string, unknown>;
   return {
     value: readNumber(row.value),
     percent: readNumber(row.percent),
-    direction: readString(row.direction),
+    direction: parsePeriodDeltaDirection(row.direction),
     label: readString(row.label),
   };
 }
