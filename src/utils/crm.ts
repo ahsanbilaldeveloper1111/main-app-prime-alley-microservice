@@ -4420,7 +4420,16 @@ function getApiErrorMessageFromResponseData(data: unknown): string {
     return "";
   }
   const message = (data as { message?: unknown }).message;
-  return message == null ? "" : String(message);
+  if (message == null) {
+    return "";
+  }
+  if (typeof message === "string") {
+    return message;
+  }
+  if (typeof message === "number" || typeof message === "boolean") {
+    return String(message);
+  }
+  return "";
 }
 
 export const getRelevantDealTemplate = async (params: {
