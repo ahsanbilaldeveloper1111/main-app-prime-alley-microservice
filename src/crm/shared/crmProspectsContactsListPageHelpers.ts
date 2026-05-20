@@ -2,6 +2,52 @@ import type { FilterPill } from "@components/GenericTable";
 import { getCrmDataCounts } from "@utils/crm";
 import { persistVisibleColumnKeys } from "@utils/crmListVisibleColumnsStorage";
 import type { CrmProspectsContactsListPageConfig } from "@crm/shared/crmProspectsContactsListPageConfig";
+import { normalizeSearchQuery } from "@utils/Helper";
+
+/**
+ * True when the prospects list matches the default “full directory” view: All tab,
+ * no toolbar search, no advanced sidebar filters, and no metric-widget-driven filters.
+ * Used to snapshot `total_all_records` for the “All Prospects” stat and toolbar count.
+ */
+export function isProspectsUnfilteredBaselineListContext(args: {
+  activeFilter: string;
+  search: string;
+  currentFilters: Record<string, unknown>;
+  hasAdvancedFiltersApplied: boolean;
+}): boolean {
+  const { activeFilter, search, currentFilters, hasAdvancedFiltersApplied } = args;
+  if (activeFilter !== "all") {
+    return false;
+  }
+  if (hasAdvancedFiltersApplied) {
+    return false;
+  }
+  if (normalizeSearchQuery(search)) {
+    return false;
+  }
+  if (currentFilters.scheduled_call_from) {
+    return false;
+  }
+  if (currentFilters.scheduled_call_to) {
+    return false;
+  }
+  if (currentFilters.scheduled_call_status) {
+    return false;
+  }
+  if (currentFilters.last_called_at_from || currentFilters.last_called_at_to) {
+    return false;
+  }
+  if (currentFilters.has_scheduled_calls === true) {
+    return false;
+  }
+  if (currentFilters.has_scheduled_calls === false) {
+    return false;
+  }
+  if (currentFilters.has_tickets === true) {
+    return false;
+  }
+  return true;
+}
 
 type AssignmentFiltersForCounts = {
   selectedCampaigns: ReadonlyArray<{ value: string }> | Set<{ value: string }>;

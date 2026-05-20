@@ -505,11 +505,15 @@ const MeetingModal: React.FC<MeetingModalProps> = ({
     <div
       style={{
         position: 'fixed',
-        top: '50%',
-        left: '50%',
-        transform: 'translate(-50%, -50%)',
-        height: isMaximized ? 'auto' : '750px',
-        width: isMaximized ? 'auto' : '1320px',
+        ...(isMaximized
+          ? { top: '60px', right: '20px', bottom: '20px', left: '20px' }
+          : {
+              top: '50%',
+              left: '50%',
+              transform: 'translate(-50%, -50%)',
+              width: '1320px',
+              height: '750px',
+            }),
         backgroundColor: '#ffffff',
         zIndex: 1000,
         display: 'flex',
@@ -642,7 +646,7 @@ const MeetingModal: React.FC<MeetingModalProps> = ({
                 display: 'block',
                 marginBottom: '8px'
               }}>
-                Title
+                Title <span style={{ color: '#f2545b' }}>*</span>
               </label>
               <input
                 ref={titleInputRef}
@@ -673,7 +677,7 @@ const MeetingModal: React.FC<MeetingModalProps> = ({
                     display: 'block',
                     marginBottom: '8px'
                   }}>
-                    Start date
+                    Start date <span style={{ color: '#f2545b' }}>*</span>
                   </label>
                   <button
                     type="button"
@@ -733,7 +737,7 @@ const MeetingModal: React.FC<MeetingModalProps> = ({
                     display: 'block',
                     marginBottom: '8px'
                   }}>
-                    Start time
+                    Start time <span style={{ color: '#f2545b' }}>*</span>
                   </label>
                   <div style={{
                     padding: '8px 12px',
@@ -782,7 +786,7 @@ const MeetingModal: React.FC<MeetingModalProps> = ({
                     display: 'block',
                     marginBottom: '8px'
                   }}>
-                    End time
+                    End time <span style={{ color: '#f2545b' }}>*</span>
                   </label>
                   <div style={{
                     padding: '8px 12px',

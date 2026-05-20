@@ -15,7 +15,6 @@ import {
   getCrmProducts,
   getCampaignById,
   getIndustries,
-  getDealTemplates,
   CrmProduct,
   IndustryData,
   DealTemplateData,
@@ -148,8 +147,8 @@ function useIndustriesQueryErrorToast(
 ): void {
   useEffect(() => {
     if (!isError) return;
-    console.error("Failed to fetch industries:", error);
-    toast.error("Failed to fetch industries");
+    console.error("Failed to fetch product groups:", error);
+    toast.error("Failed to fetch product groups");
   }, [isError, error]);
 }
 
@@ -256,7 +255,7 @@ function useEditDealProductLoading(
       setProducts(response.data || []);
     } catch (error) {
       console.error("Failed to fetch products:", error);
-      toast.error("Failed to fetch products for selected industry");
+      toast.error("Failed to fetch products for selected product group");
     } finally {
       setLoadingProducts(false);
     }
@@ -304,7 +303,6 @@ type EditDealFormActionDeps = Readonly<{
   probability: number;
   estimationItems: EstimationLineItem[];
   setLoading: React.Dispatch<React.SetStateAction<boolean>>;
-  availableTemplates: unknown[];
 }>;
 
 function useEditDealFormActions(deps: EditDealFormActionDeps) {
@@ -322,7 +320,6 @@ function useEditDealFormActions(deps: EditDealFormActionDeps) {
     probability,
     estimationItems,
     setLoading,
-    availableTemplates,
   } = deps;
 
   const validateCurrentStep = useCallback(
@@ -341,18 +338,12 @@ function useEditDealFormActions(deps: EditDealFormActionDeps) {
       e.preventDefault();
       if (!validateCurrentStep()) return;
       let nextStep = formStep + 1;
-      if (nextStep === 2 && !dealTemplate && availableTemplates.length === 0) {
+      if (nextStep === 2 && !dealTemplate) {
         nextStep = 3;
       }
       setFormStep(Math.min(4, nextStep));
     },
-    [
-      validateCurrentStep,
-      formStep,
-      dealTemplate,
-      availableTemplates.length,
-      setFormStep,
-    ],
+    [validateCurrentStep, formStep, dealTemplate, setFormStep],
   );
 
   const handleSubmit = useCallback(
@@ -362,7 +353,6 @@ function useEditDealFormActions(deps: EditDealFormActionDeps) {
         advanceEditDealFormStepOnSubmit({
           formStep,
           dealTemplate,
-          availableTemplates,
           setFormStep,
         })
       ) {
@@ -383,7 +373,6 @@ function useEditDealFormActions(deps: EditDealFormActionDeps) {
         probability,
         estimationItems,
         setLoading,
-        availableTemplates,
       });
     },
     [
@@ -400,7 +389,6 @@ function useEditDealFormActions(deps: EditDealFormActionDeps) {
       probability,
       estimationItems,
       setLoading,
-      availableTemplates,
     ],
   );
 
@@ -410,7 +398,7 @@ function useEditDealFormActions(deps: EditDealFormActionDeps) {
 function useEditDealInitialLoadOnReady(args: {
   router: ReturnType<typeof useRouter>;
   id: string | string[] | undefined;
-  isInitialLoad: React.MutableRefObject<boolean>;
+  isInitialLoad: { current: boolean };
   setFetching: React.Dispatch<React.SetStateAction<boolean>>;
   setFormData: React.Dispatch<React.SetStateAction<any>>;
   setBusinessTypeId: React.Dispatch<React.SetStateAction<number | null>>;
@@ -499,20 +487,11 @@ function useEditDealPageQueries(sourceLead: { campaign_id?: unknown } | null) {
       return r.data ?? [];
     },
   });
-  const dealTemplatesQuery = useQuery({
-    queryKey: crmAppKeys.campaigns.dealTemplates(),
-    queryFn: async () => {
-      const response = await getDealTemplates({ per_page: 1000, page: 1 });
-      return response?.data ?? [];
-    },
-  });
-
   const stages = stagesQuery.data ?? [];
   const extensions = extensionsQuery.data ?? [];
   const businessTypes = businessTypesQuery.data ?? [];
   const allIndustries = industriesQuery.data ?? [];
   const loadingAllIndustries = industriesQuery.isPending;
-  const availableTemplates = dealTemplatesQuery.data ?? [];
 
   const campaignIdForQuery = sourceLead?.campaign_id
     ? Number(sourceLead.campaign_id)
@@ -532,7 +511,6 @@ function useEditDealPageQueries(sourceLead: { campaign_id?: unknown } | null) {
     businessTypes,
     allIndustries,
     loadingAllIndustries,
-    availableTemplates,
     campaignQuery,
     industriesQuery,
     loadingIndustries,
@@ -542,7 +520,7 @@ function useEditDealPageQueries(sourceLead: { campaign_id?: unknown } | null) {
 type EditDealLoadedPhaseIntegrationArgs = Readonly<{
   router: ReturnType<typeof useRouter>;
   id: string | string[] | undefined;
-  isInitialLoad: React.MutableRefObject<boolean>;
+  isInitialLoad: { current: boolean };
   showAllIndustries: boolean;
   formData: { industry_ids?: number[] };
   allIndustries: IndustryData[];
@@ -583,7 +561,6 @@ type EditDealLoadedPhaseIntegrationArgs = Readonly<{
   probability: number;
   estimationItems: EstimationLineItem[];
   setLoading: React.Dispatch<React.SetStateAction<boolean>>;
-  availableTemplates: unknown[];
 }>;
 
 function useEditDealLoadedPhaseIntegration(a: EditDealLoadedPhaseIntegrationArgs) {
@@ -649,7 +626,6 @@ function useEditDealLoadedPhaseIntegration(a: EditDealLoadedPhaseIntegrationArgs
     probability: a.probability,
     estimationItems: a.estimationItems,
     setLoading: a.setLoading,
-    availableTemplates: a.availableTemplates,
   });
 
   return { addItemAvailableIndustries, handleNextStep, handleSubmit };
@@ -754,7 +730,6 @@ const EditDeal = () => { // NOSONAR S3776 — wizard markup; logic extracted to 
     businessTypes,
     allIndustries,
     loadingAllIndustries,
-    availableTemplates,
     campaignQuery,
     industriesQuery,
     loadingIndustries,
@@ -799,7 +774,6 @@ const EditDeal = () => { // NOSONAR S3776 — wizard markup; logic extracted to 
       probability,
       estimationItems,
       setLoading,
-      availableTemplates,
     });
 
   if (fetching) {
@@ -828,7 +802,10 @@ const EditDeal = () => { // NOSONAR S3776 — wizard markup; logic extracted to 
         {/* Edit Deal Form */}
         <div className="row">
           <div className="col-12">
-            <Card className="border-0 shadow-sm">
+            <Card
+              className="border-0 shadow-sm"
+              data-attachment-count={attachments.length}
+            >
               <Card.Header>
                 <div className="d-flex justify-content-between align-items-center">
                   <h4 className="mb-0 app-heading">Edit Deal Information</h4>
@@ -846,7 +823,6 @@ const EditDeal = () => { // NOSONAR S3776 — wizard markup; logic extracted to 
                     formStep={formStep}
                     setFormStep={setFormStep}
                     dealTemplate={dealTemplate}
-                    availableTemplatesLength={availableTemplates.length}
                   />
 
                   {/* Form Content - Same structure as create page */}
@@ -1252,8 +1228,7 @@ const EditDeal = () => { // NOSONAR S3776 — wizard markup; logic extracted to 
                     )}
 
                     {/* Step 2: Deal Characteristics */}
-                    {formStep === 2 &&
-                      (dealTemplate || availableTemplates.length > 0) && (
+                    {formStep === 2 && dealTemplate && (
                         <Card className="mb-3 border-0 bg-light">
                           <Card.Body>
                             <div className="d-flex justify-content-between align-items-center mb-4">
@@ -2372,7 +2347,7 @@ const EditDeal = () => { // NOSONAR S3776 — wizard markup; logic extracted to 
                                 {addItemAvailableIndustries.length === 1 &&
                                   !showAllIndustries && (
                                     <Form.Text className="text-muted">
-                                      Only one industry available
+                                      Only one product group available
                                     </Form.Text>
                                   )}
                               </Form.Group>
@@ -2469,7 +2444,7 @@ const EditDeal = () => { // NOSONAR S3776 — wizard markup; logic extracted to 
                                   placeholder={
                                     selectedIndustryId
                                       ? "Select a product"
-                                      : "Please select an industry first"
+                                      : "Please select a product group first"
                                   }
                                   isSearchable
                                   isLoading={loadingProducts}

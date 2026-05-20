@@ -28,7 +28,6 @@ type NextPageWithLayout = React.FC & {
 const SalesDashboard: NextPageWithLayout = () => {
   const { data: session } = useSession();
   const { isMobile, isTablet, isCompactViewport } = useViewportBreakpoints();
-
   const navTabs = useMemo(() => {
     const perms = session?.user?.permissions ?? [];
     return SALES_DASHBOARD_NAV_TABS.filter(

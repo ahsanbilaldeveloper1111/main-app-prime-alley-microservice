@@ -210,7 +210,7 @@ export function useBusinessTypesPage() {
       {
         key: "name",
         label: "Name",
-        sortable: true,
+        sortable: false,
         type: "custom",
         width: "260px",
         render: (bt) => <div className="fw-semibold">{bt.name}</div>,
@@ -226,7 +226,7 @@ export function useBusinessTypesPage() {
       {
         key: "created_at",
         label: "Created At",
-        sortable: true,
+        sortable: false,
         type: "custom",
         width: "200px",
         render: (bt) => (

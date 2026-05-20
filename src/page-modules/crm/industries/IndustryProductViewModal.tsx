@@ -68,7 +68,7 @@ export function IndustryProductViewModal({
           </div>
           {industry && (
             <div className="industries-product-view-tile">
-              <div className="industries-product-view-tile-label">Industry</div>
+              <div className="industries-product-view-tile-label">Product Group</div>
               <div className="industries-product-view-tile-value">
                 <Badge
                   bg="primary"

@@ -243,7 +243,7 @@ function ProductsPage(props: CrmPageDisplayProps = {}) {
               pageSizeOptions: [15, 25, 50, 100],
             }}
             onPaginationChange={handleProductsPaginationChange}
-            sortable
+            sortable={false}
             customizableColumns
             selectedColumns={selectedProductsColumns}
             defaultSelectedColumns={DEFAULT_PRODUCT_TABLE_COLUMNS}

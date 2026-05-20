@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { X, Maximize2, Paperclip, ChevronDown } from 'lucide-react';
 import RichNoteEditor from '@components/RichNoteEditor';
-import { buildFollowUpTaskFields } from '@utils/crmFollowUpTaskDue';
+import { buildFollowUpTaskFields, buildIn3BusinessDaysLabel } from '@utils/crmFollowUpTaskDue';
+import { toast } from 'react-toastify';
 
 export interface NotesModalSavePayload {
   note: string;
@@ -29,9 +30,7 @@ const NotesModal: React.FC<NotesModalProps> = ({
   const [isMaximized, setIsMaximized] = useState(false);
   const [attachments, setAttachments] = useState<File[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [activityDate, setActivityDate] = useState(
-    'In 3 business days (Friday)',
-  );
+  const [activityDate, setActivityDate] = useState(() => buildIn3BusinessDaysLabel());
   const [activityTime, setActivityTime] = useState(() =>
     new Date().toTimeString().slice(0, 5),
   );
@@ -43,10 +42,16 @@ const NotesModal: React.FC<NotesModalProps> = ({
   );
   const [showDatePicker, setShowDatePicker] = useState(false);
 
+  const draftStorageKey = (() => {
+    if (globalThis.window === undefined) return null;
+    const safe = String(recordName || 'global').slice(0, 160);
+    return `crm:notesDraft:${safe}`;
+  })();
+
   const dateOptions = [
     'Today',
     'Tomorrow',
-    'In 3 business days (Friday)',
+    buildIn3BusinessDaysLabel(),
     'In 1 week',
     'In 2 weeks',
     'In 1 month',
@@ -60,7 +65,7 @@ const NotesModal: React.FC<NotesModalProps> = ({
       setIsDraftSaved(false);
       setIsMaximized(false);
       setAttachments([]);
-      setActivityDate('In 3 business days (Friday)');
+      setActivityDate(buildIn3BusinessDaysLabel());
       setActivityTime(new Date().toTimeString().slice(0, 5));
       setCustomDate(new Date().toISOString().slice(0, 10));
       setCustomTime(new Date().toTimeString().slice(0, 5));
@@ -68,14 +73,70 @@ const NotesModal: React.FC<NotesModalProps> = ({
     }
   }, [isOpen]);
 
-  // Auto-save draft simulation
+  // Restore draft when opening
   useEffect(() => {
-    const hasContent = noteHtml.trim() !== '' && noteHtml.trim() !== '<p><br></p>';
-    if (hasContent) {
-      const timer = setTimeout(() => setIsDraftSaved(true), 1000);
-      return () => clearTimeout(timer);
+    if (!isOpen) return;
+    if (!draftStorageKey) return;
+    try {
+      const raw = globalThis.localStorage.getItem(draftStorageKey);
+      if (!raw) return;
+      const parsed: unknown = JSON.parse(raw);
+      if (!parsed || typeof parsed !== 'object') return;
+      const p = parsed as Record<string, unknown>;
+      if (typeof p.noteHtml === 'string') setNoteHtml(p.noteHtml);
+      if (typeof p.createTask === 'boolean') setCreateTask(p.createTask);
+      if (typeof p.activityDate === 'string') setActivityDate(p.activityDate);
+      if (typeof p.activityTime === 'string') setActivityTime(p.activityTime);
+      if (typeof p.customDate === 'string') setCustomDate(p.customDate);
+      if (typeof p.customTime === 'string') setCustomTime(p.customTime);
+      setIsDraftSaved(true);
+    } catch {
+      /* ignore malformed draft */
     }
-  }, [noteHtml]);
+  }, [isOpen, draftStorageKey]);
+
+  // Auto-save draft (persist to localStorage)
+  useEffect(() => {
+    if (!isOpen) return;
+    if (!draftStorageKey) return;
+    const t = noteHtml.trim();
+    const hasContent = t !== '' && t !== '<p><br></p>' && t !== '<p></p>' && t !== '<br>';
+    const hasAnyDraft = hasContent || createTask || attachments.length > 0;
+    const timer = globalThis.setTimeout(() => {
+      try {
+        if (!hasAnyDraft) {
+          globalThis.localStorage.removeItem(draftStorageKey);
+          setIsDraftSaved(false);
+          return;
+        }
+        globalThis.localStorage.setItem(
+          draftStorageKey,
+          JSON.stringify({
+            noteHtml,
+            createTask,
+            activityDate,
+            activityTime,
+            customDate,
+            customTime,
+          }),
+        );
+        setIsDraftSaved(true);
+      } catch {
+        setIsDraftSaved(false);
+      }
+    }, 800);
+    return () => globalThis.clearTimeout(timer);
+  }, [
+    isOpen,
+    draftStorageKey,
+    noteHtml,
+    createTask,
+    attachments.length,
+    activityDate,
+    activityTime,
+    customDate,
+    customTime,
+  ]);
 
   if (!isOpen) return null;
 
@@ -98,12 +159,19 @@ const NotesModal: React.FC<NotesModalProps> = ({
       note: noteHtml,
       ...followUp,
     });
+    if (draftStorageKey && globalThis.window !== undefined) {
+      try {
+        globalThis.localStorage.removeItem(draftStorageKey);
+      } catch {
+        /* ignore */
+      }
+    }
     setNoteHtml('');
     setCreateTask(false);
     setIsDraftSaved(false);
     setIsMaximized(false);
     setAttachments([]);
-    setActivityDate('In 3 business days (Friday)');
+    setActivityDate(buildIn3BusinessDaysLabel());
     const now = new Date();
     const today = now.toISOString().slice(0, 10);
     const timeStr = now.toTimeString().slice(0, 5);
@@ -124,7 +192,35 @@ const NotesModal: React.FC<NotesModalProps> = ({
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
-    setAttachments(prev => [...prev, ...files]);
+    const blockedExt = new Set([
+      '.exe',
+      '.msi',
+      '.bat',
+      '.cmd',
+      '.com',
+      '.ps1',
+      '.vbs',
+      '.js',
+      '.jar',
+    ]);
+    const allowed: File[] = [];
+    const blocked: File[] = [];
+    for (const f of files) {
+      const name = String(f?.name ?? '');
+      const dot = name.lastIndexOf('.');
+      const ext = dot >= 0 ? name.slice(dot).toLowerCase() : '';
+      if (ext && blockedExt.has(ext)) {
+        blocked.push(f);
+      } else {
+        allowed.push(f);
+      }
+    }
+    if (blocked.length > 0) {
+      toast.error('Executable/script files are not allowed for upload.');
+    }
+    if (allowed.length > 0) {
+      setAttachments(prev => [...prev, ...allowed]);
+    }
     e.target.value = '';
   };
 
@@ -136,9 +232,9 @@ const NotesModal: React.FC<NotesModalProps> = ({
     <div
       style={{
         position: 'fixed',
-        inset: isMaximized ? '60px 20px 20px 20px' : 'auto 15vh 0.5vh auto',
-        height: isMaximized ? 'auto' : '512px',
-        width: isMaximized ? 'auto' : '650px',
+        ...(isMaximized
+          ? { top: '60px', right: '20px', bottom: '20px', left: '20px' }
+          : { right: '15vh', bottom: '7.5vh', width: '650px', height: '512px' }),
         backgroundColor: '#ffffff',
         zIndex: 1000,
         display: 'flex',
@@ -146,7 +242,7 @@ const NotesModal: React.FC<NotesModalProps> = ({
         boxShadow: '0 4px 24px rgba(0, 0, 0, 0.15)',
         borderRadius: '8px',
         border: '1px solid #cbd5e0',
-        overflow: 'auto',
+        overflow: 'hidden',
         animation: 'slideInUp 0.3s ease-out',
       }}
     >
@@ -286,9 +382,9 @@ const NotesModal: React.FC<NotesModalProps> = ({
               Attachments ({attachments.length})
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-              {attachments.map((file, index) => (
+              {attachments.map((file) => (
                 <div
-                  key={index}
+                  key={`${file.name}-${file.size}-${file.lastModified}`}
                   style={{
                     display: 'flex',
                     alignItems: 'center',
@@ -563,20 +659,22 @@ const NotesModal: React.FC<NotesModalProps> = ({
           disabled={isEmpty()}
           style={{
             padding: '8px 20px',
-            backgroundColor: !isEmpty() ? '#141414' : '#cbd5e0',
+            backgroundColor: isEmpty() ? '#cbd5e0' : '#141414',
             color: '#ffffff',
             border: 'none',
             borderRadius: '4px',
             fontSize: '14px',
             fontWeight: '500',
-            cursor: !isEmpty() ? 'pointer' : 'not-allowed',
+            cursor: isEmpty() ? 'not-allowed' : 'pointer',
             transition: 'background-color 0.2s',
           }}
           onMouseEnter={(e) => {
-            if (!isEmpty()) e.currentTarget.style.backgroundColor = '#ff6347';
+            if (isEmpty()) return;
+            e.currentTarget.style.backgroundColor = '#ff6347';
           }}
           onMouseLeave={(e) => {
-            if (!isEmpty()) e.currentTarget.style.backgroundColor = '#141414';
+            if (isEmpty()) return;
+            e.currentTarget.style.backgroundColor = '#141414';
           }}
         >
           Create note

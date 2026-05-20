@@ -156,7 +156,6 @@ export const useAnalysisSSE = (config: SSEConfig) => {
       // This prevents race conditions where multiple calls happen before EventSource is created
       currentConnectionUrlRef.current = sseUrl;
       
-      //console.log('Creating new EventSource for:', sseUrl);
       const eventSource = new EventSource(sseUrl);
       eventSourceRef.current = eventSource;
 
@@ -176,11 +175,9 @@ export const useAnalysisSSE = (config: SSEConfig) => {
       };
 
       eventSource.onmessage = (event) => {
-        //console.log('EventSource onmessage triggered, raw event.data:', event.data);
         try {
           const data = JSON.parse(event.data);
-          //console.log('Parsed SSE data:', data);
-          
+
           // Check if message indicates an error - stop connection and don't reconnect
           if (data.status === 'error') {
             console.error('Error status received, stopping connection:', data);
@@ -213,7 +210,6 @@ export const useAnalysisSSE = (config: SSEConfig) => {
             ...prev,
             lastMessage: data
           }));
-          // console.log('Calling onMessage callback with data:', data);
           configRef.current.onMessage?.(data);
         } catch (error) {
           // Still call onMessage with raw data in case it's not JSON

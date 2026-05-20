@@ -422,7 +422,7 @@ function DealTemplatesPage({ hideBreadcrumb }: CrmPageDisplayProps = {}) {
       {
         key: "name",
         label: "Name",
-        sortable: true,
+        sortable: false,
         type: "custom",
         width: "260px",
         render: (template) => (
@@ -553,6 +553,7 @@ function DealTemplatesPage({ hideBreadcrumb }: CrmPageDisplayProps = {}) {
         <GenericTable<DealTemplateData>
           data={templates}
           columns={templatesTableColumns}
+          sortable={false}
           showToolbar
           toolbar={templatesToolbarConfig}
           pagination={{

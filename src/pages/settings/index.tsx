@@ -43,7 +43,6 @@ import {
 
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
-import PageHeader from "@components/PageHeader";
 
 // Import ControlHub components
 import Users from "@pages/controlhub/users";
@@ -87,7 +86,6 @@ import FAQTypes from "@pages/faqs/types";
 
 // Import Staff Insights & Work Planner components
 import RequestCategories from "@pages/workforce/request-categories";
-import RequestSubCategories from "@pages/workforce/sub-categories";
 import WorkPlannerStatuses from "@pages/planner/statuses";
 
 // Import AI Chat components
@@ -100,9 +98,6 @@ import AIChatFAQsGlobal from "@pages/chat/ai-faqs/global";
 import ManageExtensions from "@pages/ai-ml/manage-extensions";
 import BackendOperations from "@pages/ai-ml/backend-operations";
 import ManualAnalysis from "@pages/ai-ml/analysis";
-
-import NotificationsPage from "@pages/notifications";
-
 import { AI_CHAT_SETTINGS_TAB_PERMISSIONS } from "@config/aiChatPermissions";
 import { HEADER_CONSTANTS} from "@constants/headerConstants";
 
@@ -1725,7 +1720,7 @@ const Settings = () => {
     ],
     "crm": [
       { key: "stages", title: "Stages", icon: Layers, color: "#ff9800", permission: PERMISSIONS.VIEW_CRM_STAGES },
-      { key: "industries", title: "Industries", icon: Building2, color: "#6c757d", permission: PERMISSIONS.VIEW_CRM_INDUSTRIES },
+      { key: "industries", title: "Product Groups", icon: Building2, color: "#6c757d", permission: PERMISSIONS.VIEW_CRM_INDUSTRIES },
       { key: "products", title: "Products", icon: Package, color: "#198754", permission: PERMISSIONS.VIEW_CRM_PRODUCTS },
       { key: "deal-templates", title: "Deal Templates", icon: FileText, color: "#9c27b0", permission: PERMISSIONS.VIEW_CRM_DEAL_TEMPLATES },
       { key: "business-types", title: "Business Types", icon: Building2, color: "#198754", permission: PERMISSIONS.VIEW_CRM_BUSINESS_TYPES },
@@ -2218,15 +2213,7 @@ const Settings = () => {
 
                   {/* Tab Content */}
                   <div >
-                {/* Your Preferences – placeholder content */}
                 {activeTab === "general-prefs" && <GeneralSettings />}
-                {/* {activeTab === "general-prefs" && (
-                  <div>
-                    <h2 style={{ fontFamily: "'Lexend Deca', Helvetica, Arial, sans-serif", fontSize: '20px', fontWeight: 600, color: '#141414', marginBottom: '16px' }}>General</h2>
-                    <p style={{ fontFamily: "'Lexend Deca', Helvetica, Arial, sans-serif", fontSize: '14px', color: '#555' }}>Content for this section goes here.</p>
-                  </div>
-                )} */}
-                {/* {activeTab === "notifications" && <NotificationsPage />} */}
                 {activeTab === "notifications" && <NotificationsSettingsNew />}
                 {/* User Management Content */}
                 {activeTab === "user-management" && shouldRenderTab("user-management", activeUserManagementTab) && (
@@ -2301,7 +2288,6 @@ const Settings = () => {
                 {activeTab === "staff-insights" && shouldRenderTab("staff-insights", activeStaffInsightsTab) && (
                   <div>
                     {activeStaffInsightsTab === "request-categories" && <RequestCategories />}
-                    {/* {activeStaffInsightsTab === "sub-categories" && <RequestSubCategories />} */}
                   </div>
                 )}
 

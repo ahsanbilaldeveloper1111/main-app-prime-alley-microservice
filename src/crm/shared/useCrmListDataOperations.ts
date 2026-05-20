@@ -93,6 +93,13 @@ interface UseCrmListDataOperationsParams {
   };
   /** Called after a single record is successfully deleted from the list modal. */
   onSingleRecordDeleted?: (deletedId: number) => void;
+  /**
+   * When true, skips updating `totalAll` from list responses (e.g. prospects “All” total
+   * frozen until the user returns to an unfiltered baseline view).
+   */
+  skipTotalAllUpdate?: boolean;
+  /** Invoked after a successful list load with the parsed API payload (not on placeholder data). */
+  onListResponse?: (response: CrmDataResponse) => void;
 }
 
 export function useCrmListDataOperations({
@@ -131,6 +138,8 @@ export function useCrmListDataOperations({
   activeFilter,
   pagination,
   onSingleRecordDeleted,
+  skipTotalAllUpdate = false,
+  onListResponse,
 }: UseCrmListDataOperationsParams) {
   const queryClient = useQueryClient();
 
@@ -172,24 +181,29 @@ export function useCrmListDataOperations({
     setTotalRecords(response.pagination?.total || 0);
 
     const totalAllFromMetrics = Number(response?.metrics?.total_all_records);
-    if (Number.isFinite(totalAllFromMetrics)) {
-      setTotalAll(totalAllFromMetrics);
-    } else {
-      const isAllTab =
-        memoizedFilters.has_scheduled_calls !== true &&
-        memoizedFilters.has_tickets !== true;
-      if (isAllTab) {
-        setTotalAll(response.pagination?.total || 0);
+    if (!skipTotalAllUpdate) {
+      if (Number.isFinite(totalAllFromMetrics)) {
+        setTotalAll(totalAllFromMetrics);
+      } else {
+        const isAllTab =
+          memoizedFilters.has_scheduled_calls !== true &&
+          memoizedFilters.has_tickets !== true;
+        if (isAllTab) {
+          setTotalAll(response.pagination?.total || 0);
+        }
       }
     }
 
     setMetrics(response.metrics);
+    onListResponse?.(response);
   }, [
     crmListQuery.data,
     crmListQuery.isError,
     crmListQuery.isPlaceholderData,
     memoizedFilters.has_scheduled_calls,
     memoizedFilters.has_tickets,
+    onListResponse,
+    skipTotalAllUpdate,
     setDataList,
     setMetrics,
     setTotalAll,

@@ -26,7 +26,7 @@ class CtiConnectionManager {
   private static instance: CtiConnectionManager | null = null;
   
   // Connection refs
-  private clientRef: Client | null = null;
+  private readonly clientRef: Client | null = null;
   private eventSourceRef: EventSource | null = null;
   private tokenRef: string | null = null;
   private userAddressRef: string | null = null;
@@ -57,11 +57,11 @@ class CtiConnectionManager {
   };
   
   // Listeners
-  private stateListeners: Set<CtiStateListener> = new Set();
-  private eventListeners: Set<CtiEventListener> = new Set();
+  private readonly stateListeners: Set<CtiStateListener> = new Set();
+  private readonly eventListeners: Set<CtiEventListener> = new Set();
   
   // Cross-tab manager
-  private crossTabManager = getCrossTabCtiManager();
+  private readonly crossTabManager = getCrossTabCtiManager();
   
   private constructor() {
     // Private constructor for singleton

@@ -503,8 +503,8 @@ const EditLead = () => {
         const response = await getIndustries({ per_page: 1000 });
         setAllIndustries(response.data || []);
       } catch (error) {
-        console.error("Failed to fetch industries:", error);
-        toast.error("Failed to fetch industries");
+        console.error("Failed to fetch product groups:", error);
+        toast.error("Failed to fetch product groups");
       } finally {
         setLoadingAllIndustries(false);
       }

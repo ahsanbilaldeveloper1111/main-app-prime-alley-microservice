@@ -56,6 +56,7 @@ const BusinessTypes = ({ hideBreadcrumb }: CrmPageDisplayProps = {}) => {
         <GenericTable<BusinessTypeData>
           data={businessTypes}
           columns={businessTableColumns}
+          sortable={false}
           showToolbar
           toolbar={businessToolbarConfig}
           pagination={{
@@ -118,24 +119,27 @@ const BusinessTypes = ({ hideBreadcrumb }: CrmPageDisplayProps = {}) => {
                 />
               </Form.Group>
             </Modal.Body>
-            <Modal.Footer
-              className="border-top"
-              style={{ flexWrap: "wrap", gap: "12px", justifyContent: "space-between" }}
-            >
+            <Modal.Footer className="border-top flex-column align-items-stretch gap-3">
               <Form.Text className="text-muted d-flex align-items-center gap-1 mb-0">
                 <AlertCircle size={14} aria-hidden />
                 <span style={{ fontSize: "0.813rem" }}>
                   Fields marked with <span className="text-danger fw-bold">*</span> are required
                 </span>
               </Form.Text>
-              <div style={CRM_DIALOG_FOOTER_ACTIONS_ROW_STYLE}>
+              <div
+                style={{
+                  ...CRM_DIALOG_FOOTER_ACTIONS_ROW_STYLE,
+                  justifyContent: "flex-end",
+                  width: "100%",
+                }}
+              >
                 <Button
                   variant="primary"
                   type="submit"
                   disabled={submitting}
                   style={{
                     ...CRM_DIALOG_PRIMARY_BUTTON_STYLE,
-                    minWidth: "168px",
+                    width: "168px",
                     justifyContent: "center",
                   }}
                 >
@@ -153,7 +157,7 @@ const BusinessTypes = ({ hideBreadcrumb }: CrmPageDisplayProps = {}) => {
                   type="button"
                   onClick={() => setShowModal(false)}
                   disabled={submitting}
-                  style={CRM_DIALOG_SECONDARY_BUTTON_STYLE}
+                  style={{ ...CRM_DIALOG_SECONDARY_BUTTON_STYLE, width: "120px", justifyContent: "center" }}
                 >
                   Cancel
                 </Button>

@@ -205,14 +205,20 @@ export function buildCrmProspectsContactsTableActions({
                       },
                     ]
                   : []),
-                {
-                  label: "Convert to Lead",
-                  icon: <FiTarget size={14} />,
-                  onClick: (row: any) => {
-                    setConvertingToLeadCrmRecordId(row.id);
-                    setShowConvertToLeadModal(true);
-                  },
-                },
+                ...(session?.user?.permissions?.includes(
+                  PERMISSIONS.CREATE_CRM_LEADS,
+                )
+                  ? [
+                      {
+                        label: "Convert to Lead",
+                        icon: <FiTarget size={14} />,
+                        onClick: (row: any) => {
+                          setConvertingToLeadCrmRecordId(row.id);
+                          setShowConvertToLeadModal(true);
+                        },
+                      },
+                    ]
+                  : []),
                 {
                   label: "Send Email",
                   icon: <Mail size={14} />,

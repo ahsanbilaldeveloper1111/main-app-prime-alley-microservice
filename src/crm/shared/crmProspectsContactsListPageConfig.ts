@@ -426,7 +426,7 @@ function buildCrmPersonListPageConfig(
 export const CRM_PROSPECTS_LIST_PAGE_CONFIG = buildCrmPersonListPageConfig(
   CRM_PROSPECTS_LIST_UI_VARIANT,
   CRM_PROSPECTS_LIST_INTEGRATIONS,
-  { enableBoardView: true },
+  { enableBoardView: false },
 );
 
 export const CRM_CONTACTS_LIST_PAGE_CONFIG = buildCrmPersonListPageConfig(

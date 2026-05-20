@@ -97,10 +97,10 @@ function normalizeStateEventPayload(
   data: unknown,
   effective: string | undefined,
 ): FinesseStateEvent {
-  if (effective != null && typeof data === "object" && data !== null) {
-    return { ...data, state: effective } as FinesseStateEvent;
+  if (effective == null || typeof data !== "object" || data === null) {
+    return data as FinesseStateEvent;
   }
-  return data as FinesseStateEvent;
+  return { ...data, state: effective };
 }
 
 function handleSSEStatePayload(

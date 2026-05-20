@@ -8,8 +8,12 @@ import {
   Paperclip,
   Sparkles,
 } from "lucide-react";
+import { toast } from "react-toastify";
 import { generateEmail } from "@utils/communication";
-import { buildFollowUpTaskFields } from "@utils/crmFollowUpTaskDue";
+import {
+  buildFollowUpTaskFields,
+  buildIn3BusinessDaysLabel,
+} from "@utils/crmFollowUpTaskDue";
 
 /** Normalize recipient to array (single string or array of strings). */
 function normalizeRecipientEmails(v?: string | string[]): string[] {
@@ -84,8 +88,8 @@ const EmailModal: React.FC<EmailModalProps> = ({
   const [sendValidationMessage, setSendValidationMessage] = useState("");
   const [confirmSendWithoutSubject, setConfirmSendWithoutSubject] =
     useState(false);
-  const [activityDate, setActivityDate] = useState(
-    "In 3 business days (Friday)",
+  const [activityDate, setActivityDate] = useState(() =>
+    buildIn3BusinessDaysLabel(),
   );
   const [activityTime, setActivityTime] = useState(() =>
     new Date().toTimeString().slice(0, 5),
@@ -116,7 +120,7 @@ const EmailModal: React.FC<EmailModalProps> = ({
   const [customCtaType, setCustomCtaType] = useState("");
   const [generateLoading, setGenerateLoading] = useState(false);
   const [showToneDropdown, setShowToneDropdown] = useState(false);
-  const bodyEditorRef = useRef<HTMLDivElement>(null);
+  const bodyEditorRef = useRef<HTMLTextAreaElement>(null);
   const bodySetByGenerateRef = useRef(false);
   const moreFormattingRef = useRef<HTMLDivElement>(null);
   const [showMoreFormattingDropdown, setShowMoreFormattingDropdown] =
@@ -132,7 +136,7 @@ const EmailModal: React.FC<EmailModalProps> = ({
   const dateOptions = [
     "Today",
     "Tomorrow",
-    "In 3 business days (Friday)",
+    buildIn3BusinessDaysLabel(),
     "In 1 week",
     "In 2 weeks",
     "In 1 month",
@@ -155,7 +159,7 @@ const EmailModal: React.FC<EmailModalProps> = ({
   // When we set body from Generate, update the contenteditable div
   useEffect(() => {
     if (!bodySetByGenerateRef.current || !bodyEditorRef.current) return;
-    bodyEditorRef.current.innerHTML = emailBody;
+    bodyEditorRef.current.value = emailBody;
     bodySetByGenerateRef.current = false;
   }, [emailBody]);
 
@@ -212,7 +216,7 @@ const EmailModal: React.FC<EmailModalProps> = ({
       setSubject("");
       setEmailBody("");
       if (bodyEditorRef.current) {
-        bodyEditorRef.current.innerHTML = "";
+        bodyEditorRef.current.value = "";
       }
       setCreateTask(false);
       setIsMaximized(false);
@@ -220,7 +224,7 @@ const EmailModal: React.FC<EmailModalProps> = ({
       const now = new Date();
       const today = now.toISOString().slice(0, 10);
       const timeStr = now.toTimeString().slice(0, 5);
-      setActivityDate("In 3 business days (Friday)");
+      setActivityDate(buildIn3BusinessDaysLabel());
       setActivityTime(timeStr);
       setCustomDate(today);
       setCustomTime(timeStr);
@@ -242,9 +246,9 @@ const EmailModal: React.FC<EmailModalProps> = ({
         cta_type: ctaType === "custom" ? customCtaType : ctaType,
         email_style: emailStyle,
         email_length: emailLength,
-        ...((bodyEditorRef.current?.innerHTML?.trim() || emailBody) && {
+        ...((bodyEditorRef.current?.value?.trim() || emailBody) && {
           previous_content:
-            bodyEditorRef.current?.innerHTML?.trim() || emailBody,
+            bodyEditorRef.current?.value?.trim() || emailBody,
         }),
         ...(contextPayload?.lead != null && { lead: contextPayload.lead }),
         ...(contextPayload?.deal != null && { deal: contextPayload.deal }),
@@ -486,52 +490,40 @@ const EmailModal: React.FC<EmailModalProps> = ({
   };
 
   const syncBodyFromEditor = () => {
-    if (bodyEditorRef.current)
-      setEmailBody(bodyEditorRef.current.innerHTML ?? "");
+    if (bodyEditorRef.current) setEmailBody(bodyEditorRef.current.value ?? "");
   };
 
-  const handleBold = () => {
-    bodyEditorRef.current?.focus();
-    document.execCommand("bold", false);
-    syncBodyFromEditor();
-  };
-  const handleItalic = () => {
-    bodyEditorRef.current?.focus();
-    document.execCommand("italic", false);
-    syncBodyFromEditor();
-  };
-  const handleUnderline = () => {
-    bodyEditorRef.current?.focus();
-    document.execCommand("underline", false);
-    syncBodyFromEditor();
-  };
-  const handleLink = () => {
-    bodyEditorRef.current?.focus();
-    const url = window.prompt("Enter URL:", "https://") ?? "https://";
-    document.execCommand("createLink", false, url);
-    syncBodyFromEditor();
-  };
-  const handleImage = () => {
-    bodyEditorRef.current?.focus();
-    const url = window.prompt("Enter image URL:", "https://") ?? "https://";
-    document.execCommand("insertImage", false, url);
-    syncBodyFromEditor();
-  };
-  const handleList = () => {
-    bodyEditorRef.current?.focus();
-    document.execCommand("insertUnorderedList", false);
-    syncBodyFromEditor();
-  };
-  const handleCode = () => {
+  const wrapTextareaSelection = (before: string, after: string) => {
     const el = bodyEditorRef.current;
     if (!el) return;
     el.focus();
-    const sel = window.getSelection();
-    const range = sel?.rangeCount ? sel.getRangeAt(0) : null;
-    const selectedText = range?.toString() || "code";
-    document.execCommand("insertHTML", false, `<code>${selectedText}</code>`);
+    const start = el.selectionStart ?? 0;
+    const end = el.selectionEnd ?? 0;
+    const text = el.value ?? "";
+    const selected = text.slice(start, end);
+    const next = `${text.slice(0, start)}${before}${selected}${after}${text.slice(end)}`;
+    el.value = next;
+    const nextStart = start + before.length;
+    const nextEnd = nextStart + selected.length;
+    el.setSelectionRange(nextStart, nextEnd);
     syncBodyFromEditor();
   };
+
+  const handleBold = () => wrapTextareaSelection("<strong>", "</strong>");
+  const handleItalic = () => wrapTextareaSelection("<em>", "</em>");
+  const handleUnderline = () => wrapTextareaSelection("<u>", "</u>");
+  const handleLink = () => {
+    const url =
+      globalThis.window?.prompt?.("Enter URL:", "https://") ?? "https://";
+    wrapTextareaSelection(`<a href="${url}">`, "</a>");
+  };
+  const handleImage = () => {
+    const url =
+      globalThis.window?.prompt?.("Enter image URL:", "https://") ?? "https://";
+    wrapTextareaSelection(`<img src="${url}" alt="">`, "");
+  };
+  const handleList = () => wrapTextareaSelection("<ul><li>", "</li></ul>");
+  const handleCode = () => wrapTextareaSelection("<code>", "</code>");
 
   const handleAttachmentClick = () => {
     fileInputRef.current?.click();
@@ -542,7 +534,35 @@ const EmailModal: React.FC<EmailModalProps> = ({
     if (!files.length) {
       return;
     }
-    setAttachments((prev) => [...prev, ...files]);
+    const blockedExt = new Set([
+      ".exe",
+      ".msi",
+      ".bat",
+      ".cmd",
+      ".com",
+      ".ps1",
+      ".vbs",
+      ".js",
+      ".jar",
+    ]);
+    const allowed: File[] = [];
+    const blocked: File[] = [];
+    for (const f of files) {
+      const name = String(f?.name ?? "");
+      const dot = name.lastIndexOf(".");
+      const ext = dot >= 0 ? name.slice(dot).toLowerCase() : "";
+      if (ext && blockedExt.has(ext)) {
+        blocked.push(f);
+      } else {
+        allowed.push(f);
+      }
+    }
+    if (blocked.length > 0) {
+      toast.error("Executable/script files are not allowed for upload.");
+    }
+    if (allowed.length > 0) {
+      setAttachments((prev) => [...prev, ...allowed]);
+    }
     e.target.value = "";
   };
 
@@ -566,7 +586,7 @@ const EmailModal: React.FC<EmailModalProps> = ({
       return;
     }
     setConfirmSendWithoutSubject(false);
-    const bodyToSend = bodyEditorRef.current?.innerHTML?.trim() ?? emailBody;
+    const bodyToSend = bodyEditorRef.current?.value?.trim() ?? emailBody;
     const timeForFollowUp =
       activityDate === "Custom..." ? customTime : activityTime;
     const followUp = buildFollowUpTaskFields(
@@ -591,7 +611,7 @@ const EmailModal: React.FC<EmailModalProps> = ({
       setBccEmails([]);
       setSubject("");
       setEmailBody("");
-      if (bodyEditorRef.current) bodyEditorRef.current.innerHTML = "";
+      if (bodyEditorRef.current) bodyEditorRef.current.value = "";
       setShowCc(false);
       setShowBcc(false);
       setCreateTask(false);
@@ -599,7 +619,7 @@ const EmailModal: React.FC<EmailModalProps> = ({
       const now = new Date();
       const today = now.toISOString().slice(0, 10);
       const timeStr = now.toTimeString().slice(0, 5);
-      setActivityDate("In 3 business days (Friday)");
+      setActivityDate(buildIn3BusinessDaysLabel());
       setActivityTime(timeStr);
       setCustomDate(today);
       setCustomTime(timeStr);
@@ -617,9 +637,9 @@ const EmailModal: React.FC<EmailModalProps> = ({
     <div
       style={{
         position: "fixed",
-        inset: isMaximized ? "60px 20px 20px 20px" : "auto 15vh 7.5vh auto",
-        height: isMaximized ? "auto" : "550px",
-        width: isMaximized ? "auto" : "650px",
+        ...(isMaximized
+          ? { top: "60px", right: "20px", bottom: "20px", left: "20px" }
+          : { right: "15vh", bottom: "7.5vh", width: "650px", height: "550px" }),
         backgroundColor: "#ffffff",
         zIndex: 1000,
         display: "flex",
@@ -627,7 +647,7 @@ const EmailModal: React.FC<EmailModalProps> = ({
         boxShadow: "0 4px 24px rgba(0, 0, 0, 0.15)",
         borderRadius: "8px",
         border: "1px solid #cbd5e0",
-        overflow: "visible",
+        overflow: "hidden",
         animation: "slideInUp 0.3s ease-out",
       }}
     >
@@ -1270,40 +1290,12 @@ const EmailModal: React.FC<EmailModalProps> = ({
           >
             Email body
           </label>
-          <div
+          <textarea
             ref={bodyEditorRef}
-            contentEditable
-            suppressContentEditableWarning
-            role="textbox"
-            aria-multiline="true"
             aria-label="Email body"
-            data-placeholder="Type your email here or use Generate above, edit this content and it will be sent as the email body."
-            onInput={() => {
-              const html = bodyEditorRef.current?.innerHTML ?? "";
-              setEmailBody(html);
-            }}
-            onKeyDown={(e) => {
-              if (e.ctrlKey || e.metaKey) {
-                switch (e.key.toLowerCase()) {
-                  case "b":
-                    e.preventDefault();
-                    handleBold();
-                    break;
-                  case "i":
-                    e.preventDefault();
-                    handleItalic();
-                    break;
-                  case "u":
-                    e.preventDefault();
-                    handleUnderline();
-                    break;
-                  case "k":
-                    e.preventDefault();
-                    handleLink();
-                    break;
-                }
-              }
-            }}
+            placeholder="Type your email here or use Generate above. This content will be sent as the email body (HTML supported)."
+            value={emailBody}
+            onChange={(e) => setEmailBody(e.target.value)}
             style={{
               width: "100%",
               minHeight: isMaximized ? "400px" : "200px",
@@ -1317,14 +1309,11 @@ const EmailModal: React.FC<EmailModalProps> = ({
               padding: "10px 12px",
               overflow: "auto",
               backgroundColor: "#fff",
+              resize: "vertical",
             }}
             className="email-body-editor"
           />
           <style>{`
-            .email-body-editor:empty::before {
-              content: attr(data-placeholder);
-              color: #a0aec0;
-            }
             .email-body-editor:focus {
               border-color: #0091ae;
               box-shadow: 0 0 0 1px #0091ae;

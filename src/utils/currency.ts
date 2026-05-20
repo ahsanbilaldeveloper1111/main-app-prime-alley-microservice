@@ -86,14 +86,14 @@ export async function convertCurrency(
   toCurrency: string
 ): Promise<number> {
   if (fromCurrency === toCurrency) {
-    return parseFloat(amount.toFixed(2));
+    return Number.parseFloat(amount.toFixed(2));
   }
 
   const rate = await getExchangeRate(fromCurrency, toCurrency);
   const converted = amount * rate;
   
   // Round to 2 decimal places
-  return parseFloat(converted.toFixed(2));
+  return Number.parseFloat(converted.toFixed(2));
 }
 
 /**

@@ -73,6 +73,7 @@ import {
   buildFollowUpTaskFields,
   followUpTaskFieldsToApiPayload,
   resolveFollowUpDueDateYmd,
+  buildIn3BusinessDaysLabel,
 } from "@utils/crmFollowUpTaskDue";
 import { buildCrmAuditLinesForEntry } from "@utils/crmAuditTrail";
 import { ListCallLogs } from "@utils/calls";
@@ -1232,7 +1233,7 @@ const NotesModal: React.FC<NotesModalProps> = ({
     onSave(
       noteText,
       createTask,
-      createTask ? "In 3 business days (Friday)" : undefined,
+      createTask ? buildIn3BusinessDaysLabel() : undefined,
       attachments.length > 0 ? attachments : undefined,
     );
     setNoteText("");
@@ -1982,7 +1983,7 @@ const NotesModal: React.FC<NotesModalProps> = ({
                   fontWeight: "600",
                 }}
               >
-                In 3 business days (Friday)
+                {buildIn3BusinessDaysLabel()}
               </button>
               <ChevronDown size={14} style={{ marginLeft: "4px" }} />
             </span>
@@ -2566,7 +2567,7 @@ const TaskModal: React.FC<TaskModalProps> = ({
 }) => {
   const [title, setTitle] = useState("");
   const [activityDate, setActivityDate] = useState(
-    "In 3 business days (Friday)",
+    buildIn3BusinessDaysLabel(),
   );
   const [activityTime, setActivityTime] = useState(() =>
     new Date().toTimeString().slice(0, 5),
@@ -2898,7 +2899,7 @@ const TaskModal: React.FC<TaskModalProps> = ({
     const today = now.toISOString().slice(0, 10);
     const timeStr = now.toTimeString().slice(0, 5);
     setTitle("");
-    setActivityDate("In 3 business days (Friday)");
+    setActivityDate(buildIn3BusinessDaysLabel());
     setActivityTime(timeStr);
     setCustomDate(today);
     setCustomTime(timeStr);
@@ -2980,7 +2981,7 @@ const TaskModal: React.FC<TaskModalProps> = ({
   const dateOptions = [
     "Today",
     "Tomorrow",
-    "In 3 business days (Friday)",
+    buildIn3BusinessDaysLabel(),
     "In 1 week",
     "In 2 weeks",
     "In 1 month",
@@ -5636,7 +5637,7 @@ const getRecentActivitiesState = ({
       data:
         activityHistoryChain == null
           ? null
-          : ({ audit_trail: activityHistoryChain } as Record<string, unknown>),
+          : { audit_trail: activityHistoryChain },
       detailPath: (id: number) =>
         `/crm/detailspage?type=${normalizeActivityEntityType(activityEntityType ?? "lead")}&id=${id}&section=activities`,
     },
@@ -6125,6 +6126,7 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
   isOpen,
   onClose,
   title,
+  subtitle,
   company,
   avatar,
   email,
@@ -6501,7 +6503,7 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
     if (crmRecordType && recordId != null) {
       try {
         await createCrmNote({
-          record_type: crmRecordType as CrmEntityType,
+          record_type: crmRecordType,
           record_id: Number(recordId),
           text,
           ...(attachments?.length ? { attachments } : {}),
@@ -8303,20 +8305,35 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
             <div
               style={{
                 display: "flex",
-                alignItems: "center",
+                alignItems: "flex-start",
                 justifyContent: "space-between",
+                gap: "12px",
               }}
             >
-              <h2
-                style={{
-                  fontSize: "20px",
-                  fontWeight: "500",
-                  color: "#141414",
-                  margin: 0,
-                }}
-              >
-                {title}
-              </h2>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <h2
+                  style={{
+                    fontSize: "20px",
+                    fontWeight: "500",
+                    color: "#141414",
+                    margin: 0,
+                  }}
+                >
+                  {title}
+                </h2>
+                {subtitle ? (
+                  <p
+                    style={{
+                      margin: "6px 0 0",
+                      fontSize: "14px",
+                      color: "#718096",
+                      fontWeight: 400,
+                    }}
+                  >
+                    {subtitle}
+                  </p>
+                ) : null}
+              </div>
 
               {onClose && (
                 <button

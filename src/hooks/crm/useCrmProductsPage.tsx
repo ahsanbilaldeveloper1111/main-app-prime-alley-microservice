@@ -40,6 +40,10 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "react-toastify";
 import type { Session } from "next-auth";
 import type { FilterPill } from "@components/GenericTable";
+import {
+  CRM_REACT_SELECT_MENU_PORTAL_Z_INDEX,
+  getCrmReactSelectBodyMenuPortalProps,
+} from "@utils/crmReactSelectMenuPortalProps";
 import { crmAppKeys } from "@query/keys";
 
 type SelectStyles = Record<string, any>;
@@ -195,6 +199,10 @@ export function useCrmProductsPage(): UseCrmProductsPageResult {
         ...provided,
         fontSize: "0.875rem",
       }),
+      menuPortal: (provided: any) => ({
+        ...provided,
+        zIndex: CRM_REACT_SELECT_MENU_PORTAL_Z_INDEX,
+      }),
     }),
     [],
   );
@@ -304,7 +312,6 @@ export function useCrmProductsPage(): UseCrmProductsPageResult {
         total: response.total ?? 0,
       };
     },
-    placeholderData: (previousData) => previousData,
   });
 
   const products = productsListQuery.data?.data ?? [];
@@ -380,6 +387,7 @@ export function useCrmProductsPage(): UseCrmProductsPageResult {
           isLoading={loadingIndustries}
           isDisabled={loadingIndustries}
           isClearable
+          {...getCrmReactSelectBodyMenuPortalProps()}
         />
       </Form>
     ),
@@ -421,6 +429,7 @@ export function useCrmProductsPage(): UseCrmProductsPageResult {
           placeholder="Select or create category..."
           styles={customSelectStyles}
           isClearable
+          {...getCrmReactSelectBodyMenuPortalProps()}
         />
       </Form>
     ),
@@ -469,6 +478,7 @@ export function useCrmProductsPage(): UseCrmProductsPageResult {
           placeholder="Select status..."
           styles={customSelectStyles}
           isClearable
+          {...getCrmReactSelectBodyMenuPortalProps()}
         />
       </Form>
     ),
@@ -568,7 +578,7 @@ export function useCrmProductsPage(): UseCrmProductsPageResult {
   const handleProductSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (!productFormData.industry_id) {
-      toast.error("Please select an industry");
+      toast.error("Please select a product group");
       return;
     }
 

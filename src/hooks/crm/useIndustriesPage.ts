@@ -36,7 +36,7 @@ import { crmAppKeys } from "@query/keys";
 const { PERMISSIONS } = HEADER_CONSTANTS;
 
 function consumeHandledApiError(error: unknown, source: string): void {
-  reportApiErrorFromCatch(error, source, { scope: "IndustriesPage" });
+  reportApiErrorFromCatch(error, source, { scope: "ProductGroupsPage" });
 }
 
 export function useIndustriesPage() {
@@ -161,7 +161,7 @@ export function useIndustriesPage() {
       setEditingIndustry(null);
       await fetchIndustries();
     } catch (error: unknown) {
-      consumeHandledApiError(error, "IndustriesPage.handleSubmit");
+      consumeHandledApiError(error, "ProductGroupsPage.handleSubmit");
     } finally {
       setSubmitting(false);
     }
@@ -176,7 +176,7 @@ export function useIndustriesPage() {
       setDeletingIndustry(null);
       await fetchIndustries();
     } catch (error: unknown) {
-      consumeHandledApiError(error, "IndustriesPage.handleDelete");
+      consumeHandledApiError(error, "ProductGroupsPage.handleDelete");
     } finally {
       setDeletingIndustryPending(false);
     }
@@ -259,7 +259,7 @@ export function useIndustriesPage() {
         queryKey: crmAppKeys.industriesPage.productsByIndustry(viewingIndustry.id),
       });
     } catch (error: unknown) {
-      consumeHandledApiError(error, "IndustriesPage.handleProductSubmit");
+      consumeHandledApiError(error, "ProductGroupsPage.handleProductSubmit");
     } finally {
       setProductSubmitting(false);
     }
@@ -276,7 +276,7 @@ export function useIndustriesPage() {
         queryKey: crmAppKeys.industriesPage.productsByIndustry(viewingIndustry.id),
       });
     } catch (error: unknown) {
-      consumeHandledApiError(error, "IndustriesPage.handleDeleteProduct");
+      consumeHandledApiError(error, "ProductGroupsPage.handleDeleteProduct");
     } finally {
       setDeletingProductPending(false);
     }

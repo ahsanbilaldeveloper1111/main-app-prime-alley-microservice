@@ -38,6 +38,7 @@ import { StatsCardData } from "@components/GenericStatsCards";
 import {
   CrmDataItem,
   CrmDataMetrics,
+  CrmDataResponse,
   downloadExampleCsv,
   updateCrmData,
 } from "@utils/crm";
@@ -97,6 +98,7 @@ import {
   buildProspectsContactsAppliedFiltersPayload,
   fetchCrmProspectsEntryCountsForFilters,
   getProspectsContactsDeleteModalItemName,
+  isProspectsUnfilteredBaselineListContext,
   mergeCrmProspectsToolbarFilterPills,
   persistCrmProspectsContactsSelectedColumns,
   resetActiveFilterIfRemovedTabMatches,
@@ -165,6 +167,11 @@ export function CrmProspectsContactsListPage({
 
   const [deleteModalMode, setDeleteModalMode] = useState<
     "single" | "bulk" | null
+  >(null);
+
+  /** Snapshotted “All prospects” total from an unfiltered baseline list load (see widget handlers). */
+  const [baselineAllProspectsCount, setBaselineAllProspectsCount] = useState<
+    number | null
   >(null);
 
   const afterProspectsRemovedRef = useRef<(ids: readonly number[]) => void>(
@@ -561,7 +568,7 @@ export function CrmProspectsContactsListPage({
     handleFilterChange,
   ]);
 
-  /** Prospects only: Overdue metric switches to Scheduled tab + API overdue filter. */
+  /** Prospects only: Overdue → Scheduled tab + `scheduled_call_status=overdue` (same as companies CRM). */
   const handleProspectOverdueMetricClick = useCallback(() => {
     if (config.operationsEntityName !== "prospects") {
       return;
@@ -569,8 +576,7 @@ export function CrmProspectsContactsListPage({
     handleFilterChange("scheduled");
     applyTableFiltersPatch({
       ...clearProspectsWidgetFiltersPatch,
-      // Backend accepts ISO (scheduleCall uses ISO) so we can filter precisely.
-      scheduled_call_to: new Date().toISOString(),
+      scheduled_call_status: "overdue",
     });
   }, [
     applyTableFiltersPatch,
@@ -579,7 +585,10 @@ export function CrmProspectsContactsListPage({
     handleFilterChange,
   ]);
 
-  /** Prospects: Upcoming metric → Scheduled tab (all upcoming, not only overdue). */
+  /**
+   * Prospects: Upcoming → Scheduled tab + `scheduled_call_from` = now (ISO).
+   * If past calls still appear, the API may ignore this filter alongside `has_scheduled_calls` — verify BE.
+   */
   const handleProspectUpcomingMetricClick = useCallback(() => {
     if (config.operationsEntityName !== "prospects") {
       return;
@@ -647,6 +656,60 @@ export function CrmProspectsContactsListPage({
     handleFilterChange,
   ]);
 
+  const prospectsSkipTotalAllUpdate = useMemo(
+    () =>
+      config.operationsEntityName === "prospects" &&
+      !isProspectsUnfilteredBaselineListContext({
+        activeFilter,
+        search: prospectsSearch,
+        currentFilters: memoizedFilters,
+        hasAdvancedFiltersApplied,
+      }),
+    [
+      activeFilter,
+      config.operationsEntityName,
+      hasAdvancedFiltersApplied,
+      memoizedFilters,
+      prospectsSearch,
+    ],
+  );
+
+  const prospectsAllCountDisplay = useMemo(() => {
+    if (config.operationsEntityName !== "prospects") {
+      return totalAllProspects;
+    }
+    return baselineAllProspectsCount ?? totalAllProspects;
+  }, [baselineAllProspectsCount, config.operationsEntityName, totalAllProspects]);
+
+  const handleProspectsBaselineListResponse = useCallback(
+    (response: CrmDataResponse) => {
+      if (config.operationsEntityName !== "prospects") {
+        return;
+      }
+      if (
+        !isProspectsUnfilteredBaselineListContext({
+          activeFilter,
+          search: prospectsSearch,
+          currentFilters: memoizedFilters,
+          hasAdvancedFiltersApplied,
+        })
+      ) {
+        return;
+      }
+      const v = Number(response?.metrics?.total_all_records);
+      if (Number.isFinite(v)) {
+        setBaselineAllProspectsCount(v);
+      }
+    },
+    [
+      activeFilter,
+      config.operationsEntityName,
+      hasAdvancedFiltersApplied,
+      memoizedFilters,
+      prospectsSearch,
+    ],
+  );
+
   const {
     fetchCrmData,
     handleExport: handleProspectsExport,
@@ -690,6 +753,8 @@ export function CrmProspectsContactsListPage({
     pagination,
     onSingleRecordDeleted: (deletedId) =>
       afterProspectsRemovedRef.current([deletedId]),
+    skipTotalAllUpdate: prospectsSkipTotalAllUpdate,
+    onListResponse: handleProspectsBaselineListResponse,
   });
 
   const dispositionQuickUpdateInFlightRef = useRef<Set<number>>(new Set());
@@ -842,11 +907,17 @@ export function CrmProspectsContactsListPage({
     () => [
       {
         title: config.stats.allCardTitle,
-        value: totalAllProspects ?? 0,
+        value: prospectsAllCountDisplay ?? 0,
         icon: Users,
         iconColor: "#6366F1",
         iconBgColor: "#EEF2FF",
-        subtitle: config.stats.subtitleAssignedUnassigned(metrics),
+        ...(config.operationsEntityName === "prospects"
+          ? {
+              additionalText: "Currently in the system",
+            }
+          : {
+              subtitle: config.stats.subtitleAssignedUnassigned(metrics),
+            }),
         ...(config.operationsEntityName === "prospects"
           ? { onClick: handleProspectAllMetricClick }
           : {}),
@@ -932,7 +1003,7 @@ export function CrmProspectsContactsListPage({
       handleProspectRecentlyContactedMetricClick,
       handleProspectNotContactedMetricClick,
       metrics,
-      totalAllProspects,
+      prospectsAllCountDisplay,
     ],
   );
 
@@ -1021,7 +1092,7 @@ export function CrmProspectsContactsListPage({
       {
         id: "all",
         label: config.toolbar.allTabLabel,
-        count: totalAllProspects,
+        count: prospectsAllCountDisplay,
         removable: false,
       },
       ...customTabs,

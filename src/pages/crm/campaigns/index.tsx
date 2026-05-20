@@ -353,17 +353,24 @@ function getZeroUserCampaignNamesFromAssignmentResult(
   });
 }
 
+function toStableStringKey(value: unknown): string | null {
+  if (value == null) return null;
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (!trimmed) return null;
+    return trimmed;
+  }
+  if (typeof value === "number") return Number.isFinite(value) ? String(value) : null;
+  if (typeof value === "bigint") return String(value);
+  return null;
+}
+
 function campaignFieldRowKey(
   field: { id?: unknown; field_name?: string; field_type?: string; sort_order?: number },
   index: number,
 ): string {
-  if (field.id != null && field.id !== "") {
-    const idStr =
-      typeof field.id === "object"
-        ? JSON.stringify(field.id)
-        : String(field.id as string | number | boolean | bigint);
-    return `campaign-field-${idStr}`;
-  }
+  const idStr = toStableStringKey(field.id);
+  if (idStr) return `campaign-field-${idStr}`;
   // IMPORTANT: do not derive React keys from editable text; it causes remounts and input focus loss while typing.
   return `campaign-field-idx-${index}`;
 }
@@ -434,13 +441,13 @@ function deriveEditorStateFromCampaignApi(
   if (industriesData?.length) {
     selectedIndustries = industriesData.map((ind: any) => ({
       value: ind.id.toString(),
-      label: ind.name || `Industry ${ind.id}`,
+      label: ind.name || `Product group ${ind.id}`,
       id: ind.id,
     }));
   } else if (industryIds?.length) {
     selectedIndustries = industryIds.map((id: number) => {
       const industry = industries.find((ind) => ind.id === id);
-      return { value: id.toString(), label: industry?.name || `Industry ${id}`, id };
+      return { value: id.toString(), label: industry?.name || `Product group ${id}`, id };
     });
   }
 
@@ -493,7 +500,10 @@ function buildCrmCampaignListFilters(
   if (campaignFilters.dateTo) filters.date_to = campaignFilters.dateTo;
   if (campaignFilters.userExtensions?.length) filters.user_extensions = campaignFilters.userExtensions;
   if (campaignFilters.hasUnassignedProspects !== null) {
+    // Backend naming is inconsistent across endpoints; send common aliases.
     filters.has_unassigned_prospects = campaignFilters.hasUnassignedProspects;
+    filters.hasUnassignedProspects = campaignFilters.hasUnassignedProspects;
+    filters.has_unassigned_records = campaignFilters.hasUnassignedProspects;
   }
   if (campaignFilters.tags?.length) filters.tags = campaignFilters.tags;
   return filters;
@@ -602,7 +612,7 @@ function buildCampaignSavePayload(
     description: formData.description.trim() || null,
     start_date: formData.start_date || undefined,
     end_date: formData.end_date || undefined,
-    status: formData.status as "active" | "inactive",
+    status: formData.status === "inactive" ? "inactive" : "active",
     fields: cleanedFields,
     campaign_users: campaignUsers.map((user) => user.value),
     industry_ids: selectedIndustries.map((ind: any) => Number.parseInt(String(ind.value || ind.id), 10)),
@@ -1178,7 +1188,6 @@ const CrmCampaigns = ({ hideBreadcrumb }: CrmPageDisplayProps = {}) => { // NOSO
     selectedColumns: selectedCampaignTableColumns,
     setSelectedColumns: setSelectedCampaignTableColumns,
     handlePaginationChange: handleCampaignsPaginationChange,
-    handleSort: handleCampaignsSort,
   } = useCrmSettingsTableState({
     defaultSelectedColumns: DEFAULT_CAMPAIGN_SELECTED_COLUMNS,
     selectableColumnKeys: CAMPAIGN_SELECTABLE_COLUMN_KEYS,
@@ -1873,7 +1882,7 @@ const CrmCampaigns = ({ hideBreadcrumb }: CrmPageDisplayProps = {}) => { // NOSO
     {
       key: "name",
       label: "Campaign Name",
-      sortable: true,
+      sortable: false,
       type: "custom",
       width: "26%",
       render: (campaign: any) => (
@@ -1891,6 +1900,8 @@ const CrmCampaigns = ({ hideBreadcrumb }: CrmPageDisplayProps = {}) => { // NOSO
             display: "-webkit-box",
             WebkitLineClamp: 2,
             WebkitBoxOrient: "vertical",
+            lineHeight: 1.35,
+            paddingBottom: "2px",
           }}
         >
           {campaign.name || "Unnamed Campaign"}
@@ -1900,21 +1911,23 @@ const CrmCampaigns = ({ hideBreadcrumb }: CrmPageDisplayProps = {}) => { // NOSO
     {
       key: "description",
       label: "Description",
-      sortable: true,
+      sortable: false,
       type: "custom",
       width: "34%",
       render: (campaign: any) => (
-        <CrmTruncatedDescriptionCell
-          text={campaign.description}
-          emptyDisplay="No description"
-          className="small text-muted"
-        />
+        <div style={{ minWidth: 0, width: "100%", paddingTop: "2px" }}>
+          <CrmTruncatedDescriptionCell
+            text={campaign.description}
+            emptyDisplay="No description"
+            className="small text-muted"
+          />
+        </div>
       ),
     },
     {
       key: "status",
       label: "Status",
-      sortable: true,
+      sortable: false,
       type: "custom",
       render: (campaign: any) => (
         <Badge bg={campaign.status === "active" ? "success" : "secondary"} className="bg-opacity-10 text-dark">
@@ -1925,7 +1938,7 @@ const CrmCampaigns = ({ hideBreadcrumb }: CrmPageDisplayProps = {}) => { // NOSO
     {
       key: "start_date",
       label: "Date Range",
-      sortable: true,
+      sortable: false,
       type: "custom",
       render: (campaign: any) => (
         <div>
@@ -1950,7 +1963,7 @@ const CrmCampaigns = ({ hideBreadcrumb }: CrmPageDisplayProps = {}) => { // NOSO
     {
       key: "created_by",
       label: "Created By",
-      sortable: true,
+      sortable: false,
       type: "custom",
       render: (campaign: any) => (
         <small className="text-muted">{getCreatedByName(campaign)}</small>
@@ -1959,7 +1972,7 @@ const CrmCampaigns = ({ hideBreadcrumb }: CrmPageDisplayProps = {}) => { // NOSO
     {
       key: "created_at",
       label: "Created",
-      sortable: true,
+      sortable: false,
       type: "custom",
       render: (campaign: any) => (
         <small className="text-muted">
@@ -2093,10 +2106,7 @@ const CrmCampaigns = ({ hideBreadcrumb }: CrmPageDisplayProps = {}) => { // NOSO
           actions={campaignsTableActions}
           showActions={campaignsTableActions.length > 0}
           actionsLabel="Actions"
-          sortable
-          defaultSortBy={campaignsPagination.sortBy}
-          defaultSortOrder={campaignsPagination.sortOrder}
-          onSort={handleCampaignsSort}
+          sortable={false}
           loading={listLoading}
           emptyMessage="No campaigns found matching your criteria"
           pagination={{
@@ -2834,9 +2844,9 @@ const CrmCampaigns = ({ hideBreadcrumb }: CrmPageDisplayProps = {}) => { // NOSO
                       { label: "Campaign Name", value: selectedCampaign.name },
                       { label: "Status", value: <Badge bg={selectedCampaign.status === "active" ? "success" : "secondary"} style={{ padding: "6px 14px", borderRadius: "20px", fontSize: "12px", fontWeight: 600 }}>{selectedCampaign.status?.charAt(0).toUpperCase() + selectedCampaign.status?.slice(1) || "Inactive"}</Badge> },
                     ].map((item) => (
-                      <div key={item.label} style={{ background: "#f8f9fa", padding: "16px", borderRadius: "10px" }}>
+                      <div key={item.label} style={{ background: "#f8f9fa", padding: "16px", borderRadius: "10px", minWidth: 0 }}>
                         <div style={{ fontSize: "12px", fontWeight: 600, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "6px" }}>{item.label}</div>
-                        <div style={{ fontSize: "15px", color: "#1f2937", fontWeight: 500 }}>{item.value}</div>
+                        <div style={{ fontSize: "15px", color: "#1f2937", fontWeight: 500, minWidth: 0, overflowWrap: "anywhere", wordBreak: "break-word" }}>{item.value}</div>
                       </div>
                     ))}
                   </div>

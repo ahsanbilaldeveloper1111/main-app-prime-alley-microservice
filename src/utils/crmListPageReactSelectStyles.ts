@@ -1,4 +1,5 @@
 import type { StylesConfig } from "react-select";
+import { CRM_REACT_SELECT_MENU_PORTAL_Z_INDEX } from "@utils/crmReactSelectMenuPortalProps";
 
 /** Shared react-select styles for CRM-style list pages (45px controls, bootstrap-like focus ring). */
 export const crmListPageReactSelectStyles: StylesConfig<unknown, boolean> = {
@@ -45,5 +46,9 @@ export const crmListPageReactSelectStyles: StylesConfig<unknown, boolean> = {
   menu: (provided) => ({
     ...provided,
     fontSize: "0.875rem",
+  }),
+  menuPortal: (provided) => ({
+    ...provided,
+    zIndex: CRM_REACT_SELECT_MENU_PORTAL_Z_INDEX,
   }),
 };

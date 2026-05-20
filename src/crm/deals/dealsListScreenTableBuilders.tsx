@@ -254,7 +254,7 @@ export function buildDealsListTableColumns(
       {
         key: "value",
         label: "Value",
-        sortable: true,
+        sortable: false,
         type: "custom",
         render: (row) => (
           <span className="fw-semibold">
@@ -366,7 +366,7 @@ export function buildDealsListTableColumns(
     {
       key: "value",
       label: "Value",
-      sortable: true,
+      sortable: false,
       type: "custom",
       render: (row) => (
         <span className="fw-semibold">

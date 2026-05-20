@@ -988,6 +988,7 @@ function GenericTableBodyDataCell<T extends Record<string, any>>({
     <td
       className="generic-table-td"
       style={{
+        verticalAlign: "top",
         textAlign: col.align || "left",
         position: colIdx === 0 ? "relative" : undefined,
         ...(col.width
@@ -1461,8 +1462,12 @@ const GenericTable = <T extends Record<string, any>>({
     }
   };
 
-  /** Escape scroll/overflow parents so the menu is not clipped. */
   const columnSelectorMenuPopperConfig = useMemo(
+    () => ({ strategy: "fixed" as const }),
+    [],
+  );
+
+  const filterPillMenuPopperConfig = useMemo(
     () => ({ strategy: "fixed" as const }),
     [],
   );
@@ -1984,6 +1989,7 @@ const GenericTable = <T extends Record<string, any>>({
                             overflowY: "auto",
                           }
                         }
+                        popperConfig={filterPillMenuPopperConfig}
                         onMouseDown={(e) => e.stopPropagation()}
                       >
                         <GenericTableFilterPillMenuBody

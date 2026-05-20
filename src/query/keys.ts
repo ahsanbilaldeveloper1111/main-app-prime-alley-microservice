@@ -227,6 +227,17 @@ export const complianceKeys = {
 };
 
 /** Workforce / employee dashboard reads (`src/pages/workforce/dashboard/*`). */
+/** Main app dashboard (`/dashboard`) Summary tab analytics. */
+export const mainDashboardKeys = {
+  root: ["mainDashboard"] as const,
+  crmListCounts: (startDate: string, endDate: string) =>
+    [...mainDashboardKeys.root, "crmListCounts", startDate, endDate] as const,
+  attendanceActivity: (startDate: string, endDate: string) =>
+    [...mainDashboardKeys.root, "attendanceActivity", startDate, endDate] as const,
+  crmCreatedCounts: (startDate: string, endDate: string) =>
+    [...mainDashboardKeys.root, "crmCreatedCounts", startDate, endDate] as const,
+};
+
 export const workforceKeys = {
   root: ["workforce"] as const,
 
