@@ -391,12 +391,12 @@ export const transferCalls = async (params: TransferCallParams): Promise<DialRes
 
 function normalizeMonitoringApiParams<P extends Record<string, unknown>>(params: P): P {
   const out = { ...params } as Record<string, unknown>
-  if (Object.prototype.hasOwnProperty.call(out, "monitorDeviceType")) {
+  if (Object.hasOwn(out, "monitorDeviceType")) {
     out.monitorDeviceType = normalizeCtiApiMonitoringDeviceType(
       out.monitorDeviceType as string | null | undefined,
     )
   }
-  if (Object.prototype.hasOwnProperty.call(out, "monitoredDeviceType")) {
+  if (Object.hasOwn(out, "monitoredDeviceType")) {
     out.monitoredDeviceType = normalizeCtiApiMonitoringDeviceType(
       out.monitoredDeviceType as string | null | undefined,
     )

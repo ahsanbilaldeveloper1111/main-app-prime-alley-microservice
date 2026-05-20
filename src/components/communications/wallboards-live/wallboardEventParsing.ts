@@ -596,17 +596,15 @@ function isTerminatedWallboardParty(party: Party): boolean {
   return s === "DROPPED" || s === "DISCONNECTED" || s === "ENDED";
 }
 
-type MonitoringStartEventSlice = WallboardLogEventSlice & {
-  isMonitoring?: boolean;
-  monitoring?: {
-    monitorDn?: string;
-    monitoredDn?: string;
-    monitoringType?: string;
-  };
-};
+function parseWallboardLogEvent(raw: unknown): WallboardLogEventSlice | null {
+  if (raw === null || typeof raw !== "object") {
+    return null;
+  }
+  return raw as WallboardLogEventSlice;
+}
 
 function isMonitoringSessionStartForActive(
-  evt: MonitoringStartEventSlice,
+  evt: WallboardLogEventSlice,
   active: WallboardActiveMonitoringSnapshot,
 ): boolean {
   const m = evt.monitoring;
@@ -634,15 +632,91 @@ export function findLatestMonitoringSessionStartLogIndex(
   }
   const start = Math.max(0, eventLog.length - scanDepth);
   for (let i = eventLog.length - 1; i >= start; i -= 1) {
-    const raw = eventLog[i];
-    if (!raw || typeof raw !== "object") {
-      continue;
-    }
-    if (isMonitoringSessionStartForActive(raw as MonitoringStartEventSlice, active)) {
+    const evt = parseWallboardLogEvent(eventLog[i]);
+    if (evt && isMonitoringSessionStartForActive(evt, active)) {
       return i;
     }
   }
   return -1;
+}
+
+type TerminalMonitoringClearContext = {
+  monitoredDn: string;
+  supervisorDn?: string;
+  monitoredDeviceName?: string | null;
+};
+
+function isTerminalWallboardEventType(eventType: string | undefined): boolean {
+  return (
+    eventType === "DROPPED" ||
+    eventType === "DISCONNECTED" ||
+    eventType === "ENDED"
+  );
+}
+
+function isSupervisorMonitoredTerminalDrop(
+  evt: WallboardLogEventSlice,
+  ctx: TerminalMonitoringClearContext,
+): boolean {
+  const { supervisorDn, monitoredDn } = ctx;
+  if (!supervisorDn || !evt.parties?.length) {
+    return false;
+  }
+  if (!isTerminalWallboardEventType(evt.eventType)) {
+    return false;
+  }
+  return evt.parties.some(
+    (party) =>
+      isTerminatedWallboardParty(party) &&
+      involvesDnOnParty(party, supervisorDn) &&
+      involvesDnOnParty(party, monitoredDn),
+  );
+}
+
+function terminalClearReasonFromLogEvent(
+  evt: WallboardLogEventSlice,
+  ctx: TerminalMonitoringClearContext,
+): string | null {
+  if (
+    ctx.supervisorDn &&
+    wallboardEventClaimsActiveMonitoringForPair(
+      evt,
+      ctx.supervisorDn,
+      ctx.monitoredDn,
+    )
+  ) {
+    return null;
+  }
+
+  if (
+    evt.eventName === "CallObservationEndedEvImpl" &&
+    isSupervisorMonitoredTerminalDrop(evt, ctx)
+  ) {
+    return "monitoring call ended";
+  }
+
+  if (isSupervisorMonitoredTerminalDrop(evt, ctx)) {
+    return "monitoring call ended";
+  }
+
+  if (!isTerminalWallboardEventType(evt.eventType) || !evt.parties?.length) {
+    return null;
+  }
+
+  const monitoredDrop = evt.parties.some((party) => {
+    if (!isTerminatedWallboardParty(party) || !involvesDnOnParty(party, ctx.monitoredDn)) {
+      return false;
+    }
+    if (!ctx.monitoredDeviceName) {
+      return true;
+    }
+    return (
+      party.callingDeviceName === ctx.monitoredDeviceName ||
+      party.calledDeviceName === ctx.monitoredDeviceName
+    );
+  });
+
+  return monitoredDrop ? "call dropped" : null;
 }
 
 /**
@@ -659,8 +733,11 @@ export function findTerminalMonitoringClearInRecentLog(
   if (!monitoredDn || !eventLog.length) {
     return null;
   }
-  const supervisorDn = active.monitor;
-  const monitoredDeviceName = active.deviceName;
+  const ctx: TerminalMonitoringClearContext = {
+    monitoredDn,
+    supervisorDn: active.monitor,
+    monitoredDeviceName: active.deviceName,
+  };
   const start = Math.max(0, eventLog.length - scanDepth);
   const sessionStartIndex = findLatestMonitoringSessionStartLogIndex(
     eventLog,
@@ -672,74 +749,13 @@ export function findTerminalMonitoringClearInRecentLog(
     if (sessionStartIndex >= 0 && i <= sessionStartIndex) {
       break;
     }
-    const raw = eventLog[i];
-    if (!raw || typeof raw !== "object") {
+    const evt = parseWallboardLogEvent(eventLog[i]);
+    if (!evt?.parties?.length) {
       continue;
     }
-    const lastEvent = raw as WallboardLogEventSlice;
-    if (!lastEvent.parties?.length) {
-      continue;
-    }
-
-    if (
-      supervisorDn &&
-      wallboardEventClaimsActiveMonitoringForPair(
-        lastEvent,
-        supervisorDn,
-        monitoredDn,
-      )
-    ) {
-      continue;
-    }
-
-    const terminalEventType =
-      lastEvent.eventType === "DROPPED" ||
-      lastEvent.eventType === "DISCONNECTED" ||
-      lastEvent.eventType === "ENDED";
-
-    if (
-      lastEvent.eventName === "CallObservationEndedEvImpl" &&
-      terminalEventType &&
-      supervisorDn &&
-      lastEvent.parties.some(
-        (party) =>
-          isTerminatedWallboardParty(party) &&
-          involvesDnOnParty(party, supervisorDn) &&
-          involvesDnOnParty(party, monitoredDn),
-      )
-    ) {
-      return "monitoring call ended";
-    }
-
-    if (
-      terminalEventType &&
-      supervisorDn &&
-      lastEvent.parties.some(
-        (party) =>
-          isTerminatedWallboardParty(party) &&
-          involvesDnOnParty(party, supervisorDn) &&
-          involvesDnOnParty(party, monitoredDn),
-      )
-    ) {
-      return "monitoring call ended";
-    }
-
-    if (
-      terminalEventType &&
-      lastEvent.parties.some((party) => {
-        if (!isTerminatedWallboardParty(party) || !involvesDnOnParty(party, monitoredDn)) {
-          return false;
-        }
-        if (!monitoredDeviceName) {
-          return true;
-        }
-        return (
-          party.callingDeviceName === monitoredDeviceName ||
-          party.calledDeviceName === monitoredDeviceName
-        );
-      })
-    ) {
-      return "call dropped";
+    const reason = terminalClearReasonFromLogEvent(evt, ctx);
+    if (reason) {
+      return reason;
     }
   }
 
@@ -845,7 +861,8 @@ export function buildWallboardMonitoringPayloadFromEvent(
   return buildMonitoringPayloadFromPartiesAndDns(parties, monitoring, dnsMap);
 }
 
-type MonitoringCallStateSlice = {
+/** Shared shape for call-state and loose wallboard call party checks. */
+type WallboardCallPartiesSlice = {
   parties?: Party[];
   monitoring?: {
     monitorDn?: string;
@@ -854,6 +871,9 @@ type MonitoringCallStateSlice = {
   };
   isMonitoring?: boolean;
   isTerminating?: boolean;
+};
+
+type MonitoringCallStateSlice = WallboardCallPartiesSlice & {
   hasActiveParticipants?: boolean;
   eventTime?: string;
 };
@@ -908,7 +928,7 @@ function isWallboardMonitoringCallStateCandidate(
       )
     ) {
       return callHasLiveAgentPartyWithNonSupervisor(
-        call as LooseWallboardCall,
+        call,
         m.monitoredDn,
         m.monitorDn,
       );
@@ -1290,11 +1310,7 @@ export function supervisionSessionHasLiveSupervisorAgentLeg(
     if (
       isBargeInMonitoringType(payload.monitoringType) &&
       c.isMonitoring === true &&
-      callHasLiveAgentPartyWithNonSupervisor(
-        c as LooseWallboardCall,
-        monitoredDn,
-        monitorDn,
-      )
+      callHasLiveAgentPartyWithNonSupervisor(c, monitoredDn, monitorDn)
     ) {
       return true;
     }
@@ -1414,19 +1430,7 @@ export function resolveEffectiveWallboardMonitoring(
   return activeMonitoringFromPayload(remotePayload);
 }
 
-type LooseWallboardCall = {
-  isTerminating?: boolean;
-  isMonitoring?: boolean;
-  monitoring?: {
-    monitorDn?: string;
-    monitoredDn?: string;
-    monitoringType?: string;
-  };
-  parties?: Array<{
-    callingAddress?: string;
-    calledAddress?: string;
-    callStatus?: string;
-  }>;
+type LooseWallboardCall = WallboardCallPartiesSlice & {
   eventTime?: string;
   callId?: string;
 };
@@ -1478,7 +1482,7 @@ export function isSilentOrWhisperMonitoringType(
  * Barge-in joins the supervisor onto the agent's call, so those calls must not be treated as observation-only.
  */
 export function callHasLiveAgentPartyWithNonSupervisor(
-  call: LooseWallboardCall,
+  call: WallboardCallPartiesSlice,
   agentDn: string,
   supervisorDn: string,
 ): boolean {

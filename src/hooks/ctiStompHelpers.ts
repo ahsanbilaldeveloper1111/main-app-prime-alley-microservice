@@ -708,10 +708,7 @@ export function applyCallEventToCallStateMap(
     dnsMap,
   );
 
-  const monitoringKeyPresent = Object.prototype.hasOwnProperty.call(
-    evt,
-    "monitoring",
-  );
+  const monitoringKeyPresent = Object.hasOwn(evt, "monitoring");
   let nextMonitoring: typeof base.monitoring;
   if (monitoringKeyPresent) {
     nextMonitoring =
