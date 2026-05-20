@@ -1403,6 +1403,7 @@ export interface MyDayPreferences {
   daily_capacity_minutes?: number;
   my_day_default_view?: boolean;
   rollover_shown_date?: string | null;
+  last_my_day_seen_date?: string | null;
 }
 
 /**
@@ -1415,6 +1416,9 @@ export interface MyDayTasksMeta {
   completed_minutes?: number;
   active_count?: number;
   completed_count?: number;
+  tasks_planned?: number;
+  tasks_completed?: number;
+  unestimated_task_count?: number;
 }
 
 export interface MyDayTasksPayload {
@@ -1423,6 +1427,8 @@ export interface MyDayTasksPayload {
   plan_date?: string;
   meta?: MyDayTasksMeta;
   read_only?: boolean;
+  is_empty_by_design?: boolean;
+  last_my_day_seen_date?: string | null;
 }
 
 export type MyDaySuggestionCategory =
@@ -1432,7 +1438,9 @@ export type MyDaySuggestionCategory =
   | "assigned_to_me"
   | "organizational_tasks"
   | "personal_tasks"
-  | "flexible_upcoming";
+  | "flexible_upcoming"
+  | "backlog"
+  | "repeatedly_ignored";
 
 export type MyDaySuggestionsPayload = Partial<Record<MyDaySuggestionCategory, unknown[]>>;
 
@@ -1446,9 +1454,29 @@ export interface MyDayCapacityPayload {
 
 export interface MyDayRolloverPayload {
   tasks: unknown[];
-  /** When true, show first-login rollover UI once; client should POST `rollover/ack` after displaying (Postman §7.2). */
+  /** Server: tasks exist, not acked today, `days_since_last_seen === 1`. */
   show_rollover_prompt?: boolean;
   tasks_preview?: unknown[];
+  prompt_acknowledged_today?: boolean;
+  previous_date?: string | null;
+  days_since_last_seen?: number | null;
+  last_my_day_seen_date?: string | null;
+}
+
+export interface MyDayTeamReporteePayload {
+  extension_number: string;
+  active: unknown[];
+  completed: unknown[];
+  meta?: MyDayTasksMeta;
+}
+
+export interface MyDayTeamPayload {
+  plan_date?: string;
+  reportees: MyDayTeamReporteePayload[];
+}
+
+export interface MyDayRolloverAckPayload {
+  rollover_shown_date?: string | null;
   prompt_acknowledged_today?: boolean;
 }
 
@@ -1474,6 +1502,36 @@ function buildMyDayQuery(params: Record<string, string | number | undefined>): U
     searchParams.set(key, String(value));
   });
   return searchParams;
+}
+
+function buildMyDayQueryWithArrays(
+  params: Record<string, string | number | undefined>,
+  arrayParams: Record<string, string[]> = {},
+): URLSearchParams {
+  const searchParams = buildMyDayQuery(params);
+  Object.entries(arrayParams).forEach(([key, values]) => {
+    values.forEach((value) => {
+      if (value.trim() !== "") searchParams.append(key, value);
+    });
+  });
+  return searchParams;
+}
+
+function normalizeMyDayTasksPayload(payload: MyDayTasksPayload): MyDayTasksPayload {
+  const meta = payload.meta ?? {};
+  return {
+    active: Array.isArray(payload.active) ? payload.active : [],
+    completed: Array.isArray(payload.completed) ? payload.completed : [],
+    plan_date: payload.plan_date,
+    meta: {
+      ...meta,
+      active_count: meta.active_count ?? undefined,
+      completed_count: meta.completed_count ?? undefined,
+    },
+    read_only: payload.read_only === true,
+    is_empty_by_design: payload.is_empty_by_design === true,
+    last_my_day_seen_date: payload.last_my_day_seen_date ?? null,
+  };
 }
 
 function buildMyDayUrl(path: string, query: URLSearchParams): string {
@@ -1510,20 +1568,15 @@ export const listMyDayTasks = async (
   });
   const response = await axiosInstance.get(`work-planner/my-day/tasks?${query.toString()}`);
   const payload = parseMyDayResponseData<MyDayTasksPayload>(response);
-  return {
-    active: Array.isArray(payload.active) ? payload.active : [],
-    completed: Array.isArray(payload.completed) ? payload.completed : [],
-    plan_date: payload.plan_date,
-    meta: payload.meta ?? {},
-    read_only: payload.read_only === true,
-  };
+  return normalizeMyDayTasksPayload(payload);
 };
 
 export const getMyDaySuggestions = async (
   params: { search?: string; extension_number?: string } = {},
 ): Promise<MyDaySuggestionsPayload> => {
+  const trimmedSearch = params.search?.trim();
   const query = buildMyDayQuery({
-    search: params.search ?? "",
+    ...(trimmedSearch ? { search: trimmedSearch } : {}),
     extension_number: params.extension_number,
   });
   const response = await axiosInstance.get(`work-planner/my-day/suggestions?${query.toString()}`);
@@ -1603,26 +1656,48 @@ export const getMyDayRollover = async (
   );
   const payload = parseMyDayResponseData<MyDayRolloverPayload>(response);
   const tasksList = Array.isArray(payload.tasks) ? payload.tasks : [];
-  const explicitShow = payload.show_rollover_prompt;
-  const showRolloverPrompt =
-    explicitShow === true ||
-    (explicitShow == null &&
-      tasksList.length > 0 &&
-      payload.prompt_acknowledged_today !== true);
   return {
     tasks: tasksList,
     tasks_preview: Array.isArray(payload.tasks_preview) ? payload.tasks_preview : undefined,
-    show_rollover_prompt: showRolloverPrompt,
+    show_rollover_prompt: payload.show_rollover_prompt === true,
     prompt_acknowledged_today: payload.prompt_acknowledged_today === true,
+    previous_date: payload.previous_date ?? null,
+    days_since_last_seen:
+      payload.days_since_last_seen == null ? null : Number(payload.days_since_last_seen),
+    last_my_day_seen_date: payload.last_my_day_seen_date ?? null,
   };
 };
 
-export const ackMyDayRolloverPrompt = async (extensionNumber?: string): Promise<unknown> => {
+export const ackMyDayRolloverPrompt = async (
+  extensionNumber?: string,
+): Promise<MyDayRolloverAckPayload> => {
   const query = buildMyDayQuery({ extension_number: extensionNumber });
   const response = await axiosInstance.post(
     buildMyDayUrl("work-planner/my-day/rollover/ack", query),
   );
-  return parseMyDayResponseData(response);
+  return parseMyDayResponseData<MyDayRolloverAckPayload>(response);
+};
+
+export const getMyDayTeam = async (
+  params: {
+    extension_number?: string;
+    reportee_extensions: string[];
+    date?: string;
+  },
+): Promise<MyDayTeamPayload> => {
+  const query = buildMyDayQueryWithArrays(
+    {
+      extension_number: params.extension_number,
+      date: params.date,
+    },
+    { "reportee_extensions[]": params.reportee_extensions },
+  );
+  const response = await axiosInstance.get(`work-planner/my-day/team?${query.toString()}`);
+  const payload = parseMyDayResponseData<MyDayTeamPayload>(response);
+  return {
+    plan_date: payload.plan_date,
+    reportees: Array.isArray(payload.reportees) ? payload.reportees : [],
+  };
 };
 
 export const submitMyDayRolloverAction = async (
@@ -1646,13 +1721,7 @@ export const getMyDayPastDaySnapshot = async (
     buildMyDayUrl(`work-planner/my-day/past-days/${date}`, query),
   );
   const payload = parseMyDayResponseData<MyDayTasksPayload>(response);
-  return {
-    active: Array.isArray(payload.active) ? payload.active : [],
-    completed: Array.isArray(payload.completed) ? payload.completed : [],
-    plan_date: payload.plan_date,
-    meta: payload.meta ?? {},
-    read_only: payload.read_only === true,
-  };
+  return normalizeMyDayTasksPayload({ ...payload, read_only: true });
 };
 
 // ==================== Workload (team capacity / planner) ====================

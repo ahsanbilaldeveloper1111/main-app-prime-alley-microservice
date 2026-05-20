@@ -1,9 +1,12 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import moment from "moment";
+import { useSession } from "next-auth/react";
 import { Button, Form, Modal } from "react-bootstrap";
 import { Circle, CircleCheckBig, History, Pencil, Plus, Search, X } from "lucide-react";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 import CreateTaskSidebar from "@components/CreatePlannerTaskSidebar";
+import { MyDayTeamSection } from "@components/planner/my-day/MyDayTeamSection";
+import { getSessionPhoneOrExtension } from "@planner/projectMemberRole";
 import {
   ackMyDayRolloverPrompt,
   addTaskToMyDay,
@@ -13,6 +16,7 @@ import {
   getMyDaySuggestions,
   listMyDayTasks,
   overrideMyDayCapacity,
+  patchMyDayPreferences,
   removeTaskFromMyDay,
   submitMyDayRolloverAction,
   toggleMyDayTaskComplete,
@@ -23,6 +27,25 @@ import {
 import { MyDayHistoryModal } from "@components/planner/MyDayHistoryModal";
 import { useHierarchyData } from "@components/filters/useHierarchyData";
 import { formatDateGlobal, ModuleSlug } from "@utils/Helper";
+import {
+  formatCapacityOverageMessage,
+  formatMyDayHeaderMetaLine,
+  formatRolloverPromptCopy,
+  formatSuggestionDueDate,
+  getCapacityFillTone,
+  isFlexibleTaskRow,
+  MY_DAY_CATEGORY_LABELS,
+  MY_DAY_SUGGESTION_CATEGORY_ORDER,
+  readRolloverIgnoreCount,
+  resolveEstimateMinutesFromRow,
+  resolveMyDayReporteeExtensions,
+  resolveMyDayTaskCount,
+  resolveMyDayUnestimatedCount,
+  resolveProjectFromRow,
+  resolveShowRolloverPrompt,
+  shouldShowIgnoredFlag,
+  toMinutesDisplay,
+} from "@page-modules/planner/my-day/myDayDomain";
 import "@assets/scss/my-day-tasks.scss";
 import { toast } from "react-toastify";
 
@@ -47,8 +70,11 @@ type MyDayTask = {
   estimateMinutes: number;
   projectName: string;
   isPersonalTask: boolean;
+  isOrganizationalTask: boolean;
   isFlexibleTask: boolean;
   isCarryOver: boolean;
+  rolloverIgnoreCount: number;
+  showIgnoredFlag: boolean;
   alreadyInMyDay?: boolean;
   raw: ApiTask;
 };
@@ -65,27 +91,6 @@ function swallowAsyncError(promise: Promise<unknown>): void {
   promise.catch(() => undefined);
 }
 
-function toMinutesDisplay(totalMinutes: number): string {
-  const m = Math.max(0, totalMinutes);
-  const h = Math.floor(m / 60);
-  const rem = m % 60;
-  if (h > 0 && rem > 0) return `${h}h ${rem}m`;
-  if (h > 0) return `${h}h`;
-  return `${rem}m`;
-}
-
-function formatMyDayHeaderMetaLine(taskCount: number, usedMinutes: number): string {
-  const taskPart = taskCount === 1 ? "1 task planned" : `${taskCount} tasks planned`;
-  return `${taskPart} · ${toMinutesDisplay(usedMinutes)} capacity used`;
-}
-
-function resolveMyDayTaskCount(tasks: MyDayTask[], meta: MyDayTasksMeta): number {
-  if (meta.active_count != null && meta.completed_count != null) {
-    return meta.active_count + meta.completed_count;
-  }
-  return tasks.length;
-}
-
 function resolveMyDayCapacityUsedMinutes(tasks: MyDayTask[], plannedMinutes: number): number {
   const fromEstimates = tasks.reduce(
     (sum, task) => sum + Math.max(0, task.estimateMinutes),
@@ -95,45 +100,8 @@ function resolveMyDayCapacityUsedMinutes(tasks: MyDayTask[], plannedMinutes: num
   return Math.max(0, plannedMinutes);
 }
 
-function isFlexibleTaskRow(
-  row: Record<string, unknown>,
-  category?: MyDaySuggestionCategory,
-): boolean {
-  if (category === "flexible_upcoming") return true;
-  return row.is_flexible === true || row.flexible === true || row.is_flexible_task === true;
-}
-
 function isSuggestionInMyDay(task: SuggestedTask, myDayTaskIds: ReadonlySet<number>): boolean {
   return myDayTaskIds.has(task.id) || task.alreadyInMyDay === true;
-}
-
-function resolveEstimateMinutesFromRow(row: Record<string, unknown>): number {
-  const candidates = [
-    row.estimated_minutes,
-    row.estimated_duration_minutes,
-    row.my_day_estimated_minutes,
-    row.plan_estimated_minutes,
-    row.estimate_minutes,
-    row.duration_minutes,
-  ];
-  for (const value of candidates) {
-    const parsed = Number(value);
-    if (Number.isFinite(parsed) && parsed > 0) return Math.round(parsed);
-  }
-  const hours = Number(row.estimated_hours);
-  if (Number.isFinite(hours) && hours > 0) return Math.round(hours * 60);
-  return 0;
-}
-
-function resolveProjectFromRow(row: Record<string, unknown>): { label: string; isPersonal: boolean } {
-  const project = row.project;
-  if (project != null && typeof project === "object") {
-    const name = (project as { name?: string | null }).name?.trim();
-    if (name) return { label: name, isPersonal: false };
-  }
-  const projectName = typeof row.project_name === "string" ? row.project_name.trim() : "";
-  if (projectName) return { label: projectName, isPersonal: false };
-  return { label: "Personal Task", isPersonal: true };
 }
 
 const MAX_CAPACITY_DURATION_INPUT_LENGTH = 40;
@@ -188,14 +156,6 @@ function formatCapacityDurationInput(totalMinutes: number): string {
   return toMinutesDisplay(totalMinutes);
 }
 
-type CapacityFillTone = "low" | "medium" | "high";
-
-function getCapacityFillTone(usagePct: number): CapacityFillTone {
-  if (usagePct >= 100) return "high";
-  if (usagePct >= 75) return "medium";
-  return "low";
-}
-
 function mapApiTaskToMyDayTask(
   apiTask: ApiTask,
   todayStart: moment.Moment,
@@ -207,6 +167,8 @@ function mapApiTaskToMyDayTask(
   const row = apiTask as unknown as Record<string, unknown>;
   const estimate = resolveEstimateMinutesFromRow(row);
   const project = resolveProjectFromRow(row);
+  const ignoreCount = readRolloverIgnoreCount(row);
+  const isOrgTask = row.is_org_task === true || project.isOrganizational;
   return {
     id: apiTask.id,
     title: apiTask.title?.trim() || `Task #${apiTask.id}`,
@@ -216,11 +178,20 @@ function mapApiTaskToMyDayTask(
     estimateMinutes: estimate,
     projectName: project.label,
     isPersonalTask: project.isPersonal,
+    isOrganizationalTask: isOrgTask,
     isFlexibleTask: isFlexibleTaskRow(row, category),
     isCarryOver,
+    rolloverIgnoreCount: ignoreCount,
+    showIgnoredFlag: shouldShowIgnoredFlag(row),
     alreadyInMyDay: apiTask.already_in_my_day === true,
     raw: apiTask,
   };
+}
+
+function readMyDayEstimatedMinutesFromRow(row: Record<string, unknown>): number | null {
+  if (typeof row.my_day_estimated_minutes === "number") return row.my_day_estimated_minutes;
+  if (typeof row.estimated_minutes === "number") return row.estimated_minutes;
+  return null;
 }
 
 function readMyDaySuggestionProject(
@@ -250,36 +221,16 @@ function toApiTask(input: unknown): ApiTask {
       typeof row.estimated_duration_minutes === "number"
         ? row.estimated_duration_minutes
         : null,
-    estimated_minutes: typeof row.estimated_minutes === "number" ? row.estimated_minutes : null,
+    estimated_minutes: readMyDayEstimatedMinutesFromRow(row),
     already_in_my_day: row.already_in_my_day === true,
     project: readMyDaySuggestionProject(row.project),
   };
 }
 
-const SUGGESTION_CATEGORY_ORDER: MyDaySuggestionCategory[] = [
-  "overdue",
-  "due_today",
-  "high_priority",
-  "assigned_to_me",
-  "organizational_tasks",
-  "personal_tasks",
-  "flexible_upcoming",
-];
-
-const CATEGORY_LABELS: Record<MyDaySuggestionCategory, string> = {
-  overdue: "Overdue",
-  due_today: "Due Today",
-  high_priority: "High Priority",
-  assigned_to_me: "Assigned to Me",
-  organizational_tasks: "Organizational Tasks",
-  personal_tasks: "Personal Tasks",
-  flexible_upcoming: "Flexible Upcoming",
-};
-
 function collectSuggestionCategories(payload: MyDaySuggestionsPayload): MyDaySuggestionCategory[] {
   const seen = new Set<string>();
   const ordered: MyDaySuggestionCategory[] = [];
-  for (const category of SUGGESTION_CATEGORY_ORDER) {
+  for (const category of MY_DAY_SUGGESTION_CATEGORY_ORDER) {
     if (!Array.isArray(payload[category])) continue;
     ordered.push(category);
     seen.add(category);
@@ -304,6 +255,7 @@ function MyDaySuggestedItemButton({
   onAdd,
 }: MyDaySuggestedItemButtonProps) {
   const priorityKey = task.priority.toLowerCase().replace(/\s+/g, "-");
+  const dueLabel = formatSuggestionDueDate(task.dueDate);
   return (
     <button
       type="button"
@@ -313,10 +265,11 @@ function MyDaySuggestedItemButton({
     >
       <div className="title">{task.title}</div>
       <div className="meta">
+        {dueLabel ? <span className="myday-tag myday-tag--due">{dueLabel}</span> : null}
         <span
           className={`myday-tag myday-tag--project ${
             task.isPersonalTask ? "myday-tag--personal" : ""
-          }`}
+          } ${task.isOrganizationalTask ? "myday-tag--organizational" : ""}`}
         >
           {task.projectName}
         </span>
@@ -325,6 +278,9 @@ function MyDaySuggestedItemButton({
         </span>
         {task.isFlexibleTask ? (
           <span className="myday-tag myday-tag--flexible">Flexible Task</span>
+        ) : null}
+        {task.showIgnoredFlag ? (
+          <span className="myday-tag myday-tag--ignored">3x Ignored</span>
         ) : null}
         <span className="myday-tag myday-tag--estimate">
           {task.estimateMinutes > 0 ? toMinutesDisplay(task.estimateMinutes) : "No estimate"}
@@ -392,7 +348,7 @@ function MyDayTaskCard({ task, onToggleComplete, onRemove, onEditEstimate }: MyD
             <span
               className={`myday-tag myday-tag--project ${
                 task.isPersonalTask ? "myday-tag--personal" : ""
-              }`}
+              } ${task.isOrganizationalTask ? "myday-tag--organizational" : ""}`}
             >
               {task.projectName}
             </span>
@@ -402,26 +358,33 @@ function MyDayTaskCard({ task, onToggleComplete, onRemove, onEditEstimate }: MyD
             {task.isFlexibleTask ? (
               <span className="myday-tag myday-tag--flexible">Flexible Task</span>
             ) : null}
+            {task.showIgnoredFlag ? (
+              <span className="myday-tag myday-tag--ignored">3x Ignored</span>
+            ) : null}
             <MyDayTaskEstimateSlot task={task} onEditEstimate={onEditEstimate} />
           </div>
         </div>
       </div>
-      {task.isCompleted ? null : (
-        <button
-          type="button"
-          className="myday-task-card__remove"
-          aria-label="Remove from My Day"
-          onClick={() => onRemove(task.id)}
-        >
-          <X size={16} />
-        </button>
-      )}
+      <button
+        type="button"
+        className="myday-task-card__remove"
+        aria-label="Remove from My Day"
+        onClick={() => onRemove(task.id)}
+      >
+        <X size={16} />
+      </button>
     </div>
   );
 }
 
 const MyDayTasksPage: React.FC = () => {
+  const { data: session } = useSession();
+  const managerExtension = useMemo(() => getSessionPhoneOrExtension(session), [session]);
   const { hierarchyDataExtensions } = useHierarchyData(ModuleSlug.WORK_PLANNER);
+  const reporteeExtensions = useMemo(
+    () => resolveMyDayReporteeExtensions(hierarchyDataExtensions, managerExtension),
+    [hierarchyDataExtensions, managerExtension],
+  );
   const [tasks, setTasks] = useState<MyDayTask[]>([]);
   const [suggestedTasks, setSuggestedTasks] = useState<SuggestedTask[]>([]);
   const [rolloverTasks, setRolloverTasks] = useState<MyDayTask[]>([]);
@@ -443,6 +406,13 @@ const MyDayTasksPage: React.FC = () => {
   const [capacityDraft, setCapacityDraft] = useState("");
   const [debouncedSuggestedSearch, setDebouncedSuggestedSearch] = useState("");
   const [suggestionsLoading, setSuggestionsLoading] = useState(false);
+  const [defaultCapacityMinutes, setDefaultCapacityMinutes] = useState(8 * 60);
+  const [showDefaultCapacityModal, setShowDefaultCapacityModal] = useState(false);
+  const [defaultCapacityDraft, setDefaultCapacityDraft] = useState("");
+  const [showScheduleLaterModal, setShowScheduleLaterModal] = useState(false);
+  const [scheduleLaterDate, setScheduleLaterDate] = useState("");
+  const [isEmptyByDesign, setIsEmptyByDesign] = useState(false);
+  const [rolloverPreviousDate, setRolloverPreviousDate] = useState<string | null>(null);
   const rolloverAckSentRef = useRef(false);
   const suggestionsRequestRef = useRef(0);
   const tasksRef = useRef<MyDayTask[]>([]);
@@ -468,7 +438,7 @@ const MyDayTasksPage: React.FC = () => {
       collectSuggestionCategories(suggestionsPayload).forEach((category) => {
         const rows = suggestionsPayload[category];
         if (!Array.isArray(rows)) return;
-        const categoryLabel = CATEGORY_LABELS[category] ?? category.replaceAll("_", " ");
+        const categoryLabel = MY_DAY_CATEGORY_LABELS[category] ?? category.replaceAll("_", " ");
         rows.forEach((row) => {
           const mapped = mapApiTaskToMyDayTask(toApiTask(row), todayStart, category);
           flattened.push({
@@ -490,7 +460,9 @@ const MyDayTasksPage: React.FC = () => {
       suggestionsRequestRef.current = requestId;
       setSuggestionsLoading(true);
       try {
-        const suggestionsPayload = await getMyDaySuggestions({ search });
+        const suggestionsPayload = await getMyDaySuggestions(
+          search ? { search } : {},
+        );
         if (requestId !== suggestionsRequestRef.current) return;
         setSuggestedTasks(buildSuggestionsFromPayload(suggestionsPayload));
       } catch {
@@ -510,7 +482,7 @@ const MyDayTasksPage: React.FC = () => {
       setLoading(true);
       const [preferences, taskPayload, capacityPayload, rolloverPayload] = await Promise.all([
         getMyDayPreferences(),
-        listMyDayTasks({ date: today }),
+        listMyDayTasks(),
         getMyDayCapacity({ date: today }),
         getMyDayRollover(),
       ]);
@@ -524,10 +496,13 @@ const MyDayTasksPage: React.FC = () => {
       setTasks([...active, ...completed]);
       setPlanDate(taskPayload.plan_date ?? today);
       setTasksMeta(taskPayload.meta ?? {});
+      setIsEmptyByDesign(taskPayload.is_empty_by_design === true);
 
       const defaultCapacity = Number(preferences.daily_capacity_minutes ?? 0);
+      const resolvedDefault = defaultCapacity > 0 ? defaultCapacity : 8 * 60;
+      setDefaultCapacityMinutes(resolvedDefault);
       const effectiveCapacity = Number(capacityPayload.effective_capacity_minutes ?? 0);
-      const resolvedCapacity = effectiveCapacity || defaultCapacity || 8 * 60;
+      const resolvedCapacity = effectiveCapacity || resolvedDefault;
       setCapacityMinutes(resolvedCapacity);
       setPlannedMinutes(
         Number(capacityPayload.planned_minutes ?? taskPayload.meta?.planned_minutes ?? 0),
@@ -537,7 +512,14 @@ const MyDayTasksPage: React.FC = () => {
         mapApiTaskToMyDayTask(toApiTask(row), todayStart),
       );
       setRolloverTasks(rollover);
-      setRolloverShowPrompt(rolloverPayload.show_rollover_prompt === true);
+      setRolloverPreviousDate(rolloverPayload.previous_date ?? null);
+      const hasIncompleteToday = [...active, ...completed].some((task) => !task.isCompleted);
+      setRolloverShowPrompt(
+        resolveShowRolloverPrompt(rolloverPayload, {
+          hasIncompleteTodayTasks: hasIncompleteToday,
+          todayTaskCount: active.length + completed.length,
+        }),
+      );
     } catch {
       toast.error("Failed to load My Day tasks");
       setTasks([]);
@@ -576,10 +558,12 @@ const MyDayTasksPage: React.FC = () => {
     }
     if (rolloverAckSentRef.current) return;
     rolloverAckSentRef.current = true;
-    void ackMyDayRolloverPrompt().catch(() => {
-      rolloverAckSentRef.current = false;
-    });
-  }, [rolloverShowPrompt, carryOverTasks.length, carryOverMode]);
+    void ackMyDayRolloverPrompt()
+      .then(() => refreshMyDayPage())
+      .catch(() => {
+        rolloverAckSentRef.current = false;
+      });
+  }, [carryOverMode, carryOverTasks.length, refreshMyDayPage, rolloverShowPrompt]);
 
   useEffect(() => {
     if (carryOverTasks.length === 0) {
@@ -605,6 +589,21 @@ const MyDayTasksPage: React.FC = () => {
     [visibleTasks],
   );
 
+  const organizationalActiveTasks = useMemo(
+    () => activeTasks.filter((task) => task.isOrganizationalTask),
+    [activeTasks],
+  );
+
+  const standardActiveTasks = useMemo(
+    () => activeTasks.filter((task) => !task.isOrganizationalTask),
+    [activeTasks],
+  );
+
+  const unestimatedActiveCount = useMemo(
+    () => resolveMyDayUnestimatedCount(activeTasks, tasksMeta),
+    [activeTasks, tasksMeta],
+  );
+
   const completedTasks = useMemo(
     () => visibleTasks.filter((task) => task.isCompleted),
     [visibleTasks],
@@ -612,10 +611,15 @@ const MyDayTasksPage: React.FC = () => {
 
   const summary = useMemo(() => {
     const planned = resolveMyDayCapacityUsedMinutes(tasks, plannedMinutes);
-    const plannedPct = Math.min(100, Math.round((planned / Math.max(1, capacityMinutes)) * 100));
-    const capacityTone = getCapacityFillTone(plannedPct);
+    const plannedPct = Math.round((planned / Math.max(1, capacityMinutes)) * 100);
+    const capacityTone = getCapacityFillTone(Math.min(100, plannedPct));
     return { planned, plannedPct, capacityTone };
   }, [capacityMinutes, plannedMinutes, tasks]);
+
+  const capacityOverageMessage = useMemo(
+    () => formatCapacityOverageMessage(summary.planned, capacityMinutes),
+    [capacityMinutes, summary.planned],
+  );
 
   const groupedSuggestions = useMemo(() => {
     const byCategory = new Map<MyDaySuggestionCategory, SuggestedTask[]>();
@@ -626,12 +630,12 @@ const MyDayTasksPage: React.FC = () => {
     }
     const groups: { category: MyDaySuggestionCategory; label: string; items: SuggestedTask[] }[] =
       [];
-    for (const category of SUGGESTION_CATEGORY_ORDER) {
+    for (const category of MY_DAY_SUGGESTION_CATEGORY_ORDER) {
       const items = byCategory.get(category);
       if (!items?.length) continue;
       groups.push({
         category,
-        label: CATEGORY_LABELS[category] ?? category.replaceAll("_", " "),
+        label: MY_DAY_CATEGORY_LABELS[category] ?? category.replaceAll("_", " "),
         items,
       });
       byCategory.delete(category);
@@ -640,7 +644,7 @@ const MyDayTasksPage: React.FC = () => {
       if (!items.length) continue;
       groups.push({
         category,
-        label: CATEGORY_LABELS[category] ?? category.replaceAll("_", " "),
+        label: MY_DAY_CATEGORY_LABELS[category] ?? category.replaceAll("_", " "),
         items,
       });
     }
@@ -653,10 +657,15 @@ const MyDayTasksPage: React.FC = () => {
   }, [planDate, today]);
 
   const headerMetaLine = useMemo(() => {
-    const taskCount = resolveMyDayTaskCount(tasks, tasksMeta);
+    const taskCount = resolveMyDayTaskCount(tasks.length, tasksMeta);
     const usedMinutes = resolveMyDayCapacityUsedMinutes(tasks, plannedMinutes);
     return formatMyDayHeaderMetaLine(taskCount, usedMinutes);
   }, [plannedMinutes, tasks, tasksMeta]);
+
+  const rolloverPromptCopy = useMemo(
+    () => formatRolloverPromptCopy(rolloverPreviousDate),
+    [rolloverPreviousDate],
+  );
 
   const applyOptimisticMyDayAdd = useCallback((task: MyDayTask, estimatedMinutes?: number) => {
     const minutes = Math.max(0, estimatedMinutes ?? task.estimateMinutes ?? 0);
@@ -859,19 +868,60 @@ const MyDayTasksPage: React.FC = () => {
         action: "dismiss",
       }).then(() => {
         setCarryOverMode("skipped");
+        setRolloverShowPrompt(false);
         return refreshMyDayPage();
       }),
     );
   }, [refreshMyDayPage, selectedCarryOverIds]);
+
+  const handleCarryOverScheduleLater = useCallback(() => {
+    if (!scheduleLaterDate) {
+      toast.error("Choose a date to schedule missed tasks");
+      return;
+    }
+    swallowAsyncError(
+      submitMyDayRolloverAction({
+        task_ids: selectedCarryOverIds,
+        action: "schedule",
+        schedule_date: scheduleLaterDate,
+      }).then(() => {
+        setShowScheduleLaterModal(false);
+        setCarryOverMode("skipped");
+        setRolloverShowPrompt(false);
+        return refreshMyDayPage();
+      }),
+    );
+  }, [refreshMyDayPage, scheduleLaterDate, selectedCarryOverIds]);
 
   const handleCarryOverApply = useCallback(() => {
     swallowAsyncError(
       submitMyDayRolloverAction({
         task_ids: selectedCarryOverIds,
         action: "today",
-      }).then(() => refreshMyDayPage()),
+      }).then(() => {
+        setCarryOverMode("added");
+        setRolloverShowPrompt(false);
+        return refreshMyDayPage();
+      }),
     );
   }, [refreshMyDayPage, selectedCarryOverIds]);
+
+  const handleSaveDefaultCapacity = useCallback(async () => {
+    const parsed = parseCapacityDurationInput(defaultCapacityDraft);
+    if (parsed == null) {
+      toast.error("Enter default capacity like 8h or 2h 30m");
+      return;
+    }
+    try {
+      await patchMyDayPreferences({ daily_capacity_minutes: parsed });
+      setDefaultCapacityMinutes(parsed);
+      setShowDefaultCapacityModal(false);
+      refreshMyDayPage().catch(() => undefined);
+      toast.success("Default daily capacity saved");
+    } catch {
+      toast.error("Failed to save default capacity");
+    }
+  }, [defaultCapacityDraft, refreshMyDayPage]);
 
   const skipEstimateAndAddToMyDay = useCallback(async () => {
     if (pendingEstimateTask == null) return;
@@ -976,6 +1026,19 @@ const MyDayTasksPage: React.FC = () => {
                   <span className="myday-capacity-units"> (hours &amp; minutes)</span>
                 </span>
               </div>
+              <div className="myday-capacity-side">
+                <span className="myday-capacity-pct-inline">{summary.plannedPct}%</span>
+                <button
+                  type="button"
+                  className="btn btn-link btn-sm myday-default-capacity-btn"
+                  onClick={() => {
+                    setDefaultCapacityDraft(formatCapacityDurationInput(defaultCapacityMinutes));
+                    setShowDefaultCapacityModal(true);
+                  }}
+                >
+                  Default capacity
+                </button>
+              </div>
               <div className="myday-capacity-input">
                 {isEditingCapacity ? (
                   <>
@@ -1015,15 +1078,25 @@ const MyDayTasksPage: React.FC = () => {
             <div className="myday-progress-track myday-progress-track--capacity">
               <div
                 className={`myday-progress-fill myday-progress-fill--${summary.capacityTone}`}
-                style={{ width: `${summary.plannedPct}%` }}
+                style={{ width: `${Math.min(100, summary.plannedPct)}%` }}
               />
-              <span className="myday-capacity-pct">{summary.plannedPct}%</span>
             </div>
+            {capacityOverageMessage ? (
+              <output className="myday-capacity-alert">{capacityOverageMessage}</output>
+            ) : null}
+            {unestimatedActiveCount > 0 ? (
+              <p className="myday-unestimated-count">
+                {unestimatedActiveCount === 1
+                  ? "1 task without an estimate"
+                  : `${unestimatedActiveCount} tasks without an estimate`}
+              </p>
+            ) : null}
           </div>
 
-          {carryOverTasks.length > 0 && carryOverMode === "pending" && (
+          {carryOverTasks.length > 0 && carryOverMode === "pending" && rolloverShowPrompt ? (
             <div className="myday-carry-card">
-              <h4>Kal ke incomplete tasks</h4>
+              <h4>Missed yesterday</h4>
+              <p className="myday-carry-copy">{rolloverPromptCopy}</p>
               <div className="myday-carry-list">
                 {carryOverTasks.slice(0, 5).map((task) => (
                   <button
@@ -1038,22 +1111,24 @@ const MyDayTasksPage: React.FC = () => {
                 ))}
               </div>
               <div className="myday-carry-actions">
-                <button type="button" onClick={() => setCarryOverMode("added")}>Selected Add Karo</button>
+                <button type="button" onClick={handleCarryOverApply}>
+                  Add to today
+                </button>
                 <button
                   type="button"
-                  onClick={() => setSelectedCarryOverIds(carryOverTasks.map((t) => t.id))}
+                  onClick={() => {
+                    setScheduleLaterDate(moment().add(1, "day").format("YYYY-MM-DD"));
+                    setShowScheduleLaterModal(true);
+                  }}
                 >
-                  Sab Select Karo
+                  Schedule later
                 </button>
                 <button type="button" onClick={handleCarryOverSkip}>
-                  Skip
-                </button>
-                <button type="button" onClick={handleCarryOverApply}>
-                  Apply
+                  Handle later
                 </button>
               </div>
             </div>
-          )}
+          ) : null}
 
           <div className="myday-table-card">
             <div className="myday-section-header">
@@ -1066,10 +1141,14 @@ const MyDayTasksPage: React.FC = () => {
               <p className="myday-empty-state">Loading My Day tasks...</p>
             ) : null}
             {!loading && activeTasks.length === 0 ? (
-              <p className="myday-empty-state">No active tasks in My Day</p>
+              <p className="myday-empty-state">
+                {isEmptyByDesign
+                  ? "My Day starts empty each morning. Add tasks from suggestions or create a new task."
+                  : "No active tasks in My Day"}
+              </p>
             ) : null}
             <div className="myday-task-card-list">
-              {activeTasks.map((task) => (
+              {standardActiveTasks.map((task) => (
                 <MyDayTaskCard
                   key={task.id}
                   task={task}
@@ -1079,7 +1158,34 @@ const MyDayTasksPage: React.FC = () => {
                 />
               ))}
             </div>
+            {organizationalActiveTasks.length > 0 ? (
+              <>
+                <div className="myday-section-title myday-section-title--nested">
+                  Organizational Tasks
+                </div>
+                <div className="myday-task-card-list">
+                  {organizationalActiveTasks.map((task) => (
+                    <MyDayTaskCard
+                      key={`org-${task.id}`}
+                      task={task}
+                      onToggleComplete={onTaskToggleCompleteClick}
+                      onRemove={onTaskRemoveClick}
+                      onEditEstimate={handleOpenEstimateModal}
+                    />
+                  ))}
+                </div>
+              </>
+            ) : null}
           </div>
+
+          {reporteeExtensions.length > 0 ? (
+            <MyDayTeamSection
+              planDate={planDate || today}
+              managerExtension={managerExtension}
+              reporteeExtensions={reporteeExtensions}
+              hierarchyExtensions={hierarchyDataExtensions}
+            />
+          ) : null}
 
           {completedTasks.length > 0 ? (
             <div className="myday-table-card myday-completed-card">
@@ -1204,6 +1310,70 @@ const MyDayTasksPage: React.FC = () => {
         todayIso={today}
         onClose={() => setShowHistoryModal(false)}
       />
+
+      <Modal
+        show={showDefaultCapacityModal}
+        onHide={() => setShowDefaultCapacityModal(false)}
+        centered
+      >
+        <Modal.Header closeButton>
+          <Modal.Title>Default daily capacity</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <p className="text-muted small mb-2">
+            Used as your default when opening My Day (Settings / My Day).
+          </p>
+          <Form.Control
+            type="text"
+            placeholder="8h or 2h 30m"
+            value={defaultCapacityDraft}
+            onChange={(e) => setDefaultCapacityDraft(e.target.value)}
+          />
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={() => setShowDefaultCapacityModal(false)}>
+            Cancel
+          </Button>
+          <Button
+            onClick={() => {
+              handleSaveDefaultCapacity().catch(() => undefined);
+            }}
+          >
+            Save default
+          </Button>
+        </Modal.Footer>
+      </Modal>
+
+      <Modal
+        show={showScheduleLaterModal}
+        onHide={() => setShowScheduleLaterModal(false)}
+        centered
+      >
+        <Modal.Header closeButton>
+          <Modal.Title>Schedule missed tasks</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <Form.Label>Schedule for</Form.Label>
+          <Form.Control
+            type="date"
+            min={today}
+            value={scheduleLaterDate}
+            onChange={(e) => setScheduleLaterDate(e.target.value)}
+          />
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={() => setShowScheduleLaterModal(false)}>
+            Cancel
+          </Button>
+          <Button
+            onClick={() => {
+              handleCarryOverScheduleLater();
+            }}
+          >
+            Schedule later
+          </Button>
+        </Modal.Footer>
+      </Modal>
     </div>
   );
 };

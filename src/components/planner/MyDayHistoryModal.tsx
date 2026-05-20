@@ -71,8 +71,11 @@ export function MyDayHistoryModal({ show, todayIso, onClose }: MyDayHistoryModal
       setRows([...active, ...completed]);
 
       const meta = payload.meta ?? {};
-      const activeCount = meta.active_count ?? active.length;
-      const completedCount = meta.completed_count ?? completed.length;
+      const activeCount =
+        meta.tasks_planned != null && meta.tasks_completed != null
+          ? Math.max(0, meta.tasks_planned - meta.tasks_completed)
+          : (meta.active_count ?? active.length);
+      const completedCount = meta.tasks_completed ?? meta.completed_count ?? completed.length;
       const planned = Number(meta.planned_minutes ?? 0);
       const done = Number(meta.completed_minutes ?? 0);
       setMetaLine(
