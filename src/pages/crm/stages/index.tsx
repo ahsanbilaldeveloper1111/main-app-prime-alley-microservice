@@ -66,7 +66,6 @@ const StagesManagement = ({ hideBreadcrumb }: CrmPageDisplayProps = {}) => {
     setSelectedStagesColumns,
     stagesPagination,
     handleStagesPaginationChange,
-    handleStagesSort,
     loadingStages,
     showRestoreModal,
     setShowRestoreModal,
@@ -212,10 +211,7 @@ const StagesManagement = ({ hideBreadcrumb }: CrmPageDisplayProps = {}) => {
             columns={stagesTableColumns}
             actions={[]}
             showActions={false}
-            sortable
-            defaultSortBy={stagesPagination.sortBy}
-            defaultSortOrder={stagesPagination.sortOrder}
-            onSort={handleStagesSort}
+            sortable={false}
             loading={loadingStages}
             emptyMessage="No stages found matching your criteria"
             pagination={{

@@ -31,10 +31,8 @@ function editDealWizardStepLabel(step: number): string {
 function editDealWizardStepDisplayNumber(
   step: number,
   dealTemplate: unknown,
-  availableTemplatesLength: number,
 ): number {
-  const hideStep2 = !dealTemplate && availableTemplatesLength === 0;
-  if (hideStep2 && step > 2) {
+  if (!dealTemplate && step > 2) {
     return step;
   }
   return step + 1;
@@ -44,17 +42,14 @@ export type EditDealWizardTimelineProps = Readonly<{
   formStep: number;
   setFormStep: (step: number) => void;
   dealTemplate: unknown;
-  availableTemplatesLength: number;
 }>;
 
 export function EditDealWizardTimeline({
   formStep,
   setFormStep,
   dealTemplate,
-  availableTemplatesLength,
 }: EditDealWizardTimelineProps) {
-  const hasTemplateStep =
-    Boolean(dealTemplate) || availableTemplatesLength > 0;
+  const hasTemplateStep = Boolean(dealTemplate);
   const widthPct = getEditDealWizardProgressWidthPercent(
     formStep,
     hasTemplateStep,
@@ -86,14 +81,13 @@ export function EditDealWizardTimeline({
         />
 
         {[0, 1, 2, 3, 4].map((step) => {
-          if (step === 2 && !dealTemplate && availableTemplatesLength === 0) {
+          if (step === 2 && !dealTemplate) {
             return null;
           }
 
           const displayNumber = editDealWizardStepDisplayNumber(
             step,
             dealTemplate,
-            availableTemplatesLength,
           );
 
           return (

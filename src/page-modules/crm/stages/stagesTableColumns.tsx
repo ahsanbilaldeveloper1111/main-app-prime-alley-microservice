@@ -25,7 +25,7 @@ function buildNameColumn(): TableColumn<StageRow> {
   return {
     key: "name",
     label: "Stage Name",
-    sortable: true,
+    sortable: false,
     type: "custom",
     render: (stage) => (
       <div className="d-flex align-items-center gap-2">
@@ -43,7 +43,7 @@ function buildSequenceColumn(): TableColumn<StageRow> {
   return {
     key: "sequence",
     label: "Sequence",
-    sortable: true,
+    sortable: false,
     align: "center",
     type: "custom",
     width: "120px",
@@ -55,7 +55,7 @@ function buildTypeColumn(): TableColumn<StageRow> {
   return {
     key: "type",
     label: "Type",
-    sortable: true,
+    sortable: false,
     type: "custom",
     render: (stage) => (
       <Badge

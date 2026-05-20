@@ -297,9 +297,14 @@ async function loadLeadTemplateImpl(args: {
     if (template) {
       args.setDealTemplate(template);
       args.setTemplateFieldsData(initialFields);
+    } else {
+      args.setDealTemplate(null);
+      args.setTemplateFieldsData({});
     }
-  } catch (error) {
+  } catch (error: unknown) {
     console.error("Failed to fetch deal template:", error);
+    args.setDealTemplate(null);
+    args.setTemplateFieldsData({});
   } finally {
     args.setLoadingTemplate(false);
   }

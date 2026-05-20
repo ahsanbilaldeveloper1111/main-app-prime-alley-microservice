@@ -2369,7 +2369,7 @@ export function useCrmLeadsPageModel() {
       {
         key: "email",
         label: "Email",
-        sortable: true,
+        sortable: false,
         type: "text",
       },
       {

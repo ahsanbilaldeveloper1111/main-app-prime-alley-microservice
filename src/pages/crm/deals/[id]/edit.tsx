@@ -15,7 +15,6 @@ import {
   getCrmProducts,
   getCampaignById,
   getIndustries,
-  getDealTemplates,
   CrmProduct,
   IndustryData,
   DealTemplateData,
@@ -304,7 +303,6 @@ type EditDealFormActionDeps = Readonly<{
   probability: number;
   estimationItems: EstimationLineItem[];
   setLoading: React.Dispatch<React.SetStateAction<boolean>>;
-  availableTemplates: unknown[];
 }>;
 
 function useEditDealFormActions(deps: EditDealFormActionDeps) {
@@ -322,7 +320,6 @@ function useEditDealFormActions(deps: EditDealFormActionDeps) {
     probability,
     estimationItems,
     setLoading,
-    availableTemplates,
   } = deps;
 
   const validateCurrentStep = useCallback(
@@ -341,18 +338,12 @@ function useEditDealFormActions(deps: EditDealFormActionDeps) {
       e.preventDefault();
       if (!validateCurrentStep()) return;
       let nextStep = formStep + 1;
-      if (nextStep === 2 && !dealTemplate && availableTemplates.length === 0) {
+      if (nextStep === 2 && !dealTemplate) {
         nextStep = 3;
       }
       setFormStep(Math.min(4, nextStep));
     },
-    [
-      validateCurrentStep,
-      formStep,
-      dealTemplate,
-      availableTemplates.length,
-      setFormStep,
-    ],
+    [validateCurrentStep, formStep, dealTemplate, setFormStep],
   );
 
   const handleSubmit = useCallback(
@@ -362,7 +353,6 @@ function useEditDealFormActions(deps: EditDealFormActionDeps) {
         advanceEditDealFormStepOnSubmit({
           formStep,
           dealTemplate,
-          availableTemplates,
           setFormStep,
         })
       ) {
@@ -383,7 +373,6 @@ function useEditDealFormActions(deps: EditDealFormActionDeps) {
         probability,
         estimationItems,
         setLoading,
-        availableTemplates,
       });
     },
     [
@@ -400,7 +389,6 @@ function useEditDealFormActions(deps: EditDealFormActionDeps) {
       probability,
       estimationItems,
       setLoading,
-      availableTemplates,
     ],
   );
 
@@ -499,20 +487,11 @@ function useEditDealPageQueries(sourceLead: { campaign_id?: unknown } | null) {
       return r.data ?? [];
     },
   });
-  const dealTemplatesQuery = useQuery({
-    queryKey: crmAppKeys.campaigns.dealTemplates(),
-    queryFn: async () => {
-      const response = await getDealTemplates({ per_page: 1000, page: 1 });
-      return response?.data ?? [];
-    },
-  });
-
   const stages = stagesQuery.data ?? [];
   const extensions = extensionsQuery.data ?? [];
   const businessTypes = businessTypesQuery.data ?? [];
   const allIndustries = industriesQuery.data ?? [];
   const loadingAllIndustries = industriesQuery.isPending;
-  const availableTemplates = dealTemplatesQuery.data ?? [];
 
   const campaignIdForQuery = sourceLead?.campaign_id
     ? Number(sourceLead.campaign_id)
@@ -532,7 +511,6 @@ function useEditDealPageQueries(sourceLead: { campaign_id?: unknown } | null) {
     businessTypes,
     allIndustries,
     loadingAllIndustries,
-    availableTemplates,
     campaignQuery,
     industriesQuery,
     loadingIndustries,
@@ -583,7 +561,6 @@ type EditDealLoadedPhaseIntegrationArgs = Readonly<{
   probability: number;
   estimationItems: EstimationLineItem[];
   setLoading: React.Dispatch<React.SetStateAction<boolean>>;
-  availableTemplates: unknown[];
 }>;
 
 function useEditDealLoadedPhaseIntegration(a: EditDealLoadedPhaseIntegrationArgs) {
@@ -649,7 +626,6 @@ function useEditDealLoadedPhaseIntegration(a: EditDealLoadedPhaseIntegrationArgs
     probability: a.probability,
     estimationItems: a.estimationItems,
     setLoading: a.setLoading,
-    availableTemplates: a.availableTemplates,
   });
 
   return { addItemAvailableIndustries, handleNextStep, handleSubmit };
@@ -754,7 +730,6 @@ const EditDeal = () => { // NOSONAR S3776 — wizard markup; logic extracted to 
     businessTypes,
     allIndustries,
     loadingAllIndustries,
-    availableTemplates,
     campaignQuery,
     industriesQuery,
     loadingIndustries,
@@ -799,7 +774,6 @@ const EditDeal = () => { // NOSONAR S3776 — wizard markup; logic extracted to 
       probability,
       estimationItems,
       setLoading,
-      availableTemplates,
     });
 
   if (fetching) {
@@ -849,7 +823,6 @@ const EditDeal = () => { // NOSONAR S3776 — wizard markup; logic extracted to 
                     formStep={formStep}
                     setFormStep={setFormStep}
                     dealTemplate={dealTemplate}
-                    availableTemplatesLength={availableTemplates.length}
                   />
 
                   {/* Form Content - Same structure as create page */}
@@ -1255,8 +1228,7 @@ const EditDeal = () => { // NOSONAR S3776 — wizard markup; logic extracted to 
                     )}
 
                     {/* Step 2: Deal Characteristics */}
-                    {formStep === 2 &&
-                      (dealTemplate || availableTemplates.length > 0) && (
+                    {formStep === 2 && dealTemplate && (
                         <Card className="mb-3 border-0 bg-light">
                           <Card.Body>
                             <div className="d-flex justify-content-between align-items-center mb-4">

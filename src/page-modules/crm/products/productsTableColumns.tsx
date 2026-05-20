@@ -18,7 +18,7 @@ function buildProductNameColumn(): TableColumn<ProductDisplayData> {
   return {
     key: "productName",
     label: "Product Name",
-    sortable: true,
+    sortable: false,
     type: "custom",
     render: (product) => (
       <span className="fw-semibold">{product.productName}</span>
@@ -30,7 +30,7 @@ function buildSkuColumn(): TableColumn<ProductDisplayData> {
   return {
     key: "sku",
     label: "SKU",
-    sortable: true,
+    sortable: false,
     type: "custom",
     render: (product) => (
       <Badge bg="light" text="dark" className="font-monospace">
@@ -44,7 +44,7 @@ function buildPriceColumn(): TableColumn<ProductDisplayData> {
   return {
     key: "price",
     label: "Price",
-    sortable: true,
+    sortable: false,
     type: "custom",
     render: (product) => (
       <span className="fw-semibold text-success">
@@ -58,7 +58,7 @@ function buildCurrencyColumn(): TableColumn<ProductDisplayData> {
   return {
     key: "currency",
     label: "Currency",
-    sortable: true,
+    sortable: false,
   };
 }
 
@@ -66,7 +66,7 @@ function buildCategoryColumn(): TableColumn<ProductDisplayData> {
   return {
     key: "category",
     label: "Category",
-    sortable: true,
+    sortable: false,
     type: "custom",
     render: (product) => (
       <Badge bg="info" className="bg-opacity-10 text-dark">
@@ -80,7 +80,7 @@ function buildBrandColumn(): TableColumn<ProductDisplayData> {
   return {
     key: "brand",
     label: "Brand",
-    sortable: true,
+    sortable: false,
     type: "custom",
     render: (product) => <span>{product.brand || "N/A"}</span>,
   };
@@ -90,7 +90,7 @@ function buildStatusColumn(): TableColumn<ProductDisplayData> {
   return {
     key: "status",
     label: "Status",
-    sortable: true,
+    sortable: false,
     type: "custom",
     render: (product) => (
       <Badge bg={product.status === "Active" ? "success" : "secondary"}>
@@ -120,7 +120,7 @@ function buildCreatedColumn(): TableColumn<ProductDisplayData> {
   return {
     key: "created",
     label: "Created",
-    sortable: true,
+    sortable: false,
     type: "custom",
     render: (product) => (
       <span className="text-muted">{product.created}</span>

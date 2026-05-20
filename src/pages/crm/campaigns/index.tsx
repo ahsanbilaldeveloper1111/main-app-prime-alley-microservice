@@ -1188,7 +1188,6 @@ const CrmCampaigns = ({ hideBreadcrumb }: CrmPageDisplayProps = {}) => { // NOSO
     selectedColumns: selectedCampaignTableColumns,
     setSelectedColumns: setSelectedCampaignTableColumns,
     handlePaginationChange: handleCampaignsPaginationChange,
-    handleSort: handleCampaignsSort,
   } = useCrmSettingsTableState({
     defaultSelectedColumns: DEFAULT_CAMPAIGN_SELECTED_COLUMNS,
     selectableColumnKeys: CAMPAIGN_SELECTABLE_COLUMN_KEYS,
@@ -1883,7 +1882,7 @@ const CrmCampaigns = ({ hideBreadcrumb }: CrmPageDisplayProps = {}) => { // NOSO
     {
       key: "name",
       label: "Campaign Name",
-      sortable: true,
+      sortable: false,
       type: "custom",
       width: "26%",
       render: (campaign: any) => (
@@ -1912,7 +1911,7 @@ const CrmCampaigns = ({ hideBreadcrumb }: CrmPageDisplayProps = {}) => { // NOSO
     {
       key: "description",
       label: "Description",
-      sortable: true,
+      sortable: false,
       type: "custom",
       width: "34%",
       render: (campaign: any) => (
@@ -1928,7 +1927,7 @@ const CrmCampaigns = ({ hideBreadcrumb }: CrmPageDisplayProps = {}) => { // NOSO
     {
       key: "status",
       label: "Status",
-      sortable: true,
+      sortable: false,
       type: "custom",
       render: (campaign: any) => (
         <Badge bg={campaign.status === "active" ? "success" : "secondary"} className="bg-opacity-10 text-dark">
@@ -1939,7 +1938,7 @@ const CrmCampaigns = ({ hideBreadcrumb }: CrmPageDisplayProps = {}) => { // NOSO
     {
       key: "start_date",
       label: "Date Range",
-      sortable: true,
+      sortable: false,
       type: "custom",
       render: (campaign: any) => (
         <div>
@@ -1964,7 +1963,7 @@ const CrmCampaigns = ({ hideBreadcrumb }: CrmPageDisplayProps = {}) => { // NOSO
     {
       key: "created_by",
       label: "Created By",
-      sortable: true,
+      sortable: false,
       type: "custom",
       render: (campaign: any) => (
         <small className="text-muted">{getCreatedByName(campaign)}</small>
@@ -1973,7 +1972,7 @@ const CrmCampaigns = ({ hideBreadcrumb }: CrmPageDisplayProps = {}) => { // NOSO
     {
       key: "created_at",
       label: "Created",
-      sortable: true,
+      sortable: false,
       type: "custom",
       render: (campaign: any) => (
         <small className="text-muted">
@@ -2107,10 +2106,7 @@ const CrmCampaigns = ({ hideBreadcrumb }: CrmPageDisplayProps = {}) => { // NOSO
           actions={campaignsTableActions}
           showActions={campaignsTableActions.length > 0}
           actionsLabel="Actions"
-          sortable
-          defaultSortBy={campaignsPagination.sortBy}
-          defaultSortOrder={campaignsPagination.sortOrder}
-          onSort={handleCampaignsSort}
+          sortable={false}
           loading={listLoading}
           emptyMessage="No campaigns found matching your criteria"
           pagination={{

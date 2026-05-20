@@ -1,4 +1,5 @@
 import { toast } from "react-toastify";
+import { isAxiosError } from "axios";
 import { reportApiError } from "./sentryLogger";
 import axiosInstance from "./axios";
 import { ModuleSlug } from "./Helper";
@@ -4412,6 +4413,16 @@ export const deleteDealTemplate = async (id: number): Promise<void> => {
   }
 };
 
+type RelevantDealTemplateApiPayload = DealTemplateData | null | undefined;
+
+function getApiErrorMessageFromResponseData(data: unknown): string {
+  if (data === undefined || data === null || typeof data !== "object") {
+    return "";
+  }
+  const message = (data as { message?: unknown }).message;
+  return message == null ? "" : String(message);
+}
+
 export const getRelevantDealTemplate = async (params: {
   lead_id?: number;
   deal_id?: number;
@@ -4421,17 +4432,21 @@ export const getRelevantDealTemplate = async (params: {
       "/crm/deal-templates/relevant/get",
       { params },
     );
-    return extractData<DealTemplateData>(response.data);
-  } catch (error: any) {
+    const parsed = extractData<RelevantDealTemplateApiPayload>(response.data);
+    return parsed ?? null;
+  } catch (error: unknown) {
     // Return null if no template found (not an error)
-    if (error?.response?.status === 404) {
+    if (isAxiosError(error) && error.response?.status === 404) {
       return null;
     }
-    toast.error(
-      error?.response?.data?.message ||
-        error?.message ||
-        "Failed to fetch relevant deal template",
+    const fromBody = getApiErrorMessageFromResponseData(
+      isAxiosError(error) ? error.response?.data : undefined,
     );
+    const message =
+      fromBody ||
+      (error instanceof Error ? error.message : "") ||
+      "Failed to fetch relevant deal template";
+    toast.error(message);
     throw error;
   }
 };

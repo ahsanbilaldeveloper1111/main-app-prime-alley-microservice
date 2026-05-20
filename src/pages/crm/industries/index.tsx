@@ -169,6 +169,7 @@ const IndustriesPage = ({ hideBreadcrumb }: CrmPageDisplayProps = {}) => {
         <GenericTable<IndustryData>
           data={industries}
           columns={industriesTableColumns}
+          sortable={false}
           showToolbar
           toolbar={industriesToolbarConfig}
           pagination={{

@@ -56,6 +56,7 @@ const BusinessTypes = ({ hideBreadcrumb }: CrmPageDisplayProps = {}) => {
         <GenericTable<BusinessTypeData>
           data={businessTypes}
           columns={businessTableColumns}
+          sortable={false}
           showToolbar
           toolbar={businessToolbarConfig}
           pagination={{

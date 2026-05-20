@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Button, Form, Badge, Dropdown } from "react-bootstrap";
-import PhoneInput from "react-phone-number-input";
-import { parsePhoneNumber } from "react-phone-number-input";
+import PhoneInput, { parsePhoneNumber } from "react-phone-number-input";
 import { Plus,  Trash2, X } from "lucide-react";
 import { toast } from "react-toastify";
 import {
@@ -12,7 +11,6 @@ import {
   createEstimate,
   getIndustries,
   getBusinessTypes,
-  getDealTemplates,
   CrmProduct,
   StageData,
   DealTemplateData,
@@ -43,6 +41,18 @@ import {
   validateConvertDealStep2,
   validateConvertDealStep4,
 } from "@utils/crm/convertToDealShared";
+
+function leadConvertTemplateFieldInputType(
+  fieldType: string | undefined,
+): "date" | "email" | "text" {
+  if (fieldType === "date") {
+    return "date";
+  }
+  if (fieldType === "email") {
+    return "email";
+  }
+  return "text";
+}
 
 export interface ConvertLeadToDealModalProps {
   show: boolean;
@@ -92,8 +102,6 @@ const ConvertLeadToDealModal: React.FC<ConvertLeadToDealModalProps> = ({
   const [dealTemplate, setDealTemplate] = useState<DealTemplateData | null>(null);
   const [loadingTemplate, setLoadingTemplate] = useState(false);
   const [templateFieldsData, setTemplateFieldsData] = useState<Record<string, any>>({});
-  const [availableTemplates, setAvailableTemplates] = useState<DealTemplateData[]>([]);
-  const [loadingTemplateList, setLoadingTemplateList] = useState(false);
   const [businessTypes, setBusinessTypes] = useState<BusinessTypeData[]>([]);
   const [businessTypeId, setBusinessTypeId] = useState<number | null>(null);
   const [businessTypeOther, setBusinessTypeOther] = useState<string>("");
@@ -178,7 +186,6 @@ const ConvertLeadToDealModal: React.FC<ConvertLeadToDealModalProps> = ({
       fetchExtensions();
       fetchBusinessTypes();
       fetchAllIndustries();
-      fetchAvailableTemplates();
       const fetchLineItemProducts = async () => {
         setLoadingLineItemProducts(true);
         try {
@@ -222,13 +229,19 @@ const ConvertLeadToDealModal: React.FC<ConvertLeadToDealModalProps> = ({
 
       try {
         setLoadingTemplate(true);
-        const { template, templateFieldsData: initialFields } = await loadDealTemplateForLead(leadId);
+        const { template, templateFieldsData: initialFields } =
+          await loadDealTemplateForLead(leadId);
         if (template) {
           setDealTemplate(template);
           setTemplateFieldsData(initialFields);
+        } else {
+          setDealTemplate(null);
+          setTemplateFieldsData({});
         }
-      } catch (error) {
+      } catch (error: unknown) {
         console.error("Failed to fetch deal template:", error);
+        setDealTemplate(null);
+        setTemplateFieldsData({});
       } finally {
         setLoadingTemplate(false);
       }
@@ -261,45 +274,6 @@ const ConvertLeadToDealModal: React.FC<ConvertLeadToDealModalProps> = ({
     } finally {
       setLoadingLead(false);
     }
-  };
-
-  const fetchAvailableTemplates = async () => {
-    try {
-      setLoadingTemplateList(true);
-      const response = await getDealTemplates({ per_page: 1000, page: 1 });
-      setAvailableTemplates(response?.data || []);
-    } catch (error) {
-      console.error("Failed to fetch deal templates:", error);
-      setAvailableTemplates([]);
-    } finally {
-      setLoadingTemplateList(false);
-    }
-  };
-
-  const handleTemplateSelectionChange = (templateIdRaw: string) => {
-    if (!templateIdRaw) {
-      setDealTemplate(null);
-      setTemplateFieldsData({});
-      return;
-    }
-
-    const selectedTemplateId = Number(templateIdRaw);
-    const selectedTemplate = availableTemplates.find(
-      (template) => template.id === selectedTemplateId,
-    );
-
-    if (!selectedTemplate) {
-      return;
-    }
-
-    setDealTemplate(selectedTemplate);
-    const nextTemplateFieldValues: Record<string, string> = {};
-    (selectedTemplate.fields || []).forEach((field) => {
-      const previousValue = templateFieldsData[field.field_name];
-      nextTemplateFieldValues[field.field_name] =
-        previousValue == null ? "" : String(previousValue);
-    });
-    setTemplateFieldsData(nextTemplateFieldValues);
   };
 
   const fetchStages = async () => {
@@ -942,28 +916,19 @@ const ConvertLeadToDealModal: React.FC<ConvertLeadToDealModalProps> = ({
                     </div>
                   </>
 
-                {/* Deal Characteristics (template) */}
+                {/* Deal Characteristics (template from API when available) */}
                   <h3 style={sectionHeadingNext}>DEAL CHARACTERISTICS</h3>
-                  <div style={fieldWrap}>
-                    {fieldLabel("Deal Template")}
-                    <Form.Select
-                      value={dealTemplate?.id || ""}
-                      onChange={(e) => handleTemplateSelectionChange(e.target.value)}
-                      style={inputStyle}
-                      disabled={loadingTemplateList}
-                    >
-                      <option value="">
-                        {loadingTemplateList
-                          ? "Loading templates..."
-                          : "Select Deal Template (Optional)"}
-                      </option>
-                      {availableTemplates.map((template) => (
-                        <option key={template.id} value={template.id}>
-                          {template.name}
-                        </option>
-                      ))}
-                    </Form.Select>
-                  </div>
+                  {loadingTemplate && (
+                    <div style={{ textAlign: "center", padding: "16px" }}>
+                      <div className="spinner-border spinner-border-sm text-primary" aria-hidden />
+                      <p className="small text-muted mt-2 mb-0">Loading deal template...</p>
+                    </div>
+                  )}
+                  {!loadingTemplate && !dealTemplate && (
+                    <p className="text-muted small mb-3">
+                      No deal template applies to this lead. You can continue without template fields.
+                    </p>
+                  )}
 
                   {dealTemplate && (
                     <>
@@ -988,14 +953,7 @@ const ConvertLeadToDealModal: React.FC<ConvertLeadToDealModalProps> = ({
                         {dealTemplate.description}
                       </div>
                     )}
-                    {loadingTemplate ? (
-                      <div style={{ textAlign: "center", padding: "24px" }}>
-                        <div className="spinner-border text-primary" role="status" />
-                        <p style={{ marginTop: "12px", marginBottom: 0, color: "#6c757d" }}>
-                          Loading template fields...
-                        </p>
-                      </div>
-                    ) : dealTemplate.fields && dealTemplate.fields.length > 0 ? (
+                    {dealTemplate.fields && dealTemplate.fields.length > 0 ? (
                       (() => {
                         const fieldsArray = dealTemplate.fields || [];
                         const sortedFields = [...fieldsArray].sort(
@@ -1024,40 +982,20 @@ const ConvertLeadToDealModal: React.FC<ConvertLeadToDealModalProps> = ({
                                   <option value="">
                                     Select {field.field_name}
                                   </option>
-                                  {field.options &&
-                                    field.options.map(
-                                      (option: string, index: number) => (
-                                        <option key={index} value={option}>
-                                          {option}
-                                        </option>
-                                      )
-                                    )}
+                                  {field.options?.map((option: string) => (
+                                    <option
+                                      key={`${field.field_name}:${option}`}
+                                      value={option}
+                                    >
+                                      {option}
+                                    </option>
+                                  ))}
                                 </Form.Select>
-                              ) : field.field_type === "text" ||
-                                !field.field_type ? (
-                                <input
-                                  type="text"
-                                  value={fieldValue}
-                                  onChange={(e) =>
-                                    setTemplateFieldsData({
-                                      ...templateFieldsData,
-                                      [field.field_name]: e.target.value,
-                                    })
-                                  }
-                                  style={inputStyle}
-                                  onFocus={focusStyle}
-                                  onBlur={blurStyle}
-                                  placeholder={`Enter ${field.field_name}`}
-                                />
                               ) : (
                                 <input
-                                  type={
-                                    field.field_type === "date"
-                                      ? "date"
-                                      : field.field_type === "email"
-                                        ? "email"
-                                        : "text"
-                                  }
+                                  type={leadConvertTemplateFieldInputType(
+                                    field.field_type,
+                                  )}
                                   value={fieldValue}
                                   onChange={(e) =>
                                     setTemplateFieldsData({

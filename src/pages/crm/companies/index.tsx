@@ -1766,7 +1766,7 @@ const CrmCompanyManagement = () => {
       {
         key: "last_called_at",
         label: "Last Activity Date",
-        sortable: true,
+        sortable: false,
         type: "text",
         accessor: (row) =>
           row.last_called_at
@@ -2021,7 +2021,7 @@ const CrmCompanyManagement = () => {
         key: "last_called_at",
         name: "Last Called",
         selector: (row: any) => row.last_called_at,
-        sortable: true,
+        sortable: false,
         cell: (props: any) => {
           // Generate random date within last week
           const now = moment();

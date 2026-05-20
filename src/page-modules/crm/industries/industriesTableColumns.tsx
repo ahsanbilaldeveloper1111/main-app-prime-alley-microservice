@@ -61,7 +61,7 @@ export function buildIndustriesTableColumns(
     {
       key: "name",
       label: "Name",
-      sortable: true,
+      sortable: false,
       type: "custom",
       width: "240px",
       render: (industry) => (
@@ -81,7 +81,7 @@ export function buildIndustriesTableColumns(
     {
       key: "created_at",
       label: "Created At",
-      sortable: true,
+      sortable: false,
       type: "custom",
       width: "200px",
       render: (industry) => (

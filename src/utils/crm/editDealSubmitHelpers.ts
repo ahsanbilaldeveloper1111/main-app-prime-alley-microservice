@@ -26,20 +26,18 @@ export type SubmitUpdatedDealFromEditPageArgs = Readonly<{
   probability: number;
   estimationItems: EstimationLineItem[];
   setLoading: (v: boolean) => void;
-  availableTemplates: unknown[];
 }>;
 
 /** Advance wizard step when submitting before the final step. */
 export function advanceEditDealFormStepOnSubmit(args: {
   formStep: number;
   dealTemplate: DealTemplateData | null;
-  availableTemplates: unknown[];
   setFormStep: (n: number) => void;
 }): boolean {
-  const { formStep, dealTemplate, availableTemplates, setFormStep } = args;
+  const { formStep, dealTemplate, setFormStep } = args;
   if (formStep >= 4) return false;
   let nextStep = formStep + 1;
-  if (nextStep === 2 && !dealTemplate && availableTemplates.length === 0) {
+  if (nextStep === 2 && !dealTemplate) {
     nextStep = 3;
   }
   setFormStep(nextStep);
