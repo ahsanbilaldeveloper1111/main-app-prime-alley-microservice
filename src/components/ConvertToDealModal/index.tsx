@@ -888,8 +888,8 @@ function DealCharacteristicsStep(props: Readonly<{
           required={field.is_required}
         >
           <option value="">Select {field.field_name}</option>
-          {field.options?.map((option: string, index: number) => (
-            <option key={index} value={option}>
+          {field.options?.map((option: string) => (
+            <option key={`${field.field_name}:${option}`} value={option}>
               {option}
             </option>
           ))}
