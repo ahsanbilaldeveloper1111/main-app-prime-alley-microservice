@@ -114,7 +114,11 @@ function removeCallByCallIdFromMap(newMap: Map<string, ActiveCallMapValue>, call
   }
 }
 
-function mergeCallStateIntoMap(newMap: Map<string, ActiveCallMapValue>, callState: any): void {
+function mergeCallStateIntoMap(
+  newMap: Map<string, ActiveCallMapValue>,
+  callState: any,
+  previousActiveCall?: ActiveCallMapValue,
+): void {
   if (!callState.callId || !callState.parties?.length) {
     return;
   }
@@ -134,13 +138,12 @@ function mergeCallStateIntoMap(newMap: Map<string, ActiveCallMapValue>, callStat
   const callNumber = calledAddress || callingAddress;
   const callKey = callId || `call_${Date.now()}`;
 
-  const parsedApiStart = parseCallAnswerStartTimeUtc(callState);
-  const startTime = parsedApiStart ?? new Date();
+  const startTime = resolveActiveCallStartTime(callState, previousActiveCall);
 
   let duration = 0;
-  if (localStatus === 'connected' && parsedApiStart) {
+  if (localStatus === 'connected') {
     const now = new Date();
-    duration = Math.max(0, Math.round((now.getTime() - parsedApiStart.getTime()) / 1000));
+    duration = Math.max(0, Math.round((now.getTime() - startTime.getTime()) / 1000));
   }
 
   const existingCall = Array.from(newMap.values()).find(
@@ -150,6 +153,19 @@ function mergeCallStateIntoMap(newMap: Map<string, ActiveCallMapValue>, callStat
   );
 
   if (existingCall) {
+    const existingStart = coerceActiveCallStartDate(existingCall.startTime);
+    const mergedStart =
+      existingStart && existingStart.getTime() < startTime.getTime()
+        ? existingStart
+        : startTime;
+    const mergedDuration =
+      localStatus === 'connected'
+        ? Math.max(
+            duration,
+            existingCall.duration ?? 0,
+            previousActiveCall?.duration ?? 0,
+          )
+        : existingCall.duration || 0;
     newMap.set(existingCall.id, {
       ...existingCall,
       status: localStatus,
@@ -158,8 +174,8 @@ function mergeCallStateIntoMap(newMap: Map<string, ActiveCallMapValue>, callStat
       calledAddress: calledAddress || existingCall.calledAddress,
       callingDeviceName: callingDeviceName || existingCall.callingDeviceName,
       callingDeviceType: callingDeviceType || existingCall.callingDeviceType,
-      startTime: existingCall.startTime || startTime,
-      duration: localStatus === 'connected' ? duration : existingCall.duration || 0,
+      startTime: mergedStart,
+      duration: mergedDuration,
     });
     return;
   }
@@ -178,9 +194,33 @@ function mergeCallStateIntoMap(newMap: Map<string, ActiveCallMapValue>, callStat
   });
 }
 
+function coerceActiveCallStartDate(
+  value: Date | string | undefined,
+): Date | null {
+  if (!value) {
+    return null;
+  }
+  const d = value instanceof Date ? value : new Date(value);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+function resolveActiveCallStartTime(
+  callState: { parties?: unknown[] },
+  previousActiveCall: ActiveCallMapValue | undefined,
+): Date {
+  const parsedApiStart = parseCallAnswerStartTimeUtc(callState);
+  let resolved = parsedApiStart ?? new Date();
+  const prevStart = coerceActiveCallStartDate(previousActiveCall?.startTime);
+  if (prevStart && prevStart.getTime() < resolved.getTime()) {
+    resolved = prevStart;
+  }
+  return resolved;
+}
+
 /** Rebuild activeCalls from CTI call state only — avoids stale entries from merge-with-previous. */
 function buildActiveCallsMapFromCallStateMap(
   callStateMap: Record<string, unknown> | null | undefined,
+  previousActiveCalls?: Map<string, ActiveCallMapValue>,
 ): Map<string, ActiveCallMapValue> {
   const newMap = new Map<string, ActiveCallMapValue>();
   if (!callStateMap || typeof callStateMap !== 'object') {
@@ -195,7 +235,12 @@ function buildActiveCallsMapFromCallStateMap(
       (call as { parties: unknown[] }).parties.length > 0,
   );
   allCallStates.forEach((callState) => {
-    mergeCallStateIntoMap(newMap, callState as any);
+    const callId = (callState as { callId?: string }).callId;
+    const prevRow =
+      callId && previousActiveCalls
+        ? Array.from(previousActiveCalls.values()).find((c) => c.callId === callId)
+        : undefined;
+    mergeCallStateIntoMap(newMap, callState as any, prevRow);
   });
   return newMap;
 }
@@ -663,6 +708,7 @@ export const CtiProvider: React.FC<CtiProviderProps> = ({ children }) => {
       ctiStomp.isInitialized && ctiStomp.callStateMap
         ? buildActiveCallsMapFromCallStateMap(
             ctiStomp.callStateMap as Record<string, unknown>,
+            activeCallsRef.current,
           )
         : new Map<string, ActiveCallMapValue>();
     const merged = mergePendingOutboundIntoActiveCallsMap(

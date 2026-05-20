@@ -5,6 +5,12 @@ import { normalizeConferenceFlagsForLiveParties } from "@utils/ctiCallDisplay";
 import { normalizeCtiApiMonitoringDeviceType } from "@utils/ctiApiDeviceType";
 import type { ActiveMonitoring, MonitoringTeardownHint } from "@components/live-calls/utils/types";
 import { ctiAddressesEquivalent } from "@utils/ctiAddressMatching";
+import {
+  callHasLiveAgentPartyWithNonSupervisor,
+  partyIsLiveCtiParty,
+} from "@utils/ctiMonitoringCallParties";
+
+export { callHasLiveAgentPartyWithNonSupervisor } from "@utils/ctiMonitoringCallParties";
 
 export type RegisteredDeviceEntry = {
   deviceName: string;
@@ -704,8 +710,12 @@ function terminalClearReasonFromLogEvent(
     return null;
   }
 
-  const monitoredDrop = evt.parties.some((party) => {
-    if (!isTerminatedWallboardParty(party) || !involvesDnOnParty(party, ctx.monitoredDn)) {
+  const monitoredPartiesOnEvent = evt.parties.filter((party) =>
+    involvesDnOnParty(party, ctx.monitoredDn),
+  );
+
+  const monitoredDrop = monitoredPartiesOnEvent.some((party) => {
+    if (!isTerminatedWallboardParty(party)) {
       return false;
     }
     if (!ctx.monitoredDeviceName) {
@@ -717,7 +727,48 @@ function terminalClearReasonFromLogEvent(
     );
   });
 
-  return monitoredDrop ? "call dropped" : null;
+  if (monitoredDrop) {
+    return "call dropped";
+  }
+
+  // Hang-up from Jabber/other device may not match stored monitoredDeviceName (WebCTI).
+  if (
+    monitoredPartiesOnEvent.length > 0 &&
+    monitoredPartiesOnEvent.every((party) => isTerminatedWallboardParty(party))
+  ) {
+    return "call dropped";
+  }
+
+  // External/PSTN hung up on a barge call — agent leg may still show CONNECTED to supervisor.
+  if (ctx.supervisorDn) {
+    const externalLegEnded = evt.parties.some((party) => {
+      if (!isTerminatedWallboardParty(party)) {
+        return false;
+      }
+      if (!involvesDnOnParty(party, ctx.monitoredDn)) {
+        return false;
+      }
+      const other =
+        ctiAddressesEquivalent(party.callingAddress, ctx.monitoredDn)
+          ? party.calledAddress
+          : party.callingAddress;
+      if (!other) {
+        return false;
+      }
+      if (ctiAddressesEquivalent(other, ctx.monitoredDn)) {
+        return false;
+      }
+      if (ctiAddressesEquivalent(other, ctx.supervisorDn)) {
+        return false;
+      }
+      return true;
+    });
+    if (externalLegEnded) {
+      return "external party ended call";
+    }
+  }
+
+  return null;
 }
 
 /**
@@ -1304,6 +1355,9 @@ export function supervisionSessionHasLiveSupervisorAgentLeg(
           ctiAddressesEquivalent(p.calledAddress, monitoredDn)),
     );
     if (hasLiveObservationLeg) {
+      if (isBargeInMonitoringType(payload.monitoringType)) {
+        return callHasLiveAgentPartyWithNonSupervisor(c, monitoredDn, monitorDn);
+      }
       return true;
     }
 
@@ -1317,6 +1371,78 @@ export function supervisionSessionHasLiveSupervisorAgentLeg(
     }
   }
   return false;
+}
+
+const LIVE_AGENT_CONVERSATION_STATUSES = new Set([
+  "CONNECTED",
+  "ON_HOLD",
+  "ANSWERED",
+  "RETRIEVED",
+  "RINGING",
+]);
+
+function partyHasLiveAgentConversationStatus(p: {
+  callStatus?: string;
+}): boolean {
+  const s = (p.callStatus ?? "").toUpperCase();
+  return LIVE_AGENT_CONVERSATION_STATUSES.has(s) && partyIsLiveForWallboard(p);
+}
+
+/**
+ * True when the monitored agent still has a live customer/external leg (not only a stale
+ * supervisor observation row after hang-up from Jabber).
+ */
+export function monitoredAgentCustomerConversationLiveInCallStateMap(
+  callStateMap: Record<string, unknown>,
+  monitoredDn: string,
+  monitorDn: string,
+): boolean {
+  for (const call of Object.values(callStateMap)) {
+    if (!call || typeof call !== "object") {
+      continue;
+    }
+    const c = call as MonitoringCallStateSlice;
+    if (c.isTerminating || !c.parties?.length) {
+      continue;
+    }
+    if (callHasLiveAgentPartyWithNonSupervisor(c, monitoredDn, monitorDn)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/** True when every call involving the agent DN has only terminal parties (call ended). */
+export function callStateMapMonitoredAgentCallsFullyTerminal(
+  callStateMap: Record<string, unknown>,
+  monitoredDn: string,
+): boolean {
+  let sawAgentCall = false;
+  for (const call of Object.values(callStateMap)) {
+    if (!call || typeof call !== "object") {
+      continue;
+    }
+    const c = call as MonitoringCallStateSlice;
+    if (!c.parties?.length) {
+      continue;
+    }
+    const agentParties = c.parties.filter(
+      (p) =>
+        ctiAddressesEquivalent(p.callingAddress, monitoredDn) ||
+        ctiAddressesEquivalent(p.calledAddress, monitoredDn),
+    );
+    if (agentParties.length === 0) {
+      continue;
+    }
+    sawAgentCall = true;
+    if (
+      !c.isTerminating &&
+      agentParties.some((p) => partyHasLiveAgentConversationStatus(p))
+    ) {
+      return false;
+    }
+  }
+  return sawAgentCall;
 }
 
 /**
@@ -1346,15 +1472,45 @@ export function isWallboardRemoteSupervisionSessionActive(
       return false;
     }
     if (
-      !callStateMapHasActiveMonitoringForPair(
+      !monitoredAgentCustomerConversationLiveInCallStateMap(
         callStateMap,
-        payload.monitorDn,
         payload.monitoredDn,
+        payload.monitorDn,
       )
     ) {
       return false;
     }
-    return supervisionSessionHasLiveSupervisorAgentLeg(callStateMap, payload);
+    return (
+      callStateMapHasActiveMonitoringForPair(
+        callStateMap,
+        payload.monitorDn,
+        payload.monitoredDn,
+      ) &&
+      supervisionSessionHasLiveSupervisorAgentLeg(callStateMap, payload)
+    );
+  }
+
+  if (isSilentOrWhisperMonitoringType(payload.monitoringType)) {
+    if (!callStateMap) {
+      return false;
+    }
+    if (
+      monitoredAgentCustomerConversationLiveInCallStateMap(
+        callStateMap,
+        payload.monitoredDn,
+        payload.monitorDn,
+      )
+    ) {
+      return true;
+    }
+    if (callStateMapMonitoredAgentCallsFullyTerminal(callStateMap, payload.monitoredDn)) {
+      return false;
+    }
+    return callStateMapHasActiveMonitoringForPair(
+      callStateMap,
+      payload.monitorDn,
+      payload.monitoredDn,
+    );
   }
 
   return true;
@@ -1455,7 +1611,7 @@ function wallboardMonitoringContextForCall(
 function partyIsLiveForWallboard(p: {
   callStatus?: string;
 }): boolean {
-  return p.callStatus !== "DROPPED" && p.callStatus !== "DISCONNECTED";
+  return partyIsLiveCtiParty(p);
 }
 
 export function isBargeInMonitoringType(
@@ -1476,34 +1632,6 @@ export function isSilentOrWhisperMonitoringType(
     .toUpperCase()
     .replaceAll("-", "_");
   return normalized === "SILENT" || normalized === "WHISPER";
-}
-
-/**
- * True when the agent has a live leg with someone other than the supervisor (e.g. customer).
- * Barge-in joins the supervisor onto the agent's call, so those calls must not be treated as observation-only.
- */
-export function callHasLiveAgentPartyWithNonSupervisor(
-  call: WallboardCallPartiesSlice,
-  agentDn: string,
-  supervisorDn: string,
-): boolean {
-  const agent = String(agentDn);
-  const supervisor = String(supervisorDn);
-  if (!call.parties?.length) {
-    return false;
-  }
-  return call.parties.some((p) => {
-    if (!partyIsLiveForWallboard(p)) {
-      return false;
-    }
-    const callingAddress = String(p.callingAddress ?? "");
-    const calledAddress = String(p.calledAddress ?? "");
-    if (callingAddress !== agent && calledAddress !== agent) {
-      return false;
-    }
-    const otherParty = callingAddress === agent ? calledAddress : callingAddress;
-    return otherParty !== supervisor && otherParty !== agent;
-  });
 }
 
 export function callHasLiveSupervisorAndAgentParties(

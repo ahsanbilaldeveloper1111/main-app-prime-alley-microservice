@@ -7,6 +7,20 @@ export type CtiCallPartyLike = Readonly<{
   calledAddress?: string;
 }>;
 
+export type CtiEventPartyForIncoming = CtiCallPartyLike &
+  Readonly<{
+    callStatus?: string;
+    controllerAddress?: string;
+    controllerDeviceName?: string;
+    controllerDeviceType?: string;
+  }>;
+
+const RINGING_CALLEE_PARTY_STATUSES = new Set([
+  "RINGING",
+  "ALERTING",
+  "PROCEEDING",
+]);
+
 export type IncomingCallMatchable = Readonly<{
   callId: string;
   callingAddress: string;
@@ -247,6 +261,38 @@ export function resolveCallIdForAttendApi(
   return { callId: incoming.callId, resolvedFrom: "unresolved" };
 }
 
+/**
+ * Party row for this user as inbound callee (Jabber / external PSTN may not be `parties[0]`).
+ * For RINGING, prefers a leg still in RINGING/ALERTING/PROCEEDING; falls back to any callee row.
+ */
+export function findIncomingCalleePartyFromCtiEvent(
+  parties: ReadonlyArray<CtiEventPartyForIncoming> | undefined,
+  userAddress: string,
+  eventType: string | undefined,
+): CtiEventPartyForIncoming | undefined {
+  if (!parties?.length || !userAddress) {
+    return undefined;
+  }
+
+  const calleeParties = parties.filter((p) =>
+    addressesMatchForAttend(p.calledAddress, userAddress),
+  );
+  if (!calleeParties.length) {
+    return undefined;
+  }
+
+  const et = (eventType ?? "").toUpperCase();
+  if (et !== "RINGING") {
+    return calleeParties[0];
+  }
+
+  const ringingCallee = calleeParties.find((p) => {
+    const s = (p.callStatus ?? "").toUpperCase();
+    return RINGING_CALLEE_PARTY_STATUSES.has(s);
+  });
+  return ringingCallee ?? calleeParties[0];
+}
+
 /** Suppress duplicate RINGING / INCOMING_CALL reopen while the same session is already shown. */
 export function isDuplicateRingingEventForOpenModal(
   eventData: CtiCallPartyLike,
@@ -258,7 +304,7 @@ export function isDuplicateRingingEventForOpenModal(
     );
   }
   return (
-    eventData.callingAddress === cur.callingAddress &&
-    eventData.calledAddress === cur.calledAddress
+    addressesMatchForAttend(eventData.callingAddress, cur.callingAddress) &&
+    addressesMatchForAttend(eventData.calledAddress, cur.calledAddress)
   );
 }

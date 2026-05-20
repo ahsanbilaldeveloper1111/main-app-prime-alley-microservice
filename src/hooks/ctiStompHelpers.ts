@@ -2,8 +2,12 @@
  * Pure helpers for useCtiStomp — keeps the hook under Sonar cognitive-complexity limits.
  */
 
-import { normalizeCtiAddressDigits } from "../utils/ctiAddressMatching";
+import {
+  ctiAddressesEquivalent,
+  normalizeCtiAddressDigits,
+} from "../utils/ctiAddressMatching";
 import { normalizeConferenceFlagsForLiveParties } from "../utils/ctiCallDisplay";
+import { callHasLiveAgentPartyWithNonSupervisor } from "../utils/ctiMonitoringCallParties";
 
 const LOAD_PERSIST_ACTIVE_STATUSES = new Set([
   "CONNECTED",
@@ -123,6 +127,30 @@ export function partyLegHasStartTime(startTime: unknown): boolean {
   return true;
 }
 
+function partyStartTimeEpochMs(startTime: unknown): number | null {
+  if (!partyLegHasStartTime(startTime)) {
+    return null;
+  }
+  const d = new Date(startTime as string);
+  const ms = d.getTime();
+  return Number.isNaN(ms) ? null : ms;
+}
+
+function pickEarlierPartyStartTimeValue(
+  previous: unknown,
+  incoming: unknown,
+): unknown {
+  const prevMs = partyStartTimeEpochMs(previous);
+  const nextMs = partyStartTimeEpochMs(incoming);
+  if (prevMs == null) {
+    return incoming;
+  }
+  if (nextMs == null) {
+    return previous;
+  }
+  return prevMs <= nextMs ? previous : incoming;
+}
+
 export function preservePartyStartTimesFromBase(
   parties: any[],
   baseParties: any[] | undefined,
@@ -131,18 +159,22 @@ export function preservePartyStartTimesFromBase(
     return parties;
   }
   return parties.map((party) => {
-    if (partyLegHasStartTime(party?.startTime)) {
-      return party;
-    }
     const prev = baseParties.find(
       (b: any) =>
-        b?.callingAddress === party?.callingAddress &&
-        b?.calledAddress === party?.calledAddress,
+        ctiAddressesEquivalent(b?.callingAddress, party?.callingAddress) &&
+        ctiAddressesEquivalent(b?.calledAddress, party?.calledAddress),
     );
-    if (prev && partyLegHasStartTime(prev.startTime)) {
-      return { ...party, startTime: prev.startTime };
+    if (!prev) {
+      return party;
     }
-    return party;
+    const earliest = pickEarlierPartyStartTimeValue(
+      prev.startTime,
+      party?.startTime,
+    );
+    if (!partyLegHasStartTime(earliest)) {
+      return party;
+    }
+    return { ...party, startTime: earliest };
   });
 }
 
@@ -522,6 +554,44 @@ function computeShouldTerminate(
   );
 }
 
+function isBargeMonitoringType(monitoringType: string | undefined): boolean {
+  const normalized = String(monitoringType ?? "")
+    .trim()
+    .toUpperCase()
+    .replaceAll("-", "_");
+  return normalized === "BARGE_IN" || normalized === "BARGEIN";
+}
+
+/** Tear down stale barge rows when PSTN/external hung up but sup↔agent leg stays CONNECTED. */
+function shouldTerminateBargeMonitoringWithoutCustomer(call: {
+  parties?: Array<{
+    callStatus?: string;
+    callingAddress?: string;
+    calledAddress?: string;
+  }>;
+  isMonitoring?: boolean;
+  monitoring?: {
+    monitoringType?: string;
+    monitorDn?: string;
+    monitoredDn?: string;
+  };
+}): boolean {
+  const monitoring = call.monitoring;
+  const monitorDn = monitoring?.monitorDn;
+  const monitoredDn = monitoring?.monitoredDn;
+  if (!monitorDn || !monitoredDn) {
+    return false;
+  }
+  const monitoringType = monitoring?.monitoringType;
+  if (!call.isMonitoring && !isBargeMonitoringType(monitoringType)) {
+    return false;
+  }
+  if (!isBargeMonitoringType(monitoringType)) {
+    return false;
+  }
+  return !callHasLiveAgentPartyWithNonSupervisor(call, monitoredDn, monitorDn);
+}
+
 function computeEffectiveCurrentState(
   evt: any,
   base: any,
@@ -686,7 +756,7 @@ export function applyCallEventToCallStateMap(
     );
 
   const hasActiveParties = activePartiesOnly.length > 0;
-  const shouldTerminate = computeShouldTerminate(
+  let shouldTerminate = computeShouldTerminate(
     evt,
     processedParties,
     hasActiveParties,
@@ -723,6 +793,16 @@ export function applyCallEventToCallStateMap(
     nextIsMonitoring = false;
   } else {
     nextIsMonitoring = Boolean(base.isMonitoring);
+  }
+
+  if (
+    shouldTerminateBargeMonitoringWithoutCustomer({
+      parties: activePartiesOnly,
+      isMonitoring: nextIsMonitoring,
+      monitoring: nextMonitoring,
+    })
+  ) {
+    shouldTerminate = true;
   }
 
   updated[callId] = normalizeConferenceFlagsForLiveParties({

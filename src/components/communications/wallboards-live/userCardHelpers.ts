@@ -1,6 +1,9 @@
 import type { CSSProperties, Dispatch, SetStateAction } from 'react'
 import type { ActiveMonitoring, ShowPopup } from '@components/live-calls/utils/types'
-import { isDisplayConferenceCall } from '@utils/ctiCallDisplay'
+import {
+  isDirectConferenceCallNotMonitorable,
+  isDisplayConferenceCall,
+} from '@utils/ctiCallDisplay'
 
 /** Pure helpers for UserCard — keeps Sonar cognitive complexity out of the main component. */
 
@@ -45,11 +48,10 @@ const MONITORING_PERM_SET = new Set([
 
 const DEVICE_ACTIVE_CALL_STATES = new Set(['CONNECTED', 'ON_HOLD', 'ANSWERED', 'RETRIEVED'])
 
-/** Matches stable labels from computeUserCardCallStatus for connected/live calls. */
+/** Matches stable labels from computeUserCardCallStatus for connected/live calls (not conference). */
 const USER_CARD_MONITORING_ELIGIBLE_STATUS = new Set([
   'ONGOING',
   'CONNECTED',
-  'Conference Call',
   'On Hold',
 ])
 
@@ -391,7 +393,11 @@ export function computeUserCardMonitoringDerived({
       )
   )
 
-  const showMonitoringButtons = !isCurrentUserInThisCall && isThisCardInCall
+  const isDirectConference =
+    Boolean(call) && isDirectConferenceCallNotMonitorable(call)
+
+  const showMonitoringButtons =
+    !isCurrentUserInThisCall && isThisCardInCall && !isDirectConference
 
   const supervisorIsAlreadyMonitoring = Boolean(
     userAddress &&

@@ -1,12 +1,15 @@
 import { CtiDevice, ActiveMonitoring, MonitoringTeardownHint } from './types'
 import { SECTION_CONFIG } from './constants'
 import {
-  callHasLiveAgentPartyWithNonSupervisor,
   isBargeInMonitoringType,
   isSilentOrWhisperMonitoringType,
   shouldExcludeCallFromWallboardContext,
 } from '@components/communications/wallboards-live/wallboardEventParsing'
-import { isDisplayConferenceCall } from '@utils/ctiCallDisplay'
+import { callHasLiveAgentPartyWithNonSupervisor } from '@utils/ctiMonitoringCallParties'
+import {
+  isDirectConferenceCallNotMonitorable,
+  isDisplayConferenceCall,
+} from '@utils/ctiCallDisplay'
 import moment from 'moment'
 
 export type { MonitoringTeardownHint } from './types'
@@ -103,20 +106,29 @@ function resolveSupervisionSection(p: CategorizeDnsParams): string | null {
   }
 
   const supervisorCalls = getCallStatesForDn(dn) as LooseCall[]
-  if (hasSupervisorAgentActiveMonitoringCall(supervisorCalls, dn, agentDn)) {
-    return 'supervision'
-  }
-
   const agentCalls = getCallStatesForDn(agentDn) as LooseCall[]
 
   if (isBargeInMonitoringType(activeMonitoring.type)) {
-    if (agentCallHasConferenceBargeWithCustomer(agentCalls, agentDn, dn)) {
-      return 'supervision'
+    const customerStillLive = agentCalls.some(
+      (c) =>
+        !c.isTerminating &&
+        callHasLiveAgentPartyWithNonSupervisor(c, agentDn, dn),
+    )
+    if (!customerStillLive) {
+      return null
     }
-    if (hasSupervisorAgentActiveMonitoringCall(agentCalls, dn, agentDn)) {
+    if (
+      hasSupervisorAgentActiveMonitoringCall(supervisorCalls, dn, agentDn) ||
+      agentCallHasConferenceBargeWithCustomer(agentCalls, agentDn, dn) ||
+      hasSupervisorAgentActiveMonitoringCall(agentCalls, dn, agentDn)
+    ) {
       return 'supervision'
     }
     return null
+  }
+
+  if (hasSupervisorAgentActiveMonitoringCall(supervisorCalls, dn, agentDn)) {
+    return 'supervision'
   }
 
   // SILENT / WHISPER: CTI often attaches the supervision leg only on the agent's call object.
@@ -124,10 +136,23 @@ function resolveSupervisionSection(p: CategorizeDnsParams): string | null {
     return 'supervision'
   }
 
-  // Listen-only: supervisor card should appear when the session is active (API / effectiveMonitoring),
-  // not only after SSE adds a live sup↔agent party (often 5–10s after CTI connects).
   if (isSilentOrWhisperMonitoringType(activeMonitoring.type)) {
-    return 'supervision'
+    if (!monitorDn) {
+      return 'supervision'
+    }
+    if (agentCalls.length === 0) {
+      return 'supervision'
+    }
+    if (
+      agentCalls.some(
+        (c) =>
+          !c.isTerminating &&
+          callHasLiveAgentPartyWithNonSupervisor(c, agentDn, monitorDn),
+      )
+    ) {
+      return 'supervision'
+    }
+    return null
   }
 
   if (!activeMonitoring.deviceName) {
@@ -472,8 +497,64 @@ export const getText = (
   return stateMap[effectiveState] ?? effectiveState
 }
 
+const MONITORING_ELIGIBLE_PARTY_STATUSES = new Set([
+  'CONNECTED',
+  'ON_HOLD',
+  'ANSWERED',
+  'RETRIEVED',
+  'RINGING',
+])
+
+function callHasMonitoringEligiblePartyForDn(
+  call: LooseCall,
+  dn: string,
+): boolean {
+  if (call.isTerminating || !call.parties?.length) {
+    return false
+  }
+  return call.parties.some(
+    (p) =>
+      partyInvolvesDn(p, dn) &&
+      partyIsLive(p) &&
+      MONITORING_ELIGIBLE_PARTY_STATUSES.has(
+        String(p.callStatus ?? '').toUpperCase(),
+      ),
+  )
+}
+
 /**
- * Check if DN is in active call
+ * True when the DN has a 1:1 (or supervision) call that supports starting CTI monitoring.
+ * Direct/native conferences are excluded.
+ */
+export function isDnEligibleForCtiMonitoring(
+  dn: string,
+  getCallStatesForDn: (dn: string) => unknown[],
+  getDnCallState?: (dn: string) => unknown,
+): boolean {
+  const calls = getCallStatesForDn(dn) as LooseCall[]
+  for (const callState of calls) {
+    if (isDirectConferenceCallNotMonitorable(callState)) {
+      continue
+    }
+    if (callHasMonitoringEligiblePartyForDn(callState, dn)) {
+      return true
+    }
+  }
+
+  const fallback = getDnCallState?.(dn) as LooseCall | null | undefined
+  if (
+    fallback &&
+    !isDirectConferenceCallNotMonitorable(fallback) &&
+    callHasMonitoringEligiblePartyForDn(fallback, dn)
+  ) {
+    return true
+  }
+
+  return false
+}
+
+/**
+ * Check if DN is in active call (wallboard sectioning / display).
  */
 export const isDnInActiveCall = (
   dn: string,
@@ -547,7 +628,9 @@ function coerceToValidDate(value: unknown): Date | null {
 }
 
 /**
- * Parse call answer/connected start instant from API fields only (party leg, then call-level).
+ * Parse call answer/connected start instant from API fields only.
+ * Uses the earliest `startTime` across all party legs and call-level (resume from hold / Jabber
+ * may refresh `parties[0].startTime` while an older leg still carries the original answer time).
  * Does not use eventTime (message ordering timestamp).
  */
 export function parseCallAnswerStartTimeUtc(
@@ -555,23 +638,31 @@ export function parseCallAnswerStartTimeUtc(
   fallbackStart?: Date | string | null
 ): Date | null {
   const c = call as { parties?: { startTime?: string }[]; startTime?: string } | null | undefined
-  const firstParty = c?.parties?.[0]
-  if (firstParty?.startTime) {
-    const d = coerceToValidDate(firstParty.startTime)
-    if (d) {
-      return d
+  let earliest: Date | null = null
+
+  const consider = (raw: unknown) => {
+    const d = coerceToValidDate(raw)
+    if (!d) {
+      return
+    }
+    if (!earliest || d.getTime() < earliest.getTime()) {
+      earliest = d
+    }
+  }
+
+  for (const party of c?.parties ?? []) {
+    if (party?.startTime) {
+      consider(party.startTime)
     }
   }
   if (c?.startTime) {
-    const d = coerceToValidDate(c.startTime)
-    if (d) {
-      return d
-    }
+    consider(c.startTime)
   }
   if (fallbackStart != null && fallbackStart !== '') {
-    return coerceToValidDate(fallbackStart)
+    consider(fallbackStart)
   }
-  return null
+
+  return earliest
 }
 
 /**
