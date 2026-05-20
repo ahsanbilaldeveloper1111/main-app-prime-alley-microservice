@@ -182,6 +182,28 @@ export const plannerKeys = {
     unassigned: (ext: string, projectKey = "all") =>
       [...plannerKeys.workload.all(), "unassigned", ext, projectKey] as const,
   },
+
+  reports: {
+    all: () => [...plannerKeys.root, "reports"] as const,
+    overview: (params: {
+      tenant: string;
+      start: string;
+      end: string;
+      project: string;
+      member: string;
+      staleDays: number;
+    }) =>
+      [
+        ...plannerKeys.reports.all(),
+        "overview",
+        params.tenant,
+        params.start,
+        params.end,
+        params.project,
+        params.member,
+        params.staleDays,
+      ] as const,
+  },
 };
 
 /** DNCR / compliance module list reads (`src/pages/compliance/*`). */

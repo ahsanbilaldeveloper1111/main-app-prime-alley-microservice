@@ -35,6 +35,46 @@ export function formatWorkloadDayHeader(isoDate: string): string {
   return `${wd} ${month} ${day}`;
 }
 
+/** Two-line grid column header (weekday + month day), matching workload grid design. */
+export function formatWorkloadGridDayHeader(isoDate: string): { weekday: string; dateLabel: string } {
+  const d = new Date(`${isoDate}T12:00:00`);
+  if (Number.isNaN(d.getTime())) {
+    return { weekday: isoDate, dateLabel: "" };
+  }
+  const month = d.toLocaleString("en-US", { month: "short" });
+  return {
+    weekday: WEEKDAY_SHORT[d.getDay()] ?? "",
+    dateLabel: `${month} ${d.getDate()}`,
+  };
+}
+
+export type WorkloadGridCellVisualVariant = "empty" | "zero" | "filled";
+
+export function workloadGridCellVisualVariant(
+  cell: { task_count?: number; estimated_minutes?: number } | undefined,
+): WorkloadGridCellVisualVariant {
+  if (cell == null || (cell.task_count ?? 0) <= 0) return "empty";
+  if ((cell.estimated_minutes ?? 0) <= 0) return "zero";
+  return "filled";
+}
+
+export function workloadGridCellPercentLabel(loadPercent: number, variant: WorkloadGridCellVisualVariant): string {
+  if (variant === "zero") return "0% Planned";
+  return formatWorkloadPercent(loadPercent);
+}
+
+export function workloadCellHasUnestimated(cell: {
+  has_unestimated?: boolean;
+  unestimated_count?: number;
+}): boolean {
+  return cell.has_unestimated === true || (cell.unestimated_count ?? 0) > 0;
+}
+
+export function workloadCellBarFillClass(band: string): string {
+  const safe = band.replace(/[^a-z0-9_-]/gi, "");
+  return `workload-cell__bar-fill--${safe || "available"}`;
+}
+
 const WORKLOAD_AVATAR_PALETTE = [
   "#0d9488",
   "#2563eb",
