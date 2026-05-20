@@ -23,6 +23,7 @@ import {
   type MyDaySuggestionCategory,
   type MyDaySuggestionsPayload,
   type MyDayCapacityPayload,
+  type MyDayRolloverPayload,
   type MyDayTasksMeta,
   type MyDayTasksPayload,
 } from "@utils/tasks";
@@ -74,6 +75,14 @@ type SuggestedTask = MyDayTask & {
   category: MyDaySuggestionCategory;
   categoryLabel: string;
 };
+
+type MyDayCarryOverMode = "pending" | "added" | "skipped";
+
+type MyDaySuggestionGroup = Readonly<{
+  category: MyDaySuggestionCategory;
+  label: string;
+  items: SuggestedTask[];
+}>;
 
 /** Spec §3.6: lead with 30m / 1h / 2h chips; extra presets for custom flows. */
 const ESTIMATE_PRESETS = [30, 60, 120, 15, 90, 180] as const;
@@ -155,6 +164,67 @@ type MyDayTaskListsSnapshot = Readonly<{
   hasIncompleteToday: boolean;
   todayTaskCount: number;
 }>;
+
+function syncRolloverFromPayload(
+  rolloverPayload: MyDayRolloverPayload,
+  todayStart: moment.Moment,
+  lists: MyDayTaskListsSnapshot,
+): Readonly<{
+  rolloverTasks: MyDayTask[];
+  previousDate: string | null;
+  showPrompt: boolean;
+}> {
+  return {
+    rolloverTasks: (rolloverPayload.tasks ?? []).map((row) => mapMyDayTaskRow(row, todayStart)),
+    previousDate: rolloverPayload.previous_date ?? null,
+    showPrompt: resolveShowRolloverPrompt(rolloverPayload, {
+      hasIncompleteTodayTasks: lists.hasIncompleteToday,
+      todayTaskCount: lists.todayTaskCount,
+    }),
+  };
+}
+
+function groupSuggestionsByCategory(suggestedTasks: SuggestedTask[]): MyDaySuggestionGroup[] {
+  const byCategory = new Map<MyDaySuggestionCategory, SuggestedTask[]>();
+  for (const task of suggestedTasks) {
+    const bucket = byCategory.get(task.category) ?? [];
+    bucket.push(task);
+    byCategory.set(task.category, bucket);
+  }
+  const groups: MyDaySuggestionGroup[] = [];
+  for (const category of MY_DAY_SUGGESTION_CATEGORY_ORDER) {
+    const items = byCategory.get(category);
+    if (!items?.length) continue;
+    groups.push({
+      category,
+      label: MY_DAY_CATEGORY_LABELS[category] ?? category.replaceAll("_", " "),
+      items,
+    });
+    byCategory.delete(category);
+  }
+  for (const [category, items] of byCategory.entries()) {
+    if (!items.length) continue;
+    groups.push({
+      category,
+      label: MY_DAY_CATEGORY_LABELS[category] ?? category.replaceAll("_", " "),
+      items,
+    });
+  }
+  return groups;
+}
+
+function resolveCompletedTasksCount(
+  completedTasks: MyDayTask[],
+  tasksMeta: MyDayTasksMeta,
+): number {
+  if (tasksMeta.tasks_completed != null) {
+    return Math.max(0, Math.floor(tasksMeta.tasks_completed));
+  }
+  if (tasksMeta.completed_count != null) {
+    return Math.max(0, Math.floor(tasksMeta.completed_count));
+  }
+  return completedTasks.length;
+}
 
 function buildMyDayTaskListsSnapshot(
   taskPayload: MyDayTasksPayload,
@@ -396,7 +466,7 @@ function MyDayTaskCard({ task, onToggleComplete, onRemove, onEditEstimate }: MyD
 function useMyDayRolloverAck(
   rolloverShowPrompt: boolean,
   carryOverTaskCount: number,
-  carryOverMode: "pending" | "added" | "skipped",
+  carryOverMode: MyDayCarryOverMode,
   refreshMyDayPage: () => Promise<void>,
 ): void {
   const rolloverAckSentRef = useRef(false);
@@ -420,7 +490,7 @@ function useMyDayRolloverAck(
 
 function useMyDayCarryOverSelection(
   carryOverTasks: MyDayTask[],
-  setCarryOverMode: React.Dispatch<React.SetStateAction<"pending" | "added" | "skipped">>,
+  setCarryOverMode: React.Dispatch<React.SetStateAction<MyDayCarryOverMode>>,
   setSelectedCarryOverIds: React.Dispatch<React.SetStateAction<number[]>>,
 ): void {
   useEffect(() => {
@@ -436,7 +506,7 @@ function useMyDayCarryOverSelection(
   }, [carryOverTasks, setCarryOverMode, setSelectedCarryOverIds]);
 }
 
-const MyDayTasksPage: React.FC = () => {
+function useMyDayTasksPageController() {
   const { data: session } = useSession();
   const managerExtension = useMemo(() => getSessionPhoneOrExtension(session), [session]);
   const { hierarchyDataExtensions } = useHierarchyData(ModuleSlug.WORK_PLANNER);
@@ -450,7 +520,7 @@ const MyDayTasksPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [capacityMinutes, setCapacityMinutes] = useState(8 * 60);
   const [showCreateSidebar, setShowCreateSidebar] = useState(false);
-  const [carryOverMode, setCarryOverMode] = useState<"pending" | "added" | "skipped">("pending");
+  const [carryOverMode, setCarryOverMode] = useState<MyDayCarryOverMode>("pending");
   const [selectedCarryOverIds, setSelectedCarryOverIds] = useState<number[]>([]);
   const [suggestedSearch, setSuggestedSearch] = useState("");
   const [showEstimateModal, setShowEstimateModal] = useState(false);
@@ -571,17 +641,10 @@ const MyDayTasksPage: React.FC = () => {
           Number(capacityPayload.effective_capacity_minutes ?? 0) || resolvedDefault,
       });
 
-      const rollover = (rolloverPayload.tasks ?? []).map((row) =>
-        mapMyDayTaskRow(row, todayStart),
-      );
-      setRolloverTasks(rollover);
-      setRolloverPreviousDate(rolloverPayload.previous_date ?? null);
-      setRolloverShowPrompt(
-        resolveShowRolloverPrompt(rolloverPayload, {
-          hasIncompleteTodayTasks: lists.hasIncompleteToday,
-          todayTaskCount: lists.todayTaskCount,
-        }),
-      );
+      const rollover = syncRolloverFromPayload(rolloverPayload, todayStart, lists);
+      setRolloverTasks(rollover.rolloverTasks);
+      setRolloverPreviousDate(rollover.previousDate);
+      setRolloverShowPrompt(rollover.showPrompt);
     } catch {
       toast.error("Failed to load My Day tasks");
       setTasks([]);
@@ -604,17 +667,10 @@ const MyDayTasksPage: React.FC = () => {
       setTasksMeta(lists.meta);
       setIsEmptyByDesign(lists.isEmptyByDesign);
 
-      const rollover = (rolloverPayload.tasks ?? []).map((row) =>
-        mapMyDayTaskRow(row, todayStart),
-      );
-      setRolloverTasks(rollover);
-      setRolloverPreviousDate(rolloverPayload.previous_date ?? null);
-      setRolloverShowPrompt(
-        resolveShowRolloverPrompt(rolloverPayload, {
-          hasIncompleteTodayTasks: lists.hasIncompleteToday,
-          todayTaskCount: lists.todayTaskCount,
-        }),
-      );
+      const rollover = syncRolloverFromPayload(rolloverPayload, todayStart, lists);
+      setRolloverTasks(rollover.rolloverTasks);
+      setRolloverPreviousDate(rollover.previousDate);
+      setRolloverShowPrompt(rollover.showPrompt);
     } catch {
       toast.error("Failed to refresh My Day tasks");
     }
@@ -678,15 +734,10 @@ const MyDayTasksPage: React.FC = () => {
     [visibleTasks],
   );
 
-  const completedTasksCount = useMemo(() => {
-    if (tasksMeta.tasks_completed != null) {
-      return Math.max(0, Math.floor(tasksMeta.tasks_completed));
-    }
-    if (tasksMeta.completed_count != null) {
-      return Math.max(0, Math.floor(tasksMeta.completed_count));
-    }
-    return completedTasks.length;
-  }, [completedTasks.length, tasksMeta.completed_count, tasksMeta.tasks_completed]);
+  const completedTasksCount = useMemo(
+    () => resolveCompletedTasksCount(completedTasks, tasksMeta),
+    [completedTasks, tasksMeta],
+  );
 
   const summary = useMemo(() => {
     const planned = resolveMyDayCapacityUsedMinutes(tasks, plannedMinutes);
@@ -700,35 +751,10 @@ const MyDayTasksPage: React.FC = () => {
     [capacityMinutes, summary.planned],
   );
 
-  const groupedSuggestions = useMemo(() => {
-    const byCategory = new Map<MyDaySuggestionCategory, SuggestedTask[]>();
-    for (const task of suggestedTasks) {
-      const bucket = byCategory.get(task.category) ?? [];
-      bucket.push(task);
-      byCategory.set(task.category, bucket);
-    }
-    const groups: { category: MyDaySuggestionCategory; label: string; items: SuggestedTask[] }[] =
-      [];
-    for (const category of MY_DAY_SUGGESTION_CATEGORY_ORDER) {
-      const items = byCategory.get(category);
-      if (!items?.length) continue;
-      groups.push({
-        category,
-        label: MY_DAY_CATEGORY_LABELS[category] ?? category.replaceAll("_", " "),
-        items,
-      });
-      byCategory.delete(category);
-    }
-    for (const [category, items] of byCategory.entries()) {
-      if (!items.length) continue;
-      groups.push({
-        category,
-        label: MY_DAY_CATEGORY_LABELS[category] ?? category.replaceAll("_", " "),
-        items,
-      });
-    }
-    return groups;
-  }, [suggestedTasks]);
+  const groupedSuggestions = useMemo(
+    () => groupSuggestionsByCategory(suggestedTasks),
+    [suggestedTasks],
+  );
 
   const headerDateLabel = useMemo(() => {
     const iso = planDate || today;
@@ -1098,6 +1124,150 @@ const MyDayTasksPage: React.FC = () => {
     },
     [handleRemoveFromMyDay],
   );
+
+  return {
+    managerExtension,
+    reporteeExtensions,
+    hierarchyDataExtensions,
+    loading,
+    capacityMinutes,
+    showCreateSidebar,
+    setShowCreateSidebar,
+    carryOverMode,
+    carryOverTasks,
+    selectedCarryOverIds,
+    suggestedSearch,
+    setSuggestedSearch,
+    showEstimateModal,
+    setShowEstimateModal,
+    estimateInput,
+    setEstimateInput,
+    pendingEstimateTask,
+    setPendingEstimateTask,
+    rolloverShowPrompt,
+    showHistoryModal,
+    setShowHistoryModal,
+    planDate,
+    isEditingCapacity,
+    setIsEditingCapacity,
+    capacityDraft,
+    setCapacityDraft,
+    suggestionsLoading,
+    defaultCapacityMinutes,
+    showDefaultCapacityModal,
+    setShowDefaultCapacityModal,
+    defaultCapacityDraft,
+    setDefaultCapacityDraft,
+    showScheduleLaterModal,
+    setShowScheduleLaterModal,
+    scheduleLaterDate,
+    setScheduleLaterDate,
+    isEmptyByDesign,
+    suggestionsPanelRef,
+    today,
+    myDayTaskIds,
+    activeTasks,
+    organizationalActiveTasks,
+    standardActiveTasks,
+    unestimatedActiveCount,
+    completedTasks,
+    completedTasksCount,
+    summary,
+    capacityOverageMessage,
+    groupedSuggestions,
+    headerDateLabel,
+    headerMetaLine,
+    rolloverPromptCopy,
+    refreshMyDayPage,
+    toggleCarryOverSelection,
+    handleOpenEstimateModal,
+    scrollToSuggestions,
+    confirmEstimateAndAdd,
+    skipEstimateAndAddToMyDay,
+    handleSaveDefaultCapacity,
+    handleSaveCapacityDraft,
+    handleStartCapacityEdit,
+    handleCarryOverApply,
+    handleCarryOverSkip,
+    handleCarryOverScheduleLater,
+    handleSuggestedAddClick,
+    onTaskToggleCompleteClick,
+    onTaskRemoveClick,
+  };
+}
+
+type MyDayTasksPageViewModel = ReturnType<typeof useMyDayTasksPageController>;
+
+function MyDayTasksPageView(vm: MyDayTasksPageViewModel) {
+  const {
+    managerExtension,
+    reporteeExtensions,
+    hierarchyDataExtensions,
+    loading,
+    capacityMinutes,
+    showCreateSidebar,
+    setShowCreateSidebar,
+    carryOverMode,
+    carryOverTasks,
+    selectedCarryOverIds,
+    suggestedSearch,
+    setSuggestedSearch,
+    showEstimateModal,
+    setShowEstimateModal,
+    estimateInput,
+    setEstimateInput,
+    pendingEstimateTask,
+    setPendingEstimateTask,
+    rolloverShowPrompt,
+    showHistoryModal,
+    setShowHistoryModal,
+    planDate,
+    isEditingCapacity,
+    setIsEditingCapacity,
+    capacityDraft,
+    setCapacityDraft,
+    suggestionsLoading,
+    defaultCapacityMinutes,
+    showDefaultCapacityModal,
+    setShowDefaultCapacityModal,
+    defaultCapacityDraft,
+    setDefaultCapacityDraft,
+    showScheduleLaterModal,
+    setShowScheduleLaterModal,
+    scheduleLaterDate,
+    setScheduleLaterDate,
+    isEmptyByDesign,
+    suggestionsPanelRef,
+    today,
+    myDayTaskIds,
+    activeTasks,
+    organizationalActiveTasks,
+    standardActiveTasks,
+    unestimatedActiveCount,
+    completedTasks,
+    completedTasksCount,
+    summary,
+    capacityOverageMessage,
+    groupedSuggestions,
+    headerDateLabel,
+    headerMetaLine,
+    rolloverPromptCopy,
+    refreshMyDayPage,
+    toggleCarryOverSelection,
+    handleOpenEstimateModal,
+    scrollToSuggestions,
+    confirmEstimateAndAdd,
+    skipEstimateAndAddToMyDay,
+    handleSaveDefaultCapacity,
+    handleSaveCapacityDraft,
+    handleStartCapacityEdit,
+    handleCarryOverApply,
+    handleCarryOverSkip,
+    handleCarryOverScheduleLater,
+    handleSuggestedAddClick,
+    onTaskToggleCompleteClick,
+    onTaskRemoveClick,
+  } = vm;
 
   return (
     <div className="myday-page-shell">
@@ -1489,6 +1659,10 @@ const MyDayTasksPage: React.FC = () => {
       </Modal>
     </div>
   );
-};
+}
+
+const MyDayTasksPage: React.FC = () => (
+  <MyDayTasksPageView {...useMyDayTasksPageController()} />
+);
 
 export default MyDayTasksPage;
