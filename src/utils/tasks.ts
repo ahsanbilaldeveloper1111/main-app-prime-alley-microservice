@@ -676,10 +676,12 @@ export const removeMember = async (projectId: string | number, extensionNumber: 
 
 // ==================== Tasks API ====================
 
+type TaskQueryParamValue = string | number | undefined;
+
 function appendTruthyQueryParam(
   searchParams: URLSearchParams,
   key: string,
-  value: string | number | undefined,
+  value: TaskQueryParamValue,
 ): void {
   if (value) {
     searchParams.append(key, String(value));

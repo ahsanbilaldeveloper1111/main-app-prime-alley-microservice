@@ -1,5 +1,5 @@
 import React from "react";
-import { Alert, Badge, Col, Row, Spinner, Table } from "react-bootstrap";
+import { Alert, Badge, Spinner, Table } from "react-bootstrap";
 import {
   CartesianGrid,
   Line,
@@ -37,21 +37,23 @@ type KpiCardProps = Readonly<{
   accent?: "default" | "completed" | "overdue" | "pending";
 }>;
 
+function resolveKpiAccentClass(accent: KpiCardProps["accent"]): string {
+  if (accent === "completed") return "reports-kpi-card--completed";
+  if (accent === "overdue") return "reports-kpi-card--overdue";
+  if (accent === "pending") return "reports-kpi-card--pending";
+  return "";
+}
+
+function resolveKpiDeltaClass(delta: string | null | undefined): string {
+  if (!delta) return "";
+  if (delta.startsWith("↑") || delta.includes("up")) return "reports-kpi-card__delta--up";
+  if (delta.startsWith("↓") || delta.includes("down")) return "reports-kpi-card__delta--down";
+  return "";
+}
+
 export function ReportsKpiCard({ label, value, sub, delta, accent = "default" }: KpiCardProps) {
-  const accentClass =
-    accent === "completed"
-      ? "reports-kpi-card--completed"
-      : accent === "overdue"
-        ? "reports-kpi-card--overdue"
-        : accent === "pending"
-          ? "reports-kpi-card--pending"
-          : "";
-  const deltaClass =
-    delta?.startsWith("↑") || delta?.includes("up")
-      ? "reports-kpi-card__delta--up"
-      : delta?.startsWith("↓") || delta?.includes("down")
-        ? "reports-kpi-card__delta--down"
-        : "";
+  const accentClass = resolveKpiAccentClass(accent);
+  const deltaClass = resolveKpiDeltaClass(delta);
   return (
     <div className={`reports-kpi-card ${accentClass}`.trim()}>
       <div className="reports-kpi-card__label">{label}</div>
@@ -294,9 +296,9 @@ export function ReportsStaleTasks({
           <div>
             <div className="reports-task-row__title">{task.title}</div>
             <div className="reports-task-row__meta">
-              {task.days_in_progress != null
-                ? `${task.days_in_progress} days in progress`
-                : "Stale"}
+              {task.days_in_progress == null
+                ? "Stale"
+                : `${task.days_in_progress} days in progress`}
               {task.last_updated_at
                 ? ` · updated ${formatReportsDateLabel(task.last_updated_at.slice(0, 10))}`
                 : ""}

@@ -55,6 +55,16 @@ function parsePositiveMinutes(value: unknown): number | null {
 }
 
 /** Resolve estimate minutes from My Day / planner API rows (field names and types vary). */
+export function readTaskPriorityLabel(priority: unknown): string {
+  if (typeof priority === "string" && priority.trim()) return priority.trim();
+  if (priority != null && typeof priority === "object") {
+    const record = priority as Record<string, unknown>;
+    if (typeof record.name === "string" && record.name.trim()) return record.name.trim();
+    if (typeof record.label === "string" && record.label.trim()) return record.label.trim();
+  }
+  return "normal";
+}
+
 export function resolveEstimateMinutesFromRow(row: Record<string, unknown>): number {
   const nestedTask = row.task;
   if (nestedTask != null && typeof nestedTask === "object") {

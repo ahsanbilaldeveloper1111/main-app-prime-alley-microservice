@@ -220,7 +220,7 @@ const WorkloadReportsPage: React.FC = () => {
           </div>
         </div>
 
-        {!tenantId ? (
+        {tenantId === "" ? (
           <Alert variant="warning">
             Tenant context is missing. Sign in again or contact your administrator.
           </Alert>

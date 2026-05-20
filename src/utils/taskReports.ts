@@ -18,7 +18,7 @@ export interface TaskReportsQuery {
 export interface TaskReportsPeriodDelta {
   value?: number;
   percent?: number;
-  direction?: "up" | "down" | "flat" | string;
+  direction?: "up" | "down" | "flat";
   label?: string;
 }
 

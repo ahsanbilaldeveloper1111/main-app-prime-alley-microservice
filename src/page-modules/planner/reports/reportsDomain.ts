@@ -14,10 +14,15 @@ export type ReportsDatePreset = "last_7" | "last_30" | "this_month" | "custom";
 
 export type ReportsProjectFilter = "all" | number;
 
-export function getPlannerTenantId(session: Session | null | undefined): string {
-  const user = session?.user as Record<string, unknown> | undefined;
-  const raw = user?.tenant_id ?? user?.tenant;
+function readTenantIdFromUser(user: unknown): string {
+  if (user == null || typeof user !== "object") return "";
+  const record = user as Record<string, unknown>;
+  const raw = record.tenant_id ?? record.tenant;
   return typeof raw === "string" ? raw.trim() : "";
+}
+
+export function getPlannerTenantId(session: Session | null | undefined): string {
+  return readTenantIdFromUser(session?.user);
 }
 
 export function getReportsDateRangeForPreset(
@@ -199,12 +204,18 @@ export function resolveSummaryMetric(
   return typeof value === "number" && Number.isFinite(value) ? value : fallback;
 }
 
+function formatReportsDeltaDirection(direction: TaskReportsPeriodDelta["direction"]): string {
+  if (direction === "down") return "↓";
+  if (direction === "up") return "↑";
+  return "•";
+}
+
 export function formatReportsDelta(delta: TaskReportsPeriodDelta | undefined): string | null {
   if (!delta) return null;
   if (delta.label?.trim()) return delta.label.trim();
   const pct = delta.percent;
   if (pct == null || !Number.isFinite(pct)) return null;
-  const dir = delta.direction === "down" ? "↓" : delta.direction === "up" ? "↑" : "•";
+  const dir = formatReportsDeltaDirection(delta.direction);
   return `${dir} ${Math.abs(pct).toFixed(0)}% vs last period`;
 }
 
