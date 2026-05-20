@@ -596,11 +596,12 @@ function isTerminatedWallboardParty(party: Party): boolean {
   return s === "DROPPED" || s === "DISCONNECTED" || s === "ENDED";
 }
 
+function isWallboardLogEventSlice(raw: unknown): raw is WallboardLogEventSlice {
+  return raw !== null && typeof raw === "object";
+}
+
 function parseWallboardLogEvent(raw: unknown): WallboardLogEventSlice | null {
-  if (raw === null || typeof raw !== "object") {
-    return null;
-  }
-  return raw as WallboardLogEventSlice;
+  return isWallboardLogEventSlice(raw) ? raw : null;
 }
 
 function isMonitoringSessionStartForActive(

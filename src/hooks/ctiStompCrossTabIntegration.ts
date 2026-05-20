@@ -1,26 +1,22 @@
 import type { Dispatch, SetStateAction } from "react";
 import type { CrossTabCtiManager } from "../utils/crossTabCtiManager";
 import { mergeRemoteEventLogWithPrevious } from "./ctiStompHelpers";
-import type { CtiCallEvent, CtiDevice, SummaryData } from "./ctiStompHookTypes";
+import type { CtiCallEvent, SummaryData } from "./ctiStompHookTypes";
 import {
   dispatchCrossTabCtiBroadcastEvent,
   type CrossTabBroadcastCtx,
+  type CtiDnsMapGrouped,
 } from "./ctiStompCrossTabBroadcastDispatch";
-
-type CtiDnsMapState = Record<
-  string,
-  { dn: string; devices: Record<string, CtiDevice> }
->;
 
 export type CtiStompCrossTabListenCtx = {
   instanceIdRef: { current: string };
   isGlobalInstance: boolean;
   crossTabManagerRef: { current: CrossTabCtiManager };
   userDataExtensionsRef: { current: unknown };
-  handleCallEvent: (evt: unknown) => void;
+  handleCallEventRef: { current: ((evt: unknown) => void) | null };
   groupDevicesByDnAndDeviceNameRef: CrossTabBroadcastCtx["groupDevicesByDnAndDeviceNameRef"];
   updateSummaryDataRef: CrossTabBroadcastCtx["updateSummaryDataRef"];
-  setDnsMap: Dispatch<SetStateAction<CtiDnsMapState>>;
+  setDnsMap: Dispatch<SetStateAction<CtiDnsMapGrouped>>;
   setEventLog: Dispatch<SetStateAction<unknown[]>>;
   setCallStateMap: Dispatch<SetStateAction<Record<string, CtiCallEvent>>>;
   setSummaryData: Dispatch<SetStateAction<SummaryData>>;
@@ -51,7 +47,7 @@ function requestUserDataExtensionsFromMaster(
 
 function applyMasterTabStateUpdate(
   state: {
-    dnsMap?: CtiDnsMapState;
+    dnsMap?: CtiDnsMapGrouped;
     callStateMap?: Record<string, CtiCallEvent>;
     summaryData?: SummaryData;
     userAddress?: string;
@@ -117,10 +113,10 @@ export function subscribeCtiStompCrossTabListeners(
     isGlobalInstance: ctx.isGlobalInstance,
     manager,
     userDataExtensionsRef: ctx.userDataExtensionsRef,
-    handleCallEvent: ctx.handleCallEvent,
+    handleCallEvent: (evt) => ctx.handleCallEventRef.current?.(evt),
     groupDevicesByDnAndDeviceNameRef: ctx.groupDevicesByDnAndDeviceNameRef,
     updateSummaryDataRef: ctx.updateSummaryDataRef,
-    setDnsMap: ctx.setDnsMap as unknown as CrossTabBroadcastCtx["setDnsMap"],
+    setDnsMap: ctx.setDnsMap,
     setEventLog: ctx.setEventLog,
   };
 
@@ -145,7 +141,7 @@ export function subscribeCtiStompCrossTabListeners(
 
 export type CtiStompCrossTabMasterBroadcastCtx = {
   crossTabManagerRef: { current: CrossTabCtiManager };
-  dnsMap: CtiDnsMapState;
+  dnsMap: CtiDnsMapGrouped;
   callStateMap: Record<string, CtiCallEvent>;
   summaryData: SummaryData;
   userAddress: string;

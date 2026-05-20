@@ -17,7 +17,6 @@ import { CTI_CALL_STATES } from "./ctiStompHookConstants";
 import { generateCtiStompInstanceId } from "./ctiStompInstanceId";
 import { subscribeMasterTabStatusPoll } from "./ctiStompMasterTabPoll";
 import { useCtiStompConnectionRefs } from "./useCtiStompConnectionRefs";
-import type { CrossTabBroadcastCtx } from "./ctiStompCrossTabBroadcastDispatch";
 import {
   broadcastCtiStompMasterLatestEvent,
   broadcastCtiStompMasterState,
@@ -138,7 +137,7 @@ export default function useCtiStomp(
 
   // Store latest callback functions in refs to avoid stale closures
   // These will be initialized after the functions are defined
-  const handleCallEventRef = useRef<typeof handleCallEvent | null>(null);
+  const handleCallEventRef = useRef<((evt: unknown) => void) | null>(null);
   const handleOngoingCallsRef = useRef<((data: any) => void) | null>(null);
   const groupDevicesByDnAndDeviceNameRef = useRef<
     typeof groupDevicesByDnAndDeviceName | null
@@ -289,7 +288,7 @@ export default function useCtiStomp(
 
   // Update refs when callbacks change (after all functions are defined)
   useEffect(() => {
-    handleCallEventRef.current = handleCallEvent;
+    handleCallEventRef.current = (evt) => handleCallEvent(evt as CtiCallEvent);
     handleOngoingCallsRef.current = handleOngoingCalls;
     groupDevicesByDnAndDeviceNameRef.current = groupDevicesByDnAndDeviceName;
     updateSummaryDataRef.current = updateSummaryData;
@@ -524,12 +523,9 @@ export default function useCtiStomp(
         isGlobalInstance,
         crossTabManagerRef,
         userDataExtensionsRef,
-        handleCallEvent: (evt) =>
-          handleCallEventRef.current?.(evt as CtiCallEvent),
-        groupDevicesByDnAndDeviceNameRef:
-          groupDevicesByDnAndDeviceNameRef as unknown as CrossTabBroadcastCtx["groupDevicesByDnAndDeviceNameRef"],
-        updateSummaryDataRef:
-          updateSummaryDataRef as unknown as CrossTabBroadcastCtx["updateSummaryDataRef"],
+        handleCallEventRef,
+        groupDevicesByDnAndDeviceNameRef,
+        updateSummaryDataRef,
         setDnsMap,
         setEventLog,
         setCallStateMap,
