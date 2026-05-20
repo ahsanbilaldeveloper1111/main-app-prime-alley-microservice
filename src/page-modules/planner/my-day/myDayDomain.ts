@@ -47,19 +47,38 @@ export function resolveMyDayUnestimatedCount(
   return activeTasks.filter((task) => !task.isCompleted && task.estimateMinutes <= 0).length;
 }
 
+function parsePositiveMinutes(value: unknown): number | null {
+  if (value == null || value === "") return null;
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed <= 0) return null;
+  return Math.round(parsed);
+}
+
+/** Resolve estimate minutes from My Day / planner API rows (field names and types vary). */
 export function resolveEstimateMinutesFromRow(row: Record<string, unknown>): number {
+  const nestedTask = row.task;
+  if (nestedTask != null && typeof nestedTask === "object") {
+    const fromNested = resolveEstimateMinutesFromRow(nestedTask as Record<string, unknown>);
+    if (fromNested > 0) return fromNested;
+  }
+
   const candidates = [
     row.my_day_estimated_minutes,
     row.estimated_minutes,
     row.estimated_duration_minutes,
+    row.estimated_duration,
     row.plan_estimated_minutes,
     row.estimate_minutes,
     row.duration_minutes,
+    row.estimate,
+    row.time_estimate_minutes,
+    row.estimated_time_minutes,
   ];
   for (const value of candidates) {
-    const parsed = Number(value);
-    if (Number.isFinite(parsed) && parsed > 0) return Math.round(parsed);
+    const minutes = parsePositiveMinutes(value);
+    if (minutes != null) return minutes;
   }
+
   const hours = Number(row.estimated_hours);
   if (Number.isFinite(hours) && hours > 0) return Math.round(hours * 60);
   return 0;

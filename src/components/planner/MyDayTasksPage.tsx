@@ -22,6 +22,7 @@ import {
   toggleMyDayTaskComplete,
   type MyDaySuggestionCategory,
   type MyDaySuggestionsPayload,
+  type MyDayCapacityPayload,
   type MyDayTasksMeta,
 } from "@utils/tasks";
 import { MyDayHistoryModal } from "@components/planner/MyDayHistoryModal";
@@ -49,18 +50,6 @@ import {
 import "@assets/scss/my-day-tasks.scss";
 import { toast } from "react-toastify";
 
-type ApiTask = {
-  id: number;
-  title?: string;
-  due_date?: string | null;
-  priority?: string | null;
-  is_completed?: boolean;
-  estimated_duration_minutes?: number | null;
-  project?: { name?: string | null } | null;
-  estimated_minutes?: number | null;
-  already_in_my_day?: boolean;
-};
-
 type MyDayTask = {
   id: number;
   title: string;
@@ -76,7 +65,7 @@ type MyDayTask = {
   rolloverIgnoreCount: number;
   showIgnoredFlag: boolean;
   alreadyInMyDay?: boolean;
-  raw: ApiTask;
+  raw: Record<string, unknown>;
 };
 
 type SuggestedTask = MyDayTask & {
@@ -156,25 +145,36 @@ function formatCapacityDurationInput(totalMinutes: number): string {
   return toMinutesDisplay(totalMinutes);
 }
 
-function mapApiTaskToMyDayTask(
-  apiTask: ApiTask,
+function mapMyDayTaskRow(
+  input: unknown,
   todayStart: moment.Moment,
   category?: MyDaySuggestionCategory,
 ): MyDayTask {
-  const dueRaw = apiTask.due_date ?? null;
+  const row =
+    input != null && typeof input === "object"
+      ? (input as Record<string, unknown>)
+      : ({} as Record<string, unknown>);
+  const id = Math.floor(Number(row.id ?? row.task_id ?? 0));
+  let dueRaw: string | null = null;
+  if (typeof row.due_date === "string") {
+    dueRaw = row.due_date;
+  } else if (typeof row.end_date === "string") {
+    dueRaw = row.end_date;
+  }
   const dueMoment = dueRaw ? moment(dueRaw) : null;
   const isCarryOver = dueMoment?.isValid() === true && dueMoment.isBefore(todayStart, "day");
-  const row = apiTask as unknown as Record<string, unknown>;
   const estimate = resolveEstimateMinutesFromRow(row);
   const project = resolveProjectFromRow(row);
   const ignoreCount = readRolloverIgnoreCount(row);
   const isOrgTask = row.is_org_task === true || project.isOrganizational;
+  const title =
+    typeof row.title === "string" && row.title.trim() ? row.title.trim() : `Task #${id}`;
   return {
-    id: apiTask.id,
-    title: apiTask.title?.trim() || `Task #${apiTask.id}`,
+    id,
+    title,
     dueDate: dueRaw,
-    priority: String(apiTask.priority ?? "normal"),
-    isCompleted: apiTask.is_completed === true,
+    priority: String(row.priority ?? "normal"),
+    isCompleted: row.is_completed === true || row.completed === true,
     estimateMinutes: estimate,
     projectName: project.label,
     isPersonalTask: project.isPersonal,
@@ -183,47 +183,8 @@ function mapApiTaskToMyDayTask(
     isCarryOver,
     rolloverIgnoreCount: ignoreCount,
     showIgnoredFlag: shouldShowIgnoredFlag(row),
-    alreadyInMyDay: apiTask.already_in_my_day === true,
-    raw: apiTask,
-  };
-}
-
-function readMyDayEstimatedMinutesFromRow(row: Record<string, unknown>): number | null {
-  if (typeof row.my_day_estimated_minutes === "number") return row.my_day_estimated_minutes;
-  if (typeof row.estimated_minutes === "number") return row.estimated_minutes;
-  return null;
-}
-
-function readMyDaySuggestionProject(
-  project: unknown,
-): { name?: string | null } | null {
-  if (project == null || typeof project !== "object") return null;
-  const name = (project as Record<string, unknown>).name;
-  return { name: typeof name === "string" ? name : null };
-}
-
-function toApiTask(input: unknown): ApiTask {
-  if (input == null || typeof input !== "object") return { id: 0 };
-  const row = input as Record<string, unknown>;
-  let dueDateValue: string | null = null;
-  if (typeof row.due_date === "string") {
-    dueDateValue = row.due_date;
-  } else if (typeof row.end_date === "string") {
-    dueDateValue = row.end_date;
-  }
-  return {
-    id: Number(row.id ?? 0),
-    title: typeof row.title === "string" ? row.title : undefined,
-    due_date: dueDateValue,
-    priority: typeof row.priority === "string" ? row.priority : null,
-    is_completed: row.is_completed === true,
-    estimated_duration_minutes:
-      typeof row.estimated_duration_minutes === "number"
-        ? row.estimated_duration_minutes
-        : null,
-    estimated_minutes: readMyDayEstimatedMinutesFromRow(row),
-    already_in_my_day: row.already_in_my_day === true,
-    project: readMyDaySuggestionProject(row.project),
+    alreadyInMyDay: row.already_in_my_day === true,
+    raw: row,
   };
 }
 
@@ -282,8 +243,19 @@ function MyDaySuggestedItemButton({
         {task.showIgnoredFlag ? (
           <span className="myday-tag myday-tag--ignored">3x Ignored</span>
         ) : null}
-        <span className="myday-tag myday-tag--estimate">
-          {task.estimateMinutes > 0 ? toMinutesDisplay(task.estimateMinutes) : "No estimate"}
+        <span
+          className={`myday-tag myday-tag--estimate ${
+            task.estimateMinutes <= 0 ? "myday-tag--no-estimate" : ""
+          }`}
+        >
+          {task.estimateMinutes > 0 ? (
+            toMinutesDisplay(task.estimateMinutes)
+          ) : (
+            <>
+              <span className="myday-unestimated-dot" title="No estimate" aria-label="No estimate" />
+              No estimate
+            </>
+          )}
         </span>
         {inMyDay ? <span className="myday-added-label">Added</span> : null}
       </div>
@@ -305,8 +277,14 @@ function MyDayTaskEstimateSlot({
       </span>
     );
   }
+  const noEstimate = (
+    <span className="myday-tag myday-tag--estimate myday-tag--no-estimate">
+      <span className="myday-unestimated-dot" title="No estimate" aria-label="No estimate" />
+      No estimate
+    </span>
+  );
   if (task.isCompleted) {
-    return <span className="myday-tag myday-tag--estimate">No estimate</span>;
+    return noEstimate;
   }
   if (onEditEstimate) {
     return (
@@ -319,7 +297,7 @@ function MyDayTaskEstimateSlot({
       </button>
     );
   }
-  return <span className="myday-tag myday-tag--estimate">No estimate</span>;
+  return noEstimate;
 }
 
 type MyDayTaskCardProps = Readonly<{
@@ -440,7 +418,7 @@ const MyDayTasksPage: React.FC = () => {
         if (!Array.isArray(rows)) return;
         const categoryLabel = MY_DAY_CATEGORY_LABELS[category] ?? category.replaceAll("_", " ");
         rows.forEach((row) => {
-          const mapped = mapApiTaskToMyDayTask(toApiTask(row), todayStart, category);
+          const mapped = mapMyDayTaskRow(row, todayStart, category);
           flattened.push({
             ...mapped,
             category,
@@ -477,6 +455,17 @@ const MyDayTasksPage: React.FC = () => {
     [buildSuggestionsFromPayload],
   );
 
+  const applyCapacityFromApi = useCallback((capacityPayload: MyDayCapacityPayload) => {
+    const effective = Number(capacityPayload.effective_capacity_minutes ?? 0);
+    if (effective > 0) {
+      setCapacityMinutes(effective);
+    }
+    const planned = Number(capacityPayload.planned_minutes);
+    if (Number.isFinite(planned)) {
+      setPlannedMinutes(Math.max(0, planned));
+    }
+  }, []);
+
   const fetchCoreMyDayData = useCallback(async () => {
     try {
       setLoading(true);
@@ -488,10 +477,10 @@ const MyDayTasksPage: React.FC = () => {
       ]);
 
       const active = (taskPayload.active ?? []).map((row) =>
-        mapApiTaskToMyDayTask(toApiTask(row), todayStart),
+        mapMyDayTaskRow(row, todayStart),
       );
       const completed = (taskPayload.completed ?? []).map((row) =>
-        mapApiTaskToMyDayTask(toApiTask(row), todayStart),
+        mapMyDayTaskRow(row, todayStart),
       );
       setTasks([...active, ...completed]);
       setPlanDate(taskPayload.plan_date ?? today);
@@ -501,15 +490,14 @@ const MyDayTasksPage: React.FC = () => {
       const defaultCapacity = Number(preferences.daily_capacity_minutes ?? 0);
       const resolvedDefault = defaultCapacity > 0 ? defaultCapacity : 8 * 60;
       setDefaultCapacityMinutes(resolvedDefault);
-      const effectiveCapacity = Number(capacityPayload.effective_capacity_minutes ?? 0);
-      const resolvedCapacity = effectiveCapacity || resolvedDefault;
-      setCapacityMinutes(resolvedCapacity);
-      setPlannedMinutes(
-        Number(capacityPayload.planned_minutes ?? taskPayload.meta?.planned_minutes ?? 0),
-      );
+      applyCapacityFromApi({
+        ...capacityPayload,
+        effective_capacity_minutes:
+          Number(capacityPayload.effective_capacity_minutes ?? 0) || resolvedDefault,
+      });
 
       const rollover = (rolloverPayload.tasks ?? []).map((row) =>
-        mapApiTaskToMyDayTask(toApiTask(row), todayStart),
+        mapMyDayTaskRow(row, todayStart),
       );
       setRolloverTasks(rollover);
       setRolloverPreviousDate(rolloverPayload.previous_date ?? null);
@@ -527,6 +515,40 @@ const MyDayTasksPage: React.FC = () => {
       setRolloverShowPrompt(false);
     } finally {
       setLoading(false);
+    }
+  }, [applyCapacityFromApi, today, todayStart]);
+
+  const refreshTasksAndRollover = useCallback(async () => {
+    try {
+      const [taskPayload, rolloverPayload] = await Promise.all([
+        listMyDayTasks(),
+        getMyDayRollover(),
+      ]);
+      const active = (taskPayload.active ?? []).map((row) =>
+        mapMyDayTaskRow(row, todayStart),
+      );
+      const completed = (taskPayload.completed ?? []).map((row) =>
+        mapMyDayTaskRow(row, todayStart),
+      );
+      setTasks([...active, ...completed]);
+      setPlanDate(taskPayload.plan_date ?? today);
+      setTasksMeta(taskPayload.meta ?? {});
+      setIsEmptyByDesign(taskPayload.is_empty_by_design === true);
+
+      const rollover = (rolloverPayload.tasks ?? []).map((row) =>
+        mapMyDayTaskRow(row, todayStart),
+      );
+      setRolloverTasks(rollover);
+      setRolloverPreviousDate(rolloverPayload.previous_date ?? null);
+      const hasIncompleteToday = [...active, ...completed].some((task) => !task.isCompleted);
+      setRolloverShowPrompt(
+        resolveShowRolloverPrompt(rolloverPayload, {
+          hasIncompleteTodayTasks: hasIncompleteToday,
+          todayTaskCount: active.length + completed.length,
+        }),
+      );
+    } catch {
+      toast.error("Failed to refresh My Day tasks");
     }
   }, [today, todayStart]);
 
@@ -608,6 +630,16 @@ const MyDayTasksPage: React.FC = () => {
     () => visibleTasks.filter((task) => task.isCompleted),
     [visibleTasks],
   );
+
+  const completedTasksCount = useMemo(() => {
+    if (tasksMeta.tasks_completed != null) {
+      return Math.max(0, Math.floor(tasksMeta.tasks_completed));
+    }
+    if (tasksMeta.completed_count != null) {
+      return Math.max(0, Math.floor(tasksMeta.completed_count));
+    }
+    return completedTasks.length;
+  }, [completedTasks.length, tasksMeta.completed_count, tasksMeta.tasks_completed]);
 
   const summary = useMemo(() => {
     const planned = resolveMyDayCapacityUsedMinutes(tasks, plannedMinutes);
@@ -786,12 +818,22 @@ const MyDayTasksPage: React.FC = () => {
       });
       if (!alreadyOnMyDay && result.already_in_my_day) return;
 
+      let resolvedMinutes = parsed;
+      if (result.task != null && typeof result.task === "object") {
+        const fromApi = resolveEstimateMinutesFromRow(
+          result.task as Record<string, unknown>,
+        );
+        if (fromApi > 0) resolvedMinutes = fromApi;
+      }
+
       if (alreadyOnMyDay) {
         const previousMinutes = pendingEstimateTask.estimateMinutes;
-        const delta = parsed - previousMinutes;
+        const delta = resolvedMinutes - previousMinutes;
         setTasks((prev) =>
           prev.map((row) =>
-            row.id === pendingEstimateTask.id ? { ...row, estimateMinutes: parsed } : row,
+            row.id === pendingEstimateTask.id
+              ? { ...row, estimateMinutes: resolvedMinutes }
+              : row,
           ),
         );
         if (delta > 0) {
@@ -802,7 +844,7 @@ const MyDayTasksPage: React.FC = () => {
           }));
         }
       } else {
-        applyOptimisticMyDayAdd(pendingEstimateTask, parsed);
+        applyOptimisticMyDayAdd(pendingEstimateTask, resolvedMinutes);
       }
 
       setShowEstimateModal(false);
@@ -845,7 +887,14 @@ const MyDayTasksPage: React.FC = () => {
       try {
         const result = await addTaskToMyDay({ task_id: task.id, plan_date: today });
         if (result.already_in_my_day) return;
-        applyOptimisticMyDayAdd(task, task.estimateMinutes);
+        let minutes = task.estimateMinutes;
+        if (result.task != null && typeof result.task === "object") {
+          const fromApi = resolveEstimateMinutesFromRow(
+            result.task as Record<string, unknown>,
+          );
+          if (fromApi > 0) minutes = fromApi;
+        }
+        applyOptimisticMyDayAdd(task, minutes);
         refreshMyDayPage().catch(() => undefined);
       } catch {
         toast.error("Failed to add task to My Day");
@@ -916,12 +965,27 @@ const MyDayTasksPage: React.FC = () => {
       await patchMyDayPreferences({ daily_capacity_minutes: parsed });
       setDefaultCapacityMinutes(parsed);
       setShowDefaultCapacityModal(false);
-      refreshMyDayPage().catch(() => undefined);
+      const capacityPayload = await getMyDayCapacity({ date: today });
+      applyCapacityFromApi({
+        ...capacityPayload,
+        effective_capacity_minutes:
+          Number(capacityPayload.effective_capacity_minutes ?? 0) || parsed,
+        default_capacity_minutes: parsed,
+      });
+      await refreshTasksAndRollover();
+      await fetchSuggestions(debouncedSuggestedSearch).catch(() => undefined);
       toast.success("Default daily capacity saved");
     } catch {
       toast.error("Failed to save default capacity");
     }
-  }, [defaultCapacityDraft, refreshMyDayPage]);
+  }, [
+    applyCapacityFromApi,
+    debouncedSuggestedSearch,
+    defaultCapacityDraft,
+    fetchSuggestions,
+    refreshTasksAndRollover,
+    today,
+  ]);
 
   const skipEstimateAndAddToMyDay = useCallback(async () => {
     if (pendingEstimateTask == null) return;
@@ -949,15 +1013,26 @@ const MyDayTasksPage: React.FC = () => {
           1,
           Math.min(1440, Math.floor(minutesOverride ?? capacityMinutes)),
         );
-        await overrideMyDayCapacity({ minutes: parsed, for_date: today });
-        setCapacityMinutes(parsed);
+        const capacityPayload = await overrideMyDayCapacity({
+          minutes: parsed,
+          for_date: today,
+        });
+        applyCapacityFromApi(capacityPayload);
         setIsEditingCapacity(false);
-        refreshMyDayPage().catch(() => undefined);
+        await refreshTasksAndRollover();
+        await fetchSuggestions(debouncedSuggestedSearch).catch(() => undefined);
       } catch {
         toast.error("Failed to override capacity");
       }
     },
-    [capacityMinutes, refreshMyDayPage, today],
+    [
+      applyCapacityFromApi,
+      capacityMinutes,
+      debouncedSuggestedSearch,
+      fetchSuggestions,
+      refreshTasksAndRollover,
+      today,
+    ],
   );
 
   const handleStartCapacityEdit = useCallback(() => {
@@ -1189,7 +1264,10 @@ const MyDayTasksPage: React.FC = () => {
 
           {completedTasks.length > 0 ? (
             <div className="myday-table-card myday-completed-card">
-              <div className="myday-section-title">Completed Tasks</div>
+              <div className="myday-section-title">
+                Completed Tasks
+                <span className="myday-section-count">({completedTasksCount})</span>
+              </div>
               <div className="myday-task-card-list">
                 {completedTasks.map((task) => (
                   <MyDayTaskCard

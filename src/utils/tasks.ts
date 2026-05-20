@@ -1421,14 +1421,19 @@ export interface MyDayTasksMeta {
   unestimated_task_count?: number;
 }
 
+/** Postman: `daily_log` (EOD / past-days rebuild); `my_day_entries` (live plan fallback). */
+export type MyDayHistorySource = "daily_log" | "my_day_entries";
+
 export interface MyDayTasksPayload {
   active: unknown[];
   completed: unknown[];
+  deleted_tasks?: unknown[];
   plan_date?: string;
   meta?: MyDayTasksMeta;
   read_only?: boolean;
   is_empty_by_design?: boolean;
   last_my_day_seen_date?: string | null;
+  history_source?: MyDayHistorySource | null;
 }
 
 export type MyDaySuggestionCategory =
@@ -1480,6 +1485,30 @@ export interface MyDayRolloverAckPayload {
   prompt_acknowledged_today?: boolean;
 }
 
+/** EOD snapshot from `GET /my-day/daily-logs/{date}` (Postman: daily-log-save cron). */
+export interface MyDayDailyLogPayload {
+  log_date?: string;
+  plan_date?: string;
+  tasks_planned?: number;
+  tasks_completed?: number;
+  planned_minutes?: number;
+  completed_minutes?: number;
+  effective_capacity_minutes?: number;
+  default_capacity_minutes?: number;
+  override_capacity_minutes?: number;
+  capacity_used_percent?: number;
+  load_percent?: number;
+  tasks?: unknown[];
+  deleted_tasks?: unknown[];
+  snapshots?: unknown[];
+  meta?: MyDayTasksMeta;
+  history_source?: MyDayHistorySource | null;
+}
+
+export interface MyDayDailyLogsListPayload {
+  logs?: MyDayDailyLogPayload[];
+}
+
 function parseMyDayResponseData<T>(response: { data?: unknown }): T {
   const responseData = response?.data;
   if (responseData == null || typeof responseData !== "object") {
@@ -1517,11 +1546,20 @@ function buildMyDayQueryWithArrays(
   return searchParams;
 }
 
+export function parseMyDayHistorySource(value: unknown): MyDayHistorySource | null {
+  if (value === "daily_log" || value === "my_day_entries") {
+    return value;
+  }
+  return null;
+}
+
 function normalizeMyDayTasksPayload(payload: MyDayTasksPayload): MyDayTasksPayload {
   const meta = payload.meta ?? {};
+  const historySource = parseMyDayHistorySource(payload.history_source);
   return {
     active: Array.isArray(payload.active) ? payload.active : [],
     completed: Array.isArray(payload.completed) ? payload.completed : [],
+    deleted_tasks: Array.isArray(payload.deleted_tasks) ? payload.deleted_tasks : [],
     plan_date: payload.plan_date,
     meta: {
       ...meta,
@@ -1531,6 +1569,7 @@ function normalizeMyDayTasksPayload(payload: MyDayTasksPayload): MyDayTasksPaylo
     read_only: payload.read_only === true,
     is_empty_by_design: payload.is_empty_by_design === true,
     last_my_day_seen_date: payload.last_my_day_seen_date ?? null,
+    history_source: historySource,
   };
 }
 
@@ -1722,6 +1761,41 @@ export const getMyDayPastDaySnapshot = async (
   );
   const payload = parseMyDayResponseData<MyDayTasksPayload>(response);
   return normalizeMyDayTasksPayload({ ...payload, read_only: true });
+};
+
+export const listMyDayDailyLogs = async (
+  params: {
+    extension_number?: string;
+    from?: string;
+    to?: string;
+    limit?: number;
+  } = {},
+): Promise<MyDayDailyLogPayload[]> => {
+  const query = buildMyDayQuery({
+    extension_number: params.extension_number,
+    from: params.from,
+    to: params.to,
+    limit: params.limit ?? 90,
+  });
+  const response = await axiosInstance.get(
+    `work-planner/my-day/daily-logs?${query.toString()}`,
+  );
+  const payload = parseMyDayResponseData<MyDayDailyLogsListPayload | MyDayDailyLogPayload[]>(
+    response,
+  );
+  if (Array.isArray(payload)) return payload;
+  return Array.isArray(payload.logs) ? payload.logs : [];
+};
+
+export const getMyDayDailyLogByDate = async (
+  date: string,
+  extensionNumber?: string,
+): Promise<MyDayDailyLogPayload> => {
+  const query = buildMyDayQuery({ extension_number: extensionNumber });
+  const response = await axiosInstance.get(
+    buildMyDayUrl(`work-planner/my-day/daily-logs/${date}`, query),
+  );
+  return parseMyDayResponseData<MyDayDailyLogPayload>(response);
 };
 
 // ==================== Workload (team capacity / planner) ====================

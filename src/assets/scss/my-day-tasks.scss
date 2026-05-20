@@ -402,6 +402,82 @@
     margin-top: 4px;
   }
 
+  .myday-section-count {
+    margin-left: 6px;
+    font-weight: 600;
+    color: #6b7280;
+  }
+
+  .myday-unestimated-dot {
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #ef4444;
+    margin-right: 4px;
+    vertical-align: middle;
+    flex-shrink: 0;
+  }
+
+  .myday-tag--no-estimate {
+    display: inline-flex;
+    align-items: center;
+  }
+
+  .myday-tag--deleted {
+    background-color: #fee2e2;
+    color: #991b1b;
+    font-size: 10px;
+  }
+
+  .myday-past-stats {
+    border: 1px solid #e5e7eb;
+    border-radius: 10px;
+    padding: 12px 14px;
+    margin-bottom: 12px;
+    background: #fafafa;
+  }
+
+  .myday-past-stats__grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px 16px;
+    margin-bottom: 12px;
+  }
+
+  .myday-past-stats__item {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+
+    strong {
+      font-size: 15px;
+      color: #111827;
+    }
+  }
+
+  .myday-past-stats__label {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: #6b7280;
+  }
+
+  .myday-past-stats__capacity-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 8px;
+    font-size: 12px;
+    color: #374151;
+    margin-bottom: 6px;
+
+    strong {
+      color: #111827;
+    }
+  }
+
   .myday-carry-card {
     padding: 12px;
     margin-bottom: 12px;
