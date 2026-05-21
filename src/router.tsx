@@ -113,14 +113,19 @@ function stripPagesExtension(relative: string): string {
 
 function isValidRouteParamName(name: string): boolean {
   if (!name) return false;
-  for (let i = 0; i < name.length; i += 1) {
-    const code = name.charCodeAt(i);
+  let index = 0;
+  while (index < name.length) {
+    const code = name.codePointAt(index);
+    if (code === undefined) {
+      return false;
+    }
     const isDigit = code >= 48 && code <= 57;
     const isUpper = code >= 65 && code <= 90;
     const isLower = code >= 97 && code <= 122;
     if (!(isDigit || isUpper || isLower || code === 95 || code === 45)) {
       return false;
     }
+    index += code > 0xffff ? 2 : 1;
   }
   return true;
 }
@@ -133,7 +138,7 @@ function mapDynamicRouteSegment(
   if (segment.length < 3 || segment.length > maxLen) {
     return null;
   }
-  if (segment[0] !== "[" || segment.at(-1) !== "]") {
+  if (!segment.startsWith("[") || !segment.endsWith("]")) {
     return null;
   }
   const inner = segment.slice(1, -1);
