@@ -19,7 +19,7 @@ export interface AIChatbotSettingsFormValues {
   budget: AIChatbotBudgetFields;
   openAiModel: string;
   pricing: AIChatbotPricingFields;
-  /** Percent markup on base LLM cost; blank = no markup. */
+  /** Percent margin on base LLM cost; blank = no margin. */
   marginPct: string;
 }
 

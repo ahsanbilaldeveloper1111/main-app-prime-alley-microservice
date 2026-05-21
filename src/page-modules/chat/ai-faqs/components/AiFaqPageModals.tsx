@@ -24,8 +24,8 @@ export type AiFaqPageModalsProps = Readonly<{
   fileInputKey: number;
   resetForm: () => void;
   handleAddFAQItem: () => void;
-  handleRemoveFAQItem: (index: number) => void;
-  handleUpdateFAQItem: (index: number, field: keyof FAQItem, value: string) => void;
+  handleRemoveFAQItem: (clientKey: string) => void;
+  handleUpdateFAQItem: (clientKey: string, field: keyof FAQItem, value: string) => void;
   handleFileChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   handleRemoveFile: (index: number) => void;
   handleSubmit: () => void | Promise<void>;
@@ -87,7 +87,13 @@ export function AiFaqPageModals(props: AiFaqPageModalsProps) {
           <Modal.Title>{`Add ${scopeLabel} FAQs`}</Modal.Title>
         </Modal.Header>
         <Modal.Body>
-          <Form>
+          <Form
+            id="ai-faq-add-form"
+            onSubmit={(e) => {
+              e.preventDefault();
+              void handleSubmit();
+            }}
+          >
             {addModalBodyPrefix}
             <AiFaqDraftItemCards
               variant="multi"
@@ -108,6 +114,7 @@ export function AiFaqPageModals(props: AiFaqPageModalsProps) {
         </Modal.Body>
         <Modal.Footer>
           <Button
+            type="button"
             variant="secondary"
             onClick={() => {
               setShowAddModal(false);
@@ -116,12 +123,7 @@ export function AiFaqPageModals(props: AiFaqPageModalsProps) {
           >
             Cancel
           </Button>
-          <Button
-            variant="primary"
-            onClick={() => {
-              void handleSubmit();
-            }}
-          >
+          <Button type="submit" form="ai-faq-add-form" variant="primary">
             Create FAQs
           </Button>
         </Modal.Footer>
@@ -142,7 +144,13 @@ export function AiFaqPageModals(props: AiFaqPageModalsProps) {
             <Modal.Title>{`Edit ${scopeLabel} FAQ`}</Modal.Title>
           </Modal.Header>
           <Modal.Body>
-            <Form>
+            <Form
+              id="ai-faq-edit-form"
+              onSubmit={(e) => {
+                e.preventDefault();
+                void handleSubmit();
+              }}
+            >
               <AiFaqDraftItemCards
                 variant="single"
                 faqItems={faqItems}
@@ -161,6 +169,7 @@ export function AiFaqPageModals(props: AiFaqPageModalsProps) {
           </Modal.Body>
           <Modal.Footer>
             <Button
+              type="button"
               variant="secondary"
               onClick={() => {
                 setShowEditModal(false);
@@ -170,12 +179,7 @@ export function AiFaqPageModals(props: AiFaqPageModalsProps) {
             >
               Cancel
             </Button>
-            <Button
-              variant="primary"
-              onClick={() => {
-                void handleSubmit();
-              }}
-            >
+            <Button type="submit" form="ai-faq-edit-form" variant="primary">
               Update FAQ
             </Button>
           </Modal.Footer>

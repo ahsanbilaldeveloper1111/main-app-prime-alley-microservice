@@ -323,9 +323,9 @@ export function mapFormValuesToTenantSettingsUpdate(
   validateOptionalNonNegativeInt(userPerMinute, "User per minute");
   validateOptionalNonNegativeNumber(inputCost, "Input cost per million");
   validateOptionalNonNegativeNumber(outputCost, "Output cost per million");
-  validateOptionalNonNegativeNumber(defaultUserBudget, "Default user budget");
+  validateOptionalNonNegativeNumber(defaultUserBudget, "Default per user budget");
   validateOptionalThresholdPct(defaultThresholdPct);
-  validateOptionalNonNegativeNumber(marginPct, "Cost markup (%)");
+  validateOptionalNonNegativeNumber(marginPct, "Cost margin (%)");
 
   return {
     tenant_id: id,
@@ -368,12 +368,12 @@ export function mapTenantChatSettingsMarginPct(
   return null;
 }
 
-/** User-facing label for tenant LLM cost markup. */
+/** User-facing label for tenant LLM cost margin. */
 export function formatTenantMarginPctDisplay(
   marginPct: string | null | undefined,
 ): string {
   if (!marginPct?.trim()) {
-    return "No markup (base cost)";
+    return "No margin (base cost)";
   }
   const value = Number.parseFloat(marginPct.trim());
   if (!Number.isFinite(value)) {

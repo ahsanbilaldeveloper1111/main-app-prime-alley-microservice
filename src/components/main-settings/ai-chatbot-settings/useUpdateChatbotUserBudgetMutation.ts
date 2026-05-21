@@ -1,4 +1,4 @@
-import { chatKeys } from "@query/keys";
+import { chatKeys, controlhubKeys } from "@query/keys";
 import {
   updateChatbotUserBudget,
   type UpdateChatbotUserBudgetPayload,
@@ -30,6 +30,9 @@ export function useUpdateChatbotUserBudgetMutation(tenantId: string) {
         .catch(() => undefined);
       queryClient
         .invalidateQueries({ queryKey: chatKeys.assistant.all() })
+        .catch(() => undefined);
+      queryClient
+        .invalidateQueries({ queryKey: controlhubKeys.users.all() })
         .catch(() => undefined);
       toast.success("User budget override saved.");
     },

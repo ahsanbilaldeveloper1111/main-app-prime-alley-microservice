@@ -8,14 +8,31 @@ import React from "react";
 export type ChatAssistantBudgetBarProps = Readonly<{
   budget: ChatAssistantBudgetView | null | undefined;
   isLoading?: boolean;
+  isUnlimited?: boolean;
+  identityMissing?: boolean;
+  loadError?: boolean;
   compact?: boolean;
 }>;
 
 export function ChatAssistantBudgetBar({
   budget,
   isLoading = false,
+  isUnlimited = false,
+  identityMissing = false,
+  loadError = false,
   compact = false,
 }: ChatAssistantBudgetBarProps) {
+  const padding = compact ? "6px 12px" : "8px 16px";
+  const fieldsetStyle: React.CSSProperties = {
+    padding,
+    border: "none",
+    margin: 0,
+    minWidth: 0,
+    borderBottom: "1px solid #f0f0f0",
+    flexShrink: 0,
+    backgroundColor: "#ffffff",
+  };
+
   if (isLoading) {
     return (
       <fieldset
@@ -44,22 +61,62 @@ export function ChatAssistantBudgetBar({
     );
   }
 
+  if (identityMissing) {
+    return (
+      <fieldset style={fieldsetStyle}>
+        <legend className="visually-hidden">Monthly chat budget</legend>
+        <div style={{ fontSize: "11px", color: "#a0aec0" }}>
+          Monthly budget unavailable (missing tenant or user context).
+        </div>
+      </fieldset>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <fieldset style={fieldsetStyle}>
+        <legend className="visually-hidden">Monthly chat budget</legend>
+        <div style={{ fontSize: "11px", color: "#a0aec0" }}>
+          Monthly budget could not be loaded. Try again in a moment.
+        </div>
+      </fieldset>
+    );
+  }
+
+  if (isUnlimited) {
+    return (
+      <fieldset style={fieldsetStyle}>
+        <legend className="visually-hidden">Monthly chat budget</legend>
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            fontSize: "11.5px",
+            color: "#4a5568",
+            marginBottom: 4,
+          }}
+        >
+          <span style={{ fontWeight: 600, color: "#2d3748" }}>Monthly budget</span>
+          <span style={{ fontWeight: 600, color: "#059669" }}>Unlimited</span>
+        </div>
+        <div
+          style={{
+            height: 6,
+            borderRadius: 3,
+            backgroundColor: "#d1fae5",
+          }}
+          aria-hidden
+        />
+      </fieldset>
+    );
+  }
+
   if (!budget) return null;
 
-  const padding = compact ? "6px 12px" : "8px 16px";
   const barColor = chatAssistantBudgetBarColor(budget.variant);
   const remainingLabel = formatChatBudgetUsd(budget.remainingUsd, true);
   const totalLabel = formatChatBudgetUsd(budget.totalUsd);
-
-  const fieldsetStyle: React.CSSProperties = {
-    padding,
-    border: "none",
-    margin: 0,
-    minWidth: 0,
-    borderBottom: "1px solid #f0f0f0",
-    flexShrink: 0,
-    backgroundColor: "#ffffff",
-  };
 
   return (
     <fieldset style={fieldsetStyle}>

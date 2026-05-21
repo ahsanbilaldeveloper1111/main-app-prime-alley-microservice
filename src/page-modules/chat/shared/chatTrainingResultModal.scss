@@ -1,0 +1,41 @@
+.chatTrainingResultModal-message {
+  font-size: 16px;
+  color: #2d3748;
+  margin: 0;
+  line-height: 1.6;
+  text-align: center;
+  padding: 12px 8px;
+}
+
+.chatTrainingResultModal-stats {
+  margin: 0;
+  display: grid;
+  gap: 12px;
+}
+
+.chatTrainingResultModal-statRow {
+  display: grid;
+  grid-template-columns: minmax(140px, 200px) 1fr;
+  gap: 8px 16px;
+  align-items: baseline;
+  padding: 10px 12px;
+  background: #f8fafc;
+  border: 1px solid #e8eef5;
+  border-radius: 8px;
+}
+
+.chatTrainingResultModal-statRow dt {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.chatTrainingResultModal-statRow dd {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 500;
+  color: #1e293b;
+}

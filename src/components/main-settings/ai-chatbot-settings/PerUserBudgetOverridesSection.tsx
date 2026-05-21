@@ -1,9 +1,17 @@
-import type { TenantUserBudgetRow } from "@page-modules/chat/tenant-dashboard/types";
+import type { ChatCompanyOption } from "@page-modules/chat/useChatCompaniesQuery";
 import { useChatTenantUsersQuery } from "@page-modules/chat/tenant-dashboard/useChatTenantUsersQuery";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Button, Spinner } from "react-bootstrap";
 import { toast } from "react-toastify";
 
+import {
+  formatChatbotPerUserBudgetOptionLabel,
+  type ChatbotPerUserBudgetOption,
+} from "./mapUsersDirectoryForBudget";
+import {
+  MAIN_SETTINGS_USERS_FETCH_ERROR_MESSAGE,
+  useMainSettingsUsersForChatbotQuery,
+} from "./useMainSettingsUsersForChatbotQuery";
 import { useUpdateChatbotUserBudgetMutation } from "./useUpdateChatbotUserBudgetMutation";
 
 function formatMonthlyCapValue(value: string | null | undefined): string {
@@ -36,40 +44,50 @@ function renderUserCountStatus(
   return formatUserCountLabel(userCount);
 }
 
-function formatUserOptionLabel(row: TenantUserBudgetRow): string {
-  if (row.displayName === row.userId) {
-    return row.displayName;
-  }
-  return `${row.displayName} (${row.userId})`;
-}
-
 export type PerUserBudgetOverridesSectionProps = Readonly<{
   tenantId: string;
+  companies?: readonly ChatCompanyOption[];
   enabled: boolean;
   canEdit: boolean;
 }>;
 
 export function PerUserBudgetOverridesSection({
   tenantId,
+  companies = [],
   enabled,
   canEdit,
 }: PerUserBudgetOverridesSectionProps) {
-  const usersQuery = useChatTenantUsersQuery(tenantId, enabled);
+  const usersQuery = useMainSettingsUsersForChatbotQuery(
+    enabled,
+    tenantId,
+    companies,
+  );
+  const chatBudgetQuery = useChatTenantUsersQuery(tenantId, enabled);
   const saveMutation = useUpdateChatbotUserBudgetMutation(tenantId);
 
   const [selectedUserId, setSelectedUserId] = useState("");
   const [monthlyCapUsd, setMonthlyCapUsd] = useState("");
 
-  const rows = usersQuery.rows;
-  const userCount = rows.length;
+  const users = usersQuery.users;
+  const userCount = users.length;
 
-  const rowsByUserId = useMemo(() => {
-    const map = new Map<string, TenantUserBudgetRow>();
-    for (const row of rows) {
-      if (row.userId) map.set(row.userId, row);
+  const monthlyBudgetByUserId = useMemo(() => {
+    const map = new Map<string, string | null>();
+    for (const row of chatBudgetQuery.rows) {
+      if (row.userId) {
+        map.set(row.userId, row.monthlyBudgetUsd);
+      }
     }
     return map;
-  }, [rows]);
+  }, [chatBudgetQuery.rows]);
+
+  const usersByUserId = useMemo(() => {
+    const map = new Map<string, ChatbotPerUserBudgetOption>();
+    for (const user of users) {
+      if (user.userId) map.set(user.userId, user);
+    }
+    return map;
+  }, [users]);
 
   useEffect(() => {
     setSelectedUserId("");
@@ -79,15 +97,19 @@ export function PerUserBudgetOverridesSection({
   const handleUserChange = useCallback(
     (userId: string) => {
       setSelectedUserId(userId);
-      const row = rowsByUserId.get(userId);
-      setMonthlyCapUsd(formatMonthlyCapValue(row?.monthlyBudgetUsd));
+      const existing = monthlyBudgetByUserId.get(userId);
+      setMonthlyCapUsd(formatMonthlyCapValue(existing));
     },
-    [rowsByUserId],
+    [monthlyBudgetByUserId],
   );
 
   const handleSave = useCallback(() => {
     if (!selectedUserId.trim()) {
       toast.info("Please select a user");
+      return;
+    }
+    if (!usersByUserId.has(selectedUserId)) {
+      toast.error("Selected user is not in the list. Please choose again.");
       return;
     }
     const capError = validateMonthlyCap(monthlyCapUsd);
@@ -99,11 +121,14 @@ export function PerUserBudgetOverridesSection({
       userId: selectedUserId,
       payload: { monthly_budget_usd: monthlyCapUsd.trim() },
     });
-  }, [monthlyCapUsd, saveMutation, selectedUserId]);
+  }, [monthlyCapUsd, saveMutation, selectedUserId, usersByUserId]);
 
   const capValidationError = validateMonthlyCap(monthlyCapUsd);
-  const fieldsDisabled =
-    !canEdit || usersQuery.isFetching || saveMutation.isPending;
+  const usersListLoading =
+    usersQuery.isPending || (usersQuery.isFetching && userCount === 0);
+  const selectDisabled = usersListLoading || userCount === 0;
+  const capFieldsDisabled =
+    !canEdit || usersListLoading || saveMutation.isPending;
   const hasSelectedUser = Boolean(selectedUserId.trim());
   const canSave =
     canEdit &&
@@ -124,7 +149,7 @@ export function PerUserBudgetOverridesSection({
           Per-user budget overrides
         </h3>
         <span className="ai-chatbot-settings__per-user-budget-count">
-          {renderUserCountStatus(usersQuery.isFetching, userCount)}
+          {renderUserCountStatus(usersListLoading, userCount)}
         </span>
       </div>
 
@@ -134,17 +159,13 @@ export function PerUserBudgetOverridesSection({
       </p>
 
       <p className="ai-chatbot-settings__per-user-budget-note">
-        User list source: ChatbotUser rows for this tenant — populated by
-        mainapp via{" "}
-        <code className="ai-chatbot-settings__per-user-budget-code">
-          PUT /api/users/&lt;tenant&gt;/&lt;user_id&gt;/
-        </code>
-        {'.'}
+        Users are loaded from Main Settings → Users &amp; Teams (User Directory).
+        Overrides are saved with PUT /api/chat/users/&#123;tenant&#125;/&#123;extension&#125;/.
       </p>
 
       {usersQuery.isError ? (
         <p className="ai-chatbot-settings__status" role="alert">
-          Could not load users for this tenant.{" "}
+          {MAIN_SETTINGS_USERS_FETCH_ERROR_MESSAGE}{" "}
           <button
             type="button"
             className="ai-chatbot-settings__retry"
@@ -157,19 +178,26 @@ export function PerUserBudgetOverridesSection({
         </p>
       ) : null}
 
+      {!usersListLoading && !usersQuery.isError && userCount === 0 ? (
+        <p className="ai-chatbot-settings__status">
+          No users found for this company. Check Users &amp; Teams → User
+          Directory, or apply the company filter above.
+        </p>
+      ) : null}
+
       <div className="ai-chatbot-settings__per-user-budget-grid">
         <label className="ai-chatbot-settings__field">
           <span className="ai-chatbot-settings__field-label">User</span>
           <select
             className="ai-chatbot-settings__select"
             value={selectedUserId}
-            disabled={fieldsDisabled || userCount === 0}
+            disabled={selectDisabled}
             onChange={(e) => handleUserChange(e.target.value)}
           >
             <option value="">— Select a user —</option>
-            {rows.map((row) => (
-              <option key={row.userId} value={row.userId}>
-                {formatUserOptionLabel(row)}
+            {users.map((user) => (
+              <option key={user.userId} value={user.userId}>
+                {formatChatbotPerUserBudgetOptionLabel(user)}
               </option>
             ))}
           </select>
@@ -186,7 +214,7 @@ export function PerUserBudgetOverridesSection({
             placeholder="e.g. 10.00"
             min={0}
             step="0.01"
-            disabled={fieldsDisabled || hasSelectedUser === false}
+            disabled={capFieldsDisabled || hasSelectedUser === false}
             onChange={(e) => setMonthlyCapUsd(e.target.value)}
           />
         </label>

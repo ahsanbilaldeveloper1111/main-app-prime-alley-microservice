@@ -15,6 +15,8 @@ import {
   Table,
 } from "react-bootstrap";
 
+import { ChatModuleDateTimeFilterField } from "@page-modules/chat/shared/ChatModuleDateTimeFilterField";
+
 import {
   chatbotsDashboardColTenantClass,
   chatbotsDashboardTdClass,
@@ -99,23 +101,21 @@ export function AdminDashboardPricingHistoryTab({
               </Form.Select>
             </Col>
             <Col xs={12} md={6} lg={3}>
-              <Form.Label className="small text-muted text-uppercase fw-semibold">
-                From (UTC)
-              </Form.Label>
-              <Form.Control
-                type="date"
+              <ChatModuleDateTimeFilterField
+                label="Start date & time"
+                bound="from"
                 value={draftFilters.from}
-                onChange={(e) => updateDraft({ from: e.target.value })}
+                disabled={isLoading}
+                onChange={(from) => updateDraft({ from })}
               />
             </Col>
             <Col xs={12} md={6} lg={3}>
-              <Form.Label className="small text-muted text-uppercase fw-semibold">
-                To (UTC)
-              </Form.Label>
-              <Form.Control
-                type="date"
+              <ChatModuleDateTimeFilterField
+                label="End date & time"
+                bound="to"
                 value={draftFilters.to}
-                onChange={(e) => updateDraft({ to: e.target.value })}
+                disabled={isLoading}
+                onChange={(to) => updateDraft({ to })}
               />
             </Col>
             <Col xs={12} md={6} lg={3}>

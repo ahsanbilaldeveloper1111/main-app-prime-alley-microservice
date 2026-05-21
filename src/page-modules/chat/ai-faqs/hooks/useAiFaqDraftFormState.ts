@@ -1,6 +1,6 @@
 import type { FAQItem } from "@utils/chat";
 import type React from "react";
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { emptyFaqDraft, type FAQItemDraft } from "../faqItemDraft";
 
 export function useAiFaqDraftFormState() {
@@ -8,6 +8,11 @@ export function useAiFaqDraftFormState() {
   const [haveFiles, setHaveFiles] = useState(false);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [fileInputKey, setFileInputKey] = useState(0);
+
+  const faqItemsRef = useRef(faqItems);
+  const selectedFilesRef = useRef(selectedFiles);
+  faqItemsRef.current = faqItems;
+  selectedFilesRef.current = selectedFiles;
 
   const clearFileFieldState = useCallback(() => {
     setHaveFiles(false);
@@ -26,25 +31,36 @@ export function useAiFaqDraftFormState() {
     setFaqItems((items) => [...items, emptyFaqDraft()]);
   }, []);
 
-  const handleRemoveFAQItem = useCallback((index: number) => {
-    setFaqItems((items) => (items.length > 1 ? items.filter((_, i) => i !== index) : items));
+  const handleRemoveFAQItem = useCallback((clientKey: string) => {
+    setFaqItems((items) =>
+      items.length > 1 ? items.filter((item) => item.clientKey !== clientKey) : items,
+    );
   }, []);
 
-  const handleUpdateFAQItem = useCallback((index: number, field: keyof FAQItem, value: string) => {
-    setFaqItems((items) => {
-      const updated = [...items];
-      updated[index] = { ...updated[index], [field]: value };
-      return updated;
-    });
-  }, []);
+  const handleUpdateFAQItem = useCallback(
+    (clientKey: string, field: keyof FAQItem, value: string) => {
+      setFaqItems((items) =>
+        items.map((item) =>
+          item.clientKey === clientKey ? { ...item, [field]: value } : item,
+        ),
+      );
+    },
+    [],
+  );
 
   const handleFileChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files) {
-      const files = Array.from(e.target.files);
-      setSelectedFiles(files);
-      setHaveFiles(files.length > 0);
-    }
+    const files = e.target.files ? Array.from(e.target.files) : [];
+    setSelectedFiles(files);
+    setHaveFiles(files.length > 0);
   }, []);
+
+  const getDraftSnapshot = useCallback(
+    () => ({
+      faqItems: faqItemsRef.current,
+      selectedFiles: selectedFilesRef.current,
+    }),
+    [],
+  );
 
   const handleRemoveFile = useCallback((index: number) => {
     setSelectedFiles((prev) => {
@@ -62,6 +78,7 @@ export function useAiFaqDraftFormState() {
     fileInputKey,
     resetForm,
     clearAttachments,
+    getDraftSnapshot,
     handleAddFAQItem,
     handleRemoveFAQItem,
     handleUpdateFAQItem,

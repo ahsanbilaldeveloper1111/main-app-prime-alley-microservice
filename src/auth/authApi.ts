@@ -121,11 +121,25 @@ export async function loginRequest(
     throw new Error("Login response missing refresh token");
   }
 
+  const loginRecord = data as Record<string, unknown>;
+  const extension =
+    (typeof loginRecord.extension === "string" && loginRecord.extension) ||
+    (typeof loginRecord.user_extension === "string" &&
+      loginRecord.user_extension) ||
+    (typeof loginRecord.extension_number === "string" &&
+      loginRecord.extension_number) ||
+    null;
+
   const user: AuthUser = {
     id: data.id ?? null,
     name: data.name ?? null,
     email: data.email ?? null,
     username: data.username ?? null,
+    extension,
+    user_extension:
+      typeof loginRecord.user_extension === "string"
+        ? loginRecord.user_extension
+        : extension,
     company_id: data.company_id ?? null,
     company_name: data.company_name ?? null,
     company_identifier: data.company_identifier ?? null,

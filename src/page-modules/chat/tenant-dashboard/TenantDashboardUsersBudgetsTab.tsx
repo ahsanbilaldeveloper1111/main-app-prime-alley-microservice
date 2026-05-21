@@ -1,6 +1,14 @@
-import { RefreshCw, Users, Wallet } from "lucide-react";
+import { AlertTriangle, RefreshCw, Users, Wallet } from "lucide-react";
 import React from "react";
-import { Alert, Badge, Button, Card, Col, ProgressBar, Row, Spinner, Table } from "react-bootstrap";
+import { Alert, Badge, Button, Card, Col, Row, Spinner, Table } from "react-bootstrap";
+
+import { ChatBudgetUsageBar } from "../shared/ChatBudgetUsageBar";
+import {
+  clampUsedPct,
+  formatBudgetPct,
+  formatBudgetUsd,
+  isUnlimitedBudgetSource,
+} from "../shared/chatBudgetUsage";
 
 import {
   chatbotsDashboardColUserClass,
@@ -14,41 +22,9 @@ import { DashboardTableCard } from "../shared/DashboardTableCard";
 import type { TenantUserBudgetRow } from "./types";
 import { useChatTenantUsersQuery } from "./useChatTenantUsersQuery";
 
-const usd2 = new Intl.NumberFormat("en-US", {
-  style: "currency",
-  currency: "USD",
-  minimumFractionDigits: 2,
-  maximumFractionDigits: 2,
-});
-
-const usd4 = new Intl.NumberFormat("en-US", {
-  style: "currency",
-  currency: "USD",
-  minimumFractionDigits: 4,
-  maximumFractionDigits: 4,
-});
-
-const pct1 = new Intl.NumberFormat("en-US", {
-  minimumFractionDigits: 1,
-  maximumFractionDigits: 1,
-});
-
-function formatUsd(value: string | null | undefined, precise = false): string {
-  const trimmed = value?.trim();
-  if (!trimmed) return "—";
-  const n = Number.parseFloat(trimmed);
-  if (!Number.isFinite(n)) return trimmed;
-  return precise ? usd4.format(n) : usd2.format(n);
-}
-
-function formatPct(value: number | null | undefined): string {
-  if (value == null || !Number.isFinite(value)) return "—";
-  return `${pct1.format(value)}%`;
-}
-
 function formatNullableUsd(value: string | null): string {
   if (value == null) return "—";
-  return formatUsd(value);
+  return formatBudgetUsd(value);
 }
 
 function formatLastSeen(iso: string | null): string {
@@ -64,31 +40,6 @@ function formatLastSeen(iso: string | null): string {
   });
 }
 
-function UsedPctBar({ row }: Readonly<{ row: TenantUserBudgetRow }>) {
-  const pct = Math.min(100, Math.max(0, row.usedPct));
-  let variant: "success" | "warning" | "danger" = "success";
-  if (row.isExhausted) {
-    variant = "danger";
-  } else if (pct >= row.effectiveThresholdPct) {
-    variant = "warning";
-  }
-
-  return (
-    <div className="tenant-dashboard-users__usage">
-      <div className="d-flex justify-content-between small mb-1">
-        <span>{pct1.format(pct)}%</span>
-        <span className="text-muted">{formatUsd(row.remainingUsd, true)} left</span>
-      </div>
-      <ProgressBar
-        now={pct}
-        variant={variant}
-        style={{ height: 6 }}
-        aria-label={`${row.displayName} budget used ${pct}%`}
-      />
-    </div>
-  );
-}
-
 export type TenantDashboardUsersBudgetsTabProps = Readonly<{
   tenantId: string;
   active: boolean;
@@ -102,6 +53,14 @@ export function TenantDashboardUsersBudgetsTab({
     tenantId,
     active,
   );
+
+  const exhaustedCount = rows.filter((r) => r.isExhausted).length;
+  const atThresholdCount = rows.filter(
+    (r) =>
+      !isUnlimitedBudgetSource(r.budgetSource) &&
+      !r.isExhausted &&
+      clampUsedPct(r.usedPct) >= r.effectiveThresholdPct,
+  ).length;
 
   if (isFetching && rows.length === 0) {
     return (
@@ -134,8 +93,33 @@ export function TenantDashboardUsersBudgetsTab({
         </Alert>
       ) : null}
 
+      {exhaustedCount > 0 || atThresholdCount > 0 ? (
+        <Alert
+          variant={exhaustedCount > 0 ? "danger" : "warning"}
+          className="d-flex align-items-start gap-2"
+        >
+          <AlertTriangle size={18} className="flex-shrink-0 mt-1" aria-hidden />
+          <span>
+            {exhaustedCount > 0 ? (
+              <>
+                <strong>{exhaustedCount}</strong> user
+                {exhaustedCount === 1 ? " has" : "s have"} exhausted their budget.
+                {atThresholdCount > 0 ? " " : ""}
+              </>
+            ) : null}
+            {atThresholdCount > 0 ? (
+              <>
+                <strong>{atThresholdCount}</strong> user
+                {atThresholdCount === 1 ? " is" : "s are"} at or above the alert
+                threshold.
+              </>
+            ) : null}
+          </span>
+        </Alert>
+      ) : null}
+
       <Row className="g-3 mb-3">
-        <Col xs={12} sm={6} md={4}>
+        <Col xs={12} sm={6} md={3}>
           <Card className="border-0 shadow-sm h-100">
             <Card.Body className="d-flex align-items-center gap-3">
               <div
@@ -159,7 +143,31 @@ export function TenantDashboardUsersBudgetsTab({
             </Card.Body>
           </Card>
         </Col>
-        <Col xs={12} sm={6} md={4}>
+        <Col xs={12} sm={6} md={3}>
+          <Card className="border-0 shadow-sm h-100">
+            <Card.Body className="d-flex align-items-center gap-3">
+              <div
+                className="rounded-3 d-flex align-items-center justify-content-center"
+                style={{
+                  width: 40,
+                  height: 40,
+                  backgroundColor: "#d9770618",
+                  color: "#d97706",
+                }}
+                aria-hidden
+              >
+                <AlertTriangle size={20} />
+              </div>
+              <div>
+                <div className="text-muted small text-uppercase fw-semibold">
+                  At threshold
+                </div>
+                <div className="fs-4 fw-semibold">{atThresholdCount}</div>
+              </div>
+            </Card.Body>
+          </Card>
+        </Col>
+        <Col xs={12} sm={6} md={3}>
           <Card className="border-0 shadow-sm h-100">
             <Card.Body className="d-flex align-items-center gap-3">
               <div
@@ -178,16 +186,14 @@ export function TenantDashboardUsersBudgetsTab({
                 <div className="text-muted small text-uppercase fw-semibold">
                   Budget exhausted
                 </div>
-                <div className="fs-4 fw-semibold">
-                  {rows.filter((r) => r.isExhausted).length}
-                </div>
+                <div className="fs-4 fw-semibold">{exhaustedCount}</div>
               </div>
             </Card.Body>
           </Card>
         </Col>
         <Col
           xs={12}
-          md={4}
+          md={3}
           className="d-flex align-items-center justify-content-md-end"
         >
           <Button
@@ -275,23 +281,23 @@ export function TenantDashboardUsersBudgetsTab({
                   className={chatbotsDashboardTdClass}
                   data-label="Effective budget"
                 >
-                  {formatUsd(row.effectiveBudgetUsd)}
+                  {formatBudgetUsd(row.effectiveBudgetUsd)}
                 </td>
                 <td
                   className={chatbotsDashboardTdClass}
                   data-label="Effective threshold"
                 >
-                  {formatPct(row.effectiveThresholdPct)}
+                  {formatBudgetPct(row.effectiveThresholdPct)}
                 </td>
                 <td className={chatbotsDashboardTdClass} data-label="MTD spend">
-                  {formatUsd(row.mtdSpend, true)}
+                  {formatBudgetUsd(row.mtdSpend, true)}
                 </td>
                 <td
                   className={chatbotsDashboardTdClass}
                   data-label="Usage"
                   style={{ minWidth: 140 }}
                 >
-                  <UsedPctBar row={row} />
+                  <ChatBudgetUsageBar row={row} />
                 </td>
                 <td className={chatbotsDashboardTdClass} data-label="Source">
                   <Badge

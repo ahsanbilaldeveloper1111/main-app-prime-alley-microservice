@@ -778,6 +778,7 @@ export const chatKeys = {
   /** AI assistant popup thread (`GET/POST /chat/`). */
   assistant: {
     all: () => [...chatKeys.root, "assistant"] as const,
+    conversations: () => [...chatKeys.assistant.all(), "conversations"] as const,
     thread: (threadId: string) =>
       [...chatKeys.assistant.all(), "thread", threadId] as const,
     userBudget: (tenantId: string, userId: string) =>
@@ -1250,6 +1251,9 @@ export const controlhubKeys = {
         params.search,
         params.filtersKey,
       ] as const,
+    /** Full user directory (`POST users/list` paginated), Main Settings → Users & Teams. */
+    directoryAll: (tenantScope: string) =>
+      [...controlhubKeys.users.all(), "directoryAll", tenantScope] as const,
   },
 
   teams: {

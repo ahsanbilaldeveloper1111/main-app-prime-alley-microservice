@@ -15,9 +15,6 @@ import {
   type ChatAdminAuditLogFilterForm,
 } from "./types";
 
-/** Set true when GET `/chat/admin/audit-log/` is available on the backend. */
-const CHAT_ADMIN_AUDIT_LOG_FETCH_ENABLED = false;
-
 export function useChatAdminAuditLogPage() {
   const { status: sessionStatus } = useSession();
   const companiesQuery = useChatCompaniesQuery(sessionStatus === "authenticated");
@@ -33,8 +30,7 @@ export function useChatAdminAuditLogPage() {
   const auditLogQuery = useQuery({
     queryKey: chatKeys.adminAuditLog.list(appliedQuery),
     queryFn: () => getChatAdminAuditLog(appliedQuery),
-    enabled:
-      CHAT_ADMIN_AUDIT_LOG_FETCH_ENABLED && sessionStatus === "authenticated",
+    enabled: sessionStatus === "authenticated",
     staleTime: 30_000,
   });
 

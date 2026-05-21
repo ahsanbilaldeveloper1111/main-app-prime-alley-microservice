@@ -44,6 +44,14 @@ function mapPricing(
   };
 }
 
+function readKpiQueries(bucket: { queries?: number } | undefined): number {
+  return bucket?.queries ?? 0;
+}
+
+function readKpiCost(bucket: { cost?: string } | undefined): number {
+  return parseCost(bucket?.cost);
+}
+
 export function mapTenantDashboardApi(
   data: TenantChatDashboardResponse,
 ): ChatbotsTenantDashboardModel {
@@ -51,16 +59,19 @@ export function mapTenantDashboardApi(
     a.date.localeCompare(b.date),
   );
 
+  const today = data.kpis?.today;
+  const thisMonth = data.kpis?.this_month;
+
   return {
     tenantId: data.tenant_id,
     companyName: data.company_name,
     generatedAt: data.generated_at,
     summary: {
-      queriesToday: data.kpis.today.queries,
-      costTodayUsd: parseCost(data.kpis.today.cost),
-      queriesThisMonth: data.kpis.this_month.queries,
-      costThisMonthUsd: parseCost(data.kpis.this_month.cost),
-      activeUsers: data.kpis.active_users_7d,
+      queriesToday: readKpiQueries(today),
+      costTodayUsd: readKpiCost(today),
+      queriesThisMonth: readKpiQueries(thisMonth),
+      costThisMonthUsd: readKpiCost(thisMonth),
+      activeUsers: data.kpis?.active_users_7d ?? 0,
     },
     dailyCostQueriesLast30Days: {
       categories: trend.map((p) => formatTrendLabel(p.date)),
@@ -79,10 +90,10 @@ export function mapTenantDashboardApi(
       users: row.unique_users,
     })),
     knowledgeBase: {
-      tenantFaqs: data.kb.tenant_faqs,
-      globalFaqs: data.kb.global_faqs,
-      trained: data.kb.is_trained,
-      lastTraining: data.kb.last_training
+      tenantFaqs: data.kb?.tenant_faqs ?? 0,
+      globalFaqs: data.kb?.global_faqs ?? 0,
+      trained: data.kb?.is_trained ?? false,
+      lastTraining: data.kb?.last_training
         ? formatActivity(data.kb.last_training)
         : null,
     },

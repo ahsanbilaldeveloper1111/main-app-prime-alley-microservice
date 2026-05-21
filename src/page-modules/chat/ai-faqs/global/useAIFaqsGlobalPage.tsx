@@ -20,7 +20,8 @@ const { PERMISSIONS } = HEADER_CONSTANTS;
 import {
   buildAiFaqSubmitFields,
   emptyFaqListPage,
-  getValidFaqItemsForSubmit,
+  evaluateAiFaqSubmitDraft,
+  getAiFaqSubmitValidationError,
   paginateArrayForTable,
 } from "../faqItemDraft";
 import { useAiFaqDraftFormState } from "../hooks/useAiFaqDraftFormState";
@@ -46,6 +47,7 @@ export function useAIFaqsGlobalPage() {
     handleUpdateFAQItem,
     handleFileChange,
     handleRemoveFile,
+    getDraftSnapshot,
   } = useAiFaqDraftFormState();
 
   const [showViewModal, setShowViewModal] = useState(false);
@@ -69,16 +71,16 @@ export function useAIFaqsGlobalPage() {
   );
 
   const handleSubmit = useCallback(async () => {
-    const validFAQs = getValidFaqItemsForSubmit(faqItems);
-    const hasFiles = haveFiles && selectedFiles.length > 0;
-
-    if (validFAQs.length === 0 && !hasFiles) {
-      toast.error("Add at least one FAQ (question and answer) or attach a file");
+    const { faqItems: draftItems, selectedFiles: draftFiles } = getDraftSnapshot();
+    const evaluation = evaluateAiFaqSubmitDraft(draftItems, draftFiles);
+    const validationError = getAiFaqSubmitValidationError(evaluation, "a file");
+    if (validationError) {
+      toast.error(validationError);
       return;
     }
 
     try {
-      const fields = buildAiFaqSubmitFields(validFAQs, haveFiles, selectedFiles);
+      const fields = buildAiFaqSubmitFields(evaluation.validFAQs, draftFiles);
       const payload: CreateGlobalFAQPayload = {
         faqs: fields.faqs,
         ...(fields.files?.length ? { files: fields.files } : {}),
@@ -93,7 +95,12 @@ export function useAIFaqsGlobalPage() {
     } catch (error) {
       console.error("Failed to save FAQs:", error);
     }
-  }, [faqItems, haveFiles, selectedFiles, resetForm, queryClient]);
+  }, [getDraftSnapshot, resetForm, queryClient]);
+
+  const openAddModal = useCallback(() => {
+    resetForm();
+    setShowAddModal(true);
+  }, [resetForm]);
 
   const handleConfirmDelete = useCallback(async () => {
     if (!selectedFAQ?.id) return;
@@ -158,6 +165,7 @@ export function useAIFaqsGlobalPage() {
     stableFilters,
     showAddModal,
     setShowAddModal,
+    openAddModal,
     showDeleteModal,
     setShowDeleteModal,
     selectedFAQ,

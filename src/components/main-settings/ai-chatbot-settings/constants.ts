@@ -16,7 +16,7 @@ export const AI_CHATBOT_FIELD_PLACEHOLDERS = {
     inputCostPerMillion: "Default: $0.15",
     outputCostPerMillion: "Default: $0.60",
   },
-  marginPct: "Blank = no markup",
+  marginPct: "Blank = no margin",
 } as const;
 
 export type ModelPricingDefaultRow = Readonly<{
