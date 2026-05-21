@@ -689,6 +689,85 @@ function resolveHasActiveParticipantsForEvent(
   return evt.hasActiveParticipants ?? hasActiveParties;
 }
 
+type ProcessedCallPartiesResult = {
+  processedParties: any[];
+  activePartiesOnly: any[];
+  allPartiesDropped: boolean;
+  hasActiveParties: boolean;
+};
+
+function prepareCallPartiesFromEvent(
+  base: any,
+  evt: any,
+  dnsMap: Record<
+    string,
+    {
+      dn: string;
+      devices: Record<string, { deviceName: string; deviceType: string }>;
+    }
+  >,
+): ProcessedCallPartiesResult {
+  const partiesToProcess = mergeCallEventParties(base.parties, evt.parties);
+  const processedParties = partiesToProcess.map((party: any) => {
+    enrichPartyCallingDeviceType(party, dnsMap);
+    return party;
+  });
+  const partiesWithPreservedStart = preservePartyStartTimesFromBase(
+    processedParties,
+    base.parties,
+  );
+  const activePartiesOnly = partiesWithPreservedStart.filter(
+    (p: any) => p.callStatus !== "DROPPED" && p.callStatus !== "DISCONNECTED",
+  );
+  const allPartiesDropped =
+    processedParties.length > 0 &&
+    processedParties.every(
+      (p: any) => p.callStatus === "DROPPED" || p.callStatus === "DISCONNECTED",
+    );
+  return {
+    processedParties,
+    activePartiesOnly,
+    allPartiesDropped,
+    hasActiveParties: activePartiesOnly.length > 0,
+  };
+}
+
+function resolveMonitoringFieldsFromEvent(
+  evt: any,
+  base: any,
+): { nextMonitoring: any; nextIsMonitoring: boolean } {
+  const monitoringKeyPresent = Object.hasOwn(evt, "monitoring");
+  let nextMonitoring = base.monitoring;
+  if (monitoringKeyPresent && evt.monitoring !== undefined) {
+    nextMonitoring = evt.monitoring;
+  }
+
+  let nextIsMonitoring: boolean;
+  if (typeof evt.isMonitoring === "boolean") {
+    nextIsMonitoring = evt.isMonitoring;
+  } else if (monitoringKeyPresent && evt.monitoring === null) {
+    nextIsMonitoring = false;
+  } else {
+    nextIsMonitoring = Boolean(base.isMonitoring);
+  }
+
+  return { nextMonitoring, nextIsMonitoring };
+}
+
+function finalizeTerminatedCallStateMap(
+  updated: Record<string, any>,
+  callId: string,
+  evt: any,
+  saveCallStatesToStorage: (m: Record<string, any>) => void,
+  notifyCallIdsRemoved?: (callIds: readonly string[]) => void,
+): Record<string, any> {
+  notifyCallIdsRemoved?.([callId]);
+  recordTerminatedCallForRebirthGuard(callId, evt, updated[callId]);
+  const { [callId]: _removed, ...rest } = updated;
+  saveCallStatesToStorage(rest);
+  return rest;
+}
+
 /**
  * Applies one CTI call event to the call state map (same semantics as previous inline reducer).
  */
@@ -734,28 +813,9 @@ export function applyCallEventToCallStateMap(
     return updated;
   }
 
-  const partiesToProcess = mergeCallEventParties(base.parties, evt.parties);
-  const processedParties = partiesToProcess.map((party: any) => {
-    enrichPartyCallingDeviceType(party, dnsMap);
-    return party;
-  });
+  const { processedParties, activePartiesOnly, allPartiesDropped, hasActiveParties } =
+    prepareCallPartiesFromEvent(base, evt, dnsMap);
 
-  const partiesWithPreservedStart = preservePartyStartTimesFromBase(
-    processedParties,
-    base.parties,
-  );
-
-  const activePartiesOnly = partiesWithPreservedStart.filter(
-    (p: any) => p.callStatus !== "DROPPED" && p.callStatus !== "DISCONNECTED",
-  );
-
-  const allPartiesDropped =
-    processedParties.length > 0 &&
-    processedParties.every(
-      (p: any) => p.callStatus === "DROPPED" || p.callStatus === "DISCONNECTED",
-    );
-
-  const hasActiveParties = activePartiesOnly.length > 0;
   let shouldTerminate = computeShouldTerminate(
     evt,
     processedParties,
@@ -778,22 +838,10 @@ export function applyCallEventToCallStateMap(
     dnsMap,
   );
 
-  const monitoringKeyPresent = Object.hasOwn(evt, "monitoring");
-  let nextMonitoring: typeof base.monitoring;
-  if (monitoringKeyPresent) {
-    nextMonitoring =
-      evt.monitoring === undefined ? base.monitoring : evt.monitoring;
-  } else {
-    nextMonitoring = base.monitoring;
-  }
-  let nextIsMonitoring: boolean;
-  if (typeof evt.isMonitoring === "boolean") {
-    nextIsMonitoring = evt.isMonitoring;
-  } else if (monitoringKeyPresent && evt.monitoring === null) {
-    nextIsMonitoring = false;
-  } else {
-    nextIsMonitoring = Boolean(base.isMonitoring);
-  }
+  const { nextMonitoring, nextIsMonitoring } = resolveMonitoringFieldsFromEvent(
+    evt,
+    base,
+  );
 
   if (
     shouldTerminateBargeMonitoringWithoutCustomer({
@@ -827,11 +875,13 @@ export function applyCallEventToCallStateMap(
   });
 
   if (shouldTerminate) {
-    notifyCallIdsRemoved?.([callId]);
-    recordTerminatedCallForRebirthGuard(callId, evt, updated[callId]);
-    const { [callId]: _removed, ...rest } = updated;
-    saveCallStatesToStorage(rest);
-    return rest;
+    return finalizeTerminatedCallStateMap(
+      updated,
+      callId,
+      evt,
+      saveCallStatesToStorage,
+      notifyCallIdsRemoved,
+    );
   }
 
   applyStaleDroppedPartyCleanup(

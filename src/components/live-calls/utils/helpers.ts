@@ -91,68 +91,96 @@ function monitoredCallHasActiveParties(monitoredCall: LooseCall | null | undefin
   return monitoredCall.parties.some((p) => partyIsLive(p))
 }
 
-function resolveSupervisionSection(p: CategorizeDnsParams): string | null {
-  const { dn, activeMonitoring, getCallStatesForDn, getCallStateForDevice } = p
+function isSupervisionWallboardTarget(
+  dn: string,
+  activeMonitoring: ActiveMonitoring,
+): activeMonitoring is ActiveMonitoring & { dn: string; monitor: string; type: string } {
   const agentDn = activeMonitoring.dn
   const monitorDn = activeMonitoring.monitor
+  return Boolean(
+    monitorDn &&
+      String(dn) === String(monitorDn) &&
+      activeMonitoring.type &&
+      agentDn,
+  )
+}
+
+function agentHasLiveCustomerDuringBarge(
+  agentCalls: LooseCall[],
+  agentDn: string,
+  monitorDn: string,
+): boolean {
+  return agentCalls.some(
+    (c) =>
+      !c.isTerminating &&
+      callHasLiveAgentPartyWithNonSupervisor(c, agentDn, monitorDn),
+  )
+}
+
+function resolveBargeInSupervisionSection(
+  supervisorCalls: LooseCall[],
+  agentCalls: LooseCall[],
+  agentDn: string,
+  monitorDn: string,
+): string | null {
+  if (!agentHasLiveCustomerDuringBarge(agentCalls, agentDn, monitorDn)) {
+    return null
+  }
+  const bargeSessionActive =
+    hasSupervisorAgentActiveMonitoringCall(supervisorCalls, monitorDn, agentDn) ||
+    agentCallHasConferenceBargeWithCustomer(agentCalls, agentDn, monitorDn) ||
+    hasSupervisorAgentActiveMonitoringCall(agentCalls, monitorDn, agentDn)
+  return bargeSessionActive ? 'supervision' : null
+}
+
+function resolveSilentWhisperSupervisionSection(
+  agentCalls: LooseCall[],
+  agentDn: string,
+  monitorDn: string,
+): string | null {
+  if (agentCalls.length === 0) {
+    return 'supervision'
+  }
+  const customerLive = agentCalls.some(
+    (c) =>
+      !c.isTerminating &&
+      callHasLiveAgentPartyWithNonSupervisor(c, agentDn, monitorDn),
+  )
+  return customerLive ? 'supervision' : null
+}
+
+function resolveSupervisionSection(p: CategorizeDnsParams): string | null {
+  const { dn, activeMonitoring, getCallStatesForDn, getCallStateForDevice } = p
   // Live Coaching section is for the supervisor (monitor) DN only; the monitored agent stays in Live Calls.
-  if (
-    !monitorDn ||
-    String(dn) !== String(monitorDn) ||
-    !activeMonitoring.type ||
-    !agentDn
-  ) {
+  if (!isSupervisionWallboardTarget(dn, activeMonitoring)) {
     return null
   }
 
+  const agentDn = activeMonitoring.dn
+  const monitorDn = activeMonitoring.monitor
   const supervisorCalls = getCallStatesForDn(dn) as LooseCall[]
   const agentCalls = getCallStatesForDn(agentDn) as LooseCall[]
 
   if (isBargeInMonitoringType(activeMonitoring.type)) {
-    const customerStillLive = agentCalls.some(
-      (c) =>
-        !c.isTerminating &&
-        callHasLiveAgentPartyWithNonSupervisor(c, agentDn, dn),
+    return resolveBargeInSupervisionSection(
+      supervisorCalls,
+      agentCalls,
+      agentDn,
+      monitorDn,
     )
-    if (!customerStillLive) {
-      return null
-    }
-    if (
-      hasSupervisorAgentActiveMonitoringCall(supervisorCalls, dn, agentDn) ||
-      agentCallHasConferenceBargeWithCustomer(agentCalls, agentDn, dn) ||
-      hasSupervisorAgentActiveMonitoringCall(agentCalls, dn, agentDn)
-    ) {
-      return 'supervision'
-    }
-    return null
   }
 
-  if (hasSupervisorAgentActiveMonitoringCall(supervisorCalls, dn, agentDn)) {
+  if (hasSupervisorAgentActiveMonitoringCall(supervisorCalls, monitorDn, agentDn)) {
     return 'supervision'
   }
 
   // SILENT / WHISPER: CTI often attaches the supervision leg only on the agent's call object.
-  if (hasSupervisorAgentActiveMonitoringCall(agentCalls, dn, agentDn)) {
+  if (hasSupervisorAgentActiveMonitoringCall(agentCalls, monitorDn, agentDn)) {
     return 'supervision'
   }
 
   if (isSilentOrWhisperMonitoringType(activeMonitoring.type)) {
-    if (!monitorDn) {
-      return 'supervision'
-    }
-    if (agentCalls.length === 0) {
-      return 'supervision'
-    }
-    if (
-      agentCalls.some(
-        (c) =>
-          !c.isTerminating &&
-          callHasLiveAgentPartyWithNonSupervisor(c, agentDn, monitorDn),
-      )
-    ) {
-      return 'supervision'
-    }
-    return null
+    return resolveSilentWhisperSupervisionSection(agentCalls, agentDn, monitorDn)
   }
 
   if (!activeMonitoring.deviceName) {
@@ -163,11 +191,7 @@ function resolveSupervisionSection(p: CategorizeDnsParams): string | null {
     agentDn,
     activeMonitoring.deviceName,
   ) as LooseCall
-  if (monitoredCallHasActiveParties(monitoredCall)) {
-    return 'supervision'
-  }
-
-  return null
+  return monitoredCallHasActiveParties(monitoredCall) ? 'supervision' : null
 }
 
 export function dnHasActiveCallForWallboard(
