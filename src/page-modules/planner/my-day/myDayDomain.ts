@@ -2,10 +2,153 @@ import moment from "moment";
 import type {
   MyDayRolloverPayload,
   MyDaySuggestionCategory,
+  MyDaySuggestionsPayload,
   MyDayTasksMeta,
 } from "@utils/tasks";
 
 export const ROLLOVER_IGNORE_FLAG_THRESHOLD = 3;
+
+/** Postman: flexible tasks appear in suggestions within this many days before due (no search). */
+export const FLEXIBLE_SUGGESTION_LOOKAHEAD_DAYS = 2;
+
+const FLEXIBLE_SOURCE_CATEGORIES: MyDaySuggestionCategory[] = [
+  "overdue",
+  "due_today",
+  "high_priority",
+  "assigned_to_me",
+  "organizational_tasks",
+  "personal_tasks",
+];
+
+function readSuggestionTaskId(row: unknown): number | null {
+  if (row == null || typeof row !== "object") return null;
+  const record = row as Record<string, unknown>;
+  const parsed = Number(record.id ?? record.task_id);
+  if (!Number.isFinite(parsed) || parsed <= 0) return null;
+  return Math.floor(parsed);
+}
+
+function readSuggestionDueDate(row: unknown): string | null {
+  if (row == null || typeof row !== "object") return null;
+  const record = row as Record<string, unknown>;
+  if (typeof record.due_date === "string") return record.due_date;
+  if (typeof record.end_date === "string") return record.end_date;
+  return null;
+}
+
+/** Req 4: today, tomorrow, or within N days before due; with search, all flexible matches stay visible. */
+export function isFlexibleTaskDueInSuggestionWindow(
+  row: unknown,
+  todayStart: moment.Moment,
+  hasSearch: boolean,
+): boolean {
+  if (hasSearch) return true;
+  const dueRaw = readSuggestionDueDate(row);
+  if (!dueRaw) return false;
+  const due = moment(dueRaw).startOf("day");
+  if (!due.isValid()) return false;
+  const today = todayStart.clone().startOf("day");
+  const lastEligible = today.clone().add(FLEXIBLE_SUGGESTION_LOOKAHEAD_DAYS, "days");
+  return due.isSameOrAfter(today, "day") && due.isSameOrBefore(lastEligible, "day");
+}
+
+/** Postman: `flexible_tasks` is an alias for `flexible_upcoming` (same array). */
+export function mergeFlexibleTasksSuggestionAlias(
+  payload: MyDaySuggestionsPayload & { flexible_tasks?: unknown[] },
+): MyDaySuggestionsPayload {
+  const result: MyDaySuggestionsPayload = { ...payload };
+  const flexibleRows: unknown[] = Array.isArray(payload.flexible_upcoming)
+    ? [...payload.flexible_upcoming]
+    : [];
+  const seenIds = new Set<number>();
+  for (const row of flexibleRows) {
+    const id = readSuggestionTaskId(row);
+    if (id != null) seenIds.add(id);
+  }
+  const aliasRows = payload.flexible_tasks;
+  if (Array.isArray(aliasRows)) {
+    for (const row of aliasRows) {
+      const id = readSuggestionTaskId(row);
+      if (id != null && !seenIds.has(id)) {
+        seenIds.add(id);
+        flexibleRows.push(row);
+      }
+    }
+  }
+  if (flexibleRows.length > 0) {
+    result.flexible_upcoming = flexibleRows;
+  }
+  return result;
+}
+
+function seedFlexibleSuggestionSeenIds(flexibleRows: unknown[]): Set<number> {
+  const seenIds = new Set<number>();
+  for (const row of flexibleRows) {
+    const id = readSuggestionTaskId(row);
+    if (id != null) seenIds.add(id);
+  }
+  return seenIds;
+}
+
+function partitionFlexibleSuggestionCategory(
+  rows: unknown[],
+  category: MyDaySuggestionCategory,
+  options: { todayStart: moment.Moment; hasSearch: boolean },
+  seenIds: Set<number>,
+  flexibleRows: unknown[],
+): unknown[] {
+  const kept: unknown[] = [];
+  for (const row of rows) {
+    const record = row as Record<string, unknown>;
+    if (!isFlexibleTaskRow(record, category)) {
+      kept.push(row);
+      continue;
+    }
+    if (!isFlexibleTaskDueInSuggestionWindow(row, options.todayStart, options.hasSearch)) {
+      continue;
+    }
+    const id = readSuggestionTaskId(row);
+    if (id != null && seenIds.has(id)) {
+      continue;
+    }
+    if (id != null) {
+      seenIds.add(id);
+      flexibleRows.push(row);
+    }
+  }
+  return kept;
+}
+
+/**
+ * Ensures flexible tasks appear under `flexible_upcoming` with correct window/search behavior
+ * when the API places them in other buckets.
+ */
+export function normalizeMyDaySuggestionsPayload(
+  payload: MyDaySuggestionsPayload & { flexible_tasks?: unknown[] },
+  options: { todayStart: moment.Moment; hasSearch: boolean },
+): MyDaySuggestionsPayload {
+  const merged = mergeFlexibleTasksSuggestionAlias(payload);
+  const result: MyDaySuggestionsPayload = { ...merged };
+  const flexibleRows: unknown[] = Array.isArray(merged.flexible_upcoming)
+    ? [...merged.flexible_upcoming]
+    : [];
+  const seenIds = seedFlexibleSuggestionSeenIds(flexibleRows);
+
+  for (const category of FLEXIBLE_SOURCE_CATEGORIES) {
+    const rows = merged[category];
+    if (!Array.isArray(rows)) continue;
+    result[category] = partitionFlexibleSuggestionCategory(
+      rows,
+      category,
+      options,
+      seenIds,
+      flexibleRows,
+    );
+  }
+
+  result.flexible_upcoming = flexibleRows;
+  return result;
+}
 
 export type MyDayProjectMeta = {
   label: string;
@@ -63,6 +206,12 @@ export function readTaskPriorityLabel(priority: unknown): string {
     if (typeof record.label === "string" && record.label.trim()) return record.label.trim();
   }
   return "normal";
+}
+
+/** Postman: `has_estimate` is true when minutes > 0 — prefer this over parsing alone. */
+export function readHasEstimateFromRow(row: Record<string, unknown>): boolean {
+  if (row.has_estimate === true) return true;
+  return resolveEstimateMinutesFromRow(row) > 0;
 }
 
 export function resolveEstimateMinutesFromRow(row: Record<string, unknown>): number {
@@ -154,6 +303,7 @@ export function readRolloverIgnoreCount(row: Record<string, unknown>): number {
 }
 
 export function shouldShowIgnoredFlag(row: Record<string, unknown>): boolean {
+  if (row.ignored_three_times === true) return true;
   return readRolloverIgnoreCount(row) >= ROLLOVER_IGNORE_FLAG_THRESHOLD;
 }
 
@@ -168,6 +318,65 @@ export function formatCapacityOverageMessage(plannedMinutes: number, capacityMin
   const over = Math.max(0, plannedMinutes - capacityMinutes);
   if (over <= 0) return "";
   return `You are ${toMinutesDisplay(over)} over your daily capacity (${toMinutesDisplay(plannedMinutes)} planned vs ${toMinutesDisplay(capacityMinutes)}).`;
+}
+
+export type MyDayCapacityStats = Readonly<{
+  capacityUsedPercent: number | null;
+  isOverCapacity: boolean;
+  minutesOverCapacity: number;
+}>;
+
+function resolveCapacityUsedPercent(
+  apiPct: number | undefined,
+  plannedMinutes: number,
+  effectiveCapacityMinutes: number,
+): number | null {
+  if (typeof apiPct === "number" && Number.isFinite(apiPct)) {
+    return Math.round(apiPct * 10) / 10;
+  }
+  if (effectiveCapacityMinutes <= 0) {
+    return null;
+  }
+  return Math.round((plannedMinutes / effectiveCapacityMinutes) * 1000) / 10;
+}
+
+export function resolveCapacityStatsFromPayload(
+  payload: {
+    capacity_used_percent?: number;
+    is_over_capacity?: boolean;
+    minutes_over_capacity?: number;
+  },
+  plannedMinutes: number,
+  effectiveCapacityMinutes: number,
+): MyDayCapacityStats {
+  const capacityUsedPercent = resolveCapacityUsedPercent(
+    payload.capacity_used_percent,
+    plannedMinutes,
+    effectiveCapacityMinutes,
+  );
+  const minutesOverCapacity =
+    typeof payload.minutes_over_capacity === "number" &&
+    Number.isFinite(payload.minutes_over_capacity)
+      ? Math.max(0, Math.floor(payload.minutes_over_capacity))
+      : Math.max(0, plannedMinutes - effectiveCapacityMinutes);
+  const isOverCapacity =
+    payload.is_over_capacity === true ||
+    (capacityUsedPercent != null && capacityUsedPercent > 100) ||
+    minutesOverCapacity > 0;
+  return { capacityUsedPercent, isOverCapacity, minutesOverCapacity };
+}
+
+export function formatCapacityOverageMessageFromStats(
+  stats: MyDayCapacityStats,
+  plannedMinutes: number,
+  effectiveCapacityMinutes: number,
+): string {
+  if (!stats.isOverCapacity) return "";
+  const over = stats.minutesOverCapacity > 0
+    ? stats.minutesOverCapacity
+    : Math.max(0, plannedMinutes - effectiveCapacityMinutes);
+  if (over <= 0) return "";
+  return formatCapacityOverageMessage(plannedMinutes, effectiveCapacityMinutes);
 }
 
 export type CapacityFillTone = "low" | "medium" | "high";
@@ -194,11 +403,28 @@ export function resolveShowRolloverPrompt(
   return true;
 }
 
-export function formatRolloverPromptCopy(previousDate: string | null | undefined): string {
-  const dateLabel = previousDate
-    ? moment(previousDate).format("D MMMM, YYYY")
-    : "yesterday";
-  return `These tasks were missed on ${dateLabel}. Would you like to add them to today's tasks or handle them later?`;
+export function formatRolloverPromptCopy(_previousDate?: string | null): string {
+  return "These tasks were missed yesterday. Would you like to add them to today's tasks or handle them later?";
+}
+
+export function resolveMyDayTeamReporteeExtensions(
+  hierarchyExtensions: unknown[] | null | undefined,
+  managerExtension: string,
+): string[] {
+  const manager = managerExtension.trim();
+  const direct = parseHierarchyExtensionNumbers(hierarchyExtensions).filter(
+    (ext) => ext !== manager,
+  );
+  return direct;
+}
+
+export function shouldShowMyDayTeamSection(
+  hierarchyExtensions: unknown[] | null | undefined,
+  managerExtension: string,
+): boolean {
+  const all = parseHierarchyExtensionNumbers(hierarchyExtensions);
+  if (all.length <= 1) return false;
+  return resolveMyDayTeamReporteeExtensions(hierarchyExtensions, managerExtension).length > 0;
 }
 
 export function parseHierarchyExtensionNumbers(
@@ -226,10 +452,7 @@ export function resolveMyDayReporteeExtensions(
   hierarchyExtensions: unknown[] | null | undefined,
   managerExtension: string,
 ): string[] {
-  const manager = managerExtension.trim();
-  return parseHierarchyExtensionNumbers(hierarchyExtensions).filter(
-    (ext) => ext !== manager,
-  );
+  return resolveMyDayTeamReporteeExtensions(hierarchyExtensions, managerExtension);
 }
 
 export const MY_DAY_SUGGESTION_CATEGORY_ORDER: MyDaySuggestionCategory[] = [

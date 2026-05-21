@@ -1457,7 +1457,18 @@ export interface MyDayCapacityPayload {
   effective_capacity_minutes?: number;
   planned_minutes?: number;
   completed_minutes?: number;
+  tasks_planned?: number;
+  tasks_completed?: number;
+  unestimated_task_count?: number;
+  capacity_used_percent?: number;
+  is_over_capacity?: boolean;
+  minutes_over_capacity?: number;
 }
+
+/** Raw suggestions body may use `flexible_tasks` as an alias for `flexible_upcoming`. */
+export type MyDaySuggestionsApiPayload = MyDaySuggestionsPayload & {
+  flexible_tasks?: unknown[];
+};
 
 export interface MyDayRolloverPayload {
   tasks: unknown[];
@@ -1621,7 +1632,7 @@ export const getMyDaySuggestions = async (
     extension_number: params.extension_number,
   });
   const response = await axiosInstance.get(`work-planner/my-day/suggestions?${query.toString()}`);
-  return parseMyDayResponseData<MyDaySuggestionsPayload>(response);
+  return parseMyDayResponseData<MyDaySuggestionsApiPayload>(response);
 };
 
 export const getMyDayCapacity = async (
@@ -1807,11 +1818,33 @@ const workloadTasksPath = `${prefix}/tasks/workload`;
 export type WorkloadRangePreset = "this_week" | "next_week" | "custom";
 export type AssigneeMatch = "primary" | "any";
 
+export interface WorkloadSummaryMember {
+  extension_number: string;
+  load_band?: string;
+  load_percent?: number;
+  task_count?: number;
+  unestimated_task_count?: number;
+  is_overloaded?: boolean;
+}
+
 export interface WorkloadSummaryData {
-  total_tasks_in_range: number;
-  overdue_tasks: number;
-  under_allocated_cells: number;
-  over_allocated_cells: number;
+  /** Primary KPI cards (TaskWorkloadController summary). */
+  total_tasks_this_week: number;
+  unestimated_tasks: number;
+  critical_priority_tasks: number;
+  overloaded_members: number;
+  total_members?: number;
+  /** Legacy / additional counts (still returned by API). */
+  total_tasks_in_range?: number;
+  total_workload?: number;
+  overdue_tasks?: number;
+  overdue_tasks_in_range?: number;
+  under_allocated_cells?: number;
+  over_allocated_cells?: number;
+  range?: { start: string; end: string };
+  extension_numbers?: string[];
+  assignee_match?: AssigneeMatch;
+  members?: WorkloadSummaryMember[];
 }
 
 export interface WorkloadGridMember {
@@ -1979,7 +2012,62 @@ export async function getWorkloadSummary(
   const response = await axiosInstance.get(
     `${workloadTasksPath}/summary?${params.toString()}`,
   );
-  return parseWorkloadPlannerResponseData<WorkloadSummaryData>(response);
+  const data = parseWorkloadPlannerResponseData<WorkloadSummaryData>(response);
+  return normalizeWorkloadSummaryData(data);
+}
+
+function readWorkloadSummaryCount(value: unknown): number {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed < 0) return 0;
+  return Math.floor(parsed);
+}
+
+function countOverloadedMembersFromSummary(members: WorkloadSummaryMember[] | undefined): number {
+  if (!Array.isArray(members)) return 0;
+  return members.filter(
+    (m) => m.is_overloaded === true || m.load_band === "overloaded",
+  ).length;
+}
+
+function resolveWorkloadSummaryTotalMembers(
+  rawTotalMembers: unknown,
+  membersLength: number,
+): number | undefined {
+  if (rawTotalMembers == null) {
+    return membersLength > 0 ? membersLength : undefined;
+  }
+  return readWorkloadSummaryCount(rawTotalMembers);
+}
+
+function normalizeWorkloadSummaryData(raw: WorkloadSummaryData): WorkloadSummaryData {
+  const members = Array.isArray(raw.members) ? raw.members : [];
+  const totalTasksThisWeek = readWorkloadSummaryCount(
+    raw.total_tasks_this_week ??
+      raw.total_tasks_in_range ??
+      raw.total_workload,
+  );
+  const overloadedFromMembers = countOverloadedMembersFromSummary(members);
+  const overloadedMembers = readWorkloadSummaryCount(
+    raw.overloaded_members ?? overloadedFromMembers,
+  );
+
+  return {
+    total_tasks_this_week: totalTasksThisWeek,
+    unestimated_tasks: readWorkloadSummaryCount(raw.unestimated_tasks),
+    critical_priority_tasks: readWorkloadSummaryCount(raw.critical_priority_tasks),
+    overloaded_members: overloadedMembers,
+    total_members: resolveWorkloadSummaryTotalMembers(raw.total_members, members.length),
+    total_tasks_in_range: readWorkloadSummaryCount(raw.total_tasks_in_range) || totalTasksThisWeek,
+    total_workload: readWorkloadSummaryCount(raw.total_workload),
+    overdue_tasks: readWorkloadSummaryCount(raw.overdue_tasks),
+    overdue_tasks_in_range: readWorkloadSummaryCount(raw.overdue_tasks_in_range),
+    under_allocated_cells: readWorkloadSummaryCount(raw.under_allocated_cells),
+    over_allocated_cells: readWorkloadSummaryCount(raw.over_allocated_cells),
+    range: raw.range,
+    extension_numbers: raw.extension_numbers,
+    assignee_match: raw.assignee_match,
+    members,
+  };
 }
 
 export async function getWorkloadGrid(

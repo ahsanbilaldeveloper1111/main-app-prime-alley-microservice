@@ -30,6 +30,8 @@ import {
   formatWorkloadMemberLabel,
   getWorkloadWeekRange,
   isWorkloadCustomRangeValid,
+  resolveWorkloadGridDisplayData,
+  resolveWorkloadPeriodDisplayMembers,
   readWorkloadMainViewPreference,
   workloadProjectFilterQuery,
   writeWorkloadMainViewPreference,
@@ -115,6 +117,7 @@ const WorkloadPlannerPage: React.FC = () => {
   const [priorityFilter, setPriorityFilter] = useState<WorkloadPriorityFilterValue>("all");
   const [boardDropIntent, setBoardDropIntent] = useState<WorkloadBoardDropIntent | null>(null);
   const [boardDropOverload, setBoardDropOverload] = useState(false);
+  const [showWorkloadPerDay, setShowWorkloadPerDay] = useState(true);
 
   const customRangeValid = useMemo(
     () => range !== "custom" || isWorkloadCustomRangeValid(customStart, customEnd),
@@ -249,23 +252,39 @@ const WorkloadPlannerPage: React.FC = () => {
     staleTime: 30_000,
   });
 
-  const cellMap = useMemo(() => buildCellMap(gridQuery.data?.cells), [gridQuery.data?.cells]);
+  const gridRangeFallback = useMemo((): { start: string; end: string } => {
+    if (range === "custom" && customRangeValid) {
+      return { start: customStart, end: customEnd };
+    }
+    return getWorkloadWeekRange(range === "next_week" ? "next_week" : "this_week");
+  }, [range, customStart, customEnd, customRangeValid]);
 
-  const completedTaskCount = useMemo(() => {
-    if (!boardQuery.data?.columns) return 0;
-    return boardQuery.data.columns.reduce(
-      (total, col) => total + col.tasks.filter((t) => t.is_completed).length,
-      0,
-    );
-  }, [boardQuery.data?.columns]);
+  const displayGridData = useMemo(
+    () =>
+      resolveWorkloadGridDisplayData(gridQuery.data, {
+        viewerExtension: extension,
+        memberFilter,
+        rangeFallback: gridRangeFallback,
+      }),
+    [gridQuery.data, extension, memberFilter, gridRangeFallback],
+  );
+
+  const cellMap = useMemo(
+    () => buildCellMap(displayGridData?.cells ?? gridQuery.data?.cells),
+    [displayGridData?.cells, gridQuery.data?.cells],
+  );
 
   const memberExtensions = useMemo(() => {
-    const fromMembers = gridQuery.data?.members?.map((m) => m.extension_number) ?? [];
-    if (fromMembers.length > 0) return fromMembers;
-    const fromGridRoot = gridQuery.data?.extension_numbers ?? [];
-    if (fromGridRoot.length > 0) return fromGridRoot;
+    const fromDisplay = displayGridData?.members?.map((m) => m.extension_number) ?? [];
+    if (fromDisplay.length > 0) return fromDisplay;
+    if (extension) return [extension];
     return boardQuery.data?.columns?.map((c) => c.extension_number) ?? [];
-  }, [gridQuery.data?.members, gridQuery.data?.extension_numbers, boardQuery.data?.columns]);
+  }, [displayGridData?.members, extension, boardQuery.data?.columns]);
+
+  const displayPeriodMembers = useMemo(
+    () => resolveWorkloadPeriodDisplayMembers(summaryQuery.data?.members, extension),
+    [summaryQuery.data?.members, extension],
+  );
 
   const invalidateWorkload = useCallback(() => {
     queryClient
@@ -559,18 +578,18 @@ const WorkloadPlannerPage: React.FC = () => {
           enabled={enabled}
           mainView={mainView}
           summaryData={summaryQuery.data}
-          gridData={gridQuery.data}
+          gridData={displayGridData}
+          periodMembers={displayPeriodMembers}
           boardData={boardQuery.data}
           cellMap={cellMap}
           hierarchyExtensions={hierarchyDataExtensions}
           priorityFilter={priorityFilter}
           boardDragSaving={boardDragMutation.isPending}
           onBoardDropIntent={handleBoardDropIntent}
-          unassignedCount={unassignedQuery.data?.count}
-          completedCount={completedTaskCount}
-          onOpenUnassigned={() => setShowUnassigned(true)}
+          showWorkloadPerDay={showWorkloadPerDay}
+          onToggleWorkloadPerDay={() => setShowWorkloadPerDay((prev) => !prev)}
           onSelectCell={(extension, date) => {
-            const member = gridQuery.data?.members?.find(
+            const member = displayGridData?.members?.find(
               (m) => m.extension_number === extension,
             );
             const cell = cellMap.get(workloadCellKey(extension, date));

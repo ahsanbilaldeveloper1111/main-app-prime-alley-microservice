@@ -49,7 +49,6 @@
     font-weight: 500;
     color: var(--bs-secondary-color, #6b7280);
     margin-bottom: 0.4rem;
-    text-transform: capitalize;
   }
 
   .workload-summary-card__value {
@@ -116,6 +115,47 @@
     color: var(--bs-secondary-color, #6c757d);
   }
 
+  .workload-legend--toolbar {
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.75rem 1rem;
+    padding: 0.65rem 1rem;
+    background: #fff;
+    border: 1px solid var(--bs-border-color, #e5e7eb);
+    border-radius: 0.5rem;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+    font-size: 0.78rem;
+    color: #4b5563;
+  }
+
+  .workload-legend__items {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.65rem 1.1rem;
+    align-items: center;
+  }
+
+  .workload-legend__per-day-toggle {
+    margin-left: auto;
+    border: none;
+    background: transparent;
+    padding: 0;
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: #2563eb;
+    text-decoration: none;
+    cursor: pointer;
+    white-space: nowrap;
+
+    &:hover {
+      text-decoration: underline;
+    }
+
+    &.is-active {
+      color: #1d4ed8;
+    }
+  }
+
   .workload-legend__item {
     display: inline-flex;
     align-items: center;
@@ -123,10 +163,51 @@
   }
 
   .workload-legend__swatch {
-    width: 0.65rem;
-    height: 0.65rem;
+    width: 0.55rem;
+    height: 0.55rem;
     border-radius: 50%;
     flex-shrink: 0;
+  }
+
+  .workload-period-panel {
+    border: 1px solid var(--bs-border-color, #e5e7eb);
+    border-radius: 0.65rem;
+    background: #fff;
+    overflow: hidden;
+  }
+
+  .workload-period-panel__row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.75rem 1rem;
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid #f3f4f6;
+
+    &:last-child {
+      border-bottom: none;
+    }
+  }
+
+  .workload-period-panel__band {
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 0.15rem 0.5rem;
+    border-radius: 999px;
+    background: #f3f4f6;
+    color: #374151;
+  }
+
+  .workload-period-panel__pct {
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: #111827;
+    min-width: 3rem;
+  }
+
+  .workload-period-panel__meta {
+    font-size: 0.78rem;
+    margin-left: auto;
   }
 
   .workload-grid-wrap {
@@ -395,6 +476,11 @@
 
   .workload-cell-btn--overloaded .workload-cell__pct--filled {
     color: #b91c1c;
+  }
+
+  .workload-cell__pct--over {
+    color: #dc2626;
+    font-weight: 700;
   }
 
   .workload-cell__pct--zero {

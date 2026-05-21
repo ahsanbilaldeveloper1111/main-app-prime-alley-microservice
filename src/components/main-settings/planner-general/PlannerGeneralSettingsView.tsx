@@ -6,6 +6,7 @@ type Props = Readonly<{
   showMyDay: boolean
   requireEstimateForMyDay: boolean
   saveFeedback: string
+  isSaving: boolean
   onCapacityInputChange: (value: string) => void
   onShowMyDayChange: (checked: boolean) => void
   onRequireEstimateChange: (checked: boolean) => void
@@ -43,6 +44,7 @@ export const PlannerGeneralSettingsView: React.FC<Props> = ({
   showMyDay,
   requireEstimateForMyDay,
   saveFeedback,
+  isSaving,
   onCapacityInputChange,
   onShowMyDayChange,
   onRequireEstimateChange,
@@ -61,10 +63,10 @@ export const PlannerGeneralSettingsView: React.FC<Props> = ({
       </div>
       <div style={{ marginBottom: '18px' }}>
         <div style={{ marginBottom: '6px', fontSize: '14px', fontWeight: 500, color: '#111827' }}>
-          Capacity per day
+          Default daily capacity (minutes)
         </div>
         <div style={{ marginBottom: '10px', fontSize: '12px', color: '#6b7280' }}>
-          Default number of tasks a user can handle per day.
+          Syncs with My Day capacity. Used as the default when planning your day.
         </div>
         <input
           type="number"
@@ -112,8 +114,8 @@ export const PlannerGeneralSettingsView: React.FC<Props> = ({
         </label>
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
-        <button type="button" onClick={onSave} style={saveButtonStyle}>
-          Save
+        <button type="button" onClick={onSave} disabled={isSaving} style={saveButtonStyle}>
+          {isSaving ? 'Saving…' : 'Save'}
         </button>
       </div>
       {saveFeedback.length > 0 ? (
