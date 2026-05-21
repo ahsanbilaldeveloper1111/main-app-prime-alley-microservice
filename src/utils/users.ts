@@ -851,3 +851,39 @@ export const mainAppAuditLogs = async (params: Record<string, unknown> = {}) => 
     throw error;
   }
 };
+
+/** Per-user chat budget override (`PUT /api/users/<tenant_id>/<user_id>/`). */
+export type UpdateChatbotUserBudgetPayload = Readonly<{
+  monthly_budget_usd: string;
+}>;
+
+export const CHATBOT_USER_BUDGET_UPDATE_ERROR_MESSAGE =
+  "Failed to save user budget override. Please try again.";
+
+export const updateChatbotUserBudget = async (
+  tenantId: string,
+  userId: string,
+  payload: UpdateChatbotUserBudgetPayload,
+): Promise<void> => {
+  const tid = tenantId.trim();
+  const uid = userId.trim();
+  if (!tid || !uid) {
+    throw new Error("Tenant and user are required.");
+  }
+
+  try {
+    await axiosInstance.put(
+      `users/${encodeURIComponent(tid)}/${encodeURIComponent(uid)}/`,
+      payload,
+      {
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+        },
+      },
+    );
+  } catch (error: unknown) {
+    reportApiErrorFromCatch(error, "users");
+    throw new Error(CHATBOT_USER_BUDGET_UPDATE_ERROR_MESSAGE);
+  }
+};

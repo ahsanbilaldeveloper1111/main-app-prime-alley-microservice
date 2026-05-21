@@ -1,7 +1,13 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Form, Button, Spinner } from 'react-bootstrap';
 import { Send, Paperclip, Mic, Smile, X, MessageCircle, Minimize2, Maximize2, Star, Image as ImageIcon, Play, Pause, Bot } from 'lucide-react';
-import { sendChatMessage, submitChatSurvey } from '@utils/chat';
+import {
+  isChatUserBudgetExhaustedError,
+  sendChatMessage,
+  submitChatSurvey,
+} from '@utils/chat';
+import { ChatAssistantBudgetBar } from '@components/chat-assistant/ChatAssistantBudgetBar';
+import { useChatAssistantUserBudget } from '@hooks/useChatAssistantUserBudget';
 import { toast } from 'react-toastify';
 import { useSession } from 'next-auth/react';
 import '@assets/scss/chat.scss';
@@ -20,6 +26,19 @@ interface Message {
 }
 
 const EMOJI_LIST = ['😊', '😂', '❤️', '👍', '🎉', '🤔', '😢', '😮', '🔥', '✨'];
+
+const CHAT_DEFAULT_ERROR_REPLY =
+  'Sorry, I encountered an error. Please try again.';
+
+function chatErrorReplyText(error: unknown): string {
+  if (isChatUserBudgetExhaustedError(error)) {
+    return error.message;
+  }
+  if (error instanceof Error && error.message.trim()) {
+    return error.message.trim();
+  }
+  return CHAT_DEFAULT_ERROR_REPLY;
+}
 
 // Voice Message Player Component
 const VoiceMessagePlayer: React.FC<{ message: Message }> = ({ message }) => {
@@ -178,6 +197,13 @@ export default function ChatbotWidget() {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const recordingIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
+  const {
+    budget: chatBudget,
+    isLoading: chatBudgetLoading,
+    hasIdentity: chatBudgetHasIdentity,
+    refetch: refetchChatBudget,
+  } = useChatAssistantUserBudget(isOpen);
+
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
@@ -265,14 +291,16 @@ export default function ChatbotWidget() {
       };
 
       setMessages(prev => [...prev, aiMessage]);
-    } catch (error: any) {
+      refetchChatBudget();
+    } catch (error: unknown) {
       console.error('Chat API error:', error);
-      
-      // Error toast is already shown in sendChatMessage function
-      // Add error message to chat
+
+      const errorText = chatErrorReplyText(error);
+
+      // Error toast is already shown in sendChatMessage for API failures
       const errorMessage: Message = {
         id: (Date.now() + 1).toString(),
-        text: 'Sorry, I encountered an error. Please try again.',
+        text: errorText,
         sender: 'ai',
         timestamp: new Date(),
         type: 'text'
@@ -599,6 +627,12 @@ export default function ChatbotWidget() {
           </button>
         </div>
       </div>
+
+      <ChatAssistantBudgetBar
+        budget={chatBudget}
+        isLoading={chatBudgetLoading && chatBudgetHasIdentity}
+        compact
+      />
 
       {/* Messages or Survey */}
       <div 

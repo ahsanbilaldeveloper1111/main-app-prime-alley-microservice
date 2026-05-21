@@ -13,6 +13,7 @@ const emptyTrend = {
 };
 
 export type ChatbotsTenantDashboardCtx = Readonly<{
+  tenantId: string;
   model: ChatbotsTenantDashboardModel | null;
   companyName: string;
   isLoading: boolean;
@@ -102,6 +103,7 @@ export function useChatbotsTenantDashboard(): ChatbotsTenantDashboardCtx {
   );
 
   return {
+    tenantId: dashboardQuery.tenantId,
     model,
     companyName: model?.companyName?.trim() ?? "",
     isLoading: isPending,

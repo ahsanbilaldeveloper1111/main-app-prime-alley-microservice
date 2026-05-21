@@ -10,7 +10,7 @@ import {
   Users,
 } from "lucide-react";
 import dynamic from "next/dynamic";
-import React, { useMemo } from "react";
+import React, { useMemo, useState } from "react";
 import {
   Alert,
   Button,
@@ -36,7 +36,14 @@ import {
 import { DashboardTableCard } from "../shared/DashboardTableCard";
 import { useMediaQuery } from "../shared/useMediaQuery";
 
+import { AdminDashboardPricingHistoryTab } from "./AdminDashboardPricingHistoryTab";
+import { AdminDashboardUsersBudgetsTab } from "./AdminDashboardUsersBudgetsTab";
+import {
+  ADMIN_DASHBOARD_TABS,
+  type AdminDashboardTab,
+} from "./adminDashboardTabs";
 import type { ChatbotsAdminDashboardCtx } from "./useChatbotsAdminDashboard";
+import { useChatAdminPricingHistoryPage } from "./useChatAdminPricingHistoryPage";
 
 const ReactApexChart = dynamic(() => import("react-apexcharts"), {
   ssr: false,
@@ -120,6 +127,39 @@ export type ChatbotsAdminDashboardViewProps = Readonly<{
   ctx: ChatbotsAdminDashboardCtx;
 }>;
 
+function AdminDashboardTabRow(props: Readonly<{
+  activeTab: AdminDashboardTab;
+  onSelectTab: (tab: AdminDashboardTab) => void;
+}>) {
+  const { activeTab, onSelectTab } = props;
+  return (
+    <div className="chatbots-dashboard__tab-row" role="tablist">
+      {ADMIN_DASHBOARD_TABS.map((tab, index) => {
+        const isActive = activeTab === tab.id;
+        const isLast = index === ADMIN_DASHBOARD_TABS.length - 1;
+        return (
+          <button
+            key={tab.id}
+            type="button"
+            role="tab"
+            aria-selected={isActive}
+            onClick={() => onSelectTab(tab.id)}
+            className={[
+              "chatbots-dashboard__tab-btn",
+              isActive ? "chatbots-dashboard__tab-btn--active" : "",
+            ]
+              .filter(Boolean)
+              .join(" ")}
+            style={isLast ? { borderRight: "1px solid #e0e0e0" } : undefined}
+          >
+            {tab.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 function DashboardLoading() {
   return (
     <div
@@ -139,7 +179,11 @@ function DashboardLoading() {
 export function ChatbotsAdminDashboardView({
   ctx,
 }: ChatbotsAdminDashboardViewProps) {
+  const [activeTab, setActiveTab] = useState<AdminDashboardTab>("overview");
   const { model, costQueriesChart, isLoading, isError, error, refetch } = ctx;
+  const pricingHistoryCtx = useChatAdminPricingHistoryPage(
+    activeTab === "pricing-history",
+  );
 
   return (
     <React.Fragment>
@@ -151,9 +195,19 @@ export function ChatbotsAdminDashboardView({
         fluid
         className="px-2 px-sm-3 px-lg-4 pb-4 chatbots-dashboard"
       >
-        {isLoading && <DashboardLoading />}
+        <AdminDashboardTabRow activeTab={activeTab} onSelectTab={setActiveTab} />
 
-        {isError && !isLoading && (
+        {activeTab === "users" ? (
+          <AdminDashboardUsersBudgetsTab active={activeTab === "users"} />
+        ) : null}
+
+        {activeTab === "pricing-history" ? (
+          <AdminDashboardPricingHistoryTab ctx={pricingHistoryCtx} />
+        ) : null}
+
+        {activeTab === "overview" && isLoading ? <DashboardLoading /> : null}
+
+        {activeTab === "overview" && isError && !isLoading ? (
           <Alert
             variant="danger"
             className="d-flex flex-column flex-sm-row align-items-stretch align-items-sm-center gap-2 gap-sm-3"
@@ -170,14 +224,14 @@ export function ChatbotsAdminDashboardView({
               Retry
             </Button>
           </Alert>
-        )}
+        ) : null}
 
-        {!isLoading && !isError && model && (
+        {activeTab === "overview" && !isLoading && !isError && model ? (
           <AdminDashboardContent
             model={model}
             costQueriesChart={costQueriesChart}
           />
-        )}
+        ) : null}
       </Container>
     </React.Fragment>
   );

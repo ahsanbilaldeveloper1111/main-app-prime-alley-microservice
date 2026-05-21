@@ -933,6 +933,13 @@ const ApplicationCustomerSidebar: React.FC = () => {
           permission: PERMISSIONS.VIEW_TENANT_DASHBOARD_AI_CHAT,
           url: "/chat/tenant-dashboard",
         },
+        {
+          id: "chatbots-audit-logs",
+          title: "Audit Logs",
+          icon: <History size={16} />,
+          permission: PERMISSIONS.VIEW_ADMIN_DASHBOARD_AI_CHAT,
+          url: "/chat/audit-logs",
+        },
       ].filter((item) => !item.permission || hasPermission(item.permission)),
     },
     //chatbots end

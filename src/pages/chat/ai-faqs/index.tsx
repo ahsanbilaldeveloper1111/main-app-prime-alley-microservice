@@ -12,7 +12,12 @@ import PageHeader from "@components/PageHeader";
 import { useRouter } from 'next/router';
 import { Container, Row, Col, Card, Button, Modal, Spinner } from 'react-bootstrap';
 import { Building2, Globe, ChevronRight, Bot, X } from 'lucide-react';
-import { submitChatTraining, ChatTrainingResponse } from '@utils/chat';
+import {
+  postChatTraining,
+  formatChatTrainingResultMessage,
+  type ChatTrainingResponse,
+} from '@utils/chat';
+import { toast } from 'react-toastify';
 
 
 
@@ -31,12 +36,14 @@ const AIChatFAQs = () => {
         chunk_overlap: 200
       };
       
-      const response = await submitChatTraining(payload);
+      const response = await postChatTraining(payload);
       setTrainingResponse(response);
       setShowTrainingModal(true);
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Error training bot:', error);
-      // Error is already handled by submitChatTraining (toast notification)
+      const message =
+        error instanceof Error ? error.message : 'Failed to train bot.';
+      toast.error(message);
     } finally {
       setLoading(false);
     }
@@ -210,12 +217,7 @@ const AIChatFAQs = () => {
                 margin: 0,
                 lineHeight: '1.6'
               }}>
-                {(() => {
-                  const tenantFiles = trainingResponse.tenant_documents?.files || 0;
-                  const globalFiles = trainingResponse.global_documents?.files || 0;
-                  const totalChunks = trainingResponse.total_chunks || 0;
-                  return `Training completed successfully! Processed ${tenantFiles} tenant files and ${globalFiles} global files. Total chunks: ${totalChunks}`;
-                })()}
+                {formatChatTrainingResultMessage(trainingResponse)}
               </p>
             </div>
           )}

@@ -18,6 +18,7 @@ import {
   Outlet,
   RouterProvider,
   useLocation,
+  useNavigate,
 } from "react-router-dom";
 import {
   Suspense,
@@ -81,16 +82,127 @@ const pageGlob = import.meta.glob<PageModule>([
   "!./pages/_error.tsx",
 ]);
 
+/** Static imports for pages that must exist even if `import.meta.glob` missed them (e.g. new file before dev restart). */
+const supplementalPageGlob: Record<string, () => Promise<PageModule>> = {
+  "./pages/chat/audit-logs/index.tsx": () =>
+    import("./pages/chat/audit-logs/index"),
+};
+
+function normalizeGlobFilePath(filePath: string): string {
+  return filePath.replaceAll("\\", "/");
+}
+
+/** Linear trim of trailing slashes (no regex — avoids ReDoS on pathnames). */
+function stripTrailingSlashes(pathname: string): string {
+  let end = pathname.length;
+  while (end > 1 && pathname[end - 1] === "/") {
+    end -= 1;
+  }
+  return pathname.slice(0, end);
+}
+
+function stripPagesExtension(relative: string): string {
+  if (relative.endsWith(".tsx")) {
+    return relative.slice(0, -4);
+  }
+  if (relative.endsWith(".jsx")) {
+    return relative.slice(0, -4);
+  }
+  return relative;
+}
+
+function isValidRouteParamName(name: string): boolean {
+  if (!name) return false;
+  let index = 0;
+  while (index < name.length) {
+    const code = name.codePointAt(index);
+    if (code === undefined) {
+      return false;
+    }
+    const isDigit = code >= 48 && code <= 57;
+    const isUpper = code >= 65 && code <= 90;
+    const isLower = code >= 97 && code <= 122;
+    if (!(isDigit || isUpper || isLower || code === 95 || code === 45)) {
+      return false;
+    }
+    index += code > 0xffff ? 2 : 1;
+  }
+  return true;
+}
+
+/** Map `[id]` / `[...slug]` to `:id` / `*` without backtracking-prone regex. */
+function mapDynamicRouteSegment(
+  segment: string,
+): { mapped: string; isCatchAll: boolean } | null {
+  const maxLen = 256;
+  if (segment.length < 3 || segment.length > maxLen) {
+    return null;
+  }
+  if (!segment.startsWith("[") || !segment.endsWith("]")) {
+    return null;
+  }
+  const inner = segment.slice(1, -1);
+  if (!inner || inner.includes("[") || inner.includes("]") || inner.includes("/")) {
+    return null;
+  }
+  if (inner.startsWith("...")) {
+    const param = inner.slice(3);
+    if (!isValidRouteParamName(param)) {
+      return null;
+    }
+    return { mapped: "*", isCatchAll: true };
+  }
+  if (!isValidRouteParamName(inner)) {
+    return null;
+  }
+  return { mapped: `:${inner}`, isCatchAll: false };
+}
+
+type PageLoader = () => Promise<PageModule>;
+
+function mergePageGlobLoaders(): Record<string, PageLoader> {
+  const merged: Record<string, PageLoader> = {
+    ...(pageGlob as Record<string, PageLoader>),
+  };
+  for (const [filePath, loader] of Object.entries(supplementalPageGlob)) {
+    const normalized = normalizeGlobFilePath(filePath);
+    const exists = Object.keys(merged).some(
+      (key) => normalizeGlobFilePath(key) === normalized,
+    );
+    if (!exists) {
+      merged[filePath] = loader;
+    }
+  }
+  return merged;
+}
+
+function lazyPageFromLoader(loader: PageLoader): ComponentType<unknown> {
+  const Lazy = lazy(async () => {
+    const mod = await loader();
+    const Component = mod.default;
+    const wrapper = (props: Record<string, unknown>) => {
+      const element = <Component {...props} />;
+      return Component.getLayout
+        ? (Component.getLayout(element) as ReactElement)
+        : element;
+    };
+    return { default: wrapper };
+  });
+  return Lazy as unknown as ComponentType<unknown>;
+}
+
 function fileToRoutePath(filePath: string): {
   path: string;
   isCatchAll: boolean;
 } {
   // ./pages/foo/bar/[id].tsx → /foo/bar/:id
   // Normalize `\` (Windows) so glob keys always match the `./pages/` prefix.
-  let relative = filePath
-    .replaceAll("\\", "/")
-    .replace(/^\.\/pages\//, "/")
-    .replace(/\.(tsx|jsx)$/, "");
+  let relative = normalizeGlobFilePath(filePath);
+  const pagesPrefix = "./pages/";
+  if (relative.startsWith(pagesPrefix)) {
+    relative = `/${relative.slice(pagesPrefix.length)}`;
+  }
+  relative = stripPagesExtension(relative);
 
   if (relative.endsWith("/index")) {
     relative = relative.slice(0, -"/index".length) || "/";
@@ -99,14 +211,14 @@ function fileToRoutePath(filePath: string): {
   let isCatchAll = false;
   const segments = relative.split("/").filter(Boolean);
   const mappedSegments = segments.map((segment) => {
-    const dynamicMatch = /^\[(?<inner>[^\]]+)\]$/.exec(segment);
-    if (!dynamicMatch?.groups?.inner) return segment;
-    const inner = dynamicMatch.groups.inner;
-    if (inner.startsWith("...")) {
-      isCatchAll = true;
-      return "*";
+    const dynamic = mapDynamicRouteSegment(segment);
+    if (!dynamic) {
+      return segment;
     }
-    return `:${inner}`;
+    if (dynamic.isCatchAll) {
+      isCatchAll = true;
+    }
+    return dynamic.mapped;
   });
 
   const path = mappedSegments.length === 0 ? "/" : `/${mappedSegments.join("/")}`;
@@ -114,26 +226,17 @@ function fileToRoutePath(filePath: string): {
 }
 
 function buildRouteEntries(): RouteEntry[] {
-  const entries: RouteEntry[] = [];
-  for (const [filePath, loader] of Object.entries(pageGlob)) {
+  const entriesByPath = new Map<string, RouteEntry>();
+  for (const [filePath, loader] of Object.entries(mergePageGlobLoaders())) {
     const { path, isCatchAll } = fileToRoutePath(filePath);
-    const Lazy = lazy(async () => {
-      const mod = await (loader as () => Promise<PageModule>)();
-      const Component = mod.default;
-      const wrapper = (props: Record<string, unknown>) => {
-        const element = <Component {...props} />;
-        return Component.getLayout
-          ? (Component.getLayout(element) as ReactElement)
-          : element;
-      };
-      return { default: wrapper };
-    });
-    entries.push({
+    if (entriesByPath.has(path)) continue;
+    entriesByPath.set(path, {
       path,
-      Component: Lazy as unknown as ComponentType<unknown>,
+      Component: lazyPageFromLoader(loader),
       isCatchAll,
     });
   }
+  const entries = [...entriesByPath.values()];
   // Static routes first, catch-all routes last so dynamic segments don't
   // accidentally swallow concrete paths (`/foo/bar` before `/foo/:id`).
   entries.sort((a, b) => {
@@ -210,6 +313,23 @@ export function RouteGuard({ children }: RouteGuardProps) {
  * resolving. Drives NProgress (start on mount, done on unmount), preserving
  * the top-of-page progress bar the old `_app.tsx` ran via `Router.events`.
  */
+/** React Router does not strip trailing slashes; permission checks do. Normalize here. */
+function TrailingSlashRedirect() {
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    const { pathname, search, hash } = location;
+    if (pathname.length > 1 && pathname.endsWith("/")) {
+      navigate(`${stripTrailingSlashes(pathname)}${search}${hash}`, {
+        replace: true,
+      });
+    }
+  }, [location, navigate]);
+
+  return null;
+}
+
 function PageLoadProgress() {
   useEffect(() => {
     NProgress.start();
@@ -270,6 +390,7 @@ function RootLayout() {
   return (
     <Providers>
       <RouteGuard>
+        <TrailingSlashRedirect />
         <Suspense fallback={<PageLoadProgress />}>
           <Outlet />
         </Suspense>
@@ -305,8 +426,8 @@ function buildRouter() {
 }
 
 function getPageGlobSignature(): string {
-  return Object.keys(pageGlob)
-    .map((k) => k.replaceAll("\\", "/"))
+  return Object.keys(mergePageGlobLoaders())
+    .map((k) => normalizeGlobFilePath(k))
     .sort((a, b) => a.localeCompare(b))
     .join("\0");
 }

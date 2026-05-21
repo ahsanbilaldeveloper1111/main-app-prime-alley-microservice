@@ -1,5 +1,13 @@
 import { toast } from "react-toastify";
 import axiosInstance from "./axios";
+import {
+  httpErrorStatus,
+  parseHttpRetryAfterSeconds,
+  rateLimitUserMessage,
+  type ChatRateLimitErrorBody,
+} from "./httpRetryAfter";
+
+export type { ChatRateLimitErrorBody } from "./httpRetryAfter";
 
 const tenant_id = "tenant_123";
 
@@ -9,41 +17,223 @@ const TENANT_FAQS_API_PATH = "/chat/tenant-faqs";
 /** AI assistant thread API (`GET/POST /api/chat/` when `BACKEND_URL` ends with `/api/`). */
 const CHAT_ASSISTANT_API_PATH = "/chat/";
 
+/** Bot training API (`POST /api/chat/training` when `BACKEND_URL` ends with `/api/`). */
+const CHAT_TRAINING_API_PATH = "/chat/training";
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
 
-function httpErrorStatus(error: unknown): number | undefined {
-  if (!isRecord(error)) {
+/** Thrown when `POST/GET /api/chat/` returns HTTP 429. */
+export class ChatRateLimitedError extends Error {
+  readonly status = 429;
+  readonly retryAfterSeconds: number;
+
+  constructor(retryAfterSeconds: number, message?: string) {
+    const seconds = Math.max(1, Math.floor(retryAfterSeconds));
+    super(message ?? rateLimitUserMessage(seconds));
+    this.name = "ChatRateLimitedError";
+    this.retryAfterSeconds = seconds;
+  }
+}
+
+export function isChatRateLimitedError(
+  error: unknown,
+): error is ChatRateLimitedError {
+  return error instanceof ChatRateLimitedError;
+}
+
+/** POST `/api/chat/` when the caller's per-user monthly budget is exhausted. */
+export const CHAT_USER_BUDGET_EXHAUSTED_CODE = "user_budget_exhausted";
+
+/** Legacy POST `/chat/` code during rollout; prefer {@link CHAT_USER_BUDGET_EXHAUSTED_CODE}. */
+const CHAT_LEGACY_BUDGET_EXHAUSTED_CODE = "budget_exhausted";
+
+/** @deprecated Use {@link CHAT_LEGACY_BUDGET_EXHAUSTED_CODE} via {@link isChatUserBudgetExhaustedCode}. */
+export const CHAT_BUDGET_EXHAUSTED_CODE_LEGACY = CHAT_LEGACY_BUDGET_EXHAUSTED_CODE;
+
+export const CHAT_USER_BUDGET_EXHAUSTED_DEFAULT_MESSAGE =
+  "You've reached your monthly chat budget. Please contact your administrator to raise it.";
+
+export interface ChatBudgetStatus {
+  user_id?: string;
+  [key: string]: unknown;
+}
+
+/** Thrown when POST `/api/chat/` rejects due to per-user budget exhaustion (typically non-2xx). */
+export class ChatUserBudgetExhaustedError extends Error {
+  readonly code = CHAT_USER_BUDGET_EXHAUSTED_CODE;
+  readonly budgetStatus: ChatBudgetStatus | undefined;
+  readonly userId: string | undefined;
+
+  constructor(
+    message?: string,
+    budgetStatus?: ChatBudgetStatus,
+    userId?: string,
+  ) {
+    super(message ?? CHAT_USER_BUDGET_EXHAUSTED_DEFAULT_MESSAGE);
+    this.name = "ChatUserBudgetExhaustedError";
+    this.budgetStatus = budgetStatus;
+    this.userId =
+      userId ??
+      (typeof budgetStatus?.user_id === "string"
+        ? budgetStatus.user_id
+        : undefined);
+  }
+}
+
+export function isChatUserBudgetExhaustedError(
+  error: unknown,
+): error is ChatUserBudgetExhaustedError {
+  return error instanceof ChatUserBudgetExhaustedError;
+}
+
+export function isChatUserBudgetExhaustedCode(
+  code: string | undefined,
+): boolean {
+  return (
+    code === CHAT_USER_BUDGET_EXHAUSTED_CODE ||
+    code === CHAT_LEGACY_BUDGET_EXHAUSTED_CODE
+  );
+}
+
+function readChatApiCode(data: Record<string, unknown>): string | undefined {
+  if (typeof data.code === "string" && data.code.trim()) {
+    return data.code.trim();
+  }
+  const metadata = data.metadata;
+  if (isRecord(metadata) && typeof metadata.code === "string" && metadata.code.trim()) {
+    return metadata.code.trim();
+  }
+  return undefined;
+}
+
+function readChatBudgetStatus(
+  data: Record<string, unknown>,
+): ChatBudgetStatus | undefined {
+  const metadata = data.metadata;
+  if (!isRecord(metadata)) {
     return undefined;
   }
-  const response = error.response;
-  if (!isRecord(response)) {
+  const budgetStatus = metadata.budget_status;
+  if (!isRecord(budgetStatus)) {
     return undefined;
   }
-  const status = response.status;
-  return typeof status === "number" ? status : undefined;
+  return budgetStatus;
+}
+
+function readChatApiResponseMessage(data: Record<string, unknown>): string | undefined {
+  if (typeof data.response === "string" && data.response.trim()) {
+    return data.response.trim();
+  }
+  return undefined;
+}
+
+function parseChatUserBudgetExhaustedFromBody(
+  data: unknown,
+): ChatUserBudgetExhaustedError | null {
+  if (!isRecord(data)) {
+    return null;
+  }
+  const code = readChatApiCode(data);
+  if (!isChatUserBudgetExhaustedCode(code)) {
+    return null;
+  }
+  const budgetStatus = readChatBudgetStatus(data);
+  const message =
+    readChatApiResponseMessage(data) ?? CHAT_USER_BUDGET_EXHAUSTED_DEFAULT_MESSAGE;
+  return new ChatUserBudgetExhaustedError(message, budgetStatus);
+}
+
+/** True when a successful POST body includes a per-user budget exhaustion code. */
+export function isChatUserBudgetExhaustedResponse(
+  data: ChatSendMessageResponse | null | undefined,
+): boolean {
+  if (!data || !isRecord(data)) {
+    return false;
+  }
+  return isChatUserBudgetExhaustedCode(readChatApiCode(data));
+}
+
+function chatRateLimitMessageFromError(error: unknown): string {
+  if (isRecord(error)) {
+    const response = error.response;
+    if (isRecord(response) && isRecord(response.data)) {
+      const body = response.data as ChatRateLimitErrorBody;
+      if (typeof body.message === "string" && body.message.trim()) {
+        return body.message.trim();
+      }
+      if (typeof body.error === "string" && body.error.trim()) {
+        return body.error.trim();
+      }
+    }
+  }
+  const seconds = parseHttpRetryAfterSeconds(error) ?? 1;
+  return rateLimitUserMessage(seconds);
+}
+
+function rethrowChatApiError(error: unknown, fallback: string): never {
+  if (httpErrorStatus(error) === 429) {
+    const retryAfter = parseHttpRetryAfterSeconds(error) ?? 1;
+    const rateErr = new ChatRateLimitedError(
+      retryAfter,
+      chatRateLimitMessageFromError(error),
+    );
+    toast.error(rateErr.message);
+    throw rateErr;
+  }
+  if (isRecord(error)) {
+    const axiosData = error.response;
+    if (isRecord(axiosData) && isRecord(axiosData.data)) {
+      const budgetErr = parseChatUserBudgetExhaustedFromBody(axiosData.data);
+      if (budgetErr) {
+        toast.error(budgetErr.message);
+        throw budgetErr;
+      }
+    }
+  }
+  toast.error(chatApiErrorMessage(error, fallback));
+  throw error;
+}
+
+function messageFromAxiosErrorData(
+  data: Record<string, unknown>,
+): string | undefined {
+  const budgetErr = parseChatUserBudgetExhaustedFromBody(data);
+  if (budgetErr) {
+    return budgetErr.message;
+  }
+  const responseMessage = readChatApiResponseMessage(data);
+  if (responseMessage) {
+    return responseMessage;
+  }
+  const apiError = data.error;
+  if (typeof apiError === "string" && apiError.trim()) {
+    return apiError.trim();
+  }
+  const apiMessage = data.message;
+  if (typeof apiMessage === "string" && apiMessage.trim()) {
+    return apiMessage.trim();
+  }
+  return undefined;
 }
 
 function chatApiErrorMessage(error: unknown, fallback: string): string {
   if (typeof error === "string" && error.trim()) {
-    return error;
+    return error.trim();
   }
   if (!isRecord(error)) {
     return fallback;
   }
   const response = error.response;
   if (isRecord(response) && isRecord(response.data)) {
-    const { error: apiError, message: apiMessage } = response.data;
-    if (typeof apiError === "string" && apiError) {
-      return apiError;
-    }
-    if (typeof apiMessage === "string" && apiMessage) {
-      return apiMessage;
+    const fromData = messageFromAxiosErrorData(response.data);
+    if (fromData) {
+      return fromData;
     }
   }
-  if (typeof error.message === "string" && error.message) {
-    return error.message;
+  if (typeof error.message === "string" && error.message.trim()) {
+    return error.message.trim();
   }
   return fallback;
 }
@@ -68,6 +258,8 @@ export interface ChatSendMetadata {
   needs_tool: boolean;
   awaiting_parameters: boolean;
   parameter_request: string;
+  /** Present when per-user (or tenant) budget limits apply to the turn. */
+  budget_status?: ChatBudgetStatus;
 }
 
 export interface ChatSendMessageResponse {
@@ -76,6 +268,8 @@ export interface ChatSendMessageResponse {
   thread_id: string;
   metadata: ChatSendMetadata;
   error?: string;
+  /** e.g. `user_budget_exhausted` when the caller cannot consume more budget. */
+  code?: string;
 }
 
 /** @deprecated Use {@link ChatSendMessageResponse}. */
@@ -308,7 +502,8 @@ export type ChatTrainingVectorStoreInfo = Readonly<Record<string, unknown>>;
 
 /**
  * POST `/chat/training` success body (200) when `BACKEND_URL` ends with `/api/`
- * (i.e. `/api/chat/training`).
+ * (i.e. `/api/chat/training`). Full stats on normal training; reconcile-only tenants
+ * may return only `{ message }` (vector store pruned, no FAQs/files left).
  */
 export interface ChatTrainingResponse {
   message: string;
@@ -325,7 +520,7 @@ export interface ChatTrainingResponse {
   error?: string;
 }
 
-/** GET `/training/status/` — tenant-scoped bot training metadata (when `BACKEND_URL` ends with `/api/`). */
+/** GET `/chat/training/status` — tenant-scoped bot training metadata (when `BACKEND_URL` ends with `/api/`). */
 export interface ChatTrainingStatusResponse {
   tenant_id: string;
   is_trained: boolean;
@@ -358,13 +553,7 @@ export const getChatThread = async (
     }
     return response.data;
   } catch (error: unknown) {
-    toast.error(
-      chatApiErrorMessage(
-        error,
-        "Failed to load conversation. Please try again.",
-      ),
-    );
-    throw error;
+    rethrowChatApiError(error, "Failed to load conversation. Please try again.");
   }
 };
 
@@ -393,13 +582,10 @@ export const sendChatMessage = async (
 
     return response.data;
   } catch (error: unknown) {
-    toast.error(
-      chatApiErrorMessage(
-        error,
-        "An error occurred while processing your request. Please try again.",
-      ),
+    rethrowChatApiError(
+      error,
+      "An error occurred while processing your request. Please try again.",
     );
-    throw error;
   }
 };
 
@@ -754,12 +940,130 @@ export const deleteGlobalFAQ = async (
   }
 };
 
+const EMPTY_TRAINING_DOCUMENT_STATS: ChatTrainingDocumentStats = {
+  files: 0,
+  chunks: 0,
+};
+
+const EMPTY_TRAINING_FAQ_STATS: ChatTrainingFaqStats = {
+  count: 0,
+  chunks: 0,
+};
+
+function readTrainingDocumentStats(
+  value: unknown,
+): ChatTrainingDocumentStats {
+  if (!isRecord(value)) {
+    return EMPTY_TRAINING_DOCUMENT_STATS;
+  }
+  return {
+    files: typeof value.files === "number" ? value.files : 0,
+    chunks: typeof value.chunks === "number" ? value.chunks : 0,
+  };
+}
+
+function readTrainingFaqStats(value: unknown): ChatTrainingFaqStats {
+  if (!isRecord(value)) {
+    return EMPTY_TRAINING_FAQ_STATS;
+  }
+  return {
+    count: typeof value.count === "number" ? value.count : 0,
+    chunks: typeof value.chunks === "number" ? value.chunks : 0,
+  };
+}
+
+function isChatTrainingReconcilePayload(data: Record<string, unknown>): boolean {
+  const message =
+    typeof data.message === "string" ? data.message.toLowerCase() : "";
+  if (message.includes("emptied") && message.includes("reconcil")) {
+    return true;
+  }
+  const hasTrainingStats =
+    isRecord(data.tenant_documents) ||
+    isRecord(data.global_documents) ||
+    typeof data.total_chunks === "number";
+  return Boolean(message.trim()) && !hasTrainingStats;
+}
+
+function normalizeChatTrainingResponseBody(
+  raw: Record<string, unknown>,
+): ChatTrainingResponse {
+  const message = typeof raw.message === "string" ? raw.message : "";
+  const tenantId = typeof raw.tenant_id === "string" ? raw.tenant_id : "";
+  const chunkSize = typeof raw.chunk_size === "number" ? raw.chunk_size : 0;
+  const chunkOverlap =
+    typeof raw.chunk_overlap === "number" ? raw.chunk_overlap : 0;
+
+  if (isChatTrainingReconcilePayload(raw)) {
+    return {
+      message,
+      tenant_id: tenantId,
+      chunk_size: chunkSize,
+      chunk_overlap: chunkOverlap,
+      tenant_documents: EMPTY_TRAINING_DOCUMENT_STATS,
+      global_documents: EMPTY_TRAINING_DOCUMENT_STATS,
+      tenant_faqs: EMPTY_TRAINING_FAQ_STATS,
+      global_faqs: EMPTY_TRAINING_FAQ_STATS,
+      total_chunks: 0,
+      vector_store_info: isRecord(raw.vector_store_info)
+        ? raw.vector_store_info
+        : {},
+    };
+  }
+
+  const tenantDocuments = readTrainingDocumentStats(raw.tenant_documents);
+  const globalDocuments = readTrainingDocumentStats(raw.global_documents);
+  const tenantFaqs = readTrainingFaqStats(raw.tenant_faqs);
+  const globalFaqs = readTrainingFaqStats(raw.global_faqs);
+
+  return {
+    message,
+    tenant_id: tenantId,
+    chunk_size: chunkSize,
+    chunk_overlap: chunkOverlap,
+    tenant_documents: tenantDocuments,
+    global_documents: globalDocuments,
+    tenant_faqs: tenantFaqs,
+    global_faqs: globalFaqs,
+    total_chunks: typeof raw.total_chunks === "number" ? raw.total_chunks : 0,
+    vector_store_info: isRecord(raw.vector_store_info)
+      ? raw.vector_store_info
+      : {},
+    error: typeof raw.error === "string" ? raw.error : undefined,
+  };
+}
+
 function unwrapChatTrainingResponse(data: unknown): ChatTrainingResponse {
-  const body = data as Record<string, unknown>;
+  if (!isRecord(data)) {
+    throw new Error("Invalid training response");
+  }
   const nested =
-    (body.data as ChatTrainingResponse | undefined) ??
-    (body.result as ChatTrainingResponse | undefined);
-  return nested ?? (data as ChatTrainingResponse);
+    (isRecord(data.data) ? data.data : undefined) ??
+    (isRecord(data.result) ? data.result : undefined);
+  const raw = isRecord(nested) ? nested : data;
+  return normalizeChatTrainingResponseBody(raw);
+}
+
+/** True when POST `/api/chat/training` reconciled an existing vector store with no content left. */
+export function isChatTrainingReconciledResponse(
+  response: ChatTrainingResponse,
+): boolean {
+  const message = response.message?.toLowerCase() ?? "";
+  return message.includes("emptied") && message.includes("reconcil");
+}
+
+/** User-facing summary for training success modal and inline copy. */
+export function formatChatTrainingResultMessage(
+  response: ChatTrainingResponse,
+): string {
+  const apiMessage = response.message?.trim();
+  if (isChatTrainingReconciledResponse(response) && apiMessage) {
+    return apiMessage;
+  }
+  const tenantFiles = response.tenant_documents.files;
+  const globalFiles = response.global_documents.files;
+  const totalChunks = response.total_chunks;
+  return `Training completed successfully! Processed ${tenantFiles} tenant files and ${globalFiles} global files. Total chunks: ${totalChunks}`;
 }
 
 /**
@@ -775,7 +1079,7 @@ export const postChatTraining = async (
 
   try {
     const response = await axiosInstance.post<ChatTrainingResponse>(
-      "/chat/training",
+      CHAT_TRAINING_API_PATH,
       {
         tenant_id: tenantId,
         chunk_size: payload.chunk_size,
@@ -817,7 +1121,7 @@ export const submitChatTraining = async (
 };
 
 /**
- * Training status for a tenant (GET `/api/training/status/` when `BACKEND_URL` ends with `/api/`).
+ * Training status for a tenant (GET `/api/chat/training/status` when `BACKEND_URL` ends with `/api/`).
  * Sends `tenant_id` as a query parameter.
  */
 export const getChatTrainingStatus = async (
@@ -829,7 +1133,7 @@ export const getChatTrainingStatus = async (
   }
   try {
     const response = await axiosInstance.get<ChatTrainingStatusResponse>(
-      "/training/status/",
+      "/chat/training/status",
       {
         params: { tenant_id: id },
       },
@@ -907,23 +1211,26 @@ export interface TenantDashboardTopQuestion {
   served_by_tool_pct: number;
 }
 
-export interface TenantDashboardRecentConversation {
-  thread_id?: string;
-  thread?: string;
-  title?: string;
-  user_id?: string;
-  display_name?: string;
-  user?: string;
-  last_activity?: string;
+export interface TenantDashboardPricing {
+  model: string;
+  input_per_million: string;
+  output_per_million: string;
 }
 
-export interface TenantDashboardRateLimit {
-  per_minute_used: number;
-  per_minute_limit: number;
-  per_minute_remaining: number;
-  per_day_used: number;
-  per_day_limit: number;
-  per_day_remaining: number;
+export interface TenantDashboardRecentConversation {
+  thread_id?: string;
+  user_id?: string;
+  title?: string;
+  updated_at?: string;
+  display_name?: string;
+  /** LLM for the last turn; empty when none recorded. */
+  model_used?: string;
+  /** Tenant-charged thread cost (margin included); `"0"` when none. */
+  cost?: string;
+  /** @deprecated Prefer `updated_at`. */
+  last_activity?: string;
+  thread?: string;
+  user?: string;
 }
 
 export interface TenantChatDashboardResponse {
@@ -942,13 +1249,156 @@ export interface TenantChatDashboardResponse {
   recent_conversations: TenantDashboardRecentConversation[];
   top_questions_7d: TenantDashboardTopQuestion[];
   recent_failures: unknown[];
-  rate_limit: TenantDashboardRateLimit;
+  /** Current tenant LLM rates (margin included; raw base prices not exposed). */
+  pricing?: TenantDashboardPricing;
 }
+
+/** Tenant dashboard API (`GET /api/chat/tenant/dashboard` when `BACKEND_URL` ends with `/api/`). */
+const CHAT_TENANT_DASHBOARD_API_PATH = "/chat/tenant/dashboard";
 
 /**
  * Tenant analytics dashboard (GET `/api/chat/tenant/dashboard` when `BACKEND_URL` ends with `/api/`).
  * Optional `tenant_id` query scopes the dashboard to a tenant.
  */
+export type TenantChatUserBudgetSource =
+  | "user"
+  | "tenant_default"
+  | "global_default"
+  | "unlimited"
+  | (string & {});
+
+export interface TenantChatUserRow {
+  user_id: string;
+  display_name: string;
+  monthly_budget_usd: string | null;
+  budget_threshold_pct: number | null;
+  effective_budget_usd: string;
+  effective_threshold_pct: number;
+  mtd_spend: string;
+  remaining_usd: string;
+  used_pct: number;
+  is_exhausted: boolean;
+  budget_source: TenantChatUserBudgetSource;
+  budget_synced_at: string | null;
+  last_seen: string | null;
+}
+
+export interface TenantChatUsersResponse {
+  tenant_id: string;
+  count: number;
+  rows: TenantChatUserRow[];
+}
+
+/** Tenant user budgets (`GET /api/chat/tenant/users` when `BACKEND_URL` ends with `/api/`). */
+const CHAT_TENANT_USERS_API_PATH = "/chat/tenant/users";
+
+export const CHAT_TENANT_USERS_FETCH_ERROR_MESSAGE =
+  "Having trouble fetching user budgets. Please try again later.";
+
+/**
+ * Per-user budget and usage rows for the tenant (GET `/api/chat/tenant/users`).
+ * Optional `tenant_id` query scopes to a tenant (admin); omitted uses session tenant.
+ */
+export const getTenantChatUsers = async (
+  tenantId?: string,
+): Promise<TenantChatUsersResponse> => {
+  try {
+    const params: Record<string, string> = {};
+    const id = tenantId?.trim();
+    if (id) params.tenant_id = id;
+
+    const response = await axiosInstance.get<TenantChatUsersResponse>(
+      CHAT_TENANT_USERS_API_PATH,
+      { params },
+    );
+
+    if (response.data == null) {
+      throw new Error("Failed to load tenant users");
+    }
+
+    return {
+      tenant_id: response.data.tenant_id ?? "",
+      count: response.data.count ?? 0,
+      rows: Array.isArray(response.data.rows) ? response.data.rows : [],
+    };
+  } catch {
+    throw new Error(CHAT_TENANT_USERS_FETCH_ERROR_MESSAGE);
+  }
+};
+
+/** Single chat user profile (`GET /api/chat/users/{tenantId}/{userId}`). */
+const CHAT_USER_DETAIL_API_PATH = "/chat/users";
+
+export const CHAT_USER_DETAIL_FETCH_ERROR_MESSAGE =
+  "Having trouble loading your chat budget. Please try again later.";
+
+export interface ChatUserDetailLifetime {
+  queries: number;
+  failed: number;
+  tokens: number;
+  cost: string;
+  avg_cost: string;
+}
+
+export interface ChatUserDetailBudget {
+  budget: string | null;
+  spend: string;
+  used_pct: number;
+  is_unlimited: boolean;
+  is_exhausted: boolean;
+  threshold_pct: number;
+  budget_source: TenantChatUserBudgetSource;
+  synced_at: string | null;
+}
+
+export interface ChatUserDetailTrendPoint {
+  date: string;
+  queries: number;
+  cost: string;
+  tokens: number;
+}
+
+export interface ChatUserDetailResponse {
+  tenant_id: string;
+  user_id: string;
+  display_name: string;
+  first_seen: string;
+  last_seen: string;
+  lifetime: ChatUserDetailLifetime;
+  preferred_model?: string;
+  rate_limit_now?: Record<string, number>;
+  limits?: Record<string, number>;
+  trend_30d?: ChatUserDetailTrendPoint[];
+  budget: ChatUserDetailBudget;
+}
+
+/**
+ * Chat user detail including MTD budget (GET `/api/chat/users/{tenantId}/{userId}`).
+ */
+export const getChatUserDetail = async (
+  tenantId: string,
+  userId: string,
+): Promise<ChatUserDetailResponse> => {
+  const tid = tenantId.trim();
+  const uid = userId.trim();
+  if (!tid || !uid) {
+    throw new Error("Tenant and user are required to load chat budget.");
+  }
+
+  try {
+    const path = `${CHAT_USER_DETAIL_API_PATH}/${encodeURIComponent(tid)}/${encodeURIComponent(uid)}`;
+    const response = await axiosInstance.get<ChatUserDetailResponse>(path);
+
+    if (response.data == null) {
+      throw new Error("Failed to load chat user");
+    }
+
+    return response.data;
+  } catch {
+    throw new Error(CHAT_USER_DETAIL_FETCH_ERROR_MESSAGE);
+  }
+};
+
 export const getTenantChatDashboard = async (
   tenantId?: string,
 ): Promise<TenantChatDashboardResponse> => {
@@ -958,7 +1408,7 @@ export const getTenantChatDashboard = async (
     if (id) params.tenant_id = id;
 
     const response = await axiosInstance.get<TenantChatDashboardResponse>(
-      "/chat/tenant/dashboard",
+      CHAT_TENANT_DASHBOARD_API_PATH,
       { params },
     );
 
@@ -1077,24 +1527,23 @@ export interface TenantChatSettingsModelOption {
   name?: string;
 }
 
+/** GET tenant settings threshold field (numeric or string from API). */
+export type TenantChatSettingsThresholdPct = number | string | null;
+
 export interface TenantChatSettingsOverrides {
   user_per_minute?: number | null;
-  user_per_day?: number | null;
-  tenant_per_minute?: number | null;
-  tenant_per_day?: number | null;
   input_cost_per_million?: string | null;
   output_cost_per_million?: string | null;
-  monthly_budget_usd?: string | null;
-  threshold_pct?: number | null;
+  default_user_budget_usd?: string | null;
+  default_budget_threshold_pct?: TenantChatSettingsThresholdPct;
   model_name?: string | null;
+  /** Percent markup on base LLM cost; `null` = no markup. */
+  margin_pct?: string | null;
 }
 
 export interface TenantChatSettingsDefaults {
   rate_limits?: {
     user_per_minute?: number;
-    user_per_day?: number;
-    tenant_per_minute?: number;
-    tenant_per_day?: number;
   };
   pricing_default_model?: string;
   pricing?: {
@@ -1109,14 +1558,15 @@ export interface TenantChatSettingsDefaults {
 export interface TenantChatSettingsUpdateRequest {
   tenant_id: string;
   user_per_minute: string;
-  user_per_day: string;
-  tenant_per_minute: string;
-  tenant_per_day: string;
   input_cost_per_million: string;
   output_cost_per_million: string;
-  monthly_budget_usd: string;
-  threshold_pct: string;
   model_name: string;
+  /** Blank clears markup; decimal string `>= 0` (e.g. `"25"` for +25%). */
+  margin_pct: string;
+  /** Default monthly budget (USD) applied to new users; blank clears. */
+  default_user_budget_usd: string;
+  /** Default alert threshold (%); blank clears. */
+  default_budget_threshold_pct: string;
 }
 
 export interface TenantChatSettingsResponse {
@@ -1127,9 +1577,6 @@ export interface TenantChatSettingsResponse {
   budget?: TenantChatSettingsBudget;
   /** Legacy flat shape (still accepted by the mapper). */
   user_per_minute?: number;
-  user_per_day?: number;
-  tenant_per_minute?: number;
-  tenant_per_day?: number;
   rate_limits?: TenantChatSettingsDefaults["rate_limits"];
   available_models?: Array<string | TenantChatSettingsModelOption>;
   openai_model?: string;
@@ -1172,6 +1619,60 @@ function unwrapTenantChatSettingsBody(
   return null;
 }
 
+/** Tenant settings API (`GET/PUT /api/chat/tenant/settings` when `BACKEND_URL` ends with `/api/`). */
+const CHAT_TENANT_SETTINGS_API_PATH = "/chat/tenant/settings";
+
+/** Tenant settings change history (`GET /api/chat/tenant/settings/history`). */
+const CHAT_TENANT_SETTINGS_HISTORY_API_PATH = "/chat/tenant/settings/history";
+
+/** `from` / `to` values in settings or pricing history change rows. */
+export type ChatFieldChangeValue = string | number | null;
+
+export interface TenantChatSettingsHistoryFieldChange {
+  from: ChatFieldChangeValue;
+  to: ChatFieldChangeValue;
+}
+
+export interface TenantChatSettingsHistoryRow {
+  ts: string;
+  ts_raw: string;
+  event: string;
+  user_id?: string;
+  changes: Record<string, TenantChatSettingsHistoryFieldChange>;
+}
+
+export interface TenantChatSettingsHistoryResponse {
+  tenant_id: string;
+  rows: TenantChatSettingsHistoryRow[];
+}
+
+export interface TenantChatSettingsHistoryQueryParams {
+  tenant_id?: string;
+  from?: string;
+  to?: string;
+  limit?: number;
+}
+
+/** User-facing message when settings history request fails. */
+export const CHAT_TENANT_SETTINGS_HISTORY_FETCH_ERROR_MESSAGE =
+  "Having trouble fetching change history. Please try again later.";
+
+function buildTenantChatSettingsHistoryQueryParams(
+  params: TenantChatSettingsHistoryQueryParams,
+): Record<string, string | number> {
+  const query: Record<string, string | number> = {};
+  const tenantId = params.tenant_id?.trim();
+  if (tenantId) query.tenant_id = tenantId;
+  const from = params.from?.trim();
+  if (from) query.from = from;
+  const to = params.to?.trim();
+  if (to) query.to = to;
+  const limit =
+    params.limit == null ? 50 : Math.min(200, Math.max(1, Math.floor(params.limit)));
+  query.limit = limit;
+  return query;
+}
+
 /**
  * Tenant chat settings (GET `/api/chat/tenant/settings` when `BACKEND_URL` ends with `/api/`).
  * Returns `null` when the API responds with 404 or an empty body — callers apply defaults.
@@ -1185,7 +1686,7 @@ export const getTenantChatSettings = async (
     if (id) params.tenant_id = id;
 
     const response = await axiosInstance.get<TenantChatSettingsResponse>(
-      "/chat/tenant/settings",
+      CHAT_TENANT_SETTINGS_API_PATH,
       {
         params,
         validateStatus: (status) =>
@@ -1218,7 +1719,7 @@ export const updateTenantChatSettings = async (
 ): Promise<TenantChatSettingsResponse> => {
   try {
     const response = await axiosInstance.put<TenantChatSettingsResponse>(
-      "/chat/tenant/settings",
+      CHAT_TENANT_SETTINGS_API_PATH,
       payload,
     );
 
@@ -1238,6 +1739,262 @@ export const updateTenantChatSettings = async (
         "Failed to save chat settings. Please try again.",
       ),
     );
+  }
+};
+
+/**
+ * Tenant settings change history (GET `/api/chat/tenant/settings/history` when `BACKEND_URL` ends with `/api/`).
+ */
+export const getTenantChatSettingsHistory = async (
+  params: TenantChatSettingsHistoryQueryParams = {},
+): Promise<TenantChatSettingsHistoryResponse> => {
+  try {
+    const response = await axiosInstance.get<TenantChatSettingsHistoryResponse>(
+      CHAT_TENANT_SETTINGS_HISTORY_API_PATH,
+      { params: buildTenantChatSettingsHistoryQueryParams(params) },
+    );
+
+    if (response.data == null) {
+      throw new Error("Failed to load settings history");
+    }
+
+    return {
+      tenant_id: response.data.tenant_id ?? "",
+      rows: Array.isArray(response.data.rows) ? response.data.rows : [],
+    };
+  } catch {
+    throw new Error(CHAT_TENANT_SETTINGS_HISTORY_FETCH_ERROR_MESSAGE);
+  }
+};
+
+/** Applied filters echoed by GET `/chat/admin/audit-log/`. */
+export interface ChatAdminAuditLogFiltersEcho {
+  tenant_id?: string | null;
+  from?: string | null;
+  to?: string | null;
+  q?: string | null;
+  event?: string | null;
+  level?: string | null;
+  logger?: string | null;
+  limit?: number | null;
+}
+
+export interface ChatAdminAuditLogRow {
+  ts: string;
+  request_id: string;
+  tenant_id: string;
+  actor: string | null;
+  event: string;
+  target_type: string | null;
+  target_id: string | null;
+  message: string;
+  meta: Record<string, unknown>;
+}
+
+export interface ChatAdminAuditLogResponse {
+  filters: ChatAdminAuditLogFiltersEcho;
+  count: number;
+  rows: ChatAdminAuditLogRow[];
+}
+
+export interface ChatAdminAuditLogQueryParams {
+  tenant_id?: string;
+  event?: string;
+  from?: string;
+  to?: string;
+  q?: string;
+  limit?: number;
+}
+
+const CHAT_ADMIN_AUDIT_LOG_API_PATH = "/chat/admin/audit-log/";
+
+/** User-facing message when the admin audit log request fails (any HTTP/status). */
+export const CHAT_ADMIN_AUDIT_LOG_FETCH_ERROR_MESSAGE =
+  "Having trouble fetching logs. Please try again later.";
+
+function buildChatAdminAuditLogQueryParams(
+  params: ChatAdminAuditLogQueryParams,
+): Record<string, string | number> {
+  const query: Record<string, string | number> = {};
+  const tenantId = params.tenant_id?.trim();
+  if (tenantId) query.tenant_id = tenantId;
+  const event = params.event?.trim();
+  if (event) query.event = event;
+  const from = params.from?.trim();
+  if (from) query.from = from;
+  const to = params.to?.trim();
+  if (to) query.to = to;
+  const q = params.q?.trim();
+  if (q) query.q = q;
+  if (params.limit != null) {
+    const limit = Math.min(500, Math.max(1, Math.floor(params.limit)));
+    query.limit = limit;
+  }
+  return query;
+}
+
+/**
+ * Admin chat audit log (GET `/api/chat/admin/audit-log/` when `BACKEND_URL` ends with `/api/`).
+ */
+export const getChatAdminAuditLog = async (
+  params: ChatAdminAuditLogQueryParams = {},
+): Promise<ChatAdminAuditLogResponse> => {
+  try {
+    const response = await axiosInstance.get<ChatAdminAuditLogResponse>(
+      CHAT_ADMIN_AUDIT_LOG_API_PATH,
+      { params: buildChatAdminAuditLogQueryParams(params) },
+    );
+
+    if (response.data == null) {
+      throw new Error("Failed to load audit log");
+    }
+
+    return response.data;
+  } catch {
+    throw new Error(CHAT_ADMIN_AUDIT_LOG_FETCH_ERROR_MESSAGE);
+  }
+};
+
+export interface AdminChatUserRow {
+  tenant_id: string;
+  user_id: string;
+  display_name: string;
+  monthly_budget_usd: string | null;
+  budget_threshold_pct: number | null;
+  effective_budget_usd: string;
+  effective_threshold_pct: number;
+  mtd_spend: string;
+  used_pct: number;
+  is_exhausted: boolean;
+  budget_synced_at: string | null;
+  last_seen: string | null;
+}
+
+export interface AdminChatUsersResponse {
+  count: number;
+  rows: AdminChatUserRow[];
+}
+
+const CHAT_ADMIN_USERS_API_PATH = "/chat/admin/users";
+
+export const CHAT_ADMIN_USERS_FETCH_ERROR_MESSAGE =
+  "Having trouble fetching user budgets. Please try again later.";
+
+/**
+ * Admin-wide per-user budget and usage (GET `/api/chat/admin/users`).
+ */
+export interface ChatPricingFieldChange {
+  from: ChatFieldChangeValue;
+  to: ChatFieldChangeValue;
+}
+
+export interface ChatAdminPricingHistoryRow {
+  ts: string;
+  ts_raw: string;
+  tenant_id: string;
+  changes: Record<string, ChatPricingFieldChange>;
+}
+
+export interface ChatAdminPricingHistoryFiltersEcho {
+  tenant_id?: string | null;
+  from?: string | null;
+  to?: string | null;
+  field?: string | null;
+  limit?: number | null;
+}
+
+export interface ChatAdminPricingHistoryResponse {
+  filters: ChatAdminPricingHistoryFiltersEcho;
+  count: number;
+  rows: ChatAdminPricingHistoryRow[];
+}
+
+export type ChatAdminPricingHistoryField =
+  | "margin_pct"
+  | "input_cost_per_million"
+  | "output_cost_per_million";
+
+export interface ChatAdminPricingHistoryQueryParams {
+  tenant_id?: string;
+  from?: string;
+  to?: string;
+  field?: ChatAdminPricingHistoryField;
+  limit?: number;
+}
+
+const CHAT_ADMIN_PRICING_HISTORY_API_PATH = "/chat/admin/pricing-history";
+
+export const CHAT_ADMIN_PRICING_HISTORY_FETCH_ERROR_MESSAGE =
+  "Having trouble fetching pricing history. Please try again later.";
+
+const PRICING_HISTORY_FIELDS = new Set<string>([
+  "margin_pct",
+  "input_cost_per_million",
+  "output_cost_per_million",
+]);
+
+function buildChatAdminPricingHistoryQueryParams(
+  params: ChatAdminPricingHistoryQueryParams,
+): Record<string, string | number> {
+  const query: Record<string, string | number> = {};
+  const tenantId = params.tenant_id?.trim();
+  if (tenantId) query.tenant_id = tenantId;
+  const from = params.from?.trim();
+  if (from) query.from = from;
+  const to = params.to?.trim();
+  if (to) query.to = to;
+  const field = params.field?.trim();
+  if (field && PRICING_HISTORY_FIELDS.has(field)) {
+    query.field = field;
+  }
+  const limit =
+    params.limit == null ? 100 : Math.min(500, Math.max(1, Math.floor(params.limit)));
+  query.limit = limit;
+  return query;
+}
+
+/**
+ * Admin pricing change history (GET `/api/chat/admin/pricing-history`).
+ */
+export const getChatAdminPricingHistory = async (
+  params: ChatAdminPricingHistoryQueryParams = {},
+): Promise<ChatAdminPricingHistoryResponse> => {
+  try {
+    const response = await axiosInstance.get<ChatAdminPricingHistoryResponse>(
+      CHAT_ADMIN_PRICING_HISTORY_API_PATH,
+      { params: buildChatAdminPricingHistoryQueryParams(params) },
+    );
+
+    if (response.data == null) {
+      throw new Error("Failed to load pricing history");
+    }
+
+    return {
+      filters: response.data.filters ?? {},
+      count: response.data.count ?? 0,
+      rows: Array.isArray(response.data.rows) ? response.data.rows : [],
+    };
+  } catch {
+    throw new Error(CHAT_ADMIN_PRICING_HISTORY_FETCH_ERROR_MESSAGE);
+  }
+};
+
+export const getAdminChatUsers = async (): Promise<AdminChatUsersResponse> => {
+  try {
+    const response = await axiosInstance.get<AdminChatUsersResponse>(
+      CHAT_ADMIN_USERS_API_PATH,
+    );
+
+    if (response.data == null) {
+      throw new Error("Failed to load admin users");
+    }
+
+    return {
+      count: response.data.count ?? 0,
+      rows: Array.isArray(response.data.rows) ? response.data.rows : [],
+    };
+  } catch {
+    throw new Error(CHAT_ADMIN_USERS_FETCH_ERROR_MESSAGE);
   }
 };
 

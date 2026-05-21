@@ -10,6 +10,11 @@ import tokenService from "./tokenService";
 import { markAxiosUserFacingRejection } from "./axiosUserFacingRejection";
 import { isBenignNetworkFailure } from "./benignNetworkFailure";
 import { getAuthSnapshot } from "../auth/AuthProvider";
+import {
+  isChatAssistantThreadRequest,
+  parseHttpRetryAfterSeconds,
+  rateLimitUserMessage,
+} from "./httpRetryAfter";
 
 type MutableConfig = InternalAxiosRequestConfig & { _retry?: boolean };
 
@@ -161,7 +166,10 @@ async function handleResponseWithBody(
     throw error;
   }
   if (status === 429) {
-    toast.error("Too many requests. Please try again in a few moments.");
+    if (!isChatAssistantThreadRequest(originalRequest.url)) {
+      const retryAfter = parseHttpRetryAfterSeconds(error) ?? 1;
+      toast.error(rateLimitUserMessage(retryAfter));
+    }
     markAxiosUserFacingRejection(error);
     throw error;
   }

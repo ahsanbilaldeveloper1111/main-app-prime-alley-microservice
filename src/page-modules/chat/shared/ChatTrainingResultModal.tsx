@@ -1,14 +1,10 @@
-import type { ChatTrainingResponse } from "@utils/chat";
+import {
+  formatChatTrainingResultMessage,
+  type ChatTrainingResponse,
+} from "@utils/chat";
 import { Bot, X } from "lucide-react";
 import React from "react";
 import { Button, Modal } from "react-bootstrap";
-
-function formatTrainingSummary(response: ChatTrainingResponse): string {
-  const tenantFiles = response.tenant_documents.files;
-  const globalFiles = response.global_documents.files;
-  const totalChunks = response.total_chunks;
-  return `Training completed successfully! Processed ${tenantFiles} tenant files and ${globalFiles} global files. Total chunks: ${totalChunks}`;
-}
 
 export type ChatTrainingResultModalProps = Readonly<{
   show: boolean;
@@ -65,7 +61,7 @@ export function ChatTrainingResultModal({
               padding: "12px 8px",
             }}
           >
-            {formatTrainingSummary(response)}
+            {formatChatTrainingResultMessage(response)}
           </p>
         ) : null}
       </Modal.Body>
