@@ -39,6 +39,22 @@ export interface TopQaAcrossCompaniesRow {
   asked: number;
 }
 
+export interface AdminUserBudgetRow {
+  tenantId: string;
+  tenantName: string;
+  userId: string;
+  displayName: string;
+  monthlyBudgetUsd: string | null;
+  budgetThresholdPct: number | null;
+  effectiveBudgetUsd: string;
+  effectiveThresholdPct: number;
+  mtdSpend: string;
+  usedPct: number;
+  isExhausted: boolean;
+  budgetSyncedAt: string | null;
+  lastSeen: string | null;
+}
+
 export interface ChatbotsAdminDashboardModel {
   generatedAt?: string;
   summary: ChatbotsSummaryStats;

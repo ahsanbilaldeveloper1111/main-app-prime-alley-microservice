@@ -4,7 +4,6 @@ import { useQuery } from "@tanstack/react-query";
 import { useSession } from "next-auth/react";
 
 import {
-  mapTenantChatSettingsBudget,
   mapTenantChatSettingsModelOptions,
   mapTenantChatSettingsPricingTable,
   mapTenantChatSettingsToFormValues,
@@ -26,7 +25,6 @@ export function useChatTenantSettingsQuery(appliedTenantId: string) {
       return {
         rawSettings: data,
         formValues: mapTenantChatSettingsToFormValues(data),
-        budget: mapTenantChatSettingsBudget(data),
         modelOptions: mapTenantChatSettingsModelOptions(data),
         pricingTable: mapTenantChatSettingsPricingTable(data),
         hasApiData: data != null,
@@ -39,7 +37,6 @@ export function useChatTenantSettingsQuery(appliedTenantId: string) {
     tenantId,
     dataUpdatedAt: query.dataUpdatedAt,
     formValues: query.data?.formValues ?? null,
-    budget: query.data?.budget ?? null,
     modelOptions: query.data?.modelOptions ?? [],
     pricingTable: query.data?.pricingTable ?? {},
     rawSettings: query.data?.rawSettings ?? null,

@@ -6,7 +6,6 @@ import type {
 import { AI_CHATBOT_DEFAULT_RATE_LIMITS } from "./constants";
 import type {
   AIChatbotModelOption,
-  AIChatbotSettingsBudgetView,
   AIChatbotSettingsFormValues,
 } from "./types";
 
@@ -15,11 +14,7 @@ export type TenantChatPricingTable = Record<
   { input: string; output: string }
 >;
 
-type RateLimitKey =
-  | "user_per_minute"
-  | "user_per_day"
-  | "tenant_per_minute"
-  | "tenant_per_day";
+type RateLimitKey = "user_per_minute";
 
 function asRecord(value: unknown): Record<string, unknown> | null {
   if (value && typeof value === "object" && !Array.isArray(value)) {
@@ -106,28 +101,30 @@ function readEffectiveModelName(root: Record<string, unknown>): string {
   );
 }
 
-function readEffectiveMonthlyBudgetUsd(root: Record<string, unknown>): string {
+function readEffectiveDefaultUserBudgetUsd(root: Record<string, unknown>): string {
   const overrides = asRecord(root.overrides);
-  const fromOverride = readStringValue(overrides?.monthly_budget_usd);
+  const fromOverride = readStringValue(overrides?.default_user_budget_usd);
   if (fromOverride) return fromOverride;
-
-  const budget = asRecord(root.budget);
-  if (budget?.is_unlimited === true) return "";
-  return readStringValue(budget?.budget);
+  return readStringValue(overrides?.monthly_budget_usd);
 }
 
-function readEffectiveThresholdPct(root: Record<string, unknown>): string {
+function readEffectiveMarginPct(root: Record<string, unknown>): string {
   const overrides = asRecord(root.overrides);
-  if (typeof overrides?.threshold_pct === "number" && Number.isFinite(overrides.threshold_pct)) {
-    return String(overrides.threshold_pct);
-  }
+  const raw = overrides?.margin_pct;
+  if (raw == null) return "";
+  return readStringValue(raw);
+}
 
-  const budget = asRecord(root.budget);
-  if (typeof budget?.threshold_pct === "number" && Number.isFinite(budget.threshold_pct)) {
-    return String(budget.threshold_pct);
+function readEffectiveDefaultBudgetThresholdPct(
+  root: Record<string, unknown>,
+): string {
+  const overrides = asRecord(root.overrides);
+  const raw =
+    overrides?.default_budget_threshold_pct ?? overrides?.threshold_pct;
+  if (typeof raw === "number" && Number.isFinite(raw)) {
+    return String(raw);
   }
-
-  return "";
+  return readStringValue(raw);
 }
 
 export function mapTenantChatSettingsPricingTable(
@@ -221,15 +218,11 @@ export function mapTenantChatSettingsToFormValues(
   if (!root) return {
     rateLimits: {
       perUserPerMinute: String(AI_CHATBOT_DEFAULT_RATE_LIMITS.user_per_minute),
-      perUserPerDay: String(AI_CHATBOT_DEFAULT_RATE_LIMITS.user_per_day),
-      perTenantPerMinute: String(
-        AI_CHATBOT_DEFAULT_RATE_LIMITS.tenant_per_minute,
-      ),
-      perTenantPerDay: String(AI_CHATBOT_DEFAULT_RATE_LIMITS.tenant_per_day),
     },
-    budget: { monthlyBudgetUsd: "", alertThresholdPct: "" },
+    budget: { defaultUserBudgetUsd: "", defaultBudgetThresholdPct: "" },
     openAiModel: "",
     pricing: { inputCostPerMillion: "", outputCostPerMillion: "" },
+    marginPct: "",
   };
 
   const pricingTable = mapTenantChatSettingsPricingTable(data);
@@ -239,19 +232,17 @@ export function mapTenantChatSettingsToFormValues(
   return {
     rateLimits: {
       perUserPerMinute: String(readEffectiveLimit(root, "user_per_minute")),
-      perUserPerDay: String(readEffectiveLimit(root, "user_per_day")),
-      perTenantPerMinute: String(readEffectiveLimit(root, "tenant_per_minute")),
-      perTenantPerDay: String(readEffectiveLimit(root, "tenant_per_day")),
     },
     budget: {
-      monthlyBudgetUsd: readEffectiveMonthlyBudgetUsd(root),
-      alertThresholdPct: readEffectiveThresholdPct(root),
+      defaultUserBudgetUsd: readEffectiveDefaultUserBudgetUsd(root),
+      defaultBudgetThresholdPct: readEffectiveDefaultBudgetThresholdPct(root),
     },
     openAiModel: modelName,
     pricing: {
       inputCostPerMillion: pricing.input,
       outputCostPerMillion: pricing.output,
     },
+    marginPct: readEffectiveMarginPct(root),
   };
 }
 
@@ -321,34 +312,30 @@ export function mapFormValuesToTenantSettingsUpdate(
   }
 
   const userPerMinute = toPayloadString(values.rateLimits.perUserPerMinute);
-  const userPerDay = toPayloadString(values.rateLimits.perUserPerDay);
-  const tenantPerMinute = toPayloadString(values.rateLimits.perTenantPerMinute);
-  const tenantPerDay = toPayloadString(values.rateLimits.perTenantPerDay);
   const inputCost = toPayloadString(values.pricing.inputCostPerMillion);
   const outputCost = toPayloadString(values.pricing.outputCostPerMillion);
-  const monthlyBudget = toPayloadString(values.budget.monthlyBudgetUsd);
-  const thresholdPct = toPayloadString(values.budget.alertThresholdPct);
+  const defaultUserBudget = toPayloadString(values.budget.defaultUserBudgetUsd);
+  const defaultThresholdPct = toPayloadString(
+    values.budget.defaultBudgetThresholdPct,
+  );
+  const marginPct = toPayloadString(values.marginPct);
 
   validateOptionalNonNegativeInt(userPerMinute, "User per minute");
-  validateOptionalNonNegativeInt(userPerDay, "User per day");
-  validateOptionalNonNegativeInt(tenantPerMinute, "Tenant per minute");
-  validateOptionalNonNegativeInt(tenantPerDay, "Tenant per day");
   validateOptionalNonNegativeNumber(inputCost, "Input cost per million");
   validateOptionalNonNegativeNumber(outputCost, "Output cost per million");
-  validateOptionalNonNegativeNumber(monthlyBudget, "Monthly budget");
-  validateOptionalThresholdPct(thresholdPct);
+  validateOptionalNonNegativeNumber(defaultUserBudget, "Default user budget");
+  validateOptionalThresholdPct(defaultThresholdPct);
+  validateOptionalNonNegativeNumber(marginPct, "Cost markup (%)");
 
   return {
     tenant_id: id,
     user_per_minute: userPerMinute,
-    user_per_day: userPerDay,
-    tenant_per_minute: tenantPerMinute,
-    tenant_per_day: tenantPerDay,
     input_cost_per_million: inputCost,
     output_cost_per_million: outputCost,
-    monthly_budget_usd: monthlyBudget,
-    threshold_pct: thresholdPct,
     model_name: modelName,
+    margin_pct: marginPct,
+    default_user_budget_usd: defaultUserBudget,
+    default_budget_threshold_pct: defaultThresholdPct,
   };
 }
 
@@ -364,20 +351,34 @@ export function validateAIChatbotSettingsForm(
   }
 }
 
-export function mapTenantChatSettingsBudget(
+/** Raw `overrides.margin_pct` from GET settings (`null` = no markup). */
+export function mapTenantChatSettingsMarginPct(
   data: TenantChatSettingsResponse | null | undefined,
-): AIChatbotSettingsBudgetView | null {
-  const root = normalizeTenantChatSettingsPayload(data);
-  const budget = root?.budget;
-  if (!budget) return null;
+): string | null {
+  const root = asRecord(normalizeTenantChatSettingsPayload(data));
+  if (!root) return null;
 
-  return {
-    spend: budget.spend ?? "0",
-    budget: budget.budget,
-    usedPct: budget.used_pct ?? 0,
-    isUnlimited: Boolean(budget.is_unlimited),
-    isExhausted: Boolean(budget.is_exhausted),
-    thresholdPct: budget.threshold_pct ?? 0,
-    resetsOn: budget.resets_on ?? "",
-  };
+  const overrides = asRecord(root.overrides);
+  const raw = overrides?.margin_pct;
+  if (raw == null) return null;
+  if (typeof raw === "string") {
+    const trimmed = raw.trim();
+    return trimmed || null;
+  }
+  return null;
 }
+
+/** User-facing label for tenant LLM cost markup. */
+export function formatTenantMarginPctDisplay(
+  marginPct: string | null | undefined,
+): string {
+  if (marginPct == null || !marginPct.trim()) {
+    return "No markup (base cost)";
+  }
+  const value = Number.parseFloat(marginPct.trim());
+  if (!Number.isFinite(value)) {
+    return marginPct.trim();
+  }
+  return `+${value}%`;
+}
+

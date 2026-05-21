@@ -13,8 +13,11 @@ import {
   ChevronDown,
   Trash2,
 } from "lucide-react";
+import { ChatAssistantBudgetBar } from "@components/chat-assistant/ChatAssistantBudgetBar";
+import { useChatAssistantUserBudget } from "@hooks/useChatAssistantUserBudget";
 import {
   getChatThread,
+  isChatUserBudgetExhaustedError,
   mapChatThreadMessagesToUi,
   sendChatMessage,
 } from "@utils/chat";
@@ -93,11 +96,21 @@ function removeStoredThread(threadId: string) {
 const BREEZE_ERROR_REPLY =
   "Sorry, something went wrong. Please try again.";
 
-function createBreezeErrorMessage(): BreezeMessage {
+function breezeReplyFromChatError(error: unknown): string {
+  if (isChatUserBudgetExhaustedError(error)) {
+    return error.message;
+  }
+  if (error instanceof Error && error.message.trim()) {
+    return error.message.trim();
+  }
+  return BREEZE_ERROR_REPLY;
+}
+
+function createBreezeErrorMessage(error?: unknown): BreezeMessage {
   return {
     id: `error-${Date.now()}`,
     role: "assistant",
-    content: BREEZE_ERROR_REPLY,
+    content: error ? breezeReplyFromChatError(error) : BREEZE_ERROR_REPLY,
     timestamp: new Date(),
   };
 }
@@ -1339,6 +1352,21 @@ const BreezeAssistantSidebar: React.FC<BreezeAssistantSidebarProps> = ({
     return () => document.removeEventListener("mousedown", h);
   }, []);
 
+  const showChatBudgetBar = view === "chat";
+  const {
+    budget: chatBudget,
+    isLoading: chatBudgetLoading,
+    hasIdentity: chatBudgetHasIdentity,
+    refetch: refetchChatBudget,
+  } = useChatAssistantUserBudget(isOpen && showChatBudgetBar);
+
+  const ChatBudgetBar = showChatBudgetBar ? (
+    <ChatAssistantBudgetBar
+      budget={chatBudget}
+      isLoading={chatBudgetLoading && chatBudgetHasIdentity}
+    />
+  ) : null;
+
   if (!isOpen) return null;
 
   // ── Send: used by Send button click and Enter key; calls sendChatMessage API (or onSendMessage prop) ──
@@ -1378,9 +1406,10 @@ const BreezeAssistantSidebar: React.FC<BreezeAssistantSidebarProps> = ({
           persistThreadToHistory,
         ),
       );
+      refetchChatBudget();
     } catch (error: unknown) {
       console.error("AI Assistant send failed:", error);
-      setMessages((prev) => [...prev, createBreezeErrorMessage()]);
+      setMessages((prev) => [...prev, createBreezeErrorMessage(error)]);
     } finally {
       setIsLoading(false);
     }
@@ -1733,6 +1762,7 @@ const BreezeAssistantSidebar: React.FC<BreezeAssistantSidebarProps> = ({
             />
             <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
               {TopBar}
+              {ChatBudgetBar}
               <div
                 className="breeze-scroll"
                 style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}
@@ -1778,6 +1808,7 @@ const BreezeAssistantSidebar: React.FC<BreezeAssistantSidebarProps> = ({
         }}
       >
         {TopBar}
+        {ChatBudgetBar}
         {BodyContent}
         {FooterBar}
       </div>

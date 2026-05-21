@@ -16,7 +16,10 @@ import {
 } from "react-bootstrap";
 import Select from "react-select";
 import React, { useMemo } from "react";
-import type { ChatTrainingStatusResponse } from "@utils/chat";
+import {
+  formatChatTrainingResultMessage,
+  type ChatTrainingStatusResponse,
+} from "@utils/chat";
 import {
   findChatCompanySelectOption,
   mapChatCompaniesToSelectOptions,
@@ -388,12 +391,7 @@ export function FaqProfilesPageView({ ctx }: FaqProfilesPageViewProps) {
                   lineHeight: "1.6",
                 }}
               >
-                {(() => {
-                  const tenantFiles = trainingResponse.tenant_documents.files;
-                  const globalFiles = trainingResponse.global_documents.files;
-                  const totalChunks = trainingResponse.total_chunks;
-                  return `Training completed successfully! Processed ${tenantFiles} tenant files and ${globalFiles} global files. Total chunks: ${totalChunks}`;
-                })()}
+                {formatChatTrainingResultMessage(trainingResponse)}
               </p>
             </div>
           ) : null}

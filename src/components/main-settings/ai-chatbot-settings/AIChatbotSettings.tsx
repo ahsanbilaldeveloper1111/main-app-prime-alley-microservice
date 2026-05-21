@@ -12,18 +12,25 @@ const { PERMISSIONS } = HEADER_CONSTANTS;
 
 import type {
   AIChatbotModelOption,
-  AIChatbotSettingsBudgetView,
   AIChatbotSettingsFormValues,
 } from "./types";
 import { defaultAIChatbotSettingsFormValues } from "./types";
 import {
+  formatTenantMarginPctDisplay,
   resolvePricingForModel,
   validateAIChatbotSettingsForm,
 } from "./mapTenantChatSettings";
 import { AI_CHATBOT_FIELD_PLACEHOLDERS } from "./constants";
 import { AIChatbotSettingsFormSkeleton } from "./AIChatbotSettingsFormSkeleton";
+import { AIChatbotSettingsHistoryPanel } from "./AIChatbotSettingsHistoryPanel";
 import { ModelPricingDefaultsTable } from "./ModelPricingDefaultsTable";
+import {
+  AI_CHATBOT_SETTINGS_INNER_TABS,
+  type AIChatbotSettingsInnerTab,
+} from "./tenantSettingsHistoryTypes";
+import { PerUserBudgetOverridesSection } from "./PerUserBudgetOverridesSection";
 import { useAIChatbotSettingsPage } from "./useAIChatbotSettingsPage";
+import { useChatTenantSettingsHistory } from "./useChatTenantSettingsHistory";
 
 type CompanySelectOption = { value: string; label: string };
 
@@ -149,71 +156,35 @@ function ReadonlyField(props: Readonly<{ label: string; value: string }>) {
   );
 }
 
-function formatResetsOn(iso: string): string {
-  if (!iso.trim()) return "—";
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return iso;
-  return d.toLocaleDateString(undefined, {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  });
-}
-
-function formatSpendUsd(spend: string): string {
-  const trimmed = spend.trim();
-  if (!trimmed) return "—";
-  return trimmed.startsWith("$") ? trimmed : `$${trimmed}`;
-}
-
-function LiveSpendSection(props: Readonly<{
-  budget: AIChatbotSettingsBudgetView | null;
+function AIChatbotSettingsInnerTabs(props: Readonly<{
+  activeTab: AIChatbotSettingsInnerTab;
+  onSelectTab: (tab: AIChatbotSettingsInnerTab) => void;
 }>) {
-  const { budget } = props;
-  const spendDisplay = budget ? formatSpendUsd(budget.spend) : "—";
-  const resetsDisplay = budget ? formatResetsOn(budget.resetsOn) : "—";
-
-  const usedPct = budget
-    ? Math.min(100, Math.max(0, budget.usedPct))
-    : 0;
-  let barColor = "#059669";
-  if (budget?.isExhausted) {
-    barColor = "#dc2626";
-  } else if (budget && usedPct >= budget.thresholdPct) {
-    barColor = "#d97706";
-  }
-
+  const { activeTab, onSelectTab } = props;
   return (
-    <div className="ai-chatbot-settings__section">
-      <p className="ai-chatbot-settings__row-label">Live spend (Month-to-date)</p>
-      <div className="ai-chatbot-settings__grid-2">
-        <ReadonlyField label="Spend" value={spendDisplay} />
-        <ReadonlyField label="Reset on" value={resetsDisplay} />
-      </div>
-      {budget && !budget.isUnlimited && (
-        <>
-          <p className="ai-chatbot-settings__live-spend-meta">
-            <span>{usedPct.toFixed(1)}% of monthly cap used</span>
-            {budget.isExhausted && (
-              <span className="ai-chatbot-settings__live-spend-exhausted">
-                · Budget exhausted
-              </span>
-            )}
-          </p>
-          <div className="ai-chatbot-settings__progress-track" aria-hidden>
-            <div
-              style={{
-                height: "100%",
-                width: `${usedPct}%`,
-                background: barColor,
-              }}
-            />
-          </div>
-        </>
-      )}
-      {budget?.isUnlimited && (
-        <p className="ai-chatbot-settings__hint">No monthly cap configured.</p>
-      )}
+    <div className="ai-chatbot-settings__inner-tab-row" role="tablist">
+      {AI_CHATBOT_SETTINGS_INNER_TABS.map((tab, index) => {
+        const isActive = activeTab === tab.id;
+        const isLast = index === AI_CHATBOT_SETTINGS_INNER_TABS.length - 1;
+        return (
+          <button
+            key={tab.id}
+            type="button"
+            role="tab"
+            aria-selected={isActive}
+            onClick={() => onSelectTab(tab.id)}
+            className={[
+              "ai-chatbot-settings__inner-tab-btn",
+              isActive ? "ai-chatbot-settings__inner-tab-btn--active" : "",
+            ]
+              .filter(Boolean)
+              .join(" ")}
+            style={isLast ? { borderRight: "1px solid #e0e0e0" } : undefined}
+          >
+            {tab.label}
+          </button>
+        );
+      })}
     </div>
   );
 }
@@ -221,6 +192,8 @@ function LiveSpendSection(props: Readonly<{
 export const AIChatbotSettings: React.FC = () => {
   const { hasPermission } = usePermissions();
   const canEditSettings = hasPermission(PERMISSIONS.EDIT_TENANT_SETTINGS_AI_CHAT);
+
+  const [innerTab, setInnerTab] = useState<AIChatbotSettingsInnerTab>("settings");
 
   const {
     companiesLoading,
@@ -234,11 +207,16 @@ export const AIChatbotSettings: React.FC = () => {
     saveMutation,
   } = useAIChatbotSettingsPage();
 
+  const historyCtx = useChatTenantSettingsHistory(
+    appliedTenantId,
+    innerTab === "history",
+  );
+  const { resetFiltersForTenant } = historyCtx;
+
   const {
     tenantId: queryTenantId,
     dataUpdatedAt,
     formValues: fetchedFormValues,
-    budget,
     modelOptions,
     pricingTable,
     rawSettings,
@@ -256,7 +234,9 @@ export const AIChatbotSettings: React.FC = () => {
   useEffect(() => {
     setValues(defaultAIChatbotSettingsFormValues());
     setFormHydrated(false);
-  }, [appliedTenantId]);
+    setInnerTab("settings");
+    resetFiltersForTenant();
+  }, [appliedTenantId, resetFiltersForTenant]);
 
   useEffect(() => {
     if (!appliedTenantId || queryTenantId !== appliedTenantId || isLoading) {
@@ -339,6 +319,10 @@ export const AIChatbotSettings: React.FC = () => {
           onCompanySelect={handleCompanySelect}
           onApplyFilter={handleApplyFilter}
         />
+        <AIChatbotSettingsInnerTabs
+          activeTab={innerTab}
+          onSelectTab={setInnerTab}
+        />
         <p className="ai-chatbot-settings__hint">Select a company to load settings.</p>
       </div>
     );
@@ -359,9 +343,17 @@ export const AIChatbotSettings: React.FC = () => {
         appliedCompanyLabel={appliedCompanyLabel}
       />
 
-      {showFormSkeleton ? (
+      <AIChatbotSettingsInnerTabs activeTab={innerTab} onSelectTab={setInnerTab} />
+
+      {innerTab === "history" ? (
+        <AIChatbotSettingsHistoryPanel ctx={historyCtx} />
+      ) : null}
+
+      {innerTab === "settings" && showFormSkeleton ? (
         <AIChatbotSettingsFormSkeleton />
-      ) : (
+      ) : null}
+
+      {innerTab === "settings" && !showFormSkeleton ? (
         <>
       {isError && (
         <p className="ai-chatbot-settings__status">
@@ -386,7 +378,7 @@ export const AIChatbotSettings: React.FC = () => {
 
       <div className="ai-chatbot-settings__section">
         <p className="ai-chatbot-settings__row-label">Rate limits</p>
-        <div className="ai-chatbot-settings__grid-4">
+        <div className="ai-chatbot-settings__grid-2">
           <NumberField
             label="User / min"
             value={values.rateLimits.perUserPerMinute}
@@ -394,49 +386,28 @@ export const AIChatbotSettings: React.FC = () => {
             placeholder={AI_CHATBOT_FIELD_PLACEHOLDERS.rateLimits.perUserPerMinute}
             disabled={fieldsDisabled}
           />
-          <NumberField
-            label="User / day"
-            value={values.rateLimits.perUserPerDay}
-            onChange={(v) => updateRateLimit("perUserPerDay", v)}
-            placeholder={AI_CHATBOT_FIELD_PLACEHOLDERS.rateLimits.perUserPerDay}
-            disabled={fieldsDisabled}
-          />
-          <NumberField
-            label="Tenant / min"
-            value={values.rateLimits.perTenantPerMinute}
-            onChange={(v) => updateRateLimit("perTenantPerMinute", v)}
-            placeholder={
-              AI_CHATBOT_FIELD_PLACEHOLDERS.rateLimits.perTenantPerMinute
-            }
-            disabled={fieldsDisabled}
-          />
-          <NumberField
-            label="Tenant / day"
-            value={values.rateLimits.perTenantPerDay}
-            onChange={(v) => updateRateLimit("perTenantPerDay", v)}
-            placeholder={AI_CHATBOT_FIELD_PLACEHOLDERS.rateLimits.perTenantPerDay}
-            disabled={fieldsDisabled}
-          />
         </div>
       </div>
 
       <div className="ai-chatbot-settings__section">
-        <p className="ai-chatbot-settings__row-label">Budget (USD)</p>
+        <p className="ai-chatbot-settings__row-label">Default user budget</p>
         <div className="ai-chatbot-settings__grid-2">
           <NumberField
-            label="Monthly Budget (USD)"
-            value={values.budget.monthlyBudgetUsd}
-            onChange={(v) => updateBudget("monthlyBudgetUsd", v)}
-            placeholder={AI_CHATBOT_FIELD_PLACEHOLDERS.budget.monthlyBudgetUsd}
+            label="Default user budget (USD)"
+            value={values.budget.defaultUserBudgetUsd}
+            onChange={(v) => updateBudget("defaultUserBudgetUsd", v)}
+            placeholder={AI_CHATBOT_FIELD_PLACEHOLDERS.budget.defaultUserBudgetUsd}
             step="0.01"
             min={0}
             disabled={fieldsDisabled}
           />
           <NumberField
-            label="Alert threshold (%)"
-            value={values.budget.alertThresholdPct}
-            onChange={(v) => updateBudget("alertThresholdPct", v)}
-            placeholder={AI_CHATBOT_FIELD_PLACEHOLDERS.budget.alertThresholdPct}
+            label="Default alert threshold (%)"
+            value={values.budget.defaultBudgetThresholdPct}
+            onChange={(v) => updateBudget("defaultBudgetThresholdPct", v)}
+            placeholder={
+              AI_CHATBOT_FIELD_PLACEHOLDERS.budget.defaultBudgetThresholdPct
+            }
             min={0}
             max={100}
             step="1"
@@ -444,15 +415,45 @@ export const AIChatbotSettings: React.FC = () => {
           />
         </div>
         <p className="ai-chatbot-settings__hint">
-          Alert threshold triggers when spend reaches this percentage of the
-          monthly cap.
+          Applied as the default monthly cap for users without their own budget.
+          Alert threshold triggers when a user&apos;s spend reaches this
+          percentage of their cap.
         </p>
       </div>
 
-      <LiveSpendSection budget={budget} />
+      <PerUserBudgetOverridesSection
+        tenantId={appliedTenantId}
+        enabled={innerTab === "settings" && Boolean(appliedTenantId)}
+        canEdit={canEditSettings}
+      />
 
       <div className="ai-chatbot-settings__section">
         <p className="ai-chatbot-settings__row-label">Model & pricing</p>
+        <div className="ai-chatbot-settings__grid-2 mb-3">
+          {canEditSettings ? (
+            <NumberField
+              label="Cost markup (%)"
+              value={values.marginPct}
+              onChange={(v) =>
+                setValues((prev) => ({ ...prev, marginPct: v }))
+              }
+              placeholder={AI_CHATBOT_FIELD_PLACEHOLDERS.marginPct}
+              step="0.01"
+              min={0}
+              disabled={fieldsDisabled}
+            />
+          ) : (
+            <ReadonlyField
+              label="Cost markup (%)"
+              value={formatTenantMarginPctDisplay(values.marginPct)}
+            />
+          )}
+        </div>
+        <p className="ai-chatbot-settings__hint mb-3">
+          Markup is added on top of base LLM cost when computing tenant-facing
+          rates and thread costs. Leave blank for no markup. Tenants only see
+          effective prices on the dashboard, not this percentage or base costs.
+        </p>
         <div className="ai-chatbot-settings__grid-3">
           <label className="ai-chatbot-settings__field">
             <span className="ai-chatbot-settings__field-label">OpenAI model</span>
@@ -523,7 +524,7 @@ export const AIChatbotSettings: React.FC = () => {
         </p>
       )}
         </>
-      )}
+      ) : null}
     </form>
   );
 };

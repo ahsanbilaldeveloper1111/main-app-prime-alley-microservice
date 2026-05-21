@@ -680,10 +680,48 @@ export const chatKeys = {
       [...chatKeys.tenantDashboard.all(), tenantId || "__current__"] as const,
   },
 
+  /** Tenant user budgets & usage (`GET /chat/tenant/users`). */
+  tenantUsers: {
+    all: () => [...chatKeys.root, "tenantUsers"] as const,
+    detail: (tenantId: string) =>
+      [...chatKeys.tenantUsers.all(), tenantId || "__current__"] as const,
+  },
+
   /** Admin analytics dashboard (`GET /chat/admin/dashboard`). */
   adminDashboard: {
     all: () => [...chatKeys.root, "adminDashboard"] as const,
     detail: () => [...chatKeys.adminDashboard.all(), "detail"] as const,
+  },
+
+  /** Admin user budgets across tenants (`GET /chat/admin/users`). */
+  adminUsers: {
+    all: () => [...chatKeys.root, "adminUsers"] as const,
+    list: () => [...chatKeys.adminUsers.all(), "list"] as const,
+  },
+
+  /** Admin pricing history (`GET /chat/admin/pricing-history`). */
+  adminPricingHistory: {
+    all: () => [...chatKeys.root, "adminPricingHistory"] as const,
+    list: (filters: {
+      tenant_id?: string;
+      from?: string;
+      to?: string;
+      field?: string;
+      limit?: number;
+    }) => [...chatKeys.adminPricingHistory.all(), "list", filters] as const,
+  },
+
+  /** Admin chat audit log (`GET /chat/admin/audit-log/`). */
+  adminAuditLog: {
+    all: () => [...chatKeys.root, "adminAuditLog"] as const,
+    list: (filters: {
+      tenant_id?: string;
+      event?: string;
+      from?: string;
+      to?: string;
+      q?: string;
+      limit?: number;
+    }) => [...chatKeys.adminAuditLog.all(), "list", filters] as const,
   },
 
   /** Tenant chat settings (`GET /chat/tenant/settings`). */
@@ -691,6 +729,13 @@ export const chatKeys = {
     all: () => [...chatKeys.root, "tenantSettings"] as const,
     detail: (tenantId: string) =>
       [...chatKeys.tenantSettings.all(), tenantId || "__current__"] as const,
+    history: (tenantId: string, filters: { from?: string; to?: string; limit?: number }) =>
+      [
+        ...chatKeys.tenantSettings.all(),
+        "history",
+        tenantId || "__current__",
+        filters,
+      ] as const,
   },
 
   /** AI assistant popup thread (`GET/POST /chat/`). */
@@ -698,6 +743,13 @@ export const chatKeys = {
     all: () => [...chatKeys.root, "assistant"] as const,
     thread: (threadId: string) =>
       [...chatKeys.assistant.all(), "thread", threadId] as const,
+    userBudget: (tenantId: string, userId: string) =>
+      [
+        ...chatKeys.assistant.all(),
+        "userBudget",
+        tenantId || "__none__",
+        userId || "__none__",
+      ] as const,
   },
 };
 

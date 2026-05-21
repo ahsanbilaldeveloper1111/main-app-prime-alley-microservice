@@ -75,6 +75,7 @@ export const routePermissions: RoutePermission[] = [
     { path: '/chat/tenant-dashboard', permissions: [PERMISSIONS.VIEW_TENANT_DASHBOARD_AI_CHAT] },
     { path: '/chat/ai-faqs/global', permissions: [PERMISSIONS.MANAGE_GLOBAL_FAQS_AI_CHAT] },
     { path: '/chat/admin-dashboard', permissions: [PERMISSIONS.VIEW_ADMIN_DASHBOARD_AI_CHAT] },
+    { path: '/chat/audit-logs', permissions: [PERMISSIONS.VIEW_ADMIN_DASHBOARD_AI_CHAT] },
     { path: '/chat/faq-profiles', permissions: [PERMISSIONS.VIEW_FAQS_PROFILE_AI_CHAT] },
     { path: '/chat/faq-profiles/tenant', permissions: [PERMISSIONS.MANAGE_TENANT_PROFILE_AI_CHAT] },
     { path: '/chat/faq-profiles/global', permissions: [PERMISSIONS.MANAGE_GLOBAL_FAQS_AI_CHAT] },

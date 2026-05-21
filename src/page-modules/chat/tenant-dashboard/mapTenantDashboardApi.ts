@@ -22,6 +22,19 @@ function formatActivity(value: string | undefined): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
+function mapPricing(
+  pricing: TenantChatDashboardResponse["pricing"],
+): ChatbotsTenantDashboardModel["pricing"] {
+  if (!pricing) {
+    return null;
+  }
+  return {
+    model: pricing.model?.trim() || "—",
+    inputPerMillion: pricing.input_per_million?.trim() || "0",
+    outputPerMillion: pricing.output_per_million?.trim() || "0",
+  };
+}
+
 export function mapTenantDashboardApi(
   data: TenantChatDashboardResponse,
 ): ChatbotsTenantDashboardModel {
@@ -39,12 +52,6 @@ export function mapTenantDashboardApi(
       queriesThisMonth: data.kpis.this_month.queries,
       costThisMonthUsd: parseCost(data.kpis.this_month.cost),
       activeUsers: data.kpis.active_users_7d,
-    },
-    rateLimit: {
-      queriesPerMinuteLimit: data.rate_limit.per_minute_limit,
-      queriesPerMinuteRemaining: data.rate_limit.per_minute_remaining,
-      queriesTodayLimit: data.rate_limit.per_day_limit,
-      queriesTodayRemaining: data.rate_limit.per_day_remaining,
     },
     dailyCostQueriesLast30Days: {
       categories: trend.map((p) => formatTrendLabel(p.date)),
@@ -70,18 +77,25 @@ export function mapTenantDashboardApi(
         ? formatActivity(data.kb.last_training)
         : null,
     },
-    recentConversations: (data.recent_conversations ?? []).map((row, i) => ({
-      thread:
-        row.thread?.trim() ||
-        row.title?.trim() ||
-        row.thread_id?.trim() ||
-        `Thread ${i + 1}`,
-      user:
-        row.display_name?.trim() ||
-        row.user?.trim() ||
-        row.user_id?.trim() ||
-        "—",
-      lastActivity: formatActivity(row.last_activity),
-    })),
+    recentConversations: (data.recent_conversations ?? []).map((row, i) => {
+      const threadId = row.thread_id?.trim() || `row-${i}`;
+      return {
+        threadId,
+        thread:
+          row.title?.trim() ||
+          row.thread?.trim() ||
+          threadId ||
+          `Thread ${i + 1}`,
+        user:
+          row.display_name?.trim() ||
+          row.user?.trim() ||
+          row.user_id?.trim() ||
+          "—",
+        lastActivity: formatActivity(row.updated_at ?? row.last_activity),
+        modelUsed: row.model_used?.trim() || "—",
+        costUsd: parseCost(row.cost),
+      };
+    }),
+    pricing: mapPricing(data.pricing),
   };
 }

@@ -5,14 +5,13 @@ import {
   CalendarRange,
   Clock,
   DollarSign,
-  Gauge,
   Hash,
   MessageSquare,
   Users,
 } from "lucide-react";
 import dynamic from "next/dynamic";
-import React, { useMemo } from "react";
-import { Alert, Button, Card, Col, Container, ProgressBar, Row, Table } from "react-bootstrap";
+import React, { useMemo, useState } from "react";
+import { Alert, Button, Card, Col, Container, Row, Table } from "react-bootstrap";
 
 import "../shared/chatbotsDashboard.scss";
 import {
@@ -28,7 +27,15 @@ import {
 import { DashboardTableCard } from "../shared/DashboardTableCard";
 import { useMediaQuery } from "../shared/useMediaQuery";
 
-import type { RateLimitUsage, TenantKnowledgeBaseStats } from "./types";
+import type {
+  TenantDashboardPricing,
+  TenantKnowledgeBaseStats,
+} from "./types";
+import { TenantDashboardUsersBudgetsTab } from "./TenantDashboardUsersBudgetsTab";
+import {
+  TENANT_DASHBOARD_TABS,
+  type TenantDashboardTab,
+} from "./tenantDashboardTabs";
 import type { ChatbotsTenantDashboardCtx } from "./useChatbotsTenantDashboard";
 
 const ReactApexChart = dynamic(() => import("react-apexcharts"), {
@@ -46,6 +53,21 @@ const float3 = new Intl.NumberFormat("en-US", {
   minimumFractionDigits: 3,
   maximumFractionDigits: 3,
 });
+
+const usd4 = new Intl.NumberFormat("en-US", {
+  style: "currency",
+  currency: "USD",
+  minimumFractionDigits: 4,
+  maximumFractionDigits: 4,
+});
+
+function formatPerMillionRate(value: string): string {
+  const trimmed = value.trim();
+  if (!trimmed) return "—";
+  const n = Number.parseFloat(trimmed);
+  if (!Number.isFinite(n)) return trimmed;
+  return `${usd4.format(n)} / 1M tokens`;
+}
 
 const intFmt = new Intl.NumberFormat("en-US");
 
@@ -82,65 +104,49 @@ function StatCard(props: Readonly<{
   );
 }
 
-function rateLimitPercent(remaining: number, limit: number): number {
-  if (limit <= 0) return 0;
-  return Math.min(100, Math.max(0, (remaining / limit) * 100));
-}
+function TenantPricingCard({
+  pricing,
+}: Readonly<{ pricing: TenantDashboardPricing }>) {
+  const items = [
+    {
+      label: "Model",
+      value: pricing.model,
+    },
+    {
+      label: "Input",
+      value: formatPerMillionRate(pricing.inputPerMillion),
+    },
+    {
+      label: "Output",
+      value: formatPerMillionRate(pricing.outputPerMillion),
+    },
+  ];
 
-function rateLimitProgressVariant(
-  pct: number,
-): "danger" | "warning" | "success" {
-  if (pct < 20) return "danger";
-  if (pct < 40) return "warning";
-  return "success";
-}
-
-function RateLimitRow(props: Readonly<{
-  label: string;
-  remaining: number;
-  limit: number;
-}>) {
-  const { label, remaining, limit } = props;
-  const used = Math.max(0, limit - remaining);
-  const pct = rateLimitPercent(remaining, limit);
   return (
-    <div className="mb-3">
-      <div className="d-flex flex-column flex-sm-row flex-sm-wrap gap-1 gap-sm-2 justify-content-sm-between align-items-sm-center mb-1">
-        <span className="fw-medium">{label}</span>
-        <span className="text-muted small text-sm-end">
-          {intFmt.format(remaining)} remaining of {intFmt.format(limit)}
-        </span>
-      </div>
-      <ProgressBar
-        now={pct}
-        variant={rateLimitProgressVariant(pct)}
-        className="mb-0"
-        style={{ height: 8 }}
-        aria-label={`${label}: ${intFmt.format(remaining)} remaining`}
-      />
-      <div className="text-muted small mt-1">{intFmt.format(used)} used</div>
-    </div>
-  );
-}
-
-function RateLimitUsageCard({ rateLimit }: Readonly<{ rateLimit: RateLimitUsage }>) {
-  return (
-    <Card className="h-100 border-0 shadow-sm">
+    <Card className="border-0 shadow-sm h-100">
       <Card.Body>
         <h5 className="mb-3 fw-semibold d-flex align-items-center gap-2">
-          <Gauge size={18} className="text-primary" aria-hidden />
-          Rate limit usage
+          <DollarSign size={18} className="text-primary" aria-hidden />
+          Current pricing
         </h5>
-        <RateLimitRow
-          label="Queries per minute"
-          remaining={rateLimit.queriesPerMinuteRemaining}
-          limit={rateLimit.queriesPerMinuteLimit}
-        />
-        <RateLimitRow
-          label="Queries today"
-          remaining={rateLimit.queriesTodayRemaining}
-          limit={rateLimit.queriesTodayLimit}
-        />
+        <p className="text-muted small mb-3">
+          Rates shown include your tenant margin. Base model prices are managed
+          in admin pricing history.
+        </p>
+        <Row xs={1} sm={3} className="g-3">
+          {items.map((item) => (
+            <Col key={item.label}>
+              <div className="border rounded-3 p-3 h-100 bg-light bg-opacity-50">
+                <div className="text-muted small text-uppercase fw-semibold">
+                  {item.label}
+                </div>
+                <div className="fs-6 fw-semibold mt-1 text-break">
+                  {item.value}
+                </div>
+              </div>
+            </Col>
+          ))}
+        </Row>
       </Card.Body>
     </Card>
   );
@@ -198,6 +204,39 @@ export type ChatbotsTenantDashboardViewProps = Readonly<{
   ctx: ChatbotsTenantDashboardCtx;
 }>;
 
+function TenantDashboardTabRow(props: Readonly<{
+  activeTab: TenantDashboardTab;
+  onSelectTab: (tab: TenantDashboardTab) => void;
+}>) {
+  const { activeTab, onSelectTab } = props;
+  return (
+    <div className="chatbots-dashboard__tab-row" role="tablist">
+      {TENANT_DASHBOARD_TABS.map((tab, index) => {
+        const isActive = activeTab === tab.id;
+        const isLast = index === TENANT_DASHBOARD_TABS.length - 1;
+        return (
+          <button
+            key={tab.id}
+            type="button"
+            role="tab"
+            aria-selected={isActive}
+            onClick={() => onSelectTab(tab.id)}
+            className={[
+              "chatbots-dashboard__tab-btn",
+              isActive ? "chatbots-dashboard__tab-btn--active" : "",
+            ]
+              .filter(Boolean)
+              .join(" ")}
+            style={isLast ? { borderRight: "1px solid #e0e0e0" } : undefined}
+          >
+            {tab.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 function DashboardLoading() {
   return (
     <div
@@ -214,7 +253,10 @@ function DashboardLoading() {
 export function ChatbotsTenantDashboardView({
   ctx,
 }: ChatbotsTenantDashboardViewProps) {
+  const [activeTab, setActiveTab] = useState<TenantDashboardTab>("overview");
+
   const {
+    tenantId,
     model,
     companyName,
     isLoading,
@@ -238,9 +280,18 @@ export function ChatbotsTenantDashboardView({
         fluid
         className="px-2 px-sm-3 px-lg-4 pb-4 chatbots-dashboard"
       >
-        {isLoading && <DashboardLoading />}
+        <TenantDashboardTabRow activeTab={activeTab} onSelectTab={setActiveTab} />
 
-        {isError && !isLoading && (
+        {activeTab === "users" ? (
+          <TenantDashboardUsersBudgetsTab
+            tenantId={tenantId}
+            active={activeTab === "users"}
+          />
+        ) : null}
+
+        {activeTab === "overview" && isLoading ? <DashboardLoading /> : null}
+
+        {activeTab === "overview" && isError && !isLoading ? (
           <Alert
             variant="danger"
             className="d-flex flex-column flex-sm-row align-items-stretch align-items-sm-center gap-2 gap-sm-3"
@@ -257,14 +308,14 @@ export function ChatbotsTenantDashboardView({
               Retry
             </Button>
           </Alert>
-        )}
+        ) : null}
 
-        {!isLoading && !isError && model && (
+        {activeTab === "overview" && !isLoading && !isError && model ? (
           <TenantDashboardContent
             model={model}
             dailyCostQueriesChart={dailyCostQueriesChart}
           />
-        )}
+        ) : null}
       </Container>
     </React.Fragment>
   );
@@ -277,7 +328,7 @@ function TenantDashboardContent({
   model: NonNullable<ChatbotsTenantDashboardViewProps["ctx"]["model"]>;
   dailyCostQueriesChart: ChatbotsTenantDashboardViewProps["ctx"]["dailyCostQueriesChart"];
 }>) {
-  const { summary, rateLimit, knowledgeBase } = model;
+  const { summary, knowledgeBase, pricing } = model;
   const isMobile = useMediaQuery("(max-width: 767.98px)");
   const isTablet = useMediaQuery("(max-width: 991.98px)");
 
@@ -328,10 +379,7 @@ function TenantDashboardContent({
         </Row>
 
         <Row className="mb-3">
-          <Col xs={12} lg={4}>
-            <RateLimitUsageCard rateLimit={rateLimit} />
-          </Col>
-          <Col xs={12} lg={8} className="mt-3 mt-lg-0 min-w-0">
+          <Col xs={12} className="min-w-0">
             <Card className="h-100 border-0 shadow-sm">
               <Card.Body className="chatbots-dashboard__chart">
                 <h5 className="mb-3 fw-semibold">
@@ -443,8 +491,13 @@ function TenantDashboardContent({
           </Col>
         </Row>
 
-        <Row className="mb-3">
-          <Col xs={12}>
+        <Row className="mb-3 g-3">
+          {pricing ? (
+            <Col xs={12} lg={5}>
+              <TenantPricingCard pricing={pricing} />
+            </Col>
+          ) : null}
+          <Col xs={12} lg={pricing ? 7 : 12}>
             <KnowledgeBaseCard kb={knowledgeBase} />
           </Col>
         </Row>
@@ -454,20 +507,26 @@ function TenantDashboardContent({
             <DashboardTableCard title="Recent conversations" compact>
               <Table hover size="sm" className={chatbotsDashboardTableClass}>
                 <colgroup>
-                  <col style={{ width: "40%" }} />
-                  <col style={{ width: "30%" }} />
-                  <col style={{ width: "30%" }} />
+                  <col style={{ width: "28%" }} />
+                  <col style={{ width: "18%" }} />
+                  <col style={{ width: "18%" }} />
+                  <col style={{ width: "18%" }} />
+                  <col style={{ width: "18%" }} />
                 </colgroup>
                 <thead className="table-light">
                   <tr>
                     <th className={chatbotsDashboardThClass}>Thread</th>
                     <th className={chatbotsDashboardThClass}>User</th>
                     <th className={chatbotsDashboardThClass}>Last activity</th>
+                    <th className={chatbotsDashboardThClass}>Model</th>
+                    <th className={`${chatbotsDashboardThClass} text-md-center`}>
+                      Cost
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
                   {model.recentConversations.map((row) => (
-                    <tr key={`${row.thread}-${row.user}`}>
+                    <tr key={row.threadId}>
                       <td
                         data-label="Thread"
                         className={`${chatbotsDashboardTdClass} ${chatbotsDashboardPrimaryCellClass} fw-medium`}
@@ -496,6 +555,19 @@ function TenantDashboardContent({
                           <Clock size={12} aria-hidden />
                           {row.lastActivity}
                         </span>
+                      </td>
+                      <td
+                        data-label="Model"
+                        className={`${chatbotsDashboardTdClass} text-muted small text-break`}
+                        title={row.modelUsed}
+                      >
+                        {row.modelUsed}
+                      </td>
+                      <td
+                        data-label="Cost"
+                        className={`${chatbotsDashboardTdClass} text-md-center text-nowrap`}
+                      >
+                        {usd3.format(row.costUsd)}
                       </td>
                     </tr>
                   ))}

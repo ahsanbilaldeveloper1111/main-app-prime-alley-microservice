@@ -26,10 +26,7 @@ export function AIChatbotSettingsFormSkeleton() {
   return (
     <div className="ai-chatbot-settings__skeleton-form" aria-busy="true" aria-label="Loading settings">
       <SkeletonSection titleWidth="28%">
-        <div className="ai-chatbot-settings__grid-4">
-          <SkeletonField />
-          <SkeletonField />
-          <SkeletonField />
+        <div className="ai-chatbot-settings__grid-2">
           <SkeletonField />
         </div>
       </SkeletonSection>

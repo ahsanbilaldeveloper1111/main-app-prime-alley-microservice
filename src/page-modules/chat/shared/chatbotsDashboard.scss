@@ -1,6 +1,38 @@
 .chatbots-dashboard {
   min-width: 0;
 
+  &__tab-row {
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 0;
+    margin-bottom: 1.25rem;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+  }
+
+  &__tab-btn {
+    flex: 0 0 auto;
+    padding: 8px 20px;
+    background: whitesmoke;
+    border: 1px solid #e0e0e0;
+    border-right: none;
+    border-bottom: 2px solid #e0e0e0;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 400;
+    color: #141414;
+    white-space: nowrap;
+    position: relative;
+    top: 1px;
+
+    &--active {
+      background: #fff;
+      border-bottom-color: #fff;
+      font-weight: 600;
+    }
+  }
+
   .chatbots-dashboard__chart {
     min-width: 0;
     overflow: hidden;
@@ -15,6 +47,62 @@
       @media (min-width: 768px) {
         text-align: center !important;
       }
+    }
+  }
+
+  /* Must beat `.chatbots-dashboard .chatbots-dashboard__table { table-layout: fixed }` */
+  .table-responsive:has(.chatbots-dashboard__table--users-budgets) {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .chatbots-dashboard__table.chatbots-dashboard__table--users-budgets {
+    width: 100%;
+    table-layout: auto;
+    min-width: 1120px;
+
+    col.chatbots-dashboard__col-tenant-width {
+      width: 9.5rem;
+    }
+
+    col.chatbots-dashboard__col-user-width {
+      width: 9.5rem;
+    }
+
+    th.chatbots-dashboard__col-tenant,
+    td.chatbots-dashboard__col-tenant {
+      width: 9.5rem;
+      min-width: 9.5rem;
+      max-width: 12rem;
+      white-space: normal !important;
+      word-break: break-word;
+      overflow-wrap: anywhere;
+      vertical-align: top;
+      box-sizing: border-box;
+    }
+
+    th.chatbots-dashboard__col-user,
+    td.chatbots-dashboard__col-user {
+      width: 9.5rem;
+      min-width: 9.5rem;
+      max-width: 12rem;
+      white-space: normal !important;
+      word-break: break-word;
+      overflow-wrap: anywhere;
+      vertical-align: top;
+      box-sizing: border-box;
+    }
+
+    td.chatbots-dashboard__col-tenant code,
+    td.chatbots-dashboard__col-user code {
+      white-space: normal;
+      word-break: break-word;
+    }
+
+    td.chatbots-dashboard__col-user .badge {
+      display: block;
+      width: fit-content;
+      margin-top: 0.25rem;
     }
   }
 
@@ -74,5 +162,9 @@
         }
       }
     }
+  }
+
+  .tenant-dashboard-users__usage {
+    min-width: 120px;
   }
 }

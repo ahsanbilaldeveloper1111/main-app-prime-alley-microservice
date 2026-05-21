@@ -59,3 +59,17 @@ export function findChatCompanySelectOption(
   }
   return { value: id, label: id };
 }
+
+/** Resolve tenant display name from company list; falls back to tenant id. */
+export function resolveTenantDisplayFromCompanies(
+  tenantId: string,
+  companies: readonly ChatCompanyOption[],
+): Readonly<{ tenantId: string; tenantName: string }> {
+  const id = tenantId.trim();
+  if (!id) {
+    return { tenantId: "", tenantName: "—" };
+  }
+  const match = companies.find((c) => resolveTenantIdFromCompany(c) === id);
+  const tenantName = match?.name?.trim() || id;
+  return { tenantId: id, tenantName };
+}
