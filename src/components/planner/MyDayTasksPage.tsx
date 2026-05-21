@@ -378,7 +378,7 @@ function MyDaySuggestedItemButton({
           }`}
         >
           {task.hasEstimate || task.estimateMinutes > 0 ? (
-            toMinutesDisplay(task.estimateMinutes > 0 ? task.estimateMinutes : 0) || "Estimated"
+            toMinutesDisplay(Math.max(0, task.estimateMinutes)) || "Estimated"
           ) : (
             <span className="myday-tag__no-estimate-text">
               <span className="myday-unestimated-dot" title="No estimate" aria-label="No estimate" />
@@ -768,9 +768,9 @@ function useMyDayTasksPageController() {
   const summary = useMemo(() => {
     const planned = resolveMyDayCapacityUsedMinutes(tasks, plannedMinutes);
     const plannedPct =
-      capacityStats.capacityUsedPercent != null
-        ? Math.round(capacityStats.capacityUsedPercent)
-        : Math.round((planned / Math.max(1, capacityMinutes)) * 100);
+      capacityStats.capacityUsedPercent == null
+        ? Math.round((planned / Math.max(1, capacityMinutes)) * 100)
+        : Math.round(capacityStats.capacityUsedPercent);
     const capacityTone = getCapacityFillTone(Math.min(100, plannedPct));
     return { planned, plannedPct, capacityTone, displayPct: plannedPct };
   }, [capacityMinutes, capacityStats.capacityUsedPercent, plannedMinutes, tasks]);

@@ -81,6 +81,44 @@ export function mergeFlexibleTasksSuggestionAlias(
   return result;
 }
 
+function seedFlexibleSuggestionSeenIds(flexibleRows: unknown[]): Set<number> {
+  const seenIds = new Set<number>();
+  for (const row of flexibleRows) {
+    const id = readSuggestionTaskId(row);
+    if (id != null) seenIds.add(id);
+  }
+  return seenIds;
+}
+
+function partitionFlexibleSuggestionCategory(
+  rows: unknown[],
+  category: MyDaySuggestionCategory,
+  options: { todayStart: moment.Moment; hasSearch: boolean },
+  seenIds: Set<number>,
+  flexibleRows: unknown[],
+): unknown[] {
+  const kept: unknown[] = [];
+  for (const row of rows) {
+    const record = row as Record<string, unknown>;
+    if (!isFlexibleTaskRow(record, category)) {
+      kept.push(row);
+      continue;
+    }
+    if (!isFlexibleTaskDueInSuggestionWindow(row, options.todayStart, options.hasSearch)) {
+      continue;
+    }
+    const id = readSuggestionTaskId(row);
+    if (id != null && seenIds.has(id)) {
+      continue;
+    }
+    if (id != null) {
+      seenIds.add(id);
+      flexibleRows.push(row);
+    }
+  }
+  return kept;
+}
+
 /**
  * Ensures flexible tasks appear under `flexible_upcoming` with correct window/search behavior
  * when the API places them in other buckets.
@@ -94,32 +132,18 @@ export function normalizeMyDaySuggestionsPayload(
   const flexibleRows: unknown[] = Array.isArray(merged.flexible_upcoming)
     ? [...merged.flexible_upcoming]
     : [];
-  const seenIds = new Set<number>();
-  for (const row of flexibleRows) {
-    const id = readSuggestionTaskId(row);
-    if (id != null) seenIds.add(id);
-  }
+  const seenIds = seedFlexibleSuggestionSeenIds(flexibleRows);
 
   for (const category of FLEXIBLE_SOURCE_CATEGORIES) {
     const rows = merged[category];
     if (!Array.isArray(rows)) continue;
-    const kept: unknown[] = [];
-    for (const row of rows) {
-      const record = row as Record<string, unknown>;
-      if (!isFlexibleTaskRow(record, category)) {
-        kept.push(row);
-        continue;
-      }
-      if (!isFlexibleTaskDueInSuggestionWindow(row, options.todayStart, options.hasSearch)) {
-        continue;
-      }
-      const id = readSuggestionTaskId(row);
-      if (id != null && !seenIds.has(id)) {
-        seenIds.add(id);
-        flexibleRows.push(row);
-      }
-    }
-    result[category] = kept;
+    result[category] = partitionFlexibleSuggestionCategory(
+      rows,
+      category,
+      options,
+      seenIds,
+      flexibleRows,
+    );
   }
 
   result.flexible_upcoming = flexibleRows;
@@ -302,6 +326,20 @@ export type MyDayCapacityStats = Readonly<{
   minutesOverCapacity: number;
 }>;
 
+function resolveCapacityUsedPercent(
+  apiPct: number | undefined,
+  plannedMinutes: number,
+  effectiveCapacityMinutes: number,
+): number | null {
+  if (typeof apiPct === "number" && Number.isFinite(apiPct)) {
+    return Math.round(apiPct * 10) / 10;
+  }
+  if (effectiveCapacityMinutes <= 0) {
+    return null;
+  }
+  return Math.round((plannedMinutes / effectiveCapacityMinutes) * 1000) / 10;
+}
+
 export function resolveCapacityStatsFromPayload(
   payload: {
     capacity_used_percent?: number;
@@ -311,13 +349,11 @@ export function resolveCapacityStatsFromPayload(
   plannedMinutes: number,
   effectiveCapacityMinutes: number,
 ): MyDayCapacityStats {
-  const apiPct = payload.capacity_used_percent;
-  const capacityUsedPercent =
-    typeof apiPct === "number" && Number.isFinite(apiPct)
-      ? Math.round(apiPct * 10) / 10
-      : effectiveCapacityMinutes > 0
-        ? Math.round((plannedMinutes / effectiveCapacityMinutes) * 1000) / 10
-        : null;
+  const capacityUsedPercent = resolveCapacityUsedPercent(
+    payload.capacity_used_percent,
+    plannedMinutes,
+    effectiveCapacityMinutes,
+  );
   const minutesOverCapacity =
     typeof payload.minutes_over_capacity === "number" &&
     Number.isFinite(payload.minutes_over_capacity)

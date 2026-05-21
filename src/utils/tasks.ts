@@ -2029,6 +2029,16 @@ function countOverloadedMembersFromSummary(members: WorkloadSummaryMember[] | un
   ).length;
 }
 
+function resolveWorkloadSummaryTotalMembers(
+  rawTotalMembers: unknown,
+  membersLength: number,
+): number | undefined {
+  if (rawTotalMembers == null) {
+    return membersLength > 0 ? membersLength : undefined;
+  }
+  return readWorkloadSummaryCount(rawTotalMembers);
+}
+
 function normalizeWorkloadSummaryData(raw: WorkloadSummaryData): WorkloadSummaryData {
   const members = Array.isArray(raw.members) ? raw.members : [];
   const totalTasksThisWeek = readWorkloadSummaryCount(
@@ -2046,12 +2056,7 @@ function normalizeWorkloadSummaryData(raw: WorkloadSummaryData): WorkloadSummary
     unestimated_tasks: readWorkloadSummaryCount(raw.unestimated_tasks),
     critical_priority_tasks: readWorkloadSummaryCount(raw.critical_priority_tasks),
     overloaded_members: overloadedMembers,
-    total_members:
-      raw.total_members != null
-        ? readWorkloadSummaryCount(raw.total_members)
-        : members.length > 0
-          ? members.length
-          : undefined,
+    total_members: resolveWorkloadSummaryTotalMembers(raw.total_members, members.length),
     total_tasks_in_range: readWorkloadSummaryCount(raw.total_tasks_in_range) || totalTasksThisWeek,
     total_workload: readWorkloadSummaryCount(raw.total_workload),
     overdue_tasks: readWorkloadSummaryCount(raw.overdue_tasks),
