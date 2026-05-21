@@ -6,6 +6,7 @@ import type {
   WorkloadGridData,
   WorkloadGridMember,
   WorkloadSummaryData,
+  WorkloadSummaryMember,
 } from "@utils/tasks";
 import {
   formatWorkloadGridDayHeader,
@@ -17,13 +18,14 @@ import {
   workloadCellBandClass,
   workloadCellBarFillClass,
   workloadCellHasUnestimated,
+  isWorkloadCellOverCapacity,
   workloadGridCellPercentLabel,
   workloadGridCellVisualVariant,
   workloadMemberAvatarColor,
   workloadCellKey,
   workloadLoadBandLabel,
   workloadMemberInitials,
-  WORKLOAD_LOAD_BANDS,
+  WORKLOAD_GRID_LEGEND_ITEMS,
 } from "@page-modules/planner/workload/workloadDomain";
 
 const WORKLOAD_BOARD_LEGEND = [
@@ -94,70 +96,40 @@ export function WorkloadMemberIdentity({
   );
 }
 
-function legendSwatchColor(band: string): string {
-  switch (band) {
-    case "available":
-      return "#9aa0a6";
-    case "incomplete_data":
-      return "#f59e0b";
-    case "comfortable":
-      return "#22c55e";
-    case "near_full":
-      return "#f97316";
-    case "overloaded":
-      return "#ef4444";
-    default:
-      return "#94a3b8";
-  }
-}
-
 type WorkloadSummaryCardsProps = Readonly<{
   data: WorkloadSummaryData;
-  unassignedCount?: number;
-  completedCount?: number;
-  onUnassignedClick?: () => void;
 }>;
 
-export function WorkloadSummaryCardsRow({
-  data,
-  unassignedCount = 0,
-  completedCount = 0,
-  onUnassignedClick,
-}: WorkloadSummaryCardsProps) {
+export function WorkloadSummaryCardsRow({ data }: WorkloadSummaryCardsProps) {
   return (
     <Row className="g-3 mb-3 workload-summary-row">
       <Col xs={6} lg={3}>
         <div className="workload-summary-card">
-          <div className="workload-summary-card__label">Total workload</div>
-          <div className="workload-summary-card__value">{data.total_tasks_in_range}</div>
+          <div className="workload-summary-card__label">Total tasks this week</div>
+          <div className="workload-summary-card__value">{data.total_tasks_this_week}</div>
         </div>
       </Col>
       <Col xs={6} lg={3}>
         <div className="workload-summary-card">
-          <div className="workload-summary-card__label">Overdue tasks</div>
+          <div className="workload-summary-card__label">Unestimated tasks</div>
           <div className="workload-summary-card__value workload-summary-card__value--danger">
-            {data.overdue_tasks}
+            {data.unestimated_tasks}
           </div>
         </div>
       </Col>
       <Col xs={6} lg={3}>
-        <button
-          type="button"
-          className="workload-summary-card workload-summary-card--action"
-          onClick={onUnassignedClick}
-          disabled={!onUnassignedClick}
-        >
-          <div className="workload-summary-card__label">Unassigned tasks</div>
-          <div className="workload-summary-card__value workload-summary-card__value--warning">
-            {unassignedCount}
+        <div className="workload-summary-card">
+          <div className="workload-summary-card__label">Critical priority tasks</div>
+          <div className="workload-summary-card__value workload-summary-card__value--danger">
+            {data.critical_priority_tasks}
           </div>
-        </button>
+        </div>
       </Col>
       <Col xs={6} lg={3}>
         <div className="workload-summary-card">
-          <div className="workload-summary-card__label">Completed tasks</div>
-          <div className="workload-summary-card__value workload-summary-card__value--success">
-            {completedCount}
+          <div className="workload-summary-card__label">Overloaded members</div>
+          <div className="workload-summary-card__value workload-summary-card__value--danger">
+            {data.overloaded_members}
           </div>
         </div>
       </Col>
@@ -183,16 +155,78 @@ export function WorkloadBoardLegendBar() {
   );
 }
 
-export function WorkloadLegendRow() {
+function WorkloadLegendSwatch({ item }: Readonly<{ item: (typeof WORKLOAD_GRID_LEGEND_ITEMS)[number] }>) {
   return (
-    <div className="workload-legend mb-2">
-      <span className="text-muted me-2">Legend:</span>
-      {WORKLOAD_LOAD_BANDS.map((band) => (
-        <span key={band} className="workload-legend__item">
-          <span className="workload-legend__swatch" style={{ background: legendSwatchColor(band) }} />
-          {workloadLoadBandLabel(band)}
-        </span>
-      ))}
+    <span className="workload-legend__swatch" style={{ background: item.swatch }} aria-hidden />
+  );
+}
+
+export function WorkloadLegendRow({
+  showWorkloadPerDay,
+  onToggleWorkloadPerDay,
+}: Readonly<{
+  showWorkloadPerDay: boolean;
+  onToggleWorkloadPerDay: () => void;
+}>) {
+  return (
+    <div className="workload-legend workload-legend--toolbar mb-3">
+      <div className="workload-legend__items">
+        {WORKLOAD_GRID_LEGEND_ITEMS.map((item) => (
+          <span key={item.id} className="workload-legend__item">
+            <WorkloadLegendSwatch item={item} />
+            {item.label}
+          </span>
+        ))}
+      </div>
+      <button
+        type="button"
+        className={`workload-legend__per-day-toggle ${showWorkloadPerDay ? "is-active" : ""}`}
+        onClick={onToggleWorkloadPerDay}
+      >
+        Show workload per day
+      </button>
+    </div>
+  );
+}
+
+type WorkloadPeriodMembersPanelProps = Readonly<{
+  members: WorkloadSummaryMember[];
+  hierarchyExtensions?: unknown[] | null;
+}>;
+
+export function WorkloadPeriodMembersPanel({
+  members,
+  hierarchyExtensions,
+}: WorkloadPeriodMembersPanelProps) {
+  if (members.length === 0) {
+    return <p className="small text-muted mb-3">No member workload data for this range.</p>;
+  }
+  return (
+    <div className="workload-period-panel mb-3">
+      {members.map((member) => {
+        const band = member.load_band ?? "available";
+        return (
+          <div key={member.extension_number} className="workload-period-panel__row">
+            <WorkloadMemberIdentity
+              extensionNumber={member.extension_number}
+              hierarchyExtensions={hierarchyExtensions}
+              displayMode="inline"
+            />
+            <span className={`workload-period-panel__band workload-cell--${band.replace(/[^a-z0-9_-]/gi, "")}`}>
+              {workloadLoadBandLabel(band)}
+            </span>
+            <span className="workload-period-panel__pct">
+              {formatWorkloadPercent(member.load_percent ?? 0)}
+            </span>
+            <span className="workload-period-panel__meta text-muted">
+              {member.task_count ?? 0} tasks
+              {(member.unestimated_task_count ?? 0) > 0
+                ? ` · ${member.unestimated_task_count} unestimated`
+                : ""}
+            </span>
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -206,11 +240,13 @@ type WorkloadGridCellButtonProps = Readonly<{
 function WorkloadGridCellButton({ cell, band, onSelect }: WorkloadGridCellButtonProps) {
   const variant = workloadGridCellVisualVariant(cell);
   const estimatedMinutes = cell?.estimated_minutes ?? 0;
-  const barPct = Math.min(100, Math.max(0, cell?.load_percent ?? 0));
+  const loadPercent = Math.max(0, cell?.load_percent ?? 0);
+  const barPct = Math.min(100, loadPercent);
+  const isOver = isWorkloadCellOverCapacity(loadPercent);
   const showUnestimatedDot =
     cell != null && variant !== "empty" && workloadCellHasUnestimated(cell);
   const barFillClass = workloadCellBarFillClass(band);
-  const percentLabel = workloadGridCellPercentLabel(barPct, variant);
+  const percentLabel = workloadGridCellPercentLabel(loadPercent, variant);
 
   return (
     <button
@@ -237,7 +273,11 @@ function WorkloadGridCellButton({ cell, band, onSelect }: WorkloadGridCellButton
                 />
               ) : null}
             </div>
-            <div className={`workload-cell__pct workload-cell__pct--${variant}`}>
+            <div
+              className={`workload-cell__pct workload-cell__pct--${variant} ${
+                isOver ? "workload-cell__pct--over" : ""
+              }`}
+            >
               {percentLabel}
             </div>
             <div className="workload-cell__bar">

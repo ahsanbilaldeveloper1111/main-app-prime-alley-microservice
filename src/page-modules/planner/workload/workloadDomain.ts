@@ -1,4 +1,5 @@
 import { lookupHierarchyExtensionDisplayName } from "@components/planner/plannerTasksListing/plannerTasksListingDomain";
+import type { WorkloadGridData, WorkloadGridMember, WorkloadSummaryMember } from "@utils/tasks";
 
 const MINUTES_PER_HOUR = 60;
 
@@ -60,7 +61,14 @@ export function workloadGridCellVisualVariant(
 
 export function workloadGridCellPercentLabel(loadPercent: number, variant: WorkloadGridCellVisualVariant): string {
   if (variant === "zero") return "0% Planned";
-  return formatWorkloadPercent(loadPercent);
+  const rounded = Math.round(loadPercent * 10) / 10;
+  const base = `${rounded}%`;
+  if (loadPercent > 100) return `${base} (over)`;
+  return base;
+}
+
+export function isWorkloadCellOverCapacity(loadPercent: number): boolean {
+  return Number.isFinite(loadPercent) && loadPercent > 100;
 }
 
 export function workloadCellHasUnestimated(cell: {
@@ -314,16 +322,25 @@ export const WORKLOAD_LOAD_BANDS = [
 export type WorkloadLoadBand = (typeof WORKLOAD_LOAD_BANDS)[number];
 
 const LOAD_BAND_LABELS: Record<string, string> = {
-  available: "Available",
+  available: "Available (0–70%)",
+  comfortable: "Comfortable (70–90%)",
+  near_full: "Near full (90–100%)",
+  overloaded: "Overloaded (>100%)",
   incomplete_data: "Incomplete data",
-  comfortable: "Comfortable",
-  near_full: "Near full",
-  overloaded: "Overloaded",
 };
 
 export function workloadLoadBandLabel(band: string): string {
   return LOAD_BAND_LABELS[band] ?? band.replaceAll("_", " ");
 }
+
+/** Grid legend (reference design + Postman `load_band`). */
+export const WORKLOAD_GRID_LEGEND_ITEMS = [
+  { id: "available", swatch: "#22c55e", label: "Available (0–70%)" },
+  { id: "comfortable", swatch: "#eab308", label: "Comfortable (70–90%)" },
+  { id: "near_full", swatch: "#f97316", label: "Near full (90–100%)" },
+  { id: "overloaded", swatch: "#ef4444", label: "Overloaded (>100%)" },
+  { id: "incomplete_data", swatch: "#9ca3af", label: "Incomplete data" },
+] as const;
 
 /** BEM-style modifier for cell backgrounds (see `workload-view.scss`). */
 export function workloadCellBandClass(band: string): string {
@@ -333,6 +350,112 @@ export function workloadCellBandClass(band: string): string {
 
 export function workloadCellKey(extensionNumber: string, isoDate: string): string {
   return `${extensionNumber}|${isoDate}`;
+}
+
+/** Collect assignee extensions from grid API payload (members, root list, or cells). */
+export function collectWorkloadMemberExtensionsFromGrid(grid: WorkloadGridData): string[] {
+  const fromMembers = (grid.members ?? [])
+    .map((m) => m.extension_number?.trim())
+    .filter((ext): ext is string => Boolean(ext));
+  if (fromMembers.length > 0) return [...new Set(fromMembers)];
+
+  const fromRoot = (grid.extension_numbers ?? [])
+    .map((ext) => String(ext).trim())
+    .filter(Boolean);
+  if (fromRoot.length > 0) return [...new Set(fromRoot)];
+
+  const fromCells = (grid.cells ?? [])
+    .map((c) => c.extension_number?.trim())
+    .filter((ext): ext is string => Boolean(ext));
+  return [...new Set(fromCells)];
+}
+
+function buildWorkloadGridMemberRow(
+  extensionNumber: string,
+  existing?: WorkloadGridMember,
+): WorkloadGridMember {
+  return {
+    extension_number: extensionNumber,
+    name: existing?.name ?? null,
+    display_name: existing?.display_name ?? null,
+    is_owner: existing?.is_owner,
+    role: existing?.role ?? null,
+  };
+}
+
+/**
+ * When the API returns no `members`, fall back to the logged-in user's extension (and any
+ * extensions discovered on cells). Ensures the PEOPLE row still renders like the reference UI.
+ */
+export function resolveWorkloadGridDisplayData(
+  grid: WorkloadGridData | undefined,
+  options: {
+    viewerExtension: string;
+    memberFilter?: string;
+    rangeFallback?: WorkloadIsoDateRange;
+  },
+): WorkloadGridData | undefined {
+  if (!grid) return undefined;
+
+  const existingByExt = new Map<string, WorkloadGridMember>();
+  for (const member of grid.members ?? []) {
+    const ext = member.extension_number?.trim();
+    if (ext) existingByExt.set(ext, member);
+  }
+
+  let extensionList = collectWorkloadMemberExtensionsFromGrid(grid);
+  const viewer = options.viewerExtension.trim();
+
+  if (options.memberFilter && options.memberFilter !== "all") {
+    extensionList = [options.memberFilter.trim()];
+  } else if (extensionList.length === 0 && viewer) {
+    extensionList = [viewer];
+  }
+
+  const members = extensionList.map((ext) =>
+    buildWorkloadGridMemberRow(ext, existingByExt.get(ext)),
+  );
+
+  let days = Array.isArray(grid.days) ? [...grid.days] : [];
+  if (days.length === 0 && grid.range?.start && grid.range?.end) {
+    days = listWorkloadDaysInRange(grid.range.start, grid.range.end);
+  }
+  if (days.length === 0 && options.rangeFallback) {
+    days = listWorkloadDaysInRange(options.rangeFallback.start, options.rangeFallback.end);
+  }
+
+  const hasDisplayMembers = members.length > 0;
+  const effectiveEmptyTeam = grid.empty_team === true && !hasDisplayMembers;
+
+  return {
+    ...grid,
+    members,
+    days,
+    empty_team: effectiveEmptyTeam,
+    empty_team_message: effectiveEmptyTeam ? grid.empty_team_message : null,
+  };
+}
+
+/** Summary period panel: use API members or current viewer when empty. */
+export function resolveWorkloadPeriodDisplayMembers(
+  apiMembers: WorkloadSummaryMember[] | undefined,
+  viewerExtension: string,
+): WorkloadSummaryMember[] {
+  if (Array.isArray(apiMembers) && apiMembers.length > 0) {
+    return apiMembers;
+  }
+  const viewer = viewerExtension.trim();
+  if (!viewer) return [];
+  return [
+    {
+      extension_number: viewer,
+      load_band: "available",
+      load_percent: 0,
+      task_count: 0,
+      unestimated_task_count: 0,
+      is_overloaded: false,
+    },
+  ];
 }
 
 export function memberInitials(extensionNumber: string): string {

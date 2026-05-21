@@ -379,6 +379,12 @@
     color: #374151;
   }
 
+  .myday-tag--estimate-has-value {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+
   .myday-edit-estimate-btn {
     border: 1px solid #d1d5db;
     border-radius: 999px;
@@ -388,6 +394,11 @@
     font-weight: 600;
     padding: 2px 8px;
     line-height: 1.4;
+    cursor: pointer;
+  }
+
+  .myday-edit-estimate-btn--inline {
+    margin-left: 0;
   }
 
   .myday-carry-copy {
@@ -697,7 +708,7 @@
   .myday-suggested-groups {
     display: flex;
     flex-direction: column;
-    gap: 10px;
+    gap: 8px;
   }
 
   .myday-suggested-group {
@@ -705,7 +716,7 @@
   }
 
   .myday-suggested-group__title {
-    margin: 0 0 4px;
+    margin: 0 0 2px;
     font-size: 11px;
     font-weight: 700;
     letter-spacing: 0.04em;
@@ -734,7 +745,7 @@
   .myday-suggested-list {
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: 4px;
   }
 
   .myday-suggested-item {

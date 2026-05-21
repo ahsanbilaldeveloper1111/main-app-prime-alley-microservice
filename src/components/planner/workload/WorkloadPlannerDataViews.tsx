@@ -5,6 +5,7 @@ import type {
   WorkloadGridCell,
   WorkloadGridData,
   WorkloadSummaryData,
+  WorkloadSummaryMember,
 } from "@utils/tasks";
 import type { WorkloadPriorityFilterValue } from "@page-modules/planner/workload/workloadDomain";
 import { WorkloadBoardPanel } from "./WorkloadBoardPanel";
@@ -12,6 +13,7 @@ import type { WorkloadBoardDropIntent } from "./WorkloadBoardPanel";
 import {
   WorkloadGridPanel,
   WorkloadLegendRow,
+  WorkloadPeriodMembersPanel,
   WorkloadSummaryCardsRow,
 } from "./WorkloadPlannerSubviews";
 
@@ -30,9 +32,9 @@ type WorkloadPlannerDataViewsProps = Readonly<{
   boardDragSaving: boolean;
   onBoardDropIntent: (intent: WorkloadBoardDropIntent) => void;
   onSelectCell: (extension: string, date: string) => void;
-  unassignedCount?: number;
-  completedCount?: number;
-  onOpenUnassigned?: () => void;
+  showWorkloadPerDay: boolean;
+  onToggleWorkloadPerDay: () => void;
+  periodMembers?: WorkloadSummaryMember[];
 }>;
 
 export function WorkloadPlannerDataViews({
@@ -48,9 +50,9 @@ export function WorkloadPlannerDataViews({
   boardDragSaving,
   onBoardDropIntent,
   onSelectCell,
-  unassignedCount,
-  completedCount,
-  onOpenUnassigned,
+  showWorkloadPerDay,
+  onToggleWorkloadPerDay,
+  periodMembers = [],
 }: WorkloadPlannerDataViewsProps) {
   if (loadingMain && enabled) {
     return (
@@ -63,12 +65,7 @@ export function WorkloadPlannerDataViews({
   return (
     <>
       {!loadingMain && enabled && summaryData ? (
-        <WorkloadSummaryCardsRow
-          data={summaryData}
-          unassignedCount={unassignedCount}
-          completedCount={completedCount}
-          onUnassignedClick={onOpenUnassigned}
-        />
+        <WorkloadSummaryCardsRow data={summaryData} />
       ) : null}
 
       {mainView === "board" && priorityFilter !== "all" ? (
@@ -86,13 +83,23 @@ export function WorkloadPlannerDataViews({
 
       {!loadingMain && enabled && mainView === "grid" && gridData && !gridData.empty_team ? (
         <>
-          <WorkloadLegendRow />
-          <WorkloadGridPanel
-            gridData={gridData}
-            cellMap={cellMap}
-            hierarchyExtensions={hierarchyExtensions}
-            onSelectCell={onSelectCell}
+          <WorkloadLegendRow
+            showWorkloadPerDay={showWorkloadPerDay}
+            onToggleWorkloadPerDay={onToggleWorkloadPerDay}
           />
+          {showWorkloadPerDay ? (
+            <WorkloadGridPanel
+              gridData={gridData}
+              cellMap={cellMap}
+              hierarchyExtensions={hierarchyExtensions}
+              onSelectCell={onSelectCell}
+            />
+          ) : (
+            <WorkloadPeriodMembersPanel
+              members={periodMembers}
+              hierarchyExtensions={hierarchyExtensions}
+            />
+          )}
         </>
       ) : null}
 

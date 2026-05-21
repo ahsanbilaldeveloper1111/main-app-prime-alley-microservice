@@ -31,8 +31,9 @@ import { MyDayHistoryModal } from "@components/planner/MyDayHistoryModal";
 import { useHierarchyData } from "@components/filters/useHierarchyData";
 import { formatDateGlobal, ModuleSlug } from "@utils/Helper";
 import {
-  formatCapacityOverageMessage,
+  formatCapacityOverageMessageFromStats,
   formatMyDayHeaderMetaLine,
+  resolveCapacityStatsFromPayload,
   formatRolloverPromptCopy,
   formatSuggestionDueDate,
   getCapacityFillTone,
@@ -41,9 +42,12 @@ import {
   MY_DAY_SUGGESTION_CATEGORY_ORDER,
   readRolloverIgnoreCount,
   readTaskPriorityLabel,
+  readHasEstimateFromRow,
   resolveEstimateMinutesFromRow,
+  normalizeMyDaySuggestionsPayload,
   resolveMyDayReporteeExtensions,
   resolveMyDayTaskCount,
+  shouldShowMyDayTeamSection,
   resolveMyDayUnestimatedCount,
   resolveProjectFromRow,
   resolveShowRolloverPrompt,
@@ -60,6 +64,7 @@ type MyDayTask = {
   priority: string;
   isCompleted: boolean;
   estimateMinutes: number;
+  hasEstimate: boolean;
   projectName: string;
   isPersonalTask: boolean;
   isOrganizationalTask: boolean;
@@ -165,6 +170,16 @@ type MyDayTaskListsSnapshot = Readonly<{
   todayTaskCount: number;
 }>;
 
+function isDeletedRolloverRow(row: unknown): boolean {
+  if (row == null || typeof row !== "object") return false;
+  const record = row as Record<string, unknown>;
+  return (
+    record.is_deleted === true ||
+    record.deleted === true ||
+    (typeof record.deleted_at === "string" && record.deleted_at.length > 0)
+  );
+}
+
 function syncRolloverFromPayload(
   rolloverPayload: MyDayRolloverPayload,
   todayStart: moment.Moment,
@@ -174,8 +189,9 @@ function syncRolloverFromPayload(
   previousDate: string | null;
   showPrompt: boolean;
 }> {
+  const rolloverRows = (rolloverPayload.tasks ?? []).filter((row) => !isDeletedRolloverRow(row));
   return {
-    rolloverTasks: (rolloverPayload.tasks ?? []).map((row) => mapMyDayTaskRow(row, todayStart)),
+    rolloverTasks: rolloverRows.map((row) => mapMyDayTaskRow(row, todayStart)),
     previousDate: rolloverPayload.previous_date ?? null,
     showPrompt: resolveShowRolloverPrompt(rolloverPayload, {
       hasIncompleteTodayTasks: lists.hasIncompleteToday,
@@ -263,6 +279,7 @@ function mapMyDayTaskRow(
   const dueMoment = dueRaw ? moment(dueRaw) : null;
   const isCarryOver = dueMoment?.isValid() === true && dueMoment.isBefore(todayStart, "day");
   const estimate = resolveEstimateMinutesFromRow(row);
+  const hasEstimate = readHasEstimateFromRow(row);
   const project = resolveProjectFromRow(row);
   const ignoreCount = readRolloverIgnoreCount(row);
   const isOrgTask = row.is_org_task === true || project.isOrganizational;
@@ -275,6 +292,7 @@ function mapMyDayTaskRow(
     priority: readTaskPriorityLabel(row.priority),
     isCompleted: row.is_completed === true || row.completed === true,
     estimateMinutes: estimate,
+    hasEstimate,
     projectName: project.label,
     isPersonalTask: project.isPersonal,
     isOrganizationalTask: isOrgTask,
@@ -300,12 +318,15 @@ function collectSuggestionCategories(payload: MyDaySuggestionsPayload): MyDaySug
   const seen = new Set<string>();
   const ordered: MyDaySuggestionCategory[] = [];
   for (const category of MY_DAY_SUGGESTION_CATEGORY_ORDER) {
-    if (!Array.isArray(payload[category])) continue;
+    const rows = payload[category];
+    if (!Array.isArray(rows) || rows.length === 0) continue;
     ordered.push(category);
     seen.add(category);
   }
   for (const key of Object.keys(payload)) {
-    if (seen.has(key) || !Array.isArray(payload[key as MyDaySuggestionCategory])) continue;
+    if (seen.has(key) || key === "flexible_tasks") continue;
+    const rows = payload[key as MyDaySuggestionCategory];
+    if (!Array.isArray(rows) || rows.length === 0) continue;
     ordered.push(key as MyDaySuggestionCategory);
   }
   return ordered;
@@ -356,8 +377,8 @@ function MyDaySuggestedItemButton({
             task.estimateMinutes <= 0 ? "myday-tag--no-estimate" : ""
           }`}
         >
-          {task.estimateMinutes > 0 ? (
-            toMinutesDisplay(task.estimateMinutes)
+          {task.hasEstimate || task.estimateMinutes > 0 ? (
+            toMinutesDisplay(task.estimateMinutes > 0 ? task.estimateMinutes : 0) || "Estimated"
           ) : (
             <span className="myday-tag__no-estimate-text">
               <span className="myday-unestimated-dot" title="No estimate" aria-label="No estimate" />
@@ -378,10 +399,21 @@ function MyDayTaskEstimateSlot({
   task: MyDayTask;
   onEditEstimate?: (task: MyDayTask) => void;
 }>) {
-  if (task.estimateMinutes > 0) {
+  if (task.hasEstimate || task.estimateMinutes > 0) {
+    const label =
+      task.estimateMinutes > 0 ? toMinutesDisplay(task.estimateMinutes) : "Estimated";
     return (
-      <span className="myday-tag myday-tag--estimate">
-        {toMinutesDisplay(task.estimateMinutes)}
+      <span className="myday-tag myday-tag--estimate myday-tag--estimate-has-value">
+        <span>{label}</span>
+        {onEditEstimate && !task.isCompleted ? (
+          <button
+            type="button"
+            className="myday-edit-estimate-btn myday-edit-estimate-btn--inline"
+            onClick={() => onEditEstimate(task)}
+          >
+            Edit
+          </button>
+        ) : null}
       </span>
     );
   }
@@ -463,31 +495,6 @@ function MyDayTaskCard({ task, onToggleComplete, onRemove, onEditEstimate }: MyD
   );
 }
 
-function useMyDayRolloverAck(
-  rolloverShowPrompt: boolean,
-  carryOverTaskCount: number,
-  carryOverMode: MyDayCarryOverMode,
-  refreshMyDayPage: () => Promise<void>,
-): void {
-  const rolloverAckSentRef = useRef(false);
-  useEffect(() => {
-    if (!rolloverShowPrompt) {
-      rolloverAckSentRef.current = false;
-      return;
-    }
-    if (carryOverTaskCount === 0 || carryOverMode !== "pending") {
-      return;
-    }
-    if (rolloverAckSentRef.current) return;
-    rolloverAckSentRef.current = true;
-    void ackMyDayRolloverPrompt()
-      .then(() => refreshMyDayPage())
-      .catch(() => {
-        rolloverAckSentRef.current = false;
-      });
-  }, [carryOverMode, carryOverTaskCount, refreshMyDayPage, rolloverShowPrompt]);
-}
-
 function useMyDayCarryOverSelection(
   carryOverTasks: MyDayTask[],
   setCarryOverMode: React.Dispatch<React.SetStateAction<MyDayCarryOverMode>>,
@@ -514,6 +521,10 @@ function useMyDayTasksPageController() {
     () => resolveMyDayReporteeExtensions(hierarchyDataExtensions, managerExtension),
     [hierarchyDataExtensions, managerExtension],
   );
+  const showMyTeamSection = useMemo(
+    () => shouldShowMyDayTeamSection(hierarchyDataExtensions, managerExtension),
+    [hierarchyDataExtensions, managerExtension],
+  );
   const [tasks, setTasks] = useState<MyDayTask[]>([]);
   const [suggestedTasks, setSuggestedTasks] = useState<SuggestedTask[]>([]);
   const [rolloverTasks, setRolloverTasks] = useState<MyDayTask[]>([]);
@@ -527,6 +538,9 @@ function useMyDayTasksPageController() {
   const [estimateInput, setEstimateInput] = useState("");
   const [pendingEstimateTask, setPendingEstimateTask] = useState<MyDayTask | null>(null);
   const [plannedMinutes, setPlannedMinutes] = useState(0);
+  const [capacityStats, setCapacityStats] = useState(() =>
+    resolveCapacityStatsFromPayload({}, 0, 8 * 60),
+  );
   const [rolloverShowPrompt, setRolloverShowPrompt] = useState(false);
   const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [planDate, setPlanDate] = useState("");
@@ -588,11 +602,16 @@ function useMyDayTasksPageController() {
       suggestionsRequestRef.current = requestId;
       setSuggestionsLoading(true);
       try {
+        const searchTerm = search.trim();
         const suggestionsPayload = await getMyDaySuggestions(
-          search ? { search } : {},
+          searchTerm ? { search: searchTerm } : {},
         );
         if (requestId !== suggestionsRequestRef.current) return;
-        setSuggestedTasks(buildSuggestionsFromPayload(suggestionsPayload));
+        const normalized = normalizeMyDaySuggestionsPayload(suggestionsPayload, {
+          todayStart,
+          hasSearch: searchTerm.length > 0,
+        });
+        setSuggestedTasks(buildSuggestionsFromPayload(normalized));
       } catch {
         if (requestId !== suggestionsRequestRef.current) return;
         setSuggestedTasks([]);
@@ -605,16 +624,28 @@ function useMyDayTasksPageController() {
     [buildSuggestionsFromPayload],
   );
 
-  const applyCapacityFromApi = useCallback((capacityPayload: MyDayCapacityPayload) => {
-    const effective = Number(capacityPayload.effective_capacity_minutes ?? 0);
-    if (effective > 0) {
-      setCapacityMinutes(effective);
-    }
-    const planned = Number(capacityPayload.planned_minutes);
-    if (Number.isFinite(planned)) {
-      setPlannedMinutes(Math.max(0, planned));
-    }
-  }, []);
+  const applyCapacityFromApi = useCallback(
+    (capacityPayload: MyDayCapacityPayload, fallbackCapacityMinutes?: number) => {
+      const effectiveRaw = Number(capacityPayload.effective_capacity_minutes ?? 0);
+      const fallback = fallbackCapacityMinutes ?? 8 * 60;
+      const resolvedEffective = effectiveRaw > 0 ? effectiveRaw : fallback;
+      const planned = Number(capacityPayload.planned_minutes);
+      const resolvedPlanned = Number.isFinite(planned) ? Math.max(0, planned) : 0;
+
+      setCapacityMinutes(resolvedEffective);
+      if (Number.isFinite(planned)) {
+        setPlannedMinutes(resolvedPlanned);
+      }
+      setCapacityStats(
+        resolveCapacityStatsFromPayload(
+          capacityPayload,
+          resolvedPlanned,
+          resolvedEffective,
+        ),
+      );
+    },
+    [],
+  );
 
   const fetchCoreMyDayData = useCallback(async () => {
     try {
@@ -635,11 +666,14 @@ function useMyDayTasksPageController() {
       const defaultCapacity = Number(preferences.daily_capacity_minutes ?? 0);
       const resolvedDefault = defaultCapacity > 0 ? defaultCapacity : 8 * 60;
       setDefaultCapacityMinutes(resolvedDefault);
-      applyCapacityFromApi({
-        ...capacityPayload,
-        effective_capacity_minutes:
-          Number(capacityPayload.effective_capacity_minutes ?? 0) || resolvedDefault,
-      });
+      applyCapacityFromApi(
+        {
+          ...capacityPayload,
+          effective_capacity_minutes:
+            Number(capacityPayload.effective_capacity_minutes ?? 0) || resolvedDefault,
+        },
+        resolvedDefault,
+      );
 
       const rollover = syncRolloverFromPayload(rolloverPayload, todayStart, lists);
       setRolloverTasks(rollover.rolloverTasks);
@@ -694,13 +728,15 @@ function useMyDayTasksPageController() {
     [rolloverTasks],
   );
 
-  useMyDayRolloverAck(
-    rolloverShowPrompt,
-    carryOverTasks.length,
-    carryOverMode,
-    refreshMyDayPage,
-  );
   useMyDayCarryOverSelection(carryOverTasks, setCarryOverMode, setSelectedCarryOverIds);
+
+  const persistRolloverAck = useCallback(async () => {
+    try {
+      await ackMyDayRolloverPrompt();
+    } catch {
+      /* prompt may still show on next load if ack fails */
+    }
+  }, []);
 
   const visibleTasks = useMemo(() => {
     if (carryOverMode === "added") return tasks;
@@ -712,16 +748,6 @@ function useMyDayTasksPageController() {
   const activeTasks = useMemo(
     () => visibleTasks.filter((task) => !task.isCompleted),
     [visibleTasks],
-  );
-
-  const organizationalActiveTasks = useMemo(
-    () => activeTasks.filter((task) => task.isOrganizationalTask),
-    [activeTasks],
-  );
-
-  const standardActiveTasks = useMemo(
-    () => activeTasks.filter((task) => !task.isOrganizationalTask),
-    [activeTasks],
   );
 
   const unestimatedActiveCount = useMemo(
@@ -741,14 +767,18 @@ function useMyDayTasksPageController() {
 
   const summary = useMemo(() => {
     const planned = resolveMyDayCapacityUsedMinutes(tasks, plannedMinutes);
-    const plannedPct = Math.round((planned / Math.max(1, capacityMinutes)) * 100);
+    const plannedPct =
+      capacityStats.capacityUsedPercent != null
+        ? Math.round(capacityStats.capacityUsedPercent)
+        : Math.round((planned / Math.max(1, capacityMinutes)) * 100);
     const capacityTone = getCapacityFillTone(Math.min(100, plannedPct));
-    return { planned, plannedPct, capacityTone };
-  }, [capacityMinutes, plannedMinutes, tasks]);
+    return { planned, plannedPct, capacityTone, displayPct: plannedPct };
+  }, [capacityMinutes, capacityStats.capacityUsedPercent, plannedMinutes, tasks]);
 
   const capacityOverageMessage = useMemo(
-    () => formatCapacityOverageMessage(summary.planned, capacityMinutes),
-    [capacityMinutes, summary.planned],
+    () =>
+      formatCapacityOverageMessageFromStats(capacityStats, summary.planned, capacityMinutes),
+    [capacityMinutes, capacityStats, summary.planned],
   );
 
   const groupedSuggestions = useMemo(
@@ -976,13 +1006,14 @@ function useMyDayTasksPageController() {
       submitMyDayRolloverAction({
         task_ids: selectedCarryOverIds,
         action: "dismiss",
-      }).then(() => {
+      }).then(async () => {
         setCarryOverMode("skipped");
         setRolloverShowPrompt(false);
+        await persistRolloverAck();
         return refreshMyDayPage();
       }),
     );
-  }, [refreshMyDayPage, selectedCarryOverIds]);
+  }, [persistRolloverAck, refreshMyDayPage, selectedCarryOverIds]);
 
   const handleCarryOverScheduleLater = useCallback(() => {
     if (!scheduleLaterDate) {
@@ -994,27 +1025,29 @@ function useMyDayTasksPageController() {
         task_ids: selectedCarryOverIds,
         action: "schedule",
         schedule_date: scheduleLaterDate,
-      }).then(() => {
+      }).then(async () => {
         setShowScheduleLaterModal(false);
         setCarryOverMode("skipped");
         setRolloverShowPrompt(false);
+        await persistRolloverAck();
         return refreshMyDayPage();
       }),
     );
-  }, [refreshMyDayPage, scheduleLaterDate, selectedCarryOverIds]);
+  }, [persistRolloverAck, refreshMyDayPage, scheduleLaterDate, selectedCarryOverIds]);
 
   const handleCarryOverApply = useCallback(() => {
     swallowAsyncError(
       submitMyDayRolloverAction({
         task_ids: selectedCarryOverIds,
         action: "today",
-      }).then(() => {
+      }).then(async () => {
         setCarryOverMode("added");
         setRolloverShowPrompt(false);
+        await persistRolloverAck();
         return refreshMyDayPage();
       }),
     );
-  }, [refreshMyDayPage, selectedCarryOverIds]);
+  }, [persistRolloverAck, refreshMyDayPage, selectedCarryOverIds]);
 
   const handleSaveDefaultCapacity = useCallback(async () => {
     const parsed = parseCapacityDurationInput(defaultCapacityDraft);
@@ -1027,12 +1060,15 @@ function useMyDayTasksPageController() {
       setDefaultCapacityMinutes(parsed);
       setShowDefaultCapacityModal(false);
       const capacityPayload = await getMyDayCapacity({ date: today });
-      applyCapacityFromApi({
-        ...capacityPayload,
-        effective_capacity_minutes:
-          Number(capacityPayload.effective_capacity_minutes ?? 0) || parsed,
-        default_capacity_minutes: parsed,
-      });
+      applyCapacityFromApi(
+        {
+          ...capacityPayload,
+          effective_capacity_minutes:
+            Number(capacityPayload.effective_capacity_minutes ?? 0) || parsed,
+          default_capacity_minutes: parsed,
+        },
+        parsed,
+      );
       await refreshTasksAndRollover();
       await fetchSuggestions(debouncedSuggestedSearch).catch(() => undefined);
       toast.success("Default daily capacity saved");
@@ -1078,7 +1114,7 @@ function useMyDayTasksPageController() {
           minutes: parsed,
           for_date: today,
         });
-        applyCapacityFromApi(capacityPayload);
+        applyCapacityFromApi(capacityPayload, defaultCapacityMinutes);
         setIsEditingCapacity(false);
         await refreshTasksAndRollover();
         await fetchSuggestions(debouncedSuggestedSearch).catch(() => undefined);
@@ -1128,6 +1164,7 @@ function useMyDayTasksPageController() {
   return {
     managerExtension,
     reporteeExtensions,
+    showMyTeamSection,
     hierarchyDataExtensions,
     loading,
     capacityMinutes,
@@ -1167,8 +1204,6 @@ function useMyDayTasksPageController() {
     today,
     myDayTaskIds,
     activeTasks,
-    organizationalActiveTasks,
-    standardActiveTasks,
     unestimatedActiveCount,
     completedTasks,
     completedTasksCount,
@@ -1249,7 +1284,7 @@ function MyDayCapacitySection({ vm }: MyDayTasksPageViewProps) {
           </span>
         </div>
         <div className="myday-capacity-side">
-          <span className="myday-capacity-pct-inline">{vm.summary.plannedPct}%</span>
+          <span className="myday-capacity-pct-inline">{vm.summary.displayPct}%</span>
           <button
             type="button"
             className="btn btn-link btn-sm myday-default-capacity-btn"
@@ -1352,7 +1387,7 @@ function MyDayRolloverSection({ vm }: MyDayTasksPageViewProps) {
           Schedule later
         </button>
         <button type="button" onClick={vm.handleCarryOverSkip}>
-          Handle later
+          Handle them later
         </button>
       </div>
     </div>
@@ -1409,17 +1444,7 @@ function MyDayTodayTasksSection({ vm }: MyDayTasksPageViewProps) {
       {showEmpty ? (
         <p className="myday-empty-state">{resolveTodayEmptyMessage(vm.isEmptyByDesign)}</p>
       ) : null}
-      <MyDayTaskList tasks={vm.standardActiveTasks} handlers={handlers} />
-      {vm.organizationalActiveTasks.length > 0 ? (
-        <>
-          <div className="myday-section-title myday-section-title--nested">Organizational Tasks</div>
-          <MyDayTaskList
-            tasks={vm.organizationalActiveTasks}
-            handlers={handlers}
-            keyPrefix="org-"
-          />
-        </>
-      ) : null}
+      <MyDayTaskList tasks={vm.activeTasks} handlers={handlers} />
     </div>
   );
 }
@@ -1615,7 +1640,7 @@ function MyDayTasksPageModals({ vm }: MyDayTasksPageViewProps) {
 }
 
 function MyDayTasksPageView({ vm }: MyDayTasksPageViewProps) {
-  const showTeam = vm.reporteeExtensions.length > 0;
+  const showTeam = vm.showMyTeamSection;
   return (
     <div className="myday-page-shell">
       <BreadcrumbItem mainTitle="Planner" mainLink="/planner/dashboard" subTitle="My Day" />
@@ -1625,7 +1650,7 @@ function MyDayTasksPageView({ vm }: MyDayTasksPageViewProps) {
           <MyDayCapacitySection vm={vm} />
           <MyDayRolloverSection vm={vm} />
           <MyDayTodayTasksSection vm={vm} />
-          {showTeam ? (
+          {showTeam && vm.reporteeExtensions.length > 0 ? (
             <MyDayTeamSection
               planDate={vm.planDate || vm.today}
               managerExtension={vm.managerExtension}
