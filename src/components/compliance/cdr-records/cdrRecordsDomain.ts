@@ -8,6 +8,7 @@ export interface CDRRecord {
   CalledNumber: string;
   UserID: string;
   AllowRepetitiveCalls: string;
+  AllowLocalDNCLCalls: string;
   IndividualRepetitiveCallsAllowDaily: string;
   IndividualRepetitiveCallsAllowWeekly: string;
   CallRepFollowCompSettings: string;
@@ -122,6 +123,7 @@ export interface MappedCDRRecord {
   called: string;
   userId: string;
   localDND: string;
+  allowLocalDncl: string;
   repetition: string;
   time: string;
   allowRepetition: string;
@@ -357,6 +359,7 @@ export function mapCdrRecordToUI(record: CDRRecord): MappedCDRRecord {
     called: record.CalledNumber || "",
     userId: record.UserID || "",
     localDND: record.LocalDNDStatus,
+    allowLocalDncl: record.AllowLocalDNCLCalls ?? "",
     repetition: mapRepetitionStatus(record.CallRepetitionStatus),
     time: record.TotalTimeTakenMs?.toFixed(2) || "0",
     allowRepetition: record.AllowRepetitiveCalls,

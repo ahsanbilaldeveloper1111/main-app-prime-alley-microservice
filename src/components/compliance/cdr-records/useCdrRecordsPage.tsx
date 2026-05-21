@@ -471,6 +471,12 @@ export function useCdrRecordsPage(): CdrRecordsPageViewModel {
         ),
       },
       {
+        key: "allowLocalDncl",
+        label: "ALLOW LOCAL DNCL",
+        type: "text",
+        sortable: false,
+      },
+      {
         key: "repetition",
         label: "REPETITION",
         type: "custom",
