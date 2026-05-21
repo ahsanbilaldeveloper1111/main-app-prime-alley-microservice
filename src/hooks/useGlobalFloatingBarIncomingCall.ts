@@ -1,7 +1,9 @@
 import { useEffect, useRef, type MutableRefObject, type Dispatch, type SetStateAction } from "react";
 import {
+  findIncomingCalleePartyFromCtiEvent,
   isDuplicateRingingEventForOpenModal,
   shouldCloseIncomingModalOnCallEndEvent,
+  type CtiEventPartyForIncoming,
 } from "@utils/incomingCallMatching";
 
 /** Ref object for incoming-call auto-dismiss timer (avoid React's MutableRefObject import for Sonar/deprecation). */
@@ -24,18 +26,9 @@ type DnsMapShape = Record<
   { devices?: Record<string, { terminalState?: string; deviceName?: string; deviceType?: string }> } | undefined
 >;
 
-type EventParty = {
-  callId?: string;
-  callingAddress?: string;
-  calledAddress?: string;
-  controllerAddress?: string;
-  controllerDeviceName?: string;
-  controllerDeviceType?: string;
-};
-
 type LogEvent = {
   eventType?: string;
-  parties?: EventParty[];
+  parties?: CtiEventPartyForIncoming[];
 };
 
 export function clearFloatingBarIncomingTimer(timerRef: FloatingBarIncomingTimerRef) {
@@ -98,7 +91,7 @@ const INCOMING_SESSION_AUTO_CLOSE_EVENT_TYPES = new Set([
 ]);
 
 function isRingingDuplicateForOpenModal(
-  eventData: EventParty,
+  eventData: CtiEventPartyForIncoming,
   cur: FloatingBarIncomingCallState | null,
   showIncomingCallModal: boolean
 ): boolean {
@@ -127,14 +120,14 @@ type IncomingDeps = {
 
 function handleIncomingCallEventBranch(args: {
   latestEvent: LogEvent;
-  eventData: EventParty | undefined;
+  eventData: CtiEventPartyForIncoming | undefined;
   userAddress: string;
   logTailIndex: number;
   lastIncomingOpenLogIndexRef: MutableRefObject<number>;
   deps: IncomingDeps;
 }): boolean {
   const { latestEvent, eventData, userAddress, logTailIndex, lastIncomingOpenLogIndexRef, deps } = args;
-  if (latestEvent.eventType !== "INCOMING_CALL" || eventData?.calledAddress !== userAddress) {
+  if (latestEvent.eventType !== "INCOMING_CALL" || !eventData) {
     return false;
   }
   if (logTailIndex <= lastIncomingOpenLogIndexRef.current) {
@@ -162,7 +155,7 @@ function handleIncomingCallEventBranch(args: {
 
 function handleRingingEventBranch(args: {
   latestEvent: LogEvent;
-  eventData: EventParty | undefined;
+  eventData: CtiEventPartyForIncoming | undefined;
   userAddress: string;
   logTailIndex: number;
   dnsMap: DnsMapShape | undefined;
@@ -182,7 +175,7 @@ function handleRingingEventBranch(args: {
     incomingCallRef,
     deps,
   } = args;
-  if (latestEvent.eventType !== "RINGING" || eventData?.calledAddress !== userAddress) {
+  if (latestEvent.eventType !== "RINGING" || !eventData) {
     return false;
   }
   if (logTailIndex <= lastIncomingOpenLogIndexRef.current) {
@@ -283,7 +276,11 @@ export function useGlobalFloatingBarIncomingCall({
     const latestEvent = eventLog.at(-1);
     if (!latestEvent) return;
 
-    const eventData = latestEvent.parties?.[0];
+    const eventData = findIncomingCalleePartyFromCtiEvent(
+      latestEvent.parties,
+      userAddress,
+      latestEvent.eventType,
+    );
     const incomingDeps: IncomingDeps = {
       setIncomingCall,
       setIncomingCallContext,

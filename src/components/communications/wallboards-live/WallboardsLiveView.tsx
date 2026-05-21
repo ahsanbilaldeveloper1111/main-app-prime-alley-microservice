@@ -26,6 +26,7 @@ import {
   monitoringPayloadDiffersFromActive,
   pickBestMonitoringPayloadFromCallStateMap,
   isWallboardRemoteSupervisionSessionActive,
+  monitoredAgentCustomerConversationLiveInCallStateMap,
   resolveEffectiveWallboardMonitoring,
   shouldBlockMonitoringRefillDueToSuppression,
   registeredEntriesFromDevices,
@@ -35,7 +36,7 @@ import {
 import {
   categorizeDns as categorizeDnsHelper,
   dnHasActiveCallForWallboard,
-  isDnInActiveCall as isDnInActiveCallHelper,
+  isDnEligibleForCtiMonitoring,
 } from '@components/live-calls/utils/helpers'
 import type { MonitoringTeardownHint } from '@components/live-calls/utils/types'
 import { resolveWallboardDisplayCall } from '@components/communications/wallboards-live/wallboardEventParsing'
@@ -827,12 +828,32 @@ const WallboardsLiveView: React.FC = () => {
     }
   }, [eventLog, activeMonitoring.dn, activeMonitoring.deviceName, activeMonitoring.monitor, clearMonitoringState])
 
-  // Auto-clear monitoring state when call ends
+  // Auto-clear monitoring state when the monitored agent's conversation ends (e.g. hang-up from Jabber)
   useEffect(() => {
-    if (!activeMonitoring.dn || !activeMonitoring.deviceName || !isInitialized || !dnsMap) return
+    if (!activeMonitoring.dn || !isInitialized || !dnsMap) return
 
     const monitoredDn = activeMonitoring.dn
+    const monitorDn = activeMonitoring.monitor
+    const map = callStateMap as Record<string, unknown> | undefined
+
+    if (map && monitorDn) {
+      if (
+        monitoredAgentCustomerConversationLiveInCallStateMap(
+          map,
+          monitoredDn,
+          monitorDn,
+        )
+      ) {
+        return
+      }
+      clearMonitoringState(monitoredDn, 'call ended')
+      return
+    }
+
     const monitoredDeviceName = activeMonitoring.deviceName
+    if (!monitoredDeviceName) {
+      return
+    }
 
     const isCallActive = (call: { isTerminating?: boolean; parties?: Array<{ callStatus?: string }> } | null) =>
       Boolean(
@@ -863,7 +884,15 @@ const WallboardsLiveView: React.FC = () => {
     }
 
     clearMonitoringState(monitoredDn, 'call ended')
-  }, [activeMonitoring, dnsMap, isInitialized, getCallStateForDevice, getDnCallState, clearMonitoringState])
+  }, [
+    activeMonitoring,
+    callStateMap,
+    dnsMap,
+    isInitialized,
+    getCallStateForDevice,
+    getDnCallState,
+    clearMonitoringState,
+  ])
 
   useEffect(() => {
     if (!monitoringTeardown) {
@@ -1048,15 +1077,8 @@ const WallboardsLiveView: React.FC = () => {
     return ok
   }
 
-  const isDnInActiveCall = (dn: string) => {
-    return isDnInActiveCallHelper(
-      dn,
-      getWallboardCallForDn,
-      getCallStatesForDn,
-      effectiveMonitoring,
-      monitoringTeardown,
-    )
-  }
+  const isDnInActiveCall = (dn: string) =>
+    isDnEligibleForCtiMonitoring(dn, getCallStatesForDn, getWallboardCallForDn)
 
 
 
