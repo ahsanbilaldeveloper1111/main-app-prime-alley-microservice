@@ -15,7 +15,6 @@ export interface ApiNumberCheckResultsSectionProps {
   tableData: NumberCheckTableRow[];
   tableColumns: TableColumn<NumberCheckTableRow>[];
   isChecking: boolean;
-  isUploading: boolean;
 }
 
 export function ApiNumberCheckResultsSection(
@@ -30,7 +29,6 @@ export function ApiNumberCheckResultsSection(
     tableData,
     tableColumns,
     isChecking,
-    isUploading,
   } = props;
 
   return (
@@ -67,14 +65,14 @@ export function ApiNumberCheckResultsSection(
             showActions={false}
             showToolbar={false}
             showToolbarActions={false}
-            loading={isChecking || isUploading}
+            loading={isChecking}
             loadingMessage="Loading results..."
-            emptyMessage='No results yet. Enter phone numbers and click Check Numbers to see results.'
+            emptyMessage='No results yet. Enter a phone number and click Check Number to see results.'
           />
         ) : (
           <div className="apiNumberCheck-emptyResults">
-            No results yet. Enter phone numbers and click &quot;Check
-            Numbers&quot; to see results.
+            No results yet. Enter a phone number and click &quot;Check
+            Number&quot; to see results.
           </div>
         )}
       </div>

@@ -42,13 +42,13 @@ const DNCRIndex = () => {
                             <div className="mb-3">
                                 <i className="fas fa-upload fa-3x text-success"></i>
                             </div>
-                            <Card.Title>CDR Records</Card.Title>
+                            <Card.Title>Compliance Analytics</Card.Title>
                             <Card.Text>
                                 Upload CSV files to check multiple phone numbers at once.
                             </Card.Text>
                             <Link href="/compliance/cdr-records" passHref>
                                 <Button variant="success" className="w-100">
-                                    CDR Records
+                                    Compliance Analytics
                                 </Button>
                             </Link>
                         </Card.Body>
@@ -61,13 +61,13 @@ const DNCRIndex = () => {
                             <div className="mb-3">
                                 <i className="fas fa-chart-bar fa-3x text-info"></i>
                             </div>
-                            <Card.Title>Add Records</Card.Title>
+                            <Card.Title>Add Local DND</Card.Title>
                             <Card.Text>
                                 Add records to the Compliance database.
                             </Card.Text>
                             <Link href="/compliance/add-records" passHref>
                                 <Button variant="info" className="w-100">
-                                    Add Records
+                                    Add Local DND
                                 </Button>
                             </Link>
                         </Card.Body>

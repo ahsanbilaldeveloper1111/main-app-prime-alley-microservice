@@ -21,11 +21,9 @@ import {
   CDR_REPETITION_STATUS_CHOICES,
   computeCdrAggregatedStats,
   createDefaultCdrAppliedFilters,
-  DNCR_API_STATUS_LABELS,
   formatCdrFilterDatetimeForDisplay,
   getCdrDefaultDateFromLocal,
   getCdrDefaultDateToLocal,
-  getDncrTone,
   getTriStateTone,
   mapCdrRecordToUI,
   type CDRRecord,
@@ -57,7 +55,6 @@ export function useCdrRecordsPage(): CdrRecordsPageViewModel {
   const [userIdFilter, setUserIdFilter] = useState("");
   const [repetitionStatusFilter, setRepetitionStatusFilter] = useState("");
   const [localDndStatusFilter, setLocalDndStatusFilter] = useState("");
-  const [dncrApiStatusFilter, setDncrApiStatusFilter] = useState("");
 
   const [dateFromFilter, setDateFromFilter] = useState(getCdrDefaultDateFromLocal);
   const [dateToFilter, setDateToFilter] = useState(getCdrDefaultDateToLocal);
@@ -135,11 +132,6 @@ export function useCdrRecordsPage(): CdrRecordsPageViewModel {
         subtitle: `Blocked: ${stats.repetitionNotAllowed || 0} · Not Checked: ${stats.repetitionNotChecked || 0}`,
       },
       {
-        title: "DNCR API — Allowed",
-        value: stats.dncrApiFalse || 0,
-        subtitle: `Blocked: ${stats.dncrApiTrue || 0} · Not Checked: ${stats.dncrApiNotChecked || 0}`,
-      },
-      {
         title: "Avg Response Time",
         value: `${(stats.avgTime || 0).toFixed(1)}ms`,
         subtitle: `Min ${(stats.minTime || 0).toFixed(1)}ms / Max ${(stats.maxTime || 0).toFixed(1)}ms`,
@@ -152,7 +144,7 @@ export function useCdrRecordsPage(): CdrRecordsPageViewModel {
     () => [
       {
         id: "cdr-records",
-        label: "CDR Records",
+        label: "Compliance Analytics",
         count: totalRecords,
         removable: false,
       },
@@ -168,7 +160,6 @@ export function useCdrRecordsPage(): CdrRecordsPageViewModel {
       user_id: userIdFilter.trim(),
       call_repetition_status: repetitionStatusFilter,
       local_dnd_status: localDndStatusFilter,
-      dncr_api_status: dncrApiStatusFilter,
       date_from: dateFromFilter.trim() || getCdrDefaultDateFromLocal(),
       date_to: dateToFilter.trim() || getCdrDefaultDateToLocal(),
     });
@@ -180,7 +171,6 @@ export function useCdrRecordsPage(): CdrRecordsPageViewModel {
     userIdFilter,
     repetitionStatusFilter,
     localDndStatusFilter,
-    dncrApiStatusFilter,
     dateFromFilter,
     dateToFilter,
   ]);
@@ -192,7 +182,6 @@ export function useCdrRecordsPage(): CdrRecordsPageViewModel {
     setUserIdFilter("");
     setRepetitionStatusFilter("");
     setLocalDndStatusFilter("");
-    setDncrApiStatusFilter("");
     setDateFromFilter(getCdrDefaultDateFromLocal());
     setDateToFilter(getCdrDefaultDateToLocal());
     setAppliedFilters(createDefaultCdrAppliedFilters());
@@ -224,19 +213,6 @@ export function useCdrRecordsPage(): CdrRecordsPageViewModel {
         setLocalDndStatusFilter,
       ),
     [localDndStatusFilter],
-  );
-
-  const dncrApiFilterOptions = useMemo(
-    () =>
-      buildCdrFilterPillDropdownOptions(
-        "All Statuses",
-        Object.entries(DNCR_API_STATUS_LABELS)
-          .filter(([key]) => key !== "")
-          .map(([value, label]) => ({ label, value })),
-        dncrApiStatusFilter,
-        setDncrApiStatusFilter,
-      ),
-    [dncrApiStatusFilter],
   );
 
   const callingDropdownContent = useMemo(
@@ -389,13 +365,6 @@ export function useCdrRecordsPage(): CdrRecordsPageViewModel {
         dropdownOptions: localDndFilterOptions,
         onClearExtra: () => setLocalDndStatusFilter(""),
       }),
-      makeFilterPill("cdr-dncr", "DNCR API", "dncr_api_status", {
-        draftValue: dncrApiStatusFilter,
-        dropdownOptions: dncrApiFilterOptions,
-        searchable: true,
-        formatActiveLabel: (v) => DNCR_API_STATUS_LABELS[v] || v,
-        onClearExtra: () => setDncrApiStatusFilter(""),
-      }),
       makeFilterPill("cdr-date-from", "Date From", "date_from", {
         draftValue: dateFromFilter,
         dropdownContent: dateFromDropdownContent,
@@ -417,7 +386,6 @@ export function useCdrRecordsPage(): CdrRecordsPageViewModel {
       userIdFilter,
       repetitionStatusFilter,
       localDndStatusFilter,
-      dncrApiStatusFilter,
       dateFromFilter,
       dateToFilter,
       callingDropdownContent,
@@ -427,7 +395,6 @@ export function useCdrRecordsPage(): CdrRecordsPageViewModel {
       dateToDropdownContent,
       repetitionFilterOptions,
       localDndFilterOptions,
-      dncrApiFilterOptions,
     ],
   );
 
@@ -475,7 +442,6 @@ export function useCdrRecordsPage(): CdrRecordsPageViewModel {
 
   const cdrColumns = useMemo<TableColumn<MappedCDRRecord>[]>(
     () => [
-      { key: "id", label: "ID", type: "text", sortable: false },
       { key: "dateTime", label: "DATE/TIME", type: "text", sortable: false },
       {
         key: "calling",
@@ -514,15 +480,6 @@ export function useCdrRecordsPage(): CdrRecordsPageViewModel {
             text={row.repetition}
             tone={getTriStateTone(row.repetition, "Allowed", "Not Checked")}
           />
-        ),
-      },
-      {
-        key: "dncrApi",
-        label: "DNCR API",
-        type: "custom",
-        sortable: false,
-        render: (row) => (
-          <CdrToneBadge text={row.dncrApi} tone={getDncrTone(row.dncrApi)} />
         ),
       },
       { key: "time", label: "TIME (MS)", type: "text", sortable: false },

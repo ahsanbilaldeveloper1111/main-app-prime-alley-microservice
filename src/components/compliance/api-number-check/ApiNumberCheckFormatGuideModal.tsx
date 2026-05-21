@@ -1,19 +1,18 @@
 import React from "react";
 import { Modal } from "react-bootstrap";
-import { Edit3, HelpCircle, Upload } from "lucide-react";
+import { Edit3, HelpCircle } from "lucide-react";
 
 import "./apiNumberCheckPage.scss";
 
 export interface ApiNumberCheckFormatGuideModalProps {
   show: boolean;
   onHide: () => void;
-  canBulkCheckDncr: boolean;
 }
 
 export function ApiNumberCheckFormatGuideModal(
   props: Readonly<ApiNumberCheckFormatGuideModalProps>,
 ): React.ReactElement {
-  const { show, onHide, canBulkCheckDncr } = props;
+  const { show, onHide } = props;
   return (
     <Modal show={show} onHide={onHide} centered size="lg">
       <Modal.Header closeButton>
@@ -38,10 +37,7 @@ export function ApiNumberCheckFormatGuideModal(
                   Each number must be exactly <strong>10 digits</strong> total
                 </li>
                 <li>
-                  Separate multiple numbers with <strong>comma</strong>
-                </li>
-                <li>
-                  Maximum <strong>10 numbers</strong> allowed per check
+                  Enter <strong>one number</strong> per check
                 </li>
                 <li>
                   Non-digit characters (spaces, dashes) are automatically
@@ -53,46 +49,11 @@ export function ApiNumberCheckFormatGuideModal(
                   Example:
                 </strong>
                 <code className="apiNumberCheck-guideCode">
-                  0512345678, 0598765432, 0555555555
+                  0512345678
                 </code>
               </div>
             </div>
           </div>
-
-          {canBulkCheckDncr && (
-            <div>
-              <h5 className="apiNumberCheck-guideBlockTitle">
-                <Upload size={18} />
-                CSV File Format
-              </h5>
-              <div className="apiNumberCheck-guidePanel">
-                <ul className="apiNumberCheck-guideList">
-                  <li>
-                    File must be in <strong>CSV format</strong> (.csv extension)
-                  </li>
-                  <li>First column should contain phone numbers</li>
-                  <li>
-                    Numbers must start with <strong>&quot;05&quot;</strong> and
-                    be exactly <strong>10 digits</strong>
-                  </li>
-                  <li>Each row represents one phone number</li>
-                  <li>Header row is optional (will be skipped if present)</li>
-                  <li>Maximum file size and row limits may apply</li>
-                </ul>
-                <div className="apiNumberCheck-guideExample">
-                  <strong className="apiNumberCheck-guideExampleLabel">
-                    Example CSV:
-                  </strong>
-                  <code className="apiNumberCheck-guideCodeBlock">
-                    {`Phone Number
-0512345678
-0598765432
-0555555555`}
-                  </code>
-                </div>
-              </div>
-            </div>
-          )}
 
           <div className="apiNumberCheck-guideWarning">
             <h6 className="apiNumberCheck-guideWarningTitle">

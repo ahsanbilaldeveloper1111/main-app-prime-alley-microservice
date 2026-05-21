@@ -1,5 +1,4 @@
 import { toast } from "react-toastify";
-import { CheckNumbers } from "@utils/dncr";
 
 export interface PhoneResult {
   input: string;
@@ -34,14 +33,7 @@ export interface ApiResultItem {
   details?: ApiResultDetails;
 }
 
-export interface BatchApiResponse {
-  results?: Record<string, ApiResultItem>;
-}
-
-export const MAX_MANUAL_NUMBERS = 10;
-export const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024;
-export const BULK_DNCR_PERMISSION_TOAST =
-  "You do not have permission for bulk DNCR checks.";
+export const MAX_MANUAL_NUMBERS = 1;
 
 export function normalizeDigits(value: string): string {
   return value.replaceAll(/\D/g, "");
@@ -51,8 +43,7 @@ export function parsePhoneNumbers(input: string): string[] {
   return input
     .split(/[,\n]/)
     .map((num) => num.trim())
-    .filter((num) => num.length > 0)
-    .slice(0, MAX_MANUAL_NUMBERS);
+    .filter((num) => num.length > 0);
 }
 
 export function isValidPhoneNumber(phoneNumber: string): boolean {
@@ -151,50 +142,29 @@ export async function runManualNumberCheck(
   checkSingleNumber: (phoneNumber: string) => Promise<PhoneResult>,
 ): Promise<PhoneResult[] | null> {
   if (!manualInput.trim()) {
-    toast.error("Please enter at least one phone number");
+    toast.error("Please enter a phone number");
     return null;
   }
 
   const phoneNumbers = parsePhoneNumbers(manualInput);
   if (phoneNumbers.length === 0) {
-    toast.error("Please enter valid phone numbers");
+    toast.error("Please enter a phone number");
     return null;
   }
 
   if (phoneNumbers.length > MAX_MANUAL_NUMBERS) {
-    toast.error("Maximum 10 numbers allowed");
+    toast.error("Only one number can be checked at a time");
     return null;
   }
 
-  const invalidNumbers = phoneNumbers.filter((phoneNumber) => !isValidPhoneNumber(phoneNumber));
-  if (invalidNumbers.length > 0) {
+  const phoneNumber = phoneNumbers[0];
+  if (!isValidPhoneNumber(phoneNumber)) {
     toast.error(
-      `Invalid phone numbers: ${invalidNumbers.join(", ")}. Numbers must start with "05" and be exactly 10 digits.`,
+      'Invalid phone number. Numbers must start with "05" and be exactly 10 digits.',
     );
     return null;
   }
 
-  if (phoneNumbers.length === 1) {
-    const result = await checkSingleNumber(phoneNumbers[0]);
-    return [result];
-  }
-
-  const apiResponse = await CheckNumbers(phoneNumbers);
-  if (!apiResponse || apiResponse === false) {
-    return phoneNumbers.map((phoneNumber) => createErrorResult(phoneNumber, "API request failed"));
-  }
-
-  const responseObj = apiResponse as BatchApiResponse;
-  if (!responseObj.results || typeof responseObj.results !== "object") {
-    return phoneNumbers.map((phoneNumber) =>
-      createErrorResult(phoneNumber, "Unexpected response format"),
-    );
-  }
-
-  return phoneNumbers.map((phoneNumber) => {
-    const result = responseObj.results?.[phoneNumber];
-    return result
-      ? transformCheckResult(phoneNumber, result)
-      : createErrorResult(phoneNumber, "No result found for this number");
-  });
+  const result = await checkSingleNumber(phoneNumber);
+  return [result];
 }

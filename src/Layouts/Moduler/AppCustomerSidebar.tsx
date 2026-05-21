@@ -819,14 +819,14 @@ const ApplicationCustomerSidebar: React.FC = () => {
         },
         {
           id: "compliance-cdr-records",
-          title: "CDR Records",
+          title: "Compliance Analytics",
           icon: <FileText size={16} />,
           permission: PERMISSIONS.VIEW_CDR_DNCR,
           url: "/compliance/cdr-records",
         },
         {
           id: "dncr-local-dnd-call-block",
-          title: "Add Records",
+          title: "Add Local DND",
           icon: <PhoneCall size={16} />,
           permission: PERMISSIONS.VIEW_LOCAL_DND_CALL_BLOCK_DNCR,
           url: "/compliance/add-records",
