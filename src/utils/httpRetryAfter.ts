@@ -2,6 +2,20 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
 
+/** Linear trim of leading/trailing slashes (no regex — avoids ReDoS on URL paths). */
+function trimPathSlashes(path: string, maxLen = 2048): string {
+  const bounded = path.length > maxLen ? path.slice(0, maxLen) : path;
+  let start = 0;
+  let end = bounded.length;
+  while (start < end && bounded[start] === "/") {
+    start += 1;
+  }
+  while (end > start && bounded[end - 1] === "/") {
+    end -= 1;
+  }
+  return bounded.slice(start, end);
+}
+
 function normalizeRetryAfterSeconds(value: unknown): number | undefined {
   if (typeof value === "number" && Number.isFinite(value)) {
     return Math.max(1, Math.floor(value));
@@ -81,6 +95,5 @@ export function isChatAssistantThreadRequest(url: string | undefined): boolean {
     return false;
   }
   const pathOnly = url.split("?")[0] ?? "";
-  const normalized = pathOnly.replace(/^\/+/, "").replace(/\/+$/, "");
-  return normalized === "chat";
+  return trimPathSlashes(pathOnly) === "chat";
 }

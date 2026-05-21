@@ -92,6 +92,67 @@ function normalizeGlobFilePath(filePath: string): string {
   return filePath.replaceAll("\\", "/");
 }
 
+/** Linear trim of trailing slashes (no regex — avoids ReDoS on pathnames). */
+function stripTrailingSlashes(pathname: string): string {
+  let end = pathname.length;
+  while (end > 1 && pathname[end - 1] === "/") {
+    end -= 1;
+  }
+  return pathname.slice(0, end);
+}
+
+function stripPagesExtension(relative: string): string {
+  if (relative.endsWith(".tsx")) {
+    return relative.slice(0, -4);
+  }
+  if (relative.endsWith(".jsx")) {
+    return relative.slice(0, -4);
+  }
+  return relative;
+}
+
+function isValidRouteParamName(name: string): boolean {
+  if (!name) return false;
+  for (let i = 0; i < name.length; i += 1) {
+    const code = name.charCodeAt(i);
+    const isDigit = code >= 48 && code <= 57;
+    const isUpper = code >= 65 && code <= 90;
+    const isLower = code >= 97 && code <= 122;
+    if (!(isDigit || isUpper || isLower || code === 95 || code === 45)) {
+      return false;
+    }
+  }
+  return true;
+}
+
+/** Map `[id]` / `[...slug]` to `:id` / `*` without backtracking-prone regex. */
+function mapDynamicRouteSegment(
+  segment: string,
+): { mapped: string; isCatchAll: boolean } | null {
+  const maxLen = 256;
+  if (segment.length < 3 || segment.length > maxLen) {
+    return null;
+  }
+  if (segment[0] !== "[" || segment.at(-1) !== "]") {
+    return null;
+  }
+  const inner = segment.slice(1, -1);
+  if (!inner || inner.includes("[") || inner.includes("]") || inner.includes("/")) {
+    return null;
+  }
+  if (inner.startsWith("...")) {
+    const param = inner.slice(3);
+    if (!isValidRouteParamName(param)) {
+      return null;
+    }
+    return { mapped: "*", isCatchAll: true };
+  }
+  if (!isValidRouteParamName(inner)) {
+    return null;
+  }
+  return { mapped: `:${inner}`, isCatchAll: false };
+}
+
 type PageLoader = () => Promise<PageModule>;
 
 function mergePageGlobLoaders(): Record<string, PageLoader> {
@@ -131,10 +192,12 @@ function fileToRoutePath(filePath: string): {
 } {
   // ./pages/foo/bar/[id].tsx → /foo/bar/:id
   // Normalize `\` (Windows) so glob keys always match the `./pages/` prefix.
-  let relative = filePath
-    .replaceAll("\\", "/")
-    .replace(/^\.\/pages\//, "/")
-    .replace(/\.(tsx|jsx)$/, "");
+  let relative = normalizeGlobFilePath(filePath);
+  const pagesPrefix = "./pages/";
+  if (relative.startsWith(pagesPrefix)) {
+    relative = `/${relative.slice(pagesPrefix.length)}`;
+  }
+  relative = stripPagesExtension(relative);
 
   if (relative.endsWith("/index")) {
     relative = relative.slice(0, -"/index".length) || "/";
@@ -143,14 +206,14 @@ function fileToRoutePath(filePath: string): {
   let isCatchAll = false;
   const segments = relative.split("/").filter(Boolean);
   const mappedSegments = segments.map((segment) => {
-    const dynamicMatch = /^\[(?<inner>[^\]]+)\]$/.exec(segment);
-    if (!dynamicMatch?.groups?.inner) return segment;
-    const inner = dynamicMatch.groups.inner;
-    if (inner.startsWith("...")) {
-      isCatchAll = true;
-      return "*";
+    const dynamic = mapDynamicRouteSegment(segment);
+    if (!dynamic) {
+      return segment;
     }
-    return `:${inner}`;
+    if (dynamic.isCatchAll) {
+      isCatchAll = true;
+    }
+    return dynamic.mapped;
   });
 
   const path = mappedSegments.length === 0 ? "/" : `/${mappedSegments.join("/")}`;
@@ -253,7 +316,7 @@ function TrailingSlashRedirect() {
   useEffect(() => {
     const { pathname, search, hash } = location;
     if (pathname.length > 1 && pathname.endsWith("/")) {
-      navigate(`${pathname.replace(/\/+$/, "")}${search}${hash}`, {
+      navigate(`${stripTrailingSlashes(pathname)}${search}${hash}`, {
         replace: true,
       });
     }

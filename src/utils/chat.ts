@@ -1625,9 +1625,12 @@ const CHAT_TENANT_SETTINGS_API_PATH = "/chat/tenant/settings";
 /** Tenant settings change history (`GET /api/chat/tenant/settings/history`). */
 const CHAT_TENANT_SETTINGS_HISTORY_API_PATH = "/chat/tenant/settings/history";
 
+/** `from` / `to` values in settings or pricing history change rows. */
+export type ChatFieldChangeValue = string | number | null;
+
 export interface TenantChatSettingsHistoryFieldChange {
-  from: string | number | null;
-  to: string | number | null;
+  from: ChatFieldChangeValue;
+  to: ChatFieldChangeValue;
 }
 
 export interface TenantChatSettingsHistoryRow {
@@ -1881,8 +1884,8 @@ export const CHAT_ADMIN_USERS_FETCH_ERROR_MESSAGE =
  * Admin-wide per-user budget and usage (GET `/api/chat/admin/users`).
  */
 export interface ChatPricingFieldChange {
-  from: string | number | null;
-  to: string | number | null;
+  from: ChatFieldChangeValue;
+  to: ChatFieldChangeValue;
 }
 
 export interface ChatAdminPricingHistoryRow {
