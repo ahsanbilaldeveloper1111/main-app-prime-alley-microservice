@@ -13,10 +13,11 @@ import { useRouter } from 'next/router';
 import { Container, Row, Col, Card, Button, Modal, Spinner } from 'react-bootstrap';
 import { Building2, Globe, ChevronRight, Bot, X } from 'lucide-react';
 import {
-  submitChatTraining,
+  postChatTraining,
   formatChatTrainingResultMessage,
   type ChatTrainingResponse,
 } from '@utils/chat';
+import { toast } from 'react-toastify';
 
 
 
@@ -35,12 +36,14 @@ const AIChatFAQs = () => {
         chunk_overlap: 200
       };
       
-      const response = await submitChatTraining(payload);
+      const response = await postChatTraining(payload);
       setTrainingResponse(response);
       setShowTrainingModal(true);
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Error training bot:', error);
-      // Error is already handled by submitChatTraining (toast notification)
+      const message =
+        error instanceof Error ? error.message : 'Failed to train bot.';
+      toast.error(message);
     } finally {
       setLoading(false);
     }

@@ -33,6 +33,26 @@ export type AdminDashboardPricingHistoryTabProps = Readonly<{
   ctx: ChatAdminPricingHistoryPageCtx;
 }>;
 
+function formatPricingHistoryEventCount(count: number): string {
+  const label = count === 1 ? "event" : "events";
+  return `${count} ${label}`;
+}
+
+function renderPricingHistoryHeaderStatus(
+  isLoading: boolean,
+  count: number,
+): React.ReactNode {
+  if (isLoading) {
+    return (
+      <>
+        <Spinner animation="border" size="sm" />
+        Loading…
+      </>
+    );
+  }
+  return formatPricingHistoryEventCount(count);
+}
+
 export function AdminDashboardPricingHistoryTab({
   ctx,
 }: AdminDashboardPricingHistoryTabProps) {
@@ -146,14 +166,7 @@ export function AdminDashboardPricingHistoryTab({
         <div className="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
           <span className="text-muted small d-flex align-items-center gap-2">
             <History size={16} className="text-primary" aria-hidden />
-            {isLoading ? (
-              <>
-                <Spinner animation="border" size="sm" />
-                Loading…
-              </>
-            ) : (
-              `${count} event${count === 1 ? "" : "s"}`
-            )}
+            {renderPricingHistoryHeaderStatus(isLoading, count)}
           </span>
         </div>
         <Table hover size="sm" className={chatbotsDashboardUsersBudgetsTableClass}>

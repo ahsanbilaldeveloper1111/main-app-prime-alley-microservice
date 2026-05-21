@@ -18,16 +18,19 @@ export function ChatAssistantBudgetBar({
 }: ChatAssistantBudgetBarProps) {
   if (isLoading) {
     return (
-      <div
+      <fieldset
         style={{
           padding: compact ? "6px 12px" : "8px 16px",
+          border: "none",
+          margin: 0,
+          minWidth: 0,
           borderBottom: "1px solid #f0f0f0",
           flexShrink: 0,
           backgroundColor: "#ffffff",
         }}
         aria-busy="true"
-        aria-label="Loading monthly budget"
       >
+        <legend className="visually-hidden">Loading monthly budget</legend>
         <div
           style={{
             height: 6,
@@ -35,8 +38,9 @@ export function ChatAssistantBudgetBar({
             backgroundColor: "#e2e8f0",
             animation: "pulse 1.2s ease-in-out infinite",
           }}
+          aria-hidden
         />
-      </div>
+      </fieldset>
     );
   }
 
@@ -47,17 +51,19 @@ export function ChatAssistantBudgetBar({
   const remainingLabel = formatChatBudgetUsd(budget.remainingUsd, true);
   const totalLabel = formatChatBudgetUsd(budget.totalUsd);
 
+  const fieldsetStyle: React.CSSProperties = {
+    padding,
+    border: "none",
+    margin: 0,
+    minWidth: 0,
+    borderBottom: "1px solid #f0f0f0",
+    flexShrink: 0,
+    backgroundColor: "#ffffff",
+  };
+
   return (
-    <div
-      style={{
-        padding,
-        borderBottom: "1px solid #f0f0f0",
-        flexShrink: 0,
-        backgroundColor: "#ffffff",
-      }}
-      role="group"
-      aria-label="Monthly chat budget usage"
-    >
+    <fieldset style={fieldsetStyle}>
+      <legend className="visually-hidden">Monthly chat budget usage</legend>
       <div
         style={{
           display: "flex",
@@ -109,6 +115,6 @@ export function ChatAssistantBudgetBar({
         <span>{budget.usedPct.toFixed(1)}% used</span>
         <span>MTD {formatChatBudgetUsd(budget.spendUsd, true)}</span>
       </div>
-    </div>
+    </fieldset>
   );
 }

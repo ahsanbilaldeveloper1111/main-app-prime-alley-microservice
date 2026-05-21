@@ -1,4 +1,7 @@
-import type { TenantChatDashboardResponse } from "@utils/chat";
+import type {
+  TenantChatDashboardResponse,
+  TenantDashboardRecentConversation,
+} from "@utils/chat";
 
 import type { ChatbotsTenantDashboardModel } from "./types";
 
@@ -20,6 +23,12 @@ function formatActivity(value: string | undefined): string {
   if (Number.isNaN(d.getTime())) return value;
   const pad = (n: number) => String(n).padStart(2, "0");
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+function formatRecentConversationActivity(
+  row: TenantDashboardRecentConversation,
+): string {
+  return formatActivity(row.updated_at);
 }
 
 function mapPricing(
@@ -91,7 +100,7 @@ export function mapTenantDashboardApi(
           row.user?.trim() ||
           row.user_id?.trim() ||
           "—",
-        lastActivity: formatActivity(row.updated_at ?? row.last_activity),
+        lastActivity: formatRecentConversationActivity(row),
         modelUsed: row.model_used?.trim() || "—",
         costUsd: parseCost(row.cost),
       };

@@ -46,8 +46,11 @@ export function isChatRateLimitedError(
 /** POST `/api/chat/` when the caller's per-user monthly budget is exhausted. */
 export const CHAT_USER_BUDGET_EXHAUSTED_CODE = "user_budget_exhausted";
 
-/** @deprecated Backend may still send during rollout; treat like {@link CHAT_USER_BUDGET_EXHAUSTED_CODE}. */
-export const CHAT_BUDGET_EXHAUSTED_CODE_LEGACY = "budget_exhausted";
+/** Legacy POST `/chat/` code during rollout; prefer {@link CHAT_USER_BUDGET_EXHAUSTED_CODE}. */
+const CHAT_LEGACY_BUDGET_EXHAUSTED_CODE = "budget_exhausted";
+
+/** @deprecated Use {@link CHAT_LEGACY_BUDGET_EXHAUSTED_CODE} via {@link isChatUserBudgetExhaustedCode}. */
+export const CHAT_BUDGET_EXHAUSTED_CODE_LEGACY = CHAT_LEGACY_BUDGET_EXHAUSTED_CODE;
 
 export const CHAT_USER_BUDGET_EXHAUSTED_DEFAULT_MESSAGE =
   "You've reached your monthly chat budget. Please contact your administrator to raise it.";
@@ -59,8 +62,7 @@ export interface ChatBudgetStatus {
 
 /** Thrown when POST `/api/chat/` rejects due to per-user budget exhaustion (typically non-2xx). */
 export class ChatUserBudgetExhaustedError extends Error {
-  readonly code =
-    CHAT_USER_BUDGET_EXHAUSTED_CODE as typeof CHAT_USER_BUDGET_EXHAUSTED_CODE;
+  readonly code = CHAT_USER_BUDGET_EXHAUSTED_CODE;
   readonly budgetStatus: ChatBudgetStatus | undefined;
   readonly userId: string | undefined;
 
@@ -91,7 +93,7 @@ export function isChatUserBudgetExhaustedCode(
 ): boolean {
   return (
     code === CHAT_USER_BUDGET_EXHAUSTED_CODE ||
-    code === CHAT_BUDGET_EXHAUSTED_CODE_LEGACY
+    code === CHAT_LEGACY_BUDGET_EXHAUSTED_CODE
   );
 }
 
@@ -114,7 +116,10 @@ function readChatBudgetStatus(
     return undefined;
   }
   const budgetStatus = metadata.budget_status;
-  return isRecord(budgetStatus) ? (budgetStatus as ChatBudgetStatus) : undefined;
+  if (!isRecord(budgetStatus)) {
+    return undefined;
+  }
+  return budgetStatus;
 }
 
 function readChatApiResponseMessage(data: Record<string, unknown>): string | undefined {
@@ -191,34 +196,44 @@ function rethrowChatApiError(error: unknown, fallback: string): never {
   throw error;
 }
 
+function messageFromAxiosErrorData(
+  data: Record<string, unknown>,
+): string | undefined {
+  const budgetErr = parseChatUserBudgetExhaustedFromBody(data);
+  if (budgetErr) {
+    return budgetErr.message;
+  }
+  const responseMessage = readChatApiResponseMessage(data);
+  if (responseMessage) {
+    return responseMessage;
+  }
+  const apiError = data.error;
+  if (typeof apiError === "string" && apiError.trim()) {
+    return apiError.trim();
+  }
+  const apiMessage = data.message;
+  if (typeof apiMessage === "string" && apiMessage.trim()) {
+    return apiMessage.trim();
+  }
+  return undefined;
+}
+
 function chatApiErrorMessage(error: unknown, fallback: string): string {
   if (typeof error === "string" && error.trim()) {
-    return error;
+    return error.trim();
   }
   if (!isRecord(error)) {
     return fallback;
   }
   const response = error.response;
   if (isRecord(response) && isRecord(response.data)) {
-    const data = response.data;
-    const budgetErr = parseChatUserBudgetExhaustedFromBody(data);
-    if (budgetErr) {
-      return budgetErr.message;
-    }
-    const responseMessage = readChatApiResponseMessage(data);
-    if (responseMessage) {
-      return responseMessage;
-    }
-    const { error: apiError, message: apiMessage } = data;
-    if (typeof apiError === "string" && apiError) {
-      return apiError;
-    }
-    if (typeof apiMessage === "string" && apiMessage) {
-      return apiMessage;
+    const fromData = messageFromAxiosErrorData(response.data);
+    if (fromData) {
+      return fromData;
     }
   }
-  if (typeof error.message === "string" && error.message) {
-    return error.message;
+  if (typeof error.message === "string" && error.message.trim()) {
+    return error.message.trim();
   }
   return fallback;
 }
@@ -1512,12 +1527,15 @@ export interface TenantChatSettingsModelOption {
   name?: string;
 }
 
+/** GET tenant settings threshold field (numeric or string from API). */
+export type TenantChatSettingsThresholdPct = number | string | null;
+
 export interface TenantChatSettingsOverrides {
   user_per_minute?: number | null;
   input_cost_per_million?: string | null;
   output_cost_per_million?: string | null;
   default_user_budget_usd?: string | null;
-  default_budget_threshold_pct?: number | string | null;
+  default_budget_threshold_pct?: TenantChatSettingsThresholdPct;
   model_name?: string | null;
   /** Percent markup on base LLM cost; `null` = no markup. */
   margin_pct?: string | null;

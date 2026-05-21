@@ -98,9 +98,9 @@ function UsedPctBar({ row }: Readonly<{ row: AdminUserBudgetRow }>) {
     <div className="tenant-dashboard-users__usage">
       <div className="d-flex justify-content-between small mb-1">
         <span>{pct1.format(pct)}%</span>
-        {remaining != null ? (
+        {remaining == null ? null : (
           <span className="text-muted">{formatUsd(remaining, true)} left</span>
-        ) : null}
+        )}
       </div>
       <ProgressBar
         now={pct}
@@ -188,11 +188,11 @@ export function AdminDashboardUsersBudgetsTab({
               </Button>
             </Col>
           </Row>
-          {totalCount !== count ? (
+          {totalCount === count ? null : (
             <p className="text-muted small mb-0 mt-2">
               Showing {count} of {totalCount} users
             </p>
-          ) : null}
+          )}
         </Card.Body>
       </Card>
 

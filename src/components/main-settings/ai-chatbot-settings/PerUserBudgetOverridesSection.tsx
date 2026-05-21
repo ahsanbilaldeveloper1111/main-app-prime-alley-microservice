@@ -21,6 +21,28 @@ function validateMonthlyCap(raw: string): string | null {
   return null;
 }
 
+function formatUserCountLabel(count: number): string {
+  const label = count === 1 ? "user" : "users";
+  return `${count} ${label}`;
+}
+
+function renderUserCountStatus(
+  isFetching: boolean,
+  userCount: number,
+): React.ReactNode {
+  if (isFetching) {
+    return <Spinner animation="border" size="sm" aria-hidden />;
+  }
+  return formatUserCountLabel(userCount);
+}
+
+function formatUserOptionLabel(row: TenantUserBudgetRow): string {
+  if (row.displayName === row.userId) {
+    return row.displayName;
+  }
+  return `${row.displayName} (${row.userId})`;
+}
+
 export type PerUserBudgetOverridesSectionProps = Readonly<{
   tenantId: string;
   enabled: boolean;
@@ -82,11 +104,12 @@ export function PerUserBudgetOverridesSection({
   const capValidationError = validateMonthlyCap(monthlyCapUsd);
   const fieldsDisabled =
     !canEdit || usersQuery.isFetching || saveMutation.isPending;
+  const hasSelectedUser = Boolean(selectedUserId.trim());
   const canSave =
     canEdit &&
-    Boolean(selectedUserId.trim()) &&
-    !capValidationError &&
-    !saveMutation.isPending;
+    hasSelectedUser &&
+    capValidationError == null &&
+    saveMutation.isPending === false;
 
   return (
     <section
@@ -101,11 +124,7 @@ export function PerUserBudgetOverridesSection({
           Per-user budget overrides
         </h3>
         <span className="ai-chatbot-settings__per-user-budget-count">
-          {usersQuery.isFetching ? (
-            <Spinner animation="border" size="sm" aria-hidden />
-          ) : (
-            `${userCount} user${userCount === 1 ? "" : "s"}`
-          )}
+          {renderUserCountStatus(usersQuery.isFetching, userCount)}
         </span>
       </div>
 
@@ -120,7 +139,7 @@ export function PerUserBudgetOverridesSection({
         <code className="ai-chatbot-settings__per-user-budget-code">
           PUT /api/users/&lt;tenant&gt;/&lt;user_id&gt;/
         </code>
-        .
+        {'.'}
       </p>
 
       {usersQuery.isError ? (
@@ -150,8 +169,7 @@ export function PerUserBudgetOverridesSection({
             <option value="">— Select a user —</option>
             {rows.map((row) => (
               <option key={row.userId} value={row.userId}>
-                {row.displayName}
-                {row.displayName !== row.userId ? ` (${row.userId})` : ""}
+                {formatUserOptionLabel(row)}
               </option>
             ))}
           </select>
@@ -168,7 +186,7 @@ export function PerUserBudgetOverridesSection({
             placeholder="e.g. 10.00"
             min={0}
             step="0.01"
-            disabled={fieldsDisabled || !selectedUserId}
+            disabled={fieldsDisabled || hasSelectedUser === false}
             onChange={(e) => setMonthlyCapUsd(e.target.value)}
           />
         </label>
@@ -184,7 +202,7 @@ export function PerUserBudgetOverridesSection({
         <Button
           type="button"
           variant="primary"
-          disabled={!canSave}
+          disabled={canSave === false}
           onClick={handleSave}
         >
           {saveMutation.isPending ? (

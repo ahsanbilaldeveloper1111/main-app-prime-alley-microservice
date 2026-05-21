@@ -372,7 +372,7 @@ export function mapTenantChatSettingsMarginPct(
 export function formatTenantMarginPctDisplay(
   marginPct: string | null | undefined,
 ): string {
-  if (marginPct == null || !marginPct.trim()) {
+  if (!marginPct?.trim()) {
     return "No markup (base cost)";
   }
   const value = Number.parseFloat(marginPct.trim());

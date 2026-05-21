@@ -13,6 +13,26 @@ export type AIChatbotSettingsHistoryPanelProps = Readonly<{
   ctx: ChatTenantSettingsHistoryCtx;
 }>;
 
+function formatHistoryEventCount(count: number): string {
+  const label = count === 1 ? "event" : "events";
+  return `${count} ${label}`;
+}
+
+function renderHistoryHeaderStatus(
+  isLoading: boolean,
+  rowCount: number,
+): React.ReactNode {
+  if (isLoading) {
+    return (
+      <span className="d-inline-flex align-items-center gap-2">
+        <Spinner animation="border" size="sm" />
+        Loading…
+      </span>
+    );
+  }
+  return formatHistoryEventCount(rowCount);
+}
+
 export function AIChatbotSettingsHistoryPanel({
   ctx,
 }: AIChatbotSettingsHistoryPanelProps) {
@@ -111,14 +131,7 @@ export function AIChatbotSettingsHistoryPanel({
             Change history
           </p>
           <span className="text-muted small">
-            {isLoading ? (
-              <span className="d-inline-flex align-items-center gap-2">
-                <Spinner animation="border" size="sm" />
-                Loading…
-              </span>
-            ) : (
-              `${rows.length} event${rows.length === 1 ? "" : "s"}`
-            )}
+            {renderHistoryHeaderStatus(isLoading, rows.length)}
           </span>
         </div>
 
