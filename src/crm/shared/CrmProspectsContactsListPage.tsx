@@ -913,7 +913,10 @@ export function CrmProspectsContactsListPage({
         iconBgColor: "#EEF2FF",
         ...(config.operationsEntityName === "prospects"
           ? {
-              additionalText: "Currently in the system",
+              metric: {
+                text: "Currently in the system",
+                dotColor: "#0066CC",
+              },
             }
           : {
               subtitle: config.stats.subtitleAssignedUnassigned(metrics),
@@ -986,7 +989,7 @@ export function CrmProspectsContactsListPage({
         iconBgColor: "#F1F5F9",
         metric: {
           text: "No call attempt has occurred yet.",
-          dotColor: "#6B7280",
+          dotColor: "#4B5563",
         },
         ...(config.operationsEntityName === "prospects"
           ? { onClick: handleProspectNotContactedMetricClick }

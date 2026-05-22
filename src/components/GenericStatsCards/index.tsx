@@ -112,7 +112,8 @@ const StatsCards: React.FC<StatsCardsProps> = ({
             {card.metric && (
               <div style={{
                 display: 'flex',
-                alignItems: 'center',
+                flexWrap: 'nowrap',
+                alignItems: 'flex-start',
                 justifyContent: 'center',
                 width: '100%',
                 gap: '6px',
@@ -121,7 +122,7 @@ const StatsCards: React.FC<StatsCardsProps> = ({
                 textAlign: 'center',
                 marginTop: card.badge ? '8px' : '0'
               }}>
-                <Circle size={8} fill={card.metric.dotColor} color={card.metric.dotColor} />
+                <Circle size={8} fill={card.metric.dotColor} color={card.metric.dotColor} style={{ flexShrink: 0 }} />
                 <span>{card.metric.text}</span>
               </div>
             )}
@@ -141,7 +142,8 @@ const StatsCards: React.FC<StatsCardsProps> = ({
             {card.subtitle && (
               <div style={{
                 display: 'flex',
-                alignItems: 'center',
+                flexWrap: 'nowrap',
+                alignItems: 'flex-start',
                 justifyContent: 'center',
                 width: '100%',
                 gap: '6px',
@@ -150,7 +152,7 @@ const StatsCards: React.FC<StatsCardsProps> = ({
                 textAlign: 'center',
                 marginTop: card.badge || card.metric ? '8px' : '0'
               }}>
-                <Circle size={8} fill="#0066CC" color="#0066CC" />
+                <Circle size={8} fill="#0066CC" color="#0066CC" style={{ flexShrink: 0 }} />
                 <span>{card.subtitle}</span>
               </div>
             )}
