@@ -1,6 +1,7 @@
 import React from "react";
+import Link from "next/link";
 import { Badge, Button, Card, Col, Form, Nav, Row } from "react-bootstrap";
-import { Download, LayoutGrid, ListTodo, RefreshCw } from "lucide-react";
+import { BarChart3, LayoutGrid, ListTodo, RefreshCw } from "lucide-react";
 import type { AssigneeMatch, WorkloadRangePreset } from "@utils/tasks";
 import type {
   WorkloadPriorityFilterValue,
@@ -39,10 +40,10 @@ export function WorkloadPlannerPageHeader({
         </p>
       </div>
       <div className="d-flex flex-wrap gap-2 align-items-center">
-        <Button variant="outline-secondary" size="sm" onClick={onExportCsv}>
-          <Download size={16} className="me-1" />
-          Export CSV
-        </Button>
+        <Link href="/planner/reports" className="btn btn-outline-secondary btn-sm">
+          <BarChart3 size={16} className="me-1" />
+          Reports
+        </Link>
         <Button variant="outline-primary" size="sm" onClick={onRefresh} disabled={!enabled}>
           <RefreshCw size={16} className="me-1" />
           Refresh

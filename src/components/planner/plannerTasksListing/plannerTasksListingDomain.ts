@@ -104,12 +104,23 @@ export function resolvePlannerListTaskDueDate(apiTask: ApiTask): string | null {
 export type HierarchyExtension = {
   id?: string;
   extension_number?: string;
+  extension?: string | number;
   name?: string;
+  display_name?: string;
+  user_id?: string | number;
   user?: {
     name?: string | null;
     display_name?: string | null;
   } | null;
 };
+
+export function isExtensionPlaceholderLabel(label: string, extension: string): boolean {
+  const normalized = label.trim();
+  const ext = extension.trim();
+  if (!normalized) return true;
+  if (ext && normalized === ext) return true;
+  return /^\d+$/.test(normalized);
+}
 
 export function lookupHierarchyExtensionDisplayName(
   extNumber: string | number | null | undefined,
@@ -120,17 +131,23 @@ export function lookupHierarchyExtensionDisplayName(
   if (!trimmed) return "";
   if (!Array.isArray(hierarchyDataExtensions)) return trimmed;
   const ext = hierarchyDataExtensions.find((e) => {
-    const item = e as HierarchyExtension;
+    const item = e as HierarchyExtension & { extension?: string | number };
     const id = item.id == null ? "" : String(item.id).trim();
     const en =
       item.extension_number == null ? "" : String(item.extension_number).trim();
-    return id === trimmed || en === trimmed;
+    const extension =
+      item.extension == null ? "" : String(item.extension).trim();
+    return id === trimmed || en === trimmed || extension === trimmed;
   }) as HierarchyExtension | undefined;
   const name =
     ext?.user?.name?.trim() ||
     ext?.user?.display_name?.trim() ||
+    ext?.display_name?.trim() ||
     ext?.name?.trim();
-  return name && name.length > 0 ? name : trimmed;
+  if (name && name.length > 0 && !isExtensionPlaceholderLabel(name, trimmed)) {
+    return name;
+  }
+  return trimmed;
 }
 
 export function assigneeDisplayNamesForTaskRow(

@@ -1,4 +1,7 @@
-import { lookupHierarchyExtensionDisplayName } from "@components/planner/plannerTasksListing/plannerTasksListingDomain";
+import {
+  isExtensionPlaceholderLabel,
+  lookupHierarchyExtensionDisplayName,
+} from "@components/planner/plannerTasksListing/plannerTasksListingDomain";
 import type { WorkloadGridData, WorkloadGridMember, WorkloadSummaryMember } from "@utils/tasks";
 
 const MINUTES_PER_HOUR = 60;
@@ -490,9 +493,11 @@ export function resolveWorkloadMemberName(
   const ext = extensionNumber.trim();
   if (!ext) return "Unknown";
   const fromApi = member?.display_name?.trim() || member?.name?.trim();
-  if (fromApi) return fromApi;
+  if (fromApi && !isExtensionPlaceholderLabel(fromApi, ext)) return fromApi;
   const fromHierarchy = lookupHierarchyExtensionDisplayName(ext, hierarchyExtensions);
-  if (fromHierarchy && fromHierarchy !== ext) return fromHierarchy;
+  if (fromHierarchy && !isExtensionPlaceholderLabel(fromHierarchy, ext)) {
+    return fromHierarchy;
+  }
   return ext;
 }
 
