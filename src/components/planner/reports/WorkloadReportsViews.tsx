@@ -2,8 +2,11 @@ import React from "react";
 import { Alert, Badge, Spinner, Table } from "react-bootstrap";
 import {
   CartesianGrid,
+  Cell,
   Line,
   LineChart,
+  Pie,
+  PieChart,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -20,12 +23,16 @@ import {
   formatReportsDateLabel,
   formatReportsDelta,
   formatReportsHours,
+  formatReportsMemberLabel,
   priorityBadgeClass,
+  resolveAverageTimeLabel,
+  resolveInProgressCount,
   resolveSummaryMetric,
+  resolveTaskAssigneeDisplay,
   statusRowPercent,
 } from "@page-modules/planner/reports/reportsDomain";
 import {
-  formatWorkloadMemberLabel,
+  workloadMemberAvatarColor,
   workloadMemberInitials,
 } from "@page-modules/planner/workload/workloadDomain";
 
@@ -34,13 +41,14 @@ type KpiCardProps = Readonly<{
   value: string | number;
   sub: string;
   delta?: string | null;
-  accent?: "default" | "completed" | "overdue" | "pending";
+  accent?: "default" | "completed" | "overdue" | "pending" | "in_progress";
 }>;
 
 function resolveKpiAccentClass(accent: KpiCardProps["accent"]): string {
   if (accent === "completed") return "reports-kpi-card--completed";
   if (accent === "overdue") return "reports-kpi-card--overdue";
   if (accent === "pending") return "reports-kpi-card--pending";
+  if (accent === "in_progress") return "reports-kpi-card--in-progress";
   return "";
 }
 
@@ -62,6 +70,90 @@ export function ReportsKpiCard({ label, value, sub, delta, accent = "default" }:
       {delta ? (
         <div className={`reports-kpi-card__delta ${deltaClass}`.trim()}>{delta}</div>
       ) : null}
+    </div>
+  );
+}
+
+export function ReportsTeamLiveKpiRow({
+  summary,
+  statusRows,
+}: Readonly<{ summary: TaskReportsSummary; statusRows: TaskReportsStatusRow[] }>) {
+  const vs = summary.vs_previous_period ?? {};
+  const total = resolveSummaryMetric(summary, "total_tasks");
+  const completed = resolveSummaryMetric(summary, "completed_tasks");
+  const overdue = resolveSummaryMetric(summary, "overdue_tasks");
+  const inProgress = resolveInProgressCount(summary, statusRows);
+
+  return (
+    <div className="reports-kpi-grid">
+      <ReportsKpiCard
+        label="Total Tasks"
+        value={total}
+        sub="vs previous period"
+        delta={formatReportsDelta(vs.total_tasks)}
+      />
+      <ReportsKpiCard
+        label="Completed"
+        value={completed}
+        sub="vs previous period"
+        delta={formatReportsDelta(vs.completed_tasks)}
+        accent="completed"
+      />
+      <ReportsKpiCard
+        label="Overdue"
+        value={overdue}
+        sub="vs previous period"
+        delta={formatReportsDelta(vs.overdue_tasks)}
+        accent="overdue"
+      />
+      <ReportsKpiCard
+        label="In Progress"
+        value={inProgress}
+        sub="Currently active work"
+        delta={formatReportsDelta(vs.pending_tasks)}
+        accent="in_progress"
+      />
+    </div>
+  );
+}
+
+export function ReportsTeamBoardKpiRow({
+  summary,
+}: Readonly<{ summary: TaskReportsSummary }>) {
+  const vs = summary.vs_previous_period ?? {};
+  const total = resolveSummaryMetric(summary, "total_tasks");
+  const completed = resolveSummaryMetric(summary, "completed_tasks");
+  const pending = resolveSummaryMetric(summary, "pending_tasks");
+  const avgTime = resolveAverageTimeLabel(summary);
+
+  return (
+    <div className="reports-kpi-grid">
+      <ReportsKpiCard
+        label="Total Tasks"
+        value={total}
+        sub="vs previous period"
+        delta={formatReportsDelta(vs.total_tasks)}
+      />
+      <ReportsKpiCard
+        label="Completed Tasks"
+        value={completed}
+        sub="vs previous period"
+        delta={formatReportsDelta(vs.completed_tasks)}
+        accent="completed"
+      />
+      <ReportsKpiCard
+        label="Pending Tasks"
+        value={pending}
+        sub="vs previous period"
+        delta={formatReportsDelta(vs.pending_tasks)}
+        accent="pending"
+      />
+      <ReportsKpiCard
+        label="Avg. Time"
+        value={avgTime}
+        sub="Per completed task"
+        accent="in_progress"
+      />
     </div>
   );
 }
@@ -166,9 +258,11 @@ export function ReportsStatusBreakdown({
 export function ReportsAssigneeList({
   rows,
   hierarchyExtensions,
+  countField = "total",
 }: Readonly<{
   rows: TaskReportsAssigneeRow[];
   hierarchyExtensions?: unknown[] | null;
+  countField?: "total" | "completed";
 }>) {
   if (rows.length === 0) {
     return <p className="small text-muted mb-0">No assignee data.</p>;
@@ -177,11 +271,11 @@ export function ReportsAssigneeList({
     <div>
       {rows.map((row) => {
         const ext = row.extension_number ?? "";
-        const label = ext
-          ? formatWorkloadMemberLabel(ext, hierarchyExtensions, row)
-          : row.display_name ?? row.name ?? "Unknown";
+        const label = formatReportsMemberLabel(row, hierarchyExtensions);
         const count =
-          row.completed_tasks ?? row.done_count ?? row.total_tasks ?? row.task_count ?? 0;
+          countField === "completed"
+            ? (row.completed_tasks ?? row.done_count ?? 0)
+            : (row.total_tasks ?? row.task_count ?? row.completed_tasks ?? row.done_count ?? 0);
         const suffix = count === 1 ? "task" : "tasks";
         return (
           <div key={ext || label} className="reports-assignee-row">
@@ -239,6 +333,177 @@ function ReportsTaskList({
           </div>
         </div>
       ))}
+    </div>
+  );
+}
+
+function resolveStatusBadgeVariant(
+  statusName: string | null | undefined,
+): string {
+  const status = (statusName ?? "").toLowerCase();
+  if (status.includes("done") || status.includes("complete")) return "success";
+  if (status.includes("progress")) return "primary";
+  if (status.includes("overdue")) return "danger";
+  return "secondary";
+}
+
+export function ReportsPendingTasksTable({
+  tasks,
+  hierarchyExtensions,
+}: Readonly<{
+  tasks: TaskReportsTaskRow[];
+  hierarchyExtensions?: unknown[] | null;
+}>) {
+  if (tasks.length === 0) {
+    return <p className="small text-muted mb-0">No data found</p>;
+  }
+  return (
+    <Table responsive className="reports-pending-table mb-0">
+      <thead>
+        <tr>
+          <th>Task Name</th>
+          <th>Project</th>
+          <th>Assignee</th>
+          <th>Due Date</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        {tasks.map((task) => (
+          <tr key={task.id}>
+            <td className="fw-semibold">{task.title}</td>
+            <td>{task.project_name?.trim() || "—"}</td>
+            <td>{resolveTaskAssigneeDisplay(task, hierarchyExtensions)}</td>
+            <td>{task.due_date ? formatReportsDateLabel(task.due_date.slice(0, 10)) : "—"}</td>
+            <td>
+              {task.status_name ? (
+                <Badge bg={resolveStatusBadgeVariant(task.status_name)}>
+                  {task.status_name}
+                </Badge>
+              ) : (
+                "—"
+              )}
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </Table>
+  );
+}
+
+type MemberWiseSegment = Readonly<{ key: string; value: number; color: string }>;
+
+function buildMemberWiseSegments(row: TaskReportsAssigneeRow): MemberWiseSegment[] {
+  const done = row.done_count ?? row.completed_tasks ?? 0;
+  const inProgress = row.in_progress_count ?? 0;
+  const pending = row.todo_count ?? 0;
+  const overdue = row.overdue_count ?? 0;
+  return [
+    { key: "done", value: done, color: "#22c55e" },
+    { key: "in_progress", value: inProgress, color: "#3b82f6" },
+    { key: "pending", value: pending, color: "#f59e0b" },
+    { key: "overdue", value: overdue, color: "#ef4444" },
+  ].filter((segment) => segment.value > 0);
+}
+
+export function ReportsMemberWiseTasks({
+  rows,
+  hierarchyExtensions,
+}: Readonly<{
+  rows: TaskReportsAssigneeRow[];
+  hierarchyExtensions?: unknown[] | null;
+}>) {
+  if (rows.length === 0) {
+    return <p className="small text-muted mb-0">No member data for this period.</p>;
+  }
+  return (
+    <div className="reports-member-wise-list">
+      {rows.map((row) => {
+        const ext = row.extension_number ?? "";
+        const label = formatReportsMemberLabel(row, hierarchyExtensions);
+        const segments = buildMemberWiseSegments(row);
+        const total = segments.reduce((sum, segment) => sum + segment.value, 0) || 1;
+        return (
+          <div key={ext || label} className="reports-member-wise-row">
+            <span
+              className="reports-assignee-row__avatar"
+              style={{ backgroundColor: workloadMemberAvatarColor(ext) }}
+              aria-hidden
+            >
+              {workloadMemberInitials(ext, hierarchyExtensions, row)}
+            </span>
+            <div className="reports-member-wise-row__meta">
+              <div className="reports-member-wise-row__name">{label}</div>
+              <div className="reports-member-wise-bar" aria-hidden>
+                {segments.map((segment) => (
+                  <span
+                    key={segment.key}
+                    className="reports-member-wise-bar__segment"
+                    style={{
+                      width: `${(segment.value / total) * 100}%`,
+                      backgroundColor: segment.color,
+                    }}
+                  />
+                ))}
+              </div>
+            </div>
+            <span className="reports-member-wise-row__total">{total}</span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+const STATUS_DONUT_COLORS = ["#22c55e", "#3b82f6", "#f59e0b", "#ef4444", "#8b5cf6", "#64748b"];
+
+export function ReportsStatusDonutChart({
+  rows,
+}: Readonly<{ rows: TaskReportsStatusRow[] }>) {
+  const total = rows.reduce((sum, row) => sum + row.count, 0);
+  if (rows.length === 0 || total <= 0) {
+    return <p className="small text-muted mb-0">No status data for this period.</p>;
+  }
+  const data = rows.map((row, index) => ({
+    name: row.status_name,
+    value: row.count,
+    color: row.status_color?.trim() || STATUS_DONUT_COLORS[index % STATUS_DONUT_COLORS.length],
+  }));
+
+  return (
+    <div className="reports-status-donut">
+      <div className="reports-status-donut__chart">
+        <ResponsiveContainer width="100%" height={220}>
+          <PieChart>
+            <Pie
+              data={data}
+              dataKey="value"
+              nameKey="name"
+              innerRadius={58}
+              outerRadius={88}
+              paddingAngle={2}
+            >
+              {data.map((entry) => (
+                <Cell key={entry.name} fill={entry.color} />
+              ))}
+            </Pie>
+            <Tooltip />
+          </PieChart>
+        </ResponsiveContainer>
+        <div className="reports-status-donut__center">
+          <div className="reports-status-donut__center-value">{total}</div>
+          <div className="reports-status-donut__center-label">Total</div>
+        </div>
+      </div>
+      <ul className="reports-status-donut__legend">
+        {data.map((entry) => (
+          <li key={entry.name}>
+            <span className="reports-status-donut__dot" style={{ backgroundColor: entry.color }} />
+            <span>{entry.name}</span>
+            <span className="reports-status-donut__legend-count">{entry.value}</span>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }
@@ -349,9 +614,7 @@ export function ReportsMemberTable({
       <tbody>
         {rows.map((row) => {
           const ext = row.extension_number ?? "";
-          const label = ext
-            ? formatWorkloadMemberLabel(ext, hierarchyExtensions, row)
-            : row.display_name ?? row.name ?? "—";
+          const label = formatReportsMemberLabel(row, hierarchyExtensions);
           return (
             <tr key={ext || label}>
               <td>
@@ -387,14 +650,21 @@ export function ReportsMemberTable({
 
 export function ReportsTrendChart({
   points,
-}: Readonly<{ points: TaskReportsTrendPoint[] }>) {
+  series = "volume",
+}: Readonly<{
+  points: TaskReportsTrendPoint[];
+  series?: "volume" | "completed";
+}>) {
   if (points.length === 0) {
     return <p className="small text-muted mb-0">No trend data for this period.</p>;
   }
   const data = points.map((p) => ({
     date: p.date,
     label: formatReportsDateLabel(p.date),
-    tasks: p.count ?? p.total_tasks ?? p.tasks ?? 0,
+    value:
+      series === "completed"
+        ? (p.completed_count ?? p.count ?? 0)
+        : (p.count ?? p.total_tasks ?? p.tasks ?? 0),
   }));
   return (
     <div className="reports-trend-chart">
@@ -406,7 +676,7 @@ export function ReportsTrendChart({
           <Tooltip />
           <Line
             type="monotone"
-            dataKey="tasks"
+            dataKey="value"
             stroke="#2563eb"
             strokeWidth={2}
             dot={{ r: 3, fill: "#2563eb" }}

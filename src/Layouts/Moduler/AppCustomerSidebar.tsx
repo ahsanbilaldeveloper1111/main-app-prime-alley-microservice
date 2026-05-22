@@ -725,7 +725,7 @@ const ApplicationCustomerSidebar: React.FC = () => {
           title: "Reports",
           icon: <BarChart3 size={16} />,
           url: "/planner/reports",
-          permission: PERMISSIONS.VIEW_REPORTS_WORK_PLANNER,
+          permission: PERMISSIONS.VIEW_TASKSLIST_WORK_PLANNER,
         },
         ...(showMyDayInPlannerSidebar
           ? [
