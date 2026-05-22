@@ -179,20 +179,34 @@ function resolveProjectHealth(
   return { health: "on_track", healthLabel: "On Track" };
 }
 
+function resolveBreakdownProgressPercent(row: TaskReportsProjectBreakdownRow): number {
+  if (row.progress_percent != null && Number.isFinite(row.progress_percent)) {
+    return Math.min(100, Math.max(0, Math.round(row.progress_percent)));
+  }
+  const totalTasks = row.total_tasks;
+  const completedTasks = row.completed_tasks;
+  if (totalTasks != null && totalTasks > 0 && completedTasks != null) {
+    return Math.min(100, Math.max(0, Math.round((completedTasks / totalTasks) * 100)));
+  }
+  return 0;
+}
+
+function resolveBreakdownDelayPercent(
+  row: TaskReportsProjectBreakdownRow,
+  progress: number,
+): number {
+  if (row.delay_percent != null && Number.isFinite(row.delay_percent)) {
+    return Math.min(100, Math.max(0, Math.round(row.delay_percent)));
+  }
+  return Math.max(0, 100 - progress);
+}
+
 function mapBreakdownToProjectRow(
   row: TaskReportsProjectBreakdownRow,
   project?: PlannerProjectListItem,
 ): ProjectReportRow {
-  const progress =
-    row.progress_percent != null && Number.isFinite(row.progress_percent)
-      ? Math.min(100, Math.max(0, Math.round(row.progress_percent)))
-      : row.total_tasks != null && row.total_tasks > 0 && row.completed_tasks != null
-        ? Math.min(100, Math.max(0, Math.round((row.completed_tasks / row.total_tasks) * 100)))
-        : 0;
-  const delay =
-    row.delay_percent != null && Number.isFinite(row.delay_percent)
-      ? Math.min(100, Math.max(0, Math.round(row.delay_percent)))
-      : Math.max(0, 100 - progress);
+  const progress = resolveBreakdownProgressPercent(row);
+  const delay = resolveBreakdownDelayPercent(row, progress);
   const totalTasks = row.total_tasks ?? 0;
   const completedTasks = row.completed_tasks ?? 0;
   const pendingTasks = row.pending_tasks ?? Math.max(0, totalTasks - completedTasks);
@@ -218,11 +232,7 @@ function mapBreakdownToProjectRow(
 
 export function formatProjectHealthStatsLine(row: ProjectReportRow): string {
   const overduePart =
-    row.overdueCount > 0
-      ? ` - ${row.overdueCount} overdue`
-      : row.overdueCount === 0 && row.totalTasks > 0
-        ? ""
-        : "";
+    row.overdueCount > 0 ? ` - ${row.overdueCount} overdue` : "";
   if (row.totalTasks > 0) {
     return `${row.completedTasks}/${row.totalTasks} tasks${overduePart}`;
   }
@@ -264,6 +274,17 @@ export function buildOverdueByProjectEntries(
     .sort((a, b) => b.count - a.count);
 }
 
+function resolveBreakdownProject(
+  row: TaskReportsProjectBreakdownRow,
+  byId: Map<number, PlannerProjectListItem>,
+  byName: Map<string, PlannerProjectListItem>,
+): PlannerProjectListItem | undefined {
+  if (row.project_id == null) {
+    return byName.get(row.project_name);
+  }
+  return byId.get(Math.floor(row.project_id)) ?? byName.get(row.project_name);
+}
+
 export function buildProjectReportRowsFromBreakdown(
   breakdown: TaskReportsProjectBreakdownRow[],
   projects: PlannerProjectListItem[],
@@ -272,9 +293,7 @@ export function buildProjectReportRowsFromBreakdown(
   const byId = new Map(projects.map((p) => [p.id, p]));
   const byName = new Map(projects.map((p) => [p.name, p]));
   return breakdown.map((row) => {
-    const project =
-      (row.project_id != null ? byId.get(Math.floor(row.project_id)) : undefined) ??
-      byName.get(row.project_name);
+    const project = resolveBreakdownProject(row, byId, byName);
     return mapBreakdownToProjectRow(row, project);
   });
 }
@@ -316,6 +335,30 @@ function sumBreakdownOverdue(breakdown: TaskReportsProjectBreakdownRow[]): numbe
   return breakdown.reduce((sum, row) => sum + (row.overdue_tasks ?? 0), 0);
 }
 
+function resolveReportTotalOverdue(
+  overviewOverdueTotal: number | undefined,
+  breakdown: TaskReportsProjectBreakdownRow[] | undefined,
+  rowOverdueSum: number,
+): number {
+  if (overviewOverdueTotal != null && Number.isFinite(overviewOverdueTotal)) {
+    return Math.max(0, Math.floor(overviewOverdueTotal));
+  }
+  if (breakdown?.length) {
+    return sumBreakdownOverdue(breakdown);
+  }
+  return rowOverdueSum;
+}
+
+function resolveSummaryTotalOverdue(
+  overviewOverdueTotal: number | undefined,
+  fallback: number,
+): number {
+  if (overviewOverdueTotal == null || !Number.isFinite(overviewOverdueTotal)) {
+    return fallback;
+  }
+  return Math.max(0, Math.floor(overviewOverdueTotal));
+}
+
 function countProjectsByOverdueThreshold(
   rows: ReadonlyArray<{ overdueCount: number }>,
 ): { onTrack: number; atRisk: number } {
@@ -350,15 +393,20 @@ export function buildProjectReportSummaryFromBreakdown(
   };
 }
 
+const PROJECT_VIEW_PERIOD_SUBTEXTS: Record<
+  "last_7" | "last_30" | "this_month" | "custom",
+  string
+> = {
+  last_7: "Active this week",
+  last_30: "In selected period",
+  this_month: "Active this month",
+  custom: "In selected period",
+};
+
 export function resolveProjectViewKpiSubtexts(
   datePreset: "last_7" | "last_30" | "this_month" | "custom",
 ): ProjectViewKpiSubtexts {
-  const totalProjects =
-    datePreset === "last_7"
-      ? "Active this week"
-      : datePreset === "this_month"
-        ? "Active this month"
-        : "In selected period";
+  const totalProjects = PROJECT_VIEW_PERIOD_SUBTEXTS[datePreset];
   return {
     totalProjects,
     onTrack: "Projects with <2 overdue",
@@ -485,12 +533,11 @@ export function buildProjectReportSummary(
 ): ProjectReportSummary {
   const { onTrack, atRisk } = countProjectsByOverdueThreshold(rows);
   const rowOverdueSum = rows.reduce((sum, row) => sum + row.overdueCount, 0);
-  const totalOverdue =
-    overviewOverdueTotal != null && Number.isFinite(overviewOverdueTotal)
-      ? Math.max(0, Math.floor(overviewOverdueTotal))
-      : breakdown?.length
-        ? sumBreakdownOverdue(breakdown)
-        : rowOverdueSum;
+  const totalOverdue = resolveReportTotalOverdue(
+    overviewOverdueTotal,
+    breakdown,
+    rowOverdueSum,
+  );
 
   if (rows.length > 0) {
     return {
@@ -511,10 +558,10 @@ export function buildProjectReportSummary(
     return {
       ...fromBreakdown,
       completed: apiSummary?.completed ?? fromBreakdown.completed,
-      totalOverdue:
-        overviewOverdueTotal != null && Number.isFinite(overviewOverdueTotal)
-          ? Math.max(0, Math.floor(overviewOverdueTotal))
-          : fromBreakdown.totalOverdue,
+      totalOverdue: resolveSummaryTotalOverdue(
+        overviewOverdueTotal,
+        fromBreakdown.totalOverdue,
+      ),
     };
   }
   if (apiSummary) {
@@ -546,13 +593,14 @@ export function buildOverdueByProjectRows(
   if (!overview) return [];
   const rows: OverdueByProjectRow[] = [];
   for (const task of overview.pending_tasks) {
-    if (!isTaskOverdue(task.due_date) || isTaskDone(task.status_name)) continue;
-    rows.push({
-      projectName: task.project_name?.trim() || "No project",
-      taskId: task.id,
-      taskTitle: task.title,
-      dueDate: task.due_date ?? null,
-    });
+    if (isTaskOverdue(task.due_date) && !isTaskDone(task.status_name)) {
+      rows.push({
+        projectName: task.project_name?.trim() || "No project",
+        taskId: task.id,
+        taskTitle: task.title,
+        dueDate: task.due_date ?? null,
+      });
+    }
   }
   return rows;
 }

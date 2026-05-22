@@ -2,8 +2,10 @@ import type {
   TaskReportsActivityRow,
   TaskReportsAssigneeRow,
   TaskReportsOverview,
+  TaskReportsStatusRow,
   TaskReportsSummary,
   TaskReportsTaskRow,
+  TaskReportsTrendPoint,
 } from "@utils/taskReports";
 import {
   formatReportsDelta,
@@ -12,7 +14,6 @@ import {
   resolveInProgressCount,
   resolveSummaryMetric,
 } from "@page-modules/planner/reports/reportsDomain";
-import type { TaskReportsStatusRow, TaskReportsTrendPoint } from "@utils/taskReports";
 import {
   formatWorkloadMemberLabel,
   workloadMemberAvatarColor,

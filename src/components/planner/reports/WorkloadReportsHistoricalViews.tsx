@@ -140,9 +140,16 @@ function MemberWeekPercentCell({ cell }: Readonly<{ cell: MemberWeekCell | undef
   );
 }
 
+function memberTrendDirectionArrow(
+  direction: HistoricalMemberTrendRow["trend"]["direction"],
+): string {
+  if (direction === "up") return "↑";
+  if (direction === "down") return "↓";
+  return "";
+}
+
 function MemberTrendDeltaCell({ trend }: Readonly<{ trend: HistoricalMemberTrendRow["trend"] }>) {
-  const arrow =
-    trend.direction === "up" ? "↑" : trend.direction === "down" ? "↓" : "";
+  const arrow = memberTrendDirectionArrow(trend.direction);
   return (
     <span
       className={`reports-member-trend-delta reports-member-trend-delta--${trend.direction}`}

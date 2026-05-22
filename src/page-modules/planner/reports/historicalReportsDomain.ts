@@ -290,7 +290,7 @@ export function buildMemberTrendTable(
   }
 
   const periodBuckets = buckets.length > 1 ? buckets.slice(0, -1) : buckets;
-  const deltaBucket = buckets.length > 1 ? buckets[buckets.length - 1] : null;
+  const deltaBucket = buckets.length > 1 ? (buckets.at(-1) ?? null) : null;
 
   return members.map((member) => {
     const ext = member.extension_number?.trim() ?? "";
@@ -322,8 +322,8 @@ export function buildMemberTrendTable(
       if (apiDelta?.delta_label) {
         deltaDisplay = formatDeltaCell(apiDelta.delta_label);
       } else if (periodValues.length >= 2) {
-        const change = periodValues[periodValues.length - 1] - periodValues[0];
-        deltaDisplay = change === 0 ? "0%" : `${change > 0 ? "+" : ""}${change}%`;
+        const change = (periodValues.at(-1) ?? 0) - (periodValues.at(0) ?? 0);
+        deltaDisplay = formatPeriodValuesChange(change);
       }
       cells.push({
         label: deltaBucket.label,
@@ -362,6 +362,75 @@ export function buildProjectBreakdownBarSegments(
       color: row.color?.trim() || PROJECT_BAR_COLORS[index % PROJECT_BAR_COLORS.length],
     }))
     .filter((segment) => segment.value > 0);
+}
+
+function formatPeriodValuesChange(change: number): string {
+  if (change === 0) return "0%";
+  const sign = change > 0 ? "+" : "";
+  return `${sign}${change}%`;
+}
+
+/** Collapse runs of whitespace without regex alternation (ReDoS-safe). */
+function collapseWhitespace(value: string): string {
+  return value.trim().split(/\s+/).filter(Boolean).join(" ");
+}
+
+const VS_PRIOR_PERIOD_MARKER = "vs prior period";
+
+function stripVsPriorPeriodSuffix(label: string): string {
+  const lower = label.toLowerCase();
+  const idx = lower.indexOf(VS_PRIOR_PERIOD_MARKER);
+  if (idx < 0) return label.trim();
+  return label.slice(0, idx).trim();
+}
+
+function resolveDeltaDirectionFromLabel(label: string): MemberTrendDelta["direction"] {
+  if (label.startsWith("-")) return "down";
+  if (label.startsWith("+") || label.includes("+")) return "up";
+  return "flat";
+}
+
+function normalizeMemberTrendDeltaLabel(trimmed: string): string {
+  const normalized = collapseWhitespace(trimmed);
+  const shouldStripVsPrior =
+    normalized.includes("%") ||
+    normalized.startsWith("+") ||
+    normalized.startsWith("-");
+  if (shouldStripVsPrior) {
+    return stripVsPriorPeriodSuffix(normalized);
+  }
+  return normalized;
+}
+
+function resolveDeltaFromLastPeriod(
+  periods: TaskReportsMemberTrendRow["periods"] | undefined,
+): MemberTrendDelta | null {
+  const lastPeriod = periods?.at(-1);
+  const deltaLabel = lastPeriod?.delta_label?.trim();
+  if (!deltaLabel) return null;
+  return {
+    label: normalizeMemberTrendDeltaLabel(deltaLabel),
+    direction: resolveDeltaDirectionFromLabel(deltaLabel),
+  };
+}
+
+function resolveDeltaFromWeekCells(weekCells: MemberWeekCell[]): MemberTrendDelta | null {
+  if (weekCells.length >= 2) {
+    const prev = weekCells.at(-2)?.percent ?? 0;
+    const current = weekCells.at(-1)?.percent ?? 0;
+    const change = Math.round((current - prev) * 10) / 10;
+    if (change === 0) {
+      return { label: "0%", direction: "flat" };
+    }
+    return {
+      label: formatPeriodValuesChange(change),
+      direction: change > 0 ? "up" : "down",
+    };
+  }
+  if (weekCells.length === 1) {
+    return { label: formatWeekPercentDisplay(weekCells[0].percent), direction: "flat" };
+  }
+  return null;
 }
 
 function resolveCompletionPercentTone(percent: number): MemberWeekPercentTone {
@@ -423,38 +492,11 @@ function resolveMemberTrendDelta(
     return { label: apiDelta.label.trim(), direction };
   }
 
-  const periods = apiTrend?.periods ?? [];
-  const lastPeriod = periods[periods.length - 1];
-  if (lastPeriod?.delta_label?.trim()) {
-    const trimmed = lastPeriod.delta_label.trim();
-    const direction = trimmed.startsWith("-")
-      ? "down"
-      : trimmed.startsWith("+") || trimmed.includes("+")
-        ? "up"
-        : "flat";
-    const label =
-      trimmed.includes("%") || trimmed.startsWith("+") || trimmed.startsWith("-")
-        ? trimmed.replace(/\s*vs prior period/i, "").trim()
-        : trimmed;
-    return { label, direction };
-  }
+  const fromPeriod = resolveDeltaFromLastPeriod(apiTrend?.periods);
+  if (fromPeriod) return fromPeriod;
 
-  if (weekCells.length >= 2) {
-    const prev = weekCells[weekCells.length - 2].percent;
-    const current = weekCells[weekCells.length - 1].percent;
-    const change = Math.round((current - prev) * 10) / 10;
-    if (change === 0) {
-      return { label: "0%", direction: "flat" };
-    }
-    return {
-      label: `${change > 0 ? "+" : ""}${change}%`,
-      direction: change > 0 ? "up" : "down",
-    };
-  }
-
-  if (weekCells.length === 1) {
-    return { label: formatWeekPercentDisplay(weekCells[0].percent), direction: "flat" };
-  }
+  const fromWeekCells = resolveDeltaFromWeekCells(weekCells);
+  if (fromWeekCells) return fromWeekCells;
 
   return { label: "—", direction: "flat" };
 }
@@ -524,7 +566,7 @@ export function buildHistoricalMemberTrendRows(
       return {
         key: ext || memberLabel,
         memberLabel,
-        displayName: displayName !== ext ? displayName : memberLabel,
+        displayName: displayName === ext ? memberLabel : displayName,
         initials,
         avatarColor,
         weekCells,

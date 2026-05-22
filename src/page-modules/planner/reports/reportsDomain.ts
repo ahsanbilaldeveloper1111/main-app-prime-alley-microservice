@@ -170,7 +170,13 @@ function normalizeListLimits(raw: unknown): TaskReportsListLimits | undefined {
     const flag = normalizeListLimitFlag(source[key] ?? source[camelAliases[key]]);
     if (flag) limits[key] = flag;
   }
-  return Object.keys(limits).length > 0 ? (limits as TaskReportsListLimits) : undefined;
+  return hasPopulatedListLimits(limits) ? limits : undefined;
+}
+
+function hasPopulatedListLimits(
+  limits: Record<string, TaskReportsListLimitFlag>,
+): limits is TaskReportsListLimits {
+  return Object.keys(limits).length > 0;
 }
 
 export function hasTruncatedReportLists(limits: TaskReportsListLimits | undefined): boolean {
@@ -341,7 +347,7 @@ function extensionMatchesRecord(ext: string, record: Record<string, unknown>): b
     readString(record.extension),
     readString(record.id),
   ].filter((value): value is string => Boolean(value));
-  return candidates.some((candidate) => candidate === ext);
+  return candidates.includes(ext);
 }
 
 function readHierarchyUserDisplayName(record: Record<string, unknown>): string | undefined {
@@ -380,6 +386,61 @@ function lookupHierarchyUserById(
   return undefined;
 }
 
+function tryResolveNameFromExtensionRecord(
+  ext: string,
+  record: Record<string, unknown>,
+  hierarchyUsers?: unknown[] | null,
+): string | undefined {
+  const name = readHierarchyPersonName(record, ext);
+  if (name) return name;
+  const userId = readString(record.user_id);
+  if (!userId) return undefined;
+  const fromLinkedUser = lookupHierarchyUserById(userId, hierarchyUsers);
+  if (fromLinkedUser && !isPlaceholderExtensionLabel(fromLinkedUser, ext)) {
+    return fromLinkedUser;
+  }
+  return undefined;
+}
+
+function findMemberNameInExtensionRows(
+  ext: string,
+  hierarchyExtensions: unknown[],
+  hierarchyUsers?: unknown[] | null,
+): string | undefined {
+  for (const row of hierarchyExtensions) {
+    if (row == null || typeof row !== "object") continue;
+    const record = row as Record<string, unknown>;
+    if (!extensionMatchesRecord(ext, record)) continue;
+    const resolved = tryResolveNameFromExtensionRecord(ext, record, hierarchyUsers);
+    if (resolved) return resolved;
+  }
+  return undefined;
+}
+
+function findMemberNameInUserRows(
+  ext: string,
+  hierarchyUsers: unknown[],
+): string | undefined {
+  for (const row of hierarchyUsers) {
+    if (row == null || typeof row !== "object") continue;
+    const record = row as Record<string, unknown>;
+    if (!extensionMatchesRecord(ext, record)) continue;
+    const name = readHierarchyPersonName(record, ext);
+    if (name) return name;
+  }
+  return undefined;
+}
+
+function resolveHierarchyExtensionFallback(
+  ext: string,
+  fromExtensions: string,
+): string {
+  if (fromExtensions && !isPlaceholderExtensionLabel(fromExtensions, ext)) {
+    return fromExtensions;
+  }
+  return "";
+}
+
 export function lookupHierarchyMemberDisplayName(
   extensionNumber: string,
   hierarchyExtensions?: unknown[] | null,
@@ -394,35 +455,20 @@ export function lookupHierarchyMemberDisplayName(
   }
 
   if (Array.isArray(hierarchyExtensions)) {
-    for (const row of hierarchyExtensions) {
-      if (row == null || typeof row !== "object") continue;
-      const record = row as Record<string, unknown>;
-      if (!extensionMatchesRecord(ext, record)) continue;
-      const name = readHierarchyPersonName(record, ext);
-      if (name) return name;
-      const userId = readString(record.user_id);
-      const fromLinkedUser = userId
-        ? lookupHierarchyUserById(userId, hierarchyUsers)
-        : undefined;
-      if (fromLinkedUser && !isPlaceholderExtensionLabel(fromLinkedUser, ext)) {
-        return fromLinkedUser;
-      }
-    }
+    const fromExtensionRows = findMemberNameInExtensionRows(
+      ext,
+      hierarchyExtensions,
+      hierarchyUsers,
+    );
+    if (fromExtensionRows) return fromExtensionRows;
   }
 
   if (Array.isArray(hierarchyUsers)) {
-    for (const row of hierarchyUsers) {
-      if (row == null || typeof row !== "object") continue;
-      const record = row as Record<string, unknown>;
-      if (!extensionMatchesRecord(ext, record)) continue;
-      const name = readHierarchyPersonName(record, ext);
-      if (name) return name;
-    }
+    const fromUserRows = findMemberNameInUserRows(ext, hierarchyUsers);
+    if (fromUserRows) return fromUserRows;
   }
 
-  return fromExtensions && !isPlaceholderExtensionLabel(fromExtensions, ext)
-    ? fromExtensions
-    : "";
+  return resolveHierarchyExtensionFallback(ext, fromExtensions);
 }
 
 function lookupHierarchyExtensionByDisplayName(
@@ -445,7 +491,7 @@ function lookupHierarchyExtensionByDisplayName(
       "label",
       "full_name",
     ]);
-    if (ext && label && label.toLowerCase() === target) return ext;
+    if (ext && label?.toLowerCase() === target) return ext;
   }
   return "";
 }
@@ -493,7 +539,7 @@ function resolveReportsStatusName(
     const nested = resolveReportsStatusName(statusRecord, statusNamesById);
     if (nested !== "Unknown" && !nested.startsWith("Status ")) return nested;
   }
-  return statusId != null ? `Status ${statusId}` : "Unknown";
+  return statusId == null ? "Unknown" : `Status ${statusId}`;
 }
 
 export function buildPlannerStatusNamesMap(
@@ -618,17 +664,25 @@ function parsePeriodDeltaDirection(
   return undefined;
 }
 
-function normalizePeriodDelta(raw: unknown): TaskReportsPeriodDelta | undefined {
-  if (typeof raw === "number" && Number.isFinite(raw)) {
-    const direction = raw > 0 ? "up" : raw < 0 ? "down" : "flat";
-    return {
-      value: raw,
-      percent: Math.abs(raw),
-      direction,
-    };
-  }
-  if (raw == null || typeof raw !== "object") return undefined;
-  const row = raw as Record<string, unknown>;
+function resolveSignedDeltaDirection(
+  value: number,
+): TaskReportsPeriodDelta["direction"] {
+  if (value > 0) return "up";
+  if (value < 0) return "down";
+  return "flat";
+}
+
+function normalizeNumericPeriodDelta(value: number): TaskReportsPeriodDelta {
+  return {
+    value,
+    percent: Math.abs(value),
+    direction: resolveSignedDeltaDirection(value),
+  };
+}
+
+function normalizeObjectPeriodDelta(
+  row: Record<string, unknown>,
+): TaskReportsPeriodDelta | undefined {
   const percent =
     readNumber(row.percent) ??
     readNumber(row.change_percent) ??
@@ -636,15 +690,24 @@ function normalizePeriodDelta(raw: unknown): TaskReportsPeriodDelta | undefined 
   const value = readNumber(row.value) ?? percent;
   let direction = parsePeriodDeltaDirection(row.direction);
   if (!direction && percent != null) {
-    direction = percent > 0 ? "up" : percent < 0 ? "down" : "flat";
+    direction = resolveSignedDeltaDirection(percent);
   }
-  if (percent == null && value == null && !readString(row.label)) return undefined;
+  const label = readString(row.label);
+  if (percent == null && value == null && !label) return undefined;
   return {
     value,
-    percent: percent != null ? Math.abs(percent) : undefined,
+    percent: percent == null ? undefined : Math.abs(percent),
     direction,
-    label: readString(row.label),
+    label,
   };
+}
+
+function normalizePeriodDelta(raw: unknown): TaskReportsPeriodDelta | undefined {
+  if (typeof raw === "number" && Number.isFinite(raw)) {
+    return normalizeNumericPeriodDelta(raw);
+  }
+  if (raw == null || typeof raw !== "object") return undefined;
+  return normalizeObjectPeriodDelta(raw as Record<string, unknown>);
 }
 
 function normalizeVsPreviousPeriod(
@@ -803,10 +866,11 @@ function normalizeTaskRow(raw: unknown): TaskReportsTaskRow | null {
 function normalizeWeeklyTrendPoint(raw: unknown): TaskReportsWeeklyTrendPoint | null {
   if (raw == null || typeof raw !== "object") return null;
   const row = raw as Record<string, unknown>;
+  const weekIndex = readNumber(row.week_index);
   const weekLabel =
     readString(row.week_label) ??
     readString(row.label) ??
-    (readNumber(row.week_index) != null ? `Wk ${readNumber(row.week_index)}` : undefined);
+    (weekIndex == null ? undefined : `Wk ${weekIndex}`);
   if (!weekLabel) return null;
   const overdueCount =
     readNumber(row.overdue_count) ?? readNumber(row.overdue) ?? readNumber(row.count);
@@ -959,14 +1023,6 @@ function normalizeActiveIssueRow(raw: unknown): TaskReportsActiveIssueRow | null
   };
 }
 
-function parseMemberTrendDirection(
-  value: unknown,
-): "up" | "down" | "flat" | undefined {
-  const raw = readString(value);
-  if (raw === "up" || raw === "down" || raw === "flat") return raw;
-  return undefined;
-}
-
 function normalizeMemberTrendPeriods(
   row: Record<string, unknown>,
 ): TaskReportsMemberTrendRow["periods"] {
@@ -1021,7 +1077,7 @@ function normalizeMemberTrendRow(raw: unknown): TaskReportsMemberTrendRow | null
     ? {
         delta_percent: readNumber(trendRecord.delta_percent),
         label: readString(trendRecord.label),
-        direction: parseMemberTrendDirection(trendRecord.direction),
+        direction: parsePeriodDeltaDirection(trendRecord.direction),
       }
     : undefined;
   const weeksRaw = row.weeks;
@@ -1081,6 +1137,65 @@ function normalizeList<T>(
   return raw.map(mapRow).filter((row): row is T => row != null);
 }
 
+function isResolvableStatusName(name: string): boolean {
+  return name !== "Unknown" && !name.startsWith("Status ");
+}
+
+function mergeStatusNamesFromFilterStatuses(
+  map: Map<number, string>,
+  filters: Record<string, unknown>,
+): void {
+  const statuses = filters.statuses;
+  if (!Array.isArray(statuses)) return;
+  for (const item of statuses) {
+    if (item == null || typeof item !== "object") continue;
+    const row = item as Record<string, unknown>;
+    const id = readNumber(row.id) ?? readNumber(row.status_id);
+    const name = resolveReportsStatusName(row, map);
+    if (id != null && isResolvableStatusName(name)) {
+      map.set(id, name);
+    }
+  }
+}
+
+function mergeStatusNamesFromTaskList(
+  map: Map<number, string>,
+  list: unknown,
+): void {
+  if (!Array.isArray(list)) return;
+  for (const item of list) {
+    if (item == null || typeof item !== "object") continue;
+    const row = item as Record<string, unknown>;
+    const statusRecord = readNestedRecord(row.status);
+    const id =
+      readNumber(row.status_id) ?? (statusRecord ? readNumber(statusRecord.id) : undefined);
+    const name =
+      readString(row.status_name) ??
+      (statusRecord ? resolveReportsStatusName(statusRecord, map) : undefined);
+    if (id != null && name) map.set(id, name);
+  }
+}
+
+function mergeStatusNamesFromBreakdown(
+  map: Map<number, string>,
+  breakdown: unknown,
+): void {
+  if (!Array.isArray(breakdown)) return;
+  for (const item of breakdown) {
+    if (item == null || typeof item !== "object") continue;
+    const row = item as Record<string, unknown>;
+    const statusRecord = readNestedRecord(row.status);
+    const id =
+      readNumber(row.status_id) ??
+      readNumber(row.id) ??
+      (statusRecord ? readNumber(statusRecord.id) : undefined);
+    const name = resolveReportsStatusName(row, map);
+    if (id != null && isResolvableStatusName(name)) {
+      map.set(id, name);
+    }
+  }
+}
+
 function buildStatusNamesByIdMap(
   source: Record<string, unknown>,
   external?: ReadonlyMap<number, string>,
@@ -1088,18 +1203,7 @@ function buildStatusNamesByIdMap(
   const map = new Map<number, string>(external);
   const filters = source.filters;
   if (filters != null && typeof filters === "object") {
-    const statuses = (filters as Record<string, unknown>).statuses;
-    if (Array.isArray(statuses)) {
-      for (const item of statuses) {
-        if (item == null || typeof item !== "object") continue;
-        const row = item as Record<string, unknown>;
-        const id = readNumber(row.id) ?? readNumber(row.status_id);
-        const name = resolveReportsStatusName(row, map);
-        if (id != null && name !== "Unknown" && !name.startsWith("Status ")) {
-          map.set(id, name);
-        }
-      }
-    }
+    mergeStatusNamesFromFilterStatuses(map, filters as Record<string, unknown>);
   }
 
   const taskLists = [
@@ -1108,36 +1212,13 @@ function buildStatusNamesByIdMap(
     pickOverviewSection(source, ["stale_in_progress_tasks", "staleInProgressTasks"]),
   ];
   for (const list of taskLists) {
-    if (!Array.isArray(list)) continue;
-    for (const item of list) {
-      if (item == null || typeof item !== "object") continue;
-      const row = item as Record<string, unknown>;
-      const statusRecord = readNestedRecord(row.status);
-      const id =
-        readNumber(row.status_id) ?? (statusRecord ? readNumber(statusRecord.id) : undefined);
-      const name =
-        readString(row.status_name) ??
-        (statusRecord ? resolveReportsStatusName(statusRecord, map) : undefined);
-      if (id != null && name) map.set(id, name);
-    }
+    mergeStatusNamesFromTaskList(map, list);
   }
 
-  const breakdown = pickOverviewSection(source, ["status_breakdown", "statusBreakdown"]);
-  if (Array.isArray(breakdown)) {
-    for (const item of breakdown) {
-      if (item == null || typeof item !== "object") continue;
-      const row = item as Record<string, unknown>;
-      const statusRecord = readNestedRecord(row.status);
-      const id =
-        readNumber(row.status_id) ??
-        readNumber(row.id) ??
-        (statusRecord ? readNumber(statusRecord.id) : undefined);
-      const name = resolveReportsStatusName(row, map);
-      if (id != null && name !== "Unknown" && !name.startsWith("Status ")) {
-        map.set(id, name);
-      }
-    }
-  }
+  mergeStatusNamesFromBreakdown(
+    map,
+    pickOverviewSection(source, ["status_breakdown", "statusBreakdown"]),
+  );
   return map;
 }
 
