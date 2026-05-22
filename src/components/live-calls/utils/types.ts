@@ -50,3 +50,18 @@ export interface AvailableDevice {
   details: string
 }
 
+/** Inputs for wallboard {@link categorizeDns} (see helpers.ts). */
+export interface CategorizeDnsParams {
+  dn: string
+  devices: CtiDevice[]
+  call: unknown
+  active: boolean
+  activeMonitoring: ActiveMonitoring
+  getCallStateForDevice: (dn: string, deviceName: string) => unknown
+  getCallStatesForDn: (dn: string) => unknown[]
+  userAddress?: string | null
+  monitoringTeardown?: MonitoringTeardownHint | null
+  /** True while SSE/log says supervision is still active for this pair. */
+  supervisionSessionActive?: boolean
+}
+

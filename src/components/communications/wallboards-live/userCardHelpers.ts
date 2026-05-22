@@ -4,6 +4,10 @@ import {
   isDirectConferenceCallNotMonitorable,
   isDisplayConferenceCall,
 } from '@utils/ctiCallDisplay'
+import {
+  callHasLiveAgentPartyWithNonSupervisor,
+  dnHasLiveCustomerConversationOnCall,
+} from '@utils/ctiMonitoringCallParties'
 
 /** Pure helpers for UserCard — keeps Sonar cognitive complexity out of the main component. */
 
@@ -206,13 +210,10 @@ export function getActivePartyForDn(
       p.callStatus !== 'DROPPED' &&
       p.callStatus !== 'DISCONNECTED'
   )
-  if (activeForDn) {
+  if (activeForDn && dnHasLiveCustomerConversationOnCall(call, dn)) {
     return activeForDn
   }
-  const anyForDn = call.parties.find(
-    (p) => p.callingAddress === dn || p.calledAddress === dn
-  )
-  return anyForDn ?? call.parties[0] ?? null
+  return null
 }
 
 function statusFromActivePartyForDn(
@@ -342,11 +343,24 @@ export function computeUserCardCallStatus(
         return undefined
       }
 
+      if (!dnHasLiveCustomerConversationOnCall(call, dn)) {
+        return undefined
+      }
+
       const fromParty = statusFromActivePartyForDn(filtered, dn, isConferenceCall)
       if (fromParty !== undefined) {
         return fromParty
       }
     }
+  }
+
+  const m = call.monitoring
+  if (
+    m?.monitorDn &&
+    m?.monitoredDn &&
+    !callHasLiveAgentPartyWithNonSupervisor(call, m.monitoredDn, m.monitorDn)
+  ) {
+    return undefined
   }
 
   return callLevelUserCardCallStatus(call, isConferenceCall)

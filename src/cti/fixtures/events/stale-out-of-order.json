@@ -1,0 +1,31 @@
+{
+  "_scenario": "stale-event-ignore",
+  "_description": "Event arrives with older eventTime than what is already in callStateMap — must be ignored",
+  "_base_state": {
+    "callId": "CALL-001",
+    "eventType": "CONNECTED",
+    "sequence": 5,
+    "eventTime": "2026-01-01T10:00:10.000Z"
+  },
+  "type": "call_events",
+  "data": {
+    "callId": "CALL-001",
+    "eventType": "RINGING",
+    "sequence": 2,
+    "eventTime": "2026-01-01T10:00:01.000Z",
+    "isConference": false,
+    "isOneToOne": true,
+    "isTerminating": false,
+    "hasActiveParticipants": true,
+    "eventName": "CallRinging",
+    "currentState": "RINGING",
+    "parties": [
+      {
+        "callId": "CALL-001",
+        "callingAddress": "5551234",
+        "calledAddress": "1001",
+        "callStatus": "RINGING"
+      }
+    ]
+  }
+}

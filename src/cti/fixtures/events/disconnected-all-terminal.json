@@ -1,0 +1,26 @@
+{
+  "_scenario": "call-end-all-terminal",
+  "_description": "Call ends — all parties disconnected; call should be removed from map",
+  "type": "call_events",
+  "data": {
+    "callId": "CALL-001",
+    "eventType": "DISCONNECTED",
+    "sequence": 4,
+    "eventTime": "2026-01-01T10:05:00.000Z",
+    "isConference": false,
+    "isOneToOne": true,
+    "isTerminating": true,
+    "hasActiveParticipants": false,
+    "eventName": "CallDisconnected",
+    "currentState": "DISCONNECTED",
+    "parties": [
+      {
+        "callId": "CALL-001",
+        "callingAddress": "5551234",
+        "calledAddress": "1001",
+        "callStatus": "DISCONNECTED",
+        "startTime": "2026-01-01T10:00:05.000Z"
+      }
+    ]
+  }
+}

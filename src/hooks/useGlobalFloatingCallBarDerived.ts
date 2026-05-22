@@ -18,6 +18,7 @@ export type UseGlobalFloatingCallBarDerivedParams = {
   activeCalls: Map<string, FloatingBarCtiCall>;
   userAddress: string | null | undefined;
   callStateMap: Record<string, FloatingBarCallStateEntry> | undefined;
+  eventLog?: readonly unknown[];
   dnsMap: FloatingBarDnsMap | undefined;
   formatDuration: (seconds: number) => string;
   getUserDataExtensions: UserDataExtensionsGetter;
@@ -27,6 +28,7 @@ export function useGlobalFloatingCallBarDerived({
   activeCalls,
   userAddress,
   callStateMap,
+  eventLog,
   dnsMap,
   formatDuration,
   getUserDataExtensions,
@@ -37,8 +39,9 @@ export function useGlobalFloatingCallBarDerived({
         activeCalls,
         userAddress,
         callStateMap,
+        eventLog,
       ),
-    [activeCalls, userAddress, callStateMap],
+    [activeCalls, userAddress, callStateMap, eventLog],
   );
 
   const canCurrentUserResumeCall = useMemo(() => {

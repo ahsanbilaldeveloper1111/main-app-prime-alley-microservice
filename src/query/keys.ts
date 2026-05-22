@@ -1310,3 +1310,30 @@ export const controlhubKeys = {
       ] as const,
   },
 };
+
+/**
+ * CTI (Computer Telephony Integration) query keys.
+ *
+ * Used by TanStack Query mutation hooks to invalidate / optimistically update
+ * call state after REST commands.
+ *
+ * Live call state itself lives in CtiContext (SSE-driven), not in the Query
+ * cache.  These keys are used for:
+ *   - REST command mutations (dial, end, hold, resume, attend, transfer, monitor)
+ *   - Reconciliation reads (ongoing calls, call legs)
+ */
+export const ctiKeys = {
+  root: ["cti"] as const,
+
+  /** Active calls snapshot from GET/ongoing-calls — used for reconciliation. */
+  ongoingCalls: (userDn: string) =>
+    [...ctiKeys.root, "ongoingCalls", userDn] as const,
+
+  /** Individual call leg detail. */
+  callLegs: (callId: string) =>
+    [...ctiKeys.root, "callLegs", callId] as const,
+
+  /** Dial command result (optimistic) — keyed by a client-side pending id. */
+  dialResult: (pendingId: string) =>
+    [...ctiKeys.root, "dialResult", pendingId] as const,
+};
