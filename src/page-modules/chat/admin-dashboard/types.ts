@@ -2,6 +2,7 @@ export interface ChatbotsSummaryStats {
   queriesToday: number;
   costTodayUsd: number;
   costMonthUsd: number;
+  profitMonthUsd: number;
   tenants: number;
   users: number;
   failuresToday: number;
@@ -11,6 +12,9 @@ export interface TopCompanyRow {
   company: string;
   queries: number;
   costUsd: number;
+  revenueUsd: number;
+  profitUsd: number;
+  marginPct: number | null;
 }
 
 export interface TopUserRow {
@@ -29,6 +33,9 @@ export interface AllCompaniesRow {
   company: string;
   monthQueries: number;
   monthCostUsd: number;
+  monthRevenueUsd: number;
+  monthProfitUsd: number;
+  marginPct: number | null;
   /** Display-ready timestamp (API may send ISO; UI can format). */
   lastActivity: string;
 }
@@ -49,6 +56,8 @@ export interface AdminUserBudgetRow {
   effectiveBudgetUsd: string;
   effectiveThresholdPct: number;
   mtdSpend: string;
+  mtdBaseSpend: string;
+  profitUsd: string;
   usedPct: number;
   isExhausted: boolean;
   budgetSyncedAt: string | null;

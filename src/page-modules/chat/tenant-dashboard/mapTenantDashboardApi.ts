@@ -31,19 +31,6 @@ function formatRecentConversationActivity(
   return formatActivity(row.updated_at);
 }
 
-function mapPricing(
-  pricing: TenantChatDashboardResponse["pricing"],
-): ChatbotsTenantDashboardModel["pricing"] {
-  if (!pricing) {
-    return null;
-  }
-  return {
-    model: pricing.model?.trim() || "—",
-    inputPerMillion: pricing.input_per_million?.trim() || "0",
-    outputPerMillion: pricing.output_per_million?.trim() || "0",
-  };
-}
-
 function readKpiQueries(bucket: { queries?: number } | undefined): number {
   return bucket?.queries ?? 0;
 }
@@ -116,6 +103,5 @@ export function mapTenantDashboardApi(
         costUsd: parseCost(row.cost),
       };
     }),
-    pricing: mapPricing(data.pricing),
   };
 }

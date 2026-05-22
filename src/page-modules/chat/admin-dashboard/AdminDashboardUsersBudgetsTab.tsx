@@ -59,11 +59,6 @@ function formatPct(value: number | null | undefined): string {
   return `${pct1.format(value)}%`;
 }
 
-function formatNullableUsd(value: string | null): string {
-  if (value == null) return "—";
-  return formatUsd(value);
-}
-
 function formatLastSeen(iso: string | null): string {
   if (!iso?.trim()) return "—";
   const d = new Date(iso);
@@ -309,11 +304,11 @@ export function AdminDashboardUsersBudgetsTab({
           <colgroup>
             <col className="chatbots-dashboard__col-tenant-width" />
             <col className="chatbots-dashboard__col-user-width" />
-            <col style={{ width: "7%" }} />
-            <col style={{ width: "8%" }} />
             <col style={{ width: "10%" }} />
-            <col style={{ width: "9%" }} />
-            <col style={{ width: "9%" }} />
+            <col style={{ width: "10%" }} />
+            <col style={{ width: "10%" }} />
+            <col style={{ width: "10%" }} />
+            <col style={{ width: "10%" }} />
             <col style={{ width: "14%" }} />
             <col style={{ width: "12%" }} />
           </colgroup>
@@ -329,11 +324,11 @@ export function AdminDashboardUsersBudgetsTab({
               >
                 User
               </th>
-              <th className={chatbotsDashboardThClass}>Row budget</th>
-              <th className={chatbotsDashboardThClass}>Row threshold</th>
               <th className={chatbotsDashboardThClass}>Effective budget</th>
               <th className={chatbotsDashboardThClass}>Effective threshold</th>
               <th className={chatbotsDashboardThClass}>MTD spend</th>
+              <th className={chatbotsDashboardThClass}>MTD base spend</th>
+              <th className={chatbotsDashboardThClass}>Profit</th>
               <th className={chatbotsDashboardThClass}>Usage</th>
               <th className={chatbotsDashboardThClass}>Last seen</th>
             </tr>
@@ -373,17 +368,6 @@ export function AdminDashboardUsersBudgetsTab({
                     <Badge bg="danger">Exhausted</Badge>
                   ) : null}
                 </td>
-                <td className={chatbotsDashboardTdClass} data-label="Row budget">
-                  {formatNullableUsd(row.monthlyBudgetUsd)}
-                </td>
-                <td
-                  className={chatbotsDashboardTdClass}
-                  data-label="Row threshold"
-                >
-                  {row.budgetThresholdPct == null
-                    ? "—"
-                    : formatPct(row.budgetThresholdPct)}
-                </td>
                 <td
                   className={chatbotsDashboardTdClass}
                   data-label="Effective budget"
@@ -398,6 +382,15 @@ export function AdminDashboardUsersBudgetsTab({
                 </td>
                 <td className={chatbotsDashboardTdClass} data-label="MTD spend">
                   {formatUsd(row.mtdSpend, true)}
+                </td>
+                <td
+                  className={chatbotsDashboardTdClass}
+                  data-label="MTD base spend"
+                >
+                  {formatUsd(row.mtdBaseSpend, true)}
+                </td>
+                <td className={chatbotsDashboardTdClass} data-label="Profit">
+                  {formatUsd(row.profitUsd, true)}
                 </td>
                 <td
                   className={chatbotsDashboardTdClass}

@@ -154,16 +154,6 @@ function readPricingForModel(
   modelName: string,
   pricingTable: TenantChatPricingTable,
 ): { input: string; output: string } {
-  const overrides = asRecord(root.overrides);
-  const overrideInput = readStringValue(overrides?.input_cost_per_million);
-  const overrideOutput = readStringValue(overrides?.output_cost_per_million);
-  if (overrideInput || overrideOutput) {
-    return {
-      input: overrideInput,
-      output: overrideOutput,
-    };
-  }
-
   const fromTable = pricingTable[modelName];
   if (fromTable) return fromTable;
 
@@ -312,8 +302,6 @@ export function mapFormValuesToTenantSettingsUpdate(
   }
 
   const userPerMinute = toPayloadString(values.rateLimits.perUserPerMinute);
-  const inputCost = toPayloadString(values.pricing.inputCostPerMillion);
-  const outputCost = toPayloadString(values.pricing.outputCostPerMillion);
   const defaultUserBudget = toPayloadString(values.budget.defaultUserBudgetUsd);
   const defaultThresholdPct = toPayloadString(
     values.budget.defaultBudgetThresholdPct,
@@ -321,8 +309,6 @@ export function mapFormValuesToTenantSettingsUpdate(
   const marginPct = toPayloadString(values.marginPct);
 
   validateOptionalNonNegativeInt(userPerMinute, "User per minute");
-  validateOptionalNonNegativeNumber(inputCost, "Input cost per million");
-  validateOptionalNonNegativeNumber(outputCost, "Output cost per million");
   validateOptionalNonNegativeNumber(defaultUserBudget, "Default per user budget");
   validateOptionalThresholdPct(defaultThresholdPct);
   validateOptionalNonNegativeNumber(marginPct, "Cost margin (%)");
@@ -330,8 +316,6 @@ export function mapFormValuesToTenantSettingsUpdate(
   return {
     tenant_id: id,
     user_per_minute: userPerMinute,
-    input_cost_per_million: inputCost,
-    output_cost_per_million: outputCost,
     model_name: modelName,
     margin_pct: marginPct,
     default_user_budget_usd: defaultUserBudget,

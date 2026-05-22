@@ -197,21 +197,19 @@ export function ChatAdminAuditLogView({ ctx }: ChatAdminAuditLogViewProps) {
                     <th className={chatbotsDashboardThClass}>Event</th>
                     <th className={chatbotsDashboardThClass}>Message</th>
                     <th className={chatbotsDashboardThClass}>Target</th>
-                    <th className={chatbotsDashboardThClass}>Actor</th>
-                    <th className={chatbotsDashboardThClass}>Request ID</th>
                     <th className={chatbotsDashboardThClass}>Meta</th>
                   </tr>
                 </thead>
                 <tbody>
                   {!isLoading && rows.length === 0 ? (
                     <tr>
-                      <td colSpan={8} className="text-center text-muted py-4">
+                      <td colSpan={6} className="text-center text-muted py-4">
                         No audit events to display. Event data will load here once
                         the audit log API is available.
                       </td>
                     </tr>
                   ) : null}
-                  {rows.map((row) => {
+                  {rows.map((row, index) => {
                     const target =
                       row.target_type || row.target_id
                         ? [row.target_type, row.target_id].filter(Boolean).join(" #")
@@ -219,7 +217,7 @@ export function ChatAdminAuditLogView({ ctx }: ChatAdminAuditLogViewProps) {
                     const metaText = formatAuditMeta(row.meta);
                     return (
                       <tr
-                        key={`${row.request_id}-${row.ts}-${row.event}-${row.target_id ?? ""}`}
+                        key={`${row.ts}-${row.event}-${row.tenant_id ?? ""}-${row.target_id ?? ""}-${index}`}
                       >
                         <td
                           className={`${chatbotsDashboardTdClass} text-nowrap small`}
@@ -235,15 +233,6 @@ export function ChatAdminAuditLogView({ ctx }: ChatAdminAuditLogViewProps) {
                         <td className={chatbotsDashboardTdClass}>{row.message}</td>
                         <td className={`${chatbotsDashboardTdClass} small`}>
                           {target}
-                        </td>
-                        <td className={`${chatbotsDashboardTdClass} text-nowrap`}>
-                          {row.actor ?? "—"}
-                        </td>
-                        <td
-                          className={`${chatbotsDashboardTdClass} small text-break`}
-                          style={{ maxWidth: 140 }}
-                        >
-                          {row.request_id}
                         </td>
                         <td
                           className={`${chatbotsDashboardTdClass} small text-break`}

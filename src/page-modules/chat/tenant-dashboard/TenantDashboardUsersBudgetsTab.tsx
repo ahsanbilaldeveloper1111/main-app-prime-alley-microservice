@@ -22,11 +22,6 @@ import { DashboardTableCard } from "../shared/DashboardTableCard";
 import type { TenantUserBudgetRow } from "./types";
 import { useChatTenantUsersQuery } from "./useChatTenantUsersQuery";
 
-function formatNullableUsd(value: string | null): string {
-  if (value == null) return "—";
-  return formatBudgetUsd(value);
-}
-
 function formatLastSeen(iso: string | null): string {
   if (!iso?.trim()) return "—";
   const d = new Date(iso);
@@ -235,14 +230,6 @@ function UserBudgetTableRow({
         )}
         {row.isExhausted ? <Badge bg="danger">Exhausted</Badge> : null}
       </td>
-      <td className={chatbotsDashboardTdClass} data-label="Row budget">
-        {formatNullableUsd(row.monthlyBudgetUsd)}
-      </td>
-      <td className={chatbotsDashboardTdClass} data-label="Row threshold">
-        {row.budgetThresholdPct == null
-          ? "—"
-          : formatBudgetPct(row.budgetThresholdPct)}
-      </td>
       <td className={chatbotsDashboardTdClass} data-label="Effective budget">
         {formatBudgetUsd(row.effectiveBudgetUsd)}
       </td>
@@ -292,14 +279,12 @@ function UsersBudgetsTable({
       <Table hover size="sm" className={chatbotsDashboardUsersBudgetsTableClass}>
         <colgroup>
           <col className="chatbots-dashboard__col-user-width" />
-          <col style={{ width: "9%" }} />
-          <col style={{ width: "9%" }} />
-          <col style={{ width: "11%" }} />
-          <col style={{ width: "10%" }} />
-          <col style={{ width: "10%" }} />
-          <col style={{ width: "16%" }} />
           <col style={{ width: "12%" }} />
-          <col style={{ width: "14%" }} />
+          <col style={{ width: "11%" }} />
+          <col style={{ width: "12%" }} />
+          <col style={{ width: "18%" }} />
+          <col style={{ width: "12%" }} />
+          <col style={{ width: "16%" }} />
         </colgroup>
         <thead className="table-light">
           <tr>
@@ -308,8 +293,6 @@ function UsersBudgetsTable({
             >
               User
             </th>
-            <th className={chatbotsDashboardThClass}>Row budget</th>
-            <th className={chatbotsDashboardThClass}>Row threshold</th>
             <th className={chatbotsDashboardThClass}>Effective budget</th>
             <th className={chatbotsDashboardThClass}>Effective threshold</th>
             <th className={chatbotsDashboardThClass}>MTD spend</th>
@@ -321,7 +304,7 @@ function UsersBudgetsTable({
         <tbody>
           {!isFetching && rows.length === 0 ? (
             <tr>
-              <td colSpan={9} className="text-center text-muted py-4">
+              <td colSpan={7} className="text-center text-muted py-4">
                 No users found for this tenant.
               </td>
             </tr>

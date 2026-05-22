@@ -20,6 +20,8 @@ function mapUserRow(row: AdminChatUserRow): AdminUserBudgetRow {
     effectiveBudgetUsd: row.effective_budget_usd ?? "",
     effectiveThresholdPct: row.effective_threshold_pct ?? 0,
     mtdSpend: row.mtd_spend ?? "",
+    mtdBaseSpend: row.mtd_base_spend ?? "",
+    profitUsd: row.profit_usd ?? "",
     usedPct: row.used_pct ?? 0,
     isExhausted: Boolean(row.is_exhausted),
     budgetSyncedAt: row.budget_synced_at,

@@ -1537,12 +1537,6 @@ export interface TenantDashboardTopQuestion {
   served_by_tool_pct: number;
 }
 
-export interface TenantDashboardPricing {
-  model: string;
-  input_per_million: string;
-  output_per_million: string;
-}
-
 export interface TenantDashboardRecentConversation {
   thread_id?: string;
   user_id?: string;
@@ -1575,8 +1569,6 @@ export interface TenantChatDashboardResponse {
   recent_conversations: TenantDashboardRecentConversation[];
   top_questions_7d: TenantDashboardTopQuestion[];
   recent_failures: unknown[];
-  /** Current tenant LLM rates (margin included; raw base prices not exposed). */
-  pricing?: TenantDashboardPricing;
 }
 
 /** Tenant dashboard API (`GET /api/chat/tenant/dashboard` when `BACKEND_URL` ends with `/api/`). */
@@ -1961,16 +1953,6 @@ export function unwrapTenantChatDashboardResponse(
     trendRaw = inner.trend30d;
   }
 
-  const pricingRaw = inner.pricing;
-  const pricing =
-    isRecord(pricingRaw) ?
-      {
-        model: readChatStringField(pricingRaw.model) || "—",
-        input_per_million: readChatStringField(pricingRaw.input_per_million) || "0",
-        output_per_million: readChatStringField(pricingRaw.output_per_million) || "0",
-      }
-    : undefined;
-
   return {
     tenant_id:
       readChatStringField(inner.tenant_id) || readChatStringField(inner.tenantId),
@@ -1995,7 +1977,6 @@ export function unwrapTenantChatDashboardResponse(
     recent_failures: Array.isArray(inner.recent_failures)
       ? inner.recent_failures
       : [],
-    pricing,
   };
 }
 
@@ -2050,6 +2031,9 @@ export interface AdminDashboardTopTenant {
   tokens: number;
   cost: string;
   failed: number;
+  tenant_revenue?: string;
+  profit_usd?: string;
+  margin_pct?: string | number | null;
 }
 
 export interface AdminDashboardTopUser {
@@ -2079,6 +2063,9 @@ export interface AdminDashboardTenantRow {
   last_activity: string;
   month_cost: string;
   month_queries: number;
+  month_revenue?: string;
+  month_profit?: string;
+  margin_pct?: string | number | null;
 }
 
 export interface AdminDashboardTopQuestion {
@@ -2095,6 +2082,7 @@ export interface AdminChatDashboardResponse {
     today: AdminDashboardKpiBucket;
     yesterday: AdminDashboardKpiBucket;
     this_month: AdminDashboardKpiBucket;
+    profit_this_month?: string;
     active_tenants_7d: number;
     active_users_7d: number;
   };
@@ -2134,8 +2122,6 @@ export type TenantChatSettingsThresholdPct = number | string | null;
 
 export interface TenantChatSettingsOverrides {
   user_per_minute?: number | null;
-  input_cost_per_million?: string | null;
-  output_cost_per_million?: string | null;
   default_user_budget_usd?: string | null;
   default_budget_threshold_pct?: TenantChatSettingsThresholdPct;
   model_name?: string | null;
@@ -2160,8 +2146,6 @@ export interface TenantChatSettingsDefaults {
 export interface TenantChatSettingsUpdateRequest {
   tenant_id: string;
   user_per_minute: string;
-  input_cost_per_million: string;
-  output_cost_per_million: string;
   model_name: string;
   /** Blank clears markup; decimal string `>= 0` (e.g. `"25"` for +25%). */
   margin_pct: string;
@@ -2466,6 +2450,8 @@ export interface AdminChatUserRow {
   effective_budget_usd: string;
   effective_threshold_pct: number;
   mtd_spend: string;
+  mtd_base_spend?: string;
+  profit_usd?: string;
   used_pct: number;
   is_exhausted: boolean;
   budget_synced_at: string | null;

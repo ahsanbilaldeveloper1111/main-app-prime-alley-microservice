@@ -298,10 +298,6 @@ type AIChatbotSettingsFormContentProps = Readonly<{
     key: keyof AIChatbotSettingsFormValues["budget"],
     next: string,
   ) => void;
-  updatePricing: (
-    key: keyof AIChatbotSettingsFormValues["pricing"],
-    next: string,
-  ) => void;
 }>;
 
 function AIChatbotSettingsFormContent(
@@ -327,7 +323,6 @@ function AIChatbotSettingsFormContent(
     onMarginChange,
     updateRateLimit,
     updateBudget,
-    updatePricing,
   } = props;
 
   return (
@@ -436,8 +431,9 @@ function AIChatbotSettingsFormContent(
         </div>
         <p className="ai-chatbot-settings__hint mb-3">
           Margin is added on top of base LLM cost when computing tenant-facing
-          rates and thread costs. Leave blank for no margin. Tenants only see
-          effective prices on the dashboard, not this percentage or base costs.
+          rates and thread costs. Leave blank for no margin. Per-model token
+          rates come from the global pricing table below and are not saved on
+          tenant settings.
         </p>
         <div className="ai-chatbot-settings__grid-3">
           <label className="ai-chatbot-settings__field">
@@ -458,27 +454,13 @@ function AIChatbotSettingsFormContent(
               ))}
             </select>
           </label>
-          <NumberField
-            label="Input $ / 1M tokens"
-            value={values.pricing.inputCostPerMillion}
-            onChange={(v) => updatePricing("inputCostPerMillion", v)}
-            placeholder={
-              AI_CHATBOT_FIELD_PLACEHOLDERS.pricing.inputCostPerMillion
-            }
-            step="0.000001"
-            min={0}
-            disabled={fieldsDisabled}
+          <ReadonlyField
+            label="Input $ / 1M tokens (reference)"
+            value={values.pricing.inputCostPerMillion || "—"}
           />
-          <NumberField
-            label="Output $ / 1M tokens"
-            value={values.pricing.outputCostPerMillion}
-            onChange={(v) => updatePricing("outputCostPerMillion", v)}
-            placeholder={
-              AI_CHATBOT_FIELD_PLACEHOLDERS.pricing.outputCostPerMillion
-            }
-            step="0.000001"
-            min={0}
-            disabled={fieldsDisabled}
+          <ReadonlyField
+            label="Output $ / 1M tokens (reference)"
+            value={values.pricing.outputCostPerMillion || "—"}
           />
         </div>
       </div>
@@ -587,16 +569,6 @@ export const AIChatbotSettings: React.FC = () => {
       setValues((prev) => ({
         ...prev,
         budget: { ...prev.budget, [key]: next },
-      }));
-    },
-    [],
-  );
-
-  const updatePricing = useCallback(
-    (key: keyof AIChatbotSettingsFormValues["pricing"], next: string) => {
-      setValues((prev) => ({
-        ...prev,
-        pricing: { ...prev.pricing, [key]: next },
       }));
     },
     [],
@@ -767,7 +739,6 @@ export const AIChatbotSettings: React.FC = () => {
           onMarginChange={handleMarginChange}
           updateRateLimit={updateRateLimit}
           updateBudget={updateBudget}
-          updatePricing={updatePricing}
         />
       ) : null}
     </form>
