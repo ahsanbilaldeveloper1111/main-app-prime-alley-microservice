@@ -2,8 +2,10 @@
  * Wallboard section placement for supervision (Live Coaching) — split by monitoring mode
  * so SILENT / WHISPER / BARGE_IN rules do not fight each other in one branch.
  */
-import type { ActiveMonitoring } from "@components/live-calls/utils/types";
-import type { CategorizeDnsParams } from "@components/live-calls/utils/types";
+import type {
+  ActiveMonitoring,
+  CategorizeDnsParams,
+} from "@components/live-calls/utils/types";
 import {
   isBargeInMonitoringType,
   isSilentMonitoringType,
