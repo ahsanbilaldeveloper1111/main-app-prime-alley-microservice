@@ -644,7 +644,7 @@ const ChatHistoryPanel: React.FC<{
   deletingThreadId?: string;
   onSelectThread: (item: BreezeChatHistory) => void;
   onNewChat: () => void;
-  onDeleteThread: (item: BreezeChatHistory) => void;
+  onDeleteThread: (item: BreezeChatHistory) => void | Promise<void>;
 }> = ({ history, activeId, deletingThreadId, onSelectThread, onNewChat, onDeleteThread }) => {
   const [searchQuery, setSearchQuery] = useState("");
   const filtered = history.filter((h) =>
@@ -738,7 +738,7 @@ const ChatHistoryPanel: React.FC<{
                   disabled={deletingThreadId === item.threadId}
                   onClick={(e) => {
                     e.stopPropagation();
-                    void onDeleteThread(item);
+                    Promise.resolve(onDeleteThread(item)).catch(() => undefined);
                   }}
                   title="Delete"
                   style={{
@@ -1693,8 +1693,9 @@ const BreezeAssistantSidebar: React.FC<BreezeAssistantSidebarProps> = ({
                 No conversations yet. Start a new chat to begin.
               </p>
             ) : null}
-            {!(conversationsLoading && chatHistory.length === 0)
-              ? historyList.map((item) => {
+            {conversationsLoading && chatHistory.length === 0
+              ? null
+              : historyList.map((item) => {
               const isActive = item.id === activeChatId;
               const canDelete = item.id !== "new" && item.threadId;
               return (
@@ -1732,7 +1733,9 @@ const BreezeAssistantSidebar: React.FC<BreezeAssistantSidebarProps> = ({
                       disabled={deletingThreadId === item.threadId}
                       onClick={(e) => {
                         e.stopPropagation();
-                        void handleDeleteThread(item);
+                        Promise.resolve(handleDeleteThread(item)).catch(
+                          () => undefined,
+                        );
                       }}
                       title="Delete"
                       style={{
@@ -1755,8 +1758,7 @@ const BreezeAssistantSidebar: React.FC<BreezeAssistantSidebarProps> = ({
                   )}
                 </div>
               );
-            })
-              : null}
+            })}
           </div>
         );
 

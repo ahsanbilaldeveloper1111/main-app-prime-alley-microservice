@@ -9,6 +9,8 @@ import {
   formatBudgetPct,
   formatBudgetUsd,
   listTenantBudgetAttentionUsers,
+  resolveTenantAggregateProgressVariant,
+  type TenantBudgetAggregate,
   type TenantBudgetAttentionRow,
 } from "../shared/chatBudgetUsage";
 
@@ -29,66 +31,56 @@ function toAttentionRow(row: TenantUserBudgetRow): TenantBudgetAttentionRow {
   };
 }
 
-export type TenantDashboardBudgetOverviewProps = Readonly<{
-  tenantId: string;
-  active: boolean;
+function formatPooledBudgetSubtitle(aggregate: TenantBudgetAggregate): string {
+  const userLabel = aggregate.limitedUserCount === 1 ? "user" : "users";
+  const unlimitedSuffix =
+    aggregate.unlimitedUserCount > 0
+      ? ` (${aggregate.unlimitedUserCount} unlimited)`
+      : "";
+  return `Rolled up across ${aggregate.limitedUserCount} ${userLabel} with a set budget${unlimitedSuffix}.`;
+}
+
+function BudgetOverviewLoadingCard(): React.ReactElement {
+  return (
+    <Card className="border-0 shadow-sm mb-3">
+      <Card.Body className="d-flex align-items-center gap-2 text-muted">
+        <Spinner animation="border" size="sm" aria-hidden />
+        Loading budget usage…
+      </Card.Body>
+    </Card>
+  );
+}
+
+function BudgetOverviewErrorAlert(): React.ReactElement {
+  return (
+    <Alert variant="warning" className="mb-3">
+      Budget usage could not be loaded. Open the Users budgets tab or refresh
+      the page to try again.
+    </Alert>
+  );
+}
+
+function BudgetOverviewUnlimitedAlert(): React.ReactElement {
+  return (
+    <Alert variant="info" className="mb-3">
+      All users have unlimited chat budgets — no monthly usage progress to
+      display.
+    </Alert>
+  );
+}
+
+type BudgetOverviewContentProps = Readonly<{
+  aggregate: TenantBudgetAggregate;
+  attentionRows: TenantBudgetAttentionRow[];
 }>;
 
-export function TenantDashboardBudgetOverview({
-  tenantId,
-  active,
-}: TenantDashboardBudgetOverviewProps) {
-  const { rows, isFetching, isError } = useChatTenantUsersQuery(tenantId, active);
-
-  const attentionRows = useMemo(
-    () => listTenantBudgetAttentionUsers(rows.map(toAttentionRow)),
-    [rows],
-  );
-
-  const aggregate = useMemo(
-    () => aggregateTenantBudgetRows(rows.map(toAttentionRow)),
-    [rows],
-  );
-
-  if (!active) {
-    return null;
-  }
-
-  if (isFetching && rows.length === 0) {
-    return (
-      <Card className="border-0 shadow-sm mb-3">
-        <Card.Body className="d-flex align-items-center gap-2 text-muted">
-          <Spinner animation="border" size="sm" aria-hidden />
-          Loading budget usage…
-        </Card.Body>
-      </Card>
-    );
-  }
-
-  if (isError) {
-    return (
-      <Alert variant="warning" className="mb-3">
-        Budget usage could not be loaded. Open the Users budgets tab or refresh
-        the page to try again.
-      </Alert>
-    );
-  }
-
-  if (!aggregate) {
-    return (
-      <Alert variant="info" className="mb-3">
-        All users have unlimited chat budgets — no monthly usage progress to
-        display.
-      </Alert>
-    );
-  }
-
-  const tenantVariant: "success" | "warning" | "danger" =
-    aggregate.exhaustedCount > 0 || aggregate.usedPct >= 100
-      ? "danger"
-      : aggregate.atThresholdCount > 0
-        ? "warning"
-        : "success";
+function TenantDashboardBudgetOverviewContent({
+  aggregate,
+  attentionRows,
+}: BudgetOverviewContentProps): React.ReactElement {
+  const tenantVariant = resolveTenantAggregateProgressVariant(aggregate);
+  const exhaustedVerb = aggregate.exhaustedCount === 1 ? " has" : "s have";
+  const thresholdVerb = aggregate.atThresholdCount === 1 ? " is" : "s are";
 
   return (
     <div className="mb-3">
@@ -96,9 +88,8 @@ export function TenantDashboardBudgetOverview({
         <Alert variant="danger" className="d-flex align-items-start gap-2">
           <AlertTriangle size={18} className="flex-shrink-0 mt-1" aria-hidden />
           <span>
-            <strong>{aggregate.exhaustedCount}</strong> user
-            {aggregate.exhaustedCount === 1 ? " has" : "s have"} exhausted their
-            monthly chat budget.
+            <strong>{aggregate.exhaustedCount}</strong> user{exhaustedVerb}{" "}
+            exhausted their monthly chat budget.
           </span>
         </Alert>
       ) : null}
@@ -107,9 +98,8 @@ export function TenantDashboardBudgetOverview({
         <Alert variant="warning" className="d-flex align-items-start gap-2">
           <AlertTriangle size={18} className="flex-shrink-0 mt-1" aria-hidden />
           <span>
-            <strong>{aggregate.atThresholdCount}</strong> user
-            {aggregate.atThresholdCount === 1 ? " is" : "s are"} at or above
-            their alert threshold.
+            <strong>{aggregate.atThresholdCount}</strong> user{thresholdVerb}{" "}
+            at or above their alert threshold.
           </span>
         </Alert>
       ) : null}
@@ -132,12 +122,7 @@ export function TenantDashboardBudgetOverview({
             <div className="flex-grow-1">
               <h5 className="mb-1 fw-semibold">Monthly budget usage</h5>
               <p className="mb-0 small text-muted">
-                Rolled up across {aggregate.limitedUserCount} user
-                {aggregate.limitedUserCount === 1 ? "" : "s"} with a set budget
-                {aggregate.unlimitedUserCount > 0
-                  ? ` (${aggregate.unlimitedUserCount} unlimited)`
-                  : ""}
-                .
+                {formatPooledBudgetSubtitle(aggregate)}
               </p>
             </div>
           </div>
@@ -178,5 +163,50 @@ export function TenantDashboardBudgetOverview({
         </Card.Body>
       </Card>
     </div>
+  );
+}
+
+export type TenantDashboardBudgetOverviewProps = Readonly<{
+  tenantId: string;
+  active: boolean;
+}>;
+
+export function TenantDashboardBudgetOverview({
+  tenantId,
+  active,
+}: TenantDashboardBudgetOverviewProps) {
+  const { rows, isFetching, isError } = useChatTenantUsersQuery(tenantId, active);
+
+  const attentionRows = useMemo(
+    () => listTenantBudgetAttentionUsers(rows.map(toAttentionRow)),
+    [rows],
+  );
+
+  const aggregate = useMemo(
+    () => aggregateTenantBudgetRows(rows.map(toAttentionRow)),
+    [rows],
+  );
+
+  if (!active) {
+    return null;
+  }
+
+  if (isFetching && rows.length === 0) {
+    return <BudgetOverviewLoadingCard />;
+  }
+
+  if (isError) {
+    return <BudgetOverviewErrorAlert />;
+  }
+
+  if (!aggregate) {
+    return <BudgetOverviewUnlimitedAlert />;
+  }
+
+  return (
+    <TenantDashboardBudgetOverviewContent
+      aggregate={aggregate}
+      attentionRows={attentionRows}
+    />
   );
 }

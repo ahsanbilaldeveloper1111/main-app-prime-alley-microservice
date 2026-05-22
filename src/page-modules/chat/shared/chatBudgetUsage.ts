@@ -125,6 +125,22 @@ export function aggregateTenantBudgetRows(
   };
 }
 
+/** Progress bar variant for tenant-level pooled budget usage. */
+export function resolveTenantAggregateProgressVariant(
+  aggregate: Pick<
+    TenantBudgetAggregate,
+    "exhaustedCount" | "atThresholdCount" | "usedPct"
+  >,
+): BudgetProgressVariant {
+  if (aggregate.exhaustedCount > 0 || aggregate.usedPct >= 100) {
+    return "danger";
+  }
+  if (aggregate.atThresholdCount > 0) {
+    return "warning";
+  }
+  return "success";
+}
+
 export function listTenantBudgetAttentionUsers(
   rows: readonly TenantBudgetAttentionRow[],
   limit = 8,

@@ -35,7 +35,7 @@ export function faqAttachmentFileDomKey(file: File): string {
 
 /** Collapse odd whitespace (e.g. NBSP from paste) so trim() is reliable. */
 export function normalizeFaqField(value: string): string {
-  return value.replace(/\u00a0/g, " ").trim();
+  return value.replaceAll("\u00a0", " ").trim();
 }
 
 export function getValidFaqItemsForSubmit(items: FAQItemDraft[]): FAQItem[] {
