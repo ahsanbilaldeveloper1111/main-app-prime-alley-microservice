@@ -1697,8 +1697,8 @@ function pickBestScoredApplicableMonitoring(
 /** Best stream payload that is allowed to drive wallboard monitoring UI right now. */
 export function pickBestApplicableMonitoringPayload(
   callStateMap: Record<string, unknown> | undefined,
-  dnsMap: Record<string, { devices?: Record<string, DnsDevice> } | undefined>,
-  eventLog: readonly unknown[] | undefined,
+  dnsMap?: Record<string, { devices?: Record<string, DnsDevice> } | undefined>,
+  eventLog?: readonly unknown[],
   options?: ResolveEffectiveWallboardMonitoringOptions,
 ): MonitoringPayload | null {
   const map = dnsMap ?? options?.dnsMap;

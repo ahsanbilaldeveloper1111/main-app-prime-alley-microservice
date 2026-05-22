@@ -28,6 +28,7 @@ type CallParty = {
 type LooseCall = {
   isTerminating?: boolean
   isMonitoring?: boolean
+  monitoring?: { monitorDn?: string; monitoredDn?: string }
   parties?: CallParty[]
   currentState?: string
 }

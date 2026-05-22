@@ -21,6 +21,8 @@ export interface ActiveMonitoring {
   type: string | null
   monitor?: string
   deviceName?: string | null
+  monitorDeviceName?: string
+  monitorDeviceType?: string
 }
 
 /** After stop-monitoring, ignore stale supervisor↔agent legs briefly so cards return to idle. */
