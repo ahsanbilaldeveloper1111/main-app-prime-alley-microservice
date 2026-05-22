@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useMemo } from "react";
 import {
   X,
   Maximize2,
@@ -14,6 +14,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { ChatAssistantBudgetBar } from "@components/chat-assistant/ChatAssistantBudgetBar";
+import { useChatAssistantConversations } from "@hooks/useChatAssistantConversations";
 import { useChatAssistantUserBudget } from "@hooks/useChatAssistantUserBudget";
 import {
   getChatThread,
@@ -138,12 +139,14 @@ function persistMessagesAfterReply(
   userMsg: BreezeMessage,
   assistantMsg: BreezeMessage,
   newThreadId: string,
-  persist: (tid: string, title: string, msgs: BreezeMessage[]) => void,
+  previousThreadId: string,
+  persist: (tid: string, title: string, msgs: BreezeMessage[], syncList: boolean) => void,
 ): BreezeMessage[] {
   const next = [...prev, assistantMsg];
   if (newThreadId) {
     const firstUser = prev.find((m) => m.role === "user") ?? userMsg;
-    persist(newThreadId, firstUser.content?.slice(0, 80) || "New Chat", next);
+    const syncList = !previousThreadId || newThreadId !== previousThreadId;
+    persist(newThreadId, firstUser.content?.slice(0, 80) || "New Chat", next, syncList);
   }
   return next;
 }
@@ -209,6 +212,67 @@ const GlobalBreezeStyles: React.FC = () => (
     .breeze-scroll::-webkit-scrollbar-track { background: transparent; }
     .breeze-scroll::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 10px; }
     .breeze-scroll::-webkit-scrollbar-thumb:hover { background: #cbd5e0; }
+    .breeze-chat-history-row {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      border-radius: 6px;
+      background-color: transparent;
+      transition: background 0.15s;
+      box-sizing: border-box;
+    }
+    .breeze-chat-history-row:not(.breeze-chat-history-row--active):hover {
+      background-color: #f7f7f7;
+    }
+    .breeze-chat-history-row--active {
+      background-color: #f0f0f0;
+    }
+    .breeze-chat-history-row__select {
+      flex: 1;
+      min-width: 0;
+      padding: 10px 12px;
+      display: flex;
+      align-items: center;
+      border: none;
+      border-radius: 6px;
+      background: transparent;
+      cursor: pointer;
+      font-size: 13.5px;
+      color: #141414;
+      font-family: inherit;
+      text-align: left;
+    }
+    .breeze-chat-history-row__select--active {
+      font-weight: 500;
+    }
+    .breeze-chat-history-row__title {
+      flex: 1;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .breeze-chat-history-row__delete {
+      padding: 4px;
+      margin-right: 8px;
+      border: none;
+      border-radius: 4px;
+      background: transparent;
+      color: #718096;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      flex-shrink: 0;
+    }
+    .breeze-chat-history-row__delete:hover:not(:disabled) {
+      color: #dc2626;
+      background-color: #fef2f2;
+    }
+    .breeze-chat-history-row__delete:disabled {
+      cursor: wait;
+      opacity: 0.5;
+    }
   `}</style>
 );
 
@@ -632,16 +696,199 @@ const ConversationState: React.FC<{
 );
 
 // ============================================================================
+// CHAT HISTORY LIST (shared by panel + fullscreen history view)
+// ============================================================================
+
+function handleBreezeChatHistoryDeleteClick(
+  event: React.MouseEvent,
+  onDelete: () => void | Promise<void>,
+): void {
+  event.stopPropagation();
+  Promise.resolve(onDelete()).catch(() => undefined);
+}
+
+type BreezeChatHistoryListItemProps = Readonly<{
+  item: BreezeChatHistory;
+  isActive: boolean;
+  canDelete: boolean;
+  isDeleting: boolean;
+  onActivate: () => void;
+  onDelete: () => void | Promise<void>;
+  rowMarginBottom?: string;
+}>;
+
+function BreezeChatHistoryListItem({
+  item,
+  isActive,
+  canDelete,
+  isDeleting,
+  onActivate,
+  onDelete,
+  rowMarginBottom = "4px",
+}: BreezeChatHistoryListItemProps): React.ReactElement {
+  const rowClassName = [
+    "breeze-chat-history-row",
+    isActive ? "breeze-chat-history-row--active" : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+
+  const selectClassName = [
+    "breeze-chat-history-row__select",
+    isActive ? "breeze-chat-history-row__select--active" : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+
+  return (
+    <div className={rowClassName} style={{ marginBottom: rowMarginBottom }}>
+      <button type="button" className={selectClassName} onClick={onActivate}>
+        <span className="breeze-chat-history-row__title">{item.title}</span>
+      </button>
+      {canDelete ? (
+        <button
+          type="button"
+          className="breeze-chat-history-row__delete"
+          disabled={isDeleting}
+          onClick={(event) => handleBreezeChatHistoryDeleteClick(event, onDelete)}
+          title="Delete"
+          aria-label={`Delete ${item.title}`}
+        >
+          <Trash2 size={14} />
+        </button>
+      ) : null}
+    </div>
+  );
+}
+
+type BreezeChatHistoryListProps = Readonly<{
+  items: readonly BreezeChatHistory[];
+  activeId: string;
+  deletingThreadId?: string;
+  onActivateItem: (item: BreezeChatHistory) => void;
+  onDeleteItem: (item: BreezeChatHistory) => void | Promise<void>;
+  rowMarginBottom?: string;
+}>;
+
+function BreezeChatHistoryList({
+  items,
+  activeId,
+  deletingThreadId,
+  onActivateItem,
+  onDeleteItem,
+  rowMarginBottom,
+}: BreezeChatHistoryListProps): React.ReactElement {
+  return (
+    <>
+      {items.map((item) => (
+        <BreezeChatHistoryListItem
+          key={item.id}
+          item={item}
+          isActive={item.id === activeId}
+          canDelete={item.id !== "new" && Boolean(item.threadId)}
+          isDeleting={deletingThreadId === item.threadId}
+          onActivate={() => onActivateItem(item)}
+          onDelete={() => onDeleteItem(item)}
+          rowMarginBottom={rowMarginBottom}
+        />
+      ))}
+    </>
+  );
+}
+
+type ChatHistoryFullscreenListProps = Readonly<{
+  historyList: readonly BreezeChatHistory[];
+  activeChatId: string;
+  deletingThreadId?: string;
+  conversationsLoading: boolean;
+  conversationsError: boolean;
+  hasConversations: boolean;
+  onActivateItem: (item: BreezeChatHistory) => void;
+  onDeleteItem: (item: BreezeChatHistory) => void | Promise<void>;
+}>;
+
+function ChatHistoryFullscreenList({
+  historyList,
+  activeChatId,
+  deletingThreadId,
+  conversationsLoading,
+  conversationsError,
+  hasConversations,
+  onActivateItem,
+  onDeleteItem,
+}: ChatHistoryFullscreenListProps): React.ReactElement {
+  const showLoading = conversationsLoading && !hasConversations;
+  const showError = conversationsError && !conversationsLoading;
+  const showEmpty =
+    !conversationsError && !conversationsLoading && !hasConversations;
+  const showList = !showLoading;
+
+  return (
+    <div
+      className="breeze-scroll"
+      style={{ flex: 1, overflowY: "auto", padding: "8px 12px 16px 12px" }}
+    >
+      {showLoading ? (
+        <p
+          style={{
+            fontSize: "13px",
+            color: "#718096",
+            textAlign: "center",
+            padding: "24px 12px",
+          }}
+        >
+          Loading conversations…
+        </p>
+      ) : null}
+      {showError ? (
+        <p
+          style={{
+            fontSize: "13px",
+            color: "#dc2626",
+            textAlign: "center",
+            padding: "24px 12px",
+          }}
+        >
+          Could not load conversations. Try again from the menu.
+        </p>
+      ) : null}
+      {showEmpty ? (
+        <p
+          style={{
+            fontSize: "13px",
+            color: "#718096",
+            textAlign: "center",
+            padding: "24px 12px",
+          }}
+        >
+          No conversations yet. Start a new chat to begin.
+        </p>
+      ) : null}
+      {showList ? (
+        <BreezeChatHistoryList
+          items={historyList}
+          activeId={activeChatId}
+          deletingThreadId={deletingThreadId}
+          onActivateItem={onActivateItem}
+          onDeleteItem={onDeleteItem}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+// ============================================================================
 // CHAT HISTORY LEFT PANEL (expanded mode only)
 // ============================================================================
 
 const ChatHistoryPanel: React.FC<{
   history: BreezeChatHistory[];
   activeId: string;
+  deletingThreadId?: string;
   onSelectThread: (item: BreezeChatHistory) => void;
   onNewChat: () => void;
-  onDeleteThread: (item: BreezeChatHistory) => void;
-}> = ({ history, activeId, onSelectThread, onNewChat, onDeleteThread }) => {
+  onDeleteThread: (item: BreezeChatHistory) => void | Promise<void>;
+}> = ({ history, activeId, deletingThreadId, onSelectThread, onNewChat, onDeleteThread }) => {
   const [searchQuery, setSearchQuery] = useState("");
   const filtered = history.filter((h) =>
     h.title.toLowerCase().includes(searchQuery.toLowerCase())
@@ -696,63 +943,16 @@ const ChatHistoryPanel: React.FC<{
         </div>
       </div>
       <div className="breeze-scroll" style={{ flex: 1, overflowY: "auto", padding: "0 8px 16px 8px" }}>
-        {filtered.map((item) => {
-          const isActive = item.id === activeId;
-          const canDelete = item.id !== "new" && item.threadId;
-          return (
-            <div
-              key={item.id}
-              role="button"
-              tabIndex={0}
-              onClick={() => (item.id === "new" ? onNewChat() : onSelectThread(item))}
-              onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); item.id === "new" ? onNewChat() : onSelectThread(item); } }}
-              style={{
-                width: "100%",
-                padding: "10px 12px",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                gap: "8px",
-                border: "none",
-                borderRadius: "6px",
-                backgroundColor: isActive ? "#f0f0f0" : "transparent",
-                cursor: "pointer",
-                fontSize: "13.5px",
-                color: "#141414",
-                fontWeight: isActive ? "500" : "400",
-                marginBottom: "1px",
-                transition: "background 0.15s",
-                boxSizing: "border-box",
-              }}
-              onMouseEnter={(e) => { if (!isActive) e.currentTarget.style.backgroundColor = "#f7f7f7"; }}
-              onMouseLeave={(e) => { if (!isActive) e.currentTarget.style.backgroundColor = "transparent"; }}
-            >
-              <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.title}</span>
-              {canDelete && (
-                <button
-                  type="button"
-                  onClick={(e) => { e.stopPropagation(); onDeleteThread(item); }}
-                  title="Delete"
-                  style={{
-                    padding: "4px",
-                    border: "none",
-                    borderRadius: "4px",
-                    background: "transparent",
-                    color: "#718096",
-                    cursor: "pointer",
-                    display: "flex",
-                    alignItems: "center",
-                    flexShrink: 0,
-                  }}
-                  onMouseEnter={(e) => { e.currentTarget.style.color = "#dc2626"; e.currentTarget.style.backgroundColor = "#fef2f2"; }}
-                  onMouseLeave={(e) => { e.currentTarget.style.color = "#718096"; e.currentTarget.style.backgroundColor = "transparent"; }}
-                >
-                  <Trash2 size={14} />
-                </button>
-              )}
-            </div>
-          );
-        })}
+        <BreezeChatHistoryList
+          items={filtered}
+          activeId={activeId}
+          deletingThreadId={deletingThreadId}
+          rowMarginBottom="1px"
+          onActivateItem={(item) =>
+            item.id === "new" ? onNewChat() : onSelectThread(item)
+          }
+          onDeleteItem={onDeleteThread}
+        />
       </div>
     </div>
   );
@@ -1302,19 +1502,55 @@ const BreezeAssistantSidebar: React.FC<BreezeAssistantSidebarProps> = ({
   const [showMoreMenu, setShowMoreMenu] = useState(false);
   const [activeChatId, setActiveChatId] = useState("new");
   const [threadId,     setThreadId]     = useState("");
-  const [chatHistory,  setChatHistory]  = useState<BreezeChatHistory[]>(() =>
-    getStoredThreads().map((t) => ({ ...t, timestamp: new Date(t.timestamp), threadId: t.threadId }))
-  );
-
   // current view — "chat" | "chatHistory" | "prompts" | "addPrompt"
   const [view, setView] = useState<BreezeView>("chat");
+
+  const {
+    conversations: apiConversations,
+    conversationsTenantId,
+    isLoading: conversationsLoading,
+    isError: conversationsError,
+    invalidateConversations,
+    deleteConversation,
+    isDeletingConversation,
+    deletingThreadId,
+  } = useChatAssistantConversations(isOpen);
+
+  const localFallbackHistory = useMemo((): BreezeChatHistory[] => {
+    if (!conversationsError) return [];
+    return getStoredThreads().map((t) => ({
+      id: t.id,
+      title: t.title,
+      timestamp: new Date(t.timestamp),
+      threadId: t.threadId,
+    }));
+  }, [conversationsError]);
+
+  const chatHistory = useMemo((): BreezeChatHistory[] => {
+    const source =
+      apiConversations.length > 0 || !conversationsError
+        ? apiConversations
+        : localFallbackHistory;
+    return source.map(({ id, title, timestamp, threadId }) => ({
+      id,
+      title,
+      timestamp,
+      threadId,
+    }));
+  }, [apiConversations, conversationsError, localFallbackHistory]);
 
   const historyList: BreezeChatHistory[] = [
     { id: "new", title: "New Chat", timestamp: new Date() },
     ...chatHistory,
   ];
 
-  const persistThreadToHistory = (tid: string, title: string, msgs: BreezeMessage[]) => {
+  const persistThreadToHistory = (
+    tid: string,
+    title: string,
+    msgs: BreezeMessage[],
+    syncList: boolean,
+  ) => {
+    saveStoredMessages(tid, msgs);
     const threads = getStoredThreads();
     const existing = threads.find((t) => t.threadId === tid);
     const entry: StoredThread = {
@@ -1327,8 +1563,9 @@ const BreezeAssistantSidebar: React.FC<BreezeAssistantSidebarProps> = ({
       ? threads.map((t) => (t.threadId === tid ? entry : t))
       : [entry, ...threads];
     saveStoredThreads(next);
-    saveStoredMessages(tid, msgs);
-    setChatHistory(next.map((t) => ({ ...t, timestamp: new Date(t.timestamp), threadId: t.threadId })));
+    if (syncList) {
+      invalidateConversations();
+    }
   };
 
   const textareaRef    = useRef<HTMLTextAreaElement>(null);
@@ -1352,18 +1589,22 @@ const BreezeAssistantSidebar: React.FC<BreezeAssistantSidebarProps> = ({
     return () => document.removeEventListener("mousedown", h);
   }, []);
 
-  const showChatBudgetBar = view === "chat";
   const {
     budget: chatBudget,
     isLoading: chatBudgetLoading,
+    isUnlimited: chatBudgetUnlimited,
+    isError: chatBudgetError,
     hasIdentity: chatBudgetHasIdentity,
     refetch: refetchChatBudget,
-  } = useChatAssistantUserBudget(isOpen && showChatBudgetBar);
+  } = useChatAssistantUserBudget(isOpen, conversationsTenantId);
 
-  const ChatBudgetBar = showChatBudgetBar ? (
+  const ChatBudgetBar = isOpen ? (
     <ChatAssistantBudgetBar
       budget={chatBudget}
-      isLoading={chatBudgetLoading && chatBudgetHasIdentity}
+      isUnlimited={chatBudgetUnlimited}
+      isLoading={chatBudgetLoading}
+      loadError={chatBudgetError && chatBudgetHasIdentity}
+      identityMissing={!chatBudgetHasIdentity && !chatBudgetLoading}
     />
   ) : null;
 
@@ -1382,13 +1623,14 @@ const BreezeAssistantSidebar: React.FC<BreezeAssistantSidebarProps> = ({
     setMessages((prev) => [...prev, userMsg]);
     setInputValue("");
     setIsLoading(true);
+    const previousThreadId = threadId;
     try {
       const { reply, newThreadId } = await requestAssistantReply(
         text,
-        threadId,
+        previousThreadId,
         onSendMessage,
       );
-      if (newThreadId && newThreadId !== threadId) {
+      if (newThreadId && newThreadId !== previousThreadId) {
         setThreadId(newThreadId);
       }
       const assistantMsg: BreezeMessage = {
@@ -1403,6 +1645,7 @@ const BreezeAssistantSidebar: React.FC<BreezeAssistantSidebarProps> = ({
           userMsg,
           assistantMsg,
           newThreadId,
+          previousThreadId,
           persistThreadToHistory,
         ),
       );
@@ -1436,6 +1679,7 @@ const BreezeAssistantSidebar: React.FC<BreezeAssistantSidebarProps> = ({
         thread.thread_id,
         thread.title || item.title,
         loaded,
+        false,
       );
     } catch (error: unknown) {
       console.error("AI Assistant thread load failed:", error);
@@ -1448,16 +1692,20 @@ const BreezeAssistantSidebar: React.FC<BreezeAssistantSidebarProps> = ({
   const handleSaveCurrentChat = () => {
     if (threadId && messages.length > 0) {
       const title = messages[0].role === "user" ? messages[0].content : "New Chat";
-      persistThreadToHistory(threadId, title, messages);
+      persistThreadToHistory(threadId, title, messages, false);
       setShowMoreMenu(false);
     }
   };
 
-  const handleDeleteThread = (item: BreezeChatHistory) => {
-    if (item.id === "new" || !item.threadId) return;
-    removeStoredThread(item.threadId);
-    setChatHistory((prev) => prev.filter((t) => t.threadId !== item.threadId));
-    if (activeChatId === item.id) handleNewConversation();
+  const handleDeleteThread = async (item: BreezeChatHistory) => {
+    if (item.id === "new" || !item.threadId || isDeletingConversation) return;
+    try {
+      await deleteConversation(item.threadId);
+      removeStoredThread(item.threadId);
+      if (activeChatId === item.id) handleNewConversation();
+    } catch (error: unknown) {
+      console.error("AI Assistant conversation delete failed:", error);
+    }
   };
 
   // ── Derive left-side button for TopBar ────────────────────────────────────
@@ -1620,65 +1868,18 @@ const BreezeAssistantSidebar: React.FC<BreezeAssistantSidebarProps> = ({
     switch (view) {
       case "chatHistory":
         return (
-          <div className="breeze-scroll" style={{ flex: 1, overflowY: "auto", padding: "8px 12px 16px 12px" }}>
-            {historyList.map((item) => {
-              const isActive = item.id === activeChatId;
-              const canDelete = item.id !== "new" && item.threadId;
-              return (
-                <div
-                  key={item.id}
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => (item.id === "new" ? handleNewConversation() : handleSelectThread(item))}
-                  onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); item.id === "new" ? handleNewConversation() : handleSelectThread(item); } }}
-                  style={{
-                    width: "100%",
-                    padding: "10px 12px",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    gap: "8px",
-                    border: "none",
-                    borderRadius: "6px",
-                    backgroundColor: isActive ? "#f0f0f0" : "transparent",
-                    cursor: "pointer",
-                    fontSize: "13.5px",
-                    color: "#141414",
-                    fontWeight: isActive ? "500" : "400",
-                    marginBottom: "4px",
-                    transition: "background 0.15s",
-                    boxSizing: "border-box",
-                  }}
-                  onMouseEnter={(e) => { if (!isActive) e.currentTarget.style.backgroundColor = "#f7f7f7"; }}
-                  onMouseLeave={(e) => { if (!isActive) e.currentTarget.style.backgroundColor = "transparent"; }}
-                >
-                  <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.title}</span>
-                  {canDelete && (
-                    <button
-                      type="button"
-                      onClick={(e) => { e.stopPropagation(); handleDeleteThread(item); }}
-                      title="Delete"
-                      style={{
-                        padding: "4px",
-                        border: "none",
-                        borderRadius: "4px",
-                        background: "transparent",
-                        color: "#718096",
-                        cursor: "pointer",
-                        display: "flex",
-                        alignItems: "center",
-                        flexShrink: 0,
-                      }}
-                      onMouseEnter={(e) => { e.currentTarget.style.color = "#dc2626"; e.currentTarget.style.backgroundColor = "#fef2f2"; }}
-                      onMouseLeave={(e) => { e.currentTarget.style.color = "#718096"; e.currentTarget.style.backgroundColor = "transparent"; }}
-                    >
-                      <Trash2 size={14} />
-                    </button>
-                  )}
-                </div>
-              );
-            })}
-          </div>
+          <ChatHistoryFullscreenList
+            historyList={historyList}
+            activeChatId={activeChatId}
+            deletingThreadId={deletingThreadId}
+            conversationsLoading={conversationsLoading}
+            conversationsError={conversationsError}
+            hasConversations={chatHistory.length > 0}
+            onActivateItem={(item) =>
+              item.id === "new" ? handleNewConversation() : handleSelectThread(item)
+            }
+            onDeleteItem={handleDeleteThread}
+          />
         );
 
       case "prompts":
@@ -1756,6 +1957,7 @@ const BreezeAssistantSidebar: React.FC<BreezeAssistantSidebarProps> = ({
             <ChatHistoryPanel
               history={historyList}
               activeId={activeChatId}
+              deletingThreadId={deletingThreadId}
               onSelectThread={handleSelectThread}
               onNewChat={handleNewConversation}
               onDeleteThread={handleDeleteThread}

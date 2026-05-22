@@ -1,3 +1,4 @@
+import { chatDateTimeUiToApiDate } from "@page-modules/chat/shared/chatDateTimeFilters";
 import type { TenantChatSettingsHistoryQueryParams } from "@utils/chat";
 
 export type AIChatbotSettingsInnerTab = "settings" | "history";
@@ -33,8 +34,8 @@ export function tenantSettingsHistoryFiltersToQuery(
 
   return {
     tenant_id: tenantId.trim() || undefined,
-    from: form.from.trim() || undefined,
-    to: form.to.trim() || undefined,
+    from: chatDateTimeUiToApiDate(form.from, "from"),
+    to: chatDateTimeUiToApiDate(form.to, "to"),
     limit,
   };
 }

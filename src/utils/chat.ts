@@ -17,6 +17,9 @@ const TENANT_FAQS_API_PATH = "/chat/tenant-faqs";
 /** AI assistant thread API (`GET/POST /api/chat/` when `BACKEND_URL` ends with `/api/`). */
 const CHAT_ASSISTANT_API_PATH = "/chat/";
 
+/** AI assistant conversation list (`GET /api/chat/conversations` when `BACKEND_URL` ends with `/api/`). */
+const CHAT_CONVERSATIONS_API_PATH = "/chat/conversations";
+
 /** Bot training API (`POST /api/chat/training` when `BACKEND_URL` ends with `/api/`). */
 const CHAT_TRAINING_API_PATH = "/chat/training";
 
@@ -315,6 +318,129 @@ export function mapChatThreadMessagesToUi(
   }));
 }
 
+export interface ChatConversationSummary {
+  thread_id: string;
+  title: string;
+  message_count: number;
+  created_at: string;
+  updated_at: string;
+  is_active: boolean;
+}
+
+export interface ChatConversationsResponse {
+  tenant_id: string;
+  count: number;
+  conversations: ChatConversationSummary[];
+  error?: string;
+}
+
+export type ChatAssistantConversationListItem = {
+  id: string;
+  title: string;
+  timestamp: Date;
+  threadId: string;
+  messageCount: number;
+  isActive: boolean;
+};
+
+function readChatStringField(value: unknown): string {
+  if (typeof value === "string" && value.trim()) {
+    return value.trim();
+  }
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return String(value);
+  }
+  return "";
+}
+
+function readChatNumberField(value: unknown): number | undefined {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
+  }
+  if (typeof value === "string" && value.trim()) {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : undefined;
+  }
+  return undefined;
+}
+
+function normalizeChatConversationSummary(
+  raw: unknown,
+): ChatConversationSummary | null {
+  if (!isRecord(raw)) {
+    return null;
+  }
+  const thread_id =
+    readChatStringField(raw.thread_id) || readChatStringField(raw.threadId);
+  if (!thread_id) {
+    return null;
+  }
+  return {
+    thread_id,
+    title: readChatStringField(raw.title) || "New Chat",
+    message_count:
+      readChatNumberField(raw.message_count) ??
+      readChatNumberField(raw.messageCount) ??
+      0,
+    created_at:
+      readChatStringField(raw.created_at) || readChatStringField(raw.createdAt),
+    updated_at:
+      readChatStringField(raw.updated_at) || readChatStringField(raw.updatedAt),
+    is_active: raw.is_active !== false && raw.isActive !== false,
+  };
+}
+
+/** Unwrap list payloads that may be nested under `data` or use alternate array keys. */
+export function unwrapChatConversationsResponse(
+  data: unknown,
+): ChatConversationsResponse {
+  if (!isRecord(data)) {
+    return { tenant_id: "", count: 0, conversations: [] };
+  }
+
+  const inner = isRecord(data.data) ? data.data : data;
+  let rawList: unknown[] = [];
+  if (Array.isArray(inner.conversations)) {
+    rawList = inner.conversations;
+  } else if (Array.isArray(inner.results)) {
+    rawList = inner.results;
+  } else if (Array.isArray(data.conversations)) {
+    rawList = data.conversations;
+  }
+
+  const conversations = rawList
+    .map(normalizeChatConversationSummary)
+    .filter((item): item is ChatConversationSummary => item !== null);
+
+  return {
+    tenant_id:
+      readChatStringField(inner.tenant_id) || readChatStringField(inner.tenantId),
+    count: readChatNumberField(inner.count) ?? conversations.length,
+    conversations,
+    error: readChatStringField(inner.error) || readChatStringField(data.error) || undefined,
+  };
+}
+
+export function mapChatConversationsToListItems(
+  conversations: ChatConversationSummary[],
+): ChatAssistantConversationListItem[] {
+  return [...conversations]
+    .filter((c) => Boolean(c.thread_id?.trim()))
+    .sort(
+      (a, b) =>
+        new Date(b.updated_at || b.created_at || 0).getTime() -
+        new Date(a.updated_at || a.created_at || 0).getTime(),
+    )
+    .map((c) => ({
+      id: c.thread_id,
+      threadId: c.thread_id,
+      title: c.title?.trim() || "New Chat",
+      timestamp: new Date(c.updated_at || c.created_at || Date.now()),
+      messageCount: c.message_count,
+      isActive: c.is_active,
+    }));
+}
+
 // Chat Survey Interfaces
 export interface ChatSurveyPayload {
   rating: number;
@@ -530,6 +656,63 @@ export interface ChatTrainingStatusResponse {
   vector_store_path: string | null;
   error?: string;
 }
+
+/**
+ * List assistant conversations for the current tenant/user (GET `/api/chat/conversations`).
+ */
+export const getChatConversations = async (): Promise<ChatConversationsResponse> => {
+  try {
+    const response = await axiosInstance.get<unknown>(CHAT_CONVERSATIONS_API_PATH);
+    const body = unwrapChatConversationsResponse(response.data);
+    if (body.error) {
+      throw new Error(body.error || "Failed to load conversations");
+    }
+    return body;
+  } catch (error: unknown) {
+    rethrowChatApiError(
+      error,
+      "Failed to load chat conversations. Please try again.",
+    );
+  }
+};
+
+function chatConversationDeletePath(tenantId: string, threadId: string): string {
+  return `${CHAT_CONVERSATIONS_API_PATH}/${encodeURIComponent(tenantId.trim())}/${encodeURIComponent(threadId.trim())}`;
+}
+
+/**
+ * Delete an assistant conversation (DELETE `/api/chat/conversations/{tenantId}/{threadId}`).
+ */
+export const deleteChatConversation = async (
+  tenantId: string,
+  threadId: string,
+): Promise<void> => {
+  const tenant = tenantId.trim();
+  const thread = threadId.trim();
+  if (!tenant) {
+    throw new Error("Tenant id is required");
+  }
+  if (!thread) {
+    throw new Error("Thread id is required");
+  }
+  try {
+    const response = await axiosInstance.delete<unknown>(
+      chatConversationDeletePath(tenant, thread),
+    );
+    if (isRecord(response.data)) {
+      const err = readChatStringField(response.data.error);
+      if (err) {
+        throw new Error(err);
+      }
+    }
+    toast.success("Conversation deleted.");
+  } catch (error: unknown) {
+    rethrowChatApiError(
+      error,
+      "Failed to delete conversation. Please try again.",
+    );
+  }
+};
 
 /**
  * Load an existing assistant thread (GET `/api/chat/?thread_id=…`).
@@ -950,6 +1133,28 @@ const EMPTY_TRAINING_FAQ_STATS: ChatTrainingFaqStats = {
   chunks: 0,
 };
 
+function readNonNegativeInt(value: unknown): number {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return Math.max(0, Math.floor(value));
+  }
+  if (typeof value === "string" && value.trim() !== "") {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) {
+      return Math.max(0, Math.floor(parsed));
+    }
+  }
+  return 0;
+}
+
+function pickFirstDefined(...values: unknown[]): unknown {
+  for (const value of values) {
+    if (value !== undefined && value !== null) {
+      return value;
+    }
+  }
+  return undefined;
+}
+
 function readTrainingDocumentStats(
   value: unknown,
 ): ChatTrainingDocumentStats {
@@ -957,8 +1162,24 @@ function readTrainingDocumentStats(
     return EMPTY_TRAINING_DOCUMENT_STATS;
   }
   return {
-    files: typeof value.files === "number" ? value.files : 0,
-    chunks: typeof value.chunks === "number" ? value.chunks : 0,
+    files: readNonNegativeInt(
+      pickFirstDefined(
+        value.files,
+        value.file_count,
+        value.fileCount,
+        value.documents,
+        value.document_count,
+        value.count,
+      ),
+    ),
+    chunks: readNonNegativeInt(
+      pickFirstDefined(
+        value.chunks,
+        value.chunk_count,
+        value.chunkCount,
+        value.total_chunks,
+      ),
+    ),
   };
 }
 
@@ -967,23 +1188,88 @@ function readTrainingFaqStats(value: unknown): ChatTrainingFaqStats {
     return EMPTY_TRAINING_FAQ_STATS;
   }
   return {
-    count: typeof value.count === "number" ? value.count : 0,
-    chunks: typeof value.chunks === "number" ? value.chunks : 0,
+    count: readNonNegativeInt(
+      pickFirstDefined(
+        value.count,
+        value.faq_count,
+        value.faqCount,
+        value.faqs,
+        value.files,
+      ),
+    ),
+    chunks: readNonNegativeInt(
+      pickFirstDefined(value.chunks, value.chunk_count, value.chunkCount),
+    ),
+  };
+}
+
+function readTrainingDocumentStatsFromRaw(
+  raw: Record<string, unknown>,
+  scope: "tenant" | "global",
+): ChatTrainingDocumentStats {
+  const nestedKey = scope === "tenant" ? "tenant_documents" : "global_documents";
+  const nestedCamel =
+    scope === "tenant" ? "tenantDocuments" : "globalDocuments";
+  const nested = readTrainingDocumentStats(
+    pickFirstDefined(raw[nestedKey], raw[nestedCamel]),
+  );
+  if (nested.files > 0 || nested.chunks > 0) {
+    return nested;
+  }
+
+  const prefix = scope === "tenant" ? "tenant" : "global";
+  return {
+    files: readNonNegativeInt(
+      pickFirstDefined(
+        raw[`${prefix}_document_files`],
+        raw[`${prefix}_files`],
+        raw[`${prefix}_document_count`],
+      ),
+    ),
+    chunks: readNonNegativeInt(
+      pickFirstDefined(
+        raw[`${prefix}_document_chunks`],
+        raw[`${prefix}_chunks`],
+        raw[`${prefix}_document_chunk_count`],
+      ),
+    ),
+  };
+}
+
+function readTrainingFaqStatsFromRaw(
+  raw: Record<string, unknown>,
+  scope: "tenant" | "global",
+): ChatTrainingFaqStats {
+  const nestedKey = scope === "tenant" ? "tenant_faqs" : "global_faqs";
+  const nestedCamel = scope === "tenant" ? "tenantFaqs" : "globalFaqs";
+  const nested = readTrainingFaqStats(
+    pickFirstDefined(raw[nestedKey], raw[nestedCamel]),
+  );
+  if (nested.count > 0 || nested.chunks > 0) {
+    return nested;
+  }
+
+  const prefix = scope === "tenant" ? "tenant" : "global";
+  return {
+    count: readNonNegativeInt(
+      pickFirstDefined(raw[`${prefix}_faq_count`], raw[`${prefix}_faqs`]),
+    ),
+    chunks: readNonNegativeInt(
+      pickFirstDefined(raw[`${prefix}_faq_chunks`], raw[`${prefix}_faq_chunk_count`]),
+    ),
   };
 }
 
 function isChatTrainingReconcilePayload(data: Record<string, unknown>): boolean {
   const message =
     typeof data.message === "string" ? data.message.toLowerCase() : "";
-  if (message.includes("emptied") && message.includes("reconcil")) {
-    return true;
-  }
-  const hasTrainingStats =
-    isRecord(data.tenant_documents) ||
-    isRecord(data.global_documents) ||
-    typeof data.total_chunks === "number";
-  return Boolean(message.trim()) && !hasTrainingStats;
+  return message.includes("emptied") && message.includes("reconcil");
 }
+
+export type ChatTrainingResultLine = Readonly<{
+  label: string;
+  value: string;
+}>;
 
 function normalizeChatTrainingResponseBody(
   raw: Record<string, unknown>,
@@ -1011,10 +1297,14 @@ function normalizeChatTrainingResponseBody(
     };
   }
 
-  const tenantDocuments = readTrainingDocumentStats(raw.tenant_documents);
-  const globalDocuments = readTrainingDocumentStats(raw.global_documents);
-  const tenantFaqs = readTrainingFaqStats(raw.tenant_faqs);
-  const globalFaqs = readTrainingFaqStats(raw.global_faqs);
+  const tenantDocuments = readTrainingDocumentStatsFromRaw(raw, "tenant");
+  const globalDocuments = readTrainingDocumentStatsFromRaw(raw, "global");
+  const tenantFaqs = readTrainingFaqStatsFromRaw(raw, "tenant");
+  const globalFaqs = readTrainingFaqStatsFromRaw(raw, "global");
+
+  const totalChunks = readNonNegativeInt(
+    pickFirstDefined(raw.total_chunks, raw.totalChunks),
+  );
 
   return {
     message,
@@ -1025,7 +1315,7 @@ function normalizeChatTrainingResponseBody(
     global_documents: globalDocuments,
     tenant_faqs: tenantFaqs,
     global_faqs: globalFaqs,
-    total_chunks: typeof raw.total_chunks === "number" ? raw.total_chunks : 0,
+    total_chunks: totalChunks,
     vector_store_info: isRecord(raw.vector_store_info)
       ? raw.vector_store_info
       : {},
@@ -1039,9 +1329,50 @@ function unwrapChatTrainingResponse(data: unknown): ChatTrainingResponse {
   }
   const nested =
     (isRecord(data.data) ? data.data : undefined) ??
-    (isRecord(data.result) ? data.result : undefined);
+    (isRecord(data.result) ? data.result : undefined) ??
+    (isRecord(data.body) ? data.body : undefined) ??
+    (isRecord(data.payload) ? data.payload : undefined);
   const raw = isRecord(nested) ? nested : data;
   return normalizeChatTrainingResponseBody(raw);
+}
+
+/** Structured rows for training success UI (tenant/global documents and FAQs). */
+export function getChatTrainingResultLines(
+  response: ChatTrainingResponse,
+): ChatTrainingResultLine[] {
+  const apiMessage = response.message?.trim();
+  if (isChatTrainingReconciledResponse(response) && apiMessage) {
+    return [{ label: "Status", value: apiMessage }];
+  }
+
+  const lines: ChatTrainingResultLine[] = [
+    {
+      label: "Tenant documents",
+      value: `${response.tenant_documents.files} file(s), ${response.tenant_documents.chunks} chunk(s)`,
+    },
+    {
+      label: "Global documents",
+      value: `${response.global_documents.files} file(s), ${response.global_documents.chunks} chunk(s)`,
+    },
+    {
+      label: "Tenant FAQs",
+      value: `${response.tenant_faqs.count} FAQ(s), ${response.tenant_faqs.chunks} chunk(s)`,
+    },
+    {
+      label: "Global FAQs",
+      value: `${response.global_faqs.count} FAQ(s), ${response.global_faqs.chunks} chunk(s)`,
+    },
+    {
+      label: "Total chunks",
+      value: String(response.total_chunks),
+    },
+  ];
+
+  if (apiMessage) {
+    lines.unshift({ label: "Summary", value: apiMessage });
+  }
+
+  return lines;
 }
 
 /** True when POST `/api/chat/training` reconciled an existing vector store with no content left. */
@@ -1056,14 +1387,9 @@ export function isChatTrainingReconciledResponse(
 export function formatChatTrainingResultMessage(
   response: ChatTrainingResponse,
 ): string {
-  const apiMessage = response.message?.trim();
-  if (isChatTrainingReconciledResponse(response) && apiMessage) {
-    return apiMessage;
-  }
-  const tenantFiles = response.tenant_documents.files;
-  const globalFiles = response.global_documents.files;
-  const totalChunks = response.total_chunks;
-  return `Training completed successfully! Processed ${tenantFiles} tenant files and ${globalFiles} global files. Total chunks: ${totalChunks}`;
+  return getChatTrainingResultLines(response)
+    .map((line) => `${line.label}: ${line.value}`)
+    .join(" · ");
 }
 
 /**
@@ -1343,6 +1669,8 @@ export interface ChatUserDetailLifetime {
 export interface ChatUserDetailBudget {
   budget: string | null;
   spend: string;
+  /** Resolved MTD remaining when the API provides it (tenant users list shape). */
+  remaining_usd?: string | null;
   used_pct: number;
   is_unlimited: boolean;
   is_exhausted: boolean;
@@ -1372,8 +1700,147 @@ export interface ChatUserDetailResponse {
   budget: ChatUserDetailBudget;
 }
 
+function normalizeChatUserDetailLifetime(raw: unknown): ChatUserDetailLifetime {
+  if (!isRecord(raw)) {
+    return { queries: 0, failed: 0, tokens: 0, cost: "0", avg_cost: "0" };
+  }
+  return {
+    queries: readChatNumberField(raw.queries) ?? 0,
+    failed: readChatNumberField(raw.failed) ?? 0,
+    tokens: readChatNumberField(raw.tokens) ?? 0,
+    cost: readChatStringField(raw.cost) || "0",
+    avg_cost: readChatStringField(raw.avg_cost) || "0",
+  };
+}
+
+function emptyChatUserDetailBudget(): ChatUserDetailBudget {
+  return {
+    budget: null,
+    spend: "0",
+    remaining_usd: null,
+    used_pct: 0,
+    is_unlimited: false,
+    is_exhausted: false,
+    threshold_pct: 0,
+    budget_source: "tenant_default",
+    synced_at: null,
+  };
+}
+
+function pickChatStringFromRecords(
+  records: readonly Record<string, unknown>[],
+  ...keys: string[]
+): string | null {
+  for (const record of records) {
+    for (const key of keys) {
+      const value = readChatStringField(record[key]);
+      if (value) return value;
+    }
+  }
+  return null;
+}
+
+function pickChatNumberFromRecords(
+  records: readonly Record<string, unknown>[],
+  ...keys: string[]
+): number | undefined {
+  for (const record of records) {
+    for (const key of keys) {
+      const value = readChatNumberField(record[key]);
+      if (value != null) return value;
+    }
+  }
+  return undefined;
+}
+
+function pickChatBooleanFromRecords(
+  records: readonly Record<string, unknown>[],
+  key: string,
+): boolean | undefined {
+  for (const record of records) {
+    if (record[key] === true) return true;
+    if (record[key] === false) return false;
+  }
+  return undefined;
+}
+
+/** Normalize budget from nested `budget` and/or flat fields (same keys as tenant users rows). */
+function normalizeChatUserDetailBudget(
+  raw: unknown,
+  flatFallback?: Record<string, unknown>,
+): ChatUserDetailBudget {
+  const records: Record<string, unknown>[] = [];
+  if (isRecord(raw)) records.push(raw);
+  if (flatFallback) records.push(flatFallback);
+  if (records.length === 0) {
+    return emptyChatUserDetailBudget();
+  }
+
+  const cap = pickChatStringFromRecords(
+    records,
+    "budget",
+    "effective_budget_usd",
+    "effective_budget",
+    "monthly_budget_usd",
+  );
+  const spend =
+    pickChatStringFromRecords(records, "spend", "mtd_spend") || "0";
+  const remaining = pickChatStringFromRecords(
+    records,
+    "remaining_usd",
+    "remaining",
+  );
+  const budgetSource =
+    pickChatStringFromRecords(records, "budget_source") || "tenant_default";
+  const isUnlimitedFlag = pickChatBooleanFromRecords(records, "is_unlimited");
+  const isExhaustedFlag = pickChatBooleanFromRecords(records, "is_exhausted");
+
+  return {
+    budget: cap,
+    spend,
+    remaining_usd: remaining,
+    used_pct: pickChatNumberFromRecords(records, "used_pct") ?? 0,
+    is_unlimited:
+      isUnlimitedFlag === true ||
+      budgetSource.trim().toLowerCase() === "unlimited",
+    is_exhausted: isExhaustedFlag === true,
+    threshold_pct:
+      pickChatNumberFromRecords(
+        records,
+        "threshold_pct",
+        "effective_threshold_pct",
+        "budget_threshold_pct",
+      ) ?? 0,
+    budget_source: budgetSource || "tenant_default",
+    synced_at:
+      pickChatStringFromRecords(records, "synced_at", "budget_synced_at") ||
+      null,
+  };
+}
+
+/** Unwrap user detail payloads nested under `data` or with alternate keys. */
+export function unwrapChatUserDetailResponse(data: unknown): ChatUserDetailResponse {
+  const inner = isRecord(data) && isRecord(data.data) ? data.data : data;
+  if (!isRecord(inner)) {
+    throw new Error("Invalid chat user detail response");
+  }
+  const budgetRaw =
+    inner.budget ?? inner.mtd_budget ?? inner.user_budget ?? inner.budget_status;
+  return {
+    tenant_id:
+      readChatStringField(inner.tenant_id) || readChatStringField(inner.tenantId),
+    user_id: readChatStringField(inner.user_id) || readChatStringField(inner.userId),
+    display_name: readChatStringField(inner.display_name) || "",
+    first_seen: readChatStringField(inner.first_seen) || "",
+    last_seen: readChatStringField(inner.last_seen) || "",
+    lifetime: normalizeChatUserDetailLifetime(inner.lifetime),
+    budget: normalizeChatUserDetailBudget(budgetRaw, inner),
+  };
+}
+
 /**
  * Chat user detail including MTD budget (GET `/api/chat/users/{tenantId}/{userId}`).
+ * `userId` should be the caller's extension (see `resolveChatAssistantUserId`).
  */
 export const getChatUserDetail = async (
   tenantId: string,
@@ -1387,17 +1854,150 @@ export const getChatUserDetail = async (
 
   try {
     const path = `${CHAT_USER_DETAIL_API_PATH}/${encodeURIComponent(tid)}/${encodeURIComponent(uid)}`;
-    const response = await axiosInstance.get<ChatUserDetailResponse>(path);
-
+    const response = await axiosInstance.get<unknown>(path);
     if (response.data == null) {
       throw new Error("Failed to load chat user");
     }
-
-    return response.data;
-  } catch {
+    return unwrapChatUserDetailResponse(response.data);
+  } catch (error: unknown) {
+    if (error instanceof Error && error.message === "Invalid chat user detail response") {
+      throw error;
+    }
     throw new Error(CHAT_USER_DETAIL_FETCH_ERROR_MESSAGE);
   }
 };
+
+function emptyTenantDashboardKpiBucket(): TenantDashboardKpiBucket {
+  return { queries: 0, tokens: 0, cost: "0", failed: 0 };
+}
+
+function normalizeTenantDashboardKpiBucket(raw: unknown): TenantDashboardKpiBucket {
+  if (!isRecord(raw)) {
+    return emptyTenantDashboardKpiBucket();
+  }
+  return {
+    queries: readChatNumberField(raw.queries) ?? 0,
+    tokens: readChatNumberField(raw.tokens) ?? 0,
+    cost: readChatStringField(raw.cost) || "0",
+    failed: readChatNumberField(raw.failed) ?? 0,
+  };
+}
+
+function normalizeTenantDashboardKpis(
+  raw: unknown,
+): TenantChatDashboardResponse["kpis"] {
+  if (!isRecord(raw)) {
+    const empty = emptyTenantDashboardKpiBucket();
+    return {
+      today: empty,
+      yesterday: empty,
+      this_month: empty,
+      active_users_7d: 0,
+    };
+  }
+  return {
+    today: normalizeTenantDashboardKpiBucket(raw.today),
+    yesterday: normalizeTenantDashboardKpiBucket(raw.yesterday),
+    this_month: normalizeTenantDashboardKpiBucket(
+      raw.this_month ?? raw.thisMonth,
+    ),
+    active_users_7d:
+      readChatNumberField(raw.active_users_7d) ??
+      readChatNumberField(raw.activeUsers7d) ??
+      0,
+  };
+}
+
+function normalizeTenantDashboardKb(raw: unknown): TenantDashboardKb {
+  if (!isRecord(raw)) {
+    return {
+      tenant_faqs: 0,
+      global_faqs: 0,
+      files: 0,
+      is_trained: false,
+      last_training: null,
+    };
+  }
+  return {
+    tenant_faqs: readChatNumberField(raw.tenant_faqs) ?? 0,
+    global_faqs: readChatNumberField(raw.global_faqs) ?? 0,
+    files: readChatNumberField(raw.files) ?? 0,
+    is_trained: raw.is_trained === true,
+    last_training: readChatStringField(raw.last_training) || null,
+  };
+}
+
+function normalizeTenantDashboardTrendPoint(
+  raw: unknown,
+): TenantDashboardTrendPoint | null {
+  if (!isRecord(raw)) {
+    return null;
+  }
+  const date = readChatStringField(raw.date);
+  if (!date) {
+    return null;
+  }
+  return {
+    date,
+    queries: readChatNumberField(raw.queries) ?? 0,
+    cost: readChatStringField(raw.cost) || "0",
+    tokens: readChatNumberField(raw.tokens) ?? 0,
+  };
+}
+
+/** Unwrap tenant dashboard payloads nested under `data` or with partial KPI blocks. */
+export function unwrapTenantChatDashboardResponse(
+  data: unknown,
+): TenantChatDashboardResponse {
+  const inner = isRecord(data) && isRecord(data.data) ? data.data : data;
+  if (!isRecord(inner)) {
+    throw new Error("Invalid tenant dashboard response");
+  }
+
+  let trendRaw: unknown[] = [];
+  if (Array.isArray(inner.trend_30d)) {
+    trendRaw = inner.trend_30d;
+  } else if (Array.isArray(inner.trend30d)) {
+    trendRaw = inner.trend30d;
+  }
+
+  const pricingRaw = inner.pricing;
+  const pricing =
+    isRecord(pricingRaw) ?
+      {
+        model: readChatStringField(pricingRaw.model) || "—",
+        input_per_million: readChatStringField(pricingRaw.input_per_million) || "0",
+        output_per_million: readChatStringField(pricingRaw.output_per_million) || "0",
+      }
+    : undefined;
+
+  return {
+    tenant_id:
+      readChatStringField(inner.tenant_id) || readChatStringField(inner.tenantId),
+    company_name:
+      readChatStringField(inner.company_name) ||
+      readChatStringField(inner.companyName),
+    generated_at:
+      readChatStringField(inner.generated_at) ||
+      readChatStringField(inner.generatedAt),
+    kpis: normalizeTenantDashboardKpis(inner.kpis),
+    trend_30d: trendRaw
+      .map(normalizeTenantDashboardTrendPoint)
+      .filter((p): p is TenantDashboardTrendPoint => p !== null),
+    top_users: Array.isArray(inner.top_users) ? inner.top_users : [],
+    kb: normalizeTenantDashboardKb(inner.kb),
+    recent_conversations: Array.isArray(inner.recent_conversations)
+      ? inner.recent_conversations
+      : [],
+    top_questions_7d: Array.isArray(inner.top_questions_7d)
+      ? inner.top_questions_7d
+      : [],
+    recent_failures: Array.isArray(inner.recent_failures)
+      ? inner.recent_failures
+      : [],
+    pricing,
+  };
+}
 
 export const getTenantChatDashboard = async (
   tenantId?: string,
@@ -1407,17 +2007,19 @@ export const getTenantChatDashboard = async (
     const id = tenantId?.trim();
     if (id) params.tenant_id = id;
 
-    const response = await axiosInstance.get<TenantChatDashboardResponse>(
-      CHAT_TENANT_DASHBOARD_API_PATH,
-      { params },
-    );
+    const response = await axiosInstance.get<unknown>(CHAT_TENANT_DASHBOARD_API_PATH, {
+      params,
+    });
 
     if (response.data == null) {
       throw new Error("Failed to load tenant dashboard");
     }
 
-    return response.data;
+    return unwrapTenantChatDashboardResponse(response.data);
   } catch (error: unknown) {
+    if (error instanceof Error && error.message === "Invalid tenant dashboard response") {
+      throw error;
+    }
     throw new Error(
       chatApiErrorMessage(
         error,

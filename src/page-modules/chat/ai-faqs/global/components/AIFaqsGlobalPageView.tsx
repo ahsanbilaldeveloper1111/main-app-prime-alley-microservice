@@ -18,6 +18,7 @@ export function AIFaqsGlobalPageView({ ctx }: AIFaqsGlobalPageViewProps) {
     columns,
     getListQueryOptions,
     stableFilters,
+    openAddModal,
     showAddModal,
     setShowAddModal,
     showDeleteModal,
@@ -50,7 +51,7 @@ export function AIFaqsGlobalPageView({ ctx }: AIFaqsGlobalPageViewProps) {
         showSearch={false}
         buttons={
           <>
-            <Button variant="primary" onClick={() => setShowAddModal(true)}>
+            <Button variant="primary" onClick={openAddModal}>
               <Plus size={16} className="me-2" />
               Add FAQs
             </Button>

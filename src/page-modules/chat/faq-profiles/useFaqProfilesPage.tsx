@@ -1,13 +1,16 @@
 import { chatKeys } from "@query/keys";
 import { useChatCompaniesQuery } from "@page-modules/chat/useChatCompaniesQuery";
+import { resolveTenantIdFromSession } from "@page-modules/chat/shared/resolveTenantIdFromSession";
+import { useChatSessionAdmin } from "@page-modules/chat/shared/useChatSessionAdmin";
 import {
   getChatTrainingStatus,
   postChatTraining,
   type ChatTrainingResponse,
 } from "@utils/chat";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useSession } from "next-auth/react";
 import { useRouter } from "next/router";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "react-toastify";
 
 const TRAINING_CHUNK_SIZE = 1000;
@@ -16,7 +19,14 @@ const TRAINING_CHUNK_OVERLAP = 200;
 export function useFaqProfilesPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
-  const companiesQuery = useChatCompaniesQuery(true);
+  const { data: session } = useSession();
+  const isAdmin = useChatSessionAdmin();
+  const sessionTenantId = useMemo(
+    () => resolveTenantIdFromSession(session?.user),
+    [session?.user],
+  );
+
+  const companiesQuery = useChatCompaniesQuery(isAdmin);
   const companies = companiesQuery.data ?? [];
   const companiesLoading = companiesQuery.isPending;
 
@@ -25,6 +35,11 @@ export function useFaqProfilesPage() {
   const [trainingResponse, setTrainingResponse] = useState<ChatTrainingResponse | null>(null);
   const [selectedCompanyId, setSelectedCompanyId] = useState("");
   const [statusTenantId, setStatusTenantId] = useState("");
+
+  useEffect(() => {
+    if (!sessionTenantId || isAdmin) return;
+    setStatusTenantId(sessionTenantId);
+  }, [sessionTenantId, isAdmin]);
 
   const statusTenantTrimmed = statusTenantId.trim();
 
@@ -62,9 +77,17 @@ export function useFaqProfilesPage() {
   });
 
   const handleTrainBotClick = useCallback(() => {
+    if (!isAdmin) {
+      if (!sessionTenantId) {
+        toast.info("Your account is not linked to a company.");
+        return;
+      }
+      trainingMutation.mutate(sessionTenantId);
+      return;
+    }
     setSelectedCompanyId("");
     setShowCompanyModal(true);
-  }, []);
+  }, [isAdmin, sessionTenantId, trainingMutation]);
 
   const handleCompanySubmit = useCallback(() => {
     if (!selectedCompanyId?.trim()) {
@@ -82,11 +105,15 @@ export function useFaqProfilesPage() {
 
   const refetchTrainingStatus = useCallback(() => {
     if (!statusTenantTrimmed) {
-      toast.info("Select a company above to load training status");
+      toast.info(
+        isAdmin
+          ? "Select a company above to load training status"
+          : "Your account is not linked to a company.",
+      );
       return;
     }
     trainingStatusQuery.refetch().catch(() => undefined);
-  }, [statusTenantTrimmed, trainingStatusQuery]);
+  }, [isAdmin, statusTenantTrimmed, trainingStatusQuery]);
 
   const trainingStatusErrorMessage =
     trainingStatusQuery.isError && trainingStatusQuery.error instanceof Error
@@ -94,6 +121,8 @@ export function useFaqProfilesPage() {
       : null;
 
   return {
+    isAdmin,
+    showCompanyFilter: isAdmin,
     router,
     companies,
     companiesLoading,

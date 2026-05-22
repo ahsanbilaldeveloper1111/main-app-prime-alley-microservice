@@ -7,8 +7,8 @@ export type AiFaqDraftItemCardsProps = Readonly<{
   faqItems: FAQItemDraft[];
   variant: "multi" | "single";
   onAddItem?: () => void;
-  onRemoveItem: (index: number) => void;
-  onUpdateItem: (index: number, field: keyof FAQItem, value: string) => void;
+  onRemoveItem: (clientKey: string) => void;
+  onUpdateItem: (clientKey: string, field: keyof FAQItem, value: string) => void;
 }>;
 
 export function AiFaqDraftItemCards({
@@ -23,7 +23,7 @@ export function AiFaqDraftItemCards({
       <div className="d-flex justify-content-between align-items-center mb-3">
         <h6>{variant === "single" ? "FAQ Item" : "FAQ Items"}</h6>
         {variant === "multi" && onAddItem ? (
-          <Button variant="outline-primary" size="sm" onClick={onAddItem}>
+          <Button variant="outline-primary" size="sm" type="button" onClick={onAddItem}>
             <Plus size={14} className="me-1" />
             Add FAQ
           </Button>
@@ -42,7 +42,7 @@ export function AiFaqDraftItemCards({
                     size="sm"
                     className="text-danger p-0"
                     type="button"
-                    onClick={() => onRemoveItem(index)}
+                    onClick={() => onRemoveItem(item.clientKey)}
                   >
                     <X size={16} />
                   </Button>
@@ -56,7 +56,7 @@ export function AiFaqDraftItemCards({
               <Form.Control
                 type="text"
                 value={item.question}
-                onChange={(e) => onUpdateItem(index, "question", e.target.value)}
+                onChange={(e) => onUpdateItem(item.clientKey, "question", e.target.value)}
                 placeholder="Enter question"
               />
             </Form.Group>
@@ -68,7 +68,7 @@ export function AiFaqDraftItemCards({
                 as="textarea"
                 rows={3}
                 value={item.answer}
-                onChange={(e) => onUpdateItem(index, "answer", e.target.value)}
+                onChange={(e) => onUpdateItem(item.clientKey, "answer", e.target.value)}
                 placeholder="Enter answer"
               />
             </Form.Group>

@@ -31,6 +31,7 @@ import type {
   TenantDashboardPricing,
   TenantKnowledgeBaseStats,
 } from "./types";
+import { TenantDashboardBudgetOverview } from "./TenantDashboardBudgetOverview";
 import { TenantDashboardUsersBudgetsTab } from "./TenantDashboardUsersBudgetsTab";
 import {
   TENANT_DASHBOARD_TABS,
@@ -312,6 +313,7 @@ export function ChatbotsTenantDashboardView({
 
         {activeTab === "overview" && !isLoading && !isError && model ? (
           <TenantDashboardContent
+            tenantId={tenantId}
             model={model}
             dailyCostQueriesChart={dailyCostQueriesChart}
           />
@@ -322,9 +324,11 @@ export function ChatbotsTenantDashboardView({
 }
 
 function TenantDashboardContent({
+  tenantId,
   model,
   dailyCostQueriesChart,
 }: Readonly<{
+  tenantId: string;
   model: NonNullable<ChatbotsTenantDashboardViewProps["ctx"]["model"]>;
   dailyCostQueriesChart: ChatbotsTenantDashboardViewProps["ctx"]["dailyCostQueriesChart"];
 }>) {
@@ -345,6 +349,8 @@ function TenantDashboardContent({
 
   return (
     <>
+        <TenantDashboardBudgetOverview tenantId={tenantId} active />
+
         <Row xs={1} sm={2} md={3} xl={5} className="g-3 mb-3">
           <StatCard
             title="Queries today"

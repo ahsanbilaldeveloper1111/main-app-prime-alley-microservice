@@ -10,13 +10,10 @@ import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
 import PageHeader from "@components/PageHeader";
 import { useRouter } from 'next/router';
-import { Container, Row, Col, Card, Button, Modal, Spinner } from 'react-bootstrap';
-import { Building2, Globe, ChevronRight, Bot, X } from 'lucide-react';
-import {
-  postChatTraining,
-  formatChatTrainingResultMessage,
-  type ChatTrainingResponse,
-} from '@utils/chat';
+import { Container, Row, Col, Card, Button, Spinner } from 'react-bootstrap';
+import { Building2, Globe, ChevronRight, Bot } from 'lucide-react';
+import { postChatTraining, type ChatTrainingResponse } from '@utils/chat';
+import { ChatTrainingResultModal } from '@page-modules/chat/shared/ChatTrainingResultModal';
 import { toast } from 'react-toastify';
 
 
@@ -171,69 +168,14 @@ const AIChatFAQs = () => {
         </Row>
       </Container>
 
-      {/* Training Response Modal */}
-      <Modal 
-        show={showTrainingModal} 
-        onHide={() => {
+      <ChatTrainingResultModal
+        show={showTrainingModal}
+        response={trainingResponse}
+        onClose={() => {
           setShowTrainingModal(false);
           setTrainingResponse(null);
         }}
-        size="lg"
-        centered
-      >
-        <Modal.Header style={{ borderBottom: '1px solid #e8eef5' }}>
-          <Modal.Title style={{ fontSize: '18px', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <Bot size={20} color="#4e6fa5" />
-            Training Results
-          </Modal.Title>
-          <Button
-            variant="link"
-            onClick={() => {
-              setShowTrainingModal(false);
-              setTrainingResponse(null);
-            }}
-            style={{ 
-              background: 'none',
-              border: 'none',
-              padding: '4px',
-              cursor: 'pointer',
-              color: '#6c757d',
-              display: 'flex',
-              alignItems: 'center'
-            }}
-          >
-            <X size={20} />
-          </Button>
-        </Modal.Header>
-        <Modal.Body>
-          {trainingResponse && (
-            <div style={{ 
-              padding: '20px',
-              textAlign: 'center'
-            }}>
-              <p style={{ 
-                fontSize: '16px',
-                color: '#2d3748',
-                margin: 0,
-                lineHeight: '1.6'
-              }}>
-                {formatChatTrainingResultMessage(trainingResponse)}
-              </p>
-            </div>
-          )}
-        </Modal.Body>
-        <Modal.Footer>
-          <Button 
-            variant="secondary" 
-            onClick={() => {
-              setShowTrainingModal(false);
-              setTrainingResponse(null);
-            }}
-          >
-            Close
-          </Button>
-        </Modal.Footer>
-      </Modal>
+      />
 
     </React.Fragment>
   );

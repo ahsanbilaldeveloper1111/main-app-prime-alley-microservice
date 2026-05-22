@@ -2,6 +2,8 @@ import { Filter, History, RefreshCw, Search } from "lucide-react";
 import React from "react";
 import { Alert, Button, Spinner, Table } from "react-bootstrap";
 
+import { ChatModuleDateTimeFilterField } from "@page-modules/chat/shared/ChatModuleDateTimeFilterField";
+
 import {
   formatSettingsHistoryChangeLine,
   formatSettingsHistoryEventLabel,
@@ -56,24 +58,22 @@ export function AIChatbotSettingsHistoryPanel({
           Filters
         </p>
         <div className="ai-chatbot-settings__history-filters">
-          <label className="ai-chatbot-settings__field">
-            <span className="ai-chatbot-settings__field-label">From (UTC)</span>
-            <input
-              type="date"
-              className="ai-chatbot-settings__input"
-              value={draftFilters.from}
-              onChange={(e) => updateDraft({ from: e.target.value })}
-            />
-          </label>
-          <label className="ai-chatbot-settings__field">
-            <span className="ai-chatbot-settings__field-label">To (UTC)</span>
-            <input
-              type="date"
-              className="ai-chatbot-settings__input"
-              value={draftFilters.to}
-              onChange={(e) => updateDraft({ to: e.target.value })}
-            />
-          </label>
+          <ChatModuleDateTimeFilterField
+            layout="ai-chatbot"
+            label="Start date & time"
+            bound="from"
+            value={draftFilters.from}
+            disabled={isLoading}
+            onChange={(from) => updateDraft({ from })}
+          />
+          <ChatModuleDateTimeFilterField
+            layout="ai-chatbot"
+            label="End date & time"
+            bound="to"
+            value={draftFilters.to}
+            disabled={isLoading}
+            onChange={(to) => updateDraft({ to })}
+          />
           <label className="ai-chatbot-settings__field">
             <span className="ai-chatbot-settings__field-label">Limit</span>
             <input

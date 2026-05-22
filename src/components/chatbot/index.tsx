@@ -200,6 +200,8 @@ export default function ChatbotWidget() {
   const {
     budget: chatBudget,
     isLoading: chatBudgetLoading,
+    isUnlimited: chatBudgetUnlimited,
+    isError: chatBudgetError,
     hasIdentity: chatBudgetHasIdentity,
     refetch: refetchChatBudget,
   } = useChatAssistantUserBudget(isOpen);
@@ -630,7 +632,10 @@ export default function ChatbotWidget() {
 
       <ChatAssistantBudgetBar
         budget={chatBudget}
-        isLoading={chatBudgetLoading && chatBudgetHasIdentity}
+        isUnlimited={chatBudgetUnlimited}
+        isLoading={chatBudgetLoading}
+        loadError={chatBudgetError && chatBudgetHasIdentity}
+        identityMissing={!chatBudgetHasIdentity && !chatBudgetLoading}
         compact
       />
 

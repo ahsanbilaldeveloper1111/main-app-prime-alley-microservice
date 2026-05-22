@@ -18,8 +18,8 @@ export type AiFaqUpsertModalProps = Readonly<{
   onRequestClose: () => void;
   onSubmit: () => void | Promise<void>;
   onAddItem?: () => void;
-  onRemoveItem?: (index: number) => void;
-  onUpdateItem: (index: number, field: keyof FAQItem, value: string) => void;
+  onRemoveItem?: (clientKey: string) => void;
+  onUpdateItem: (clientKey: string, field: keyof FAQItem, value: string) => void;
   onFileChange: (e: ChangeEvent<HTMLInputElement>) => void;
   onRemoveFile: (index: number) => void;
   childrenBeforeItems?: ReactNode;
@@ -50,7 +50,13 @@ export function AiFaqUpsertModal({
         <Modal.Title>{title}</Modal.Title>
       </Modal.Header>
       <Modal.Body>
-        <Form>
+        <Form
+          id="ai-faq-upsert-form"
+          onSubmit={(e) => {
+            e.preventDefault();
+            void onSubmit();
+          }}
+        >
           <AiFaqDraftItemsEditor
             mode={editorMode}
             faqItems={faqItems}
@@ -70,10 +76,10 @@ export function AiFaqUpsertModal({
         </Form>
       </Modal.Body>
       <Modal.Footer>
-        <Button variant="secondary" onClick={onRequestClose}>
+        <Button type="button" variant="secondary" onClick={onRequestClose}>
           Cancel
         </Button>
-        <Button variant="primary" onClick={() => onSubmit()}>
+        <Button type="submit" form="ai-faq-upsert-form" variant="primary">
           {primaryActionLabel}
         </Button>
       </Modal.Footer>

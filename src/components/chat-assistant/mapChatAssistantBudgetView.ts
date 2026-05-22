@@ -41,8 +41,11 @@ export function formatChatBudgetUsd(
   return precise ? usd4.format(n) : usd2.format(n);
 }
 
-/** No progress bar when budget is unlimited (`is_unlimited` or `budget_source`). */
+/** No progress bar when there is no finite monthly cap. */
 export function isChatBudgetUnlimited(budget: ChatUserDetailBudget): boolean {
+  const cap = parseMoney(budget.budget);
+  if (cap != null) return false;
+
   if (budget.is_unlimited) return true;
   return String(budget.budget_source ?? "").trim().toLowerCase() === "unlimited";
 }
@@ -67,8 +70,10 @@ export function mapChatAssistantBudgetView(
 
   const total = parseMoney(budget.budget);
   const spend = parseMoney(budget.spend) ?? 0;
+  const remainingFromApi = parseMoney(budget.remaining_usd);
   const remaining =
-    total == null ? null : Math.max(0, total - spend);
+    remainingFromApi ??
+    (total == null ? null : Math.max(0, total - spend));
 
   return {
     usedPct,

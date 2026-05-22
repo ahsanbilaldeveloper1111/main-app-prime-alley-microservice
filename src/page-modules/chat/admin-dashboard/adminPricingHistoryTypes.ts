@@ -1,3 +1,4 @@
+import { chatDateTimeUiToApiDate } from "@page-modules/chat/shared/chatDateTimeFilters";
 import type { ChatAdminPricingHistoryField } from "@utils/chat";
 
 export type AdminPricingHistoryFilterForm = Readonly<{
@@ -35,9 +36,9 @@ export function adminPricingHistoryFiltersToQuery(
     limit?: number;
   } = { limit };
 
-  const from = form.from.trim();
+  const from = chatDateTimeUiToApiDate(form.from, "from");
   if (from) query.from = from;
-  const to = form.to.trim();
+  const to = chatDateTimeUiToApiDate(form.to, "to");
   if (to) query.to = to;
   if (
     field === "margin_pct" ||
@@ -55,7 +56,7 @@ export const ADMIN_PRICING_HISTORY_FIELD_OPTIONS: ReadonlyArray<{
   label: string;
 }> = [
   { value: "", label: "All fields" },
-  { value: "margin_pct", label: "Cost markup (%)" },
+  { value: "margin_pct", label: "Cost margin (%)" },
   { value: "input_cost_per_million", label: "Input $ / 1M tokens" },
   { value: "output_cost_per_million", label: "Output $ / 1M tokens" },
 ];

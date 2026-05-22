@@ -1,3 +1,4 @@
+import { chatDateTimeUiToApiDate } from "@page-modules/chat/shared/chatDateTimeFilters";
 import type { ChatAdminAuditLogQueryParams } from "@utils/chat";
 
 export type ChatAdminAuditLogFilterForm = Readonly<{
@@ -29,8 +30,8 @@ export function chatAdminAuditLogFiltersToQuery(
   return {
     tenant_id: form.tenantId.trim() || undefined,
     event: form.event.trim() || undefined,
-    from: form.from.trim() || undefined,
-    to: form.to.trim() || undefined,
+    from: chatDateTimeUiToApiDate(form.from, "from"),
+    to: chatDateTimeUiToApiDate(form.to, "to"),
     q: form.q.trim() || undefined,
     limit,
   };

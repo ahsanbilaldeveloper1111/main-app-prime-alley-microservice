@@ -6,9 +6,9 @@ const EVENT_LABELS: Record<string, string> = {
 };
 
 const FIELD_LABELS: Record<string, string> = {
-  default_user_budget_usd: "Default user budget (USD)",
+  default_user_budget_usd: "Default per user budget (USD)",
   default_budget_threshold_pct: "Default alert threshold (%)",
-  monthly_budget_usd: "Default user budget (USD)",
+  monthly_budget_usd: "Default per user budget (USD)",
   budget_threshold_pct: "Default alert threshold (%)",
   model_name: "Model",
   input_cost_per_million: "Input $ / 1M tokens",

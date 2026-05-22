@@ -1,7 +1,7 @@
 import type { ChatPricingFieldChange } from "@utils/chat";
 
 const FIELD_LABELS: Record<string, string> = {
-  margin_pct: "Cost markup (%)",
+  margin_pct: "Cost margin (%)",
   input_cost_per_million: "Input $ / 1M tokens",
   output_cost_per_million: "Output $ / 1M tokens",
 };
