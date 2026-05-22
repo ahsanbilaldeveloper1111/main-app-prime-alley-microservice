@@ -1097,7 +1097,7 @@ const TasksListingPage = ({
                     e.currentTarget.style.background = "#333";
                   }}
                   onMouseLeave={e => {
-                    e.currentTarget.style.backgroundColor = "#000";
+                    e.currentTarget.style.backgroundColor = "#0066CC";
                     e.currentTarget.style.background = "#000";
                   }}
                 >Create task</button>
@@ -1717,7 +1717,7 @@ const TasksListingPage = ({
                   e.currentTarget.style.background = "#333";
                 }}
                 onMouseLeave={e => {
-                  e.currentTarget.style.backgroundColor = "#000";
+                  e.currentTarget.style.backgroundColor = "#0066CC";
                   e.currentTarget.style.background = "#000";
                 }}
               >
@@ -1739,7 +1739,7 @@ const TasksListingPage = ({
                   e.currentTarget.style.background = "#333";
                 }}
                 onMouseLeave={e => {
-                  e.currentTarget.style.backgroundColor = "#000";
+                  e.currentTarget.style.backgroundColor = "#0066CC";
                   e.currentTarget.style.background = "#000";
                 }}
               >

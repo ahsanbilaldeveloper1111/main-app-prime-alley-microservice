@@ -119,10 +119,10 @@ export function CrmProspectsContactsAddContactsButton({
             gap: "8px",
           }}
           onMouseEnter={(e) => {
-            e.currentTarget.style.backgroundColor = "#1a1a1a";
+            e.currentTarget.style.backgroundColor = "#0052A3";
           }}
           onMouseLeave={(e) => {
-            e.currentTarget.style.backgroundColor = "#000000";
+            e.currentTarget.style.backgroundColor = "#0066CC";
           }}
         >
           {config.addMenuButtonLabel}
