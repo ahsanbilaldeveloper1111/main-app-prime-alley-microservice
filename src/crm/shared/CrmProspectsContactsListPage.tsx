@@ -909,7 +909,7 @@ export function CrmProspectsContactsListPage({
         title: config.stats.allCardTitle,
         value: prospectsAllCountDisplay ?? 0,
         icon: Users,
-        iconColor: "#6366F1",
+        iconColor: "#0066CC",
         iconBgColor: "#EEF2FF",
         ...(config.operationsEntityName === "prospects"
           ? {
@@ -926,11 +926,11 @@ export function CrmProspectsContactsListPage({
         title: "Upcoming",
         value: metrics.scheduled_records ?? 0,
         icon: Calendar,
-        iconColor: "#10B981",
+        iconColor: "#D97706",
         iconBgColor: "#D1FAE5",
         metric: {
           text: `${metrics.scheduled_next_hour_records ?? 0} in next hour`,
-          dotColor: "#F59E0B",
+          dotColor: "#D97706",
         },
         ...(config.operationsEntityName === "prospects"
           ? { onClick: handleProspectUpcomingMetricClick }
@@ -940,11 +940,11 @@ export function CrmProspectsContactsListPage({
         title: "Overdue",
         value: metrics.overdue_scheduled_records ?? 0,
         icon: ClockIcon,
-        iconColor: "#F97316",
+        iconColor: "#DC2626",
         iconBgColor: "#FFEDD5",
         metric: {
           text: "Client-defined",
-          dotColor: "#F97316",
+          dotColor: "#DC2626",
         },
         ...(config.operationsEntityName === "prospects"
           ? { onClick: handleProspectOverdueMetricClick }
@@ -954,11 +954,11 @@ export function CrmProspectsContactsListPage({
         title: config.stats.convertedCardTitle,
         value: metrics.converted_prospects_records ?? 0,
         icon: Target,
-        iconColor: "#8B5CF6",
+        iconColor: "#059669",
         iconBgColor: "#EDE9FE",
         metric: {
           text: "Has associated leads",
-          dotColor: "#8B5CF6",
+          dotColor: "#059669",
         },
         ...(config.operationsEntityName === "prospects"
           ? { onClick: handleProspectConvertedMetricClick }
@@ -968,11 +968,11 @@ export function CrmProspectsContactsListPage({
         title: "Recently Contacted",
         value: metrics.recently_contacted_last_24h_records ?? 0,
         icon: MessageCircle,
-        iconColor: "#0EA5E9",
+        iconColor: "#0066CC",
         iconBgColor: "#E0F2FE",
         metric: {
           text: "In last 24 hrs",
-          dotColor: "#0EA5E9",
+          dotColor: "#0066CC",
         },
         ...(config.operationsEntityName === "prospects"
           ? { onClick: handleProspectRecentlyContactedMetricClick }
@@ -982,11 +982,11 @@ export function CrmProspectsContactsListPage({
         title: "Not Contacted",
         value: metrics.not_contacted_records ?? 0,
         icon: XCircle,
-        iconColor: "#64748B",
+        iconColor: "#6B7280",
         iconBgColor: "#F1F5F9",
         metric: {
           text: "No call attempt has occurred yet.",
-          dotColor: "#94A3B8",
+          dotColor: "#6B7280",
         },
         ...(config.operationsEntityName === "prospects"
           ? { onClick: handleProspectNotContactedMetricClick }
