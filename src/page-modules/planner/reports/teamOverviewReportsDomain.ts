@@ -159,7 +159,7 @@ export function buildActiveIssuesItems(
     const item = mapTaskToListItem(task, hierarchyExtensions);
     return {
       ...item,
-      badge: task.days_in_progress != null ? `${task.days_in_progress}d stale` : "Overdue",
+      badge: task.days_in_progress == null ? "Overdue" : `${task.days_in_progress}d stale`,
       badgeTone: "critical" as const,
     };
   });
