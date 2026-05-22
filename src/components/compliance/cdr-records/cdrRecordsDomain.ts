@@ -7,9 +7,8 @@ export interface CDRRecord {
   CallingNumber: string;
   CalledNumber: string;
   UserID: string;
-  AllowLocalDNCLCalls: string;
-  AllowApiDNCLCalls: string;
   AllowRepetitiveCalls: string;
+  AllowLocalDNCLCalls: string;
   IndividualRepetitiveCallsAllowDaily: string;
   IndividualRepetitiveCallsAllowWeekly: string;
   CallRepFollowCompSettings: string;
@@ -17,7 +16,6 @@ export interface CDRRecord {
   CompanyRepetitiveCallsAllowWeekly: string;
   LocalDNDStatus: string;
   CallRepetitionStatus: string;
-  DNCRAPIStatus: string;
   TotalTimeTakenMs: number;
   CreatedDate: string;
 }
@@ -35,14 +33,6 @@ export interface CDRResponse {
         allowed: number;
         blocked: number;
         not_checked: number;
-      };
-      dncr_api: {
-        allowed: number;
-        blocked: number;
-        not_checked: number;
-        invalid: number;
-        none: number;
-        error: number;
       };
       performance: {
         avg_time_ms: number;
@@ -82,27 +72,6 @@ export function getTriStateTone(
   if (value === neutral) return { color: "#6c757d", backgroundColor: "#e9ecef" };
   return { color: "#dc3545", backgroundColor: "#f8d7da" };
 }
-
-export function getDncrTone(value: string): StatusChipTone {
-  if (value === "TRUE") return { color: "#dc3545", backgroundColor: "#f8d7da" };
-  if (value === "FALSE") return { color: "#0d8a5e", backgroundColor: "#d1f4e8" };
-  return { color: "#6c757d", backgroundColor: "#e9ecef" };
-}
-
-export const DNCR_API_STATUS_LABELS: Record<string, string> = {
-  "": "DNCR API",
-  TRUE: "🚫 TRUE (Blocked in DNCR)",
-  FALSE: "✅ FALSE (Allowed by DNCR)",
-  "Not Checked": "⏭️ Not Checked",
-  INVALID: "⚠️ INVALID (Not Found)",
-  NONE: "⚠️ NONE (Null Status)",
-  NULL: "⚠️ NULL (Null Status)",
-  UNKNOWN: "❌ UNKNOWN (Timeout/Error)",
-  ERROR: "❌ ERROR (API Failed)",
-  "%CACHE-BLOCKED": "🔄 Cache: Blocked",
-  "%CACHE-ALLOWED": "🔄 Cache: Allowed",
-  "%NOT-IN-CACHE": "🚫 Cache: Miss (Fail-closed)",
-};
 
 export const CDR_REPETITION_STATUS_CHOICES = [
   { label: "Allowed", value: "Allowed" },
@@ -154,11 +123,9 @@ export interface MappedCDRRecord {
   called: string;
   userId: string;
   localDND: string;
+  allowLocalDncl: string;
   repetition: string;
-  dncrApi: string;
   time: string;
-  allowLocalDNCL: string;
-  allowApiDNCLCalls: string;
   allowRepetition: string;
 }
 
@@ -169,7 +136,6 @@ export interface AppliedFilters {
   user_id: string;
   call_repetition_status: string;
   local_dnd_status: string;
-  dncr_api_status: string;
   date_from: string;
   date_to: string;
 }
@@ -245,7 +211,6 @@ export function buildCdrQueryParams(
   if (filters.call_repetition_status)
     params.call_repetition_status = filters.call_repetition_status;
   if (filters.local_dnd_status) params.local_dnd_status = filters.local_dnd_status;
-  if (filters.dncr_api_status) params.dncr_api_status = filters.dncr_api_status;
   params.date_from = filters.date_from.trim() || getCdrDefaultDateFromLocal();
   params.date_to = filters.date_to.trim() || getCdrDefaultDateToLocal();
   return params;
@@ -259,14 +224,6 @@ export interface CdrAggregatedStats {
   repetitionAllowed: number;
   repetitionNotAllowed: number;
   repetitionNotChecked: number;
-  dncrApiFalse: number;
-  dncrApiTrue: number;
-  dncrApiNotChecked: number;
-  dncrApiInvalid: number;
-  dncrApiNone: number;
-  dncrApiError: number;
-  allowLocalDNCLTrue: number;
-  allowLocalDNCLFalse: number;
   avgTime: number;
   minTime: number;
   maxTime: number;
@@ -282,14 +239,6 @@ export function cdrEmptyAggregateStats(totalRecords: number): CdrAggregatedStats
     repetitionAllowed: 0,
     repetitionNotAllowed: 0,
     repetitionNotChecked: 0,
-    dncrApiFalse: 0,
-    dncrApiTrue: 0,
-    dncrApiNotChecked: 0,
-    dncrApiInvalid: 0,
-    dncrApiNone: 0,
-    dncrApiError: 0,
-    allowLocalDNCLTrue: 0,
-    allowLocalDNCLFalse: 0,
     avgTime: 0,
     minTime: 0,
     maxTime: 0,
@@ -308,14 +257,6 @@ export function cdrAggregatedStatsFromThisMonth(
     repetitionAllowed: tm.call_repetition?.allowed || 0,
     repetitionNotAllowed: tm.call_repetition?.blocked || 0,
     repetitionNotChecked: tm.call_repetition?.not_checked || 0,
-    dncrApiFalse: tm.dncr_api?.allowed || 0,
-    dncrApiTrue: tm.dncr_api?.blocked || 0,
-    dncrApiNotChecked: tm.dncr_api?.not_checked || 0,
-    dncrApiInvalid: tm.dncr_api?.invalid || 0,
-    dncrApiNone: tm.dncr_api?.none || 0,
-    dncrApiError: tm.dncr_api?.error || 0,
-    allowLocalDNCLTrue: 0,
-    allowLocalDNCLFalse: 0,
     totalTime: 0,
     avgTime: tm.performance?.avg_time_ms || 0,
     minTime: tm.performance?.min_time_ms || 0,
@@ -356,16 +297,6 @@ export function computeCdrAggregatedStats(
     } else {
       stats.repetitionNotChecked++;
     }
-    if (record.DNCRAPIStatus === "Blocked") {
-      stats.dncrApiTrue++;
-    } else {
-      stats.dncrApiFalse++;
-    }
-    if (record.AllowLocalDNCLCalls?.toLowerCase() === "true") {
-      stats.allowLocalDNCLTrue++;
-    } else {
-      stats.allowLocalDNCLFalse++;
-    }
     stats.totalTime += record.TotalTimeTakenMs || 0;
   });
   return {
@@ -384,7 +315,6 @@ export function createDefaultCdrAppliedFilters(): AppliedFilters {
     user_id: "",
     call_repetition_status: "",
     local_dnd_status: "",
-    dncr_api_status: "",
     date_from: getCdrDefaultDateFromLocal(),
     date_to: getCdrDefaultDateToLocal(),
   };
@@ -429,13 +359,9 @@ export function mapCdrRecordToUI(record: CDRRecord): MappedCDRRecord {
     called: record.CalledNumber || "",
     userId: record.UserID || "",
     localDND: record.LocalDNDStatus,
+    allowLocalDncl: record.AllowLocalDNCLCalls ?? "",
     repetition: mapRepetitionStatus(record.CallRepetitionStatus),
-
-    dncrApi: record.DNCRAPIStatus,
-
     time: record.TotalTimeTakenMs?.toFixed(2) || "0",
-    allowLocalDNCL: record.AllowLocalDNCLCalls,
-    allowApiDNCLCalls: record.AllowApiDNCLCalls,
     allowRepetition: record.AllowRepetitiveCalls,
   };
 }

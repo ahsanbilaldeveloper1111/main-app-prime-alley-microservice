@@ -293,8 +293,8 @@ const APP_PERMISSION_MODULES: AppPermissionModule[] = [
     label: "Compliance",
     categories: [
       { id: "compliance-api-number-check", label: "API Number Check" },
-      { id: "compliance-cdr-records", label: "CDR Records" },
-      { id: "dncr-local-dnd-call-block", label: "Add Records" },
+      { id: "compliance-cdr-records", label: "Compliance Analytics" },
+      { id: "dncr-local-dnd-call-block", label: "Add Local DND" },
     ],
   },
   {
