@@ -212,6 +212,67 @@ const GlobalBreezeStyles: React.FC = () => (
     .breeze-scroll::-webkit-scrollbar-track { background: transparent; }
     .breeze-scroll::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 10px; }
     .breeze-scroll::-webkit-scrollbar-thumb:hover { background: #cbd5e0; }
+    .breeze-chat-history-row {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      border-radius: 6px;
+      background-color: transparent;
+      transition: background 0.15s;
+      box-sizing: border-box;
+    }
+    .breeze-chat-history-row:not(.breeze-chat-history-row--active):hover {
+      background-color: #f7f7f7;
+    }
+    .breeze-chat-history-row--active {
+      background-color: #f0f0f0;
+    }
+    .breeze-chat-history-row__select {
+      flex: 1;
+      min-width: 0;
+      padding: 10px 12px;
+      display: flex;
+      align-items: center;
+      border: none;
+      border-radius: 6px;
+      background: transparent;
+      cursor: pointer;
+      font-size: 13.5px;
+      color: #141414;
+      font-family: inherit;
+      text-align: left;
+    }
+    .breeze-chat-history-row__select--active {
+      font-weight: 500;
+    }
+    .breeze-chat-history-row__title {
+      flex: 1;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .breeze-chat-history-row__delete {
+      padding: 4px;
+      margin-right: 8px;
+      border: none;
+      border-radius: 4px;
+      background: transparent;
+      color: #718096;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      flex-shrink: 0;
+    }
+    .breeze-chat-history-row__delete:hover:not(:disabled) {
+      color: #dc2626;
+      background-color: #fef2f2;
+    }
+    .breeze-chat-history-row__delete:disabled {
+      cursor: wait;
+      opacity: 0.5;
+    }
   `}</style>
 );
 
@@ -665,93 +726,33 @@ function BreezeChatHistoryListItem({
   onDelete,
   rowMarginBottom = "4px",
 }: BreezeChatHistoryListItemProps): React.ReactElement {
-  const handleKeyDown = (event: React.KeyboardEvent) => {
-    if (event.key === "Enter" || event.key === " ") {
-      event.preventDefault();
-      onActivate();
-    }
-  };
+  const rowClassName = [
+    "breeze-chat-history-row",
+    isActive ? "breeze-chat-history-row--active" : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
 
-  const handleRowMouseEnter = (event: React.MouseEvent<HTMLDivElement>) => {
-    if (!isActive) {
-      event.currentTarget.style.backgroundColor = "#f7f7f7";
-    }
-  };
-
-  const handleRowMouseLeave = (event: React.MouseEvent<HTMLDivElement>) => {
-    if (!isActive) {
-      event.currentTarget.style.backgroundColor = "transparent";
-    }
-  };
-
-  const handleDeleteMouseEnter = (event: React.MouseEvent<HTMLButtonElement>) => {
-    event.currentTarget.style.color = "#dc2626";
-    event.currentTarget.style.backgroundColor = "#fef2f2";
-  };
-
-  const handleDeleteMouseLeave = (event: React.MouseEvent<HTMLButtonElement>) => {
-    event.currentTarget.style.color = "#718096";
-    event.currentTarget.style.backgroundColor = "transparent";
-  };
+  const selectClassName = [
+    "breeze-chat-history-row__select",
+    isActive ? "breeze-chat-history-row__select--active" : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
 
   return (
-    <div
-      role="button"
-      tabIndex={0}
-      onClick={onActivate}
-      onKeyDown={handleKeyDown}
-      style={{
-        width: "100%",
-        padding: "10px 12px",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "space-between",
-        gap: "8px",
-        border: "none",
-        borderRadius: "6px",
-        backgroundColor: isActive ? "#f0f0f0" : "transparent",
-        cursor: "pointer",
-        fontSize: "13.5px",
-        color: "#141414",
-        fontWeight: isActive ? "500" : "400",
-        marginBottom: rowMarginBottom,
-        transition: "background 0.15s",
-        boxSizing: "border-box",
-      }}
-      onMouseEnter={handleRowMouseEnter}
-      onMouseLeave={handleRowMouseLeave}
-    >
-      <span
-        style={{
-          flex: 1,
-          minWidth: 0,
-          overflow: "hidden",
-          textOverflow: "ellipsis",
-          whiteSpace: "nowrap",
-        }}
-      >
-        {item.title}
-      </span>
+    <div className={rowClassName} style={{ marginBottom: rowMarginBottom }}>
+      <button type="button" className={selectClassName} onClick={onActivate}>
+        <span className="breeze-chat-history-row__title">{item.title}</span>
+      </button>
       {canDelete ? (
         <button
           type="button"
+          className="breeze-chat-history-row__delete"
           disabled={isDeleting}
           onClick={(event) => handleBreezeChatHistoryDeleteClick(event, onDelete)}
           title="Delete"
-          style={{
-            padding: "4px",
-            border: "none",
-            borderRadius: "4px",
-            background: "transparent",
-            color: "#718096",
-            cursor: isDeleting ? "wait" : "pointer",
-            display: "flex",
-            alignItems: "center",
-            flexShrink: 0,
-            opacity: isDeleting ? 0.5 : 1,
-          }}
-          onMouseEnter={handleDeleteMouseEnter}
-          onMouseLeave={handleDeleteMouseLeave}
+          aria-label={`Delete ${item.title}`}
         >
           <Trash2 size={14} />
         </button>
