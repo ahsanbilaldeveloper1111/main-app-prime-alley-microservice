@@ -149,22 +149,6 @@ export function mapTenantChatSettingsPricingTable(
   return result;
 }
 
-function readPricingForModel(
-  root: Record<string, unknown>,
-  modelName: string,
-  pricingTable: TenantChatPricingTable,
-): { input: string; output: string } {
-  const fromTable = pricingTable[modelName];
-  if (fromTable) return fromTable;
-
-  const defaults = asRecord(root.defaults);
-  const pricing = asRecord(defaults?.pricing);
-  return {
-    input: readStringValue(pricing?.input_cost_per_million),
-    output: readStringValue(pricing?.output_cost_per_million),
-  };
-}
-
 export function mapTenantChatSettingsModelOptions(
   data: TenantChatSettingsResponse | null | undefined,
 ): AIChatbotModelOption[] {
@@ -211,13 +195,10 @@ export function mapTenantChatSettingsToFormValues(
     },
     budget: { defaultUserBudgetUsd: "", defaultBudgetThresholdPct: "" },
     openAiModel: "",
-    pricing: { inputCostPerMillion: "", outputCostPerMillion: "" },
     marginPct: "",
   };
 
-  const pricingTable = mapTenantChatSettingsPricingTable(data);
   const modelName = readEffectiveModelName(root);
-  const pricing = readPricingForModel(root, modelName, pricingTable);
 
   return {
     rateLimits: {
@@ -228,30 +209,7 @@ export function mapTenantChatSettingsToFormValues(
       defaultBudgetThresholdPct: readEffectiveDefaultBudgetThresholdPct(root),
     },
     openAiModel: modelName,
-    pricing: {
-      inputCostPerMillion: pricing.input,
-      outputCostPerMillion: pricing.output,
-    },
     marginPct: readEffectiveMarginPct(root),
-  };
-}
-
-export function resolvePricingForModel(
-  data: TenantChatSettingsResponse | null | undefined,
-  modelName: string,
-): { inputCostPerMillion: string; outputCostPerMillion: string } {
-  const root = asRecord(normalizeTenantChatSettingsPayload(data));
-  if (!root) {
-    return { inputCostPerMillion: "", outputCostPerMillion: "" };
-  }
-  const pricing = readPricingForModel(
-    root,
-    modelName.trim(),
-    mapTenantChatSettingsPricingTable(data),
-  );
-  return {
-    inputCostPerMillion: pricing.input,
-    outputCostPerMillion: pricing.output,
   };
 }
 

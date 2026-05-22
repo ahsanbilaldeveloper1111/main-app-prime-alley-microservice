@@ -17,7 +17,6 @@ import type {
 import { defaultAIChatbotSettingsFormValues } from "./types";
 import {
   formatTenantMarginPctDisplay,
-  resolvePricingForModel,
   validateAIChatbotSettingsForm,
   type TenantChatPricingTable,
 } from "./mapTenantChatSettings";
@@ -432,37 +431,24 @@ function AIChatbotSettingsFormContent(
         <p className="ai-chatbot-settings__hint mb-3">
           Margin is added on top of base LLM cost when computing tenant-facing
           rates and thread costs. Leave blank for no margin. Per-model token
-          rates come from the global pricing table below and are not saved on
-          tenant settings.
+          rates are shown in the global pricing table below.
         </p>
-        <div className="ai-chatbot-settings__grid-3">
-          <label className="ai-chatbot-settings__field">
-            <span className="ai-chatbot-settings__field-label">
-              OpenAI model
-            </span>
-            <select
-              className="ai-chatbot-settings__select"
-              value={values.openAiModel}
-              disabled={fieldsDisabled}
-              onChange={(e) => onModelChange(e.target.value)}
-            >
-              <option value="">Select model…</option>
-              {modelSelectOptions.map((opt) => (
-                <option key={opt.value} value={opt.value}>
-                  {opt.label}
-                </option>
-              ))}
-            </select>
-          </label>
-          <ReadonlyField
-            label="Input $ / 1M tokens (reference)"
-            value={values.pricing.inputCostPerMillion || "—"}
-          />
-          <ReadonlyField
-            label="Output $ / 1M tokens (reference)"
-            value={values.pricing.outputCostPerMillion || "—"}
-          />
-        </div>
+        <label className="ai-chatbot-settings__field">
+          <span className="ai-chatbot-settings__field-label">OpenAI model</span>
+          <select
+            className="ai-chatbot-settings__select"
+            value={values.openAiModel}
+            disabled={fieldsDisabled}
+            onChange={(e) => onModelChange(e.target.value)}
+          >
+            <option value="">Select model…</option>
+            {modelSelectOptions.map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
+        </label>
       </div>
 
       <ModelPricingDefaultsTable pricingTable={props.pricingTable} />
@@ -520,7 +506,6 @@ export const AIChatbotSettings: React.FC = () => {
     formValues: fetchedFormValues,
     modelOptions,
     pricingTable,
-    rawSettings,
     isLoading,
     isError,
     refetch,
@@ -590,24 +575,9 @@ export const AIChatbotSettings: React.FC = () => {
     saveMutation.mutate(values);
   }, [appliedTenantId, canEditSettings, saveMutation, values]);
 
-  const handleModelChange = useCallback(
-    (model: string) => {
-      const pricing = model
-        ? resolvePricingForModel(rawSettings, model)
-        : null;
-      setValues((prev) => ({
-        ...prev,
-        openAiModel: model,
-        pricing: pricing
-          ? {
-              inputCostPerMillion: pricing.inputCostPerMillion,
-              outputCostPerMillion: pricing.outputCostPerMillion,
-            }
-          : prev.pricing,
-      }));
-    },
-    [rawSettings],
-  );
+  const handleModelChange = useCallback((model: string) => {
+    setValues((prev) => ({ ...prev, openAiModel: model }));
+  }, []);
 
   const handleMarginChange = useCallback((marginPct: string) => {
     setValues((prev) => ({ ...prev, marginPct }));

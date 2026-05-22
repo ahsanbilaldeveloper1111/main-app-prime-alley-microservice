@@ -4,11 +4,6 @@ export interface AIChatbotRateLimitFields {
   perUserPerMinute: string;
 }
 
-export interface AIChatbotPricingFields {
-  inputCostPerMillion: string;
-  outputCostPerMillion: string;
-}
-
 export interface AIChatbotBudgetFields {
   defaultUserBudgetUsd: string;
   defaultBudgetThresholdPct: string;
@@ -18,7 +13,6 @@ export interface AIChatbotSettingsFormValues {
   rateLimits: AIChatbotRateLimitFields;
   budget: AIChatbotBudgetFields;
   openAiModel: string;
-  pricing: AIChatbotPricingFields;
   /** Percent margin on base LLM cost; blank = no margin. */
   marginPct: string;
 }
@@ -38,9 +32,5 @@ export const defaultAIChatbotSettingsFormValues =
       defaultBudgetThresholdPct: "",
     },
     openAiModel: "",
-    pricing: {
-      inputCostPerMillion: "",
-      outputCostPerMillion: "",
-    },
     marginPct: "",
   });

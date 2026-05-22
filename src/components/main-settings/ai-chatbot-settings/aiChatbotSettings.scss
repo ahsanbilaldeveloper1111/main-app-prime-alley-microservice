@@ -397,37 +397,59 @@
 
   &__pricing-reference-table {
     width: 100%;
-    min-width: 420px;
+    min-width: 36rem;
+    table-layout: fixed;
     border-collapse: collapse;
     font-size: 13px;
     line-height: 1.35;
 
-    thead th {
+    col.ai-chatbot-settings__pricing-ref-col-num {
+      width: 10.5rem;
+    }
+
+    thead th,
+    tbody td {
+      box-sizing: border-box;
       padding: 10px 12px;
-      text-align: left;
+      vertical-align: top;
+    }
+
+    thead th {
       font-weight: 600;
       color: #374151;
       background: #f3f4f6;
       border-bottom: 1px solid #e5e7eb;
+    }
+
+    th.ai-chatbot-settings__pricing-ref-model-col,
+    td.ai-chatbot-settings__pricing-ref-model-col {
+      text-align: left;
+      white-space: normal;
+      word-break: break-word;
+      overflow-wrap: anywhere;
+    }
+
+    th.ai-chatbot-settings__pricing-ref-num {
+      text-align: right;
+      white-space: normal;
+      line-height: 1.25;
+      font-variant-numeric: tabular-nums;
+    }
+
+    td.ai-chatbot-settings__pricing-ref-num {
+      text-align: right;
       white-space: nowrap;
+      font-variant-numeric: tabular-nums;
     }
 
     tbody td {
-      padding: 10px 12px;
       border-bottom: 1px solid #e5e7eb;
       color: #111827;
-      vertical-align: middle;
     }
 
     tbody tr:last-child td {
       border-bottom: none;
     }
-  }
-
-  &__pricing-ref-num {
-    text-align: right;
-    white-space: nowrap;
-    font-variant-numeric: tabular-nums;
   }
 
   &__pricing-ref-model {
