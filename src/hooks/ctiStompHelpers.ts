@@ -602,6 +602,35 @@ function pruneStaleSupervisionCallsWithoutCustomer(
   return result;
 }
 
+function currentStateAfterMonitoringEnded(
+  base: { currentState?: string },
+  hasActiveParties: boolean,
+): string {
+  return hasActiveParties
+    ? base.currentState || "ANSWERED"
+    : base.currentState || "DROPPED";
+}
+
+function currentStateFromActivePartyAfterDrop(
+  activeParty: { callStatus?: string } | undefined,
+  base: { currentState?: string },
+  dropEventType: string,
+): string {
+  if (!activeParty) {
+    return base.currentState || dropEventType;
+  }
+  if (activeParty.callStatus === "CONNECTED") {
+    return base.currentState || "ANSWERED";
+  }
+  if (activeParty.callStatus === "ON_HOLD") {
+    return "HELD";
+  }
+  if (activeParty.callStatus === "RETRIEVED") {
+    return "RETRIEVED";
+  }
+  return base.currentState || "ANSWERED";
+}
+
 function computeEffectiveCurrentState(
   evt: any,
   base: any,
@@ -614,10 +643,7 @@ function computeEffectiveCurrentState(
     return "RINGING";
   }
   if (isMonitoringEndedEventType(evt.eventType)) {
-    if (hasActiveParties) {
-      return base.currentState || "ANSWERED";
-    }
-    return base.currentState || "DROPPED";
+    return currentStateAfterMonitoringEnded(base, hasActiveParties);
   }
   if (
     evt.eventType === "DROPPED" &&
@@ -630,20 +656,11 @@ function computeEffectiveCurrentState(
     return "DROPPED";
   }
   if (evt.eventType === "DROPPED" && hasActiveParties) {
-    const activeParty = activePartiesOnly[0];
-    if (!activeParty) {
-      return base.currentState || evt.eventType;
-    }
-    if (activeParty.callStatus === "CONNECTED") {
-      return base.currentState || "ANSWERED";
-    }
-    if (activeParty.callStatus === "ON_HOLD") {
-      return "HELD";
-    }
-    if (activeParty.callStatus === "RETRIEVED") {
-      return "RETRIEVED";
-    }
-    return base.currentState || "ANSWERED";
+    return currentStateFromActivePartyAfterDrop(
+      activePartiesOnly[0],
+      base,
+      evt.eventType,
+    );
   }
   return evt.eventType;
 }

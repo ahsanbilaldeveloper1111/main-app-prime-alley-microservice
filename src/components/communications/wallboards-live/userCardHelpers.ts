@@ -318,6 +318,50 @@ function callLevelUserCardCallStatus(
   return currentState
 }
 
+type UserCardPartyStatusResult =
+  | { kind: 'resolved'; status: string | undefined }
+  | { kind: 'useCallLevel' }
+
+function tryUserCardCallStatusFromParties(
+  call: any,
+  dn: string,
+  isConferenceCall: boolean,
+): UserCardPartyStatusResult {
+  if (!call.parties?.length) {
+    return { kind: 'useCallLevel' }
+  }
+
+  const filtered = call.parties.filter(
+    (p: any) => p.callingAddress === dn || p.calledAddress === dn,
+  )
+  if (filtered.length === 0) {
+    return { kind: 'useCallLevel' }
+  }
+
+  const allDropped = filtered.every(
+    (p: any) => p.callStatus === 'DROPPED' || p.callStatus === 'DISCONNECTED',
+  )
+  if (allDropped || !dnHasLiveCustomerConversationOnCall(call, dn)) {
+    return { kind: 'resolved', status: undefined }
+  }
+
+  const fromParty = statusFromActivePartyForDn(filtered, dn, isConferenceCall)
+  if (fromParty !== undefined) {
+    return { kind: 'resolved', status: fromParty }
+  }
+
+  return { kind: 'useCallLevel' }
+}
+
+function isStaleSupervisionCallWithoutLiveAgent(call: any): boolean {
+  const m = call.monitoring
+  return Boolean(
+    m?.monitorDn &&
+      m?.monitoredDn &&
+      !callHasLiveAgentPartyWithNonSupervisor(call, m.monitoredDn, m.monitorDn),
+  )
+}
+
 export function computeUserCardCallStatus(
   call: any,
   active: boolean,
@@ -328,38 +372,12 @@ export function computeUserCardCallStatus(
   }
 
   const isConferenceCall = isDisplayConferenceCall(call)
-
-  if (call.parties && call.parties.length > 0) {
-    const filtered = call.parties.filter(
-      (p: any) => p.callingAddress === dn || p.calledAddress === dn
-    )
-
-    if (filtered.length > 0) {
-      const allDropped = filtered.every(
-        (p: any) => p.callStatus === 'DROPPED' || p.callStatus === 'DISCONNECTED'
-      )
-
-      if (allDropped) {
-        return undefined
-      }
-
-      if (!dnHasLiveCustomerConversationOnCall(call, dn)) {
-        return undefined
-      }
-
-      const fromParty = statusFromActivePartyForDn(filtered, dn, isConferenceCall)
-      if (fromParty !== undefined) {
-        return fromParty
-      }
-    }
+  const partyStatus = tryUserCardCallStatusFromParties(call, dn, isConferenceCall)
+  if (partyStatus.kind === 'resolved') {
+    return partyStatus.status
   }
 
-  const m = call.monitoring
-  if (
-    m?.monitorDn &&
-    m?.monitoredDn &&
-    !callHasLiveAgentPartyWithNonSupervisor(call, m.monitoredDn, m.monitorDn)
-  ) {
+  if (isStaleSupervisionCallWithoutLiveAgent(call)) {
     return undefined
   }
 

@@ -8,52 +8,59 @@
  */
 
 // ---------------------------------------------------------------------------
-// Party status enum (subset of values the CTI platform emits)
+// Party status (subset of values the CTI platform emits)
 // ---------------------------------------------------------------------------
 
-export type CtiPartyStatus =
-  | "RINGING"
-  | "CONNECTED"
-  | "ANSWERED"
-  | "RETRIEVED"
-  | "ON_HOLD"
-  | "HELD"
-  | "DROPPED"
-  | "DISCONNECTED"
-  | "ENDED"
-  | string; // allow unknown future values without crashing
+export const KNOWN_CTI_PARTY_STATUSES = [
+  "RINGING",
+  "CONNECTED",
+  "ANSWERED",
+  "RETRIEVED",
+  "ON_HOLD",
+  "HELD",
+  "DROPPED",
+  "DISCONNECTED",
+  "ENDED",
+] as const;
+
+export type KnownCtiPartyStatus = (typeof KNOWN_CTI_PARTY_STATUSES)[number];
 
 // ---------------------------------------------------------------------------
 // Call event types
 // ---------------------------------------------------------------------------
 
-export type CtiEventType =
-  | "RINGING"
-  | "CONNECTED"
-  | "ANSWERED"
-  | "RETRIEVED"
-  | "HELD"
-  | "ON_HOLD"
-  | "DROPPED"
-  | "DISCONNECTED"
-  | "ENDED"
-  | "MONITORING_ENDED"
-  | string;
+export const KNOWN_CTI_EVENT_TYPES = [
+  "RINGING",
+  "CONNECTED",
+  "ANSWERED",
+  "RETRIEVED",
+  "HELD",
+  "ON_HOLD",
+  "DROPPED",
+  "DISCONNECTED",
+  "ENDED",
+  "MONITORING_ENDED",
+] as const;
+
+export type KnownCtiEventType = (typeof KNOWN_CTI_EVENT_TYPES)[number];
 
 // ---------------------------------------------------------------------------
 // Monitoring
 // ---------------------------------------------------------------------------
 
-export type CtiMonitoringType =
-  | "SILENT"
-  | "WHISPER"
-  | "BARGE_IN"
-  | "BARGE-IN"
-  | "BARGEIN"
-  | string;
+export const KNOWN_CTI_MONITORING_TYPES = [
+  "SILENT",
+  "WHISPER",
+  "BARGE_IN",
+  "BARGE-IN",
+  "BARGEIN",
+] as const;
+
+export type KnownCtiMonitoringType = (typeof KNOWN_CTI_MONITORING_TYPES)[number];
 
 export interface CtiMonitoringInfo {
-  monitoringType?: CtiMonitoringType;
+  /** Supervision mode — see {@link KNOWN_CTI_MONITORING_TYPES}. */
+  monitoringType?: string;
   monitorDn?: string;
   monitoredDn?: string;
   callId?: string;
@@ -74,7 +81,8 @@ export interface CtiPartyLeg {
   callId?: string;
   callingAddress?: string;
   calledAddress?: string;
-  callStatus?: CtiPartyStatus;
+  /** Party leg status — see {@link KNOWN_CTI_PARTY_STATUSES}. */
+  callStatus?: string;
   callingDeviceName?: string;
   callingDeviceType?: string;
   calledDeviceName?: string;
@@ -92,7 +100,8 @@ export interface CtiPartyLeg {
 
 export interface CtiCallEvent {
   callId: string;
-  eventType: CtiEventType;
+  /** Event type — see {@link KNOWN_CTI_EVENT_TYPES}. */
+  eventType: string;
   sequence: number;
   /** ISO timestamp — used for stale-event detection */
   eventTime: string;

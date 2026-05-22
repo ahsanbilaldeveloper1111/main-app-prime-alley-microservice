@@ -7,7 +7,14 @@
  * Pure functions — no React, no side effects.
  */
 
-import type { CtiCallStateMap, CtiDnEntry, CtiDnStatus, CtiDnsMap } from "../types";
+import type {
+  CtiCallEvent,
+  CtiCallStateMap,
+  CtiDnEntry,
+  CtiDnStatus,
+  CtiDnsMap,
+  CtiPartyLeg,
+} from "../types";
 import { ctiAddressesEquivalent } from "../../utils/ctiAddressMatching";
 import { callHasLiveAgentPartyWithNonSupervisor } from "../../utils/ctiMonitoringCallParties";
 import { getLiveParties } from "./activeCalls";
@@ -48,6 +55,91 @@ export function getDnStatus(
   return "unknown";
 }
 
+function partyInvolvesDn(party: CtiPartyLeg, dn: string): boolean {
+  return (
+    ctiAddressesEquivalent(party.callingAddress, dn) ||
+    ctiAddressesEquivalent(party.calledAddress, dn)
+  );
+}
+
+function statusFromLivePartyCallStatus(
+  callStatus: string | undefined,
+): CtiDnStatus {
+  const status = String(callStatus ?? "").toUpperCase();
+  if (status === "RINGING") {
+    return "ringing";
+  }
+  if (status === "ON_HOLD" || status === "HELD") {
+    return "onHold";
+  }
+  return "onCall";
+}
+
+function isMonitoredAgentObservationOnlyLeg(
+  call: CtiCallEvent,
+  dn: string,
+  monitorDn: string | undefined,
+  monitoredDn: string | undefined,
+): boolean {
+  if (!call.isMonitoring || !monitoredDn || !monitorDn) {
+    return false;
+  }
+  if (!ctiAddressesEquivalent(monitoredDn, dn)) {
+    return false;
+  }
+  return !callHasLiveAgentPartyWithNonSupervisor(call, monitoredDn, monitorDn);
+}
+
+type SupervisorDnCallProbe = "monitoring" | "skip-call" | "check-parties";
+
+function probeSupervisorMonitoringForDn(
+  dn: string,
+  call: CtiCallEvent,
+): SupervisorDnCallProbe {
+  const monitorDn = call.monitoring?.monitorDn;
+  if (!call.isMonitoring || !monitorDn || !ctiAddressesEquivalent(monitorDn, dn)) {
+    return "check-parties";
+  }
+  const monitoredDn = call.monitoring?.monitoredDn;
+  if (
+    monitoredDn &&
+    callHasLiveAgentPartyWithNonSupervisor(call, monitoredDn, monitorDn)
+  ) {
+    return "monitoring";
+  }
+  return "skip-call";
+}
+
+function tryDnStatusFromCall(
+  dn: string,
+  call: CtiCallEvent,
+): CtiDnStatus | null {
+  if (call.isTerminating) {
+    return null;
+  }
+
+  const supervisorProbe = probeSupervisorMonitoringForDn(dn, call);
+  if (supervisorProbe === "monitoring") {
+    return "monitoring";
+  }
+  if (supervisorProbe === "skip-call") {
+    return null;
+  }
+
+  const monitorDn = call.monitoring?.monitorDn;
+  const monitoredDn = call.monitoring?.monitoredDn;
+  for (const party of getLiveParties(call)) {
+    if (!partyInvolvesDn(party, dn)) {
+      continue;
+    }
+    if (isMonitoredAgentObservationOnlyLeg(call, dn, monitorDn, monitoredDn)) {
+      continue;
+    }
+    return statusFromLivePartyCallStatus(party.callStatus);
+  }
+  return null;
+}
+
 /**
  * Returns a call-based status if the DN has a live leg, or `null` if idle.
  */
@@ -56,41 +148,9 @@ function getDnOnCallStatus(
   callStateMap: CtiCallStateMap,
 ): CtiDnStatus | null {
   for (const call of Object.values(callStateMap)) {
-    if (call.isTerminating) continue;
-
-    const monitorDn = call.monitoring?.monitorDn;
-    const monitoredDn = call.monitoring?.monitoredDn;
-
-    if (call.isMonitoring && monitorDn && ctiAddressesEquivalent(monitorDn, dn)) {
-      if (
-        monitoredDn &&
-        callHasLiveAgentPartyWithNonSupervisor(call, monitoredDn, monitorDn)
-      ) {
-        return "monitoring";
-      }
-      continue;
-    }
-
-    for (const p of getLiveParties(call)) {
-      const involved =
-        ctiAddressesEquivalent(p.callingAddress, dn) ||
-        ctiAddressesEquivalent(p.calledAddress, dn);
-      if (!involved) continue;
-
-      if (
-        call.isMonitoring &&
-        monitoredDn &&
-        ctiAddressesEquivalent(monitoredDn, dn) &&
-        monitorDn &&
-        !callHasLiveAgentPartyWithNonSupervisor(call, monitoredDn, monitorDn)
-      ) {
-        continue;
-      }
-
-      const status = String(p.callStatus ?? "").toUpperCase();
-      if (status === "RINGING") return "ringing";
-      if (status === "ON_HOLD" || status === "HELD") return "onHold";
-      return "onCall";
+    const status = tryDnStatusFromCall(dn, call);
+    if (status !== null) {
+      return status;
     }
   }
   return null;

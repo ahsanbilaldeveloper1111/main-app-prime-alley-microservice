@@ -7,17 +7,12 @@
  */
 
 import { ctiAddressesEquivalent } from "../../utils/ctiAddressMatching";
-import type {
-  CtiCallEvent,
-  CtiCallStateMap,
-  CtiMonitoringInfo,
-  CtiMonitoringType,
-} from "../types";
+import type { CtiCallEvent, CtiCallStateMap, CtiMonitoringInfo } from "../types";
 import { getLiveParties } from "./activeCalls";
 
 export type MonitoringSession = {
   callId: string;
-  monitoringType: CtiMonitoringType;
+  monitoringType: string;
   monitorDn: string;
   monitoredDn: string;
   call: CtiCallEvent;
@@ -27,7 +22,7 @@ const BARGE_IN_TYPES = new Set<string>(["BARGE_IN", "BARGE-IN", "BARGEIN"]);
 
 export function isBargeInType(type: string | undefined): boolean {
   return BARGE_IN_TYPES.has(
-    String(type ?? "").trim().toUpperCase().replace(/-/g, "_"),
+    String(type ?? "").trim().toUpperCase().replaceAll("-", "_"),
   );
 }
 

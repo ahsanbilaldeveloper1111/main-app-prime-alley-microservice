@@ -5,6 +5,10 @@ import { dnHasLiveCustomerConversationOnCall } from "../utils/ctiMonitoringCallP
 
 type Party = Record<string, unknown>;
 
+function partyCallStatusRaw(status: unknown): string {
+  return typeof status === "string" ? status : "";
+}
+
 function partyInvolvesDn(p: Party, dn: string): boolean {
   return (
     ctiAddressesEquivalent(p.callingAddress as string | undefined, dn) ||
@@ -13,12 +17,16 @@ function partyInvolvesDn(p: Party, dn: string): boolean {
 }
 
 function partyIsNonTerminal(p: Party): boolean {
-  const status = String(p.callStatus ?? "").toUpperCase();
-  return status !== "DROPPED" && status !== "DISCONNECTED" && status !== "ENDED";
+  const status = partyCallStatusRaw(p.callStatus).toUpperCase();
+  return (
+    status !== "DROPPED" && status !== "DISCONNECTED" && status !== "ENDED"
+  );
 }
 
 function callHasNonTerminalPartyForDn(call: CtiCallEvent, dn: string): boolean {
-  return Boolean(call.parties?.some((p) => partyInvolvesDn(p, dn) && partyIsNonTerminal(p)));
+  return Boolean(
+    call.parties?.some((p) => partyInvolvesDn(p, dn) && partyIsNonTerminal(p)),
+  );
 }
 
 /**
@@ -33,9 +41,13 @@ function callCountsAsActiveForDn(call: CtiCallEvent, dn: string): boolean {
     return false;
   }
   if (call.currentState === "RINGING") {
-    return call.parties?.some(
-      (p) => partyInvolvesDn(p, dn) && String(p.callStatus ?? "").toUpperCase() === "RINGING",
-    ) ?? false;
+    return (
+      call.parties?.some(
+        (p) =>
+          partyInvolvesDn(p, dn) &&
+          partyCallStatusRaw(p.callStatus).toUpperCase() === "RINGING",
+      ) ?? false
+    );
   }
   return dnHasLiveCustomerConversationOnCall(call, dn);
 }
@@ -45,14 +57,18 @@ export function getCallStatesForDnFromMap(
   callStateMap: Record<string, CtiCallEvent>,
   dn: string,
 ): CtiCallEvent[] {
-  return Object.values(callStateMap).filter((call) => callCountsAsActiveForDn(call, dn));
+  return Object.values(callStateMap).filter((call) =>
+    callCountsAsActiveForDn(call, dn),
+  );
 }
 
 export function hasActiveCallsInMap(
   callStateMap: Record<string, CtiCallEvent>,
   dn: string,
 ): boolean {
-  return Object.values(callStateMap).some((call) => callCountsAsActiveForDn(call, dn));
+  return Object.values(callStateMap).some((call) =>
+    callCountsAsActiveForDn(call, dn),
+  );
 }
 
 /** Most recent call state for DN — lifted from useCtiStomp. */
@@ -79,7 +95,10 @@ export function getDnCallStateFromMap(
   return {
     ...mostRecent,
     parties: activeParties,
-    role: ctiAddressesEquivalent(matchedParty.callingAddress as string | undefined, dn)
+    role: ctiAddressesEquivalent(
+      matchedParty.callingAddress as string | undefined,
+      dn,
+    )
       ? "calling"
       : "called",
     isActive: true,
@@ -109,7 +128,8 @@ export function getCallStateForDeviceFromMap(
     (call) =>
       !call.isTerminating &&
       call.parties?.some(
-        (p: Party) => partyMatchesDnAndDevice(p, dn, deviceName) && partyIsNonTerminal(p),
+        (p: Party) =>
+          partyMatchesDnAndDevice(p, dn, deviceName) && partyIsNonTerminal(p),
       ),
   );
 
@@ -122,7 +142,8 @@ export function getCallStateForDeviceFromMap(
   }
 
   const matchedParty = mostRecent.parties?.find(
-    (p: Party) => partyMatchesDnAndDevice(p, dn, deviceName) && partyIsNonTerminal(p),
+    (p: Party) =>
+      partyMatchesDnAndDevice(p, dn, deviceName) && partyIsNonTerminal(p),
   );
 
   if (!matchedParty) return null;
@@ -135,7 +156,10 @@ export function getCallStateForDeviceFromMap(
   return {
     ...mostRecent,
     parties: activeParties,
-    role: ctiAddressesEquivalent(matchedParty.callingAddress as string | undefined, dn)
+    role: ctiAddressesEquivalent(
+      matchedParty.callingAddress as string | undefined,
+      dn,
+    )
       ? "calling"
       : "called",
     isActive: true,
