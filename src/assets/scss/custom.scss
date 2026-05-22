@@ -407,26 +407,15 @@ transition: var(--transition-speed);
     }
 }
 
-[data-pc-preset=preset-1] .btn-primary {
-    background: linear-gradient(135deg, #2583f2, #4facfe);
-    border-color: #2583f2;
-    &:hover{
-        background: linear-gradient(135deg, #2374d4, #4facfe);
+.btn-primary {
+    background-color: #0066CC;
+    border-color: #0066CC;
+    color: #ffffff;
+    &:hover {
+        background-color: #0052A3;
+        border-color: #0052A3;
     }
 }
-.btn-primary {
-   
-    background: rgb(0, 0, 0) !important;
-    color: rgb(255, 255, 255);
-    border: none;
-    &:hover {
-      background-color: rgb(30, 30, 30); // optional hover
-    }
-  }
- 
-  .auth-form .btn-primary {
-        background: linear-gradient(135deg, #2583f2, #4facfe) !important;
-    }
 .btn-outline-primary{
     border-color: #2583f2;
     &:hover{
