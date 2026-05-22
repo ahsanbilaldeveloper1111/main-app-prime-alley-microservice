@@ -573,7 +573,7 @@ export const CrmOrdersPageContentImpl = () => {
             //   }
             // }
           ]}
-          gridMinWidth="180px"
+          gridMinWidth="150px"
         />
 
         {/* Analytics Section - Collapsible */}

@@ -4211,6 +4211,7 @@ export function CrmDealsListScreenView({
                 toolbar={dealsToolbarConfig}
                 // Stats cards for metrics
                 statsCards={dealsStatsCards}
+                metricsGridMinWidth="150px"
                 customBody={
                   dealsViewMode === "board" ? (
                     <KanbanBoard

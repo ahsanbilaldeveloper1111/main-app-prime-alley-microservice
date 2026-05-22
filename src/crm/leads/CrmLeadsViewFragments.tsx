@@ -2713,6 +2713,7 @@ export function CrmLeadsViewFragment02() {
                 showToolbar={true}
                 toolbar={leadsToolbarConfig}
                 statsCards={leadsStatsCards}
+                metricsGridMinWidth="150px"
                 customBody={
                   leadsViewMode === "board" ? (
                     <KanbanBoard

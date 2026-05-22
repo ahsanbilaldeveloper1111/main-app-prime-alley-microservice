@@ -722,6 +722,7 @@ const MembersTab: React.FC<MembersTabProps> = ({
           
           // Stats cards for metrics
           statsCards={statsCardsData}
+          metricsGridMinWidth="150px"
         />
       </div>
 
