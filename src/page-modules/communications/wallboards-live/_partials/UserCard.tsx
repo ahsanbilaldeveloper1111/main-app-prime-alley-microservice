@@ -14,6 +14,7 @@ import {
   computeUserCardMonitoringDerived,
   type MonitoringWithSessions,
 } from '@components/communications/wallboards-live/userCardHelpers'
+import { ctiAddressesEquivalent } from '@utils/ctiAddressMatching'
 import {
   UserCardSupervisionBadge,
   UserCardAgentStatusBadge,
@@ -163,7 +164,11 @@ const UserCard: React.FC<UserCardProps> = ({
     }
   }, [call, dn])
 
-  const isSupervisorMonitoring = Boolean(activeMonitoring.monitor === dn && activeMonitoring.type)
+  const isSupervisorMonitoring = Boolean(
+    activeMonitoring.type &&
+      activeMonitoring.monitor &&
+      ctiAddressesEquivalent(activeMonitoring.monitor, dn),
+  )
   const supervisionType = isSupervisorMonitoring
     ? getNormalizedMonitoringType(activeMonitoring.type)
     : undefined

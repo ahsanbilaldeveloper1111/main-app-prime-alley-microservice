@@ -127,6 +127,7 @@ const GlobalFloatingCallBar: React.FC = () => {
     activeCalls: activeCalls as Map<string, FloatingBarCtiCall>,
     userAddress,
     callStateMap: callStateMap as UseGlobalFloatingCallBarDerivedParams["callStateMap"],
+    eventLog,
     dnsMap,
     formatDuration,
     getUserDataExtensions,

@@ -1,0 +1,76 @@
+{
+
+  "_scenario": "hold",
+
+  "_description": "Agent put the connected call on hold — holder from event-level heldByAddress and party holdSegments",
+
+  "type": "call_events",
+
+  "data": {
+
+    "callId": "CALL-001",
+
+    "eventType": "HELD",
+
+    "sequence": 3,
+
+    "eventTime": "2026-01-01T10:00:15.000Z",
+
+    "isConference": false,
+
+    "isOneToOne": true,
+
+    "isTerminating": false,
+
+    "hasActiveParticipants": true,
+
+    "eventName": "CallHeld",
+
+    "currentState": "HELD",
+
+    "heldByAddress": "1001",
+
+    "heldByDeviceName": "WebCTI",
+
+    "parties": [
+
+      {
+
+        "callId": "CALL-001",
+
+        "callingAddress": "5551234",
+
+        "calledAddress": "1001",
+
+        "callStatus": "ON_HOLD",
+
+        "callingDeviceName": "EXTERNAL",
+
+        "callingDeviceType": "IP_PHONE",
+
+        "startTime": "2026-01-01T10:00:05.000Z",
+
+        "holdSegments": [
+
+          {
+
+            "startTime": "2026-01-01T10:00:15.000Z",
+
+            "endTime": null,
+
+            "heldByAddress": "1001",
+
+            "heldByDeviceName": "WebCTI"
+
+          }
+
+        ]
+
+      }
+
+    ]
+
+  }
+
+}
+

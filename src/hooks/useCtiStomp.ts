@@ -286,6 +286,17 @@ export default function useCtiStomp(
   const scheduleRefreshAfterCallEndRef = useRef(scheduleRefreshAfterCallEnd);
   scheduleRefreshAfterCallEndRef.current = scheduleRefreshAfterCallEnd;
 
+  /** Request fresh dns + call snapshots (same as post–call-end refresh, without throttle). */
+  const requestCtiStreamRefresh = useCallback(async (): Promise<boolean> => {
+    const pub = publishStompMessageRef.current;
+    if (!pub) {
+      return false;
+    }
+    const initial = await pub("/app/request/initial-state", "");
+    const ongoing = await pub("/app/request/ongoing-calls", "");
+    return initial && ongoing;
+  }, []);
+
   // Update refs when callbacks change (after all functions are defined)
   useEffect(() => {
     handleCallEventRef.current = (evt) => handleCallEvent(evt as CtiCallEvent);
@@ -679,5 +690,6 @@ export default function useCtiStomp(
     onAllLoaded, // Function that runs when all things are loaded
     getUserTeams, // Get user teams data
     getUserDataExtensions, // Get user data extensions
+    requestCtiStreamRefresh,
   };
 }
