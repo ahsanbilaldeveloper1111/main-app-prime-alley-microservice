@@ -11,12 +11,16 @@ export function getInitials(name: string): string {
   return `${words[0][0]}${words[1][0]}`.toUpperCase();
 }
 
+const AVATAR_PALETTE = [
+  "#1a6fbd", "#0e7490", "#0f766e", "#1d4ed8",
+  "#4f46e5", "#7c3aed", "#0369a1", "#065f46",
+];
+
 export function getAvatarColor(name: string): string {
   let hash = 0;
   for (const ch of name) {
     const code = ch.codePointAt(0) ?? 0;
     hash = code + ((hash << 5) - hash);
   }
-  const hue = Math.abs(hash) % 360;
-  return `hsla(${hue}, 55%, 45%, 0.6)`;
+  return AVATAR_PALETTE[Math.abs(hash) % AVATAR_PALETTE.length];
 }

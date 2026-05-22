@@ -56,15 +56,14 @@ export function stableStringHash(input: string): number {
   return Math.abs(hash);
 }
 
-/** Deterministic hsla color from a display name for avatar backgrounds. */
+const AVATAR_PALETTE = [
+  "#1a6fbd", "#0e7490", "#0f766e", "#1d4ed8",
+  "#4f46e5", "#7c3aed", "#0369a1", "#065f46",
+];
+
 export function getRandomColor(name: unknown): string {
   const s = crmAvatarDisplayString(name);
   if (!s) return "#6c757d";
-
   const hash = stableStringHash(s);
-  const hue = hash % 360;
-  const saturation = 50 + (hash % 30);
-  const lightness = 40 + (hash % 20);
-
-  return `hsla(${hue}, ${saturation}%, ${lightness}%, 0.6)`;
+  return AVATAR_PALETTE[hash % AVATAR_PALETTE.length];
 }
