@@ -85,7 +85,7 @@ const StatsCards: React.FC<StatsCardsProps> = ({
             <div style={{
               fontSize: '28px',
               fontWeight: '500',
-              color: '#006162',
+              color: '#0066CC',
               lineHeight: '1',
               textAlign: 'center'
             }}>
