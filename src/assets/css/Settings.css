@@ -32,7 +32,7 @@
     border-radius: 4px !important;
     font-size: 12px !important;
     font-weight: 500 !important;
-    background: rgb(0, 0, 0) !important;
+    background: #0066CC !important;
     color: rgb(255, 255, 255);
 }
 div:has(> .generic-table-container) {
