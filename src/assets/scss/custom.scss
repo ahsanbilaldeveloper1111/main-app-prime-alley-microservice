@@ -488,4 +488,15 @@ h2.react-datepicker__current-month, .react-datepicker-time__header{
   object-position: center;
   display: block;
 }
+
+// Global button color standardization
+button[style*="background-color: rgb(0, 0, 0)"],
+button[style*="backgroundColor: #000000"],
+button[style*="background-color: #000000"],
+[style*="background-color: rgb(0, 0, 0)"][class*="btn"],
+.btn-dark:not(.sidebar-intentional-dark) {
+  background-color: #0066CC !important;
+  border-color: #0066CC !important;
+  color: #ffffff !important;
+}
   
