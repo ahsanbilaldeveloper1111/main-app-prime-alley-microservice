@@ -45,7 +45,6 @@ describe("extractHeldByFromPayload", () => {
 
   it("reads active holdSegment when top-level heldByAddress is absent", () => {
     const result = extractHeldByFromPayload({
-      eventType: "HELD",
       parties: [
         {
           callStatus: "ON_HOLD",
