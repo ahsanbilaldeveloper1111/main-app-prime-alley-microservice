@@ -35,13 +35,13 @@ interface StatsCardsProps {
 
 const StatsCards: React.FC<StatsCardsProps> = ({ 
   data, 
-  gridMinWidth = '200px',
+  gridMinWidth = '150px',
   valueFontSize = '36px'
 }) => {
   return (
     <div style={{
       display: 'grid',
-      gridTemplateColumns: `repeat(auto-fit, minmax(${gridMinWidth}, 1fr))`,
+      gridTemplateColumns: `repeat(auto-fill, minmax(${gridMinWidth}, 1fr))`,
       gap: '16px',
       marginBottom: '16px',
       background: '#FFFFFF',
@@ -52,7 +52,7 @@ const StatsCards: React.FC<StatsCardsProps> = ({
         const cardKey = card.title + '|' + String(card.value) + '|' + (card.subtitle || '') + '|' + (card.additionalText || '');
         const interactive = typeof card.onClick === 'function';
         const shellStyle: React.CSSProperties = {
-          padding: '20px 0 40px 0',
+          padding: '16px 12px',
           borderRadius: interactive ? '8px' : undefined,
           transition: interactive ? 'background-color 0.15s ease' : undefined,
           ...(interactive
@@ -150,7 +150,7 @@ const StatsCards: React.FC<StatsCardsProps> = ({
                 textAlign: 'center',
                 marginTop: card.badge || card.metric ? '8px' : '0'
               }}>
-                <Circle size={8} fill="#6366F1" color="#6366F1" />
+                <Circle size={8} fill="#0066CC" color="#0066CC" />
                 <span>{card.subtitle}</span>
               </div>
             )}
