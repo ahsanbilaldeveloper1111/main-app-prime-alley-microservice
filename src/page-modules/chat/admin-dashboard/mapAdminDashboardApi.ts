@@ -8,6 +8,15 @@ function parseCost(value: string | number | undefined): number {
   return Number.isFinite(n) ? n : 0;
 }
 
+function parseMarginPct(
+  value: string | number | null | undefined,
+): number | null {
+  if (value == null || value === "") return null;
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  const n = Number.parseFloat(String(value));
+  return Number.isFinite(n) ? n : null;
+}
+
 function formatTrendLabel(isoDate: string): string {
   const d = new Date(isoDate);
   if (Number.isNaN(d.getTime())) return isoDate;
@@ -57,6 +66,7 @@ export function mapAdminDashboardApi(
       queriesToday: data.kpis.today.queries,
       costTodayUsd: parseCost(data.kpis.today.cost),
       costMonthUsd: parseCost(data.kpis.this_month.cost),
+      profitMonthUsd: parseCost(data.kpis.profit_this_month),
       tenants: data.kpis.active_tenants_7d,
       users: data.kpis.active_users_7d,
       failuresToday: data.kpis.today.failed,
@@ -70,6 +80,9 @@ export function mapAdminDashboardApi(
       company: tenantDisplayName(row.tenant_id, row.name),
       queries: row.queries,
       costUsd: parseCost(row.cost),
+      revenueUsd: parseCost(row.tenant_revenue),
+      profitUsd: parseCost(row.profit_usd),
+      marginPct: parseMarginPct(row.margin_pct),
     })),
     topUsersThisMonth: (data.top_users ?? []).map((row) => ({
       user: row.display_name?.trim() || row.user_id,
@@ -90,6 +103,9 @@ export function mapAdminDashboardApi(
       company: tenantDisplayName(row.tenant_id, row.name),
       monthQueries: row.month_queries,
       monthCostUsd: parseCost(row.month_cost),
+      monthRevenueUsd: parseCost(row.month_revenue),
+      monthProfitUsd: parseCost(row.month_profit),
+      marginPct: parseMarginPct(row.margin_pct),
       lastActivity: formatActivity(row.last_activity),
     })),
     topQasAcrossCompanies: (data.top_questions_7d ?? []).map((row) => ({

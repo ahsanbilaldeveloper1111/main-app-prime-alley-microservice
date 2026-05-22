@@ -17,7 +17,6 @@ import type {
 import { defaultAIChatbotSettingsFormValues } from "./types";
 import {
   formatTenantMarginPctDisplay,
-  resolvePricingForModel,
   validateAIChatbotSettingsForm,
   type TenantChatPricingTable,
 } from "./mapTenantChatSettings";
@@ -298,10 +297,6 @@ type AIChatbotSettingsFormContentProps = Readonly<{
     key: keyof AIChatbotSettingsFormValues["budget"],
     next: string,
   ) => void;
-  updatePricing: (
-    key: keyof AIChatbotSettingsFormValues["pricing"],
-    next: string,
-  ) => void;
 }>;
 
 function AIChatbotSettingsFormContent(
@@ -327,7 +322,6 @@ function AIChatbotSettingsFormContent(
     onMarginChange,
     updateRateLimit,
     updateBudget,
-    updatePricing,
   } = props;
 
   return (
@@ -436,51 +430,25 @@ function AIChatbotSettingsFormContent(
         </div>
         <p className="ai-chatbot-settings__hint mb-3">
           Margin is added on top of base LLM cost when computing tenant-facing
-          rates and thread costs. Leave blank for no margin. Tenants only see
-          effective prices on the dashboard, not this percentage or base costs.
+          rates and thread costs. Leave blank for no margin. Per-model token
+          rates are shown in the global pricing table below.
         </p>
-        <div className="ai-chatbot-settings__grid-3">
-          <label className="ai-chatbot-settings__field">
-            <span className="ai-chatbot-settings__field-label">
-              OpenAI model
-            </span>
-            <select
-              className="ai-chatbot-settings__select"
-              value={values.openAiModel}
-              disabled={fieldsDisabled}
-              onChange={(e) => onModelChange(e.target.value)}
-            >
-              <option value="">Select model…</option>
-              {modelSelectOptions.map((opt) => (
-                <option key={opt.value} value={opt.value}>
-                  {opt.label}
-                </option>
-              ))}
-            </select>
-          </label>
-          <NumberField
-            label="Input $ / 1M tokens"
-            value={values.pricing.inputCostPerMillion}
-            onChange={(v) => updatePricing("inputCostPerMillion", v)}
-            placeholder={
-              AI_CHATBOT_FIELD_PLACEHOLDERS.pricing.inputCostPerMillion
-            }
-            step="0.000001"
-            min={0}
+        <label className="ai-chatbot-settings__field">
+          <span className="ai-chatbot-settings__field-label">OpenAI model</span>
+          <select
+            className="ai-chatbot-settings__select"
+            value={values.openAiModel}
             disabled={fieldsDisabled}
-          />
-          <NumberField
-            label="Output $ / 1M tokens"
-            value={values.pricing.outputCostPerMillion}
-            onChange={(v) => updatePricing("outputCostPerMillion", v)}
-            placeholder={
-              AI_CHATBOT_FIELD_PLACEHOLDERS.pricing.outputCostPerMillion
-            }
-            step="0.000001"
-            min={0}
-            disabled={fieldsDisabled}
-          />
-        </div>
+            onChange={(e) => onModelChange(e.target.value)}
+          >
+            <option value="">Select model…</option>
+            {modelSelectOptions.map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
+        </label>
       </div>
 
       <ModelPricingDefaultsTable pricingTable={props.pricingTable} />
@@ -538,7 +506,6 @@ export const AIChatbotSettings: React.FC = () => {
     formValues: fetchedFormValues,
     modelOptions,
     pricingTable,
-    rawSettings,
     isLoading,
     isError,
     refetch,
@@ -592,16 +559,6 @@ export const AIChatbotSettings: React.FC = () => {
     [],
   );
 
-  const updatePricing = useCallback(
-    (key: keyof AIChatbotSettingsFormValues["pricing"], next: string) => {
-      setValues((prev) => ({
-        ...prev,
-        pricing: { ...prev.pricing, [key]: next },
-      }));
-    },
-    [],
-  );
-
   const handleSave = useCallback(() => {
     if (!canEditSettings) {
       toast.error("You do not have permission to edit tenant settings.");
@@ -618,24 +575,9 @@ export const AIChatbotSettings: React.FC = () => {
     saveMutation.mutate(values);
   }, [appliedTenantId, canEditSettings, saveMutation, values]);
 
-  const handleModelChange = useCallback(
-    (model: string) => {
-      const pricing = model
-        ? resolvePricingForModel(rawSettings, model)
-        : null;
-      setValues((prev) => ({
-        ...prev,
-        openAiModel: model,
-        pricing: pricing
-          ? {
-              inputCostPerMillion: pricing.inputCostPerMillion,
-              outputCostPerMillion: pricing.outputCostPerMillion,
-            }
-          : prev.pricing,
-      }));
-    },
-    [rawSettings],
-  );
+  const handleModelChange = useCallback((model: string) => {
+    setValues((prev) => ({ ...prev, openAiModel: model }));
+  }, []);
 
   const handleMarginChange = useCallback((marginPct: string) => {
     setValues((prev) => ({ ...prev, marginPct }));
@@ -767,7 +709,6 @@ export const AIChatbotSettings: React.FC = () => {
           onMarginChange={handleMarginChange}
           updateRateLimit={updateRateLimit}
           updateBudget={updateBudget}
-          updatePricing={updatePricing}
         />
       ) : null}
     </form>

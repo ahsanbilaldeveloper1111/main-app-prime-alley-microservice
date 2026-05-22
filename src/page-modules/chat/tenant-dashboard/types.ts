@@ -35,13 +35,6 @@ export interface TenantRecentConversationRow {
   costUsd: number;
 }
 
-/** Tenant-facing LLM rates from dashboard `pricing` (margin already applied). */
-export interface TenantDashboardPricing {
-  model: string;
-  inputPerMillion: string;
-  outputPerMillion: string;
-}
-
 export interface TenantUserBudgetRow {
   userId: string;
   displayName: string;
@@ -73,5 +66,4 @@ export interface ChatbotsTenantDashboardModel {
   topQuestions7d: TenantTopQuestionRow[];
   knowledgeBase: TenantKnowledgeBaseStats;
   recentConversations: TenantRecentConversationRow[];
-  pricing: TenantDashboardPricing | null;
 }

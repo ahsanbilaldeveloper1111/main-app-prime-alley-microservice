@@ -63,6 +63,16 @@ const float3 = new Intl.NumberFormat("en-US", {
 
 const intFmt = new Intl.NumberFormat("en-US");
 
+const pct1 = new Intl.NumberFormat("en-US", {
+  minimumFractionDigits: 1,
+  maximumFractionDigits: 1,
+});
+
+function formatMarginPct(value: number | null): string {
+  if (value == null || !Number.isFinite(value)) return "—";
+  return `${pct1.format(value)}%`;
+}
+
 /** Resolve donut slice raw value from Apex formatter context (label may be %). */
 function donutSliceRawValue(
   labeledValue: number,
@@ -264,7 +274,7 @@ function AdminDashboardContent({
 
   return (
     <>
-      <Row xs={1} sm={2} md={3} xl={6} className="g-3 mb-4">
+      <Row xs={1} sm={2} md={3} xl={4} className="g-3 mb-4">
         <StatCard
           title="Queries today"
           value={float3.format(summary.queriesToday)}
@@ -282,6 +292,12 @@ function AdminDashboardContent({
           value={usd3.format(summary.costMonthUsd)}
           icon={<CalendarRange size={20} />}
           accent="#7c3aed"
+        />
+        <StatCard
+          title="Profit this month"
+          value={usd3.format(summary.profitMonthUsd)}
+          icon={<DollarSign size={20} />}
+          accent="#16a34a"
         />
         <StatCard
           title="Tenants"
@@ -326,9 +342,12 @@ function AdminDashboardContent({
           <DashboardTableCard title="Top companies (this month)">
             <Table hover size="sm" className={chatbotsDashboardTableClass}>
               <colgroup>
-                <col style={{ width: "50%" }} />
-                <col style={{ width: "25%" }} />
-                <col style={{ width: "25%" }} />
+                <col style={{ width: "28%" }} />
+                <col style={{ width: "12%" }} />
+                <col style={{ width: "15%" }} />
+                <col style={{ width: "15%" }} />
+                <col style={{ width: "15%" }} />
+                <col style={{ width: "15%" }} />
               </colgroup>
               <thead className="table-light">
                 <tr>
@@ -338,6 +357,15 @@ function AdminDashboardContent({
                   </th>
                   <th className={`${chatbotsDashboardThClass} text-md-center`}>
                     Cost
+                  </th>
+                  <th className={`${chatbotsDashboardThClass} text-md-center`}>
+                    Revenue
+                  </th>
+                  <th className={`${chatbotsDashboardThClass} text-md-center`}>
+                    Profit
+                  </th>
+                  <th className={`${chatbotsDashboardThClass} text-md-center`}>
+                    Margin
                   </th>
                 </tr>
               </thead>
@@ -361,6 +389,24 @@ function AdminDashboardContent({
                       className={`${chatbotsDashboardTdClass} text-md-center text-nowrap`}
                     >
                       {usd3.format(row.costUsd)}
+                    </td>
+                    <td
+                      data-label="Revenue"
+                      className={`${chatbotsDashboardTdClass} text-md-center text-nowrap`}
+                    >
+                      {usd3.format(row.revenueUsd)}
+                    </td>
+                    <td
+                      data-label="Profit"
+                      className={`${chatbotsDashboardTdClass} text-md-center text-nowrap`}
+                    >
+                      {usd3.format(row.profitUsd)}
+                    </td>
+                    <td
+                      data-label="Margin"
+                      className={`${chatbotsDashboardTdClass} text-md-center text-nowrap`}
+                    >
+                      {formatMarginPct(row.marginPct)}
                     </td>
                   </tr>
                 ))}
@@ -464,10 +510,13 @@ function AdminDashboardContent({
           <DashboardTableCard title="All companies" compact>
             <Table hover size="sm" className={chatbotsDashboardTableClass}>
               <colgroup>
-                <col style={{ width: "36%" }} />
                 <col style={{ width: "22%" }} />
-                <col style={{ width: "22%" }} />
-                <col style={{ width: "20%" }} />
+                <col style={{ width: "12%" }} />
+                <col style={{ width: "14%" }} />
+                <col style={{ width: "14%" }} />
+                <col style={{ width: "14%" }} />
+                <col style={{ width: "10%" }} />
+                <col style={{ width: "14%" }} />
               </colgroup>
               <thead className="table-light">
                 <tr>
@@ -477,6 +526,15 @@ function AdminDashboardContent({
                   </th>
                   <th className={`${chatbotsDashboardThClass} text-md-center`}>
                     Month cost
+                  </th>
+                  <th className={`${chatbotsDashboardThClass} text-md-center`}>
+                    Month revenue
+                  </th>
+                  <th className={`${chatbotsDashboardThClass} text-md-center`}>
+                    Month profit
+                  </th>
+                  <th className={`${chatbotsDashboardThClass} text-md-center`}>
+                    Margin
                   </th>
                   <th className={`${chatbotsDashboardThClass} text-md-center`}>
                     Last activity
@@ -504,6 +562,24 @@ function AdminDashboardContent({
                       className={`${chatbotsDashboardTdClass} text-md-center text-nowrap`}
                     >
                       {usd3.format(row.monthCostUsd)}
+                    </td>
+                    <td
+                      data-label="Month revenue"
+                      className={`${chatbotsDashboardTdClass} text-md-center text-nowrap`}
+                    >
+                      {usd3.format(row.monthRevenueUsd)}
+                    </td>
+                    <td
+                      data-label="Month profit"
+                      className={`${chatbotsDashboardTdClass} text-md-center text-nowrap`}
+                    >
+                      {usd3.format(row.monthProfitUsd)}
+                    </td>
+                    <td
+                      data-label="Margin"
+                      className={`${chatbotsDashboardTdClass} text-md-center text-nowrap`}
+                    >
+                      {formatMarginPct(row.marginPct)}
                     </td>
                     <td
                       data-label="Last activity"

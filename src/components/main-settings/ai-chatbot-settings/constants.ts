@@ -12,10 +12,6 @@ export const AI_CHATBOT_FIELD_PLACEHOLDERS = {
     defaultUserBudgetUsd: "e.g. 10.00 (blank = no default)",
     defaultBudgetThresholdPct: "Default: 80",
   },
-  pricing: {
-    inputCostPerMillion: "Default: $0.15",
-    outputCostPerMillion: "Default: $0.60",
-  },
   marginPct: "Blank = no margin",
 } as const;
 

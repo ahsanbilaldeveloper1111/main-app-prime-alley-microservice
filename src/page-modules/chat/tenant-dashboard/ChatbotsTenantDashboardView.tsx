@@ -27,10 +27,7 @@ import {
 import { DashboardTableCard } from "../shared/DashboardTableCard";
 import { useMediaQuery } from "../shared/useMediaQuery";
 
-import type {
-  TenantDashboardPricing,
-  TenantKnowledgeBaseStats,
-} from "./types";
+import type { TenantKnowledgeBaseStats } from "./types";
 import { TenantDashboardBudgetOverview } from "./TenantDashboardBudgetOverview";
 import { TenantDashboardUsersBudgetsTab } from "./TenantDashboardUsersBudgetsTab";
 import {
@@ -54,21 +51,6 @@ const float3 = new Intl.NumberFormat("en-US", {
   minimumFractionDigits: 3,
   maximumFractionDigits: 3,
 });
-
-const usd4 = new Intl.NumberFormat("en-US", {
-  style: "currency",
-  currency: "USD",
-  minimumFractionDigits: 4,
-  maximumFractionDigits: 4,
-});
-
-function formatPerMillionRate(value: string): string {
-  const trimmed = value.trim();
-  if (!trimmed) return "—";
-  const n = Number.parseFloat(trimmed);
-  if (!Number.isFinite(n)) return trimmed;
-  return `${usd4.format(n)} / 1M tokens`;
-}
 
 const intFmt = new Intl.NumberFormat("en-US");
 
@@ -102,54 +84,6 @@ function StatCard(props: Readonly<{
         </Card.Body>
       </Card>
     </Col>
-  );
-}
-
-function TenantPricingCard({
-  pricing,
-}: Readonly<{ pricing: TenantDashboardPricing }>) {
-  const items = [
-    {
-      label: "Model",
-      value: pricing.model,
-    },
-    {
-      label: "Input",
-      value: formatPerMillionRate(pricing.inputPerMillion),
-    },
-    {
-      label: "Output",
-      value: formatPerMillionRate(pricing.outputPerMillion),
-    },
-  ];
-
-  return (
-    <Card className="border-0 shadow-sm h-100">
-      <Card.Body>
-        <h5 className="mb-3 fw-semibold d-flex align-items-center gap-2">
-          <DollarSign size={18} className="text-primary" aria-hidden />
-          Current pricing
-        </h5>
-        <p className="text-muted small mb-3">
-          Rates shown include your tenant margin. Base model prices are managed
-          in admin pricing history.
-        </p>
-        <Row xs={1} sm={3} className="g-3">
-          {items.map((item) => (
-            <Col key={item.label}>
-              <div className="border rounded-3 p-3 h-100 bg-light bg-opacity-50">
-                <div className="text-muted small text-uppercase fw-semibold">
-                  {item.label}
-                </div>
-                <div className="fs-6 fw-semibold mt-1 text-break">
-                  {item.value}
-                </div>
-              </div>
-            </Col>
-          ))}
-        </Row>
-      </Card.Body>
-    </Card>
   );
 }
 
@@ -332,7 +266,7 @@ function TenantDashboardContent({
   model: NonNullable<ChatbotsTenantDashboardViewProps["ctx"]["model"]>;
   dailyCostQueriesChart: ChatbotsTenantDashboardViewProps["ctx"]["dailyCostQueriesChart"];
 }>) {
-  const { summary, knowledgeBase, pricing } = model;
+  const { summary, knowledgeBase } = model;
   const isMobile = useMediaQuery("(max-width: 767.98px)");
   const isTablet = useMediaQuery("(max-width: 991.98px)");
 
@@ -498,12 +432,7 @@ function TenantDashboardContent({
         </Row>
 
         <Row className="mb-3 g-3">
-          {pricing ? (
-            <Col xs={12} lg={5}>
-              <TenantPricingCard pricing={pricing} />
-            </Col>
-          ) : null}
-          <Col xs={12} lg={pricing ? 7 : 12}>
+          <Col xs={12}>
             <KnowledgeBaseCard kb={knowledgeBase} />
           </Col>
         </Row>
