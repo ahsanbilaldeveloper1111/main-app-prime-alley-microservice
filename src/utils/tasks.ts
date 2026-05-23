@@ -1970,7 +1970,8 @@ function parseWorkloadPlannerResponseData<T>(response: { data?: unknown }): T {
 }
 
 export interface WorkloadQueryBase {
-  extension_number: string;
+  /** Viewer identity; omitted when `extension_numbers` scopes a team owner request. */
+  extension_number?: string;
   assignee_match?: AssigneeMatch;
   range?: WorkloadRangePreset;
   start?: string;
@@ -1986,7 +1987,10 @@ function appendWorkloadQueryParams(
   params: URLSearchParams,
   q: WorkloadQueryBase,
 ): void {
-  params.set("extension_number", q.extension_number);
+  const viewerExtension = q.extension_number?.trim();
+  if (viewerExtension) {
+    params.set("extension_number", viewerExtension);
+  }
   if (q.assignee_match) params.set("assignee_match", q.assignee_match);
   if (q.range) params.set("range", q.range);
   if (q.start) params.set("start", q.start);

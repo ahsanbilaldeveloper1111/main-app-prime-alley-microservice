@@ -367,6 +367,7 @@ export function WorkloadGridPanel({
 type WorkloadPlannerAlertStackProps = Readonly<{
   sessionStatus: string;
   enabled: boolean;
+  teamMemberOnly?: boolean;
   accessForbidden: boolean;
   summaryError: unknown;
   summaryHasError: boolean;
@@ -381,6 +382,7 @@ type WorkloadPlannerAlertStackProps = Readonly<{
 export function WorkloadPlannerAlertStack({
   sessionStatus,
   enabled,
+  teamMemberOnly = false,
   accessForbidden,
   summaryError,
   summaryHasError,
@@ -399,16 +401,23 @@ export function WorkloadPlannerAlertStack({
         </div>
       ) : null}
 
-      {!enabled && sessionStatus === "authenticated" ? (
+      {!enabled && sessionStatus === "authenticated" && !teamMemberOnly ? (
         <Alert variant="warning">
           Your session does not include a phone or extension; workload APIs cannot be called.
         </Alert>
       ) : null}
 
+      {teamMemberOnly ? (
+        <Alert variant="info">
+          Workload is a manager-only view (team owners). Use{" "}
+          <a href="/planner/my-tasks">My Day</a> for your personal task plan.
+        </Alert>
+      ) : null}
+
       {accessForbidden ? (
         <Alert variant="danger">
-          You do not have access to this workload view (403). This area is restricted to team owners
-          on the server.
+          You do not have access to this workload view (403). It is restricted to team managers
+          (owners) on the server.
         </Alert>
       ) : null}
 

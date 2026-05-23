@@ -396,6 +396,8 @@ export function resolveWorkloadGridDisplayData(
     viewerExtension: string;
     memberFilter?: string;
     rangeFallback?: WorkloadIsoDateRange;
+    /** When the viewer is a team owner, use full roster if the API omits `members`. */
+    teamExtensionNumbers?: string[];
   },
 ): WorkloadGridData | undefined {
   if (!grid) return undefined;
@@ -411,8 +413,15 @@ export function resolveWorkloadGridDisplayData(
 
   if (options.memberFilter && options.memberFilter !== "all") {
     extensionList = [options.memberFilter.trim()];
-  } else if (extensionList.length === 0 && viewer) {
-    extensionList = [viewer];
+  } else if (extensionList.length === 0) {
+    const teamRoster = (options.teamExtensionNumbers ?? [])
+      .map((ext) => ext.trim())
+      .filter(Boolean);
+    if (teamRoster.length > 0) {
+      extensionList = [...new Set(teamRoster)];
+    } else if (viewer) {
+      extensionList = [viewer];
+    }
   }
 
   const members = extensionList.map((ext) =>
@@ -443,9 +452,14 @@ export function resolveWorkloadGridDisplayData(
 export function resolveWorkloadPeriodDisplayMembers(
   apiMembers: WorkloadSummaryMember[] | undefined,
   viewerExtension: string,
+  teamExtensionNumbers?: string[],
 ): WorkloadSummaryMember[] {
   if (Array.isArray(apiMembers) && apiMembers.length > 0) {
     return apiMembers;
+  }
+  const roster = (teamExtensionNumbers ?? []).map((ext) => ext.trim()).filter(Boolean);
+  if (roster.length > 0) {
+    return roster.map((extension_number) => ({ extension_number }));
   }
   const viewer = viewerExtension.trim();
   if (!viewer) return [];
