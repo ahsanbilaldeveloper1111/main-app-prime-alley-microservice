@@ -1229,7 +1229,7 @@ export function CrmProspectsContactsListPage({
                 }}
                 // Stats cards for metrics
                 statsCards={prospectsStatsCards}
-                metricsGridMinWidth="150px"
+                metricsGridMinWidth="120px"
                 customBody={
                   config.enableBoardView
                     ? renderCrmProspectsKanbanTableCustomBody({
