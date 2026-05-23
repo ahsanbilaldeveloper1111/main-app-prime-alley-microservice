@@ -25,7 +25,7 @@ export const SmartCrmPage: React.FC<ControlledTabsProps> = ({
     onTabChange,
     smartCrmTabs,
     'stages',
-    'smartCrm'
+    { syncMode: 'smartCrm' },
   )
 
   return (
