@@ -36,7 +36,8 @@ export function WorkloadPlannerPageHeader({
       <div>
         <h1 className="workload-page__title">Workload</h1>
         <p className="text-muted small mb-0">
-          Team capacity for the selected week. Owner-only visibility follows server rules.
+          Manager view of your team&apos;s task load for the selected week — who is overloaded,
+          who has capacity, and where work is stuck.
         </p>
       </div>
       <div className="d-flex flex-wrap gap-2 align-items-center">
@@ -227,7 +228,7 @@ export function WorkloadPlannerFiltersCard({
                   className="d-flex align-items-center py-1 px-2 small"
                 >
                   <LayoutGrid size={16} className="me-1" />
-                  Grid
+                  Spreadsheet
                 </Nav.Link>
               </Nav.Item>
               <Nav.Item>
