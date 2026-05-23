@@ -386,56 +386,83 @@ function buildWorkloadGridMemberRow(
   };
 }
 
+type WorkloadGridDisplayOptions = Readonly<{
+  viewerExtension: string;
+  memberFilter?: string;
+  rangeFallback?: WorkloadIsoDateRange;
+  /** When the viewer is a team owner, use full roster if the API omits `members`. */
+  teamExtensionNumbers?: string[];
+}>;
+
+function buildExistingMembersByExtension(
+  grid: WorkloadGridData,
+): Map<string, WorkloadGridMember> {
+  const existingByExt = new Map<string, WorkloadGridMember>();
+  for (const member of grid.members ?? []) {
+    const ext = member.extension_number?.trim();
+    if (ext) existingByExt.set(ext, member);
+  }
+  return existingByExt;
+}
+
+function resolveWorkloadGridExtensionList(
+  grid: WorkloadGridData,
+  options: WorkloadGridDisplayOptions,
+): string[] {
+  const memberFilter = options.memberFilter?.trim();
+  if (memberFilter && memberFilter !== "all") {
+    return [memberFilter];
+  }
+
+  const fromGrid = collectWorkloadMemberExtensionsFromGrid(grid);
+  if (fromGrid.length > 0) {
+    return fromGrid;
+  }
+
+  const teamRoster = (options.teamExtensionNumbers ?? [])
+    .map((ext) => ext.trim())
+    .filter(Boolean);
+  if (teamRoster.length > 0) {
+    return [...new Set(teamRoster)];
+  }
+
+  const viewer = options.viewerExtension.trim();
+  return viewer ? [viewer] : [];
+}
+
+function resolveWorkloadGridDays(
+  grid: WorkloadGridData,
+  rangeFallback?: WorkloadIsoDateRange,
+): string[] {
+  const days = Array.isArray(grid.days) ? [...grid.days] : [];
+  if (days.length > 0) {
+    return days;
+  }
+  if (grid.range?.start && grid.range?.end) {
+    return listWorkloadDaysInRange(grid.range.start, grid.range.end);
+  }
+  if (rangeFallback) {
+    return listWorkloadDaysInRange(rangeFallback.start, rangeFallback.end);
+  }
+  return [];
+}
+
 /**
  * When the API returns no `members`, fall back to the logged-in user's extension (and any
  * extensions discovered on cells). Ensures the PEOPLE row still renders like the reference UI.
  */
 export function resolveWorkloadGridDisplayData(
   grid: WorkloadGridData | undefined,
-  options: {
-    viewerExtension: string;
-    memberFilter?: string;
-    rangeFallback?: WorkloadIsoDateRange;
-    /** When the viewer is a team owner, use full roster if the API omits `members`. */
-    teamExtensionNumbers?: string[];
-  },
+  options: WorkloadGridDisplayOptions,
 ): WorkloadGridData | undefined {
   if (!grid) return undefined;
 
-  const existingByExt = new Map<string, WorkloadGridMember>();
-  for (const member of grid.members ?? []) {
-    const ext = member.extension_number?.trim();
-    if (ext) existingByExt.set(ext, member);
-  }
-
-  let extensionList = collectWorkloadMemberExtensionsFromGrid(grid);
-  const viewer = options.viewerExtension.trim();
-
-  if (options.memberFilter && options.memberFilter !== "all") {
-    extensionList = [options.memberFilter.trim()];
-  } else if (extensionList.length === 0) {
-    const teamRoster = (options.teamExtensionNumbers ?? [])
-      .map((ext) => ext.trim())
-      .filter(Boolean);
-    if (teamRoster.length > 0) {
-      extensionList = [...new Set(teamRoster)];
-    } else if (viewer) {
-      extensionList = [viewer];
-    }
-  }
-
+  const existingByExt = buildExistingMembersByExtension(grid);
+  const extensionList = resolveWorkloadGridExtensionList(grid, options);
   const members = extensionList.map((ext) =>
     buildWorkloadGridMemberRow(ext, existingByExt.get(ext)),
   );
-
-  let days = Array.isArray(grid.days) ? [...grid.days] : [];
-  if (days.length === 0 && grid.range?.start && grid.range?.end) {
-    days = listWorkloadDaysInRange(grid.range.start, grid.range.end);
-  }
-  if (days.length === 0 && options.rangeFallback) {
-    days = listWorkloadDaysInRange(options.rangeFallback.start, options.rangeFallback.end);
-  }
-
+  const days = resolveWorkloadGridDays(grid, options.rangeFallback);
   const hasDisplayMembers = members.length > 0;
   const effectiveEmptyTeam = grid.empty_team === true && !hasDisplayMembers;
 
