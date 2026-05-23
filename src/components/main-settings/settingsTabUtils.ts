@@ -12,8 +12,24 @@ export function getUserPermissions(session: unknown): string[] {
   return []
 }
 
-export function filterTabsByPermission(tabs: Tab[], userPermissions: string[]): Tab[] {
-  return tabs.filter((t) => !t.permission || userPermissions.includes(t.permission))
+export type FilterSettingsTabsOptions = Readonly<{
+  isTabVisible?: (tab: Tab) => boolean;
+}>;
+
+export function filterTabsByPermission(
+  tabs: Tab[],
+  userPermissions: string[],
+  options?: FilterSettingsTabsOptions,
+): Tab[] {
+  return tabs.filter((t) => {
+    if (t.permission && !userPermissions.includes(t.permission)) {
+      return false;
+    }
+    if (options?.isTabVisible && !options.isTabVisible(t)) {
+      return false;
+    }
+    return true;
+  });
 }
 
 export function resolveAllowedActiveTabId(
