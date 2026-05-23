@@ -1469,7 +1469,24 @@ const GenericTable = <T extends Record<string, any>>({
   );
 
   const filterPillMenuPopperConfig = useMemo(
-    () => ({ strategy: "fixed" as const }),
+    () => ({
+      strategy: "fixed" as const,
+      modifiers: [
+        {
+          name: "preventOverflow",
+          options: {
+            boundary: "viewport",
+            padding: 8,
+          },
+        },
+        {
+          name: "flip",
+          options: {
+            fallbackPlacements: ["top-start", "bottom-start"],
+          },
+        },
+      ],
+    }),
     [],
   );
 
@@ -1987,6 +2004,7 @@ const GenericTable = <T extends Record<string, any>>({
                           )}
                         </Dropdown.Toggle>
                         <Dropdown.Menu
+                          renderOnMount={true}
                           style={
                             pill.dropdownMenuStyle ?? {
                               maxHeight: "280px",
