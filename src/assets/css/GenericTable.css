@@ -129,7 +129,7 @@ th.generic-table-th:not(:last-child) {
     background: transparent !important;
     box-shadow: unset !important;
     color: #141414 !important;
-    font-weight: 100 !important;
+    font-weight: 400 !important;
 }
 
 /* Table Rows */
