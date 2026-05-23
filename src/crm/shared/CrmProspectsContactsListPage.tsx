@@ -1123,19 +1123,6 @@ export function CrmProspectsContactsListPage({
       setPagination((prev) => ({ ...prev, currentPage: 1 })),
     rightActions: (
       <div className="d-flex align-items-center gap-2 flex-wrap justify-content-end">
-        {(hasAdvancedFiltersApplied ||
-          normalizeSearchQuery(prospectsSearch) ||
-          activeFilter !== "all" ||
-          Object.keys(currentFilters).length > 0) && (
-          <Button
-            type="button"
-            variant="outline-secondary"
-            size="sm"
-            onClick={handleResetListScope}
-          >
-            Reset filters
-          </Button>
-        )}
         <CrmProspectsContactsAddContactsButton
           addContactsRef={addContactsRef}
           session={session}
