@@ -1080,7 +1080,7 @@ background: #fff !important;
   font-size: 13px;
   color: #374151;
   background: #fff;
-  border: 1px solid #e2e8f0;
+  border: none;
   border-radius: 4px;
   cursor: pointer;
   transition: all 0.2s ease;
