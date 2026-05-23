@@ -45,6 +45,11 @@ import {
   type WorkloadPlannerFilterState,
 } from "@page-modules/planner/workload/workloadDomain";
 import type { WorkloadBoardDropIntent } from "./workload/WorkloadBoardPanel";
+import { useWorkloadTeamScope } from "./workload/useWorkloadTeamScope";
+import {
+  buildWorkloadGridBoardQuery,
+  buildWorkloadSummaryQuery,
+} from "@page-modules/planner/workload/workloadTeamScope";
 import {
   WorkloadPlannerAlertStack,
 } from "./workload/WorkloadPlannerSubviews";
@@ -92,6 +97,11 @@ const WorkloadPlannerPage: React.FC = () => {
   const { data: session, status: sessionStatus } = useSession();
   const queryClient = useQueryClient();
   const extension = useMemo(() => getSessionPhoneOrExtension(session), [session]);
+  const sessionUserId = useMemo(() => {
+    const id = (session?.user as { id?: string | number } | undefined)?.id;
+    return id == null ? "" : String(id).trim();
+  }, [session?.user]);
+  const teamScope = useWorkloadTeamScope(sessionUserId, extension, sessionStatus);
   const { hierarchyDataExtensions } = useHierarchyData(ModuleSlug.WORK_PLANNER);
 
   const [draftFilters, setDraftFilters] = useState<WorkloadPlannerFilterState>(
@@ -277,6 +287,8 @@ const WorkloadPlannerPage: React.FC = () => {
         viewerExtension: extension,
         memberFilter: appliedFilters.memberFilter,
         rangeFallback: gridRangeFallback,
+        teamExtensionNumbers:
+          teamScope.teamExtensions.length > 0 ? teamScope.teamExtensions : undefined,
       }),
     [gridQuery.data, extension, appliedFilters.memberFilter, gridRangeFallback],
   );
@@ -287,15 +299,28 @@ const WorkloadPlannerPage: React.FC = () => {
   );
 
   const memberExtensions = useMemo(() => {
+    if (teamScope.teamExtensions.length > 0) {
+      return teamScope.teamExtensions;
+    }
     const fromDisplay = displayGridData?.members?.map((m) => m.extension_number) ?? [];
     if (fromDisplay.length > 0) return fromDisplay;
     if (extension) return [extension];
     return boardQuery.data?.columns?.map((c) => c.extension_number) ?? [];
-  }, [displayGridData?.members, extension, boardQuery.data?.columns]);
+  }, [
+    teamScope.teamExtensions,
+    displayGridData?.members,
+    extension,
+    boardQuery.data?.columns,
+  ]);
 
   const displayPeriodMembers = useMemo(
-    () => resolveWorkloadPeriodDisplayMembers(summaryQuery.data?.members, extension),
-    [summaryQuery.data?.members, extension],
+    () =>
+      resolveWorkloadPeriodDisplayMembers(
+        summaryQuery.data?.members,
+        extension,
+        teamScope.teamExtensions.length > 0 ? teamScope.teamExtensions : undefined,
+      ),
+    [summaryQuery.data?.members, extension, teamScope.teamExtensions],
   );
 
   const invalidateWorkload = useCallback(() => {
