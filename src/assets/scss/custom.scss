@@ -519,3 +519,15 @@ button[style*="background-color: #000000"],
   background: transparent;
 }
 
+// Tablet responsive sidebar
+@media (max-width: 1024px) {
+  .generic-sidebar-new-container {
+    width: 320px !important;
+  }
+}
+
+@media (max-width: 768px) {
+  .generic-sidebar-new-container {
+    width: 280px !important;
+  }
+}
