@@ -8712,13 +8712,13 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
                       width: "40px",
                       height: "37px",
                       borderRadius: "26px",
-                      background: "#efe7f0",
+                      background: avatar.gradient || "#efe7f0",
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "center",
                       fontSize: "10px",
                       fontWeight: "400",
-                      color: "#141414",
+                      color: "#ffffff",
                       flexShrink: 0,
                       backgroundImage: avatar.imageUrl
                         ? `url(${avatar.imageUrl})`
