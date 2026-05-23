@@ -1945,7 +1945,7 @@ const GenericTable = <T extends Record<string, any>>({
                         }
                       >
                         <Dropdown.Toggle
-                          variant={pill.active ? "primary" : "outline-secondary"}
+                          variant="link"
                           size="sm"
                           className={`gt-filter-pill${pill.active ? " gt-filter-pill-active" : ""}`}
                         >
