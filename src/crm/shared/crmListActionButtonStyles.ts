@@ -20,7 +20,7 @@ export const CRM_LIST_DELETE_BUTTON_STYLE: CSSProperties = {
 
 export const CRM_LIST_PRIMARY_BUTTON_STYLE: CSSProperties = {
   ...ACTION_BUTTON_BASE,
-  backgroundColor: "#000000",
+  backgroundColor: "#0066CC",
   gap: "8px",
 };
 
@@ -67,5 +67,5 @@ export function makeHoverHandlers(
 }
 
 export const DELETE_BUTTON_HOVER = makeHoverHandlers("#dc3545", "#c82333");
-export const PRIMARY_BUTTON_HOVER = makeHoverHandlers("#000000", "#1a1a1a");
+export const PRIMARY_BUTTON_HOVER = makeHoverHandlers("#0066CC", "#0052A3");
 export const DROPDOWN_ITEM_HOVER = makeHoverHandlers("transparent", "#f7fafc");
