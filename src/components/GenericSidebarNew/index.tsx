@@ -8292,6 +8292,11 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
         className="generic-sidebar-new-container"
         style={dockedOuterStyle}
       >
+        <div style={dockedBodyColumnStyle}>
+          <div
+            className="sidebar-scrollbar"
+            style={{ ...dockedScrollBodyStyle, position: "relative", zIndex: 1 }}
+          >
         {!hideTopHeadingBar && (
           <div
             style={{
@@ -8366,16 +8371,6 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
             </div>
           </div>
         )}
-
-        <div style={dockedBodyColumnStyle}>
-          {/* z-index keeps header Actions menu above the scroll sibling (later siblings paint on top by default). */}
-          <div
-            style={{
-              flexShrink: 0,
-              position: "relative",
-              zIndex: 5,
-            }}
-          >
           {/* Contact & Actions Section */}
           <div
             style={{
@@ -8937,12 +8932,7 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
               })}
             </div>
           </div>
-          </div>
 
-          <div
-            className="sidebar-scrollbar"
-            style={{ ...dockedScrollBodyStyle, position: "relative", zIndex: 1 }}
-          >
           {/* Record summary (from API crm_summary) */}
           {recordSummary && (
             <div
