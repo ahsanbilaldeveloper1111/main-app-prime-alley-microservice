@@ -61,9 +61,6 @@ export function CrmProspectsContactsAddContactsButton({
   return (
     <div
       style={{
-        position: "absolute",
-        right: "19px",
-        top: "18px",
         display: "flex",
         alignItems: "center",
         gap: "8px",
