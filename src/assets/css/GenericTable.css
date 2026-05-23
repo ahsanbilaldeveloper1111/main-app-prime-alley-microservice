@@ -144,7 +144,15 @@ th.generic-table-th:not(:last-child) {
 
 .generic-table-row.clickable:hover,
 .generic-table-row:hover {
-  background-color: #ebebeb;
+  background-color: #F8FAFC;
+}
+
+.generic-table-row:hover .generic-table-td {
+  background-color: #F8FAFC;
+}
+
+.generic-table-row:hover .generic-table-td:hover {
+  box-shadow: inset 0 0 0 1px #E2E8F0;
 }
 
 .dropdown-menu {
