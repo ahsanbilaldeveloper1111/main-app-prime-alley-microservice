@@ -1,9 +1,20 @@
 import { toast } from "react-toastify";
 import axiosInstance from "./axios";
-import { postPagedList, type PaginationParams } from "./paginatedList";
+import {
+  normalizePostPagedListResult,
+  postPagedList,
+  type NormalizedPagedList,
+  type PaginationParams,
+} from "./paginatedList";
+import type { TeamListResponse } from "../types/controlhub/teams";
 
-export const ListTeams = async (params: PaginationParams = {}) => {
-  return await postPagedList(`teams/list`, params, { context: "teams" });
+export const ListTeams = async (
+  params: PaginationParams = {},
+): Promise<NormalizedPagedList<TeamListResponse["dataList"][number]>> => {
+  const raw = await postPagedList<TeamListResponse>(`teams/list`, params, {
+    context: "teams",
+  });
+  return normalizePostPagedListResult(raw);
 };
 
 export const getAllTeams = async (): Promise<any[]> => {

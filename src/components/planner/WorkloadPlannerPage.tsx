@@ -5,6 +5,7 @@ import { isAxiosError } from "axios";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 import { Container } from "react-bootstrap";
 import { toast } from "react-toastify";
+import "@assets/scss/common.scss";
 import { useHierarchyData } from "@components/filters/useHierarchyData";
 import { getSessionPhoneOrExtension } from "@planner/projectMemberRole";
 import { ModuleSlug } from "@utils/Helper";
@@ -19,7 +20,6 @@ import {
   listProjects,
   patchWorkloadTask,
   updateTask,
-  type AssigneeMatch,
   type WorkloadGridCell,
   type WorkloadRangePreset,
   type WorkloadGridMember,
@@ -29,18 +29,20 @@ import {
   formatWorkloadDayDetailDate,
   formatWorkloadMemberLabel,
   getWorkloadWeekRange,
-  isWorkloadCustomRangeValid,
   resolveWorkloadGridDisplayData,
   resolveWorkloadPeriodDisplayMembers,
+  createDefaultWorkloadPlannerFilters,
+  isDefaultWorkloadPlannerFilters,
+  isWorkloadPlannerDraftRangeValid,
   readWorkloadMainViewPreference,
+  workloadPlannerFiltersEqual,
   workloadProjectFilterQuery,
   writeWorkloadMainViewPreference,
   buildWorkloadTaskPatchBody,
   resolveWorkloadTaskEstimateMinutes,
   workloadCellKey,
   workloadPriorityToApiString,
-  type WorkloadPriorityFilterValue,
-  type WorkloadProjectFilterValue,
+  type WorkloadPlannerFilterState,
 } from "@page-modules/planner/workload/workloadDomain";
 import type { WorkloadBoardDropIntent } from "./workload/WorkloadBoardPanel";
 import {
@@ -50,7 +52,7 @@ import {
   WorkloadPlannerDataViews,
 } from "./workload/WorkloadPlannerDataViews";
 import {
-  WorkloadPlannerFiltersCard,
+  WorkloadPlannerFilterBar,
   WorkloadPlannerPageHeader,
   type WorkloadProjectOption,
 } from "./workload/WorkloadPlannerChrome";
@@ -92,11 +94,12 @@ const WorkloadPlannerPage: React.FC = () => {
   const extension = useMemo(() => getSessionPhoneOrExtension(session), [session]);
   const { hierarchyDataExtensions } = useHierarchyData(ModuleSlug.WORK_PLANNER);
 
-  const [range, setRange] = useState<WorkloadRangePreset>("this_week");
-  const defaultWeekRange = useMemo(() => getWorkloadWeekRange("this_week"), []);
-  const [customStart, setCustomStart] = useState(defaultWeekRange.start);
-  const [customEnd, setCustomEnd] = useState(defaultWeekRange.end);
-  const [assigneeMatch, setAssigneeMatch] = useState<AssigneeMatch>("primary");
+  const [draftFilters, setDraftFilters] = useState<WorkloadPlannerFilterState>(
+    createDefaultWorkloadPlannerFilters,
+  );
+  const [appliedFilters, setAppliedFilters] = useState<WorkloadPlannerFilterState>(
+    createDefaultWorkloadPlannerFilters,
+  );
   const [mainView, setMainView] = useState<MainView>(() => readWorkloadMainViewPreference());
   const [reassignOverloadConfirm, setReassignOverloadConfirm] = useState(false);
   const [selectedCell, setSelectedCell] = useState<{
@@ -112,32 +115,37 @@ const WorkloadPlannerPage: React.FC = () => {
   const [rescheduleTask, setRescheduleTask] = useState<WorkloadTaskCard | null>(null);
   const [rescheduleDate, setRescheduleDate] = useState("");
   const [overloadSecondStep, setOverloadSecondStep] = useState(false);
-  const [projectFilter, setProjectFilter] = useState<WorkloadProjectFilterValue>("all");
-  const [memberFilter, setMemberFilter] = useState("all");
-  const [priorityFilter, setPriorityFilter] = useState<WorkloadPriorityFilterValue>("all");
   const [boardDropIntent, setBoardDropIntent] = useState<WorkloadBoardDropIntent | null>(null);
   const [boardDropOverload, setBoardDropOverload] = useState(false);
   const [showWorkloadPerDay, setShowWorkloadPerDay] = useState(true);
 
-  const customRangeValid = useMemo(
-    () => range !== "custom" || isWorkloadCustomRangeValid(customStart, customEnd),
-    [range, customStart, customEnd],
+  const appliedRangeValid = useMemo(
+    () => isWorkloadPlannerDraftRangeValid(appliedFilters),
+    [appliedFilters],
   );
 
-  const projectFilterKey = useMemo(() => {
+  const draftRangeInvalid = useMemo(
+    () => !isWorkloadPlannerDraftRangeValid(draftFilters),
+    [draftFilters],
+  );
+
+  const appliedProjectFilterKey = useMemo(() => {
+    const { projectFilter } = appliedFilters;
     if (projectFilter === "all") return "all";
     if (projectFilter === "none") return "none";
     return String(projectFilter);
-  }, [projectFilter]);
+  }, [appliedFilters]);
 
   const queryBase = useMemo(() => {
+    const { range, customStart, customEnd, assigneeMatch, projectFilter, memberFilter } =
+      appliedFilters;
     const base: Parameters<typeof getWorkloadSummary>[0] = {
       extension_number: extension,
       assignee_match: assigneeMatch,
       range,
       ...workloadProjectFilterQuery(projectFilter),
     };
-    if (range === "custom" && customRangeValid) {
+    if (range === "custom" && appliedRangeValid) {
       base.start = customStart;
       base.end = customEnd;
     }
@@ -145,68 +153,69 @@ const WorkloadPlannerPage: React.FC = () => {
       base.extension_numbers = [memberFilter];
     }
     return base;
-  }, [
-    extension,
-    assigneeMatch,
-    range,
-    customStart,
-    customEnd,
-    customRangeValid,
-    projectFilter,
-    memberFilter,
-  ]);
+  }, [extension, appliedFilters, appliedRangeValid]);
 
-  const workloadQueryKeyParams = useMemo(
-    () => ({
+  const workloadQueryKeyParams = useMemo(() => {
+    const { range, customStart, customEnd, assigneeMatch, memberFilter } = appliedFilters;
+    return {
       ext: extension,
       range,
       match: assigneeMatch,
       start: range === "custom" ? customStart : undefined,
       end: range === "custom" ? customEnd : undefined,
       member: memberFilter,
-      project: projectFilterKey,
-    }),
-    [extension, range, assigneeMatch, customStart, customEnd, memberFilter, projectFilterKey],
-  );
+      project: appliedProjectFilterKey,
+    };
+  }, [extension, appliedFilters, appliedProjectFilterKey]);
 
-  const enabled = extension.length > 0 && customRangeValid;
+  const queriesEnabled = extension.length > 0 && appliedRangeValid;
+  const filtersEnabled = extension.length > 0;
 
   useEffect(() => {
     writeWorkloadMainViewPreference(mainView);
   }, [mainView]);
 
-  const handleRangeChange = useCallback((value: WorkloadRangePreset) => {
-    setRange(value);
-    if (value === "custom") {
-      const week = getWorkloadWeekRange("this_week");
-      setCustomStart(week.start);
-      setCustomEnd(week.end);
-    }
+  const handleDraftRangeChange = useCallback((value: WorkloadRangePreset) => {
+    setDraftFilters((prev) => {
+      if (value === "custom") {
+        const week = getWorkloadWeekRange("this_week");
+        return { ...prev, range: value, customStart: week.start, customEnd: week.end };
+      }
+      return { ...prev, range: value };
+    });
   }, []);
+
+  const handleApplyFilters = useCallback(() => {
+    if (!isWorkloadPlannerDraftRangeValid(draftFilters)) {
+      toast.error("Choose a valid custom date range.");
+      return;
+    }
+    setAppliedFilters({ ...draftFilters });
+  }, [draftFilters]);
 
   const summaryQuery = useQuery({
     queryKey: plannerKeys.workload.summary(workloadQueryKeyParams),
     queryFn: () => getWorkloadSummary(queryBase),
-    enabled,
+    enabled: queriesEnabled,
   });
 
   const gridQuery = useQuery({
     queryKey: plannerKeys.workload.grid(workloadQueryKeyParams),
     queryFn: () => getWorkloadGrid(queryBase),
-    enabled,
+    enabled: queriesEnabled,
   });
 
   const boardQuery = useQuery({
     queryKey: plannerKeys.workload.board(workloadQueryKeyParams),
     queryFn: () => getWorkloadBoard(queryBase),
-    enabled: enabled && mainView === "board",
+    enabled: queriesEnabled && mainView === "board",
   });
 
   const dayQuery = useQuery({
     queryKey: plannerKeys.workload.day({
       ext: selectedCell?.extension ?? "",
       date: selectedCell?.date ?? "",
-      match: assigneeMatch,
+      match: appliedFilters.assigneeMatch,
     }),
     queryFn: async () => {
       const cell = selectedCell;
@@ -216,10 +225,10 @@ const WorkloadPlannerPage: React.FC = () => {
       return getWorkloadDay({
         extension_number: cell.extension,
         date: cell.date,
-        assignee_match: assigneeMatch,
+        assignee_match: appliedFilters.assigneeMatch,
       });
     },
-    enabled: Boolean(selectedCell && enabled),
+    enabled: Boolean(selectedCell && queriesEnabled),
   });
 
   const projectsQuery = useQuery({
@@ -231,42 +240,45 @@ const WorkloadPlannerPage: React.FC = () => {
         .filter((p) => typeof p.id === "number" && p.name)
         .map((p) => ({ id: p.id as number, name: String(p.name) }));
     },
-    enabled,
+    enabled: filtersEnabled,
     staleTime: 120_000,
   });
 
   const projectOptions: WorkloadProjectOption[] = projectsQuery.data ?? [];
 
   const unassignedProjectId =
-    typeof projectFilter === "number" ? projectFilter : undefined;
+    typeof appliedFilters.projectFilter === "number"
+      ? appliedFilters.projectFilter
+      : undefined;
 
   const unassignedQuery = useQuery({
-    queryKey: plannerKeys.workload.unassigned(extension, projectFilterKey),
+    queryKey: plannerKeys.workload.unassigned(extension, appliedProjectFilterKey),
     queryFn: () =>
       getWorkloadUnassigned({
         extension_number: extension,
         limit: 100,
         project_id: unassignedProjectId,
       }),
-    enabled,
+    enabled: queriesEnabled,
     staleTime: 30_000,
   });
 
   const gridRangeFallback = useMemo((): { start: string; end: string } => {
-    if (range === "custom" && customRangeValid) {
+    const { range, customStart, customEnd } = appliedFilters;
+    if (range === "custom" && appliedRangeValid) {
       return { start: customStart, end: customEnd };
     }
     return getWorkloadWeekRange(range === "next_week" ? "next_week" : "this_week");
-  }, [range, customStart, customEnd, customRangeValid]);
+  }, [appliedFilters, appliedRangeValid]);
 
   const displayGridData = useMemo(
     () =>
       resolveWorkloadGridDisplayData(gridQuery.data, {
         viewerExtension: extension,
-        memberFilter,
+        memberFilter: appliedFilters.memberFilter,
         rangeFallback: gridRangeFallback,
       }),
-    [gridQuery.data, extension, memberFilter, gridRangeFallback],
+    [gridQuery.data, extension, appliedFilters.memberFilter, gridRangeFallback],
   );
 
   const cellMap = useMemo(
@@ -397,7 +409,7 @@ const WorkloadPlannerPage: React.FC = () => {
         date: selectedCell.date,
         additional_estimated_minutes: minutes,
         exclude_task_id: reassignTask.id,
-        assignee_match: assigneeMatch,
+        assignee_match: appliedFilters.assigneeMatch,
       });
       if (check.overloaded) {
         setReassignOverloadConfirm(true);
@@ -409,7 +421,7 @@ const WorkloadPlannerPage: React.FC = () => {
     }
   }, [
     assignMutation,
-    assigneeMatch,
+    appliedFilters.assigneeMatch,
     reassignOverloadConfirm,
     reassignTarget,
     reassignTask,
@@ -454,11 +466,11 @@ const WorkloadPlannerPage: React.FC = () => {
         date: targetDate,
         additional_estimated_minutes: minutes,
         exclude_task_id: intent.task.id,
-        assignee_match: assigneeMatch,
+        assignee_match: appliedFilters.assigneeMatch,
       });
       if (check.overloaded) setBoardDropOverload(true);
     },
-    [assigneeMatch, boardQuery.data?.range.start],
+    [appliedFilters.assigneeMatch, boardQuery.data?.range.start],
   );
 
   const handleBoardDropIntent = useCallback(
@@ -488,7 +500,7 @@ const WorkloadPlannerPage: React.FC = () => {
         date: rescheduleDate,
         additional_estimated_minutes: minutes,
         exclude_task_id: rescheduleTask.id,
-        assignee_match: assigneeMatch,
+        assignee_match: appliedFilters.assigneeMatch,
       });
       if (check.overloaded && !overloadSecondStep) {
         setOverloadSecondStep(true);
@@ -499,7 +511,7 @@ const WorkloadPlannerPage: React.FC = () => {
       toast.error(workloadErrorMessage(err));
     }
   }, [
-    assigneeMatch,
+    appliedFilters.assigneeMatch,
     extension,
     overloadSecondStep,
     rescheduleDate,
@@ -512,15 +524,37 @@ const WorkloadPlannerPage: React.FC = () => {
   const boardForbidden = boardQuery.isError && isForbiddenError(boardQuery.error);
   const accessForbidden = summaryForbidden || gridForbidden || boardForbidden;
 
-  const handleExportCsv = useCallback(() => {
-    toast.info("CSV export will be available in a later release.");
+  const hasActiveFilters = useMemo(
+    () => !isDefaultWorkloadPlannerFilters(draftFilters),
+    [draftFilters],
+  );
+
+  const hasPendingFilters = useMemo(
+    () => !workloadPlannerFiltersEqual(draftFilters, appliedFilters),
+    [draftFilters, appliedFilters],
+  );
+
+  const handleClearFilters = useCallback(() => {
+    const defaults = createDefaultWorkloadPlannerFilters();
+    setDraftFilters(defaults);
+    setAppliedFilters(defaults);
   }, []);
 
   const loadingMain =
-    !enabled ||
+    !queriesEnabled ||
     summaryQuery.isPending ||
     (mainView === "grid" && gridQuery.isPending) ||
     (mainView === "board" && boardQuery.isPending);
+
+  const applyDisabled =
+    !filtersEnabled || draftRangeInvalid || !hasPendingFilters || loadingMain;
+
+  const isApplyingFilters =
+    !hasPendingFilters &&
+    queriesEnabled &&
+    (summaryQuery.isFetching ||
+      (mainView === "grid" && gridQuery.isFetching) ||
+      (mainView === "board" && boardQuery.isFetching));
 
   return (
     <div className="workload-page">
@@ -528,54 +562,69 @@ const WorkloadPlannerPage: React.FC = () => {
         <BreadcrumbItem mainTitle="Planner" mainLink="/planner/dashboard" subTitle="Workload" />
 
         <WorkloadPlannerPageHeader
-          onExportCsv={handleExportCsv}
-          onRefresh={() => invalidateWorkload()}
-          onOpenUnassigned={() => setShowUnassigned(true)}
-          enabled={enabled}
+          mainView={mainView}
+          onMainViewChange={setMainView}
+          enabled={queriesEnabled}
+        />
+
+        <WorkloadPlannerFilterBar
+          range={draftFilters.range}
+          onRangeChange={handleDraftRangeChange}
+          customStart={draftFilters.customStart}
+          customEnd={draftFilters.customEnd}
+          onCustomStartChange={(value) =>
+            setDraftFilters((prev) => ({ ...prev, customStart: value }))
+          }
+          onCustomEndChange={(value) =>
+            setDraftFilters((prev) => ({ ...prev, customEnd: value }))
+          }
+          customRangeInvalid={draftFilters.range === "custom" && draftRangeInvalid}
+          assigneeMatch={draftFilters.assigneeMatch}
+          onAssigneeMatchChange={(value) =>
+            setDraftFilters((prev) => ({ ...prev, assigneeMatch: value }))
+          }
+          projectFilter={draftFilters.projectFilter}
+          onProjectFilterChange={(value) =>
+            setDraftFilters((prev) => ({ ...prev, projectFilter: value }))
+          }
+          projectOptions={projectOptions}
+          memberFilter={draftFilters.memberFilter}
+          onMemberFilterChange={(value) =>
+            setDraftFilters((prev) => ({ ...prev, memberFilter: value }))
+          }
+          memberExtensions={memberExtensions}
+          hierarchyExtensions={hierarchyDataExtensions}
+          priorityFilter={draftFilters.priorityFilter}
+          onPriorityFilterChange={(value) =>
+            setDraftFilters((prev) => ({ ...prev, priorityFilter: value }))
+          }
+          enabled={filtersEnabled}
           unassignedCount={unassignedQuery.data?.count}
+          onOpenUnassigned={() => setShowUnassigned(true)}
+          onClearFilters={handleClearFilters}
+          hasActiveFilters={hasActiveFilters}
+          onApply={handleApplyFilters}
+          applyDisabled={applyDisabled}
+          isApplying={isApplyingFilters}
         />
 
         <WorkloadPlannerAlertStack
-          sessionStatus={sessionStatus}
-          enabled={enabled}
-          accessForbidden={accessForbidden}
-          summaryError={summaryQuery.error}
-          summaryHasError={summaryQuery.isError}
-          gridError={gridQuery.error}
-          gridHasError={gridQuery.isError}
-          boardError={boardQuery.error}
-          boardHasError={boardQuery.isError && !boardForbidden}
-          mainView={mainView}
-          workloadErrorMessage={workloadErrorMessage}
-        />
+            sessionStatus={sessionStatus}
+            enabled={queriesEnabled}
+            accessForbidden={accessForbidden}
+            summaryError={summaryQuery.error}
+            summaryHasError={summaryQuery.isError}
+            gridError={gridQuery.error}
+            gridHasError={gridQuery.isError}
+            boardError={boardQuery.error}
+            boardHasError={boardQuery.isError && !boardForbidden}
+            mainView={mainView}
+            workloadErrorMessage={workloadErrorMessage}
+          />
 
-        <WorkloadPlannerFiltersCard
-          range={range}
-          onRangeChange={handleRangeChange}
-          customStart={customStart}
-          customEnd={customEnd}
-          onCustomStartChange={setCustomStart}
-          onCustomEndChange={setCustomEnd}
-          customRangeInvalid={range === "custom" && !customRangeValid}
-          assigneeMatch={assigneeMatch}
-          onAssigneeMatchChange={setAssigneeMatch}
-          mainView={mainView}
-          onMainViewChange={setMainView}
-          projectFilter={projectFilter}
-          onProjectFilterChange={setProjectFilter}
-          projectOptions={projectOptions}
-          memberFilter={memberFilter}
-          onMemberFilterChange={setMemberFilter}
-          memberExtensions={memberExtensions}
-          hierarchyExtensions={hierarchyDataExtensions}
-          priorityFilter={priorityFilter}
-          onPriorityFilterChange={setPriorityFilter}
-          enabled={extension.length > 0}
-        />
-
-        <WorkloadPlannerDataViews
+          <WorkloadPlannerDataViews
           loadingMain={loadingMain}
-          enabled={enabled}
+          enabled={queriesEnabled}
           mainView={mainView}
           summaryData={summaryQuery.data}
           gridData={displayGridData}
@@ -583,7 +632,7 @@ const WorkloadPlannerPage: React.FC = () => {
           boardData={boardQuery.data}
           cellMap={cellMap}
           hierarchyExtensions={hierarchyDataExtensions}
-          priorityFilter={priorityFilter}
+          priorityFilter={appliedFilters.priorityFilter}
           boardDragSaving={boardDragMutation.isPending}
           onBoardDropIntent={handleBoardDropIntent}
           showWorkloadPerDay={showWorkloadPerDay}
@@ -596,8 +645,9 @@ const WorkloadPlannerPage: React.FC = () => {
             setSelectedCell({ extension, date, member, cell });
           }}
         />
+      </Container>
 
-        <WorkloadDayOffcanvas
+      <WorkloadDayOffcanvas
           selected={selectedCell}
           onClose={() => setSelectedCell(null)}
           dayQuery={dayQuery}
@@ -702,7 +752,6 @@ const WorkloadPlannerPage: React.FC = () => {
           }}
           onConfirm={confirmBoardDrop}
         />
-      </Container>
     </div>
   );
 };

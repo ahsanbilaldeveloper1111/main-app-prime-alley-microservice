@@ -1,18 +1,17 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Button, Collapse, Form } from "react-bootstrap";
-import { Calendar, ChevronDown, FolderKanban, GripVertical } from "lucide-react";
+import { GripVertical } from "lucide-react";
 import type { WorkloadTaskCard } from "@utils/tasks";
 import {
   formatWorkloadBoardMoveLabel,
   formatWorkloadRangeLabel,
   formatWorkloadShortDueDate,
+  formatWorkloadTaskEstimate,
   isWorkloadTaskUnestimated,
-  workloadPriorityLabel,
-  workloadPriorityTone,
-  workloadTaskCardAccent,
+  workloadBoardStatusBdgTone,
   workloadTaskProjectLabel,
 } from "@page-modules/planner/workload/workloadDomain";
+import { WorkloadBdg, WorkloadPriorityBadge } from "./WorkloadPlannerSubviews";
 
 type WorkloadBoardTaskCardProps = Readonly<{
   task: WorkloadTaskCard;
@@ -33,6 +32,15 @@ function defaultMoveDate(task: WorkloadTaskCard, rangeDays: string[]): string {
   return rangeDays[0] ?? "";
 }
 
+function shouldPreventCardDrag(eventTarget: EventTarget | null): boolean {
+  if (!(eventTarget instanceof HTMLElement)) return false;
+  return Boolean(
+    eventTarget.closest(
+      "a, button, input, select, textarea, label, [contenteditable='true'], .workload-board-task-card__date-row",
+    ),
+  );
+}
+
 export function WorkloadBoardTaskCard({
   task,
   columnExtension,
@@ -45,8 +53,6 @@ export function WorkloadBoardTaskCard({
   onDragEnd,
   onMove,
 }: WorkloadBoardTaskCardProps) {
-  const accent = workloadTaskCardAccent(task);
-  const priorityTone = workloadPriorityTone(task.priority);
   const unestimated = isWorkloadTaskUnestimated(task);
   const statusLabel = task.status_name?.trim();
   const projectLabel = workloadTaskProjectLabel(task);
@@ -59,26 +65,40 @@ export function WorkloadBoardTaskCard({
     [rangeDays, task.due_date, task.id],
   );
   const [moveDate, setMoveDate] = useState(initialMoveDate);
-  const [showMove, setShowMove] = useState(false);
+
+  useEffect(() => {
+    setMoveDate(initialMoveDate);
+  }, [initialMoveDate]);
+
+  const handleCardDragStart = (e: React.DragEvent<HTMLDivElement>) => {
+    if (shouldPreventCardDrag(e.target)) {
+      e.preventDefault();
+      return;
+    }
+    onDragStart(e, task);
+  };
 
   return (
     <div
-      className={`workload-board-task-card workload-board-task-card--${accent} ${
-        isDragging ? "workload-board-task-card--dragging" : ""
-      } ${task.is_completed ? "workload-board-task-card--completed" : ""}`}
+      role="listitem"
+      className={[
+        "workload-board-task-card",
+        task.is_completed ? "workload-board-task-card--done" : "",
+        task.is_completed ? "workload-board-task-card--completed" : "",
+        task.is_overdue && !task.is_completed ? "workload-board-task-card--overdue" : "",
+        isDragging ? "workload-board-task-card--dragging" : "",
+      ]
+        .filter(Boolean)
+        .join(" ")}
+      draggable={!dragSaving}
+      title={dragSaving ? undefined : "Drag to another column to reassign"}
+      onDragStart={handleCardDragStart}
+      onDragEnd={onDragEnd}
     >
       <div className="workload-board-task-card__header">
-        <button
-          type="button"
-          className="workload-board-task-card__drag-handle"
-          draggable={!dragSaving}
-          aria-label={`Drag ${task.title}`}
-          disabled={dragSaving}
-          onDragStart={(e) => onDragStart(e, task)}
-          onDragEnd={onDragEnd}
-        >
-          <GripVertical size={14} aria-hidden />
-        </button>
+        <span className="workload-board-task-card__drag-handle" aria-hidden>
+          <GripVertical size={12} />
+        </span>
         <div className="workload-board-task-card__title-wrap">
           <div className="workload-board-task-card__title">{task.title}</div>
           {unestimated ? (
@@ -91,86 +111,68 @@ export function WorkloadBoardTaskCard({
         </div>
       </div>
 
-      <div className="workload-board-task-card__project">
-        <FolderKanban size={14} className="workload-board-task-card__project-icon" aria-hidden />
-        <span>{projectLabel}</span>
-      </div>
-
       <div className="workload-board-task-card__meta">
-        <span className={`workload-priority-badge workload-priority-badge--${priorityTone}`}>
-          {workloadPriorityLabel(task.priority)}
-        </span>
-        {statusLabel ? (
-          <span
-            className="workload-board-task-card__tag workload-board-task-card__tag--status"
-            style={
-              task.status_color
-                ? { borderColor: task.status_color, color: task.status_color }
-                : undefined
-            }
-          >
-            {statusLabel}
-          </span>
+        <WorkloadPriorityBadge priority={task.priority} />
+        {projectLabel && projectLabel !== "—" ? (
+          <WorkloadBdg tone="gray">{projectLabel}</WorkloadBdg>
         ) : null}
-        {unestimated ? (
-          <span className="workload-board-task-card__tag workload-board-task-card__tag--warn">
-            Unestimated
-          </span>
+        {statusLabel ? (
+          <WorkloadBdg tone={workloadBoardStatusBdgTone(statusLabel)}>{statusLabel}</WorkloadBdg>
         ) : null}
       </div>
 
-      <div className="workload-board-task-card__schedule">
-        <Calendar size={13} aria-hidden />
-        <span className={task.is_overdue ? "text-danger" : undefined}>{scheduleLabel}</span>
+      <div className="workload-board-task-card__meta workload-board-task-card__meta--secondary">
+        <span
+          className={[
+            "workload-board-task-card__due",
+            task.is_overdue && !task.is_completed ? "workload-board-task-card__due--overdue" : "",
+          ]
+            .filter(Boolean)
+            .join(" ")}
+        >
+          <span aria-hidden>📅</span> {scheduleLabel}
+        </span>
+        {unestimated ? (
+          <span className="workload-est-pill workload-est-pill--add">⏱ Unestimated</span>
+        ) : (
+          <span className="workload-est-pill">⏱ {formatWorkloadTaskEstimate(task)}</span>
+        )}
+      </div>
+
+      <div className="workload-board-task-card__date-row">
+        <span className="workload-board-task-card__date-label">Move to:</span>
+        <select
+          className="workload-board-task-card__date-select"
+          value={moveDate}
+          disabled={dragSaving || rangeDays.length === 0}
+          onChange={(e) => setMoveDate(e.target.value)}
+          onClick={(e) => e.stopPropagation()}
+          aria-label={`Move ${task.title} to date`}
+        >
+          {rangeDays.map((day) => (
+            <option key={day} value={day}>
+              {formatWorkloadBoardMoveLabel(day)}
+            </option>
+          ))}
+        </select>
+        <button
+          type="button"
+          className="workload-board-task-card__move-btn"
+          disabled={dragSaving || !moveDate}
+          onClick={(e) => {
+            e.stopPropagation();
+            onMove(task, columnExtension, moveDate);
+          }}
+        >
+          Move
+        </button>
       </div>
 
       <div className="workload-board-task-card__footer">
-        <button
-          type="button"
-          className="workload-board-task-card__move-toggle btn btn-link btn-sm p-0"
-          onClick={() => setShowMove((open) => !open)}
-          aria-expanded={showMove}
-        >
-          Move
-          <ChevronDown
-            size={14}
-            className={`ms-1 workload-board-task-card__chevron ${showMove ? "workload-board-task-card__chevron--open" : ""}`}
-            aria-hidden
-          />
-        </button>
-        <Link
-          href={`/planner/tasks/${task.id}`}
-          className="btn btn-primary btn-sm workload-board-task-card__view"
-        >
+        <Link href={`/planner/tasks/${task.id}`} className="workload-board-task-card__view">
           View
         </Link>
       </div>
-
-      <Collapse in={showMove} unmountOnExit>
-        <div className="workload-board-task-card__move-panel">
-          <Form.Select
-            size="sm"
-            value={moveDate}
-            disabled={dragSaving || rangeDays.length === 0}
-            onChange={(e) => setMoveDate(e.target.value)}
-            aria-label={`Move ${task.title} to date`}
-          >
-            {rangeDays.map((day) => (
-              <option key={day} value={day}>
-                {formatWorkloadBoardMoveLabel(day)}
-              </option>
-            ))}
-          </Form.Select>
-          <Button
-            size="sm"
-            variant="outline-primary"
-            disabled={dragSaving || !moveDate}
-            onClick={() => onMove(task, columnExtension, moveDate)}
-          >
-            Apply
-          </Button>
-        </div>
-      </Collapse>
     </div>
   );
 }
