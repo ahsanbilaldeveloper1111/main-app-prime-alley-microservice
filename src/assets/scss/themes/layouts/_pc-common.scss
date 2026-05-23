@@ -9,8 +9,13 @@
   top: $header-height;
   margin-left: $sidebar-width;
   min-height: calc(100vh - #{$temp});
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 
   .pc-content {
+    flex: 1;
+    overflow: hidden;
     padding-left: 40px;
     padding-right: 40px;
     padding-top: 20px;

@@ -125,6 +125,7 @@ export function buildCrmListPageScopedLayoutCss(
     config.scrollableContentClass +
     ` {
           flex: 1;
+          height: 100%;
           overflow-y: auto;
           overflow-x: hidden;
         }

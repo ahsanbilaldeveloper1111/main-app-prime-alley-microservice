@@ -1171,25 +1171,27 @@ export function CrmProspectsContactsListPage({
   return (
     <React.Fragment>
       <CrmListPageScopedLayoutStyles config={config.scopedLayout} />
-      <BreadcrumbItem
-        mainTitle="CRM"
-        mainLink="/crm/dashboard"
-        subTitle={config.breadcrumbSubTitle}
-      />
       {/* Main flex container for content and sidebar */}
       <div
         style={{
           display: "flex",
           gap: "0",
-          height: "calc(100vh)",
+          height: "calc(100vh - 74px)",
           overflow: "hidden",
         }}
       >
         {/* Main content area */}
-        <div className="prospects-scrollable-content" style={{ flex: 1 }}>
-          
+        <div
+          className="prospects-scrollable-content"
+          style={{ flex: 1, height: "100%", overflowY: "auto" }}
+        >
+          <BreadcrumbItem
+            mainTitle="CRM"
+            mainLink="/crm/dashboard"
+            subTitle={config.breadcrumbSubTitle}
+          />
 
-          <div className="container-fluid">
+          <div className="container-fluid" style={{ height: "100%" }}>
             <div
               className="prospects-table-wrapper"
               style={{
