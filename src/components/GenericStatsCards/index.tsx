@@ -41,7 +41,7 @@ const StatsCards: React.FC<StatsCardsProps> = ({
   return (
     <div style={{
       display: 'grid',
-      gridTemplateColumns: `repeat(auto-fill, minmax(${gridMinWidth}, 1fr))`,
+      gridTemplateColumns: `repeat(auto-fit, minmax(${gridMinWidth}, 1fr))`,
       gap: '16px',
       marginBottom: '16px',
       background: '#FFFFFF',
@@ -113,7 +113,7 @@ const StatsCards: React.FC<StatsCardsProps> = ({
               <div style={{
                 display: 'flex',
                 flexWrap: 'nowrap',
-                alignItems: 'flex-start',
+                alignItems: 'center',
                 justifyContent: 'center',
                 width: '100%',
                 gap: '6px',
@@ -143,7 +143,7 @@ const StatsCards: React.FC<StatsCardsProps> = ({
               <div style={{
                 display: 'flex',
                 flexWrap: 'nowrap',
-                alignItems: 'flex-start',
+                alignItems: 'center',
                 justifyContent: 'center',
                 width: '100%',
                 gap: '6px',
