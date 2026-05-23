@@ -70,7 +70,7 @@ export function WorkloadBoardTaskCard({
     setMoveDate(initialMoveDate);
   }, [initialMoveDate]);
 
-  const handleCardDragStart = (e: React.DragEvent<HTMLDivElement>) => {
+  const handleCardDragStart = (e: React.DragEvent<HTMLElement>) => {
     if (shouldPreventCardDrag(e.target)) {
       e.preventDefault();
       return;
@@ -78,23 +78,25 @@ export function WorkloadBoardTaskCard({
     onDragStart(e, task);
   };
 
+  const cardClassName = [
+    "workload-board-task-card",
+    task.is_completed ? "workload-board-task-card--done" : "",
+    task.is_completed ? "workload-board-task-card--completed" : "",
+    task.is_overdue && !task.is_completed ? "workload-board-task-card--overdue" : "",
+    isDragging ? "workload-board-task-card--dragging" : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+
   return (
-    <div
-      role="listitem"
-      className={[
-        "workload-board-task-card",
-        task.is_completed ? "workload-board-task-card--done" : "",
-        task.is_completed ? "workload-board-task-card--completed" : "",
-        task.is_overdue && !task.is_completed ? "workload-board-task-card--overdue" : "",
-        isDragging ? "workload-board-task-card--dragging" : "",
-      ]
-        .filter(Boolean)
-        .join(" ")}
-      draggable={!dragSaving}
-      title={dragSaving ? undefined : "Drag to another column to reassign"}
-      onDragStart={handleCardDragStart}
-      onDragEnd={onDragEnd}
-    >
+    <li className="workload-board-task-card-item">
+      <article
+        className={cardClassName}
+        draggable={!dragSaving}
+        title={dragSaving ? undefined : "Drag to another column to reassign"}
+        onDragStart={handleCardDragStart}
+        onDragEnd={onDragEnd}
+      >
       <div className="workload-board-task-card__header">
         <span className="workload-board-task-card__drag-handle" aria-hidden>
           <GripVertical size={12} />
@@ -173,6 +175,7 @@ export function WorkloadBoardTaskCard({
           View
         </Link>
       </div>
-    </div>
+      </article>
+    </li>
   );
 }

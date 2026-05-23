@@ -134,9 +134,8 @@ export function WorkloadBoardPanel({
           );
           const isDropTarget = dropHighlight === col.extension_number;
           return (
-            <div
+            <section
               key={col.extension_number}
-              role="group"
               className="workload-board__column"
               aria-label={`${columnLabel} workload column`}
             >
@@ -171,8 +170,7 @@ export function WorkloadBoardPanel({
                   </div>
                 </div>
               </div>
-              <div
-                role="list"
+              <ul
                 aria-label={`${columnLabel} tasks`}
                 className={[
                   "workload-board__column-body",
@@ -188,7 +186,9 @@ export function WorkloadBoardPanel({
                 onDrop={(e) => handleDrop(e, col.extension_number, null)}
               >
                 {tasks.length === 0 ? (
-                  <p className="workload-board__empty-msg">No records</p>
+                  <li className="workload-board__empty-item">
+                    <p className="workload-board__empty-msg">No records</p>
+                  </li>
                 ) : (
                   tasks.map((task) => (
                     <WorkloadBoardTaskCard
@@ -206,8 +206,8 @@ export function WorkloadBoardPanel({
                     />
                   ))
                 )}
-              </div>
-            </div>
+              </ul>
+            </section>
           );
         })}
       </div>

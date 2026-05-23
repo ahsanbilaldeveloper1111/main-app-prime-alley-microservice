@@ -477,7 +477,7 @@
     width: 2rem;
     height: 2rem;
     border-radius: 50%;
-    background: var(--primary-accent, #2583f2);
+    background: var(--primary-accent, #1d4ed8);
     color: #ffffff;
     font-size: 0.65rem;
     font-weight: 700;
@@ -832,7 +832,7 @@
     font-size: 11px;
     font-weight: 600;
     line-height: 1.3;
-    color: #6b7280;
+    color: #4b5563;
     background: #f3f4f6;
     border: 1px solid #e5e7eb;
     border-radius: 10px;
@@ -843,7 +843,7 @@
     margin: 0 0 4px;
     line-height: 1.3;
     font-size: 11px;
-    color: #6b7280;
+    color: #4b5563;
     font-family: $planner-board-font;
   }
 
@@ -864,12 +864,19 @@
     font-family: $planner-board-font;
   }
 
+  .workload-board-task-card-item {
+    display: block;
+    list-style: none;
+    margin: 0 0 8px;
+  }
+
   .workload-board-task-card {
+    display: block;
     background: $workload-board-column-bg;
     border: 1px solid #e5e7eb;
     border-radius: 8px;
     padding: 8px 10px 9px;
-    margin: 0 0 8px;
+    margin: 0;
     cursor: grab;
     box-shadow: $planner-board-shadow;
     overflow: visible;
@@ -1055,7 +1062,7 @@
     width: 1.35rem;
     height: 1.35rem;
     border-radius: 50%;
-    background: var(--primary-accent, #2583f2);
+    background: #1e40af;
     color: #ffffff;
     font-size: 0.55rem;
     font-weight: 700;
@@ -1134,6 +1141,7 @@
     }
   }
 
+  section.workload-board__column,
   .workload-board__column {
     flex: 0 0 $workload-board-column-width;
     width: $workload-board-column-width;
@@ -1195,9 +1203,9 @@
     flex-direction: column;
     gap: 0;
     flex: 1;
-    min-height: 0;
     margin: 0;
     padding: 8px;
+    list-style: none;
     border-radius: 0 0 6px 6px;
     border-top: none;
     background: $workload-board-column-body-bg;
@@ -1208,14 +1216,22 @@
     scrollbar-width: thin;
     scrollbar-color: #c8c8c8 transparent;
 
-    > .workload-board__empty-msg {
-      margin: 0;
-      padding: 28px 8px;
-      text-align: center;
-      color: #ccc;
-      font-size: 12px;
-      font-family: $planner-board-font;
+    > .workload-board__empty-item {
+      list-style: none;
+
+      .workload-board__empty-msg {
+        margin: 0;
+        padding: 28px 8px;
+        text-align: center;
+        color: #ccc;
+        font-size: 12px;
+        font-family: $planner-board-font;
+      }
     }
+  }
+
+  .workload-board__empty-item {
+    display: block;
   }
 
   .workload-board__column-body--drop-target {
@@ -1536,25 +1552,25 @@
 
 .workload-bdg--red {
   background: #fef2f2;
-  color: #dc2626;
+  color: #b91c1c;
   border-color: #fecaca;
 }
 
 .workload-bdg--orange {
   background: #fff7ed;
-  color: #ea580c;
+  color: #c2410c;
   border-color: #fed7aa;
 }
 
 .workload-bdg--yellow {
   background: #fffbeb;
-  color: #d97706;
+  color: #a16207;
   border-color: #fde68a;
 }
 
 .workload-bdg--green {
   background: #f0fdf4;
-  color: #16a34a;
+  color: #15803d;
   border-color: #bbf7d0;
 }
 
@@ -1593,7 +1609,7 @@
 
 .workload-est-pill--add {
   background: #fff7ed;
-  color: #ea580c;
+  color: #c2410c;
   border-color: #fed7aa;
 }
 

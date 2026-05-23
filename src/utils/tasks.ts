@@ -2067,16 +2067,9 @@ function normalizeWorkloadBoardData(data: WorkloadBoardData): WorkloadBoardData 
   };
 }
 
-function normalizeWorkloadDayData(data: WorkloadDayData): WorkloadDayData {
-  return {
-    ...data,
-    tasks: normalizeWorkloadTaskList(data.tasks),
-  };
-}
-
-function normalizeWorkloadUnassignedData(
-  data: WorkloadUnassignedData,
-): WorkloadUnassignedData {
+function normalizeWorkloadTasksPayload<T extends { tasks?: WorkloadTaskCard[] }>(
+  data: T,
+): T {
   return {
     ...data,
     tasks: normalizeWorkloadTaskList(data.tasks),
@@ -2152,7 +2145,7 @@ export async function getWorkloadDay(params: {
     `${workloadTasksPath}/day?${search.toString()}`,
   );
   const data = parseWorkloadPlannerResponseData<WorkloadDayData>(response);
-  return normalizeWorkloadDayData(data);
+  return normalizeWorkloadTasksPayload(data);
 }
 
 export async function getWorkloadUnassigned(params: {
@@ -2170,7 +2163,7 @@ export async function getWorkloadUnassigned(params: {
     `${workloadTasksPath}/unassigned?${search.toString()}`,
   );
   const data = parseWorkloadPlannerResponseData<WorkloadUnassignedData>(response);
-  return normalizeWorkloadUnassignedData(data);
+  return normalizeWorkloadTasksPayload(data);
 }
 
 export async function getWorkloadOverloadCheck(params: {
