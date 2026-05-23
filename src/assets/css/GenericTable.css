@@ -1403,3 +1403,24 @@ background: #fff !important;
     scroll-behavior: smooth;
   }
 }
+
+.generic-table-container {
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+}
+.generic-table-container:hover {
+  scrollbar-color: #CBD5E1 transparent;
+}
+.generic-table-container::-webkit-scrollbar {
+  height: 6px;
+}
+.generic-table-container::-webkit-scrollbar-track {
+  background: transparent;
+}
+.generic-table-container::-webkit-scrollbar-thumb {
+  background-color: transparent;
+  border-radius: 999px;
+}
+.generic-table-container:hover::-webkit-scrollbar-thumb {
+  background-color: #CBD5E1;
+}
