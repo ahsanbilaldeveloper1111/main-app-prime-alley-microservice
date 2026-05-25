@@ -65,13 +65,6 @@ interface AllUser {
     phone?: string;
 }
 
-interface TeamsApiResponse {
-    data: TeamRow[];
-    total: number;
-    current_page: number;
-    per_page: number;
-}
-
 interface TeamUsersResponse {
     team_member?: TeamUser[];
     team_owners?: TeamUser[];
@@ -247,13 +240,12 @@ const Teams = () => {
         }),
         queryFn: async () => {
             try {
-                const response = (await ListTeams({
+                return await ListTeams({
                     page: currentPage,
                     perPage: rowsPerPage,
                     search: debouncedSearchValue,
                     filters: currentFilters,
-                })) as TeamsApiResponse;
-                return { data: response?.data ?? [], total: response?.total ?? 0 };
+                });
             } catch {
                 toast.error('Failed to load teams');
                 throw new Error('Failed to load teams');

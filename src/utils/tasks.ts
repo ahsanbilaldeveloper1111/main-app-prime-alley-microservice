@@ -1,3 +1,4 @@
+import { normalizeWorkloadPriorityRank } from "@page-modules/planner/workload/workloadDomain";
 import { toast } from "react-toastify";
 import { reportApiError } from "./sentryLogger";
 import axiosInstance from "./axios";
@@ -1883,6 +1884,7 @@ export interface WorkloadTaskCard {
   id: number;
   task_id: string;
   title: string;
+  /** Normalized rank: 0 low, 1 medium, 2 high, 3 critical (see `normalizeWorkloadTaskCard`). */
   priority: number;
   due_date: string | null;
   is_overdue: boolean;
@@ -2043,6 +2045,41 @@ function resolveWorkloadSummaryTotalMembers(
   return readWorkloadSummaryCount(rawTotalMembers);
 }
 
+export function normalizeWorkloadTaskCard(task: WorkloadTaskCard): WorkloadTaskCard {
+  return {
+    ...task,
+    priority: normalizeWorkloadPriorityRank(task.priority),
+  };
+}
+
+function normalizeWorkloadTaskList(
+  tasks: WorkloadTaskCard[] | undefined,
+): WorkloadTaskCard[] {
+  if (!Array.isArray(tasks)) return [];
+  return tasks.map(normalizeWorkloadTaskCard);
+}
+
+function normalizeWorkloadBoardData(data: WorkloadBoardData): WorkloadBoardData {
+  return {
+    ...data,
+    columns: Array.isArray(data.columns)
+      ? data.columns.map((column) => ({
+          ...column,
+          tasks: normalizeWorkloadTaskList(column.tasks),
+        }))
+      : [],
+  };
+}
+
+function normalizeWorkloadTasksPayload<T extends { tasks?: WorkloadTaskCard[] }>(
+  data: T,
+): T {
+  return {
+    ...data,
+    tasks: normalizeWorkloadTaskList(data.tasks),
+  };
+}
+
 function normalizeWorkloadSummaryData(raw: WorkloadSummaryData): WorkloadSummaryData {
   const members = Array.isArray(raw.members) ? raw.members : [];
   const totalTasksThisWeek = readWorkloadSummaryCount(
@@ -2093,7 +2130,8 @@ export async function getWorkloadBoard(
   const response = await axiosInstance.get(
     `${workloadTasksPath}/board?${params.toString()}`,
   );
-  return parseWorkloadPlannerResponseData<WorkloadBoardData>(response);
+  const data = parseWorkloadPlannerResponseData<WorkloadBoardData>(response);
+  return normalizeWorkloadBoardData(data);
 }
 
 export async function getWorkloadDay(params: {
@@ -2110,7 +2148,8 @@ export async function getWorkloadDay(params: {
   const response = await axiosInstance.get(
     `${workloadTasksPath}/day?${search.toString()}`,
   );
-  return parseWorkloadPlannerResponseData<WorkloadDayData>(response);
+  const data = parseWorkloadPlannerResponseData<WorkloadDayData>(response);
+  return normalizeWorkloadTasksPayload(data);
 }
 
 export async function getWorkloadUnassigned(params: {
@@ -2127,7 +2166,8 @@ export async function getWorkloadUnassigned(params: {
   const response = await axiosInstance.get(
     `${workloadTasksPath}/unassigned?${search.toString()}`,
   );
-  return parseWorkloadPlannerResponseData<WorkloadUnassignedData>(response);
+  const data = parseWorkloadPlannerResponseData<WorkloadUnassignedData>(response);
+  return normalizeWorkloadTasksPayload(data);
 }
 
 export async function getWorkloadOverloadCheck(params: {

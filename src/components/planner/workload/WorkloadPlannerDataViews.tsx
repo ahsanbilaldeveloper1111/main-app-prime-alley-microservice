@@ -62,7 +62,7 @@ function WorkloadPlannerPriorityHint({
 }: Readonly<{ mainView: MainView; priorityFilter: WorkloadPriorityFilterValue }>) {
   if (mainView !== "board" || priorityFilter === "all") return null;
   return (
-    <p className="small text-muted mb-2">
+    <p className="workload-board-priority-hint small text-muted">
       Priority filter applies to board task cards. Grid totals are unchanged.
     </p>
   );
@@ -96,6 +96,7 @@ function WorkloadPlannerGridSection({
   return (
     <>
       <WorkloadLegendRow
+        mainView={mainView}
         showWorkloadPerDay={showWorkloadPerDay}
         onToggleWorkloadPerDay={onToggleWorkloadPerDay}
       />
@@ -138,13 +139,15 @@ function WorkloadPlannerBoardSection({
     return <WorkloadEmptyTeamAlert message={boardData.empty_team_message} />;
   }
   return (
-    <WorkloadBoardPanel
-      boardData={boardData}
-      hierarchyExtensions={hierarchyExtensions}
-      priorityFilter={priorityFilter}
-      dragSaving={boardDragSaving}
-      onDropIntent={onBoardDropIntent}
-    />
+    <div className="workload-board-view">
+      <WorkloadBoardPanel
+        boardData={boardData}
+        hierarchyExtensions={hierarchyExtensions}
+        priorityFilter={priorityFilter}
+        dragSaving={boardDragSaving}
+        onDropIntent={onBoardDropIntent}
+      />
+    </div>
   );
 }
 

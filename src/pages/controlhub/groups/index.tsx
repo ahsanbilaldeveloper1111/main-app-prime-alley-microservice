@@ -30,12 +30,6 @@ interface GroupRow {
     total_team_owners?: number;
 }
 
-interface GroupsApiResponse {
-    data: GroupRow[];
-    total: number;
-}
-
-
 const Groups = () => {
     const { data: session } = useSession();
     const queryClient = useQueryClient();
@@ -73,13 +67,12 @@ const Groups = () => {
         }),
         queryFn: async () => {
             try {
-                const response = (await ListGroups({
+                return await ListGroups({
                     page: currentPage,
                     perPage: rowsPerPage,
                     search: debouncedSearchValue,
                     filters: memoizedFilters,
-                })) as GroupsApiResponse;
-                return { data: response?.data ?? [], total: response?.total ?? 0 };
+                });
             } catch {
                 toast.error('Failed to load groups');
                 throw new Error('Failed to load groups');

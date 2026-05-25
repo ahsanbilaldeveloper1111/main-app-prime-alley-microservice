@@ -20,6 +20,45 @@ type PostPagedListOptions = {
   toastOnExport?: boolean;
 };
 
+export type NormalizedPagedList<T> = {
+  data: T[];
+  total: number;
+};
+
+/** Unwrap common list API shapes (`dataList` + `meta`, or `data` + `total`). */
+export function normalizePostPagedListResult<T = unknown>(
+  raw: unknown,
+): NormalizedPagedList<T> {
+  if (!raw || typeof raw !== "object") {
+    return { data: [], total: 0 };
+  }
+
+  const record = raw as Record<string, unknown>;
+  const dataList = record.dataList;
+  const data = record.data;
+  let rows: unknown[] = [];
+  if (Array.isArray(dataList)) {
+    rows = dataList;
+  } else if (Array.isArray(data)) {
+    rows = data;
+  }
+
+  const meta =
+    record.meta && typeof record.meta === "object"
+      ? (record.meta as Record<string, unknown>)
+      : undefined;
+
+  const total =
+    Number(record.total) ||
+    Number(meta?.total) ||
+    Number(record.recordsTotal) ||
+    Number(record.recordsFiltered) ||
+    rows.length ||
+    0;
+
+  return { data: rows as T[], total };
+}
+
 export async function postPagedList<T = any>(
   endpoint: string,
   params: PaginationParams = {},
