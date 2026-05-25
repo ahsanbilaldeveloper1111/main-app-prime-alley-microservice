@@ -174,6 +174,8 @@ export function CrmProspectsContactsListPage({
     number | null
   >(null);
 
+  const [tableMaxHeight, setTableMaxHeight] = useState("calc(100vh - 405px)");
+
   const afterProspectsRemovedRef = useRef<(ids: readonly number[]) => void>(
     () => {},
   );
@@ -381,6 +383,35 @@ export function CrmProspectsContactsListPage({
       ];
     });
   }, [activeFilter, config.stats.convertedCardTitle, setCustomTabs]);
+
+  useEffect(() => {
+    const updateMaxHeight = () => {
+      const toolbarEl = document.querySelector<HTMLElement>(
+        ".gt-toolbar-container",
+      );
+      if (toolbarEl) {
+        const toolbarHeight = toolbarEl.getBoundingClientRect().height;
+        const headerHeight = 74;
+        const paginationHeight = 130;
+        const buffer = 0;
+        setTableMaxHeight(
+          `calc(100vh - ${headerHeight + toolbarHeight + paginationHeight + buffer}px)`,
+        );
+      }
+    };
+    const timer = setTimeout(updateMaxHeight, 100);
+    const observer = new ResizeObserver(updateMaxHeight);
+    const toolbarEl = document.querySelector<HTMLElement>(
+      ".gt-toolbar-container",
+    );
+    if (toolbarEl) observer.observe(toolbarEl);
+    window.addEventListener("resize", updateMaxHeight);
+    return () => {
+      clearTimeout(timer);
+      observer.disconnect();
+      window.removeEventListener("resize", updateMaxHeight);
+    };
+  }, []);
 
   const prospectsCalculateEntryCounts = useCallback(async () => {
     return fetchCrmProspectsEntryCountsForFilters(assignmentFilters);
@@ -1183,7 +1214,7 @@ export function CrmProspectsContactsListPage({
         {/* Main content area */}
         <div
           className="prospects-scrollable-content"
-          style={{ flex: 1, height: "100%", overflowY: "auto" }}
+          style={{ flex: 1, height: "100%", overflowY: "hidden" }}
         >
           <BreadcrumbItem
             mainTitle="CRM"
@@ -1224,6 +1255,7 @@ export function CrmProspectsContactsListPage({
                   onRowDoubleClick: (row) =>
                     prospectsTableRowDoubleClick(session, handleViewData, row),
                 })}
+                maxHeight={tableMaxHeight}
                 toolbar={{
                   ...prospectsToolbarConfig,
                   // Remove the "+ More" pill on this page
