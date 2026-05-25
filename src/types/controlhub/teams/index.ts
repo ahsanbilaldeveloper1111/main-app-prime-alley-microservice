@@ -39,6 +39,15 @@ export interface Team {
     updated_at: string;
 }
 
+/** Row shape for POST teams/list and the teams directory table */
+export interface TeamRow {
+    id: number;
+    name: string;
+    module_names?: string[];
+    owner_count?: number;
+    assigned_user_count?: number;
+}
+
 /**
  * Team with assigned users
  * Used in view, edit, assign-users, remove-users endpoints
@@ -69,8 +78,10 @@ export interface TeamListResponse {
     draw: number;
     recordsTotal: number;
     recordsFiltered: number;
-    dataList: Team[];
+    dataList?: TeamRow[];
+    data?: TeamRow[];
     meta: PaginationMeta;
+    total?: number;
 }
 
 /**
