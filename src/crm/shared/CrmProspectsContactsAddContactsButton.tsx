@@ -99,7 +99,7 @@ export function CrmProspectsContactsAddContactsButton({
         </button>
       )}
       {canCreate && (
-      <div style={{ width: "146px" }}>
+      <div style={{ width: "146px", position: "relative" }}>
         <button
           onClick={() => setShowAddContactsDropdown(!showAddContactsDropdown)}
           style={{
