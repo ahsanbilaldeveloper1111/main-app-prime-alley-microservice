@@ -7711,7 +7711,7 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
         style={{
           backgroundColor: "#ffffff",
           overflow: "hidden",
-          borderTop: "1px solid #eaf0f6",
+          borderTop: "1px solid #d1d5db",
         }}
       >
         {/* Section Header */}
@@ -8304,7 +8304,7 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
           <div
             style={{
               padding: "16px 20px",
-              borderBottom: "1px solid #eaf0f6",
+              borderBottom: "1px solid #d1d5db",
               backgroundColor: "#ffffff",
               flexShrink: 0,
             }}
@@ -8378,7 +8378,7 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
             style={{
               backgroundColor: "#ffffff",
               padding: "16px 24px",
-              borderTop: "1px solid #eaf0f6",
+              borderTop: "1px solid #d1d5db",
             }}
           >
             {/* Record Link and Actions */}
@@ -8387,8 +8387,13 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "space-between",
-                marginBottom: "16px",
-                paddingBottom: "10px",
+                paddingBottom: "12px",
+                borderBottom: "1px solid #d1d5db",
+                marginBottom: "0px",
+                marginLeft: "-24px",
+                marginRight: "-24px",
+                paddingLeft: "24px",
+                paddingRight: "24px",
               }}
             >
               {recordLink && (
@@ -8683,7 +8688,7 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
             )}
 
             {/* Avatar and Name Section */}
-            <div style={{ marginBottom: "16px" }}>
+            <div style={{ marginBottom: "16px", paddingTop: "16px" }}>
               <div
                 style={{
                   display: "flex",
@@ -8930,7 +8935,7 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
               style={{
                 backgroundColor: "#ffffff",
                 overflow: "hidden",
-                borderTop: "1px solid #eaf0f6",
+                borderTop: "1px solid #d1d5db",
               }}
             >
               <button
