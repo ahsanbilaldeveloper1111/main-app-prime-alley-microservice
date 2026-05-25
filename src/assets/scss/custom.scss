@@ -550,6 +550,25 @@ body:has(.prospects-scrollable-content) {
     overflow: hidden !important;
   }
 
+  .generic-table-card {
+    border-radius: 0 0 8px 8px !important;
+    border: 1px solid #ccc !important;
+    border-top: none !important;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12) !important;
+    flex: 1 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    min-height: 0 !important;
+  }
+
+  .prospects-table-wrapper {
+    flex: 1 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    min-height: 0 !important;
+    height: 100% !important;
+  }
+
   .prospects-scrollable-content {
     scrollbar-width: thin;
     scrollbar-color: transparent transparent;

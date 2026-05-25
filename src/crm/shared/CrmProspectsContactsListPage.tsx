@@ -1222,7 +1222,7 @@ export function CrmProspectsContactsListPage({
             subTitle={config.breadcrumbSubTitle}
           />
 
-          <div className="container-fluid" style={{ height: "100%" }}>
+          <div className="container-fluid" style={{ height: "100%", display: "flex", flexDirection: "column" }}>
             <div
               className="prospects-table-wrapper"
               style={{
@@ -1230,6 +1230,7 @@ export function CrmProspectsContactsListPage({
                 overflow: "hidden",
                 display: "flex",
                 flexDirection: "column",
+                height: "100%",
               }}
             >
               <GenericTable
