@@ -1,8 +1,8 @@
 import { HEADER_CONSTANTS } from '@constants/headerConstants'
-import FAQModules from '@pages/faqs/modules'
-import FAQTopics from '@pages/faqs/topics'
-import FAQItems from '@pages/faqs/items'
-import FAQTypes from '@pages/faqs/types'
+import FaqModulesPanel from '@page-modules/faqs/modules/FaqModulesPanel'
+import FAQTopicsPanel from '@page-modules/faqs/topics/FAQTopicsPanel'
+import FaqItemsPanel from '@page-modules/faqs/items/FaqItemsPanel'
+import FAQTypesPanel from '@page-modules/faqs/types/FAQTypesPanel'
 import React from 'react'
 import type { ControlledTabsProps, Tab } from '../types'
 import { SettingsSectionTabShell } from './SettingsSectionTabShell'
@@ -20,13 +20,13 @@ const helpCenterTabs: Tab[] = [
 function HelpCenterTabPanel({ activeTab }: Readonly<{ activeTab: string }>) {
   switch (activeTab) {
     case 'modules':
-      return <FAQModules />
+      return <FaqModulesPanel />
     case 'topics':
-      return <FAQTopics />
+      return <FAQTopicsPanel />
     case 'items':
-      return <FAQItems />
+      return <FaqItemsPanel />
     case 'types':
-      return <FAQTypes />
+      return <FAQTypesPanel />
     default:
       return null
   }

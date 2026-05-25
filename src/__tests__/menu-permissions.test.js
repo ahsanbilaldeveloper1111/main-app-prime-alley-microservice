@@ -61,11 +61,11 @@ const menuItems = [
     url: '',
     submenuItems: [
       { key: 'crm-dashboard', label: 'Dashboard', permission: 'dashboard-crm', href: '/crm/dashboard' },
-      { key: 'crm-campaigns', label: 'Campaigns', permission: 'view-crm-campaigns', href: '/crm/campaigns' },
+      { key: 'crm-campaigns', label: 'Campaigns', permission: 'view-crm-campaigns', href: '/main-settings/smart-crm/campaigns' },
       { key: 'crm-data', label: 'Data Management', permission: 'view-crm-data-management', href: '/crm/prospects' },
       { key: 'crm-leads', label: 'Leads', permission: 'view-crm-leads', href: '/crm/leads' },
       { key: 'crm-opportunities', label: 'Opportunities', permission: 'view-crm-opportunities', href: '/crm/opportunities' },
-      { key: 'crm-stages', label: 'Stages', permission: 'view-crm-stages', href: '/crm/stages' },
+      { key: 'crm-stages', label: 'Stages', permission: 'view-crm-stages', href: '/main-settings/smart-crm/stages' },
       { key: 'crm-lost-reasons', label: 'Lost Reasons', permission: 'view-crm-lost-reasons', href: '/crm/lost-reasons' }
     ]
   },
@@ -156,9 +156,9 @@ const menuItems = [
     submenuItems: [
       { key: 'tickets-dashboard', label: 'Dashboard', permission: 'dashboard-tickets', href: '/tickets/dashboard' },
       { key: 'tickets-list', label: 'Tickets', permission: 'view-ticket-tickets', href: '/tickets/list' },
-      { key: 'tickets-status', label: 'Status', permission: 'ticket-statuses-tickets', href: '/tickets/statuses' },
-      { key: 'tickets-modules', label: 'Modules', permission: 'ticket-modules-tickets', href: '/tickets/modules' },
-      { key: 'tickets-types', label: 'Types', permission: 'view-ticket-types-tickets', href: '/tickets/types' }
+      { key: 'tickets-status', label: 'Status', permission: 'ticket-statuses-tickets', href: '/main-settings/tickets/statuses' },
+      { key: 'tickets-modules', label: 'Modules', permission: 'ticket-modules-tickets', href: '/main-settings/tickets/modules' },
+      { key: 'tickets-types', label: 'Types', permission: 'view-ticket-types-tickets', href: '/main-settings/tickets/types' }
     ]
   },
   {
@@ -208,9 +208,10 @@ const menuItems = [
     isMain: false,
     url: '',
     submenuItems: [
-      { key: 'view-users', label: 'User Directory', permission: 'view-users', href: '/controlhub/users' },
-      { key: 'view-ranks', label: 'Ranks', permission: 'view-ranks', href: '/controlhub/ranks' },
-      { key: 'view-groups', label: 'Groups', permission: 'view-groups', href: '/controlhub/groups' }
+      { key: 'view-users', label: 'User Directory', permission: 'view-users', href: '/main-settings/users-teams/user-directory' },
+      { key: 'view-teams', label: 'Teams', permission: 'view-teams', href: '/main-settings/users-teams/supervisor-teams' },
+      { key: 'view-ranks', label: 'Ranks', permission: 'view-ranks', href: '/main-settings/users-teams/ranks-and-permissions' },
+      { key: 'view-groups', label: 'Groups', permission: 'view-groups', href: '/main-settings/users-teams/management-groups' }
     ]
   },
   {

@@ -619,7 +619,7 @@ export const ticketsKeys = {
   },
 };
 
-/** FAQs / Help Center admin (`src/pages/faqs/*`). */
+/** FAQs / Help Center admin (`/main-settings/help-center/*`). */
 export const faqsKeys = {
   root: ["faqs"] as const,
 

@@ -9,6 +9,7 @@ import { IconKeys, IconLock, IconPencil, IconRuler, MagnifyPlaceholder } from ".
 import { BASE_BUTTON, FONT, PRIMARY_TEXT } from "./styles";
 import type { AccessMethod, PermCategory, PermStatus } from "./types";
 import { LinkButton } from "@components/shared/LinkButton";
+import { DEFAULT_USERS_DIRECTORY_PATH } from "@utils/controlhub/usersNavigation";
 
 function useClickOutside({
   open,
@@ -1009,7 +1010,7 @@ export default function CreateUsersPage(): JSX.Element {
       });
       const userCount = emails.length;
       toast.success(`${userCount} user${userCount === 1 ? "" : "s"} created successfully!`);
-      await router.push("/settings/users");
+      await router.push(DEFAULT_USERS_DIRECTORY_PATH);
     } catch {
       toast.error("Failed to create users. Please try again.");
       setSubmitting(false);

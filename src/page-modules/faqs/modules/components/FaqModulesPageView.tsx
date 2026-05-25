@@ -564,6 +564,8 @@ export type FaqModulesPageViewProps = Readonly<{
   onIconSearchChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onIconSelect: (name: string) => void;
   isSubmitting: boolean;
+  showBreadcrumb?: boolean;
+  breadcrumbMainLink?: string;
 }>;
 
 export const FaqModulesPageView: React.FC<FaqModulesPageViewProps> = ({
@@ -613,10 +615,14 @@ export const FaqModulesPageView: React.FC<FaqModulesPageViewProps> = ({
   onIconSearchChange,
   onIconSelect,
   isSubmitting,
+  showBreadcrumb = true,
+  breadcrumbMainLink = "/main-settings/help-center/modules",
 }) => {
   return (
     <React.Fragment>
-      <BreadcrumbItem mainTitle="FAQs" mainLink="/faqs" subTitle="Modules" />
+      {showBreadcrumb ? (
+        <BreadcrumbItem mainTitle="FAQs" mainLink={breadcrumbMainLink} subTitle="Modules" />
+      ) : null}
 
       <div className="page-header-title style-2 mb-3">
         <div className="d-flex justify-content-end">

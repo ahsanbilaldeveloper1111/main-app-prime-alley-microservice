@@ -10,7 +10,7 @@ const CampaignDetail = () => {
     if (id) {
       // Redirect to campaigns list with a message
       toast.info("Campaign details are now available in the campaigns list. Use the 'View' action to see details.");
-      router.push("/crm/campaigns");
+      router.push("/main-settings/smart-crm/campaigns");
     }
   }, [id, router]);
 
