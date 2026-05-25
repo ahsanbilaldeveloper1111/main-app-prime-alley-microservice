@@ -1835,73 +1835,82 @@ function initiatorPinnedPayloadIsStaleAfterTerminal(
   );
 }
 
-/**
- * Initiator refill: keep the supervisor's current channel when it is still live or in local-start lag,
- * instead of replacing it with a higher-sequence stale row of another type (e.g. BARGE over WHISPER).
- */
-function initiatorRefillPinnedPayload(
+function resolveInitiatorRefillSameChannelMapPin(
+  pinnedFromMap: MonitoringPayload,
   map: Record<string, unknown>,
-  dnsMap: Record<string, { devices?: Record<string, DnsDevice> } | undefined> | undefined,
+  eventLog: readonly unknown[] | undefined,
+  activeMonitoring: ActiveMonitoring,
+): MonitoringPayload | null | undefined {
+  const sameChannel =
+    normalizeMonitoringTypeForWallboardCompare(pinnedFromMap.monitoringType) ===
+    normalizeMonitoringTypeForWallboardCompare(activeMonitoring.type);
+  if (!sameChannel) {
+    return undefined;
+  }
+  if (
+    supervisionEndedInLogWithoutNewerMapSession(
+      pinnedFromMap,
+      map,
+      eventLog,
+    )
+  ) {
+    return undefined;
+  }
+  if (remoteSupervisionSupersededInCallStateMap(pinnedFromMap, map)) {
+    return pinnedFromMap;
+  }
+  return undefined;
+}
+
+function resolveInitiatorRefillPinnedFromMapSession(
+  pinnedFromMap: MonitoringPayload,
+  map: Record<string, unknown>,
   eventLog: readonly unknown[] | undefined,
   activeMonitoring: ActiveMonitoring,
   base: ResolveEffectiveWallboardMonitoringOptions,
   liveOpts: ResolveEffectiveWallboardMonitoringOptions,
 ): MonitoringPayload | null | undefined {
-  const mapDns = dnsMap ?? base.dnsMap;
-  if (!mapDns) {
+  if (isRemoteSupervisionSessionSuppressed(pinnedFromMap, base)) {
     return undefined;
   }
-  const pinnedFromMap = pickPinnedSupervisionPayloadFromCallStateMap(
+  const remoteLive = isWallboardRemoteSupervisionSessionActive(
+    pinnedFromMap,
     map,
-    mapDns,
-    activeMonitoring,
+    eventLog,
+    liveOpts,
   );
-  if (pinnedFromMap) {
-    if (isRemoteSupervisionSessionSuppressed(pinnedFromMap, base)) {
-      return undefined;
-    }
-    const remoteLive = isWallboardRemoteSupervisionSessionActive(
+  const retainLocal = shouldRetainLocalWallboardMonitoringDuringSseLag(
+    activeMonitoring,
+    eventLog,
+    base,
+  );
+  if (
+    (remoteLive || retainLocal) &&
+    !initiatorPinnedPayloadIsStaleAfterTerminal(
       pinnedFromMap,
       map,
       eventLog,
-      liveOpts,
-    );
-    const retainLocal = shouldRetainLocalWallboardMonitoringDuringSseLag(
       activeMonitoring,
-      eventLog,
-      base,
-    );
-    if (
-      (remoteLive || retainLocal) &&
-      !initiatorPinnedPayloadIsStaleAfterTerminal(
-        pinnedFromMap,
-        map,
-        eventLog,
-        activeMonitoring,
-      )
-    ) {
-      return pinnedFromMap;
-    }
-    const sameChannel =
-      normalizeMonitoringTypeForWallboardCompare(pinnedFromMap.monitoringType) ===
-      normalizeMonitoringTypeForWallboardCompare(activeMonitoring.type);
-    if (!sameChannel) {
-      return undefined;
-    }
-    if (
-      supervisionEndedInLogWithoutNewerMapSession(
-        pinnedFromMap,
-        map,
-        eventLog,
-      )
-    ) {
-      return undefined;
-    }
-    if (remoteSupervisionSupersededInCallStateMap(pinnedFromMap, map)) {
-      return pinnedFromMap;
-    }
-    return undefined;
+    )
+  ) {
+    return pinnedFromMap;
   }
+  return resolveInitiatorRefillSameChannelMapPin(
+    pinnedFromMap,
+    map,
+    eventLog,
+    activeMonitoring,
+  );
+}
+
+function resolveInitiatorRefillFromFallbackPick(
+  map: Record<string, unknown>,
+  mapDns: Record<string, { devices?: Record<string, DnsDevice> } | undefined>,
+  eventLog: readonly unknown[] | undefined,
+  activeMonitoring: ActiveMonitoring,
+  base: ResolveEffectiveWallboardMonitoringOptions,
+  liveOpts: ResolveEffectiveWallboardMonitoringOptions,
+): MonitoringPayload | null | undefined {
   const pinned = pickBestApplicableMonitoringPayload(map, mapDns, eventLog, {
     ...base,
     activeMonitoring,
@@ -1924,6 +1933,47 @@ function initiatorRefillPinnedPayload(
     return pinned;
   }
   return undefined;
+}
+
+/**
+ * Initiator refill: keep the supervisor's current channel when it is still live or in local-start lag,
+ * instead of replacing it with a higher-sequence stale row of another type (e.g. BARGE over WHISPER).
+ */
+function initiatorRefillPinnedPayload(
+  map: Record<string, unknown>,
+  dnsMap: Record<string, { devices?: Record<string, DnsDevice> } | undefined> | undefined,
+  eventLog: readonly unknown[] | undefined,
+  activeMonitoring: ActiveMonitoring,
+  base: ResolveEffectiveWallboardMonitoringOptions,
+  liveOpts: ResolveEffectiveWallboardMonitoringOptions,
+): MonitoringPayload | null | undefined {
+  const mapDns = dnsMap ?? base.dnsMap;
+  if (!mapDns) {
+    return undefined;
+  }
+  const pinnedFromMap = pickPinnedSupervisionPayloadFromCallStateMap(
+    map,
+    mapDns,
+    activeMonitoring,
+  );
+  if (pinnedFromMap) {
+    return resolveInitiatorRefillPinnedFromMapSession(
+      pinnedFromMap,
+      map,
+      eventLog,
+      activeMonitoring,
+      base,
+      liveOpts,
+    );
+  }
+  return resolveInitiatorRefillFromFallbackPick(
+    map,
+    mapDns,
+    eventLog,
+    activeMonitoring,
+    base,
+    liveOpts,
+  );
 }
 
 export function pickMonitoringPayloadForInitiatorRefill(

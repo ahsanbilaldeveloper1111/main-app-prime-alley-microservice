@@ -44,7 +44,7 @@ export const PER_CALL_COST_TABLE_COLUMNS: ReadonlyArray<{
 
 function formatOptionalText(value: string | null | undefined): string {
   const trimmed = value?.trim();
-  return trimmed ? trimmed : "—";
+  return trimmed || "—";
 }
 
 function formatLabelValue(value: string): string {

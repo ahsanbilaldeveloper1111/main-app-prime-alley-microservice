@@ -51,11 +51,14 @@ export const AnalysisTenantConfigTab: React.FC = () => {
   }, [appliedTenantId]);
 
   useEffect(() => {
-    if (!appliedTenantId || queryTenantId !== appliedTenantId || tenantLoading) {
-      return;
+    if (
+      appliedTenantId &&
+      queryTenantId === appliedTenantId &&
+      tenantLoading === false
+    ) {
+      setValues(fetchedFormValues);
+      setFormHydrated(true);
     }
-    setValues(fetchedFormValues);
-    setFormHydrated(true);
   }, [
     appliedTenantId,
     queryTenantId,
@@ -74,7 +77,8 @@ export const AnalysisTenantConfigTab: React.FC = () => {
   }, [saveMutation, tenantData, values]);
 
   const isSaving = saveMutation.isPending;
-  const fieldsDisabled = tenantLoading || !formHydrated || isSaving;
+  const fieldsDisabled =
+    tenantLoading || isSaving || formHydrated === false;
   const lastUpdatedLabel = formatAnalysisLastUpdated(updatedAt);
 
   return (
@@ -96,13 +100,13 @@ export const AnalysisTenantConfigTab: React.FC = () => {
         selectClassPrefix="ai-analysis-tenant-config-company"
       />
 
-      {!appliedTenantId ? (
+      {appliedTenantId ? null : (
         <p className="ai-analysis-tenant-config__hint">
           Select a company and apply the filter to edit tenant settings.
         </p>
-      ) : null}
+      )}
 
-      {appliedTenantId && tenantLoading && !formHydrated ? (
+      {appliedTenantId && tenantLoading && formHydrated === false ? (
         <AnalysisFormSkeleton fields={tenantFormSkeletonFields()} />
       ) : null}
 
@@ -123,11 +127,11 @@ export const AnalysisTenantConfigTab: React.FC = () => {
 
       {appliedTenantId && tenantLoaded && formHydrated ? (
         <>
-          {!hasApiData ? (
+          {hasApiData ? null : (
             <p className="ai-analysis-tenant-config__hint">
               No tenant settings returned — enter values and save to create settings.
             </p>
-          ) : null}
+          )}
 
           <div key={appliedTenantId} className="ai-analysis-tenant-config__grid">
             <TenantField
