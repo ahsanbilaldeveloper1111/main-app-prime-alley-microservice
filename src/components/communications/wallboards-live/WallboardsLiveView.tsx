@@ -775,12 +775,18 @@ const WallboardsLiveView: React.FC = () => {
   const clearMonitoringState = useCallback((monitoredDn: string, reason: string = 'call ended') => {
     console.log('[Monitoring] clearMonitoringState called', { monitoredDn, reason })
     const snap = activeMonitoringRef.current
-    const sessionKey =
-      snap.monitor && snap.type
-        ? wallboardMonitoringSessionKey(snap.monitor, monitoredDn, snap.type)
-        : snap.monitor
-          ? `${snap.monitor}:${monitoredDn}`
-          : `*:${monitoredDn}`
+    let sessionKey: string
+    if (snap.monitor && snap.type) {
+      sessionKey = wallboardMonitoringSessionKey(
+        snap.monitor,
+        monitoredDn,
+        snap.type,
+      )
+    } else if (snap.monitor) {
+      sessionKey = `${snap.monitor}:${monitoredDn}`
+    } else {
+      sessionKey = `*:${monitoredDn}`
+    }
     suppressedMonitoringRefillKeyRef.current = sessionKey
     setSuppressedMonitoringKey(sessionKey)
     monitoringSnapshotAppliedRef.current = false
