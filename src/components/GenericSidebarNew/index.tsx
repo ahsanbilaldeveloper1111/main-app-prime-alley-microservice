@@ -331,24 +331,19 @@ const RecentActivitiesSection = ({
             <div
               key={entry.id ?? index}
               style={{
-                padding: "10px 0",
-                marginBottom: index < displayTrail.length - 1 ? "10px" : 0,
+                padding: "10px 12px",
+                marginBottom: index < displayTrail.length - 1 ? "8px" : 0,
                 minWidth: 0,
+                border: "1px solid #e2e8f0",
+                borderRadius: "6px",
+                backgroundColor: "#ffffff",
               }}
             >
               <p
-                style={{
-                  fontSize: "14px",
-                  color: "#141414",
-                  margin: "0 0 8px 0",
-                  lineHeight: "1.6",
-                  whiteSpace: "pre-wrap",
-                  overflowWrap: "break-word",
-                  wordBreak: "break-word",
-                }}
+                style={{ fontSize: "13px", color: "#141414", margin: "0 0 4px 0", fontWeight: "500" }}
                 dangerouslySetInnerHTML={{ __html: description }}
               />
-              <span style={{ fontSize: "12px", color: "#718096" }}>
+              <span style={{ fontSize: "11px", color: "#718096" }}>
                 {timestampWithUser}
               </span>
             </div>
