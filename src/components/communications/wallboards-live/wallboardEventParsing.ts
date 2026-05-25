@@ -12,6 +12,7 @@ import {
   isCtiSupervisionMonitoringType,
   partyIsLiveCtiParty,
 } from "@utils/ctiMonitoringCallParties";
+import { wallboardDebugLog } from "@components/communications/wallboards-live/wallboardDebugLog";
 export { callHasLiveAgentPartyWithNonSupervisor } from "@utils/ctiMonitoringCallParties";
 
 export type RegisteredDeviceEntry = {
@@ -1775,30 +1776,141 @@ export function pickPinnedSupervisionPayloadFromCallStateMap(
   return best?.payload ?? null;
 }
 
-/**
- * Initiator refill: keep the supervisor's current channel when it is still live or in local-start lag,
- * instead of replacing it with a higher-sequence stale row of another type (e.g. BARGE over WHISPER).
- */
-function initiatorRefillPinnedPayload(
+function initiatorPinnedPayloadIsStaleAfterTerminal(
+  payload: MonitoringPayload,
   map: Record<string, unknown>,
-  dnsMap: Record<string, { devices?: Record<string, DnsDevice> } | undefined> | undefined,
+  eventLog: readonly unknown[] | undefined,
+  activeMonitoring: ActiveMonitoring,
+): boolean {
+  if (
+    supervisionEndedInLogWithoutNewerMapSession(payload, map, eventLog)
+  ) {
+    return true;
+  }
+  const payloadNorm = normalizeMonitoringTypeForWallboardCompare(
+    payload.monitoringType,
+  );
+  const activeNorm = normalizeMonitoringTypeForWallboardCompare(
+    activeMonitoring.type,
+  );
+  if (
+    isSilentOrWhisperMonitoringType(payload.monitoringType) &&
+    activeNorm &&
+    payloadNorm &&
+    activeNorm === payloadNorm &&
+    callStateMapHasSupervisionMonitoringFlagForPair(
+      map,
+      payload.monitorDn,
+      payload.monitoredDn,
+    )
+  ) {
+    return false;
+  }
+  const snapshot: WallboardRetainLocalSnapshot = {
+    dn: payload.monitoredDn,
+    monitor: payload.monitorDn,
+    deviceName: payload.monitoredDeviceName,
+    type: payload.monitoringType,
+  };
+  const lastTerminalIdx = findLatestTerminalMonitoringEventIndexForActive(
+    eventLog ?? [],
+    snapshot,
+  );
+  if (lastTerminalIdx < 0) {
+    return false;
+  }
+  if (
+    findMonitoringSessionStartAfterIndex(eventLog ?? [], snapshot, lastTerminalIdx) >=
+    0
+  ) {
+    return false;
+  }
+  return (
+    !supervisionSessionHasLiveSupervisorAgentLeg(map, payload) &&
+    !monitoredAgentCustomerConversationLiveInCallStateMap(
+      map,
+      payload.monitoredDn,
+      payload.monitorDn,
+    )
+  );
+}
+
+function resolveInitiatorRefillSameChannelMapPin(
+  pinnedFromMap: MonitoringPayload,
+  map: Record<string, unknown>,
+  eventLog: readonly unknown[] | undefined,
+  activeMonitoring: ActiveMonitoring,
+): MonitoringPayload | null | undefined {
+  const sameChannel =
+    normalizeMonitoringTypeForWallboardCompare(pinnedFromMap.monitoringType) ===
+    normalizeMonitoringTypeForWallboardCompare(activeMonitoring.type);
+  if (!sameChannel) {
+    return undefined;
+  }
+  if (
+    supervisionEndedInLogWithoutNewerMapSession(
+      pinnedFromMap,
+      map,
+      eventLog,
+    )
+  ) {
+    return undefined;
+  }
+  if (remoteSupervisionSupersededInCallStateMap(pinnedFromMap, map)) {
+    return pinnedFromMap;
+  }
+  return undefined;
+}
+
+function resolveInitiatorRefillPinnedFromMapSession(
+  pinnedFromMap: MonitoringPayload,
+  map: Record<string, unknown>,
   eventLog: readonly unknown[] | undefined,
   activeMonitoring: ActiveMonitoring,
   base: ResolveEffectiveWallboardMonitoringOptions,
   liveOpts: ResolveEffectiveWallboardMonitoringOptions,
 ): MonitoringPayload | null | undefined {
-  const mapDns = dnsMap ?? base.dnsMap;
-  if (!mapDns) {
+  if (isRemoteSupervisionSessionSuppressed(pinnedFromMap, base)) {
     return undefined;
   }
-  const pinnedFromMap = pickPinnedSupervisionPayloadFromCallStateMap(
+  const remoteLive = isWallboardRemoteSupervisionSessionActive(
+    pinnedFromMap,
     map,
-    mapDns,
-    activeMonitoring,
+    eventLog,
+    liveOpts,
   );
-  if (pinnedFromMap) {
+  const retainLocal = shouldRetainLocalWallboardMonitoringDuringSseLag(
+    activeMonitoring,
+    eventLog,
+    base,
+  );
+  if (
+    (remoteLive || retainLocal) &&
+    !initiatorPinnedPayloadIsStaleAfterTerminal(
+      pinnedFromMap,
+      map,
+      eventLog,
+      activeMonitoring,
+    )
+  ) {
     return pinnedFromMap;
   }
+  return resolveInitiatorRefillSameChannelMapPin(
+    pinnedFromMap,
+    map,
+    eventLog,
+    activeMonitoring,
+  );
+}
+
+function resolveInitiatorRefillFromFallbackPick(
+  map: Record<string, unknown>,
+  mapDns: Record<string, { devices?: Record<string, DnsDevice> } | undefined>,
+  eventLog: readonly unknown[] | undefined,
+  activeMonitoring: ActiveMonitoring,
+  base: ResolveEffectiveWallboardMonitoringOptions,
+  liveOpts: ResolveEffectiveWallboardMonitoringOptions,
+): MonitoringPayload | null | undefined {
   const pinned = pickBestApplicableMonitoringPayload(map, mapDns, eventLog, {
     ...base,
     activeMonitoring,
@@ -1821,6 +1933,47 @@ function initiatorRefillPinnedPayload(
     return pinned;
   }
   return undefined;
+}
+
+/**
+ * Initiator refill: keep the supervisor's current channel when it is still live or in local-start lag,
+ * instead of replacing it with a higher-sequence stale row of another type (e.g. BARGE over WHISPER).
+ */
+function initiatorRefillPinnedPayload(
+  map: Record<string, unknown>,
+  dnsMap: Record<string, { devices?: Record<string, DnsDevice> } | undefined> | undefined,
+  eventLog: readonly unknown[] | undefined,
+  activeMonitoring: ActiveMonitoring,
+  base: ResolveEffectiveWallboardMonitoringOptions,
+  liveOpts: ResolveEffectiveWallboardMonitoringOptions,
+): MonitoringPayload | null | undefined {
+  const mapDns = dnsMap ?? base.dnsMap;
+  if (!mapDns) {
+    return undefined;
+  }
+  const pinnedFromMap = pickPinnedSupervisionPayloadFromCallStateMap(
+    map,
+    mapDns,
+    activeMonitoring,
+  );
+  if (pinnedFromMap) {
+    return resolveInitiatorRefillPinnedFromMapSession(
+      pinnedFromMap,
+      map,
+      eventLog,
+      activeMonitoring,
+      base,
+      liveOpts,
+    );
+  }
+  return resolveInitiatorRefillFromFallbackPick(
+    map,
+    mapDns,
+    eventLog,
+    activeMonitoring,
+    base,
+    liveOpts,
+  );
 }
 
 export function pickMonitoringPayloadForInitiatorRefill(
@@ -1861,7 +2014,7 @@ export function pickMonitoringPayloadForInitiatorRefill(
     }
   }
 
-  return pickBestApplicableMonitoringPayload(map, dnsMap, eventLog, {
+  const fallback = pickBestApplicableMonitoringPayload(map, dnsMap, eventLog, {
     ...base,
     activeMonitoring: {
       dn: activeMonitoring.dn,
@@ -1872,6 +2025,24 @@ export function pickMonitoringPayloadForInitiatorRefill(
     activeMonitoringType: null,
     effectiveMonitoringType: null,
   });
+  if (
+    !fallback ||
+    !activeMonitoring.type ||
+    isWallboardRemoteSupervisionSessionActive(
+      fallback,
+      map,
+      eventLog,
+      liveOpts,
+    ) ||
+    shouldRetainLocalWallboardMonitoringDuringSseLag(
+      activeMonitoring,
+      eventLog,
+      base,
+    )
+  ) {
+    return fallback;
+  }
+  return null;
 }
 
 function streamPayloadFromOptions(
@@ -2393,6 +2564,27 @@ export function deriveWallboardMonitoringState(
     streamOpts,
   );
 
+  if (
+    local.type &&
+    normalizeMonitoringTypeForWallboardCompare(local.type) === "SILENT" &&
+    (!ui.type || !supervisionSessionActive)
+  ) {
+    // #region agent log
+    wallboardDebugLog(
+      "H",
+      "wallboardEventParsing.ts:deriveWallboardMonitoringState:silent-missing-ui",
+      "initiator SILENT without ui or sessionActive",
+      {
+        activeType: local.type,
+        effectiveType: effective.type,
+        uiType: ui.type,
+        supervisionSessionActive,
+        viewer: options?.viewerUserAddress ?? null,
+      },
+    );
+    // #endregion
+  }
+
   return { effective, ui, supervisionSessionActive };
 }
 
@@ -2574,6 +2766,10 @@ export function shouldSkipMonitoringRefillTypeDowngrade(
   if (!monitoringPayloadDiffersFromActive(activeMonitoring, incoming)) {
     return false;
   }
+  const activeNorm = normalizeMonitoringTypeForWallboardCompare(activeMonitoring.type);
+  const incomingNorm = normalizeMonitoringTypeForWallboardCompare(
+    incoming.monitoringType,
+  );
   const pairMaxSeq = bestSupervisionSequenceForPairInCallStateMap(
     callStateMap,
     activeMonitoring.monitor,
@@ -2585,6 +2781,16 @@ export function shouldSkipMonitoringRefillTypeDowngrade(
     incoming.monitoredDn,
     incoming.monitoringType,
   );
+  if (
+    activeNorm &&
+    incomingNorm &&
+    activeNorm !== incomingNorm &&
+    pairMaxSeq != null &&
+    incomingSeq != null &&
+    incomingSeq >= pairMaxSeq
+  ) {
+    return false;
+  }
   const activeSeq = supervisionSequenceForPairAndTypeInCallStateMap(
     callStateMap,
     activeMonitoring.monitor,

@@ -1,35 +1,53 @@
 import type { AnalysisPerCallCostFilters } from "@utils/aiAnalytics";
 
 export type PerCallCostFilterForm = {
-  tenantId: string;
   dateFrom: string;
   dateTo: string;
   status: "" | "success" | "failed";
-  limit: string;
 };
 
-export const DEFAULT_PER_CALL_LIMIT = 100;
+/** Matches call logs table pagination options. */
+export const PER_CALL_TABLE_PAGE_SIZE_OPTIONS = [10, 15, 25, 50, 100] as const;
+
+export const DEFAULT_PER_CALL_ROWS_PER_PAGE = 15;
+
+export type PerCallCostTablePaginationState = {
+  currentPage: number;
+  rowsPerPage: number;
+  totalRows: number;
+  pageSizeOptions: number[];
+};
 
 export function defaultPerCallCostFilterForm(): PerCallCostFilterForm {
   return {
-    tenantId: "",
     dateFrom: "",
     dateTo: "",
     status: "",
-    limit: String(DEFAULT_PER_CALL_LIMIT),
+  };
+}
+
+export function defaultPerCallCostTablePagination(): PerCallCostTablePaginationState {
+  return {
+    currentPage: 1,
+    rowsPerPage: DEFAULT_PER_CALL_ROWS_PER_PAGE,
+    totalRows: 0,
+    pageSizeOptions: [...PER_CALL_TABLE_PAGE_SIZE_OPTIONS],
   };
 }
 
 export function toAppliedPerCallCostFilters(
   form: PerCallCostFilterForm,
-  offset: number,
+  currentPage: number,
+  rowsPerPage: number,
 ): AnalysisPerCallCostFilters {
-  const filters: AnalysisPerCallCostFilters = { offset };
+  const limit = Math.min(500, Math.max(1, rowsPerPage));
+  const page = Math.max(1, currentPage);
 
-  const tenantId = form.tenantId.trim();
-  if (tenantId) {
-    filters.tenant_id = tenantId;
-  }
+  const filters: AnalysisPerCallCostFilters = {
+    limit,
+    offset: (page - 1) * limit,
+  };
+
   const dateFrom = form.dateFrom.trim();
   if (dateFrom) {
     filters.date_from = dateFrom;
@@ -41,11 +59,6 @@ export function toAppliedPerCallCostFilters(
   if (form.status === "success" || form.status === "failed") {
     filters.status = form.status;
   }
-  const limitRaw = form.limit.trim();
-  const parsedLimit = limitRaw
-    ? Number.parseInt(limitRaw, 10)
-    : DEFAULT_PER_CALL_LIMIT;
-  filters.limit = Number.isFinite(parsedLimit) ? parsedLimit : DEFAULT_PER_CALL_LIMIT;
 
   return filters;
 }

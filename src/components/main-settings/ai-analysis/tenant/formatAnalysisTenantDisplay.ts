@@ -1,17 +1,8 @@
 import type { AnalysisTenantRecord } from "@utils/aiAnalytics";
 
-const TOKENS_PER_MILLION = 1_000_000;
+import { formatAnalysisTimestamp } from "../shared/formatAnalysisTimestamp";
 
-function formatTimestamp(value: string | null): string {
-  if (!value?.trim()) {
-    return "—";
-  }
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return value;
-  }
-  return date.toLocaleString();
-}
+const TOKENS_PER_MILLION = 1_000_000;
 
 function formatUsd(value: number | null): string {
   if (value == null || !Number.isFinite(value)) {
@@ -57,9 +48,9 @@ export function formatTenantTableCell(
     case "cost_limit_usd":
       return `$${row.cost_limit_usd.toFixed(2)}`;
     case "created_at":
-      return formatTimestamp(row.created_at);
+      return formatAnalysisTimestamp(row.created_at);
     case "updated_at":
-      return formatTimestamp(row.updated_at);
+      return formatAnalysisTimestamp(row.updated_at);
     case "input_override":
       return formatPerMillionOverride(row.cost_per_input_token_usd);
     case "output_override":
