@@ -1,13 +1,9 @@
 import { resolveChatTenantIdFromSession } from "@components/main-settings/ai-chatbot-settings/resolveChatTenantId";
-import {
-  findChatCompanySelectOption,
-  mapChatCompaniesToSelectOptions,
-} from "@page-modules/chat/shared/chatCompanySelectOptions";
-import { useChatCompaniesQuery } from "@page-modules/chat/useChatCompaniesQuery";
-import type { AnalysisMonthlyRollupFilters } from "@utils/aiAnalytics";
 import { useSession } from "next-auth/react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "react-toastify";
+
+import type { AnalysisMonthlyRollupFilters } from "@utils/aiAnalytics";
 
 import {
   defaultMonthlyRollupFilterForm,
@@ -41,52 +37,27 @@ export function useAIAnalysisMonthlyRollupPage() {
     [session?.user],
   );
 
-  const companiesQuery = useChatCompaniesQuery(sessionStatus === "authenticated");
-  const companies = companiesQuery.data ?? [];
-  const companiesLoading = companiesQuery.isPending;
-
   const [filterForm, setFilterForm] = useState(defaultMonthlyRollupFilterForm);
-  const [appliedFilters, setAppliedFilters] = useState<AnalysisMonthlyRollupFilters>(
-    {},
+  const [appliedFilterForm, setAppliedFilterForm] = useState(
+    defaultMonthlyRollupFilterForm,
   );
   const [filtersApplied, setFiltersApplied] = useState(false);
 
+  const appliedFilters = useMemo(
+    () => toAppliedMonthlyRollupFilters(appliedFilterForm, sessionTenantId),
+    [appliedFilterForm, sessionTenantId],
+  );
+
   useEffect(() => {
     if (sessionStatus !== "authenticated") return;
-    setAppliedFilters(toAppliedMonthlyRollupFilters(defaultMonthlyRollupFilterForm()));
+    setAppliedFilterForm(defaultMonthlyRollupFilterForm());
     setFiltersApplied(true);
   }, [sessionStatus]);
 
-  useEffect(() => {
-    if (!sessionTenantId) return;
-    setFilterForm((prev) => ({
-      ...prev,
-      tenantId: prev.tenantId || sessionTenantId,
-    }));
-    setAppliedFilters((prev) =>
-      prev.tenant_id ? prev : { ...prev, tenant_id: sessionTenantId },
-    );
-    setFiltersApplied(true);
-  }, [sessionTenantId]);
-
   const rollupQuery = useAnalysisMonthlyRollupQuery(
     appliedFilters,
-    sessionStatus === "authenticated" && filtersApplied,
+    sessionStatus === "authenticated" && filtersApplied && Boolean(sessionTenantId),
   );
-
-  const companyOptions = useMemo(
-    () => mapChatCompaniesToSelectOptions(companies),
-    [companies],
-  );
-
-  const selectedCompanyOption = useMemo(() => {
-    if (!filterForm.tenantId) return null;
-    return findChatCompanySelectOption(companies, filterForm.tenantId);
-  }, [companies, filterForm.tenantId]);
-
-  const handleCompanySelect = useCallback((companyId: string) => {
-    setFilterForm((prev) => ({ ...prev, tenantId: companyId.trim() }));
-  }, []);
 
   const handleApplyFilter = useCallback(() => {
     const validationError = parseFilterForm(filterForm);
@@ -94,7 +65,7 @@ export function useAIAnalysisMonthlyRollupPage() {
       toast.error(validationError);
       return;
     }
-    setAppliedFilters(toAppliedMonthlyRollupFilters(filterForm));
+    setAppliedFilterForm(filterForm);
     setFiltersApplied(true);
   }, [filterForm]);
 
@@ -109,14 +80,11 @@ export function useAIAnalysisMonthlyRollupPage() {
   );
 
   return {
-    companiesLoading,
-    companyOptions,
-    selectedCompanyOption,
     filterForm,
     updateFilterField,
-    handleCompanySelect,
     handleApplyFilter,
     rollupQuery,
     filtersApplied,
+    sessionTenantId,
   };
 }

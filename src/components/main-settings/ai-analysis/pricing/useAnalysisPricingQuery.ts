@@ -6,14 +6,13 @@ import { useMemo } from "react";
 
 import { mapAnalysisPricingToFormValues } from "./mapAnalysisPricing";
 
-export function useAnalysisPricingQuery(appliedTenantId: string) {
+export function useAnalysisPricingQuery() {
   const { status: sessionStatus } = useSession();
-  const tenantId = appliedTenantId.trim();
 
   const query = useQuery({
-    queryKey: aiAnalyticsKeys.costPricing.detail(tenantId),
-    queryFn: () => getAnalysisCostPricing(tenantId),
-    enabled: sessionStatus === "authenticated" && Boolean(tenantId),
+    queryKey: aiAnalyticsKeys.costPricing.detail(),
+    queryFn: () => getAnalysisCostPricing(),
+    enabled: sessionStatus === "authenticated",
     staleTime: 60_000,
   });
 
@@ -24,7 +23,6 @@ export function useAnalysisPricingQuery(appliedTenantId: string) {
 
   return {
     ...query,
-    tenantId,
     formValues,
     updatedAt: query.data?.updated_at ?? null,
     hasApiData: query.data != null,

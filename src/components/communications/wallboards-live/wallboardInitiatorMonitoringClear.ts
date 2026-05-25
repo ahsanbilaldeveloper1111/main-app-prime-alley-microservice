@@ -10,7 +10,6 @@ import {
   shouldRetainLocalWallboardMonitoringDuringSseLag,
   type ResolveEffectiveWallboardMonitoringOptions,
 } from "@components/communications/wallboards-live/wallboardEventParsing";
-
 export type InitiatorMonitoringClearDecision =
   | { action: "none" }
   | { action: "clear" }

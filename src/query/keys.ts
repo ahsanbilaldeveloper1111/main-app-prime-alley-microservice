@@ -796,8 +796,7 @@ export const aiAnalyticsKeys = {
   root: ["aiAnalytics"] as const,
   costPricing: {
     all: () => [...aiAnalyticsKeys.root, "costPricing"] as const,
-    detail: (tenantId: string) =>
-      [...aiAnalyticsKeys.costPricing.all(), tenantId || "__none__"] as const,
+    detail: () => [...aiAnalyticsKeys.costPricing.all(), "detail"] as const,
   },
   tenants: {
     all: () => [...aiAnalyticsKeys.root, "tenants"] as const,
@@ -834,7 +833,7 @@ export const aiAnalyticsKeys = {
         filters.date_from ?? "",
         filters.date_to ?? "",
         filters.status ?? "",
-        filters.limit ?? 100,
+        filters.limit ?? 15,
         filters.offset ?? 0,
       ] as const,
   },

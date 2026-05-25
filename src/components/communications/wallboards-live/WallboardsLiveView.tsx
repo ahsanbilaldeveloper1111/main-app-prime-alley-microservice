@@ -56,6 +56,7 @@ import {
 import { executeMonitoring } from '@components/live-calls/utils/monitoringHelpers'
 import { animateCardMove as animateCardMoveHelper } from '@components/live-calls/utils/animationHelpers'
 import { evaluateInitiatorMonitoringClear } from '@components/communications/wallboards-live/wallboardInitiatorMonitoringClear'
+import { wallboardDebugLog } from '@components/communications/wallboards-live/wallboardDebugLog'
 
 const WallboardsLiveView: React.FC = () => {
   const { data:session, status } = useSession();
@@ -826,6 +827,25 @@ const WallboardsLiveView: React.FC = () => {
       },
     )
     if (!payload) {
+      if (
+        activeMonitoring.type &&
+        isWallboardSupervisionInitiator(userAddress, activeMonitoring.monitor)
+      ) {
+        // #region agent log
+        wallboardDebugLog(
+          'H',
+          'WallboardsLiveView.tsx:refill-no-payload',
+          'initiator refill returned null',
+          {
+            activeType: activeMonitoring.type,
+            dn: activeMonitoring.dn,
+            monitor: activeMonitoring.monitor,
+            suppressedKey: suppressedMonitoringRefillKeyRef.current,
+            hasTeardown: Boolean(monitoringTeardown),
+          },
+        )
+        // #endregion
+      }
       return
     }
 
@@ -907,6 +927,17 @@ const WallboardsLiveView: React.FC = () => {
         callStateMap as Record<string, unknown>,
       )
     ) {
+      // #region agent log
+      wallboardDebugLog(
+        'H',
+        'WallboardsLiveView.tsx:refill-skip-downgrade',
+        'refill blocked by type downgrade guard',
+        {
+          activeType: activeMonitoring.type,
+          payloadType: payload.monitoringType,
+        },
+      )
+      // #endregion
       return
     }
 

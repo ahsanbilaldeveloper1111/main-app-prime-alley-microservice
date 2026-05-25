@@ -1425,6 +1425,120 @@ describe("wallboard supervision live events", () => {
     ).toBe("WHISPER");
   });
 
+  it("pickMonitoringPayloadForInitiatorRefill returns SILENT after WHISPER when active is SILENT and map has flag", () => {
+    const callStateMap = {
+      whisper: {
+        isMonitoring: true,
+        sequence: 50,
+        monitoring: {
+          monitoringType: "WHISPER",
+          monitorDn: "9001",
+          monitoredDn: "1001",
+        },
+        parties: [
+          {
+            callStatus: "CONNECTED",
+            callingAddress: "9001",
+            calledAddress: "1001",
+          },
+        ],
+      },
+      silent: {
+        isMonitoring: true,
+        sequence: 55,
+        monitoring: {
+          monitoringType: "SILENT",
+          monitorDn: "9001",
+          monitoredDn: "1001",
+        },
+        parties: [],
+      },
+    };
+    const eventLog = [
+      {
+        sequence: 50,
+        eventType: "MONITORING_ENDED",
+        isMonitoring: false,
+        monitoring: {
+          monitoringType: "WHISPER",
+          monitorDn: "9001",
+          monitoredDn: "1001",
+        },
+      },
+      {
+        sequence: 55,
+        isMonitoring: true,
+        monitoring: {
+          monitoringType: "SILENT",
+          monitorDn: "9001",
+          monitoredDn: "1001",
+        },
+      },
+    ];
+    const active = {
+      dn: "1001",
+      type: "SILENT",
+      monitor: "9001",
+      deviceName: "AGT",
+    };
+    expect(
+      pickMonitoringPayloadForInitiatorRefill(
+        callStateMap,
+        dnsMap,
+        eventLog,
+        active,
+        { viewerUserAddress: "9001" },
+      )?.monitoringType,
+    ).toBe("SILENT");
+    expect(
+      deriveWallboardMonitoringState(active, callStateMap, dnsMap, eventLog, {
+        viewerUserAddress: "9001",
+      }).supervisionSessionActive,
+    ).toBe(true);
+  });
+
+  it("pickMonitoringPayloadForInitiatorRefill skips stale SILENT pin after terminal clear", () => {
+    const callStateMap = {
+      stale: {
+        isMonitoring: true,
+        sequence: 7126,
+        monitoring: {
+          monitoringType: "SILENT",
+          monitorDn: "9001",
+          monitoredDn: "1001",
+        },
+        parties: [],
+      },
+    };
+    const eventLog = [
+      {
+        sequence: 7126,
+        eventType: "MONITORING_ENDED",
+        isMonitoring: false,
+        monitoring: {
+          monitoringType: "SILENT",
+          monitorDn: "9001",
+          monitoredDn: "1001",
+        },
+      },
+    ];
+    const active = {
+      dn: "1001",
+      type: "SILENT",
+      monitor: "9001",
+      deviceName: "AGT",
+    };
+    expect(
+      pickMonitoringPayloadForInitiatorRefill(
+        callStateMap,
+        dnsMap,
+        eventLog,
+        active,
+        { viewerUserAddress: "9001" },
+      ),
+    ).toBeNull();
+  });
+
   it("prefers WHISPER over older BARGE_IN in callStateMap by sequence", () => {
     const callStateMap = {
       barge: {
