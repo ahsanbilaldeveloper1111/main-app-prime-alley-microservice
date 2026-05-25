@@ -6204,7 +6204,10 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
   // Always show the section; when summary is missing/empty, the UI will display a fallback message.
   const recordSummary: RecordSummaryDisplay = {
     content: (crmSummary?.summary ?? "").trim(),
-    timestamp: "",
+    timestamp: crmSummary ? `Generated ${new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit" })}` : "",
+    onRefresh: () => {
+      globalThis.window?.dispatchEvent(new CustomEvent("breeze-summary:refresh"));
+    },
     onCopy: () => {
       void copyToClipboard(crmSummary?.summary ?? "");
     },
@@ -9004,18 +9007,26 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
               {!collapsedSections.has("breeze-summary") && (
                 <div
                   style={{
-                    padding: "20px",
+                    padding: "8px 12px",
                   }}
                 >
+                  <div
+                    style={{
+                      border: "1px solid #ff9fcc",
+                      borderRadius: "8px",
+                      padding: "10px 12px",
+                      backgroundColor: "#ffffff",
+                    }}
+                  >
                   {(recordSummary.timestamp || recordSummary.onRefresh) && (
                     <div
                       style={{
                         display: "flex",
                         alignItems: "center",
                         gap: "6px",
-                        fontSize: "13px",
-                        color: "#141414",
-                        marginBottom: "12px",
+                        fontSize: "12px",
+                        color: "#718096",
+                        marginBottom: "8px",
                       }}
                     >
                       {recordSummary.timestamp && (
@@ -9047,8 +9058,8 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
                       color: recordSummary.content ? "#141414" : "#718096",
                       lineHeight: "1.6",
                       marginBottom: "16px",
-                      border: recordSummary.content ? "1px solid #ff9fcc" : "none",
-                      padding: recordSummary.content ? "18px 20px" : "0 20px",
+                      border: "none",
+                      padding: recordSummary.content ? "8px 0" : "0",
                       borderRadius: "5px",
                       overflowWrap: "break-word",
                       wordBreak: "break-word",
@@ -9065,7 +9076,7 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
                           display: "flex",
                           alignItems: "center",
                           gap: "8px",
-                          paddingTop: "12px",
+                          paddingTop: "8px",
                           borderTop: "1px solid #fee",
                         }}
                       >
@@ -9146,7 +9157,7 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
                       <button
                         onClick={() => recordSummary.onAskQuestion?.()}
                         style={{
-                          marginTop: "16px",
+                          marginTop: "8px",
                           width: "36%",
                           padding: "6px 0",
                           backgroundColor: "transparent",
@@ -9174,7 +9185,8 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
                       </button>
                     </>
                   )}
-                </div>
+                  </div>
+              </div>
               )}
             </div>
           )}
