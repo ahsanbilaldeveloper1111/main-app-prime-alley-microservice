@@ -27,6 +27,14 @@ import { FiEdit, FiTrash2, FiEye } from 'react-icons/fi';
 import { HEADER_CONSTANTS } from '@constants/headerConstants';
 
 // Helper function to get badge colors based on severity level
+function readDisplayLabel(value: unknown): string {
+    if (typeof value === 'string') return value;
+    if (typeof value === 'number') return String(value);
+    if (typeof value !== 'object' || value === null || !('name' in value)) return '';
+    const name = Reflect.get(value, 'name');
+    return typeof name === 'string' ? name : '';
+}
+
 const getSeverityBadgeColors = (severityLevel: string): { bg: string; text: string } => {
     const level = severityLevel?.toLowerCase();
     switch (level) {
@@ -140,12 +148,7 @@ const RanksPanel = () => {
                 label: 'Severity Level',
                 accessor: (row) => {
                     const v = (row as unknown as Record<string, unknown>).severity_level;
-                    if (typeof v === 'string') return v;
-                    if (typeof v === 'number') return String(v);
-                    if (v && typeof v === 'object' && 'name' in v && typeof (v as { name: unknown }).name === 'string') {
-                        return (v as { name: string }).name;
-                    }
-                    return '';
+                    return readDisplayLabel(v);
                 },
                 sortable: true,
                 render: (props) => {
@@ -216,11 +219,7 @@ const RanksPanel = () => {
                     label: 'Created By',
                     accessor: (row: RankRow) => {
                         const c = (row as unknown as Record<string, unknown>).company;
-                        if (typeof c === 'string') return c;
-                        if (c && typeof c === 'object' && 'name' in c && typeof (c as { name: unknown }).name === 'string') {
-                            return (c as { name: string }).name;
-                        }
-                        return '';
+                        return readDisplayLabel(c);
                     },
                     sortable: true,
                 },
