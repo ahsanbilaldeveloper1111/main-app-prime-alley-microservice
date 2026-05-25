@@ -262,7 +262,7 @@ const RecentActivitiesSection = ({
             style={{
               marginTop: "12px",
               padding: "8px 16px",
-              backgroundColor: "#0091ae",
+              backgroundColor: "#0066CC",
               color: "white",
               border: "none",
               borderRadius: "4px",
@@ -356,7 +356,7 @@ const RecentActivitiesSection = ({
           style={{
             marginTop: "8px",
             padding: "8px 16px",
-            backgroundColor: "#0091ae",
+            backgroundColor: "#0066CC",
             color: "white",
             border: "none",
             borderRadius: "4px",
@@ -576,7 +576,7 @@ function renderCallsSection(options: {
               style={{
                 marginTop: "8px",
                 padding: "8px 16px",
-                backgroundColor: "#0091ae",
+                backgroundColor: "#0066CC",
                 color: "white",
                 border: "none",
                 borderRadius: "4px",
@@ -624,7 +624,7 @@ function renderCallsSection(options: {
             style={{
               marginTop: "12px",
               padding: "8px 16px",
-              backgroundColor: "#0091ae",
+              backgroundColor: "#0066CC",
               color: "white",
               border: "none",
               borderRadius: "4px",
@@ -677,7 +677,7 @@ function renderGenericSectionContent(
             style={{
               marginTop: "12px",
               padding: "8px 16px",
-              backgroundColor: "#0091ae",
+              backgroundColor: "#0066CC",
               color: "white",
               border: "none",
               borderRadius: "4px",
@@ -781,7 +781,7 @@ function renderGenericSectionContent(
             }}
             style={{
               padding: "8px 16px",
-              backgroundColor: "#0091ae",
+              backgroundColor: "#0066CC",
               color: "white",
               border: "none",
               borderRadius: "4px",
@@ -2506,7 +2506,7 @@ const UrlInputModal: React.FC<UrlInputModalProps> = ({
           onClick={handleSubmit}
           style={{
             padding: "8px 16px",
-            backgroundColor: "#0091ae",
+            backgroundColor: "#0066CC",
             color: "#ffffff",
             border: "none",
             borderRadius: "4px",
@@ -8020,7 +8020,7 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
                           style={{
                             marginTop: "12px",
                             padding: "8px 16px",
-                            backgroundColor: "#0091ae",
+                            backgroundColor: "#0066CC",
                             color: "white",
                             border: "none",
                             borderRadius: "4px",
