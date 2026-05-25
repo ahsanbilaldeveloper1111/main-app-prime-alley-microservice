@@ -12,7 +12,6 @@ import {
   isCtiSupervisionMonitoringType,
   partyIsLiveCtiParty,
 } from "@utils/ctiMonitoringCallParties";
-import { wallboardDebugLog } from "@components/communications/wallboards-live/wallboardDebugLog";
 export { callHasLiveAgentPartyWithNonSupervisor } from "@utils/ctiMonitoringCallParties";
 
 export type RegisteredDeviceEntry = {
@@ -421,7 +420,7 @@ export function computeNextIdleSinceMap(
   return next;
 }
 
-function normalizeMonitoringTypeForWallboardCompare(
+export function normalizeMonitoringTypeForWallboardCompare(
   t: string | null | undefined,
 ): string {
   if (t == null || t === "") {
@@ -463,7 +462,7 @@ export function wallboardMonitoringSessionKeyMatchesSuppressed(
   return suppressedKey.startsWith(`${pairKey}:`);
 }
 
-function monitoringTypeFromSuppressedSessionKey(
+export function monitoringTypeFromSuppressedSessionKey(
   suppressedKey: string,
 ): string | null {
   const parts = suppressedKey.split(":");
@@ -494,17 +493,34 @@ export function shouldBlockMonitoringRefillDueToSuppression(
   }
   const activeNorm = normalizeMonitoringTypeForWallboardCompare(activeType);
   const incomingNorm = normalizeMonitoringTypeForWallboardCompare(incomingType);
+  if (!activeNorm) {
+    return true;
+  }
   const suppressedNorm = monitoringTypeFromSuppressedSessionKey(suppressedKey);
   if (incomingNorm && suppressedNorm && incomingNorm !== suppressedNorm) {
     return false;
-  }
-  if (!activeNorm) {
-    return true;
   }
   if (activeNorm !== incomingNorm) {
     return true;
   }
   return true;
+}
+
+/** Blocks callStateMap refill while the user-requested stop teardown window is active. */
+export function monitoringTeardownBlocksRefill(
+  teardown: MonitoringTeardownHint | null | undefined,
+  payload: MonitoringPayload,
+): boolean {
+  if (!teardown?.monitoredDn) {
+    return false;
+  }
+  if (!ctiAddressesEquivalent(teardown.monitoredDn, payload.monitoredDn)) {
+    return false;
+  }
+  if (!teardown.monitorDn) {
+    return true;
+  }
+  return ctiAddressesEquivalent(teardown.monitorDn, payload.monitorDn);
 }
 
 export function monitoringPayloadDiffersFromActive(
@@ -1884,6 +1900,13 @@ function resolveInitiatorRefillPinnedFromMapSession(
     eventLog,
     base,
   );
+  const sameChannelAsActive =
+    Boolean(activeMonitoring.type) &&
+    normalizeMonitoringTypeForWallboardCompare(pinnedFromMap.monitoringType) ===
+      normalizeMonitoringTypeForWallboardCompare(activeMonitoring.type);
+  if (retainLocal && sameChannelAsActive) {
+    return pinnedFromMap;
+  }
   if (
     (remoteLive || retainLocal) &&
     !initiatorPinnedPayloadIsStaleAfterTerminal(
@@ -1918,13 +1941,10 @@ function resolveInitiatorRefillFromFallbackPick(
     effectiveMonitoringType: activeMonitoring.type,
   });
   if (!pinned) {
-    return shouldRetainLocalWallboardMonitoringDuringSseLag(
-      activeMonitoring,
-      eventLog,
-      base,
-    )
-      ? null
-      : undefined;
+    if (shouldRetainLocalWallboardMonitoringDuringSseLag(activeMonitoring, eventLog, base)) {
+      return monitoringPayloadFromActiveMonitoring(activeMonitoring) ?? null;
+    }
+    return undefined;
   }
   if (isWallboardRemoteSupervisionSessionActive(pinned, map, eventLog, liveOpts)) {
     return pinned;
@@ -2010,7 +2030,9 @@ export function pickMonitoringPayloadForInitiatorRefill(
       liveOpts,
     );
     if (pinned !== undefined) {
-      return pinned;
+      return (
+        pinned ?? monitoringPayloadFromActiveMonitoring(activeMonitoring)
+      );
     }
   }
 
@@ -2564,27 +2586,6 @@ export function deriveWallboardMonitoringState(
     streamOpts,
   );
 
-  if (
-    local.type &&
-    normalizeMonitoringTypeForWallboardCompare(local.type) === "SILENT" &&
-    (!ui.type || !supervisionSessionActive)
-  ) {
-    // #region agent log
-    wallboardDebugLog(
-      "H",
-      "wallboardEventParsing.ts:deriveWallboardMonitoringState:silent-missing-ui",
-      "initiator SILENT without ui or sessionActive",
-      {
-        activeType: local.type,
-        effectiveType: effective.type,
-        uiType: ui.type,
-        supervisionSessionActive,
-        viewer: options?.viewerUserAddress ?? null,
-      },
-    );
-    // #endregion
-  }
-
   return { effective, ui, supervisionSessionActive };
 }
 
@@ -2770,6 +2771,9 @@ export function shouldSkipMonitoringRefillTypeDowngrade(
   const incomingNorm = normalizeMonitoringTypeForWallboardCompare(
     incoming.monitoringType,
   );
+  if (activeNorm === "SILENT" && incomingNorm === "WHISPER") {
+    return true;
+  }
   const pairMaxSeq = bestSupervisionSequenceForPairInCallStateMap(
     callStateMap,
     activeMonitoring.monitor,
@@ -3239,6 +3243,9 @@ function resolveEffectiveWhenRemoteSessionInactive(
   monitorDeviceName?: string;
   monitorDeviceType?: string;
 } {
+  if (isRemoteSupervisionSessionSuppressed(remotePayload, streamPickOptions)) {
+    return CLEARED_WALLBOARD_MONITORING;
+  }
   const terminalClear = findTerminalMonitoringClearInRecentLog(eventLog ?? [], {
     dn: remotePayload.monitoredDn,
     monitor: remotePayload.monitorDn,

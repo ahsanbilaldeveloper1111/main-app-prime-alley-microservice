@@ -23,6 +23,7 @@ import {
   shouldRetainLocalWallboardMonitoringDuringSseLag,
   shouldRetainRemoteWallboardMonitoringDuringSseLag,
   shouldBlockMonitoringRefillDueToSuppression,
+  monitoringTeardownBlocksRefill,
   shouldSkipMonitoringRefillTypeDowngrade,
   wallboardMonitoringPayloadShouldApplyFromStream,
   wallboardMonitoringSessionKey,
@@ -814,7 +815,7 @@ describe("wallboard supervision live events", () => {
     ).toBe("WHISPER");
   });
 
-  it("allows refill when incoming channel differs from suppressed session type", () => {
+  it("blocks cross-channel refill while local active is empty and stop suppression is active", () => {
     expect(
       shouldBlockMonitoringRefillDueToSuppression(
         "9001:1001:WHISPER",
@@ -822,6 +823,53 @@ describe("wallboard supervision live events", () => {
         "1001",
         null,
         "BARGE_IN",
+      ),
+    ).toBe(true);
+  });
+
+  it("blocks stale whisper refill after silent stop while local active is empty", () => {
+    expect(
+      shouldBlockMonitoringRefillDueToSuppression(
+        "538:543:SILENT",
+        "538",
+        "543",
+        null,
+        "WHISPER",
+      ),
+    ).toBe(true);
+  });
+
+  it("blocks same-channel silent refill while local active is empty and stop suppression active", () => {
+    expect(
+      shouldBlockMonitoringRefillDueToSuppression(
+        "538:543:SILENT",
+        "538",
+        "543",
+        null,
+        "SILENT",
+      ),
+    ).toBe(true);
+  });
+
+  it("monitoringTeardownBlocksRefill blocks refill for matching pair", () => {
+    expect(
+      monitoringTeardownBlocksRefill(
+        { monitorDn: "538", monitoredDn: "543" },
+        {
+          monitorDn: "538",
+          monitoredDn: "543",
+          monitoringType: "SILENT",
+        },
+      ),
+    ).toBe(true);
+    expect(
+      monitoringTeardownBlocksRefill(
+        { monitorDn: "538", monitoredDn: "543" },
+        {
+          monitorDn: "538",
+          monitoredDn: "544",
+          monitoringType: "SILENT",
+        },
       ),
     ).toBe(false);
   });
@@ -1309,6 +1357,43 @@ describe("wallboard supervision live events", () => {
     ).toBe(false);
   });
 
+  it("shouldSkipMonitoringRefillTypeDowngrade blocks stale WHISPER over active SILENT even when whisper seq is higher", () => {
+    const callStateMap = {
+      whisper: {
+        isMonitoring: true,
+        sequence: 60,
+        monitoring: {
+          monitoringType: "WHISPER",
+          monitorDn: "538",
+          monitoredDn: "543",
+        },
+      },
+      silent: {
+        isMonitoring: true,
+        sequence: 55,
+        monitoring: {
+          monitoringType: "SILENT",
+          monitorDn: "538",
+          monitoredDn: "543",
+        },
+      },
+    };
+    const active = {
+      dn: "543",
+      type: "SILENT",
+      monitor: "538",
+      deviceName: "AGT",
+    };
+    const incoming = buildWallboardMonitoringPayloadFromEvent(
+      [],
+      { monitorDn: "538", monitoredDn: "543", monitoringType: "WHISPER" },
+      dnsMap,
+    )!;
+    expect(
+      shouldSkipMonitoringRefillTypeDowngrade(active, incoming, callStateMap),
+    ).toBe(true);
+  });
+
   it("shouldSkipMonitoringRefillTypeDowngrade blocks older SILENT over newer WHISPER in map", () => {
     const callStateMap = {
       whisper: {
@@ -1524,7 +1609,7 @@ describe("wallboard supervision live events", () => {
     ];
     const active = {
       dn: "1001",
-      type: "SILENT",
+      type: null,
       monitor: "9001",
       deviceName: "AGT",
     };
