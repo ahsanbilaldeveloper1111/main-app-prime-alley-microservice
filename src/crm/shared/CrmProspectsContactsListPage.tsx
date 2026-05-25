@@ -1048,7 +1048,7 @@ export function CrmProspectsContactsListPage({
         iconColor: "#6B7280",
         iconBgColor: "#F1F5F9",
         metric: {
-          text: "No call attempt has occurred yet.",
+          text: "No attempts yet",
           dotColor: "#4B5563",
         },
         ...(config.operationsEntityName === "prospects"
@@ -1290,6 +1290,7 @@ export function CrmProspectsContactsListPage({
                 // Stats cards for metrics
                 statsCards={prospectsStatsCards}
                 metricsGridMinWidth="120px"
+                metricsColumns={6}
                 customBody={
                   config.enableBoardView
                     ? renderCrmProspectsKanbanTableCustomBody({
@@ -1554,6 +1555,7 @@ export function CrmProspectsContactsListPage({
         {showProspectSidebar && (
           <GenericSidebar
             sidebarMarginTop={sidebarMarginTop}
+            width={window.innerWidth < 1280 ? "360px" : "420px"}
             isOpen={showProspectSidebar}
             onClose={handleCloseProspectSidebar}
             title={selectedProspect?.name || config.sidebar.fallbackTitle}

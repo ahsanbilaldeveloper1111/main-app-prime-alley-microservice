@@ -308,7 +308,7 @@ const CRM_PROSPECTS_LIST_UI_VARIANT: CrmPersonListVariantUi = {
   },
   stats: {
     allCardTitle: "All Prospects",
-    subtitleAssignedUnassigned: () => "Currently in the system",
+    subtitleAssignedUnassigned: () => "In the system",
     convertedCardTitle: "Converted Prospects",
   },
   callRecordingExtras: {

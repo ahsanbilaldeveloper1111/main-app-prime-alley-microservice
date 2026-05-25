@@ -573,6 +573,7 @@ export interface GenericTableProps<T = any> {
   // Stats cards
   statsCards?: StatsCardData[]; // Stats cards data to display above table
   metricsGridMinWidth?: string; // Grid min width for metrics cards layout
+  metricsColumns?: number; // Fixed number of columns for metrics cards
 
   // Hide toolbar actions (three dots menu)
   showToolbarActions?: boolean;
@@ -1189,6 +1190,7 @@ const GenericTable = <T extends Record<string, any>>({
   maxHeight = "calc(100vh - 300px)",
   statsCards,
   metricsGridMinWidth = "200px",
+  metricsColumns,
   showToolbarActions = true,
   noBorder = false,
   customBody,
@@ -2103,7 +2105,7 @@ const GenericTable = <T extends Record<string, any>>({
               borderRight: "1px solid #cccccc",
             }}
           >
-            <StatsCards data={statsCards} gridMinWidth={metricsGridMinWidth} />
+            <StatsCards data={statsCards} gridMinWidth={metricsGridMinWidth} columns={metricsColumns}/>
           </div>
         )}
       </div>
