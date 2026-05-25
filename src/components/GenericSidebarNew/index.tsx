@@ -6383,7 +6383,7 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
       dockInParent
         ? {
             width,
-            backgroundColor: "#f0f0f0",
+            backgroundColor: "#ffffff",
             display: "flex",
             flexDirection: "column",
             flex: 1,
@@ -6399,7 +6399,7 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
           }
         : {
             width,
-            backgroundColor: "#f0f0f0",
+            backgroundColor: "#ffffff",
             display: "flex",
             flexDirection: "column",
             height: "100%",
@@ -6432,7 +6432,7 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
             flex: 1,
             minHeight: 0,
             overflowY: "auto",
-            backgroundColor: "#f0f0f0",
+            backgroundColor: "#ffffff",
             borderBottom: "1px solid #cccccc",
             borderRadius: "0 0 10px 10px",
           }
@@ -6440,7 +6440,7 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
             flex: 1,
             minHeight: 0,
             overflowY: "auto",
-            backgroundColor: "#f0f0f0",
+            backgroundColor: "#ffffff",
             maxHeight: "100%",
             borderBottom: "1px solid #cccccc",
             borderRadius: "0 0 10px 10px",
@@ -7704,11 +7704,8 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
         key={section.id}
         style={{
           backgroundColor: "#ffffff",
-          borderRadius: "10px",
-          marginBottom: "12px",
           overflow: "hidden",
-          boxShadow: "0 1px 3px rgba(0, 0, 0, 0.06)",
-          border: "1px solid #cccccc",
+          borderTop: "1px solid #eaf0f6",
         }}
       >
         {/* Section Header */}
@@ -7718,7 +7715,7 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
-            padding: "14px 20px",
+            padding: "10px 16px",
             cursor: section.collapsible ? "pointer" : "default",
             backgroundColor: "#ffffff",
             borderBottom: isCollapsed ? "none" : "1px solid #eaf0f6",
@@ -7905,7 +7902,7 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
 
         {/* Section Content */}
         {!isCollapsed && (
-          <div style={{ padding: "20px", paddingRight: "10px" }}>
+          <div style={{ padding: "12px 16px" }}>
             {section.id === "notes" ? (
               (() => {
                 if (sidebarNotesLoading) {
@@ -8300,11 +8297,10 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
         {!hideTopHeadingBar && (
           <div
             style={{
-              padding: "20px 24px",
-              border: "1px solid #cccccc",
+              padding: "16px 20px",
+              borderBottom: "1px solid #eaf0f6",
               backgroundColor: "#ffffff",
               flexShrink: 0,
-              borderRadius: "10px 10px 0 0",
             }}
           >
             <div
@@ -8376,18 +8372,7 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
             style={{
               backgroundColor: "#ffffff",
               padding: "16px 24px",
-              marginBottom: "12px",
-              borderLeft: "1px solid #cccccc",
-              borderRight: "1px solid #cccccc",
-              borderBottom: "1px solid #cccccc",
-              ...(hideTopHeadingBar
-                ? {
-                    borderTop: "1px solid #cccccc",
-                    borderRadius: "10px",
-                  }
-                : {
-                    borderRadius: "0 0 10px 10px",
-                  }),
+              borderTop: "1px solid #eaf0f6",
             }}
           >
             {/* Record Link and Actions */}
@@ -8938,10 +8923,8 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
             <div
               style={{
                 backgroundColor: "#ffffff",
-                borderRadius: "10px",
-                marginBottom: "12px",
                 overflow: "hidden",
-                border: "1px solid #cccccc",
+                borderTop: "1px solid #eaf0f6",
               }}
             >
               <button
