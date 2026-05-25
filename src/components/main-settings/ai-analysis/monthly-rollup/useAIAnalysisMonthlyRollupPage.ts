@@ -3,10 +3,7 @@ import { useSession } from "next-auth/react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "react-toastify";
 
-import type { AnalysisMonthlyRollupFilters } from "@utils/aiAnalytics";
-
-import {
-  defaultMonthlyRollupFilterForm,
+import {  defaultMonthlyRollupFilterForm,
   toAppliedMonthlyRollupFilters,
   type MonthlyRollupFilterForm,
 } from "./types";

@@ -196,6 +196,44 @@ function RollupTable(props: Readonly<{
 
 
 
+function MonthlyRollupBody(props: Readonly<{
+  sessionTenantId: string | undefined;
+  filtersApplied: boolean;
+  rows: AnalysisMonthlyRollupRow[];
+  isLoading: boolean;
+  isError: boolean;
+  onRetry: () => void;
+}>) {
+  const { sessionTenantId, filtersApplied, rows, isLoading, isError, onRetry } =
+    props;
+
+  if (sessionTenantId) {
+    if (filtersApplied) {
+      return (
+        <RollupTable
+          rows={rows}
+          isLoading={isLoading}
+          isError={isError}
+          onRetry={onRetry}
+        />
+      );
+    }
+    return (
+      <p className="ai-analysis-monthly-rollup__hint">
+        Apply filters to load monthly rollup data.
+      </p>
+    );
+  }
+
+  return (
+    <p className="ai-analysis-monthly-rollup__hint">
+      No tenant is associated with your account.
+    </p>
+  );
+}
+
+
+
 export const AnalysisMonthlyRollupTab: React.FC = () => {
 
   const {
@@ -308,41 +346,16 @@ export const AnalysisMonthlyRollupTab: React.FC = () => {
 
 
 
-      {!sessionTenantId ? (
-
-        <p className="ai-analysis-monthly-rollup__hint">
-
-          No tenant is associated with your account.
-
-        </p>
-
-      ) : filtersApplied ? (
-
-        <RollupTable
-
-          rows={rows}
-
-          isLoading={rollupQuery.isPending}
-
-          isError={rollupQuery.isError}
-
-          onRetry={() => {
-
-            rollupQuery.refetch().catch(() => undefined);
-
-          }}
-
-        />
-
-      ) : (
-
-        <p className="ai-analysis-monthly-rollup__hint">
-
-          Apply filters to load monthly rollup data.
-
-        </p>
-
-      )}
+      <MonthlyRollupBody
+        sessionTenantId={sessionTenantId}
+        filtersApplied={filtersApplied}
+        rows={rows}
+        isLoading={rollupQuery.isPending}
+        isError={rollupQuery.isError}
+        onRetry={() => {
+          rollupQuery.refetch().catch(() => undefined);
+        }}
+      />
 
     </div>
 

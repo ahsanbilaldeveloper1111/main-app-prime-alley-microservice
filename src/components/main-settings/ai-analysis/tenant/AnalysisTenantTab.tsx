@@ -19,11 +19,7 @@ export const AnalysisTenantTab: React.FC = () => {
         </p>
       </header>
 
-      {!sessionTenantId ? (
-        <p className="ai-analysis-tenant__hint">
-          No tenant is associated with your account.
-        </p>
-      ) : (
+      {sessionTenantId ? (
         <TenantsTable
           rows={rows}
           isLoading={isLoading}
@@ -32,6 +28,10 @@ export const AnalysisTenantTab: React.FC = () => {
             refetch().catch(() => undefined);
           }}
         />
+      ) : (
+        <p className="ai-analysis-tenant__hint">
+          No tenant is associated with your account.
+        </p>
       )}
     </div>
   );
