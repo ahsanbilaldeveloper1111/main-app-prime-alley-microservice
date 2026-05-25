@@ -1278,7 +1278,7 @@ export function CrmProspectsContactsListPage({
                   // Hide Advanced filters button while the filters sidebar is open
                   showAdvancedFilters: !showFiltersSidebar,
                   // Keep pills visible by default so advanced pills can appear inline
-                  showFilterPills: true,
+                  showFilterPills: window.innerWidth >= 1920,
                   onAdvancedFiltersClick: () =>
                     setShowAdvancedFilters((prev) => !prev),
                   filterPills: mergeCrmProspectsToolbarFilterPills(
