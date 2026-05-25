@@ -6384,6 +6384,8 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
         ? {
             width,
             backgroundColor: "#ffffff",
+            border: "1px solid #cccccc",
+            borderRadius: "10px",
             display: "flex",
             flexDirection: "column",
             flex: 1,
@@ -6400,6 +6402,8 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
         : {
             width,
             backgroundColor: "#ffffff",
+            border: "1px solid #cccccc",
+            borderRadius: "10px",
             display: "flex",
             flexDirection: "column",
             height: "100%",

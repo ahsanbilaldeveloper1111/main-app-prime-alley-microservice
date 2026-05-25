@@ -559,6 +559,8 @@ body:has(.prospects-scrollable-content) {
     display: flex !important;
     flex-direction: column !important;
     min-height: 0 !important;
+    overflow: hidden !important;
+    height: 100% !important;
   }
 
   .prospects-table-wrapper {
