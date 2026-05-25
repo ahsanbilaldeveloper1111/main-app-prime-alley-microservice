@@ -8149,14 +8149,14 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            padding: 11px 10px;
+            padding: 7px 8px;
             background: #ffffff;
             border: 1px solid #8a8a8a;
             border-radius: 50%;
             cursor: pointer;
             transition: all 0.2s ease;
-            width: 40px;
-            height: 40px;
+            width: 32px;
+            height: 32px;
             position: relative;
           }
 
@@ -8896,7 +8896,7 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                gap: "23px",
+                gap: "16px",
                 paddingTop: "5px",
                 flexWrap: "wrap",
               }}
@@ -8918,7 +8918,7 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
                       disabled={action.disabled}
                     >
                       <ActionIcon
-                        size={20}
+                        size={16}
                         color={action.disabled ? "#cbd5e0" : "#718096"}
                       />
                     </button>
