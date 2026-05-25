@@ -32,16 +32,10 @@ import SelectCheckBox, { SelectCheckBoxOption } from '@components/SelectCheckBox
 import GenericTable, { TableColumn, TableAction } from '@components/GenericTable';
 import { useDebouncedValue } from '@hooks/useDebouncedValue';
 import { controlhubKeys } from "@query/keys";
+import type { TeamRow } from "@typings/controlhub/teams";
+import type { NormalizedPagedList } from "@utils/paginatedList";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
-
-interface TeamRow {
-    id: number;
-    name: string;
-    module_names?: string[];
-    owner_count: number;
-    assigned_user_count: number;
-}
 
 interface TeamUser {
     id: number;
@@ -231,7 +225,7 @@ const Teams = () => {
     }, []);
 
     const filtersListKey = JSON.stringify(currentFilters);
-    const teamsListQuery = useQuery({
+    const teamsListQuery = useQuery<NormalizedPagedList<TeamRow>>({
         queryKey: controlhubKeys.teams.list({
             page: currentPage,
             perPage: rowsPerPage,
@@ -699,15 +693,15 @@ const Teams = () => {
                 key: 'owner_count',
                 label: 'Assigned Owners',
                 sortable: true,
-                accessor: (row) => row.owner_count,
-                render: (row) => <CountBadgeCell count={row.owner_count} />,
+                accessor: (row) => row.owner_count ?? 0,
+                render: (row) => <CountBadgeCell count={row.owner_count ?? 0} />,
             },
             {
                 key: 'assigned_user_count',
                 label: 'Assigned Users',
                 sortable: true,
-                accessor: (row) => row.assigned_user_count,
-                render: (row) => <CountBadgeCell count={row.assigned_user_count} />,
+                accessor: (row) => row.assigned_user_count ?? 0,
+                render: (row) => <CountBadgeCell count={row.assigned_user_count ?? 0} />,
             },
         ],
         [],

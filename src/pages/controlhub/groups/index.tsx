@@ -20,15 +20,8 @@ import { Module } from '@typings/controlhub/users';
 import SelectCheckBox, { SelectCheckBoxOption } from '@components/SelectCheckBox';
 import { useDebouncedValue } from '@hooks/useDebouncedValue';
 import { controlhubKeys } from "@query/keys";
-
-interface GroupRow {
-    id: number;
-    name: string;
-    assigned_modules?: Array<{ id: number; name?: string; slug?: string }>;
-    assigned_teams?: Array<{ id: number; name?: string }>;
-    total_team_users?: number;
-    total_team_owners?: number;
-}
+import type { GroupRow } from "@typings/controlhub/groups";
+import type { NormalizedPagedList } from "@utils/paginatedList";
 
 const Groups = () => {
     const { data: session } = useSession();
@@ -58,7 +51,7 @@ const Groups = () => {
     }, [currentFilters]);
 
     const filtersListKey = JSON.stringify(memoizedFilters);
-    const groupsListQuery = useQuery({
+    const groupsListQuery = useQuery<NormalizedPagedList<GroupRow>>({
         queryKey: controlhubKeys.groups.list({
             page: currentPage,
             perPage: rowsPerPage,

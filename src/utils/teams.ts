@@ -6,15 +6,15 @@ import {
   type NormalizedPagedList,
   type PaginationParams,
 } from "./paginatedList";
-import type { TeamListResponse } from "../types/controlhub/teams";
+import type { TeamListResponse, TeamRow } from "../types/controlhub/teams";
 
 export const ListTeams = async (
   params: PaginationParams = {},
-): Promise<NormalizedPagedList<TeamListResponse["dataList"][number]>> => {
+): Promise<NormalizedPagedList<TeamRow>> => {
   const raw = await postPagedList<TeamListResponse>(`teams/list`, params, {
     context: "teams",
   });
-  return normalizePostPagedListResult(raw);
+  return normalizePostPagedListResult<TeamRow>(raw);
 };
 
 export const getAllTeams = async (): Promise<any[]> => {
