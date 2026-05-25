@@ -571,6 +571,14 @@ body:has(.prospects-scrollable-content) {
     height: 100% !important;
   }
 
+  .gt-toolbar-main {
+    flex-shrink: 0 !important;
+  }
+
+  .gt-toolbar-tabs-section {
+    flex-shrink: 0 !important;
+  }
+
   .prospects-scrollable-content {
     scrollbar-width: thin;
     scrollbar-color: transparent transparent;

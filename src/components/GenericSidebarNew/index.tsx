@@ -995,6 +995,7 @@ export interface GenericSidebarProps {
   onLogSms?: () => void;
   onLogWhatsApp?: () => void;
   onLogMeeting?: () => void;
+  sidebarMarginTop?: string | number;
 }
 
 // ============================================================================
@@ -6166,6 +6167,7 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
   onLogSms,
   onLogWhatsApp,
   onLogMeeting,
+  sidebarMarginTop = 0,
 }) => {
   const router = useRouter();
   const emailContextPayload = buildEmailContextPayload(contextPayload);
@@ -6411,7 +6413,7 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
             overflow: "hidden",
             animation: "slideInRight 0.3s ease-out",
             flexShrink: 0,
-            marginTop: "0",
+            marginTop: sidebarMarginTop,
             position: "relative",
           },
     [dockInParent, width],

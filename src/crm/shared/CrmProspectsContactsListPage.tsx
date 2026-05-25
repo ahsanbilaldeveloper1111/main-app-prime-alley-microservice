@@ -175,6 +175,7 @@ export function CrmProspectsContactsListPage({
   >(null);
 
   const [tableMaxHeight, setTableMaxHeight] = useState("calc(100vh - 405px)");
+  const [sidebarMarginTop, setSidebarMarginTop] = useState<number>(0);
 
   const afterProspectsRemovedRef = useRef<(ids: readonly number[]) => void>(
     () => {},
@@ -410,6 +411,21 @@ export function CrmProspectsContactsListPage({
       clearTimeout(timer);
       observer.disconnect();
       window.removeEventListener("resize", updateMaxHeight);
+    };
+  }, []);
+
+  useEffect(() => {
+    const updateSidebarMarginTop = () => {
+      const tabsEl = document.querySelector<HTMLElement>('.gt-toolbar-tabs-section');
+      if (tabsEl) {
+        setSidebarMarginTop(Math.round(tabsEl.getBoundingClientRect().height));
+      }
+    };
+    const timer = setTimeout(updateSidebarMarginTop, 100);
+    window.addEventListener('resize', updateSidebarMarginTop);
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener('resize', updateSidebarMarginTop);
     };
   }, []);
 
@@ -1165,27 +1181,7 @@ export function CrmProspectsContactsListPage({
     extensions,
     onPaginationReset: () =>
       setPagination((prev) => ({ ...prev, currentPage: 1 })),
-    rightActions: (
-      <div className="d-flex align-items-center gap-2 flex-wrap justify-content-end">
-        <CrmProspectsContactsAddContactsButton
-          addContactsRef={addContactsRef}
-          session={session}
-          extensions={extensions}
-          config={config}
-          selectedItems={selectedItems}
-          showAddContactsDropdown={showAddContactsDropdown}
-          setShowAddContactsDropdown={setShowAddContactsDropdown}
-          setEditingContactId={setEditingContactId}
-          setContactForm={
-            setContactForm as Dispatch<SetStateAction<CrmListContactFormState>>
-          }
-          setShowCreateContactSidebar={setShowCreateContactSidebar}
-          setShowUploadModal={setShowUploadModal}
-          setDeleteModalMode={setDeleteModalMode}
-          setShowDeleteModal={setShowDeleteModal}
-        />
-      </div>
-    ),
+    rightActions: null,
     prospectsTabCountOverrides: {
       loading,
       totalRecords,
@@ -1202,6 +1198,24 @@ export function CrmProspectsContactsListPage({
   return (
     <React.Fragment>
       <CrmListPageScopedLayoutStyles config={config.scopedLayout} />
+      {/* Add prospects button - fixed top right */}
+      <div style={{ position: "fixed", top: "64px", right: "16px", zIndex: 100 }}>
+        <CrmProspectsContactsAddContactsButton
+          addContactsRef={addContactsRef}
+          session={session}
+          extensions={extensions}
+          config={config}
+          selectedItems={selectedItems}
+          showAddContactsDropdown={showAddContactsDropdown}
+          setShowAddContactsDropdown={setShowAddContactsDropdown}
+          setEditingContactId={setEditingContactId}
+          setContactForm={setContactForm as Dispatch<SetStateAction<CrmListContactFormState>>}
+          setShowCreateContactSidebar={setShowCreateContactSidebar}
+          setShowUploadModal={setShowUploadModal}
+          setDeleteModalMode={setDeleteModalMode}
+          setShowDeleteModal={setShowDeleteModal}
+        />
+      </div>
       {/* Main flex container for content and sidebar */}
       <div
         style={{
@@ -1539,6 +1553,7 @@ export function CrmProspectsContactsListPage({
         {/* Prospect Detail Sidebar */}
         {showProspectSidebar && (
           <GenericSidebar
+            sidebarMarginTop={sidebarMarginTop}
             isOpen={showProspectSidebar}
             onClose={handleCloseProspectSidebar}
             title={selectedProspect?.name || config.sidebar.fallbackTitle}
