@@ -540,6 +540,10 @@ body:has(.prospects-scrollable-content) {
     overflow: hidden !important;
   }
 
+  .pc-content {
+    padding-top: 0 !important;
+  }
+
   .min-vh-100 {
     height: 100vh !important;
     min-height: unset !important;
