@@ -14,6 +14,21 @@ import { authAPI } from "@utils/api";
 import { useAuth } from "../../hooks/useAuth";
 import { useTmsPermissions } from "../../hooks/useTmsPermissions";
 import { HEADER_CONSTANTS } from "@constants/headerConstants";
+import {
+  MAIN_SETTINGS_USER_DIRECTORY_PATH,
+  MAIN_SETTINGS_SUPERVISOR_TEAMS_PATH,
+  MAIN_SETTINGS_MANAGEMENT_GROUPS_PATH,
+  MAIN_SETTINGS_RANKS_AND_PERMISSIONS_PATH,
+} from "@utils/controlhub/usersNavigation";
+import {
+  MAIN_SETTINGS_TICKETS_STATUSES_PATH,
+  MAIN_SETTINGS_TICKETS_MODULES_PATH,
+  MAIN_SETTINGS_TICKETS_TYPES_PATH,
+} from "@utils/tickets/ticketsNavigation";
+import {
+  MAIN_SETTINGS_SMART_CRM_STAGES_PATH,
+  MAIN_SETTINGS_SMART_CRM_CAMPAIGNS_PATH,
+} from "@utils/crm/smartCrmNavigation";
 
 import { FiChevronDown } from "react-icons/fi";
 
@@ -784,24 +799,32 @@ const Header = ({ themeMode }: HeaderProps) => {
                     permission: 'view-users',
                     icon: ICONS.USERS,
                     label: SUBMENU_LABELS.USER_DIRECTORY,
-                    href: '/controlhub/users',
-                    pathMatch: 'controlhub/users'
+                    href: MAIN_SETTINGS_USER_DIRECTORY_PATH,
+                    pathMatch: 'users-teams/user-directory'
                 },
                 {
                     key: 'view-ranks',
                     permission: 'view-ranks',
                     icon: ICONS.USERS,
                     label: SUBMENU_LABELS.RANKS,
-                    href: '/controlhub/ranks',
-                    pathMatch: 'controlhub/ranks'
+                    href: MAIN_SETTINGS_RANKS_AND_PERMISSIONS_PATH,
+                    pathMatch: 'users-teams/ranks-and-permissions'
                 },
                 {
                     key: 'view-groups',
                     permission: 'view-groups',
                     icon: ICONS.USERS,
                     label: SUBMENU_LABELS.GROUPS,
-                    href: '/controlhub/groups',
-                    pathMatch: 'controlhub/groups'
+                    href: MAIN_SETTINGS_MANAGEMENT_GROUPS_PATH,
+                    pathMatch: 'users-teams/management-groups'
+                },
+                {
+                    key: 'view-teams',
+                    permission: 'view-teams',
+                    icon: ICONS.USERS,
+                    label: SUBMENU_LABELS.TEAMS,
+                    href: MAIN_SETTINGS_SUPERVISOR_TEAMS_PATH,
+                    pathMatch: 'users-teams/supervisor-teams'
                 },
                 
             ]
@@ -1065,21 +1088,21 @@ const Header = ({ themeMode }: HeaderProps) => {
                     permission: 'ticket-statuses-tickets',
                     icon: ICONS.TICKETS,
                     label: SUBMENU_LABELS.STATUS,
-                    href: '/tickets/statuses'
+                    href: MAIN_SETTINGS_TICKETS_STATUSES_PATH
                 },
                 {
                     key: 'ticket-modules-tickets',
                     permission: 'ticket-modules-tickets',
                     icon: ICONS.TICKETS,
                     label: SUBMENU_LABELS.MODULES,
-                    href: '/tickets/modules'
+                    href: MAIN_SETTINGS_TICKETS_MODULES_PATH
                 },
                 {
                     key: 'view-ticket-types-tickets',
                     permission: 'view-ticket-types-tickets',
                     icon: ICONS.TICKETS,
                     label: SUBMENU_LABELS.TYPES,
-                    href: '/tickets/types'
+                    href: MAIN_SETTINGS_TICKETS_TYPES_PATH
                 }
             ]
         },
@@ -1264,7 +1287,7 @@ const Header = ({ themeMode }: HeaderProps) => {
 
                 {session?.user?.permissions?.includes(PERMISSIONS.VIEW_CRM_CAMPAIGNS) && (
                                             <li className="pc-item">
-                                        <Link className="pc-link" href={`${BASE_URL}/crm/campaigns`}>
+                                        <Link className="pc-link" href={`${BASE_URL}${MAIN_SETTINGS_SMART_CRM_CAMPAIGNS_PATH}`}>
                                             <span className="pc-micon"><i className={ICONS.MEGAPHONE}></i></span>
                                             <span className="pc-mtext">{SUBMENU_LABELS.CAMPAIGNS}</span>
                                         </Link>
@@ -1302,7 +1325,7 @@ const Header = ({ themeMode }: HeaderProps) => {
 
                 {session?.user?.permissions?.includes(PERMISSIONS.VIEW_CRM_STAGES) && (
                                     <li className="pc-item">
-                                        <Link className="pc-link" href={`${BASE_URL}/crm/stages`}>
+                                        <Link className="pc-link" href={`${BASE_URL}${MAIN_SETTINGS_SMART_CRM_STAGES_PATH}`}>
                                             <span className="pc-micon"><i className={ICONS.TRENDING_UP}></i></span>
                                             <span className="pc-mtext">{SUBMENU_LABELS.STAGES}</span>
                                                 </Link>

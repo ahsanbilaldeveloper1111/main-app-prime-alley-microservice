@@ -11,6 +11,8 @@ import type { GenericListPageQueryParams, GenericListPageQueryOptions } from "@c
 import type { TicketModulePickerRow } from "../moduleCategoriesTypes";
 
 export type ModuleCategoriesPageViewProps = Readonly<{
+  showBreadcrumb?: boolean;
+  breadcrumbMainLink?: string;
   memoizedFilters: { search: string };
   columns: Column[];
   getListQueryOptions: (params: GenericListPageQueryParams) => GenericListPageQueryOptions;
@@ -31,6 +33,8 @@ export type ModuleCategoriesPageViewProps = Readonly<{
 }>;
 
 export const ModuleCategoriesPageView: React.FC<ModuleCategoriesPageViewProps> = ({
+  showBreadcrumb = true,
+  breadcrumbMainLink = "/main-settings/tickets/modules",
   memoizedFilters,
   columns,
   getListQueryOptions,
@@ -50,7 +54,9 @@ export const ModuleCategoriesPageView: React.FC<ModuleCategoriesPageViewProps> =
   onConfirmDelete,
 }) => (
   <React.Fragment>
-    <BreadcrumbItem mainTitle="Tickets" mainLink="/tickets/modules" subTitle="Submodules" />
+    {showBreadcrumb ? (
+      <BreadcrumbItem mainTitle="Tickets" mainLink={breadcrumbMainLink} subTitle="Submodules" />
+    ) : null}
 
       <PageHeader
         title=""

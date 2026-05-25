@@ -1,4 +1,4 @@
-import React, { ReactElement, useEffect, useState, useCallback } from 'react';
+import React, { ReactElement, useEffect, useState, useCallback, useMemo } from 'react';
 import Layout from '@layout/index';
 import BreadcrumbItem from '@common/BreadcrumbItem';
 import { Col, Row, Tab, Tabs, Modal, Button } from 'react-bootstrap';
@@ -16,11 +16,20 @@ import SuccessfulModal from '@components/page-partials/SuccessfulModal';
 import OverviewTab from "@page-modules/controlhub/users/[id]/partials/OverviewTab";
 import UserCallingAccess from "@page-modules/controlhub/users/[id]/partials/UserCallingAccess";
 import { User, Role, Group } from '@typings/controlhub/users';
+import {
+    DEFAULT_USERS_DIRECTORY_PATH,
+    sanitizeReturnPath,
+} from '@utils/controlhub/usersNavigation';
 
 const UserView = () => {
     const { data: session } = useSession();
     const router = useRouter();
-    const { id } = router.query;
+    const { id, returnTo } = router.query;
+
+    const usersListPath = useMemo(
+        () => sanitizeReturnPath(returnTo, DEFAULT_USERS_DIRECTORY_PATH),
+        [returnTo],
+    );
 
     const [currentUser, setCurrentUser] = useState<User | null>(null);
     const [roles, setRoles] = useState<Role[]>([]);
@@ -113,7 +122,7 @@ const UserView = () => {
     if (isLoading) {
         return (
             <React.Fragment>
-                <BreadcrumbItem mainTitle="Controlhub" mainLink="/controlhub/users" subTitle="Users" />
+                <BreadcrumbItem mainTitle="Controlhub" mainLink={usersListPath} subTitle="Users" />
                 <Row>
                     <Col md={12} className="text-center py-5">
                         <output aria-live="polite" className="d-block border-0 bg-transparent p-0">
@@ -130,13 +139,13 @@ const UserView = () => {
 
     return (
         <React.Fragment>
-            <BreadcrumbItem mainTitle="Controlhub" mainLink="/controlhub/users" subTitle="Users" />
+            <BreadcrumbItem mainTitle="Controlhub" mainLink={usersListPath} subTitle="Users" />
 
             <Row className="mb-3">
                 <Col md={12}>
                     <Button
                         variant="outline-secondary"
-                        onClick={() => router.push('/controlhub/users')}
+                        onClick={() => router.push(usersListPath)}
                         className="d-flex align-items-center gap-2"
                     >
                         <ArrowLeft size={16} aria-hidden />

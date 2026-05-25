@@ -1,9 +1,9 @@
 import { HEADER_CONSTANTS } from '@constants/headerConstants'
-import TicketStatuses from '@pages/tickets/statuses'
-import TicketModules from '@pages/tickets/modules'
-import ModuleCategories from '@pages/tickets/modules/categories'
-import ModuleSubCategories from '@pages/tickets/modules/sub-categories'
-import TicketTypes from '@pages/tickets/types'
+import ModuleCategoriesPanel from '@page-modules/tickets/modules/categories/ModuleCategoriesPanel'
+import ModuleSubCategoriesPanel from '@page-modules/tickets/modules/sub-categories/ModuleSubCategoriesPanel'
+import TicketModulesPanel from '@page-modules/tickets/modules/TicketModulesPanel'
+import TicketStatusesPanel from '@page-modules/tickets/statuses/TicketStatusesPanel'
+import TicketTypesPanel from '@page-modules/tickets/types/TicketTypesPanel'
 import React from 'react'
 import type { ControlledTabsProps, Tab } from '../types'
 import { SettingsSectionTabShell } from './SettingsSectionTabShell'
@@ -22,15 +22,15 @@ const ticketsTabs: Tab[] = [
 function TicketsTabPanel({ activeTab }: Readonly<{ activeTab: string }>) {
   switch (activeTab) {
     case 'statuses':
-      return <TicketStatuses />
+      return <TicketStatusesPanel />
     case 'modules':
-      return <TicketModules />
+      return <TicketModulesPanel />
     case 'categories':
-      return <ModuleCategories />
+      return <ModuleCategoriesPanel />
     case 'sub-categories':
-      return <ModuleSubCategories />
+      return <ModuleSubCategoriesPanel />
     case 'types':
-      return <TicketTypes />
+      return <TicketTypesPanel />
     default:
       return null
   }

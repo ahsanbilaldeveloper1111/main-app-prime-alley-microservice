@@ -15,6 +15,131 @@ export type SidebarGroup = {
   items: SidebarItem[];
 };
 
+/** Searchable main-settings sub-tabs (section + subTab navigation). */
+export type SettingsSubTabSearchItem = {
+  sectionId: string;
+  subTabId: string;
+  label: string;
+  permission?: string | readonly string[];
+};
+
+export const settingsSubTabSearchItems: SettingsSubTabSearchItem[] = [
+  {
+    sectionId: "users-teams",
+    subTabId: "user-directory",
+    label: "User Directory",
+    permission: PERMISSIONS.VIEW_USERS,
+  },
+  {
+    sectionId: "users-teams",
+    subTabId: "supervisor-teams",
+    label: "Supervisor Teams",
+    permission: PERMISSIONS.VIEW_TEAMS,
+  },
+  {
+    sectionId: "users-teams",
+    subTabId: "management-groups",
+    label: "Management Groups",
+    permission: PERMISSIONS.VIEW_GROUPS,
+  },
+  {
+    sectionId: "users-teams",
+    subTabId: "ranks-and-permissions",
+    label: "Ranks and Permissions",
+    permission: PERMISSIONS.VIEW_RANKS,
+  },
+  {
+    sectionId: "help-center",
+    subTabId: "modules",
+    label: "FAQ Modules",
+    permission: PERMISSIONS.MANAGE_HELP_CENTER,
+  },
+  {
+    sectionId: "help-center",
+    subTabId: "topics",
+    label: "FAQ Topics",
+    permission: PERMISSIONS.MANAGE_HELP_CENTER,
+  },
+  {
+    sectionId: "help-center",
+    subTabId: "items",
+    label: "FAQ Items",
+    permission: PERMISSIONS.MANAGE_HELP_CENTER,
+  },
+  {
+    sectionId: "help-center",
+    subTabId: "types",
+    label: "FAQ Types",
+    permission: PERMISSIONS.MANAGE_HELP_CENTER,
+  },
+  {
+    sectionId: "tickets",
+    subTabId: "statuses",
+    label: "Ticket Statuses",
+    permission: PERMISSIONS.VIEW_TICKETS_STATUS,
+  },
+  {
+    sectionId: "tickets",
+    subTabId: "modules",
+    label: "Ticket Modules",
+    permission: PERMISSIONS.VIEW_TICKETS_MODULES,
+  },
+  {
+    sectionId: "tickets",
+    subTabId: "categories",
+    label: "Ticket Categories",
+    permission: PERMISSIONS.VIEW_TICKETS_CATEGORIES,
+  },
+  {
+    sectionId: "tickets",
+    subTabId: "sub-categories",
+    label: "Ticket Sub Categories",
+    permission: PERMISSIONS.VIEW_TICKETS_SUBCATEGORIES,
+  },
+  {
+    sectionId: "tickets",
+    subTabId: "types",
+    label: "Ticket Types",
+    permission: PERMISSIONS.VIEW_TICKETS_TYPES,
+  },
+  {
+    sectionId: "smart-crm",
+    subTabId: "stages",
+    label: "CRM Stages",
+    permission: PERMISSIONS.VIEW_CRM_STAGES,
+  },
+  {
+    sectionId: "smart-crm",
+    subTabId: "industries",
+    label: "CRM Product Groups",
+    permission: PERMISSIONS.VIEW_CRM_INDUSTRIES,
+  },
+  {
+    sectionId: "smart-crm",
+    subTabId: "products",
+    label: "CRM Products",
+    permission: PERMISSIONS.VIEW_CRM_PRODUCTS,
+  },
+  {
+    sectionId: "smart-crm",
+    subTabId: "deal-templates",
+    label: "CRM Deal Templates",
+    permission: PERMISSIONS.VIEW_CRM_DEAL_TEMPLATES,
+  },
+  {
+    sectionId: "smart-crm",
+    subTabId: "business-types",
+    label: "CRM Business Types",
+    permission: PERMISSIONS.VIEW_CRM_BUSINESS_TYPES,
+  },
+  {
+    sectionId: "smart-crm",
+    subTabId: "campaigns",
+    label: "CRM Campaigns",
+    permission: PERMISSIONS.VIEW_CRM_CAMPAIGNS,
+  },
+];
+
 export const sidebarGroups: SidebarGroup[] = [
   {
     heading: "Your Preferences",
