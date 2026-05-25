@@ -8320,7 +8320,7 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
               <div style={{ flex: 1, minWidth: 0 }}>
                 <h2
                   style={{
-                    fontSize: "20px",
+                    fontSize: "15px",
                     fontWeight: "500",
                     color: "#141414",
                     margin: 0,
@@ -8332,7 +8332,7 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
                   <p
                     style={{
                       margin: "6px 0 0",
-                      fontSize: "14px",
+                      fontSize: "13px",
                       color: "#718096",
                       fontWeight: 400,
                     }}
@@ -8377,7 +8377,7 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
           <div
             style={{
               backgroundColor: "#ffffff",
-              padding: "16px 24px",
+              padding: "10px 16px",
               borderTop: "1px solid #d1d5db",
             }}
           >
@@ -8688,13 +8688,13 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
             )}
 
             {/* Avatar and Name Section */}
-            <div style={{ marginBottom: "16px", paddingTop: "16px" }}>
+            <div style={{ marginBottom: "8px", paddingTop: "12px" }}>
               <div
                 style={{
                   display: "flex",
                   alignItems: "flex-start",
                   gap: "12px",
-                  marginBottom: "12px",
+                  marginBottom: "8px",
                 }}
               >
                 {avatar && (
@@ -8726,7 +8726,7 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
                 <div style={{ flex: 1 }}>
                   <h1
                     style={{
-                      fontSize: "22px",
+                      fontSize: "16px",
                       fontWeight: "500",
                       color: "#141414",
                       margin: "0 0 4px 0",
