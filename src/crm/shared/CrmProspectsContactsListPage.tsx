@@ -876,6 +876,19 @@ export function CrmProspectsContactsListPage({
     didInitialPreviewRestoreRef.current = true;
   }, []);
 
+  useEffect(() => {
+    const wrapper = document.querySelector(
+      ".main-content-wrapper",
+    ) as HTMLElement;
+    if (wrapper) {
+      const original = wrapper.style.overflow;
+      wrapper.style.overflow = "hidden";
+      return () => {
+        wrapper.style.overflow = original;
+      };
+    }
+  }, []);
+
   const showAdvancedFilterPills =
     showAdvancedFilters || hasAdvancedFiltersApplied;
 
