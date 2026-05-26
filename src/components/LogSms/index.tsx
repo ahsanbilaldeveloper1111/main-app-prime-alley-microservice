@@ -985,7 +985,7 @@ const SmsMessageModal: React.FC<SmsMessageModalProps> = ({
         ...modalContainerStyle,
         ...(isMaximized
           ? { top: '60px', right: '20px', bottom: '20px', left: '20px' }
-          : { right: '15vh', bottom: '0.5vh', width: '650px' }),
+          : { right: '15vh', bottom: '0.5vh', width: 'min(650px, calc(100vw - 120px))' }),
       }}
     >
       {/* ── Header ── */}

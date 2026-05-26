@@ -696,7 +696,7 @@ const TaskModal: React.FC<TaskModalProps> = ({ // NOSONAR
           position: 'fixed',
           inset: isMaximized ? '60px 20px 20px 20px' : 'auto 15vh 7.5vh auto',
           height: isMaximized ? 'auto' : '650px',
-          width: isMaximized ? 'auto' : '650px',
+          width: isMaximized ? 'auto' : 'min(650px, calc(100vw - 120px))',
           backgroundColor: '#ffffff',
           zIndex: 1000,
           display: 'flex',
