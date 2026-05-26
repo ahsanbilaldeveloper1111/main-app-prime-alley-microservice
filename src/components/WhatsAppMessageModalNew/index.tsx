@@ -218,9 +218,7 @@ const WhatsAppMessageModal: React.FC<WhatsAppMessageModalProps> = ({
       <div style={{
         position: 'fixed',
         inset: 0,
-        backgroundColor: 'rgba(0, 0, 0, 0.3)',
-        backdropFilter: 'blur(4px)',
-        WebkitBackdropFilter: 'blur(4px)',
+        backgroundColor: 'rgba(0, 0, 0, 0.15)',
         zIndex: 999,
       }} onClick={onClose} />
       <div
