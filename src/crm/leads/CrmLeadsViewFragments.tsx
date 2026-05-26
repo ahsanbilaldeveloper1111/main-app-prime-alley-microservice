@@ -2224,7 +2224,7 @@ export function CrmLeadsViewFragment02() {
         style={{
           display: "flex",
           gap: "0",
-          height: "calc(100vh)",
+          height: "calc(100vh - 74px)",
           overflow: "hidden",
         }}
       >
