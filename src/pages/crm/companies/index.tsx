@@ -707,6 +707,23 @@ const CrmCompanyManagement = () => {
     to: 0,
   });
 
+  const [sidebarMarginTop, setSidebarMarginTop] = useState<number>(0);
+
+  useEffect(() => {
+    const updateSidebarMarginTop = () => {
+      const tabsEl = document.querySelector<HTMLElement>('.gt-toolbar-tabs-section');
+      if (tabsEl) {
+        setSidebarMarginTop(Math.round(tabsEl.getBoundingClientRect().height));
+      }
+    };
+    const timer = setTimeout(updateSidebarMarginTop, 100);
+    window.addEventListener('resize', updateSidebarMarginTop);
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener('resize', updateSidebarMarginTop);
+    };
+  }, []);
+
   // Function to fetch campaigns by IDs
   const fetchCampaignsByIds = useCallback(async (campaignIds: number[]) => {
     try {
@@ -2288,9 +2305,10 @@ const CrmCompanyManagement = () => {
   const renderAddContactsButton = () => (
     <div
       style={{
-        position: "absolute",
-        right: "19px",
-        top: "18px",
+        position: "fixed",
+        top: "64px",
+        right: "24px",
+        zIndex: 100,
         display: "flex",
         alignItems: "center",
         gap: "8px",
@@ -2337,7 +2355,7 @@ const CrmCompanyManagement = () => {
         }}
         style={{
           padding: "9px 13px",
-          backgroundColor: "#000000",
+          backgroundColor: "#0066CC",
           color: "#ffffff",
           border: "none",
           borderRadius: "4px",
@@ -4537,6 +4555,8 @@ const CrmCompanyManagement = () => {
 
             return (
               <GenericSidebar
+                sidebarMarginTop={sidebarMarginTop}
+                width={window.innerWidth < 1280 ? "360px" : "420px"}
                 isOpen={showCompanySidebar}
                 onClose={handleCloseCompanySidebar}
                 title={selectedCompany?.name || "Company Details"}
