@@ -639,7 +639,7 @@ const EmailModal: React.FC<EmailModalProps> = ({
         position: "fixed",
         ...(isMaximized
           ? { top: "60px", right: "20px", bottom: "20px", left: "20px" }
-          : { right: "15vh", bottom: "7.5vh", width: "650px", height: "550px" }),
+          : { right: "15vh", bottom: "7.5vh", width: "min(650px, calc(100vw - 120px))", height: "min(550px, calc(100vh - 120px))"}),
         backgroundColor: "#ffffff",
         zIndex: 1000,
         display: "flex",
