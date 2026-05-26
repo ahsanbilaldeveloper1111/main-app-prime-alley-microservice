@@ -508,11 +508,11 @@ const MeetingModal: React.FC<MeetingModalProps> = ({
         ...(isMaximized
           ? { top: '74px', left: '50%', transform: 'translateX(-50%)', width: 'min(1200px, calc(100vw - 84px))', maxHeight: 'calc(100vh - 94px)' }
           : {
-              top: '50%',
               left: '50%',
+              top: '50%',
               transform: 'translate(-50%, -50%)',
-              width: 'min(1320px, calc(100vw - 40px))',
-              height: 'min(750px, calc(100vh - 80px))',
+              width: 'min(1000px, calc(100vw - 120px))',
+              height: 'min(650px, calc(100vh - 120px))',
             }),
         backgroundColor: '#ffffff',
         zIndex: 1000,

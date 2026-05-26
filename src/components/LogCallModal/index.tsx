@@ -331,8 +331,8 @@ const LogCallModal: React.FC<LogCallModalProps> = ({
       <div
         style={{
           position: 'fixed',
-          inset: isMaximized ? 'unset' : 'auto 15vh 0.5vh auto',
-          ...(isMaximized ? { top: '74px', left: '50%', transform: 'translateX(-50%)', width: 'min(900px, calc(100vw - 84px))', maxHeight: 'calc(100vh - 94px)' } : {}),
+          inset: isMaximized ? 'unset' : 'unset',
+          ...(isMaximized ? { top: '74px', left: '50%', transform: 'translateX(-50%)', width: 'min(900px, calc(100vw - 84px))', maxHeight: 'calc(100vh - 94px)' } : { left: '50%', top: '50%', transform: 'translate(-50%, -50%)', width: 'min(650px, calc(100vw - 120px))' }),
           height: isMaximized ? 'auto' : 'auto',
           width: isMaximized ? 'auto' : 'min(650px, calc(100vw - 120px))',
           backgroundColor: '#ffffff',

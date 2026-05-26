@@ -35,7 +35,8 @@ const modalContainerStyle: React.CSSProperties = {
   borderRadius: '8px',
   border: '1px solid #cbd5e0',
   overflow: 'hidden',
-  animation: 'slideInUp 0.3s ease-out',
+  animation: 'none',
+  transition: 'none',
 };
 
 const sectionBoxStyle: React.CSSProperties = {
@@ -218,7 +219,7 @@ const WhatsAppMessageModal: React.FC<WhatsAppMessageModalProps> = ({
         ...modalContainerStyle,
         ...(isMaximized
           ? { top: '74px', left: '50%', transform: 'translateX(-50%)', width: 'min(900px, calc(100vw - 84px))', maxHeight: 'calc(100vh - 94px)' }
-          : { right: '15vh', bottom: '7.5vh', width: 'min(650px, calc(100vw - 120px))', height: 'min(650px, calc(100vh - 120px))' }),
+          : { left: '50%', top: '50%', transform: 'translate(-50%, -50%)', width: 'min(650px, calc(100vw - 120px))', height: 'min(650px, calc(100vh - 120px))', willChange: 'transform' }),
       }}
     >
       {/* ── Header ── */}
