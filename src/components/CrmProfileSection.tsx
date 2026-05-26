@@ -43,19 +43,19 @@ const CrmProfileSection: React.FC<CrmProfileSectionProps> = ({
         </h3>
       </div>
 
-      <div style={{ padding: "20px" }}>
+      <div style={{ padding: "12px 16px" }}>
         <div
           style={{
             display: "grid",
             gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
-            gap: "20px",
+            gap: "12px",
           }}
         >
           {fields.map((field, index) => (
             <div key={index}>
               <div
                 style={{
-                  fontSize: "13px",
+                  fontSize: "12px",
                   color: "#666666",
                   marginBottom: "4px",
                 }}
