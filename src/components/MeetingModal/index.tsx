@@ -506,7 +506,7 @@ const MeetingModal: React.FC<MeetingModalProps> = ({
       style={{
         position: 'fixed',
         ...(isMaximized
-          ? { top: '60px', right: '20px', bottom: '20px', left: '20px' }
+          ? { top: '74px', left: '50%', transform: 'translateX(-50%)', width: 'min(1200px, calc(100vw - 84px))', maxHeight: 'calc(100vh - 94px)' }
           : {
               top: '50%',
               left: '50%',

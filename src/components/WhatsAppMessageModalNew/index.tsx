@@ -217,7 +217,7 @@ const WhatsAppMessageModal: React.FC<WhatsAppMessageModalProps> = ({
       style={{
         ...modalContainerStyle,
         ...(isMaximized
-          ? { top: '60px', right: '20px', bottom: '20px', left: '20px' }
+          ? { top: '74px', left: '50%', transform: 'translateX(-50%)', width: 'min(900px, calc(100vw - 84px))', maxHeight: 'calc(100vh - 94px)' }
           : { right: '15vh', bottom: '7.5vh', width: 'min(650px, calc(100vw - 120px))', height: 'min(650px, calc(100vh - 120px))' }),
       }}
     >

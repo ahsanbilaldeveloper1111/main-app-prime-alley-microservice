@@ -1452,7 +1452,8 @@ const NotesModal: React.FC<NotesModalProps> = ({
     <div
       style={{
         position: "fixed",
-        inset: isMaximized ? "60px 20px 20px 20px" : "auto 15vh 0.5vh auto",
+        inset: isMaximized ? "unset" : "auto 15vh 0.5vh auto",
+        ...(isMaximized ? { top: "74px", left: "50%", transform: "translateX(-50%)", width: "min(900px, calc(100vw - 84px))", maxHeight: "calc(100vh - 94px)" } : {}),
         height: isMaximized ? "auto" : "512px",
         width: isMaximized ? "auto" : "min(650px, calc(100vw - 120px))",
         backgroundColor: "#ffffff",
@@ -3024,7 +3025,8 @@ const TaskModal: React.FC<TaskModalProps> = ({
       <div
         style={{
           position: "fixed",
-          inset: isMaximized ? "60px 20px 20px 20px" : "auto 15vh 7.5vh auto",
+          inset: isMaximized ? "unset" : "auto 15vh 7.5vh auto",
+          ...(isMaximized ? { top: "74px", left: "50%", transform: "translateX(-50%)", width: "min(900px, calc(100vw - 84px))", maxHeight: "calc(100vh - 94px)" } : {}),
           height: isMaximized ? "auto" : "650px",
           width: isMaximized ? "auto" : "min(650px, calc(100vw - 120px))",
           backgroundColor: "#ffffff",
@@ -6921,6 +6923,7 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
     };
     const logHandler = logHandlerByAction[actionId];
     if (logHandler) {
+      window.dispatchEvent(new CustomEvent("close-all-activity-modals"));
       logHandler();
       return;
     }

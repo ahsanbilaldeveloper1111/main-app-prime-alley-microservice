@@ -3,7 +3,7 @@
  * used on prospect, lead, deal, and order detail pages. Provides modal state,
  * openers for the sidebar icon bar, and props for CrmActivitiesPanel.
  */
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/router";
 import { createCrmNote, createMeeting, createTask } from "@utils/crm";
@@ -84,12 +84,25 @@ export function useCrmActivityModals({
   const [showSmsModal, setShowSmsModal] = useState(false);
   const [showWhatsAppModal, setShowWhatsAppModal] = useState(false);
 
-  const openNote = useCallback(() => setShowNotesModal(true), []);
-  const openEmail = useCallback(() => setShowEmailModal(true), []);
-  const openTask = useCallback(() => setShowTaskModal(true), []);
-  const openMeeting = useCallback(() => setShowMeetingModal(true), []);
-  const openSms = useCallback(() => setShowSmsModal(true), []);
-  const openWhatsApp = useCallback(() => setShowWhatsAppModal(true), []);
+  const openNote = useCallback(() => { setShowEmailModal(false); setShowTaskModal(false); setShowMeetingModal(false); setShowSmsModal(false); setShowWhatsAppModal(false); setShowNotesModal(true); }, []);
+  const openEmail = useCallback(() => { setShowNotesModal(false); setShowTaskModal(false); setShowMeetingModal(false); setShowSmsModal(false); setShowWhatsAppModal(false); setShowEmailModal(true); }, []);
+  const openTask = useCallback(() => { setShowNotesModal(false); setShowEmailModal(false); setShowMeetingModal(false); setShowSmsModal(false); setShowWhatsAppModal(false); setShowTaskModal(true); }, []);
+  const openMeeting = useCallback(() => { setShowNotesModal(false); setShowEmailModal(false); setShowTaskModal(false); setShowSmsModal(false); setShowWhatsAppModal(false); setShowMeetingModal(true); }, []);
+  const openSms = useCallback(() => { setShowNotesModal(false); setShowEmailModal(false); setShowTaskModal(false); setShowMeetingModal(false); setShowWhatsAppModal(false); setShowSmsModal(true); }, []);
+  const openWhatsApp = useCallback(() => { setShowNotesModal(false); setShowEmailModal(false); setShowTaskModal(false); setShowMeetingModal(false); setShowSmsModal(false); setShowWhatsAppModal(true); }, []);
+
+  useEffect(() => {
+    const handleCloseAll = () => {
+      setShowNotesModal(false);
+      setShowEmailModal(false);
+      setShowTaskModal(false);
+      setShowMeetingModal(false);
+      setShowSmsModal(false);
+      setShowWhatsAppModal(false);
+    };
+    window.addEventListener("close-all-activity-modals", handleCloseAll);
+    return () => window.removeEventListener("close-all-activity-modals", handleCloseAll);
+  }, []);
 
   const handleNoteSave = useCallback(
     async (payload: NotesModalSavePayload) => {

@@ -821,6 +821,19 @@ const CrmActivitiesPanelInnerRender: React.ForwardRefRenderFunction<
     return () => clearTimeout(t);
   }, [whatsappMessagesLoading, whatsappMessages]);
 
+  useEffect(() => {
+    const handleCloseAll = () => {
+      setShowEmailModal(false);
+      setShowNotesModal(false);
+      setShowMeetingModal(false);
+      setShowSmsModal(false);
+      setShowWhatsAppModal(false);
+      setEditMeetingModalOpen(false);
+    };
+    window.addEventListener("close-all-activity-modals", handleCloseAll);
+    return () => window.removeEventListener("close-all-activity-modals", handleCloseAll);
+  }, []);
+
   const handleNoteCreate = useCallback(
     async (payload: NotesModalSavePayload) => {
       const text = (payload.note ?? "").trim();
@@ -1495,7 +1508,7 @@ const CrmActivitiesPanelInnerRender: React.ForwardRefRenderFunction<
               alignItems: "center",
               gap: "6px",
             }}
-            onClick={onOpenEmail ?? (() => setShowEmailModal(true))}
+            onClick={onOpenEmail ?? (() => { setShowNotesModal(false); setShowMeetingModal(false); setShowSmsModal(false); setShowWhatsAppModal(false); setShowEmailModal(true); })}
           >
             <Mail size={16} />
             Create email
@@ -1526,7 +1539,7 @@ const CrmActivitiesPanelInnerRender: React.ForwardRefRenderFunction<
               alignItems: "center",
               gap: "6px",
             }}
-            onClick={onOpenNote ?? (() => setShowNotesModal(true))}
+            onClick={onOpenNote ?? (() => { setShowEmailModal(false); setShowMeetingModal(false); setShowSmsModal(false); setShowWhatsAppModal(false); setShowNotesModal(true); })}
           >
             <ClipboardList size={16} />
             Create note
@@ -1557,7 +1570,7 @@ const CrmActivitiesPanelInnerRender: React.ForwardRefRenderFunction<
               alignItems: "center",
               gap: "6px",
             }}
-            onClick={onOpenMeeting ?? (() => setShowMeetingModal(true))}
+            onClick={onOpenMeeting ?? (() => { setShowEmailModal(false); setShowNotesModal(false); setShowSmsModal(false); setShowWhatsAppModal(false); setShowMeetingModal(true); })}
           >
             <Calendar size={16} />
             Create meeting
@@ -2993,13 +3006,13 @@ const CrmActivitiesPanelInnerRender: React.ForwardRefRenderFunction<
                     tabIndex={0}
                     onClick={() => {
                       setSelectedSmsId(sms.id);
-                      setShowSmsModal(true);
+                      setShowEmailModal(false); setShowNotesModal(false); setShowMeetingModal(false); setShowWhatsAppModal(false); setShowSmsModal(true);
                     }}
                     onKeyDown={(e) => {
                       if (e.key === "Enter" || e.key === " ") {
                         e.preventDefault();
                         setSelectedSmsId(sms.id);
-                        setShowSmsModal(true);
+                        setShowEmailModal(false); setShowNotesModal(false); setShowMeetingModal(false); setShowWhatsAppModal(false); setShowSmsModal(true);
                       }
                     }}
                     style={{
@@ -3311,7 +3324,7 @@ const CrmActivitiesPanelInnerRender: React.ForwardRefRenderFunction<
                       }
                       setSelectedWhatsAppChatId(chat.id);
                       setSelectedWhatsAppChat(chat);
-                      setShowWhatsAppModal(true);
+                      setShowEmailModal(false); setShowNotesModal(false); setShowMeetingModal(false); setShowSmsModal(false); setShowWhatsAppModal(true);
                     }}
                     onKeyDown={(e) => {
                       if (e.key === "Enter" || e.key === " ") {
@@ -3325,7 +3338,7 @@ const CrmActivitiesPanelInnerRender: React.ForwardRefRenderFunction<
                         }
                         setSelectedWhatsAppChatId(chat.id);
                         setSelectedWhatsAppChat(chat);
-                        setShowWhatsAppModal(true);
+                        setShowEmailModal(false); setShowNotesModal(false); setShowMeetingModal(false); setShowSmsModal(false); setShowWhatsAppModal(true);
                       }
                     }}
                     style={{
