@@ -317,16 +317,14 @@ const LogCallModal: React.FC<LogCallModalProps> = ({
 
   return (
     <>
-      {/* Backdrop (subtle) */}
-      <div
-        onClick={handleClose}
-        style={{
-          position: 'fixed',
-          inset: 0,
-          zIndex: 999,
-          backgroundColor: 'transparent',
-        }}
-      />
+      <div style={{
+        position: 'fixed',
+        inset: 0,
+        backgroundColor: 'rgba(0, 0, 0, 0.3)',
+        backdropFilter: 'blur(4px)',
+        WebkitBackdropFilter: 'blur(4px)',
+        zIndex: 999,
+      }} onClick={handleClose} />
 
       <div
         style={{

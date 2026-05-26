@@ -634,7 +634,16 @@ const EmailModal: React.FC<EmailModalProps> = ({
   };
 
   return (
-    <div
+    <React.Fragment>
+      <div style={{
+        position: 'fixed',
+        inset: 0,
+        backgroundColor: 'rgba(0, 0, 0, 0.3)',
+        backdropFilter: 'blur(4px)',
+        WebkitBackdropFilter: 'blur(4px)',
+        zIndex: 999,
+      }} onClick={onClose} />
+      <div
       style={{
         position: "fixed",
         ...(isMaximized
@@ -1921,6 +1930,7 @@ const EmailModal: React.FC<EmailModalProps> = ({
         </div>
       </div>
     </div>
+    </React.Fragment>
   );
 };
 

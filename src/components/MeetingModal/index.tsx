@@ -502,7 +502,16 @@ const MeetingModal: React.FC<MeetingModalProps> = ({
   ];
 
   return (
-    <div
+    <React.Fragment>
+      <div style={{
+        position: 'fixed',
+        inset: 0,
+        backgroundColor: 'rgba(0, 0, 0, 0.3)',
+        backdropFilter: 'blur(4px)',
+        WebkitBackdropFilter: 'blur(4px)',
+        zIndex: 999,
+      }} onClick={onClose} />
+      <div
       style={{
         position: 'fixed',
         ...(isMaximized
@@ -1533,6 +1542,7 @@ const MeetingModal: React.FC<MeetingModalProps> = ({
         </div>
       </div>
     </div>
+    </React.Fragment>
   );
 };
 

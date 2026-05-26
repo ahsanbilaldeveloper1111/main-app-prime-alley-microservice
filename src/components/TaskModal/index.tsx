@@ -691,6 +691,14 @@ const TaskModal: React.FC<TaskModalProps> = ({ // NOSONAR
         onClose={() => setUrlModalType(null)}
         onInsertHtml={insertHtmlAtSelection}
       />
+      <div style={{
+        position: 'fixed',
+        inset: 0,
+        backgroundColor: 'rgba(0, 0, 0, 0.3)',
+        backdropFilter: 'blur(4px)',
+        WebkitBackdropFilter: 'blur(4px)',
+        zIndex: 999,
+      }} onClick={onClose} />
       <div
         style={{
           position: 'fixed',
