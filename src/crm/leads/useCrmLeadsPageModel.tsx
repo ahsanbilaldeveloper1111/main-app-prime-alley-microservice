@@ -2597,17 +2597,17 @@ export function useCrmLeadsPageModel() {
       session?.user?.permissions?.includes(PERMISSIONS.CREATE_CRM_LEADS) ? (
         <div
           style={{
-            position: "absolute",
-            right: "40px",
-            top: "18px",
-            width: "auto",
+            position: "fixed",
+            top: "64px",
+            right: "24px",
+            zIndex: 100,
           }}
         >
           <button
             onClick={() => setShowCreateLeadModal(true)}
             style={{
               padding: "9px 13px",
-              backgroundColor: "#000000",
+              backgroundColor: "#0066CC",
               color: "#ffffff",
               border: "none",
               borderRadius: "4px",
