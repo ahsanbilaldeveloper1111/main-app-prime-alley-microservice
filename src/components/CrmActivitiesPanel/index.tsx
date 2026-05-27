@@ -192,6 +192,17 @@ function formatValForAudit(v: unknown): string {
   return String(v);
 }
 
+const formatIfDate = (val: string): string => {
+  if (!val || val === "—") return val;
+  const iso = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(val);
+  if (!iso) return val;
+  try {
+    return formatCrmPreviewDateTime(val);
+  } catch {
+    return val;
+  }
+};
+
 /** Resolve assigned_to ID/extension to display label (pure). */
 function resolveAssignedToLabel(
   val: unknown,
@@ -1377,7 +1388,7 @@ const CrmActivitiesPanelInnerRender: React.ForwardRefRenderFunction<
                   <h4
                     style={{
                       fontSize: "14px",
-                      fontWeight: "600",
+                      fontWeight: "500",
                       color: "#141414",
                       margin: 0,
                     }}
@@ -1388,8 +1399,8 @@ const CrmActivitiesPanelInnerRender: React.ForwardRefRenderFunction<
                 </div>
                 <p
                   style={{
-                    fontSize: "14px",
-                    color: "#141414",
+                    fontSize: "clamp(11px, 0.9vw, 13px)",
+                    color: "#718096",
                     margin: "4px 0",
                     lineHeight: "1.6",
                   }}
@@ -1410,8 +1421,11 @@ const CrmActivitiesPanelInnerRender: React.ForwardRefRenderFunction<
                                 marginTop: i ? "6px" : 0,
                               }}
                             >
-                              <strong>{c.field}</strong>: {c.oldVal} →{" "}
-                              {c.newVal}
+                              <span style={{ fontSize: "clamp(10px, 0.8vw, 12px)", color: "#718096", fontWeight: "500" }}>{c.field}</span>
+                              <span style={{ color: "#718096", fontWeight: "400" }}>: </span>
+                              <span style={{ color: "#718096" }}>{formatIfDate(c.oldVal)}</span>
+                              <span style={{ color: "#718096" }}> → </span>
+                              <span style={{ color: "#141414", fontWeight: "500" }}>{formatIfDate(c.newVal)}</span>
                             </span>
                           ))
                         : (activity.auditDescription ?? activity.description)}
@@ -2847,8 +2861,8 @@ const CrmActivitiesPanelInnerRender: React.ForwardRefRenderFunction<
                           </p>
                           <p
                             style={{
-                              fontSize: "14px",
-                              color: "#141414",
+                              fontSize: "13px",
+                              color: "#718096",
                               margin: "4px 0",
                               lineHeight: "1.6",
                             }}
@@ -3042,15 +3056,8 @@ const CrmActivitiesPanelInnerRender: React.ForwardRefRenderFunction<
                             marginBottom: "4px",
                           }}
                         >
-                          <span
-                            style={{
-                              fontSize: "13px",
-                              fontWeight: "600",
-                              color: "#141414",
-                            }}
-                          >
-                            To: {sms.to}
-                          </span>
+                          <span style={{ fontSize: "clamp(10px, 0.8vw, 12px)", color: "#718096" }}>To: </span>
+                          <span style={{ fontSize: "clamp(11px, 0.9vw, 13px)", color: "#141414", fontWeight: "500" }}>{sms.to}</span>
                           {sms.status != null && (
                             <span
                               style={{
@@ -3670,12 +3677,11 @@ const CrmActivitiesPanelInnerRender: React.ForwardRefRenderFunction<
                 <div style={{ padding: "20px" }}>
                   <div
                     style={{
-                      fontSize: "13px",
-                      color: "#718096",
                       marginBottom: "8px",
                     }}
                   >
-                    To: {selectedSms.to}
+                    <span style={{ fontSize: "clamp(10px, 0.8vw, 12px)", color: "#718096" }}>To: </span>
+                    <span style={{ fontSize: "clamp(11px, 0.9vw, 13px)", color: "#141414", fontWeight: "500" }}>{selectedSms.to}</span>
                   </div>
                   <div
                     style={{
@@ -3782,21 +3788,19 @@ const CrmActivitiesPanelInnerRender: React.ForwardRefRenderFunction<
                 <div style={{ padding: "20px" }}>
                   <div
                     style={{
-                      fontSize: "13px",
-                      color: "#718096",
                       marginBottom: "4px",
                     }}
                   >
-                    From: {fromDisplay}
+                    <span style={{ fontSize: "clamp(10px, 0.8vw, 12px)", color: "#718096" }}>From: </span>
+                    <span style={{ fontSize: "clamp(11px, 0.9vw, 13px)", color: "#141414", fontWeight: "500" }}>{fromDisplay}</span>
                   </div>
                   <div
                     style={{
-                      fontSize: "13px",
-                      color: "#718096",
                       marginBottom: "8px",
                     }}
                   >
-                    To: {toDisplay}
+                    <span style={{ fontSize: "clamp(10px, 0.8vw, 12px)", color: "#718096" }}>To: </span>
+                    <span style={{ fontSize: "clamp(11px, 0.9vw, 13px)", color: "#141414", fontWeight: "500" }}>{toDisplay}</span>
                   </div>
                   <div
                     style={{
