@@ -142,7 +142,7 @@ const Card: React.FC<{
           style={{
             fontSize: 14,
             fontWeight: 600,
-            color: TEAL,
+            color: "#0066CC",
             cursor: "pointer",
             fontFamily: FONT,
             lineHeight: "18px",
@@ -162,7 +162,7 @@ const Card: React.FC<{
           <span
             title={card.email}
             style={{
-              fontSize: 11.5, color: TEAL, fontFamily: FONT,
+              fontSize: 11.5, color: "#4a5568", fontFamily: FONT,
               overflow: "hidden", textOverflow: "ellipsis",
               whiteSpace: "nowrap", maxWidth: 180, lineHeight: "18px",
             }}
@@ -405,6 +405,7 @@ const Column: React.FC<{
         flexShrink: 0,
         width: isCollapsed ? 36 : COL_W,
         minWidth: isCollapsed ? 36 : COL_W,
+        flex: isCollapsed ? "0 0 36px" : "1 1 280px",
         maxHeight: "100%",
         overflow: "hidden",
         transition: "width .15s ease",
