@@ -27,6 +27,7 @@ export interface KanbanColumnDef {
   id: string;
   title: string;
   cards: KanbanCardData[];
+  color?: string;
 }
 
 export interface KanbanBoardProps {
@@ -213,7 +214,8 @@ const ColumnHeader: React.FC<{
   isCollapsed: boolean;
   isLast: boolean;
   onToggle: () => void;
-}> = ({ title, count, isCollapsed, isLast, onToggle }) => {
+  color?: string;
+}> = ({ title, count, isCollapsed, isLast, onToggle, color }) => {
   const [hov, setHov] = useState(false);
 
   if (isCollapsed) {
@@ -297,7 +299,7 @@ const ColumnHeader: React.FC<{
         position: "relative",
         height: HEADER_H,
         flexShrink: 0,
-        backgroundColor: "#ccc",
+        backgroundColor: color || "#6c757d",
         borderTopLeftRadius: 0,
         clipPath: clipPathValue,
         zIndex: 1,
@@ -311,7 +313,7 @@ const ColumnHeader: React.FC<{
           left: 1,
           right: isLast ? 1 : 0,
           bottom: 1,
-          backgroundColor: "#f7f2f7",
+          backgroundColor: color ? `${color}22` : "#f7f2f7",
           borderTopLeftRadius: 0,
           display: "flex",
           alignItems: "center",
@@ -422,6 +424,7 @@ const Column: React.FC<{
           isCollapsed={isCollapsed}
           isLast={isLast}
           onToggle={onToggle}
+          color={col.color}
         />
       </div>
 
