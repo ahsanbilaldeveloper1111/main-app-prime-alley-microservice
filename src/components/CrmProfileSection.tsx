@@ -33,7 +33,7 @@ const CrmProfileSection: React.FC<CrmProfileSectionProps> = ({
       >
         <h3
           style={{
-            fontSize: "16px",
+            fontSize: "clamp(13px, 1vw, 16px)",
             fontWeight: "600",
             color: "#141414",
             margin: 0,
@@ -55,7 +55,7 @@ const CrmProfileSection: React.FC<CrmProfileSectionProps> = ({
             <div key={index}>
               <div
                 style={{
-                  fontSize: "12px",
+                  fontSize: "clamp(10px, 0.8vw, 12px)",
                   color: "#666666",
                   marginBottom: "4px",
                 }}
@@ -64,7 +64,7 @@ const CrmProfileSection: React.FC<CrmProfileSectionProps> = ({
               </div>
               <div
                 style={{
-                  fontSize: "14px",
+                  fontSize: "clamp(11px, 0.9vw, 13px)",
                   color: field.link ? "#006162" : "#141414",
                   wordBreak: "break-word",
                 }}

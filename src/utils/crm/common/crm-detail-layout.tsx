@@ -698,7 +698,7 @@ export function CrmDetailPageLayout( // NOSONAR
                   display: "flex",
                   alignItems: "center",
                   gap: "8px",
-                  fontSize: "14px",
+                  fontSize: "clamp(12px, 1vw, 14px)",
                   color: "#141414",
                   fontWeight: "500",
                 }}
@@ -764,7 +764,7 @@ export function CrmDetailPageLayout( // NOSONAR
               <div style={{ display: "flex", alignItems: "flex-start", gap: "12px", marginBottom: "12px" }}>
                 {headerAvatar}
                 <div style={{ flex: 1 }}>
-                  <h2 style={{ fontSize: "18px", fontWeight: "500", color: "#141414", margin: "0 0 4px 0", lineHeight: "1.3" }}>
+                  <h2 style={{ fontSize: "clamp(15px, 1.2vw, 18px)", fontWeight: "500", color: "#141414", margin: "0 0 4px 0", lineHeight: "1.3" }}>
                     {config.avatarDisplayName ?? "—"}
                   </h2>
                   {(() => {
@@ -908,7 +908,7 @@ export function CrmDetailPageLayout( // NOSONAR
                     >
                       <Icon size={20} />
                     </button>
-                    <span style={{ fontSize: "12px", color: "#141414", fontWeight: "400" }}>{action.label}</span>
+                    <span style={{ fontSize: "clamp(10px, 0.8vw, 12px)", color: "#141414", fontWeight: "400" }}>{action.label}</span>
                   </div>
                 );
               })}
@@ -982,7 +982,7 @@ export function CrmDetailPageLayout( // NOSONAR
                     transition: "transform 0.2s ease",
                   }}
                 />
-                <h3 style={{ fontSize: "16px", fontWeight: "600", color: "#141414", margin: 0 }}>Key information</h3>
+                <h3 style={{ fontSize: "clamp(13px, 1vw, 16px)", fontWeight: "600", color: "#141414", margin: 0 }}>Key information</h3>
               </button>
               {config.recordType !== "company" && (
                 <button
@@ -1013,9 +1013,9 @@ export function CrmDetailPageLayout( // NOSONAR
               <div id="key-info-section-content" style={{ padding: "12px 16px", maxHeight: "none", overflowY: "auto" }}>
                 {config.keyInfoFields.map((field) => (
                   <div key={field.label} style={{ paddingTop: "10px", paddingBottom: "10px", borderBottom: "1px solid #f0f0f0" }}>
-                    <div style={{ fontSize: "12px", fontWeight: "400", color: "#666", marginBottom: "4px" }}>{field.label}</div>
+                    <div style={{ fontSize: "clamp(10px, 0.8vw, 12px)", fontWeight: "400", color: "#666", marginBottom: "4px" }}>{field.label}</div>
                     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px" }}>
-                      <div style={{ fontSize: "13px", color: "#141414", fontWeight: "400", flex: 1 }}>{field.value}</div>
+                      <div style={{ fontSize: "clamp(11px, 0.9vw, 13px)", color: "#141414", fontWeight: "400", flex: 1 }}>{field.value}</div>
                       {field.copyable && field.value !== "--" && (
                         <button
                           onClick={() => copyToClipboard(field.value ?? "")}
