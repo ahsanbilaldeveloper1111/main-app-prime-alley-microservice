@@ -48,6 +48,8 @@ export interface KanbanBoardProps {
   /** Right-click menu items (same rules as GenericTable row actions). */
   cardContextMenuItems?: (card: KanbanCardData) => BoundTableContextMenuItem[];
   searchValue?: string;
+  /** Optional height for the board container. Defaults to calc(100vh - 194px) */
+  boardHeight?: string;
 }
 
 // ─── Mini avatar ──────────────────────────────────────────────────────────────
@@ -483,6 +485,7 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({
   onCardMove,
   cardContextMenuItems,
   searchValue,
+  boardHeight = "calc(100vh - 194px)",
 }) => {
   const [columns, setColumns]     = useState<KanbanColumnDef[]>(initialColumns);
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
@@ -657,7 +660,7 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({
         style={{
           display: "flex",
           flexDirection: "row",
-          height: "80vh",
+          height: boardHeight,
           width: "100%",
           overflowX: "auto",
           overflowY: "hidden",

@@ -2549,6 +2549,22 @@ export function CrmDealsListScreenView({
   const [dealsViewMode, setDealsViewMode] = useState<"table" | "board">(() =>
     listVariant === "approvals" ? "table" : "board",
   );
+  const [boardHeight, setBoardHeight] = useState("calc(100vh - 194px)");
+  const toolbarRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const el = document.querySelector(".gt-toolbar-container");
+    if (!el) return;
+    const observer = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        const toolbarH = entry.contentRect.height;
+        setBoardHeight(`calc(100vh - 74px - ${toolbarH}px)`);
+      }
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
   const [exportFilters, setExportFilters] = useState<Record<string, any>>({});
   const [exportFileName, setExportFileName] = useState("");
   const [exporting, setExporting] = useState(false);
@@ -4236,6 +4252,7 @@ export function CrmDealsListScreenView({
                         }
                       }}
                       searchValue={dealsSearch}
+                      boardHeight={boardHeight}
                     />
                   ) : undefined
                 }
