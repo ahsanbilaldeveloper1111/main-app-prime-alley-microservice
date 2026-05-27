@@ -1485,12 +1485,12 @@ const CrmActivitiesPanelInnerRender: React.ForwardRefRenderFunction<
               border: "none",
               borderBottom:
                 activityFilter === filter.id
-                  ? "2px solid #141414"
+                  ? "2px solid #0066CC"
                   : "2px solid transparent",
               cursor: "pointer",
               fontSize: "14px",
               fontWeight: activityFilter === filter.id ? "600" : "400",
-              color: "#141414",
+              color: activityFilter === filter.id ? "#141414" : "#718096",
               transition: "all 0.2s",
               marginBottom: "-2px",
             }}
@@ -1507,7 +1507,7 @@ const CrmActivitiesPanelInnerRender: React.ForwardRefRenderFunction<
             alignItems: "center",
             justifyContent: "flex-end",
             gap: "12px",
-            marginBottom: "20px",
+            marginBottom: "12px",
           }}
         >
           <button
