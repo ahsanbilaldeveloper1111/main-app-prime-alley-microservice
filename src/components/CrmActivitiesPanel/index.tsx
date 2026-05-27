@@ -1365,7 +1365,7 @@ const CrmActivitiesPanelInnerRender: React.ForwardRefRenderFunction<
                   )}
                 </button>
               )}
-              <div style={{ flex: 1 }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
                 <div
                   style={{
                     display: "flex",
@@ -1405,6 +1405,8 @@ const CrmActivitiesPanelInnerRender: React.ForwardRefRenderFunction<
                               key={i}
                               style={{
                                 display: "block",
+                                wordBreak: "break-word",
+                                overflowWrap: "anywhere",
                                 marginTop: i ? "6px" : 0,
                               }}
                             >
