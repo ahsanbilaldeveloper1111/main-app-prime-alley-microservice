@@ -661,6 +661,7 @@ export function CrmDetailPageLayout( // NOSONAR
     <>
       <style>{SCROLL_STYLES}</style>
       <div
+        className="crm-detail-page-layout"
         style={{
           display: "flex",
           width: "100%",
