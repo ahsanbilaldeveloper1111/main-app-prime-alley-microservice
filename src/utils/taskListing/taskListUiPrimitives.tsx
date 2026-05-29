@@ -229,7 +229,7 @@ export function TaskListingSearchRow({
               if (e.key === "Enter") onSubmitSearch();
             }}
             style={{
-              height: 41,
+              height: 36,
               width: 260,
               padding: "0 12px 0 34px",
               border: "1px solid #d1d5db",
@@ -247,8 +247,8 @@ export function TaskListingSearchRow({
           variant="outline-secondary"
           onClick={onSubmitSearch}
           style={{
-            height: 41,
-            padding: "0 16px",
+            height: 36,
+            padding: "0 14px",
             borderRadius: "0 20px 20px 0",
             border: "1px solid #d1d5db",
             borderLeft: "none",
@@ -258,6 +258,8 @@ export function TaskListingSearchRow({
             alignItems: "center",
             fontSize: 13,
             fontFamily: "Lexend Deca, Helvetica, Arial, sans-serif",
+            outline: "none",
+            boxShadow: "none",
           }}
         >
           <FiSearch size={15} />
