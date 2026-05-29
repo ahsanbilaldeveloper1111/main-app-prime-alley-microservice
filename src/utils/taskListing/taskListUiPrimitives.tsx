@@ -319,8 +319,8 @@ export function buildTaskListingPageStyleTag(options?: {
 }): string {
   const hoverRules = options?.showTitleHoverEditButton
     ? `
-          .tasks-page .task-title-cell .task-edit-btn { visibility: hidden; }
-          .tasks-page .task-title-cell:hover .task-edit-btn { visibility: visible; }
+          .tasks-page .task-title-cell .ptl-title-edit-btn { visibility: hidden; }
+          .tasks-page .task-title-cell:hover .ptl-title-edit-btn { visibility: visible; }
   `
     : "";
   const extra = options?.extraRules ?? "";
