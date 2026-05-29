@@ -455,3 +455,13 @@
   border-radius: 0 20px 20px 0 !important;
   border-left: none !important;
 }
+
+.ptl-edit-columns-menu .form-check-input:checked {
+  background-color: #0066CC !important;
+  border-color: #0066CC !important;
+}
+
+.ptl-edit-columns-menu .form-check-input:focus {
+  border-color: #0066CC !important;
+  box-shadow: 0 0 0 0.2rem rgba(0, 102, 204, 0.25) !important;
+}
