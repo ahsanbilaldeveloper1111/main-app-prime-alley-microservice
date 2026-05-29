@@ -1262,6 +1262,34 @@ export const crmAppKeys = {
     list: (params: Record<string, unknown>) =>
       [...crmAppKeys.crmTasksListing.all(), "list", JSON.stringify(params)] as const,
   },
+
+  /** CRM tickets list (`src/pages/crm/tickets`) — `/tickets/list`. */
+  crmTicketsPage: {
+    all: () => [...crmAppKeys.root, "crmTicketsPage"] as const,
+    list: (params: {
+      search: string;
+      filtersKey: string;
+      page: number;
+      perPage: number;
+      activeTab: string;
+    }) =>
+      [
+        ...crmAppKeys.crmTicketsPage.all(),
+        "list",
+        params.search,
+        params.filtersKey,
+        params.page,
+        params.perPage,
+        params.activeTab,
+      ] as const,
+    dashboard: (filtersKey: string) =>
+      [...crmAppKeys.crmTicketsPage.all(), "dashboard", filtersKey] as const,
+    detail: (ticketId: string) =>
+      [...crmAppKeys.crmTicketsPage.all(), "detail", ticketId] as const,
+    hierarchyExtensions: () =>
+      [...crmAppKeys.crmTicketsPage.all(), "hierarchyExtensions"] as const,
+    statuses: () => [...crmAppKeys.crmTicketsPage.all(), "statuses"] as const,
+  },
 };
 
 /** Control Hub lists (`src/pages/controlhub/*`). */

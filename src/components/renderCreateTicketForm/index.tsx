@@ -1,29 +1,12 @@
-import React, { useEffect, useMemo, useState } from "react";
-import { X, Plus, ChevronDown, ChevronRight, ExternalLink } from "lucide-react";
+import React from "react";
+import { X, Plus, ChevronDown, ChevronRight, ExternalLink, Loader2 } from "lucide-react";
 import { Dropdown, Form } from "react-bootstrap";
 import { APP_FONT } from "../../styles/fonts";
-import { getAllUsers } from "../../utils/users";
+import { CreateTicketSidebarFooter } from "@components/renderCreateTicketForm/CreateTicketSidebarFooter";
+import type { TicketFormData } from "@components/renderCreateTicketForm/createTicketFormTypes";
+import { useCreateTicketSidebarForm } from "@components/renderCreateTicketForm/useCreateTicketSidebarForm";
 
 const FF = APP_FONT;
-
-// ─── Type Definitions ─────────────────────────────────────────────────────────
-interface TicketFormData {
-  ticketName: string;
-  pipeline: string;
-  ticketStatus: string;
-  ticketDescription: string;
-  source: string;
-  ticketOwner: string;
-  priority: string;
-  createDate: string;
-  // Associations
-  contactAssociateRecord: string;
-  contactAssociationLabel: string;
-  addTimelineContact: boolean;
-  companyAssociateRecord: string;
-  companyAssociationLabel: string;
-  addTimelineCompany: boolean;
-}
 
 interface SimpleDropdownProps {
   value: string;
@@ -37,29 +20,12 @@ interface SimpleDropdownProps {
 interface CreateTicketSidebarProps {
   onClose: () => void;
   onSuccess?: () => void;
+  editTicketId?: number | null;
+  /** List-row or preview payload used while view-ticket loads (and as fallback). */
+  initialTicket?: unknown;
 }
 
-// ─── Initial State ────────────────────────────────────────────────────────────
-const initialTicketForm: TicketFormData = {
-  ticketName: "",
-  pipeline: "Support Pipeline",
-  ticketStatus: "New",
-  ticketDescription: "",
-  source: "",
-  ticketOwner: "",
-  priority: "",
-  createDate: "",
-  contactAssociateRecord: "",
-  contactAssociationLabel: "No label",
-  addTimelineContact: false,
-  companyAssociateRecord: "",
-  companyAssociationLabel: "Primary",
-  addTimelineCompany: false,
-};
-
 // ─── Dropdown options ─────────────────────────────────────────────────────────
-const PIPELINE_OPTIONS = ["Support Pipeline", "Technical Pipeline", "Billing Pipeline"];
-const TICKET_STATUS_OPTIONS = ["New", "Waiting on contact", "Waiting on us", "Closed"];
 const SOURCE_OPTIONS = ["Email", "Phone", "Chat", "Web form", "Social media"];
 const PRIORITY_OPTIONS = ["Low", "Medium", "High", "Urgent"];
 const ASSOCIATION_LABEL_OPTIONS = ["No label", "Decision Maker", "Primary", "Billing"];
@@ -158,6 +124,24 @@ const SIDEBAR_STYLE: React.CSSProperties = {
   fontFamily: FF,
 };
 
+const FORM_LOADING_OVERLAY_STYLE: React.CSSProperties = {
+  position: "absolute",
+  inset: 0,
+  zIndex: 2,
+  display: "flex",
+  flexDirection: "column",
+  alignItems: "center",
+  justifyContent: "center",
+  gap: "12px",
+  backgroundColor: "rgba(255, 255, 255, 0.88)",
+  padding: "24px",
+};
+
+const SPINNER_STYLE: React.CSSProperties = {
+  animation: "create-ticket-sidebar-spin 0.9s linear infinite",
+  color: "#0091ae",
+};
+
 // ─── Sub-components ───────────────────────────────────────────────────────────
 const SimpleDropdown: React.FC<SimpleDropdownProps> = ({
   value,
@@ -212,109 +196,50 @@ export default renderCreateTicket;
 export const CreateTicketSidebar: React.FC<CreateTicketSidebarProps> = ({
   onClose,
   onSuccess,
+  editTicketId = null,
+  initialTicket,
 }) => {
-  const [ticketForm, setTicketForm] = useState<TicketFormData>(initialTicketForm);
-  const [loading, setLoading] = useState(false);
-  const [ownerOptions, setOwnerOptions] = useState<string[]>([]);
-  const [isContactsExpanded, setIsContactsExpanded] = useState(true);
-  const [isCompaniesExpanded, setIsCompaniesExpanded] = useState(true);
-
-  const set =
-    <K extends keyof TicketFormData>(key: K) =>
-    (val: TicketFormData[K]) =>
-      setTicketForm((prev) => ({ ...prev, [key]: val }));
-
-  const setE =
-    (key: keyof TicketFormData) =>
-    (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
-      setTicketForm((prev) => ({ ...prev, [key]: e.target.value }));
-
-  const isFormValid =
-    ticketForm.ticketName.trim() !== "" &&
-    ticketForm.pipeline !== "" &&
-    ticketForm.ticketStatus !== "";
-
-  const todayDate = useMemo(() => {
-    const now = new Date();
-    const localDate = new Date(now.getTime() - now.getTimezoneOffset() * 60000);
-    return localDate.toISOString().split("T")[0];
-  }, []);
-
-  const handleCreateDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const selectedDate = e.target.value;
-    const safeDate = selectedDate && selectedDate > todayDate ? todayDate : selectedDate;
-    setTicketForm((prev) => ({ ...prev, createDate: safeDate }));
-  };
-
-  useEffect(() => {
-    const getDisplayValue = (item: unknown, keys: string[]): string => {
-      const record = (item ?? {}) as Record<string, unknown>;
-      for (const key of keys) {
-        const value = record[key];
-        if (typeof value === "string" && value.trim()) return value.trim();
-      }
-      return "";
-    };
-
-    const loadFormDropdowns = async () => {
-      try {
-        const usersResponse = await getAllUsers({ page: 1, perPage: 500 });
-
-        const userList = Array.isArray(usersResponse?.dataList)
-          ? usersResponse.dataList
-          : [];
-        const owners = userList
-          .map((user: unknown) =>
-            getDisplayValue(user, [
-              "name",
-              "display_name",
-              "full_name",
-              "first_name",
-              "email",
-              "user_extension",
-            ]),
-          )
-          .filter(Boolean);
-        setOwnerOptions(Array.from(new Set(owners)));
-
-       
-        
-      } catch (error) {
-        console.error("Failed to load create ticket dropdown options:", error);
-      }
-    };
-
-    loadFormDropdowns();
-  }, []);
-
-  useEffect(() => {
-    if (!ticketForm.ticketOwner && ownerOptions.length > 0) {
-      setTicketForm((prev) => ({ ...prev, ticketOwner: ownerOptions[0] }));
-    }
-  }, [ownerOptions, ticketForm.ticketOwner]);
+  const {
+    ticketForm,
+    loading,
+    picklistsLoading,
+    isEditMode,
+    isFormValid,
+    pipelineLabels,
+    submoduleLabels,
+    statusLabels,
+    typeLabels,
+    ownerLabels,
+    isContactsExpanded,
+    setIsContactsExpanded,
+    isCompaniesExpanded,
+    setIsCompaniesExpanded,
+    handleCreateDateChange,
+    handleSubmit,
+    setField,
+    setFieldFromEvent,
+    setTicketForm,
+    todayDate,
+  } = useCreateTicketSidebarForm({
+    editTicketId,
+    initialTicket,
+    onSuccess,
+    onClose,
+  });
 
   const focusStyle = (e: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement>) =>
     (e.currentTarget.style.borderColor = "#0091ae");
   const blurStyle = (e: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement>) =>
     (e.currentTarget.style.borderColor = "rgb(138, 138, 138)");
 
-  const handleSubmit = async () => {
-    if (!isFormValid) return;
-    setLoading(true);
-    try {
-      // Replace with actual API call e.g. createTicket(ticketForm)
-      await new Promise((res) => setTimeout(res, 800));
-      if (onSuccess) onSuccess();
-      onClose();
-    } catch (error) {
-      console.error("Failed to create ticket:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   return (
     <>
+      <style>{`
+        @keyframes create-ticket-sidebar-spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+      `}</style>
       {/* Overlay */}
       <button
         type="button"
@@ -346,7 +271,7 @@ export const CreateTicketSidebar: React.FC<CreateTicketSidebarProps> = ({
               fontFamily: FF,
             }}
           >
-            Create Ticket
+            {isEditMode ? "Edit Ticket" : "Create Ticket"}
           </h2>
           <button
             type="button"
@@ -366,7 +291,48 @@ export const CreateTicketSidebar: React.FC<CreateTicketSidebarProps> = ({
         </div>
 
         {/* ── Content ── */}
-        <div style={{ flex: 1, overflowY: "auto", padding: "16px clamp(16px, 6vw, 40px) 40px" }}>
+        <div
+          style={{
+            flex: 1,
+            position: "relative",
+            display: "flex",
+            flexDirection: "column",
+            minHeight: 0,
+          }}
+        >
+          {picklistsLoading && (
+            <div
+              style={FORM_LOADING_OVERLAY_STYLE}
+              role="status"
+              aria-live="polite"
+              aria-busy="true"
+            >
+              <Loader2 size={32} style={SPINNER_STYLE} aria-hidden="true" />
+              <p
+                style={{
+                  margin: 0,
+                  fontSize: "14px",
+                  fontWeight: 500,
+                  color: "#33475b",
+                  fontFamily: FF,
+                  textAlign: "center",
+                }}
+              >
+                {isEditMode ? "Loading ticket details..." : "Loading form options..."}
+              </p>
+            </div>
+          )}
+
+          <div
+            style={{
+              flex: 1,
+              overflowY: "auto",
+              padding: "16px clamp(16px, 6vw, 40px) 40px",
+              opacity: picklistsLoading ? 0.45 : 1,
+              pointerEvents: picklistsLoading ? "none" : "auto",
+              transition: "opacity 150ms ease-out",
+            }}
+          >
 
           {/* Edit this form link */}
           <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "20px" }}>
@@ -399,7 +365,7 @@ export const CreateTicketSidebar: React.FC<CreateTicketSidebarProps> = ({
               type="text"
               data-test-id="ticketname-input"
               value={ticketForm.ticketName}
-              onChange={setE("ticketName")}
+              onChange={setFieldFromEvent("ticketName")}
               style={inputStyle}
               onFocus={focusStyle}
               onBlur={blurStyle}
@@ -413,10 +379,36 @@ export const CreateTicketSidebar: React.FC<CreateTicketSidebarProps> = ({
             <SimpleDropdown
               id="create-ticket-pipeline"
               value={ticketForm.pipeline}
-              options={PIPELINE_OPTIONS}
-              onChange={set("pipeline")}
+              options={pipelineLabels}
+              onChange={setField("pipeline")}
               placeholder="Select Pipeline"
               testId="pipeline-input"
+            />
+          </div>
+
+          {/* Primary issue / submodule */}
+          <div style={fieldWrap}>
+            {fieldLabel("Primary issue", true)}
+            <SimpleDropdown
+              id="create-ticket-submodule"
+              value={ticketForm.submodule}
+              options={submoduleLabels}
+              onChange={setField("submodule")}
+              placeholder="Select primary issue"
+              testId="submodule-input"
+            />
+          </div>
+
+          {/* Ticket Type */}
+          <div style={fieldWrap}>
+            {fieldLabel("Ticket type", true)}
+            <SimpleDropdown
+              id="create-ticket-type"
+              value={ticketForm.ticketType}
+              options={typeLabels}
+              onChange={setField("ticketType")}
+              placeholder="Select type"
+              testId="tickettype-input"
             />
           </div>
 
@@ -426,8 +418,8 @@ export const CreateTicketSidebar: React.FC<CreateTicketSidebarProps> = ({
             <SimpleDropdown
               id="create-ticket-status"
               value={ticketForm.ticketStatus}
-              options={TICKET_STATUS_OPTIONS}
-              onChange={set("ticketStatus")}
+              options={statusLabels}
+              onChange={setField("ticketStatus")}
               placeholder="Select Status"
               testId="ticketstatus-input"
             />
@@ -440,7 +432,7 @@ export const CreateTicketSidebar: React.FC<CreateTicketSidebarProps> = ({
               type="text"
               data-test-id="ticketdescription-input"
               value={ticketForm.ticketDescription}
-              onChange={setE("ticketDescription")}
+              onChange={setFieldFromEvent("ticketDescription")}
               style={inputStyle}
               onFocus={focusStyle}
               onBlur={blurStyle}
@@ -455,7 +447,7 @@ export const CreateTicketSidebar: React.FC<CreateTicketSidebarProps> = ({
               id="create-ticket-source"
               value={ticketForm.source}
               options={SOURCE_OPTIONS}
-              onChange={set("source")}
+              onChange={setField("source")}
               placeholder=""
               testId="source-input"
             />
@@ -467,8 +459,8 @@ export const CreateTicketSidebar: React.FC<CreateTicketSidebarProps> = ({
             <SimpleDropdown
               id="create-ticket-owner"
               value={ticketForm.ticketOwner}
-              options={ownerOptions}
-              onChange={set("ticketOwner")}
+              options={ownerLabels}
+              onChange={setField("ticketOwner")}
               placeholder="Select owner"
               testId="ticketowner-input"
             />
@@ -481,7 +473,7 @@ export const CreateTicketSidebar: React.FC<CreateTicketSidebarProps> = ({
               id="create-ticket-priority"
               value={ticketForm.priority}
               options={PRIORITY_OPTIONS}
-              onChange={set("priority")}
+              onChange={setField("priority")}
               placeholder=""
               testId="priority-input"
             />
@@ -584,7 +576,7 @@ export const CreateTicketSidebar: React.FC<CreateTicketSidebarProps> = ({
                       id="create-ticket-contact-associate"
                       value={ticketForm.contactAssociateRecord}
                       options={["Contact A", "Contact B", "Contact C"]}
-                      onChange={set("contactAssociateRecord")}
+                      onChange={setField("contactAssociateRecord")}
                       placeholder="Search"
                       testId="contact-associate-input"
                     />
@@ -608,7 +600,7 @@ export const CreateTicketSidebar: React.FC<CreateTicketSidebarProps> = ({
                       id="create-ticket-contact-association-label"
                       value={ticketForm.contactAssociationLabel}
                       options={ASSOCIATION_LABEL_OPTIONS}
-                      onChange={set("contactAssociationLabel")}
+                      onChange={setField("contactAssociationLabel")}
                       testId="contact-label-input"
                     />
                   </div>
@@ -640,7 +632,7 @@ export const CreateTicketSidebar: React.FC<CreateTicketSidebarProps> = ({
                       }
                       checked={ticketForm.addTimelineContact}
                       onChange={(e) =>
-                        setTicketForm((p) => ({ ...p, addTimelineContact: e.target.checked }))
+                        setTicketForm((p: TicketFormData) => ({ ...p, addTimelineContact: e.target.checked }))
                       }
                     />
                   </div>
@@ -729,7 +721,7 @@ export const CreateTicketSidebar: React.FC<CreateTicketSidebarProps> = ({
                       id="create-ticket-company-associate"
                       value={ticketForm.companyAssociateRecord}
                       options={["Company A", "Company B", "Company C"]}
-                      onChange={set("companyAssociateRecord")}
+                      onChange={setField("companyAssociateRecord")}
                       placeholder="Search"
                       testId="company-associate-input"
                     />
@@ -807,7 +799,7 @@ export const CreateTicketSidebar: React.FC<CreateTicketSidebarProps> = ({
                       }
                       checked={ticketForm.addTimelineCompany}
                       onChange={(e) =>
-                        setTicketForm((p) => ({ ...p, addTimelineCompany: e.target.checked }))
+                        setTicketForm((p: TicketFormData) => ({ ...p, addTimelineCompany: e.target.checked }))
                       }
                     />
                   </div>
@@ -833,98 +825,16 @@ export const CreateTicketSidebar: React.FC<CreateTicketSidebarProps> = ({
             </div>
           </div>
         </div>
-
-        {/* ── Footer ── */}
-        <div
-          style={{
-            padding: "16px clamp(16px, 4vw, 24px)",
-            borderTop: "1px solid #eaf0f6",
-            display: "flex",
-            gap: "12px",
-            justifyContent: "flex-start",
-            flexWrap: "wrap",
-          }}
-        >
-          {/* Create */}
-          <button
-            type="button"
-            disabled={!isFormValid || loading}
-            onClick={handleSubmit}
-            style={{
-              padding: "10px 20px",
-              backgroundColor: isFormValid && !loading ? "#0091ae" : "#cbd5e0",
-              color: "#ffffff",
-              border: "none",
-              borderRadius: "4px",
-              fontSize: "14px",
-              fontWeight: "500",
-              cursor: isFormValid && !loading ? "pointer" : "not-allowed",
-              fontFamily: FF,
-              transition: "150ms ease-out",
-            }}
-            onMouseEnter={(e) => {
-              if (isFormValid && !loading) e.currentTarget.style.backgroundColor = "#007a94";
-            }}
-            onMouseLeave={(e) => {
-              if (isFormValid && !loading) e.currentTarget.style.backgroundColor = "#0091ae";
-            }}
-          >
-            {loading ? "Creating..." : "Create"}
-          </button>
-
-          {/* Create and add another */}
-          <button
-            type="button"
-            disabled={!isFormValid || loading}
-            style={{
-              padding: "10px 20px",
-              backgroundColor: "transparent",
-              color: isFormValid && !loading ? "#141414" : "#a0aec0",
-              border: "1px solid #8a8a8a",
-              borderRadius: "4px",
-              fontSize: "14px",
-              fontWeight: "500",
-              cursor: isFormValid && !loading ? "pointer" : "not-allowed",
-              fontFamily: FF,
-              transition: "150ms ease-out",
-            }}
-            onMouseEnter={(e) => {
-              if (isFormValid && !loading) e.currentTarget.style.backgroundColor = "#f7fafc";
-            }}
-            onMouseLeave={(e) => {
-              if (isFormValid && !loading) e.currentTarget.style.backgroundColor = "transparent";
-            }}
-          >
-            Create and add another
-          </button>
-
-          {/* Cancel */}
-          <button
-            type="button"
-            onClick={onClose}
-            disabled={loading}
-            style={{
-              padding: "10px 20px",
-              backgroundColor: "transparent",
-              color: "#141414",
-              border: "1px solid #8a8a8a",
-              borderRadius: "4px",
-              fontSize: "14px",
-              fontWeight: "500",
-              cursor: loading ? "not-allowed" : "pointer",
-              fontFamily: FF,
-              transition: "150ms ease-out",
-            }}
-            onMouseEnter={(e) => {
-              if (!loading) e.currentTarget.style.backgroundColor = "#f7fafc";
-            }}
-            onMouseLeave={(e) => {
-              if (!loading) e.currentTarget.style.backgroundColor = "transparent";
-            }}
-          >
-            Cancel
-          </button>
         </div>
+
+        <CreateTicketSidebarFooter
+          isEditMode={isEditMode}
+          isFormValid={isFormValid}
+          loading={loading}
+          picklistsLoading={picklistsLoading}
+          onSubmit={handleSubmit}
+          onClose={onClose}
+        />
       </div>
     </>
   );
