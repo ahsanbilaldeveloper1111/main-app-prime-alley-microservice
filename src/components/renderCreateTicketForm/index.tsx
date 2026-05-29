@@ -1,8 +1,28 @@
-import React, { useEffect, useMemo, useState } from "react";
-import { X, Plus, ChevronDown, ChevronRight, ExternalLink } from "lucide-react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { X, Plus, ChevronDown, ChevronRight, ExternalLink, Loader2 } from "lucide-react";
 import { Dropdown, Form } from "react-bootstrap";
+import { useSession } from "next-auth/react";
+import { toast } from "react-toastify";
 import { APP_FONT } from "../../styles/fonts";
-import { getAllUsers } from "../../utils/users";
+import { GetHierarchyData } from "@utils/users";
+import { ModuleSlug } from "@utils/Helper";
+import { GetAllModules, GetAllSubmodules } from "@utils/ticket-module";
+import { GetAllStatuses } from "@utils/ticket-statuses";
+import { GetAllTypes } from "@utils/ticket-types";
+import {
+  CreateTicket,
+  GetTicket,
+  UpdateTicketFromFormData,
+} from "@utils/tickets";
+import {
+  buildTicketFormData,
+  filterSubmodulesForModule,
+  findPicklistOptionId,
+  mapApiRecordsToPicklistOptions,
+  mapApiTicketToFormValues,
+  mapExtensionsToOwnerOptions,
+  type TicketPicklistOption,
+} from "@components/crm/tickets/crmTicketFormDomain";
 
 const FF = APP_FONT;
 
@@ -10,6 +30,8 @@ const FF = APP_FONT;
 interface TicketFormData {
   ticketName: string;
   pipeline: string;
+  submodule: string;
+  ticketType: string;
   ticketStatus: string;
   ticketDescription: string;
   source: string;
@@ -37,17 +59,22 @@ interface SimpleDropdownProps {
 interface CreateTicketSidebarProps {
   onClose: () => void;
   onSuccess?: () => void;
+  editTicketId?: number | null;
+  /** List-row or preview payload used while view-ticket loads (and as fallback). */
+  initialTicket?: unknown;
 }
 
 // ─── Initial State ────────────────────────────────────────────────────────────
 const initialTicketForm: TicketFormData = {
   ticketName: "",
-  pipeline: "Support Pipeline",
-  ticketStatus: "New",
+  pipeline: "",
+  submodule: "",
+  ticketType: "",
+  ticketStatus: "",
   ticketDescription: "",
   source: "",
   ticketOwner: "",
-  priority: "",
+  priority: "Medium",
   createDate: "",
   contactAssociateRecord: "",
   contactAssociationLabel: "No label",
@@ -58,8 +85,6 @@ const initialTicketForm: TicketFormData = {
 };
 
 // ─── Dropdown options ─────────────────────────────────────────────────────────
-const PIPELINE_OPTIONS = ["Support Pipeline", "Technical Pipeline", "Billing Pipeline"];
-const TICKET_STATUS_OPTIONS = ["New", "Waiting on contact", "Waiting on us", "Closed"];
 const SOURCE_OPTIONS = ["Email", "Phone", "Chat", "Web form", "Social media"];
 const PRIORITY_OPTIONS = ["Low", "Medium", "High", "Urgent"];
 const ASSOCIATION_LABEL_OPTIONS = ["No label", "Decision Maker", "Primary", "Billing"];
@@ -158,6 +183,24 @@ const SIDEBAR_STYLE: React.CSSProperties = {
   fontFamily: FF,
 };
 
+const FORM_LOADING_OVERLAY_STYLE: React.CSSProperties = {
+  position: "absolute",
+  inset: 0,
+  zIndex: 2,
+  display: "flex",
+  flexDirection: "column",
+  alignItems: "center",
+  justifyContent: "center",
+  gap: "12px",
+  backgroundColor: "rgba(255, 255, 255, 0.88)",
+  padding: "24px",
+};
+
+const SPINNER_STYLE: React.CSSProperties = {
+  animation: "create-ticket-sidebar-spin 0.9s linear infinite",
+  color: "#0091ae",
+};
+
 // ─── Sub-components ───────────────────────────────────────────────────────────
 const SimpleDropdown: React.FC<SimpleDropdownProps> = ({
   value,
@@ -212,12 +255,45 @@ export default renderCreateTicket;
 export const CreateTicketSidebar: React.FC<CreateTicketSidebarProps> = ({
   onClose,
   onSuccess,
+  editTicketId = null,
+  initialTicket,
 }) => {
+  const { data: session } = useSession();
+  const isEditMode = editTicketId != null;
+  const editFormHydratedRef = useRef(false);
   const [ticketForm, setTicketForm] = useState<TicketFormData>(initialTicketForm);
   const [loading, setLoading] = useState(false);
-  const [ownerOptions, setOwnerOptions] = useState<string[]>([]);
+  const [picklistsLoading, setPicklistsLoading] = useState(true);
+  const [moduleOptions, setModuleOptions] = useState<TicketPicklistOption[]>([]);
+  const [submoduleOptions, setSubmoduleOptions] = useState<TicketPicklistOption[]>([]);
+  const [statusOptions, setStatusOptions] = useState<TicketPicklistOption[]>([]);
+  const [typeOptions, setTypeOptions] = useState<TicketPicklistOption[]>([]);
+  const [ownerOptions, setOwnerOptions] = useState<TicketPicklistOption[]>([]);
   const [isContactsExpanded, setIsContactsExpanded] = useState(true);
   const [isCompaniesExpanded, setIsCompaniesExpanded] = useState(true);
+
+  const pipelineLabels = useMemo(
+    () => moduleOptions.map((option) => option.label),
+    [moduleOptions],
+  );
+  const submoduleLabels = useMemo(() => {
+    const moduleId = findPicklistOptionId(moduleOptions, ticketForm.pipeline);
+    return filterSubmodulesForModule(submoduleOptions, moduleId ?? "").map(
+      (option) => option.label,
+    );
+  }, [submoduleOptions, moduleOptions, ticketForm.pipeline]);
+  const statusLabels = useMemo(
+    () => statusOptions.map((option) => option.label),
+    [statusOptions],
+  );
+  const typeLabels = useMemo(
+    () => typeOptions.map((option) => option.label),
+    [typeOptions],
+  );
+  const ownerLabels = useMemo(
+    () => ownerOptions.map((option) => option.label),
+    [ownerOptions],
+  );
 
   const set =
     <K extends keyof TicketFormData>(key: K) =>
@@ -230,8 +306,10 @@ export const CreateTicketSidebar: React.FC<CreateTicketSidebarProps> = ({
       setTicketForm((prev) => ({ ...prev, [key]: e.target.value }));
 
   const isFormValid =
-    ticketForm.ticketName.trim() !== "" &&
+    ticketForm.ticketName.trim().length >= 5 &&
     ticketForm.pipeline !== "" &&
+    ticketForm.submodule !== "" &&
+    ticketForm.ticketType !== "" &&
     ticketForm.ticketStatus !== "";
 
   const todayDate = useMemo(() => {
@@ -247,51 +325,136 @@ export const CreateTicketSidebar: React.FC<CreateTicketSidebarProps> = ({
   };
 
   useEffect(() => {
-    const getDisplayValue = (item: unknown, keys: string[]): string => {
-      const record = (item ?? {}) as Record<string, unknown>;
-      for (const key of keys) {
-        const value = record[key];
-        if (typeof value === "string" && value.trim()) return value.trim();
-      }
-      return "";
-    };
-
-    const loadFormDropdowns = async () => {
-      try {
-        const usersResponse = await getAllUsers({ page: 1, perPage: 500 });
-
-        const userList = Array.isArray(usersResponse?.dataList)
-          ? usersResponse.dataList
-          : [];
-        const owners = userList
-          .map((user: unknown) =>
-            getDisplayValue(user, [
-              "name",
-              "display_name",
-              "full_name",
-              "first_name",
-              "email",
-              "user_extension",
-            ]),
-          )
-          .filter(Boolean);
-        setOwnerOptions(Array.from(new Set(owners)));
-
-       
-        
-      } catch (error) {
-        console.error("Failed to load create ticket dropdown options:", error);
-      }
-    };
-
-    loadFormDropdowns();
-  }, []);
+    editFormHydratedRef.current = false;
+  }, [editTicketId]);
 
   useEffect(() => {
-    if (!ticketForm.ticketOwner && ownerOptions.length > 0) {
-      setTicketForm((prev) => ({ ...prev, ticketOwner: ownerOptions[0] }));
+    let cancelled = false;
+
+    const loadPicklists = async () => {
+      setPicklistsLoading(true);
+      editFormHydratedRef.current = false;
+      try {
+        const [modules, submodules, statuses, types, hierarchyData] =
+          await Promise.all([
+            GetAllModules(),
+            GetAllSubmodules(),
+            GetAllStatuses(),
+            GetAllTypes(),
+            GetHierarchyData(ModuleSlug.TICKET),
+          ]);
+
+        if (cancelled) {
+          return;
+        }
+
+        const nextModules = mapApiRecordsToPicklistOptions(
+          Array.isArray(modules) ? modules : [],
+        );
+        const nextSubmodules = mapApiRecordsToPicklistOptions(
+          Array.isArray(submodules) ? submodules : [],
+        );
+        const nextStatuses = mapApiRecordsToPicklistOptions(
+          Array.isArray(statuses) ? statuses : [],
+        );
+        const nextTypes = mapApiRecordsToPicklistOptions(
+          Array.isArray(types) ? types : [],
+        );
+        const nextOwners = mapExtensionsToOwnerOptions(
+          Array.isArray(hierarchyData?.extensions)
+            ? hierarchyData.extensions
+            : [],
+        );
+
+        setModuleOptions(nextModules);
+        setSubmoduleOptions(nextSubmodules);
+        setStatusOptions(nextStatuses);
+        setTypeOptions(nextTypes);
+        setOwnerOptions(nextOwners);
+
+        if (isEditMode && editTicketId != null) {
+          const fetchedTicket = await GetTicket(String(editTicketId));
+          const ticket = fetchedTicket ?? initialTicket;
+          if (cancelled || !ticket) {
+            if (!cancelled) {
+              toast.error("Failed to load ticket details");
+            }
+            return;
+          }
+          setTicketForm((prev) => ({
+            ...prev,
+            ...mapApiTicketToFormValues(ticket, {
+              modules: nextModules,
+              submodules: nextSubmodules,
+              types: nextTypes,
+              statuses: nextStatuses,
+              owners: nextOwners,
+            }),
+          }));
+          editFormHydratedRef.current = true;
+          return;
+        }
+
+        setTicketForm((prev) => ({
+          ...prev,
+          pipeline: nextModules[0]?.label ?? "",
+          submodule:
+            filterSubmodulesForModule(
+              nextSubmodules,
+              nextModules[0]?.id ?? "",
+            )[0]?.label ?? "",
+          ticketType: nextTypes[0]?.label ?? "",
+          ticketStatus: nextStatuses[0]?.label ?? "",
+          ticketOwner: nextOwners[0]?.label ?? "",
+          priority: prev.priority || "Medium",
+        }));
+      } catch (error) {
+        console.error("Failed to load create ticket dropdown options:", error);
+        toast.error("Failed to load ticket form options");
+      } finally {
+        if (!cancelled) {
+          setPicklistsLoading(false);
+        }
+      }
+    };
+
+    loadPicklists().catch(() => undefined);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [editTicketId, initialTicket, isEditMode]);
+
+  useEffect(() => {
+    if (picklistsLoading) {
+      return;
     }
-  }, [ownerOptions, ticketForm.ticketOwner]);
+    if (isEditMode && !editFormHydratedRef.current) {
+      return;
+    }
+    const moduleId = findPicklistOptionId(moduleOptions, ticketForm.pipeline);
+    const availableSubmodules = filterSubmodulesForModule(
+      submoduleOptions,
+      moduleId ?? "",
+    );
+    if (
+      ticketForm.submodule &&
+      availableSubmodules.some((option) => option.label === ticketForm.submodule)
+    ) {
+      return;
+    }
+    setTicketForm((prev) => ({
+      ...prev,
+      submodule: availableSubmodules[0]?.label ?? "",
+    }));
+  }, [
+    picklistsLoading,
+    isEditMode,
+    ticketForm.pipeline,
+    moduleOptions,
+    submoduleOptions,
+    ticketForm.submodule,
+  ]);
 
   const focusStyle = (e: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement>) =>
     (e.currentTarget.style.borderColor = "#0091ae");
@@ -299,15 +462,53 @@ export const CreateTicketSidebar: React.FC<CreateTicketSidebarProps> = ({
     (e.currentTarget.style.borderColor = "rgb(138, 138, 138)");
 
   const handleSubmit = async () => {
-    if (!isFormValid) return;
+    if (!isFormValid || picklistsLoading) {
+      return;
+    }
+
+    const moduleId = findPicklistOptionId(moduleOptions, ticketForm.pipeline);
+    const submoduleId = findPicklistOptionId(
+      submoduleOptions,
+      ticketForm.submodule,
+    );
+    const statusId = findPicklistOptionId(statusOptions, ticketForm.ticketStatus);
+    const typeId = findPicklistOptionId(typeOptions, ticketForm.ticketType);
+    const ownerExtensionId = findPicklistOptionId(
+      ownerOptions,
+      ticketForm.ticketOwner,
+    );
+
+    if (!moduleId || !submoduleId || !statusId || !typeId) {
+      toast.error("Please complete all required ticket fields");
+      return;
+    }
+
     setLoading(true);
     try {
-      // Replace with actual API call e.g. createTicket(ticketForm)
-      await new Promise((res) => setTimeout(res, 800));
-      if (onSuccess) onSuccess();
-      onClose();
+      const formData = buildTicketFormData({
+        values: ticketForm,
+        moduleId,
+        submoduleId,
+        statusId,
+        typeId,
+        ownerExtensionId,
+        createdBy: session?.user?.phone || session?.user?.email || "system",
+      });
+
+      if (isEditMode && editTicketId != null) {
+        formData.append("id", String(editTicketId));
+      }
+
+      const saved = isEditMode && editTicketId != null
+        ? await UpdateTicketFromFormData(formData)
+        : await CreateTicket(formData);
+
+      if (saved) {
+        onSuccess?.();
+        onClose();
+      }
     } catch (error) {
-      console.error("Failed to create ticket:", error);
+      console.error("Failed to save ticket:", error);
     } finally {
       setLoading(false);
     }
@@ -315,6 +516,12 @@ export const CreateTicketSidebar: React.FC<CreateTicketSidebarProps> = ({
 
   return (
     <>
+      <style>{`
+        @keyframes create-ticket-sidebar-spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+      `}</style>
       {/* Overlay */}
       <button
         type="button"
@@ -346,7 +553,7 @@ export const CreateTicketSidebar: React.FC<CreateTicketSidebarProps> = ({
               fontFamily: FF,
             }}
           >
-            Create Ticket
+            {isEditMode ? "Edit Ticket" : "Create Ticket"}
           </h2>
           <button
             type="button"
@@ -366,7 +573,48 @@ export const CreateTicketSidebar: React.FC<CreateTicketSidebarProps> = ({
         </div>
 
         {/* ── Content ── */}
-        <div style={{ flex: 1, overflowY: "auto", padding: "16px clamp(16px, 6vw, 40px) 40px" }}>
+        <div
+          style={{
+            flex: 1,
+            position: "relative",
+            display: "flex",
+            flexDirection: "column",
+            minHeight: 0,
+          }}
+        >
+          {picklistsLoading && (
+            <div
+              style={FORM_LOADING_OVERLAY_STYLE}
+              role="status"
+              aria-live="polite"
+              aria-busy="true"
+            >
+              <Loader2 size={32} style={SPINNER_STYLE} aria-hidden="true" />
+              <p
+                style={{
+                  margin: 0,
+                  fontSize: "14px",
+                  fontWeight: 500,
+                  color: "#33475b",
+                  fontFamily: FF,
+                  textAlign: "center",
+                }}
+              >
+                {isEditMode ? "Loading ticket details..." : "Loading form options..."}
+              </p>
+            </div>
+          )}
+
+          <div
+            style={{
+              flex: 1,
+              overflowY: "auto",
+              padding: "16px clamp(16px, 6vw, 40px) 40px",
+              opacity: picklistsLoading ? 0.45 : 1,
+              pointerEvents: picklistsLoading ? "none" : "auto",
+              transition: "opacity 150ms ease-out",
+            }}
+          >
 
           {/* Edit this form link */}
           <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "20px" }}>
@@ -413,10 +661,36 @@ export const CreateTicketSidebar: React.FC<CreateTicketSidebarProps> = ({
             <SimpleDropdown
               id="create-ticket-pipeline"
               value={ticketForm.pipeline}
-              options={PIPELINE_OPTIONS}
+              options={pipelineLabels}
               onChange={set("pipeline")}
               placeholder="Select Pipeline"
               testId="pipeline-input"
+            />
+          </div>
+
+          {/* Primary issue / submodule */}
+          <div style={fieldWrap}>
+            {fieldLabel("Primary issue", true)}
+            <SimpleDropdown
+              id="create-ticket-submodule"
+              value={ticketForm.submodule}
+              options={submoduleLabels}
+              onChange={set("submodule")}
+              placeholder="Select primary issue"
+              testId="submodule-input"
+            />
+          </div>
+
+          {/* Ticket Type */}
+          <div style={fieldWrap}>
+            {fieldLabel("Ticket type", true)}
+            <SimpleDropdown
+              id="create-ticket-type"
+              value={ticketForm.ticketType}
+              options={typeLabels}
+              onChange={set("ticketType")}
+              placeholder="Select type"
+              testId="tickettype-input"
             />
           </div>
 
@@ -426,7 +700,7 @@ export const CreateTicketSidebar: React.FC<CreateTicketSidebarProps> = ({
             <SimpleDropdown
               id="create-ticket-status"
               value={ticketForm.ticketStatus}
-              options={TICKET_STATUS_OPTIONS}
+              options={statusLabels}
               onChange={set("ticketStatus")}
               placeholder="Select Status"
               testId="ticketstatus-input"
@@ -467,7 +741,7 @@ export const CreateTicketSidebar: React.FC<CreateTicketSidebarProps> = ({
             <SimpleDropdown
               id="create-ticket-owner"
               value={ticketForm.ticketOwner}
-              options={ownerOptions}
+              options={ownerLabels}
               onChange={set("ticketOwner")}
               placeholder="Select owner"
               testId="ticketowner-input"
@@ -833,6 +1107,7 @@ export const CreateTicketSidebar: React.FC<CreateTicketSidebarProps> = ({
             </div>
           </div>
         </div>
+        </div>
 
         {/* ── Footer ── */}
         <div
@@ -848,34 +1123,47 @@ export const CreateTicketSidebar: React.FC<CreateTicketSidebarProps> = ({
           {/* Create */}
           <button
             type="button"
-            disabled={!isFormValid || loading}
+            disabled={!isFormValid || loading || picklistsLoading}
             onClick={handleSubmit}
             style={{
               padding: "10px 20px",
-              backgroundColor: isFormValid && !loading ? "#0091ae" : "#cbd5e0",
+              backgroundColor:
+                isFormValid && !loading && !picklistsLoading ? "#0091ae" : "#cbd5e0",
               color: "#ffffff",
               border: "none",
               borderRadius: "4px",
               fontSize: "14px",
               fontWeight: "500",
-              cursor: isFormValid && !loading ? "pointer" : "not-allowed",
+              cursor:
+                isFormValid && !loading && !picklistsLoading ? "pointer" : "not-allowed",
               fontFamily: FF,
               transition: "150ms ease-out",
             }}
             onMouseEnter={(e) => {
-              if (isFormValid && !loading) e.currentTarget.style.backgroundColor = "#007a94";
+              if (isFormValid && !loading && !picklistsLoading) {
+                e.currentTarget.style.backgroundColor = "#007a94";
+              }
             }}
             onMouseLeave={(e) => {
-              if (isFormValid && !loading) e.currentTarget.style.backgroundColor = "#0091ae";
+              if (isFormValid && !loading && !picklistsLoading) {
+                e.currentTarget.style.backgroundColor = "#0091ae";
+              }
             }}
           >
-            {loading ? "Creating..." : "Create"}
+            {loading
+              ? isEditMode
+                ? "Saving..."
+                : "Creating..."
+              : isEditMode
+                ? "Save changes"
+                : "Create"}
           </button>
 
           {/* Create and add another */}
+          {!isEditMode && (
           <button
             type="button"
-            disabled={!isFormValid || loading}
+            disabled={!isFormValid || loading || picklistsLoading}
             style={{
               padding: "10px 20px",
               backgroundColor: "transparent",
@@ -897,6 +1185,7 @@ export const CreateTicketSidebar: React.FC<CreateTicketSidebarProps> = ({
           >
             Create and add another
           </button>
+          )}
 
           {/* Cancel */}
           <button

@@ -1,4 +1,11 @@
-import React, { useState, useMemo, useRef, useEffect, useId } from "react";
+import React, {
+  useState,
+  useMemo,
+  useRef,
+  useEffect,
+  useId,
+  useCallback,
+} from "react";
 import {
   Table,
   Form,
@@ -92,6 +99,9 @@ export interface TableColumn<T = any> {
 
   /** Optional `<th>` width (e.g. `"260px"` or `"22%"`) for fixed-width columns like descriptions. */
   width?: string;
+
+  /** Row field used for sorting when it differs from `key` (e.g. sort by ISO `created_at`, display `create_date`). */
+  sortKey?: string;
 }
 
 export interface DropdownOption<T = any> {
@@ -539,6 +549,11 @@ export interface GenericTableProps<T = any> {
   defaultSelectedColumns?: string[];
   onColumnChange?: (selectedColumns: string[]) => void;
   columnStorageKey?: string;
+  /**
+   * Keeps the actions column visible. Defaults to true when row actions are enabled.
+   * Set false to let users hide Actions via the column picker.
+   */
+  pinActionsColumn?: boolean;
 
   // Row interactions
   onRowClick?: (row: T, index: number) => void;
@@ -1169,6 +1184,7 @@ const GenericTable = <T extends Record<string, any>>({
   defaultSelectedColumns,
   onColumnChange,
   columnStorageKey,
+  pinActionsColumn: pinActionsColumnProp,
   onRowClick,
   onRowDoubleClick,
   onPreviewClick,
@@ -1227,6 +1243,7 @@ const GenericTable = <T extends Record<string, any>>({
   const [sortBy, setSortBy] = useState(defaultSortBy);
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">(defaultSortOrder);
   const baseActionsEnabled = showActions && actions.length > 0;
+  const pinActionsColumn = pinActionsColumnProp ?? baseActionsEnabled;
   const allSelectableColumnKeys = useMemo(() => {
     const keys = columns.map((c) => c.key);
     if (baseActionsEnabled) keys.push(ACTION_COLUMN_KEY);
@@ -1247,13 +1264,37 @@ const GenericTable = <T extends Record<string, any>>({
         globalThis.localStorage.getItem(columnStorageKey),
         defaults,
       );
-      if (stored) return stored;
+      if (stored) {
+        if (
+          pinActionsColumn &&
+          baseActionsEnabled &&
+          !stored.includes(ACTION_COLUMN_KEY)
+        ) {
+          return [...stored, ACTION_COLUMN_KEY];
+        }
+        return stored;
+      }
     }
     return defaults.filter((key) => allSelectableColumnKeys.includes(key));
   });
 
   // Sync internal column selection when parent controls it (e.g. ColumnEditorModal apply)
-  const effectiveSelectedColumns = selectedColumnsProp ?? selectedColumns;
+  const effectiveSelectedColumns = useMemo(() => {
+    const base = selectedColumnsProp ?? selectedColumns;
+    if (
+      pinActionsColumn &&
+      baseActionsEnabled &&
+      !base.includes(ACTION_COLUMN_KEY)
+    ) {
+      return [...base, ACTION_COLUMN_KEY];
+    }
+    return base;
+  }, [
+    selectedColumnsProp,
+    selectedColumns,
+    pinActionsColumn,
+    baseActionsEnabled,
+  ]);
   // Keep a stable master list for the selector so hidden columns stay re-selectable.
   const [columnCatalog, setColumnCatalog] = useState(columns);
   useEffect(() => {
@@ -1283,6 +1324,31 @@ const GenericTable = <T extends Record<string, any>>({
       );
     }
   }, [selectedColumnsProp, allSelectableColumnKeys]);
+
+  useEffect(() => {
+    if (!pinActionsColumn || !baseActionsEnabled || selectedColumnsProp !== undefined) {
+      return;
+    }
+    setSelectedColumns((prev) => {
+      if (prev.includes(ACTION_COLUMN_KEY)) {
+        return prev;
+      }
+      const next = [...prev, ACTION_COLUMN_KEY];
+      if (columnStorageKey && globalThis.window !== undefined) {
+        globalThis.localStorage.setItem(
+          columnStorageKey,
+          JSON.stringify(next),
+        );
+      }
+      return next;
+    });
+  }, [
+    pinActionsColumn,
+    baseActionsEnabled,
+    selectedColumnsProp,
+    columnStorageKey,
+  ]);
+
   const actionsColumnVisible =
     baseActionsEnabled &&
     (!customizableColumns ||
@@ -1362,22 +1428,52 @@ const GenericTable = <T extends Record<string, any>>({
     [visibleColumns, sortable],
   );
 
+  const sortColumnDef = useMemo(
+    () => visibleColumns.find((col) => col.key === sortBy),
+    [visibleColumns, sortBy],
+  );
+
+  const getRowSortValue = useCallback(
+    (row: T): unknown => {
+      if (!sortBy) {
+        return "";
+      }
+      const fieldKey = sortColumnDef?.sortKey ?? sortBy;
+      return row[fieldKey as keyof T] ?? row[sortBy as keyof T] ?? "";
+    },
+    [sortBy, sortColumnDef?.sortKey],
+  );
+
+  const compareSortValues = useCallback(
+    (aVal: unknown, bVal: unknown): number => {
+      const aText = String(aVal ?? "").trim();
+      const bText = String(bVal ?? "").trim();
+
+      if (sortColumnDef?.type === "date") {
+        const aTime = Date.parse(aText);
+        const bTime = Date.parse(bText);
+        if (!Number.isNaN(aTime) && !Number.isNaN(bTime)) {
+          return sortOrder === "asc" ? aTime - bTime : bTime - aTime;
+        }
+      }
+
+      const aStr = aText.toLowerCase();
+      const bStr = bText.toLowerCase();
+      if (aStr < bStr) return sortOrder === "asc" ? -1 : 1;
+      if (aStr > bStr) return sortOrder === "asc" ? 1 : -1;
+      return 0;
+    },
+    [sortColumnDef?.type, sortOrder],
+  );
+
   // Sort data (client-side if no onSort provided) — before selection handlers that depend on it
   const sortedData = useMemo(() => {
     if (onSort || !sortBy) return data;
 
-    return [...data].sort((a, b) => {
-      const aVal = a[sortBy as keyof T] ?? "";
-      const bVal = b[sortBy as keyof T] ?? "";
-
-      const aStr = String(aVal).toLowerCase();
-      const bStr = String(bVal).toLowerCase();
-
-      if (aStr < bStr) return sortOrder === "asc" ? -1 : 1;
-      if (aStr > bStr) return sortOrder === "asc" ? 1 : -1;
-      return 0;
-    });
-  }, [data, sortBy, sortOrder, onSort]);
+    return [...data].sort((a, b) =>
+      compareSortValues(getRowSortValue(a), getRowSortValue(b)),
+    );
+  }, [data, sortBy, onSort, compareSortValues, getRowSortValue]);
 
   // Check if a row is selected
   const isSelected = (row: T) => {
@@ -1442,6 +1538,9 @@ const GenericTable = <T extends Record<string, any>>({
 
   // Handle column selection (when controlled, parent updates via onColumnChange)
   const handleColumnToggle = (columnKey: string) => {
+    if (pinActionsColumn && columnKey === ACTION_COLUMN_KEY) {
+      return;
+    }
     const current = effectiveSelectedColumns;
     if (current.includes(columnKey) && current.length <= 1) {
       return;
@@ -1468,7 +1567,30 @@ const GenericTable = <T extends Record<string, any>>({
   );
 
   const filterPillMenuPopperConfig = useMemo(
-    () => ({ strategy: "fixed" as const }),
+    () => ({
+      strategy: "fixed" as const,
+      modifiers: [
+        {
+          name: "preventOverflow",
+          options: {
+            boundary: "viewport",
+            padding: 8,
+            altAxis: true,
+          },
+        },
+        {
+          name: "flip",
+          options: {
+            fallbackPlacements: [
+              "bottom-start",
+              "top-start",
+              "bottom-end",
+              "top-end",
+            ],
+          },
+        },
+      ],
+    }),
     [],
   );
 
@@ -1510,6 +1632,7 @@ const GenericTable = <T extends Record<string, any>>({
               type="checkbox"
               label={actionsLabel}
               checked={effectiveSelectedColumns.includes(ACTION_COLUMN_KEY)}
+              disabled={pinActionsColumn}
               onChange={() => handleColumnToggle(ACTION_COLUMN_KEY)}
             />
           </Dropdown.Item>
@@ -1983,10 +2106,13 @@ const GenericTable = <T extends Record<string, any>>({
                         )}
                       </Dropdown.Toggle>
                       <Dropdown.Menu
+                        renderOnMount
                         style={
                           pill.dropdownMenuStyle ?? {
                             maxHeight: "280px",
                             overflowY: "auto",
+                            overflowX: "hidden",
+                            maxWidth: "min(320px, calc(100vw - 24px))",
                           }
                         }
                         popperConfig={filterPillMenuPopperConfig}
@@ -2032,14 +2158,14 @@ const GenericTable = <T extends Record<string, any>>({
                   </div>
                 )}
               </div>
-              {toolbar.advancedFiltersOpen &&
-                toolbar.advancedFiltersContent && (
-                  <div className="w-100 mt-2">
-                    {toolbar.advancedFiltersContent}
-                  </div>
-                )}
             </div>
           )}
+
+        {toolbar?.advancedFiltersOpen && toolbar.advancedFiltersContent && (
+          <div className="gt-advanced-filters">
+            {toolbar.advancedFiltersContent}
+          </div>
+        )}
 
         {/* Stats Cards */}
         {showMetrics && statsCards && statsCards.length > 0 && (

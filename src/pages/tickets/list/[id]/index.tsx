@@ -329,14 +329,13 @@ const TicketDetail = () => {
 
     try {
       setLoading(true);
-      const ticketResponse = await GetTicket(ticketId);
+      const ticket = await GetTicket(ticketId);
 
-      if (ticketResponse?.success !== true) {
+      if (!ticket) {
         handleTicketLoadFailure("Failed to fetch ticket");
         return;
       }
 
-      const ticket = ticketResponse.data;
       setTicketData(ticket);
 
       // Fire-and-forget; comment loader has its own error handling.

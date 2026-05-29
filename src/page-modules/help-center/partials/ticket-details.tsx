@@ -174,9 +174,9 @@ const TicketDetail: React.FC<TicketDetailProps> = ({ ticketId, onBack }) => {
     setLoading(true);
     setError(null);
     try {
-      const response: GetTicketResponse | undefined = await GetTicket(ticketId);
-      if (response?.success === true && response?.data) {
-        setTicketData(response.data);
+      const ticket = await GetTicket(ticketId);
+      if (ticket) {
+        setTicketData(ticket as unknown as TicketData);
         fetchComments(ticketId);
       } else {
         setError('Failed to load ticket');
