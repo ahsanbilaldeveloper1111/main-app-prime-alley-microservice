@@ -270,6 +270,20 @@ export function TaskListingSearchRow({
   );
 }
 
+const TASK_AVATAR_COLORS = [
+  "#4299e1", "#48bb78", "#ed64a6", "#f6ad55",
+  "#667eea", "#fc8181", "#38b2ac", "#9f7aea",
+];
+
+function getTaskAvatarColor(name: string): string {
+  if (!name) return TASK_AVATAR_COLORS[0];
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) {
+    hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  return TASK_AVATAR_COLORS[Math.abs(hash) % TASK_AVATAR_COLORS.length];
+}
+
 export type TaskListingAssigneeCellProps = Readonly<{
   label: string;
 }>;
@@ -286,7 +300,7 @@ export function TaskListingAssigneeCell({ label }: TaskListingAssigneeCellProps)
           width: 22,
           height: 22,
           borderRadius: "50%",
-          background: "#10b981",
+          background: getTaskAvatarColor(label),
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
