@@ -720,6 +720,13 @@ const ApplicationCustomerSidebar: React.FC = () => {
           url: "/planner/workload",
           permission: PERMISSIONS.VIEW_WORKLOAD_WORK_PLANNER,
         },
+        {
+          id: "planner-reports",
+          title: "Reports",
+          icon: <BarChart3 size={16} />,
+          url: "/planner/reports",
+          permission: PERMISSIONS.VIEW_TASKSLIST_WORK_PLANNER,
+        },
         ...(showMyDayInPlannerSidebar
           ? [
               {
@@ -812,14 +819,14 @@ const ApplicationCustomerSidebar: React.FC = () => {
         },
         {
           id: "compliance-cdr-records",
-          title: "CDR Records",
+          title: "Compliance Analytics",
           icon: <FileText size={16} />,
           permission: PERMISSIONS.VIEW_CDR_DNCR,
           url: "/compliance/cdr-records",
         },
         {
           id: "dncr-local-dnd-call-block",
-          title: "Add Records",
+          title: "Add Local DND",
           icon: <PhoneCall size={16} />,
           permission: PERMISSIONS.VIEW_LOCAL_DND_CALL_BLOCK_DNCR,
           url: "/compliance/add-records",
@@ -925,6 +932,13 @@ const ApplicationCustomerSidebar: React.FC = () => {
           icon: <Building2 size={16} />,
           permission: PERMISSIONS.VIEW_TENANT_DASHBOARD_AI_CHAT,
           url: "/chat/tenant-dashboard",
+        },
+        {
+          id: "chatbots-audit-logs",
+          title: "Audit Logs",
+          icon: <History size={16} />,
+          permission: PERMISSIONS.VIEW_ADMIN_DASHBOARD_AI_CHAT,
+          url: "/chat/audit-logs",
         },
       ].filter((item) => !item.permission || hasPermission(item.permission)),
     },

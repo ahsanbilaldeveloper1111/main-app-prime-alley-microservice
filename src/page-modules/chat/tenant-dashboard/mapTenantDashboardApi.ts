@@ -1,4 +1,7 @@
-import type { TenantChatDashboardResponse } from "@utils/chat";
+import type {
+  TenantChatDashboardResponse,
+  TenantDashboardRecentConversation,
+} from "@utils/chat";
 
 import type { ChatbotsTenantDashboardModel } from "./types";
 
@@ -22,6 +25,20 @@ function formatActivity(value: string | undefined): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
+function formatRecentConversationActivity(
+  row: TenantDashboardRecentConversation,
+): string {
+  return formatActivity(row.updated_at);
+}
+
+function readKpiQueries(bucket: { queries?: number } | undefined): number {
+  return bucket?.queries ?? 0;
+}
+
+function readKpiCost(bucket: { cost?: string } | undefined): number {
+  return parseCost(bucket?.cost);
+}
+
 export function mapTenantDashboardApi(
   data: TenantChatDashboardResponse,
 ): ChatbotsTenantDashboardModel {
@@ -29,22 +46,19 @@ export function mapTenantDashboardApi(
     a.date.localeCompare(b.date),
   );
 
+  const today = data.kpis?.today;
+  const thisMonth = data.kpis?.this_month;
+
   return {
     tenantId: data.tenant_id,
     companyName: data.company_name,
     generatedAt: data.generated_at,
     summary: {
-      queriesToday: data.kpis.today.queries,
-      costTodayUsd: parseCost(data.kpis.today.cost),
-      queriesThisMonth: data.kpis.this_month.queries,
-      costThisMonthUsd: parseCost(data.kpis.this_month.cost),
-      activeUsers: data.kpis.active_users_7d,
-    },
-    rateLimit: {
-      queriesPerMinuteLimit: data.rate_limit.per_minute_limit,
-      queriesPerMinuteRemaining: data.rate_limit.per_minute_remaining,
-      queriesTodayLimit: data.rate_limit.per_day_limit,
-      queriesTodayRemaining: data.rate_limit.per_day_remaining,
+      queriesToday: readKpiQueries(today),
+      costTodayUsd: readKpiCost(today),
+      queriesThisMonth: readKpiQueries(thisMonth),
+      costThisMonthUsd: readKpiCost(thisMonth),
+      activeUsers: data.kpis?.active_users_7d ?? 0,
     },
     dailyCostQueriesLast30Days: {
       categories: trend.map((p) => formatTrendLabel(p.date)),
@@ -63,25 +77,31 @@ export function mapTenantDashboardApi(
       users: row.unique_users,
     })),
     knowledgeBase: {
-      tenantFaqs: data.kb.tenant_faqs,
-      globalFaqs: data.kb.global_faqs,
-      trained: data.kb.is_trained,
-      lastTraining: data.kb.last_training
+      tenantFaqs: data.kb?.tenant_faqs ?? 0,
+      globalFaqs: data.kb?.global_faqs ?? 0,
+      trained: data.kb?.is_trained ?? false,
+      lastTraining: data.kb?.last_training
         ? formatActivity(data.kb.last_training)
         : null,
     },
-    recentConversations: (data.recent_conversations ?? []).map((row, i) => ({
-      thread:
-        row.thread?.trim() ||
-        row.title?.trim() ||
-        row.thread_id?.trim() ||
-        `Thread ${i + 1}`,
-      user:
-        row.display_name?.trim() ||
-        row.user?.trim() ||
-        row.user_id?.trim() ||
-        "—",
-      lastActivity: formatActivity(row.last_activity),
-    })),
+    recentConversations: (data.recent_conversations ?? []).map((row, i) => {
+      const threadId = row.thread_id?.trim() || `row-${i}`;
+      return {
+        threadId,
+        thread:
+          row.title?.trim() ||
+          row.thread?.trim() ||
+          threadId ||
+          `Thread ${i + 1}`,
+        user:
+          row.display_name?.trim() ||
+          row.user?.trim() ||
+          row.user_id?.trim() ||
+          "—",
+        lastActivity: formatRecentConversationActivity(row),
+        modelUsed: row.model_used?.trim() || "—",
+        costUsd: parseCost(row.cost),
+      };
+    }),
   };
 }

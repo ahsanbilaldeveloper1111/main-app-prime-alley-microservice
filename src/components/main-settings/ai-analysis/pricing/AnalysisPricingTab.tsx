@@ -1,7 +1,4 @@
 import React, { useCallback, useEffect, useState } from "react";
-import { Button } from "react-bootstrap";
-import { Filter } from "lucide-react";
-import Select from "react-select";
 import { toast } from "react-toastify";
 
 import "./aiAnalysisPricing.scss";
@@ -10,12 +7,11 @@ import {
   AnalysisFormSkeleton,
   pricingFormSkeletonFields,
 } from "../shared/AnalysisFormSkeleton";
+import { formatAnalysisLastUpdated } from "../shared/formatAnalysisTimestamp";
 import { validateAnalysisPricingForm } from "./mapAnalysisPricing";
 import type { AnalysisPricingFormValues } from "./types";
 import { defaultAnalysisPricingFormValues } from "./types";
 import { useAIAnalysisPricingPage } from "./useAIAnalysisPricingPage";
-
-type CompanySelectOption = { value: string; label: string };
 
 function PricingNumberField(props: Readonly<{
   label: string;
@@ -41,62 +37,8 @@ function PricingNumberField(props: Readonly<{
   );
 }
 
-function CompanyFilterBar(props: Readonly<{
-  companiesLoading: boolean;
-  companyOptions: CompanySelectOption[];
-  selectedCompanyOption: CompanySelectOption | null;
-  onCompanySelect: (companyId: string) => void;
-  onApplyFilter: () => void;
-  appliedCompanyLabel?: string;
-}>) {
-  const {
-    companiesLoading,
-    companyOptions,
-    selectedCompanyOption,
-    onCompanySelect,
-    onApplyFilter,
-    appliedCompanyLabel,
-  } = props;
-
-  return (
-    <div className="ai-analysis-pricing__company-filter">
-      <div className="ai-analysis-pricing__company-select">
-        <span className="ai-analysis-pricing__field-label">Company</span>
-        <Select<CompanySelectOption>
-          isLoading={companiesLoading}
-          options={companyOptions}
-          value={selectedCompanyOption}
-          onChange={(opt) => onCompanySelect(opt?.value ?? "")}
-          placeholder="Select company..."
-          isClearable
-          classNamePrefix="ai-analysis-pricing-company"
-        />
-      </div>
-      <Button type="button" variant="primary" onClick={onApplyFilter}>
-        <Filter size={16} className="me-2" aria-hidden />
-        Filter
-      </Button>
-      {appliedCompanyLabel ? (
-        <p className="ai-analysis-pricing__meta">
-          Viewing: <strong>{appliedCompanyLabel}</strong>
-        </p>
-      ) : null}
-    </div>
-  );
-}
-
 export const AnalysisPricingTab: React.FC = () => {
-  const {
-    companiesLoading,
-    companyOptions,
-    selectedCompanyOption,
-    appliedCompanyLabel,
-    appliedTenantId,
-    handleCompanySelect,
-    handleApplyFilter,
-    pricingQuery,
-    saveMutation,
-  } = useAIAnalysisPricingPage();
+  const { pricingQuery, saveMutation } = useAIAnalysisPricingPage();
 
   const {
     formValues: fetchedFormValues,
@@ -104,7 +46,6 @@ export const AnalysisPricingTab: React.FC = () => {
     isError,
     refetch,
     dataUpdatedAt,
-    tenantId: queryTenantId,
     updatedAt,
     hasApiData,
   } = pricingQuery;
@@ -115,17 +56,12 @@ export const AnalysisPricingTab: React.FC = () => {
   const [formHydrated, setFormHydrated] = useState(false);
 
   useEffect(() => {
-    setValues(defaultAnalysisPricingFormValues());
-    setFormHydrated(false);
-  }, [appliedTenantId]);
-
-  useEffect(() => {
-    if (!appliedTenantId || queryTenantId !== appliedTenantId || isLoading) {
+    if (isLoading) {
       return;
     }
     setValues(fetchedFormValues);
     setFormHydrated(true);
-  }, [appliedTenantId, queryTenantId, dataUpdatedAt, fetchedFormValues, isLoading]);
+  }, [dataUpdatedAt, fetchedFormValues, isLoading]);
 
   const handleSave = useCallback(() => {
     const validationError = validateAnalysisPricingForm(values);
@@ -138,28 +74,7 @@ export const AnalysisPricingTab: React.FC = () => {
 
   const isSaving = saveMutation.isPending;
   const fieldsDisabled = isLoading || !formHydrated || isSaving;
-
-  if (!appliedTenantId) {
-    return (
-      <div className="ai-analysis-pricing">
-        <header>
-          <h2 className="ai-analysis-pricing__heading">Analysis pricing</h2>
-          <p className="ai-analysis-pricing__subheading">
-            Formula cost = fixed per-call + (input tokens × input_rate) + (output
-            tokens × output rate). Cache-served calls cost $0
-          </p>
-        </header>
-        <CompanyFilterBar
-          companiesLoading={companiesLoading}
-          companyOptions={companyOptions}
-          selectedCompanyOption={selectedCompanyOption}
-          onCompanySelect={handleCompanySelect}
-          onApplyFilter={handleApplyFilter}
-        />
-        <p className="ai-analysis-pricing__hint">Select a company to load pricing.</p>
-      </div>
-    );
-  }
+  const lastUpdatedLabel = formatAnalysisLastUpdated(updatedAt);
 
   if (isLoading && !formHydrated) {
     return (
@@ -171,21 +86,13 @@ export const AnalysisPricingTab: React.FC = () => {
             tokens × output rate). Cache-served calls cost $0
           </p>
         </header>
-        <CompanyFilterBar
-          companiesLoading={companiesLoading}
-          companyOptions={companyOptions}
-          selectedCompanyOption={selectedCompanyOption}
-          onCompanySelect={handleCompanySelect}
-          onApplyFilter={handleApplyFilter}
-          appliedCompanyLabel={appliedCompanyLabel}
-        />
         <AnalysisFormSkeleton fields={pricingFormSkeletonFields()} />
       </div>
     );
   }
 
   return (
-    <div key={appliedTenantId} className="ai-analysis-pricing">
+    <div className="ai-analysis-pricing">
       <header>
         <h2 className="ai-analysis-pricing__heading">Analysis pricing</h2>
         <p className="ai-analysis-pricing__subheading">
@@ -193,15 +100,6 @@ export const AnalysisPricingTab: React.FC = () => {
           tokens × output rate). Cache-served calls cost $0
         </p>
       </header>
-
-      <CompanyFilterBar
-        companiesLoading={companiesLoading}
-        companyOptions={companyOptions}
-        selectedCompanyOption={selectedCompanyOption}
-        onCompanySelect={handleCompanySelect}
-        onApplyFilter={handleApplyFilter}
-        appliedCompanyLabel={appliedCompanyLabel}
-      />
 
       {isError ? (
         <p className="ai-analysis-pricing__hint">
@@ -220,7 +118,7 @@ export const AnalysisPricingTab: React.FC = () => {
 
       {!isError && !hasApiData && formHydrated ? (
         <p className="ai-analysis-pricing__hint">
-          No pricing returned — enter values and save to create tenant pricing.
+          No pricing returned — enter values and save to create pricing.
         </p>
       ) : null}
 
@@ -273,8 +171,8 @@ export const AnalysisPricingTab: React.FC = () => {
         </label>
       </div>
 
-      {updatedAt ? (
-        <p className="ai-analysis-pricing__meta">Last updated: {updatedAt}</p>
+      {lastUpdatedLabel ? (
+        <p className="ai-analysis-pricing__meta">Last updated: {lastUpdatedLabel}</p>
       ) : null}
 
       <button

@@ -70,6 +70,10 @@ export function WorkloadBoardPanel({
   const handleDragStart = useCallback((e: React.DragEvent, task: WorkloadTaskCard) => {
     e.dataTransfer.setData(WORKLOAD_DRAG_TASK_MIME, String(task.id));
     e.dataTransfer.effectAllowed = "move";
+    const cardEl = e.currentTarget;
+    if (cardEl instanceof HTMLElement) {
+      e.dataTransfer.setDragImage(cardEl, 12, 16);
+    }
     setDraggingTaskId(task.id);
   }, []);
 
@@ -132,42 +136,59 @@ export function WorkloadBoardPanel({
           return (
             <section
               key={col.extension_number}
-              className={`workload-board__column ${isDropTarget ? "workload-board__column--drop-target" : ""}`}
+              className="workload-board__column"
               aria-label={`${columnLabel} workload column`}
-              onDragOver={allowDrop}
-              onDragEnter={() => setDropHighlight(col.extension_number)}
-              onDragLeave={() => setDropHighlight(null)}
-              onDrop={(e) => handleDrop(e, col.extension_number, null)}
             >
               <div className="workload-board__column-head">
-                <WorkloadMemberIdentity
-                  extensionNumber={col.extension_number}
-                  hierarchyExtensions={hierarchyExtensions}
-                  member={col}
-                  isOwner={col.is_owner}
-                  displayMode="inline"
-                />
-                <div className="workload-board__progress-row">
-                  <div
-                    className={`workload-cell__bar workload-board__progress-bar ${workloadCellBandClass(col.load_band)}`}
-                  >
-                    <div
-                      className="workload-cell__bar-fill"
-                      style={{ width: `${barPct}%` }}
+                <div className="workload-board__column-head-inner">
+                  <div className="workload-board__column-head-top">
+                    <WorkloadMemberIdentity
+                      extensionNumber={col.extension_number}
+                      hierarchyExtensions={hierarchyExtensions}
+                      member={col}
+                      isOwner={col.is_owner}
+                      displayMode="inline"
                     />
+                    <span className="workload-board__task-count">{tasks.length}</span>
                   </div>
-                  <span className="workload-board__progress-pct">
-                    {formatWorkloadPercent(col.load_percent)}
-                  </span>
-                </div>
-                <div className="workload-board__hours small text-muted">
-                  {formatWorkloadMinutes(col.estimated_minutes)} /{" "}
-                  {formatWorkloadMinutes(periodCapacity)}
+                  <div className="workload-board__hours">
+                    {formatWorkloadMinutes(col.estimated_minutes)} /{" "}
+                    {formatWorkloadMinutes(periodCapacity)}
+                  </div>
+                  <div className="workload-board__progress-row">
+                    <div
+                      className={`workload-cell__bar workload-board__progress-bar ${workloadCellBandClass(col.load_band)}`}
+                    >
+                      <div
+                        className="workload-cell__bar-fill"
+                        style={{ width: `${barPct}%` }}
+                      />
+                    </div>
+                    <span className="workload-board__progress-pct">
+                      {formatWorkloadPercent(col.load_percent)}
+                    </span>
+                  </div>
                 </div>
               </div>
-              <div className="workload-board__column-body">
+              <ul
+                aria-label={`${columnLabel} tasks`}
+                className={[
+                  "workload-board__column-body",
+                  "kb-col-cards",
+                  tasks.length === 0 ? "workload-board__column-body--empty" : "",
+                  isDropTarget ? "workload-board__column-body--drop-target" : "",
+                ]
+                  .filter(Boolean)
+                  .join(" ")}
+                onDragOver={allowDrop}
+                onDragEnter={() => setDropHighlight(col.extension_number)}
+                onDragLeave={() => setDropHighlight(null)}
+                onDrop={(e) => handleDrop(e, col.extension_number, null)}
+              >
                 {tasks.length === 0 ? (
-                  <p className="small text-muted mb-0 px-1">No tasks</p>
+                  <li className="workload-board__empty-item">
+                    <p className="workload-board__empty-msg">No records</p>
+                  </li>
                 ) : (
                   tasks.map((task) => (
                     <WorkloadBoardTaskCard
@@ -185,7 +206,7 @@ export function WorkloadBoardPanel({
                     />
                   ))
                 )}
-              </div>
+              </ul>
             </section>
           );
         })}

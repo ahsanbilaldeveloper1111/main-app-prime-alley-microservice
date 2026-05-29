@@ -10,6 +10,73 @@ export const getAllUsers = async (params: PaginationParams = {}) => {
   });
 };
 
+const USERS_DIRECTORY_PAGE_SIZE = 200;
+const USERS_DIRECTORY_MAX_PAGES = 100;
+
+type UsersDirectoryPagedResponse = {
+  data?: unknown[];
+  dataList?: unknown[];
+  total?: number;
+  meta?: { total?: number };
+};
+
+function extractUsersDirectoryPageRows(response: unknown): unknown[] {
+  if (Array.isArray(response)) {
+    return response;
+  }
+  if (!response || typeof response !== "object") {
+    return [];
+  }
+  const record = response as UsersDirectoryPagedResponse;
+  if (Array.isArray(record.data)) {
+    return record.data;
+  }
+  if (Array.isArray(record.dataList)) {
+    return record.dataList;
+  }
+  return [];
+}
+
+function readUsersDirectoryTotal(response: unknown, fallback: number): number {
+  if (!response || typeof response !== "object") {
+    return fallback;
+  }
+  const record = response as UsersDirectoryPagedResponse;
+  const total = Number(record.total ?? record.meta?.total);
+  return Number.isFinite(total) && total > 0 ? total : fallback;
+}
+
+/**
+ * Full user directory list (`POST users/list`), same source as Main Settings → Users & Teams → User Directory.
+ * Fetches all pages returned by the paginated list API.
+ */
+export async function fetchUsersDirectoryList(): Promise<unknown[]> {
+  const rows: unknown[] = [];
+  let page = 1;
+  let total = 0;
+
+  while (page <= USERS_DIRECTORY_MAX_PAGES) {
+    const response = await getAllUsers({
+      page,
+      perPage: USERS_DIRECTORY_PAGE_SIZE,
+      search: "",
+      filters: {},
+    });
+
+    const batch = extractUsersDirectoryPageRows(response);
+    if (page === 1) {
+      total = readUsersDirectoryTotal(response, batch.length);
+    }
+    rows.push(...batch);
+    if (batch.length === 0 || rows.length >= total) {
+      break;
+    }
+    page += 1;
+  }
+
+  return rows;
+}
+
 export const getParentUsers = async () => {
   try {
     const response = await axiosInstance.post(`users/list`, { show_all: 1 });
@@ -849,5 +916,41 @@ export const mainAppAuditLogs = async (params: Record<string, unknown> = {}) => 
     reportApiErrorFromCatch(error, 'users');
     console.error('API Error:', error);
     throw error;
+  }
+};
+
+/** Per-user chat budget override (`PUT /api/chat/users/<tenant_id>/<user_id>/`). */
+export type UpdateChatbotUserBudgetPayload = Readonly<{
+  monthly_budget_usd: string;
+}>;
+
+export const CHATBOT_USER_BUDGET_UPDATE_ERROR_MESSAGE =
+  "Failed to save user budget override. Please try again.";
+
+export const updateChatbotUserBudget = async (
+  tenantId: string,
+  userId: string,
+  payload: UpdateChatbotUserBudgetPayload,
+): Promise<void> => {
+  const tid = tenantId.trim();
+  const uid = userId.trim();
+  if (!tid || !uid) {
+    throw new Error("Tenant and user are required.");
+  }
+
+  try {
+    await axiosInstance.put(
+      `chat/users/${encodeURIComponent(tid)}/${encodeURIComponent(uid)}/`,
+      payload,
+      {
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+        },
+      },
+    );
+  } catch (error: unknown) {
+    reportApiErrorFromCatch(error, "users");
+    throw new Error(CHATBOT_USER_BUDGET_UPDATE_ERROR_MESSAGE);
   }
 };

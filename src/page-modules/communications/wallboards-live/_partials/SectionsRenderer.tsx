@@ -4,7 +4,11 @@ import SectionContainer from './SectionContainer'
 import { SECTION_ORDER } from '@components/live-calls/utils/constants'
 import { getCallSortDurationMs } from '@components/live-calls/utils/helpers'
 import { CtiDevice } from '@components/live-calls/utils/types'
-import { parseWallboardTimestampToMs } from '@components/communications/wallboards-live/wallboardEventParsing'
+import {
+  isSilentMonitoringType,
+  parseWallboardTimestampToMs,
+} from '@components/communications/wallboards-live/wallboardEventParsing'
+import { ctiAddressesEquivalent } from '@utils/ctiAddressMatching'
 
 const SECTION_STATUS_MAP: Record<string, string> = {
   supervision: 'supervision',
@@ -146,21 +150,26 @@ function sortSectionsByDuration(
   )
 }
 
-/** SILENT: hide the supervisor's row from everyone except the supervisor (monitor sees full grid including monitored agent). */
+/**
+ * SILENT: hide the supervisor's Live Coaching card from everyone except the monitor who started it.
+ */
 function shouldOmitSupervisorRowForSilentMonitoring(
   dn: string,
   userAddress: string | null | undefined,
-  activeMonitoring: { monitor?: string; type?: string | null }
+  activeMonitoring: { monitor?: string; type?: string | null },
+  _section: string,
 ): boolean {
-  const monitoringType = activeMonitoring?.type
-  if (!monitoringType || String(monitoringType).toUpperCase() !== 'SILENT') {
+  if (!isSilentMonitoringType(activeMonitoring?.type)) {
     return false
   }
   const monitorDn = activeMonitoring.monitor
   if (monitorDn == null || userAddress == null || userAddress === '') {
     return false
   }
-  return String(dn) === String(monitorDn) && String(userAddress) !== String(monitorDn)
+  return (
+    ctiAddressesEquivalent(dn, monitorDn) &&
+    !ctiAddressesEquivalent(userAddress, monitorDn)
+  )
 }
 
 interface SectionsRendererProps {
@@ -327,7 +336,7 @@ const SectionsRenderer: React.FC<SectionsRendererProps> = ({
     const active = hasActiveCalls(dn)
     const section = categorizeDns(dn, deviceList, call, active)
 
-    if (shouldOmitSupervisorRowForSilentMonitoring(dn, userAddress, activeMonitoring)) {
+    if (shouldOmitSupervisorRowForSilentMonitoring(dn, userAddress, activeMonitoring, section)) {
       return
     }
     if (!matchesFilters(dn, section)) {

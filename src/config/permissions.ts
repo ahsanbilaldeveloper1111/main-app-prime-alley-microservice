@@ -6,6 +6,8 @@ export interface RoutePermission {
     path: string;
     permissions: string[];
     children?: RoutePermission[];
+    /** Optional display label for global header search (defaults to path-derived label). */
+    searchLabel?: string;
 }
 
 // Define all route permissions in a hierarchical structure
@@ -35,11 +37,6 @@ export const routePermissions: RoutePermission[] = [
     
     { path: '/dialpad-use', permissions: [PERMISSIONS.VIEW_CTI] },
     
-    {path:'/faqs',permissions: [PERMISSIONS.MANAGE_HELP_CENTER]},
-    {path:'/faqs/modules',permissions: [PERMISSIONS.MANAGE_HELP_CENTER]},
-    {path:'/faqs/items',permissions: [PERMISSIONS.MANAGE_HELP_CENTER]},
-    {path:'/faqs/topics',permissions: [PERMISSIONS.MANAGE_HELP_CENTER]},
-    {path:'/faqs/types',permissions: [PERMISSIONS.MANAGE_HELP_CENTER]},
     {
         path: '/main-settings',
         permissions: [PERMISSIONS.GENERAL_SERVICES],
@@ -47,16 +44,131 @@ export const routePermissions: RoutePermission[] = [
             { path: '/general-prefs', permissions: [PERMISSIONS.GENERAL_SERVICES] },
             { path: '/notifications', permissions: [PERMISSIONS.VIEW_USER_NOTIFICATIONS] },
             { path: '/account-defaults', permissions: [PERMISSIONS.GENERAL_SERVICES] },
-            { path: '/users-teams', permissions: [PERMISSIONS.CONTROL_HUB_SERVICES] },
-            { path: '/smart-crm', permissions: [PERMISSIONS.CRM_SERVICES] },
+            {
+                path: '/users-teams',
+                permissions: [PERMISSIONS.CONTROL_HUB_SERVICES],
+                children: [
+                    {
+                        path: '/user-directory',
+                        permissions: [PERMISSIONS.VIEW_USERS],
+                        searchLabel: 'User Directory',
+                    },
+                    {
+                        path: '/supervisor-teams',
+                        permissions: [PERMISSIONS.VIEW_TEAMS],
+                        searchLabel: 'Supervisor Teams',
+                    },
+                    {
+                        path: '/management-groups',
+                        permissions: [PERMISSIONS.VIEW_GROUPS],
+                        searchLabel: 'Management Groups',
+                    },
+                    {
+                        path: '/ranks-and-permissions',
+                        permissions: [PERMISSIONS.VIEW_RANKS],
+                        searchLabel: 'Ranks and Permissions',
+                    },
+                ],
+            },
+            {
+                path: '/smart-crm',
+                permissions: [PERMISSIONS.CRM_SERVICES],
+                children: [
+                    {
+                        path: '/stages',
+                        permissions: [PERMISSIONS.VIEW_CRM_STAGES],
+                        searchLabel: 'CRM Stages',
+                    },
+                    {
+                        path: '/industries',
+                        permissions: [PERMISSIONS.VIEW_CRM_INDUSTRIES],
+                        searchLabel: 'CRM Product Groups',
+                    },
+                    {
+                        path: '/products',
+                        permissions: [PERMISSIONS.VIEW_CRM_PRODUCTS],
+                        searchLabel: 'CRM Products',
+                    },
+                    {
+                        path: '/deal-templates',
+                        permissions: [PERMISSIONS.VIEW_CRM_DEAL_TEMPLATES],
+                        searchLabel: 'CRM Deal Templates',
+                    },
+                    {
+                        path: '/business-types',
+                        permissions: [PERMISSIONS.VIEW_CRM_BUSINESS_TYPES],
+                        searchLabel: 'CRM Business Types',
+                    },
+                    {
+                        path: '/campaigns',
+                        permissions: [PERMISSIONS.VIEW_CRM_CAMPAIGNS],
+                        searchLabel: 'CRM Campaigns',
+                    },
+                ],
+            },
             { path: '/communications', permissions: [PERMISSIONS.COMMUNICATIONS_SERVICES] },
             { path: '/planner', permissions: [PERMISSIONS.WORK_PLANNER_SERVICES] },
             { path: '/pulse', permissions: [PERMISSIONS.PULSE_SERVICES] },
             { path: '/compliance', permissions: [PERMISSIONS.DNCR_SERVICES] },
             { path: '/workforce', permissions: [PERMISSIONS.STAFF_MANAGEMENT_SERVICES] },
             { path: '/billing', permissions: [PERMISSIONS.ACCOUNTS_SERVICES] },
-            { path: '/tickets', permissions: [PERMISSIONS.TICKETS_SERVICES] },
-            { path: '/help-center', permissions: [PERMISSIONS.MANAGE_HELP_CENTER] },
+            {
+                path: '/tickets',
+                permissions: [PERMISSIONS.TICKETS_SERVICES],
+                children: [
+                    {
+                        path: '/statuses',
+                        permissions: [PERMISSIONS.VIEW_TICKETS_STATUS],
+                        searchLabel: 'Ticket Statuses',
+                    },
+                    {
+                        path: '/modules',
+                        permissions: [PERMISSIONS.VIEW_TICKETS_MODULES],
+                        searchLabel: 'Ticket Modules',
+                    },
+                    {
+                        path: '/categories',
+                        permissions: [PERMISSIONS.VIEW_TICKETS_CATEGORIES],
+                        searchLabel: 'Ticket Categories',
+                    },
+                    {
+                        path: '/sub-categories',
+                        permissions: [PERMISSIONS.VIEW_TICKETS_SUBCATEGORIES],
+                        searchLabel: 'Ticket Sub Categories',
+                    },
+                    {
+                        path: '/types',
+                        permissions: [PERMISSIONS.VIEW_TICKETS_TYPES],
+                        searchLabel: 'Ticket Types',
+                    },
+                ],
+            },
+            {
+                path: '/help-center',
+                permissions: [PERMISSIONS.MANAGE_HELP_CENTER],
+                children: [
+                    {
+                        path: '/modules',
+                        permissions: [PERMISSIONS.MANAGE_HELP_CENTER],
+                        searchLabel: 'FAQ Modules',
+                    },
+                    {
+                        path: '/topics',
+                        permissions: [PERMISSIONS.MANAGE_HELP_CENTER],
+                        searchLabel: 'FAQ Topics',
+                    },
+                    {
+                        path: '/items',
+                        permissions: [PERMISSIONS.MANAGE_HELP_CENTER],
+                        searchLabel: 'FAQ Items',
+                    },
+                    {
+                        path: '/types',
+                        permissions: [PERMISSIONS.MANAGE_HELP_CENTER],
+                        searchLabel: 'FAQ Types',
+                    },
+                ],
+            },
             {
                 path: '/ai-chat',
                 permissions: [PERMISSIONS.VIEW_AI_CHAT_AI_CHAT],
@@ -75,6 +187,7 @@ export const routePermissions: RoutePermission[] = [
     { path: '/chat/tenant-dashboard', permissions: [PERMISSIONS.VIEW_TENANT_DASHBOARD_AI_CHAT] },
     { path: '/chat/ai-faqs/global', permissions: [PERMISSIONS.MANAGE_GLOBAL_FAQS_AI_CHAT] },
     { path: '/chat/admin-dashboard', permissions: [PERMISSIONS.VIEW_ADMIN_DASHBOARD_AI_CHAT] },
+    { path: '/chat/audit-logs', permissions: [PERMISSIONS.VIEW_ADMIN_DASHBOARD_AI_CHAT] },
     { path: '/chat/faq-profiles', permissions: [PERMISSIONS.VIEW_FAQS_PROFILE_AI_CHAT] },
     { path: '/chat/faq-profiles/tenant', permissions: [PERMISSIONS.MANAGE_TENANT_PROFILE_AI_CHAT] },
     { path: '/chat/faq-profiles/global', permissions: [PERMISSIONS.MANAGE_GLOBAL_FAQS_AI_CHAT] },
@@ -873,23 +986,37 @@ function hasBraceParam(path: string): boolean {
  * Routes (or path prefixes) to exclude from header search suggestions.
  * Exact match or path starting with an entry (e.g. '/help-center/knowledge-base') is excluded.
  */
+/** Exact path matches only (does not exclude child paths). */
+export const SEARCH_EXCLUDED_EXACT_ROUTES: string[] = [
+    // Legacy controlhub list hubs; use /main-settings/users-teams/* in search instead.
+    '/controlhub/users',
+    '/controlhub/teams',
+    '/controlhub/groups',
+    '/controlhub/ranks',
+    // Legacy tickets admin hubs; use /main-settings/tickets/* in search instead.
+    '/tickets/statuses',
+    '/tickets/modules',
+    '/tickets/modules/categories',
+    '/tickets/modules/sub-categories',
+    '/tickets/types',
+    // Legacy Smart CRM admin hubs; use /main-settings/smart-crm/* in search instead.
+    '/crm/stages',
+    '/crm/products',
+    '/crm/industries',
+    '/crm/deal-templates',
+    '/crm/business-types',
+    '/crm/campaigns',
+];
+
 export const SEARCH_EXCLUDED_ROUTES: string[] = [
-   
+    // Legacy FAQ admin hub; use /main-settings/help-center/* in search instead.
+    '/faqs',
+
     '/help-center/knowledge-base/[id]',
     '/help-center/my-tickets/[id]',
     '/planner/tasks/:id',
     '/planner/projects/{id}',
     '/crm-new-dashboard',
-
-    // Smart CRM settings pages – reachable via /main-settings/smart-crm
-    // (kept as standalone routes for direct deep-linking, but hidden from
-    // global search to avoid duplicate entries).
-    '/crm/campaigns',
-    '/crm/stages',
-    '/crm/products',
-    '/crm/deal-templates',
-    '/crm/industries',
-    '/crm/business-types',
 
     '/coming-soon',
     '/plan-upgrade',
@@ -909,6 +1036,13 @@ export const SEARCH_EXCLUDED_ROUTES: string[] = [
 
 function isExcludedFromSearch(path: string): boolean {
     const normalized = path.replaceAll(/\/+/g, '/').replace(/\/$/, '') || '/';
+    const isExactExcluded = SEARCH_EXCLUDED_EXACT_ROUTES.some((ex) => {
+        const exNorm = ex.replaceAll(/\/+/g, '/').replace(/\/$/, '') || '/';
+        return normalized === exNorm;
+    });
+    if (isExactExcluded) {
+        return true;
+    }
     return SEARCH_EXCLUDED_ROUTES.some((ex) => {
         const exNorm = ex.replaceAll(/\/+/g, '/').replace(/\/$/, '') || '/';
         return normalized === exNorm || normalized.startsWith(exNorm + '/');
@@ -924,7 +1058,10 @@ export function getSearchableRoutes(): SearchableRoute[] {
             if (isDynamicPath(fullPath)) continue;
             const normalized = fullPath.endsWith('/') && fullPath.length > 1 ? fullPath.slice(0, -1) : fullPath;
             if (isExcludedFromSearch(normalized)) continue;
-            result.push({ path: normalized, label: pathToLabel(normalized) });
+            result.push({
+                path: normalized,
+                label: route.searchLabel ?? pathToLabel(normalized),
+            });
             if (route.children?.length) traverse(route.children, fullPath);
         }
     }

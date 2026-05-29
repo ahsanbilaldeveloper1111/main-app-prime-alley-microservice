@@ -1,4 +1,4 @@
-﻿import React from 'react'
+import React from 'react'
 import { PlannerGeneralSettingsView } from './planner-general/PlannerGeneralSettingsView'
 import { usePlannerGeneralSettings } from './planner-general/usePlannerGeneralSettings'
 
@@ -8,6 +8,7 @@ export const PlannerGeneralSettings: React.FC = () => {
     showMyDay,
     requireEstimateForMyDay,
     saveFeedback,
+    isSaving,
     onCapacityInputChange,
     onShowMyDayChange,
     onRequireEstimateChange,
@@ -20,6 +21,7 @@ export const PlannerGeneralSettings: React.FC = () => {
       showMyDay={showMyDay}
       requireEstimateForMyDay={requireEstimateForMyDay}
       saveFeedback={saveFeedback}
+      isSaving={isSaving}
       onCapacityInputChange={onCapacityInputChange}
       onShowMyDayChange={onShowMyDayChange}
       onRequireEstimateChange={onRequireEstimateChange}

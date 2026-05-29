@@ -2,10 +2,9 @@
 
 import React, { useMemo, useState } from "react";
 import {
-  Bar,
-  BarChart,
   CartesianGrid,
-  Cell,
+  Line,
+  LineChart,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -13,7 +12,11 @@ import {
 } from "recharts";
 import { Info } from "lucide-react";
 import { MainDashboardChartLoader } from "@components/salesDashboard/MainDashboardChartLoader";
-import { useMainDashboardAttendanceActivity } from "@hooks/useMainDashboardAttendanceActivity";
+import { useMainDashboardCrmDailyCreationCounts } from "@hooks/useMainDashboardCrmDailyCreationCounts";
+import {
+  DAILY_CREATION_LINE_SERIES,
+  buildDailyCreationLineChartRows,
+} from "@utils/mainDashboardChartData";
 import {
   getMainDashboardDateRange,
   type MainDashboardRangePill,
@@ -28,20 +31,7 @@ const TICK_STYLE = {
   fontWeight: 100,
 };
 
-const ATTENDANCE_ACTIVITY_METRICS = [
-  { key: "attendance", name: "Attendance", color: "#CE93D8" },
-  { key: "approvals", name: "Approval requests", color: "#90CAF9" },
-  { key: "pendingTasks", name: "Pending tasks", color: "#F4A57A" },
-] as const;
-
-type AttendanceMetricKey = (typeof ATTENDANCE_ACTIVITY_METRICS)[number]["key"];
-
-type AttendanceChartRow = {
-  key: AttendanceMetricKey;
-  name: string;
-  color: string;
-  count: number;
-};
+type SeriesKey = (typeof DAILY_CREATION_LINE_SERIES)[number]["key"];
 
 function PillBadge({
   children,
@@ -80,15 +70,59 @@ function PillBadge({
   return <span style={style}>{children}</span>;
 }
 
-type AttendanceActivityTooltipProps = {
-  active?: boolean;
-  payload?: Array<{ value?: number; payload?: { name?: string } }>;
+const renderLegendDot = (color: string, filled: boolean) => (
+  <span
+    style={{
+      display: "inline-block",
+      width: "10px",
+      height: "10px",
+      borderRadius: "50%",
+      backgroundColor: filled ? color : "transparent",
+      border: `2px solid ${color}`,
+      marginRight: "5px",
+      flexShrink: 0,
+    }}
+  />
+);
+
+type LineDotProps = {
+  cx?: number;
+  cy?: number;
+  payload?: Record<string, number>;
 };
 
-const AttendanceActivityTooltip = ({ active, payload }: AttendanceActivityTooltipProps) => {
+function SeriesDot({
+  cx,
+  cy,
+  payload,
+  dataKey,
+  color,
+}: LineDotProps & { dataKey: SeriesKey; color: string }) {
+  const value = payload?.[dataKey];
+  if (!cx || !cy || !value) return <g />;
+  return <circle cx={cx} cy={cy} r={3} fill={color} stroke={color} />;
+}
+
+function LeadsDot(props: Readonly<LineDotProps>) {
+  return <SeriesDot {...props} dataKey="leads" color="#90CAF9" />;
+}
+
+function DealsDot(props: Readonly<LineDotProps>) {
+  return <SeriesDot {...props} dataKey="deals" color="#F4A57A" />;
+}
+
+function OrdersDot(props: Readonly<LineDotProps>) {
+  return <SeriesDot {...props} dataKey="orders" color="#A5D6A7" />;
+}
+
+type CreationTooltipProps = {
+  active?: boolean;
+  payload?: Array<{ name?: string; value?: number; color?: string }>;
+  label?: string;
+};
+
+const CreationTooltip = ({ active, payload, label }: CreationTooltipProps) => {
   if (!active || !payload?.length) return null;
-  const row = payload[0];
-  const value = typeof row.value === "number" ? row.value : Number(row.value);
   return (
     <div
       style={{
@@ -102,56 +136,52 @@ const AttendanceActivityTooltip = ({ active, payload }: AttendanceActivityToolti
         boxShadow: "0 2px 8px rgba(0,0,0,0.1)",
       }}
     >
-      <div style={{ fontWeight: 600, marginBottom: 4 }}>{row.payload?.name}</div>
-      <div>
-        Count: <strong>{Number.isFinite(value) ? value.toLocaleString() : "—"}</strong>
-      </div>
+      <div style={{ fontWeight: 600, marginBottom: 4 }}>{label}</div>
+      {payload.map((entry) => (
+        <div key={entry.name} style={{ marginBottom: 2 }}>
+          <span style={{ color: entry.color }}>{entry.name}: </span>
+          <strong>
+            {typeof entry.value === "number" ? entry.value.toLocaleString() : "—"}
+          </strong>
+        </div>
+      ))}
     </div>
   );
 };
 
-export function AttendanceApprovalsChart() {
+const SERIES_DOTS: Record<SeriesKey, (props: LineDotProps) => React.JSX.Element> = {
+  leads: LeadsDot,
+  deals: DealsDot,
+  orders: OrdersDot,
+};
+
+export function AttendanceApprovalsChart({ scale = 1 }: Readonly<{ scale?: number }>) {
   const [activePill, setActivePill] = useState<MainDashboardRangePill>("daily");
-  const [visible, setVisible] = useState<Record<AttendanceMetricKey, boolean>>({
-    attendance: true,
-    approvals: true,
-    pendingTasks: true,
+  const [visible, setVisible] = useState<Record<SeriesKey, boolean>>({
+    leads: true,
+    deals: true,
+    orders: true,
   });
 
   const dateRange = useMemo(() => getMainDashboardDateRange(activePill), [activePill]);
-  const activityQuery = useMainDashboardAttendanceActivity(dateRange);
+  const dailyCreationQuery = useMainDashboardCrmDailyCreationCounts(dateRange);
 
-  const chartData = useMemo((): AttendanceChartRow[] => {
-    const attendance = activityQuery.data?.attendance;
-    return ATTENDANCE_ACTIVITY_METRICS.map((metric) => {
-      let count = 0;
-      if (metric.key === "attendance") {
-        count = attendance?.attendance_count ?? 0;
-      } else if (metric.key === "approvals") {
-        count = attendance?.approval_request_count ?? 0;
-      } else {
-        count = activityQuery.data?.pendingTasksCount ?? 0;
-      }
-      return { ...metric, count };
-    });
-  }, [activityQuery.data]);
+  const chartData = useMemo(
+    () =>
+      buildDailyCreationLineChartRows(dailyCreationQuery.data ?? null, activePill, scale),
+    [dailyCreationQuery.data, activePill, scale],
+  );
 
-  const visibleChartData = chartData.filter((row) => visible[row.key]);
-  const maxCount = useMemo(() => {
-    const peak = visibleChartData.reduce((max, row) => Math.max(max, row.count), 0);
-    return Math.max(peak, 1);
-  }, [visibleChartData]);
+  const isChartLoading = dailyCreationQuery.isPending || dailyCreationQuery.isFetching;
 
-  const isChartLoading = activityQuery.isPending || activityQuery.isFetching;
-
-  const toggleSeries = (key: AttendanceMetricKey) => {
+  const toggleSeries = (key: SeriesKey) => {
     setVisible((prev) => ({ ...prev, [key]: !prev[key] }));
   };
 
   const legendItemStyle = (isVisible: boolean): React.CSSProperties => ({
     display: "flex",
     alignItems: "center",
-    gap: "6px",
+    gap: "8px",
     fontSize: 11,
     color: "#141414",
     fontFamily: FONT,
@@ -175,8 +205,6 @@ export function AttendanceApprovalsChart() {
           minWidth: 0,
           width: "100%",
           fontFamily: FONT,
-          display: "flex",
-          flexDirection: "column",
         }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "10px" }}>
@@ -188,88 +216,65 @@ export function AttendanceApprovalsChart() {
               fontFamily: FONT,
             }}
           >
-            Attendance & approvals
+            CRM Activity last 7 days
           </span>
           <Info size={14} color="#888" />
-        </div>
-
-        <div style={{ display: "flex", gap: "6px", marginBottom: "12px" }}>
-          <PillBadge active={activePill === "daily"} onClick={() => setActivePill("daily")}>
-            Daily
-          </PillBadge>
-          <PillBadge active={activePill === "weekly"} onClick={() => setActivePill("weekly")}>
-            Weekly
-          </PillBadge>
-          <PillBadge active={activePill === "monthly"} onClick={() => setActivePill("monthly")}>
-            Monthly
-          </PillBadge>
         </div>
 
         <div
           style={{
             display: "flex",
             flexWrap: "wrap",
-            gap: "12px 20px",
-            marginBottom: "12px",
-            paddingLeft: "4px",
+            gap: "16px 24px",
+            marginBottom: "8px",
+            paddingLeft: "8px",
           }}
         >
-          {ATTENDANCE_ACTIVITY_METRICS.map((metric) => (
+          {DAILY_CREATION_LINE_SERIES.map((series) => (
             <button
-              key={metric.key}
+              key={series.key}
               type="button"
-              onClick={() => toggleSeries(metric.key)}
-              style={legendItemStyle(visible[metric.key])}
+              onClick={() => toggleSeries(series.key)}
+              style={legendItemStyle(visible[series.key])}
             >
-              <span
-                style={{
-                  width: 10,
-                  height: 10,
-                  borderRadius: "50%",
-                  backgroundColor: metric.color,
-                  display: "inline-block",
-                }}
-              />
-              {metric.name}
+              {renderLegendDot(series.color, visible[series.key])}
+              <span>{series.name}</span>
             </button>
           ))}
         </div>
 
-        <div style={{ width: "100%", height: 260, minHeight: 260, flexShrink: 0 }}>
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart
-              data={visibleChartData}
-              margin={{ top: 12, right: 12, left: 4, bottom: 56 }}
-              barCategoryGap="20%"
-            >
-              <CartesianGrid vertical={false} stroke="#e5e5e5" strokeDasharray="4 4" />
-              <XAxis
-                dataKey="name"
-                tick={TICK_STYLE}
-                interval={0}
-                angle={-22}
-                textAnchor="end"
-                height={56}
-                axisLine={{ stroke: "#ccc" }}
-                tickLine={false}
+        <ResponsiveContainer width="100%" height={240}>
+          <LineChart data={chartData} margin={{ top: 20, right: 16, left: 70, bottom: 8 }}>
+            <CartesianGrid horizontal vertical={false} stroke="#e5e5e5" strokeDasharray="4 4" />
+            <XAxis
+              dataKey="date"
+              tick={TICK_STYLE}
+              axisLine={{ stroke: "#ccc" }}
+              tickLine={false}
+              interval={chartData.length > 10 ? 2 : 0}
+            />
+            <YAxis
+              domain={[0, "auto"]}
+              tick={TICK_STYLE}
+              axisLine={false}
+              tickLine={false}
+              width={22}
+            />
+            <Tooltip content={<CreationTooltip />} />
+            {DAILY_CREATION_LINE_SERIES.map((series) => (
+              <Line
+                key={series.key}
+                type="monotone"
+                dataKey={series.key}
+                stroke={series.color}
+                strokeWidth={1.5}
+                hide={!visible[series.key]}
+                dot={SERIES_DOTS[series.key]}
+                name={series.name}
               />
-              <YAxis
-                allowDecimals={false}
-                domain={[0, maxCount]}
-                tick={TICK_STYLE}
-                width={36}
-                axisLine={false}
-                tickLine={false}
-              />
-              <Tooltip content={<AttendanceActivityTooltip />} cursor={{ fill: "rgba(0,0,0,0.04)" }} />
-              <Bar dataKey="count" radius={[4, 4, 0, 0]} maxBarSize={56}>
-                {visibleChartData.map((entry) => (
-                  <Cell key={entry.key} fill={entry.color} />
-                ))}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
+            ))}
+          </LineChart>
+        </ResponsiveContainer>
       </div>
     </MainDashboardChartLoader>
   );

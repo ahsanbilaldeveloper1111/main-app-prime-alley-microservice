@@ -4,8 +4,8 @@ import Layout from '@layout/index';
 import BreadcrumbItem from '@common/BreadcrumbItem';
 import { Button, Modal, Row, Col, Card, Nav } from 'react-bootstrap';
 import { useSession } from 'next-auth/react';
-import Ranks from '@pages/controlhub/ranks';
-import Groups from '@pages/controlhub/groups';
+import RanksPanel from '@page-modules/controlhub/ranks/RanksPanel';
+import GroupsPanel from '@page-modules/controlhub/groups/GroupsPanel';
 import GSMManagement from '@pages/pulse/gateways';
 import GSMAssignments from '@pages/gsm/assign';
 const Configuration = () => {
@@ -22,7 +22,7 @@ const Configuration = () => {
             title: 'Ranks',
             icon: 'ph-duotone ph-crown',
             content: (
-                  <Ranks />
+                  <RanksPanel />
             )
         },
         {
@@ -30,7 +30,7 @@ const Configuration = () => {
             title: 'Groups',
             icon: 'ph-duotone ph-users',
             content: (
-                  <Groups />
+                  <GroupsPanel />
             )
         }
         ,

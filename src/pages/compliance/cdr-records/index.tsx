@@ -17,13 +17,13 @@ const CDRRecords = () => {
 
   return (
     <React.Fragment>
-      <BreadcrumbItem mainTitle="" mainLink="" subTitle="CDR Records" />
+      <BreadcrumbItem mainTitle="" mainLink="" subTitle="Compliance Analytics" />
 
       <GenericTable<MappedCDRRecord>
         data={vm.mappedData}
         columns={vm.cdrColumns}
         loading={vm.loading}
-        loadingMessage="Loading CDR records..."
+        loadingMessage="Loading compliance analytics..."
         emptyMessage={
           vm.error ? (
             <span className="cdrRecords-emptyError">{vm.error}</span>

@@ -10,7 +10,7 @@ import {
   Users,
 } from "lucide-react";
 import dynamic from "next/dynamic";
-import React, { useMemo } from "react";
+import React, { useMemo, useState } from "react";
 import {
   Alert,
   Button,
@@ -36,7 +36,14 @@ import {
 import { DashboardTableCard } from "../shared/DashboardTableCard";
 import { useMediaQuery } from "../shared/useMediaQuery";
 
+import { AdminDashboardPricingHistoryTab } from "./AdminDashboardPricingHistoryTab";
+import { AdminDashboardUsersBudgetsTab } from "./AdminDashboardUsersBudgetsTab";
+import {
+  ADMIN_DASHBOARD_TABS,
+  type AdminDashboardTab,
+} from "./adminDashboardTabs";
 import type { ChatbotsAdminDashboardCtx } from "./useChatbotsAdminDashboard";
+import { useChatAdminPricingHistoryPage } from "./useChatAdminPricingHistoryPage";
 
 const ReactApexChart = dynamic(() => import("react-apexcharts"), {
   ssr: false,
@@ -55,6 +62,16 @@ const float3 = new Intl.NumberFormat("en-US", {
 });
 
 const intFmt = new Intl.NumberFormat("en-US");
+
+const pct1 = new Intl.NumberFormat("en-US", {
+  minimumFractionDigits: 1,
+  maximumFractionDigits: 1,
+});
+
+function formatMarginPct(value: number | null): string {
+  if (value == null || !Number.isFinite(value)) return "—";
+  return `${pct1.format(value)}%`;
+}
 
 /** Resolve donut slice raw value from Apex formatter context (label may be %). */
 function donutSliceRawValue(
@@ -120,6 +137,39 @@ export type ChatbotsAdminDashboardViewProps = Readonly<{
   ctx: ChatbotsAdminDashboardCtx;
 }>;
 
+function AdminDashboardTabRow(props: Readonly<{
+  activeTab: AdminDashboardTab;
+  onSelectTab: (tab: AdminDashboardTab) => void;
+}>) {
+  const { activeTab, onSelectTab } = props;
+  return (
+    <div className="chatbots-dashboard__tab-row" role="tablist">
+      {ADMIN_DASHBOARD_TABS.map((tab, index) => {
+        const isActive = activeTab === tab.id;
+        const isLast = index === ADMIN_DASHBOARD_TABS.length - 1;
+        return (
+          <button
+            key={tab.id}
+            type="button"
+            role="tab"
+            aria-selected={isActive}
+            onClick={() => onSelectTab(tab.id)}
+            className={[
+              "chatbots-dashboard__tab-btn",
+              isActive ? "chatbots-dashboard__tab-btn--active" : "",
+            ]
+              .filter(Boolean)
+              .join(" ")}
+            style={isLast ? { borderRight: "1px solid #e0e0e0" } : undefined}
+          >
+            {tab.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 function DashboardLoading() {
   return (
     <div
@@ -139,7 +189,11 @@ function DashboardLoading() {
 export function ChatbotsAdminDashboardView({
   ctx,
 }: ChatbotsAdminDashboardViewProps) {
+  const [activeTab, setActiveTab] = useState<AdminDashboardTab>("overview");
   const { model, costQueriesChart, isLoading, isError, error, refetch } = ctx;
+  const pricingHistoryCtx = useChatAdminPricingHistoryPage(
+    activeTab === "pricing-history",
+  );
 
   return (
     <React.Fragment>
@@ -151,9 +205,19 @@ export function ChatbotsAdminDashboardView({
         fluid
         className="px-2 px-sm-3 px-lg-4 pb-4 chatbots-dashboard"
       >
-        {isLoading && <DashboardLoading />}
+        <AdminDashboardTabRow activeTab={activeTab} onSelectTab={setActiveTab} />
 
-        {isError && !isLoading && (
+        {activeTab === "users" ? (
+          <AdminDashboardUsersBudgetsTab active={activeTab === "users"} />
+        ) : null}
+
+        {activeTab === "pricing-history" ? (
+          <AdminDashboardPricingHistoryTab ctx={pricingHistoryCtx} />
+        ) : null}
+
+        {activeTab === "overview" && isLoading ? <DashboardLoading /> : null}
+
+        {activeTab === "overview" && isError && !isLoading ? (
           <Alert
             variant="danger"
             className="d-flex flex-column flex-sm-row align-items-stretch align-items-sm-center gap-2 gap-sm-3"
@@ -170,14 +234,14 @@ export function ChatbotsAdminDashboardView({
               Retry
             </Button>
           </Alert>
-        )}
+        ) : null}
 
-        {!isLoading && !isError && model && (
+        {activeTab === "overview" && !isLoading && !isError && model ? (
           <AdminDashboardContent
             model={model}
             costQueriesChart={costQueriesChart}
           />
-        )}
+        ) : null}
       </Container>
     </React.Fragment>
   );
@@ -210,7 +274,7 @@ function AdminDashboardContent({
 
   return (
     <>
-      <Row xs={1} sm={2} md={3} xl={6} className="g-3 mb-4">
+      <Row xs={1} sm={2} md={3} xl={4} className="g-3 mb-4">
         <StatCard
           title="Queries today"
           value={float3.format(summary.queriesToday)}
@@ -228,6 +292,12 @@ function AdminDashboardContent({
           value={usd3.format(summary.costMonthUsd)}
           icon={<CalendarRange size={20} />}
           accent="#7c3aed"
+        />
+        <StatCard
+          title="Profit this month"
+          value={usd3.format(summary.profitMonthUsd)}
+          icon={<DollarSign size={20} />}
+          accent="#16a34a"
         />
         <StatCard
           title="Tenants"
@@ -272,9 +342,12 @@ function AdminDashboardContent({
           <DashboardTableCard title="Top companies (this month)">
             <Table hover size="sm" className={chatbotsDashboardTableClass}>
               <colgroup>
-                <col style={{ width: "50%" }} />
-                <col style={{ width: "25%" }} />
-                <col style={{ width: "25%" }} />
+                <col style={{ width: "28%" }} />
+                <col style={{ width: "12%" }} />
+                <col style={{ width: "15%" }} />
+                <col style={{ width: "15%" }} />
+                <col style={{ width: "15%" }} />
+                <col style={{ width: "15%" }} />
               </colgroup>
               <thead className="table-light">
                 <tr>
@@ -284,6 +357,15 @@ function AdminDashboardContent({
                   </th>
                   <th className={`${chatbotsDashboardThClass} text-md-center`}>
                     Cost
+                  </th>
+                  <th className={`${chatbotsDashboardThClass} text-md-center`}>
+                    Revenue
+                  </th>
+                  <th className={`${chatbotsDashboardThClass} text-md-center`}>
+                    Profit
+                  </th>
+                  <th className={`${chatbotsDashboardThClass} text-md-center`}>
+                    Margin
                   </th>
                 </tr>
               </thead>
@@ -307,6 +389,24 @@ function AdminDashboardContent({
                       className={`${chatbotsDashboardTdClass} text-md-center text-nowrap`}
                     >
                       {usd3.format(row.costUsd)}
+                    </td>
+                    <td
+                      data-label="Revenue"
+                      className={`${chatbotsDashboardTdClass} text-md-center text-nowrap`}
+                    >
+                      {usd3.format(row.revenueUsd)}
+                    </td>
+                    <td
+                      data-label="Profit"
+                      className={`${chatbotsDashboardTdClass} text-md-center text-nowrap`}
+                    >
+                      {usd3.format(row.profitUsd)}
+                    </td>
+                    <td
+                      data-label="Margin"
+                      className={`${chatbotsDashboardTdClass} text-md-center text-nowrap`}
+                    >
+                      {formatMarginPct(row.marginPct)}
                     </td>
                   </tr>
                 ))}
@@ -410,10 +510,13 @@ function AdminDashboardContent({
           <DashboardTableCard title="All companies" compact>
             <Table hover size="sm" className={chatbotsDashboardTableClass}>
               <colgroup>
-                <col style={{ width: "36%" }} />
                 <col style={{ width: "22%" }} />
-                <col style={{ width: "22%" }} />
-                <col style={{ width: "20%" }} />
+                <col style={{ width: "12%" }} />
+                <col style={{ width: "14%" }} />
+                <col style={{ width: "14%" }} />
+                <col style={{ width: "14%" }} />
+                <col style={{ width: "10%" }} />
+                <col style={{ width: "14%" }} />
               </colgroup>
               <thead className="table-light">
                 <tr>
@@ -423,6 +526,15 @@ function AdminDashboardContent({
                   </th>
                   <th className={`${chatbotsDashboardThClass} text-md-center`}>
                     Month cost
+                  </th>
+                  <th className={`${chatbotsDashboardThClass} text-md-center`}>
+                    Month revenue
+                  </th>
+                  <th className={`${chatbotsDashboardThClass} text-md-center`}>
+                    Month profit
+                  </th>
+                  <th className={`${chatbotsDashboardThClass} text-md-center`}>
+                    Margin
                   </th>
                   <th className={`${chatbotsDashboardThClass} text-md-center`}>
                     Last activity
@@ -450,6 +562,24 @@ function AdminDashboardContent({
                       className={`${chatbotsDashboardTdClass} text-md-center text-nowrap`}
                     >
                       {usd3.format(row.monthCostUsd)}
+                    </td>
+                    <td
+                      data-label="Month revenue"
+                      className={`${chatbotsDashboardTdClass} text-md-center text-nowrap`}
+                    >
+                      {usd3.format(row.monthRevenueUsd)}
+                    </td>
+                    <td
+                      data-label="Month profit"
+                      className={`${chatbotsDashboardTdClass} text-md-center text-nowrap`}
+                    >
+                      {usd3.format(row.monthProfitUsd)}
+                    </td>
+                    <td
+                      data-label="Margin"
+                      className={`${chatbotsDashboardTdClass} text-md-center text-nowrap`}
+                    >
+                      {formatMarginPct(row.marginPct)}
                     </td>
                     <td
                       data-label="Last activity"

@@ -29,9 +29,19 @@ export function ModelPricingDefaultsTable({
       </p>
       <div className="ai-chatbot-settings__pricing-reference-scroll">
         <table className="ai-chatbot-settings__pricing-reference-table">
+          <colgroup>
+            <col className="ai-chatbot-settings__pricing-ref-col-model" />
+            <col className="ai-chatbot-settings__pricing-ref-col-num" />
+            <col className="ai-chatbot-settings__pricing-ref-col-num" />
+          </colgroup>
           <thead>
             <tr>
-              <th scope="col">Model</th>
+              <th
+                scope="col"
+                className="ai-chatbot-settings__pricing-ref-model-col"
+              >
+                Model
+              </th>
               <th scope="col" className="ai-chatbot-settings__pricing-ref-num">
                 Input / 1M tokens (USD)
               </th>
@@ -43,7 +53,7 @@ export function ModelPricingDefaultsTable({
           <tbody>
             {rows.map((row) => (
               <tr key={row.model}>
-                <td>
+                <td className="ai-chatbot-settings__pricing-ref-model-col">
                   <code className="ai-chatbot-settings__pricing-ref-model">
                     {row.model}
                   </code>

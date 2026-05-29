@@ -4,6 +4,7 @@ import BreadcrumbItem from '@common/BreadcrumbItem'
 import { Button, Card, Col, Form, Row, OverlayTrigger, Tooltip } from 'react-bootstrap'
 import { useRouter } from 'next/router'
 import { viewRank } from '@utils/roles'
+import { MAIN_SETTINGS_RANKS_AND_PERMISSIONS_PATH } from '@utils/controlhub/usersNavigation'
 import { ArrowLeft } from 'lucide-react'
 import '@assets/scss/common.scss';
 
@@ -100,13 +101,17 @@ const ViewRolePermission = () => {
     return (
 
         <React.Fragment>
-            <BreadcrumbItem mainTitle="Controlhub" mainLink="controlhub/roles" subTitle="Permissions"  />
+            <BreadcrumbItem
+                mainTitle="Controlhub"
+                mainLink={MAIN_SETTINGS_RANKS_AND_PERMISSIONS_PATH}
+                subTitle="Permissions"
+            />
 
             <Row className="mb-3">
                 <Col md={12}>
                     <Button
                         variant="outline-secondary"
-                        onClick={() => router.push('/controlhub/ranks')}
+                        onClick={() => router.push(MAIN_SETTINGS_RANKS_AND_PERMISSIONS_PATH)}
                         className="d-flex align-items-center gap-2"
                     >
                         <ArrowLeft size={16} />

@@ -15,7 +15,12 @@ export function resolveChatTenantIdFromSession(user: unknown): string {
     return "";
   }
   const record = user as Record<string, unknown>;
-  const candidates = [record.tenant_id, record.company_identifier, record.tenant];
+  const candidates = [
+    record.tenant_id,
+    record.company_identifier,
+    record.company_id,
+    record.tenant,
+  ];
   for (const candidate of candidates) {
     const id = readTenantIdCandidate(candidate);
     if (id) return id;

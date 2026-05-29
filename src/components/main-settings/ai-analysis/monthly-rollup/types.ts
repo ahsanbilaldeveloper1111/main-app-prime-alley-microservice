@@ -1,7 +1,6 @@
 import type { AnalysisMonthlyRollupFilters } from "@utils/aiAnalytics";
 
 export type MonthlyRollupFilterForm = {
-  tenantId: string;
   year: string;
   month: string;
 };
@@ -9,7 +8,6 @@ export type MonthlyRollupFilterForm = {
 export function defaultMonthlyRollupFilterForm(): MonthlyRollupFilterForm {
   const now = new Date();
   return {
-    tenantId: "",
     year: String(now.getFullYear()),
     month: "",
   };
@@ -17,9 +15,10 @@ export function defaultMonthlyRollupFilterForm(): MonthlyRollupFilterForm {
 
 export function toAppliedMonthlyRollupFilters(
   form: MonthlyRollupFilterForm,
+  sessionTenantId = "",
 ): AnalysisMonthlyRollupFilters {
   const filters: AnalysisMonthlyRollupFilters = {};
-  const tenantId = form.tenantId.trim();
+  const tenantId = sessionTenantId.trim();
   if (tenantId) {
     filters.tenant_id = tenantId;
   }

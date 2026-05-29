@@ -61,6 +61,7 @@
       "next-redux-wrapper": ["src/shims/next-redux-wrapper.tsx"],
       "@page-modules/*": ["src/page-modules/*"],
       "@query/keys": ["src/query/keys.ts"],
+      "@cti": ["src/cti/index.ts"],
       "@sentry/nextjs": ["src/shims/sentry-nextjs.ts"]
     }
   },

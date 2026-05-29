@@ -3,6 +3,14 @@
 import React, { createContext, useContext, useCallback, useMemo, ReactNode, useState, useEffect, useRef } from 'react';
 import useCtiStomp from '../hooks/useCtiStomp';
 import {
+  getActiveCalls as ctiGetActiveCalls,
+  getCallsForAddress as ctiGetCallsForAddress,
+  getDnStatus as ctiGetDnStatus,
+  getMonitoringSessionsForSupervisor,
+  agentIsBeingSilentlyMonitored,
+  supervisorIsBargedIn,
+} from '../cti';
+import {
   makeCall as makeCallAPI,
   endCall as endCallAPI,
   holdCall as holdCallAPI,
@@ -114,7 +122,11 @@ function removeCallByCallIdFromMap(newMap: Map<string, ActiveCallMapValue>, call
   }
 }
 
-function mergeCallStateIntoMap(newMap: Map<string, ActiveCallMapValue>, callState: any): void {
+function mergeCallStateIntoMap(
+  newMap: Map<string, ActiveCallMapValue>,
+  callState: any,
+  previousActiveCall?: ActiveCallMapValue,
+): void {
   if (!callState.callId || !callState.parties?.length) {
     return;
   }
@@ -123,43 +135,60 @@ function mergeCallStateIntoMap(newMap: Map<string, ActiveCallMapValue>, callStat
     return;
   }
 
-  const { callId, callingAddress, calledAddress, callingDeviceName, callingDeviceType } = firstParty;
+  // Always use top-level callState.callId as the authoritative call ID.
+  // Real Cisco Finesse party objects do not always include their own callId field, so
+  // relying on firstParty.callId can produce undefined, which breaks the callStateMap
+  // lookup in canCurrentUserResumeCall and causes the Resume button to be hidden.
+  const stateCallId: string = callState.callId;
+  const { callingAddress, calledAddress, callingDeviceName, callingDeviceType } = firstParty;
   const localStatus = localStatusFromCallStateRecord(callState);
 
   if (localStatus === 'ended') {
-    removeCallByCallIdFromMap(newMap, callId);
+    removeCallByCallIdFromMap(newMap, stateCallId);
     return;
   }
 
   const callNumber = calledAddress || callingAddress;
-  const callKey = callId || `call_${Date.now()}`;
+  const callKey = stateCallId;
 
-  const parsedApiStart = parseCallAnswerStartTimeUtc(callState);
-  const startTime = parsedApiStart ?? new Date();
+  const startTime = resolveActiveCallStartTime(callState, previousActiveCall);
 
   let duration = 0;
-  if (localStatus === 'connected' && parsedApiStart) {
+  if (localStatus === 'connected') {
     const now = new Date();
-    duration = Math.max(0, Math.round((now.getTime() - parsedApiStart.getTime()) / 1000));
+    duration = Math.max(0, Math.round((now.getTime() - startTime.getTime()) / 1000));
   }
 
   const existingCall = Array.from(newMap.values()).find(
     (call) =>
-      call.callId === callId ||
+      call.callId === stateCallId ||
       (call.callingAddress === callingAddress && call.calledAddress === calledAddress),
   );
 
   if (existingCall) {
+    const existingStart = coerceActiveCallStartDate(existingCall.startTime);
+    const mergedStart =
+      existingStart && existingStart.getTime() < startTime.getTime()
+        ? existingStart
+        : startTime;
+    const mergedDuration =
+      localStatus === 'connected'
+        ? Math.max(
+            duration,
+            existingCall.duration ?? 0,
+            previousActiveCall?.duration ?? 0,
+          )
+        : existingCall.duration || 0;
     newMap.set(existingCall.id, {
       ...existingCall,
       status: localStatus,
-      callId: callId || existingCall.callId,
+      callId: stateCallId,
       callingAddress: callingAddress || existingCall.callingAddress,
       calledAddress: calledAddress || existingCall.calledAddress,
       callingDeviceName: callingDeviceName || existingCall.callingDeviceName,
       callingDeviceType: callingDeviceType || existingCall.callingDeviceType,
-      startTime: existingCall.startTime || startTime,
-      duration: localStatus === 'connected' ? duration : existingCall.duration || 0,
+      startTime: mergedStart,
+      duration: mergedDuration,
     });
     return;
   }
@@ -169,7 +198,7 @@ function mergeCallStateIntoMap(newMap: Map<string, ActiveCallMapValue>, callStat
     number: callNumber,
     status: localStatus,
     startTime,
-    callId,
+    callId: stateCallId,
     callingAddress,
     calledAddress,
     callingDeviceName,
@@ -178,9 +207,33 @@ function mergeCallStateIntoMap(newMap: Map<string, ActiveCallMapValue>, callStat
   });
 }
 
+function coerceActiveCallStartDate(
+  value: Date | string | undefined,
+): Date | null {
+  if (!value) {
+    return null;
+  }
+  const d = value instanceof Date ? value : new Date(value);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+function resolveActiveCallStartTime(
+  callState: { parties?: unknown[] },
+  previousActiveCall: ActiveCallMapValue | undefined,
+): Date {
+  const parsedApiStart = parseCallAnswerStartTimeUtc(callState);
+  let resolved = parsedApiStart ?? new Date();
+  const prevStart = coerceActiveCallStartDate(previousActiveCall?.startTime);
+  if (prevStart && prevStart.getTime() < resolved.getTime()) {
+    resolved = prevStart;
+  }
+  return resolved;
+}
+
 /** Rebuild activeCalls from CTI call state only — avoids stale entries from merge-with-previous. */
 function buildActiveCallsMapFromCallStateMap(
   callStateMap: Record<string, unknown> | null | undefined,
+  previousActiveCalls?: Map<string, ActiveCallMapValue>,
 ): Map<string, ActiveCallMapValue> {
   const newMap = new Map<string, ActiveCallMapValue>();
   if (!callStateMap || typeof callStateMap !== 'object') {
@@ -195,7 +248,12 @@ function buildActiveCallsMapFromCallStateMap(
       (call as { parties: unknown[] }).parties.length > 0,
   );
   allCallStates.forEach((callState) => {
-    mergeCallStateIntoMap(newMap, callState as any);
+    const callId = (callState as { callId?: string }).callId;
+    const prevRow =
+      callId && previousActiveCalls
+        ? Array.from(previousActiveCalls.values()).find((c) => c.callId === callId)
+        : undefined;
+    mergeCallStateIntoMap(newMap, callState as any, prevRow);
   });
   return newMap;
 }
@@ -451,7 +509,9 @@ interface CtiContextType {
   getActiveCallIdsFromLocalStorage: () => string[];
   getUserTeams: () => any;
   getUserDataExtensions: () => any;
-  
+  /** STOMP: request `initial-state` + `ongoing-calls` (wallboard after SILENT/WHISPER/BARGE start). */
+  requestCtiStreamRefresh: () => Promise<boolean>;
+
   // Call operations
   makeCall: (params: {
     callingAddress?: string;
@@ -540,6 +600,20 @@ interface CtiContextType {
   getAvailableExtensions: () => string[];
   getActiveCallForNumber: (number: string) => any;
   canDialNumber: (number: string) => { canDial: boolean; reason?: string; existingCall?: any };
+
+  // Domain selectors (src/cti/selectors) — prefer these in new code
+  /** All non-terminating call events from the live map. */
+  ctiActiveCalls: ReturnType<typeof ctiGetActiveCalls>;
+  /** Non-terminating calls where userAddress is a live party. */
+  ctiCallsForUser: ReturnType<typeof ctiGetCallsForAddress>;
+  /** Derived logical status for any DN. */
+  getCtiDnStatus: (dn: string) => ReturnType<typeof ctiGetDnStatus>;
+  /** Monitoring sessions where supervisorDn is the monitor. */
+  getCtiMonitoringSessions: typeof getMonitoringSessionsForSupervisor;
+  /** True when the given agent DN is under silent/whisper monitoring. */
+  isCtiAgentMonitored: (agentDn: string) => boolean;
+  /** True when the given supervisor DN has an active barge-in. */
+  isCtiSupervisorBargedIn: (supervisorDn: string) => boolean;
 }
 
 const CtiContext = createContext<CtiContextType | undefined>(undefined);
@@ -663,6 +737,7 @@ export const CtiProvider: React.FC<CtiProviderProps> = ({ children }) => {
       ctiStomp.isInitialized && ctiStomp.callStateMap
         ? buildActiveCallsMapFromCallStateMap(
             ctiStomp.callStateMap as Record<string, unknown>,
+            activeCallsRef.current,
           )
         : new Map<string, ActiveCallMapValue>();
     const merged = mergePendingOutboundIntoActiveCallsMap(
@@ -1385,6 +1460,32 @@ export const CtiProvider: React.FC<CtiProviderProps> = ({ children }) => {
     };
   }, [executeDialNumber, makeCall, endCall, holdCall, resumeCall, attendCall, mergeCalls, transferCall]);
   
+  // Domain selector helpers — stable references so useMemo deps don't change on every render
+  const getCtiDnStatus = useCallback(
+    (dn: string) => ctiGetDnStatus(dn, ctiStomp.dnsMap, ctiStomp.callStateMap),
+    [ctiStomp.dnsMap, ctiStomp.callStateMap],
+  );
+  const getCtiMonitoringSessions = useCallback(
+    (supervisorDn: string) => getMonitoringSessionsForSupervisor(supervisorDn, ctiStomp.callStateMap),
+    [ctiStomp.callStateMap],
+  );
+  const isCtiAgentMonitored = useCallback(
+    (agentDn: string) => agentIsBeingSilentlyMonitored(agentDn, ctiStomp.callStateMap),
+    [ctiStomp.callStateMap],
+  );
+  const isCtiSupervisorBargedIn = useCallback(
+    (supervisorDn: string) => supervisorIsBargedIn(supervisorDn, ctiStomp.callStateMap),
+    [ctiStomp.callStateMap],
+  );
+  const ctiActiveCalls = useMemo(
+    () => ctiGetActiveCalls(ctiStomp.callStateMap),
+    [ctiStomp.callStateMap],
+  );
+  const ctiCallsForUser = useMemo(
+    () => ctiGetCallsForAddress(ctiStomp.callStateMap, ctiStomp.userAddress),
+    [ctiStomp.callStateMap, ctiStomp.userAddress],
+  );
+
   // Memoize the context value to prevent unnecessary re-renders
   const value = useMemo<CtiContextType>(() => ({
     // Connection state
@@ -1409,7 +1510,8 @@ export const CtiProvider: React.FC<CtiProviderProps> = ({ children }) => {
     getActiveCallIdsFromLocalStorage: ctiStomp.getActiveCallIdsFromLocalStorage,
     getUserTeams: ctiStomp.getUserTeams,
     getUserDataExtensions: ctiStomp.getUserDataExtensions,
-    
+    requestCtiStreamRefresh: ctiStomp.requestCtiStreamRefresh,
+
     // Call operations
     makeCall,
     dialNumber,
@@ -1432,6 +1534,14 @@ export const CtiProvider: React.FC<CtiProviderProps> = ({ children }) => {
     getAvailableExtensions,
     getActiveCallForNumber,
     canDialNumber,
+
+    // Domain selectors
+    ctiActiveCalls,
+    ctiCallsForUser,
+    getCtiDnStatus,
+    getCtiMonitoringSessions,
+    isCtiAgentMonitored,
+    isCtiSupervisorBargedIn,
   }), [
     ctiStomp.isInitialized,
     ctiStomp.error,
@@ -1449,6 +1559,7 @@ export const CtiProvider: React.FC<CtiProviderProps> = ({ children }) => {
     ctiStomp.getActiveCallIdsFromLocalStorage,
     ctiStomp.getUserTeams,
     ctiStomp.getUserDataExtensions,
+    ctiStomp.requestCtiStreamRefresh,
     makeCall,
     dialNumber,
     endCall,
@@ -1464,6 +1575,12 @@ export const CtiProvider: React.FC<CtiProviderProps> = ({ children }) => {
     getAvailableExtensions,
     getActiveCallForNumber,
     canDialNumber,
+    ctiActiveCalls,
+    ctiCallsForUser,
+    getCtiDnStatus,
+    getCtiMonitoringSessions,
+    isCtiAgentMonitored,
+    isCtiSupervisorBargedIn,
   ]);
   
   return (

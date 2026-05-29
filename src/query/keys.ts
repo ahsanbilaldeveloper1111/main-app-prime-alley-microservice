@@ -349,6 +349,28 @@ export const plannerKeys = {
     unassigned: (ext: string, projectKey = "all") =>
       [...plannerKeys.workload.all(), "unassigned", ext, projectKey] as const,
   },
+
+  reports: {
+    all: () => [...plannerKeys.root, "reports"] as const,
+    overview: (params: {
+      tenant: string;
+      start: string;
+      end: string;
+      project: string;
+      member: string;
+      staleDays: number;
+    }) =>
+      [
+        ...plannerKeys.reports.all(),
+        "overview",
+        params.tenant,
+        params.start,
+        params.end,
+        params.project,
+        params.member,
+        params.staleDays,
+      ] as const,
+  },
 };
 
 /** DNCR / compliance module list reads (`src/pages/compliance/*`). */
@@ -403,6 +425,10 @@ export const mainDashboardKeys = {
     [...mainDashboardKeys.root, "attendanceActivity", startDate, endDate] as const,
   crmCreatedCounts: (startDate: string, endDate: string) =>
     [...mainDashboardKeys.root, "crmCreatedCounts", startDate, endDate] as const,
+  crmCreatedCountsMine: (startDate: string, endDate: string) =>
+    [...mainDashboardKeys.root, "crmCreatedCountsMine", startDate, endDate] as const,
+  crmDailyCreationCounts: (startDate: string, endDate: string) =>
+    [...mainDashboardKeys.root, "crmDailyCreationCounts", startDate, endDate] as const,
 };
 
 export const workforceKeys = {
@@ -760,7 +786,7 @@ export const ticketsKeys = {
   },
 };
 
-/** FAQs / Help Center admin (`src/pages/faqs/*`). */
+/** FAQs / Help Center admin (`/main-settings/help-center/*`). */
 export const faqsKeys = {
   root: ["faqs"] as const,
 
@@ -858,10 +884,48 @@ export const chatKeys = {
       [...chatKeys.tenantDashboard.all(), tenantId || "__current__"] as const,
   },
 
+  /** Tenant user budgets & usage (`GET /chat/tenant/users`). */
+  tenantUsers: {
+    all: () => [...chatKeys.root, "tenantUsers"] as const,
+    detail: (tenantId: string) =>
+      [...chatKeys.tenantUsers.all(), tenantId || "__current__"] as const,
+  },
+
   /** Admin analytics dashboard (`GET /chat/admin/dashboard`). */
   adminDashboard: {
     all: () => [...chatKeys.root, "adminDashboard"] as const,
     detail: () => [...chatKeys.adminDashboard.all(), "detail"] as const,
+  },
+
+  /** Admin user budgets across tenants (`GET /chat/admin/users`). */
+  adminUsers: {
+    all: () => [...chatKeys.root, "adminUsers"] as const,
+    list: () => [...chatKeys.adminUsers.all(), "list"] as const,
+  },
+
+  /** Admin pricing history (`GET /chat/admin/pricing-history`). */
+  adminPricingHistory: {
+    all: () => [...chatKeys.root, "adminPricingHistory"] as const,
+    list: (filters: {
+      tenant_id?: string;
+      from?: string;
+      to?: string;
+      field?: string;
+      limit?: number;
+    }) => [...chatKeys.adminPricingHistory.all(), "list", filters] as const,
+  },
+
+  /** Admin chat audit log (`GET /chat/admin/audit-log/`). */
+  adminAuditLog: {
+    all: () => [...chatKeys.root, "adminAuditLog"] as const,
+    list: (filters: {
+      tenant_id?: string;
+      event?: string;
+      from?: string;
+      to?: string;
+      q?: string;
+      limit?: number;
+    }) => [...chatKeys.adminAuditLog.all(), "list", filters] as const,
   },
 
   /** Tenant chat settings (`GET /chat/tenant/settings`). */
@@ -869,14 +933,29 @@ export const chatKeys = {
     all: () => [...chatKeys.root, "tenantSettings"] as const,
     detail: (tenantId: string) =>
       [...chatKeys.tenantSettings.all(), tenantId || "__current__"] as const,
+    history: (tenantId: string, filters: { from?: string; to?: string; limit?: number }) =>
+      [
+        ...chatKeys.tenantSettings.all(),
+        "history",
+        tenantId || "__current__",
+        filters,
+      ] as const,
   },
 
   /** AI assistant popup thread (`GET/POST /chat/`). */
   assistant: {
     all: () => [...chatKeys.root, "assistant"] as const,
+    conversations: () => [...chatKeys.assistant.all(), "conversations"] as const,
     thread: (threadId: string) =>
       [...chatKeys.assistant.all(), "thread", threadId] as const,
     rateLimit: () => [...chatKeys.assistant.all(), "rateLimit"] as const,
+    userBudget: (tenantId: string, userId: string) =>
+      [
+        ...chatKeys.assistant.all(),
+        "userBudget",
+        tenantId || "__none__",
+        userId || "__none__",
+      ] as const,
   },
 };
 
@@ -885,8 +964,7 @@ export const aiAnalyticsKeys = {
   root: ["aiAnalytics"] as const,
   costPricing: {
     all: () => [...aiAnalyticsKeys.root, "costPricing"] as const,
-    detail: (tenantId: string) =>
-      [...aiAnalyticsKeys.costPricing.all(), tenantId || "__none__"] as const,
+    detail: () => [...aiAnalyticsKeys.costPricing.all(), "detail"] as const,
   },
   tenants: {
     all: () => [...aiAnalyticsKeys.root, "tenants"] as const,
@@ -923,7 +1001,7 @@ export const aiAnalyticsKeys = {
         filters.date_from ?? "",
         filters.date_to ?? "",
         filters.status ?? "",
-        filters.limit ?? 100,
+        filters.limit ?? 15,
         filters.offset ?? 0,
       ] as const,
   },
@@ -1206,6 +1284,9 @@ export const controlhubKeys = {
         params.search,
         params.filtersKey,
       ] as const,
+    /** Full user directory (`POST users/list` paginated), Main Settings → Users & Teams. */
+    directoryAll: (tenantScope: string) =>
+      [...controlhubKeys.users.all(), "directoryAll", tenantScope] as const,
   },
 
   teams: {
@@ -1261,4 +1342,31 @@ export const controlhubKeys = {
         params.filtersKey,
       ] as const,
   },
+};
+
+/**
+ * CTI (Computer Telephony Integration) query keys.
+ *
+ * Used by TanStack Query mutation hooks to invalidate / optimistically update
+ * call state after REST commands.
+ *
+ * Live call state itself lives in CtiContext (SSE-driven), not in the Query
+ * cache.  These keys are used for:
+ *   - REST command mutations (dial, end, hold, resume, attend, transfer, monitor)
+ *   - Reconciliation reads (ongoing calls, call legs)
+ */
+export const ctiKeys = {
+  root: ["cti"] as const,
+
+  /** Active calls snapshot from GET/ongoing-calls — used for reconciliation. */
+  ongoingCalls: (userDn: string) =>
+    [...ctiKeys.root, "ongoingCalls", userDn] as const,
+
+  /** Individual call leg detail. */
+  callLegs: (callId: string) =>
+    [...ctiKeys.root, "callLegs", callId] as const,
+
+  /** Dial command result (optimistic) — keyed by a client-side pending id. */
+  dialResult: (pendingId: string) =>
+    [...ctiKeys.root, "dialResult", pendingId] as const,
 };

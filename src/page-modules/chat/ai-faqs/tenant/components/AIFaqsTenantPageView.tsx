@@ -25,6 +25,7 @@ export function AIFaqsTenantPageView({ ctx }: AIFaqsTenantPageViewProps) {
     columns,
     getListQueryOptions,
     stableFilters,
+    showCompanyFilter,
     companies,
     companiesLoading,
     tenantId,
@@ -85,25 +86,27 @@ export function AIFaqsTenantPageView({ ctx }: AIFaqsTenantPageViewProps) {
         }
       />
 
-      <div className="d-flex flex-wrap align-items-center gap-2 mb-3">
-        <div style={{ minWidth: "220px" }}>
-          <Select
-            isLoading={companiesLoading}
-            options={companyOptions}
-            value={findChatCompanySelectOption(
-              companies,
-              selectedCompanyForFilter,
-            )}
-            onChange={(opt) => handleCompanyFilterChange(opt?.value ?? "")}
-            placeholder="Select company..."
-            isClearable
-          />
+      {showCompanyFilter ? (
+        <div className="d-flex flex-wrap align-items-center gap-2 mb-3">
+          <div style={{ minWidth: "220px" }}>
+            <Select
+              isLoading={companiesLoading}
+              options={companyOptions}
+              value={findChatCompanySelectOption(
+                companies,
+                selectedCompanyForFilter,
+              )}
+              onChange={(opt) => handleCompanyFilterChange(opt?.value ?? "")}
+              placeholder="Select company..."
+              isClearable
+            />
+          </div>
+          <Button variant="primary" onClick={handleApplyFilter}>
+            <Filter size={16} className="me-2" />
+            Filter
+          </Button>
         </div>
-        <Button variant="primary" onClick={handleApplyFilter}>
-          <Filter size={16} className="me-2" />
-          Filter
-        </Button>
-      </div>
+      ) : null}
 
       <GenericListPage
         columns={columns}
@@ -144,19 +147,21 @@ export function AIFaqsTenantPageView({ ctx }: AIFaqsTenantPageViewProps) {
         handleSubmit={handleSubmit}
         handleConfirmDelete={handleConfirmDelete}
         addModalBodyPrefix={
-          <Form.Group className="mb-4">
-            <Form.Label>Tenant</Form.Label>
-            <Select
-              isLoading={companiesLoading}
-              options={companyOptions}
-              value={findChatCompanySelectOption(companies, tenantId)}
-              onChange={(opt) => {
-                if (opt) setTenantId(opt.value);
-              }}
-              placeholder="Select tenant..."
-              isClearable={false}
-            />
-          </Form.Group>
+          showCompanyFilter ? (
+            <Form.Group className="mb-4">
+              <Form.Label>Tenant</Form.Label>
+              <Select
+                isLoading={companiesLoading}
+                options={companyOptions}
+                value={findChatCompanySelectOption(companies, tenantId)}
+                onChange={(opt) => {
+                  if (opt) setTenantId(opt.value);
+                }}
+                placeholder="Select tenant..."
+                isClearable={false}
+              />
+            </Form.Group>
+          ) : undefined
         }
       />
     </React.Fragment>

@@ -27,8 +27,8 @@ export type AiFaqPageModalsProps = Readonly<{
   fileInputKey: number;
   resetForm: () => void;
   handleAddFAQItem: () => void;
-  handleRemoveFAQItem: (index: number) => void;
-  handleUpdateFAQItem: (index: number, field: keyof FAQItem, value: string) => void;
+  handleRemoveFAQItem: (clientKey: string) => void;
+  handleUpdateFAQItem: (clientKey: string, field: keyof FAQItem, value: string) => void;
   handleFileChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   handleRemoveFile: (index: number) => void;
   handleSubmit: () => void | Promise<void>;
@@ -117,8 +117,8 @@ export function AiFaqPageModals(props: AiFaqPageModalsProps) {
         </Modal.Body>
         <Modal.Footer>
           <Button
-            variant="secondary"
             type="button"
+            variant="secondary"
             onClick={() => {
               setShowAddModal(false);
               resetForm();
@@ -172,8 +172,8 @@ export function AiFaqPageModals(props: AiFaqPageModalsProps) {
           </Modal.Body>
           <Modal.Footer>
             <Button
-              variant="secondary"
               type="button"
+              variant="secondary"
               onClick={() => {
                 setShowEditModal(false);
                 setSelectedFAQ(null);

@@ -20,8 +20,9 @@ const { PERMISSIONS } = HEADER_CONSTANTS;
 import {
   buildAiFaqSubmitFields,
   emptyFaqListPage,
+  evaluateAiFaqSubmitDraft,
+  getAiFaqSubmitValidationError,
   paginateArrayForTable,
-  validateAiFaqDraftSubmit,
 } from "../faqItemDraft";
 import { useAiFaqDraftFormState } from "../hooks/useAiFaqDraftFormState";
 
@@ -46,6 +47,7 @@ export function useAIFaqsGlobalPage() {
     handleUpdateFAQItem,
     handleFileChange,
     handleRemoveFile,
+    getDraftSnapshot,
   } = useAiFaqDraftFormState();
 
   const [showViewModal, setShowViewModal] = useState(false);
@@ -68,22 +70,17 @@ export function useAIFaqsGlobalPage() {
     [canDeleteFaq],
   );
 
-  const openAddModal = useCallback(() => {
-    resetForm();
-    setShowAddModal(true);
-  }, [resetForm]);
-
   const handleSubmit = useCallback(async () => {
-    const validation = validateAiFaqDraftSubmit(faqItems, haveFiles, selectedFiles);
-    if (!validation.ok) {
-      toast.error(validation.message);
+    const { faqItems: draftItems, selectedFiles: draftFiles } = getDraftSnapshot();
+    const evaluation = evaluateAiFaqSubmitDraft(draftItems, draftFiles);
+    const validationError = getAiFaqSubmitValidationError(evaluation, "a file");
+    if (validationError) {
+      toast.error(validationError);
       return;
     }
 
-    const { validFAQs } = validation;
-
     try {
-      const fields = buildAiFaqSubmitFields(validFAQs, haveFiles, selectedFiles);
+      const fields = buildAiFaqSubmitFields(evaluation.validFAQs, draftFiles);
       const payload: CreateGlobalFAQPayload = {
         faqs: fields.faqs,
         have_files: fields.have_files,
@@ -99,7 +96,12 @@ export function useAIFaqsGlobalPage() {
     } catch (error) {
       console.error("Failed to save FAQs:", error);
     }
-  }, [faqItems, haveFiles, selectedFiles, resetForm, queryClient]);
+  }, [getDraftSnapshot, resetForm, queryClient]);
+
+  const openAddModal = useCallback(() => {
+    resetForm();
+    setShowAddModal(true);
+  }, [resetForm]);
 
   const handleConfirmDelete = useCallback(async () => {
     if (!selectedFAQ?.id) return;

@@ -1,7 +1,7 @@
 import BreadcrumbItem from "@common/BreadcrumbItem";
 import PageHeader from "@components/PageHeader";
 import { useFaqProfilesPage } from "../useFaqProfilesPage";
-import { Building2, Bot, ChevronRight, Globe, RefreshCw, X } from "lucide-react";
+import { Building2, Bot, ChevronRight, Globe, RefreshCw } from "lucide-react";
 import {
   Alert,
   Badge,
@@ -21,6 +21,7 @@ import {
   findChatCompanySelectOption,
   mapChatCompaniesToSelectOptions,
 } from "@page-modules/chat/shared/chatCompanySelectOptions";
+import { ChatTrainingResultModal } from "@page-modules/chat/shared/ChatTrainingResultModal";
 
 function formatTrainingLastUpdated(value: string | null): string {
   if (value == null || value === "") {
@@ -45,7 +46,8 @@ function FaqTrainingStatusDetails({
   loading,
   errorMessage,
   status,
-}: FaqTrainingStatusDetailsProps) {
+  showCompanyFilter,
+}: FaqTrainingStatusDetailsProps & { showCompanyFilter: boolean }) {
   if (errorMessage) {
     return (
       <Alert variant="danger" className="mb-0">
@@ -55,7 +57,13 @@ function FaqTrainingStatusDetails({
   }
   const tenantTrimmed = tenantId.trim();
   if (tenantTrimmed === "") {
-    return <p className="text-muted small mb-0">Choose a company to load training status.</p>;
+    return (
+      <p className="text-muted small mb-0">
+        {showCompanyFilter
+          ? "Choose a company to load training status."
+          : "Your account is not linked to a company."}
+      </p>
+    );
   }
   if (loading && status == null) {
     return (
@@ -133,6 +141,7 @@ export function FaqProfilesPageView({ ctx }: FaqProfilesPageViewProps) {
     trainingStatusLoading,
     trainingStatusErrorMessage,
     refetchTrainingStatus,
+    showCompanyFilter,
   } = ctx;
 
   const companyOptions = useMemo(
@@ -173,8 +182,9 @@ export function FaqProfilesPageView({ ctx }: FaqProfilesPageViewProps) {
                   Bot training status
                 </h5>
                 <p className="text-muted small mb-0">
-                  Select a company to see whether the bot has been trained and when data was last
-                  processed.
+                  {showCompanyFilter
+                    ? "Select a company to see whether the bot has been trained and when data was last processed."
+                    : "Training status for your company."}
                 </p>
               </div>
               <div className="d-flex flex-wrap align-items-center gap-2">
@@ -193,23 +203,26 @@ export function FaqProfilesPageView({ ctx }: FaqProfilesPageViewProps) {
                 </Button>
               </div>
             </div>
-            <Form.Group className="mb-3" style={{ maxWidth: "420px" }}>
-              <Form.Label>Company (tenant)</Form.Label>
-              <Select
-                isLoading={companiesLoading}
-                options={companyOptions}
-                value={findChatCompanySelectOption(companies, statusTenantId)}
-                onChange={(opt) => setStatusTenantId(opt?.value ?? "")}
-                placeholder="Select company to load status..."
-                isClearable
-              />
-            </Form.Group>
+            {showCompanyFilter ? (
+              <Form.Group className="mb-3" style={{ maxWidth: "420px" }}>
+                <Form.Label>Company (tenant)</Form.Label>
+                <Select
+                  isLoading={companiesLoading}
+                  options={companyOptions}
+                  value={findChatCompanySelectOption(companies, statusTenantId)}
+                  onChange={(opt) => setStatusTenantId(opt?.value ?? "")}
+                  placeholder="Select company to load status..."
+                  isClearable
+                />
+              </Form.Group>
+            ) : null}
 
             <FaqTrainingStatusDetails
               tenantId={statusTenantId}
               loading={trainingStatusLoading}
               errorMessage={trainingStatusErrorMessage}
               status={trainingStatus}
+              showCompanyFilter={showCompanyFilter}
             />
           </Card.Body>
         </Card>
@@ -313,6 +326,7 @@ export function FaqProfilesPageView({ ctx }: FaqProfilesPageViewProps) {
         </Row>
       </Container>
 
+      {showCompanyFilter ? (
       <Modal
         show={showCompanyModal}
         onHide={() => !trainingLoading && setShowCompanyModal(false)}
@@ -346,64 +360,13 @@ export function FaqProfilesPageView({ ctx }: FaqProfilesPageViewProps) {
           </Button>
         </Modal.Footer>
       </Modal>
+      ) : null}
 
-      <Modal show={showTrainingModal} onHide={closeTrainingModal} size="lg" centered>
-        <Modal.Header style={{ borderBottom: "1px solid #e8eef5" }}>
-          <Modal.Title
-            style={{
-              fontSize: "18px",
-              fontWeight: "600",
-              display: "flex",
-              alignItems: "center",
-              gap: "8px",
-            }}
-          >
-            <Bot size={20} color="#4e6fa5" />
-            Training Results
-          </Modal.Title>
-          <Button
-            variant="link"
-            onClick={closeTrainingModal}
-            style={{
-              background: "none",
-              border: "none",
-              padding: "4px",
-              cursor: "pointer",
-              color: "#6c757d",
-              display: "flex",
-              alignItems: "center",
-            }}
-          >
-            <X size={20} />
-          </Button>
-        </Modal.Header>
-        <Modal.Body>
-          {trainingResponse ? (
-            <div style={{ padding: "20px", textAlign: "center" }}>
-              <p
-                style={{
-                  fontSize: "16px",
-                  color: "#2d3748",
-                  margin: 0,
-                  lineHeight: "1.6",
-                }}
-              >
-                {(() => {
-                  const tenantFiles = trainingResponse.tenant_documents.files;
-                  const globalFiles = trainingResponse.global_documents.files;
-                  const totalChunks = trainingResponse.total_chunks;
-                  return `Training completed successfully! Processed ${tenantFiles} tenant files and ${globalFiles} global files. Total chunks: ${totalChunks}`;
-                })()}
-              </p>
-            </div>
-          ) : null}
-        </Modal.Body>
-        <Modal.Footer>
-          <Button variant="secondary" onClick={closeTrainingModal}>
-            Close
-          </Button>
-        </Modal.Footer>
-      </Modal>
+      <ChatTrainingResultModal
+        show={showTrainingModal}
+        response={trainingResponse}
+        onClose={closeTrainingModal}
+      />
     </React.Fragment>
   );
 }

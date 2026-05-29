@@ -45,6 +45,24 @@ import Link from 'next/link';
 import { useRouter } from 'next/router';
 
 import { HEADER_CONSTANTS} from "@constants/headerConstants";
+import {
+  MAIN_SETTINGS_USER_DIRECTORY_PATH,
+  MAIN_SETTINGS_SUPERVISOR_TEAMS_PATH,
+  MAIN_SETTINGS_MANAGEMENT_GROUPS_PATH,
+  MAIN_SETTINGS_RANKS_AND_PERMISSIONS_PATH,
+} from "@utils/controlhub/usersNavigation";
+import {
+  MAIN_SETTINGS_TICKETS_STATUSES_PATH,
+  MAIN_SETTINGS_TICKETS_MODULES_PATH,
+  MAIN_SETTINGS_TICKETS_CATEGORIES_PATH,
+  MAIN_SETTINGS_TICKETS_SUB_CATEGORIES_PATH,
+  MAIN_SETTINGS_TICKETS_TYPES_PATH,
+} from "@utils/tickets/ticketsNavigation";
+import {
+  MAIN_SETTINGS_SMART_CRM_STAGES_PATH,
+  MAIN_SETTINGS_SMART_CRM_PRODUCTS_PATH,
+  MAIN_SETTINGS_SMART_CRM_CAMPAIGNS_PATH,
+} from "@utils/crm/smartCrmNavigation";
 import { usePermissions } from "@utils/permissionUtils";
 
 // Destructure constants for easier use
@@ -349,7 +367,7 @@ const ApplicationSidebar: React.FC<SidebarProps> = ({
           title: HEADER_CONSTANTS.SUBMENU_LABELS.PRODUCTS,
           icon: <Package size={16} />,
           permission: PERMISSIONS.VIEW_CRM_PRODUCTS,
-          url: '/crm/products'
+          url: MAIN_SETTINGS_SMART_CRM_PRODUCTS_PATH
         },
         // {
         //   id: 'crm-tasks',
@@ -363,7 +381,7 @@ const ApplicationSidebar: React.FC<SidebarProps> = ({
           title: HEADER_CONSTANTS.SUBMENU_LABELS.STAGES,
           icon: <BarChart3 size={16} />,
           permission: PERMISSIONS.VIEW_CRM_STAGES,
-          url: '/crm/stages'
+          url: MAIN_SETTINGS_SMART_CRM_STAGES_PATH
         },
       
         {
@@ -371,7 +389,7 @@ const ApplicationSidebar: React.FC<SidebarProps> = ({
           title: HEADER_CONSTANTS.SUBMENU_LABELS.CAMPAIGNS,
           icon: <Megaphone size={16} />,
           permission: PERMISSIONS.VIEW_CRM_CAMPAIGNS,
-          url: '/crm/campaigns'
+          url: MAIN_SETTINGS_SMART_CRM_CAMPAIGNS_PATH
         },
         {
           id: 'crm-history',
@@ -625,28 +643,28 @@ const ApplicationSidebar: React.FC<SidebarProps> = ({
           title: HEADER_CONSTANTS.SUBMENU_LABELS.STATUS,
           icon: <List size={16} />,
           permission: PERMISSIONS.VIEW_TICKETS_STATUS,
-          url: '/tickets/statuses'
+          url: MAIN_SETTINGS_TICKETS_STATUSES_PATH
         },
         {
           id: 'tickets-modules',
           title: HEADER_CONSTANTS.SUBMENU_LABELS.MODULES,
           icon: <Layers size={16} />,
           permission: PERMISSIONS.VIEW_TICKETS_MODULES,
-          url: '/tickets/modules'
+          url: MAIN_SETTINGS_TICKETS_MODULES_PATH
         },
         {
           id: 'tickets-module-categories',
           title: HEADER_CONSTANTS.SUBMENU_LABELS.TICKET_MODULE_CATEGORIES,
           icon: <Layers size={16} />,
           permission: PERMISSIONS.VIEW_TICKETS_CATEGORIES,
-          url: '/tickets/modules/categories'
+          url: MAIN_SETTINGS_TICKETS_CATEGORIES_PATH
         },
         {
           id: 'tickets-module-subcategories',
           title: HEADER_CONSTANTS.SUBMENU_LABELS.TICKET_MODULE_SUBCATEGORIES,
           icon: <Layers size={16} />,
           permission: PERMISSIONS.VIEW_TICKETS_SUBCATEGORIES,
-          url: '/tickets/modules/sub-categories'
+          url: MAIN_SETTINGS_TICKETS_SUB_CATEGORIES_PATH
         },
 
         {
@@ -654,7 +672,7 @@ const ApplicationSidebar: React.FC<SidebarProps> = ({
           title: HEADER_CONSTANTS.SUBMENU_LABELS.TYPES,
           icon: <List size={16} />,
           permission: PERMISSIONS.VIEW_TICKETS_TYPES,
-          url: '/tickets/types'
+          url: MAIN_SETTINGS_TICKETS_TYPES_PATH
         }
       ].filter(item => !item.permission || hasPermission(item.permission))
     },
@@ -805,28 +823,28 @@ const ApplicationSidebar: React.FC<SidebarProps> = ({
           title: HEADER_CONSTANTS.SUBMENU_LABELS.USER_DIRECTORY,
           icon: <Users size={16} />,
           permission: PERMISSIONS.VIEW_USERS,
-          url: '/controlhub/users'
+          url: MAIN_SETTINGS_USER_DIRECTORY_PATH
         },
         {
           id: 'controlhub-teams',
           title: HEADER_CONSTANTS.SUBMENU_LABELS.TEAMS,
           icon: <Boxes size={16} />,
           permission: PERMISSIONS.VIEW_TEAMS,
-          url: '/controlhub/teams'
+          url: MAIN_SETTINGS_SUPERVISOR_TEAMS_PATH
         },
         {
           id: 'controlhub-groups',
           title: HEADER_CONSTANTS.SUBMENU_LABELS.GROUPS,
           icon: <Group size={16} />,
           permission: PERMISSIONS.VIEW_GROUPS,
-          url: '/controlhub/groups'
+          url: MAIN_SETTINGS_MANAGEMENT_GROUPS_PATH
         },
         {
           id: 'controlhub-ranks',
           title: HEADER_CONSTANTS.SUBMENU_LABELS.RANKS,
           icon: <Shield size={16} />,
           permission: PERMISSIONS.VIEW_RANKS,
-          url: '/controlhub/ranks'
+          url: MAIN_SETTINGS_RANKS_AND_PERMISSIONS_PATH
         }
         
       ].filter(item => !item.permission || hasPermission(item.permission))

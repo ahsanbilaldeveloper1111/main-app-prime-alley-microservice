@@ -8,8 +8,8 @@ export type AiFaqDraftItemsEditorProps = Readonly<{
   mode: "add" | "edit";
   faqItems: FAQItemDraft[];
   onAddItem?: () => void;
-  onRemoveItem?: (index: number) => void;
-  onUpdateItem: (index: number, field: keyof FAQItem, value: string) => void;
+  onRemoveItem?: (clientKey: string) => void;
+  onUpdateItem: (clientKey: string, field: keyof FAQItem, value: string) => void;
   childrenBeforeItems?: React.ReactNode;
 }>;
 
@@ -28,7 +28,7 @@ export function AiFaqDraftItemsEditor({
       <div className="d-flex justify-content-between align-items-center mb-3">
         <h6>{isAdd ? "FAQ Items" : "FAQ Item"}</h6>
         {isAdd && onAddItem ? (
-          <Button variant="outline-primary" size="sm" onClick={onAddItem}>
+          <Button variant="outline-primary" size="sm" type="button" onClick={onAddItem}>
             <Plus size={14} className="me-1" />
             Add FAQ
           </Button>
@@ -44,7 +44,13 @@ export function AiFaqDraftItemsEditor({
               <div className="d-flex justify-content-between align-items-center mb-2">
                 <strong>FAQ #{index + 1}</strong>
                 {faqItems.length > 1 && onRemoveItem ? (
-                  <Button variant="link" size="sm" className="text-danger p-0" onClick={() => onRemoveItem(index)}>
+                  <Button
+                    variant="link"
+                    size="sm"
+                    className="text-danger p-0"
+                    type="button"
+                    onClick={() => onRemoveItem(item.clientKey)}
+                  >
                     <X size={16} />
                   </Button>
                 ) : null}
@@ -57,7 +63,7 @@ export function AiFaqDraftItemsEditor({
               <Form.Control
                 type="text"
                 value={item.question}
-                onChange={(e) => onUpdateItem(index, "question", e.target.value)}
+                onChange={(e) => onUpdateItem(item.clientKey, "question", e.target.value)}
                 placeholder="Enter question"
               />
             </Form.Group>
@@ -69,7 +75,7 @@ export function AiFaqDraftItemsEditor({
                 as="textarea"
                 rows={3}
                 value={item.answer}
-                onChange={(e) => onUpdateItem(index, "answer", e.target.value)}
+                onChange={(e) => onUpdateItem(item.clientKey, "answer", e.target.value)}
                 placeholder="Enter answer"
               />
             </Form.Group>

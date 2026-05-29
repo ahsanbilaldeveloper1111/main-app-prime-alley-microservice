@@ -17,6 +17,9 @@ export interface AuthUser {
   name?: string | null;
   email?: string | null;
   username?: string | null;
+  /** PBX / portal extension — used as chat API `user_id` when present. */
+  extension?: string | null;
+  user_extension?: string | null;
   company_id?: string | null;
   company_name?: string | null;
   company_identifier?: string | null;

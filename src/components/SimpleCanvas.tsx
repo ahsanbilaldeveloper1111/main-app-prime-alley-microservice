@@ -6,6 +6,7 @@ import Link from 'next/link';
 import moment from 'moment';
 import { formatDateTimeToLocal, GlobalDateTimeFormat } from '@utils/Helper';
 import ResetPasswordModal from './ResetPasswordModal';
+import { buildUserEditPath } from '@utils/controlhub/usersNavigation';
 
 interface SimpleCanvasProps {
   show: boolean;
@@ -147,7 +148,7 @@ const SimpleCanvas: React.FC<SimpleCanvasProps> = ({
                         <div className="button-group mt-3 d-flex flex-column gap-2">
                         {session?.user?.permissions?.includes('edit-users')  && (
                             <Link 
-                                href={`/controlhub/users/${rowData.encId}`} 
+                                href={buildUserEditPath(rowData.encId)} 
                                 className="btn btn-sm btn-outline-primary w-100">
                                 Edit
                             </Link> 

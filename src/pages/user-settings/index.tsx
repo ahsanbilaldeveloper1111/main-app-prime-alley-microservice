@@ -6,6 +6,7 @@ import React, {
 } from "react";
 import { useRouter } from "next/router";
 import { toast } from "react-toastify";
+import { DEFAULT_USERS_DIRECTORY_PATH } from "@utils/controlhub/usersNavigation";
 import { X, ChevronRight, ChevronDown, ExternalLink, Search, Info } from "lucide-react";
 
 // ─── Shared style tokens ─────────────────────────────────────────────────────
@@ -293,8 +294,8 @@ const APP_PERMISSION_MODULES: AppPermissionModule[] = [
     label: "Compliance",
     categories: [
       { id: "compliance-api-number-check", label: "API Number Check" },
-      { id: "compliance-cdr-records", label: "CDR Records" },
-      { id: "dncr-local-dnd-call-block", label: "Add Records" },
+      { id: "compliance-cdr-records", label: "Compliance Analytics" },
+      { id: "dncr-local-dnd-call-block", label: "Add Local DND" },
     ],
   },
   {
@@ -2707,7 +2708,7 @@ const CreateUsersPage = () => {
       await new Promise((r) => setTimeout(r, 800));
       const plural = emails.length === 1 ? "" : "s";
       toast.success(`${emails.length} user${plural} created successfully!`);
-      router.push("/settings/users");
+      router.push(DEFAULT_USERS_DIRECTORY_PATH);
     } catch (err) {
       console.error("Failed to create users", err);
       toast.error("Failed to create users. Please try again.");

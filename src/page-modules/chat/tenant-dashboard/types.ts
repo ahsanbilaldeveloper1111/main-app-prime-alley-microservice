@@ -6,13 +6,6 @@ export interface ChatbotsTenantSummaryStats {
   activeUsers: number;
 }
 
-export interface RateLimitUsage {
-  queriesPerMinuteLimit: number;
-  queriesPerMinuteRemaining: number;
-  queriesTodayLimit: number;
-  queriesTodayRemaining: number;
-}
-
 export interface TenantTopUserRow {
   user: string;
   queries: number;
@@ -34,9 +27,29 @@ export interface TenantKnowledgeBaseStats {
 }
 
 export interface TenantRecentConversationRow {
+  threadId: string;
   thread: string;
   user: string;
   lastActivity: string;
+  modelUsed: string;
+  costUsd: number;
+}
+
+export interface TenantUserBudgetRow {
+  userId: string;
+  displayName: string;
+  monthlyBudgetUsd: string | null;
+  budgetThresholdPct: number | null;
+  effectiveBudgetUsd: string;
+  effectiveThresholdPct: number;
+  mtdSpend: string;
+  remainingUsd: string;
+  usedPct: number;
+  isExhausted: boolean;
+  budgetSource: string;
+  budgetSourceLabel: string;
+  budgetSyncedAt: string | null;
+  lastSeen: string | null;
 }
 
 export interface ChatbotsTenantDashboardModel {
@@ -44,7 +57,6 @@ export interface ChatbotsTenantDashboardModel {
   companyName?: string;
   generatedAt?: string;
   summary: ChatbotsTenantSummaryStats;
-  rateLimit: RateLimitUsage;
   dailyCostQueriesLast30Days: {
     categories: string[];
     costSeries: number[];

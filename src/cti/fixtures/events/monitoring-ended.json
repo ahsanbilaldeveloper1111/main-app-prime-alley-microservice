@@ -1,0 +1,24 @@
+{
+  "callId": "agent-call-001",
+  "eventType": "MONITORING_ENDED",
+  "sequence": 42,
+  "eventTime": "2026-05-22T12:00:00.000Z",
+  "isConference": false,
+  "isOneToOne": true,
+  "isTerminating": false,
+  "hasActiveParticipants": true,
+  "eventName": "MonitoringEndedEvImpl",
+  "isMonitoring": false,
+  "monitoring": {
+    "monitorDn": "9001",
+    "monitoredDn": "1001",
+    "monitoringType": "BARGE_IN"
+  },
+  "parties": [
+    {
+      "callStatus": "CONNECTED",
+      "callingAddress": "1001",
+      "calledAddress": "+15551234567"
+    }
+  ]
+}

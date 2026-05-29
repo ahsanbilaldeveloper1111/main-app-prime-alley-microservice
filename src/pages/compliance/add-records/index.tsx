@@ -26,7 +26,7 @@ const AddRecords = () => {
       <BreadcrumbItem
         mainTitle=""
         mainLink=""
-        subTitle="Local DND Call Block Management"
+        subTitle="Add Local DND"
       />
 
       <AddRecordsPageHeader />

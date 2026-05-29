@@ -33,10 +33,55 @@ export function faqAttachmentFileDomKey(file: File): string {
   return `${file.name}-${file.size}-${file.lastModified}`;
 }
 
+/** Collapse odd whitespace (e.g. NBSP from paste) so trim() is reliable. */
+export function normalizeFaqField(value: string): string {
+  return value.replaceAll("\u00a0", " ").trim();
+}
+
 export function getValidFaqItemsForSubmit(items: FAQItemDraft[]): FAQItem[] {
   return items
-    .filter((item) => item.question.trim() && item.answer.trim())
-    .map(({ question, answer }) => ({ question, answer }));
+    .filter(
+      (item) =>
+        normalizeFaqField(item.question).length > 0 &&
+        normalizeFaqField(item.answer).length > 0,
+    )
+    .map(({ question, answer }) => ({
+      question: normalizeFaqField(question),
+      answer: normalizeFaqField(answer),
+    }));
+}
+
+export type AiFaqSubmitDraftEvaluation = {
+  validFAQs: FAQItem[];
+  hasAttachments: boolean;
+  hasPartialFaq: boolean;
+};
+
+export function evaluateAiFaqSubmitDraft(
+  items: FAQItemDraft[],
+  selectedFiles: File[],
+): AiFaqSubmitDraftEvaluation {
+  const validFAQs = getValidFaqItemsForSubmit(items);
+  const hasAttachments = selectedFiles.length > 0;
+  const hasPartialFaq = items.some((item) => {
+    const question = normalizeFaqField(item.question);
+    const answer = normalizeFaqField(item.answer);
+    return (question.length > 0) !== (answer.length > 0);
+  });
+  return { validFAQs, hasAttachments, hasPartialFaq };
+}
+
+export function getAiFaqSubmitValidationError(
+  evaluation: AiFaqSubmitDraftEvaluation,
+  fileHint: string,
+): string | null {
+  if (evaluation.validFAQs.length > 0 || evaluation.hasAttachments) {
+    return null;
+  }
+  if (evaluation.hasPartialFaq) {
+    return "Each FAQ needs both a question and an answer. Complete or remove empty FAQ cards.";
+  }
+  return `Add at least one FAQ (question and answer) or attach ${fileHint}`;
 }
 
 export type AiFaqDraftSubmitValidation =
@@ -83,11 +128,10 @@ export type AiFaqSubmitFieldPayload = {
 
 export function buildAiFaqSubmitFields(
   validFAQs: FAQItem[],
-  haveFiles: boolean,
   selectedFiles: File[],
 ): AiFaqSubmitFieldPayload {
   const faqsJson = JSON.stringify(validFAQs);
-  const hasFiles = haveFiles && selectedFiles.length > 0;
+  const hasFiles = selectedFiles.length > 0;
   return {
     faqs: faqsJson,
     have_files: hasFiles ? "true" : "false",

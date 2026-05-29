@@ -1,0 +1,28 @@
+{
+  "_scenario": "inbound-ring",
+  "_description": "Incoming call to agent DN 1001 from external number 5551234",
+  "type": "call_events",
+  "data": {
+    "callId": "CALL-001",
+    "eventType": "RINGING",
+    "sequence": 1,
+    "eventTime": "2026-01-01T10:00:00.000Z",
+    "isConference": false,
+    "isOneToOne": true,
+    "isTerminating": false,
+    "hasActiveParticipants": true,
+    "eventName": "CallRinging",
+    "currentState": "RINGING",
+    "parties": [
+      {
+        "callId": "CALL-001",
+        "callingAddress": "5551234",
+        "calledAddress": "1001",
+        "callStatus": "RINGING",
+        "callingDeviceName": "EXTERNAL",
+        "callingDeviceType": "IP_PHONE",
+        "startTime": ""
+      }
+    ]
+  }
+}

@@ -6,20 +6,16 @@ import { toast } from "react-toastify";
 import { mapFormValuesToAnalysisPricingUpdate } from "./mapAnalysisPricing";
 import type { AnalysisPricingFormValues } from "./types";
 
-export function useUpdateAnalysisPricingMutation(appliedTenantId: string) {
+export function useUpdateAnalysisPricingMutation() {
   const queryClient = useQueryClient();
-  const tenantId = appliedTenantId.trim();
 
   return useMutation({
     mutationFn: async (values: AnalysisPricingFormValues) => {
-      if (!tenantId) {
-        throw new Error("Please select a company first");
-      }
       const payload = mapFormValuesToAnalysisPricingUpdate(values);
-      return updateAnalysisCostPricing(tenantId, payload);
+      return updateAnalysisCostPricing(payload);
     },
     onSuccess: (data) => {
-      queryClient.setQueryData(aiAnalyticsKeys.costPricing.detail(tenantId), data);
+      queryClient.setQueryData(aiAnalyticsKeys.costPricing.detail(), data);
       queryClient
         .invalidateQueries({ queryKey: aiAnalyticsKeys.costPricing.all() })
         .catch(() => undefined);

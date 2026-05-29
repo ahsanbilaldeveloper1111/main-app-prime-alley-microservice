@@ -1,14 +1,14 @@
-import type { ChatTrainingResponse } from "@utils/chat";
+import {
+  formatChatTrainingResultMessage,
+  getChatTrainingResultLines,
+  isChatTrainingReconciledResponse,
+  type ChatTrainingResponse,
+} from "@utils/chat";
 import { Bot, X } from "lucide-react";
 import React from "react";
 import { Button, Modal } from "react-bootstrap";
 
-function formatTrainingSummary(response: ChatTrainingResponse): string {
-  const tenantFiles = response.tenant_documents.files;
-  const globalFiles = response.global_documents.files;
-  const totalChunks = response.total_chunks;
-  return `Training completed successfully! Processed ${tenantFiles} tenant files and ${globalFiles} global files. Total chunks: ${totalChunks}`;
-}
+import "./chatTrainingResultModal.scss";
 
 export type ChatTrainingResultModalProps = Readonly<{
   show: boolean;
@@ -21,6 +21,10 @@ export function ChatTrainingResultModal({
   response,
   onClose,
 }: ChatTrainingResultModalProps) {
+  const lines = response ? getChatTrainingResultLines(response) : [];
+  const reconciled = response ? isChatTrainingReconciledResponse(response) : false;
+  const showStatsGrid = Boolean(response) && !reconciled && lines.length > 1;
+
   return (
     <Modal show={show} onHide={onClose} size="lg" centered>
       <Modal.Header style={{ borderBottom: "1px solid #e8eef5" }}>
@@ -54,18 +58,19 @@ export function ChatTrainingResultModal({
         </Button>
       </Modal.Header>
       <Modal.Body>
-        {response ? (
-          <p
-            style={{
-              fontSize: "16px",
-              color: "#2d3748",
-              margin: 0,
-              lineHeight: 1.6,
-              textAlign: "center",
-              padding: "12px 8px",
-            }}
-          >
-            {formatTrainingSummary(response)}
+        {response && showStatsGrid ? (
+          <dl className="chatTrainingResultModal-stats">
+            {lines.map((line) => (
+              <div key={line.label} className="chatTrainingResultModal-statRow">
+                <dt>{line.label}</dt>
+                <dd>{line.value}</dd>
+              </div>
+            ))}
+          </dl>
+        ) : null}
+        {response && !showStatsGrid ? (
+          <p className="chatTrainingResultModal-message">
+            {formatChatTrainingResultMessage(response)}
           </p>
         ) : null}
       </Modal.Body>

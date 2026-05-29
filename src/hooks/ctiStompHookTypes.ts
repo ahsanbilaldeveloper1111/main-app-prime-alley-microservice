@@ -22,6 +22,8 @@ export interface CtiCallEvent {
   currentState?: string;
   /** Set on HELD: address of the party who put the call on hold (only they can resume). */
   heldByAddress?: string;
+  /** Set on HELD: device name of the party who put the call on hold. */
+  heldByDeviceName?: string;
 }
 
 export interface SummaryData {

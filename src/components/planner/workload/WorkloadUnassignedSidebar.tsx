@@ -8,10 +8,9 @@ import {
   formatWorkloadShortDueDate,
   formatWorkloadTaskEstimate,
   isWorkloadTaskUnestimated,
-  workloadPriorityLabel,
-  workloadPriorityTone,
   workloadTaskProjectLabel,
 } from "@page-modules/planner/workload/workloadDomain";
+import { WorkloadPriorityBadge } from "./WorkloadPlannerSubviews";
 
 type UnassignedQuerySlice = Readonly<{
   isPending: boolean;
@@ -39,16 +38,22 @@ function WorkloadUnassignedTaskRow({
   onAssign,
   isAssigning,
 }: WorkloadUnassignedTaskRowProps) {
-  const priorityTone = workloadPriorityTone(task.priority);
   const unestimated = isWorkloadTaskUnestimated(task);
 
   return (
     <div className="workload-unassigned-task">
-      <p className="workload-unassigned-task__title">{task.title}</p>
+      <p className="workload-unassigned-task__title">
+        {task.title}
+        {unestimated ? (
+          <span
+            className="workload-unestimated-dot ms-1"
+            title="No estimate"
+            aria-label="No estimate"
+          />
+        ) : null}
+      </p>
       <div className="workload-unassigned-task__tags">
-        <span className={`workload-priority-badge workload-priority-badge--${priorityTone}`}>
-          {workloadPriorityLabel(task.priority)}
-        </span>
+        <WorkloadPriorityBadge priority={task.priority} />
         <span className="workload-unassigned-task__tag">{workloadTaskProjectLabel(task)}</span>
         {unestimated ? (
           <span className="workload-unassigned-task__tag workload-unassigned-task__tag--warn">
