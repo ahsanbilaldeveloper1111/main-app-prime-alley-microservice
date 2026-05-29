@@ -413,23 +413,23 @@
 }
 
 .ptl-priority-badge--low {
-  background-color: #dcfce7;
+  background-color: #dcfce7 !important;
   color: #166534;
 }
 
 .ptl-priority-badge--medium,
 .ptl-priority-badge--normal {
-  background-color: #fef3c7;
+  background-color: #fef3c7 !important;
   color: #92400e;
 }
 
 .ptl-priority-badge--high {
-  background-color: #fee2e2;
+  background-color: #fee2e2 !important;
   color: #991b1b;
 }
 
 .ptl-priority-badge--urgent {
-  background-color: #fce7f3;
+  background-color: #fce7f3 !important;
   color: #9d174d;
 }
 
@@ -442,7 +442,5 @@
   font-size: 12px;
   font-family: "Lexend Deca", Helvetica, Arial, sans-serif;
   font-weight: 500;
-  background-color: #e2e8f0;
-  color: #475569;
   white-space: nowrap;
 }
