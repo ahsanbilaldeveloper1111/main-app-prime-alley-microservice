@@ -2,6 +2,8 @@ import type { ReactNode } from "react";
 import type { FilterPill, TabConfig, ToolbarConfig } from "@components/GenericTable";
 import { renderApplyResetFilterActions } from "@utils/communicationsStagedFilters";
 
+const CRM_TICKETS_SEARCH_DEBOUNCE_MS = 400;
+
 export interface BuildCrmTicketsTableToolbarParams {
   searchValue: string;
   onSearchChange: (value: string) => void;
@@ -34,6 +36,7 @@ export function buildCrmTicketsTableToolbar({
     searchValue,
     searchPlaceholder: "Search tickets...",
     onSearchChange,
+    searchDebounceMs: CRM_TICKETS_SEARCH_DEBOUNCE_MS,
     onSearch: () => {},
     showTabs: true,
     tabs: ticketTabs,
