@@ -1036,6 +1036,8 @@ const TasksListingPage = ({
         dueDateFilterPillLabel,
       ],
     );
+
+    const hasActiveFilters = filterPills.some((p) => p.isActive);
   
     // ── Render ─────────────────────────────────────────────────────────────────────
     return (
@@ -1707,6 +1709,27 @@ const TasksListingPage = ({
                     )}
                   </div>
                 ))}
+                {hasActiveFilters && (
+                  <button
+                    type="button"
+                    onClick={resetCurrentFilters}
+                    style={{
+                      background: "none",
+                      border: "none",
+                      color: "#e53e3e",
+                      fontSize: 13,
+                      fontWeight: 500,
+                      fontFamily: "Lexend Deca, Helvetica, Arial, sans-serif",
+                      cursor: "pointer",
+                      padding: "4px 8px",
+                      textDecoration: "none",
+                    }}
+                    onMouseEnter={e => e.currentTarget.style.textDecoration = "underline"}
+                    onMouseLeave={e => e.currentTarget.style.textDecoration = "none"}
+                  >
+                    Clear all
+                  </button>
+                )}
               </div>
             </div>
   
@@ -1724,8 +1747,8 @@ const TasksListingPage = ({
                   fontWeight: 600,
                 }}
                 onMouseEnter={e => {
-                  e.currentTarget.style.backgroundColor = "#333";
-                  e.currentTarget.style.background = "#333";
+                  e.currentTarget.style.backgroundColor = "#0052A3";
+                  e.currentTarget.style.background = "#0052A3";
                 }}
                 onMouseLeave={e => {
                   e.currentTarget.style.backgroundColor = "#0066CC";
@@ -1733,28 +1756,6 @@ const TasksListingPage = ({
                 }}
               >
                 Apply filters
-              </button>
-              <button
-                type="button"
-                onClick={resetCurrentFilters}
-                style={{
-                  ...TASK_LIST_BTN_OUTLINE,
-                  backgroundColor: "#0066CC",
-                  background: "#0066CC",
-                  borderColor: "#0066CC",
-                  color: "#fff",
-                  fontWeight: 600,
-                }}
-                onMouseEnter={e => {
-                  e.currentTarget.style.backgroundColor = "#333";
-                  e.currentTarget.style.background = "#333";
-                }}
-                onMouseLeave={e => {
-                  e.currentTarget.style.backgroundColor = "#0066CC";
-                  e.currentTarget.style.background = "#0066CC";
-                }}
-              >
-                Reset filters
               </button>
             </div>
           </div>
