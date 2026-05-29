@@ -980,12 +980,14 @@ const TasksListingPage = ({
       {
         id: "project",
         label: fForm.project,
+        isActive: fForm.project !== "All Projects",
         icon: <ChevronDown size={12} />,
         onClick: () => setOpenQuickFilter((prev) => (prev === "project" ? null : "project")),
       },
       {
         id: "assigned_to",
         label: `Assigned to (${fForm.assignee.length})`,
+        isActive: fForm.assignee.length > 0,
         icon: <ChevronDown size={12} />,
         onClick: () => setOpenQuickFilter((prev) => (prev === "assigned_to" ? null : "assigned_to")),
       },
@@ -994,30 +996,35 @@ const TasksListingPage = ({
         label: fForm.task_type
           ? TASK_TYPE_OPTIONS.find((o) => o.value === fForm.task_type?.value)?.label || "Task type"
           : "Task type",
+        isActive: fForm.task_type != null,
         icon: <ChevronDown size={12} />,
         onClick: () => setOpenQuickFilter((prev) => (prev === "task_type" ? null : "task_type")),
       },
       {
         id: "status",
         label: statusFilterPillLabel,
+        isActive: fForm.status !== ALL_STATUS_VALUE,
         icon: <ChevronDown size={12} />,
         onClick: () => setOpenQuickFilter((prev) => (prev === "status" ? null : "status")),
       },
       {
         id: "priority",
         label: priorityFilterPillLabel,
+        isActive: fForm.priority != null,
         icon: <ChevronDown size={12} />,
         onClick: () => setOpenQuickFilter((prev) => (prev === "priority" ? null : "priority")),
       },
       {
         id: "due_date",
         label: dueDateFilterPillLabel,
+        isActive: !!(fForm.due_date_from || fForm.due_date_to),
         icon: <ChevronDown size={12} />,
         onClick: () => setOpenQuickFilter((prev) => (prev === "due_date" ? null : "due_date")),
       },
       {
         id: "queue",
         label: "Queue",
+        isActive: false,
         icon: <ChevronDown size={12} />,
         onClick: () => setOpenQuickFilter((prev) => (prev === "queue" ? null : "queue")),
       },
@@ -1273,10 +1280,13 @@ const TasksListingPage = ({
             {/* LEFT — filter pills (GenericTable style) */}
             <div className="gt-filter-pills" ref={quickFilterRef}>
               <div className="d-flex align-items-center gap-2 flex-wrap">
-                {filterPills.map((pill) => (
-                  <div key={pill.id} style={{ position: "relative" }}>
+                {filterPills.map((pill, idx) => (
+                  <div key={pill.id} style={{ position: "relative", display: "inline-flex", alignItems: "center" }}>
+                    {idx > 0 && filterPills[idx - 1].isActive && !pill.isActive && (
+                      <span style={{ color: "#cbd5e0", fontSize: 18, marginRight: 8, userSelect: "none" }}>|</span>
+                    )}
                     <button
-                      className="gt-filter-pill"
+                      className={`gt-filter-pill${pill.isActive ? " gt-filter-pill-active" : ""}`}
                       onClick={pill.onClick}
                     >
                       {pill.icon && <span className="me-1">{pill.icon}</span>}
