@@ -183,17 +183,17 @@ const ProspectMetaSection: React.FC<ProspectMetaSectionProps> = ({
   extensions,
   isEditing,
 }) => (
-  <div className="contact-form-section" style={{ marginTop: "24px" }}>
-    <div className="contact-form-field" style={{ marginBottom: "20px" }}>
+  <div className="contact-form-section" style={{ marginTop: "12px" }}>
+    <div className="contact-form-field" style={{ marginBottom: "12px" }}>
       <label
         htmlFor="prospect-campaign-select"
         className="contact-form-label"
         style={{
           display: "block",
-          fontSize: "14px",
-          fontWeight: 600,
+          fontSize: "clamp(11px, 0.85vw, 13px)",
+          fontWeight: 400,
           color: "#141414",
-          marginBottom: "8px",
+          marginBottom: "4px",
         }}
       >
         Campaign
@@ -241,10 +241,10 @@ const ProspectMetaSection: React.FC<ProspectMetaSectionProps> = ({
                 title="This campaign is inactive and cannot be changed."
                 style={{
                   width: "100%",
-                  padding: "10px 12px",
+                  padding: "8px 10px",
                   border: "1px solid #cbd5e0",
                   borderRadius: "4px",
-                  fontSize: "14px",
+                  fontSize: "clamp(12px, 0.9vw, 13px)",
                   outline: "none",
                   backgroundColor: "#f1f5f9",
                   color: "#475569",
@@ -291,23 +291,23 @@ const ProspectMetaSection: React.FC<ProspectMetaSectionProps> = ({
                 minHeight: 40,
                 border: "1px solid #8a8a8a",
                 borderRadius: "4px",
-                fontSize: "14px",
+                fontSize: "clamp(12px, 0.9vw, 13px)",
               }),
             }}
           />
         );
       })()}
     </div>
-    <div className="contact-form-field" style={{ marginBottom: "20px" }}>
+    <div className="contact-form-field" style={{ marginBottom: "12px" }}>
       <label
         htmlFor="prospect-owner-select"
         className="contact-form-label"
         style={{
           display: "block",
-          fontSize: "14px",
-          fontWeight: 600,
+          fontSize: "clamp(11px, 0.85vw, 13px)",
+          fontWeight: 400,
           color: "#141414",
-          marginBottom: "8px",
+          marginBottom: "4px",
         }}
       >
         Owner
@@ -350,21 +350,21 @@ const ProspectMetaSection: React.FC<ProspectMetaSectionProps> = ({
             minHeight: 40,
             border: "1px solid #8a8a8a",
             borderRadius: "4px",
-            fontSize: "14px",
+            fontSize: "clamp(12px, 0.9vw, 13px)",
           }),
         }}
       />
     </div>
-    <div className="contact-form-field" style={{ marginBottom: "20px" }}>
+    <div className="contact-form-field" style={{ marginBottom: "12px" }}>
       <label
         htmlFor="prospect-source-input"
         className="contact-form-label"
         style={{
           display: "block",
-          fontSize: "14px",
-          fontWeight: 600,
+          fontSize: "clamp(11px, 0.85vw, 13px)",
+          fontWeight: 400,
           color: "#141414",
-          marginBottom: "8px",
+          marginBottom: "4px",
         }}
       >
         Source
@@ -381,10 +381,10 @@ const ProspectMetaSection: React.FC<ProspectMetaSectionProps> = ({
         }
         style={{
           width: "100%",
-          padding: "10px 12px",
+          padding: "8px 10px",
           border: "1px solid #8a8a8a",
           borderRadius: "4px",
-          fontSize: "14px",
+          fontSize: "clamp(12px, 0.9vw, 13px)",
           outline: "none",
         }}
         onFocus={(e) => (e.currentTarget.style.borderColor = "#0091ae")}
@@ -392,16 +392,16 @@ const ProspectMetaSection: React.FC<ProspectMetaSectionProps> = ({
         placeholder="Enter source"
       />
     </div>
-    <div className="contact-form-field" style={{ marginBottom: "20px" }}>
+    <div className="contact-form-field" style={{ marginBottom: "12px" }}>
       <label
         htmlFor="prospect-disposition-dropdown"
         className="contact-form-label"
         style={{
           display: "block",
-          fontSize: "14px",
-          fontWeight: 600,
+          fontSize: "clamp(11px, 0.85vw, 13px)",
+          fontWeight: 400,
           color: "#141414",
-          marginBottom: "8px",
+          marginBottom: "4px",
         }}
       >
         Disposition
@@ -413,10 +413,10 @@ const ProspectMetaSection: React.FC<ProspectMetaSectionProps> = ({
           style={{
             width: "100%",
             textAlign: "left",
-            padding: "10px 12px",
+            padding: "8px 10px",
             border: "1px solid #8a8a8a",
             borderRadius: "4px",
-            fontSize: "14px",
+            fontSize: "clamp(12px, 0.9vw, 13px)",
             backgroundColor: "#fff",
             color: contactForm.disposition ? "#141414" : "#a0aec0",
           }}
@@ -442,16 +442,16 @@ const ProspectMetaSection: React.FC<ProspectMetaSectionProps> = ({
         </Dropdown.Menu>
       </Dropdown>
     </div>
-    <div className="contact-form-field" style={{ marginBottom: "20px" }}>
+    <div className="contact-form-field" style={{ marginBottom: "12px" }}>
       <label
         htmlFor="prospect-legal-basis-dropdown"
         className="contact-form-label"
         style={{
           display: "block",
-          fontSize: "14px",
-          fontWeight: 600,
+          fontSize: "clamp(11px, 0.85vw, 13px)",
+          fontWeight: 400,
           color: "#141414",
-          marginBottom: "8px",
+          marginBottom: "4px",
         }}
       >
         Legal basis for processing contact&apos;s data
@@ -463,10 +463,10 @@ const ProspectMetaSection: React.FC<ProspectMetaSectionProps> = ({
           style={{
             width: "100%",
             textAlign: "left",
-            padding: "10px 12px",
+            padding: "8px 10px",
             border: "1px solid #8a8a8a",
             borderRadius: "4px",
-            fontSize: "14px",
+            fontSize: "clamp(12px, 0.9vw, 13px)",
             backgroundColor: "#fff",
             color: contactForm.legal_basis?.length ? "#141414" : "#a0aec0",
           }}
@@ -512,21 +512,21 @@ const ProspectAdditionalSection: React.FC<ProspectAdditionalSectionProps> = ({
   <div
     className="contact-form-section"
     style={{
-      marginTop: "24px",
+      marginTop: "12px",
       paddingTop: "24px",
       borderTop: "1px solid #eaf0f6",
     }}
   >
-    <div className="contact-form-field" style={{ marginBottom: "20px" }}>
+    <div className="contact-form-field" style={{ marginBottom: "12px" }}>
       <label
         htmlFor="prospect-company-domain-input"
         className="contact-form-label"
         style={{
           display: "block",
-          fontSize: "14px",
-          fontWeight: 600,
+          fontSize: "clamp(11px, 0.85vw, 13px)",
+          fontWeight: 400,
           color: "#141414",
-          marginBottom: "8px",
+          marginBottom: "4px",
         }}
       >
         Company domain
@@ -545,10 +545,10 @@ const ProspectAdditionalSection: React.FC<ProspectAdditionalSectionProps> = ({
         data-no-capitalize
         style={{
           width: "100%",
-          padding: "10px 12px",
+          padding: "8px 10px",
           border: "1px solid #8a8a8a",
           borderRadius: "4px",
-          fontSize: "14px",
+          fontSize: "clamp(12px, 0.9vw, 13px)",
           outline: "none",
         }}
         onFocus={(e) => (e.currentTarget.style.borderColor = "#0091ae")}
@@ -556,16 +556,16 @@ const ProspectAdditionalSection: React.FC<ProspectAdditionalSectionProps> = ({
       />
     </div>
     {showScheduledCallField && (
-      <div className="contact-form-field" style={{ marginBottom: "20px" }}>
+      <div className="contact-form-field" style={{ marginBottom: "12px" }}>
       <label
         htmlFor="prospect-scheduled-call-input"
         className="contact-form-label"
         style={{
           display: "block",
-          fontSize: "14px",
-          fontWeight: 600,
+          fontSize: "clamp(11px, 0.85vw, 13px)",
+          fontWeight: 400,
           color: "#141414",
-          marginBottom: "8px",
+          marginBottom: "4px",
         }}
       >
         Scheduled call at
@@ -582,25 +582,25 @@ const ProspectAdditionalSection: React.FC<ProspectAdditionalSectionProps> = ({
         }}
         style={{
           width: "100%",
-          padding: "10px 12px",
+          padding: "8px 10px",
           border: "1px solid #8a8a8a",
           borderRadius: "4px",
-          fontSize: "14px",
+          fontSize: "clamp(12px, 0.9vw, 13px)",
           outline: "none",
         }}
       />
       </div>
     )}
-    <div className="contact-form-field" style={{ marginBottom: "20px" }}>
+    <div className="contact-form-field" style={{ marginBottom: "12px" }}>
       <label
         htmlFor="prospect-tags-select"
         className="contact-form-label"
         style={{
           display: "block",
-          fontSize: "14px",
-          fontWeight: 600,
+          fontSize: "clamp(11px, 0.85vw, 13px)",
+          fontWeight: 400,
           color: "#141414",
-          marginBottom: "8px",
+          marginBottom: "4px",
         }}
       >
         Tags
@@ -625,21 +625,21 @@ const ProspectAdditionalSection: React.FC<ProspectAdditionalSectionProps> = ({
             minHeight: 40,
             border: "1px solid #8a8a8a",
             borderRadius: "4px",
-            fontSize: "14px",
+            fontSize: "clamp(12px, 0.9vw, 13px)",
           }),
         }}
       />
     </div>
-    <div className="contact-form-field" style={{ marginBottom: "20px" }}>
+    <div className="contact-form-field" style={{ marginBottom: "12px" }}>
       <label
         htmlFor="prospect-description-editor"
         className="contact-form-label"
         style={{
           display: "block",
-          fontSize: "14px",
-          fontWeight: 600,
+          fontSize: "clamp(11px, 0.85vw, 13px)",
+          fontWeight: 400,
           color: "#141414",
-          marginBottom: "8px",
+          marginBottom: "4px",
         }}
       >
         Description
@@ -681,7 +681,7 @@ const ProspectAdditionalSection: React.FC<ProspectAdditionalSectionProps> = ({
           backgroundColor: "transparent",
           border: "1px dashed #8a8a8a",
           borderRadius: "4px",
-          fontSize: "14px",
+          fontSize: "clamp(12px, 0.9vw, 13px)",
           color: "#141414",
           cursor: "pointer",
         }}
@@ -718,10 +718,10 @@ const ProspectAdditionalSection: React.FC<ProspectAdditionalSectionProps> = ({
               placeholder="Title"
               style={{
                 width: "100%",
-                padding: "10px 12px",
+                padding: "8px 10px",
                 border: "1px solid #8a8a8a",
                 borderRadius: "4px",
-                fontSize: "14px",
+                fontSize: "clamp(12px, 0.9vw, 13px)",
                 outline: "none",
               }}
               onFocus={(e) => (e.currentTarget.style.borderColor = "#0091ae")}
@@ -736,10 +736,10 @@ const ProspectAdditionalSection: React.FC<ProspectAdditionalSectionProps> = ({
               placeholder="Value"
               style={{
                 width: "100%",
-                padding: "10px 12px",
+                padding: "8px 10px",
                 border: "1px solid #8a8a8a",
                 borderRadius: "4px",
-                fontSize: "14px",
+                fontSize: "clamp(12px, 0.9vw, 13px)",
                 outline: "none",
               }}
               onFocus={(e) => (e.currentTarget.style.borderColor = "#0091ae")}
@@ -821,12 +821,12 @@ const ProspectSidebarFooter: React.FC<ProspectSidebarFooterProps> = ({
         className="contact-form-btn-create"
         disabled={isPrimaryDisabled}
         style={{
-          padding: "10px 20px",
+          padding: "8px 14px",
           backgroundColor: canPrimaryHover ? "#0091ae" : "#cbd5e0",
           color: "#ffffff",
           border: "none",
           borderRadius: "4px",
-          fontSize: "14px",
+          fontSize: "clamp(11px, 0.85vw, 13px)",
           fontWeight: "500",
           cursor: canPrimaryHover ? "pointer" : "not-allowed",
         }}
@@ -850,12 +850,12 @@ const ProspectSidebarFooter: React.FC<ProspectSidebarFooterProps> = ({
           disabled={!canSecondaryActions}
           onClick={onCreateAndAddAnother}
           style={{
-            padding: "10px 20px",
+            padding: "8px 14px",
             backgroundColor: "transparent",
             color: canSecondaryActions ? "#141414" : "#a0aec0",
             border: "1px solid #8a8a8a",
             borderRadius: "4px",
-            fontSize: "14px",
+            fontSize: "clamp(11px, 0.85vw, 13px)",
             fontWeight: "500",
             cursor: canSecondaryActions ? "pointer" : "not-allowed",
           }}
@@ -879,12 +879,12 @@ const ProspectSidebarFooter: React.FC<ProspectSidebarFooterProps> = ({
         disabled={createContactLoading}
         onClick={onClose}
         style={{
-          padding: "10px 20px",
+          padding: "8px 14px",
           backgroundColor: "transparent",
           color: "#141414",
           border: "1px solid #8a8a8a",
           borderRadius: "4px",
-          fontSize: "14px",
+          fontSize: "clamp(11px, 0.85vw, 13px)",
           fontWeight: "500",
           cursor: "pointer",
         }}
@@ -907,17 +907,17 @@ const ProspectRequiredFieldsSection: React.FC<
   <div className="contact-form-section">
     <div
       className="contact-form-field"
-      style={{ marginBottom: "20px" }}
+      style={{ marginBottom: "12px" }}
     >
       <label
         htmlFor="prospect-first-name"
         className="contact-form-label contact-form-label-required"
         style={{
           display: "block",
-          fontSize: "14px",
-          fontWeight: 600,
+          fontSize: "clamp(11px, 0.85vw, 13px)",
+          fontWeight: 400,
           color: "#141414",
-          marginBottom: "8px",
+          marginBottom: "4px",
         }}
       >
         First name <span style={{ color: "#f2545b" }}>*</span>
@@ -935,10 +935,10 @@ const ProspectRequiredFieldsSection: React.FC<
         }
         style={{
           width: "100%",
-          padding: "10px 12px",
+          padding: "8px 10px",
           border: "1px solid #8a8a8a",
           borderRadius: "4px",
-          fontSize: "14px",
+          fontSize: "clamp(12px, 0.9vw, 13px)",
           outline: "none",
         }}
         onFocus={(e) =>
@@ -951,17 +951,17 @@ const ProspectRequiredFieldsSection: React.FC<
     </div>
     <div
       className="contact-form-field"
-      style={{ marginBottom: "20px" }}
+      style={{ marginBottom: "12px" }}
     >
       <label
         htmlFor="prospect-last-name"
         className="contact-form-label contact-form-label-required"
         style={{
           display: "block",
-          fontSize: "14px",
-          fontWeight: 600,
+          fontSize: "clamp(11px, 0.85vw, 13px)",
+          fontWeight: 400,
           color: "#141414",
-          marginBottom: "8px",
+          marginBottom: "4px",
         }}
       >
         Last name <span style={{ color: "#f2545b" }}>*</span>
@@ -979,10 +979,10 @@ const ProspectRequiredFieldsSection: React.FC<
         }
         style={{
           width: "100%",
-          padding: "10px 12px",
+          padding: "8px 10px",
           border: "1px solid #8a8a8a",
           borderRadius: "4px",
-          fontSize: "14px",
+          fontSize: "clamp(12px, 0.9vw, 13px)",
           outline: "none",
         }}
         onFocus={(e) =>
@@ -995,17 +995,17 @@ const ProspectRequiredFieldsSection: React.FC<
     </div>
     <div
       className="contact-form-field"
-      style={{ marginBottom: "20px" }}
+      style={{ marginBottom: "12px" }}
     >
       <label
         htmlFor="prospect-email"
         className="contact-form-label contact-form-label-required"
         style={{
           display: "block",
-          fontSize: "14px",
-          fontWeight: 600,
+          fontSize: "clamp(11px, 0.85vw, 13px)",
+          fontWeight: 400,
           color: "#141414",
-          marginBottom: "8px",
+          marginBottom: "4px",
         }}
       >
         Email <span style={{ color: "#f2545b" }}>*</span>
@@ -1023,10 +1023,10 @@ const ProspectRequiredFieldsSection: React.FC<
         }
         style={{
           width: "100%",
-          padding: "10px 12px",
+          padding: "8px 10px",
           border: "1px solid #8a8a8a",
           borderRadius: "4px",
-          fontSize: "14px",
+          fontSize: "clamp(12px, 0.9vw, 13px)",
           outline: "none",
         }}
         onFocus={(e) =>
@@ -1039,17 +1039,17 @@ const ProspectRequiredFieldsSection: React.FC<
     </div>
     <div
       className="contact-form-field"
-      style={{ marginBottom: "20px" }}
+      style={{ marginBottom: "12px" }}
     >
       <label
         htmlFor="prospect-phone"
         className="contact-form-label contact-form-label-required"
         style={{
           display: "block",
-          fontSize: "14px",
-          fontWeight: 600,
+          fontSize: "clamp(11px, 0.85vw, 13px)",
+          fontWeight: 400,
           color: "#141414",
-          marginBottom: "8px",
+          marginBottom: "4px",
         }}
       >
         Phone <span style={{ color: "#f2545b" }}>*</span>
@@ -1153,7 +1153,7 @@ const ProspectEditSidebar: React.FC<ProspectEditSidebarProps> = ({
             position: "fixed",
             top: 0,
             right: 0,
-            width: "600px",
+            width: "min(600px, calc(100vw - 80px))",
             height: "100vh",
             backgroundColor: "#ffffff",
             boxShadow: "-2px 0 8px rgba(0, 0, 0, 0.1)",
