@@ -1086,9 +1086,9 @@ const TasksListingPage = ({
                   }}
                   style={{
                     ...TASK_LIST_BTN_OUTLINE,
-                    backgroundColor: "#000",
-                    background: "#000",
-                    borderColor: "#000",
+                    backgroundColor: "#0066CC",
+                    background: "#0066CC",
+                    borderColor: "#0066CC",
                     color: "#fff",
                     fontWeight: 600,
                   }}
@@ -1098,7 +1098,7 @@ const TasksListingPage = ({
                   }}
                   onMouseLeave={e => {
                     e.currentTarget.style.backgroundColor = "#0066CC";
-                    e.currentTarget.style.background = "#000";
+                    e.currentTarget.style.background = "#0066CC";
                   }}
                 >Create task</button>
               )}
@@ -1139,7 +1139,7 @@ const TasksListingPage = ({
                   border: "none",
                   borderRight: "1px solid #8A8A8A",
                   borderTop: "1px solid #8A8A8A",
-                  backgroundColor: activeTab === tab.id ? "#f7f2f7" : "#fff",
+                  backgroundColor: activeTab === tab.id ? "#f5f8fa" : "#fff",
                   borderBottom: activeTab === tab.id ? "none" : "1px solid #8A8A8A",
                   color: "#141414",
                   fontSize: 13,
@@ -1706,9 +1706,9 @@ const TasksListingPage = ({
                 onClick={applyCurrentFilters}
                 style={{
                   ...TASK_LIST_BTN_OUTLINE,
-                  backgroundColor: "#000",
-                  background: "#000",
-                  borderColor: "#000",
+                  backgroundColor: "#0066CC",
+                  background: "#0066CC",
+                  borderColor: "#0066CC",
                   color: "#fff",
                   fontWeight: 600,
                 }}
@@ -1718,7 +1718,7 @@ const TasksListingPage = ({
                 }}
                 onMouseLeave={e => {
                   e.currentTarget.style.backgroundColor = "#0066CC";
-                  e.currentTarget.style.background = "#000";
+                  e.currentTarget.style.background = "#0066CC";
                 }}
               >
                 Apply filters
@@ -1728,9 +1728,9 @@ const TasksListingPage = ({
                 onClick={resetCurrentFilters}
                 style={{
                   ...TASK_LIST_BTN_OUTLINE,
-                  backgroundColor: "#000",
-                  background: "#000",
-                  borderColor: "#000",
+                  backgroundColor: "#0066CC",
+                  background: "#0066CC",
+                  borderColor: "#0066CC",
                   color: "#fff",
                   fontWeight: 600,
                 }}
@@ -1740,7 +1740,7 @@ const TasksListingPage = ({
                 }}
                 onMouseLeave={e => {
                   e.currentTarget.style.backgroundColor = "#0066CC";
-                  e.currentTarget.style.background = "#000";
+                  e.currentTarget.style.background = "#0066CC";
                 }}
               >
                 Reset filters
