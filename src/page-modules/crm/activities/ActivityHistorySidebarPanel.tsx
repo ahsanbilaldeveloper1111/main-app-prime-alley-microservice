@@ -225,6 +225,7 @@ export function ActivityHistorySidebarPanel({
   return (
     <GenericSidebar
       sidebarMarginTop={sidebarMarginTop}
+      width={typeof window !== "undefined" && window.innerWidth < 1280 ? "360px" : "420px"}
       isOpen={showActivitySidebar}
       onClose={() => setShowActivitySidebar(false)}
       title={selectedActivityRecord?.customer || "Activity Details"}
