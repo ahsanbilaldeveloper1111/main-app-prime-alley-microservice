@@ -748,7 +748,7 @@ const TasksListingPage = ({
     // ── Columns ───────────────────────────────────────────────────────────────────
     const columns: TableColumn<Task>[] = useMemo(() => [
       {
-        key: "complete", label: "Done", sortable: false, type: "custom",
+        key: "complete", label: "Status", sortable: false, type: "custom",
         render: (row) => {
           const canToggleComplete = getTaskRowPermissions(row).canOpenTaskEdit;
           let completeBtnTitle = "Mark complete";
