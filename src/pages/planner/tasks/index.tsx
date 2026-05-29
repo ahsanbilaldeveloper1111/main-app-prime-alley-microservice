@@ -1900,24 +1900,25 @@ const TasksListingPage = ({
           {/* ══════════════════════════════════════════════════════
               ROW 4 — Search + Edit columns
           ══════════════════════════════════════════════════════ */}
-          <TaskListingSearchRow
-            search={search}
-            onSearchChange={setSearch}
-            onSubmitSearch={() => {
-              setFilters((p) => ({ ...p, search }));
-              setPager((p) => ({ ...p, page: 1 }));
-            }}
-            wrapperClassName="ptl-search-row-border"
-            editColumnsSlot={
-              <PlannerTasksEditColumnsDropdown
-                columns={columns}
-                visibleTaskColumnKeys={visibleTaskColumnKeys}
-                toggleTaskColumnVisibility={toggleTaskColumnVisibility}
-                selectAllTaskColumns={selectAllTaskColumns}
-                resetTaskColumnsToDefault={resetTaskColumnsToDefault}
-              />
-            }
-          />
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 16px", borderBottom: "1px solid #e5e7eb", flexShrink: 0, backgroundColor: "#fff" }}>
+            <TaskListingSearchRow
+              search={search}
+              onSearchChange={setSearch}
+              onSubmitSearch={() => {
+                setFilters((p) => ({ ...p, search }));
+                setPager((p) => ({ ...p, page: 1 }));
+              }}
+              wrapperClassName="ptl-search-row-border"
+              wrapperStyle={{ padding: 0, border: "none", flex: 1 }}
+            />
+            <PlannerTasksEditColumnsDropdown
+              columns={columns}
+              visibleTaskColumnKeys={visibleTaskColumnKeys}
+              toggleTaskColumnVisibility={toggleTaskColumnVisibility}
+              selectAllTaskColumns={selectAllTaskColumns}
+              resetTaskColumnsToDefault={resetTaskColumnsToDefault}
+            />
+          </div>
   
           {/* ══════════════════════════════════════════════════════
               ROW 5 — Table (fills remaining height)

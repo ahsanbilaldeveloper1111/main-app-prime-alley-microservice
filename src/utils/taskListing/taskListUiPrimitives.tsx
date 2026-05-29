@@ -202,11 +202,12 @@ export function TaskListingSearchRow({
     padding: "8px 16px",
     backgroundColor: "#fff",
     flexShrink: 0,
+    gap: 12,
     ...wrapperStyle,
   };
   return (
     <div className={wrapperClassName} style={rowStyle}>
-      <div style={{ display: "flex", alignItems: "center", gap: 0 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 0, flexGrow: 1 }}>
         <div style={{ position: "relative" }}>
           <FiSearch
             size={14}
