@@ -22,10 +22,7 @@ import {
 } from "./mapTenantChatSettings";
 import type { ChatCompanyOption } from "@page-modules/chat/useChatCompaniesQuery";
 import { AI_CHATBOT_FIELD_PLACEHOLDERS } from "./constants";
-import {
-  AI_CHATBOT_DECIMAL_PLACES,
-  formatDecimalInputValue,
-} from "./aiChatbotDecimalFormat";
+import { formatDecimalInputValue } from "./aiChatbotDecimalFormat";
 import { AIChatbotSettingsFormSkeleton } from "./AIChatbotSettingsFormSkeleton";
 import { AIChatbotSettingsHistoryPanel } from "./AIChatbotSettingsHistoryPanel";
 import { ModelPricingDefaultsTable } from "./ModelPricingDefaultsTable";
@@ -409,9 +406,9 @@ function AIChatbotSettingsFormContent(
           />
         </div>
         <p className="ai-chatbot-settings__hint">
-          Applied as the default monthly cap for users without their own
-          budget. Alert threshold triggers when a user&apos;s spend reaches
-          this percentage of their cap.
+          Applied as the default monthly cap for users without their own budget.
+          Alert threshold triggers when a user&apos;s spend reaches this
+          percentage of their cap.
         </p>
         <p className="ai-chatbot-settings__hint">{totalCompanyBudgetHint}</p>
       </div>
@@ -670,8 +667,7 @@ export const AIChatbotSettings: React.FC = () => {
     );
   }
 
-  const showSettingsForm =
-    innerTab === "settings" && !showFormSkeleton;
+  const showSettingsForm = innerTab === "settings" && !showFormSkeleton;
 
   return (
     <form

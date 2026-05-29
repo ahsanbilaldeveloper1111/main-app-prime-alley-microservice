@@ -794,6 +794,135 @@ const ConversationState: React.FC<{
 );
 
 // ============================================================================
+// CHAT HISTORY ROW / LIST
+// ============================================================================
+
+const ChatHistoryRow: React.FC<{
+  item: BreezeChatHistory;
+  isActive: boolean;
+  onSelect: () => void;
+  onDelete: () => void;
+  marginBottom?: string;
+}> = ({ item, isActive, onSelect, onDelete, marginBottom = "1px" }) => {
+  const canDelete = item.id !== "new" && item.threadId;
+
+  return (
+    <div
+      style={{
+        width: "100%",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        gap: "8px",
+        marginBottom,
+        boxSizing: "border-box",
+      }}
+    >
+      <button
+        type="button"
+        onClick={onSelect}
+        style={{
+          flex: 1,
+          minWidth: 0,
+          padding: "10px 12px",
+          display: "flex",
+          alignItems: "center",
+          border: "none",
+          borderRadius: "6px",
+          backgroundColor: isActive ? "#f0f0f0" : "transparent",
+          cursor: "pointer",
+          fontSize: "13.5px",
+          color: "#141414",
+          fontWeight: isActive ? "500" : "400",
+          transition: "background 0.15s",
+          boxSizing: "border-box",
+          textAlign: "left",
+        }}
+        onMouseEnter={(e) => {
+          if (isActive) return;
+          e.currentTarget.style.backgroundColor = "#f7f7f7";
+        }}
+        onMouseLeave={(e) => {
+          if (isActive) return;
+          e.currentTarget.style.backgroundColor = "transparent";
+        }}
+      >
+        <span
+          style={{
+            flex: 1,
+            minWidth: 0,
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap",
+          }}
+        >
+          {item.title}
+        </span>
+      </button>
+      {canDelete && (
+        <button
+          type="button"
+          onClick={onDelete}
+          title="Delete"
+          style={{
+            padding: "4px",
+            border: "none",
+            borderRadius: "4px",
+            background: "transparent",
+            color: "#718096",
+            cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            flexShrink: 0,
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.color = "#dc2626";
+            e.currentTarget.style.backgroundColor = "#fef2f2";
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.color = "#718096";
+            e.currentTarget.style.backgroundColor = "transparent";
+          }}
+        >
+          <Trash2 size={14} />
+        </button>
+      )}
+    </div>
+  );
+};
+
+const ChatHistoryList: React.FC<{
+  items: BreezeChatHistory[];
+  activeId: string;
+  onSelectThread: (item: BreezeChatHistory) => void;
+  onNewChat: () => void;
+  onDeleteThread: (item: BreezeChatHistory) => void;
+  rowMarginBottom?: string;
+}> = ({
+  items,
+  activeId,
+  onSelectThread,
+  onNewChat,
+  onDeleteThread,
+  rowMarginBottom = "1px",
+}) => (
+  <>
+    {items.map((item) => (
+      <ChatHistoryRow
+        key={item.id}
+        item={item}
+        isActive={item.id === activeId}
+        onSelect={() =>
+          item.id === "new" ? onNewChat() : onSelectThread(item)
+        }
+        onDelete={() => onDeleteThread(item)}
+        marginBottom={rowMarginBottom}
+      />
+    ))}
+  </>
+);
+
+// ============================================================================
 // CHAT HISTORY LEFT PANEL (expanded mode only)
 // ============================================================================
 
@@ -873,95 +1002,13 @@ const ChatHistoryPanel: React.FC<{
         className="breeze-scroll"
         style={{ flex: 1, overflowY: "auto", padding: "0 8px 16px 8px" }}
       >
-        {filtered.map((item) => {
-          const isActive = item.id === activeId;
-          const canDelete = item.id !== "new" && item.threadId;
-          return (
-            <div
-              key={item.id}
-              role="button"
-              tabIndex={0}
-              onClick={() =>
-                item.id === "new" ? onNewChat() : onSelectThread(item)
-              }
-              onKeyDown={(e) => {
-                if (e.key === "Enter" || e.key === " ") {
-                  e.preventDefault();
-                  item.id === "new" ? onNewChat() : onSelectThread(item);
-                }
-              }}
-              style={{
-                width: "100%",
-                padding: "10px 12px",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                gap: "8px",
-                border: "none",
-                borderRadius: "6px",
-                backgroundColor: isActive ? "#f0f0f0" : "transparent",
-                cursor: "pointer",
-                fontSize: "13.5px",
-                color: "#141414",
-                fontWeight: isActive ? "500" : "400",
-                marginBottom: "1px",
-                transition: "background 0.15s",
-                boxSizing: "border-box",
-              }}
-              onMouseEnter={(e) => {
-                if (!isActive)
-                  e.currentTarget.style.backgroundColor = "#f7f7f7";
-              }}
-              onMouseLeave={(e) => {
-                if (!isActive)
-                  e.currentTarget.style.backgroundColor = "transparent";
-              }}
-            >
-              <span
-                style={{
-                  flex: 1,
-                  minWidth: 0,
-                  overflow: "hidden",
-                  textOverflow: "ellipsis",
-                  whiteSpace: "nowrap",
-                }}
-              >
-                {item.title}
-              </span>
-              {canDelete && (
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onDeleteThread(item);
-                  }}
-                  title="Delete"
-                  style={{
-                    padding: "4px",
-                    border: "none",
-                    borderRadius: "4px",
-                    background: "transparent",
-                    color: "#718096",
-                    cursor: "pointer",
-                    display: "flex",
-                    alignItems: "center",
-                    flexShrink: 0,
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.color = "#dc2626";
-                    e.currentTarget.style.backgroundColor = "#fef2f2";
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.color = "#718096";
-                    e.currentTarget.style.backgroundColor = "transparent";
-                  }}
-                >
-                  <Trash2 size={14} />
-                </button>
-              )}
-            </div>
-          );
-        })}
+        <ChatHistoryList
+          items={filtered}
+          activeId={activeId}
+          onSelectThread={onSelectThread}
+          onNewChat={onNewChat}
+          onDeleteThread={onDeleteThread}
+        />
       </div>
     </div>
   );
@@ -1781,11 +1828,14 @@ const BreezeAssistantSidebar: React.FC<BreezeAssistantSidebarProps> = ({
 
   useEffect(() => {
     const h = (e: MouseEvent) => {
+      const target = e.target;
       if (
         moreMenuRef.current &&
-        !moreMenuRef.current.contains(e.target as Node)
-      )
+        target instanceof Node &&
+        !moreMenuRef.current.contains(target)
+      ) {
         setShowMoreMenu(false);
+      }
     };
     document.addEventListener("mousedown", h);
     return () => document.removeEventListener("mousedown", h);
@@ -1996,8 +2046,9 @@ const BreezeAssistantSidebar: React.FC<BreezeAssistantSidebarProps> = ({
               }}
             >
               {[
-                ...(!isMaximized
-                  ? [
+                ...(isMaximized
+                  ? []
+                  : [
                       {
                         label: "Chats",
                         onClick: () => {
@@ -2005,8 +2056,7 @@ const BreezeAssistantSidebar: React.FC<BreezeAssistantSidebarProps> = ({
                           setShowMoreMenu(false);
                         },
                       },
-                    ]
-                  : []),
+                    ]),
                 ...(threadId && messages.length > 0
                   ? [
                       {
@@ -2152,99 +2202,14 @@ const BreezeAssistantSidebar: React.FC<BreezeAssistantSidebarProps> = ({
               padding: "8px 12px 16px 12px",
             }}
           >
-            {historyList.map((item) => {
-              const isActive = item.id === activeChatId;
-              const canDelete = item.id !== "new" && item.threadId;
-              return (
-                <div
-                  key={item.id}
-                  role="button"
-                  tabIndex={0}
-                  onClick={() =>
-                    item.id === "new"
-                      ? handleNewConversation()
-                      : handleSelectThread(item)
-                  }
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" || e.key === " ") {
-                      e.preventDefault();
-                      item.id === "new"
-                        ? handleNewConversation()
-                        : handleSelectThread(item);
-                    }
-                  }}
-                  style={{
-                    width: "100%",
-                    padding: "10px 12px",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    gap: "8px",
-                    border: "none",
-                    borderRadius: "6px",
-                    backgroundColor: isActive ? "#f0f0f0" : "transparent",
-                    cursor: "pointer",
-                    fontSize: "13.5px",
-                    color: "#141414",
-                    fontWeight: isActive ? "500" : "400",
-                    marginBottom: "4px",
-                    transition: "background 0.15s",
-                    boxSizing: "border-box",
-                  }}
-                  onMouseEnter={(e) => {
-                    if (!isActive)
-                      e.currentTarget.style.backgroundColor = "#f7f7f7";
-                  }}
-                  onMouseLeave={(e) => {
-                    if (!isActive)
-                      e.currentTarget.style.backgroundColor = "transparent";
-                  }}
-                >
-                  <span
-                    style={{
-                      flex: 1,
-                      minWidth: 0,
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                      whiteSpace: "nowrap",
-                    }}
-                  >
-                    {item.title}
-                  </span>
-                  {canDelete && (
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleDeleteThread(item);
-                      }}
-                      title="Delete"
-                      style={{
-                        padding: "4px",
-                        border: "none",
-                        borderRadius: "4px",
-                        background: "transparent",
-                        color: "#718096",
-                        cursor: "pointer",
-                        display: "flex",
-                        alignItems: "center",
-                        flexShrink: 0,
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.color = "#dc2626";
-                        e.currentTarget.style.backgroundColor = "#fef2f2";
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.color = "#718096";
-                        e.currentTarget.style.backgroundColor = "transparent";
-                      }}
-                    >
-                      <Trash2 size={14} />
-                    </button>
-                  )}
-                </div>
-              );
-            })}
+            <ChatHistoryList
+              items={historyList}
+              activeId={activeChatId}
+              onSelectThread={handleSelectThread}
+              onNewChat={handleNewConversation}
+              onDeleteThread={handleDeleteThread}
+              rowMarginBottom="4px"
+            />
           </div>
         );
 
