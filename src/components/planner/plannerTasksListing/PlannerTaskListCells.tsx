@@ -76,8 +76,11 @@ export function PlannerTaskPriorityCell({ row }: PlannerTaskPriorityCellProps) {
     );
   }
   return (
-    <div className={`ptl-priority-badge ptl-priority-badge--${plannerPriorityDotModifier(row.priority)}`}>
-      {row.priority.charAt(0).toUpperCase() + row.priority.slice(1)}
+    <div className="ptl-priority-row">
+      <div className={`ptl-priority-dot ptl-priority-dot--${plannerPriorityDotModifier(row.priority)}`} />
+      <div className="ptl-list-cell">
+        {row.priority.charAt(0).toUpperCase() + row.priority.slice(1)}
+      </div>
     </div>
   );
 }
