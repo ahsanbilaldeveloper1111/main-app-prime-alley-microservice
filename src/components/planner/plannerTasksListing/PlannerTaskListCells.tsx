@@ -71,9 +71,9 @@ export function PlannerTaskPriorityCell({ row }: PlannerTaskPriorityCellProps) {
     );
   }
   return (
-    <span className={`ptl-priority-badge ptl-priority-badge--${plannerPriorityDotModifier(row.priority)}`}>
+    <div className={`ptl-priority-badge ptl-priority-badge--${plannerPriorityDotModifier(row.priority)}`}>
       {row.priority.charAt(0).toUpperCase() + row.priority.slice(1)}
-    </span>
+    </div>
   );
 }
 
@@ -231,7 +231,7 @@ export function PlannerTaskAssigneeCell({
 }
 
 export function PlannerTaskWorkflowStatusCell({ row }: Readonly<{ row: Task }>) {
-  return <span className="ptl-status-badge">{taskStatusColumnLabel(row)}</span>;
+  return <div className="ptl-status-badge">{taskStatusColumnLabel(row)}</div>;
 }
 
 export function PlannerTaskRepeatStatusCell({ row }: Readonly<{ row: Task }>) {
