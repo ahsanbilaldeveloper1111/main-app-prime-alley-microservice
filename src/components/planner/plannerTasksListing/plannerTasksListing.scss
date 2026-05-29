@@ -72,7 +72,7 @@
 }
 
 .ptl-tab-btn--active {
-  background-color: #f7f2f7;
+  background-color: #f5f8fa;
   border-bottom: none;
   font-weight: 500;
 }
@@ -398,4 +398,51 @@
 
 .ptl-edit-columns-menu {
   min-width: 240px;
+}
+
+/* Priority badges */
+.ptl-priority-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-family: "Lexend Deca", Helvetica, Arial, sans-serif;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.ptl-priority-badge--low {
+  background-color: #dcfce7;
+  color: #166534;
+}
+
+.ptl-priority-badge--medium,
+.ptl-priority-badge--normal {
+  background-color: #fef3c7;
+  color: #92400e;
+}
+
+.ptl-priority-badge--high {
+  background-color: #fee2e2;
+  color: #991b1b;
+}
+
+.ptl-priority-badge--urgent {
+  background-color: #fce7f3;
+  color: #9d174d;
+}
+
+/* Status badge */
+.ptl-status-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-family: "Lexend Deca", Helvetica, Arial, sans-serif;
+  font-weight: 500;
+  background-color: #e2e8f0;
+  color: #475569;
+  white-space: nowrap;
 }
