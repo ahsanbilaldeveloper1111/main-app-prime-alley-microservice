@@ -12,7 +12,7 @@ import BreadcrumbItem from "@common/BreadcrumbItem";
 import { toast } from "react-toastify";
 import { useRouter } from "next/router";
 import moment from "moment";
-import { ChevronDown, Plus } from "lucide-react";
+import { ChevronDown, Plus, X } from "lucide-react";
 import { Button, Form, Modal } from "react-bootstrap";
 import GenericTable, { TableColumn, TableAction } from "@components/GenericTable";
 import DeleteConfirmationModal from "@components/page-partials/DeleteConfirmationModal";
@@ -985,6 +985,7 @@ const TasksListingPage = ({
         isActive: fForm.project !== "All Projects",
         icon: <ChevronDown size={12} />,
         onClick: () => setOpenQuickFilter((prev) => (prev === "project" ? null : "project")),
+        onClear: () => { setFForm((prev) => ({ ...prev, project: "All Projects" })); setProjectSearch(""); },
       },
       {
         id: "assigned_to",
@@ -992,6 +993,7 @@ const TasksListingPage = ({
         isActive: fForm.assignee.length > 0,
         icon: <ChevronDown size={12} />,
         onClick: () => setOpenQuickFilter((prev) => (prev === "assigned_to" ? null : "assigned_to")),
+        onClear: () => { setFForm((prev) => ({ ...prev, assignee: [] })); setAssigneeSearch(""); },
       },
       {
         id: "task_type",
@@ -1001,6 +1003,7 @@ const TasksListingPage = ({
         isActive: fForm.task_type != null,
         icon: <ChevronDown size={12} />,
         onClick: () => setOpenQuickFilter((prev) => (prev === "task_type" ? null : "task_type")),
+        onClear: () => setFForm((prev) => ({ ...prev, task_type: null })),
       },
       {
         id: "status",
@@ -1008,6 +1011,7 @@ const TasksListingPage = ({
         isActive: fForm.status !== ALL_STATUS_VALUE,
         icon: <ChevronDown size={12} />,
         onClick: () => setOpenQuickFilter((prev) => (prev === "status" ? null : "status")),
+        onClear: () => setFForm((prev) => ({ ...prev, status: ALL_STATUS_VALUE })),
       },
       {
         id: "priority",
@@ -1015,6 +1019,7 @@ const TasksListingPage = ({
         isActive: fForm.priority != null,
         icon: <ChevronDown size={12} />,
         onClick: () => setOpenQuickFilter((prev) => (prev === "priority" ? null : "priority")),
+        onClear: () => setFForm((prev) => ({ ...prev, priority: null })),
       },
       {
         id: "due_date",
@@ -1022,6 +1027,7 @@ const TasksListingPage = ({
         isActive: !!(fForm.due_date_from || fForm.due_date_to),
         icon: <ChevronDown size={12} />,
         onClick: () => setOpenQuickFilter((prev) => (prev === "due_date" ? null : "due_date")),
+        onClear: () => setFForm((prev) => ({ ...prev, due_date_from: "", due_date_to: "" })),
       },
       {
         id: "queue",
@@ -1295,6 +1301,20 @@ const TasksListingPage = ({
                     >
                       {pill.icon && <span className="me-1">{pill.icon}</span>}
                       <span>{pill.label}</span>
+                      {pill.isActive && pill.onClear && (
+                        <button
+                          type="button"
+                          className="gt-filter-pill-clear"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            pill.onClear?.();
+                          }}
+                          title="Clear filter"
+                        >
+                          <X size={12} aria-hidden />
+                        </button>
+                      )}
                     </button>
                     {pill.id === "project" && openQuickFilter === "project" && (
                       <div style={{
@@ -1342,14 +1362,32 @@ const TasksListingPage = ({
                                   width: "100%",
                                   textAlign: "left",
                                   border: "none",
-                                  background: option.value === fForm.project ? "#f3f4f6" : "transparent",
+                                  background: option.value === fForm.project ? "#eef4ff" : "transparent",
                                   borderRadius: 6,
                                   padding: "8px 10px",
                                   fontSize: 12,
                                   fontFamily: "Lexend Deca, Helvetica, Arial, sans-serif",
+                                  display: "flex",
+                                  alignItems: "center",
+                                  justifyContent: "space-between",
+                                  color: option.value === fForm.project ? "#0066CC" : "#141414",
+                                  fontWeight: option.value === fForm.project ? 500 : 400,
+                                  cursor: "pointer",
+                                  transition: "background 0.15s ease",
+                                }}
+                                onMouseEnter={e => {
+                                  if (option.value !== fForm.project)
+                                    e.currentTarget.style.background = "#f5f8fa";
+                                }}
+                                onMouseLeave={e => {
+                                  if (option.value !== fForm.project)
+                                    e.currentTarget.style.background = "transparent";
                                 }}
                               >
-                                {option.label}
+                                <span>{option.label}</span>
+                                {option.value === fForm.project && option.value !== "All Projects" && (
+                                  <span style={{ color: "#0066CC", fontSize: 14, flexShrink: 0 }}>✓</span>
+                                )}
                               </button>
                             ))}
                         </div>
@@ -1380,7 +1418,7 @@ const TasksListingPage = ({
                               border: "1px solid #cbd5e0",
                               borderRadius: 4,
                               padding: "6px 10px",
-                              fontSize: 12,
+                              fontSize: 13,
                               fontFamily: "Lexend Deca, Helvetica, Arial, sans-serif",
                               outline: "none",
                             }}
@@ -1395,15 +1433,20 @@ const TasksListingPage = ({
                             width: "100%",
                             textAlign: "left",
                             border: "none",
-                            background: fForm.assignee.length === 0 ? "#f3f4f6" : "transparent",
+                            background: fForm.assignee.length === 0 ? "#eef4ff" : "transparent",
                             borderRadius: 6,
                             padding: "8px 10px",
-                            fontSize: 12,
+                            fontSize: 13,
                             fontFamily: "Lexend Deca, Helvetica, Arial, sans-serif",
                             display: "flex",
                             alignItems: "center",
                             gap: 8,
+                            color: fForm.assignee.length === 0 ? "#0066CC" : "#141414",
+                            fontWeight: fForm.assignee.length === 0 ? 500 : 400,
+                            cursor: "pointer",
                           }}
+                          onMouseEnter={e => { if (fForm.assignee.length > 0) e.currentTarget.style.background = "#f5f8fa"; }}
+                          onMouseLeave={e => { if (fForm.assignee.length > 0) e.currentTarget.style.background = "transparent"; }}
                         >
                           All assignees
                         </button>
@@ -1434,7 +1477,7 @@ const TasksListingPage = ({
                                 background: selected ? "#eef4ff" : "transparent",
                                 borderRadius: 6,
                                 padding: "8px 10px",
-                                fontSize: 12,
+                                fontSize: 13,
                                 fontFamily: "Lexend Deca, Helvetica, Arial, sans-serif",
                                 display: "flex",
                                 alignItems: "center",
@@ -1442,7 +1485,10 @@ const TasksListingPage = ({
                                 gap: 8,
                                 color: selected ? "#0066CC" : "#141414",
                                 fontWeight: selected ? 500 : 400,
+                                cursor: "pointer",
                               }}
+                              onMouseEnter={e => { if (!selected) e.currentTarget.style.background = "#f5f8fa"; }}
+                              onMouseLeave={e => { if (!selected) e.currentTarget.style.background = "transparent"; }}
                             >
                               <span>{option.label}</span>
                               {selected && (
@@ -1478,12 +1524,17 @@ const TasksListingPage = ({
                             width: "100%",
                             textAlign: "left",
                             border: "none",
-                            background: fForm.task_type ? "transparent" : "#f3f4f6",
+                            background: fForm.task_type ? "transparent" : "#eef4ff",
                             borderRadius: 6,
                             padding: "8px 10px",
-                            fontSize: 12,
+                            fontSize: 13,
                             fontFamily: "Lexend Deca, Helvetica, Arial, sans-serif",
+                            color: !fForm.task_type ? "#0066CC" : "#141414",
+                            fontWeight: !fForm.task_type ? 500 : 400,
+                            cursor: "pointer",
                           }}
+                          onMouseEnter={e => { if (fForm.task_type) e.currentTarget.style.background = "#f5f8fa"; }}
+                          onMouseLeave={e => { if (fForm.task_type) e.currentTarget.style.background = "transparent"; }}
                         >
                           All task types
                         </button>
@@ -1501,14 +1552,23 @@ const TasksListingPage = ({
                                 width: "100%",
                                 textAlign: "left",
                                 border: "none",
-                                background: selected ? "#f3f4f6" : "transparent",
+                                background: selected ? "#eef4ff" : "transparent",
                                 borderRadius: 6,
                                 padding: "8px 10px",
-                                fontSize: 12,
+                                fontSize: 13,
                                 fontFamily: "Lexend Deca, Helvetica, Arial, sans-serif",
+                                color: selected ? "#0066CC" : "#141414",
+                                fontWeight: selected ? 500 : 400,
+                                cursor: "pointer",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "space-between",
                               }}
+                              onMouseEnter={e => { if (!selected) e.currentTarget.style.background = "#f5f8fa"; }}
+                              onMouseLeave={e => { if (!selected) e.currentTarget.style.background = "transparent"; }}
                             >
-                              {option.label}
+                              <span>{option.label}</span>
+                              {selected && <span style={{ color: "#0066CC", fontSize: 14 }}>✓</span>}
                             </button>
                           );
                         })}
@@ -1540,14 +1600,23 @@ const TasksListingPage = ({
                               width: "100%",
                               textAlign: "left",
                               border: "none",
-                              background: option.value === fForm.status ? "#f3f4f6" : "transparent",
+                              background: option.value === fForm.status ? "#eef4ff" : "transparent",
                               borderRadius: 6,
                               padding: "8px 10px",
-                              fontSize: 12,
+                              fontSize: 13,
                               fontFamily: "Lexend Deca, Helvetica, Arial, sans-serif",
+                              color: option.value === fForm.status ? "#0066CC" : "#141414",
+                              fontWeight: option.value === fForm.status ? 500 : 400,
+                              cursor: "pointer",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "space-between",
                             }}
+                            onMouseEnter={e => { if (option.value !== fForm.status) e.currentTarget.style.background = "#f5f8fa"; }}
+                            onMouseLeave={e => { if (option.value !== fForm.status) e.currentTarget.style.background = "transparent"; }}
                           >
-                            {option.label}
+                            <span>{option.label}</span>
+                            {option.value === fForm.status && <span style={{ color: "#0066CC", fontSize: 14 }}>✓</span>}
                           </button>
                         ))}
                       </div>
@@ -1576,12 +1645,17 @@ const TasksListingPage = ({
                             width: "100%",
                             textAlign: "left",
                             border: "none",
-                            background: fForm.priority ? "transparent" : "#f3f4f6",
+                            background: fForm.priority ? "transparent" : "#eef4ff",
                             borderRadius: 6,
                             padding: "8px 10px",
-                            fontSize: 12,
+                            fontSize: 13,
                             fontFamily: "Lexend Deca, Helvetica, Arial, sans-serif",
+                            color: !fForm.priority ? "#0066CC" : "#141414",
+                            fontWeight: !fForm.priority ? 500 : 400,
+                            cursor: "pointer",
                           }}
+                          onMouseEnter={e => { if (fForm.priority) e.currentTarget.style.background = "#f5f8fa"; }}
+                          onMouseLeave={e => { if (fForm.priority) e.currentTarget.style.background = "transparent"; }}
                         >
                           All priorities
                         </button>
@@ -1601,14 +1675,23 @@ const TasksListingPage = ({
                                 width: "100%",
                                 textAlign: "left",
                                 border: "none",
-                                background: selected ? "#f3f4f6" : "transparent",
+                                background: selected ? "#eef4ff" : "transparent",
                                 borderRadius: 6,
                                 padding: "8px 10px",
-                                fontSize: 12,
+                                fontSize: 13,
                                 fontFamily: "Lexend Deca, Helvetica, Arial, sans-serif",
+                                color: selected ? "#0066CC" : "#141414",
+                                fontWeight: selected ? 500 : 400,
+                                cursor: "pointer",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "space-between",
                               }}
+                              onMouseEnter={e => { if (!selected) e.currentTarget.style.background = "#f5f8fa"; }}
+                              onMouseLeave={e => { if (!selected) e.currentTarget.style.background = "transparent"; }}
                             >
-                              {option.label}
+                              <span>{option.label}</span>
+                              {selected && <span style={{ color: "#0066CC", fontSize: 14 }}>✓</span>}
                             </button>
                           );
                         })}
