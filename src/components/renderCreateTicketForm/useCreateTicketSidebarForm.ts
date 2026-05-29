@@ -201,8 +201,10 @@ export function useCreateTicketSidebarForm(options: {
   const handleCreateDateChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
       const selectedDate = e.target.value;
-      const safeDate =
-        selectedDate && selectedDate > todayDate ? todayDate : selectedDate;
+      let safeDate = selectedDate;
+      if (selectedDate && selectedDate < todayDate) {
+        safeDate = todayDate;
+      }
       setTicketForm((prev) => ({ ...prev, createDate: safeDate }));
     },
     [todayDate],
