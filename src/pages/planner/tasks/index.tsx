@@ -1126,7 +1126,7 @@ const TasksListingPage = ({
               return (
                 <>
             {/* Tabs with equal width */}
-            {allTabs.map(tab => (
+            {allTabs.map((tab, index) => (
               <button
                 key={tab.id}
                 onClick={() => switchTab(tab.id)}
@@ -1134,16 +1134,17 @@ const TasksListingPage = ({
                   flex: 1,
                   display: "inline-flex",
                   alignItems: "center",
-                  justifyContent: "flex-start",
+                  justifyContent: "center",
                   padding: "0 20px",
                   border: "none",
+                  borderLeft: index === 0 ? "1px solid #8A8A8A" : "none",
                   borderRight: "1px solid #8A8A8A",
                   borderTop: "1px solid #8A8A8A",
                   backgroundColor: activeTab === tab.id ? "#f5f8fa" : "#fff",
-                  borderBottom: activeTab === tab.id ? "none" : "1px solid #8A8A8A",
-                  color: "#141414",
+                  borderBottom: activeTab === tab.id ? "2px solid #0066CC" : "1px solid #8A8A8A",
+                  color: activeTab === tab.id ? "#0066CC" : "#141414",
                   fontSize: 13,
-                  fontWeight: activeTab === tab.id ? 500 : 400,
+                  fontWeight: activeTab === tab.id ? 600 : 400,
                   fontFamily: "Lexend Deca, Helvetica, Arial, sans-serif",
                   cursor: "pointer",
                   height: "100%",
