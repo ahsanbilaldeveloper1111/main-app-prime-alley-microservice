@@ -25,7 +25,7 @@ export function AiFaqDraftItemCards({
         {variant === "multi" && onAddItem ? (
           <Button variant="outline-primary" size="sm" type="button" onClick={onAddItem}>
             <Plus size={14} className="me-1" />
-            Add FAQ
+            Add another FAQ
           </Button>
         ) : null}
       </div>

@@ -3,6 +3,10 @@ import type {
   TenantChatSettingsUpdateRequest,
 } from "@utils/chat";
 
+import {
+  formatDecimalInputValue,
+  readDecimalStringValue,
+} from "./aiChatbotDecimalFormat";
 import { AI_CHATBOT_DEFAULT_RATE_LIMITS } from "./constants";
 import type {
   AIChatbotModelOption,
@@ -14,7 +18,7 @@ export type TenantChatPricingTable = Record<
   { input: string; output: string }
 >;
 
-type RateLimitKey = "user_per_minute";
+type RateLimitKey = "user_per_minute" | "user_per_day";
 
 function asRecord(value: unknown): Record<string, unknown> | null {
   if (value && typeof value === "object" && !Array.isArray(value)) {
@@ -69,6 +73,23 @@ function readStringValue(raw: unknown): string {
   if (typeof raw === "string" && raw.trim()) return raw.trim();
   if (typeof raw === "number" && Number.isFinite(raw)) return String(raw);
   return "";
+}
+
+/** Effective per-user caps from tenant chat settings (for assistant UI fallback). */
+export function getEffectiveUserRateLimitsFromSettings(
+  data: TenantChatSettingsResponse | null | undefined,
+): { perMinuteLimit: number; perDayLimit: number } {
+  const root = asRecord(normalizeTenantChatSettingsPayload(data));
+  if (!root) {
+    return {
+      perMinuteLimit: AI_CHATBOT_DEFAULT_RATE_LIMITS.user_per_minute,
+      perDayLimit: AI_CHATBOT_DEFAULT_RATE_LIMITS.user_per_day,
+    };
+  }
+  return {
+    perMinuteLimit: readEffectiveLimit(root, "user_per_minute"),
+    perDayLimit: readEffectiveLimit(root, "user_per_day"),
+  };
 }
 
 function readEffectiveLimit(
@@ -141,8 +162,8 @@ export function mapTenantChatSettingsPricingTable(
   for (const [model, row] of Object.entries(table)) {
     const pricing = asRecord(row);
     if (!pricing) continue;
-    const input = readStringValue(pricing.input);
-    const output = readStringValue(pricing.output);
+    const input = readDecimalStringValue(pricing.input);
+    const output = readDecimalStringValue(pricing.output);
     if (!input && !output) continue;
     result[model] = { input, output };
   }
@@ -215,6 +236,12 @@ export function mapTenantChatSettingsToFormValues(
 
 function toPayloadString(raw: string): string {
   return raw.trim();
+}
+
+function toPayloadDecimalString(raw: string): string {
+  const trimmed = raw.trim();
+  if (!trimmed) return "";
+  return formatDecimalInputValue(trimmed);
 }
 
 function validateOptionalNonNegativeInt(raw: string, label: string): void {

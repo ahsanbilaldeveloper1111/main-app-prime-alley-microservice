@@ -1,5 +1,4 @@
 import { useChatCompaniesQuery } from "@page-modules/chat/useChatCompaniesQuery";
-import { useChatSessionAdmin } from "@page-modules/chat/shared/useChatSessionAdmin";
 import { useSession } from "next-auth/react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "react-toastify";
@@ -15,7 +14,6 @@ import { useUpdateChatTenantSettingsMutation } from "./useUpdateChatTenantSettin
 
 export function useAIChatbotSettingsPage() {
   const { data: session, status: sessionStatus } = useSession();
-  const isAdmin = useChatSessionAdmin();
   const sessionTenantId = useMemo(
     () => resolveChatTenantIdFromSession(session?.user),
     [session?.user],
@@ -30,7 +28,7 @@ export function useAIChatbotSettingsPage() {
   }, [session?.user]);
 
   const companiesQuery = useChatCompaniesQuery(
-    sessionStatus === "authenticated" && isAdmin,
+    sessionStatus === "authenticated",
   );
   const companies = companiesQuery.data ?? [];
   const companiesLoading = companiesQuery.isPending;
@@ -40,14 +38,9 @@ export function useAIChatbotSettingsPage() {
 
   useEffect(() => {
     if (!sessionTenantId) return;
-    if (isAdmin) {
-      setSelectedCompanyId((prev) => prev || sessionTenantId);
-      setAppliedTenantId((prev) => prev || sessionTenantId);
-      return;
-    }
-    setSelectedCompanyId(sessionTenantId);
-    setAppliedTenantId(sessionTenantId);
-  }, [sessionTenantId, isAdmin]);
+    setSelectedCompanyId((prev) => prev || sessionTenantId);
+    setAppliedTenantId((prev) => prev || sessionTenantId);
+  }, [sessionTenantId]);
 
   const settingsQuery = useChatTenantSettingsQuery(appliedTenantId);
   const saveMutation = useUpdateChatTenantSettingsMutation(appliedTenantId);
@@ -70,32 +63,25 @@ export function useAIChatbotSettingsPage() {
     return match?.name ?? appliedTenantId;
   }, [appliedTenantId, companies]);
 
-  const viewingCompanyLabel = isAdmin
-    ? appliedCompanyLabel
-    : sessionCompanyLabel || appliedTenantId;
+  const viewingCompanyLabel =
+    appliedCompanyLabel || sessionCompanyLabel || appliedTenantId;
 
-  const handleCompanySelect = useCallback(
-    (companyId: string) => {
-      if (!isAdmin) return;
-      const id = companyId.trim();
-      setSelectedCompanyId(id);
-      setAppliedTenantId(id);
-    },
-    [isAdmin],
-  );
+  const handleCompanySelect = useCallback((companyId: string) => {
+    const id = companyId.trim();
+    setSelectedCompanyId(id);
+    setAppliedTenantId(id);
+  }, []);
 
   const handleApplyFilter = useCallback(() => {
-    if (!isAdmin) return;
     if (!selectedCompanyId.trim()) {
       toast.info("Please select a company first");
       return;
     }
     setAppliedTenantId(selectedCompanyId.trim());
-  }, [isAdmin, selectedCompanyId]);
+  }, [selectedCompanyId]);
 
   return {
-    isAdmin,
-    showCompanyFilter: isAdmin,
+    showCompanyFilter: true,
     companiesLoading,
     companyOptions,
     selectedCompanyOption,
