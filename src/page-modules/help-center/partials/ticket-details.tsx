@@ -213,7 +213,7 @@ const TicketDetail: React.FC<TicketDetailProps> = ({ ticketId, onBack }) => {
     }
   }, [replyText, replyAttachment, ticketData, fetchComments]);
 
-  const getPriorityStyle = (priority: string | number | unknown) => {
+  const getPriorityStyle = (priority: string | number) => {
     const raw = typeof priority === 'string' ? Number.parseInt(priority, 10) : Number(priority ?? 0);
     const p = Number.isNaN(raw) ? 0 : raw;
     switch (p) {

@@ -315,13 +315,13 @@ function resolveTicketGridName(record: Record<string, unknown>): string {
 function buildCrmSummaryField(
   crmSummary: Record<string, unknown> | null,
 ): CrmTicketSummary | undefined {
-  if (crmSummary != null && crmSummary.id != null) {
-    return {
-      id: Number(crmSummary.id),
-      summary: readTrimmedString(crmSummary.summary),
-    };
+  if (crmSummary?.id == null) {
+    return undefined;
   }
-  return undefined;
+  return {
+    id: Number(crmSummary.id),
+    summary: readTrimmedString(crmSummary.summary),
+  };
 }
 
 export function buildCrmTicketsListApiFilters(
