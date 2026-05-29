@@ -1446,8 +1446,8 @@ const GenericTable = <T extends Record<string, any>>({
 
   const compareSortValues = useCallback(
     (aVal: unknown, bVal: unknown): number => {
-      const aText = String(aVal ?? "").trim();
-      const bText = String(bVal ?? "").trim();
+      const aText = safeStringifyValue(aVal).trim();
+      const bText = safeStringifyValue(bVal).trim();
 
       if (sortColumnDef?.type === "date") {
         const aTime = Date.parse(aText);

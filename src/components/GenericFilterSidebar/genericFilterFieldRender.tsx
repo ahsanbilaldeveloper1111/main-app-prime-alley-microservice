@@ -7,8 +7,27 @@ import {
 } from "@utils/crmReactSelectMenuPortalProps";
 import type { FilterField } from "./filterFieldTypes";
 
-export function renderGenericFilterField(
-  filter: Readonly<FilterField>,
+function resolveSelectOptionBackgroundColor(state: {
+  isSelected: boolean;
+  isFocused: boolean;
+}): string {
+  if (state.isSelected) {
+    return "#4f46e5";
+  }
+  if (state.isFocused) {
+    return "#f3f4f6";
+  }
+  return "white";
+}
+
+function resolveSelectOptionTextColor(state: { isSelected: boolean }): string {
+  if (state.isSelected) {
+    return "white";
+  }
+  return "#111827";
+}
+
+export function renderGenericFilterField(  filter: Readonly<FilterField>,
 ): React.ReactNode {
   const baseStyles: React.CSSProperties = {
     fontSize: "14px",
@@ -40,12 +59,8 @@ export function renderGenericFilterField(
     option: (base: Record<string, unknown>, state: { isSelected: boolean; isFocused: boolean }) => ({
       ...base,
       fontSize: "14px",
-      backgroundColor: state.isSelected
-        ? "#4f46e5"
-        : state.isFocused
-          ? "#f3f4f6"
-          : "white",
-      color: state.isSelected ? "white" : "#111827",
+      backgroundColor: resolveSelectOptionBackgroundColor(state),
+      color: resolveSelectOptionTextColor(state),
       cursor: "pointer",
     }),
     multiValue: (base: Record<string, unknown>) => ({

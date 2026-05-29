@@ -1,3 +1,11 @@
+import {
+  coerceDisplayText,
+  coercePicklistId,
+  normalizeUnknownToArray,
+  readNestedEntityName,
+  readTrimmedString,
+} from "@components/crm/tickets/crmTicketCoercion";
+import { resolveTicketExtensionLabel } from "@components/crm/tickets/crmTicketExtensionLabel";
 import { formatDateForTable } from "@utils/Helper";
 import axiosInstance from "@utils/axios";
 import { toast } from "react-toastify";
@@ -18,6 +26,36 @@ export const DEFAULT_CRM_TICKET_FILTERS: CrmTicketAppliedFilters = {
   createDateTo: "",
   priority: "All Priorities",
 };
+
+function isCrmTicketPriorityFilter(
+  value: unknown,
+): value is CrmTicketPriority | "All Priorities" {
+  return (
+    value === "All Priorities" ||
+    value === "Low" ||
+    value === "Medium" ||
+    value === "High"
+  );
+}
+
+export function toCrmTicketAppliedFilters(
+  source: Record<string, unknown>,
+  fallback: CrmTicketAppliedFilters = DEFAULT_CRM_TICKET_FILTERS,
+): CrmTicketAppliedFilters {
+  return {
+    ticketOwner:
+      typeof source.ticketOwner === "string" ? source.ticketOwner : fallback.ticketOwner,
+    createDateFrom:
+      typeof source.createDateFrom === "string"
+        ? source.createDateFrom
+        : fallback.createDateFrom,
+    createDateTo:
+      typeof source.createDateTo === "string" ? source.createDateTo : fallback.createDateTo,
+    priority: isCrmTicketPriorityFilter(source.priority)
+      ? source.priority
+      : fallback.priority,
+  };
+}
 
 export type CrmTicketSummary = {
   id: number;
@@ -150,7 +188,7 @@ export function normalizeTicketsListResponse(response: unknown): {
 }
 
 function mapTicketStatus(statusName: unknown): CrmTicketStatus {
-  const normalized = String(statusName ?? "").toLowerCase();
+  const normalized = coerceDisplayText(statusName).toLowerCase();
   if (normalized.includes("resolved") || normalized.includes("closed")) {
     return "Resolved";
   }
@@ -176,10 +214,8 @@ function mapTicketPriority(priority: unknown): CrmTicketPriority {
 }
 
 function toOptionalString(value: unknown): string | undefined {
-  if (value == null) {
-    return undefined;
-  }
-  return String(value);
+  const text = coerceDisplayText(value);
+  return text || undefined;
 }
 
 function toFormatDateInput(value: unknown): string | Date | null | undefined {
@@ -190,13 +226,7 @@ function toFormatDateInput(value: unknown): string | Date | null | undefined {
 }
 
 function readUserExtensionIds(raw: unknown): unknown[] {
-  if (Array.isArray(raw)) {
-    return raw;
-  }
-  if (raw == null || raw === "") {
-    return [];
-  }
-  return [raw];
+  return normalizeUnknownToArray(raw);
 }
 
 function resolveTicketOwnerLabel(
@@ -209,10 +239,14 @@ function resolveTicketOwnerLabel(
   }
 
   const labels = ids.map((id) => {
+    const idText = coercePicklistId(id);
     const match = extensions.find(
-      (extension) => String(extension.id) === String(id),
+      (extension) => coercePicklistId(extension.id) === idText,
     );
-    return match?.display_name || match?.name || String(id);
+    if (match) {
+      return resolveTicketExtensionLabel(match);
+    }
+    return idText;
   });
 
   return labels.join(", ");
@@ -250,8 +284,44 @@ type TicketStatusRecord = {
 };
 
 function isResolvedOrClosedStatusName(name: unknown): boolean {
-  const normalized = String(name ?? "").toLowerCase();
+  const normalized = coerceDisplayText(name).toLowerCase();
   return normalized.includes("resolved") || normalized.includes("closed");
+}
+
+function resolveTicketGridSource(
+  record: Record<string, unknown>,
+  type: Record<string, unknown> | null,
+): string {
+  const category = readTrimmedString(record.ticket_category);
+  if (category) {
+    return category;
+  }
+  const typeName = readNestedEntityName(type);
+  if (typeName) {
+    return typeName;
+  }
+  const source = readTrimmedString(record.source);
+  return source || "—";
+}
+
+function resolveTicketGridName(record: Record<string, unknown>): string {
+  return (
+    readTrimmedString(record.title) ||
+    readTrimmedString(record.ticket_name) ||
+    "Untitled ticket"
+  );
+}
+
+function buildCrmSummaryField(
+  crmSummary: Record<string, unknown> | null,
+): CrmTicketSummary | undefined {
+  if (crmSummary != null && crmSummary.id != null) {
+    return {
+      id: Number(crmSummary.id),
+      summary: readTrimmedString(crmSummary.summary),
+    };
+  }
+  return undefined;
 }
 
 export function buildCrmTicketsListApiFilters(
@@ -289,8 +359,9 @@ export function buildCrmTicketsListApiFilters(
         extension.display_name === appliedFilters.ticketOwner ||
         extension.name === appliedFilters.ticketOwner,
     );
-    if (ownerExtension?.id != null) {
-      filters.extensions = [String(ownerExtension.id)];
+    const ownerExtensionId = coercePicklistId(ownerExtension?.id);
+    if (ownerExtensionId) {
+      filters.extensions = [ownerExtensionId];
       filters.is_filtered = true;
     }
   }
@@ -302,7 +373,7 @@ export function buildCrmTicketsListApiFilters(
     const statuses = options?.statuses ?? [];
     const openStatusIds = statuses
       .filter((status) => !isResolvedOrClosedStatusName(status.name))
-      .map((status) => String(status.id ?? ""))
+      .map((status) => coercePicklistId(status.id))
       .filter((id) => id.length > 0);
     if (openStatusIds.length > 0) {
       filters.status_id = openStatusIds;
@@ -333,27 +404,19 @@ export function mapApiTicketToCrmGridRow(
 
   return {
     id: Number(record.id),
-    ticket_name: String(record.title ?? record.ticket_name ?? "Untitled ticket"),
-    pipeline: String(module?.name ?? "—"),
+    ticket_name: resolveTicketGridName(record),
+    pipeline: readNestedEntityName(module) || "—",
     ticket_status: mapTicketStatus(status?.name),
     create_date: createDate,
     priority: mapTicketPriority(record.priority),
     ticket_owner: resolveTicketOwnerLabel(record, extensions),
-    source: String(
-      record.ticket_category ?? type?.name ?? record.source ?? "—",
-    ),
+    source: resolveTicketGridSource(record, type),
     last_activity_date: lastActivityDate,
     email: toOptionalString(record.email),
     phone: toOptionalString(record.phone),
     created_at: toOptionalString(record.created_at),
     updated_at: toOptionalString(record.updated_at),
-    crm_summary:
-      crmSummary?.id != null
-        ? {
-            id: Number(crmSummary.id),
-            summary: String(crmSummary.summary ?? ""),
-          }
-        : undefined,
+    crm_summary: buildCrmSummaryField(crmSummary),
     rawData: ticket,
   };
 }
@@ -421,7 +484,7 @@ export function mapDashboardToCrmStats(dashboard: unknown): {
   let open = 0;
   for (const entry of byStatus) {
     const row = readRecord(entry);
-    const name = String(row?.name ?? "");
+    const name = coerceDisplayText(row?.name);
     const count = readPositiveNumber(row?.count ?? row?.total) ?? 0;
     if (isResolvedOrClosedStatusName(name)) {
       continue;

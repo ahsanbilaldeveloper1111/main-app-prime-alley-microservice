@@ -40,6 +40,7 @@ import {
   buildCrmTicketsListApiFilters,
   buildCrmTicketsListRequest,
   DEFAULT_CRM_TICKET_FILTERS,
+  toCrmTicketAppliedFilters,
   getTicketActivityCount,
   getTicketCommentsCount,
   getTicketCrmSummary,
@@ -239,14 +240,14 @@ const CrmTicketsPage = () => {
 
   const setStagedTicketFilters = useCallback(
     (filters: Record<string, unknown>) => {
-      setCurrentFilters(filters as TicketFilters);
+      setCurrentFilters(toCrmTicketAppliedFilters(filters));
     },
     [],
   );
 
   const applyCommittedFiltersStaged = useCallback(
     (filters: Record<string, unknown>) => {
-      applyCommittedFilters(filters as TicketFilters);
+      applyCommittedFilters(toCrmTicketAppliedFilters(filters));
     },
     [applyCommittedFilters],
   );

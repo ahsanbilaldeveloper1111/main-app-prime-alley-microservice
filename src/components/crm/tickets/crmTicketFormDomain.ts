@@ -1,3 +1,13 @@
+import {
+  coerceDisplayText,
+  coerceOptionalPicklistId,
+  coercePicklistId,
+  normalizeUnknownToArray,
+  readNestedEntityName,
+  readTrimmedString,
+} from "@components/crm/tickets/crmTicketCoercion";
+import { resolveTicketExtensionLabel } from "@components/crm/tickets/crmTicketExtensionLabel";
+
 export type TicketPicklistOption = {
   id: string;
   label: string;
@@ -32,7 +42,11 @@ export function mapApiRecordsToPicklistOptions(
 
   for (const record of records) {
     const row = readRecord(record);
-    if (row?.id == null) {
+    if (!row) {
+      continue;
+    }
+    const id = coercePicklistId(row.id);
+    if (!id) {
       continue;
     }
 
@@ -45,13 +59,13 @@ export function mapApiRecordsToPicklistOptions(
       }
     }
     if (!label) {
-      label = String(row.id);
+      label = id;
     }
 
     options.push({
-      id: String(row.id),
+      id,
       label,
-      moduleId: row.module_id != null ? String(row.module_id) : undefined,
+      moduleId: coerceOptionalPicklistId(row.module_id),
     });
   }
 
@@ -64,14 +78,15 @@ export function mapExtensionsToOwnerOptions(
   return extensions
     .map((extension) => {
       const row = readRecord(extension);
-      if (row?.id == null) {
+      if (!row) {
         return null;
       }
-      const label =
-        (typeof row.display_name === "string" && row.display_name) ||
-        (typeof row.name === "string" && row.name) ||
-        String(row.id);
-      return { id: String(row.id), label };
+      const id = coercePicklistId(row.id);
+      if (!id) {
+        return null;
+      }
+      const label = resolveTicketExtensionLabel(row);
+      return { id, label };
     })
     .filter((option): option is TicketPicklistOption => option != null);
 }
@@ -87,12 +102,11 @@ export function findPicklistOptionLabel(
   options: TicketPicklistOption[],
   id: unknown,
 ): string {
-  if (id == null || id === "") {
+  const idText = coercePicklistId(id);
+  if (!idText) {
     return "";
   }
-  return (
-    options.find((option) => option.id === String(id))?.label ?? String(id)
-  );
+  return options.find((option) => option.id === idText)?.label ?? idText;
 }
 
 export function filterSubmodulesForModule(
@@ -161,11 +175,7 @@ export function buildTicketFormData(params: {
 }
 
 function readFirstUserExtensionId(raw: unknown): unknown {
-  const values = Array.isArray(raw)
-    ? raw
-    : raw != null && raw !== ""
-      ? [raw]
-      : [];
+  const values = normalizeUnknownToArray(raw);
   const first = values[0];
   if (first != null && typeof first === "object") {
     return readRecord(first)?.id ?? first;
@@ -177,7 +187,7 @@ function toDateInputValue(value: unknown): string {
   if (value == null || value === "") {
     return "";
   }
-  const text = String(value).trim();
+  const text = coerceDisplayText(value).trim();
   const datePart = text.split("T")[0].split(" ")[0];
   if (/^\d{4}-\d{2}-\d{2}$/.test(datePart)) {
     return datePart;
@@ -187,6 +197,20 @@ function toDateInputValue(value: unknown): string {
     return "";
   }
   return new Date(parsed).toISOString().slice(0, 10);
+}
+
+function resolveTicketSource(
+  tags: unknown[],
+  record: Record<string, unknown>,
+): string {
+  if (tags.length > 0) {
+    return coerceDisplayText(tags[0]);
+  }
+  const category = coerceDisplayText(record.ticket_category);
+  if (category) {
+    return category;
+  }
+  return coerceDisplayText(record.source);
 }
 
 export function mapApiTicketToFormValues(
@@ -212,33 +236,24 @@ export function mapApiTicketToFormValues(
     PRIORITY_API_TO_LABEL[priorityNum] ??
     (priorityNum >= 2 ? "High" : "Low");
 
-  const tags = Array.isArray(record.tags)
-    ? record.tags
-    : record.tags != null && record.tags !== ""
-      ? [record.tags]
-      : [];
-  const source =
-    tags.length > 0
-      ? String(tags[0])
-      : String(record.ticket_category ?? record.source ?? "");
+  const tags = normalizeUnknownToArray(record.tags);
+  const source = resolveTicketSource(tags, record);
 
   return {
-    ticketName: String(record.title ?? ""),
-    pipeline: String(
-      module?.name ?? findPicklistOptionLabel(picklists.modules, record.module_id),
-    ),
-    submodule: String(
-      submodule?.name ??
-        findPicklistOptionLabel(picklists.submodules, record.submodule_id),
-    ),
-    ticketType: String(
-      type?.name ?? findPicklistOptionLabel(picklists.types, record.ticket_type_id),
-    ),
-    ticketStatus: String(
-      status?.name ??
-        findPicklistOptionLabel(picklists.statuses, record.ticket_status_id),
-    ),
-    ticketDescription: String(record.description ?? ""),
+    ticketName: readTrimmedString(record.title),
+    pipeline:
+      readNestedEntityName(module) ||
+      findPicklistOptionLabel(picklists.modules, record.module_id),
+    submodule:
+      readNestedEntityName(submodule) ||
+      findPicklistOptionLabel(picklists.submodules, record.submodule_id),
+    ticketType:
+      readNestedEntityName(type) ||
+      findPicklistOptionLabel(picklists.types, record.ticket_type_id),
+    ticketStatus:
+      readNestedEntityName(status) ||
+      findPicklistOptionLabel(picklists.statuses, record.ticket_status_id),
+    ticketDescription: readTrimmedString(record.description),
     source,
     ticketOwner: findPicklistOptionLabel(picklists.owners, ownerId),
     priority,

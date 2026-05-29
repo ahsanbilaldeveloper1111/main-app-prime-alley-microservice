@@ -375,7 +375,10 @@ export function normalizeViewTicketPayload(
     return nested;
   }
 
-  return record.id != null ? record : null;
+  if (record.id == null) {
+    return null;
+  }
+  return record;
 }
 
 export const GetTicket = async (id: string) => {

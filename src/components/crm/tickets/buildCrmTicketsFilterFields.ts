@@ -1,12 +1,10 @@
 import type { FilterField } from "@components/GenericFilterSidebar";
 import { toDateTimeLocalInputValue } from "@utils/communications/communicationsDateExtensionFilters";
 import type { CrmTicketAppliedFilters } from "@components/crm/tickets/crmTicketsListDomain";
-
-type TicketHierarchyExtension = {
-  id?: unknown;
-  display_name?: string;
-  name?: string;
-};
+import {
+  resolveTicketExtensionLabel,
+  type TicketHierarchyExtensionLike,
+} from "@components/crm/tickets/crmTicketExtensionLabel";
 
 type FiltersUpdater =
   | CrmTicketAppliedFilters
@@ -15,7 +13,7 @@ type FiltersUpdater =
 export function buildCrmTicketsFilterFields(
   currentFilters: CrmTicketAppliedFilters,
   onFiltersChange: (update: FiltersUpdater) => void,
-  extensions: TicketHierarchyExtension[],
+  extensions: TicketHierarchyExtensionLike[],
 ): FilterField[] {
   return [
     {
@@ -31,10 +29,7 @@ export function buildCrmTicketsFilterFields(
       options: [
         { value: "All Owners", label: "All Owners" },
         ...extensions.map((extension) => {
-          const label =
-            extension.display_name ||
-            extension.name ||
-            String(extension.id ?? "");
+          const label = resolveTicketExtensionLabel(extension);
           return { value: label, label };
         }),
       ],

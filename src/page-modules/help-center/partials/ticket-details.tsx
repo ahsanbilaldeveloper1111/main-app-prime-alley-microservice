@@ -32,22 +32,8 @@ const RELATED_ARTICLES: Array<{ title: string; icon: LucideIcon; color: string }
   { title: 'Resetting Your 2FA Device', icon: RotateCcw, color: '#1de9b6' }
 ];
 
-interface TicketData {
-  id: number | string;
-  title?: string;
-  description?: string;
-  status?: { name?: string } | string;
-  priority?: number | string;
-  user_extension?: string | string[];
-  due_date?: string;
-  created_at?: string;
-  assignee?: { name?: string };
-}
-
-interface GetTicketResponse {
-  success?: boolean;
-  data?: TicketData;
-}
+/** Normalized view-ticket record from `GetTicket` / `normalizeViewTicketPayload`. */
+type ViewTicketRecord = Record<string, unknown>;
 
 type ChatMessage = {
   id: string;
@@ -112,7 +98,15 @@ function mapCommentToMerged(
   };
 }
 
-function getTicketStatusLabel(status: TicketData['status']): string {
+function readTicketUserExtension(ticket: ViewTicketRecord): string {
+  const raw = ticket.user_extension;
+  if (Array.isArray(raw)) {
+    return asTrimmedString(raw[0], '');
+  }
+  return asTrimmedString(raw, '');
+}
+
+function getTicketStatusLabel(status: unknown): string {
   if (status == null) {
     return 'Open';
   }
@@ -134,7 +128,7 @@ interface TicketDetailProps {
 
 const TicketDetail: React.FC<TicketDetailProps> = ({ ticketId, onBack }) => {
   const { data: session } = useSession();
-  const [ticketData, setTicketData] = useState<TicketData | null>(null);
+  const [ticketData, setTicketData] = useState<ViewTicketRecord | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [replyText, setReplyText] = useState('');
@@ -176,7 +170,7 @@ const TicketDetail: React.FC<TicketDetailProps> = ({ ticketId, onBack }) => {
     try {
       const ticket = await GetTicket(ticketId);
       if (ticket) {
-        setTicketData(ticket as unknown as TicketData);
+        setTicketData(ticket);
         fetchComments(ticketId);
       } else {
         setError('Failed to load ticket');
@@ -199,9 +193,7 @@ const TicketDetail: React.FC<TicketDetailProps> = ({ ticketId, onBack }) => {
 
   const handleSendReply = useCallback(async () => {
     if (!replyText.trim() || !ticketData) return;
-    const userExtension = Array.isArray(ticketData.user_extension)
-      ? ticketData.user_extension[0] ?? ''
-      : ticketData.user_extension ?? '';
+    const userExtension = readTicketUserExtension(ticketData);
     setSendingReply(true);
     try {
       const ok = await AddComment(
@@ -221,7 +213,7 @@ const TicketDetail: React.FC<TicketDetailProps> = ({ ticketId, onBack }) => {
     }
   }, [replyText, replyAttachment, ticketData, fetchComments]);
 
-  const getPriorityStyle = (priority: string | number) => {
+  const getPriorityStyle = (priority: string | number | unknown) => {
     const raw = typeof priority === 'string' ? Number.parseInt(priority, 10) : Number(priority ?? 0);
     const p = Number.isNaN(raw) ? 0 : raw;
     switch (p) {
@@ -243,7 +235,10 @@ const TicketDetail: React.FC<TicketDetailProps> = ({ ticketId, onBack }) => {
   };
 
   const statusName = getTicketStatusLabel(ticketData?.status);
-  const priorityNum = ticketData?.priority ?? 0;
+  const priorityNum =
+    typeof ticketData?.priority === 'string' || typeof ticketData?.priority === 'number'
+      ? ticketData.priority
+      : 0;
   const priorityLabel = PRIORITY_LABELS[Number(priorityNum)] ?? 'Low';
   const priorityStyle = getPriorityStyle(priorityNum);
   const statusStyle = getStatusStyle(statusName);
@@ -303,7 +298,7 @@ const TicketDetail: React.FC<TicketDetailProps> = ({ ticketId, onBack }) => {
         </Button>
         <span style={{ color: '#6c757d', margin: '0 8px' }} aria-hidden>›</span>
         <span style={{ color: '#2c3e50', fontWeight: '600', fontSize: '14px' }}>
-          Ticket #{ticketData.id}
+          Ticket #{asTrimmedString(ticketData.id, '—')}
         </span>
       </div>
 
@@ -326,7 +321,7 @@ const TicketDetail: React.FC<TicketDetailProps> = ({ ticketId, onBack }) => {
                 fontWeight: '600',
                 color: '#4680ff'
               }}>
-                Ticket No: #{ticketData.id}
+                Ticket No: #{asTrimmedString(ticketData.id, '—')}
               </div>
               <div style={{
                 padding: '12px 20px',
@@ -384,7 +379,7 @@ const TicketDetail: React.FC<TicketDetailProps> = ({ ticketId, onBack }) => {
                     alignItems: 'center',
                     gap: '12px'
                   }}>
-                    {ticketData.title}
+                    {asTrimmedString(ticketData.title, '')}
                   </h3>
 
                   <div style={{
@@ -426,11 +421,11 @@ const TicketDetail: React.FC<TicketDetailProps> = ({ ticketId, onBack }) => {
                 background: '#f8f9fa',
                 borderRadius: '8px'
               }}>
-                {ticketData.due_date && (
+                {asTrimmedString(ticketData.due_date, '') && (
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                       <Clock size={14} color="#6c757d" aria-hidden focusable={false} />
                       <span style={{ fontSize: '13px', color: '#495057', fontWeight: '500' }}>
-                        Due {moment(ticketData.due_date).format('MMM D, YYYY')}
+                        Due {moment(asTrimmedString(ticketData.due_date, '')).format('MMM D, YYYY')}
                       </span>
                     </div>
                   )}
@@ -444,13 +439,15 @@ const TicketDetail: React.FC<TicketDetailProps> = ({ ticketId, onBack }) => {
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                     <span style={{ fontSize: '13px', color: '#6c757d' }}>Created</span>
                     <span style={{ fontSize: '13px', color: '#495057', fontWeight: '500' }}>
-                      {ticketData.created_at ? moment(ticketData.created_at).format('MMM D, YYYY') : '—'}
+                      {asTrimmedString(ticketData.created_at, '')
+                        ? moment(asTrimmedString(ticketData.created_at, '')).format('MMM D, YYYY')
+                        : '—'}
                     </span>
                   </div>
               </div>
 
               {/* Description (initial message) */}
-              {ticketData.description && (
+              {asTrimmedString(ticketData.description, '') && (
                 <div style={{ marginBottom: '24px', paddingBottom: '24px', borderBottom: '1px solid #f0f0f0' }}>
                   <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
                     <img
@@ -464,11 +461,13 @@ const TicketDetail: React.FC<TicketDetailProps> = ({ ticketId, onBack }) => {
                           {session?.user?.name ?? 'You'}
                         </span>
                         <span style={{ fontSize: '13px', color: '#6c757d' }}>
-                          {ticketData.created_at ? moment(ticketData.created_at).fromNow() : ''}
+                          {asTrimmedString(ticketData.created_at, '')
+                            ? moment(asTrimmedString(ticketData.created_at, '')).fromNow()
+                            : ''}
                         </span>
                       </div>
                       <p style={{ fontSize: '14px', color: '#495057', lineHeight: '1.6', margin: 0 }}>
-                        {ticketData.description}
+                        {asTrimmedString(ticketData.description, '')}
                       </p>
                     </div>
                   </div>

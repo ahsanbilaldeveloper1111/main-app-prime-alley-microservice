@@ -1,19 +1,35 @@
 import { useCallback, useMemo, type CSSProperties } from "react";
 import type { FilterPill } from "@components/GenericTable";
-import type {
-  CrmTicketAppliedFilters,
-  CrmTicketPriority,
+import {
+  resolveTicketExtensionLabel,
+  type TicketHierarchyExtensionLike,
+} from "@components/crm/tickets/crmTicketExtensionLabel";
+import {
+  toCrmTicketAppliedFilters,
+  type CrmTicketAppliedFilters,
+  type CrmTicketPriority,
 } from "@components/crm/tickets/crmTicketsListDomain";
 import { buildDateTimeFilterPill } from "@utils/communicationsFilterPills";
 import { createDateTimeDropdownContent } from "@utils/communicationsFilterDropdowns";
 import { formatFilterDateTimeLabel } from "@utils/communicationsDateUtils";
 
-type TicketHierarchyExtension = {
-  id?: unknown;
-  display_name?: string;
-  name?: string;
-  extension?: string;
-};
+type FiltersUpdater =
+  | CrmTicketAppliedFilters
+  | ((prev: CrmTicketAppliedFilters) => CrmTicketAppliedFilters);
+
+type TicketFiltersRecord = Record<string, unknown>;
+
+type FilterDropdownOption = NonNullable<FilterPill["dropdownOptions"]>[number];
+
+const CRM_TICKET_PRIORITY_OPTIONS: ReadonlyArray<{
+  label: string;
+  value: CrmTicketPriority | "All Priorities";
+}> = [
+  { label: "All Priorities", value: "All Priorities" },
+  { label: "Low", value: "Low" },
+  { label: "Medium", value: "Medium" },
+  { label: "High", value: "High" },
+];
 
 function truncateFilterLabel(label: string, maxLength = 28): string {
   const trimmed = label.trim();
@@ -37,25 +53,182 @@ const CRM_TICKETS_OWNER_DROPDOWN_MENU_STYLE: CSSProperties = {
   maxWidth: "min(360px, calc(100vw - 24px))",
 };
 
-function resolveExtensionLabel(
-  extension: TicketHierarchyExtension,
-): string {
-  return (
-    extension.display_name ||
-    extension.name ||
-    extension.extension ||
-    String(extension.id ?? "")
+function applyTicketOwner(
+  onFiltersChange: (update: FiltersUpdater) => void,
+  ticketOwner: string,
+): void {
+  onFiltersChange((prev) => ({ ...prev, ticketOwner }));
+}
+
+function applyTicketPriority(
+  onFiltersChange: (update: FiltersUpdater) => void,
+  priority: CrmTicketPriority | "All Priorities",
+): void {
+  onFiltersChange((prev) => ({ ...prev, priority }));
+}
+
+function createTicketFiltersRecord(
+  filters: CrmTicketAppliedFilters,
+): TicketFiltersRecord {
+  return { ...filters };
+}
+
+function mapExtensionToOwnerOption(
+  extension: TicketHierarchyExtensionLike,
+  selectedOwner: string,
+  onFiltersChange: (update: FiltersUpdater) => void,
+): FilterDropdownOption {
+  const label = resolveTicketExtensionLabel(extension);
+  return {
+    label,
+    value: label,
+    selected: selectedOwner === label,
+    onClick: () => applyTicketOwner(onFiltersChange, label),
+  };
+}
+
+function buildOwnerDropdownOptions(
+  currentFilters: CrmTicketAppliedFilters,
+  extensions: TicketHierarchyExtensionLike[],
+  onFiltersChange: (update: FiltersUpdater) => void,
+): FilterDropdownOption[] {
+  const allOwnersOption: FilterDropdownOption = {
+    label: "All Owners",
+    value: "all",
+    selected: currentFilters.ticketOwner === "All Owners",
+    onClick: () => applyTicketOwner(onFiltersChange, "All Owners"),
+  };
+
+  return [
+    allOwnersOption,
+    ...extensions.map((extension) =>
+      mapExtensionToOwnerOption(extension, currentFilters.ticketOwner, onFiltersChange),
+    ),
+  ];
+}
+
+function buildCrmTicketsOwnerFilterPill(
+  currentFilters: CrmTicketAppliedFilters,
+  extensions: TicketHierarchyExtensionLike[],
+  onFiltersChange: (update: FiltersUpdater) => void,
+): FilterPill {
+  const isOwnerFiltered = currentFilters.ticketOwner !== "All Owners";
+
+  return {
+    id: "ticket_owner",
+    label: "Ticket owner",
+    showDropdown: true,
+    searchable: true,
+    active: isOwnerFiltered,
+    activeLabelOnly: isOwnerFiltered,
+    activeLabel: isOwnerFiltered
+      ? truncateFilterLabel(currentFilters.ticketOwner)
+      : undefined,
+    dropdownMenuStyle: CRM_TICKETS_OWNER_DROPDOWN_MENU_STYLE,
+    onClear: () => applyTicketOwner(onFiltersChange, "All Owners"),
+    dropdownOptions: buildOwnerDropdownOptions(
+      currentFilters,
+      extensions,
+      onFiltersChange,
+    ),
+  };
+}
+
+function buildCrmTicketsCreateDateFromPill(
+  currentFilters: CrmTicketAppliedFilters,
+  setTicketFilters: (next: TicketFiltersRecord) => void,
+  stageTicketFilters: (next: TicketFiltersRecord) => void,
+): FilterPill {
+  const filtersRecord = createTicketFiltersRecord(currentFilters);
+  return buildDateTimeFilterPill(
+    "createDateFrom",
+    "Create date from",
+    filtersRecord,
+    setTicketFilters,
+    stageTicketFilters,
+    formatFilterDateTimeLabel,
+    createDateTimeDropdownContent,
   );
 }
 
-type FiltersUpdater =
-  | CrmTicketAppliedFilters
-  | ((prev: CrmTicketAppliedFilters) => CrmTicketAppliedFilters);
+function buildCrmTicketsCreateDateToPill(
+  currentFilters: CrmTicketAppliedFilters,
+  setTicketFilters: (next: TicketFiltersRecord) => void,
+  stageTicketFilters: (next: TicketFiltersRecord) => void,
+): FilterPill {
+  const filtersRecord = createTicketFiltersRecord(currentFilters);
+  return buildDateTimeFilterPill(
+    "createDateTo",
+    "Create date to",
+    filtersRecord,
+    setTicketFilters,
+    stageTicketFilters,
+    formatFilterDateTimeLabel,
+    createDateTimeDropdownContent,
+  );
+}
+
+function mapPriorityToDropdownOption(
+  option: (typeof CRM_TICKET_PRIORITY_OPTIONS)[number],
+  selectedPriority: CrmTicketAppliedFilters["priority"],
+  onFiltersChange: (update: FiltersUpdater) => void,
+): FilterDropdownOption {
+  return {
+    label: option.label,
+    value: option.value,
+    selected: selectedPriority === option.value,
+    onClick: () => applyTicketPriority(onFiltersChange, option.value),
+  };
+}
+
+function buildCrmTicketsPriorityFilterPill(
+  currentFilters: CrmTicketAppliedFilters,
+  onFiltersChange: (update: FiltersUpdater) => void,
+): FilterPill {
+  const isPriorityFiltered = currentFilters.priority !== "All Priorities";
+
+  return {
+    id: "priority",
+    label: "Priority",
+    showDropdown: true,
+    active: isPriorityFiltered,
+    activeLabelOnly: isPriorityFiltered,
+    activeLabel: isPriorityFiltered ? currentFilters.priority : undefined,
+    dropdownMenuStyle: CRM_TICKETS_FILTER_DROPDOWN_MENU_STYLE,
+    onClear: () => applyTicketPriority(onFiltersChange, "All Priorities"),
+    dropdownOptions: CRM_TICKET_PRIORITY_OPTIONS.map((option) =>
+      mapPriorityToDropdownOption(option, currentFilters.priority, onFiltersChange),
+    ),
+  };
+}
+
+function buildCrmTicketsFilterPillList(
+  currentFilters: CrmTicketAppliedFilters,
+  extensions: TicketHierarchyExtensionLike[],
+  onFiltersChange: (update: FiltersUpdater) => void,
+  setTicketFilters: (next: TicketFiltersRecord) => void,
+  stageTicketFilters: (next: TicketFiltersRecord) => void,
+): FilterPill[] {
+  return [
+    buildCrmTicketsOwnerFilterPill(currentFilters, extensions, onFiltersChange),
+    buildCrmTicketsCreateDateFromPill(
+      currentFilters,
+      setTicketFilters,
+      stageTicketFilters,
+    ),
+    buildCrmTicketsCreateDateToPill(
+      currentFilters,
+      setTicketFilters,
+      stageTicketFilters,
+    ),
+    buildCrmTicketsPriorityFilterPill(currentFilters, onFiltersChange),
+  ];
+}
 
 interface UseCrmTicketsFilterPillsOptions {
   currentFilters: CrmTicketAppliedFilters;
   onFiltersChange: (update: FiltersUpdater) => void;
-  extensions: TicketHierarchyExtension[];
+  extensions: TicketHierarchyExtensionLike[];
 }
 
 export function countCrmTicketsActiveFilters(
@@ -80,112 +253,34 @@ export function useCrmTicketsFilterPills({
   extensions,
 }: UseCrmTicketsFilterPillsOptions): FilterPill[] {
   const setTicketFilters = useCallback(
-    (next: Record<string, unknown>) => {
-      onFiltersChange(next as CrmTicketAppliedFilters);
+    (next: TicketFiltersRecord) => {
+      onFiltersChange(toCrmTicketAppliedFilters(next, currentFilters));
     },
-    [onFiltersChange],
+    [currentFilters, onFiltersChange],
   );
 
-  const stageTicketFilters = setTicketFilters;
+  const stageTicketFilters = useCallback(
+    (next: TicketFiltersRecord) => {
+      onFiltersChange(toCrmTicketAppliedFilters(next, currentFilters));
+    },
+    [currentFilters, onFiltersChange],
+  );
 
-  return useMemo(() => {
-    const filtersRecord = currentFilters as Record<string, unknown>;
-
-    return [
-      {
-        id: "ticket_owner",
-        label: "Ticket owner",
-        showDropdown: true,
-        searchable: true,
-        active: currentFilters.ticketOwner !== "All Owners",
-        activeLabelOnly: currentFilters.ticketOwner !== "All Owners",
-        activeLabel:
-          currentFilters.ticketOwner === "All Owners"
-            ? undefined
-            : truncateFilterLabel(currentFilters.ticketOwner),
-        dropdownMenuStyle: CRM_TICKETS_OWNER_DROPDOWN_MENU_STYLE,
-        onClear: () => {
-          onFiltersChange((prev) => ({ ...prev, ticketOwner: "All Owners" }));
-        },
-        dropdownOptions: [
-          {
-            label: "All Owners",
-            value: "all",
-            selected: currentFilters.ticketOwner === "All Owners",
-            onClick: () => {
-              onFiltersChange((prev) => ({ ...prev, ticketOwner: "All Owners" }));
-            },
-          },
-          ...extensions.map((extension) => {
-            const label = resolveExtensionLabel(extension);
-            return {
-              label,
-              value: label,
-              selected: currentFilters.ticketOwner === label,
-              onClick: () => {
-                onFiltersChange((prev) => ({ ...prev, ticketOwner: label }));
-              },
-            };
-          }),
-        ],
-      },
-      buildDateTimeFilterPill(
-        "createDateFrom",
-        "Create date from",
-        filtersRecord,
+  return useMemo(
+    () =>
+      buildCrmTicketsFilterPillList(
+        currentFilters,
+        extensions,
+        onFiltersChange,
         setTicketFilters,
         stageTicketFilters,
-        formatFilterDateTimeLabel,
-        createDateTimeDropdownContent,
       ),
-      buildDateTimeFilterPill(
-        "createDateTo",
-        "Create date to",
-        filtersRecord,
-        setTicketFilters,
-        stageTicketFilters,
-        formatFilterDateTimeLabel,
-        createDateTimeDropdownContent,
-      ),
-      {
-        id: "priority",
-        label: "Priority",
-        showDropdown: true,
-        active: currentFilters.priority !== "All Priorities",
-        activeLabelOnly: currentFilters.priority !== "All Priorities",
-        activeLabel:
-          currentFilters.priority === "All Priorities"
-            ? undefined
-            : currentFilters.priority,
-        dropdownMenuStyle: CRM_TICKETS_FILTER_DROPDOWN_MENU_STYLE,
-        onClear: () => {
-          onFiltersChange((prev) => ({ ...prev, priority: "All Priorities" }));
-        },
-        dropdownOptions: (
-          [
-            { label: "All Priorities", value: "All Priorities" },
-            { label: "Low", value: "Low" },
-            { label: "Medium", value: "Medium" },
-            { label: "High", value: "High" },
-          ] as const
-        ).map((option) => ({
-          label: option.label,
-          value: option.value,
-          selected: currentFilters.priority === option.value,
-          onClick: () => {
-            onFiltersChange((prev) => ({
-              ...prev,
-              priority: option.value as CrmTicketPriority | "All Priorities",
-            }));
-          },
-        })),
-      },
-    ];
-  }, [
-    currentFilters,
-    extensions,
-    onFiltersChange,
-    setTicketFilters,
-    stageTicketFilters,
-  ]);
+    [
+      currentFilters,
+      extensions,
+      onFiltersChange,
+      setTicketFilters,
+      stageTicketFilters,
+    ],
+  );
 }
