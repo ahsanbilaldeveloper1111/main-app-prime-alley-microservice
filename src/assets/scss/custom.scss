@@ -750,3 +750,39 @@ body:has(.crm-detail-page-layout) {
     overflow: hidden !important;
   }
 }
+
+body:has(.crm-activities-layout) {
+  overflow: hidden !important;
+
+  .main-content-wrapper {
+    overflow: hidden !important;
+  }
+
+  .pc-content {
+    padding-top: 0 !important;
+    overflow: hidden !important;
+  }
+}
+
+.crm-activities-layout {
+  display: flex;
+  height: calc(100vh - 74px);
+  overflow: hidden;
+  gap: 10px;
+  padding: 0;
+  align-items: flex-start;
+}
+
+.crm-activities-main {
+  flex: 1;
+  height: 100%;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+
+  .generic-table-container {
+    flex: 1;
+    height: 100%;
+    overflow: hidden;
+  }
+}

@@ -40,6 +40,7 @@ export type ActivityHistorySidebarPanelProps = Readonly<{
   historyChain: HistoryChainRecord[];
   crmData: CrmDataItem | null;
   router: NextRouter;
+  sidebarMarginTop?: number;
 }>;
 
 export function ActivityHistorySidebarPanel({
@@ -53,6 +54,7 @@ export function ActivityHistorySidebarPanel({
   historyChain,
   crmData,
   router,
+  sidebarMarginTop = 0,
 }: ActivityHistorySidebarPanelProps) {
   if (!showActivitySidebar) return null;
 
@@ -222,6 +224,7 @@ export function ActivityHistorySidebarPanel({
 
   return (
     <GenericSidebar
+      sidebarMarginTop={sidebarMarginTop}
       isOpen={showActivitySidebar}
       onClose={() => setShowActivitySidebar(false)}
       title={selectedActivityRecord?.customer || "Activity Details"}
