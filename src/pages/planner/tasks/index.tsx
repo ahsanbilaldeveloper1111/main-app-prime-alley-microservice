@@ -369,6 +369,8 @@ const TasksListingPage = ({
 
     const [fForm, setFForm] = useState(INITIAL_FILTER_FORM);
     const [openQuickFilter, setOpenQuickFilter] = useState<string | null>(null);
+    const [projectSearch, setProjectSearch] = useState("");
+    const [assigneeSearch, setAssigneeSearch] = useState("");
     const quickFilterRef = useRef<HTMLDivElement | null>(null);
 
     // ── Create/edit task sidebar ──────────────────────────────────────────────────
@@ -1300,36 +1302,57 @@ const TasksListingPage = ({
                         top: "calc(100% + 4px)",
                         left: 0,
                         zIndex: 30,
-                        minWidth: 220,
-                        maxHeight: 260,
-                        overflowY: "auto",
+                        minWidth: 240,
                         background: "#fff",
                         border: "1px solid #e5e7eb",
                         borderRadius: 8,
                         boxShadow: "0 10px 24px rgba(0,0,0,0.12)",
                         padding: 6,
                       }}>
-                        {projectOptions.map((option) => (
-                          <button
-                            key={option.value}
-                            onClick={() => {
-                              setFForm({ ...fForm, project: option.value });
-                              setOpenQuickFilter(null);
-                            }}
+                        <div style={{ padding: "4px 4px 6px" }}>
+                          <input
+                            autoFocus
+                            type="text"
+                            placeholder="Search projects..."
+                            value={projectSearch}
+                            onChange={e => setProjectSearch(e.target.value)}
                             style={{
                               width: "100%",
-                              textAlign: "left",
-                              border: "none",
-                              background: option.value === fForm.project ? "#f3f4f6" : "transparent",
-                              borderRadius: 6,
-                              padding: "8px 10px",
+                              border: "1px solid #cbd5e0",
+                              borderRadius: 4,
+                              padding: "6px 10px",
                               fontSize: 12,
                               fontFamily: "Lexend Deca, Helvetica, Arial, sans-serif",
+                              outline: "none",
                             }}
-                          >
-                            {option.label}
-                          </button>
-                        ))}
+                          />
+                        </div>
+                        <div style={{ maxHeight: 220, overflowY: "auto" }}>
+                          {projectOptions
+                            .filter(o => o.label.toLowerCase().includes(projectSearch.toLowerCase()))
+                            .map((option) => (
+                              <button
+                                key={option.value}
+                                onClick={() => {
+                                  setFForm({ ...fForm, project: option.value });
+                                  setOpenQuickFilter(null);
+                                  setProjectSearch("");
+                                }}
+                                style={{
+                                  width: "100%",
+                                  textAlign: "left",
+                                  border: "none",
+                                  background: option.value === fForm.project ? "#f3f4f6" : "transparent",
+                                  borderRadius: 6,
+                                  padding: "8px 10px",
+                                  fontSize: 12,
+                                  fontFamily: "Lexend Deca, Helvetica, Arial, sans-serif",
+                                }}
+                              >
+                                {option.label}
+                              </button>
+                            ))}
+                        </div>
                       </div>
                     )}
                     {pill.id === "assigned_to" && openQuickFilter === "assigned_to" && (
@@ -1338,19 +1361,35 @@ const TasksListingPage = ({
                         top: "calc(100% + 4px)",
                         left: 0,
                         zIndex: 30,
-                        minWidth: 220,
-                        maxHeight: 260,
-                        overflowY: "auto",
+                        minWidth: 240,
                         background: "#fff",
                         border: "1px solid #e5e7eb",
                         borderRadius: 8,
                         boxShadow: "0 10px 24px rgba(0,0,0,0.12)",
                         padding: 6,
                       }}>
+                        <div style={{ padding: "4px 4px 6px" }}>
+                          <input
+                            autoFocus
+                            type="text"
+                            placeholder="Search members..."
+                            value={assigneeSearch}
+                            onChange={e => setAssigneeSearch(e.target.value)}
+                            style={{
+                              width: "100%",
+                              border: "1px solid #cbd5e0",
+                              borderRadius: 4,
+                              padding: "6px 10px",
+                              fontSize: 12,
+                              fontFamily: "Lexend Deca, Helvetica, Arial, sans-serif",
+                              outline: "none",
+                            }}
+                          />
+                        </div>
+                        <div style={{ maxHeight: 220, overflowY: "auto" }}>
                         <button
                           onClick={() => {
                             setFForm((prev) => ({ ...prev, assignee: [] }));
-                            setOpenQuickFilter(null);
                           }}
                           style={{
                             width: "100%",
@@ -1361,11 +1400,16 @@ const TasksListingPage = ({
                             padding: "8px 10px",
                             fontSize: 12,
                             fontFamily: "Lexend Deca, Helvetica, Arial, sans-serif",
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 8,
                           }}
                         >
                           All assignees
                         </button>
-                        {assigneeOptions.map((option) => {
+                        {assigneeOptions
+                          .filter(o => o.label.toLowerCase().includes(assigneeSearch.toLowerCase()))
+                          .map((option) => {
                           const selected = fForm.assignee.includes(option.value);
                           return (
                             <button
@@ -1387,17 +1431,27 @@ const TasksListingPage = ({
                                 width: "100%",
                                 textAlign: "left",
                                 border: "none",
-                                background: selected ? "#f3f4f6" : "transparent",
+                                background: selected ? "#eef4ff" : "transparent",
                                 borderRadius: 6,
                                 padding: "8px 10px",
                                 fontSize: 12,
                                 fontFamily: "Lexend Deca, Helvetica, Arial, sans-serif",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "space-between",
+                                gap: 8,
+                                color: selected ? "#0066CC" : "#141414",
+                                fontWeight: selected ? 500 : 400,
                               }}
                             >
-                              {option.label}
+                              <span>{option.label}</span>
+                              {selected && (
+                                <span style={{ color: "#0066CC", fontSize: 14, flexShrink: 0 }}>✓</span>
+                              )}
                             </button>
                           );
                         })}
+                        </div>
                       </div>
                     )}
                     {pill.id === "task_type" && openQuickFilter === "task_type" && (
