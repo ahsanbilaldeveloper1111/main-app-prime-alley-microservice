@@ -343,7 +343,7 @@ const HistoryPage = () => {
           subTitle="Activity Management"
         />
         {/* Main flex container: content + sidebar (same layout as prospects) */}
-        <div className="crm-activities-layout">
+        <div className="crm-activities-layout" style={{ display: "flex", height: "calc(100vh - 74px)", overflow: "hidden" }}>
           {/* Main content area - table and modals */}
           <div className="crm-activities-main">
         {/* Activities Table */}
