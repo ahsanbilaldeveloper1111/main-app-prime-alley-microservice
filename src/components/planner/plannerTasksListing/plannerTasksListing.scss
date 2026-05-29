@@ -73,8 +73,9 @@
 
 .ptl-tab-btn--active {
   background-color: #f5f8fa;
-  border-bottom: none;
-  font-weight: 500;
+  border-bottom: 2px solid #0066CC;
+  font-weight: 600;
+  color: #0066CC;
 }
 
 .ptl-tab-btn--inactive {
@@ -245,7 +246,7 @@
 }
 
 .ptl-title-link {
-  color: #2563eb;
+  color: #2d3748;
   font-weight: 400;
   font-size: 13px;
   cursor: pointer;

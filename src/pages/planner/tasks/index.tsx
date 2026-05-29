@@ -1052,13 +1052,22 @@ const TasksListingPage = ({
       <React.Fragment>
   
         {/* ── Global style overrides ── */}
-        <style
-          dangerouslySetInnerHTML={{
-            __html: buildTaskListingPageStyleTag({
-              showTitleHoverEditButton: true,
-            }),
-          }}
-        />
+          <style
+            dangerouslySetInnerHTML={{
+              __html: buildTaskListingPageStyleTag({
+                showTitleHoverEditButton: true,
+                extraRules: `
+                  .tasks-page .ptl-tabs-row button {
+                    outline: none !important;
+                    box-shadow: none !important;
+                  }
+                  .tasks-page .ptl-tabs-row {
+                    border-bottom: 1px solid #e5e7eb;
+                  }
+                `,
+              }),
+            }}
+          />
   
         <BreadcrumbItem mainTitle="Planner" mainLink="/planner/dashboard" subTitle={breadcrumbSubTitle} />
   
@@ -1074,7 +1083,7 @@ const TasksListingPage = ({
               ROW 1 — Page title + top-right buttons
           ══════════════════════════════════════════════════════ */}
           <div style={{
-            padding: "14px 20px",
+            padding: "10px 20px",
             backgroundColor: "#fff",
             display: "flex",
             alignItems: "flex-start",
@@ -1128,14 +1137,12 @@ const TasksListingPage = ({
                       ────────── spacer ──────────  [+ Add view (4/50)]  [All Views]
           ══════════════════════════════════════════════════════ */}
           {!isTabLocked && (
-          <div style={{
+          <div className="ptl-tabs-row" style={{
             display: "flex",
             alignItems: "stretch",
             backgroundColor: "#fff",
-            
-         
-            height: 44,
             flexShrink: 0,
+            height: 44,
           }}>
             {(() => {
               const currentViewCount = allTabs.length;
@@ -1153,7 +1160,6 @@ const TasksListingPage = ({
                   alignItems: "center",
                   justifyContent: "center",
                   padding: "0 20px",
-                  border: "none",
                   borderLeft: index === 0 ? "1px solid #8A8A8A" : "none",
                   borderRight: "1px solid #8A8A8A",
                   borderTop: "1px solid #8A8A8A",
@@ -1164,8 +1170,9 @@ const TasksListingPage = ({
                   fontWeight: activeTab === tab.id ? 600 : 400,
                   fontFamily: "Lexend Deca, Helvetica, Arial, sans-serif",
                   cursor: "pointer",
-                  height: "100%",
-                  gap: tab.id === "all" ? 10 : 0,
+                  height: 44,
+                  whiteSpace: "nowrap",
+                  gap: 6,
                 }}
               >
                 {tab.label}
@@ -1181,9 +1188,8 @@ const TasksListingPage = ({
                 alignItems: "center",
                 gap: 4,
                 padding: "0 16px",
-               border: "none",
-              //   borderLeft: "1px solid #e5e7eb",
-                borderTop: "none",
+                border: "none",
+                borderBottom: "1px solid #e5e7eb",
                 backgroundColor: "#fff",
                 color: "#374151",
                 fontSize: 13,
@@ -1191,10 +1197,8 @@ const TasksListingPage = ({
                 fontWeight: 400,
                 cursor: "pointer",
                 flexShrink: 0,
-                height: "100%",
+                height: 44,
                 whiteSpace: "nowrap",
-                borderRight: "none",
-                borderBottom: "1px solid #ccc",
               }}
             >
               <Plus size={14} />
@@ -1212,20 +1216,16 @@ const TasksListingPage = ({
                 style={{
                   display: "inline-flex",
                   alignItems: "center",
-                  padding: "0 16px",
+                  padding: "10px 16px",
                   border: "none",
-                  borderBottom: "1px solid #ccc",
-                  borderLeft: "none",
-                  borderTop: "none",
-                  borderRight: "none",
+                  borderBottom: "2px solid transparent",
                   backgroundColor: "#fff",
-                  color: "#2563eb",
+                  color: "#0066CC",
                   fontSize: 13,
                   fontWeight: 600,
                   fontFamily: "Lexend Deca, Helvetica, Arial, sans-serif",
                   cursor: "pointer",
                   flexShrink: 0,
-                  height: "100%",
                   whiteSpace: "nowrap",
                 }}
               >All Views</button>
@@ -1280,8 +1280,8 @@ const TasksListingPage = ({
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
-            padding: "10px 16px",
-            backgroundColor: "#fff",
+            padding: "8px 16px",
+            backgroundColor: "#f9fafb",
             borderBottom: "1px solid #e5e7eb",
             gap: 8,
             flexShrink: 0,
@@ -1877,19 +1877,19 @@ const TasksListingPage = ({
                 onClick={applyCurrentFilters}
                 style={{
                   ...TASK_LIST_BTN_OUTLINE,
-                  backgroundColor: "#0066CC",
-                  background: "#0066CC",
-                  borderColor: "#0066CC",
-                  color: "#fff",
-                  fontWeight: 600,
+                  backgroundColor: "#fff",
+                  background: "#fff",
+                  borderColor: "#8a8a8a",
+                  color: "#141414",
+                  fontWeight: 400,
                 }}
                 onMouseEnter={e => {
-                  e.currentTarget.style.backgroundColor = "#0052A3";
-                  e.currentTarget.style.background = "#0052A3";
+                  e.currentTarget.style.backgroundColor = "#f5f8fa";
+                  e.currentTarget.style.background = "#f5f8fa";
                 }}
                 onMouseLeave={e => {
-                  e.currentTarget.style.backgroundColor = "#0066CC";
-                  e.currentTarget.style.background = "#0066CC";
+                  e.currentTarget.style.backgroundColor = "#fff";
+                  e.currentTarget.style.background = "#fff";
                 }}
               >
                 Apply filters
