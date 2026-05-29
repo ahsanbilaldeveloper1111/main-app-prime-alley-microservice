@@ -9,8 +9,8 @@ $planner-sidebar-text-muted: #64748b;
 $planner-sidebar-placeholder: #94a3b8;
 
 .create-task-sidebar-backdrop {
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
 }
 
 .create-task-sidebar-panel {
