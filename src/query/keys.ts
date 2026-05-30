@@ -20,6 +20,173 @@ export const paginatedListKey = <Base extends readonly unknown[]>(
     params.search,
   ] as const;
 
+export type CrmFiltersSortPageListParams = {
+  filtersKey: string;
+  page: number;
+  perPage: number;
+  sortBy: string;
+  sortOrder: string;
+};
+
+/** CRM list keys with filters + sort columns (`leadsPage`). */
+export const crmFiltersSortPageListKey = <Base extends readonly unknown[]>(
+  base: Base,
+  params: CrmFiltersSortPageListParams,
+) =>
+  [
+    ...base,
+    "list",
+    params.filtersKey,
+    params.page,
+    params.perPage,
+    params.sortBy,
+    params.sortOrder,
+  ] as const;
+
+export type CrmSortPageListParams = {
+  filtersKey: string;
+  activeTab: string;
+  page: number;
+  perPage: number;
+  sortBy: string;
+  sortOrder: string;
+};
+
+/** CRM list keys with tab + sort columns (`companiesPage`, etc.). */
+export const crmSortPageListKey = <Base extends readonly unknown[]>(
+  base: Base,
+  params: CrmSortPageListParams,
+  suffix: readonly unknown[] = [],
+) =>
+  [
+    ...base,
+    "list",
+    params.filtersKey,
+    params.activeTab,
+    params.page,
+    params.perPage,
+    params.sortBy,
+    params.sortOrder,
+    ...suffix,
+  ] as const;
+
+/** CRM orders list (`ordersList.page` — uses `"page"` instead of `"list"`). */
+export const crmOrdersListPageKey = <Base extends readonly unknown[]>(
+  base: Base,
+  params: CrmSortPageListParams,
+) =>
+  [
+    ...base,
+    "page",
+    params.filtersKey,
+    params.activeTab,
+    params.page,
+    params.perPage,
+    params.sortBy,
+    params.sortOrder,
+  ] as const;
+
+export type CrmActivityHistoryListParams = {
+  page: number;
+  perPage: number;
+  sortBy: string;
+  sortOrder: string;
+  search: string;
+  typeTab: string;
+  agentsKey: string;
+  dateFrom: string;
+  dateTo: string;
+  extensionsStamp: string;
+};
+
+export const crmActivityHistoryListKey = <Base extends readonly unknown[]>(
+  base: Base,
+  params: CrmActivityHistoryListParams,
+) =>
+  [
+    ...base,
+    "list",
+    params.page,
+    params.perPage,
+    params.sortBy,
+    params.sortOrder,
+    params.search,
+    params.typeTab,
+    params.agentsKey,
+    params.dateFrom,
+    params.dateTo,
+    params.extensionsStamp,
+  ] as const;
+
+export const crmActivityHistoryRecordDetailKey = <Base extends readonly unknown[]>(
+  base: Base,
+  params: { recordType: string; recordId: string; open: boolean },
+) =>
+  [
+    ...base,
+    "recordDetail",
+    params.recordType,
+    params.recordId,
+    params.open,
+  ] as const;
+
+export type CrmProductsPageListParams = {
+  page: number;
+  perPage: number;
+  search: string;
+  activeFilter: string;
+  industryId: number | null;
+  category: string | null;
+  brandKey: string;
+};
+
+const nullishQueryKeySegment = (
+  value: string | number | null | undefined,
+  fallback: string,
+): string => (value == null ? fallback : String(value));
+
+export const crmProductsPageListKey = <Base extends readonly unknown[]>(
+  base: Base,
+  params: CrmProductsPageListParams,
+) =>
+  [
+    ...base,
+    "list",
+    params.page,
+    params.perPage,
+    params.search,
+    params.activeFilter,
+    nullishQueryKeySegment(params.industryId, "none"),
+    nullishQueryKeySegment(params.category, "none"),
+    params.brandKey,
+  ] as const;
+
+export type CrmCampaignsListParams = {
+  refreshKey: number;
+  page: number;
+  perPage: number;
+  search: string;
+  activeFilter: string;
+  filtersKey: string;
+  campaignFiltersKey: string;
+};
+
+export const crmCampaignsListKey = <Base extends readonly unknown[]>(
+  base: Base,
+  params: CrmCampaignsListParams,
+) =>
+  [
+    ...base,
+    "list",
+    params.refreshKey,
+    params.page,
+    params.perPage,
+    params.search,
+    params.activeFilter,
+    params.filtersKey,
+    params.campaignFiltersKey,
+  ] as const;
+
 export const communicationsKeys = {
   root: ["communications"] as const,
 
@@ -619,7 +786,7 @@ export const ticketsKeys = {
   },
 };
 
-/** FAQs / Help Center admin (`src/pages/faqs/*`). */
+/** FAQs / Help Center admin (`/main-settings/help-center/*`). */
 export const faqsKeys = {
   root: ["faqs"] as const,
 
@@ -781,6 +948,7 @@ export const chatKeys = {
     conversations: () => [...chatKeys.assistant.all(), "conversations"] as const,
     thread: (threadId: string) =>
       [...chatKeys.assistant.all(), "thread", threadId] as const,
+    rateLimit: () => [...chatKeys.assistant.all(), "rateLimit"] as const,
     userBudget: (tenantId: string, userId: string) =>
       [
         ...chatKeys.assistant.all(),
@@ -796,8 +964,7 @@ export const aiAnalyticsKeys = {
   root: ["aiAnalytics"] as const,
   costPricing: {
     all: () => [...aiAnalyticsKeys.root, "costPricing"] as const,
-    detail: (tenantId: string) =>
-      [...aiAnalyticsKeys.costPricing.all(), tenantId || "__none__"] as const,
+    detail: () => [...aiAnalyticsKeys.costPricing.all(), "detail"] as const,
   },
   tenants: {
     all: () => [...aiAnalyticsKeys.root, "tenants"] as const,
@@ -834,7 +1001,7 @@ export const aiAnalyticsKeys = {
         filters.date_from ?? "",
         filters.date_to ?? "",
         filters.status ?? "",
-        filters.limit ?? 100,
+        filters.limit ?? 15,
         filters.offset ?? 0,
       ] as const,
   },
@@ -868,40 +1035,10 @@ export const crmAppKeys = {
 
   activityHistory: {
     all: () => [...crmAppKeys.root, "activityHistory"] as const,
-    list: (params: {
-      page: number;
-      perPage: number;
-      sortBy: string;
-      sortOrder: string;
-      search: string;
-      typeTab: string;
-      agentsKey: string;
-      dateFrom: string;
-      dateTo: string;
-      extensionsStamp: string;
-    }) =>
-      [
-        ...crmAppKeys.activityHistory.all(),
-        "list",
-        params.page,
-        params.perPage,
-        params.sortBy,
-        params.sortOrder,
-        params.search,
-        params.typeTab,
-        params.agentsKey,
-        params.dateFrom,
-        params.dateTo,
-        params.extensionsStamp,
-      ] as const,
+    list: (params: CrmActivityHistoryListParams) =>
+      crmActivityHistoryListKey(crmAppKeys.activityHistory.all(), params),
     recordDetail: (params: { recordType: string; recordId: string; open: boolean }) =>
-      [
-        ...crmAppKeys.activityHistory.all(),
-        "recordDetail",
-        params.recordType,
-        params.recordId,
-        params.open,
-      ] as const,
+      crmActivityHistoryRecordDetailKey(crmAppKeys.activityHistory.all(), params),
   },
 
   businessTypes: {
@@ -920,24 +1057,8 @@ export const crmAppKeys = {
   /** Companies list grid (`/crm/companies` on `src/pages/crm/companies`). */
   companiesPage: {
     all: () => [...crmAppKeys.root, "companiesPage"] as const,
-    list: (params: {
-      filtersKey: string;
-      activeTab: string;
-      page: number;
-      perPage: number;
-      sortBy: string;
-      sortOrder: string;
-    }) =>
-      [
-        ...crmAppKeys.companiesPage.all(),
-        "list",
-        params.filtersKey,
-        params.activeTab,
-        params.page,
-        params.perPage,
-        params.sortBy,
-        params.sortOrder,
-      ] as const,
+    list: (params: CrmSortPageListParams) =>
+      crmSortPageListKey(crmAppKeys.companiesPage.all(), params),
   },
 
   leads: {
@@ -948,22 +1069,8 @@ export const crmAppKeys = {
   /** CRM leads list (`useCrmLeadsPageModel` / `src/pages/crm/leads`). */
   leadsPage: {
     all: () => [...crmAppKeys.root, "leadsPage"] as const,
-    list: (params: {
-      filtersKey: string;
-      page: number;
-      perPage: number;
-      sortBy: string;
-      sortOrder: string;
-    }) =>
-      [
-        ...crmAppKeys.leadsPage.all(),
-        "list",
-        params.filtersKey,
-        params.page,
-        params.perPage,
-        params.sortBy,
-        params.sortOrder,
-      ] as const,
+    list: (params: CrmFiltersSortPageListParams) =>
+      crmFiltersSortPageListKey(crmAppKeys.leadsPage.all(), params),
     tabTotals: (requestKey: string) =>
       [...crmAppKeys.leadsPage.all(), "tabTotals", requestKey] as const,
   },
@@ -991,26 +1098,10 @@ export const crmAppKeys = {
   /** CRM deals / approvals list (`getDeals` on `CrmDealsListScreen`). */
   dealsPage: {
     all: () => [...crmAppKeys.root, "dealsPage"] as const,
-    list: (params: {
-      filtersKey: string;
-      activeTab: string;
-      page: number;
-      perPage: number;
-      sortBy: string;
-      sortOrder: string;
-      approvalsVariant: boolean;
-    }) =>
-      [
-        ...crmAppKeys.dealsPage.all(),
-        "list",
-        params.filtersKey,
-        params.activeTab,
-        params.page,
-        params.perPage,
-        params.sortBy,
-        params.sortOrder,
+    list: (params: CrmSortPageListParams & { approvalsVariant: boolean }) =>
+      crmSortPageListKey(crmAppKeys.dealsPage.all(), params, [
         params.approvalsVariant ? "approvals" : "deals",
-      ] as const,
+      ]),
   },
 
   /** CRM quotes list dummy/real list (`CrmQuotesListPage`). */
@@ -1079,26 +1170,8 @@ export const crmAppKeys = {
 
   campaigns: {
     all: () => [...crmAppKeys.root, "campaigns"] as const,
-    list: (params: {
-      refreshKey: number;
-      page: number;
-      perPage: number;
-      search: string;
-      activeFilter: string;
-      filtersKey: string;
-      campaignFiltersKey: string;
-    }) =>
-      [
-        ...crmAppKeys.campaigns.all(),
-        "list",
-        params.refreshKey,
-        params.page,
-        params.perPage,
-        params.search,
-        params.activeFilter,
-        params.filtersKey,
-        params.campaignFiltersKey,
-      ] as const,
+    list: (params: CrmCampaignsListParams) =>
+      crmCampaignsListKey(crmAppKeys.campaigns.all(), params),
     tags: (refreshKey: number) =>
       [...crmAppKeys.campaigns.all(), "tags", refreshKey] as const,
     uploadCampaignOptions: (refreshKey: number) =>
@@ -1155,13 +1228,7 @@ export const crmAppKeys = {
   industriesPage: {
     all: () => [...crmAppKeys.root, "industriesPage"] as const,
     list: (params: { page: number; perPage: number; search: string }) =>
-      [
-        ...crmAppKeys.industriesPage.all(),
-        "list",
-        params.page,
-        params.perPage,
-        params.search,
-      ] as const,
+      paginatedListKey(crmAppKeys.industriesPage.all(), params),
     productsByIndustry: (industryId: number) =>
       [...crmAppKeys.industriesPage.all(), "products", industryId] as const,
   },
@@ -1169,26 +1236,8 @@ export const crmAppKeys = {
   /** CRM products table (`useCrmProductsPage`). */
   crmProductsPage: {
     all: () => [...crmAppKeys.root, "crmProductsPage"] as const,
-    list: (params: {
-      page: number;
-      perPage: number;
-      search: string;
-      activeFilter: string;
-      industryId: number | null;
-      category: string | null;
-      brandKey: string;
-    }) =>
-      [
-        ...crmAppKeys.crmProductsPage.all(),
-        "list",
-        params.page,
-        params.perPage,
-        params.search,
-        params.activeFilter,
-        params.industryId ?? "none",
-        params.category ?? "none",
-        params.brandKey,
-      ] as const,
+    list: (params: CrmProductsPageListParams) =>
+      crmProductsPageListKey(crmAppKeys.crmProductsPage.all(), params),
   },
 
   /** Order create/edit shared picklists (`getStages('order')`, hierarchy, products slice). */
@@ -1203,24 +1252,8 @@ export const crmAppKeys = {
   /** CRM orders main list (`getOrders` on `src/pages/crm/orders`). */
   ordersList: {
     all: () => [...crmAppKeys.root, "ordersList"] as const,
-    page: (params: {
-      filtersKey: string;
-      activeTab: string;
-      page: number;
-      perPage: number;
-      sortBy: string;
-      sortOrder: string;
-    }) =>
-      [
-        ...crmAppKeys.ordersList.all(),
-        "page",
-        params.filtersKey,
-        params.activeTab,
-        params.page,
-        params.perPage,
-        params.sortBy,
-        params.sortOrder,
-      ] as const,
+    page: (params: CrmSortPageListParams) =>
+      crmOrdersListPageKey(crmAppKeys.ordersList.all(), params),
   },
 
   /** CRM Tasks listing page (`src/pages/crm/crm-tasks`) — mock or real list API. */
@@ -1228,6 +1261,34 @@ export const crmAppKeys = {
     all: () => [...crmAppKeys.root, "crmTasksListing"] as const,
     list: (params: Record<string, unknown>) =>
       [...crmAppKeys.crmTasksListing.all(), "list", JSON.stringify(params)] as const,
+  },
+
+  /** CRM tickets list (`src/pages/crm/tickets`) — `/tickets/list`. */
+  crmTicketsPage: {
+    all: () => [...crmAppKeys.root, "crmTicketsPage"] as const,
+    list: (params: {
+      search: string;
+      filtersKey: string;
+      page: number;
+      perPage: number;
+      activeTab: string;
+    }) =>
+      [
+        ...crmAppKeys.crmTicketsPage.all(),
+        "list",
+        params.search,
+        params.filtersKey,
+        params.page,
+        params.perPage,
+        params.activeTab,
+      ] as const,
+    dashboard: (filtersKey: string) =>
+      [...crmAppKeys.crmTicketsPage.all(), "dashboard", filtersKey] as const,
+    detail: (ticketId: string) =>
+      [...crmAppKeys.crmTicketsPage.all(), "detail", ticketId] as const,
+    hierarchyExtensions: () =>
+      [...crmAppKeys.crmTicketsPage.all(), "hierarchyExtensions"] as const,
+    statuses: () => [...crmAppKeys.crmTicketsPage.all(), "statuses"] as const,
   },
 };
 

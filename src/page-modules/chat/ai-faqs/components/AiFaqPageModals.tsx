@@ -7,6 +7,9 @@ import type { FAQItemDraft } from "../faqItemDraft";
 import { AiFaqAttachmentField } from "./AiFaqAttachmentField";
 import { AiFaqDraftItemCards } from "./AiFaqDraftItemCards";
 
+const ADD_FAQ_FORM_ID = "ai-faq-add-form";
+const EDIT_FAQ_FORM_ID = "ai-faq-edit-form";
+
 export type AiFaqPageModalsProps = Readonly<{
   scopeLabel: string;
   showAddModal: boolean;
@@ -88,7 +91,7 @@ export function AiFaqPageModals(props: AiFaqPageModalsProps) {
         </Modal.Header>
         <Modal.Body>
           <Form
-            id="ai-faq-add-form"
+            id={ADD_FAQ_FORM_ID}
             onSubmit={(e) => {
               e.preventDefault();
               void handleSubmit();
@@ -123,7 +126,7 @@ export function AiFaqPageModals(props: AiFaqPageModalsProps) {
           >
             Cancel
           </Button>
-          <Button type="submit" form="ai-faq-add-form" variant="primary">
+          <Button variant="primary" type="submit" form={ADD_FAQ_FORM_ID}>
             Create FAQs
           </Button>
         </Modal.Footer>
@@ -145,7 +148,7 @@ export function AiFaqPageModals(props: AiFaqPageModalsProps) {
           </Modal.Header>
           <Modal.Body>
             <Form
-              id="ai-faq-edit-form"
+              id={EDIT_FAQ_FORM_ID}
               onSubmit={(e) => {
                 e.preventDefault();
                 void handleSubmit();
@@ -179,7 +182,7 @@ export function AiFaqPageModals(props: AiFaqPageModalsProps) {
             >
               Cancel
             </Button>
-            <Button type="submit" form="ai-faq-edit-form" variant="primary">
+            <Button variant="primary" type="submit" form={EDIT_FAQ_FORM_ID}>
               Update FAQ
             </Button>
           </Modal.Footer>

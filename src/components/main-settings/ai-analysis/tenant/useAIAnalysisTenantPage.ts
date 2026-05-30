@@ -41,16 +41,20 @@ export function useAIAnalysisTenantPage() {
   );
 
   const selectedCompanyOption = useMemo(() => {
-    if (!selectedCompanyId) return null;
-    return findChatCompanySelectOption(companies, selectedCompanyId);
+    if (selectedCompanyId) {
+      return findChatCompanySelectOption(companies, selectedCompanyId);
+    }
+    return null;
   }, [companies, selectedCompanyId]);
 
   const appliedCompanyLabel = useMemo(() => {
-    if (!appliedTenantId) return "";
-    const match = companies.find(
-      (c) => resolveTenantIdFromCompany(c) === appliedTenantId,
-    );
-    return match?.name ?? appliedTenantId;
+    if (appliedTenantId) {
+      const match = companies.find(
+        (c) => resolveTenantIdFromCompany(c) === appliedTenantId,
+      );
+      return match?.name ?? appliedTenantId;
+    }
+    return "";
   }, [appliedTenantId, companies]);
 
   const handleCompanySelect = useCallback((companyId: string) => {
@@ -60,11 +64,12 @@ export function useAIAnalysisTenantPage() {
   }, []);
 
   const handleApplyFilter = useCallback(() => {
-    if (!selectedCompanyId.trim()) {
-      toast.info("Please select a company first");
+    const companyId = selectedCompanyId.trim();
+    if (companyId) {
+      setAppliedTenantId(companyId);
       return;
     }
-    setAppliedTenantId(selectedCompanyId.trim());
+    toast.info("Please select a company first");
   }, [selectedCompanyId]);
 
   const handleTenantRowSelect = useCallback((tenantId: string) => {

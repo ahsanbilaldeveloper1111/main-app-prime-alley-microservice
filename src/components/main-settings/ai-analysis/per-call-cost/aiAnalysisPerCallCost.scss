@@ -1,12 +1,73 @@
 @import "../shared/ai-analysis-shared";
 
 .ai-analysis-per-call-cost {
-  &__table td {
-    @media (min-width: 992px) {
-      max-width: 200px;
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: hidden;
+
+  &__cell-text {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    line-height: 1.4;
+
+    &--id {
+      word-break: break-all;
+      white-space: normal;
+    }
+  }
+
+  &__table {
+    min-width: 0;
+    max-width: 100%;
+
+    .generic-table-container {
+      overflow: hidden;
+      max-width: 100%;
+    }
+
+    .generic-table-card {
+      max-width: 100%;
+      margin: 0;
+    }
+
+    .generic-table-responsive {
+      width: 100% !important;
+      max-width: 100%;
+      margin: 0 !important;
+      border-radius: 8px 8px 0 0;
+      overflow-x: auto !important;
+      overflow-y: auto !important;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    .generic-table-responsive.fixed-height-table {
+      display: block;
+    }
+
+    .generic-table-responsive .generic-table {
+      width: max-content;
+      table-layout: fixed;
+      border-collapse: collapse;
+    }
+
+    .generic-table-responsive .generic-table-th,
+    .generic-table-responsive .generic-table-td {
+      box-sizing: border-box;
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
+      vertical-align: middle !important;
+      /* Undo GenericTable `minWidth: 0` on width-constrained cells (causes overlap). */
+      min-width: unset !important;
+    }
+
+    .generic-table-pagination {
+      margin: 0;
+      border: 1px solid #ccc;
+      border-top: none;
+      border-radius: 0 0 8px 8px;
     }
   }
 }

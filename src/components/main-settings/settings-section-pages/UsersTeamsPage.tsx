@@ -1,8 +1,8 @@
 import { HEADER_CONSTANTS } from '@constants/headerConstants'
-import Users from '@pages/controlhub/users'
-import Teams from '@pages/controlhub/teams'
-import Groups from '@pages/controlhub/groups'
-import Ranks from '@pages/controlhub/ranks'
+import UsersDirectory from '@page-modules/controlhub/users/UsersDirectory'
+import TeamsPanel from '@page-modules/controlhub/teams/TeamsPanel'
+import GroupsPanel from '@page-modules/controlhub/groups/GroupsPanel'
+import RanksPanel from '@page-modules/controlhub/ranks/RanksPanel'
 import React from 'react'
 import type { ControlledTabsProps, Tab } from '../types'
 import { SettingsSectionTabShell } from './SettingsSectionTabShell'
@@ -21,13 +21,13 @@ function UsersTeamsTabPanel({ activeTab }: Readonly<{ activeTab: string }>) {
   // User Directory: debounced search in `UsersList`. Teams / Groups / Ranks: `useDebouncedValue` on main table search (400ms).
   switch (activeTab) {
     case 'user-directory':
-      return <Users />
+      return <UsersDirectory />
     case 'supervisor-teams':
-      return <Teams />
+      return <TeamsPanel />
     case 'management-groups':
-      return <Groups />
+      return <GroupsPanel />
     case 'ranks-and-permissions':
-      return <Ranks />
+      return <RanksPanel />
     default:
       return null
   }

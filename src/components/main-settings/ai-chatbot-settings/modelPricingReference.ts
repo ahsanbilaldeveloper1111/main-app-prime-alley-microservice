@@ -1,4 +1,5 @@
 import type { TenantChatPricingTable } from "./mapTenantChatSettings";
+import { AI_CHATBOT_DECIMAL_PLACES } from "./aiChatbotDecimalFormat";
 import {
   AI_CHATBOT_DEFAULT_PRICING_TABLE,
   type ModelPricingDefaultRow,
@@ -14,8 +15,8 @@ export function formatUsdPerMillionTokens(value: string): string {
     return new Intl.NumberFormat("en-US", {
       style: "currency",
       currency: "USD",
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
+      minimumFractionDigits: AI_CHATBOT_DECIMAL_PLACES,
+      maximumFractionDigits: AI_CHATBOT_DECIMAL_PLACES,
     }).format(numeric);
   }
   return trimmed.startsWith("$") ? trimmed : `$${trimmed}`;

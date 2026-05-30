@@ -3,7 +3,7 @@ import {
   listAnalysisPerCallCosts,
   type AnalysisPerCallCostFilters,
 } from "@utils/aiAnalytics";
-import { useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 
 export function useAnalysisPerCallCostQuery(
   appliedFilters: AnalysisPerCallCostFilters,
@@ -14,5 +14,6 @@ export function useAnalysisPerCallCostQuery(
     queryFn: () => listAnalysisPerCallCosts(appliedFilters),
     enabled,
     staleTime: 60_000,
+    placeholderData: keepPreviousData,
   });
 }

@@ -1,5 +1,5 @@
 import React from "react";
-import { Alert, Badge, Col, Row, Spinner, Table } from "react-bootstrap";
+import { Alert, Badge, Spinner, Table } from "react-bootstrap";
 import type {
   WorkloadBoardColumn,
   WorkloadGridCell,
@@ -26,9 +26,13 @@ import {
   workloadLoadBandLabel,
   workloadMemberInitials,
   WORKLOAD_GRID_LEGEND_ITEMS,
+  WORKLOAD_PRIORITY_LEGEND_ITEMS,
+  workloadPriorityBdgTone,
+  workloadPriorityLabel,
 } from "@page-modules/planner/workload/workloadDomain";
+import type { WorkloadBdgTone } from "@page-modules/planner/workload/workloadDomain";
 
-const WORKLOAD_BOARD_LEGEND = [
+const WORKLOAD_BOARD_STATUS_LEGEND = [
   { label: "On Track", color: "#22c55e" },
   { label: "At Risk", color: "#eab308" },
   { label: "Overdue", color: "#ef4444" },
@@ -36,6 +40,25 @@ const WORKLOAD_BOARD_LEGEND = [
   { label: "Done", color: "#38bdf8" },
   { label: "Unassigned", color: "#9ca3af" },
 ] as const;
+
+type WorkloadBdgProps = Readonly<{
+  tone: WorkloadBdgTone;
+  children: React.ReactNode;
+  className?: string;
+}>;
+
+export function WorkloadBdg({ tone, children, className }: WorkloadBdgProps) {
+  const classes = ["workload-bdg", `workload-bdg--${tone}`, className].filter(Boolean).join(" ");
+  return <span className={classes}>{children}</span>;
+}
+
+export function WorkloadPriorityBadge({ priority }: Readonly<{ priority: unknown }>) {
+  return (
+    <WorkloadBdg tone={workloadPriorityBdgTone(priority)}>
+      {workloadPriorityLabel(priority)}
+    </WorkloadBdg>
+  );
+}
 
 type WorkloadMemberIdentityProps = Readonly<{
   extensionNumber: string;
@@ -102,54 +125,57 @@ type WorkloadSummaryCardsProps = Readonly<{
 
 export function WorkloadSummaryCardsRow({ data }: WorkloadSummaryCardsProps) {
   return (
-    <Row className="g-3 mb-3 workload-summary-row">
-      <Col xs={6} lg={3}>
-        <div className="workload-summary-card">
-          <div className="workload-summary-card__label">Total tasks this week</div>
-          <div className="workload-summary-card__value">{data.total_tasks_this_week}</div>
-        </div>
-      </Col>
-      <Col xs={6} lg={3}>
-        <div className="workload-summary-card">
-          <div className="workload-summary-card__label">Unestimated tasks</div>
-          <div className="workload-summary-card__value workload-summary-card__value--danger">
-            {data.unestimated_tasks}
-          </div>
-        </div>
-      </Col>
-      <Col xs={6} lg={3}>
-        <div className="workload-summary-card">
-          <div className="workload-summary-card__label">Critical priority tasks</div>
-          <div className="workload-summary-card__value workload-summary-card__value--danger">
-            {data.critical_priority_tasks}
-          </div>
-        </div>
-      </Col>
-      <Col xs={6} lg={3}>
-        <div className="workload-summary-card">
-          <div className="workload-summary-card__label">Overloaded members</div>
-          <div className="workload-summary-card__value workload-summary-card__value--danger">
-            {data.overloaded_members}
-          </div>
-        </div>
-      </Col>
-    </Row>
+    <div className="workload-summary-row">
+      <div className="workload-summary-card">
+        <div className="workload-summary-card__value">{data.total_tasks_this_week}</div>
+        <div className="workload-summary-card__label">Tasks this week</div>
+      </div>
+      <div className="workload-summary-card">
+        <div className="workload-summary-card__value">{data.overloaded_members}</div>
+        <div className="workload-summary-card__label">Overloaded members</div>
+      </div>
+      <div className="workload-summary-card">
+        <div className="workload-summary-card__value">{data.unestimated_tasks}</div>
+        <div className="workload-summary-card__label">Unestimated tasks</div>
+      </div>
+      <div className="workload-summary-card">
+        <div className="workload-summary-card__value">{data.critical_priority_tasks}</div>
+        <div className="workload-summary-card__label">Critical priority</div>
+      </div>
+    </div>
   );
 }
 
 export function WorkloadBoardLegendBar() {
   return (
-    <div className="workload-board-toolbar mb-3">
-      <div className="workload-board-toolbar__legend">
-        {WORKLOAD_BOARD_LEGEND.map((item) => (
-          <span key={item.label} className="workload-board-toolbar__legend-item">
-            <span
-              className="workload-board-toolbar__swatch"
-              style={{ backgroundColor: item.color }}
-            />
-            {item.label}
-          </span>
-        ))}
+    <div className="workload-board-toolbar">
+      <div className="workload-board-toolbar__legend-group">
+        <span className="workload-board-toolbar__legend-heading">Priority</span>
+        <div className="workload-board-toolbar__legend">
+          {WORKLOAD_PRIORITY_LEGEND_ITEMS.map((item) => (
+            <span key={item.id} className="workload-board-toolbar__legend-item">
+              <span
+                className="workload-board-toolbar__swatch workload-board-toolbar__swatch--priority"
+                style={{ backgroundColor: item.color }}
+              />
+              {item.label}
+            </span>
+          ))}
+        </div>
+      </div>
+      <div className="workload-board-toolbar__legend-group">
+        <span className="workload-board-toolbar__legend-heading">Task status</span>
+        <div className="workload-board-toolbar__legend">
+          {WORKLOAD_BOARD_STATUS_LEGEND.map((item) => (
+            <span key={item.label} className="workload-board-toolbar__legend-item">
+              <span
+                className="workload-board-toolbar__swatch"
+                style={{ backgroundColor: item.color }}
+              />
+              {item.label}
+            </span>
+          ))}
+        </div>
       </div>
     </div>
   );
@@ -162,14 +188,21 @@ function WorkloadLegendSwatch({ item }: Readonly<{ item: (typeof WORKLOAD_GRID_L
 }
 
 export function WorkloadLegendRow({
+  mainView,
   showWorkloadPerDay,
   onToggleWorkloadPerDay,
 }: Readonly<{
+  mainView: "grid" | "board";
   showWorkloadPerDay: boolean;
   onToggleWorkloadPerDay: () => void;
 }>) {
+  const hint =
+    mainView === "grid"
+      ? "Click any cell to see day detail"
+      : "Drag cards to reassign · Use Move to reschedule";
+
   return (
-    <div className="workload-legend workload-legend--toolbar mb-3">
+    <div className="workload-legend workload-legend--toolbar">
       <div className="workload-legend__items">
         {WORKLOAD_GRID_LEGEND_ITEMS.map((item) => (
           <span key={item.id} className="workload-legend__item">
@@ -178,13 +211,16 @@ export function WorkloadLegendRow({
           </span>
         ))}
       </div>
-      <button
-        type="button"
-        className={`workload-legend__per-day-toggle ${showWorkloadPerDay ? "is-active" : ""}`}
-        onClick={onToggleWorkloadPerDay}
-      >
-        Show workload per day
-      </button>
+      <div className="workload-legend__actions">
+        <button
+          type="button"
+          className={`workload-legend__per-day-toggle ${showWorkloadPerDay ? "is-active" : ""}`}
+          onClick={onToggleWorkloadPerDay}
+        >
+          {showWorkloadPerDay ? "Hide daily grid" : "Show workload per day"}
+        </button>
+        <span className="workload-legend__hint">{hint}</span>
+      </div>
     </div>
   );
 }
@@ -311,7 +347,7 @@ export function WorkloadGridPanel({
       <Table bordered responsive className="workload-grid-table mb-0">
         <thead>
           <tr>
-            <th className="workload-grid-table__people">PEOPLE</th>
+            <th className="workload-grid-table__people">Member</th>
             {gridData.days.map((d) => {
               const { weekday, dateLabel } = formatWorkloadGridDayHeader(d);
               return (
@@ -367,6 +403,7 @@ export function WorkloadGridPanel({
 type WorkloadPlannerAlertStackProps = Readonly<{
   sessionStatus: string;
   enabled: boolean;
+  teamMemberOnly?: boolean;
   accessForbidden: boolean;
   summaryError: unknown;
   summaryHasError: boolean;
@@ -381,6 +418,7 @@ type WorkloadPlannerAlertStackProps = Readonly<{
 export function WorkloadPlannerAlertStack({
   sessionStatus,
   enabled,
+  teamMemberOnly = false,
   accessForbidden,
   summaryError,
   summaryHasError,
@@ -399,16 +437,23 @@ export function WorkloadPlannerAlertStack({
         </div>
       ) : null}
 
-      {!enabled && sessionStatus === "authenticated" ? (
+      {!enabled && sessionStatus === "authenticated" && !teamMemberOnly ? (
         <Alert variant="warning">
           Your session does not include a phone or extension; workload APIs cannot be called.
         </Alert>
       ) : null}
 
+      {teamMemberOnly ? (
+        <Alert variant="info">
+          Workload is a manager-only view (team owners). Use{" "}
+          <a href="/planner/my-tasks">My Day</a> for your personal task plan.
+        </Alert>
+      ) : null}
+
       {accessForbidden ? (
         <Alert variant="danger">
-          You do not have access to this workload view (403). This area is restricted to team owners
-          on the server.
+          You do not have access to this workload view (403). It is restricted to team managers
+          (owners) on the server.
         </Alert>
       ) : null}
 

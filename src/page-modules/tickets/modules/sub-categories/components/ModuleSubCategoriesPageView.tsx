@@ -13,6 +13,8 @@ import { Button } from "react-bootstrap";
 import type { TicketModulePickerRow, TicketSubmoduleRow } from "../../categories/moduleCategoriesTypes";
 
 export type ModuleSubCategoriesPageViewProps = Readonly<{
+  showBreadcrumb?: boolean;
+  breadcrumbMainLink?: string;
   memoizedFilters: { search: string };
   columns: Column[];
   getListQueryOptions: (params: GenericListPageQueryParams) => GenericListPageQueryOptions;
@@ -36,6 +38,8 @@ export type ModuleSubCategoriesPageViewProps = Readonly<{
 }>;
 
 export const ModuleSubCategoriesPageView: React.FC<ModuleSubCategoriesPageViewProps> = ({
+  showBreadcrumb = true,
+  breadcrumbMainLink = "/main-settings/tickets/modules",
   memoizedFilters,
   columns,
   getListQueryOptions,
@@ -58,7 +62,9 @@ export const ModuleSubCategoriesPageView: React.FC<ModuleSubCategoriesPageViewPr
   onConfirmDelete,
 }) => (
   <React.Fragment>
-    <BreadcrumbItem mainTitle="Tickets" mainLink="/tickets/modules" subTitle="Submodules" />
+    {showBreadcrumb ? (
+      <BreadcrumbItem mainTitle="Tickets" mainLink={breadcrumbMainLink} subTitle="Submodules" />
+    ) : null}
 
     <PageHeader
       title=""

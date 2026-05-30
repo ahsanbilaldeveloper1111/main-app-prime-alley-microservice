@@ -1,10 +1,20 @@
 import { toast } from "react-toastify";
 import axiosInstance from "./axios";
-import { postPagedList, type PaginationParams } from "./paginatedList";
+import type { GroupListResponse, GroupRow } from "../types/controlhub/groups";
+import {
+  normalizePostPagedListResult,
+  postPagedList,
+  type NormalizedPagedList,
+  type PaginationParams,
+} from "./paginatedList";
 
-
-export const ListGroups = async (params: PaginationParams = {}) => {
-  return await postPagedList(`groups/list`, params, { context: "groups" });
+export const ListGroups = async (
+  params: PaginationParams = {},
+): Promise<NormalizedPagedList<GroupRow>> => {
+  const raw = await postPagedList<GroupListResponse>(`groups/list`, params, {
+    context: "groups",
+  });
+  return normalizePostPagedListResult<GroupRow>(raw);
 };
 
 export const getAllGroups = async () => {

@@ -30,38 +30,40 @@ export const DashboardData = async (filters: any = {}) => {
 
 export const ListTickets = async (params: PaginationParams = {}) => {
   try {
-    const { page = 1, perPage = 15, search = "", draw = 1, filters = {}, isExport = false, exportType = '', moduleSlug = '' } = params;
-    
-    // Build query parameters for the new API
-    const queryParams: any = {
-      page,
-      per_page: perPage,
-      module_slug: moduleSlug,
-      ...filters
-    };
-    
-    // Add search if provided
-    if (search) {
-      queryParams.search = search;
-    }
-    
-    const response = await axiosInstance.post('/tickets/list', {
-      page,
-      perPage,
-      search,
-      draw,
-      ...filters,
-      isExport,
-      exportType,
-      module_slug: moduleSlug
-    }, {
-      responseType: isExport ? 'blob' : 'json',
-      headers: isExport ? {
-        'Accept': '*/*',
-        'Content-Type': 'application/json'
-      } : undefined
-    });
-  
+    const {
+      page = 1,
+      perPage = 15,
+      search = "",
+      draw = 1,
+      filters = {},
+      isExport = false,
+      exportType = "",
+      moduleSlug = "",
+    } = params;
+
+    const response = await axiosInstance.post(
+      "/tickets/list",
+      {
+        page,
+        perPage,
+        search,
+        draw,
+        ...filters,
+        isExport,
+        exportType,
+        module_slug: moduleSlug,
+      },
+      {
+        responseType: isExport ? "blob" : "json",
+        headers: isExport
+          ? {
+              Accept: "*/*",
+              "Content-Type": "application/json",
+            }
+          : undefined,
+      },
+    );
+
     return response?.data?.data;
   } catch (error) {
     reportApiErrorFromCatch(error, "tickets");
@@ -332,13 +334,63 @@ export const UpdateTicketDetails = async (
     }
   };
 
+function readTicketRecord(value: unknown): Record<string, unknown> | null {
+  return value != null && typeof value === "object"
+    ? (value as Record<string, unknown>)
+    : null;
+}
+
+function looksLikeTicketRecord(record: Record<string, unknown>): boolean {
+  return (
+    record.id != null &&
+    (record.title != null ||
+      record.description != null ||
+      record.ticket_status_id != null ||
+      record.module_id != null)
+  );
+}
+
+/** Unwrap nested view-ticket API envelopes to a single ticket record. */
+export function normalizeViewTicketPayload(
+  payload: unknown,
+): Record<string, unknown> | null {
+  const record = readTicketRecord(payload);
+  if (!record) {
+    return null;
+  }
+
+  if (looksLikeTicketRecord(record)) {
+    return record;
+  }
+
+  if (record.success === true) {
+    const successData = normalizeViewTicketPayload(record.data);
+    if (successData) {
+      return successData;
+    }
+  }
+
+  const nested = normalizeViewTicketPayload(record.data);
+  if (nested) {
+    return nested;
+  }
+
+  if (record.id == null) {
+    return null;
+  }
+  return record;
+}
+
 export const GetTicket = async (id: string) => {
   try {
     const response = await axiosInstance.post(`/tickets/view-ticket`, {
       id: id
     });
     if(response.data){
-      return response.data?.data;
+      return (
+        normalizeViewTicketPayload(response.data?.data) ??
+        normalizeViewTicketPayload(response.data)
+      );
     }else{
       toast.error('Failed to fetch ticket');
     }
@@ -456,13 +508,31 @@ export const GetAssigneeComments = async (ticketId: string) => {
   }
 };
 
+export const UpdateTicketFromFormData = async (formData: FormData) => {
+  try {
+    const response = await axiosInstance.post(`/tickets/update-ticket`, formData);
+
+    if (response.data) {
+      const responseData = response.data;
+      if (responseData.code == 200) {
+        toast.success("Ticket details updated successfully");
+        return true;
+      }
+      toast.error(responseData.message);
+      return false;
+    }
+    toast.error("Failed to update ticket details");
+    return false;
+  } catch (error) {
+    reportApiErrorFromCatch(error, "tickets");
+    throw error;
+  }
+};
 
 export const loadImage = async (image: string) => {
   try {
-    const response = await axiosInstance.get(`/${image}`, {
-      params: { image: image },
-      // responseType: 'blob'
-    });
+    const imagePath = image.replace(/^\/+/, "");
+    const response = await axiosInstance.get(`/tickets/${imagePath}`);
     if(response?.data){
       return response.data?.data?.base64_data_url;
     }else{

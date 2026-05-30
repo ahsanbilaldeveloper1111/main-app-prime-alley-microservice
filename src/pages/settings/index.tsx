@@ -45,18 +45,18 @@ import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
 
 // Import ControlHub components
-import Users from "@pages/controlhub/users";
-import Teams from "@pages/controlhub/teams";
-import Groups from "@pages/controlhub/groups";
-import Ranks from "@pages/controlhub/ranks";
+import UsersDirectory from "@page-modules/controlhub/users/UsersDirectory";
+import TeamsPanel from "@page-modules/controlhub/teams/TeamsPanel";
+import GroupsPanel from "@page-modules/controlhub/groups/GroupsPanel";
+import RanksPanel from "@page-modules/controlhub/ranks/RanksPanel";
 
 // Import CRM components
-import Campaigns from "@pages/crm/campaigns";
-import Industries from "@pages/crm/industries";
-import Products from "@pages/crm/products";
-import Stages from "@pages/crm/stages";
-import DealTemplates from "@pages/crm/deal-templates";
-import BusinessTypes from "@pages/crm/business-types";
+import BusinessTypesPanel from "@page-modules/crm/business-types/BusinessTypesPanel";
+import CrmCampaignsPanel from "@page-modules/crm/campaigns/CrmCampaignsPanel";
+import DealTemplatesPanel from "@page-modules/crm/deal-templates/DealTemplatesPanel";
+import IndustriesPanel from "@page-modules/crm/industries/IndustriesPanel";
+import ProductsPanel from "@page-modules/crm/products/ProductsPanel";
+import StagesPanel from "@page-modules/crm/stages/StagesPanel";
 
 // Import Telco Gateway components
 import GsmAssign from "@pages/gsm/assign";
@@ -72,17 +72,17 @@ import Services from "@pages/pulse/services";
 import Alerts from "@pages/pulse/alerts-old";
 
 // Import Tickets components
-import TicketStatuses from "@pages/tickets/statuses";
-import TicketModules from "@pages/tickets/modules";
-import ModuleCategories from "@pages/tickets/modules/categories";
-import ModuleSubCategories from "@pages/tickets/modules/sub-categories";
-import TicketTypes from "@pages/tickets/types";
+import ModuleCategoriesPanel from "@page-modules/tickets/modules/categories/ModuleCategoriesPanel";
+import ModuleSubCategoriesPanel from "@page-modules/tickets/modules/sub-categories/ModuleSubCategoriesPanel";
+import TicketModulesPanel from "@page-modules/tickets/modules/TicketModulesPanel";
+import TicketStatusesPanel from "@page-modules/tickets/statuses/TicketStatusesPanel";
+import TicketTypesPanel from "@page-modules/tickets/types/TicketTypesPanel";
 
 // Import FAQ components
-import FAQModules from "@pages/faqs/modules";
-import FAQTopics from "@pages/faqs/topics";
-import FAQItems from "@pages/faqs/items";
-import FAQTypes from "@pages/faqs/types";
+import FaqModulesPanel from "@page-modules/faqs/modules/FaqModulesPanel";
+import FAQTopicsPanel from "@page-modules/faqs/topics/FAQTopicsPanel";
+import FaqItemsPanel from "@page-modules/faqs/items/FaqItemsPanel";
+import FAQTypesPanel from "@page-modules/faqs/types/FAQTypesPanel";
 
 // Import Staff Insights & Work Planner components
 import RequestCategories from "@pages/workforce/request-categories";
@@ -2218,21 +2218,21 @@ const Settings = () => {
                 {/* User Management Content */}
                 {activeTab === "user-management" && shouldRenderTab("user-management", activeUserManagementTab) && (
                   <div>
-                    {activeUserManagementTab === "user-directory" && <Users />}
-                    {activeUserManagementTab === "supervisor-teams" && <Teams />}
-                    {activeUserManagementTab === "management-groups" && <Groups />}
-                    {activeUserManagementTab === "ranks-and-permissions" && <Ranks />}
+                    {activeUserManagementTab === "user-directory" && <UsersDirectory />}
+                    {activeUserManagementTab === "supervisor-teams" && <TeamsPanel />}
+                    {activeUserManagementTab === "management-groups" && <GroupsPanel />}
+                    {activeUserManagementTab === "ranks-and-permissions" && <RanksPanel />}
                   </div>
                 )}
                 {/* CRM Content */}
                 {activeTab === "crm" && shouldRenderTab("crm", activeCrmTab) && (
                   <div>
-                    {activeCrmTab === "campaigns" && <Campaigns />}
-                    {activeCrmTab === "industries" && <Industries />}
-                    {activeCrmTab === "products" && <Products />}
-                    {activeCrmTab === "stages" && <Stages />}
-                    {activeCrmTab === "deal-templates" && <DealTemplates />}
-                    {activeCrmTab === "business-types" && <BusinessTypes />}
+                    {activeCrmTab === "campaigns" && <CrmCampaignsPanel />}
+                    {activeCrmTab === "industries" && <IndustriesPanel />}
+                    {activeCrmTab === "products" && <ProductsPanel />}
+                    {activeCrmTab === "stages" && <StagesPanel />}
+                    {activeCrmTab === "deal-templates" && <DealTemplatesPanel />}
+                    {activeCrmTab === "business-types" && <BusinessTypesPanel />}
                   </div>
                 )}
 
@@ -2266,21 +2266,21 @@ const Settings = () => {
                 {/* Tickets Content */}
                 {activeTab === "tickets" && shouldRenderTab("tickets", activeTicketsTab) && (
                   <div>
-                    {activeTicketsTab === "statuses" && <TicketStatuses />}
-                    {activeTicketsTab === "modules" && <TicketModules />}
-                    {activeTicketsTab === "categories" && <ModuleCategories />}
-                    {activeTicketsTab === "sub-categories" && <ModuleSubCategories />}
-                    {activeTicketsTab === "types" && <TicketTypes />}
+                    {activeTicketsTab === "statuses" && <TicketStatusesPanel />}
+                    {activeTicketsTab === "modules" && <TicketModulesPanel />}
+                    {activeTicketsTab === "categories" && <ModuleCategoriesPanel />}
+                    {activeTicketsTab === "sub-categories" && <ModuleSubCategoriesPanel />}
+                    {activeTicketsTab === "types" && <TicketTypesPanel />}
                   </div>
                 )}
 
                 {/* Help Center Content */}
                 {activeTab === "help-center" && shouldRenderTab("help-center", activeHelpCenterTab) && (
                   <div>
-                    {activeHelpCenterTab === "modules" && <FAQModules />}
-                    {activeHelpCenterTab === "topics" && <FAQTopics />}
-                    {activeHelpCenterTab === "items" && <FAQItems />}
-                    {activeHelpCenterTab === "types" && <FAQTypes />}
+                    {activeHelpCenterTab === "modules" && <FaqModulesPanel />}
+                    {activeHelpCenterTab === "topics" && <FAQTopicsPanel />}
+                    {activeHelpCenterTab === "items" && <FaqItemsPanel />}
+                    {activeHelpCenterTab === "types" && <FAQTypesPanel />}
                   </div>
                 )}
 

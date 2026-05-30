@@ -1,5 +1,7 @@
 import type { AnalysisPerCallCostRow } from "@utils/aiAnalytics";
 
+import { formatAnalysisTimestamp } from "../shared/formatAnalysisTimestamp";
+
 const intFmt = new Intl.NumberFormat(undefined, { maximumFractionDigits: 0 });
 const usdFmt = new Intl.NumberFormat(undefined, {
   style: "currency",
@@ -8,15 +10,68 @@ const usdFmt = new Intl.NumberFormat(undefined, {
   maximumFractionDigits: 6,
 });
 
-function formatTimestamp(value: string | null): string {
-  if (!value?.trim()) {
+export type PerCallCostTableColumnKey =
+  | "call_id"
+  | "agent_id"
+  | "call_time"
+  | "duration_s"
+  | "input_tokens"
+  | "output_tokens"
+  | "analysis_cost_usd"
+  | "status"
+  | "served_from"
+  | "fail_reason"
+  | "created_at";
+
+export const PER_CALL_COST_TABLE_COLUMNS: ReadonlyArray<{
+  key: PerCallCostTableColumnKey;
+  label: string;
+  width: string;
+  align?: "left" | "right";
+}> = [
+  { key: "call_id", label: "Call ID", width: "280px" },
+  { key: "agent_id", label: "Agent", width: "100px" },
+  { key: "call_time", label: "Call time", width: "168px" },
+  { key: "duration_s", label: "Duration", width: "88px" },
+  { key: "input_tokens", label: "Input tokens", width: "108px", align: "right" },
+  { key: "output_tokens", label: "Output tokens", width: "116px", align: "right" },
+  { key: "analysis_cost_usd", label: "Cost", width: "112px", align: "right" },
+  { key: "status", label: "Status", width: "88px" },
+  { key: "served_from", label: "Served from", width: "100px" },
+  { key: "fail_reason", label: "Fail reason", width: "160px" },
+  { key: "created_at", label: "Recorded", width: "168px" },
+];
+
+function formatOptionalText(value: string | null | undefined): string {
+  const trimmed = value?.trim();
+  return trimmed || "—";
+}
+
+function formatLabelValue(value: string): string {
+  const trimmed = value.trim();
+  if (!trimmed) {
     return "—";
   }
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return value;
+  return trimmed.charAt(0).toUpperCase() + trimmed.slice(1).toLowerCase();
+}
+
+function formatCallTime(row: AnalysisPerCallCostRow): string {
+  if (row.call_datetime?.trim()) {
+    return formatAnalysisTimestamp(row.call_datetime);
   }
-  return date.toLocaleString();
+  const dateOnly = row.call_date?.trim();
+  if (!dateOnly) {
+    return "—";
+  }
+  const parsed = new Date(dateOnly);
+  if (Number.isNaN(parsed.getTime())) {
+    return dateOnly;
+  }
+  return parsed.toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
 }
 
 function formatDurationSeconds(seconds: number): string {
@@ -33,35 +88,15 @@ function formatDurationSeconds(seconds: number): string {
 
 export function formatPerCallCostCell(
   row: AnalysisPerCallCostRow,
-  column:
-    | "id"
-    | "tenant_id"
-    | "call_id"
-    | "agent_id"
-    | "call_date"
-    | "call_datetime"
-    | "duration_s"
-    | "input_tokens"
-    | "output_tokens"
-    | "analysis_cost_usd"
-    | "status"
-    | "fail_reason"
-    | "served_from"
-    | "created_at",
+  column: PerCallCostTableColumnKey,
 ): string {
   switch (column) {
-    case "id":
-      return row.id || "—";
-    case "tenant_id":
-      return row.tenant_id;
     case "call_id":
-      return row.call_id || "—";
+      return formatOptionalText(row.call_id);
     case "agent_id":
-      return row.agent_id ?? "—";
-    case "call_date":
-      return row.call_date ?? "—";
-    case "call_datetime":
-      return formatTimestamp(row.call_datetime);
+      return formatOptionalText(row.agent_id);
+    case "call_time":
+      return formatCallTime(row);
     case "duration_s":
       return formatDurationSeconds(row.duration_s);
     case "input_tokens":
@@ -71,13 +106,13 @@ export function formatPerCallCostCell(
     case "analysis_cost_usd":
       return usdFmt.format(row.analysis_cost_usd);
     case "status":
-      return row.status || "—";
-    case "fail_reason":
-      return row.fail_reason ?? "—";
+      return formatLabelValue(row.status);
     case "served_from":
-      return row.served_from ?? "—";
+      return row.served_from ? formatLabelValue(row.served_from) : "—";
+    case "fail_reason":
+      return formatOptionalText(row.fail_reason);
     case "created_at":
-      return formatTimestamp(row.created_at);
+      return formatAnalysisTimestamp(row.created_at);
     default:
       return "—";
   }
