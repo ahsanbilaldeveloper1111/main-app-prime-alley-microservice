@@ -351,44 +351,64 @@ function MyDaySuggestedItemButton({
   return (
     <button
       type="button"
-      className={`myday-suggested-item ${inMyDay ? "is-added" : ""} ${className}`.trim()}
+      className={`myday-suggested-item ${inMyDay ? "is-added" : ""}`}
       disabled={inMyDay}
       onClick={() => onAdd(task)}
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 8,
+        width: "100%",
+        textAlign: "left",
+        padding: "7px 10px",
+        border: `1px solid ${inMyDay ? "#eaf0f6" : "#eaf0f6"}`,
+        borderRadius: 7,
+        background: inMyDay ? "#f9fafb" : "#f9fafb",
+        cursor: inMyDay ? "not-allowed" : "pointer",
+        opacity: inMyDay ? 0.55 : 1,
+        fontFamily: "inherit",
+        transition: "all 0.15s ease",
+      }}
     >
-      <div className="title">{task.title}</div>
-      <div className="meta">
-        {dueLabel ? <span className="myday-tag myday-tag--due">{dueLabel}</span> : null}
-        <span
-          className={`myday-tag myday-tag--project ${
-            task.isPersonalTask ? "myday-tag--personal" : ""
-          } ${task.isOrganizationalTask ? "myday-tag--organizational" : ""}`}
-        >
-          {task.projectName}
-        </span>
-        <span className={`myday-tag myday-tag--priority priority-${priorityKey}`}>
-          {task.priority}
-        </span>
-        {task.isFlexibleTask ? (
-          <span className="myday-tag myday-tag--flexible">Flexible Task</span>
-        ) : null}
-        {task.showIgnoredFlag ? (
-          <span className="myday-tag myday-tag--ignored">3x Ignored</span>
-        ) : null}
-        <span
-          className={`myday-tag myday-tag--estimate ${
-            task.estimateMinutes <= 0 ? "myday-tag--no-estimate" : ""
-          }`}
-        >
-          {task.hasEstimate || task.estimateMinutes > 0 ? (
-            toMinutesDisplay(Math.max(0, task.estimateMinutes)) || "Estimated"
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div className="title" style={{
+          fontSize: "clamp(11px, 1vw, 12px)",
+          fontWeight: 500,
+          color: "#141414",
+          marginBottom: 4,
+          whiteSpace: "nowrap",
+          overflow: "hidden",
+          textOverflow: "ellipsis",
+        }}>{task.title}</div>
+        <div className="meta" style={{ display: "flex", flexWrap: "wrap", gap: 5, alignItems: "center" }}>
+          {dueLabel ? (
+            <span style={{ fontSize: 10, color: "#718096" }}>{dueLabel}</span>
+          ) : null}
+          <span className={`myday-tag myday-tag--priority priority-${priorityKey}`} style={{ fontSize: 10 }}>
+            {task.priority}
+          </span>
+          {task.estimateMinutes > 0 ? (
+            <span style={{ fontSize: 10, color: "#718096" }}>{toMinutesDisplay(task.estimateMinutes)}</span>
           ) : (
-            <span className="myday-tag__no-estimate-text">
-              <span className="myday-unestimated-dot" title="No estimate" aria-label="No estimate" />
-              <span>No estimate</span>
-            </span>
+            <span style={{ fontSize: 10, color: "#f97316", fontWeight: 500 }}>No est.</span>
           )}
-        </span>
-        {inMyDay ? <span className="myday-added-label">Added</span> : null}
+        </div>
+      </div>
+      <div style={{
+        width: 22,
+        height: 22,
+        borderRadius: "50%",
+        border: inMyDay ? "1px solid #22c55e" : "1px solid #e2e8f0",
+        background: inMyDay ? "#f0fdf4" : "#fff",
+        color: inMyDay ? "#22c55e" : "#718096",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        flexShrink: 0,
+        fontSize: 14,
+        transition: "all 0.15s ease",
+      }}>
+        {inMyDay ? "✓" : "+"}
       </div>
     </button>
   );
@@ -451,16 +471,44 @@ type MyDayTaskCardProps = Readonly<{
 
 function MyDayTaskCard({ task, onToggleComplete, onRemove, onEditEstimate }: MyDayTaskCardProps) {
   const priorityKey = task.priority.toLowerCase().replace(/\s+/g, "-");
+  const priorityBorderColor: Record<string, string> = {
+    urgent: "#ef4444",
+    critical: "#ef4444",
+    high: "#f97316",
+    medium: "#eab308",
+    normal: "#eab308",
+    low: "#22c55e",
+  };
+  const borderColor = task.isCompleted ? "#e2e8f0" : (priorityBorderColor[priorityKey] ?? "#eaf0f6");
+
   return (
-    <div className={`myday-task-card ${task.isCompleted ? "is-completed" : ""}`} data-priority={priorityKey}>
+    <div
+      className={`myday-task-card ${task.isCompleted ? "is-completed" : ""}`}
+      style={{ borderLeft: `3px solid ${borderColor}` }}
+    >
       <div className="myday-task-card__main">
         <button
           type="button"
           className="myday-toggle-btn myday-task-card__complete"
           aria-label={task.isCompleted ? "Mark incomplete" : "Mark complete"}
           onClick={() => onToggleComplete(task)}
+          style={{
+            width: 20,
+            height: 20,
+            borderRadius: "50%",
+            border: task.isCompleted ? "2px solid #22c55e" : "2px solid #cbd5e0",
+            background: task.isCompleted ? "#22c55e" : "transparent",
+            color: task.isCompleted ? "#fff" : "transparent",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            flexShrink: 0,
+            marginTop: 2,
+            cursor: "pointer",
+            transition: "all 0.15s ease",
+          }}
         >
-          {task.isCompleted ? <CircleCheckBig size={18} /> : <Circle size={18} />}
+          {task.isCompleted ? <CircleCheckBig size={12} /> : null}
         </button>
         <div className="myday-task-card__body">
           <div className="myday-task-card__title">{task.title}</div>
@@ -473,10 +521,18 @@ function MyDayTaskCard({ task, onToggleComplete, onRemove, onEditEstimate }: MyD
               {task.projectName}
             </span>
             <span className={`myday-tag myday-tag--priority priority-${priorityKey}`}>
+              <span style={{
+                width: 6,
+                height: 6,
+                borderRadius: "50%",
+                background: priorityBorderColor[priorityKey] ?? "#94a3b8",
+                display: "inline-block",
+                flexShrink: 0,
+              }} />
               {task.priority}
             </span>
             {task.isFlexibleTask ? (
-              <span className="myday-tag myday-tag--flexible">Flexible Task</span>
+              <span className="myday-tag myday-tag--flexible">Flexible</span>
             ) : null}
             {task.showIgnoredFlag ? (
               <span className="myday-tag myday-tag--ignored">3x Ignored</span>
@@ -491,7 +547,7 @@ function MyDayTaskCard({ task, onToggleComplete, onRemove, onEditEstimate }: MyD
         aria-label="Remove from My Day"
         onClick={() => onRemove(task.id)}
       >
-        <X size={16} />
+        <X size={14} />
       </button>
     </div>
   );
@@ -1647,12 +1703,13 @@ function MyDayTasksPageView({ vm }: MyDayTasksPageViewProps) {
   return (
     <div className="myday-page-shell">
       <BreadcrumbItem mainTitle="Planner" mainLink="/planner/dashboard" subTitle="My Day" />
+      <div className="myday-header-area">
+        <MyDayPageHeader vm={vm} />
+        <MyDayCapacitySection vm={vm} />
+      </div>
       <div className="myday-layout">
         <div className="myday-main">
-          <MyDayPageHeader vm={vm} />
-          <MyDayCapacitySection vm={vm} />
           <MyDayRolloverSection vm={vm} />
-          <MyDayTodayTasksSection vm={vm} />
           {showTeam && vm.reporteeExtensions.length > 0 ? (
             <MyDayTeamSection
               planDate={vm.planDate || vm.today}
@@ -1661,6 +1718,7 @@ function MyDayTasksPageView({ vm }: MyDayTasksPageViewProps) {
               hierarchyExtensions={vm.hierarchyDataExtensions}
             />
           ) : null}
+          <MyDayTodayTasksSection vm={vm} />
           <MyDayCompletedSection vm={vm} />
         </div>
         <MyDaySuggestionsPanel vm={vm} />

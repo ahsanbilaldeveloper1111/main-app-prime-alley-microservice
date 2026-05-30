@@ -2,6 +2,12 @@
   font-family: "Lexend Deca", Helvetica, Arial, sans-serif;
 
   // ── Layout ──────────────────────────────────────────
+  .myday-header-area {
+    padding: clamp(14px, 2vw, 20px) clamp(16px, 2.5vw, 24px) clamp(10px, 1.5vw, 16px);
+    background: #fff;
+    border-bottom: 1px solid #eaf0f6;
+  }
+
   .myday-layout {
     display: grid;
     grid-template-columns: minmax(0, 1fr) clamp(260px, 22vw, 320px);
@@ -22,7 +28,7 @@
     justify-content: space-between;
     align-items: flex-start;
     gap: 12px;
-    margin-bottom: clamp(10px, 1.5vw, 16px);
+    margin-bottom: clamp(8px, 1.2vw, 12px);
 
     h2 {
       margin: 0 0 3px;
@@ -212,6 +218,10 @@
     background: #f1f5f9;
     overflow: hidden;
     margin-bottom: 6px;
+
+    &--capacity {
+      height: 6px;
+    }
   }
 
   .myday-progress-fill {
@@ -814,10 +824,12 @@
   .myday-suggested {
     background: #fff;
     padding: clamp(12px, 1.8vw, 16px) clamp(12px, 1.8vw, 14px);
-    height: calc(100vh - 74px);
+    min-height: calc(100vh - 74px);
+    max-height: calc(100vh - 74px);
     overflow-y: auto;
     position: sticky;
-    top: 74px;
+    top: 0;
+    border-left: 1px solid #eaf0f6;
 
     h4 {
       font-size: clamp(12px, 1.1vw, 14px);
@@ -860,18 +872,21 @@
   .myday-suggested-groups {
     display: flex;
     flex-direction: column;
-    gap: 14px;
+    gap: 10px;
+    padding: 0 !important;
+    margin: 0 !important;
   }
 
   .myday-suggested-group {
-    margin: 0;
+    padding: 0 !important;
+    margin: 0 !important;
   }
 
   .myday-suggested-group__title {
     display: flex;
     align-items: center;
     gap: 6px;
-    margin: 0 0 8px;
+    margin: 0 0 6px;
     font-size: 10px;
     font-weight: 600;
     letter-spacing: 0.06em;
@@ -906,6 +921,7 @@
     display: flex;
     flex-direction: column;
     gap: 5px;
+    margin-bottom: 4px;
   }
 
   .myday-suggested-item {
