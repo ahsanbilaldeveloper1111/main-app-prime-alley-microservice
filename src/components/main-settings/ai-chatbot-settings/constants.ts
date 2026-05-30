@@ -1,6 +1,7 @@
 /** Applied when GET `/chat/tenant/settings` returns no data or omits rate limits. */
 export const AI_CHATBOT_DEFAULT_RATE_LIMITS = {
   user_per_minute: 20,
+  user_per_day: 500,
 } as const;
 
 /** Input placeholders shown when fields are empty. */

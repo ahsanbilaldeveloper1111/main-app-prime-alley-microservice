@@ -1,0 +1,28 @@
+{
+  "_scenario": "inbound-connected",
+  "_description": "Agent answered the ringing call",
+  "type": "call_events",
+  "data": {
+    "callId": "CALL-001",
+    "eventType": "CONNECTED",
+    "sequence": 2,
+    "eventTime": "2026-01-01T10:00:05.000Z",
+    "isConference": false,
+    "isOneToOne": true,
+    "isTerminating": false,
+    "hasActiveParticipants": true,
+    "eventName": "CallConnected",
+    "currentState": "CONNECTED",
+    "parties": [
+      {
+        "callId": "CALL-001",
+        "callingAddress": "5551234",
+        "calledAddress": "1001",
+        "callStatus": "CONNECTED",
+        "callingDeviceName": "EXTERNAL",
+        "callingDeviceType": "IP_PHONE",
+        "startTime": "2026-01-01T10:00:05.000Z"
+      }
+    ]
+  }
+}

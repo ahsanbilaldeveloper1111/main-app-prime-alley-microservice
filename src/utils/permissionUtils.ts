@@ -21,9 +21,11 @@ export const usePermissions = () => {
 };
 
 const ROUTE_PERMISSIONS: Record<string, string[]> = {
-  "/controlhub/users": ["view-users"],
-  "/controlhub/ranks": ["view-ranks"],
-  "/controlhub/groups": ["view-groups"],
+  "/main-settings/users-teams/user-directory": ["view-users"],
+  "/main-settings/users-teams/supervisor-teams": ["view-teams"],
+  "/main-settings/users-teams/management-groups": ["view-groups"],
+  "/main-settings/users-teams/ranks-and-permissions": ["view-ranks"],
+  "/main-settings/users-teams": ["view-users"],
   "/gsm/dashboard": ["view-gsm"],
   "/gsm/list": ["view-gsm"],
   "/gsm/assign": ["view-gsm"],

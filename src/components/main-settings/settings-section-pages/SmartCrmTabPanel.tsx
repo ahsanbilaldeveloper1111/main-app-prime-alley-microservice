@@ -1,28 +1,26 @@
-import BusinessTypes from '@pages/crm/business-types'
-import Campaigns from '@pages/crm/campaigns'
-import DealTemplates from '@pages/crm/deal-templates'
-import Industries from '@pages/crm/industries'
-import Products from '@pages/crm/products'
-import Stages from '@pages/crm/stages'
+import BusinessTypesPanel from '@page-modules/crm/business-types/BusinessTypesPanel'
+import CrmCampaignsPanel from '@page-modules/crm/campaigns/CrmCampaignsPanel'
+import DealTemplatesPanel from '@page-modules/crm/deal-templates/DealTemplatesPanel'
+import IndustriesPanel from '@page-modules/crm/industries/IndustriesPanel'
+import ProductsPanel from '@page-modules/crm/products/ProductsPanel'
+import StagesPanel from '@page-modules/crm/stages/StagesPanel'
 import React from 'react'
 
-const settingsEmbed = { hideBreadcrumb: true as const }
-
-/** Each tab: CRM page with settings chrome; list search uses `useDebouncedSearchInput` (400ms). */
+/** Each tab: Smart CRM admin panel; list search uses `useDebouncedSearchInput` (400ms). */
 export function SmartCrmTabPanel({ activeTab }: Readonly<{ activeTab: string }>) {
   switch (activeTab) {
     case 'stages':
-      return <Stages {...settingsEmbed} />
+      return <StagesPanel />
     case 'industries':
-      return <Industries {...settingsEmbed} />
+      return <IndustriesPanel />
     case 'products':
-      return <Products {...settingsEmbed} />
+      return <ProductsPanel />
     case 'deal-templates':
-      return <DealTemplates {...settingsEmbed} />
+      return <DealTemplatesPanel />
     case 'business-types':
-      return <BusinessTypes {...settingsEmbed} />
+      return <BusinessTypesPanel />
     case 'campaigns':
-      return <Campaigns {...settingsEmbed} />
+      return <CrmCampaignsPanel />
     default:
       return null
   }

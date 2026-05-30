@@ -20,6 +20,7 @@ const { PERMISSIONS } = HEADER_CONSTANTS;
 
 import { useAiFaqListColumns } from "../aiFaqListColumns";
 import {
+  buildAiFaqSubmitFields,
   emptyFaqListPage,
   evaluateAiFaqSubmitDraft,
   getAiFaqSubmitValidationError,
@@ -130,11 +131,12 @@ export function useAIFaqsTenantPage() {
         return;
       }
 
-      const faqsJson = JSON.stringify(evaluation.validFAQs);
+      const fields = buildAiFaqSubmitFields(evaluation.validFAQs, draftFiles);
       const payload: CreateTenantFAQPayload = {
         tenant_id: tenantForPayload,
-        faqs: faqsJson,
-        ...(evaluation.hasAttachments ? { files: draftFiles } : {}),
+        faqs: fields.faqs,
+        have_files: fields.have_files,
+        ...(fields.files?.length ? { files: fields.files } : {}),
       };
 
       await createTenantFAQ(payload);

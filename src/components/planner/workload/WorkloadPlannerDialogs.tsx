@@ -29,10 +29,9 @@ import {
   workloadDayCapacityMinutes,
   workloadMemberBaseName,
   workloadMemberInitials,
-  workloadPriorityLabel,
-  workloadPriorityTone,
   workloadTaskProjectLabel,
 } from "@page-modules/planner/workload/workloadDomain";
+import { WorkloadPriorityBadge } from "./WorkloadPlannerSubviews";
 
 type DayQuerySlice = Readonly<{
   isPending: boolean;
@@ -113,7 +112,6 @@ function WorkloadDayTaskCard({
 }: WorkloadDayTaskCardProps) {
   const [estimateDraft, setEstimateDraft] = useState("");
   const unestimated = isWorkloadTaskUnestimated(task);
-  const priorityTone = workloadPriorityTone(task.priority);
   const showOrgBadge = isWorkloadOrganizationTask(task);
   const projectLabel = workloadTaskProjectLabel(task);
   const dueDateLabel = task.due_date?.slice(0, 10) ?? null;
@@ -146,9 +144,7 @@ function WorkloadDayTaskCard({
       </div>
 
       <div className="workload-day-task-card__tags">
-        <span className={`workload-priority-badge workload-priority-badge--${priorityTone}`}>
-          {workloadPriorityLabel(task.priority)}
-        </span>
+        <WorkloadPriorityBadge priority={task.priority} />
         {task.status_name ? (
           <span
             className="workload-day-task-card__tag"

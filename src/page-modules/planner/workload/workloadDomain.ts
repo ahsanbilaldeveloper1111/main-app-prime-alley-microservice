@@ -2,7 +2,13 @@ import {
   isExtensionPlaceholderLabel,
   lookupHierarchyExtensionDisplayName,
 } from "@components/planner/plannerTasksListing/plannerTasksListingDomain";
-import type { WorkloadGridData, WorkloadGridMember, WorkloadSummaryMember } from "@utils/tasks";
+import type {
+  AssigneeMatch,
+  WorkloadGridData,
+  WorkloadGridMember,
+  WorkloadRangePreset,
+  WorkloadSummaryMember,
+} from "@utils/tasks";
 
 const MINUTES_PER_HOUR = 60;
 
@@ -179,12 +185,43 @@ export function workloadDayCapacityMinutes(
   return DEFAULT_DAY_CAPACITY_MINUTES;
 }
 
+const WORKLOAD_PRIORITY_STRING_RANK: Readonly<Record<string, number>> = {
+  urgent: 3,
+  critical: 3,
+  high: 2,
+  normal: 1,
+  medium: 1,
+  low: 0,
+};
+
+/** 0 = low, 1 = medium/normal, 2 = high, 3 = critical/urgent. */
+export function normalizeWorkloadPriorityRank(priority: unknown): number {
+  if (typeof priority === "number" && Number.isFinite(priority)) {
+    if (priority >= 3) return 3;
+    if (priority >= 2) return 2;
+    if (priority >= 1) return 1;
+    return 0;
+  }
+
+  if (typeof priority === "string") {
+    const mapped = WORKLOAD_PRIORITY_STRING_RANK[priority.trim().toLowerCase()];
+    if (mapped !== undefined) return mapped;
+    const asNumber = Number(priority);
+    if (Number.isFinite(asNumber)) {
+      return normalizeWorkloadPriorityRank(asNumber);
+    }
+  }
+
+  return 1;
+}
+
 export function workloadPriorityTone(
-  priority: number,
+  priority: unknown,
 ): "critical" | "high" | "medium" | "low" {
-  if (priority >= 3) return "critical";
-  if (priority >= 2) return "high";
-  if (priority === 1) return "medium";
+  const rank = normalizeWorkloadPriorityRank(priority);
+  if (rank >= 3) return "critical";
+  if (rank >= 2) return "high";
+  if (rank >= 1) return "medium";
   return "low";
 }
 
@@ -217,6 +254,57 @@ export function formatWorkloadDayTotalSummary(
 const WORKLOAD_VIEW_STORAGE_KEY = "planner.workload.mainView";
 
 export type WorkloadMainView = "grid" | "board";
+
+/** Workload page filter form + API query inputs (draft until Apply). */
+export type WorkloadPlannerFilterState = Readonly<{
+  range: WorkloadRangePreset;
+  customStart: string;
+  customEnd: string;
+  assigneeMatch: AssigneeMatch;
+  projectFilter: WorkloadProjectFilterValue;
+  memberFilter: string;
+  priorityFilter: WorkloadPriorityFilterValue;
+}>;
+
+export function createDefaultWorkloadPlannerFilters(): WorkloadPlannerFilterState {
+  const week = getWorkloadWeekRange("this_week");
+  return {
+    range: "this_week",
+    customStart: week.start,
+    customEnd: week.end,
+    assigneeMatch: "primary",
+    projectFilter: "all",
+    memberFilter: "all",
+    priorityFilter: "all",
+  };
+}
+
+export function workloadPlannerFiltersEqual(
+  a: WorkloadPlannerFilterState,
+  b: WorkloadPlannerFilterState,
+): boolean {
+  return (
+    a.range === b.range &&
+    a.customStart === b.customStart &&
+    a.customEnd === b.customEnd &&
+    a.assigneeMatch === b.assigneeMatch &&
+    a.projectFilter === b.projectFilter &&
+    a.memberFilter === b.memberFilter &&
+    a.priorityFilter === b.priorityFilter
+  );
+}
+
+export function isDefaultWorkloadPlannerFilters(
+  filters: WorkloadPlannerFilterState,
+): boolean {
+  return workloadPlannerFiltersEqual(filters, createDefaultWorkloadPlannerFilters());
+}
+
+export function isWorkloadPlannerDraftRangeValid(
+  filters: Pick<WorkloadPlannerFilterState, "range" | "customStart" | "customEnd">,
+): boolean {
+  return filters.range !== "custom" || isWorkloadCustomRangeValid(filters.customStart, filters.customEnd);
+}
 
 export function readWorkloadMainViewPreference(): WorkloadMainView {
   if (globalThis.window === undefined) return "grid";
@@ -280,18 +368,46 @@ export function isSameCalendarDay(isoDate: string, now = new Date()): boolean {
   );
 }
 
-export function workloadPriorityLabel(priority: number): string {
-  if (priority >= 3) return "Critical";
-  if (priority >= 2) return "High";
-  if (priority === 1) return "Medium";
+export function workloadPriorityLabel(priority: unknown): string {
+  const rank = normalizeWorkloadPriorityRank(priority);
+  if (rank >= 3) return "Critical";
+  if (rank >= 2) return "High";
+  if (rank >= 1) return "Medium";
   return "Low";
 }
 
-/** Map workload numeric priority to planner task API string values. */
-export function workloadPriorityToApiString(priority: number): string {
-  if (priority >= 3) return "urgent";
-  if (priority >= 2) return "high";
-  if (priority === 1) return "normal";
+/** Design `bdg-*` class suffix for priority (workload-final-v2.html). */
+export type WorkloadBdgTone =
+  | "red"
+  | "orange"
+  | "yellow"
+  | "green"
+  | "blue"
+  | "violet"
+  | "gray";
+
+export function workloadPriorityBdgTone(priority: unknown): WorkloadBdgTone {
+  const tone = workloadPriorityTone(priority);
+  if (tone === "critical") return "red";
+  if (tone === "high") return "orange";
+  if (tone === "medium") return "yellow";
+  return "green";
+}
+
+/** Status badge tone on board cards (design uses bdg-blue / bdg-violet / bdg-gray). */
+export function workloadBoardStatusBdgTone(statusName: string): WorkloadBdgTone {
+  const normalized = statusName.trim().toLowerCase();
+  if (normalized === "in progress") return "blue";
+  if (normalized === "in review") return "violet";
+  return "gray";
+}
+
+/** Map workload priority rank to planner task API string values. */
+export function workloadPriorityToApiString(priority: unknown): string {
+  const rank = normalizeWorkloadPriorityRank(priority);
+  if (rank >= 3) return "urgent";
+  if (rank >= 2) return "high";
+  if (rank >= 1) return "normal";
   return "low";
 }
 
@@ -304,7 +420,7 @@ export type WorkloadTaskPatchFields = Readonly<{
 
 /** Always include priority so partial updates do not clear it server-side. */
 export function buildWorkloadTaskPatchBody(
-  task: Readonly<{ priority: number }>,
+  task: Readonly<{ priority: unknown }>,
   fields: WorkloadTaskPatchFields,
 ): WorkloadTaskPatchFields & { priority: string } {
   return {
@@ -335,6 +451,48 @@ const LOAD_BAND_LABELS: Record<string, string> = {
 export function workloadLoadBandLabel(band: string): string {
   return LOAD_BAND_LABELS[band] ?? band.replaceAll("_", " ");
 }
+
+/**
+ * Priority colors from `workload-final-v2.html` (`bdg-*` badges + `tcard-pri-bar`).
+ * crit=red, high=orange, med=yellow, low=green.
+ */
+export const WORKLOAD_PRIORITY_THEME = {
+  critical: {
+    bar: "#dc2626",
+    background: "#fef2f2",
+    color: "#dc2626",
+    border: "#fecaca",
+  },
+  high: {
+    bar: "#ea580c",
+    background: "#fff7ed",
+    color: "#ea580c",
+    border: "#fed7aa",
+  },
+  medium: {
+    bar: "#d97706",
+    background: "#fffbeb",
+    color: "#d97706",
+    border: "#fde68a",
+  },
+  low: {
+    bar: "#16a34a",
+    background: "#f0fdf4",
+    color: "#16a34a",
+    border: "#bbf7d0",
+  },
+} as const;
+
+export type WorkloadPriorityTone = keyof typeof WORKLOAD_PRIORITY_THEME;
+
+/** Board legend swatches (matches reference design). */
+export const WORKLOAD_PRIORITY_LEGEND_ITEMS = (
+  Object.entries(WORKLOAD_PRIORITY_THEME) as [WorkloadPriorityTone, (typeof WORKLOAD_PRIORITY_THEME)[WorkloadPriorityTone]][]
+).map(([id, theme]) => ({
+  id,
+  label: id === "critical" ? "Critical" : id.charAt(0).toUpperCase() + id.slice(1),
+  color: theme.bar,
+}));
 
 /** Grid legend (reference design + Postman `load_band`). */
 export const WORKLOAD_GRID_LEGEND_ITEMS = [
@@ -386,47 +544,83 @@ function buildWorkloadGridMemberRow(
   };
 }
 
+type WorkloadGridDisplayOptions = Readonly<{
+  viewerExtension: string;
+  memberFilter?: string;
+  rangeFallback?: WorkloadIsoDateRange;
+  /** When the viewer is a team owner, use full roster if the API omits `members`. */
+  teamExtensionNumbers?: string[];
+}>;
+
+function buildExistingMembersByExtension(
+  grid: WorkloadGridData,
+): Map<string, WorkloadGridMember> {
+  const existingByExt = new Map<string, WorkloadGridMember>();
+  for (const member of grid.members ?? []) {
+    const ext = member.extension_number?.trim();
+    if (ext) existingByExt.set(ext, member);
+  }
+  return existingByExt;
+}
+
+function resolveWorkloadGridExtensionList(
+  grid: WorkloadGridData,
+  options: WorkloadGridDisplayOptions,
+): string[] {
+  const memberFilter = options.memberFilter?.trim();
+  if (memberFilter && memberFilter !== "all") {
+    return [memberFilter];
+  }
+
+  const fromGrid = collectWorkloadMemberExtensionsFromGrid(grid);
+  if (fromGrid.length > 0) {
+    return fromGrid;
+  }
+
+  const teamRoster = (options.teamExtensionNumbers ?? [])
+    .map((ext) => ext.trim())
+    .filter(Boolean);
+  if (teamRoster.length > 0) {
+    return [...new Set(teamRoster)];
+  }
+
+  const viewer = options.viewerExtension.trim();
+  return viewer ? [viewer] : [];
+}
+
+function resolveWorkloadGridDays(
+  grid: WorkloadGridData,
+  rangeFallback?: WorkloadIsoDateRange,
+): string[] {
+  const days = Array.isArray(grid.days) ? [...grid.days] : [];
+  if (days.length > 0) {
+    return days;
+  }
+  if (grid.range?.start && grid.range?.end) {
+    return listWorkloadDaysInRange(grid.range.start, grid.range.end);
+  }
+  if (rangeFallback) {
+    return listWorkloadDaysInRange(rangeFallback.start, rangeFallback.end);
+  }
+  return [];
+}
+
 /**
  * When the API returns no `members`, fall back to the logged-in user's extension (and any
  * extensions discovered on cells). Ensures the PEOPLE row still renders like the reference UI.
  */
 export function resolveWorkloadGridDisplayData(
   grid: WorkloadGridData | undefined,
-  options: {
-    viewerExtension: string;
-    memberFilter?: string;
-    rangeFallback?: WorkloadIsoDateRange;
-  },
+  options: WorkloadGridDisplayOptions,
 ): WorkloadGridData | undefined {
   if (!grid) return undefined;
 
-  const existingByExt = new Map<string, WorkloadGridMember>();
-  for (const member of grid.members ?? []) {
-    const ext = member.extension_number?.trim();
-    if (ext) existingByExt.set(ext, member);
-  }
-
-  let extensionList = collectWorkloadMemberExtensionsFromGrid(grid);
-  const viewer = options.viewerExtension.trim();
-
-  if (options.memberFilter && options.memberFilter !== "all") {
-    extensionList = [options.memberFilter.trim()];
-  } else if (extensionList.length === 0 && viewer) {
-    extensionList = [viewer];
-  }
-
+  const existingByExt = buildExistingMembersByExtension(grid);
+  const extensionList = resolveWorkloadGridExtensionList(grid, options);
   const members = extensionList.map((ext) =>
     buildWorkloadGridMemberRow(ext, existingByExt.get(ext)),
   );
-
-  let days = Array.isArray(grid.days) ? [...grid.days] : [];
-  if (days.length === 0 && grid.range?.start && grid.range?.end) {
-    days = listWorkloadDaysInRange(grid.range.start, grid.range.end);
-  }
-  if (days.length === 0 && options.rangeFallback) {
-    days = listWorkloadDaysInRange(options.rangeFallback.start, options.rangeFallback.end);
-  }
-
+  const days = resolveWorkloadGridDays(grid, options.rangeFallback);
   const hasDisplayMembers = members.length > 0;
   const effectiveEmptyTeam = grid.empty_team === true && !hasDisplayMembers;
 
@@ -443,9 +637,14 @@ export function resolveWorkloadGridDisplayData(
 export function resolveWorkloadPeriodDisplayMembers(
   apiMembers: WorkloadSummaryMember[] | undefined,
   viewerExtension: string,
+  teamExtensionNumbers?: string[],
 ): WorkloadSummaryMember[] {
   if (Array.isArray(apiMembers) && apiMembers.length > 0) {
     return apiMembers;
+  }
+  const roster = (teamExtensionNumbers ?? []).map((ext) => ext.trim()).filter(Boolean);
+  if (roster.length > 0) {
+    return roster.map((extension_number) => ({ extension_number }));
   }
   const viewer = viewerExtension.trim();
   if (!viewer) return [];
@@ -615,16 +814,17 @@ export type WorkloadPriorityFilterValue =
   | "medium_plus";
 
 export function workloadPassesPriorityFilter(
-  priority: number,
+  priority: unknown,
   filter: WorkloadPriorityFilterValue,
 ): boolean {
+  const rank = normalizeWorkloadPriorityRank(priority);
   switch (filter) {
     case "critical":
-      return priority >= 3;
+      return rank >= 3;
     case "high_plus":
-      return priority >= 2;
+      return rank >= 2;
     case "medium_plus":
-      return priority >= 1;
+      return rank >= 1;
     default:
       return true;
   }

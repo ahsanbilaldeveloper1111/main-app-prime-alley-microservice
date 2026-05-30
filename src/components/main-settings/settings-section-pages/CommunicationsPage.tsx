@@ -6,6 +6,8 @@ import { AnalysisPerCallCostTab } from '@components/main-settings/ai-analysis/pe
 
 import { AnalysisTenantTab } from '@components/main-settings/ai-analysis/tenant/AnalysisTenantTab'
 
+import { AnalysisTenantConfigTab } from '@components/main-settings/ai-analysis/tenant/AnalysisTenantConfigTab'
+
 import { HEADER_CONSTANTS } from '@constants/headerConstants'
 
 import ManageExtensions from '@pages/ai-ml/manage-extensions'
@@ -55,6 +57,12 @@ const communicationsTabs: Tab[] = [
   { id: 'pricing', label: 'Pricing', permission: PERMISSIONS.AI_ML_SERVICES },
 
   { id: 'tenant', label: 'Tenant', permission: PERMISSIONS.AI_ML_SERVICES },
+
+  {
+    id: 'tenant-config',
+    label: 'Tenant Config',
+    permission: PERMISSIONS.AI_ML_SERVICES,
+  },
 
   {
 
@@ -115,6 +123,10 @@ function CommunicationsTabPanel({ activeTab }: Readonly<{ activeTab: string }>) 
     case 'tenant':
 
       return <AnalysisTenantTab />
+
+    case 'tenant-config':
+
+      return <AnalysisTenantConfigTab />
 
     case 'monthly-rollup':
 

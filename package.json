@@ -13,7 +13,8 @@
     "start:streaming": "node server/index.js",
     "lint": "eslint .",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "node src/__tests__/run-all-tests.js"
+    "test": "node src/__tests__/run-all-tests.js",
+    "test:cti": "vitest run src/cti"
   },
   "dependencies": {
     "@ckeditor/ckeditor5-build-balloon": "^44.3.0",
@@ -138,6 +139,7 @@
     "postcss": "^8.5.6",
     "typescript": "^5.8.3",
     "vite": "^6.0.5",
-    "vite-tsconfig-paths": "^5.1.4"
+    "vite-tsconfig-paths": "^5.1.4",
+    "vitest": "^4.1.7"
   }
 }

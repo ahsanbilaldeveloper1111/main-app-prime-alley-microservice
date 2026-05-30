@@ -1,0 +1,28 @@
+{
+  "_scenario": "outbound-dial",
+  "_description": "Agent (1001) dials external number 5559999 — RINGING then CONNECTED",
+  "type": "call_events",
+  "data": {
+    "callId": "CALL-OUT-001",
+    "eventType": "RINGING",
+    "sequence": 1,
+    "eventTime": "2026-01-01T11:00:00.000Z",
+    "isConference": false,
+    "isOneToOne": true,
+    "isTerminating": false,
+    "hasActiveParticipants": true,
+    "eventName": "CallRinging",
+    "currentState": "RINGING",
+    "parties": [
+      {
+        "callId": "CALL-OUT-001",
+        "callingAddress": "1001",
+        "calledAddress": "5559999",
+        "callStatus": "RINGING",
+        "callingDeviceName": "AGENT_PHONE",
+        "callingDeviceType": "IP_PHONE",
+        "startTime": ""
+      }
+    ]
+  }
+}

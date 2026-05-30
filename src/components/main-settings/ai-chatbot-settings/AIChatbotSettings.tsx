@@ -22,6 +22,7 @@ import {
 } from "./mapTenantChatSettings";
 import type { ChatCompanyOption } from "@page-modules/chat/useChatCompaniesQuery";
 import { AI_CHATBOT_FIELD_PLACEHOLDERS } from "./constants";
+import { formatDecimalInputValue } from "./aiChatbotDecimalFormat";
 import { AIChatbotSettingsFormSkeleton } from "./AIChatbotSettingsFormSkeleton";
 import { AIChatbotSettingsHistoryPanel } from "./AIChatbotSettingsHistoryPanel";
 import { ModelPricingDefaultsTable } from "./ModelPricingDefaultsTable";
@@ -125,6 +126,7 @@ function NumberField(
     min?: number;
     max?: number;
     step?: number | string;
+    decimalPlaces?: number;
     disabled?: boolean;
   }>,
 ) {
@@ -136,8 +138,17 @@ function NumberField(
     min = 0,
     max,
     step = 1,
+    decimalPlaces,
     disabled = false,
   } = props;
+
+  const handleBlur = () => {
+    if (decimalPlaces == null || !value.trim()) {
+      return;
+    }
+    onChange(formatDecimalInputValue(value, decimalPlaces));
+  };
+
   return (
     <label className="ai-chatbot-settings__field">
       <span className="ai-chatbot-settings__field-label">{label}</span>
@@ -151,6 +162,7 @@ function NumberField(
         placeholder={placeholder}
         disabled={disabled}
         onChange={(e) => onChange(e.target.value)}
+        onBlur={handleBlur}
       />
     </label>
   );
@@ -394,9 +406,9 @@ function AIChatbotSettingsFormContent(
           />
         </div>
         <p className="ai-chatbot-settings__hint">
-          Applied as the default monthly cap for users without their own
-          budget. Alert threshold triggers when a user&apos;s spend reaches
-          this percentage of their cap.
+          Applied as the default monthly cap for users without their own budget.
+          Alert threshold triggers when a user&apos;s spend reaches this
+          percentage of their cap.
         </p>
         <p className="ai-chatbot-settings__hint">{totalCompanyBudgetHint}</p>
       </div>
@@ -655,8 +667,7 @@ export const AIChatbotSettings: React.FC = () => {
     );
   }
 
-  const showSettingsForm =
-    innerTab === "settings" && !showFormSkeleton;
+  const showSettingsForm = innerTab === "settings" && !showFormSkeleton;
 
   return (
     <form

@@ -46,6 +46,8 @@ export type FaqItemsPageViewProps = Readonly<{
   successModalDescription: string;
   onCloseSuccessModal: () => void;
   isSubmitting: boolean;
+  showBreadcrumb?: boolean;
+  breadcrumbMainLink?: string;
 }>;
 
 export const FaqItemsPageView: React.FC<FaqItemsPageViewProps> = ({
@@ -83,10 +85,14 @@ export const FaqItemsPageView: React.FC<FaqItemsPageViewProps> = ({
   successModalDescription,
   onCloseSuccessModal,
   isSubmitting,
+  showBreadcrumb = true,
+  breadcrumbMainLink = "/main-settings/help-center/items",
 }) => {
   return (
     <React.Fragment>
-      <BreadcrumbItem mainTitle="FAQs" mainLink="/faqs" subTitle="FAQ Items" />
+      {showBreadcrumb ? (
+        <BreadcrumbItem mainTitle="FAQs" mainLink={breadcrumbMainLink} subTitle="FAQ Items" />
+      ) : null}
 
       <div className="page-header-title style-2 mb-3">
         <div className="d-flex justify-content-end">

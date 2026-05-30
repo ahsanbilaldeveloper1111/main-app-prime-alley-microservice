@@ -21,7 +21,11 @@ import {
   isChatUserBudgetExhaustedError,
   mapChatThreadMessagesToUi,
   sendChatMessage,
+  type ChatRateLimit,
 } from "@utils/chat";
+
+import { AssistantRateLimitBar } from "./AssistantRateLimitBar";
+import { useChatAssistantRateLimit } from "./useChatAssistantRateLimit";
 
 // ============================================================================
 // TYPE DEFINITIONS
@@ -45,7 +49,12 @@ export interface BreezeChatHistory {
 const BREEZE_THREADS_KEY = "breeze_assistant_chat_threads";
 const BREEZE_MESSAGES_KEY_PREFIX = "breeze_assistant_messages_";
 
-type StoredThread = { id: string; title: string; timestamp: string; threadId: string };
+type StoredThread = {
+  id: string;
+  title: string;
+  timestamp: string;
+  threadId: string;
+};
 
 function getStoredThreads(): StoredThread[] {
   try {
@@ -68,8 +77,17 @@ function getStoredMessages(threadId: string): BreezeMessage[] {
   try {
     const raw = localStorage.getItem(BREEZE_MESSAGES_KEY_PREFIX + threadId);
     if (!raw) return [];
-    const arr = JSON.parse(raw) as Array<{ id: string; role: string; content: string; timestamp: string }>;
-    return arr.map((m) => ({ ...m, timestamp: new Date(m.timestamp), role: m.role as "user" | "assistant" }));
+    const arr = JSON.parse(raw) as Array<{
+      id: string;
+      role: string;
+      content: string;
+      timestamp: string;
+    }>;
+    return arr.map((m) => ({
+      ...m,
+      timestamp: new Date(m.timestamp),
+      role: m.role as "user" | "assistant",
+    }));
   } catch {
     return [];
   }
@@ -77,8 +95,16 @@ function getStoredMessages(threadId: string): BreezeMessage[] {
 
 function saveStoredMessages(threadId: string, messages: BreezeMessage[]) {
   try {
-    const serialized = messages.map((m) => ({ id: m.id, role: m.role, content: m.content, timestamp: m.timestamp.toISOString() }));
-    localStorage.setItem(BREEZE_MESSAGES_KEY_PREFIX + threadId, JSON.stringify(serialized));
+    const serialized = messages.map((m) => ({
+      id: m.id,
+      role: m.role,
+      content: m.content,
+      timestamp: m.timestamp.toISOString(),
+    }));
+    localStorage.setItem(
+      BREEZE_MESSAGES_KEY_PREFIX + threadId,
+      JSON.stringify(serialized),
+    );
   } catch {
     // ignore
   }
@@ -94,8 +120,7 @@ function removeStoredThread(threadId: string) {
   }
 }
 
-const BREEZE_ERROR_REPLY =
-  "Sorry, something went wrong. Please try again.";
+const BREEZE_ERROR_REPLY = "Sorry, something went wrong. Please try again.";
 
 function breezeReplyFromChatError(error: unknown): string {
   if (isChatUserBudgetExhaustedError(error)) {
@@ -120,7 +145,7 @@ async function requestAssistantReply(
   text: string,
   threadId: string,
   onSendMessage?: (message: string) => Promise<string>,
-): Promise<{ reply: string; newThreadId: string }> {
+): Promise<{ reply: string; newThreadId: string; rateLimit?: ChatRateLimit }> {
   if (onSendMessage) {
     return { reply: await onSendMessage(text), newThreadId: threadId };
   }
@@ -131,6 +156,7 @@ async function requestAssistantReply(
   return {
     reply: response.response || "No response received",
     newThreadId: response.thread_id || threadId,
+    rateLimit: response.rate_limit,
   };
 }
 
@@ -139,14 +165,12 @@ function persistMessagesAfterReply(
   userMsg: BreezeMessage,
   assistantMsg: BreezeMessage,
   newThreadId: string,
-  previousThreadId: string,
-  persist: (tid: string, title: string, msgs: BreezeMessage[], syncList: boolean) => void,
+  persist: (tid: string, title: string, msgs: BreezeMessage[]) => void,
 ): BreezeMessage[] {
   const next = [...prev, assistantMsg];
   if (newThreadId) {
     const firstUser = prev.find((m) => m.role === "user") ?? userMsg;
-    const syncList = !previousThreadId || newThreadId !== previousThreadId;
-    persist(newThreadId, firstUser.content?.slice(0, 80) || "New Chat", next, syncList);
+    persist(newThreadId, firstUser.content?.slice(0, 80) || "New Chat", next);
   }
   return next;
 }
@@ -184,7 +208,7 @@ const iconBtnStyle: React.CSSProperties = {
 
 function applyIconHover(
   e: React.MouseEvent<HTMLButtonElement>,
-  entering: boolean
+  entering: boolean,
 ) {
   e.currentTarget.style.backgroundColor = entering ? "#f5f5f5" : "transparent";
   e.currentTarget.style.color = entering ? "#141414" : "#718096";
@@ -302,15 +326,15 @@ const BreezeSparkleIcon: React.FC<{ size?: number; color?: string }> = ({
 
 const AppsIcon: React.FC = () => (
   <svg width="18" height="14" viewBox="0 0 18 14" fill="none">
-    <rect x="0"   y="0"  width="5" height="4" rx="1" fill="#4285F4" />
-    <rect x="6.5" y="0"  width="5" height="4" rx="1" fill="#EA4335" />
-    <rect x="13"  y="0"  width="5" height="4" rx="1" fill="#34A853" />
-    <rect x="0"   y="5"  width="5" height="4" rx="1" fill="#FBBC04" />
-    <rect x="6.5" y="5"  width="5" height="4" rx="1" fill="#4285F4" />
-    <rect x="13"  y="5"  width="5" height="4" rx="1" fill="#EA4335" />
-    <rect x="0"   y="10" width="5" height="4" rx="1" fill="#34A853" />
+    <rect x="0" y="0" width="5" height="4" rx="1" fill="#4285F4" />
+    <rect x="6.5" y="0" width="5" height="4" rx="1" fill="#EA4335" />
+    <rect x="13" y="0" width="5" height="4" rx="1" fill="#34A853" />
+    <rect x="0" y="5" width="5" height="4" rx="1" fill="#FBBC04" />
+    <rect x="6.5" y="5" width="5" height="4" rx="1" fill="#4285F4" />
+    <rect x="13" y="5" width="5" height="4" rx="1" fill="#EA4335" />
+    <rect x="0" y="10" width="5" height="4" rx="1" fill="#34A853" />
     <rect x="6.5" y="10" width="5" height="4" rx="1" fill="#FBBC04" />
-    <rect x="13"  y="10" width="5" height="4" rx="1" fill="#4285F4" />
+    <rect x="13" y="10" width="5" height="4" rx="1" fill="#4285F4" />
   </svg>
 );
 
@@ -435,16 +459,20 @@ const InputBox: React.FC<{
               fontWeight: "500",
               transition: "background 0.2s",
             }}
-            onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "#f7f7f7")}
-            onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "#ffffff")}
+            onMouseEnter={(e) =>
+              (e.currentTarget.style.backgroundColor = "#f7f7f7")
+            }
+            onMouseLeave={(e) =>
+              (e.currentTarget.style.backgroundColor = "#ffffff")
+            }
           >
             <AppsIcon />
             Apps
           </button>
           {[
             { Icon: Paperclip, title: "Attach file" },
-            { Icon: Bookmark,  title: "Save" },
-            { Icon: AtSign,    title: "Mention a record" },
+            { Icon: Bookmark, title: "Save" },
+            { Icon: AtSign, title: "Mention a record" },
           ].map(({ Icon, title }) => (
             <button
               key={title}
@@ -475,7 +503,9 @@ const InputBox: React.FC<{
         </div>
         <SendButton
           disabled={!inputValue.trim() || isLoading}
-          onClick={() => { if (inputValue.trim() && !isLoading) onSend(); }}
+          onClick={() => {
+            if (inputValue.trim() && !isLoading) onSend();
+          }}
         />
       </div>
     </div>
@@ -591,7 +621,14 @@ const EmptyState: React.FC<{
       gap: "28px",
     }}
   >
-    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "4px" }}>
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        gap: "4px",
+      }}
+    >
       <BreezeSparkleIcon size={52} color="#260646" />
       <div style={{ textAlign: "center" }}>
         <div
@@ -608,7 +645,14 @@ const EmptyState: React.FC<{
         >
           AI
         </div>
-        <div style={{ fontSize: "15px", color: "#260646", fontWeight: "400", marginTop: "2px" }}>
+        <div
+          style={{
+            fontSize: "15px",
+            color: "#260646",
+            fontWeight: "400",
+            marginTop: "2px",
+          }}
+        >
           Assistant
         </div>
       </div>
@@ -621,7 +665,14 @@ const EmptyState: React.FC<{
       textareaRef={textareaRef}
     />
 
-    <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", justifyContent: "center" }}>
+    <div
+      style={{
+        display: "flex",
+        gap: "8px",
+        flexWrap: "wrap",
+        justifyContent: "center",
+      }}
+    >
       {["Summarize", "Create", "How do I", "Prepare"].map((chip) => (
         <QuickChip key={chip} label={chip} onClick={() => onChipClick(chip)} />
       ))}
@@ -641,35 +692,76 @@ const ConversationState: React.FC<{
   isLoading: boolean;
   textareaRef: React.RefObject<HTMLTextAreaElement | null>;
   messagesEndRef: React.RefObject<HTMLDivElement | null>;
-}> = ({ messages, inputValue, onInputChange, onSend, isLoading, textareaRef, messagesEndRef }) => (
-  <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+}> = ({
+  messages,
+  inputValue,
+  onInputChange,
+  onSend,
+  isLoading,
+  textareaRef,
+  messagesEndRef,
+}) => (
+  <div
+    style={{
+      flex: 1,
+      display: "flex",
+      flexDirection: "column",
+      overflow: "hidden",
+    }}
+  >
     <div
       className="breeze-scroll"
-      style={{ flex: 1, overflowY: "auto", paddingTop: "16px", paddingBottom: "8px" }}
+      style={{
+        flex: 1,
+        overflowY: "auto",
+        paddingTop: "16px",
+        paddingBottom: "8px",
+      }}
     >
-      {messages.map((msg) => <MessageBubble key={msg.id} message={msg} />)}
+      {messages.map((msg) => (
+        <MessageBubble key={msg.id} message={msg} />
+      ))}
       {isLoading && (
-        <div style={{ display: "flex", alignItems: "center", gap: "8px", padding: "0 16px", marginBottom: "12px" }}>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "8px",
+            padding: "0 16px",
+            marginBottom: "12px",
+          }}
+        >
           <div
             style={{
-              width: "28px", height: "28px", borderRadius: "50%",
+              width: "28px",
+              height: "28px",
+              borderRadius: "50%",
               background: "linear-gradient(135deg,#260646 0%,#260646 100%)",
-              display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              flexShrink: 0,
             }}
           >
             <BreezeSparkleIcon size={16} color="#ffffff" />
           </div>
           <div
             style={{
-              padding: "10px 14px", borderRadius: "18px 18px 18px 4px",
-              backgroundColor: "#f5f5f5", display: "flex", gap: "4px", alignItems: "center",
+              padding: "10px 14px",
+              borderRadius: "18px 18px 18px 4px",
+              backgroundColor: "#f5f5f5",
+              display: "flex",
+              gap: "4px",
+              alignItems: "center",
             }}
           >
             {[0, 1, 2].map((i) => (
               <div
                 key={i}
                 style={{
-                  width: "7px", height: "7px", borderRadius: "50%",
+                  width: "7px",
+                  height: "7px",
+                  borderRadius: "50%",
                   backgroundColor: "#260646",
                   animation: "breezeTyping 1.2s ease-in-out infinite",
                   animationDelay: `${i * 0.2}s`,
@@ -681,7 +773,13 @@ const ConversationState: React.FC<{
       )}
       <div ref={messagesEndRef} />
     </div>
-    <div style={{ borderTop: "1px solid #e2e8f0", backgroundColor: "#ffffff", padding: "10px 14px" }}>
+    <div
+      style={{
+        borderTop: "1px solid #e2e8f0",
+        backgroundColor: "#ffffff",
+        padding: "10px 14px",
+      }}
+    >
       <InputBox
         inputValue={inputValue}
         onInputChange={onInputChange}
@@ -696,186 +794,133 @@ const ConversationState: React.FC<{
 );
 
 // ============================================================================
-// CHAT HISTORY LIST (shared by panel + fullscreen history view)
+// CHAT HISTORY ROW / LIST
 // ============================================================================
 
-function handleBreezeChatHistoryDeleteClick(
-  event: React.MouseEvent,
-  onDelete: () => void | Promise<void>,
-): void {
-  event.stopPropagation();
-  Promise.resolve(onDelete()).catch(() => undefined);
-}
-
-type BreezeChatHistoryListItemProps = Readonly<{
+const ChatHistoryRow: React.FC<{
   item: BreezeChatHistory;
   isActive: boolean;
-  canDelete: boolean;
-  isDeleting: boolean;
-  onActivate: () => void;
-  onDelete: () => void | Promise<void>;
-  rowMarginBottom?: string;
-}>;
-
-function BreezeChatHistoryListItem({
-  item,
-  isActive,
-  canDelete,
-  isDeleting,
-  onActivate,
-  onDelete,
-  rowMarginBottom = "4px",
-}: BreezeChatHistoryListItemProps): React.ReactElement {
-  const rowClassName = [
-    "breeze-chat-history-row",
-    isActive ? "breeze-chat-history-row--active" : "",
-  ]
-    .filter(Boolean)
-    .join(" ");
-
-  const selectClassName = [
-    "breeze-chat-history-row__select",
-    isActive ? "breeze-chat-history-row__select--active" : "",
-  ]
-    .filter(Boolean)
-    .join(" ");
-
-  return (
-    <div className={rowClassName} style={{ marginBottom: rowMarginBottom }}>
-      <button type="button" className={selectClassName} onClick={onActivate}>
-        <span className="breeze-chat-history-row__title">{item.title}</span>
-      </button>
-      {canDelete ? (
-        <button
-          type="button"
-          className="breeze-chat-history-row__delete"
-          disabled={isDeleting}
-          onClick={(event) => handleBreezeChatHistoryDeleteClick(event, onDelete)}
-          title="Delete"
-          aria-label={`Delete ${item.title}`}
-        >
-          <Trash2 size={14} />
-        </button>
-      ) : null}
-    </div>
-  );
-}
-
-type BreezeChatHistoryListProps = Readonly<{
-  items: readonly BreezeChatHistory[];
-  activeId: string;
-  deletingThreadId?: string;
-  onActivateItem: (item: BreezeChatHistory) => void;
-  onDeleteItem: (item: BreezeChatHistory) => void | Promise<void>;
-  rowMarginBottom?: string;
-}>;
-
-function BreezeChatHistoryList({
-  items,
-  activeId,
-  deletingThreadId,
-  onActivateItem,
-  onDeleteItem,
-  rowMarginBottom,
-}: BreezeChatHistoryListProps): React.ReactElement {
-  return (
-    <>
-      {items.map((item) => (
-        <BreezeChatHistoryListItem
-          key={item.id}
-          item={item}
-          isActive={item.id === activeId}
-          canDelete={item.id !== "new" && Boolean(item.threadId)}
-          isDeleting={deletingThreadId === item.threadId}
-          onActivate={() => onActivateItem(item)}
-          onDelete={() => onDeleteItem(item)}
-          rowMarginBottom={rowMarginBottom}
-        />
-      ))}
-    </>
-  );
-}
-
-type ChatHistoryFullscreenListProps = Readonly<{
-  historyList: readonly BreezeChatHistory[];
-  activeChatId: string;
-  deletingThreadId?: string;
-  conversationsLoading: boolean;
-  conversationsError: boolean;
-  hasConversations: boolean;
-  onActivateItem: (item: BreezeChatHistory) => void;
-  onDeleteItem: (item: BreezeChatHistory) => void | Promise<void>;
-}>;
-
-function ChatHistoryFullscreenList({
-  historyList,
-  activeChatId,
-  deletingThreadId,
-  conversationsLoading,
-  conversationsError,
-  hasConversations,
-  onActivateItem,
-  onDeleteItem,
-}: ChatHistoryFullscreenListProps): React.ReactElement {
-  const showLoading = conversationsLoading && !hasConversations;
-  const showError = conversationsError && !conversationsLoading;
-  const showEmpty =
-    !conversationsError && !conversationsLoading && !hasConversations;
-  const showList = !showLoading;
+  onSelect: () => void;
+  onDelete: () => void;
+  marginBottom?: string;
+}> = ({ item, isActive, onSelect, onDelete, marginBottom = "1px" }) => {
+  const canDelete = item.id !== "new" && item.threadId;
 
   return (
     <div
-      className="breeze-scroll"
-      style={{ flex: 1, overflowY: "auto", padding: "8px 12px 16px 12px" }}
+      style={{
+        width: "100%",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        gap: "8px",
+        marginBottom,
+        boxSizing: "border-box",
+      }}
     >
-      {showLoading ? (
-        <p
+      <button
+        type="button"
+        onClick={onSelect}
+        style={{
+          flex: 1,
+          minWidth: 0,
+          padding: "10px 12px",
+          display: "flex",
+          alignItems: "center",
+          border: "none",
+          borderRadius: "6px",
+          backgroundColor: isActive ? "#f0f0f0" : "transparent",
+          cursor: "pointer",
+          fontSize: "13.5px",
+          color: "#141414",
+          fontWeight: isActive ? "500" : "400",
+          transition: "background 0.15s",
+          boxSizing: "border-box",
+          textAlign: "left",
+        }}
+        onMouseEnter={(e) => {
+          if (isActive) return;
+          e.currentTarget.style.backgroundColor = "#f7f7f7";
+        }}
+        onMouseLeave={(e) => {
+          if (isActive) return;
+          e.currentTarget.style.backgroundColor = "transparent";
+        }}
+      >
+        <span
           style={{
-            fontSize: "13px",
+            flex: 1,
+            minWidth: 0,
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap",
+          }}
+        >
+          {item.title}
+        </span>
+      </button>
+      {canDelete && (
+        <button
+          type="button"
+          onClick={onDelete}
+          title="Delete"
+          style={{
+            padding: "4px",
+            border: "none",
+            borderRadius: "4px",
+            background: "transparent",
             color: "#718096",
-            textAlign: "center",
-            padding: "24px 12px",
+            cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            flexShrink: 0,
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.color = "#dc2626";
+            e.currentTarget.style.backgroundColor = "#fef2f2";
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.color = "#718096";
+            e.currentTarget.style.backgroundColor = "transparent";
           }}
         >
-          Loading conversations…
-        </p>
-      ) : null}
-      {showError ? (
-        <p
-          style={{
-            fontSize: "13px",
-            color: "#dc2626",
-            textAlign: "center",
-            padding: "24px 12px",
-          }}
-        >
-          Could not load conversations. Try again from the menu.
-        </p>
-      ) : null}
-      {showEmpty ? (
-        <p
-          style={{
-            fontSize: "13px",
-            color: "#718096",
-            textAlign: "center",
-            padding: "24px 12px",
-          }}
-        >
-          No conversations yet. Start a new chat to begin.
-        </p>
-      ) : null}
-      {showList ? (
-        <BreezeChatHistoryList
-          items={historyList}
-          activeId={activeChatId}
-          deletingThreadId={deletingThreadId}
-          onActivateItem={onActivateItem}
-          onDeleteItem={onDeleteItem}
-        />
-      ) : null}
+          <Trash2 size={14} />
+        </button>
+      )}
     </div>
   );
-}
+};
+
+const ChatHistoryList: React.FC<{
+  items: BreezeChatHistory[];
+  activeId: string;
+  onSelectThread: (item: BreezeChatHistory) => void;
+  onNewChat: () => void;
+  onDeleteThread: (item: BreezeChatHistory) => void;
+  rowMarginBottom?: string;
+}> = ({
+  items,
+  activeId,
+  onSelectThread,
+  onNewChat,
+  onDeleteThread,
+  rowMarginBottom = "1px",
+}) => (
+  <>
+    {items.map((item) => (
+      <ChatHistoryRow
+        key={item.id}
+        item={item}
+        isActive={item.id === activeId}
+        onSelect={() =>
+          item.id === "new" ? onNewChat() : onSelectThread(item)
+        }
+        onDelete={() => onDeleteThread(item)}
+        marginBottom={rowMarginBottom}
+      />
+    ))}
+  </>
+);
 
 // ============================================================================
 // CHAT HISTORY LEFT PANEL (expanded mode only)
@@ -887,11 +932,11 @@ const ChatHistoryPanel: React.FC<{
   deletingThreadId?: string;
   onSelectThread: (item: BreezeChatHistory) => void;
   onNewChat: () => void;
-  onDeleteThread: (item: BreezeChatHistory) => void | Promise<void>;
-}> = ({ history, activeId, deletingThreadId, onSelectThread, onNewChat, onDeleteThread }) => {
+  onDeleteThread: (item: BreezeChatHistory) => void;
+}> = ({ history, activeId, onSelectThread, onNewChat, onDeleteThread }) => {
   const [searchQuery, setSearchQuery] = useState("");
   const filtered = history.filter((h) =>
-    h.title.toLowerCase().includes(searchQuery.toLowerCase())
+    h.title.toLowerCase().includes(searchQuery.toLowerCase()),
   );
 
   return (
@@ -908,7 +953,14 @@ const ChatHistoryPanel: React.FC<{
       }}
     >
       <div style={{ padding: "20px 20px 12px 20px", flexShrink: 0 }}>
-        <h2 style={{ fontSize: "16px", fontWeight: "700", color: "#141414", margin: "0 0 14px 0" }}>
+        <h2
+          style={{
+            fontSize: "16px",
+            fontWeight: "700",
+            color: "#141414",
+            margin: "0 0 14px 0",
+          }}
+        >
           Chats
         </h2>
         <div style={{ position: "relative" }}>
@@ -931,27 +983,31 @@ const ChatHistoryPanel: React.FC<{
               transition: "border-color 0.2s",
             }}
             onFocus={(e) => (e.currentTarget.style.borderColor = "#cbd5e0")}
-            onBlur={(e)  => (e.currentTarget.style.borderColor = "#e2e8f0")}
+            onBlur={(e) => (e.currentTarget.style.borderColor = "#e2e8f0")}
           />
           <Search
             size={15}
             style={{
-              position: "absolute", right: "12px", top: "50%",
-              transform: "translateY(-50%)", color: "#a0aec0", pointerEvents: "none",
+              position: "absolute",
+              right: "12px",
+              top: "50%",
+              transform: "translateY(-50%)",
+              color: "#a0aec0",
+              pointerEvents: "none",
             }}
           />
         </div>
       </div>
-      <div className="breeze-scroll" style={{ flex: 1, overflowY: "auto", padding: "0 8px 16px 8px" }}>
-        <BreezeChatHistoryList
+      <div
+        className="breeze-scroll"
+        style={{ flex: 1, overflowY: "auto", padding: "0 8px 16px 8px" }}
+      >
+        <ChatHistoryList
           items={filtered}
           activeId={activeId}
-          deletingThreadId={deletingThreadId}
-          rowMarginBottom="1px"
-          onActivateItem={(item) =>
-            item.id === "new" ? onNewChat() : onSelectThread(item)
-          }
-          onDeleteItem={onDeleteThread}
+          onSelectThread={onSelectThread}
+          onNewChat={onNewChat}
+          onDeleteThread={onDeleteThread}
         />
       </div>
     </div>
@@ -963,22 +1019,41 @@ const ChatHistoryPanel: React.FC<{
 // ============================================================================
 
 const PromptsSection: React.FC<{ onAddNew: () => void }> = ({ onAddNew }) => {
-  const [searchQuery, setSearchQuery]   = useState("");
-  const [selectedTag, setSelectedTag]   = useState("All");
-  const [showTagMenu, setShowTagMenu]   = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedTag, setSelectedTag] = useState("All");
+  const [showTagMenu, setShowTagMenu] = useState(false);
   const tags = ["All", "Sales", "Marketing", "Support", "General"];
 
   return (
     <div
       className="breeze-scroll"
-      style={{ flex: 1, display: "flex", flexDirection: "column", overflowY: "auto" }}
+      style={{
+        flex: 1,
+        display: "flex",
+        flexDirection: "column",
+        overflowY: "auto",
+      }}
     >
       {/* Header content */}
       <div style={{ padding: "20px 20px 16px 20px", flexShrink: 0 }}>
-        <h2 style={{ fontSize: "16px", fontWeight: "700", color: "#141414", margin: "0 0 6px 0" }}>
+        <h2
+          style={{
+            fontSize: "16px",
+            fontWeight: "700",
+            color: "#141414",
+            margin: "0 0 6px 0",
+          }}
+        >
           Prompts
         </h2>
-        <p style={{ fontSize: "13.5px", color: "#718096", margin: "0 0 16px 0", lineHeight: "1.5" }}>
+        <p
+          style={{
+            fontSize: "13.5px",
+            color: "#718096",
+            margin: "0 0 16px 0",
+            lineHeight: "1.5",
+          }}
+        >
           Save your go-to prompts so you can reuse them across chats.
         </p>
 
@@ -1032,13 +1107,17 @@ const PromptsSection: React.FC<{ onAddNew: () => void }> = ({ onAddNew }) => {
                 transition: "border-color 0.2s",
               }}
               onFocus={(e) => (e.currentTarget.style.borderColor = "#cbd5e0")}
-              onBlur={(e)  => (e.currentTarget.style.borderColor = "#e2e8f0")}
+              onBlur={(e) => (e.currentTarget.style.borderColor = "#e2e8f0")}
             />
             <Search
               size={14}
               style={{
-                position: "absolute", right: "12px", top: "50%",
-                transform: "translateY(-50%)", color: "#a0aec0", pointerEvents: "none",
+                position: "absolute",
+                right: "12px",
+                top: "50%",
+                transform: "translateY(-50%)",
+                color: "#a0aec0",
+                pointerEvents: "none",
               }}
             />
           </div>
@@ -1048,9 +1127,16 @@ const PromptsSection: React.FC<{ onAddNew: () => void }> = ({ onAddNew }) => {
             <button
               onClick={() => setShowTagMenu(!showTagMenu)}
               style={{
-                display: "flex", alignItems: "center", gap: "4px",
-                background: "transparent", border: "none", cursor: "pointer",
-                fontSize: "13px", color: "#141414", fontWeight: "500", padding: "4px 0",
+                display: "flex",
+                alignItems: "center",
+                gap: "4px",
+                background: "transparent",
+                border: "none",
+                cursor: "pointer",
+                fontSize: "13px",
+                color: "#141414",
+                fontWeight: "500",
+                padding: "4px 0",
               }}
             >
               Tags: {selectedTag}
@@ -1064,24 +1150,45 @@ const PromptsSection: React.FC<{ onAddNew: () => void }> = ({ onAddNew }) => {
                 />
                 <div
                   style={{
-                    position: "absolute", top: "calc(100% + 4px)", right: 0,
-                    backgroundColor: "#ffffff", border: "1px solid #e2e8f0",
-                    borderRadius: "8px", boxShadow: "0 4px 16px rgba(0,0,0,0.12)",
-                    minWidth: "130px", zIndex: 11, overflow: "hidden",
+                    position: "absolute",
+                    top: "calc(100% + 4px)",
+                    right: 0,
+                    backgroundColor: "#ffffff",
+                    border: "1px solid #e2e8f0",
+                    borderRadius: "8px",
+                    boxShadow: "0 4px 16px rgba(0,0,0,0.12)",
+                    minWidth: "130px",
+                    zIndex: 11,
+                    overflow: "hidden",
                   }}
                 >
                   {tags.map((tag) => (
                     <button
                       key={tag}
-                      onClick={() => { setSelectedTag(tag); setShowTagMenu(false); }}
+                      onClick={() => {
+                        setSelectedTag(tag);
+                        setShowTagMenu(false);
+                      }}
                       style={{
-                        width: "100%", padding: "9px 14px", backgroundColor: tag === selectedTag ? "#f5f5f5" : "transparent",
-                        border: "none", textAlign: "left", fontSize: "13px",
-                        color: "#141414", cursor: "pointer", transition: "background 0.15s",
+                        width: "100%",
+                        padding: "9px 14px",
+                        backgroundColor:
+                          tag === selectedTag ? "#f5f5f5" : "transparent",
+                        border: "none",
+                        textAlign: "left",
+                        fontSize: "13px",
+                        color: "#141414",
+                        cursor: "pointer",
+                        transition: "background 0.15s",
                         fontWeight: tag === selectedTag ? "500" : "400",
                       }}
-                      onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "#f7fafc")}
-                      onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = tag === selectedTag ? "#f5f5f5" : "transparent")}
+                      onMouseEnter={(e) =>
+                        (e.currentTarget.style.backgroundColor = "#f7fafc")
+                      }
+                      onMouseLeave={(e) =>
+                        (e.currentTarget.style.backgroundColor =
+                          tag === selectedTag ? "#f5f5f5" : "transparent")
+                      }
                     >
                       {tag}
                     </button>
@@ -1105,19 +1212,43 @@ const PromptsSection: React.FC<{ onAddNew: () => void }> = ({ onAddNew }) => {
         }}
       >
         {/* Illustration + message */}
-        <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "16px" }}>
+        <div
+          style={{
+            flex: 1,
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: "16px",
+          }}
+        >
           {/* Laptop illustration (SVG placeholder matching the design) */}
-          <svg width="140" height="110" viewBox="0 0 140 110" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <svg
+            width="140"
+            height="110"
+            viewBox="0 0 140 110"
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
+          >
             {/* Screen */}
-            <rect x="25" y="10" width="90" height="62" rx="4" fill="#e8edf2" stroke="#d0d8e4" strokeWidth="1.5"/>
-            <rect x="31" y="16" width="78" height="50" rx="2" fill="#f5f7fa"/>
+            <rect
+              x="25"
+              y="10"
+              width="90"
+              height="62"
+              rx="4"
+              fill="#e8edf2"
+              stroke="#d0d8e4"
+              strokeWidth="1.5"
+            />
+            <rect x="31" y="16" width="78" height="50" rx="2" fill="#f5f7fa" />
             {/* Keyboard base */}
-            <path d="M10 76 L130 76 L122 95 L18 95 Z" fill="#e2e8f0"/>
-            <ellipse cx="70" cy="95" rx="20" ry="3" fill="#d0d8e4"/>
+            <path d="M10 76 L130 76 L122 95 L18 95 Z" fill="#e2e8f0" />
+            <ellipse cx="70" cy="95" rx="20" ry="3" fill="#d0d8e4" />
             {/* Subtle lines on screen */}
-            <rect x="40" y="28" width="50" height="3" rx="1.5" fill="#d0d8e4"/>
-            <rect x="40" y="36" width="38" height="3" rx="1.5" fill="#d0d8e4"/>
-            <rect x="40" y="44" width="44" height="3" rx="1.5" fill="#d0d8e4"/>
+            <rect x="40" y="28" width="50" height="3" rx="1.5" fill="#d0d8e4" />
+            <rect x="40" y="36" width="38" height="3" rx="1.5" fill="#d0d8e4" />
+            <rect x="40" y="44" width="44" height="3" rx="1.5" fill="#d0d8e4" />
           </svg>
 
           <p
@@ -1129,8 +1260,8 @@ const PromptsSection: React.FC<{ onAddNew: () => void }> = ({ onAddNew }) => {
               lineHeight: "1.55",
             }}
           >
-            You haven't saved any prompts yet. Add a new one here, or
-            select the star icon below a message to save one.
+            You haven't saved any prompts yet. Add a new one here, or select the
+            star icon below a message to save one.
           </p>
         </div>
 
@@ -1169,9 +1300,11 @@ const PromptsSection: React.FC<{ onAddNew: () => void }> = ({ onAddNew }) => {
 // ADD NEW PROMPT SECTION
 // ============================================================================
 
-const AddNewPromptSection: React.FC<{ onCancel: () => void }> = ({ onCancel }) => {
-  const [promptText,  setPromptText]  = useState("");
-  const [promptName,  setPromptName]  = useState("");
+const AddNewPromptSection: React.FC<{ onCancel: () => void }> = ({
+  onCancel,
+}) => {
+  const [promptText, setPromptText] = useState("");
+  const [promptName, setPromptName] = useState("");
   const [selectedTag, setSelectedTag] = useState("");
   const [showTagMenu, setShowTagMenu] = useState(false);
   const tags = ["Sales", "Marketing", "Support", "General"];
@@ -1189,7 +1322,14 @@ const AddNewPromptSection: React.FC<{ onCancel: () => void }> = ({ onCancel }) =
       className="breeze-scroll"
       style={{ flex: 1, overflowY: "auto", padding: "20px" }}
     >
-      <h2 style={{ fontSize: "16px", fontWeight: "700", color: "#141414", margin: "0 0 16px 0" }}>
+      <h2
+        style={{
+          fontSize: "16px",
+          fontWeight: "700",
+          color: "#141414",
+          margin: "0 0 16px 0",
+        }}
+      >
         Add new prompt
       </h2>
 
@@ -1222,7 +1362,12 @@ const AddNewPromptSection: React.FC<{ onCancel: () => void }> = ({ onCancel }) =
             boxSizing: "border-box",
           }}
         />
-        <div style={{ padding: "8px 12px 12px 12px", borderTop: "1px solid #f0f0f0" }}>
+        <div
+          style={{
+            padding: "8px 12px 12px 12px",
+            borderTop: "1px solid #f0f0f0",
+          }}
+        >
           <button
             style={{
               padding: "6px 12px",
@@ -1235,8 +1380,12 @@ const AddNewPromptSection: React.FC<{ onCancel: () => void }> = ({ onCancel }) =
               cursor: "pointer",
               transition: "background 0.2s",
             }}
-            onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "#f7f7f7")}
-            onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "#ffffff")}
+            onMouseEnter={(e) =>
+              (e.currentTarget.style.backgroundColor = "#f7f7f7")
+            }
+            onMouseLeave={(e) =>
+              (e.currentTarget.style.backgroundColor = "#ffffff")
+            }
           >
             Add object placeholder
           </button>
@@ -1276,7 +1425,7 @@ const AddNewPromptSection: React.FC<{ onCancel: () => void }> = ({ onCancel }) =
             backgroundColor: "#ffffff",
           }}
           onFocus={(e) => (e.currentTarget.style.borderColor = "#718096")}
-          onBlur={(e)  => (e.currentTarget.style.borderColor = "#cbd5e0")}
+          onBlur={(e) => (e.currentTarget.style.borderColor = "#cbd5e0")}
         />
       </div>
 
@@ -1313,7 +1462,7 @@ const AddNewPromptSection: React.FC<{ onCancel: () => void }> = ({ onCancel }) =
               transition: "border-color 0.2s",
             }}
             onFocus={(e) => (e.currentTarget.style.borderColor = "#718096")}
-            onBlur={(e)  => (e.currentTarget.style.borderColor = "#cbd5e0")}
+            onBlur={(e) => (e.currentTarget.style.borderColor = "#cbd5e0")}
           >
             <span>{selectedTag || "Select tags"}</span>
             <ChevronDown size={16} color="#718096" />
@@ -1326,25 +1475,45 @@ const AddNewPromptSection: React.FC<{ onCancel: () => void }> = ({ onCancel }) =
               />
               <div
                 style={{
-                  position: "absolute", top: "calc(100% + 4px)", left: 0, right: 0,
-                  backgroundColor: "#ffffff", border: "1px solid #e2e8f0",
-                  borderRadius: "8px", boxShadow: "0 4px 16px rgba(0,0,0,0.12)",
-                  zIndex: 11, overflow: "hidden",
+                  position: "absolute",
+                  top: "calc(100% + 4px)",
+                  left: 0,
+                  right: 0,
+                  backgroundColor: "#ffffff",
+                  border: "1px solid #e2e8f0",
+                  borderRadius: "8px",
+                  boxShadow: "0 4px 16px rgba(0,0,0,0.12)",
+                  zIndex: 11,
+                  overflow: "hidden",
                 }}
               >
                 {tags.map((tag) => (
                   <button
                     key={tag}
-                    onClick={() => { setSelectedTag(tag); setShowTagMenu(false); }}
+                    onClick={() => {
+                      setSelectedTag(tag);
+                      setShowTagMenu(false);
+                    }}
                     style={{
-                      width: "100%", padding: "9px 14px",
-                      backgroundColor: tag === selectedTag ? "#f5f5f5" : "transparent",
-                      border: "none", textAlign: "left", fontSize: "13.5px",
-                      color: "#141414", cursor: "pointer", transition: "background 0.15s",
+                      width: "100%",
+                      padding: "9px 14px",
+                      backgroundColor:
+                        tag === selectedTag ? "#f5f5f5" : "transparent",
+                      border: "none",
+                      textAlign: "left",
+                      fontSize: "13.5px",
+                      color: "#141414",
+                      cursor: "pointer",
+                      transition: "background 0.15s",
                       fontWeight: tag === selectedTag ? "500" : "400",
                     }}
-                    onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "#f7fafc")}
-                    onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = tag === selectedTag ? "#f5f5f5" : "transparent")}
+                    onMouseEnter={(e) =>
+                      (e.currentTarget.style.backgroundColor = "#f7fafc")
+                    }
+                    onMouseLeave={(e) =>
+                      (e.currentTarget.style.backgroundColor =
+                        tag === selectedTag ? "#f5f5f5" : "transparent")
+                    }
                   >
                     {tag}
                   </button>
@@ -1370,8 +1539,12 @@ const AddNewPromptSection: React.FC<{ onCancel: () => void }> = ({ onCancel }) =
             cursor: "pointer",
             transition: "background 0.2s",
           }}
-          onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "#f7f7f7")}
-          onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "#ffffff")}
+          onMouseEnter={(e) =>
+            (e.currentTarget.style.backgroundColor = "#f7f7f7")
+          }
+          onMouseLeave={(e) =>
+            (e.currentTarget.style.backgroundColor = "#ffffff")
+          }
         >
           Cancel
         </button>
@@ -1404,16 +1577,35 @@ const AddNewPromptSection: React.FC<{ onCancel: () => void }> = ({ onCancel }) =
 const MemoriesSection: React.FC = () => (
   <div
     className="breeze-scroll"
-    style={{ flex: 1, display: "flex", flexDirection: "column", overflowY: "auto" }}
+    style={{
+      flex: 1,
+      display: "flex",
+      flexDirection: "column",
+      overflowY: "auto",
+    }}
   >
     {/* Header content */}
     <div style={{ padding: "20px 20px 0 20px", flexShrink: 0 }}>
-      <h2 style={{ fontSize: "16px", fontWeight: "700", color: "#141414", margin: "0 0 10px 0" }}>
+      <h2
+        style={{
+          fontSize: "16px",
+          fontWeight: "700",
+          color: "#141414",
+          margin: "0 0 10px 0",
+        }}
+      >
         Memories
       </h2>
-      <p style={{ fontSize: "13.5px", color: "#718096", margin: 0, lineHeight: "1.55" }}>
-        AI Assistant saves helpful details to its memory so it can give smarter, more relevant
-        answers over time. You can delete memories anytime.
+      <p
+        style={{
+          fontSize: "13.5px",
+          color: "#718096",
+          margin: 0,
+          lineHeight: "1.55",
+        }}
+      >
+        AI Assistant saves helpful details to its memory so it can give smarter,
+        more relevant answers over time. You can delete memories anytime.
       </p>
     </div>
 
@@ -1430,14 +1622,29 @@ const MemoriesSection: React.FC = () => (
       }}
     >
       {/* Laptop illustration — same SVG used in PromptsSection */}
-      <svg width="140" height="110" viewBox="0 0 140 110" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <rect x="25" y="10" width="90" height="62" rx="4" fill="#e8edf2" stroke="#d0d8e4" strokeWidth="1.5"/>
-        <rect x="31" y="16" width="78" height="50" rx="2" fill="#f5f7fa"/>
-        <path d="M10 76 L130 76 L122 95 L18 95 Z" fill="#e2e8f0"/>
-        <ellipse cx="70" cy="95" rx="20" ry="3" fill="#d0d8e4"/>
-        <rect x="40" y="28" width="50" height="3" rx="1.5" fill="#d0d8e4"/>
-        <rect x="40" y="36" width="38" height="3" rx="1.5" fill="#d0d8e4"/>
-        <rect x="40" y="44" width="44" height="3" rx="1.5" fill="#d0d8e4"/>
+      <svg
+        width="140"
+        height="110"
+        viewBox="0 0 140 110"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+      >
+        <rect
+          x="25"
+          y="10"
+          width="90"
+          height="62"
+          rx="4"
+          fill="#e8edf2"
+          stroke="#d0d8e4"
+          strokeWidth="1.5"
+        />
+        <rect x="31" y="16" width="78" height="50" rx="2" fill="#f5f7fa" />
+        <path d="M10 76 L130 76 L122 95 L18 95 Z" fill="#e2e8f0" />
+        <ellipse cx="70" cy="95" rx="20" ry="3" fill="#d0d8e4" />
+        <rect x="40" y="28" width="50" height="3" rx="1.5" fill="#d0d8e4" />
+        <rect x="40" y="36" width="38" height="3" rx="1.5" fill="#d0d8e4" />
+        <rect x="40" y="44" width="44" height="3" rx="1.5" fill="#d0d8e4" />
       </svg>
 
       <p
@@ -1449,8 +1656,8 @@ const MemoriesSection: React.FC = () => (
           lineHeight: "1.6",
         }}
       >
-        You don't have any memories yet. AI captures useful details automatically. You can also
-        tell it what to remember.
+        You don't have any memories yet. AI captures useful details
+        automatically. You can also tell it what to remember.
       </p>
     </div>
   </div>
@@ -1464,16 +1671,38 @@ const BackButton: React.FC<{ onClick: () => void }> = ({ onClick }) => (
   <button
     onClick={onClick}
     style={{
-      background: "transparent", border: "none", padding: "4px 8px", cursor: "pointer",
-      fontSize: "13px", fontWeight: "600", color: "#141414",
-      display: "flex", alignItems: "center", gap: "4px",
-      borderRadius: "4px", transition: "background 0.2s",
+      background: "transparent",
+      border: "none",
+      padding: "4px 8px",
+      cursor: "pointer",
+      fontSize: "13px",
+      fontWeight: "600",
+      color: "#141414",
+      display: "flex",
+      alignItems: "center",
+      gap: "4px",
+      borderRadius: "4px",
+      transition: "background 0.2s",
     }}
     onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "#f5f5f5")}
-    onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
+    onMouseLeave={(e) =>
+      (e.currentTarget.style.backgroundColor = "transparent")
+    }
   >
-    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" style={{ flexShrink: 0 }}>
-      <path d="M10 12L6 8L10 4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 16 16"
+      fill="none"
+      style={{ flexShrink: 0 }}
+    >
+      <path
+        d="M10 12L6 8L10 4"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
     </svg>
     Back
   </button>
@@ -1493,15 +1722,19 @@ const BreezeAssistantSidebar: React.FC<BreezeAssistantSidebarProps> = ({
 }) => {
   const [internalMaximized, setInternalMaximized] = useState(false);
   const isMaximized = isMaximizedProp ?? internalMaximized;
-  const setMaximized = (v: boolean) => { setInternalMaximized(v); onMaximizeChange?.(v); };
+  const setMaximized = (v: boolean) => {
+    setInternalMaximized(v);
+    onMaximizeChange?.(v);
+  };
 
-  const [messages,     setMessages]     = useState<BreezeMessage[]>([]);
-  const [inputValue,   setInputValue]   = useState("");
-  const [isLoading,       setIsLoading]       = useState(false);
+  const [messages, setMessages] = useState<BreezeMessage[]>([]);
+  const [inputValue, setInputValue] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
   const [isLoadingThread, setIsLoadingThread] = useState(false);
   const [showMoreMenu, setShowMoreMenu] = useState(false);
   const [activeChatId, setActiveChatId] = useState("new");
-  const [threadId,     setThreadId]     = useState("");
+  const [threadId, setThreadId] = useState("");
+
   // current view — "chat" | "chatHistory" | "prompts" | "addPrompt"
   const [view, setView] = useState<BreezeView>("chat");
 
@@ -1568,12 +1801,25 @@ const BreezeAssistantSidebar: React.FC<BreezeAssistantSidebarProps> = ({
     }
   };
 
-  const textareaRef    = useRef<HTMLTextAreaElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const moreMenuRef    = useRef<HTMLDivElement>(null);
+  const moreMenuRef = useRef<HTMLDivElement>(null);
 
   const hasMessages = messages.length > 0;
   const chatBusy = isLoading || isLoadingThread;
+
+  const {
+    rateLimit,
+    isLoading: isRateLimitLoading,
+    applyRateLimitFromSend,
+    refreshRateLimit,
+  } = useChatAssistantRateLimit(isOpen);
+
+  useEffect(() => {
+    if (isOpen) {
+      refreshRateLimit();
+    }
+  }, [isOpen, refreshRateLimit]);
 
   useEffect(() => {
     if (messagesEndRef.current && hasMessages)
@@ -1582,8 +1828,14 @@ const BreezeAssistantSidebar: React.FC<BreezeAssistantSidebarProps> = ({
 
   useEffect(() => {
     const h = (e: MouseEvent) => {
-      if (moreMenuRef.current && !moreMenuRef.current.contains(e.target as Node))
+      const target = e.target;
+      if (
+        moreMenuRef.current &&
+        target instanceof Node &&
+        !moreMenuRef.current.contains(target)
+      ) {
         setShowMoreMenu(false);
+      }
     };
     document.addEventListener("mousedown", h);
     return () => document.removeEventListener("mousedown", h);
@@ -1623,14 +1875,14 @@ const BreezeAssistantSidebar: React.FC<BreezeAssistantSidebarProps> = ({
     setMessages((prev) => [...prev, userMsg]);
     setInputValue("");
     setIsLoading(true);
-    const previousThreadId = threadId;
     try {
-      const { reply, newThreadId } = await requestAssistantReply(
-        text,
-        previousThreadId,
-        onSendMessage,
-      );
-      if (newThreadId && newThreadId !== previousThreadId) {
+      const {
+        reply,
+        newThreadId,
+        rateLimit: sendRateLimit,
+      } = await requestAssistantReply(text, threadId, onSendMessage);
+      applyRateLimitFromSend(sendRateLimit);
+      if (newThreadId && newThreadId !== threadId) {
         setThreadId(newThreadId);
       }
       const assistantMsg: BreezeMessage = {
@@ -1645,8 +1897,7 @@ const BreezeAssistantSidebar: React.FC<BreezeAssistantSidebarProps> = ({
           userMsg,
           assistantMsg,
           newThreadId,
-          previousThreadId,
-          persistThreadToHistory,
+          (tid, title, msgs) => persistThreadToHistory(tid, title, msgs, true),
         ),
       );
       refetchChatBudget();
@@ -1658,8 +1909,18 @@ const BreezeAssistantSidebar: React.FC<BreezeAssistantSidebarProps> = ({
     }
   };
 
-  const handleChipClick = (label: string) => { setInputValue(label + " "); textareaRef.current?.focus(); };
-  const handleNewConversation = () => { setMessages([]); setInputValue(""); setThreadId(""); setActiveChatId("new"); setShowMoreMenu(false); setView("chat"); };
+  const handleChipClick = (label: string) => {
+    setInputValue(label + " ");
+    textareaRef.current?.focus();
+  };
+  const handleNewConversation = () => {
+    setMessages([]);
+    setInputValue("");
+    setThreadId("");
+    setActiveChatId("new");
+    setShowMoreMenu(false);
+    setView("chat");
+  };
 
   const handleSelectThread = async (item: BreezeChatHistory) => {
     if (item.id === "new" || !item.threadId) {
@@ -1674,6 +1935,7 @@ const BreezeAssistantSidebar: React.FC<BreezeAssistantSidebarProps> = ({
     try {
       const thread = await getChatThread(item.threadId);
       const loaded = mapChatThreadMessagesToUi(thread.messages);
+      applyRateLimitFromSend(thread.rate_limit);
       setMessages(loaded);
       persistThreadToHistory(
         thread.thread_id,
@@ -1691,8 +1953,9 @@ const BreezeAssistantSidebar: React.FC<BreezeAssistantSidebarProps> = ({
 
   const handleSaveCurrentChat = () => {
     if (threadId && messages.length > 0) {
-      const title = messages[0].role === "user" ? messages[0].content : "New Chat";
-      persistThreadToHistory(threadId, title, messages, false);
+      const title =
+        messages[0].role === "user" ? messages[0].content : "New Chat";
+      persistThreadToHistory(threadId, title, messages, true);
       setShowMoreMenu(false);
     }
   };
@@ -1722,9 +1985,15 @@ const BreezeAssistantSidebar: React.FC<BreezeAssistantSidebarProps> = ({
     return (
       <button
         style={{
-          background: "transparent", border: "none", padding: 0, cursor: "pointer",
-          fontSize: "13px", fontWeight: "600", color: "#0091ae",
-          textDecoration: "underline", textUnderlineOffset: "2px",
+          background: "transparent",
+          border: "none",
+          padding: 0,
+          cursor: "pointer",
+          fontSize: "13px",
+          fontWeight: "600",
+          color: "#0091ae",
+          textDecoration: "underline",
+          textUnderlineOffset: "2px",
         }}
         onMouseEnter={(e) => (e.currentTarget.style.color = "#007a8c")}
         onMouseLeave={(e) => (e.currentTarget.style.color = "#0091ae")}
@@ -1764,40 +2033,73 @@ const BreezeAssistantSidebar: React.FC<BreezeAssistantSidebarProps> = ({
           {showMoreMenu && (
             <div
               style={{
-                position: "absolute", top: "calc(100% + 6px)", right: 0,
-                backgroundColor: "#ffffff", border: "1px solid #e2e8f0",
-                borderRadius: "8px", boxShadow: "0 4px 16px rgba(0,0,0,0.12)",
-                minWidth: "180px", zIndex: 1201, overflow: "hidden",
+                position: "absolute",
+                top: "calc(100% + 6px)",
+                right: 0,
+                backgroundColor: "#ffffff",
+                border: "1px solid #e2e8f0",
+                borderRadius: "8px",
+                boxShadow: "0 4px 16px rgba(0,0,0,0.12)",
+                minWidth: "180px",
+                zIndex: 1201,
+                overflow: "hidden",
               }}
             >
               {[
-                ...(!isMaximized ? [{
-                  label: "Chats",
-                  onClick: () => { setView("chatHistory"); setShowMoreMenu(false); }
-                }] : []),
-                ...(threadId && messages.length > 0 ? [{
-                  label: "Save chat",
-                  onClick: handleSaveCurrentChat,
-                }] : []),
+                ...(isMaximized
+                  ? []
+                  : [
+                      {
+                        label: "Chats",
+                        onClick: () => {
+                          setView("chatHistory");
+                          setShowMoreMenu(false);
+                        },
+                      },
+                    ]),
+                ...(threadId && messages.length > 0
+                  ? [
+                      {
+                        label: "Save chat",
+                        onClick: handleSaveCurrentChat,
+                      },
+                    ]
+                  : []),
                 {
                   label: "Prompts",
-                  onClick: () => { setView("prompts"); setShowMoreMenu(false); }
+                  onClick: () => {
+                    setView("prompts");
+                    setShowMoreMenu(false);
+                  },
                 },
                 {
                   label: "Memories",
-                  onClick: () => { setView("memories"); setShowMoreMenu(false); }
+                  onClick: () => {
+                    setView("memories");
+                    setShowMoreMenu(false);
+                  },
                 },
               ].map(({ label, onClick }) => (
                 <button
                   key={label}
                   onClick={onClick}
                   style={{
-                    width: "100%", padding: "10px 16px", backgroundColor: "transparent",
-                    border: "none", textAlign: "left", fontSize: "13.5px",
-                    color: "#141414", cursor: "pointer", transition: "background 0.15s",
+                    width: "100%",
+                    padding: "10px 16px",
+                    backgroundColor: "transparent",
+                    border: "none",
+                    textAlign: "left",
+                    fontSize: "13.5px",
+                    color: "#141414",
+                    cursor: "pointer",
+                    transition: "background 0.15s",
                   }}
-                  onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "#f7fafc")}
-                  onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
+                  onMouseEnter={(e) =>
+                    (e.currentTarget.style.backgroundColor = "#f7fafc")
+                  }
+                  onMouseLeave={(e) =>
+                    (e.currentTarget.style.backgroundColor = "transparent")
+                  }
                 >
                   {label}
                 </button>
@@ -1831,6 +2133,22 @@ const BreezeAssistantSidebar: React.FC<BreezeAssistantSidebarProps> = ({
     </div>
   );
 
+  const RateLimitStrip = (
+    <div
+      style={{
+        padding: "8px 14px",
+        borderBottom: "1px solid #e8edf2",
+        backgroundColor: "#f7fafc",
+        flexShrink: 0,
+      }}
+    >
+      <AssistantRateLimitBar
+        rateLimit={rateLimit}
+        isLoading={isRateLimitLoading}
+      />
+    </div>
+  );
+
   // ── Footer ────────────────────────────────────────────────────────────────
   const FooterBar = (
     <div
@@ -1845,14 +2163,22 @@ const BreezeAssistantSidebar: React.FC<BreezeAssistantSidebarProps> = ({
         backgroundColor: "#ffffff",
       }}
     >
-      <span style={{ fontSize: "11.5px", color: "#a0aec0", textAlign: "center" }}>
+      <span
+        style={{ fontSize: "11.5px", color: "#a0aec0", textAlign: "center" }}
+      >
         AI-generated content may be inaccurate.
       </span>
       <button
         style={{
-          background: "transparent", border: "none", padding: "2px",
-          cursor: "pointer", color: "#a0aec0", display: "flex",
-          alignItems: "center", borderRadius: "50%", transition: "color 0.2s",
+          background: "transparent",
+          border: "none",
+          padding: "2px",
+          cursor: "pointer",
+          color: "#a0aec0",
+          display: "flex",
+          alignItems: "center",
+          borderRadius: "50%",
+          transition: "color 0.2s",
         }}
         onMouseEnter={(e) => (e.currentTarget.style.color = "#718096")}
         onMouseLeave={(e) => (e.currentTarget.style.color = "#a0aec0")}
@@ -1868,18 +2194,23 @@ const BreezeAssistantSidebar: React.FC<BreezeAssistantSidebarProps> = ({
     switch (view) {
       case "chatHistory":
         return (
-          <ChatHistoryFullscreenList
-            historyList={historyList}
-            activeChatId={activeChatId}
-            deletingThreadId={deletingThreadId}
-            conversationsLoading={conversationsLoading}
-            conversationsError={conversationsError}
-            hasConversations={chatHistory.length > 0}
-            onActivateItem={(item) =>
-              item.id === "new" ? handleNewConversation() : handleSelectThread(item)
-            }
-            onDeleteItem={handleDeleteThread}
-          />
+          <div
+            className="breeze-scroll"
+            style={{
+              flex: 1,
+              overflowY: "auto",
+              padding: "8px 12px 16px 12px",
+            }}
+          >
+            <ChatHistoryList
+              items={historyList}
+              activeId={activeChatId}
+              onSelectThread={handleSelectThread}
+              onNewChat={handleNewConversation}
+              onDeleteThread={handleDeleteThread}
+              rowMarginBottom="4px"
+            />
+          </div>
         );
 
       case "prompts":
@@ -1895,7 +2226,12 @@ const BreezeAssistantSidebar: React.FC<BreezeAssistantSidebarProps> = ({
         return (
           <div
             className="breeze-scroll"
-            style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}
+            style={{
+              flex: 1,
+              display: "flex",
+              flexDirection: "column",
+              overflow: "hidden",
+            }}
           >
             {!hasMessages ? (
               <EmptyState
@@ -1962,12 +2298,24 @@ const BreezeAssistantSidebar: React.FC<BreezeAssistantSidebarProps> = ({
               onNewChat={handleNewConversation}
               onDeleteThread={handleDeleteThread}
             />
-            <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+            <div
+              style={{
+                flex: 1,
+                display: "flex",
+                flexDirection: "column",
+                overflow: "hidden",
+              }}
+            >
               {TopBar}
-              {ChatBudgetBar}
+              {view === "chat" ? RateLimitStrip : null}
               <div
                 className="breeze-scroll"
-                style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}
+                style={{
+                  flex: 1,
+                  display: "flex",
+                  flexDirection: "column",
+                  overflow: "hidden",
+                }}
               >
                 {BodyContent}
               </div>
@@ -2010,7 +2358,7 @@ const BreezeAssistantSidebar: React.FC<BreezeAssistantSidebarProps> = ({
         }}
       >
         {TopBar}
-        {ChatBudgetBar}
+        {view === "chat" ? RateLimitStrip : null}
         {BodyContent}
         {FooterBar}
       </div>

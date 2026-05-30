@@ -67,19 +67,16 @@ function unwrapPricingBody(data: unknown): AnalysisCostPricingResponse | null {
   }
   if (isRecord(data)) {
     for (const key of ["data", "result", "pricing"] as const) {
-      const nested = data[key];
-      if (isAnalysisCostPricingResponse(nested)) {
-        return nested;
+      const found = unwrapPricingBody(data[key]);
+      if (found) {
+        return found;
       }
     }
   }
   return null;
 }
 
-function pricingPath(tenantId: string): string {
-  const id = encodeURIComponent(tenantId.trim());
-  return `/ai-analytics/cost/pricing/${id}`;
-}
+const PRICING_PATH = "/ai-analytics/cost/pricing";
 
 export interface AnalysisTenantRecord {
   tenant_id: string;
@@ -184,35 +181,24 @@ function unwrapTenantRecord(data: unknown): AnalysisTenantRecord | null {
   }
   if (isRecord(data)) {
     for (const key of ["data", "result", "tenant"] as const) {
-      const nested = data[key];
-      if (isAnalysisTenantRecord(nested)) {
-        return normalizeTenantRecord(nested);
+      const found = unwrapTenantRecord(data[key]);
+      if (found) {
+        return found;
       }
     }
   }
   return null;
 }
 
-function analysisTenantPath(tenantId: string): string {
-  const id = encodeURIComponent(tenantId.trim());
-  return `/ai-analytics/cost/tenants/${id}`;
-}
-
-function updateTenantPath(tenantId: string): string {
+function tenantPath(tenantId: string): string {
   const id = encodeURIComponent(tenantId.trim());
   return `/ai-analytics/tenants/${id}`;
 }
 
-/** GET `/api/ai-analytics/cost/pricing/{tenant_id}` */
-export async function getAnalysisCostPricing(
-  tenantId: string,
-): Promise<AnalysisCostPricingResponse | null> {
-  const id = tenantId.trim();
-  if (!id) {
-    throw new Error("tenant_id is required");
-  }
+/** GET `/api/ai-analytics/cost/pricing` */
+export async function getAnalysisCostPricing(): Promise<AnalysisCostPricingResponse | null> {
   try {
-    const response = await axiosInstance.get<unknown>(pricingPath(id), {
+    const response = await axiosInstance.get<unknown>(PRICING_PATH, {
       validateStatus: (status) =>
         (status >= 200 && status < 300) || status === 404,
     });
@@ -230,17 +216,12 @@ export async function getAnalysisCostPricing(
   }
 }
 
-/** PUT `/api/ai-analytics/cost/pricing/{tenant_id}` */
+/** PUT `/api/ai-analytics/cost/pricing` */
 export async function updateAnalysisCostPricing(
-  tenantId: string,
   payload: AnalysisCostPricingUpdateRequest,
 ): Promise<AnalysisCostPricingResponse> {
-  const id = tenantId.trim();
-  if (!id) {
-    throw new Error("tenant_id is required");
-  }
   try {
-    const response = await axiosInstance.put<unknown>(pricingPath(id), payload);
+    const response = await axiosInstance.put<unknown>(PRICING_PATH, payload);
     const body = unwrapPricingBody(response.data);
     if (!body) {
       throw new Error("Failed to save analysis pricing");
@@ -256,7 +237,7 @@ export async function updateAnalysisCostPricing(
   }
 }
 
-/** GET `/api/ai-analytics/cost/tenants/{tenantId}` */
+/** GET `/api/ai-analytics/tenants/{tenantId}` */
 export async function getAnalysisTenant(
   tenantId: string,
 ): Promise<AnalysisTenantRecord | null> {
@@ -265,7 +246,7 @@ export async function getAnalysisTenant(
     throw new Error("tenant_id is required");
   }
   try {
-    const response = await axiosInstance.get<unknown>(analysisTenantPath(id), {
+    const response = await axiosInstance.get<unknown>(tenantPath(id), {
       validateStatus: (status) =>
         (status >= 200 && status < 300) || status === 404,
     });
@@ -293,7 +274,7 @@ export async function updateAnalysisTenant(
     throw new Error("tenant_id is required");
   }
   try {
-    await axiosInstance.put<unknown>(updateTenantPath(id), payload);
+    await axiosInstance.put<unknown>(tenantPath(id), payload);
     const refreshed = await getAnalysisTenant(id);
     if (!refreshed) {
       throw new Error("Failed to load tenant settings after save");
@@ -358,24 +339,40 @@ function normalizeMonthlyRollupRow(
   };
 }
 
-function unwrapMonthlyRollupList(data: unknown): AnalysisMonthlyRollupRow[] {
-  if (Array.isArray(data)) {
-    return data
-      .filter(isAnalysisMonthlyRollupRow)
-      .map((row) => normalizeMonthlyRollupRow(row));
-  }
-  if (!isRecord(data)) {
+function parseMonthlyRollupRows(value: unknown): AnalysisMonthlyRollupRow[] {
+  if (!Array.isArray(value)) {
     return [];
   }
-  for (const key of ["data", "results", "items", "rollup"] as const) {
-    const nested = data[key];
-    if (Array.isArray(nested)) {
-      return nested
-        .filter(isAnalysisMonthlyRollupRow)
-        .map((row) => normalizeMonthlyRollupRow(row));
+  return value
+    .filter(isAnalysisMonthlyRollupRow)
+    .map((row) => normalizeMonthlyRollupRow(row));
+}
+
+/** Walk nested API envelopes until `items` or a rollup row array is found. */
+function findMonthlyRollupItems(data: unknown): unknown {
+  if (data == null) {
+    return undefined;
+  }
+  if (Array.isArray(data)) {
+    return data;
+  }
+  if (!isRecord(data)) {
+    return undefined;
+  }
+  if ("items" in data) {
+    return data.items;
+  }
+  for (const key of ["data", "results", "rollup"] as const) {
+    const found = findMonthlyRollupItems(data[key]);
+    if (found !== undefined) {
+      return found;
     }
   }
-  return [];
+  return undefined;
+}
+
+function unwrapMonthlyRollupList(data: unknown): AnalysisMonthlyRollupRow[] {
+  return parseMonthlyRollupRows(findMonthlyRollupItems(data));
 }
 
 function buildMonthlyRollupParams(
@@ -472,7 +469,9 @@ function isAnalysisPerCallCostRow(value: unknown): value is AnalysisPerCallCostR
     return false;
   }
   return (
-    (typeof value.call_id === "string" || typeof value.id === "string") &&
+    (typeof value.call_id === "string" ||
+      typeof value.id === "string" ||
+      typeof value.id === "number") &&
     typeof value.tenant_id === "string"
   );
 }
@@ -498,24 +497,48 @@ function normalizePerCallCostRow(
   };
 }
 
-function unwrapPerCallCostList(data: unknown): AnalysisPerCallCostListResponse {
-  if (!isRecord(data)) {
+function parsePerCallCostPayload(value: unknown): AnalysisPerCallCostListResponse {
+  if (!isRecord(value)) {
     return { total: 0, items: [] };
   }
   const total =
-    typeof data.total === "number" && Number.isFinite(data.total)
-      ? data.total
+    typeof value.total === "number" && Number.isFinite(value.total)
+      ? value.total
       : 0;
-  const itemsRaw = data.items;
-  if (Array.isArray(itemsRaw)) {
-    return {
-      total,
-      items: itemsRaw
-        .filter(isAnalysisPerCallCostRow)
-        .map((row) => normalizePerCallCostRow(row)),
-    };
+  const itemsRaw = value.items;
+  if (!Array.isArray(itemsRaw)) {
+    return { total, items: [] };
   }
-  return { total, items: [] };
+  return {
+    total,
+    items: itemsRaw
+      .filter(isAnalysisPerCallCostRow)
+      .map((row) => normalizePerCallCostRow(row)),
+  };
+}
+
+/** Walk nested API envelopes until `{ total, items }` is found. */
+function findPerCallCostPayload(data: unknown): unknown {
+  if (data == null) {
+    return undefined;
+  }
+  if (!isRecord(data)) {
+    return undefined;
+  }
+  if ("items" in data) {
+    return data;
+  }
+  for (const key of ["data", "result", "results"] as const) {
+    const found = findPerCallCostPayload(data[key]);
+    if (found !== undefined) {
+      return found;
+    }
+  }
+  return undefined;
+}
+
+function unwrapPerCallCostList(data: unknown): AnalysisPerCallCostListResponse {
+  return parsePerCallCostPayload(findPerCallCostPayload(data));
 }
 
 function buildPerCallCostParams(

@@ -1,0 +1,76 @@
+{
+
+  "_scenario": "transfer-then-hold",
+
+  "_description": "UserA (1001) transferred to UserC (1003). UserC held — heldByAddress from server identifies holder.",
+
+  "type": "call_events",
+
+  "data": {
+
+    "callId": "CALL-XFER-001",
+
+    "eventType": "HELD",
+
+    "sequence": 5,
+
+    "eventTime": "2026-01-01T10:05:00.000Z",
+
+    "isConference": false,
+
+    "isOneToOne": true,
+
+    "isTerminating": false,
+
+    "hasActiveParticipants": true,
+
+    "eventName": "CallHeld",
+
+    "currentState": "HELD",
+
+    "heldByAddress": "1003",
+
+    "heldByDeviceName": "AGENT_C",
+
+    "parties": [
+
+      {
+
+        "callId": "CALL-XFER-001",
+
+        "callingAddress": "1001",
+
+        "calledAddress": "1003",
+
+        "callStatus": "ON_HOLD",
+
+        "startTime": "2026-01-01T10:00:05.000Z",
+
+        "holdSegments": [
+
+          {
+
+            "startTime": "2026-01-01T10:05:00.000Z",
+
+            "endTime": null,
+
+            "heldByAddress": "1003",
+
+            "heldByDeviceName": "AGENT_C"
+
+          }
+
+        ]
+
+      }
+
+    ]
+
+  },
+
+  "_dnsMap_contains": ["1001", "1002", "1003"],
+
+  "_expected_heldByAddress": "1003 — only UserC should resume"
+
+}
+

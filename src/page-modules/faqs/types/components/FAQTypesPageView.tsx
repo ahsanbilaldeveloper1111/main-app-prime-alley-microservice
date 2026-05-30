@@ -11,6 +11,8 @@ export type FAQTypesPageViewProps = Readonly<{
   isLoadingTopics: boolean;
   types: string[];
   loading: boolean;
+  showBreadcrumb?: boolean;
+  breadcrumbMainLink?: string;
 }>;
 
 export const FAQTypesPageView: React.FC<FAQTypesPageViewProps> = ({
@@ -20,6 +22,8 @@ export const FAQTypesPageView: React.FC<FAQTypesPageViewProps> = ({
   isLoadingTopics,
   types,
   loading,
+  showBreadcrumb = true,
+  breadcrumbMainLink = "/main-settings/help-center/types",
 }) => {
   const renderCardBody = (): React.ReactNode => {
     if (loading) {
@@ -71,7 +75,9 @@ export const FAQTypesPageView: React.FC<FAQTypesPageViewProps> = ({
 
   return (
     <React.Fragment>
-      <BreadcrumbItem mainTitle="FAQs" mainLink="/faqs" subTitle="Types" />
+      {showBreadcrumb ? (
+        <BreadcrumbItem mainTitle="FAQs" mainLink={breadcrumbMainLink} subTitle="Types" />
+      ) : null}
 
       <Row className="mb-3">
         <Col md={12}>

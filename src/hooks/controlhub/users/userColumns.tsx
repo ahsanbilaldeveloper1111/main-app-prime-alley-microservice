@@ -4,6 +4,7 @@ import { FiEdit } from 'react-icons/fi';
 import DatatableActionButton from '@components/DatatableActionButton';
 import { Button, Dropdown } from 'react-bootstrap';
 import { Eye, Key } from 'lucide-react';
+import { buildUserEditPath } from '@utils/controlhub/usersNavigation';
 
 const STATUS_OPTIONS = ['processing', 'completed', 'deleted'] as const;
 
@@ -90,7 +91,7 @@ export const useUserColumns = (session: any, customFieldColumns: Column[], optio
                 {session?.user?.permissions?.includes('edit-users') && (
                     <Button variant="light"  className="btn-action-style-2 p-1 text-primary" title="View" onClick={() => {
                         if (typeof globalThis !== 'undefined' && globalThis.window) {
-                            globalThis.window.location.href = `/controlhub/users/${props.encId}`;
+                            globalThis.window.location.href = buildUserEditPath(props.encId);
                         }
                     }}>
                         <Eye size={16} />

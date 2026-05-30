@@ -83,6 +83,7 @@ export function useAIFaqsGlobalPage() {
       const fields = buildAiFaqSubmitFields(evaluation.validFAQs, draftFiles);
       const payload: CreateGlobalFAQPayload = {
         faqs: fields.faqs,
+        have_files: fields.have_files,
         ...(fields.files?.length ? { files: fields.files } : {}),
       };
 

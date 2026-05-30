@@ -76,7 +76,7 @@ export function mapFormValuesToAnalysisPricingUpdate(
       "$ per 1M output tokens",
     ),
     ...(currency ? { currency } : {}),
-    ...(notes ? { notes } : {}),
+    notes,
   };
 }
 

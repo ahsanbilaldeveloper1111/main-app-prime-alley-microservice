@@ -1,0 +1,31 @@
+{
+  "_scenario": "ongoing-calls-snapshot",
+  "_description": "Snapshot of active calls received after STOMP connect (reconcile payload)",
+  "type": "ongoing_calls",
+  "data": {
+    "callsByDn": {
+      "1001": {
+        "CALL-001": {
+          "callId": "CALL-001",
+          "eventType": "CONNECTED",
+          "currentState": "CONNECTED",
+          "sequence": 10,
+          "eventTime": "2026-01-01T10:00:05.000Z",
+          "isConference": false,
+          "isOneToOne": true,
+          "isTerminating": false,
+          "hasActiveParticipants": true,
+          "parties": [
+            {
+              "callId": "CALL-001",
+              "callingAddress": "5551234",
+              "calledAddress": "1001",
+              "callStatus": "CONNECTED",
+              "startTime": "2026-01-01T10:00:05.000Z"
+            }
+          ]
+        }
+      }
+    }
+  }
+}

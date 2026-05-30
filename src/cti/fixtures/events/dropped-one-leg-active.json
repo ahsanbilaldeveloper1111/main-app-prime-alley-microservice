@@ -1,0 +1,33 @@
+{
+  "_scenario": "dropped-consult-leg",
+  "_description": "Consult leg dropped but original call (1001<->5551234) still active — call must NOT be removed",
+  "type": "call_events",
+  "data": {
+    "callId": "CALL-001",
+    "eventType": "DROPPED",
+    "sequence": 5,
+    "eventTime": "2026-01-01T10:02:00.000Z",
+    "isConference": false,
+    "isOneToOne": false,
+    "isTerminating": false,
+    "hasActiveParticipants": true,
+    "eventName": "CallDropped",
+    "currentState": "CONNECTED",
+    "parties": [
+      {
+        "callId": "CALL-001",
+        "callingAddress": "5551234",
+        "calledAddress": "1001",
+        "callStatus": "CONNECTED",
+        "startTime": "2026-01-01T10:00:05.000Z"
+      },
+      {
+        "callId": "CALL-001",
+        "callingAddress": "1001",
+        "calledAddress": "1002",
+        "callStatus": "DROPPED",
+        "startTime": "2026-01-01T10:01:00.000Z"
+      }
+    ]
+  }
+}

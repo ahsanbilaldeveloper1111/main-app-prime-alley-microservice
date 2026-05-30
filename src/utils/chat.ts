@@ -17,6 +17,13 @@ const TENANT_FAQS_API_PATH = "/chat/tenant-faqs";
 /** AI assistant thread API (`GET/POST /api/chat/` when `BACKEND_URL` ends with `/api/`). */
 const CHAT_ASSISTANT_API_PATH = "/chat/";
 
+/** Candidate paths for current-user rate limit (first match wins). */
+const CHAT_USER_RATE_LIMIT_PATHS = [
+  "/chat/rate-limit",
+  "/chat/user/rate-limit",
+  "/chat/limits",
+] as const;
+
 /** AI assistant conversation list (`GET /api/chat/conversations` when `BACKEND_URL` ends with `/api/`). */
 const CHAT_CONVERSATIONS_API_PATH = "/chat/conversations";
 
@@ -270,6 +277,7 @@ export interface ChatSendMessageResponse {
   tenant_id: string;
   thread_id: string;
   metadata: ChatSendMetadata;
+  rate_limit?: ChatRateLimit;
   error?: string;
   /** e.g. `user_budget_exhausted` when the caller cannot consume more budget. */
   code?: string;
@@ -295,6 +303,7 @@ export interface ChatThreadResponse {
   messages: ChatThreadMessage[];
   created_at: string;
   updated_at: string;
+  rate_limit?: ChatRateLimit;
   error?: string;
 }
 
@@ -506,6 +515,8 @@ export interface CreateTenantFAQPayload {
   tenant_id: string;
   /** JSON string of `[{ question, answer }]` */
   faqs: string;
+  /** `"true"` / `"false"` when the API expects an explicit files flag */
+  have_files?: string;
   /** PDF or TXT; each appended as `files[]` in multipart/form-data */
   files?: File[];
 }
@@ -545,6 +556,8 @@ export interface CreateTenantFAQResponse {
 export type CreateGlobalFAQPayload = {
   /** JSON string of `[{ question, answer }]` */
   faqs: string;
+  /** `"true"` / `"false"` when the API expects an explicit files flag */
+  have_files?: string;
   files?: File[];
 };
 
@@ -734,7 +747,10 @@ export const getChatThread = async (
     if (response.data?.error) {
       throw new Error(response.data.error || "Failed to load chat thread");
     }
-    return response.data;
+    const rateLimit = extractChatRateLimitFromResponse(response.data);
+    return rateLimit
+      ? { ...response.data, rate_limit: rateLimit }
+      : response.data;
   } catch (error: unknown) {
     rethrowChatApiError(error, "Failed to load conversation. Please try again.");
   }
@@ -763,12 +779,123 @@ export const sendChatMessage = async (
       throw new Error(response.data.error || "An error occurred");
     }
 
-    return response.data;
+    const rateLimit = extractChatRateLimitFromResponse(response.data);
+    return rateLimit
+      ? { ...response.data, rate_limit: rateLimit }
+      : response.data;
   } catch (error: unknown) {
     rethrowChatApiError(
       error,
       "An error occurred while processing your request. Please try again.",
     );
+  }
+};
+
+export interface ChatRateLimitParseResult {
+  rateLimit: ChatRateLimit;
+  hasUsageCounts: boolean;
+}
+
+function readRateLimitField(
+  raw: Record<string, unknown>,
+  limitKeys: string[],
+  remainingKeys: string[],
+): { limit: number | null; remaining: number | null } {
+  let limit: number | null = null;
+  let remaining: number | null = null;
+
+  for (const key of limitKeys) {
+    const value = parseLimitNumber(raw[key]);
+    if (value != null) {
+      limit = value;
+      break;
+    }
+  }
+
+  for (const key of remainingKeys) {
+    const value = parseLimitNumber(raw[key]);
+    if (value != null) {
+      remaining = value;
+      break;
+    }
+  }
+
+  return { limit, remaining };
+}
+
+function parseChatRateLimitRecord(
+  raw: Record<string, unknown>,
+): ChatRateLimitParseResult | null {
+  const minute = readRateLimitField(
+    raw,
+    ["per_minute_limit", "user_per_minute_limit", "user_per_minute"],
+    ["per_minute_remaining", "user_per_minute_remaining"],
+  );
+  const day = readRateLimitField(
+    raw,
+    ["per_day_limit", "user_per_day_limit", "user_per_day"],
+    ["per_day_remaining", "user_per_day_remaining"],
+  );
+
+  if (minute.limit == null || day.limit == null) {
+    return null;
+  }
+
+  const hasUsageCounts =
+    minute.remaining != null && day.remaining != null;
+
+  const perMinuteRemaining = minute.remaining ?? minute.limit;
+  const perDayRemaining = day.remaining ?? day.limit;
+  const perMinuteUsed = parseLimitNumber(raw.per_minute_used);
+  const perDayUsed = parseLimitNumber(raw.per_day_used);
+
+  return {
+    hasUsageCounts,
+    rateLimit: {
+      per_minute_limit: minute.limit,
+      per_minute_remaining: perMinuteRemaining,
+      per_minute_used:
+        perMinuteUsed ?? Math.max(0, minute.limit - perMinuteRemaining),
+      per_day_limit: day.limit,
+      per_day_remaining: perDayRemaining,
+      per_day_used: perDayUsed ?? Math.max(0, day.limit - perDayRemaining),
+    },
+  };
+}
+
+/** Pulls `rate_limit` from assistant API bodies (top-level, nested, or metadata). */
+export function extractChatRateLimitFromResponse(
+  data: unknown,
+): ChatRateLimit | undefined {
+  const parsed = parseChatRateLimitPayload(data);
+  return parsed?.rateLimit;
+}
+
+/**
+ * Current user's AI assistant rate limits (GET `/api/chat/rate-limit`).
+ * Returns `null` when the endpoint is unavailable (e.g. 404).
+ */
+export const getChatUserRateLimit = async (): Promise<ChatRateLimitParseResult | null> => {
+  for (const path of CHAT_USER_RATE_LIMIT_PATHS) {
+    try {
+      const response = await axiosInstance.get<unknown>(path);
+      const parsed = parseChatRateLimitPayload(response.data);
+      if (parsed) return parsed;
+    } catch (error: unknown) {
+      if (httpErrorStatus(error) !== 404) {
+        console.warn(`Failed to load chat rate limits from ${path}:`, error);
+      }
+    }
+  }
+
+  try {
+    const response = await axiosInstance.get<unknown>(CHAT_ASSISTANT_API_PATH);
+    return parseChatRateLimitPayload(response.data);
+  } catch (error: unknown) {
+    if (httpErrorStatus(error) !== 404) {
+      console.warn("Failed to load chat rate limits from /chat/:", error);
+    }
+    return null;
   }
 };
 
@@ -892,6 +1019,9 @@ export const createTenantFAQ = async (
     const formData = new FormData();
     formData.append("tenant_id", payload.tenant_id);
     formData.append("faqs", payload.faqs);
+    if (payload.have_files !== undefined) {
+      formData.append("have_files", payload.have_files);
+    }
 
     if (payload.files?.length) {
       for (const file of payload.files) {
@@ -1061,6 +1191,9 @@ export const createGlobalFAQ = async (
   try {
     const formData = new FormData();
     formData.append("faqs", payload.faqs);
+    if (payload.have_files !== undefined) {
+      formData.append("have_files", payload.have_files);
+    }
 
     if (payload.files?.length) {
       for (const file of payload.files) {
@@ -1551,6 +1684,100 @@ export interface TenantDashboardRecentConversation {
   last_activity?: string;
   thread?: string;
   user?: string;
+}
+
+export interface TenantDashboardRateLimit {
+  per_minute_used: number;
+  per_minute_limit: number;
+  per_minute_remaining: number;
+  per_day_used: number;
+  per_day_limit: number;
+  per_day_remaining: number;
+}
+
+/** User message rate limits (same shape as tenant dashboard `rate_limit`). */
+export type ChatRateLimit = TenantDashboardRateLimit;
+
+function parseLimitNumber(value: unknown): number | null {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
+  }
+  if (typeof value === "string" && value.trim()) {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+  return null;
+}
+
+function parseRateLimitFromNestedField(
+  data: Record<string, unknown>,
+  field: "rate_limit",
+): ChatRateLimitParseResult | null {
+  const nested = data[field];
+  if (!isRecord(nested)) {
+    return null;
+  }
+  return parseChatRateLimitRecord(nested);
+}
+
+function parseRateLimitFromMetadata(
+  data: Record<string, unknown>,
+): ChatRateLimitParseResult | null {
+  const metadata = data.metadata;
+  if (!isRecord(metadata)) {
+    return null;
+  }
+
+  const fromMetadata = parseChatRateLimitRecord(metadata);
+  if (fromMetadata) {
+    return fromMetadata;
+  }
+
+  return parseRateLimitFromNestedField(metadata, "rate_limit");
+}
+
+const RATE_LIMIT_WRAPPER_KEYS = ["data", "result"] as const;
+
+function parseRateLimitFromWrapperKeys(
+  data: Record<string, unknown>,
+): ChatRateLimitParseResult | null {
+  for (const key of RATE_LIMIT_WRAPPER_KEYS) {
+    const wrapped = data[key];
+    if (!isRecord(wrapped)) {
+      continue;
+    }
+    const parsed = parseChatRateLimitPayload(wrapped);
+    if (parsed) {
+      return parsed;
+    }
+  }
+  return null;
+}
+
+/** Normalizes `rate_limit` from API bodies (nested or flat). */
+export function parseChatRateLimitPayload(
+  data: unknown,
+): ChatRateLimitParseResult | null {
+  if (!isRecord(data)) {
+    return null;
+  }
+
+  const fromNested = parseRateLimitFromNestedField(data, "rate_limit");
+  if (fromNested) {
+    return fromNested;
+  }
+
+  const fromMetadata = parseRateLimitFromMetadata(data);
+  if (fromMetadata) {
+    return fromMetadata;
+  }
+
+  const direct = parseChatRateLimitRecord(data);
+  if (direct) {
+    return direct;
+  }
+
+  return parseRateLimitFromWrapperKeys(data);
 }
 
 export interface TenantChatDashboardResponse {

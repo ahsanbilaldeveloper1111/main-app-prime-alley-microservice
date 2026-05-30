@@ -31,6 +31,7 @@ const nextShimAliases = {
   ),
   "@sentry/nextjs": path.resolve(__dirname, "src/shims/sentry-nextjs.ts"),
   "@query/keys": path.resolve(__dirname, "src/query/keys.ts"),
+  "@cti": path.resolve(__dirname, "src/cti/index.ts"),
 };
 
 /** Upstream origin for dev `server.proxy['/api']` (parsed from absolute backend URLs in env). */

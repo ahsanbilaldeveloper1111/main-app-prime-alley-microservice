@@ -2,7 +2,12 @@ import React, { useState } from 'react'
 import { Search, ChevronLeft } from 'lucide-react'
 import { useRouter } from 'next/router'
 import { usePermissions } from '@utils/permissionUtils'
-import { sidebarGroups, defaultSubTabBySection, type SidebarItem } from '@config/mainSettingsConfig'
+import {
+  sidebarGroups,
+  defaultSubTabBySection,
+  settingsSubTabSearchItems,
+  type SidebarItem,
+} from '@config/mainSettingsConfig'
 
 type SidebarProps = {
   activeSection: string
@@ -110,15 +115,27 @@ function SidebarNavItem({
 
 const Sidebar: React.FC<SidebarProps> = ({ activeSection, onNavigate }) => {
   const router = useRouter()
+  const activeSubTab =
+    typeof router.query.subTab === 'string' ? router.query.subTab : undefined
   const { hasPermission } = usePermissions()
   const [showSearch, setShowSearch] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [hoveredNavItemId, setHoveredNavItemId] = useState<string | null>(null)
 
-  const handleItemClick = (itemId: string) => {
-    const defaultSubTab = defaultSubTabBySection[itemId]
+  const handleItemClick = (itemId: string, subTabId?: string) => {
+    const defaultSubTab = subTabId ?? defaultSubTabBySection[itemId]
     onNavigate(itemId, defaultSubTab)
   }
+
+  const q = searchQuery.trim().toLowerCase()
+
+  const filteredSubTabSearchItems = q
+    ? settingsSubTabSearchItems.filter(
+        (item) =>
+          sidebarItemPermissionAllowed(item.permission, hasPermission) &&
+          item.label.toLowerCase().includes(q),
+      )
+    : []
 
   return (
     <aside
@@ -262,9 +279,9 @@ const Sidebar: React.FC<SidebarProps> = ({ activeSection, onNavigate }) => {
         const permissionFilteredItems = group.items.filter((item) =>
           sidebarItemPermissionAllowed(item.permission, hasPermission),
         )
-        const filteredItems = searchQuery.trim()
+        const filteredItems = q
           ? permissionFilteredItems.filter((item) =>
-              item.label.toLowerCase().includes(searchQuery.toLowerCase())
+              item.label.toLowerCase().includes(q),
             )
           : permissionFilteredItems
 
@@ -309,6 +326,51 @@ const Sidebar: React.FC<SidebarProps> = ({ activeSection, onNavigate }) => {
           </div>
         )
       })}
+
+      {filteredSubTabSearchItems.length > 0 && (
+        <div style={{ marginBottom: '8px' }}>
+          <div
+            style={{
+              paddingLeft: '20px',
+              paddingRight: '20px',
+              paddingTop: '12px',
+              paddingBottom: '6px',
+              fontFamily: 'Lexend Deca, Helvetica, Arial, sans-serif',
+              fontWeight: 600,
+              fontSize: '16px',
+              color: '#141414',
+              lineHeight: '20px',
+            }}
+          >
+            Pages
+          </div>
+          {filteredSubTabSearchItems.map((item) => {
+            const isActive =
+              activeSection === item.sectionId && activeSubTab === item.subTabId
+            const itemKey = `${item.sectionId}-${item.subTabId}`
+            const isHovered = hoveredNavItemId === itemKey
+            return (
+              <SidebarNavItem
+                key={itemKey}
+                item={{ id: itemKey, label: item.label }}
+                isActive={isActive}
+                isHovered={isHovered}
+                onSelect={() => {
+                  setSearchQuery('')
+                  setShowSearch(false)
+                  handleItemClick(item.sectionId, item.subTabId)
+                }}
+                onHoverEnter={() => {
+                  if (!isActive) {
+                    setHoveredNavItemId(itemKey)
+                  }
+                }}
+                onHoverLeave={() => setHoveredNavItemId(null)}
+              />
+            )
+          })}
+        </div>
+      )}
     </aside>
   )
 }
