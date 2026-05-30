@@ -1498,9 +1498,59 @@ function MyDayTodayTasksSection({ vm }: MyDayTasksPageViewProps) {
           Add to My Day
         </Button>
       </div>
-      {showLoading ? <p className="myday-empty-state">Loading My Day tasks...</p> : null}
+      {showLoading ? (
+        <div className="myday-empty-state">
+          <div style={{ fontSize: 32, opacity: 0.2 }}>⏳</div>
+          <div style={{ fontSize: 13, fontWeight: 500, color: "#4a5568" }}>Loading tasks...</div>
+        </div>
+      ) : null}
       {showEmpty ? (
-        <p className="myday-empty-state">{resolveTodayEmptyMessage(vm.isEmptyByDesign)}</p>
+        <div className="myday-empty-state">
+          <svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ opacity: 0.18 }}>
+            <circle cx="32" cy="32" r="28" stroke="#0066CC" strokeWidth="2.5"/>
+            <path d="M20 32h24M32 20v24" stroke="#0066CC" strokeWidth="2.5" strokeLinecap="round"/>
+            <circle cx="32" cy="14" r="3" fill="#0066CC"/>
+            <circle cx="50" cy="32" r="3" fill="#0066CC"/>
+            <circle cx="32" cy="50" r="3" fill="#0066CC"/>
+            <circle cx="14" cy="32" r="3" fill="#0066CC"/>
+          </svg>
+          <div style={{ fontSize: 14, fontWeight: 500, color: "#4a5568" }}>No tasks planned for today</div>
+          <div style={{ fontSize: 12, color: "#718096", maxWidth: 220, lineHeight: 1.6, textAlign: "center" }}>
+            Add tasks from the suggestions panel or create a new one
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              vm.scrollToSuggestions();
+              setTimeout(() => {
+                const searchInput = document.querySelector('#myday-suggestions-panel input[type="text"]') as HTMLInputElement | null;
+                if (searchInput) {
+                  searchInput.focus();
+                  searchInput.style.transition = "box-shadow 0.2s ease";
+                  searchInput.style.boxShadow = "0 0 0 3px rgba(0,102,204,0.25)";
+                  setTimeout(() => { searchInput.style.boxShadow = ""; }, 1500);
+                }
+              }, 300);
+            }}
+            style={{
+              marginTop: 4,
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 6,
+              fontSize: 12,
+              fontWeight: 500,
+              color: "#fff",
+              background: "#0066CC",
+              border: "none",
+              borderRadius: 7,
+              padding: "7px 16px",
+              cursor: "pointer",
+              fontFamily: "Lexend Deca, Helvetica, Arial, sans-serif",
+            }}
+          >
+            + Browse Suggestions
+          </button>
+        </div>
       ) : null}
       <MyDayTaskList tasks={vm.activeTasks} handlers={handlers} />
     </div>
