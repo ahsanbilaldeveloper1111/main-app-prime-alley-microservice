@@ -2056,10 +2056,18 @@ const GenericTable = <T extends Record<string, any>>({
           toolbar.filterPills.length > 0 && (
             <div className="gt-filter-pills">
               <div className="d-flex align-items-center gap-2 flex-wrap">
-                {toolbar.filterPills.map((pill) =>
-                  pill.showDropdown ? (
+                {(() => {
+                  const activePills = toolbar.filterPills.filter(p => p.active);
+                  const inactivePills = toolbar.filterPills.filter(p => !p.active);
+                  const allPills = [...activePills, ...inactivePills];
+                  const separatorIndex = activePills.length > 0 && inactivePills.length > 0 ? activePills.length : -1;
+                  return allPills.map((pill, idx) => (
+                    <React.Fragment key={pill.id}>
+                      {idx === separatorIndex && (
+                        <span style={{ color: '#cbd5e1', fontSize: '16px', userSelect: 'none' }}>|</span>
+                      )}
+                      {pill.showDropdown ? (
                     <Dropdown
-                      key={pill.id}
                       show={openFilterPillId === pill.id}
                       autoClose={pill.multiSelect ? "outside" : true}
                       onToggle={(nextShow) =>
@@ -2131,15 +2139,16 @@ const GenericTable = <T extends Record<string, any>>({
                     </Dropdown>
                   ) : (
                     <button
-                      key={pill.id}
                       className="gt-filter-pill"
                       onClick={pill.onClick}
                     >
                       {pill.icon && <span className="me-1">{pill.icon}</span>}
                       <span>{pill.label}</span>
                     </button>
-                  ),
-                )}
+                  )}
+                    </React.Fragment>
+                  ));
+                })()}
                 {toolbar.showMoreFiltersButton !== false && (
                   <button className="gt-filter-pill-add">
                     <Plus size={14} className="me-1" />
