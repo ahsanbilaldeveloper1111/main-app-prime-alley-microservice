@@ -337,19 +337,21 @@ type MyDaySuggestedItemButtonProps = Readonly<{
   groupCategory: MyDaySuggestionCategory;
   inMyDay: boolean;
   onAdd: (task: SuggestedTask) => void;
+  className?: string;
 }>;
 
 function MyDaySuggestedItemButton({
   task,
   inMyDay,
   onAdd,
+  className = "",
 }: MyDaySuggestedItemButtonProps) {
   const priorityKey = task.priority.toLowerCase().replace(/\s+/g, "-");
   const dueLabel = formatSuggestionDueDate(task.dueDate);
   return (
     <button
       type="button"
-      className={`myday-suggested-item ${inMyDay ? "is-added" : ""}`}
+      className={`myday-suggested-item ${inMyDay ? "is-added" : ""} ${className}`.trim()}
       disabled={inMyDay}
       onClick={() => onAdd(task)}
     >
@@ -450,7 +452,7 @@ type MyDayTaskCardProps = Readonly<{
 function MyDayTaskCard({ task, onToggleComplete, onRemove, onEditEstimate }: MyDayTaskCardProps) {
   const priorityKey = task.priority.toLowerCase().replace(/\s+/g, "-");
   return (
-    <div className={`myday-task-card ${task.isCompleted ? "is-completed" : ""}`}>
+    <div className={`myday-task-card ${task.isCompleted ? "is-completed" : ""}`} data-priority={priorityKey}>
       <div className="myday-task-card__main">
         <button
           type="button"
@@ -1490,7 +1492,7 @@ function MyDaySuggestionsPanel({ vm }: MyDayTasksPageViewProps) {
         ) : null}
         {vm.groupedSuggestions.map((group) => (
           <section key={group.category} className="myday-suggested-group">
-            <h5 className="myday-suggested-group__title">{group.label}</h5>
+            <h5 className={`myday-suggested-group__title cat-${group.category}`}>{group.label}</h5>
             <div className="myday-suggested-list">
               {group.items.map((task) => (
                 <MyDaySuggestedItemButton
@@ -1499,6 +1501,7 @@ function MyDaySuggestionsPanel({ vm }: MyDayTasksPageViewProps) {
                   groupCategory={group.category}
                   inMyDay={isSuggestionInMyDay(task, vm.myDayTaskIds)}
                   onAdd={vm.handleSuggestedAddClick}
+                  className={group.category === "overdue" ? "cat-overdue" : ""}
                 />
               ))}
             </div>
