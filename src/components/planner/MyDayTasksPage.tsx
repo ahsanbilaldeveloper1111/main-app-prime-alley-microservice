@@ -348,65 +348,76 @@ function MyDaySuggestedItemButton({
 }: MyDaySuggestedItemButtonProps) {
   const priorityKey = task.priority.toLowerCase().replace(/\s+/g, "-");
   const dueLabel = formatSuggestionDueDate(task.dueDate);
+  const [hovered, setHovered] = React.useState(false);
   return (
     <button
       type="button"
       className={`myday-suggested-item ${inMyDay ? "is-added" : ""}`}
       disabled={inMyDay}
       onClick={() => onAdd(task)}
+      onMouseEnter={() => !inMyDay && setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
       style={{
         display: "flex",
         alignItems: "center",
-        gap: 8,
+        gap: 10,
         width: "100%",
         textAlign: "left",
-        padding: "7px 10px",
-        border: `1px solid ${inMyDay ? "#eaf0f6" : "#eaf0f6"}`,
-        borderRadius: 7,
-        background: inMyDay ? "#f9fafb" : "#f9fafb",
+        padding: "clamp(9px, 1.2vw, 13px) clamp(10px, 1.5vw, 14px)",
+        border: hovered && !inMyDay ? "1px solid #0066CC" : inMyDay ? "1px solid #bbf7d0" : "1px solid #e2e8f0",
+        borderLeft: inMyDay ? "3px solid #22c55e" : hovered && !inMyDay ? "3px solid #0066CC" : "1px solid #e2e8f0",
+        borderRadius: 8,
+        background: hovered && !inMyDay ? "#f0f7ff" : inMyDay ? "#f9fafb" : "#fff",
         cursor: inMyDay ? "not-allowed" : "pointer",
-        opacity: inMyDay ? 0.55 : 1,
+        opacity: inMyDay ? 0.65 : 1,
         fontFamily: "inherit",
         transition: "all 0.15s ease",
       }}
     >
-      <div style={{ flex: 1, minWidth: 0 }}>
+      <div style={{ flex: 1, minWidth: 0, textAlign: "left" }}>
         <div className="title" style={{
-          fontSize: "clamp(11px, 1vw, 12px)",
+          fontSize: "clamp(12px, 1.2vw, 14px)",
           fontWeight: 500,
           color: "#141414",
-          marginBottom: 4,
+          marginBottom: "clamp(4px, 0.6vw, 6px)",
           whiteSpace: "nowrap",
           overflow: "hidden",
           textOverflow: "ellipsis",
+          textAlign: "left",
         }}>{task.title}</div>
-        <div className="meta" style={{ display: "flex", flexWrap: "wrap", gap: 5, alignItems: "center" }}>
+        <div className="meta" style={{ display: "flex", flexWrap: "wrap", gap: "clamp(4px, 0.6vw, 6px)", alignItems: "center", justifyContent: "flex-start" }}>
           {dueLabel ? (
-            <span style={{ fontSize: 10, color: "#718096" }}>{dueLabel}</span>
+            <span style={{ fontSize: "clamp(10px, 0.9vw, 12px)", color: "#718096" }}>{dueLabel}</span>
           ) : null}
-          <span className={`myday-tag myday-tag--priority priority-${priorityKey}`} style={{ fontSize: 10 }}>
+          <span className={`myday-tag myday-tag--priority priority-${priorityKey}`} style={{ fontSize: "clamp(10px, 0.9vw, 11px)" }}>
+            <span style={{ width: 5, height: 5, borderRadius: "50%", display: "inline-block", flexShrink: 0, marginRight: 3,
+              background: priorityKey === "urgent" || priorityKey === "critical" ? "#ef4444" :
+                          priorityKey === "high" ? "#f97316" :
+                          priorityKey === "medium" || priorityKey === "normal" ? "#eab308" : "#22c55e"
+            }} />
             {task.priority}
           </span>
           {task.estimateMinutes > 0 ? (
-            <span style={{ fontSize: 10, color: "#718096" }}>{toMinutesDisplay(task.estimateMinutes)}</span>
+            <span style={{ fontSize: "clamp(10px, 0.9vw, 12px)", color: "#718096" }}>{toMinutesDisplay(task.estimateMinutes)}</span>
           ) : (
-            <span style={{ fontSize: 10, color: "#f97316", fontWeight: 500 }}>No est.</span>
+            <span style={{ fontSize: "clamp(10px, 0.9vw, 11px)", color: "#f97316", fontWeight: 500 }}>No est.</span>
           )}
         </div>
       </div>
       <div style={{
-        width: 22,
-        height: 22,
+        width: "clamp(22px, 2vw, 28px)",
+        height: "clamp(22px, 2vw, 28px)",
         borderRadius: "50%",
-        border: inMyDay ? "1px solid #22c55e" : "1px solid #e2e8f0",
-        background: inMyDay ? "#f0fdf4" : "#fff",
-        color: inMyDay ? "#22c55e" : "#718096",
+        border: inMyDay ? "1px solid #22c55e" : hovered ? "1px solid #0066CC" : "1px solid #e2e8f0",
+        background: inMyDay ? "#f0fdf4" : hovered ? "#0066CC" : "#fff",
+        color: inMyDay ? "#22c55e" : hovered ? "#fff" : "#718096",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
         flexShrink: 0,
-        fontSize: 14,
+        fontSize: "clamp(14px, 1.4vw, 18px)",
         transition: "all 0.15s ease",
+        marginLeft: "auto",
       }}>
         {inMyDay ? "✓" : "+"}
       </div>
@@ -1483,6 +1494,7 @@ function MyDayTaskList({
 }
 
 function MyDayTodayTasksSection({ vm }: MyDayTasksPageViewProps) {
+  const [isOpen, setIsOpen] = React.useState(true);
   const handlers: MyDayTaskListHandlers = {
     onToggleComplete: vm.onTaskToggleCompleteClick,
     onRemove: vm.onTaskRemoveClick,
@@ -1490,14 +1502,33 @@ function MyDayTodayTasksSection({ vm }: MyDayTasksPageViewProps) {
   };
   const showLoading = vm.loading && vm.activeTasks.length === 0;
   const showEmpty = !vm.loading && vm.activeTasks.length === 0;
+  const hasTasks = vm.activeTasks.length > 0;
   return (
     <div className="myday-table-card">
-      <div className="myday-section-header">
-        <div className="myday-section-title">Today&apos;s Tasks</div>
-        <Button variant="outline-primary" size="sm" onClick={vm.scrollToSuggestions}>
-          Add to My Day
-        </Button>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+        <button
+          type="button"
+          onClick={() => hasTasks && setIsOpen(!isOpen)}
+          style={{ display: "flex", alignItems: "center", gap: 8, background: "none", border: "none", cursor: hasTasks ? "pointer" : "default", padding: 0, fontFamily: "Lexend Deca, Helvetica, Arial, sans-serif", flex: 1 }}
+        >
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2"
+            style={{ transform: isOpen ? "rotate(90deg)" : "none", transition: "transform 0.2s ease", flexShrink: 0, opacity: hasTasks ? 1 : 0.3 }}>
+            <polyline points="9 18 15 12 9 6" />
+          </svg>
+          <span style={{ fontSize: 10, fontWeight: 600, color: "#718096", textTransform: "uppercase", letterSpacing: "0.06em", whiteSpace: "nowrap" }}>
+            Today&apos;s Tasks
+          </span>
+          {hasTasks && (
+            <span style={{ fontSize: 11, color: "#0066CC", background: "#eff6ff", border: "1px solid #bfdbfe", padding: "1px 8px", borderRadius: 20, fontWeight: 500 }}>
+              {vm.activeTasks.length}
+            </span>
+          )}
+          <div style={{ flex: 1, height: 1, background: "#eaf0f6", marginLeft: 4 }} />
+        </button>
+        {null}
       </div>
+      {isOpen && (
+        <>
       {showLoading ? (
         <div className="myday-empty-state">
           <div style={{ fontSize: 32, opacity: 0.2 }}>⏳</div>
@@ -1505,7 +1536,7 @@ function MyDayTodayTasksSection({ vm }: MyDayTasksPageViewProps) {
         </div>
       ) : null}
       {showEmpty ? (
-        <div className="myday-empty-state">
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "clamp(16px, 2.5vw, 28px) 16px", gap: 10, minHeight: "clamp(140px, 20vh, 220px)" }}>
           <svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ opacity: 0.18 }}>
             <circle cx="32" cy="32" r="28" stroke="#0066CC" strokeWidth="2.5"/>
             <path d="M20 32h24M32 20v24" stroke="#0066CC" strokeWidth="2.5" strokeLinecap="round"/>
@@ -1553,24 +1584,86 @@ function MyDayTodayTasksSection({ vm }: MyDayTasksPageViewProps) {
         </div>
       ) : null}
       <MyDayTaskList tasks={vm.activeTasks} handlers={handlers} />
+        </>
+      )}
     </div>
   );
 }
 
 function MyDayCompletedSection({ vm }: MyDayTasksPageViewProps) {
-  if (vm.completedTasks.length === 0) return null;
+  const [isOpen, setIsOpen] = React.useState(false);
   const handlers: MyDayTaskListHandlers = {
     onToggleComplete: vm.onTaskToggleCompleteClick,
     onRemove: vm.onTaskRemoveClick,
     onEditEstimate: vm.handleOpenEstimateModal,
   };
+  const hasCompleted = vm.completedTasks.length > 0;
   return (
-    <div className="myday-table-card myday-completed-card">
-      <div className="myday-section-title">
-        <span>Completed Tasks</span>
-        <span className="myday-section-count">({vm.completedTasksCount})</span>
-      </div>
-      <MyDayTaskList tasks={vm.completedTasks} handlers={handlers} />
+    <div style={{ marginTop: 16 }}>
+      <button
+        type="button"
+        onClick={() => hasCompleted && setIsOpen(!isOpen)}
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
+          width: "100%",
+          background: "none",
+          border: "none",
+          cursor: hasCompleted ? "pointer" : "default",
+          fontFamily: "Lexend Deca, Helvetica, Arial, sans-serif",
+          padding: 0,
+        }}
+      >
+        <svg
+          width="13"
+          height="13"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="#94a3b8"
+          strokeWidth="2"
+          style={{
+            transform: isOpen ? "rotate(90deg)" : "none",
+            transition: "transform 0.2s ease",
+            flexShrink: 0,
+            opacity: hasCompleted ? 1 : 0.3,
+          }}
+        >
+          <polyline points="9 18 15 12 9 6" />
+        </svg>
+        <span style={{ fontSize: 10, fontWeight: 600, color: "#718096", textTransform: "uppercase", letterSpacing: "0.06em", whiteSpace: "nowrap" }}>
+          Completed
+        </span>
+        {hasCompleted && (
+          <span style={{
+            fontSize: 11, color: "#22c55e", background: "#f0fdf4",
+            border: "1px solid #bbf7d0", padding: "1px 8px",
+            borderRadius: 20, fontWeight: 500, whiteSpace: "nowrap",
+          }}>
+            {vm.completedTasksCount}
+          </span>
+        )}
+        <div style={{ flex: 1, height: 1, background: "#eaf0f6", marginLeft: 4 }} />
+      </button>
+
+      {!hasCompleted && (
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "clamp(16px, 2.5vw, 28px) 16px", gap: 10, minHeight: "clamp(140px, 20vh, 220px)" }}>
+          <svg width="52" height="52" viewBox="0 0 52 52" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ opacity: 0.15 }}>
+            <circle cx="26" cy="26" r="22" stroke="#22c55e" strokeWidth="2.5"/>
+            <path d="M16 26l7 7 13-13" stroke="#22c55e" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+          <div style={{ fontSize: 13, fontWeight: 500, color: "#4a5568" }}>No completed tasks yet</div>
+          <div style={{ fontSize: 11, color: "#94a3b8", maxWidth: 200, textAlign: "center", lineHeight: 1.6 }}>
+            Complete a task to see it here
+          </div>
+        </div>
+      )}
+
+      {isOpen && hasCompleted && (
+        <div style={{ marginTop: 8 }}>
+          <MyDayTaskList tasks={vm.completedTasks} handlers={handlers} />
+        </div>
+      )}
     </div>
   );
 }
