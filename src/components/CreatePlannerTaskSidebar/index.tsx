@@ -3555,23 +3555,25 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
                           style={{ fontSize: "14px" }}
                         />
                       </div>
-                      <div
-                        style={{
-                          maxHeight: 200,
-                          overflowY: "auto",
-                          backgroundColor: "#f8fafc",
-                          border: "1px solid #e2e8f0",
-                          borderRadius: 4,
-                        }}
-                      >
-                        <PlannerSidebarLinkedRecordsBody
-                          loadingLinkedRecords={loadingLinkedRecords}
-                          linkedRecordsForDisplay={linkedRecordsForDisplay}
-                          searchQuery={searchQuery}
-                          linkedRecordIds={formData.linkedRecordIds}
-                          toggleLinkedRecord={toggleLinkedRecord}
-                        />
-                      </div>
+                      {searchQuery.trim().length > 0 && (
+                        <div
+                          style={{
+                            maxHeight: 200,
+                            overflowY: "auto",
+                            backgroundColor: "#f8fafc",
+                            border: "1px solid #e2e8f0",
+                            borderRadius: 4,
+                          }}
+                        >
+                          <PlannerSidebarLinkedRecordsBody
+                            loadingLinkedRecords={loadingLinkedRecords}
+                            linkedRecordsForDisplay={linkedRecordsForDisplay}
+                            searchQuery={searchQuery}
+                            linkedRecordIds={formData.linkedRecordIds}
+                            toggleLinkedRecord={toggleLinkedRecord}
+                          />
+                        </div>
+                      )}
                     </Form.Group>
                   </Col>
                 )}
@@ -3607,7 +3609,16 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
                               />
                               Assigned To
                             </Form.Label>
-                    <div style={helperTextStyle}>Who is responsible for completing this task?</div>
+                          </div>
+                          <div style={helperTextStyle}>Who is responsible for completing this task?</div>
+                          <div
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "space-between",
+                              marginBottom: 8,
+                            }}
+                          >
                             {!isLimitedTaskEdit && (
                               <button
                                 type="button"
@@ -3818,7 +3829,16 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
                               />
                               Watchers
                             </Form.Label>
-                    <div style={helperTextStyle}>Who should be notified of updates on this task?</div>
+                          </div>
+                          <div style={helperTextStyle}>Who should be notified of updates on this task?</div>
+                          <div
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "space-between",
+                              marginBottom: 8,
+                            }}
+                          >
                             {!isLimitedTaskEdit && (
                               <button
                                 type="button"
@@ -3876,8 +3896,8 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
                                     gap: 8,
                                     padding: "6px 12px",
                                     borderRadius: 6,
-                                    backgroundColor: "#f0fdf4",
-                                    border: "1px solid #bbf7d0",
+                                    backgroundColor: "#eef4ff",
+                                    border: "1px solid #bfdbfe",
                                     fontSize: "0.875rem",
                                     color: "#141414",
                                     fontWeight: 500,
@@ -3896,8 +3916,8 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
                                     gap: 8,
                                     padding: "6px 12px",
                                     borderRadius: 6,
-                                    backgroundColor: "#f0fdf4",
-                                    border: "1px solid #bbf7d0",
+                                    backgroundColor: "#eef4ff",
+                                    border: "1px solid #bfdbfe",
                                     fontSize: "0.875rem",
                                     cursor: "pointer",
                                     font: "inherit",
