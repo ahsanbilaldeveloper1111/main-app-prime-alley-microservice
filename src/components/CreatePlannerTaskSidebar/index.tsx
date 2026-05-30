@@ -3354,7 +3354,7 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
         >
           <h2
             style={{
-              fontSize: 30,
+              fontSize: 20,
               fontWeight: 600,
               margin: 0,
               display: "flex",
@@ -3362,9 +3362,9 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
               gap: 8,
               color: PLANNER_TASK_SIDEBAR.text,
               letterSpacing: "0",
+              fontFamily: "Lexend Deca, Helvetica, Arial, sans-serif",
             }}
           >
-            <ListTodo size={20} color={PLANNER_TASK_SIDEBAR.textMuted} strokeWidth={2} />
             {getSidebarTitle(formData.taskType, isEdit, isRecurringConversionMode)}
           </h2>
           <div className="d-flex align-items-center gap-2">
