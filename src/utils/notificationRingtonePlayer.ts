@@ -1,3 +1,5 @@
+import { unknownToLowerSoundToken } from '@utils/unknownToLowerSoundToken'
+
 export type NotificationRingtone = 'chime' | 'bell' | 'ding'
 
 let sharedAudioContext: AudioContext | null = null
@@ -11,13 +13,15 @@ function getBrowserWindow(): Window | undefined {
 }
 
 function getAudioContextClass(): typeof AudioContext | undefined {
-  const win = getBrowserWindow() as
-    | (Window & { webkitAudioContext?: typeof AudioContext })
-    | undefined
+  const win = getBrowserWindow()
   if (!win) {
     return undefined
   }
-  return win.AudioContext ?? win.webkitAudioContext
+  const webkitCtor =
+    'webkitAudioContext' in win
+      ? (win as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
+      : undefined
+  return win.AudioContext ?? webkitCtor
 }
 
 function getAudioContext(): AudioContext | null {
@@ -96,11 +100,8 @@ function playDing(ctx: AudioContext, startTime: number): void {
 }
 
 export function normalizeNotificationRingtone(raw: unknown): NotificationRingtone | null {
-  if (raw == null) {
-    return null
-  }
-  const text = String(raw).trim().toLowerCase()
-  if (text === '' || text === 'null' || text === 'none') {
+  const text = unknownToLowerSoundToken(raw)
+  if (text == null || text === 'null' || text === 'none') {
     return null
   }
   if (text === 'chime' || text === 'bell' || text === 'ding') {

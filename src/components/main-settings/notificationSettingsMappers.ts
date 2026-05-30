@@ -5,6 +5,7 @@ import type {
 } from '@services/notificationSettingsApi'
 import type { ChannelKey, NotificationSubtopic, NotificationTopic } from './notificationsSettingsTypes'
 import { SMART_CRM_TOPIC_ID } from './smartCrmNotificationConfig'
+import { unknownToLowerSoundToken } from '@utils/unknownToLowerSoundToken'
 
 const CHIME_LABEL_BY_SOUND: Record<string, string> = {
   chime: 'Chime (1 sec.)',
@@ -20,18 +21,17 @@ const SOUND_BY_CHIME_LABEL: Record<string, NotificationSound> = {
 }
 
 export function normalizeNotificationSound(raw: unknown): NotificationSound {
-  if (raw == null) return null
-  const text = String(raw).trim().toLowerCase()
-  if (text === '' || text === 'null' || text === 'none') return null
+  const text = unknownToLowerSoundToken(raw)
+  if (text == null || text === 'null' || text === 'none') return null
   if (text === 'chime' || text === 'bell' || text === 'ding') return text
   return 'chime'
 }
 
-export function notificationSoundToChimeLabel(sound: NotificationSound | string | null | undefined): string {
+export function notificationSoundToChimeLabel(sound: NotificationSound | null | undefined): string {
   if (sound == null) {
     return 'None'
   }
-  return CHIME_LABEL_BY_SOUND[String(sound)] ?? 'Chime (1 sec.)'
+  return CHIME_LABEL_BY_SOUND[sound] ?? 'Chime (1 sec.)'
 }
 
 export function chimeLabelToNotificationSound(label: string): NotificationSound {
