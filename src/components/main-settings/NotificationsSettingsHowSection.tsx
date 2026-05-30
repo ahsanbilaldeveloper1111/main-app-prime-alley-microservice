@@ -12,6 +12,7 @@ export type NotificationsSettingsHowSectionProps = {
   toggleChannelEnabled: (ch: ChannelKey) => void
   selectedChime: string
   setSelectedChime: (v: string) => void
+  onPlaySelectedChime: () => void
 }
 
 export const NotificationsSettingsHowSection: React.FC<NotificationsSettingsHowSectionProps> = ({
@@ -25,6 +26,7 @@ export const NotificationsSettingsHowSection: React.FC<NotificationsSettingsHowS
   toggleChannelEnabled,
   selectedChime,
   setSelectedChime,
+  onPlaySelectedChime,
 }) => (
   <div style={{ marginBottom: '36px' }}>
     {bannerVisible && (
@@ -280,7 +282,7 @@ export const NotificationsSettingsHowSection: React.FC<NotificationsSettingsHowS
                         backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M6 8L1 3h10z' fill='%23555'/%3E%3C/svg%3E")`,
                         backgroundRepeat: 'no-repeat',
                         backgroundPosition: 'right 10px center',
-                      } as React.CSSProperties
+                      }
                     }
                   >
                     <option>Chime (1 sec.)</option>
@@ -290,6 +292,7 @@ export const NotificationsSettingsHowSection: React.FC<NotificationsSettingsHowS
                   </select>
                   <button
                     type="button"
+                    onClick={onPlaySelectedChime}
                     style={{
                       display: 'flex',
                       alignItems: 'center',
