@@ -13,15 +13,14 @@ function getBrowserWindow(): Window | undefined {
 }
 
 function getAudioContextClass(): typeof AudioContext | undefined {
+  if (typeof AudioContext !== 'undefined') {
+    return AudioContext
+  }
   const win = getBrowserWindow()
-  if (!win) {
+  if (!win || !('webkitAudioContext' in win)) {
     return undefined
   }
-  const webkitCtor =
-    'webkitAudioContext' in win
-      ? (win as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
-      : undefined
-  return win.AudioContext ?? webkitCtor
+  return (win as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
 }
 
 function getAudioContext(): AudioContext | null {
