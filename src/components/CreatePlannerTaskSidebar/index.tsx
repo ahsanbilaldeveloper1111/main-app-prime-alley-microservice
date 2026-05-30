@@ -58,8 +58,8 @@ const TASK_TITLE_MAX_LENGTH = 150;
 
 /** Shared visual tokens for create / edit task sidebar */
 const PLANNER_TASK_SIDEBAR = {
-  accent: "#141414",
-  accentSoft: "rgba(20, 20, 20, 0.06)",
+  accent: "#0066CC",
+  accentSoft: "rgba(0, 102, 204, 0.08)",
   surface: "#ffffff",
   surfaceMuted: "#f8fafc",
   border: "#e5e7eb",
@@ -1346,7 +1346,7 @@ function PlannerSidebarFooter({
           ...(isSubmitting
             ? { backgroundColor: "#94a3b8" }
             : {
-                backgroundImage: `linear-gradient(135deg, ${PLANNER_TASK_SIDEBAR.accent} 0%, #4338ca 100%)`,
+                backgroundColor: "#0066CC",
               }),
           border: "none",
           borderRadius: 10,
