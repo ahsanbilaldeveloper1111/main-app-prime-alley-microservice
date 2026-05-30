@@ -4490,6 +4490,7 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
                     />
                     Description
                   </Form.Label>
+                  <div style={helperTextStyle}>Add details, context, or instructions for this task.</div>
                   <RichTextEditor
                     buttonSize="sm"
                     value={formData.description || ""}
@@ -4523,6 +4524,7 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
                             </span>
                           )}
                         </Form.Label>
+                        <div style={helperTextStyle}>Which project does this task belong to?</div>
                         <Form.Select
                           value={formData.projectId || ""}
                           onChange={handleProjectSelectChange}
@@ -4553,6 +4555,7 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
                         />
                         Status
                       </Form.Label>
+                      <div style={helperTextStyle}>Current state of this task.</div>
                       <Form.Select
                         value={formData.statusId ?? ""}
                         onChange={(e) =>
