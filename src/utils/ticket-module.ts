@@ -111,6 +111,45 @@ export const GetModule = async (id: string) => {
 export const ListSubmodules = (params: PaginationParams = {}) =>
   postPaginatedListRequest("/tickets/submodules", params);
 
+export type TicketSubmoduleRecord = Readonly<{
+  id: string;
+  name: string;
+  description: string;
+  module_id: string;
+  created_at: string;
+  updated_at: string;
+}>;
+
+export type TicketSubmodulesListPageParams = Readonly<{
+  page: number;
+  perPage: number;
+  search: string;
+}>;
+
+export type TicketSubmodulesListPayload = Readonly<{
+  data: TicketSubmoduleRecord[];
+  total: number;
+}>;
+
+export const fetchTicketSubmodulesListPage = (
+  params: TicketSubmodulesListPageParams,
+): Promise<TicketSubmodulesListPayload> =>
+  fetchTicketResourcePage<TicketSubmoduleRecord>(ListSubmodules, params, {
+    passSearchInFilters: true,
+  });
+
+export const getTicketSubmodulesListQueryOptions = (
+  params: TicketSubmodulesListPageParams,
+) => ({
+  queryKey: ticketsKeys.submodulesList.list({
+    page: params.page,
+    perPage: params.perPage,
+    search: params.search,
+    filtersKey: "",
+  }),
+  queryFn: () => fetchTicketSubmodulesListPage(params),
+});
+
 export const GetAllSubmodules = async () => {
   const response = await axiosInstance.get(`/tickets/submodules/all`);
   return handleFetchOneOrAllResponse(response, "Failed to fetch submodules");
@@ -166,6 +205,43 @@ export const DeleteSubmodule = (id: string) =>
 
 export const ListSubmoduleChildren = (params: PaginationParams = {}) =>
   postPaginatedListRequest("/tickets/submodule-children", params);
+
+export type TicketSubmoduleChildRecord = Readonly<{
+  id: string;
+  name: string;
+  description: string;
+  created_at: string;
+  updated_at: string;
+  submodule?: { name?: string; color?: string };
+}>;
+
+export type TicketSubmoduleChildrenListPageParams = Readonly<{
+  page: number;
+  perPage: number;
+  search: string;
+}>;
+
+export type TicketSubmoduleChildrenListPayload = Readonly<{
+  data: TicketSubmoduleChildRecord[];
+  total: number;
+}>;
+
+export const fetchTicketSubmoduleChildrenListPage = (
+  params: TicketSubmoduleChildrenListPageParams,
+): Promise<TicketSubmoduleChildrenListPayload> =>
+  fetchTicketResourcePage<TicketSubmoduleChildRecord>(ListSubmoduleChildren, params);
+
+export const getTicketSubmoduleChildrenListQueryOptions = (
+  params: TicketSubmoduleChildrenListPageParams,
+) => ({
+  queryKey: ticketsKeys.submoduleChildrenList.list({
+    page: params.page,
+    perPage: params.perPage,
+    search: params.search,
+    filtersKey: "",
+  }),
+  queryFn: () => fetchTicketSubmoduleChildrenListPage(params),
+});
 
 export const GetAllSubmoduleChildren = async () => {
   const response = await axiosInstance.get(`/tickets/submodule-children/all`);

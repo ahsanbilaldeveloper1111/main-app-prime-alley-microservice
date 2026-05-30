@@ -1,24 +1,22 @@
 import { useTicketHierarchyExtensionsQuery } from "@page-modules/tickets/useTicketHierarchyExtensionsQuery";
 import { useTicketModulesAllQuery } from "@page-modules/tickets/useTicketModulesAllQuery";
+import { useTicketSubmoduleChildrenListQuery } from "@page-modules/tickets/useTicketSubmoduleChildrenListQuery";
 import { ticketsKeys } from "@query/keys";
 import {
   ListSubmodules,
   CreateSubmoduleChild,
   DeleteSubmoduleChild,
-  ListSubmoduleChildren,
 } from "@utils/ticket-module";
-import { Column } from "@components/CustomDataTable";
-import type { GenericListPageQueryParams } from "@components/GenericListPage";
+import type { TableAction, TableColumn } from "@components/GenericTable";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useMemo, useState } from "react";
 import { toast } from "react-toastify";
-import { Button } from "react-bootstrap";
 import { GlobalDateTimeFormat } from "@utils/Helper";
 import { Trash2 } from "lucide-react";
 import moment from "moment";
 import type { TicketModulePickerRow, TicketSubmoduleRow } from "../categories/moduleCategoriesTypes";
 
-export interface SubCategoryRow extends Record<string, unknown> {
+export interface SubCategoryRow {
   id: string;
   name: string;
   description: string;
@@ -34,8 +32,19 @@ export function useModuleSubCategoriesPage() {
 
   const modules: TicketModulePickerRow[] = modulesQuery.data ?? [];
 
-  const [currentFilters] = useState({ search: "" });
-  const memoizedFilters = useMemo(() => currentFilters, [currentFilters]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [rowsPerPage, setRowsPerPage] = useState(15);
+  const [searchValue, setSearchValue] = useState("");
+
+  const listQuery = useTicketSubmoduleChildrenListQuery({
+    page: currentPage,
+    perPage: rowsPerPage,
+    search: searchValue,
+  });
+
+  const data = listQuery.data?.data ?? [];
+  const totalRows = listQuery.data?.total ?? 0;
+  const loading = listQuery.isFetching;
 
   const [showSubmoduleChildrenModal, setShowSubmoduleChildrenModal] = useState(false);
   const [newChildName, setNewChildName] = useState("");
@@ -61,31 +70,6 @@ export function useModuleSubCategoriesPage() {
     setNewChildModuleId(moduleId);
     setNewChildSubmoduleId("");
   }, []);
-
-  const getListQueryOptions = useCallback(
-    (params: GenericListPageQueryParams) => {
-      const { search: _omit, ...filtersWithoutSearch } = (params.filters || {}) as {
-        search?: string;
-      };
-      return {
-        queryKey: ticketsKeys.submoduleChildrenList.list({
-          page: params.page,
-          perPage: params.perPage,
-          search: params.search,
-          filtersKey: JSON.stringify(filtersWithoutSearch),
-        }),
-        queryFn: () =>
-          ListSubmoduleChildren({
-            page: params.page,
-            perPage: params.perPage,
-            search:
-              params.search || (params.filters as { search?: string })?.search || "",
-            filters: filtersWithoutSearch,
-          }),
-      };
-    },
-    [],
-  );
 
   const createSubCategoryMutation = useMutation({
     mutationFn: () =>
@@ -141,88 +125,91 @@ export function useModuleSubCategoriesPage() {
     setNewChildModuleId("");
   }, []);
 
-  const columns = useMemo<Column<SubCategoryRow>[]>(
+  const handleDeleteSubCategoryRow = useCallback((row: SubCategoryRow) => {
+    setSelectedSubcategoryForDelete(row.id);
+    setShowSubmoduleDeleteModal(true);
+  }, []);
+
+  const handlePaginationChange = useCallback((page: number, perPage: number) => {
+    setCurrentPage(page);
+    setRowsPerPage(perPage);
+  }, []);
+
+  const handleSearchChange = useCallback((value: string) => {
+    setSearchValue(value);
+    setCurrentPage(1);
+  }, []);
+
+  const columns = useMemo<TableColumn<SubCategoryRow>[]>(
     () => [
       {
         key: "name",
-        name: "Name",
-        selector: (row) => row.name,
+        label: "Name",
         sortable: true,
-        cell: (props) => <span className="fw-medium">{props.name}</span>,
+        render: (row) => <span className="fw-medium">{row.name}</span>,
       },
       {
         key: "description",
-        name: "Description",
-        selector: (row) => row.description || "No description",
+        label: "Description",
         sortable: true,
-        cell: (props) => (
+        render: (row) => (
           <span className="text-muted" style={{ fontSize: "0.875rem" }}>
-            {props.description && props.description.length > 50 ? (
-              <span className="text-muted text-overflow-ellipsis" style={{ fontSize: "0.875rem" }}>
-                {props.description.substring(0, 50) + "..."}
-              </span>
-            ) : (
-              <span className="text-muted" style={{ fontSize: "0.875rem" }}>
-                {props.description || "No description"}
-              </span>
-            )}
+            {row.description && row.description.length > 50
+              ? `${row.description.substring(0, 50)}...`
+              : row.description || "No description"}
           </span>
         ),
       },
       {
         key: "module",
-        name: "Category",
-        selector: (row) => row.submodule?.name || "Unknown",
+        label: "Category",
         sortable: true,
-        cell: (props) => (
+        accessor: (row) => row.submodule?.name || "Unknown",
+        render: (row) => (
           <span
             className="px-3 py-2 badge bg-outline-secondary text-secondary"
-            style={{ fontSize: "0.813rem", border: `1px solid ${props.submodule?.color}40` }}
+            style={{ fontSize: "0.813rem", border: `1px solid ${row.submodule?.color}40` }}
           >
-            {props.submodule?.name || "Unknown"}
+            {row.submodule?.name || "Unknown"}
           </span>
         ),
       },
       {
         key: "created_at",
-        name: "Created At",
-        selector: (row) => row.created_at,
+        label: "Created At",
         sortable: true,
-        cell: (props) => (
-          <span className="text-muted">{moment(props.created_at).format(GlobalDateTimeFormat)}</span>
-        ),
-      },
-      {
-        key: "actions",
-        name: "Actions",
-        selector: (row) => row.id,
-        sortable: false,
-        cell: (props) => (
-          <div className="d-flex gap-2">
-            <Button
-              variant="light"
-              size="sm"
-              className="btn-action-style-2 p-1 text-danger"
-              title="Delete"
-              type="button"
-              onClick={() => {
-                setSelectedSubcategoryForDelete(props.id);
-                setShowSubmoduleDeleteModal(true);
-              }}
-            >
-              <Trash2 size={16} />
-            </Button>
-          </div>
+        render: (row) => (
+          <span className="text-muted">{moment(row.created_at).format(GlobalDateTimeFormat)}</span>
         ),
       },
     ],
     [],
   );
 
+  const actions: TableAction<SubCategoryRow>[] = useMemo(
+    () => [
+      {
+        label: "Delete",
+        icon: <Trash2 size={16} />,
+        variant: "light",
+        className: "btn-action-style-2 p-1 text-danger",
+        onClick: handleDeleteSubCategoryRow,
+      },
+    ],
+    [handleDeleteSubCategoryRow],
+  );
+
   return {
-    memoizedFilters,
+    data,
+    loading,
     columns,
-    getListQueryOptions,
+    actions,
+    currentPage,
+    rowsPerPage,
+    totalRows,
+    searchValue,
+    handleSearchChange,
+    handlePaginationChange,
     showSubmoduleChildrenModal,
     setShowSubmoduleChildrenModal,
     closeSubCategoryModal,

@@ -291,6 +291,7 @@ function CustomDataTable<T extends Record<string, unknown> = Record<string, unkn
       <div className={`table-content ${tableStyle}`}>
 
          {/* Controls Section */}
+      {(showPageSizeSelector || showSearch) ? (
       <Row className="mb-3">
         {/* Page Size Selector */}
         {showPageSizeSelector  && (
@@ -344,6 +345,7 @@ function CustomDataTable<T extends Record<string, unknown> = Record<string, unkn
 
 
       </Row>
+      ) : null}
 
       {tableStyle === 'table-style-2222' && (
         <Row className="mb-3 g-0">

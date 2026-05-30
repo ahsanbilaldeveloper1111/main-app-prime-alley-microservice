@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import dynamic from 'next/dynamic'
 import { useSession } from 'next-auth/react'
 import { generalSettingsStyles as s, getGeneralSettingsTabStyle } from './generalSettingsPanelStyles'
@@ -43,7 +43,7 @@ export const GeneralSettings: React.FC<
 
   const [language, setLanguage] = useState('')
   const [dateFormat, setDateFormat] = useState('')
-  const [phoneCountry, setPhoneCountry] = useState('')
+  const [phoneCountry, setPhoneCountry] = useState('GB')
   const [phoneNumber, setPhoneNumber] = useState('')
 
   const [dueDate, setDueDate] = useState('In 3 business days')
