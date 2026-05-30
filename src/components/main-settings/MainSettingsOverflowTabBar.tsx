@@ -133,21 +133,21 @@ export const MainSettingsOverflowTabBar: React.FC<MainSettingsOverflowTabBarProp
   }, [activeTabId, tabs, updateScrollState, syncTabButtonHeight])
 
   const tabBarCssVars =
-    tabButtonHeight != null
-      ? ({ '--ms-tab-btn-height': `${tabButtonHeight}px` } as CSSProperties)
-      : undefined
+    tabButtonHeight == null
+      ? undefined
+      : ({ '--ms-tab-btn-height': `${tabButtonHeight}px` } as CSSProperties)
 
   const getNavButtonStyle = (variant: 'prev' | 'next'): CSSProperties | undefined => {
     const tabBorder = '1px solid #c4c4c4'
     const measuredHeightStyle =
-      tabButtonHeight != null
-        ? {
+      tabButtonHeight == null
+        ? undefined
+        : {
             height: tabButtonHeight,
             minHeight: tabButtonHeight,
             paddingTop: 0,
             paddingBottom: 0,
           }
-        : undefined
 
     const navBorderStyle: CSSProperties = {
       background: 'whitesmoke',

@@ -1452,7 +1452,7 @@ const NotesModal: React.FC<NotesModalProps> = ({
     <div
       style={{
         position: "fixed",
-        inset: isMaximized ? "unset" : "unset",
+        inset: "unset",
         ...(isMaximized ? { top: "74px", left: "50%", transform: "translateX(-50%)", width: "min(900px, calc(100vw - 84px))", maxHeight: "calc(100vh - 94px)" } : { left: "50%", top: "50%", transform: "translate(-50%, -50%)", width: "min(650px, calc(100vw - 120px))" }),
         height: isMaximized ? "auto" : "512px",
         width: isMaximized ? "auto" : "min(650px, calc(100vw - 120px))",
@@ -3025,7 +3025,7 @@ const TaskModal: React.FC<TaskModalProps> = ({
       <div
         style={{
           position: "fixed",
-          inset: isMaximized ? "unset" : "unset",
+          inset: "unset",
           ...(isMaximized ? { top: "74px", left: "50%", transform: "translateX(-50%)", width: "min(900px, calc(100vw - 84px))", maxHeight: "calc(100vh - 94px)" } : { left: "50%", top: "50%", transform: "translate(-50%, -50%)", width: "min(650px, calc(100vw - 120px))" }),
           height: isMaximized ? "auto" : "650px",
           width: isMaximized ? "auto" : "min(650px, calc(100vw - 120px))",
@@ -6343,11 +6343,11 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
       return;
     }
     syncActionsMenuPosition();
-    window.addEventListener("resize", syncActionsMenuPosition);
-    window.addEventListener("scroll", syncActionsMenuPosition, true);
+    globalThis.addEventListener("resize", syncActionsMenuPosition);
+    globalThis.addEventListener("scroll", syncActionsMenuPosition, true);
     return () => {
-      window.removeEventListener("resize", syncActionsMenuPosition);
-      window.removeEventListener("scroll", syncActionsMenuPosition, true);
+      globalThis.removeEventListener("resize", syncActionsMenuPosition);
+      globalThis.removeEventListener("scroll", syncActionsMenuPosition, true);
     };
   }, [showActionsDropdown, syncActionsMenuPosition]);
 
@@ -6923,7 +6923,7 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
     };
     const logHandler = logHandlerByAction[actionId];
     if (logHandler) {
-      window.dispatchEvent(new CustomEvent("close-all-activity-modals"));
+      globalThis.dispatchEvent(new CustomEvent("close-all-activity-modals"));
       logHandler();
       return;
     }

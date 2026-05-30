@@ -2,6 +2,8 @@
 .generic-table-container {
   width: 100%;
   overflow: hidden;
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
 }
 /* Card */
 .generic-table-card {
@@ -1458,10 +1460,6 @@ background: #fff !important;
   }
 }
 
-.generic-table-container {
-  scrollbar-width: thin;
-  scrollbar-color: transparent transparent;
-}
 .generic-table-container:hover {
   scrollbar-color: #CBD5E1 transparent;
 }

@@ -284,9 +284,9 @@ export function RequestCategoriesPageView({
 
   return (
     <div className="request-categories-page">
-      {!hideBreadcrumb ? (
+      {hideBreadcrumb ? null : (
         <BreadcrumbItem mainTitle="" mainLink="" subTitle="Request Categories" />
-      ) : null}
+      )}
 
       {embeddedInMainSettings ? (
         <div className="request-categories-page__toolbar">
