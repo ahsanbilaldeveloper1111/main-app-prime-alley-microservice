@@ -4,6 +4,23 @@ import { NotificationsSettingsHowSection } from './NotificationsSettingsHowSecti
 import { NotificationsSettingsTopicsSection } from './NotificationsSettingsTopicsSection'
 import { useNotificationsSettingsState } from './useNotificationsSettingsState'
 
+function notificationSettingsStatusMessage(
+  isGlobalLoading: boolean,
+  isGlobalSaving: boolean,
+  isSmartCrmLoading: boolean,
+): string {
+  if (isGlobalLoading) {
+    return 'Loading notification delivery preferences…'
+  }
+  if (isGlobalSaving) {
+    return 'Saving notification delivery preferences…'
+  }
+  if (isSmartCrmLoading) {
+    return 'Loading Smart CRM notification preferences…'
+  }
+  return 'Saving Smart CRM notification preferences…'
+}
+
 export const NotificationsSettingsNew: React.FC = () => {
   const baseFont = NOTIFICATIONS_BASE_FONT
   const {
@@ -20,6 +37,7 @@ export const NotificationsSettingsNew: React.FC = () => {
     toggleChannelEnabled,
     selectedChime,
     setSelectedChime,
+    playSelectedChime,
     allExpanded,
     toggleExpandAll,
     turnOffAll,
@@ -29,6 +47,12 @@ export const NotificationsSettingsNew: React.FC = () => {
     tableChannels,
     colWidth,
     getParentState,
+    isSmartCrmLoading,
+    isSmartCrmSaving,
+    smartCrmLoadError,
+    isGlobalLoading,
+    isGlobalSaving,
+    globalLoadError,
   } = useNotificationsSettingsState()
 
   return (
@@ -51,6 +75,7 @@ export const NotificationsSettingsNew: React.FC = () => {
         toggleChannelEnabled={toggleChannelEnabled}
         selectedChime={selectedChime}
         setSelectedChime={setSelectedChime}
+        onPlaySelectedChime={playSelectedChime}
       />
       <NotificationsSettingsTopicsSection
         baseFont={baseFont}
