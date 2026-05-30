@@ -293,11 +293,11 @@ const FAQModuleSidebar: React.FC<FAQModuleSidebarProps> = ({
       />
 
       <div
+        className="contact-sidebar-container"
         style={{
           position: "fixed",
           top: 0,
           right: 0,
-          width: "600px",
           height: "100vh",
           backgroundColor: "#ffffff",
           boxShadow: "-2px 0 8px rgba(0, 0, 0, 0.1)",
@@ -307,8 +307,8 @@ const FAQModuleSidebar: React.FC<FAQModuleSidebarProps> = ({
         }}
       >
         <div
+          className="contact-sidebar-header"
           style={{
-            padding: "20px 24px",
             borderBottom: "1px solid #eaf0f6",
             display: "flex",
             alignItems: "center",
@@ -342,7 +342,7 @@ const FAQModuleSidebar: React.FC<FAQModuleSidebarProps> = ({
           onSubmit={handleFormSubmit}
           style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}
         >
-          <div style={{ flex: 1, overflowY: "auto", padding: "40px" }}>
+          <div className="contact-sidebar-content" style={{ flex: 1, overflowY: "auto" }}>
             <ModuleNameField id={config.nameInputId} value={name} onChange={onNameChange} hint={nameHint} />
             <ModuleDescriptionField
               id={config.descInputId}
@@ -358,8 +358,8 @@ const FAQModuleSidebar: React.FC<FAQModuleSidebarProps> = ({
           </div>
 
           <div
+            className="contact-sidebar-footer"
             style={{
-              padding: "16px 24px",
               borderTop: "1px solid #eaf0f6",
               display: "flex",
               gap: "12px",

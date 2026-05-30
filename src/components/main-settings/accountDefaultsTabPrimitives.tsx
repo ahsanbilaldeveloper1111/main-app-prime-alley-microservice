@@ -1,5 +1,6 @@
 import React from 'react'
 import { APP_FONT } from '../../styles/fonts'
+import { MAIN_SETTINGS_FONT_SIZE } from './mainSettingsTokens'
 
 export const ACCOUNT_DEFAULTS_FONT = APP_FONT
 
@@ -14,7 +15,7 @@ const HelpDot: React.FC = () => (
       height: '16px',
       borderRadius: '50%',
       border: '1.5px solid #888',
-      fontSize: '10px',
+      fontSize: MAIN_SETTINGS_FONT_SIZE.xs,
       color: '#888',
       cursor: 'default',
       lineHeight: 1,
@@ -32,7 +33,7 @@ const FieldLabelRow: React.FC<{ label: string; helpIcon?: boolean }> = ({ label,
       gap: '6px',
       marginBottom: '8px',
       fontFamily: ACCOUNT_DEFAULTS_FONT,
-      fontSize: '14px',
+      fontSize: MAIN_SETTINGS_FONT_SIZE.base,
       fontWeight: 600,
       color: '#141414',
     }}
@@ -56,17 +57,17 @@ export const InputField: React.FC<{ label: string; value?: string; helpIcon?: bo
         width: '340px',
         maxWidth: '100%',
         padding: '8px 12px',
-        fontSize: '14px',
+        fontSize: MAIN_SETTINGS_FONT_SIZE.input,
         fontFamily: ACCOUNT_DEFAULTS_FONT,
         color: '#141414',
-        border: '1px solid #d0d0d0',
-        borderRadius: '4px',
+        border: '1px solid #b8b8b8',
+        borderRadius: '8px',
         outline: 'none',
         background: '#fff',
         boxSizing: 'border-box',
       }}
       onFocus={(e) => (e.currentTarget.style.borderColor = '#0091ae')}
-      onBlur={(e) => (e.currentTarget.style.borderColor = '#d0d0d0')}
+      onBlur={(e) => (e.currentTarget.style.borderColor = '#b8b8b8')}
     />
   </div>
 )
@@ -85,11 +86,11 @@ export const SelectField: React.FC<{ label: string; value?: string; options: str
         style={{
           width: '100%',
           padding: '8px 36px 8px 12px',
-          fontSize: '14px',
+          fontSize: MAIN_SETTINGS_FONT_SIZE.input,
           fontFamily: ACCOUNT_DEFAULTS_FONT,
           color: '#141414',
-          border: '1px solid #d0d0d0',
-          borderRadius: '4px',
+          border: '1px solid #b8b8b8',
+          borderRadius: '8px',
           outline: 'none',
           background: '#fff',
           appearance: 'none',
@@ -112,7 +113,7 @@ export const SelectField: React.FC<{ label: string; value?: string; options: str
           transform: 'translateY(-50%)',
           pointerEvents: 'none',
           color: '#555',
-          fontSize: '12px',
+          fontSize: MAIN_SETTINGS_FONT_SIZE.sm,
         }}
       >
         ▾
@@ -125,7 +126,7 @@ export const Divider = () => (
   <hr
     style={{
       border: 'none',
-      borderTop: '1px solid #e8e8e8',
+      borderTop: '1px solid #d0d0d0',
       margin: '28px 0',
     }}
   />
@@ -186,7 +187,7 @@ export const FeatureSectionHeading: React.FC<{ title: string; children: React.Re
     <h2
       style={{
         fontFamily: ACCOUNT_DEFAULTS_FONT,
-        fontSize: '20px',
+        fontSize: MAIN_SETTINGS_FONT_SIZE.lg,
         fontWeight: 700,
         color: '#141414',
         marginBottom: '6px',
@@ -197,7 +198,7 @@ export const FeatureSectionHeading: React.FC<{ title: string; children: React.Re
     <p
       style={{
         fontFamily: ACCOUNT_DEFAULTS_FONT,
-        fontSize: '14px',
+        fontSize: MAIN_SETTINGS_FONT_SIZE.input,
         fontWeight: 300,
         color: '#141414',
         lineHeight: '1.6',

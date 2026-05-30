@@ -32,7 +32,14 @@ export const NotificationsSettingsNew: React.FC = () => {
   } = useNotificationsSettingsState()
 
   return (
-    <div style={{ fontFamily: baseFont, color: '#141414', padding: '32px 40px' }}>
+    <div
+      className="settings-section-shell notifications-settings-page"
+      style={{
+        fontFamily: baseFont,
+        color: '#141414',
+        padding: 'clamp(16px, 3vw, 32px) clamp(12px, 4vw, 40px)',
+      }}
+    >
       <NotificationsSettingsHowSection
         baseFont={baseFont}
         bannerVisible={bannerVisible}

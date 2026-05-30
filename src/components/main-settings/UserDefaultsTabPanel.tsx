@@ -1,3 +1,4 @@
+import { MAIN_SETTINGS_FONT_SIZE } from './mainSettingsTokens'
 import React, { useState } from 'react'
 import '../../assets/css/Settings.css'
 import { ACCOUNT_DEFAULTS_FONT, Divider } from './accountDefaultsTabPrimitives'
@@ -22,7 +23,7 @@ const UserDefaultsTabPanel: React.FC = () => {
 
   return (
     <div className="settings-user-defaults-wrapper">
-      <p style={{ fontFamily: ACCOUNT_DEFAULTS_FONT, fontSize: '14px', color: '#555', marginBottom: '8px', fontWeight: 300 }}>
+      <p style={{ fontFamily: ACCOUNT_DEFAULTS_FONT, fontSize: MAIN_SETTINGS_FONT_SIZE.base, color: '#555', marginBottom: '8px', fontWeight: 300 }}>
         Set defaults for users in your account. To add or edit user permissions go to{' '}
         <a href="/main-settings/users-teams" style={{ color: '#0091ae', textDecoration: 'none', fontWeight: 400 }}>
           Users &amp; Teams
@@ -68,7 +69,7 @@ const UserDefaultsTabPanel: React.FC = () => {
           href="/main-settings/notifications"
           style={{
             fontFamily: ACCOUNT_DEFAULTS_FONT,
-            fontSize: '14px',
+            fontSize: MAIN_SETTINGS_FONT_SIZE.base,
             fontWeight: 500,
             color: '#0091ae',
             textDecoration: 'none',
@@ -78,7 +79,7 @@ const UserDefaultsTabPanel: React.FC = () => {
         >
           Manage account defaults
         </a>
-        <p style={{ fontFamily: ACCOUNT_DEFAULTS_FONT, fontSize: '13px', color: '#555', fontWeight: 300, margin: 0 }}>
+        <p style={{ fontFamily: ACCOUNT_DEFAULTS_FONT, fontSize: MAIN_SETTINGS_FONT_SIZE.sm, color: '#555', fontWeight: 300, margin: 0 }}>
           Set up the default notifications for all users in your account who are not included in a profile.
         </p>
       </div>
@@ -101,11 +102,11 @@ const UserDefaultsTabPanel: React.FC = () => {
                 {
                   width: '100%',
                   padding: '8px 36px 8px 12px',
-                  fontSize: '14px',
+                  fontSize: MAIN_SETTINGS_FONT_SIZE.base,
                   fontFamily: ACCOUNT_DEFAULTS_FONT,
                   color: '#141414',
-                  border: '1px solid #d0d0d0',
-                  borderRadius: '4px',
+                  border: '1px solid #b8b8b8',
+                  borderRadius: '8px',
                   outline: 'none',
                   background: '#fff',
                   appearance: 'none',
@@ -128,7 +129,7 @@ const UserDefaultsTabPanel: React.FC = () => {
                 transform: 'translateY(-50%)',
                 pointerEvents: 'none',
                 color: '#555',
-                fontSize: '12px',
+                fontSize: MAIN_SETTINGS_FONT_SIZE.sm,
               }}
             >
               ▾
@@ -143,11 +144,11 @@ const UserDefaultsTabPanel: React.FC = () => {
                 {
                   width: '100%',
                   padding: '8px 28px 8px 12px',
-                  fontSize: '14px',
+                  fontSize: MAIN_SETTINGS_FONT_SIZE.base,
                   fontFamily: ACCOUNT_DEFAULTS_FONT,
                   color: '#141414',
-                  border: '1px solid #d0d0d0',
-                  borderRadius: '4px',
+                  border: '1px solid #b8b8b8',
+                  borderRadius: '8px',
                   outline: 'none',
                   background: '#fff',
                   appearance: 'none',
@@ -170,14 +171,14 @@ const UserDefaultsTabPanel: React.FC = () => {
                 transform: 'translateY(-50%)',
                 pointerEvents: 'none',
                 color: '#555',
-                fontSize: '12px',
+                fontSize: MAIN_SETTINGS_FONT_SIZE.sm,
               }}
             >
               ▾
             </span>
           </div>
 
-          <span style={{ fontFamily: ACCOUNT_DEFAULTS_FONT, fontSize: '14px', color: '#555', fontWeight: 300 }}>pt</span>
+          <span style={{ fontFamily: ACCOUNT_DEFAULTS_FONT, fontSize: MAIN_SETTINGS_FONT_SIZE.base, color: '#555', fontWeight: 300 }}>pt</span>
 
           <ColorDot color={fontColor} />
         </div>

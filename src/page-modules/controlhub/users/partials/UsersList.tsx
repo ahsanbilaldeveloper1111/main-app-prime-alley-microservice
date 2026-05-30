@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Form } from "react-bootstrap";
+import { Button, Form } from "react-bootstrap";
 import GenericTable, {
   FilterPill,
   TableColumn,
@@ -246,15 +246,16 @@ const UsersList: React.FC<UsersListProps> = ({
       showFilterPills: false,
       filterPills,
       showMoreFiltersButton: false,
-      rightActions: (
-        <button
-          type="button"
+      actionsAfterFilters: showFilters ? (
+        <Button
+          variant="outline-secondary"
+          size="sm"
+          className="gt-toolbar-btn"
           onClick={handleResetFilters}
-          className="btn btn-outline-secondary btn-sm"
         >
           Reset
-        </button>
-      ),
+        </Button>
+      ) : undefined,
     }),
     [searchInput, handleSearchChange, flushSearchToFilters, showFilters, filterPills, handleResetFilters],
   );

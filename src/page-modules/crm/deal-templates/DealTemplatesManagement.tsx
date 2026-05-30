@@ -616,8 +616,6 @@ function DealTemplatesPage({ hideBreadcrumb, breadcrumbMainLink }: CrmPageDispla
                 position: "fixed",
                 top: 0,
                 right: 0,
-                width: "600px",
-                maxWidth: "100%",
                 height: "100vh",
                 backgroundColor: "#ffffff",
                 boxShadow: "-2px 0 8px rgba(0, 0, 0, 0.1)",
@@ -629,7 +627,6 @@ function DealTemplatesPage({ hideBreadcrumb, breadcrumbMainLink }: CrmPageDispla
               <div
                 className="contact-sidebar-header"
                 style={{
-                  padding: "20px 24px",
                   borderBottom: "1px solid #eaf0f6",
                   display: "flex",
                   alignItems: "center",
@@ -690,7 +687,6 @@ function DealTemplatesPage({ hideBreadcrumb, breadcrumbMainLink }: CrmPageDispla
                   style={{
                     flex: 1,
                     overflowY: "auto",
-                    padding: "40px",
                   }}
                 >
                   <p
@@ -972,7 +968,6 @@ function DealTemplatesPage({ hideBreadcrumb, breadcrumbMainLink }: CrmPageDispla
                 <div
                   className="contact-sidebar-footer"
                   style={{
-                    padding: "16px 24px",
                     borderTop: "1px solid #eaf0f6",
                     display: "flex",
                     gap: "12px",

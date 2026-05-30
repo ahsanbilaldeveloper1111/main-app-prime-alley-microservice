@@ -1,3 +1,4 @@
+import { MAIN_SETTINGS_FONT_SIZE } from './mainSettingsTokens'
 import React, { useState } from 'react'
 import { ACCOUNT_DEFAULTS_FONT, Divider, FeatureSectionHeading } from './accountDefaultsTabPrimitives'
 
@@ -8,7 +9,7 @@ export const FeatureReleasesTabContent: React.FC = () => {
 
   return (
     <div>
-      <p style={{ fontFamily: baseFont, fontSize: '14px', color: '#555', fontWeight: 300, marginBottom: '8px' }}>
+      <p style={{ fontFamily: baseFont, fontSize: MAIN_SETTINGS_FONT_SIZE.base, color: '#555', fontWeight: 300, marginBottom: '8px' }}>
         Set defaults related to Feature Releases.
       </p>
 
@@ -49,7 +50,7 @@ export const FeatureReleasesTabContent: React.FC = () => {
             width: '18px',
             height: '18px',
             border: `1.5px solid ${gradualRelease ? '#141414' : '#aaa'}`,
-            borderRadius: '3px',
+            borderRadius: '6px',
             background: gradualRelease ? '#141414' : '#fff',
             display: 'flex',
             alignItems: 'center',
@@ -66,13 +67,13 @@ export const FeatureReleasesTabContent: React.FC = () => {
           )}
         </div>
         <div>
-          <div style={{ fontFamily: baseFont, fontSize: '14px', fontWeight: 400, color: '#141414', lineHeight: '1.5' }}>
+          <div style={{ fontFamily: baseFont, fontSize: MAIN_SETTINGS_FONT_SIZE.base, fontWeight: 400, color: '#141414', lineHeight: '1.5' }}>
             Put this account at the end of gradual feature releases
           </div>
           <div
             style={{
               fontFamily: baseFont,
-              fontSize: '13px',
+              fontSize: MAIN_SETTINGS_FONT_SIZE.sm,
               fontWeight: 300,
               color: '#555',
               marginTop: '3px',
@@ -109,7 +110,7 @@ export const FeatureReleasesTabContent: React.FC = () => {
             width: '18px',
             height: '18px',
             border: `1.5px solid ${emailNotifications ? '#141414' : '#aaa'}`,
-            borderRadius: '3px',
+            borderRadius: '6px',
             background: emailNotifications ? '#141414' : '#fff',
             display: 'flex',
             alignItems: 'center',
@@ -124,7 +125,7 @@ export const FeatureReleasesTabContent: React.FC = () => {
             </svg>
           )}
         </div>
-        <span style={{ fontFamily: baseFont, fontSize: '14px', fontWeight: 400, color: '#141414' }}>
+        <span style={{ fontFamily: baseFont, fontSize: MAIN_SETTINGS_FONT_SIZE.base, fontWeight: 400, color: '#141414' }}>
           Turn on email notifications
         </span>
       </button>

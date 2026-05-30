@@ -1,5 +1,5 @@
 import { HEADER_CONSTANTS } from '@constants/headerConstants'
-import RequestCategories from '@pages/workforce/request-categories'
+import { RequestCategoriesPanel } from '@page-modules/workforce/request-categories/RequestCategoriesPanel'
 import React from 'react'
 import type { ControlledTabsProps, Tab } from '../types'
 import { SettingsSectionTabShell } from './SettingsSectionTabShell'
@@ -13,7 +13,7 @@ const workforceTabs: Tab[] = [
 
 function WorkforceTabPanel({ activeTab }: Readonly<{ activeTab: string }>) {
   if (activeTab === 'request-categories') {
-    return <RequestCategories />
+    return <RequestCategoriesPanel />
   }
   return null
 }

@@ -829,6 +829,21 @@ button.preview-button:hover, button.preview-button:focus {
   padding: 2px 2px 0;
   margin-bottom: -1px;
 }
+
+.gt-toolbar-tabs-row {
+  flex-wrap: wrap;
+}
+
+.gt-toolbar-tabs-list {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.gt-toolbar-tabs-actions {
+  margin-left: auto;
+  flex: 0 0 auto;
+}
+
 .members-table-wrapper .gt-toolbar-tabs-section {
  margin-left: 15px;
 }
@@ -1274,6 +1289,43 @@ background: #fff !important;
     font-size: 13px;
   }
 
+  .gt-toolbar-tabs-section {
+    overflow: visible;
+    padding: 10px 12px 0;
+  }
+
+  .gt-toolbar-tabs-row {
+    flex-direction: column;
+    align-items: stretch !important;
+    gap: 10px;
+  }
+
+  .gt-toolbar-tabs-list {
+    flex: 0 0 auto;
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    flex-wrap: nowrap;
+    padding-bottom: 2px;
+  }
+
+  .gt-toolbar-tabs-actions {
+    margin-left: 0;
+    width: 100%;
+  }
+
+  .gt-toolbar-tabs-actions > .d-flex {
+    flex-wrap: wrap;
+    width: 100%;
+    gap: 8px;
+  }
+
+  .gt-toolbar-tabs-actions .btn,
+  .gt-toolbar-tabs-actions button {
+    flex: 1 1 auto;
+    min-width: fit-content;
+  }
+
   .gt-toolbar-main {
     flex-direction: column;
     align-items: stretch;
@@ -1353,6 +1405,10 @@ background: #fff !important;
 
 @media (max-width: 576px) {
   .gt-toolbar-tabs-section {
+    overflow: visible;
+  }
+
+  .gt-toolbar-tabs-list {
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
   }

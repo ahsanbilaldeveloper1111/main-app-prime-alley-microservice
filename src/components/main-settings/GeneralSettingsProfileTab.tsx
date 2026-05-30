@@ -1,5 +1,6 @@
 import React, { useRef, useState } from 'react'
 import { generalSettingsStyles as s } from './generalSettingsPanelStyles'
+import { MAIN_SETTINGS_FONT_SIZE, MAIN_SETTINGS_RADIUS } from './mainSettingsTokens'
 
 export type GeneralSettingsProfileTabProps = {
   userName: string
@@ -84,7 +85,7 @@ export const GeneralSettingsProfileTab: React.FC<GeneralSettingsProfileTabProps>
             e.currentTarget.style.borderColor = '#006162'
           }}
           onBlur={(e) => {
-            e.currentTarget.style.borderColor = '#d0d0d0'
+            e.currentTarget.style.borderColor = '#b8b8b8'
           }}
         />
       </div>
@@ -108,7 +109,7 @@ export const GeneralSettingsProfileTab: React.FC<GeneralSettingsProfileTabProps>
           Date, time, and number format{' '}
           <span style={s.helpIcon} title="Sets date/time/number format based on locale">?</span>
         </label>
-        <div style={{ fontSize: '13px', color: '#555', fontWeight: 300, marginBottom: '8px' }}>
+        <div style={{ fontSize: MAIN_SETTINGS_FONT_SIZE.sm, color: '#555', fontWeight: 300, marginBottom: '8px' }}>
           Format: 2 March 2026, 02/03/2026, 19:41 GMT, and 1,234.56
         </div>
         <select
@@ -139,20 +140,29 @@ export const GeneralSettingsProfileTab: React.FC<GeneralSettingsProfileTabProps>
             more information ↗
           </button>
         </div>
-        <div style={{ display: 'flex', gap: '0px', marginTop: '10px' }}>
+        <div style={{ display: 'flex', gap: 0, marginTop: '10px' }}>
           <select
             aria-label="Phone country"
             value={phoneCountry}
             onChange={(e) => setPhoneCountry(e.target.value)}
             style={{
               padding: '8px',
-              fontSize: '14px',
-              border: '1px solid #d0d0d0',
-              borderRadius: '0px',
+              fontSize: MAIN_SETTINGS_FONT_SIZE.base,
+              border: '1px solid #b8b8b8',
+              borderRight: 'none',
+              borderTopLeftRadius: MAIN_SETTINGS_RADIUS.md,
+              borderBottomLeftRadius: MAIN_SETTINGS_RADIUS.md,
+              borderTopRightRadius: 0,
+              borderBottomRightRadius: 0,
               background: '#fff',
               fontFamily: "'Lexend Deca', Helvetica, Arial, sans-serif",
               outline: 'none',
-              borderRight: 'none',
+            }}
+            onFocus={(e) => {
+              e.currentTarget.style.borderColor = '#006162'
+            }}
+            onBlur={(e) => {
+              e.currentTarget.style.borderColor = '#b8b8b8'
             }}
           >
             <option value="GB">🇬🇧</option>
@@ -165,10 +175,13 @@ export const GeneralSettingsProfileTab: React.FC<GeneralSettingsProfileTabProps>
             style={{
               width: '260px',
               padding: '8px 12px',
-              fontSize: '14px',
+              fontSize: MAIN_SETTINGS_FONT_SIZE.base,
               color: '#141414',
-              border: '1px solid #d0d0d0',
-              borderRadius: '4px',
+              border: '1px solid #b8b8b8',
+              borderTopLeftRadius: 0,
+              borderBottomLeftRadius: 0,
+              borderTopRightRadius: MAIN_SETTINGS_RADIUS.md,
+              borderBottomRightRadius: MAIN_SETTINGS_RADIUS.md,
               background: '#fff',
               fontFamily: "'Lexend Deca', Helvetica, Arial, sans-serif",
               outline: 'none',
@@ -179,7 +192,7 @@ export const GeneralSettingsProfileTab: React.FC<GeneralSettingsProfileTabProps>
               e.currentTarget.style.borderColor = '#006162'
             }}
             onBlur={(e) => {
-              e.currentTarget.style.borderColor = '#d0d0d0'
+              e.currentTarget.style.borderColor = '#b8b8b8'
             }}
           />
         </div>
@@ -194,7 +207,7 @@ export const GeneralSettingsProfileTab: React.FC<GeneralSettingsProfileTabProps>
           onClick={() => null}
           style={{
             ...s.link,
-            fontSize: '14px',
+            fontSize: MAIN_SETTINGS_FONT_SIZE.base,
             fontWeight: 300,
             background: 'transparent',
             border: 'none',

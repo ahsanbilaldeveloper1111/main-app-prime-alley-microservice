@@ -2157,8 +2157,6 @@ const CrmCampaigns = ({ hideBreadcrumb, breadcrumbMainLink }: CrmPageDisplayProp
               position: "fixed",
               top: 0,
               right: 0,
-              width: "600px",
-              maxWidth: "100%",
               height: "100vh",
               backgroundColor: "#ffffff",
               boxShadow: "-2px 0 8px rgba(0, 0, 0, 0.1)",
@@ -2170,7 +2168,6 @@ const CrmCampaigns = ({ hideBreadcrumb, breadcrumbMainLink }: CrmPageDisplayProp
             <div
               className="contact-sidebar-header"
               style={{
-                padding: "20px 24px",
                 borderBottom: "1px solid #eaf0f6",
                 display: "flex",
                 alignItems: "center",
@@ -2217,7 +2214,6 @@ const CrmCampaigns = ({ hideBreadcrumb, breadcrumbMainLink }: CrmPageDisplayProp
               style={{
                 flex: 1,
                 overflowY: "auto",
-                padding: "40px",
               }}
             >
               {/* Campaign Name + Status */}
@@ -2735,7 +2731,6 @@ const CrmCampaigns = ({ hideBreadcrumb, breadcrumbMainLink }: CrmPageDisplayProp
             <div
               className="contact-sidebar-footer"
               style={{
-                padding: "16px 24px",
                 borderTop: "1px solid #eaf0f6",
                 display: "flex",
                 gap: "12px",

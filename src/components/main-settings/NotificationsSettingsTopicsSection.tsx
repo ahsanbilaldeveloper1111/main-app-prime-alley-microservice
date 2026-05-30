@@ -1,3 +1,4 @@
+import { MAIN_SETTINGS_FONT_SIZE } from './mainSettingsTokens'
 import React, { type ChangeEventHandler } from 'react'
 import { ChevronIcon } from './AccountDefaultsTabPanels'
 import { NotificationsTopicCheckbox } from './NotificationsTopicCheckbox'
@@ -71,10 +72,10 @@ export const NotificationsSettingsTopicsSection: React.FC<NotificationsSettingsT
   handleSubtopicCheckboxChange,
 }) => (
   <div>
-    <div style={{ fontSize: '20px', fontWeight: 600, color: '#141414', marginBottom: '4px', fontFamily: baseFont }}>
+    <div style={{ fontSize: MAIN_SETTINGS_FONT_SIZE.lg, fontWeight: 600, color: '#141414', marginBottom: '4px', fontFamily: baseFont }}>
       What you get notified about
     </div>
-    <div style={{ fontSize: '13px', fontWeight: 300, color: '#555', marginBottom: '20px', fontFamily: baseFont }}>
+    <div style={{ fontSize: MAIN_SETTINGS_FONT_SIZE.sm, fontWeight: 300, color: '#555', marginBottom: '20px', fontFamily: baseFont }}>
       Choose what topics matter to you and how you get notified about them.
     </div>
 
@@ -91,7 +92,7 @@ export const NotificationsSettingsTopicsSection: React.FC<NotificationsSettingsT
             paddingTop: '8px',
             paddingBottom: '8px',
             width: '640px',
-            fontSize: '16px',
+            fontSize: MAIN_SETTINGS_FONT_SIZE.md,
             height: '40px',
             fontWeight: 300,
             color: '#141414',
@@ -104,7 +105,7 @@ export const NotificationsSettingsTopicsSection: React.FC<NotificationsSettingsT
             e.currentTarget.style.borderColor = '#006162'
           }}
           onBlur={(e) => {
-            e.currentTarget.style.borderColor = '#d0d0d0'
+            e.currentTarget.style.borderColor = '#b8b8b8'
           }}
         />
         <svg
@@ -125,7 +126,7 @@ export const NotificationsSettingsTopicsSection: React.FC<NotificationsSettingsT
     </div>
 
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '0', fontSize: '14px', fontWeight: 300 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0', fontSize: MAIN_SETTINGS_FONT_SIZE.base, fontWeight: 300 }}>
         <button
           type="button"
           onClick={toggleExpandAll}
@@ -134,7 +135,7 @@ export const NotificationsSettingsTopicsSection: React.FC<NotificationsSettingsT
             border: 'none',
             cursor: 'pointer',
             color: '#006162',
-            fontSize: '14px',
+            fontSize: MAIN_SETTINGS_FONT_SIZE.base,
             fontFamily: baseFont,
             fontWeight: 300,
             padding: 0,
@@ -152,7 +153,7 @@ export const NotificationsSettingsTopicsSection: React.FC<NotificationsSettingsT
             border: 'none',
             cursor: 'pointer',
             color: '#006162',
-            fontSize: '14px',
+            fontSize: MAIN_SETTINGS_FONT_SIZE.base,
             fontFamily: baseFont,
             fontWeight: 300,
             padding: 0,
@@ -171,7 +172,7 @@ export const NotificationsSettingsTopicsSection: React.FC<NotificationsSettingsT
             height: '15px',
             border: '1.5px solid #888',
             borderRadius: '50%',
-            fontSize: '10px',
+            fontSize: MAIN_SETTINGS_FONT_SIZE.xs,
             color: '#888',
             cursor: 'default',
           }}
@@ -188,7 +189,7 @@ export const NotificationsSettingsTopicsSection: React.FC<NotificationsSettingsT
             style={{
               width: colWidth,
               textAlign: 'center',
-              fontSize: '12px',
+              fontSize: MAIN_SETTINGS_FONT_SIZE.sm,
               fontWeight: 400,
               color: '#555',
               fontFamily: baseFont,
@@ -215,7 +216,7 @@ export const NotificationsSettingsTopicsSection: React.FC<NotificationsSettingsT
             key={topic.id}
             style={{
               border: '1px solid #8a8a8a',
-              borderRadius: '4px',
+              borderRadius: '8px',
               background: '#fff',
               overflow: 'hidden',
             }}
@@ -250,14 +251,14 @@ export const NotificationsSettingsTopicsSection: React.FC<NotificationsSettingsT
                 <span style={{ display: 'inline-flex', alignItems: 'center', flexShrink: 0 }}>
                   <ChevronIcon expanded={isExpanded} />
                 </span>
-                <span style={{ fontSize: '16px', fontWeight: 500, color: '#141414' }}>{topic.label}</span>
+                <span style={{ fontSize: MAIN_SETTINGS_FONT_SIZE.md, fontWeight: 500, color: '#141414' }}>{topic.label}</span>
               </button>
 
               <div style={{ flex: 1, display: 'flex', justifyContent: 'flex-end', paddingRight: '16px' }}>
                 {isExpanded && hasSubtopics && (
                   <span
                     style={{
-                      fontSize: '11px',
+                      fontSize: MAIN_SETTINGS_FONT_SIZE.xs,
                       fontWeight: 700,
                       color: '#555',
                       letterSpacing: '0.8px',
@@ -299,7 +300,7 @@ export const NotificationsSettingsTopicsSection: React.FC<NotificationsSettingsT
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'space-between',
-                      borderTop: '1px solid #e8e8e8',
+                      borderTop: '1px solid #d0d0d0',
                       padding: '14px 20px 14px 42px',
                       background: '#fff',
                       gap: '12px',
@@ -308,7 +309,7 @@ export const NotificationsSettingsTopicsSection: React.FC<NotificationsSettingsT
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div
                         style={{
-                          fontSize: '14px',
+                          fontSize: MAIN_SETTINGS_FONT_SIZE.base,
                           fontWeight: 500,
                           color: '#141414',
                           fontFamily: baseFont,
@@ -318,7 +319,7 @@ export const NotificationsSettingsTopicsSection: React.FC<NotificationsSettingsT
                         {sub.label}
                       </div>
                       {sub.description && (
-                        <div style={{ fontSize: '12px', fontWeight: 300, color: '#888', fontFamily: baseFont }}>
+                        <div style={{ fontSize: MAIN_SETTINGS_FONT_SIZE.sm, fontWeight: 300, color: '#888', fontFamily: baseFont }}>
                           {sub.description}
                         </div>
                       )}
@@ -329,13 +330,13 @@ export const NotificationsSettingsTopicsSection: React.FC<NotificationsSettingsT
                         type="button"
                         style={{
                           padding: '5px 14px',
-                          fontSize: '13px',
+                          fontSize: MAIN_SETTINGS_FONT_SIZE.sm,
                           fontFamily: baseFont,
                           fontWeight: 300,
                           color: '#141414',
                           background: '#fff',
-                          border: '1px solid #d0d0d0',
-                          borderRadius: '4px',
+                          border: '1px solid #b8b8b8',
+                          borderRadius: '8px',
                           cursor: 'pointer',
                         }}
                       >
@@ -345,8 +346,8 @@ export const NotificationsSettingsTopicsSection: React.FC<NotificationsSettingsT
                         style={{
                           display: 'flex',
                           alignItems: 'center',
-                          border: '1px solid #d0d0d0',
-                          borderRadius: '4px',
+                          border: '1px solid #b8b8b8',
+                          borderRadius: '8px',
                           overflow: 'hidden',
                         }}
                       >
@@ -360,7 +361,7 @@ export const NotificationsSettingsTopicsSection: React.FC<NotificationsSettingsT
                             height: '28px',
                             background: '#fff',
                             border: 'none',
-                            borderRight: '1px solid #d0d0d0',
+                            borderRight: '1px solid #b8b8b8',
                             cursor: 'pointer',
                             padding: 0,
                           }}
@@ -373,7 +374,7 @@ export const NotificationsSettingsTopicsSection: React.FC<NotificationsSettingsT
                           style={
                             {
                               padding: '4px 22px 4px 8px',
-                              fontSize: '12px',
+                              fontSize: MAIN_SETTINGS_FONT_SIZE.sm,
                               fontFamily: baseFont,
                               fontWeight: 300,
                               color: '#141414',
@@ -424,7 +425,7 @@ export const NotificationsSettingsTopicsSection: React.FC<NotificationsSettingsT
           style={{
             textAlign: 'center',
             color: '#888',
-            fontSize: '14px',
+            fontSize: MAIN_SETTINGS_FONT_SIZE.base,
             fontWeight: 300,
             padding: '40px',
             fontFamily: baseFont,

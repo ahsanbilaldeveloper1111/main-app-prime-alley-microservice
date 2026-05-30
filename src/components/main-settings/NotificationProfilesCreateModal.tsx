@@ -1,3 +1,4 @@
+import { MAIN_SETTINGS_FONT_SIZE } from './mainSettingsTokens'
 import React from 'react'
 import { ACCOUNT_DEFAULTS_FONT } from './accountDefaultsTabPrimitives'
 
@@ -45,19 +46,17 @@ export const NotificationProfilesCreateModal: React.FC<NotificationProfilesCreat
         }}
       />
       <div
+        className="main-settings-form-dialog"
         style={{
           position: 'relative',
           background: '#fff',
           borderRadius: '6px',
-          width: '480px',
-          maxWidth: '95vw',
-          padding: '32px',
           boxShadow: '0 8px 32px rgba(0,0,0,0.18)',
           fontFamily: baseFont,
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
-          <h3 style={{ fontFamily: baseFont, fontSize: '18px', fontWeight: 600, color: '#141414', margin: 0 }}>
+          <h3 style={{ fontFamily: baseFont, fontSize: MAIN_SETTINGS_FONT_SIZE.lg, fontWeight: 600, color: '#141414', margin: 0 }}>
             Create notification profile
           </h3>
           <button
@@ -68,7 +67,7 @@ export const NotificationProfilesCreateModal: React.FC<NotificationProfilesCreat
               border: 'none',
               cursor: 'pointer',
               color: '#888',
-              fontSize: '22px',
+              fontSize: MAIN_SETTINGS_FONT_SIZE.icon,
               lineHeight: 1,
               padding: '0 4px',
             }}
@@ -83,7 +82,7 @@ export const NotificationProfilesCreateModal: React.FC<NotificationProfilesCreat
             style={{
               display: 'block',
               fontFamily: baseFont,
-              fontSize: '14px',
+              fontSize: MAIN_SETTINGS_FONT_SIZE.base,
               fontWeight: 600,
               color: '#141414',
               marginBottom: '8px',
@@ -103,12 +102,12 @@ export const NotificationProfilesCreateModal: React.FC<NotificationProfilesCreat
               {
                 width: '100%',
                 padding: '8px 12px',
-                fontSize: '14px',
+                fontSize: MAIN_SETTINGS_FONT_SIZE.base,
                 fontFamily: baseFont,
                 fontWeight: 300,
                 color: '#141414',
-                border: '1px solid #d0d0d0',
-                borderRadius: '4px',
+                border: '1px solid #b8b8b8',
+                borderRadius: '8px',
                 outline: 'none',
                 background: '#fff',
                 boxSizing: 'border-box',
@@ -116,7 +115,7 @@ export const NotificationProfilesCreateModal: React.FC<NotificationProfilesCreat
               } as React.CSSProperties
             }
             onFocus={(e) => (e.currentTarget.style.borderColor = '#0091ae')}
-            onBlur={(e) => (e.currentTarget.style.borderColor = '#d0d0d0')}
+            onBlur={(e) => (e.currentTarget.style.borderColor = '#b8b8b8')}
           />
         </div>
 
@@ -126,13 +125,13 @@ export const NotificationProfilesCreateModal: React.FC<NotificationProfilesCreat
             onClick={onClose}
             style={{
               padding: '9px 20px',
-              fontSize: '14px',
+              fontSize: MAIN_SETTINGS_FONT_SIZE.base,
               fontFamily: baseFont,
               fontWeight: 300,
               color: '#141414',
               background: '#fff',
-              border: '1px solid #d0d0d0',
-              borderRadius: '4px',
+              border: '1px solid #b8b8b8',
+              borderRadius: '8px',
               cursor: 'pointer',
             }}
           >
@@ -144,13 +143,13 @@ export const NotificationProfilesCreateModal: React.FC<NotificationProfilesCreat
             disabled={!canCreate}
             style={{
               padding: '9px 20px',
-              fontSize: '14px',
+              fontSize: MAIN_SETTINGS_FONT_SIZE.base,
               fontFamily: baseFont,
               fontWeight: 500,
               color: '#fff',
               background: canCreate ? '#141414' : '#a0a0a0',
               border: 'none',
-              borderRadius: '4px',
+              borderRadius: '8px',
               cursor: canCreate ? 'pointer' : 'not-allowed',
               transition: 'background 0.15s',
             }}

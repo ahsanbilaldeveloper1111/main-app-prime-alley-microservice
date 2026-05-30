@@ -2,6 +2,7 @@
 import dynamic from 'next/dynamic'
 import { useSession } from 'next-auth/react'
 import { generalSettingsStyles as s, getGeneralSettingsTabStyle } from './generalSettingsPanelStyles'
+import { MainSettingsOverflowTabBar } from './MainSettingsOverflowTabBar'
 import { SettingsSectionFallback } from './SettingsSectionFallback'
 
 const GeneralSettingsProfileTab = dynamic(
@@ -52,28 +53,21 @@ export const GeneralSettings: React.FC<
   const [followUpDisqualify, setFollowUpDisqualify] = useState(true)
 
   return (
-    <div style={s.wrapper}>
-      <h1 style={s.pageTitle}>General</h1>
+    <div style={s.wrapper} className="general-settings-panel settings-section-shell">
+      <h1 style={s.pageTitle} className="settings-section-shell__title">General</h1>
 
-      <div style={s.tabsWrapper}>
-        {generalTabs.map((tab, index) => {
-          const isActive = activeGeneralTab === tab.key
-          const isLast = index === generalTabs.length - 1
-          return (
-            <button
-              key={tab.key}
-              type="button"
-              onClick={() => {
-                setActiveGeneralTab(tab.key)
-                onTabChange?.(tab.key)
-              }}
-              style={getGeneralSettingsTabStyle(isActive, isLast)}
-            >
-              {tab.label}
-            </button>
-          )
-        })}
-      </div>
+      <MainSettingsOverflowTabBar
+        tabs={generalTabs.map((tab) => ({ id: tab.key, label: tab.label }))}
+        activeTabId={activeGeneralTab}
+        onSelect={(tabId) => {
+          const nextTab = tabId as 'profile' | 'tasks'
+          setActiveGeneralTab(nextTab)
+          onTabChange?.(nextTab)
+        }}
+        tabBarStyle={s.tabsBar}
+        tabRowStyle={s.tabsWrapper}
+        getTabButtonStyle={getGeneralSettingsTabStyle}
+      />
 
       {activeGeneralTab === 'profile' && (
         <GeneralSettingsProfileTab

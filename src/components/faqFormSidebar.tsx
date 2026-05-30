@@ -42,12 +42,11 @@ export const FaqFormSidebar: React.FC<FaqFormSidebarProps> = ({
       <div aria-hidden="true" style={faqSidebarStyles.backdrop} />
 
       {/* Panel */}
-      <div style={faqSidebarStyles.panel}>
-        {/* Header */}
-        <div style={faqSidebarStyles.header}>
+      <div className="contact-sidebar-container" style={faqSidebarStyles.panel}>
+        <div className="contact-sidebar-header" style={faqSidebarStyles.header}>
           <div style={faqSidebarStyles.headerContent}>
             {headerIcon}
-            <h2 style={faqSidebarStyles.headerTitle}>{title}</h2>
+            <h2 className="contact-sidebar-title" style={faqSidebarStyles.headerTitle}>{title}</h2>
           </div>
           <button
             type="button"
@@ -62,10 +61,9 @@ export const FaqFormSidebar: React.FC<FaqFormSidebarProps> = ({
         {/* Form */}
         <form onSubmit={handleFormSubmit} style={faqSidebarStyles.form}>
           {/* Body */}
-          <div style={faqSidebarStyles.body}>{children}</div>
+          <div className="contact-sidebar-content" style={faqSidebarStyles.body}>{children}</div>
 
-          {/* Footer */}
-          <div style={faqSidebarStyles.footer}>
+          <div className="contact-sidebar-footer" style={faqSidebarStyles.footer}>
             <button
               type="submit"
               disabled={!canSubmit}

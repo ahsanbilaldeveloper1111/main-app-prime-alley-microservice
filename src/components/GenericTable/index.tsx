@@ -467,6 +467,8 @@ export interface ToolbarConfig {
 
   // Filters
   showFiltersButton?: boolean;
+  /** Actions rendered immediately after the Filters button (e.g. Reset). */
+  actionsAfterFilters?: React.ReactNode;
   onFiltersClick?: () => void;
   showFilterPills?: boolean;
   filterPills?: FilterPill[];
@@ -1704,7 +1706,7 @@ const GenericTable = <T extends Record<string, any>>({
         {/* Tabs Section */}
         {toolbar.showTabs && toolbar.tabs && toolbar.tabs.length > 0 && (
           <div className="gt-toolbar-tabs-section">
-            <div className="d-flex align-items-center gap-3">
+            <div className="gt-toolbar-tabs-row d-flex align-items-center gap-3">
               {/* Dropdown: use provided items or fall back to default CRM items */}
               {toolbar.tabsDropdownLabel && (
                 <Dropdown>
@@ -1747,7 +1749,7 @@ const GenericTable = <T extends Record<string, any>>({
               )}
 
               {/* Tabs */}
-              <div className="d-flex align-items-center gap-2">
+              <div className="gt-toolbar-tabs-list d-flex align-items-center gap-2">
                 {toolbar.tabs.map((tab) => (
                   <button
                     key={tab.id}
@@ -1788,7 +1790,7 @@ const GenericTable = <T extends Record<string, any>>({
 
               {/* Right-aligned custom actions (e.g., Add Contacts) */}
               {toolbar.rightActions && (
-                <div style={{ marginLeft: "auto" }}>{toolbar.rightActions}</div>
+                <div className="gt-toolbar-tabs-actions">{toolbar.rightActions}</div>
               )}
             </div>
           </div>
@@ -1927,11 +1929,19 @@ const GenericTable = <T extends Record<string, any>>({
                 variant="outline-secondary"
                 size="sm"
                 className="gt-toolbar-btn"
-                onClick={() => setShowFilterPills(!showFilterPills)}
+                onClick={() => {
+                  if (toolbar.onFiltersClick) {
+                    toolbar.onFiltersClick();
+                    return;
+                  }
+                  setShowFilterPills(!showFilterPills);
+                }}
               >
                 Filters
               </Button>
             )}
+
+            {toolbar.actionsAfterFilters}
 
             {/* Sort */}
             {toolbar.showSortButton &&
