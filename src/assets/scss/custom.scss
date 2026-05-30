@@ -771,6 +771,11 @@ body:has(.crm-activities-layout) {
   gap: 10px;
   padding: 0;
   align-items: flex-start;
+
+  .generic-sidebar-new-container {
+    height: calc(100vh - 74px) !important;
+    overflow-y: auto;
+  }
 }
 
 .crm-activities-main {

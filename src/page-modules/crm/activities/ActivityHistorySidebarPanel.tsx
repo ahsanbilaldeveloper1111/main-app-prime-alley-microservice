@@ -82,7 +82,7 @@ export function ActivityHistorySidebarPanel({
       );
     }
     return (
-      <div className="position-relative" style={{ padding: "32px 0" }}>
+      <div className="position-relative" style={{ padding: "12px 0" }}>
         <div
           style={{
             position: "absolute",
@@ -120,23 +120,23 @@ export function ActivityHistorySidebarPanel({
           {[
             {
               name: "Prospect",
-              icon: <Users size={20} />,
-              color: "#9c27b0",
+              icon: <Users size={14} />,
+              color: recordStages[0]?.color || "#9c27b0",
             },
             {
               name: "Lead",
-              icon: <Target size={20} />,
-              color: "#2196f3",
+              icon: <Target size={14} />,
+              color: recordStages[1]?.color || "#2196f3",
             },
             {
               name: "Deal",
-              icon: <TrendingUp size={20} />,
-              color: "#ff9800",
+              icon: <TrendingUp size={14} />,
+              color: recordStages[2]?.color || "#ff9800",
             },
             {
               name: "Order",
-              icon: <ShoppingBag size={20} />,
-              color: "#4caf50",
+              icon: <ShoppingBag size={14} />,
+              color: recordStages[3]?.color || "#4caf50",
             },
           ].map((stage, idx) => {
             const isCompleted = idx < currentStageIndex;
@@ -178,16 +178,17 @@ export function ActivityHistorySidebarPanel({
                 <div
                   className="rounded-circle d-flex align-items-center justify-content-center mb-2"
                   style={{
-                    width: isCurrent ? 64 : 52,
-                    height: isCurrent ? 64 : 52,
+                    width: isCurrent ? 44 : 36,
+                    height: isCurrent ? 44 : 36,
                     background: circleBackground,
                     color: isCurrent || isCompleted ? "#fff" : "#9ca3af",
+                    opacity: isCompleted && !isCurrent ? 0.88 : 1,
                     transition: "all 0.3s ease",
                     boxShadow: circleBoxShadow,
                   }}
                 >
                   {isCompleted && !isCurrent ? (
-                    <CheckCircle size={24} strokeWidth={3} />
+                    <CheckCircle size={16} strokeWidth={3} />
                   ) : (
                     stage.icon
                   )}
@@ -195,7 +196,7 @@ export function ActivityHistorySidebarPanel({
                 <span
                   className="fw-semibold text-center"
                   style={{
-                    fontSize: isCurrent ? 15 : 13,
+                    fontSize: isCurrent ? "clamp(11px, 0.9vw, 13px)" : "clamp(10px, 0.8vw, 12px)",
                     color: stageLabelColor,
                   }}
                 >
@@ -207,8 +208,8 @@ export function ActivityHistorySidebarPanel({
                     style={{
                       backgroundColor: `${stage.color}22`,
                       color: stage.color,
-                      fontSize: 11,
-                      padding: "4px 10px",
+                      fontSize: 9,
+                      padding: "2px 8px",
                     }}
                   >
                     CURRENT
