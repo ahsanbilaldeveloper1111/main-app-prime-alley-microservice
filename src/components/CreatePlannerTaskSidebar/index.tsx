@@ -3422,7 +3422,7 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
               minHeight: 0,
               overflowY: "auto",
               padding: "14px 18px 22px",
-              backgroundColor: conversionBodyTone,
+              backgroundColor: "#f5f7fa",
             }}
           >
           <Form onSubmit={(e) => { e.preventDefault(); handleCreate(); }}>
@@ -3432,6 +3432,7 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
 
               <Row>
                 <Col xs={12}>
+                  <div style={{ fontSize: "13px", fontWeight: 600, letterSpacing: "0.04em", textTransform: "uppercase", color: "#4a5568", borderBottom: "1px solid #e2e8f0", paddingBottom: "8px", marginBottom: "14px", marginTop: "8px" }}>Task Details</div>
                   <Form.Group className={groupClass}>
                     <Form.Label style={labelStyle}>
                       <FileText
@@ -3579,6 +3580,7 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
                 )}
 
                 <Col xs={12}>
+                  <div style={{ fontSize: "13px", fontWeight: 600, letterSpacing: "0.04em", textTransform: "uppercase", color: "#4a5568", borderBottom: "1px solid #e2e8f0", paddingBottom: "8px", marginBottom: "14px", marginTop: "8px" }}>People</div>
                   {!isRecurringConversionMode &&
                     formData.taskType !== "todo" && (
                       <fieldset
@@ -4015,10 +4017,14 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
                 </Col>
 
               {!isRecurringConversionMode && (
+                <>
+                <Col xs={12}>
+                  <div style={{ fontSize: "13px", fontWeight: 600, letterSpacing: "0.04em", textTransform: "uppercase", color: "#4a5568", borderBottom: "1px solid #e2e8f0", paddingBottom: "8px", marginBottom: "14px", marginTop: "8px" }}>Schedule</div>
+                </Col>
                 <Col xs={12} md={6}>
                   <Form.Group className={groupClass}>
-                    <Form.Label style={labelStyle}>
-                      <Calendar size={16} className="me-2" style={{ verticalAlign: "middle" }} />
+                      <Form.Label style={labelStyle}>
+                        <Calendar size={16} className="me-2" style={{ verticalAlign: "middle" }} />
                       Start Date
                       {formData.taskType === "recurring" && (
                         <span style={{ color: "#ef4444" }}> *</span>
@@ -4035,6 +4041,7 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
                     />
                   </Form.Group>
                 </Col>
+                </>
               )}
               {formData.taskType !== "recurring" && (
               <Col xs={12} md={6}>
@@ -4482,6 +4489,7 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
 
               {!isRecurringConversionMode && (
                 <Form.Group className={groupClass}>
+                  <div style={{ fontSize: "13px", fontWeight: 600, letterSpacing: "0.04em", textTransform: "uppercase", color: "#4a5568", borderBottom: "1px solid #e2e8f0", paddingBottom: "8px", marginBottom: "14px", marginTop: "8px" }}>More Details</div>
                   <Form.Label style={labelStyle}>
                     <FileText
                       size={16}
