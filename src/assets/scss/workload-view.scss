@@ -17,20 +17,20 @@
     font-size: 1.35rem;
     font-weight: 600;
     margin: 0 0 0.25rem;
-    color: var(--main-text, #2c3e50);
+    color: var(--main-text, #141414);
   }
 
   .workload-page__view-toggle {
     .btn-primary {
-      background-color: #006162;
-      border-color: #006162;
+      background-color: #0066CC;
+      border-color: #0066CC;
       font-family: "Lexend Deca", Helvetica, Arial, sans-serif;
 
       &:hover,
       &:focus,
       &:active {
-        background-color: #004d4e;
-        border-color: #004d4e;
+        background-color: #0052A3;
+        border-color: #0052A3;
       }
     }
 
@@ -42,7 +42,7 @@
   }
 
   .workload-filters-card {
-    border: 1px solid var(--border-color, #e6eaf2);
+    border: 1px solid var(--border-color, #eaf0f6);
     border-radius: var(--border-radius-md, 12px);
     background: var(--card-bg, #fff);
     box-shadow: var(--shadow-sm, 0 2px 8px rgba(0, 0, 0, 0.04));
@@ -59,12 +59,12 @@
     .form-select,
     .form-control {
       min-height: 2rem;
-      background-color: var(--input-bg, #f8fafd);
-      border-color: var(--border-color, #e6eaf2);
-      color: var(--main-text, #2c3e50);
+      background-color: var(--input-bg, #f5f8fa);
+      border-color: var(--border-color, #eaf0f6);
+      color: var(--main-text, #141414);
 
       &:focus {
-        border-color: var(--primary-accent, #2583f2);
+        border-color: var(--primary-accent, #0066CC);
         box-shadow: 0 0 0 3px rgba(37, 131, 242, 0.15);
       }
     }
@@ -109,7 +109,7 @@
   }
 
   .workload-filters-card__clear {
-    color: var(--light-text, #7f8c8d);
+    color: var(--light-text, #718096);
     text-decoration: none;
     font-weight: 500;
 
@@ -138,7 +138,7 @@
   }
 
   .workload-summary-card {
-    border: 1px solid var(--border-color, #e6eaf2);
+    border: 1px solid var(--border-color, #eaf0f6);
     border-radius: var(--border-radius-sm, 8px);
     padding: 0.875rem 1rem;
     background: var(--card-bg, #fff);
@@ -164,7 +164,7 @@
   .workload-summary-card__label {
     font-size: 0.68rem;
     font-weight: 500;
-    color: var(--light-text, #7f8c8d);
+    color: var(--light-text, #718096);
     margin-top: 0.15rem;
   }
 
@@ -172,11 +172,11 @@
     font-size: 1.35rem;
     font-weight: 700;
     line-height: 1.1;
-    color: var(--main-text, #2c3e50);
+    color: var(--main-text, #141414);
   }
 
   // Planner dashboard board tokens (BoardView.tsx)
-  $planner-board-teal: #006162;
+  $planner-board-teal: #141414;
   $planner-board-font: "Lexend Deca", Helvetica, Arial, sans-serif;
   $planner-board-card-border: #ccc;
   $planner-board-cards-bg: whitesmoke;
@@ -279,11 +279,11 @@
     padding: 0.5rem 0.875rem;
     margin-bottom: 0.875rem;
     background: var(--card-bg, #fff);
-    border: 1px solid var(--border-color, #e6eaf2);
+    border: 1px solid var(--border-color, #eaf0f6);
     border-radius: var(--border-radius-sm, 8px);
     box-shadow: var(--shadow-sm, 0 2px 8px rgba(0, 0, 0, 0.04));
     font-size: 0.68rem;
-    color: var(--light-text, #7f8c8d);
+    color: var(--light-text, #718096);
   }
 
   .workload-legend__actions {
@@ -315,18 +315,18 @@
     padding: 0;
     font-size: 0.78rem;
     font-weight: 600;
-    color: var(--primary-accent, #2583f2);
+    color: var(--primary-accent, #0066CC);
     text-decoration: none;
     cursor: pointer;
     white-space: nowrap;
 
     &:hover {
       text-decoration: underline;
-      color: var(--primary-accent-dark, #1a6bc4);
+      color: var(--primary-accent-dark, #0052A3);
     }
 
     &.is-active {
-      color: var(--primary-accent-dark, #1a6bc4);
+      color: var(--primary-accent-dark, #0052A3);
     }
   }
 
@@ -344,7 +344,7 @@
   }
 
   .workload-period-panel {
-    border: 1px solid var(--border-color, #e6eaf2);
+    border: 1px solid var(--border-color, #eaf0f6);
     border-radius: var(--border-radius-md, 12px);
     background: var(--card-bg, #fff);
     overflow: hidden;
@@ -387,7 +387,7 @@
 
   .workload-grid-wrap {
     overflow-x: auto;
-    border: 1px solid var(--border-color, #e6eaf2);
+    border: 1px solid var(--border-color, #eaf0f6);
     border-radius: var(--border-radius-md, 12px);
     background: var(--card-bg, #fff);
     box-shadow: var(--shadow-sm, 0 2px 8px rgba(0, 0, 0, 0.04));
@@ -454,7 +454,7 @@
 
     th.workload-grid-table__day--today {
       .workload-grid-table__weekday {
-        color: #1d4ed8;
+        color: #0066CC;
       }
     }
 
@@ -548,7 +548,7 @@
     }
 
     &:focus-visible .workload-cell-card {
-      outline: 2px solid var(--primary-accent, #2583f2);
+      outline: 2px solid var(--primary-accent, #0066CC);
       outline-offset: 1px;
     }
   }
