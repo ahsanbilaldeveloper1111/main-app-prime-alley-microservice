@@ -1,11 +1,74 @@
-/* CRM tickets list (demo) layout — moved from inline style tag */
-.tickets-table-wrapper {
-  width: 100%;
-  overflow: hidden;
-}
+/* CRM tickets list layout */
+.crm-tickets-page {
+  .tickets-table-wrapper {
+    width: 100%;
+    overflow: visible;
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+  }
 
-.tickets-scrollable-content {
-  flex: 1;
-  overflow-y: auto;
-  overflow-x: hidden;
+  .tickets-scrollable-content {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+  }
+
+  /* Prevent filter dropdown menus from being clipped by table chrome */
+  .generic-table-container {
+    overflow: visible;
+  }
+
+  .gt-toolbar-container {
+    overflow: visible;
+  }
+
+  .gt-filter-pills {
+    overflow-x: auto;
+    overflow-y: visible;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+    padding-bottom: 8px;
+    gap: 8px;
+  }
+
+  .gt-filter-pills > .d-flex.align-items-center.gap-2.flex-wrap {
+    flex-wrap: nowrap !important;
+    align-items: center !important;
+    gap: 8px !important;
+    min-width: max-content;
+  }
+
+  .gt-filter-pill.dropdown-toggle,
+  .gt-filter-pill {
+    max-width: min(240px, calc(100vw - 48px));
+    min-width: 0;
+  }
+
+  .gt-filter-pill.dropdown-toggle > span,
+  .gt-filter-pill > span,
+  .gt-filter-pill-value {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 180px;
+    display: inline-block;
+    vertical-align: bottom;
+  }
+
+  .gt-filter-pills .dropdown-menu {
+    z-index: 1060;
+  }
+
+  .gt-filter-pills .dropdown-item {
+    white-space: normal;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+
+  .gt-filter-pills .dropdown-item span {
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+
 }

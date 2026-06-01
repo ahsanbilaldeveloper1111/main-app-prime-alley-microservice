@@ -6,6 +6,7 @@ import {
   useNotificationSocket,
   type SocketNotificationPayload,
 } from '../hooks/useNotificationSocket';
+import { presentSocketNotification } from '../utils/presentSocketNotification';
 
 /**
  * Maps a socket notification event to the shape expected by NotificationContext.
@@ -39,6 +40,7 @@ export default function NotificationSocketBridge(): null {
   const handleNotification = useCallback(
     (notification: SocketNotificationPayload) => {
       addNotification(mapSocketToPayload(notification));
+      presentSocketNotification(notification);
     },
     [addNotification]
   );

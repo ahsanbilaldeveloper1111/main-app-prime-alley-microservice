@@ -1,33 +1,14 @@
 import React from 'react';
-import { Button, Form } from 'react-bootstrap';
+import { Button } from 'react-bootstrap';
 import { X, RefreshCw, Check } from 'lucide-react';
-import Select from 'react-select';
-import {
-  CRM_REACT_SELECT_MENU_PORTAL_Z_INDEX,
-  getCrmReactSelectBodyMenuPortalProps,
-} from "@utils/crmReactSelectMenuPortalProps";
+import { renderGenericFilterField } from "./genericFilterFieldRender";
 
-export interface FilterOption {
-  readonly value: any;
-  readonly label: string;
-}
-
-export type FilterFieldType = 'text' | 'select' | 'multi-select' | 'date' | 'datetime' | 'dropdown';
-
-export interface FilterField {
-  readonly id: string;
-  readonly label: string;
-  readonly type: FilterFieldType;
-  readonly value: any;
-  readonly onChange: (value: any) => void;
-  readonly placeholder?: string;
-  readonly options?: readonly FilterOption[];
-  readonly isClearable?: boolean;
-  readonly styles?: any;
-  /** For `type: "date"` / `"datetime"` — passed to the native input */
-  readonly min?: string;
-  readonly max?: string;
-}
+export type {
+  FilterField,
+  FilterFieldType,
+  FilterOption,
+} from "./filterFieldTypes";
+import type { FilterField } from "./filterFieldTypes";
 
 export interface GenericFilterSidebarProps {
   readonly isOpen: boolean;
@@ -69,145 +50,6 @@ const GenericFilterSidebar: React.FC<GenericFilterSidebarProps> = ({
   const handleReset = () => {
     if (onReset) {
       onReset();
-    }
-  };
-
-  const renderFilterField = (filter: Readonly<FilterField>) => {
-    const baseStyles = {
-      fontSize: '14px',
-      padding: '10px 12px',
-      borderRadius: '8px',
-      border: '1px solid #d1d5db'
-    };
-
-    const selectStyles = {
-      control: (base: any) => ({
-        ...base,
-        fontSize: '14px',
-        padding: '2px',
-        borderRadius: '8px',
-        border: '1px solid #d1d5db',
-        boxShadow: 'none',
-        '&:hover': {
-          borderColor: '#9ca3af'
-        }
-      }),
-      menu: (base: any) => ({
-        ...base,
-        zIndex: CRM_REACT_SELECT_MENU_PORTAL_Z_INDEX
-      }),
-      menuPortal: (base: any) => ({
-        ...base,
-        zIndex: CRM_REACT_SELECT_MENU_PORTAL_Z_INDEX
-      }),
-      option: (base: any, state: any) => ({
-        ...base,
-        fontSize: '14px',
-        backgroundColor: state.isSelected ? '#4f46e5' : state.isFocused ? '#f3f4f6' : 'white',
-        color: state.isSelected ? 'white' : '#111827',
-        cursor: 'pointer'
-      }),
-      multiValue: (base: any) => ({
-        ...base,
-        backgroundColor: '#e0e7ff',
-        borderRadius: '6px'
-      }),
-      multiValueLabel: (base: any) => ({
-        ...base,
-        color: '#4f46e5',
-        fontSize: '13px'
-      }),
-      multiValueRemove: (base: any) => ({
-        ...base,
-        color: '#4f46e5',
-        ':hover': {
-          backgroundColor: '#c7d2fe',
-          color: '#4338ca'
-        }
-      }),
-      ...filter.styles
-    };
-
-    switch (filter.type) {
-      case 'text':
-        return (
-          <Form.Control
-            type="text"
-            value={filter.value || ''}
-            onChange={(e) => filter.onChange(e.target.value)}
-            placeholder={filter.placeholder}
-            style={baseStyles}
-          />
-        );
-
-      case 'select':
-        return (
-          <Select
-            options={filter.options || []}
-            value={filter.value}
-            onChange={filter.onChange}
-            placeholder={filter.placeholder || 'Select...'}
-            styles={selectStyles}
-            isClearable={filter.isClearable !== false}
-            {...getCrmReactSelectBodyMenuPortalProps()}
-          />
-        );
-
-      case 'multi-select':
-        return (
-          <Select
-            isMulti
-            options={filter.options || []}
-            value={filter.value}
-            onChange={filter.onChange}
-            placeholder={filter.placeholder || 'Select...'}
-            styles={selectStyles}
-            isClearable={filter.isClearable !== false}
-            {...getCrmReactSelectBodyMenuPortalProps()}
-          />
-        );
-
-      case 'dropdown':
-        return (
-          <Form.Select
-            value={filter.value || ''}
-            onChange={(e) => filter.onChange(e.target.value || null)}
-            style={baseStyles}
-          >
-            {filter.options?.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </Form.Select>
-        );
-
-      case 'date':
-        return (
-          <Form.Control
-            type="date"
-            value={filter.value || ''}
-            min={filter.min}
-            max={filter.max}
-            onChange={(e) => filter.onChange(e.target.value || null)}
-            style={baseStyles}
-          />
-        );
-
-      case 'datetime':
-        return (
-          <Form.Control
-            type="datetime-local"
-            value={filter.value || ''}
-            min={filter.min}
-            max={filter.max}
-            onChange={(e) => filter.onChange(e.target.value || null)}
-            style={baseStyles}
-          />
-        );
-
-      default:
-        return null;
     }
   };
 
@@ -354,7 +196,7 @@ const GenericFilterSidebar: React.FC<GenericFilterSidebarProps> = ({
                   {filter.label}
                 </label>
                 <div style={{ width: '100%' }}>
-                  {renderFilterField(filter)}
+                  {renderGenericFilterField(filter)}
                 </div>
               </div>
             ))}
@@ -436,4 +278,5 @@ const GenericFilterSidebar: React.FC<GenericFilterSidebarProps> = ({
   );
 };
 
+export { default as GenericFilterFieldsPanel } from "./GenericFilterFieldsPanel";
 export default GenericFilterSidebar;
