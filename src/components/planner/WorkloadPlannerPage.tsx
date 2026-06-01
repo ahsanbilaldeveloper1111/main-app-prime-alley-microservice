@@ -321,10 +321,12 @@ const WorkloadPlannerPage: React.FC = () => {
       task,
       toExtension,
       dueDate,
+      estimateMinutes,
     }: {
       task: WorkloadTaskCard;
       toExtension: string;
       dueDate?: string | null;
+      estimateMinutes?: number | null;
     }) => {
       if (!toExtension) throw new Error("Choose a team member.");
       await patchWorkloadTask(
@@ -333,6 +335,7 @@ const WorkloadPlannerPage: React.FC = () => {
         buildWorkloadTaskPatchBody(task, {
           extension_numbers: [toExtension],
           ...(dueDate ? { due_date: dueDate } : {}),
+          ...(estimateMinutes ? { estimated_duration_minutes: estimateMinutes } : {}),
         }),
       );
     },
@@ -663,8 +666,8 @@ const WorkloadPlannerPage: React.FC = () => {
           setReassignTask(null);
           setReassignOverloadConfirm(false);
         }}
-        onConfirm={(dueDate) => {
-          submitReassign(dueDate).catch(() => undefined);
+        onConfirm={(dueDate, estimateMinutes) => {
+          submitReassign(dueDate, estimateMinutes).catch(() => undefined);
         }}
       />
 

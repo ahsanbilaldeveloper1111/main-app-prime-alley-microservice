@@ -69,7 +69,7 @@ export function workloadGridCellVisualVariant(
 }
 
 export function workloadGridCellPercentLabel(loadPercent: number, variant: WorkloadGridCellVisualVariant): string {
-  if (variant === "zero") return "0% Planned";
+  if (variant === "zero") return "0%";
   const rounded = Math.round(loadPercent * 10) / 10;
   const base = `${rounded}%`;
   if (loadPercent > 100) return `${base} (over)`;

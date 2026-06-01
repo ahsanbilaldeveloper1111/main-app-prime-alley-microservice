@@ -355,7 +355,7 @@ type WorkloadReassignModalProps = Readonly<{
   memberName: string;
   isSaving: boolean;
   onClose: () => void;
-  onConfirm: (dueDate?: string | null) => void;
+  onConfirm: (dueDate?: string | null, estimateMinutes?: number | null) => void;
 }>;
 
 export function WorkloadReassignModal({
@@ -371,6 +371,8 @@ export function WorkloadReassignModal({
   onConfirm,
 }: WorkloadReassignModalProps) {
   const [dueDateDraft, setDueDateDraft] = React.useState("");
+  const [estimateHours, setEstimateHours] = React.useState("");
+  const [estimateMins, setEstimateMins] = React.useState("");
 
   return (
     <Modal show={Boolean(task)} onHide={onClose} centered className="workload-reassign-modal">
@@ -399,15 +401,42 @@ export function WorkloadReassignModal({
                   </span>
                 </div>
               ) : null}
-              <div className="workload-reassign-modal__row">
+              <div className={`workload-reassign-modal__row${isWorkloadTaskUnestimated(task) ? " workload-reassign-modal__row--due" : ""}`}>
                 <span className="workload-reassign-modal__label">Estimate</span>
-                <span className="workload-reassign-modal__value">
-                  {isWorkloadTaskUnestimated(task) ? (
-                    <WorkloadBdg tone="orange">No estimate</WorkloadBdg>
-                  ) : (
-                    formatWorkloadTaskEstimate(task)
-                  )}
-                </span>
+                {isWorkloadTaskUnestimated(task) ? (
+                  <div className="workload-reassign-modal__due-wrap">
+                    <div className="workload-reassign-modal__estimate-inputs">
+                      <input
+                        type="number"
+                        min={0}
+                        className="workload-reassign-modal__date-input"
+                        placeholder="hrs"
+                        value={estimateHours}
+                        onChange={(e) => setEstimateHours(e.target.value)}
+                        style={{ maxWidth: "70px" }}
+                      />
+                      <span className="workload-reassign-modal__due-hint">h</span>
+                      <input
+                        type="number"
+                        min={0}
+                        max={59}
+                        className="workload-reassign-modal__date-input"
+                        placeholder="mins"
+                        value={estimateMins}
+                        onChange={(e) => setEstimateMins(e.target.value)}
+                        style={{ maxWidth: "70px" }}
+                      />
+                      <span className="workload-reassign-modal__due-hint">m</span>
+                    </div>
+                    <span className="workload-reassign-modal__due-hint">
+                      Optional — helps calculate capacity load
+                    </span>
+                  </div>
+                ) : (
+                  <span className="workload-reassign-modal__value">
+                    {formatWorkloadTaskEstimate(task)}
+                  </span>
+                )}
               </div>
               {!task.due_date ? (
                 <div className="workload-reassign-modal__row workload-reassign-modal__row--due">
@@ -459,7 +488,10 @@ export function WorkloadReassignModal({
         <Button variant="secondary" onClick={onClose}>
           Cancel
         </Button>
-        <Button variant="primary" disabled={!targetExtension || isSaving} onClick={() => onConfirm(dueDateDraft || null)}>
+        <Button variant="primary" disabled={!targetExtension || isSaving} onClick={() => {
+          const totalMinutes = (Number(estimateHours || 0) * 60) + Number(estimateMins || 0);
+          onConfirm(dueDateDraft || null, totalMinutes > 0 ? totalMinutes : null);
+        }}>
           {overloadConfirm ? "Assign anyway" : "Confirm"}
         </Button>
       </Modal.Footer>
