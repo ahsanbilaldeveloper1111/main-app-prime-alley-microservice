@@ -109,16 +109,18 @@ function WorkloadDayTaskCard({
   isSavingEstimate,
 }: WorkloadDayTaskCardProps) {
   const [estimateDraft, setEstimateDraft] = useState("");
+  const [estimateHoursDraft, setEstimateHoursDraft] = useState("");
   const unestimated = isWorkloadTaskUnestimated(task);
   const showOrgBadge = isWorkloadOrganizationTask(task);
   const projectLabel = workloadTaskProjectLabel(task);
-  const dueDateLabel = task.due_date?.slice(0, 10) ?? null;
+  const dueDateLabel = task.due_date ? formatWorkloadShortDueDate(task.due_date) : null;
 
   const handleSaveEstimate = () => {
-    const minutes = Number.parseInt(estimateDraft.trim(), 10);
-    if (!Number.isFinite(minutes) || minutes <= 0) return;
-    onSaveEstimate(task, minutes);
+    const totalMinutes = (Number(estimateHoursDraft || 0) * 60) + Number(estimateDraft || 0);
+    if (!Number.isFinite(totalMinutes) || totalMinutes <= 0) return;
+    onSaveEstimate(task, totalMinutes);
     setEstimateDraft("");
+    setEstimateHoursDraft("");
   };
 
   return (
@@ -145,16 +147,7 @@ function WorkloadDayTaskCard({
       <div className="workload-day-task-card__tags">
         <WorkloadPriorityBadge priority={task.priority} />
         {task.status_name ? (
-          <span
-            className="workload-day-task-card__tag"
-            style={
-              task.status_color
-                ? { backgroundColor: task.status_color, color: "#fff" }
-                : undefined
-            }
-          >
-            {task.status_name}
-          </span>
+          <WorkloadBdg tone="gray">{task.status_name}</WorkloadBdg>
         ) : null}
         {!showOrgBadge && projectLabel && projectLabel !== "—" && projectLabel !== "Personal" ? (
           <WorkloadBdg tone="gray">{projectLabel}</WorkloadBdg>
@@ -183,23 +176,35 @@ function WorkloadDayTaskCard({
         <div className="workload-day-estimate-form">
           <span className="workload-day-estimate-form__label">Add time estimate:</span>
           <div className="workload-day-estimate-form__row">
-            <Form.Control
-              size="sm"
+            <input
               type="number"
-              min={1}
+              min={0}
+              className="workload-day-estimate-form__input"
+              placeholder="hrs"
+              value={estimateHoursDraft}
+              onChange={(e) => setEstimateHoursDraft(e.target.value)}
+              disabled={isSavingEstimate}
+            />
+            <span className="workload-day-estimate-form__unit">h</span>
+            <input
+              type="number"
+              min={0}
+              max={59}
+              className="workload-day-estimate-form__input"
               placeholder="mins"
               value={estimateDraft}
               onChange={(e) => setEstimateDraft(e.target.value)}
               disabled={isSavingEstimate}
             />
-            <Button
-              size="sm"
-              variant="warning"
-              disabled={isSavingEstimate || estimateDraft.trim() === ""}
+            <span className="workload-day-estimate-form__unit">m</span>
+            <button
+              type="button"
+              className="workload-day-estimate-form__save-btn"
+              disabled={isSavingEstimate || (estimateDraft.trim() === "" && estimateHoursDraft.trim() === "")}
               onClick={handleSaveEstimate}
             >
               {isSavingEstimate ? "Saving…" : "Save"}
-            </Button>
+            </button>
           </div>
         </div>
       ) : null}

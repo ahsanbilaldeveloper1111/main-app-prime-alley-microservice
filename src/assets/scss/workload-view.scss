@@ -1742,35 +1742,90 @@
   }
 
   .workload-day-estimate-form {
-    background: #fff7ed;
-    border: 1px solid #fed7aa;
-    border-radius: 0.35rem;
-    padding: 0.55rem 0.6rem;
-    margin-bottom: 0.55rem;
+    background: #f5f8fa;
+    border: 1px solid #eaf0f6;
+    border-radius: 6px;
+    padding: 10px 12px;
+    margin-bottom: 10px;
   }
 
   .workload-day-estimate-form__label {
     display: block;
-    font-size: 0.75rem;
+    font-size: 11px;
     font-weight: 600;
-    color: #c2410c;
-    margin-bottom: 0.35rem;
+    color: #718096;
+    margin-bottom: 8px;
+    font-family: "Lexend Deca", Helvetica, Arial, sans-serif;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
   }
 
   .workload-day-estimate-form__row {
     display: flex;
-    gap: 0.35rem;
+    gap: 6px;
     align-items: center;
+  }
 
-    .form-control {
-      max-width: 5.5rem;
+  .workload-day-estimate-form__input {
+    height: 30px;
+    width: 60px;
+    padding: 0 8px;
+    font-size: 12px;
+    font-family: "Lexend Deca", Helvetica, Arial, sans-serif;
+    color: #141414;
+    background: #ffffff;
+    border: 1px solid #cbd5e0;
+    border-radius: 4px;
+    outline: none;
+
+    &:focus {
+      border-color: #0066CC;
+      box-shadow: 0 0 0 2px rgba(0, 102, 204, 0.12);
+    }
+
+    &:disabled {
+      opacity: 0.6;
+    }
+  }
+
+  .workload-day-estimate-form__unit {
+    font-size: 12px;
+    font-weight: 500;
+    color: #141414;
+    font-family: "Lexend Deca", Helvetica, Arial, sans-serif;
+  }
+
+  .workload-day-estimate-form__save-btn {
+    height: 30px;
+    padding: 0 14px;
+    font-size: 12px;
+    font-weight: 500;
+    font-family: "Lexend Deca", Helvetica, Arial, sans-serif;
+    background: #0066CC;
+    color: #ffffff;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background 0.15s ease;
+    margin-left: 4px;
+
+    &:hover:not(:disabled) {
+      background: #0052A3;
+    }
+
+    &:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
     }
   }
 
   .workload-day-task-card__actions {
     display: flex;
     flex-wrap: wrap;
-    gap: 0.4rem;
+    gap: 6px;
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid #eaf0f6;
   }
 }
 
