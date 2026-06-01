@@ -64,14 +64,14 @@ export function useWorkloadPlannerTaskActions({
   setBoardDropOverload,
   formatError,
 }: UseWorkloadPlannerTaskActionsParams) {
-  const submitReassign = useCallback(async () => {
+  const submitReassign = useCallback(async (dueDate?: string | null) => {
     if (!reassignTask || !reassignTarget) return;
     if (!selectedCell) {
-      assignMutation.mutate({ task: reassignTask, toExtension: reassignTarget });
+      assignMutation.mutate({ task: reassignTask, toExtension: reassignTarget, dueDate });
       return;
     }
     if (reassignOverloadConfirm) {
-      assignMutation.mutate({ task: reassignTask, toExtension: reassignTarget });
+      assignMutation.mutate({ task: reassignTask, toExtension: reassignTarget, dueDate });
       return;
     }
     const minutes = resolveWorkloadTaskEstimateMinutes(reassignTask);
@@ -87,7 +87,7 @@ export function useWorkloadPlannerTaskActions({
         setReassignOverloadConfirm(true);
         return;
       }
-      assignMutation.mutate({ task: reassignTask, toExtension: reassignTarget });
+      assignMutation.mutate({ task: reassignTask, toExtension: reassignTarget, dueDate });
     } catch (err) {
       toast.error(formatError(err));
     }

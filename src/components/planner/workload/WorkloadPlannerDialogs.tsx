@@ -355,7 +355,7 @@ type WorkloadReassignModalProps = Readonly<{
   memberName: string;
   isSaving: boolean;
   onClose: () => void;
-  onConfirm: () => void;
+  onConfirm: (dueDate?: string | null) => void;
 }>;
 
 export function WorkloadReassignModal({
@@ -370,6 +370,8 @@ export function WorkloadReassignModal({
   onClose,
   onConfirm,
 }: WorkloadReassignModalProps) {
+  const [dueDateDraft, setDueDateDraft] = React.useState("");
+
   return (
     <Modal show={Boolean(task)} onHide={onClose} centered className="workload-reassign-modal">
       <Modal.Header closeButton>
@@ -407,6 +409,22 @@ export function WorkloadReassignModal({
                   )}
                 </span>
               </div>
+              {!task.due_date ? (
+                <div className="workload-reassign-modal__row workload-reassign-modal__row--due">
+                  <span className="workload-reassign-modal__label">Due date</span>
+                  <div className="workload-reassign-modal__due-wrap">
+                    <input
+                      type="date"
+                      className="workload-reassign-modal__date-input"
+                      value={dueDateDraft}
+                      onChange={(e) => setDueDateDraft(e.target.value)}
+                    />
+                    <span className="workload-reassign-modal__due-hint">
+                      Optional — helps show task in grid
+                    </span>
+                  </div>
+                </div>
+              ) : null}
               {targetExtension && memberName ? (
                 <div className="workload-reassign-modal__row">
                   <span className="workload-reassign-modal__label">Assign to</span>
@@ -441,7 +459,7 @@ export function WorkloadReassignModal({
         <Button variant="secondary" onClick={onClose}>
           Cancel
         </Button>
-        <Button variant="primary" disabled={!targetExtension || isSaving} onClick={onConfirm}>
+        <Button variant="primary" disabled={!targetExtension || isSaving} onClick={() => onConfirm(dueDateDraft || null)}>
           {overloadConfirm ? "Assign anyway" : "Confirm"}
         </Button>
       </Modal.Footer>

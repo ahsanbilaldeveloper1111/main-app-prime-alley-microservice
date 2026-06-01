@@ -320,15 +320,20 @@ const WorkloadPlannerPage: React.FC = () => {
     mutationFn: async ({
       task,
       toExtension,
+      dueDate,
     }: {
       task: WorkloadTaskCard;
       toExtension: string;
+      dueDate?: string | null;
     }) => {
       if (!toExtension) throw new Error("Choose a team member.");
       await patchWorkloadTask(
         task.id,
         extension,
-        buildWorkloadTaskPatchBody(task, { extension_numbers: [toExtension] }),
+        buildWorkloadTaskPatchBody(task, {
+          extension_numbers: [toExtension],
+          ...(dueDate ? { due_date: dueDate } : {}),
+        }),
       );
     },
     onSuccess: () => {
@@ -658,8 +663,8 @@ const WorkloadPlannerPage: React.FC = () => {
           setReassignTask(null);
           setReassignOverloadConfirm(false);
         }}
-        onConfirm={() => {
-          submitReassign().catch(() => undefined);
+        onConfirm={(dueDate) => {
+          submitReassign(dueDate).catch(() => undefined);
         }}
       />
 

@@ -1986,3 +1986,132 @@
   border-color: #fed7aa;
 }
 
+.workload-reassign-modal {
+  .modal-header {
+    padding: 16px 20px 12px;
+    border-bottom: 1px solid #eaf0f6;
+
+    .modal-title {
+      font-size: 16px;
+      font-weight: 600;
+      color: #141414;
+      font-family: "Lexend Deca", Helvetica, Arial, sans-serif;
+    }
+  }
+
+  .modal-body {
+    padding: 20px;
+  }
+
+  .modal-footer {
+    padding: 12px 20px;
+    border-top: 1px solid #eaf0f6;
+    gap: 8px;
+
+    .btn-secondary {
+      background: #ffffff;
+      border: 1px solid #8a8a8a;
+      color: #141414;
+      font-family: "Lexend Deca", Helvetica, Arial, sans-serif;
+      font-size: 13px;
+      font-weight: 500;
+      border-radius: 4px;
+
+      &:hover {
+        background: #f5f8fa;
+      }
+    }
+
+    .btn-primary {
+      background-color: #0066CC;
+      border-color: #0066CC;
+      font-family: "Lexend Deca", Helvetica, Arial, sans-serif;
+      font-size: 13px;
+      font-weight: 500;
+      border-radius: 4px;
+
+      &:hover:not(:disabled) {
+        background-color: #0052A3;
+        border-color: #0052A3;
+      }
+
+      &:disabled {
+        opacity: 0.6;
+      }
+    }
+  }
+
+  .workload-reassign-modal__summary {
+    background: #f9fafb;
+    border: 1px solid #eaf0f6;
+    border-radius: 8px;
+    padding: 14px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .workload-reassign-modal__row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .workload-reassign-modal__row--due {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .workload-reassign-modal__due-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    width: 100%;
+  }
+
+  .workload-reassign-modal__date-input {
+    height: 32px;
+    padding: 0 10px;
+    font-size: 12px;
+    font-family: "Lexend Deca", Helvetica, Arial, sans-serif;
+    color: #141414;
+    background: #f5f8fa;
+    border: 1px solid #cbd5e0;
+    border-radius: 4px;
+    outline: none;
+    width: 100%;
+    max-width: 180px;
+    cursor: pointer;
+
+    &:focus {
+      border-color: #0066CC;
+      box-shadow: 0 0 0 2px rgba(0, 102, 204, 0.12);
+    }
+  }
+
+  .workload-reassign-modal__due-hint {
+    font-size: 11px;
+    color: #718096;
+    font-family: "Lexend Deca", Helvetica, Arial, sans-serif;
+  }
+
+  .workload-reassign-modal__label {
+    font-size: 11px;
+    font-weight: 500;
+    color: #718096;
+    font-family: "Lexend Deca", Helvetica, Arial, sans-serif;
+    min-width: 70px;
+    flex-shrink: 0;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  .workload-reassign-modal__value {
+    font-size: 13px;
+    font-weight: 600;
+    color: #141414;
+    font-family: "Lexend Deca", Helvetica, Arial, sans-serif;
+    word-break: break-word;
+  }
+}
