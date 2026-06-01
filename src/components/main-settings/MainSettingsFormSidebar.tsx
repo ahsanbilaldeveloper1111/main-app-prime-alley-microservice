@@ -27,7 +27,7 @@ export function MainSettingsFormSidebar({
   disableClose = false,
 }: MainSettingsFormSidebarProps) {
   useEffect(() => {
-    if (!show || typeof document === "undefined") return undefined;
+    if (!show || globalThis.document === undefined) return undefined;
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     return () => {
@@ -35,7 +35,7 @@ export function MainSettingsFormSidebar({
     };
   }, [show]);
 
-  if (!show || typeof document === "undefined") {
+  if (!show || globalThis.document === undefined) {
     return null;
   }
 
@@ -62,9 +62,9 @@ export function MainSettingsFormSidebar({
           cursor: disableClose ? "default" : "pointer",
         }}
       />
-      <div
+      <dialog
+        open
         className="main-settings-form-sidebar main-settings-form-sidebar--open contact-sidebar-container"
-        role="dialog"
         aria-modal="true"
         aria-label={typeof title === "string" ? title : "Form panel"}
         style={{
@@ -130,7 +130,7 @@ export function MainSettingsFormSidebar({
             {footer}
           </div>
         ) : null}
-      </div>
+      </dialog>
     </>,
     document.body,
   );
