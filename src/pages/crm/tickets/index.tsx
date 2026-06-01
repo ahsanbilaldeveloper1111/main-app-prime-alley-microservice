@@ -1,105 +1,63 @@
 import "@assets/scss/datatable-style.scss";
 import "@assets/scss/crm-tickets-page.scss";
+import "@assets/scss/common.scss";
 import React, { ReactElement, useCallback, useMemo, useState } from "react";
-import { useRouter } from "next/router";
-import { Modal, Form, Button } from "react-bootstrap";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import Layout from "@layout/index";
 import GenericTable, {
+  TableAction,
   TableColumn,
-  FilterPill,
   TabConfig,
 } from "@components/GenericTable";
-import GenericFilterSidebar, {
-  FilterField,
-} from "@components/GenericFilterSidebar";
+import { buildCrmTicketsTableToolbar } from "@components/crm/tickets/buildCrmTicketsTableToolbar";
+import { useCrmTicketsFilterPills } from "@hooks/useCrmTicketsFilterPills";
+import { useStagedFiltersActions } from "@utils/communicationsStagedFilters";
 import GenericSidebar, { SidebarSection } from "@components/GenericSidebarNew";
 import { CreateTicketSidebar } from "@components/renderCreateTicketForm";
-import { Calendar, AlertCircle, User, Layers, Tag, History, FileText } from "lucide-react";
+import {
+  Calendar,
+  AlertCircle,
+  User,
+  Layers,
+  Tag,
+  History,
+  FileText,
+  Eye,
+  Pencil,
+  Trash2,
+} from "lucide-react";
+import {
+  DashboardData,
+  DeleteTicket,
+  GetTicket,
+  ListTickets,
+} from "@utils/tickets";
+import { GetHierarchyData } from "@utils/users";
+import { GetAllStatuses } from "@utils/ticket-statuses";
+import { ModuleSlug } from "@utils/Helper";
+import { crmAppKeys } from "@query/keys";
+import {
+  buildCrmTicketsListApiFilters,
+  buildCrmTicketsListRequest,
+  DEFAULT_CRM_TICKET_FILTERS,
+  toCrmTicketAppliedFilters,
+  getTicketActivityCount,
+  getTicketCommentsCount,
+  getTicketCrmSummary,
+  mapApiTicketsToCrmGridRows,
+  mapDashboardToCrmStats,
+  normalizeTicketsListResponse,
+  type CrmTicketAppliedFilters,
+  type CrmTicketGridRow,
+  type CrmTicketPriority,
+  type CrmTicketStatus,
+  type CrmTicketsListTab,
+} from "@components/crm/tickets/crmTicketsListDomain";
 
-type TicketStatus = "Open" | "In Progress" | "Resolved";
-type TicketPriority = "Low" | "Medium" | "High";
-type TicketFilters = {
-  ticketOwner: string;
-  createDate: string;
-  lastActivityDate: string;
-  priority: TicketPriority | "All Priorities";
-};
-
-type CrmSummary = {
-  id: number;
-  summary: string;
-};
-
-type TicketRowData = {
-  crm_summary?: CrmSummary;
-  data?: {
-    crm_summary?: CrmSummary;
-  };
-};
-
-interface TicketRow {
-  id: number;
-  ticket_name: string;
-  pipeline: string;
-  ticket_status: TicketStatus;
-  create_date: string;
-  priority: TicketPriority;
-  ticket_owner: string;
-  source: string;
-  last_activity_date: string;
-  email?: string;
-  phone?: string;
-  created_at?: string;
-  updated_at?: string;
-  crm_summary?: CrmSummary;
-  data?: TicketRowData;
-}
-
-const getTicketCrmSummary = (ticket: TicketRow): CrmSummary | undefined =>
-  ticket.crm_summary ?? ticket.data?.crm_summary ?? ticket.data?.data?.crm_summary;
-
-const DUMMY_TICKETS: TicketRow[] = [
-  {
-    id: 101,
-    ticket_name: "Login issue for enterprise account",
-    pipeline: "Support Pipeline",
-    ticket_status: "Open",
-    create_date: "2026-03-09",
-    priority: "High",
-    ticket_owner: "John Carter",
-    source: "Email",
-    last_activity_date: "2026-03-10",
-    email: "john.carter@example.com",
-    phone: "+971500000001",
-    created_at: "2026-03-09",
-    updated_at: "2026-03-10",
-    crm_summary: {
-      id: 1,
-      summary: "Customer reported enterprise login failure. Identity verification in progress.",
-    },
-  },
-  {
-    id: 102,
-    ticket_name: "Billing clarification request",
-    pipeline: "Billing Pipeline",
-    ticket_status: "In Progress",
-    create_date: "2026-03-08",
-    priority: "Medium",
-    ticket_owner: "Unassigned",
-    source: "Web Form",
-    last_activity_date: "2026-03-10",
-    email: "accounts@example.com",
-    phone: "+971500000002",
-    created_at: "2026-03-08",
-    updated_at: "2026-03-10",
-    data: {
-      crm_summary: {
-        id: 2,
-        summary: "Customer requested billing clarification. Awaiting finance team update.",
-      },
-    },
-  },
-];
+type TicketStatus = CrmTicketStatus;
+type TicketPriority = CrmTicketPriority;
+type TicketFilters = CrmTicketAppliedFilters;
+type TicketRow = CrmTicketGridRow;
 
 const ALL_COLUMNS = [
   "ticket_name",
@@ -112,159 +70,239 @@ const ALL_COLUMNS = [
   "last_activity_date",
 ];
 
-const DEFAULT_TICKET_FILTERS: TicketFilters = {
-  ticketOwner: "All Owners",
-  createDate: "",
-  lastActivityDate: "",
-  priority: "All Priorities",
-};
+const DEFAULT_TICKET_TABLE_COLUMNS = [...ALL_COLUMNS, "actions"];
 
 const CrmTicketsPage = () => {
-  const router = useRouter();
+  const queryClient = useQueryClient();
 
-  const openTicketDetailPage = useCallback(
-    (ticketId: number) => {
-      router
-        .push({
-          pathname: "/crm/tickets/tickets-detailpage",
-          query: { id: String(ticketId) },
-        })
-        .catch(() => {
-          // navigation errors can happen during rapid route changes
-        });
-    },
-    [router],
-  );
-
-  const [tickets] = useState<TicketRow[]>(DUMMY_TICKETS);
   const [activeTab, setActiveTab] = useState<string>("all");
   const [searchValue, setSearchValue] = useState<string>("");
-  const [tableView, setTableView] = useState<"table" | "board">("table");
-  const [showFilterSidebar, setShowFilterSidebar] = useState(false);
-  const [showColumnEditor, setShowColumnEditor] = useState(false);
   const [showCreateTicketModal, setShowCreateTicketModal] = useState(false);
-  const [selectedColumns, setSelectedColumns] = useState<string[]>(ALL_COLUMNS);
+  const [editingTicketId, setEditingTicketId] = useState<number | null>(null);
+  const [editingTicketInitial, setEditingTicketInitial] =
+    useState<unknown>(undefined);
   const [pagination, setPagination] = useState({
     currentPage: 1,
     rowsPerPage: 10,
-    sortBy: "create_date",
-    sortOrder: "desc" as "asc" | "desc",
   });
 
   const [showTicketSidebar, setShowTicketSidebar] = useState(false);
   const [selectedTicket, setSelectedTicket] = useState<TicketRow | null>(null);
 
-  const persistSelectedColumns = useCallback((columns: string[]) => {
-    try {
-      if (globalThis.window !== undefined) {
-        globalThis.window.localStorage.setItem(
-          "ticketsSelectedColumns",
-          JSON.stringify(columns),
-        );
+  const [currentFilters, setCurrentFilters] = useState<TicketFilters>({
+    ...DEFAULT_CRM_TICKET_FILTERS,
+  });
+  const [appliedFilters, setAppliedFilters] = useState<TicketFilters>({
+    ...DEFAULT_CRM_TICKET_FILTERS,
+  });
+
+  const appliedFiltersKey = useMemo(
+    () => JSON.stringify(appliedFilters),
+    [appliedFilters],
+  );
+
+  const hierarchyQuery = useQuery({
+    queryKey: crmAppKeys.crmTicketsPage.hierarchyExtensions(),
+    queryFn: async () => {
+      const hierarchyData = await GetHierarchyData(ModuleSlug.TICKET);
+      return Array.isArray(hierarchyData?.extensions)
+        ? hierarchyData.extensions
+        : [];
+    },
+  });
+
+  const statusesQuery = useQuery({
+    queryKey: crmAppKeys.crmTicketsPage.statuses(),
+    queryFn: async () => {
+      const statuses = await GetAllStatuses();
+      return Array.isArray(statuses) ? statuses : [];
+    },
+  });
+
+  const ticketsQuery = useQuery({
+    queryKey: crmAppKeys.crmTicketsPage.list({
+      search: searchValue.trim(),
+      filtersKey: appliedFiltersKey,
+      page: pagination.currentPage,
+      perPage: pagination.rowsPerPage,
+      activeTab,
+    }),
+    queryFn: async () => {
+      const extensions = hierarchyQuery.data ?? [];
+      const listRequest = buildCrmTicketsListRequest(
+        appliedFilters,
+        extensions,
+        {
+          page: pagination.currentPage,
+          perPage: pagination.rowsPerPage,
+          search: searchValue.trim(),
+          activeTab: activeTab as CrmTicketsListTab,
+          moduleSlug: ModuleSlug.TICKET,
+          statuses: statusesQuery.data ?? [],
+        },
+      );
+
+      const response = await ListTickets(listRequest);
+      return normalizeTicketsListResponse(response);
+    },
+    enabled: hierarchyQuery.isSuccess && statusesQuery.isSuccess,
+  });
+
+  const dashboardQuery = useQuery({
+    queryKey: crmAppKeys.crmTicketsPage.dashboard(appliedFiltersKey),
+    queryFn: async () => {
+      const extensions = hierarchyQuery.data ?? [];
+      return DashboardData(
+        buildCrmTicketsListApiFilters(appliedFilters, extensions, {
+          activeTab: "all",
+          statuses: statusesQuery.data ?? [],
+        }),
+      );
+    },
+    enabled: hierarchyQuery.isSuccess && statusesQuery.isSuccess,
+  });
+
+  const ticketDetailQuery = useQuery({
+    queryKey: crmAppKeys.crmTicketsPage.detail(
+      String(selectedTicket?.id ?? ""),
+    ),
+    queryFn: async () => {
+      if (selectedTicket == null) {
+        return null;
       }
-    } catch {
-      // Ignore storage errors (SSR, private mode, quota).
-    }
+      return GetTicket(String(selectedTicket.id));
+    },
+    enabled: showTicketSidebar && selectedTicket != null,
+  });
+
+  const tickets = useMemo(
+    () =>
+      mapApiTicketsToCrmGridRows(
+        ticketsQuery.data?.items ?? [],
+        hierarchyQuery.data ?? [],
+      ),
+    [ticketsQuery.data?.items, hierarchyQuery.data],
+  );
+
+  const ticketsListTotal = ticketsQuery.data?.total ?? 0;
+
+  const dashboardStats = useMemo(
+    () => mapDashboardToCrmStats(dashboardQuery.data),
+    [dashboardQuery.data],
+  );
+
+  const openCreateTicketModal = useCallback(() => {
+    setEditingTicketId(null);
+    setEditingTicketInitial(undefined);
+    setShowCreateTicketModal(true);
   }, []);
 
-  const handleColumnToggle = useCallback(
-    (column: string, checked: boolean) => {
-      setSelectedColumns((prev) => {
-        if (checked) return prev.includes(column) ? prev : [...prev, column];
-        const next = prev.filter((k) => k !== column);
-        return next.length ? next : ALL_COLUMNS;
-      });
+  const openEditTicketModal = useCallback(
+    (ticketId: number, initialTicket?: unknown) => {
+      const row = tickets.find((ticket) => ticket.id === ticketId);
+      setEditingTicketId(ticketId);
+      setEditingTicketInitial(initialTicket ?? row?.rawData);
+      setShowCreateTicketModal(true);
+    },
+    [tickets],
+  );
+
+  const closeCreateTicketModal = useCallback(() => {
+    setShowCreateTicketModal(false);
+    setEditingTicketId(null);
+    setEditingTicketInitial(undefined);
+  }, []);
+
+  const refreshTickets = useCallback(() => {
+    queryClient
+      .invalidateQueries({ queryKey: crmAppKeys.crmTicketsPage.all() })
+      .catch(() => undefined);
+  }, [queryClient]);
+
+  const handleDeleteTicket = useCallback(
+    (row: TicketRow) => {
+      DeleteTicket(String(row.id))
+        .then((deleted) => {
+          if (deleted) {
+            refreshTickets();
+          }
+        })
+        .catch(() => undefined);
+    },
+    [refreshTickets],
+  );
+
+  const applyCommittedFilters = useCallback((filters: TicketFilters) => {
+    setAppliedFilters(filters);
+    setCurrentFilters(filters);
+    setPagination((prev) => ({ ...prev, currentPage: 1 }));
+  }, []);
+
+  const setStagedTicketFilters = useCallback(
+    (filters: Record<string, unknown>) => {
+      setCurrentFilters(toCrmTicketAppliedFilters(filters));
     },
     [],
   );
 
-  const [filterForm, setFilterForm] = useState<TicketFilters>({ ...DEFAULT_TICKET_FILTERS });
-  const [appliedFilters, setAppliedFilters] = useState<TicketFilters>({
-    ...DEFAULT_TICKET_FILTERS,
-  });
+  const applyCommittedFiltersStaged = useCallback(
+    (filters: Record<string, unknown>) => {
+      applyCommittedFilters(toCrmTicketAppliedFilters(filters));
+    },
+    [applyCommittedFilters],
+  );
 
-  const handleCloseFilterSidebar = useCallback(() => {
-    setShowFilterSidebar(false);
-  }, []);
+  const {
+    handleApplyFiltersClick,
+    handleResetFiltersClick,
+    hasUnappliedFilterChanges,
+    hasNonDefaultFilters,
+  } = useStagedFiltersActions(
+    currentFilters,
+    appliedFilters,
+    DEFAULT_CRM_TICKET_FILTERS,
+    setStagedTicketFilters,
+    applyCommittedFiltersStaged,
+  );
 
-  const handleApplyFilters = useCallback(() => {
-    setAppliedFilters(filterForm);
-    setShowFilterSidebar(false);
-  }, [filterForm]);
-
-  const handleResetFilters = useCallback(() => {
-    const reset = { ...DEFAULT_TICKET_FILTERS };
-    setFilterForm(reset);
-    setAppliedFilters(reset);
-    setShowFilterSidebar(false);
-  }, []);
-
-  const filteredData = useMemo(() => {
-    let list = [...tickets];
-
-    if (activeTab === "open") {
-      list = list.filter((ticket) => ticket.ticket_status !== "Resolved");
-    } else if (activeTab === "unassigned") {
-      list = list.filter((ticket) => ticket.ticket_owner === "Unassigned");
-    }
-
-    const q = searchValue.trim().toLowerCase();
-    if (q) {
-      list = list.filter(
-        (ticket) =>
-          ticket.ticket_name.toLowerCase().includes(q) ||
-          ticket.pipeline.toLowerCase().includes(q) ||
-          ticket.ticket_owner.toLowerCase().includes(q) ||
-          ticket.source.toLowerCase().includes(q),
+  const handleFiltersChange = useCallback(
+    (update: TicketFilters | ((prev: TicketFilters) => TicketFilters)) => {
+      setCurrentFilters((prev) =>
+        typeof update === "function" ? update(prev) : update,
       );
-    }
+    },
+    [],
+  );
 
-    if (appliedFilters.ticketOwner !== "All Owners") {
-      list = list.filter((ticket) => ticket.ticket_owner === appliedFilters.ticketOwner);
-    }
-    if (appliedFilters.priority !== "All Priorities") {
-      list = list.filter((ticket) => ticket.priority === appliedFilters.priority);
-    }
-    if (appliedFilters.createDate) {
-      list = list.filter((ticket) => ticket.create_date === appliedFilters.createDate);
-    }
-    if (appliedFilters.lastActivityDate) {
-      list = list.filter(
-        (ticket) => ticket.last_activity_date === appliedFilters.lastActivityDate,
-      );
-    }
-
-    return list;
-  }, [tickets, activeTab, searchValue, appliedFilters]);
-
-  const pagedData = useMemo(() => {
-    const start = (pagination.currentPage - 1) * pagination.rowsPerPage;
-    const end = start + pagination.rowsPerPage;
-    return filteredData.slice(start, end);
-  }, [filteredData, pagination.currentPage, pagination.rowsPerPage]);
-
-  const ticketTabs: TabConfig[] = useMemo(() => {
-    const allCount = tickets.length;
-    const openCount = tickets.filter((ticket) => ticket.ticket_status !== "Resolved").length;
-    const unassignedCount = tickets.filter((ticket) => ticket.ticket_owner === "Unassigned").length;
-
-    return [
-      { id: "all", label: "All Tickets", count: allCount, removable: false },
-      { id: "open", label: "Open tickets", count: openCount, removable: false },
+  const ticketTabs: TabConfig[] = useMemo(
+    () => [
+      {
+        id: "all",
+        label: "All Tickets",
+        count: dashboardStats.total,
+        removable: false,
+      },
+      {
+        id: "open",
+        label: "Open tickets",
+        count: dashboardStats.open,
+        removable: false,
+      },
       {
         id: "unassigned",
         label: "Unassigned ticket",
-        count: unassignedCount,
+        count: dashboardStats.unassigned,
         removable: false,
       },
-    ];
-  }, [tickets]);
+    ],
+    [dashboardStats],
+  );
 
   const renderAddTicketsButton = useCallback(
     () => (
       <button
         type="button"
-        onClick={() => setShowCreateTicketModal(true)}
+        onClick={openCreateTicketModal}
         style={{
           padding: "9px 13px",
           backgroundColor: "#000000",
@@ -291,7 +329,7 @@ const CrmTicketsPage = () => {
         Create ticket
       </button>
     ),
-    [],
+    [openCreateTicketModal],
   );
 
   const ticketsColumns: TableColumn<TicketRow>[] = useMemo(
@@ -321,6 +359,7 @@ const CrmTicketsPage = () => {
         label: "Create date",
         sortable: true,
         type: "date",
+        sortKey: "created_at",
       },
       {
         key: "priority",
@@ -347,6 +386,7 @@ const CrmTicketsPage = () => {
         label: "Last activity date",
         sortable: true,
         type: "date",
+        sortKey: "updated_at",
       },
     ],
     [],
@@ -357,6 +397,31 @@ const CrmTicketsPage = () => {
     setShowTicketSidebar(true);
   }, []);
 
+  const ticketTableActions: TableAction<TicketRow>[] = useMemo(
+    () => [
+      {
+        label: "View",
+        icon: <Eye size={16} />,
+        onClick: (row) => openPreviewSidebar(row),
+        variant: "link",
+      },
+      {
+        label: "Edit",
+        icon: <Pencil size={16} />,
+        onClick: (row) => openEditTicketModal(row.id, row.rawData),
+        variant: "link",
+      },
+      {
+        label: "Delete",
+        icon: <Trash2 size={16} />,
+        onClick: (row) => handleDeleteTicket(row),
+        variant: "link",
+        className: "text-danger",
+      },
+    ],
+    [openPreviewSidebar, openEditTicketModal, handleDeleteTicket],
+  );
+
   const handleCloseSidebar = useCallback(() => {
     setShowTicketSidebar(false);
     setSelectedTicket(null);
@@ -364,6 +429,8 @@ const CrmTicketsPage = () => {
 
   const ticketSidebarSections: SidebarSection[] = useMemo(() => {
     if (!selectedTicket) return [];
+    const activityCount = getTicketActivityCount(ticketDetailQuery.data);
+    const notesCount = getTicketCommentsCount(ticketDetailQuery.data);
     return [
       {
         id: "ticket-overview",
@@ -376,14 +443,22 @@ const CrmTicketsPage = () => {
             label: "Edit all properties",
             onClick: () => {
               setShowTicketSidebar(false);
-              setShowCreateTicketModal(true);
+              openEditTicketModal(selectedTicket.id, selectedTicket.rawData);
             },
           },
         ],
         fields: [
-          { label: "Ticket Name", value: selectedTicket.ticket_name, copyable: true },
+          {
+            label: "Ticket Name",
+            value: selectedTicket.ticket_name,
+            copyable: true,
+          },
           { label: "Pipeline", value: selectedTicket.pipeline },
-          { label: "Status", value: selectedTicket.ticket_status, type: "badge" },
+          {
+            label: "Status",
+            value: selectedTicket.ticket_status,
+            type: "badge",
+          },
           { label: "Priority", value: selectedTicket.priority, type: "badge" },
           { label: "Owner", value: selectedTicket.ticket_owner, icon: User },
           { label: "Source", value: selectedTicket.source, icon: Tag },
@@ -394,7 +469,8 @@ const CrmTicketsPage = () => {
           },
           {
             label: "Last Updated",
-            value: selectedTicket.updated_at || selectedTicket.last_activity_date,
+            value:
+              selectedTicket.updated_at || selectedTicket.last_activity_date,
             type: "date",
           },
         ],
@@ -420,17 +496,10 @@ const CrmTicketsPage = () => {
         icon: History,
         collapsible: true,
         defaultExpanded: true,
-        count: 0,
+        count: activityCount,
         emptyState: {
           icon: History,
           message: "No recent activities for this ticket.",
-          action: {
-            label: "Open detail page",
-            onClick: () => {
-              handleCloseSidebar();
-              openTicketDetailPage(selectedTicket.id);
-            },
-          },
         },
       },
       {
@@ -439,7 +508,7 @@ const CrmTicketsPage = () => {
         icon: FileText,
         collapsible: true,
         defaultExpanded: true,
-        count: 0,
+        count: notesCount,
         emptyState: {
           icon: FileText,
           message: "No notes added yet.",
@@ -447,146 +516,55 @@ const CrmTicketsPage = () => {
             label: "Edit ticket",
             onClick: () => {
               setShowTicketSidebar(false);
-              setShowCreateTicketModal(true);
+              openEditTicketModal(selectedTicket.id, selectedTicket.rawData);
             },
           },
         },
       },
     ];
-  }, [selectedTicket, handleCloseSidebar, openTicketDetailPage]);
+  }, [selectedTicket, openEditTicketModal, ticketDetailQuery.data]);
 
-  const uniqueOwners = useMemo(
-    () => Array.from(new Set(tickets.map((ticket) => ticket.ticket_owner))),
-    [tickets],
+  const ticketExtensions = useMemo(
+    (): Array<{
+      id?: unknown;
+      display_name?: string;
+      name?: string;
+      extension?: string;
+    }> => hierarchyQuery.data ?? [],
+    [hierarchyQuery.data],
   );
 
-  const advancedFilterFields: FilterField[] = useMemo(
-    () => [
-      {
-        id: "ticketOwner",
-        label: "Ticket owner",
-        type: "dropdown",
-        value: filterForm.ticketOwner,
-        onChange: (value) =>
-          setFilterForm((prev) => ({ ...prev, ticketOwner: value || "All Owners" })),
-        options: [
-          { value: "All Owners", label: "All Owners" },
-          ...uniqueOwners.map((owner) => ({ value: owner, label: owner })),
-        ],
-      },
-      {
-        id: "createDate",
-        label: "Create date",
-        type: "date",
-        value: filterForm.createDate,
-        onChange: (value) => setFilterForm((prev) => ({ ...prev, createDate: value || "" })),
-      },
-      {
-        id: "lastActivityDate",
-        label: "Last activity date",
-        type: "date",
-        value: filterForm.lastActivityDate,
-        onChange: (value) =>
-          setFilterForm((prev) => ({ ...prev, lastActivityDate: value || "" })),
-      },
-      {
-        id: "priority",
-        label: "Priority",
-        type: "dropdown",
-        value: filterForm.priority,
-        onChange: (value) =>
-          setFilterForm((prev) => ({ ...prev, priority: value || "All Priorities" })),
-        options: [
-          { value: "All Priorities", label: "All Priorities" },
-          { value: "Low", label: "Low" },
-          { value: "Medium", label: "Medium" },
-          { value: "High", label: "High" },
-        ],
-      },
-    ],
-    [filterForm, uniqueOwners],
-  );
-
-  const filterPills: FilterPill[] = useMemo(
-    () => [
-      {
-        id: "ticketOwner",
-        label:
-          appliedFilters.ticketOwner === "All Owners"
-            ? "Ticket owner"
-            : `Ticket owner: ${appliedFilters.ticketOwner}`,
-        showDropdown: false,
-        onClick: () => setShowFilterSidebar(true),
-      },
-      {
-        id: "createDate",
-        label: appliedFilters.createDate ? `Create date: ${appliedFilters.createDate}` : "Create date",
-        showDropdown: false,
-        onClick: () => setShowFilterSidebar(true),
-      },
-      {
-        id: "lastActivityDate",
-        label: appliedFilters.lastActivityDate
-          ? `Last activity date: ${appliedFilters.lastActivityDate}`
-          : "Last activity date",
-        showDropdown: false,
-        onClick: () => setShowFilterSidebar(true),
-      },
-      {
-        id: "priority",
-        label:
-          appliedFilters.priority === "All Priorities"
-            ? "Priority"
-            : `Priority: ${appliedFilters.priority}`,
-        showDropdown: false,
-        onClick: () => setShowFilterSidebar(true),
-      },
-      {
-        id: "more",
-        label: "More",
-        showDropdown: false,
-        onClick: () => setShowFilterSidebar(true),
-      },
-      {
-        id: "advanced",
-        label: "Advance filters",
-        showDropdown: false,
-        onClick: () => setShowFilterSidebar(true),
-      },
-    ],
-    [appliedFilters],
-  );
+  const crmTicketsFilterPills = useCrmTicketsFilterPills({
+    currentFilters,
+    onFiltersChange: handleFiltersChange,
+    extensions: ticketExtensions,
+  });
 
   const ticketsStatsCards = useMemo(
     () => [
       {
         title: "All Tickets",
-        value: tickets.length,
+        value: dashboardStats.total,
         icon: Layers,
         iconColor: "#6366F1",
         iconBgColor: "#EEF2FF",
       },
       {
         title: "Open Tickets",
-        value: tickets.filter((ticket) => ticket.ticket_status !== "Resolved").length,
+        value: dashboardStats.open,
         icon: AlertCircle,
         iconColor: "#F59E0B",
         iconBgColor: "#FEF3C7",
       },
       {
         title: "Unassigned",
-        value: tickets.filter((ticket) => ticket.ticket_owner === "Unassigned").length,
+        value: dashboardStats.unassigned,
         icon: User,
         iconColor: "#10B981",
         iconBgColor: "#D1FAE5",
       },
     ],
-    [tickets],
-  );
-
-  const visibleColumns = useMemo(
-    () => ticketsColumns.filter((column) => selectedColumns.includes(column.key)),
-    [ticketsColumns, selectedColumns],
+    [dashboardStats],
   );
 
   const handleFilterChange = useCallback((tabId: string) => {
@@ -594,46 +572,43 @@ const CrmTicketsPage = () => {
     setPagination((prev) => ({ ...prev, currentPage: 1 }));
   }, []);
 
+  const handleSearchChange = useCallback((value: string) => {
+    setSearchValue(value);
+    setPagination((prev) => ({ ...prev, currentPage: 1 }));
+  }, []);
+
   const ticketsToolbarConfig = useMemo(
-    () => ({
-      showSearch: true,
+    () =>
+      buildCrmTicketsTableToolbar({
+        searchValue,
+        onSearchChange: handleSearchChange,
+        ticketTabs,
+        activeTab,
+        onTabChange: handleFilterChange,
+        filterPills: crmTicketsFilterPills,
+        handleApplyFiltersClick,
+        handleResetFiltersClick,
+        hasUnappliedFilterChanges,
+        hasNonDefaultFilters,
+        rightActions: renderAddTicketsButton(),
+      }),
+    [
       searchValue,
-      searchPlaceholder: "Search tickets...",
-      onSearchChange: setSearchValue,
-      onSearch: () => {},
-      showTabs: true,
-      tabs: ticketTabs,
+      ticketTabs,
       activeTab,
-      onTabChange: handleFilterChange,
-      tabsDropdownLabel: "Tickets",
-      showFiltersButton: true,
-      onFiltersClick: () => setShowFilterSidebar(true),
-      showFilterPills: true,
-      filterPills,
-      showMoreFiltersButton: false,
-      showAdvancedFilters: true,
-      onAdvancedFiltersClick: () => setShowFilterSidebar(true),
-      showSortButton: true,
-      showExportButton: true,
-      onExportClick: () => console.info("Export is not wired yet."),
-      showEditColumns: true,
-      onEditColumnsClick: () => setShowColumnEditor(true),
-      showTableViewDropdown: true,
-      currentTableView: tableView,
-      onTableViewChange: setTableView,
-      showImport: true,
-      onImportClick: () => console.info("Import is not wired yet."),
-      rightActions: renderAddTicketsButton(),
-    }),
-    [searchValue, ticketTabs, activeTab, handleFilterChange, filterPills, tableView, renderAddTicketsButton],
+      handleFilterChange,
+      crmTicketsFilterPills,
+      handleApplyFiltersClick,
+      handleResetFiltersClick,
+      hasUnappliedFilterChanges,
+      hasNonDefaultFilters,
+      renderAddTicketsButton,
+      handleSearchChange,
+    ],
   );
 
   return (
-    <React.Fragment>
-      {/* <div style={{ padding: "12px 16px 0" }}>
-        <h4 style={{ margin: 0, fontSize: 20, fontWeight: 600, color: "#111827" }}>Tickets</h4>
-      </div> */}
-
+    <div className="crm-tickets-page">
       <div
         style={{
           display: "flex",
@@ -644,26 +619,24 @@ const CrmTicketsPage = () => {
       >
         <div className="tickets-scrollable-content" style={{ flex: 1 }}>
           <div className="container-fluid">
-            <div
-              className="tickets-table-wrapper"
-              style={{
-                flex: 1,
-                overflow: "hidden",
-                display: "flex",
-                flexDirection: "column",
-              }}
-            >
+            <div className="tickets-table-wrapper">
               <GenericTable
-                data={pagedData}
-                columns={visibleColumns}
-                showActions={false}
+                data={tickets}
+                columns={ticketsColumns}
+                showToolbarActions={false}
+                customizableColumns={true}
+                defaultSelectedColumns={DEFAULT_TICKET_TABLE_COLUMNS}
+                columnStorageKey="crm-tickets-columns-v2"
+                pinActionsColumn={true}
+                actions={ticketTableActions}
+                showActions={true}
                 sortable={true}
                 defaultSortBy="create_date"
                 defaultSortOrder="desc"
                 pagination={{
                   currentPage: pagination.currentPage,
                   rowsPerPage: pagination.rowsPerPage,
-                  totalRows: filteredData.length,
+                  totalRows: ticketsListTotal,
                   pageSizeOptions: [10, 15, 25, 50, 100],
                 }}
                 onPaginationChange={(page, rowsPerPage) => {
@@ -673,25 +646,21 @@ const CrmTicketsPage = () => {
                     rowsPerPage,
                   }));
                 }}
-                onSort={(column, direction) => {
-                  setPagination((prev) => ({
-                    ...prev,
-                    sortBy: column,
-                    sortOrder: direction,
-                  }));
-                }}
                 onPreviewClick={(row) => openPreviewSidebar(row)}
-                onFirstColumnClick={(row) =>
-                  openTicketDetailPage(row.id)
-                }
+                onFirstColumnClick={(row) => openPreviewSidebar(row)}
                 onRowDoubleClick={(row) => openPreviewSidebar(row)}
-                loading={false}
+                  loading={
+                    ticketsQuery.isLoading ||
+                    hierarchyQuery.isLoading ||
+                    statusesQuery.isLoading ||
+                    dashboardQuery.isLoading
+                  }
                 emptyMessage="No tickets found matching your criteria"
                 loadingMessage="Loading tickets..."
                 hover={true}
                 uniqueKey="id"
                 fixedHeight={true}
-                maxHeight="calc(100vh - 345px)"
+                  maxHeight="calc(100vh - 340px)"
                 showToolbar={true}
                 toolbar={ticketsToolbarConfig}
                 statsCards={ticketsStatsCards}
@@ -721,102 +690,47 @@ const CrmTicketsPage = () => {
               label: "Actions",
               items: [
                 {
-                  label: "View Ticket Detail",
-                  onClick: () => {
-                    handleCloseSidebar();
-                    openTicketDetailPage(selectedTicket.id);
-                  },
-                },
-                {
                   label: "Edit Ticket",
                   onClick: () => {
                     setShowTicketSidebar(false);
-                    setShowCreateTicketModal(true);
+                    openEditTicketModal(
+                      selectedTicket.id,
+                      selectedTicket.rawData,
+                    );
                   },
                 },
                 {
                   label: "Delete",
                   onClick: () => {
-                    console.info("Delete ticket", selectedTicket.id);
+                    DeleteTicket(String(selectedTicket.id))
+                      .then((deleted) => {
+                        if (deleted) {
+                          handleCloseSidebar();
+                          refreshTickets();
+                        }
+                      })
+                      .catch(() => undefined);
                   },
                 },
               ],
             }}
             sections={ticketSidebarSections}
-            recordLink={{
-              label: "View record",
-              onClick: () => {
-                handleCloseSidebar();
-                openTicketDetailPage(selectedTicket.id);
-              },
-            }}
           />
         )}
       </div>
 
-      <GenericFilterSidebar
-        isOpen={showFilterSidebar}
-        onClose={handleCloseFilterSidebar}
-        title="Filters"
-        subtitle="Filter tickets"
-        filters={advancedFilterFields}
-        onApply={handleApplyFilters}
-        onReset={handleResetFilters}
-        width="400px"
-        showApplyButton
-        showResetButton
-      />
-
-      <Modal show={showColumnEditor} onHide={() => setShowColumnEditor(false)} centered>
-        <Modal.Header closeButton>
-          <Modal.Title>Customize Columns</Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-          {ALL_COLUMNS.map((column) => {
-            const found = ticketsColumns.find((c) => c.key === column);
-            return (
-              <Form.Check
-                key={column}
-                type="checkbox"
-                className="mb-2"
-                label={found?.label || column}
-                checked={selectedColumns.includes(column)}
-                onChange={(e) => {
-                  handleColumnToggle(column, e.target.checked);
-                }}
-              />
-            );
-          })}
-        </Modal.Body>
-        <Modal.Footer>
-          <Button
-            variant="outline-secondary"
-            onClick={() => {
-              setSelectedColumns(ALL_COLUMNS);
-              persistSelectedColumns(ALL_COLUMNS);
-            }}
-          >
-            Reset
-          </Button>
-          <Button
-            variant="primary"
-            onClick={() => {
-              persistSelectedColumns(selectedColumns);
-              setShowColumnEditor(false);
-            }}
-          >
-            Apply
-          </Button>
-        </Modal.Footer>
-      </Modal>
-
       {showCreateTicketModal && (
         <CreateTicketSidebar
-          onClose={() => setShowCreateTicketModal(false)}
-          onSuccess={() => setShowCreateTicketModal(false)}
+          editTicketId={editingTicketId}
+          initialTicket={editingTicketInitial}
+          onClose={closeCreateTicketModal}
+          onSuccess={() => {
+            closeCreateTicketModal();
+            refreshTickets();
+          }}
         />
       )}
-    </React.Fragment>
+    </div>
   );
 };
 
