@@ -377,24 +377,33 @@ export function WorkloadReassignModal({
       <Modal.Body>
         {task ? (
           <>
-            <Form.Group className="mb-3">
-              <Form.Label className="small text-muted mb-1">Task</Form.Label>
-              <Form.Control plaintext readOnly value={task.title} className="fw-semibold px-0" />
-            </Form.Group>
-            <Form.Group>
-              <Form.Label>Select user</Form.Label>
-              <Form.Select
-                value={targetExtension}
-                onChange={(e) => onTargetChange(e.target.value)}
-              >
-                <option value="">Select member…</option>
-                {memberExtensions.map((ext) => (
-                  <option key={ext} value={ext}>
-                    {formatWorkloadMemberLabel(ext, hierarchyExtensions)}
-                  </option>
-                ))}
-              </Form.Select>
-            </Form.Group>
+            <div className="workload-reassign-modal__summary">
+              <div className="workload-reassign-modal__row">
+                <span className="workload-reassign-modal__label">Task</span>
+                <span className="workload-reassign-modal__value">{task.title}</span>
+              </div>
+              {targetExtension && memberName ? (
+                <div className="workload-reassign-modal__row">
+                  <span className="workload-reassign-modal__label">Assign to</span>
+                  <span className="workload-reassign-modal__value">{memberName}</span>
+                </div>
+              ) : (
+                <Form.Group className="mt-3">
+                  <Form.Label className="small text-muted mb-1">Select member</Form.Label>
+                  <Form.Select
+                    value={targetExtension}
+                    onChange={(e) => onTargetChange(e.target.value)}
+                  >
+                    <option value="">Select member…</option>
+                    {memberExtensions.map((ext) => (
+                      <option key={ext} value={ext}>
+                        {formatWorkloadMemberLabel(ext, hierarchyExtensions)}
+                      </option>
+                    ))}
+                  </Form.Select>
+                </Form.Group>
+              )}
+            </div>
             {overloadConfirm ? (
               <Alert variant="warning" className="small mt-3 mb-0">
                 {memberName || "This member"} is already overloaded for that day. Assign anyway?
