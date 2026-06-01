@@ -319,7 +319,6 @@
     border-top: none;
     border-radius: 0;
     border-bottom: 1px solid #eaf0f6;
-    overflow: hidden;
   }
 
   .workload-summary-card {
@@ -821,6 +820,10 @@
   .workload-cell-card--zero {
     background: #f9fafb;
     border-color: #e5e7eb;
+
+    .workload-cell__bar {
+      display: none;
+    }
   }
 
   .workload-cell-card--filled {
