@@ -1094,16 +1094,17 @@ background: #fff !important;
 
 .gt-filter-pill-active,
 .gt-filter-pill.gt-filter-pill-active {
-  background: #0066CC !important;
-  border-color: #0066CC !important;
-  color: #fff !important;
+  background: #eff6ff !important;
+  border-color: #bfdbfe !important;
+  color: #0066CC !important;
+  font-weight: 600 !important;
 }
 
 .gt-filter-pill-active:hover,
 .gt-filter-pill.gt-filter-pill-active:hover {
-  background: #0052A3 !important;
-  border-color: #0052A3 !important;
-  color: #ffffff !important;
+  background: #dbeafe !important;
+  border-color: #93c5fd !important;
+  color: #0052A3 !important;
 }
 
 .gt-filter-pill-value {
