@@ -1,7 +1,11 @@
 import '@assets/scss/datatable-style.scss';
+import '@page-modules/controlhub/users/usersTeamsTablePage.scss';
 import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import BreadcrumbItem from '@common/BreadcrumbItem';
 import { useUsersTeamsPanelChrome } from '@page-modules/controlhub/users/useUsersTeamsPanelChrome';
+import { UsersTeamsEmbeddedToolbar } from '@page-modules/controlhub/users/UsersTeamsEmbeddedToolbar';
+import { MainSettingsFormSidebar } from '@components/main-settings/MainSettingsFormSidebar';
+import { useMainSettingsFormSidebar } from '@components/main-settings/mainSettingsFormContext';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import GenericTable, { TableAction, TableColumn } from '@components/GenericTable';
 import { ListRoles, updateRole,deleteRole,addRole,BulkDeleteRoles, getUserTypes, getModules, getPermissionsByModule, updateSeverityLevel, cloneRank } from '@utils/roles';
@@ -16,14 +20,12 @@ import { normalizePagedListResponse } from '@utils/paginatedList';
 import { controlhubKeys } from "@query/keys";
 import { getParentUsers, assignRankBulk } from '@utils/users';
 import { buildUsersDirectoryPath } from '@utils/controlhub/usersNavigation';
-import { Copy, Users } from 'lucide-react';
+import { Copy, Eye, Pencil, Trash2, Users } from 'lucide-react';
 
 import '@assets/scss/common.scss';
 import SuccessfulModal from '@components/page-partials/SuccessfulModal'
 import FormModal from '@components/page-partials/FormModal'
 import ConfirmModal from '@components/page-partials/ConfirmModal'
-
-import { FiEdit, FiTrash2, FiEye } from 'react-icons/fi';
 import { HEADER_CONSTANTS } from '@constants/headerConstants';
 
 // Helper function to get badge colors based on severity level
@@ -62,8 +64,83 @@ interface RankRow {
     user_assigned_count?: number;
 }
 
+type BulkRankOption = { value: number | string; label: string };
+
+type BulkRankAssignmentFormFieldsProps = Readonly<{
+    rankOptionsForBulk: BulkRankOption[];
+    selectedRankForBulk: BulkRankOption | null;
+    onRankChange: (rank: BulkRankOption | null) => void;
+    isLoadingRanksForBulk: boolean;
+    userOptionsForBulk: SelectCheckBoxOption[];
+    selectedUsersForBulk: SelectCheckBoxOption[];
+    onUsersChange: (users: SelectCheckBoxOption[]) => void;
+    isLoadingUsersForBulk: boolean;
+}>;
+
+function BulkRankAssignmentFormFields({
+    rankOptionsForBulk,
+    selectedRankForBulk,
+    onRankChange,
+    isLoadingRanksForBulk,
+    userOptionsForBulk,
+    selectedUsersForBulk,
+    onUsersChange,
+    isLoadingUsersForBulk,
+}: BulkRankAssignmentFormFieldsProps) {
+    return (
+        <>
+            <div className="form-group mb-4">
+                <label htmlFor="bulk-assign-select-rank" className="fw-semibold d-flex align-items-center gap-2 form-label">
+                    Select Rank <span className="text-danger">*</span>
+                </label>
+                <Select
+                    inputId="bulk-assign-select-rank"
+                    options={rankOptionsForBulk}
+                    value={selectedRankForBulk}
+                    onChange={(opt) => onRankChange(opt as BulkRankOption | null)}
+                    placeholder="Select a rank..."
+                    isClearable
+                    isSearchable
+                    isLoading={isLoadingRanksForBulk}
+                    menuPortalTarget={typeof document !== 'undefined' ? document.body : null}
+                    styles={{ menuPortal: (base) => ({ ...base, zIndex: 100000 }) }}
+                />
+                <Form.Text className="text-muted d-flex align-items-center gap-1 form-text mt-2">
+                    <span style={{ fontSize: '0.813rem' }}>
+                        Select a single rank to assign to multiple users.
+                    </span>
+                </Form.Text>
+            </div>
+
+            <div className="form-group mb-4">
+                <label htmlFor="bulk-assign-select-users" className="fw-semibold d-flex align-items-center gap-2 form-label">
+                    Select Users <span className="text-danger">*</span>
+                </label>
+                <SelectCheckBox
+                    options={userOptionsForBulk}
+                    value={selectedUsersForBulk}
+                    onChange={(opts: MultiValue<SelectCheckBoxOption>) =>
+                        onUsersChange((opts ?? []) as SelectCheckBoxOption[])
+                    }
+                    placeholder="Search and select users..."
+                    isLoading={isLoadingUsersForBulk}
+                    isSearchable
+                    noOptionsMessage="No users match your search"
+                />
+                <Form.Text className="text-muted d-flex align-items-center gap-1 form-text mt-2">
+                    <span style={{ fontSize: '0.813rem' }}>
+                        Select multiple users to assign the selected rank. You can search to filter the list.
+                    </span>
+                </Form.Text>
+            </div>
+        </>
+    );
+}
+
 const RanksPanel = () => {
-    const { showBreadcrumb, breadcrumbMainLink } = useUsersTeamsPanelChrome('ranks-and-permissions');
+    const { showBreadcrumb, breadcrumbMainLink, embeddedInMainSettings } =
+        useUsersTeamsPanelChrome('ranks-and-permissions');
+    const preferFormSidebar = useMainSettingsFormSidebar();
     const { data: session } = useSession();
     const router = useRouter();
     const queryClient = useQueryClient();
@@ -154,56 +231,32 @@ const RanksPanel = () => {
                 render: (props) => {
                     const severityCounts = props.severity_counts || {};
                     const severityLevels = ['Low', 'Medium', 'High', 'Critical'];
-                    
+
                     return (
-                        <div className="d-flex align-items-center" style={{ marginLeft: '0' }}>
-                            {severityLevels.map((level, index) => {
+                        <div className="ranks-severity-badges">
+                            {severityLevels.map((level) => {
                                 const count = severityCounts[level] || 0;
-                                
                                 const colors = getSeverityBadgeColors(level);
-                                
+
                                 return (
                                     <OverlayTrigger
                                         key={level}
                                         placement="top"
-                                        overlay={<Tooltip id={`tooltip-${level}`}>{level}: {count}</Tooltip>}
+                                        overlay={
+                                            <Tooltip id={`tooltip-${level}-${props.id}`}>
+                                                {level}: {count}
+                                            </Tooltip>
+                                        }
                                     >
-                                        <span 
-                                            className="position-relative d-inline-flex align-items-center justify-content-center"
-                                            style={{ 
-                                                minWidth: '32px',
-                                                height: '32px',
-                                                padding: '0 8px',
-                                                borderRadius: '16px',
-                                                marginLeft: '2px',
-                                                cursor: 'help',
-                                                border: '2px solid white',
-                                                backgroundColor: colors.bg,
-                                                color: colors.text,
-                                                fontSize: '11px',
-                                                fontWeight: '700',
-                                                zIndex: severityLevels.length - index,
-                                                boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-                                                whiteSpace: 'nowrap'
+                                        <span
+                                            className="ranks-severity-badge"
+                                            style={{
+                                                ['--ranks-severity-bg' as string]: colors.bg,
+                                                ['--ranks-severity-text' as string]: colors.text,
                                             }}
                                         >
-                                            {level}
-                                            <span 
-                                                className="position-absolute top-0 end-0 translate-middle d-inline-flex align-items-center justify-content-center"
-                                                style={{
-                                                    backgroundColor: colors.bg,
-                                                    color: colors.text,
-                                                    fontSize: '10px',
-                                                    fontWeight: '600',
-                                                    width: '16px',
-                                                    height: '16px',
-                                                    borderRadius: '50%',
-                                                    border: '1.5px solid white',
-                                                    lineHeight: '1'
-                                                }}
-                                            >
-                                                {count}
-                                            </span>
+                                            <span className="ranks-severity-badge__label">{level}</span>
+                                            <span className="ranks-severity-badge__count">{count}</span>
                                         </span>
                                     </OverlayTrigger>
                                 );
@@ -228,6 +281,7 @@ const RanksPanel = () => {
                     label: 'Assigned Users',
                     accessor: (row: RankRow) => row.user_assigned_count || 0,
                     sortable: true,
+                    align: 'center',
                     render: (props: RankRow) => (
                         <div>
                             <span className="status-badge primary">
@@ -395,7 +449,6 @@ const RanksPanel = () => {
     const [isLoadingUsersForBulk, setIsLoadingUsersForBulk] = useState<boolean>(false);
     const [isLoadingRanksForBulk, setIsLoadingRanksForBulk] = useState<boolean>(false);
     const [isSubmittingBulkAssignment, setIsSubmittingBulkAssignment] = useState<boolean>(false);
-    const [userSearchInput, setUserSearchInput] = useState<string>('');
     const [modules, setModules] = useState<any[]>([]);
     const [selectedModuleId, setSelectedModuleId] = useState<number | null>(null);
     const [permissions, setPermissions] = useState<any[]>([]);
@@ -438,7 +491,6 @@ const RanksPanel = () => {
         setShowBulkRankAssignmentModal(true);
         setSelectedUsersForBulk([]);
         setSelectedRankForBulk(null);
-        setUserSearchInput('');
         await fetchAllUsersForBulk();
         await fetchAllRanksForBulk();
     };
@@ -461,7 +513,6 @@ const RanksPanel = () => {
                 setShowBulkRankAssignmentModal(false);
                 setSelectedUsersForBulk([]);
                 setSelectedRankForBulk(null);
-                setUserSearchInput('');
                 setSuccessModalTitle('Ranks Assigned');
                 setSuccessModalDescription(`${selectedUsersForBulk.length} user(s) have been assigned the rank successfully`);
                 setTimeout(() => {
@@ -480,7 +531,6 @@ const RanksPanel = () => {
         setShowBulkRankAssignmentModal(false);
         setSelectedUsersForBulk([]);
         setSelectedRankForBulk(null);
-        setUserSearchInput('');
     };
 
     // Prepare user options for SelectCheckBox
@@ -586,68 +636,69 @@ const RanksPanel = () => {
 
     const tableActions = useMemo<TableAction<RankRow>[]>(() => {
         const actions: TableAction<RankRow>[] = [];
+        const permissions = session?.user?.permissions ?? [];
 
-        if (session?.user?.permissions?.includes('edit-ranks')) {
+        if (permissions.includes('edit-ranks')) {
             actions.push({
                 label: 'Edit',
-                icon: <FiEdit size={16} />,
+                icon: <Pencil size={22} aria-hidden />,
                 variant: 'light',
                 className: 'btn-action-style-2 p-1 text-primary',
-                onClick: (row: RankRow) => handleEditRank(row),
+                onClick: (row) => handleEditRank(row),
             });
         }
 
-        if (session?.user?.permissions?.includes('add-ranks')) {
+        if (permissions.includes('add-ranks')) {
             actions.push({
                 label: 'Clone Rank',
-                icon: <Copy size={16} />,
+                icon: <Copy size={22} aria-hidden />,
                 variant: 'light',
                 className: 'btn-action-style-2 p-1 text-info',
-                onClick: (row: RankRow) => handleCloneRank(row),
+                onClick: (row) => handleCloneRank(row),
             });
         }
 
-        if (session?.user?.permissions?.includes('view-permissions-ranks')) {
+        if (permissions.includes('view-permissions-ranks')) {
             actions.push({
                 label: 'View Permissions',
-                icon: <FiEye size={16} />,
+                icon: <Eye size={22} aria-hidden />,
                 variant: 'light',
                 className: 'btn-action-style-2 p-1 text-success',
-                onClick: (row: RankRow) => {
+                onClick: (row) => {
                     globalThis.location.href = `/controlhub/ranks/permissions/${row.id}`;
                 },
             });
         }
 
-        if (session?.user?.permissions?.includes('assign-permissions-ranks')) {
+        if (permissions.includes('assign-permissions-ranks')) {
             actions.push({
                 label: 'Assign Permissions',
-                icon: <FiEdit size={16} />,
+                icon: <Pencil size={22} aria-hidden />,
                 variant: 'light',
                 className: 'btn-action-style-2 p-1 text-warning',
-                onClick: (row: RankRow) => {
+                onClick: (row) => {
                     globalThis.location.href = `/controlhub/ranks/permissions/edit/${row.id}`;
                 },
             });
         }
 
-        if (session?.user?.permissions?.includes('delete-ranks')) {
+        if (permissions.includes('delete-ranks')) {
             actions.push({
                 label: 'Delete',
-                icon: <FiTrash2 size={16} />,
+                icon: <Trash2 size={22} aria-hidden />,
                 variant: 'light',
                 className: 'btn-action-style-2 p-1 text-danger',
-                onClick: (row: RankRow) => handleDeleteRank(row),
+                onClick: (row) => handleDeleteRank(row),
             });
         }
 
         if (session?.user?.is_admin === '1') {
             actions.push({
                 label: 'View Users',
-                icon: <FiEye size={16} />,
+                icon: <Users size={22} aria-hidden />,
                 variant: 'light',
                 className: 'btn-action-style-2 p-1 text-secondary',
-                onClick: (row: RankRow) => {
+                onClick: (row) => {
                     router.push(buildUsersDirectoryPath({ role_id: row.id }));
                 },
             });
@@ -656,8 +707,34 @@ const RanksPanel = () => {
         return actions;
     }, [router, session?.user?.is_admin, session?.user?.permissions]);
 
+    const ranksToolbarActions = (
+        <>
+            {session?.user?.permissions?.includes('add-ranks') ? (
+                <Button variant="primary" type="button" onClick={handleOpenCreateRankModal}>
+                    Add Rank
+                </Button>
+            ) : null}
+            {session?.user?.permissions?.includes('bulk-assign-ranks') ? (
+                <Button variant="danger" type="button" onClick={handleBulkRankAssignment}>
+                    Bulk Rank Assignment
+                </Button>
+            ) : null}
+            {session?.user?.is_admin === '1' ? (
+                <Button variant="outline-primary" type="button" onClick={handleOpenSeverityLevelModal}>
+                    Severity Level
+                </Button>
+            ) : null}
+        </>
+    );
+
+    const handleRanksSearchChange = (value: string) => {
+        setSearchValue(value);
+        setCurrentPage(1);
+    };
+
     return (
-        <React.Fragment>
+        <div className={embeddedInMainSettings ? 'users-teams-settings-panel' : undefined}>
+            <div className="users-teams-table-page users-teams-table-page--ranks">
             {showBreadcrumb ? (
                 <BreadcrumbItem
                     mainTitle="Controlhub"
@@ -665,41 +742,30 @@ const RanksPanel = () => {
                     subTitle={HEADER_CONSTANTS.SUBMENU_LABELS.RANKS}
                 />
             ) : null}
-            
 
-<Row className="mb-3">
-            <Col md={12}>
-                <div className="page-header-title style-2">
-                <Row className="d-flex justify-content-between align-items-center">
-                    <Col md={4}>
-                     
-                      {/* <h2 className="mb-0">{HEADER_CONSTANTS.SUBMENU_LABELS.RANKS}</h2> */}
-                    </Col>
-
-
-                    <Col md={8} className="d-flex justify-content-end">
-                      
-                    <div className="action-buttons">
-                    {session?.user?.permissions?.includes('add-ranks') && (
-                        <Button variant="primary"  onClick={handleOpenCreateRankModal}>Add Rank</Button>
-                    )}
-                    {session?.user?.permissions?.includes('bulk-assign-ranks') && (
-                        <Button variant="danger"  onClick={handleBulkRankAssignment}>Bulk Rank Assignment</Button>
-                    )}
-                    {session?.user?.is_admin === "1" && (
-                        <Button variant="outline-primary" className="ms-2" onClick={handleOpenSeverityLevelModal}>Severity Level</Button>
-                    )}
-                    </div>
-
-
-
-                    </Col>
-                  </Row>
-               
-                
+            {embeddedInMainSettings ? (
+                <div className="users-teams-settings-page">
+                    <UsersTeamsEmbeddedToolbar
+                        searchValue={searchValue}
+                        onSearchChange={handleRanksSearchChange}
+                        searchPlaceholder="Search ranks..."
+                        actions={ranksToolbarActions}
+                    />
                 </div>
-            </Col>
-            </Row>
+            ) : (
+                <Row className="mb-3">
+                    <Col md={12}>
+                        <div className="page-header-title style-2">
+                            <Row className="d-flex justify-content-between align-items-center">
+                                <Col md={4} />
+                                <Col md={8} className="d-flex justify-content-end">
+                                    <div className="action-buttons">{ranksToolbarActions}</div>
+                                </Col>
+                            </Row>
+                        </div>
+                    </Col>
+                </Row>
+            )}
 
             {rowSelectionEnabled && selectedRows.length > 0 && (
                 <Row className="mb-3">
@@ -723,7 +789,7 @@ const RanksPanel = () => {
                     loading={isTableLoading}
                     actions={tableActions}
                     showActions={tableActions.length > 0}
-                    actionsLabel="Action"
+                    actionsLabel="Actions"
                     uniqueKey="id"
                     selectable={rowSelectionEnabled}
                     selectedRows={selectedRows}
@@ -738,24 +804,24 @@ const RanksPanel = () => {
                         setCurrentPage(page);
                         setRowsPerPage(perPage);
                     }}
-                    showToolbar
-                    toolbar={{
-                        showSearch: true,
-                        searchValue,
-                        searchPlaceholder: 'Search ranks...',
-                        onSearchChange: (value) => {
-                            setSearchValue(value);
-                            setCurrentPage(1);
-                        },
-                    }}
+                    showToolbar={!embeddedInMainSettings}
+                    toolbar={
+                        embeddedInMainSettings
+                            ? undefined
+                            : {
+                                  showSearch: true,
+                                  searchValue,
+                                  searchPlaceholder: 'Search ranks...',
+                                  onSearchChange: handleRanksSearchChange,
+                              }
+                    }
                     showToolbarActions={false}
                     emptyMessage="No ranks found"
                     hover
                     size="md"
                 />
             )}
-
-           
+            </div>
 
             <FormModal
                 show={showEditRankModal}
@@ -1017,90 +1083,118 @@ const RanksPanel = () => {
                 }}
             />
 
-            {/* Bulk Rank Assignment Modal */}
-            <Modal
-                show={showBulkRankAssignmentModal}
-                onHide={handleCloseBulkRankAssignmentModal}
-                size="lg"
-            >
-                <Modal.Header closeButton>
-                    <Modal.Title className="d-flex align-items-center gap-2">
-                        <Users size={20} className="text-danger" />
-                        Bulk Rank Assignment
-                    </Modal.Title>
-                </Modal.Header>
-                <Modal.Body>
-                    <div className="form-group mb-4">
-                        <label htmlFor="selectRank" className="fw-semibold d-flex align-items-center gap-2 form-label">
-                            Select Rank <span className="text-danger">*</span>
-                        </label>
-                        <Select
-                            options={rankOptionsForBulk}
-                            value={selectedRankForBulk}
-                            onChange={(opt) => setSelectedRankForBulk(opt as { value: number | string; label: string } | null)}
-                            placeholder="Select a rank..."
-                            isClearable={true}
-                            isSearchable={true}
-                            isLoading={isLoadingRanksForBulk}
+            {preferFormSidebar ? (
+                <MainSettingsFormSidebar
+                    show={showBulkRankAssignmentModal}
+                    onHide={handleCloseBulkRankAssignmentModal}
+                    title="Bulk Rank Assignment"
+                    titleIcon={<Users size={22} className="text-danger" aria-hidden />}
+                    disableClose={isSubmittingBulkAssignment}
+                    footer={
+                        <div className="main-settings-form-sidebar-footer">
+                            <div className="main-settings-form-sidebar-footer__actions">
+                                <Button
+                                    variant="outline-secondary"
+                                    type="button"
+                                    className="contact-form-btn-cancel"
+                                    onClick={handleCloseBulkRankAssignmentModal}
+                                    disabled={isSubmittingBulkAssignment}
+                                >
+                                    Cancel
+                                </Button>
+                                <Button
+                                    variant="danger"
+                                    type="button"
+                                    className="contact-form-btn-create"
+                                    onClick={handleBulkRankAssignmentSubmit}
+                                    disabled={
+                                        !selectedRankForBulk ||
+                                        selectedUsersForBulk.length === 0 ||
+                                        isSubmittingBulkAssignment
+                                    }
+                                >
+                                    {isSubmittingBulkAssignment ? (
+                                        <>
+                                            <output className="spinner-border spinner-border-sm me-1" aria-live="polite">
+                                                <span className="visually-hidden">Assigning...</span>
+                                            </output>
+                                            Assigning...
+                                        </>
+                                    ) : (
+                                        <>Assign Rank to {selectedUsersForBulk.length} User(s)</>
+                                    )}
+                                </Button>
+                            </div>
+                        </div>
+                    }
+                >
+                    <BulkRankAssignmentFormFields
+                        rankOptionsForBulk={rankOptionsForBulk}
+                        selectedRankForBulk={selectedRankForBulk}
+                        onRankChange={setSelectedRankForBulk}
+                        isLoadingRanksForBulk={isLoadingRanksForBulk}
+                        userOptionsForBulk={userOptionsForBulk}
+                        selectedUsersForBulk={selectedUsersForBulk}
+                        onUsersChange={setSelectedUsersForBulk}
+                        isLoadingUsersForBulk={isLoadingUsersForBulk}
+                    />
+                </MainSettingsFormSidebar>
+            ) : (
+                <Modal
+                    show={showBulkRankAssignmentModal}
+                    onHide={handleCloseBulkRankAssignmentModal}
+                    size="lg"
+                >
+                    <Modal.Header closeButton>
+                        <Modal.Title className="d-flex align-items-center gap-2">
+                            <Users size={22} className="text-danger" />
+                            Bulk Rank Assignment
+                        </Modal.Title>
+                    </Modal.Header>
+                    <Modal.Body>
+                        <BulkRankAssignmentFormFields
+                            rankOptionsForBulk={rankOptionsForBulk}
+                            selectedRankForBulk={selectedRankForBulk}
+                            onRankChange={setSelectedRankForBulk}
+                            isLoadingRanksForBulk={isLoadingRanksForBulk}
+                            userOptionsForBulk={userOptionsForBulk}
+                            selectedUsersForBulk={selectedUsersForBulk}
+                            onUsersChange={setSelectedUsersForBulk}
+                            isLoadingUsersForBulk={isLoadingUsersForBulk}
                         />
-                        <Form.Text className="text-muted d-flex align-items-center gap-1 form-text mt-2">
-                            <span style={{ fontSize: '0.813rem' }}>
-                                Select a single rank to assign to multiple users.
-                            </span>
-                        </Form.Text>
-                    </div>
-
-                    <div className="form-group mb-4">
-                        <label htmlFor="selectUsers" className="fw-semibold d-flex align-items-center gap-2 form-label">
-                            Select Users <span className="text-danger">*</span>
-                        </label>
-                        <SelectCheckBox
-                            options={userOptionsForBulk}
-                            value={selectedUsersForBulk}
-                            onChange={(opts: MultiValue<SelectCheckBoxOption>) =>
-                                setSelectedUsersForBulk((opts ?? []) as SelectCheckBoxOption[])
+                    </Modal.Body>
+                    <Modal.Footer>
+                        <Button
+                            variant="secondary"
+                            onClick={handleCloseBulkRankAssignmentModal}
+                            disabled={isSubmittingBulkAssignment}
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            variant="danger"
+                            onClick={handleBulkRankAssignmentSubmit}
+                            disabled={
+                                !selectedRankForBulk ||
+                                selectedUsersForBulk.length === 0 ||
+                                isSubmittingBulkAssignment
                             }
-                            placeholder="Select users to assign rank..."
-                            isLoading={isLoadingUsersForBulk}
-                            inputValue={userSearchInput}
-                            onInputChange={(newValue: string, action: { action: string }) => {
-                                if (action.action !== 'input-blur' && action.action !== 'menu-close') {
-                                    setUserSearchInput(newValue);
-                                }
-                            }}
-                        />
-                        <Form.Text className="text-muted d-flex align-items-center gap-1 form-text mt-2">
-                            <span style={{ fontSize: '0.813rem' }}>
-                                Select multiple users to assign the selected rank. You can search to filter the list.
-                            </span>
-                        </Form.Text>
-                    </div>
-                </Modal.Body>
-                <Modal.Footer>
-                    <Button variant="secondary" onClick={handleCloseBulkRankAssignmentModal} disabled={isSubmittingBulkAssignment}>
-                        Cancel
-                    </Button>
-                    <Button 
-                        variant="danger" 
-                        onClick={handleBulkRankAssignmentSubmit}
-                        disabled={!selectedRankForBulk || selectedUsersForBulk.length === 0 || isSubmittingBulkAssignment}
-                    >
-                        {isSubmittingBulkAssignment ? (
-                            <>
-                                <output className="spinner-border spinner-border-sm me-1" aria-live="polite">
-                                    <span className="visually-hidden">Assigning...</span>
-                                </output>
-                                Assigning...
-                            </>
-                        ) : (
-                            <>
-                                Assign Rank to {selectedUsersForBulk.length} User(s)
-                            </>
-                        )}
-                    </Button>
-                </Modal.Footer>
-            </Modal>
-        </React.Fragment>
+                        >
+                            {isSubmittingBulkAssignment ? (
+                                <>
+                                    <output className="spinner-border spinner-border-sm me-1" aria-live="polite">
+                                        <span className="visually-hidden">Assigning...</span>
+                                    </output>
+                                    Assigning...
+                                </>
+                            ) : (
+                                <>Assign Rank to {selectedUsersForBulk.length} User(s)</>
+                            )}
+                        </Button>
+                    </Modal.Footer>
+                </Modal>
+            )}
+        </div>
     );
 };
 

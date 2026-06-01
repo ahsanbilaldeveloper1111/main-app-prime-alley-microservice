@@ -239,7 +239,7 @@ const UsersList: React.FC<UsersListProps> = ({
     () => ({
       showSearch: true,
       searchValue: searchInput,
-      searchPlaceholder: "Type ( Extension, User Name, Display Name )",
+      searchPlaceholder: "Search users...",
       onSearchChange: handleSearchChange,
       onSearch: flushSearchToFilters,
       showFiltersButton: showFilters,

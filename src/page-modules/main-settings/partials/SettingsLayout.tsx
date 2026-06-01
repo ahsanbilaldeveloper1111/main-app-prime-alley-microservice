@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react'
 import { Menu } from 'lucide-react'
+import { MainSettingsFormProvider } from '@components/main-settings/mainSettingsFormContext'
 import Sidebar from './Sidebar'
 import './main-settings-layout.scss'
 
@@ -38,6 +39,7 @@ const SettingsLayout: React.FC<SettingsLayoutProps> = ({
   }, [mobileNavOpen])
 
   return (
+    <MainSettingsFormProvider>
     <div className="main-settings-root">
         {mobileNavOpen ? (
           <button
@@ -68,6 +70,7 @@ const SettingsLayout: React.FC<SettingsLayoutProps> = ({
           {children}
         </main>
     </div>
+    </MainSettingsFormProvider>
   )
 }
 

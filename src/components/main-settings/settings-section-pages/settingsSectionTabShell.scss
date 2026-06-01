@@ -101,25 +101,12 @@
   min-width: 0;
   width: 100%;
 
-  &__mobile-select {
-    width: 100%;
-    margin-bottom: clamp(12px, 2vw, 20px);
-  }
-
-  &__desktop {
+  &__tabs {
+    display: flex;
     align-items: flex-end;
     gap: 0;
     width: 100%;
     min-width: 0;
-  }
-
-  @media (max-width: 767.98px) {
-    &.settings-section-shell__tab-bar,
-    &.ai-chatbot-settings__inner-tab-bar {
-      border-bottom: none;
-      margin-bottom: 0;
-      overflow: visible;
-    }
   }
 
   &__scroll {
@@ -183,5 +170,14 @@
     min-height: var(--ms-tab-btn-height);
     padding-top: 0;
     padding-bottom: 0;
+  }
+
+  @media (max-width: 767.98px) {
+    .settings-section-shell__tab-btn,
+    .ai-chatbot-settings__inner-tab-btn {
+      font-size: var(--ms-font-sm);
+      --ms-tab-btn-padding-x: clamp(8px, 2vw, 14px);
+      --ms-tab-btn-padding-y: clamp(8px, 1.5vw, 10px);
+    }
   }
 }

@@ -1,6 +1,5 @@
-import React, { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
-import { Form } from 'react-bootstrap'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 
 export type MainSettingsOverflowTabItem = Readonly<{
@@ -53,7 +52,6 @@ export const MainSettingsOverflowTabBar: React.FC<MainSettingsOverflowTabBarProp
   tabRowStyle,
   getTabButtonStyle,
 }) => {
-  const mobileSelectId = useId()
   const scrollRef = useRef<HTMLDivElement>(null)
   const tabRowRef = useRef<HTMLDivElement>(null)
   const [canScrollLeft, setCanScrollLeft] = useState(false)
@@ -191,23 +189,7 @@ export const MainSettingsOverflowTabBar: React.FC<MainSettingsOverflowTabBarProp
         .join(' ')}
       style={{ ...tabBarStyle, ...tabBarCssVars }}
     >
-      <div className="main-settings-overflow-tab-bar__mobile-select d-md-none">
-        <Form.Select
-          id={mobileSelectId}
-          className="main-settings-form-select"
-          value={activeTabId}
-          aria-label="Select section"
-          onChange={(event) => onSelect(event.target.value)}
-        >
-          {tabs.map((tab) => (
-            <option key={tab.id} value={tab.id}>
-              {tab.label}
-            </option>
-          ))}
-        </Form.Select>
-      </div>
-
-      <div className="main-settings-overflow-tab-bar__desktop d-none d-md-flex">
+      <div className="main-settings-overflow-tab-bar__tabs">
         {showNav ? (
           <button
             type="button"

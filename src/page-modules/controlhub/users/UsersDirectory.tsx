@@ -1,4 +1,5 @@
 import '@assets/scss/datatable-style.scss';
+import '@page-modules/controlhub/users/usersDirectoryPage.scss';
 import React, { useState, useCallback } from 'react';
 import BreadcrumbItem from '@common/BreadcrumbItem';
 import { useSession } from 'next-auth/react';
@@ -19,6 +20,7 @@ import { useUsersData } from '@hooks/controlhub/users/useUsersData';
 import { useLdapSync } from '@hooks/controlhub/users/useLdapSync';
 import { useUserModal } from '@hooks/controlhub/users/useUserModal';
 import { useUsersTeamsPanelChrome } from '@page-modules/controlhub/users/useUsersTeamsPanelChrome';
+import { MainSettingsFormProvider } from '@components/main-settings/mainSettingsFormContext';
 
 const UsersDirectory = () => {
   const { data: session } = useSession();
@@ -90,11 +92,13 @@ const UsersDirectory = () => {
   const { showUserModal, selectedUsers, closeUserModal } = useUserModal();
 
   return (
+    <MainSettingsFormProvider preferSidebarForms>
     <ProtectedRoute requiredPermissions={['view-users']}>
       {showBreadcrumb ? (
         <BreadcrumbItem mainTitle="Controlhub" mainLink={breadcrumbMainLink} subTitle="Users" />
       ) : null}
 
+      <div className="users-directory-page">
       <UsersHeader syncLdapUsers={syncLdapUsers} />
 
       <div className="tab-content">
@@ -109,6 +113,7 @@ const UsersDirectory = () => {
             hasListPermission={session?.user?.permissions?.includes('list-users') || false}
           />
         </div>
+      </div>
       </div>
 
       <UserDetailsModal
@@ -139,6 +144,7 @@ const UsersDirectory = () => {
         onSuccess={handleAfterStatusChange}
       />
     </ProtectedRoute>
+    </MainSettingsFormProvider>
   );
 };
 

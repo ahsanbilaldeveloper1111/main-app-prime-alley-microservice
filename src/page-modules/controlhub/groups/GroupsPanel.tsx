@@ -1,7 +1,9 @@
 import '@assets/scss/datatable-style.scss';
+import '@page-modules/controlhub/users/usersTeamsTablePage.scss';
 import React, { useState, useCallback, useMemo, useRef } from 'react';
 import BreadcrumbItem from '@common/BreadcrumbItem';
 import { useUsersTeamsPanelChrome } from '@page-modules/controlhub/users/useUsersTeamsPanelChrome';
+import { UsersTeamsEmbeddedToolbar } from '@page-modules/controlhub/users/UsersTeamsEmbeddedToolbar';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import GenericTable, { TableAction, TableColumn } from '@components/GenericTable';
 import {ListGroups, updateGroup,deleteGroup,addGroup, addTeamsToGroup, removeTeamsFromGroup, getGroupTeams, addModulesToGroup, removeModulesFromGroup, getGroupModules } from '@utils/groups';
@@ -24,7 +26,8 @@ import type { GroupRow } from "@typings/controlhub/groups";
 import type { NormalizedPagedList } from "@utils/paginatedList";
 
 const GroupsPanel = () => {
-    const { showBreadcrumb, breadcrumbMainLink } = useUsersTeamsPanelChrome('management-groups');
+    const { showBreadcrumb, breadcrumbMainLink, embeddedInMainSettings } =
+        useUsersTeamsPanelChrome('management-groups');
     const { data: session } = useSession();
     const queryClient = useQueryClient();
 
@@ -603,44 +606,48 @@ const GroupsPanel = () => {
         );
     }
 
+    const canAddGroup = session?.user?.permissions?.includes('add-groups') ?? false;
+    const addGroupButton = canAddGroup ? (
+        <Button variant="primary" type="button" onClick={() => setShowCreateGroupModal(true)}>
+            Add Group
+        </Button>
+    ) : null;
+
+    const handleGroupsSearchChange = (value: string) => {
+        setSearchValue(value);
+        setCurrentPage(1);
+    };
+
     return (
-        <React.Fragment>
+        <div className={embeddedInMainSettings ? 'users-teams-settings-panel' : undefined}>
+            <div className="users-teams-table-page users-teams-table-page--management-groups">
             {showBreadcrumb ? (
                 <BreadcrumbItem mainTitle="Controlhub" mainLink={breadcrumbMainLink} subTitle="Groups" />
             ) : null}
-            
 
-            <Row className="mb-3">
-            <Col md={12}>
-                <div className="page-header-title style-2">
-                <Row className="d-flex justify-content-between align-items-center">
-                    <Col md={4}>
-                      
-                      {/* <h2 className="mb-0">Groups</h2> */}
-                    </Col>
-
-
-                    <Col md={8} className="d-flex justify-content-end">
-                      
-                    <div className="action-buttons">
-                    
-                    {session?.user?.permissions?.includes('add-groups') && (
-                        <Button variant="primary"   onClick={() => setShowCreateGroupModal(true)}>Add Group</Button>
-                    )}
-                    </div>
-
-
-
-                    </Col>
-                  </Row>
-               
-                
+            {embeddedInMainSettings ? (
+                <div className="users-teams-settings-page">
+                    <UsersTeamsEmbeddedToolbar
+                        searchValue={searchValue}
+                        onSearchChange={handleGroupsSearchChange}
+                        searchPlaceholder="Search groups..."
+                        actions={addGroupButton}
+                    />
                 </div>
-            </Col>
-            </Row>
-
-
-
+            ) : (
+                <Row className="mb-3">
+                    <Col md={12}>
+                        <div className="page-header-title style-2">
+                            <Row className="d-flex justify-content-between align-items-center">
+                                <Col md={4} />
+                                <Col md={8} className="d-flex justify-content-end">
+                                    <div className="action-buttons">{addGroupButton}</div>
+                                </Col>
+                            </Row>
+                        </div>
+                    </Col>
+                </Row>
+            )}
 
             <GenericTable<GroupRow>
                 data={tableData}
@@ -660,21 +667,23 @@ const GroupsPanel = () => {
                     setCurrentPage(page);
                     setRowsPerPage(perPage);
                 }}
-                showToolbar
-                toolbar={{
-                    showSearch: true,
-                    searchValue,
-                    searchPlaceholder: 'Search groups...',
-                    onSearchChange: (value) => {
-                        setSearchValue(value);
-                        setCurrentPage(1);
-                    },
-                }}
+                showToolbar={!embeddedInMainSettings}
+                toolbar={
+                    embeddedInMainSettings
+                        ? undefined
+                        : {
+                              showSearch: true,
+                              searchValue,
+                              searchPlaceholder: 'Search groups...',
+                              onSearchChange: handleGroupsSearchChange,
+                          }
+                }
                 showToolbarActions={false}
                 emptyMessage="No groups found"
                 hover
                 size="md"
             />
+            </div>
 
             <FormModal
                 show={showEditGroupModal}
@@ -956,7 +965,7 @@ const GroupsPanel = () => {
                 requireTextConfirmation={true}
                 requiredConfirmationText="remove"
             />
-        </React.Fragment>
+        </div>
     );
 };
 

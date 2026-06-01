@@ -125,8 +125,126 @@ $add-form-dialog-padding: clamp(16px, 4vw, 32px);
   &__footer {
     padding: $add-form-sidebar-footer-padding !important;
     box-sizing: border-box;
-    flex-wrap: wrap;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    flex-shrink: 0;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    overflow-x: hidden;
     gap: 10px;
+    border-top: 1px solid #eaf0f6;
+    background: #fff;
+  }
+}
+
+// Footer actions inside Main Settings side panels — prevent horizontal overflow.
+.main-settings-form-sidebar-footer {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+
+  .form-text {
+    min-width: 0;
+  }
+}
+
+.main-settings-form-sidebar-footer__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+
+  .btn,
+  button {
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+
+  .contact-form-btn-create,
+  .contact-form-btn-cancel {
+    flex: 1 1 calc(50% - 4px);
+    min-width: min(100%, 120px);
+
+    @media (min-width: 400px) {
+      flex: 0 1 auto;
+    }
+  }
+}
+
+.main-settings-form-sidebar {
+  overflow-x: hidden;
+
+  .main-settings-form-sidebar__footer {
+    > * {
+      width: 100%;
+      min-width: 0;
+      max-width: 100%;
+      box-sizing: border-box;
+    }
+
+    .d-flex.justify-content-end,
+    .d-flex.justify-content-between {
+      flex-wrap: wrap !important;
+      justify-content: flex-end !important;
+      gap: 8px;
+      width: 100%;
+      min-width: 0;
+      max-width: 100%;
+    }
+
+    .industries-modal-footer-hint-row {
+      flex-wrap: wrap !important;
+      align-items: flex-start;
+      gap: 10px;
+
+      .industries-form-hint-text {
+        min-width: 0;
+        flex: 1 1 100%;
+      }
+    }
+
+    .industries-crm-dialog-footer,
+    .industries-crm-dialog-footer--nowrap {
+      flex-wrap: wrap !important;
+      justify-content: flex-end;
+      width: 100%;
+      min-width: 0;
+      max-width: 100%;
+      margin-left: auto;
+    }
+
+    .industries-crm-btn-primary--min148,
+    .industries-crm-btn-primary--min170 {
+      min-width: 0;
+      flex: 1 1 calc(50% - 4px);
+      max-width: 100%;
+
+      @media (min-width: 400px) {
+        flex: 0 1 auto;
+        min-width: min(148px, 100%);
+      }
+    }
+
+    .industries-crm-btn-secondary {
+      flex: 1 1 calc(50% - 4px);
+      max-width: 100%;
+
+      @media (min-width: 400px) {
+        flex: 0 1 auto;
+      }
+    }
   }
 }
 

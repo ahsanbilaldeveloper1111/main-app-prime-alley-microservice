@@ -2,6 +2,7 @@
 @import '../../../components/main-settings/smartCrmSettingsPanel.scss';
 @import '../../../components/main-settings/workforceSettingsPanel.scss';
 @import '../../../components/main-settings/ticketsSettingsPanel.scss';
+@import '../../../components/main-settings/usersTeamsSettingsPanel.scss';
 
 $main-settings-sidebar-width: 240px;
 $main-settings-layout-breakpoint-mobile: 767.98px;
@@ -275,7 +276,35 @@ $main-settings-select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.
   @media (max-width: $main-settings-layout-breakpoint-mobile) {
     .generic-table-pagination {
       padding: 10px 12px;
-      gap: 8px 10px;
+      gap: 10px;
+      grid-template-columns: minmax(0, 1fr);
+      grid-template-rows: auto auto auto;
+
+      .pagination-info {
+        grid-column: 1;
+        grid-row: 1;
+        justify-self: stretch;
+        width: 100%;
+      }
+
+      > .text-muted.small {
+        grid-column: 1;
+        grid-row: 2;
+        justify-self: stretch;
+        text-align: left;
+        white-space: normal;
+        word-break: break-word;
+        width: 100%;
+        margin: 0;
+      }
+
+      .pagination-buttons {
+        grid-column: 1;
+        grid-row: 3;
+        justify-content: center;
+        width: 100%;
+        gap: 6px;
+      }
     }
   }
 
@@ -283,15 +312,12 @@ $main-settings-select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.
     .generic-table-pagination {
       padding: 8px 10px;
       gap: 8px;
-      grid-template-columns: minmax(0, 1fr) minmax(0, min(100%, 11rem));
 
       .pagination-info {
         gap: 4px 6px;
       }
 
       > .text-muted.small {
-        white-space: normal;
-        word-break: break-word;
         font-size: var(--ms-font-xs) !important;
         line-height: 1.35;
       }

@@ -32,6 +32,7 @@ import {
   Menu,
 } from "lucide-react";
 import "@assets/css/GenericTable.css";
+import { GenericTableMobileActionsMenu } from "./GenericTableMobileActionsMenu";
 import StatsCards, { StatsCardData } from "@components/GenericStatsCards";
 import { useRouter } from "next/router";
 import { sanitizeSearchInputLive } from "@utils/Helper";
@@ -1197,6 +1198,9 @@ function GenericTableBodyDataCell<T extends Record<string, any>>({
   return (
     <td
       className="generic-table-td"
+      data-col-key={col.key}
+      onClick={col.key === "Action" ? (e) => e.stopPropagation() : undefined}
+      onMouseDown={col.key === "Action" ? (e) => e.stopPropagation() : undefined}
       style={{
         verticalAlign: "top",
         textAlign: col.align || "left",
@@ -1248,8 +1252,19 @@ function GenericTableRowActionsCell<T extends Record<string, any>>({
   rowStableKey: string;
   actions: TableAction<T>[];
 }>) {
+  const hasDesktopActions = actions.some((action) => {
+    if (action.show && !action.show(row)) return false;
+    if (action.render) return true;
+    if (action.dropdown) {
+      return action.dropdown.options.some((option) => !option.show || option.show(row));
+    }
+    return true;
+  });
+
   return (
     <>
+      {hasDesktopActions ? (
+        <div className="gt-row-actions gt-row-actions--desktop d-none d-md-flex align-items-center flex-nowrap">
       {actions.map((action, actionIndex) => {
         if (action.show && !action.show(row)) return null;
         const actionStableKey = `gt-act-${rowStableKey}-${action.label}`;
@@ -1355,6 +1370,9 @@ function GenericTableRowActionsCell<T extends Record<string, any>>({
         }
         return buttonEl;
       })}
+        </div>
+      ) : null}
+      <GenericTableMobileActionsMenu row={row} rowStableKey={rowStableKey} actions={actions} />
     </>
   );
 }
@@ -2522,6 +2540,8 @@ const GenericTable = <T extends Record<string, any>>({
           {actionsColumnVisible && (
             <td
               className="generic-table-td generic-table-actions-cell"
+              data-col-key={ACTION_COLUMN_KEY}
+              onMouseDown={(e) => e.stopPropagation()}
               onClick={(e) => e.stopPropagation()}
             >
               <div className="generic-table-actions">
@@ -2615,6 +2635,7 @@ const GenericTable = <T extends Record<string, any>>({
                       return (
                         <th
                           key={col.key}
+                          data-col-key={col.key}
                           className={`generic-table-th ${col.sortable !== false && sortable ? "sortable" : ""}`}
                           style={{
                             textAlign: col.align || "left",
@@ -2661,7 +2682,10 @@ const GenericTable = <T extends Record<string, any>>({
                       </th>
                     )}
                     {actionsColumnVisible && (
-                      <th className="generic-table-th generic-table-actions-header">
+                      <th
+                        className="generic-table-th generic-table-actions-header"
+                        data-col-key={ACTION_COLUMN_KEY}
+                      >
                         <div className="d-flex align-items-center justify-content-center gap-1 w-100">
                           <span className="text-center">{actionsLabel}</span>
                           {customizableColumns &&
