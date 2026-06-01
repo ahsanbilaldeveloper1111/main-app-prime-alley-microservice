@@ -65,7 +65,11 @@ export function useWorkloadPlannerTaskActions({
   formatError,
 }: UseWorkloadPlannerTaskActionsParams) {
   const submitReassign = useCallback(async () => {
-    if (!reassignTask || !reassignTarget || !selectedCell) return;
+    if (!reassignTask || !reassignTarget) return;
+    if (!selectedCell) {
+      assignMutation.mutate({ task: reassignTask, toExtension: reassignTarget });
+      return;
+    }
     if (reassignOverloadConfirm) {
       assignMutation.mutate({ task: reassignTask, toExtension: reassignTarget });
       return;
