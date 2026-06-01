@@ -459,15 +459,12 @@ export function WorkloadReassignModal({
                   </div>
                 </div>
               ) : null}
-              {targetExtension && memberName ? (
-                <div className="workload-reassign-modal__row">
-                  <span className="workload-reassign-modal__label">Assign to</span>
-                  <span className="workload-reassign-modal__value">{memberName}</span>
-                </div>
-              ) : (
-                <Form.Group className="mt-3">
-                  <Form.Label className="small text-muted mb-1">Select member</Form.Label>
-                  <Form.Select
+              <div className="workload-reassign-modal__row workload-reassign-modal__row--due">
+                <span className="workload-reassign-modal__label">Assign to</span>
+                <div className="workload-reassign-modal__due-wrap">
+                  <select
+                    className="workload-reassign-modal__date-input"
+                    style={{ maxWidth: "220px", paddingRight: "28px" }}
                     value={targetExtension}
                     onChange={(e) => onTargetChange(e.target.value)}
                   >
@@ -477,9 +474,9 @@ export function WorkloadReassignModal({
                         {formatWorkloadMemberLabel(ext, hierarchyExtensions)}
                       </option>
                     ))}
-                  </Form.Select>
-                </Form.Group>
-              )}
+                  </select>
+                </div>
+              </div>
             </div>
             {overloadConfirm ? (
               <Alert variant="warning" className="small mt-3 mb-0">
