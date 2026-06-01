@@ -77,10 +77,17 @@ function WorkloadUnassignedTaskRow({
             {formatWorkloadTaskEstimate(task)}
           </WorkloadBdg>
         )}
-        <WorkloadBdg tone="gray">
-          <Calendar size={10} aria-hidden />
-          {formatWorkloadShortDueDate(task.due_date)}
-        </WorkloadBdg>
+        {task.due_date ? (
+          <WorkloadBdg tone="gray">
+            <Calendar size={10} aria-hidden />
+            {formatWorkloadShortDueDate(task.due_date)}
+          </WorkloadBdg>
+        ) : (
+          <WorkloadBdg tone="orange">
+            <Calendar size={10} aria-hidden />
+            No due date
+          </WorkloadBdg>
+        )}
       </div>
       <div className="workload-unassigned-task__assign">
         <Form.Select
