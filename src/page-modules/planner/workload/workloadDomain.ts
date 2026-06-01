@@ -93,13 +93,14 @@ export function workloadCellBarFillClass(band: string): string {
 }
 
 const WORKLOAD_AVATAR_PALETTE = [
-  "#0d9488",
-  "#2563eb",
-  "#7c3aed",
-  "#db2777",
-  "#ea580c",
-  "#0891b2",
+  "#1a6fbd",
+  "#0e7490",
+  "#0f766e",
+  "#1d4ed8",
   "#4f46e5",
+  "#7c3aed",
+  "#0369a1",
+  "#065f46",
 ] as const;
 
 export function workloadMemberAvatarColor(extensionNumber: string): string {
