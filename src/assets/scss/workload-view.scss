@@ -5,6 +5,7 @@
   border-radius: 0;
   display: flex;
   flex-direction: column;
+  font-family: "Lexend Deca", Helvetica, Arial, sans-serif;
 
   .workload-page__inner {
     flex: 1;
@@ -26,7 +27,7 @@
   }
 
   .workload-page__title {
-    font-size: 20px;
+    font-size: clamp(16px, 1.2vw, 20px);
     font-weight: 700;
     margin: 0 0 2px;
     color: #141414;
@@ -341,7 +342,7 @@
   }
 
   .workload-summary-card__label {
-    font-size: 12px;
+    font-size: clamp(10px, 0.85vw, 12px);
     font-weight: 500;
     color: #141414;
     margin-bottom: 8px;
@@ -349,7 +350,7 @@
   }
 
   .workload-summary-card__value {
-    font-size: 28px;
+    font-size: clamp(20px, 1.8vw, 28px);
     font-weight: 700;
     line-height: 1;
     color: #141414;
@@ -361,7 +362,7 @@
     display: flex;
     align-items: center;
     gap: 5px;
-    font-size: 11px;
+    font-size: clamp(10px, 0.75vw, 11px);
     color: #718096;
     font-family: "Lexend Deca", Helvetica, Arial, sans-serif;
   }
@@ -483,7 +484,7 @@
     border-bottom: 1px solid #eaf0f6;
     background: var(--card-bg, #fff);
     box-shadow: var(--shadow-sm, 0 2px 8px rgba(0, 0, 0, 0.04));
-    font-size: 0.68rem;
+    font-size: clamp(10px, 0.8vw, 12px);
     color: var(--light-text, #718096);
   }
 
@@ -611,7 +612,7 @@
 
   .workload-grid-table {
     margin: 0;
-    font-size: 0.8rem;
+    font-size: clamp(11px, 0.85vw, 13px);
     white-space: nowrap;
     border-collapse: separate;
     border-spacing: 0;
@@ -723,13 +724,15 @@
 
   .workload-member-cell__name {
     font-weight: 700;
-    font-size: 0.88rem;
+    font-size: clamp(11px, 0.9vw, 13px);
+    font-family: "Lexend Deca", Helvetica, Arial, sans-serif;
     line-height: 1.25;
     color: #111827;
   }
 
   .workload-member-cell__role {
-    font-size: 0.75rem;
+    font-size: clamp(10px, 0.75vw, 11px);
+    font-family: "Lexend Deca", Helvetica, Arial, sans-serif;
     color: #9ca3af;
     line-height: 1.2;
     margin-top: 1px;
