@@ -1311,7 +1311,7 @@
 
   .workload-board-task-card__title {
     font-weight: 600;
-    font-size: 14px;
+    font-size: clamp(12px, 1vw, 14px);
     line-height: 18px;
     color: #141414;
     word-break: break-word;
