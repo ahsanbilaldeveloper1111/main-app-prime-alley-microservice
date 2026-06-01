@@ -1,3 +1,4 @@
+import { MAIN_SETTINGS_FONT_SIZE } from '../mainSettingsTokens'
 import React from 'react'
 import { PLANNER_SETTINGS_SUCCESS_MESSAGE } from './constants'
 
@@ -25,7 +26,7 @@ const inputStyle: React.CSSProperties = {
   width: '140px',
   padding: '8px 10px',
   border: '1px solid #d1d5db',
-  borderRadius: '6px',
+  borderRadius: '8px',
   outline: 'none',
 }
 
@@ -33,9 +34,9 @@ const saveButtonStyle: React.CSSProperties = {
   border: '1px solid #111827',
   background: '#111827',
   color: '#ffffff',
-  borderRadius: '6px',
+  borderRadius: '8px',
   padding: '8px 14px',
-  fontSize: '13px',
+  fontSize: MAIN_SETTINGS_FONT_SIZE.sm,
   cursor: 'pointer',
 }
 
@@ -55,17 +56,17 @@ export const PlannerGeneralSettingsView: React.FC<Props> = ({
 
   return (
     <div style={shellStyle}>
-      <div style={{ marginBottom: '8px', fontSize: '16px', fontWeight: 600, color: '#111827' }}>
+      <div style={{ marginBottom: '8px', fontSize: MAIN_SETTINGS_FONT_SIZE.md, fontWeight: 600, color: '#111827' }}>
         General
       </div>
-      <div style={{ marginBottom: '14px', fontSize: '13px', color: '#6b7280' }}>
+      <div style={{ marginBottom: '14px', fontSize: MAIN_SETTINGS_FONT_SIZE.sm, color: '#6b7280' }}>
         Configure planner defaults for My Day and task estimation behavior.
       </div>
       <div style={{ marginBottom: '18px' }}>
-        <div style={{ marginBottom: '6px', fontSize: '14px', fontWeight: 500, color: '#111827' }}>
+        <div style={{ marginBottom: '6px', fontSize: MAIN_SETTINGS_FONT_SIZE.base, fontWeight: 500, color: '#111827' }}>
           Default daily capacity (minutes)
         </div>
-        <div style={{ marginBottom: '10px', fontSize: '12px', color: '#6b7280' }}>
+        <div style={{ marginBottom: '10px', fontSize: MAIN_SETTINGS_FONT_SIZE.sm, color: '#6b7280' }}>
           Syncs with My Day capacity. Used as the default when planning your day.
         </div>
         <input
@@ -119,7 +120,7 @@ export const PlannerGeneralSettingsView: React.FC<Props> = ({
         </button>
       </div>
       {saveFeedback.length > 0 ? (
-        <div style={{ fontSize: '12px', color: feedbackColor }}>{saveFeedback}</div>
+        <div style={{ fontSize: MAIN_SETTINGS_FONT_SIZE.sm, color: feedbackColor }}>{saveFeedback}</div>
       ) : null}
     </div>
   )

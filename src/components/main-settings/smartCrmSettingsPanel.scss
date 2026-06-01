@@ -1,0 +1,63 @@
+// Prospects-style responsive filter tabs (All Types, Lead, etc.) inside Smart CRM panels.
+.smart-crm-settings-panel {
+  min-width: 0;
+  width: 100%;
+
+  .gt-toolbar-tabs-section {
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .gt-toolbar-tabs-row {
+    flex-wrap: wrap;
+    row-gap: 8px;
+  }
+
+  .gt-toolbar-tabs-list {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow-x: auto;
+    overflow-y: hidden;
+    flex-wrap: nowrap;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 2px;
+  }
+
+  .gt-tab-button {
+    margin-left: 12px;
+    white-space: nowrap;
+    flex-shrink: 0;
+
+    &:first-child {
+      margin-left: 0;
+    }
+  }
+
+  @media (max-width: 992px) {
+    .gt-toolbar-tabs-row {
+      flex-wrap: wrap;
+      row-gap: 8px;
+    }
+  }
+
+  @media (max-width: 768px) {
+    .gt-toolbar-tabs-section {
+      padding: 10px 0 0;
+    }
+
+    .gt-toolbar-tabs-list {
+      width: 100%;
+    }
+
+    .gt-toolbar-tabs-actions {
+      width: 100%;
+      margin-left: 0;
+    }
+
+    .gt-toolbar-tabs-actions > .d-flex {
+      width: 100%;
+      flex-wrap: wrap;
+    }
+  }
+}

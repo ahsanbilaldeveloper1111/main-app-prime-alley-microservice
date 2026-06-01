@@ -14,17 +14,18 @@
     nav.breadcrumb,
     .breadcrumb {
       @media (max-width: 575.98px) {
-        font-size: 0.75rem;
+        font-size: var(--ms-font-sm);
       }
     }
 
     .card {
       border: 1px solid #e5e7eb;
+      border-radius: 8px;
       overflow: hidden;
     }
 
     .card-header h5 {
-      font-size: clamp(0.95rem, 2.5vw, 1.1rem);
+      font-size: var(--ms-font-md);
       word-break: break-word;
     }
 
@@ -80,12 +81,12 @@
     nav.breadcrumb,
     .breadcrumb {
       @media (max-width: 575.98px) {
-        font-size: 0.75rem;
+        font-size: var(--ms-font-sm);
       }
     }
 
     .page-header-title h2 {
-      font-size: clamp(1.1rem, 3vw, 1.5rem);
+      font-size: var(--ms-font-xl);
     }
 
     .page-header-title .row {
@@ -95,6 +96,7 @@
     }
 
     .card {
+      border-radius: 8px;
       overflow: hidden;
     }
 
@@ -107,7 +109,7 @@
 
       .nav-link {
         white-space: nowrap;
-        font-size: clamp(0.8125rem, 2vw, 0.875rem);
+        font-size: var(--ms-font-base);
       }
     }
 

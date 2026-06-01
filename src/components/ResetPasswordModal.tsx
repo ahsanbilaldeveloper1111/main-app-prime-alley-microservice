@@ -4,6 +4,8 @@ import { toast } from "react-toastify";
 import { generateComplexId } from "@utils/Helper";
 import { UpdatePassword } from "@utils/tms/tmsUserManagement";
 import { Check, X, Lock, Copy } from "lucide-react";
+import { MainSettingsFormSidebar } from "@components/main-settings/MainSettingsFormSidebar";
+import { useMainSettingsFormSidebar } from "@components/main-settings/mainSettingsFormContext";
 
 interface ResetPasswordModalProps {
   show: boolean;
@@ -26,6 +28,7 @@ const ResetPasswordModal: React.FC<ResetPasswordModalProps> = ({
   username,
   onSuccess,
 }) => {
+  const preferSidebar = useMainSettingsFormSidebar();
   const [password, setPassword] = useState<string>("");
   const [passwordConfirmation, setPasswordConfirmation] = useState<string>("");
   const [loading, setLoading] = useState<boolean>(false);
@@ -210,20 +213,8 @@ const ResetPasswordModal: React.FC<ResetPasswordModalProps> = ({
     WebkitUserSelect: "text",
   };
 
-  return (
-    <Modal
-      show={show}
-      onHide={handleClose}
-      centered
-      enforceFocus={false}
-      autoFocus={false}
-      className="reset-password-modal-root"
-      backdropClassName="reset-password-modal-backdrop"
-    >
-      <Modal.Header closeButton>
-        <Modal.Title>Reset Password</Modal.Title>
-      </Modal.Header>
-      <Modal.Body>
+  const formBody = (
+    <>
         <Form.Group className="mb-4">
           <Form.Label className="fw-semibold mb-2">Password</Form.Label>
           <div className="input-group">
@@ -435,15 +426,65 @@ const ResetPasswordModal: React.FC<ResetPasswordModalProps> = ({
               </Form.Text>
             )}
         </Form.Group>
-      </Modal.Body>
-      <Modal.Footer>
-        <Button variant="secondary" onClick={handleClose} disabled={loading}>
-          Close
-        </Button>
-        <Button variant="primary" onClick={handleSubmit} disabled={loading}>
-          {loading ? "Updating..." : "Reset Password"}
-        </Button>
-      </Modal.Footer>
+    </>
+  );
+
+  const footerActions = (
+    <>
+      <Button
+        variant={preferSidebar ? "outline-secondary" : "secondary"}
+        onClick={handleClose}
+        disabled={loading}
+        className={preferSidebar ? "contact-form-btn-cancel" : undefined}
+      >
+        Close
+      </Button>
+      <Button
+        variant="primary"
+        onClick={handleSubmit}
+        disabled={loading}
+        className={preferSidebar ? "contact-form-btn-create" : undefined}
+      >
+        {loading ? "Updating..." : "Reset Password"}
+      </Button>
+    </>
+  );
+
+  if (preferSidebar) {
+    return (
+      <MainSettingsFormSidebar
+        show={show}
+        onHide={handleClose}
+        title="Reset Password"
+        disableClose={loading}
+        footer={
+          <div className="main-settings-form-sidebar-footer w-100">
+            <div className="main-settings-form-sidebar-footer__actions">
+              {footerActions}
+            </div>
+          </div>
+        }
+      >
+        {show ? formBody : null}
+      </MainSettingsFormSidebar>
+    );
+  }
+
+  return (
+    <Modal
+      show={show}
+      onHide={handleClose}
+      centered
+      enforceFocus={false}
+      autoFocus={false}
+      className="reset-password-modal-root"
+      backdropClassName="reset-password-modal-backdrop"
+    >
+      <Modal.Header closeButton>
+        <Modal.Title>Reset Password</Modal.Title>
+      </Modal.Header>
+      <Modal.Body>{formBody}</Modal.Body>
+      <Modal.Footer>{footerActions}</Modal.Footer>
     </Modal>
   );
 };

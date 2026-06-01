@@ -1,3 +1,4 @@
+import { MAIN_SETTINGS_FONT_SIZE } from './mainSettingsTokens'
 import React, { type ChangeEventHandler } from 'react'
 
 export type NotificationsTopicCheckboxProps = {
@@ -24,7 +25,7 @@ export const NotificationsTopicCheckbox: React.FC<NotificationsTopicCheckboxProp
           justifyContent: 'center',
           width: colWidth,
           color: '#bbb',
-          fontSize: '13px',
+          fontSize: MAIN_SETTINGS_FONT_SIZE.sm,
         }}
       >
         --
