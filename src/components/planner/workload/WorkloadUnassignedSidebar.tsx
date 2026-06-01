@@ -7,10 +7,11 @@ import {
   formatWorkloadMinutes,
   formatWorkloadShortDueDate,
   formatWorkloadTaskEstimate,
+  isWorkloadOrganizationTask,
   isWorkloadTaskUnestimated,
   workloadTaskProjectLabel,
 } from "@page-modules/planner/workload/workloadDomain";
-import { WorkloadPriorityBadge } from "./WorkloadPlannerSubviews";
+import { WorkloadBdg, WorkloadPriorityBadge } from "./WorkloadPlannerSubviews";
 
 type UnassignedQuerySlice = Readonly<{
   isPending: boolean;
@@ -39,11 +40,19 @@ function WorkloadUnassignedTaskRow({
   isAssigning,
 }: WorkloadUnassignedTaskRowProps) {
   const unestimated = isWorkloadTaskUnestimated(task);
+  const isOrg = isWorkloadOrganizationTask(task);
+  const projectLabel = workloadTaskProjectLabel(task);
 
   return (
     <div className="workload-unassigned-task">
       <p className="workload-unassigned-task__title">
         {task.title}
+        {isOrg ? (
+          <WorkloadBdg tone="green" className="ms-2">
+            <i className="ti ti-building" style={{ fontSize: "10px" }} aria-hidden />
+            Org
+          </WorkloadBdg>
+        ) : null}
         {unestimated ? (
           <span
             className="workload-unestimated-dot ms-1"
@@ -54,22 +63,24 @@ function WorkloadUnassignedTaskRow({
       </p>
       <div className="workload-unassigned-task__tags">
         <WorkloadPriorityBadge priority={task.priority} />
-        <span className="workload-unassigned-task__tag">{workloadTaskProjectLabel(task)}</span>
+        {!isOrg && projectLabel && projectLabel !== "—" && projectLabel !== "Personal" ? (
+          <WorkloadBdg tone="gray">{projectLabel}</WorkloadBdg>
+        ) : null}
         {unestimated ? (
-          <span className="workload-unassigned-task__tag workload-unassigned-task__tag--warn">
-            <AlertTriangle size={12} aria-hidden />
+          <WorkloadBdg tone="orange">
+            <AlertTriangle size={10} aria-hidden />
             No est.
-          </span>
+          </WorkloadBdg>
         ) : (
-          <span className="workload-unassigned-task__tag">
-            <Clock size={12} aria-hidden />
+          <WorkloadBdg tone="gray">
+            <Clock size={10} aria-hidden />
             {formatWorkloadTaskEstimate(task)}
-          </span>
+          </WorkloadBdg>
         )}
-        <span className="workload-unassigned-task__tag">
-          <Calendar size={12} aria-hidden />
+        <WorkloadBdg tone="gray">
+          <Calendar size={10} aria-hidden />
           {formatWorkloadShortDueDate(task.due_date)}
-        </span>
+        </WorkloadBdg>
       </div>
       <div className="workload-unassigned-task__assign">
         <Form.Select
