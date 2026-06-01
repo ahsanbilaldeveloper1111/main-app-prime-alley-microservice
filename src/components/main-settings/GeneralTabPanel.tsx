@@ -1,3 +1,4 @@
+import { MAIN_SETTINGS_FONT_SIZE } from './mainSettingsTokens'
 import React from 'react'
 import '../../assets/css/Settings.css'
 import { Divider, InputField, SelectField, ACCOUNT_DEFAULTS_FONT } from './accountDefaultsTabPrimitives'
@@ -12,7 +13,7 @@ const GeneralTabContent: React.FC = () => (
     <p
       style={{
         fontFamily: ACCOUNT_DEFAULTS_FONT,
-        fontSize: '14px',
+        fontSize: MAIN_SETTINGS_FONT_SIZE.base,
         color: '#555',
         marginBottom: '24px',
       }}
@@ -40,7 +41,7 @@ const GeneralTabContent: React.FC = () => (
     <h2
       style={{
         fontFamily: ACCOUNT_DEFAULTS_FONT,
-        fontSize: '20px',
+        fontSize: MAIN_SETTINGS_FONT_SIZE.lg,
         fontWeight: 600,
         color: '#141414',
         marginBottom: '8px',
@@ -51,7 +52,7 @@ const GeneralTabContent: React.FC = () => (
     <p
       style={{
         fontFamily: ACCOUNT_DEFAULTS_FONT,
-        fontSize: '14px',
+        fontSize: MAIN_SETTINGS_FONT_SIZE.base,
         color: '#555',
         marginBottom: '24px',
       }}

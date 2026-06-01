@@ -56,54 +56,14 @@ export const NotificationsSettingsNew: React.FC = () => {
   } = useNotificationsSettingsState()
 
   return (
-    <div style={{ fontFamily: baseFont, color: '#141414', padding: '32px 40px' }}>
-      {globalLoadError ? (
-        <div
-          role="alert"
-          style={{
-            marginBottom: '16px',
-            padding: '12px 16px',
-            borderRadius: '4px',
-            border: '1px solid #f0b4b4',
-            background: '#fff5f5',
-            fontSize: '13px',
-            color: '#8a1f1f',
-          }}
-        >
-          Could not load your notification delivery preferences. Showing defaults until the service is available.
-        </div>
-      ) : null}
-      {smartCrmLoadError ? (
-        <div
-          role="alert"
-          style={{
-            marginBottom: '16px',
-            padding: '12px 16px',
-            borderRadius: '4px',
-            border: '1px solid #f0b4b4',
-            background: '#fff5f5',
-            fontSize: '13px',
-            color: '#8a1f1f',
-          }}
-        >
-          Could not load Smart CRM notification settings. Showing defaults until the service is available.
-        </div>
-      ) : null}
-      {(isGlobalLoading || isGlobalSaving || isSmartCrmLoading || isSmartCrmSaving) && (
-        <div
-          style={{
-            marginBottom: '16px',
-            fontSize: '13px',
-            color: '#555',
-          }}
-        >
-          {notificationSettingsStatusMessage(
-            isGlobalLoading,
-            isGlobalSaving,
-            isSmartCrmLoading,
-          )}
-        </div>
-      )}
+    <div
+      className="settings-section-shell notifications-settings-page"
+      style={{
+        fontFamily: baseFont,
+        color: '#141414',
+        padding: 'clamp(16px, 3vw, 32px) clamp(12px, 4vw, 40px)',
+      }}
+    >
       <NotificationsSettingsHowSection
         baseFont={baseFont}
         bannerVisible={bannerVisible}

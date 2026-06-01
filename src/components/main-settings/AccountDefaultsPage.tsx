@@ -49,14 +49,16 @@ export const AccountDefaultsPage: React.FC<ControlledTabsProps> = ({
   )
 
   return (
-    <div style={accountDefaultsPageShellStyle}>
-      <h1 style={accountDefaultsPageTitleStyle}>Account Defaults</h1>
+    <div style={accountDefaultsPageShellStyle} className="settings-section-shell account-defaults-page">
+      <h1 style={accountDefaultsPageTitleStyle} className="settings-section-shell__title">
+        Account Defaults
+      </h1>
 
       <AccountDefaultsTabBar tabs={allowedTabs} activeTabId={activeTab} onSelect={handleSelectTab} />
 
-      <div>
+      <div className="settings-section-shell__content main-settings-section-body">
         {allowedTabs.length === 0 ? (
-          <div style={{ color: '#6b7280' }}>You don&apos;t have permission to view this section.</div>
+          <div className="settings-section-shell__no-permission">You don&apos;t have permission to view this section.</div>
         ) : (
           renderAccountDefaultsTabContent(activeTab)
         )}

@@ -32,6 +32,7 @@ import {
   Menu,
 } from "lucide-react";
 import "@assets/css/GenericTable.css";
+import { GenericTableMobileActionsMenu } from "./GenericTableMobileActionsMenu";
 import StatsCards, { StatsCardData } from "@components/GenericStatsCards";
 import { useRouter } from "next/router";
 import { sanitizeSearchInputLive } from "@utils/Helper";
@@ -467,9 +468,12 @@ export interface ToolbarConfig {
 
   // Filters
   showFiltersButton?: boolean;
+  /** Actions rendered immediately after the Filters button (e.g. Reset). */
+  actionsAfterFilters?: React.ReactNode;
   onFiltersClick?: () => void;
   showFilterPills?: boolean;
   filterPills?: FilterPill[];
+  clearAllFilters?: () => void;
   /** Controls whether the "+ More" pill is rendered in the filter pills row (defaults to true). */
   showMoreFiltersButton?: boolean;
   showAdvancedFilters?: boolean;
@@ -587,6 +591,7 @@ export interface GenericTableProps<T = any> {
   // Stats cards
   statsCards?: StatsCardData[]; // Stats cards data to display above table
   metricsGridMinWidth?: string; // Grid min width for metrics cards layout
+  metricsColumns?: number; // Fixed number of columns for metrics cards
 
   // Hide toolbar actions (three dots menu)
   showToolbarActions?: boolean;
@@ -934,6 +939,197 @@ function GenericTableFilterPillMenuBody({
   );
 }
 
+function orderFilterPillsForDisplay(pills: FilterPill[]) {
+  const activePills = pills.filter((pill) => pill.active);
+  const inactivePills = pills.filter((pill) => !pill.active);
+  const allPills = [...activePills, ...inactivePills];
+  const separatorIndex =
+    activePills.length > 0 && inactivePills.length > 0
+      ? activePills.length
+      : -1;
+  return { allPills, separatorIndex };
+}
+
+function stopFilterPillMenuMouseDown(e: React.MouseEvent) {
+  e.stopPropagation();
+}
+
+function handleFilterPillClearClick(
+  e: React.MouseEvent,
+  onClear?: () => void,
+) {
+  e.preventDefault();
+  e.stopPropagation();
+  onClear?.();
+}
+
+type FilterPillMenuPopperConfig = React.ComponentProps<
+  typeof Dropdown.Menu
+>["popperConfig"];
+
+type GenericTableFilterPillDropdownItemProps = Readonly<{
+  pill: FilterPill;
+  isOpen: boolean;
+  onOpenChange: (pillId: string | null) => void;
+  filterPillSearch: Record<string, string>;
+  setFilterPillSearch: React.Dispatch<
+    React.SetStateAction<Record<string, string>>
+  >;
+  filterPillMenuPopperConfig: FilterPillMenuPopperConfig;
+}>;
+
+function GenericTableFilterPillDropdownItem({
+  pill,
+  isOpen,
+  onOpenChange,
+  filterPillSearch,
+  setFilterPillSearch,
+  filterPillMenuPopperConfig,
+}: GenericTableFilterPillDropdownItemProps) {
+  const closeMenu = () => onOpenChange(null);
+  const handleToggle = (nextShow: boolean) => {
+    onOpenChange(nextShow ? pill.id : null);
+  };
+
+  return (
+    <Dropdown
+      show={isOpen}
+      autoClose={pill.multiSelect ? "outside" : true}
+      onToggle={handleToggle}
+    >
+      <Dropdown.Toggle
+        variant={pill.active ? "primary" : "outline-secondary"}
+        size="sm"
+        className={`gt-filter-pill${pill.active ? " gt-filter-pill-active" : ""}`}
+      >
+        {pill.icon && <span className="me-1">{pill.icon}</span>}
+        <span>
+          {pill.active && pill.activeLabel && pill.activeLabelOnly
+            ? pill.activeLabel
+            : pill.label}
+        </span>
+        {pill.active && pill.activeLabel && !pill.activeLabelOnly && (
+          <span className="gt-filter-pill-value">: {pill.activeLabel}</span>
+        )}
+        {pill.active && !pill.activeLabel && (
+          <span className="gt-filter-pill-dot" title="Filter applied" />
+        )}
+        {pill.active && pill.onClear && (
+          <button
+            type="button"
+            className="gt-filter-pill-clear"
+            onClick={(e) => handleFilterPillClearClick(e, pill.onClear)}
+            title="Clear filter"
+            aria-label="Clear filter"
+          >
+            <X size={14} aria-hidden />
+          </button>
+        )}
+      </Dropdown.Toggle>
+      <Dropdown.Menu
+        renderOnMount
+        style={
+          pill.dropdownMenuStyle ?? {
+            maxHeight: "280px",
+            overflowY: "auto",
+            overflowX: "hidden",
+            maxWidth: "min(320px, calc(100vw - 24px))",
+          }
+        }
+        popperConfig={filterPillMenuPopperConfig}
+        onMouseDown={stopFilterPillMenuMouseDown}
+      >
+        <GenericTableFilterPillMenuBody
+          pill={pill}
+          filterPillSearch={filterPillSearch}
+          setFilterPillSearch={setFilterPillSearch}
+          closeMenu={closeMenu}
+        />
+      </Dropdown.Menu>
+    </Dropdown>
+  );
+}
+
+type GenericTableFilterPillListItemProps = Readonly<
+  GenericTableFilterPillDropdownItemProps & {
+    showSeparatorBefore: boolean;
+  }
+>;
+
+function GenericTableFilterPillListItem({
+  pill,
+  showSeparatorBefore,
+  isOpen,
+  onOpenChange,
+  filterPillSearch,
+  setFilterPillSearch,
+  filterPillMenuPopperConfig,
+}: GenericTableFilterPillListItemProps) {
+  return (
+    <React.Fragment>
+      {showSeparatorBefore && (
+        <span style={{ color: "#cbd5e1", fontSize: "16px", userSelect: "none" }}>
+          |
+        </span>
+      )}
+      {pill.showDropdown ? (
+        <GenericTableFilterPillDropdownItem
+          pill={pill}
+          isOpen={isOpen}
+          onOpenChange={onOpenChange}
+          filterPillSearch={filterPillSearch}
+          setFilterPillSearch={setFilterPillSearch}
+          filterPillMenuPopperConfig={filterPillMenuPopperConfig}
+        />
+      ) : (
+        <button className="gt-filter-pill" onClick={pill.onClick}>
+          {pill.icon && <span className="me-1">{pill.icon}</span>}
+          <span>{pill.label}</span>
+        </button>
+      )}
+    </React.Fragment>
+  );
+}
+
+type GenericTableFilterPillsListProps = Readonly<{
+  filterPills: FilterPill[];
+  openFilterPillId: string | null;
+  onOpenChange: (pillId: string | null) => void;
+  filterPillSearch: Record<string, string>;
+  setFilterPillSearch: React.Dispatch<
+    React.SetStateAction<Record<string, string>>
+  >;
+  filterPillMenuPopperConfig: FilterPillMenuPopperConfig;
+}>;
+
+function GenericTableFilterPillsList({
+  filterPills,
+  openFilterPillId,
+  onOpenChange,
+  filterPillSearch,
+  setFilterPillSearch,
+  filterPillMenuPopperConfig,
+}: GenericTableFilterPillsListProps) {
+  const { allPills, separatorIndex } = orderFilterPillsForDisplay(filterPills);
+
+  return (
+    <>
+      {allPills.map((pill, idx) => (
+        <GenericTableFilterPillListItem
+          key={pill.id}
+          pill={pill}
+          showSeparatorBefore={idx === separatorIndex}
+          isOpen={openFilterPillId === pill.id}
+          onOpenChange={onOpenChange}
+          filterPillSearch={filterPillSearch}
+          setFilterPillSearch={setFilterPillSearch}
+          filterPillMenuPopperConfig={filterPillMenuPopperConfig}
+        />
+      ))}
+    </>
+  );
+}
+
 function GenericTableFirstColumnTrigger({
   children,
   onActivate,
@@ -1002,6 +1198,9 @@ function GenericTableBodyDataCell<T extends Record<string, any>>({
   return (
     <td
       className="generic-table-td"
+      data-col-key={col.key}
+      onClick={col.key === "Action" ? (e) => e.stopPropagation() : undefined}
+      onMouseDown={col.key === "Action" ? (e) => e.stopPropagation() : undefined}
       style={{
         verticalAlign: "top",
         textAlign: col.align || "left",
@@ -1053,8 +1252,19 @@ function GenericTableRowActionsCell<T extends Record<string, any>>({
   rowStableKey: string;
   actions: TableAction<T>[];
 }>) {
+  const hasDesktopActions = actions.some((action) => {
+    if (action.show && !action.show(row)) return false;
+    if (action.render) return true;
+    if (action.dropdown) {
+      return action.dropdown.options.some((option) => !option.show || option.show(row));
+    }
+    return true;
+  });
+
   return (
     <>
+      {hasDesktopActions ? (
+        <div className="gt-row-actions gt-row-actions--desktop d-none d-md-flex align-items-center flex-nowrap">
       {actions.map((action, actionIndex) => {
         if (action.show && !action.show(row)) return null;
         const actionStableKey = `gt-act-${rowStableKey}-${action.label}`;
@@ -1160,6 +1370,9 @@ function GenericTableRowActionsCell<T extends Record<string, any>>({
         }
         return buttonEl;
       })}
+        </div>
+      ) : null}
+      <GenericTableMobileActionsMenu row={row} rowStableKey={rowStableKey} actions={actions} />
     </>
   );
 }
@@ -1204,6 +1417,7 @@ const GenericTable = <T extends Record<string, any>>({
   maxHeight = "calc(100vh - 300px)",
   statsCards,
   metricsGridMinWidth = "200px",
+  metricsColumns,
   showToolbarActions = true,
   noBorder = false,
   customBody,
@@ -1371,7 +1585,7 @@ const GenericTable = <T extends Record<string, any>>({
   );
 
   // Metrics visibility: show by default when stats cards exist (toolbar "Metrics" toggles collapse).
-  const [showMetrics, setShowMetrics] = useState(true);
+  const [showMetrics, setShowMetrics] = useState(() => window.innerWidth >= 1920);
   const [openFilterPillId, setOpenFilterPillId] = useState<string | null>(null);
   const [filterPillSearch, setFilterPillSearch] = useState<
     Record<string, string>
@@ -1701,7 +1915,7 @@ const GenericTable = <T extends Record<string, any>>({
         {/* Tabs Section */}
         {toolbar.showTabs && toolbar.tabs && toolbar.tabs.length > 0 && (
           <div className="gt-toolbar-tabs-section">
-            <div className="d-flex align-items-center gap-3">
+            <div className="gt-toolbar-tabs-row d-flex align-items-center gap-3">
               {/* Dropdown: use provided items or fall back to default CRM items */}
               {toolbar.tabsDropdownLabel && (
                 <Dropdown>
@@ -1744,7 +1958,7 @@ const GenericTable = <T extends Record<string, any>>({
               )}
 
               {/* Tabs */}
-              <div className="d-flex align-items-center gap-2">
+              <div className="gt-toolbar-tabs-list d-flex align-items-center gap-2">
                 {toolbar.tabs.map((tab) => (
                   <button
                     key={tab.id}
@@ -1785,7 +1999,7 @@ const GenericTable = <T extends Record<string, any>>({
 
               {/* Right-aligned custom actions (e.g., Add Contacts) */}
               {toolbar.rightActions && (
-                <div style={{ marginLeft: "auto" }}>{toolbar.rightActions}</div>
+                <div className="gt-toolbar-tabs-actions">{toolbar.rightActions}</div>
               )}
             </div>
           </div>
@@ -1924,11 +2138,19 @@ const GenericTable = <T extends Record<string, any>>({
                 variant="outline-secondary"
                 size="sm"
                 className="gt-toolbar-btn"
-                onClick={() => setShowFilterPills(!showFilterPills)}
+                onClick={() => {
+                  if (toolbar.onFiltersClick) {
+                    toolbar.onFiltersClick();
+                    return;
+                  }
+                  setShowFilterPills(!showFilterPills);
+                }}
               >
                 Filters
               </Button>
             )}
+
+            {toolbar.actionsAfterFilters}
 
             {/* Sort */}
             {toolbar.showSortButton &&
@@ -2053,95 +2275,22 @@ const GenericTable = <T extends Record<string, any>>({
           toolbar.filterPills.length > 0 && (
             <div className="gt-filter-pills">
               <div className="d-flex align-items-center gap-2 flex-wrap">
-                {toolbar.filterPills.map((pill) =>
-                  pill.showDropdown ? (
-                    <Dropdown
-                      key={pill.id}
-                      show={openFilterPillId === pill.id}
-                      autoClose={pill.multiSelect ? "outside" : true}
-                      onToggle={(nextShow) =>
-                        setOpenFilterPillId(nextShow ? pill.id : null)
-                      }
-                    >
-                      <Dropdown.Toggle
-                        variant={pill.active ? "primary" : "outline-secondary"}
-                        size="sm"
-                        className={`gt-filter-pill${pill.active ? " gt-filter-pill-active" : ""}`}
-                      >
-                        {pill.icon && <span className="me-1">{pill.icon}</span>}
-                        <span>
-                          {pill.active &&
-                          pill.activeLabel &&
-                          pill.activeLabelOnly
-                            ? pill.activeLabel
-                            : pill.label}
-                        </span>
-                        {pill.active &&
-                          pill.activeLabel &&
-                          !pill.activeLabelOnly && (
-                            <span className="gt-filter-pill-value">
-                              : {pill.activeLabel}
-                            </span>
-                          )}
-                        {pill.active && !pill.activeLabel && (
-                          <span
-                            className="gt-filter-pill-dot"
-                            title="Filter applied"
-                          />
-                        )}
-                        {pill.active && pill.onClear && (
-                          <button
-                            type="button"
-                            className="gt-filter-pill-clear"
-                            onClick={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              pill.onClear?.();
-                            }}
-                            title="Clear filter"
-                            aria-label="Clear filter"
-                          >
-                            <X size={14} aria-hidden />
-                          </button>
-                        )}
-                      </Dropdown.Toggle>
-                      <Dropdown.Menu
-                        renderOnMount
-                        style={
-                          pill.dropdownMenuStyle ?? {
-                            maxHeight: "280px",
-                            overflowY: "auto",
-                            overflowX: "hidden",
-                            maxWidth: "min(320px, calc(100vw - 24px))",
-                          }
-                        }
-                        popperConfig={filterPillMenuPopperConfig}
-                        onMouseDown={(e) => e.stopPropagation()}
-                      >
-                        <GenericTableFilterPillMenuBody
-                          pill={pill}
-                          filterPillSearch={filterPillSearch}
-                          setFilterPillSearch={setFilterPillSearch}
-                          closeMenu={() => setOpenFilterPillId(null)}
-                        />
-                      </Dropdown.Menu>
-                    </Dropdown>
-                  ) : (
-                    <button
-                      key={pill.id}
-                      className="gt-filter-pill"
-                      onClick={pill.onClick}
-                    >
-                      {pill.icon && <span className="me-1">{pill.icon}</span>}
-                      <span>{pill.label}</span>
-                    </button>
-                  ),
-                )}
+                <GenericTableFilterPillsList
+                  filterPills={toolbar.filterPills}
+                  openFilterPillId={openFilterPillId}
+                  onOpenChange={setOpenFilterPillId}
+                  filterPillSearch={filterPillSearch}
+                  setFilterPillSearch={setFilterPillSearch}
+                  filterPillMenuPopperConfig={filterPillMenuPopperConfig}
+                />
                 {toolbar.showMoreFiltersButton !== false && (
                   <button className="gt-filter-pill-add">
                     <Plus size={14} className="me-1" />
                     <span>More</span>
                   </button>
+                )}
+                {toolbar.showAdvancedFilters && (
+                  <span style={{ color: '#cbd5e1', fontSize: '16px', userSelect: 'none' }}>|</span>
                 )}
                 {toolbar.showAdvancedFilters && (
                   <button
@@ -2150,6 +2299,21 @@ const GenericTable = <T extends Record<string, any>>({
                   >
                     <Filter size={14} className="me-1" />
                     <span>Advanced filters</span>
+                  </button>
+                )}
+                {toolbar.filterPills && toolbar.filterPills.some(p => p.active) && (
+                  <button
+                    className="gt-filter-pill-add"
+                    style={{ color: '#DC2626' }}
+                    onClick={() => {
+                      if (toolbar.clearAllFilters) {
+                        toolbar.clearAllFilters();
+                      } else {
+                        toolbar.filterPills?.filter(p => p.active && p.onClear).forEach(p => p.onClear?.());
+                      }
+                    }}
+                  >
+                    <span>Clear all</span>
                   </button>
                 )}
                 {toolbar.filterPillsRightActions && (
@@ -2180,7 +2344,7 @@ const GenericTable = <T extends Record<string, any>>({
               borderRight: "1px solid #cccccc",
             }}
           >
-            <StatsCards data={statsCards} gridMinWidth={metricsGridMinWidth} />
+            <StatsCards data={statsCards} gridMinWidth={metricsGridMinWidth} columns={metricsColumns}/>
           </div>
         )}
       </div>
@@ -2376,6 +2540,8 @@ const GenericTable = <T extends Record<string, any>>({
           {actionsColumnVisible && (
             <td
               className="generic-table-td generic-table-actions-cell"
+              data-col-key={ACTION_COLUMN_KEY}
+              onMouseDown={(e) => e.stopPropagation()}
               onClick={(e) => e.stopPropagation()}
             >
               <div className="generic-table-actions">
@@ -2469,6 +2635,7 @@ const GenericTable = <T extends Record<string, any>>({
                       return (
                         <th
                           key={col.key}
+                          data-col-key={col.key}
                           className={`generic-table-th ${col.sortable !== false && sortable ? "sortable" : ""}`}
                           style={{
                             textAlign: col.align || "left",
@@ -2515,7 +2682,10 @@ const GenericTable = <T extends Record<string, any>>({
                       </th>
                     )}
                     {actionsColumnVisible && (
-                      <th className="generic-table-th generic-table-actions-header">
+                      <th
+                        className="generic-table-th generic-table-actions-header"
+                        data-col-key={ACTION_COLUMN_KEY}
+                      >
                         <div className="d-flex align-items-center justify-content-center gap-1 w-100">
                           <span className="text-center">{actionsLabel}</span>
                           {customizableColumns &&

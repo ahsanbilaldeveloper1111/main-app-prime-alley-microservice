@@ -30,6 +30,7 @@ import {
   AI_CHATBOT_SETTINGS_INNER_TABS,
   type AIChatbotSettingsInnerTab,
 } from "./tenantSettingsHistoryTypes";
+import { MainSettingsOverflowTabBar } from "../MainSettingsOverflowTabBar";
 import { PerUserBudgetOverridesSection } from "./PerUserBudgetOverridesSection";
 import {
   formatTenantCompanyBudgetTotal,
@@ -186,30 +187,15 @@ function AIChatbotSettingsInnerTabs(
 ) {
   const { activeTab, onSelectTab } = props;
   return (
-    <div className="ai-chatbot-settings__inner-tab-row" role="tablist">
-      {AI_CHATBOT_SETTINGS_INNER_TABS.map((tab, index) => {
-        const isActive = activeTab === tab.id;
-        const isLast = index === AI_CHATBOT_SETTINGS_INNER_TABS.length - 1;
-        return (
-          <button
-            key={tab.id}
-            type="button"
-            role="tab"
-            aria-selected={isActive}
-            onClick={() => onSelectTab(tab.id)}
-            className={[
-              "ai-chatbot-settings__inner-tab-btn",
-              isActive ? "ai-chatbot-settings__inner-tab-btn--active" : "",
-            ]
-              .filter(Boolean)
-              .join(" ")}
-            style={isLast ? { borderRight: "1px solid #e0e0e0" } : undefined}
-          >
-            {tab.label}
-          </button>
-        );
-      })}
-    </div>
+    <MainSettingsOverflowTabBar
+      tabs={AI_CHATBOT_SETTINGS_INNER_TABS}
+      activeTabId={activeTab}
+      onSelect={(tabId) => onSelectTab(tabId as AIChatbotSettingsInnerTab)}
+      tabBarShellClassName="ai-chatbot-settings__inner-tab-bar"
+      tabRowClassName="ai-chatbot-settings__inner-tab-row main-settings-overflow-tab-bar__row"
+      tabButtonClassName="ai-chatbot-settings__inner-tab-btn"
+      tabButtonActiveClassName="ai-chatbot-settings__inner-tab-btn--active"
+    />
   );
 }
 

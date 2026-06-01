@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { Offcanvas, Button, Row, Col } from 'react-bootstrap';
+import { Offcanvas, Button } from 'react-bootstrap';
 import '@assets/scss/offcanvas.scss';
 import { useSession } from 'next-auth/react';
 import Link from 'next/link';
@@ -59,21 +59,20 @@ const SimpleCanvas: React.FC<SimpleCanvasProps> = ({
       show={show} 
       onHide={onHide} 
       placement="end" 
+      className="user-directory-preview-canvas"
       style={{ width: '300px' }}
     >
-      {/* <Offcanvas.Header closeButton>
-        <Offcanvas.Title>User Details</Offcanvas.Title>
-      </Offcanvas.Header> */}
-      <Offcanvas.Body>
+      <Offcanvas.Header closeButton className="user-directory-preview-canvas__header py-2 px-3">
+        <Offcanvas.Title className="fs-6 mb-0">User Details</Offcanvas.Title>
+      </Offcanvas.Header>
+      <Offcanvas.Body className="user-directory-preview-canvas__body p-3">
         {!rowData && (
-          <div className="text-center p-4">
-            <p className="text-muted">No data available</p>
+          <div className="text-center py-3">
+            <p className="text-muted mb-0 small">No data available</p>
           </div>
         )}
         {rowData && (
-          <Row className="mb-3">
-            <Col md={12}>
-              <div className="mt-2">
+              <div className="user-directory-preview-canvas__content">
                 {/* Conditional rendering based on page */}
                 {(currentPage === 'main-settings/users-teams/user-directory' || (typeof globalThis !== 'undefined' && globalThis.window?.location.pathname.includes('/main-settings/users-teams/user-directory'))) ? (
                   <div className="canvasDisplay">
@@ -145,7 +144,7 @@ const SimpleCanvas: React.FC<SimpleCanvasProps> = ({
 
 
 
-                        <div className="button-group mt-3 d-flex flex-column gap-2">
+                        <div className="button-group mt-2 d-flex flex-column gap-2">
                         {session?.user?.permissions?.includes('edit-users')  && (
                             <Link 
                                 href={buildUserEditPath(rowData.encId)} 
@@ -216,8 +215,6 @@ const SimpleCanvas: React.FC<SimpleCanvasProps> = ({
                 
                 
               </div>
-            </Col>
-          </Row>
         )}
         
         

@@ -1,3 +1,4 @@
+import { MAIN_SETTINGS_FONT_SIZE } from './mainSettingsTokens'
 import React, { useState } from 'react'
 import {
   ACCOUNT_DEFAULTS_FONT,
@@ -112,13 +113,13 @@ export const DataHostingTabContent: React.FC = () => {
   return (
     <>
       <div>
-        <p style={{ fontFamily: baseFont, fontSize: '14px', color: '#555', fontWeight: 300, marginBottom: '8px' }}>
+        <p style={{ fontFamily: baseFont, fontSize: MAIN_SETTINGS_FONT_SIZE.base, color: '#555', fontWeight: 300, marginBottom: '8px' }}>
           View or change the data hosting location for your account.
         </p>
 
         <Divider />
 
-        <h2 style={{ fontFamily: baseFont, fontSize: '20px', fontWeight: 600, color: '#141414', marginBottom: '20px' }}>
+        <h2 style={{ fontFamily: baseFont, fontSize: MAIN_SETTINGS_FONT_SIZE.lg, fontWeight: 600, color: '#141414', marginBottom: '20px' }}>
           Data Hosting
         </h2>
 
@@ -129,7 +130,7 @@ export const DataHostingTabContent: React.FC = () => {
               alignItems: 'center',
               gap: '6px',
               fontFamily: baseFont,
-              fontSize: '14px',
+              fontSize: MAIN_SETTINGS_FONT_SIZE.base,
               fontWeight: 600,
               color: '#141414',
               marginBottom: '10px',
@@ -146,7 +147,7 @@ export const DataHostingTabContent: React.FC = () => {
                 height: '16px',
                 borderRadius: '50%',
                 border: '1.5px solid #888',
-                fontSize: '10px',
+                fontSize: MAIN_SETTINGS_FONT_SIZE.xs,
                 color: '#888',
                 cursor: 'default',
                 lineHeight: 1,
@@ -161,10 +162,10 @@ export const DataHostingTabContent: React.FC = () => {
             <div
               style={{
                 padding: '8px 14px',
-                border: '1px solid #d0d0d0',
-                borderRadius: '4px',
+                border: '1px solid #b8b8b8',
+                borderRadius: '8px',
                 fontFamily: baseFont,
-                fontSize: '14px',
+                fontSize: MAIN_SETTINGS_FONT_SIZE.base,
                 fontWeight: 300,
                 color: '#141414',
                 background: '#fff',
@@ -182,7 +183,7 @@ export const DataHostingTabContent: React.FC = () => {
                 border: 'none',
                 cursor: 'pointer',
                 fontFamily: baseFont,
-                fontSize: '14px',
+                fontSize: MAIN_SETTINGS_FONT_SIZE.base,
                 fontWeight: 500,
                 color: '#0091ae',
                 padding: 0,
@@ -215,11 +216,14 @@ export const DataHostingTabContent: React.FC = () => {
       )}
 
       <div
+        className={[
+          'main-settings-form-sidebar',
+          sidebarOpen ? 'main-settings-form-sidebar--open' : 'main-settings-form-sidebar--closed',
+        ].join(' ')}
         style={{
           position: 'fixed',
           top: 0,
-          right: sidebarOpen ? 0 : '-600px',
-          width: '575px',
+          right: sidebarOpen ? 0 : undefined,
           height: '100vh',
           background: '#fff',
           boxShadow: '-4px 0 24px rgba(0,0,0,0.12)',
@@ -231,16 +235,16 @@ export const DataHostingTabContent: React.FC = () => {
         }}
       >
         <div
+          className="main-settings-form-sidebar__header"
           style={{
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            padding: '28px 32px 24px',
-            borderBottom: '1px solid #e8e8e8',
+            borderBottom: '1px solid #d0d0d0',
             flexShrink: 0,
           }}
         >
-          <h2 style={{ fontFamily: baseFont, fontSize: '20px', fontWeight: 700, color: '#141414', margin: 0 }}>
+          <h2 style={{ fontFamily: baseFont, fontSize: MAIN_SETTINGS_FONT_SIZE.lg, fontWeight: 700, color: '#141414', margin: 0 }}>
             Schedule a data migration
           </h2>
           <button
@@ -251,7 +255,7 @@ export const DataHostingTabContent: React.FC = () => {
               border: 'none',
               cursor: 'pointer',
               color: '#555',
-              fontSize: '22px',
+              fontSize: MAIN_SETTINGS_FONT_SIZE.icon,
               lineHeight: 1,
               padding: '0 4px',
               display: 'flex',
@@ -265,16 +269,16 @@ export const DataHostingTabContent: React.FC = () => {
         </div>
 
         <div
+          className="main-settings-form-sidebar__body"
           style={{
             flex: 1,
             overflowY: 'auto',
-            padding: '28px 32px',
           }}
         >
           <p
             style={{
               fontFamily: baseFont,
-              fontSize: '14px',
+              fontSize: MAIN_SETTINGS_FONT_SIZE.base,
               fontWeight: 300,
               color: '#141414',
               marginBottom: '20px',
@@ -299,7 +303,7 @@ export const DataHostingTabContent: React.FC = () => {
                 key={id}
                 style={{
                   fontFamily: baseFont,
-                  fontSize: '14px',
+                  fontSize: MAIN_SETTINGS_FONT_SIZE.base,
                   fontWeight: 300,
                   color: '#141414',
                   lineHeight: '1.6',
@@ -318,7 +322,7 @@ export const DataHostingTabContent: React.FC = () => {
                 alignItems: 'center',
                 gap: '4px',
                 fontFamily: baseFont,
-                fontSize: '14px',
+                fontSize: MAIN_SETTINGS_FONT_SIZE.base,
                 fontWeight: 600,
                 color: '#141414',
                 marginBottom: '10px',
@@ -335,12 +339,12 @@ export const DataHostingTabContent: React.FC = () => {
                   {
                     width: '100%',
                     padding: '10px 40px 10px 14px',
-                    fontSize: '14px',
+                    fontSize: MAIN_SETTINGS_FONT_SIZE.base,
                     fontFamily: baseFont,
                     fontWeight: selectedLocation ? 400 : 300,
                     color: selectedLocation ? '#141414' : '#888',
-                    border: '1px solid #d0d0d0',
-                    borderRadius: '4px',
+                    border: '1px solid #b8b8b8',
+                    borderRadius: '8px',
                     outline: 'none',
                     background: '#fff',
                     appearance: 'none',
@@ -351,7 +355,7 @@ export const DataHostingTabContent: React.FC = () => {
                   } as React.CSSProperties
                 }
                 onFocus={(e) => (e.currentTarget.style.borderColor = '#0091ae')}
-                onBlur={(e) => (e.currentTarget.style.borderColor = '#d0d0d0')}
+                onBlur={(e) => (e.currentTarget.style.borderColor = '#b8b8b8')}
               >
                 <option value="" disabled>
                   Choose a location
@@ -370,7 +374,7 @@ export const DataHostingTabContent: React.FC = () => {
                   transform: 'translateY(-50%)',
                   pointerEvents: 'none',
                   color: '#555',
-                  fontSize: '13px',
+                  fontSize: MAIN_SETTINGS_FONT_SIZE.sm,
                 }}
               >
                 ▾
@@ -380,9 +384,9 @@ export const DataHostingTabContent: React.FC = () => {
         </div>
 
         <div
+          className="main-settings-form-sidebar__footer"
           style={{
-            padding: '20px 32px',
-            borderTop: '1px solid #e8e8e8',
+            borderTop: '1px solid #d0d0d0',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'flex-end',
@@ -396,13 +400,13 @@ export const DataHostingTabContent: React.FC = () => {
             disabled={!canSchedule}
             style={{
               padding: '9px 20px',
-              fontSize: '14px',
+              fontSize: MAIN_SETTINGS_FONT_SIZE.base,
               fontFamily: baseFont,
               fontWeight: 400,
               color: canSchedule ? '#141414' : '#aaa',
               background: '#fff',
               border: `1px solid ${canSchedule ? '#d0d0d0' : '#e0e0e0'}`,
-              borderRadius: '4px',
+              borderRadius: '8px',
               cursor: canSchedule ? 'pointer' : 'not-allowed',
               transition: 'border-color 0.15s, color 0.15s',
             }}
@@ -410,7 +414,7 @@ export const DataHostingTabContent: React.FC = () => {
               if (canSchedule) e.currentTarget.style.borderColor = '#141414'
             }}
             onMouseLeave={(e) => {
-              if (canSchedule) e.currentTarget.style.borderColor = '#d0d0d0'
+              if (canSchedule) e.currentTarget.style.borderColor = '#b8b8b8'
             }}
           >
             Schedule data migration
@@ -424,13 +428,13 @@ export const DataHostingTabContent: React.FC = () => {
             }}
             style={{
               padding: '9px 20px',
-              fontSize: '14px',
+              fontSize: MAIN_SETTINGS_FONT_SIZE.base,
               fontFamily: baseFont,
               fontWeight: 500,
               color: '#141414',
               background: '#fff',
               border: '1px solid #141414',
-              borderRadius: '4px',
+              borderRadius: '8px',
               cursor: 'pointer',
             }}
           >
