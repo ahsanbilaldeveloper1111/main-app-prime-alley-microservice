@@ -1525,7 +1525,7 @@
 
 // Day-detail offcanvas renders in a portal (outside `.workload-page`).
 .workload-day-offcanvas {
-  --bs-offcanvas-width: min(24rem, 100vw);
+  --bs-offcanvas-width: clamp(24rem, 28vw, 32rem);
 
   .workload-day-offcanvas__header .btn-close {
     margin-top: 0.25rem;
@@ -1842,7 +1842,7 @@
 
 // Unassigned sidebar renders in a portal (outside `.workload-page`).
 .workload-unassigned-offcanvas {
-  --bs-offcanvas-width: min(26rem, 100vw);
+  --bs-offcanvas-width: clamp(26rem, 30vw, 34rem);
 
   .workload-unassigned-offcanvas__header .btn-close {
     margin-top: 0.25rem;
@@ -1937,13 +1937,14 @@
   }
 
   .workload-unassigned-task__assign {
-    display: flex;
+    display: grid;
+    grid-template-columns: 1fr auto;
     gap: 8px;
     align-items: center;
     margin-top: 10px;
 
     .form-select {
-      flex: 1;
+      width: 100%;
       min-width: 0;
       height: 32px;
       min-height: 32px;
@@ -1973,8 +1974,8 @@
       border-radius: 4px !important;
       color: #ffffff !important;
       white-space: nowrap;
-      transition: background-color 0.15s ease, border-color 0.15s ease;
       flex-shrink: 0;
+      transition: background-color 0.15s ease;
 
       &:hover:not(:disabled) {
         background-color: #0052A3 !important;
@@ -1984,8 +1985,6 @@
       &:disabled {
         opacity: 0.6;
         cursor: not-allowed;
-        background-color: #0066CC !important;
-        border-color: #0066CC !important;
       }
     }
   }
