@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState, useEffect } from "react";
 import type { FocusEvent, MouseEvent } from "react";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 import GenericTable from "@components/GenericTable";
@@ -2166,6 +2166,23 @@ export function CrmLeadsViewFragment02() {
     uniqueSources
   } = useLeadsPageContext();
 
+  const [sidebarMarginTop, setSidebarMarginTop] = useState<number>(0);
+
+  useEffect(() => {
+    const updateSidebarMarginTop = () => {
+      const tabsEl = document.querySelector<HTMLElement>('.gt-toolbar-tabs-section');
+      if (tabsEl) {
+        setSidebarMarginTop(Math.round(tabsEl.getBoundingClientRect().height));
+      }
+    };
+    const timer = setTimeout(updateSidebarMarginTop, 100);
+    window.addEventListener('resize', updateSidebarMarginTop);
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener('resize', updateSidebarMarginTop);
+    };
+  }, []);
+
   const leadsQuickFilters = useMemo(
     () => [
       {
@@ -2207,7 +2224,7 @@ export function CrmLeadsViewFragment02() {
         style={{
           display: "flex",
           gap: "0",
-          height: "calc(100vh)",
+          height: "calc(100vh - 74px)",
           overflow: "hidden",
         }}
       >
@@ -2713,6 +2730,7 @@ export function CrmLeadsViewFragment02() {
                 showToolbar={true}
                 toolbar={leadsToolbarConfig}
                 statsCards={leadsStatsCards}
+                metricsGridMinWidth="150px"
                 customBody={
                   leadsViewMode === "board" ? (
                     <KanbanBoard
@@ -2749,6 +2767,8 @@ export function CrmLeadsViewFragment02() {
         {/* Lead Details Sidebar */}
         {showLeadSidebar && (
           <GenericSidebar
+            sidebarMarginTop={sidebarMarginTop}
+            width={window.innerWidth < 1280 ? "360px" : "420px"}
             isOpen={showLeadSidebar}
             onClose={handleCloseLeadSidebar}
             title={selectedLead?.name || "Lead Details"}

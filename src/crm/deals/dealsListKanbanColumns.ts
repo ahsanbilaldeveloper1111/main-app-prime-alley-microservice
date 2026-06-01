@@ -44,5 +44,6 @@ export function buildDealsKanbanColumns(
     id: String(stage.id),
     title: stage.name || "No Stage",
     cards: buckets[stage.id] || [],
+    color: stage.color || undefined,
   }));
 }
