@@ -1,6 +1,6 @@
 import React from "react";
 import { Alert, Button, Form, Offcanvas, Spinner } from "react-bootstrap";
-import { AlertTriangle, Calendar, Clock, Inbox } from "lucide-react";
+import { AlertTriangle, Calendar, Clock } from "lucide-react";
 import type { WorkloadTaskCard, WorkloadUnassignedData } from "@utils/tasks";
 import {
   formatWorkloadMemberAssignOption,
@@ -154,13 +154,13 @@ export function WorkloadUnassignedSidebar({
       placement="end"
       className="workload-unassigned-offcanvas"
     >
-      <Offcanvas.Header closeButton className="workload-unassigned-offcanvas__header border-0 pb-0">
+      <Offcanvas.Header closeButton className="workload-unassigned-offcanvas__header">
         <div className="workload-unassigned-offcanvas__title-block">
           <div className="workload-unassigned-offcanvas__title-row">
-            <Inbox size={20} className="text-primary" aria-hidden />
-            <Offcanvas.Title className="mb-0">Unassigned Tasks</Offcanvas.Title>
+            <i className="ti ti-inbox workload-unassigned-offcanvas__title-icon" aria-hidden />
+            <span className="workload-unassigned-offcanvas__title-text">Unassigned Tasks</span>
           </div>
-          <p className="workload-unassigned-offcanvas__subtitle text-muted small mb-0">
+          <p className="workload-unassigned-offcanvas__subtitle">
             {unassignedQuery.isPending ? "Loading…" : subtitle}
           </p>
         </div>
