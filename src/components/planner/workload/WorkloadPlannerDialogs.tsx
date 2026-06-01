@@ -20,6 +20,7 @@ import {
   formatWorkloadMemberLabel,
   formatWorkloadMinutes,
   formatWorkloadPercent,
+  formatWorkloadShortDueDate,
   isWorkloadOrganizationTask,
   formatWorkloadTaskEstimate,
   isWorkloadTaskUnestimated,
@@ -381,6 +382,26 @@ export function WorkloadReassignModal({
               <div className="workload-reassign-modal__row">
                 <span className="workload-reassign-modal__label">Task</span>
                 <span className="workload-reassign-modal__value">{task.title}</span>
+              </div>
+              <div className="workload-reassign-modal__row">
+                <span className="workload-reassign-modal__label">Priority</span>
+                <span className="workload-reassign-modal__value">
+                  <WorkloadPriorityBadge priority={task.priority} />
+                </span>
+              </div>
+              {task.due_date ? (
+                <div className="workload-reassign-modal__row">
+                  <span className="workload-reassign-modal__label">Due date</span>
+                  <span className="workload-reassign-modal__value">
+                    {formatWorkloadShortDueDate(task.due_date)}
+                  </span>
+                </div>
+              ) : null}
+              <div className="workload-reassign-modal__row">
+                <span className="workload-reassign-modal__label">Estimate</span>
+                <span className="workload-reassign-modal__value">
+                  {formatWorkloadTaskEstimate(task)}
+                </span>
               </div>
               {targetExtension && memberName ? (
                 <div className="workload-reassign-modal__row">
