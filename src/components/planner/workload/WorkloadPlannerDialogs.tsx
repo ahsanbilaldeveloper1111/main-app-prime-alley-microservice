@@ -400,7 +400,11 @@ export function WorkloadReassignModal({
               <div className="workload-reassign-modal__row">
                 <span className="workload-reassign-modal__label">Estimate</span>
                 <span className="workload-reassign-modal__value">
-                  {formatWorkloadTaskEstimate(task)}
+                  {isWorkloadTaskUnestimated(task) ? (
+                    <WorkloadBdg tone="orange">No estimate</WorkloadBdg>
+                  ) : (
+                    formatWorkloadTaskEstimate(task)
+                  )}
                 </span>
               </div>
               {targetExtension && memberName ? (
