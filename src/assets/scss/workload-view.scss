@@ -1886,15 +1886,17 @@
   }
 
   .workload-unassigned-offcanvas__body {
-    padding-top: 0.5rem;
+    background: #f5f7fa;
+    padding: 16px;
   }
 
   .workload-unassigned-task {
-    border: 1px solid #cbd5e0;
+    border: 1px solid #b0bec5;
     border-radius: 8px;
-    padding: 12px 14px;
+    padding: 14px 16px;
     margin-bottom: 10px;
     background: #ffffff;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
   }
 
   .workload-unassigned-task__title {
