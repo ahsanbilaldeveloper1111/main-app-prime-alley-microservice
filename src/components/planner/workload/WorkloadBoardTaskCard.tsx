@@ -105,13 +105,6 @@ export function WorkloadBoardTaskCard({
         </span>
         <div className="workload-board-task-card__title-wrap">
           <div className="workload-board-task-card__title">{task.title}</div>
-          {unestimated ? (
-            <span
-              className="workload-unestimated-dot"
-              title="No estimate"
-              aria-label="No estimate"
-            />
-          ) : null}
         </div>
       </div>
 
