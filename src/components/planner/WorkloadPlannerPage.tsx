@@ -332,7 +332,12 @@ const WorkloadPlannerPage: React.FC = () => {
       );
     },
     onSuccess: () => {
-      toast.success("Task assigned");
+      toast.success(
+        reassignTask?.due_date
+          ? "Task assigned successfully"
+          : "Task assigned. Set a due date so it appears in the grid.",
+        { autoClose: reassignTask?.due_date ? 3000 : 5000 }
+      );
       setReassignTask(null);
       setReassignOverloadConfirm(false);
       invalidateWorkload();
