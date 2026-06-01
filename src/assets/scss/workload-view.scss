@@ -1738,7 +1738,7 @@
   }
 
   .workload-unassigned-task {
-    border: 1px solid #eaf0f6;
+    border: 1px solid #cbd5e0;
     border-radius: 8px;
     padding: 12px 14px;
     margin-bottom: 10px;
@@ -1747,10 +1747,16 @@
 
   .workload-unassigned-task__title {
     font-weight: 600;
-    font-size: 0.9rem;
+    font-size: clamp(13px, 1vw, 15px);
     line-height: 1.3;
-    margin-bottom: 0.45rem;
+    margin-bottom: 8px;
     word-break: break-word;
+    color: #141414;
+    font-family: "Lexend Deca", Helvetica, Arial, sans-serif;
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px;
   }
 
   .workload-unassigned-task__tags {
@@ -1824,6 +1830,8 @@
       &:disabled {
         opacity: 0.6;
         cursor: not-allowed;
+        background-color: #0066CC !important;
+        border-color: #0066CC !important;
       }
     }
   }
