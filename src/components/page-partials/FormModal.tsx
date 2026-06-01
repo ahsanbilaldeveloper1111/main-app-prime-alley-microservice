@@ -99,7 +99,6 @@ const FormModalFooterContent = ({
   showFooterInstructions,
   showCancelButton,
   showSubmitButton,
-  useCrmDialogFooterStyle,
   submitDisabled,
   isSubmitting,
   submitButtonVariant,
@@ -213,7 +212,29 @@ const FormModalFooterContent = ({
       </div>
     </Modal.Footer>
   );
-};
+}
+
+const FormModalFooterContent = (props: FormModalFooterProps) => (
+  <FormModalFooterLayout
+    variant={props.variant}
+    requiredHint={<FormModalRequiredHint show={props.showFooterInstructions} />}
+    actionButtons={
+      <FormModalActionButtons
+        useCrmDialogFooterStyle={props.useCrmDialogFooterStyle}
+        showCancelButton={props.showCancelButton}
+        showSubmitButton={props.showSubmitButton}
+        submitDisabled={props.submitDisabled}
+        isSubmitting={props.isSubmitting}
+        submitButtonVariant={props.submitButtonVariant}
+        submitButtonText={props.submitButtonText}
+        cancelButtonText={props.cancelButtonText}
+        onSubmit={props.onSubmit}
+        onCancel={props.onCancel}
+        variant={props.variant}
+      />
+    }
+  />
+);
 
 const FormModal: React.FC<FormModalProps> = ({
   show,
