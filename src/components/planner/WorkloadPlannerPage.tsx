@@ -666,9 +666,10 @@ const WorkloadPlannerPage: React.FC = () => {
         hierarchyExtensions={hierarchyDataExtensions}
         assignTargets={assignTargets}
         setAssignTargets={setAssignTargets}
-        assignMutation={{
-          isPending: assignMutation.isPending,
-          mutate: assignMutation.mutate,
+        onRequestAssign={(task, toExtension) => {
+          setReassignTask(task);
+          setReassignTarget(toExtension);
+          setReassignOverloadConfirm(false);
         }}
         formatError={workloadErrorMessage}
       />

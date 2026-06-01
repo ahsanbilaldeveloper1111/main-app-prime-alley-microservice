@@ -125,10 +125,7 @@ export type WorkloadUnassignedSidebarProps = Readonly<{
   hierarchyExtensions?: unknown[] | null;
   assignTargets: Record<number, string>;
   setAssignTargets: React.Dispatch<React.SetStateAction<Record<number, string>>>;
-  assignMutation: Readonly<{
-    isPending: boolean;
-    mutate: (vars: { task: WorkloadTaskCard; toExtension: string }) => void;
-  }>;
+  onRequestAssign: (task: WorkloadTaskCard, toExtension: string) => void;
   formatError: (err: unknown) => string;
 }>;
 
@@ -140,7 +137,7 @@ export function WorkloadUnassignedSidebar({
   hierarchyExtensions,
   assignTargets,
   setAssignTargets,
-  assignMutation,
+  onRequestAssign,
   formatError,
 }: WorkloadUnassignedSidebarProps) {
   const count = unassignedQuery.data?.count ?? unassignedQuery.data?.tasks.length ?? 0;
@@ -190,9 +187,9 @@ export function WorkloadUnassignedSidebar({
             onAssign={() => {
               const toExtension = assignTargets[task.id] ?? "";
               if (!toExtension) return;
-              assignMutation.mutate({ task, toExtension });
+              onRequestAssign(task, toExtension);
             }}
-            isAssigning={assignMutation.isPending}
+            isAssigning={false}
           />
         ))}
       </Offcanvas.Body>
