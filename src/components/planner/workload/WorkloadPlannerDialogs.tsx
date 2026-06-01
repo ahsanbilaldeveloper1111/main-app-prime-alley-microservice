@@ -535,22 +535,33 @@ export function WorkloadRescheduleModal({
       <Modal.Body>
         {task ? (
           <>
-            <Form.Group className="mb-3">
-              <Form.Label className="small text-muted mb-1">Current</Form.Label>
-              <Form.Control plaintext readOnly value={currentLabel} className="px-0" />
-            </Form.Group>
-            <Form.Group className="mb-3">
-              <Form.Label className="small text-muted mb-1">Task</Form.Label>
-              <Form.Control plaintext readOnly value={task.title} className="fw-semibold px-0" />
-            </Form.Group>
-            <Form.Group>
-              <Form.Label>New due date</Form.Label>
-              <Form.Control
-                type="date"
-                value={rescheduleDate}
-                onChange={(e) => onDateChange(e.target.value)}
-              />
-            </Form.Group>
+            <div className="workload-reassign-modal__summary">
+              <div className="workload-reassign-modal__row">
+                <span className="workload-reassign-modal__label">Task</span>
+                <span className="workload-reassign-modal__value">{task.title}</span>
+              </div>
+              <div className="workload-reassign-modal__row">
+                <span className="workload-reassign-modal__label">Priority</span>
+                <span className="workload-reassign-modal__value">
+                  <WorkloadPriorityBadge priority={task.priority} />
+                </span>
+              </div>
+              <div className="workload-reassign-modal__row">
+                <span className="workload-reassign-modal__label">Current date</span>
+                <span className="workload-reassign-modal__value">{currentLabel}</span>
+              </div>
+              <div className="workload-reassign-modal__row workload-reassign-modal__row--due">
+                <span className="workload-reassign-modal__label">New date</span>
+                <div className="workload-reassign-modal__due-wrap">
+                  <input
+                    type="date"
+                    className="workload-reassign-modal__date-input"
+                    value={rescheduleDate}
+                    onChange={(e) => onDateChange(e.target.value)}
+                  />
+                </div>
+              </div>
+            </div>
             {overloadSecondStep ? (
               <Alert variant="warning" className="small mt-3 mb-0">
                 This change may overload capacity for that day. Confirm to apply anyway.
@@ -564,7 +575,7 @@ export function WorkloadRescheduleModal({
           Cancel
         </Button>
         <Button variant="primary" disabled={!rescheduleDate || isSaving} onClick={onSubmit}>
-          {overloadSecondStep ? "Reschedule anyway" : "Reschedule"}
+          {isSaving ? "Saving…" : overloadSecondStep ? "Reschedule anyway" : "Reschedule"}
         </Button>
       </Modal.Footer>
     </Modal>
