@@ -1383,6 +1383,22 @@ export const controlhubKeys = {
  *   - REST command mutations (dial, end, hold, resume, attend, transfer, monitor)
  *   - Reconciliation reads (ongoing calls, call legs)
  */
+export const notificationSettingsKeys = {
+  root: ["notificationSettings"] as const,
+
+  global: {
+    all: () => [...notificationSettingsKeys.root, "global"] as const,
+    resolved: (userExtension: string) =>
+      [...notificationSettingsKeys.global.all(), "resolved", userExtension] as const,
+  },
+
+  smartCrm: {
+    all: () => [...notificationSettingsKeys.root, "smartCrm"] as const,
+    resolved: (userExtension: string) =>
+      [...notificationSettingsKeys.smartCrm.all(), "resolved", userExtension] as const,
+  },
+};
+
 export const ctiKeys = {
   root: ["cti"] as const,
 

@@ -4,6 +4,23 @@ import { NotificationsSettingsHowSection } from './NotificationsSettingsHowSecti
 import { NotificationsSettingsTopicsSection } from './NotificationsSettingsTopicsSection'
 import { useNotificationsSettingsState } from './useNotificationsSettingsState'
 
+function notificationSettingsStatusMessage(
+  isGlobalLoading: boolean,
+  isGlobalSaving: boolean,
+  isSmartCrmLoading: boolean,
+): string {
+  if (isGlobalLoading) {
+    return 'Loading notification delivery preferences…'
+  }
+  if (isGlobalSaving) {
+    return 'Saving notification delivery preferences…'
+  }
+  if (isSmartCrmLoading) {
+    return 'Loading Smart CRM notification preferences…'
+  }
+  return 'Saving Smart CRM notification preferences…'
+}
+
 export const NotificationsSettingsNew: React.FC = () => {
   const baseFont = NOTIFICATIONS_BASE_FONT
   const {
@@ -20,6 +37,7 @@ export const NotificationsSettingsNew: React.FC = () => {
     toggleChannelEnabled,
     selectedChime,
     setSelectedChime,
+    playSelectedChime,
     allExpanded,
     toggleExpandAll,
     turnOffAll,
@@ -29,10 +47,63 @@ export const NotificationsSettingsNew: React.FC = () => {
     tableChannels,
     colWidth,
     getParentState,
+    isSmartCrmLoading,
+    isSmartCrmSaving,
+    smartCrmLoadError,
+    isGlobalLoading,
+    isGlobalSaving,
+    globalLoadError,
   } = useNotificationsSettingsState()
 
   return (
     <div style={{ fontFamily: baseFont, color: '#141414', padding: '32px 40px' }}>
+      {globalLoadError ? (
+        <div
+          role="alert"
+          style={{
+            marginBottom: '16px',
+            padding: '12px 16px',
+            borderRadius: '4px',
+            border: '1px solid #f0b4b4',
+            background: '#fff5f5',
+            fontSize: '13px',
+            color: '#8a1f1f',
+          }}
+        >
+          Could not load your notification delivery preferences. Showing defaults until the service is available.
+        </div>
+      ) : null}
+      {smartCrmLoadError ? (
+        <div
+          role="alert"
+          style={{
+            marginBottom: '16px',
+            padding: '12px 16px',
+            borderRadius: '4px',
+            border: '1px solid #f0b4b4',
+            background: '#fff5f5',
+            fontSize: '13px',
+            color: '#8a1f1f',
+          }}
+        >
+          Could not load Smart CRM notification settings. Showing defaults until the service is available.
+        </div>
+      ) : null}
+      {(isGlobalLoading || isGlobalSaving || isSmartCrmLoading || isSmartCrmSaving) && (
+        <div
+          style={{
+            marginBottom: '16px',
+            fontSize: '13px',
+            color: '#555',
+          }}
+        >
+          {notificationSettingsStatusMessage(
+            isGlobalLoading,
+            isGlobalSaving,
+            isSmartCrmLoading,
+          )}
+        </div>
+      )}
       <NotificationsSettingsHowSection
         baseFont={baseFont}
         bannerVisible={bannerVisible}
@@ -44,6 +115,7 @@ export const NotificationsSettingsNew: React.FC = () => {
         toggleChannelEnabled={toggleChannelEnabled}
         selectedChime={selectedChime}
         setSelectedChime={setSelectedChime}
+        onPlaySelectedChime={playSelectedChime}
       />
       <NotificationsSettingsTopicsSection
         baseFont={baseFont}

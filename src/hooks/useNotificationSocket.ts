@@ -33,16 +33,21 @@ export interface SocketNotificationPayload {
   id: string | number;
   extension_id?: string | number;
   triggered_by_extension_id?: string | number | null;
+  tenant_id?: string | null;
   source_service?: string | null;
   action?: string;
-  target_id?: string;
+  target_id?: string | number;
   target_type?: string;
   module?: string;
-  changes?: Record<string, unknown>;
+  changes?: Record<string, unknown> | null;
   description?: string;
   title?: string;
   priority?: string;
   status?: string | null;
+  ringtone?: string | null;
+  popup?: boolean | null;
+  in_app?: boolean;
+  push_notification?: boolean;
   created_at?: string;
   [key: string]: unknown;
 }
@@ -80,6 +85,7 @@ function getOrCreateSocket(getAccessToken: () => string | null): Socket | null {
   if (sharedSocket?.connected) return sharedSocket;
 
   const token = getAccessToken();
+  console.log("NOTIF", token, SOCKET_URL, sharedSocket)
   if (!token || !SOCKET_URL) return null;
 
   if (sharedSocket) {
