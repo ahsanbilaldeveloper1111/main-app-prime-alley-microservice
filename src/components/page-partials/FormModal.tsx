@@ -95,11 +95,74 @@ const FormModalHeader = ({
   );
 };
 
-const FormModalFooterContent = ({
-  showFooterInstructions,
+type FormModalFooterButtonProps = Readonly<{
+  showCancelButton: boolean;
+  showSubmitButton: boolean;
+  submitDisabled: boolean;
+  isSubmitting: boolean;
+  submitButtonVariant: NonNullable<FormModalProps['submitButtonVariant']>;
+  submitButtonText: string;
+  cancelButtonText: string;
+  onSubmit: () => void;
+  onCancel: () => void;
+  variant: 'modal' | 'sidebar';
+}>;
+
+function FormModalRequiredHint({ show }: Readonly<{ show: boolean }>) {
+  if (!show) {
+    return null;
+  }
+
+  return (
+    <Form.Text className="text-muted d-flex align-items-center gap-1 form-text mb-0">
+      <AlertCircle size={14} className="flex-shrink-0" />
+      <span style={{ fontSize: '0.813rem' }}>
+        Fields marked with <span className="text-danger fw-bold">*</span> are required
+      </span>
+    </Form.Text>
+  );
+}
+
+function CrmDialogFooterButtons({
   showCancelButton,
   showSubmitButton,
-  useCrmDialogFooterStyle,
+  submitDisabled,
+  isSubmitting,
+  submitButtonText,
+  cancelButtonText,
+  onSubmit,
+  onCancel,
+}: FormModalFooterButtonProps) {
+  return (
+    <>
+      {showSubmitButton ? (
+        <Button
+          variant="primary"
+          onClick={onSubmit}
+          disabled={submitDisabled}
+          style={CRM_DIALOG_PRIMARY_BUTTON_STYLE}
+        >
+          <Check size={16} aria-hidden />
+          {submitButtonText}
+        </Button>
+      ) : null}
+      {showCancelButton ? (
+        <Button
+          variant="outline-secondary"
+          onClick={onCancel}
+          disabled={isSubmitting}
+          style={CRM_DIALOG_SECONDARY_BUTTON_STYLE}
+        >
+          {cancelButtonText}
+        </Button>
+      ) : null}
+    </>
+  );
+}
+
+function StandardFooterButtons({
+  showCancelButton,
+  showSubmitButton,
   submitDisabled,
   isSubmitting,
   submitButtonVariant,
@@ -108,94 +171,82 @@ const FormModalFooterContent = ({
   onSubmit,
   onCancel,
   variant,
-}: FormModalFooterProps) => {
+}: FormModalFooterButtonProps) {
+  const isSidebar = variant === 'sidebar';
+
+  return (
+    <>
+      {showCancelButton ? (
+        <Button
+          variant={isSidebar ? 'outline-secondary' : 'light'}
+          onClick={onCancel}
+          disabled={isSubmitting}
+          className={isSidebar ? 'contact-form-btn-cancel' : undefined}
+        >
+          {isSidebar ? (
+            cancelButtonText
+          ) : (
+            <>
+              <X size={16} className="me-1" /> {cancelButtonText}
+            </>
+          )}
+        </Button>
+      ) : null}
+      {showSubmitButton ? (
+        <Button
+          variant={submitButtonVariant}
+          onClick={onSubmit}
+          disabled={submitDisabled}
+          className={isSidebar ? 'contact-form-btn-create' : undefined}
+        >
+          {isSidebar ? (
+            submitButtonText
+          ) : (
+            <>
+              <Check size={16} className="me-1" />
+              {submitButtonText}
+            </>
+          )}
+        </Button>
+      ) : null}
+    </>
+  );
+}
+
+function FormModalActionButtons({
+  useCrmDialogFooterStyle,
+  variant,
+  ...buttonProps
+}: FormModalFooterButtonProps & Readonly<{ useCrmDialogFooterStyle: boolean }>) {
+  const isSidebar = variant === 'sidebar';
   const footerActionsClassName = useCrmDialogFooterStyle ? undefined : 'd-flex gap-2';
   const footerActionsStyle = useCrmDialogFooterStyle
     ? CRM_DIALOG_FOOTER_ACTIONS_ROW_STYLE
     : undefined;
 
-  const requiredHint = showFooterInstructions ? (
-    <Form.Text className="text-muted d-flex align-items-center gap-1 form-text mb-0">
-      <AlertCircle size={14} className="flex-shrink-0" />
-      <span style={{ fontSize: '0.813rem' }}>
-        Fields marked with <span className="text-danger fw-bold">*</span> are required
-      </span>
-    </Form.Text>
-  ) : null;
-
-  const actionButtons = (
-      <div
-        className={
-          variant === 'sidebar'
-            ? 'main-settings-form-sidebar-footer__actions'
-            : footerActionsClassName
-        }
-        style={variant === 'sidebar' ? undefined : footerActionsStyle}
-      >
-        {useCrmDialogFooterStyle ? (
-          <>
-            {showSubmitButton ? (
-              <Button
-                variant="primary"
-                onClick={onSubmit}
-                disabled={submitDisabled}
-                style={CRM_DIALOG_PRIMARY_BUTTON_STYLE}
-              >
-                <Check size={16} aria-hidden />
-                {submitButtonText}
-              </Button>
-            ) : null}
-            {showCancelButton ? (
-              <Button
-                variant="outline-secondary"
-                onClick={onCancel}
-                disabled={isSubmitting}
-                style={CRM_DIALOG_SECONDARY_BUTTON_STYLE}
-              >
-                {cancelButtonText}
-              </Button>
-            ) : null}
-          </>
-        ) : (
-          <>
-            {showCancelButton ? (
-              <Button
-                variant={variant === 'sidebar' ? 'outline-secondary' : 'light'}
-                onClick={onCancel}
-                disabled={isSubmitting}
-                className={variant === 'sidebar' ? 'contact-form-btn-cancel' : undefined}
-              >
-                {variant === 'sidebar' ? (
-                  cancelButtonText
-                ) : (
-                  <>
-                    <X size={16} className="me-1" /> {cancelButtonText}
-                  </>
-                )}
-              </Button>
-            ) : null}
-            {showSubmitButton ? (
-              <Button
-                variant={submitButtonVariant}
-                onClick={onSubmit}
-                disabled={submitDisabled}
-                className={variant === 'sidebar' ? 'contact-form-btn-create' : undefined}
-              >
-                {variant === 'sidebar' ? (
-                  submitButtonText
-                ) : (
-                  <>
-                    <Check size={16} className="me-1" />
-                    {submitButtonText}
-                  </>
-                )}
-              </Button>
-            ) : null}
-          </>
-        )}
-      </div>
+  return (
+    <div
+      className={isSidebar ? 'main-settings-form-sidebar-footer__actions' : footerActionsClassName}
+      style={isSidebar ? undefined : footerActionsStyle}
+    >
+      {useCrmDialogFooterStyle ? (
+        <CrmDialogFooterButtons variant={variant} {...buttonProps} />
+      ) : (
+        <StandardFooterButtons variant={variant} {...buttonProps} />
+      )}
+    </div>
   );
+}
 
+function FormModalFooterLayout({
+  variant,
+  requiredHint,
+  actionButtons,
+}: Readonly<{
+  variant: 'modal' | 'sidebar';
+  requiredHint: React.ReactNode;
+  actionButtons: React.ReactNode;
+}>) {
   if (variant === 'sidebar') {
     return (
       <div className="main-settings-form-sidebar-footer w-100">
@@ -213,7 +264,29 @@ const FormModalFooterContent = ({
       </div>
     </Modal.Footer>
   );
-};
+}
+
+const FormModalFooterContent = (props: FormModalFooterProps) => (
+  <FormModalFooterLayout
+    variant={props.variant}
+    requiredHint={<FormModalRequiredHint show={props.showFooterInstructions} />}
+    actionButtons={
+      <FormModalActionButtons
+        useCrmDialogFooterStyle={props.useCrmDialogFooterStyle}
+        showCancelButton={props.showCancelButton}
+        showSubmitButton={props.showSubmitButton}
+        submitDisabled={props.submitDisabled}
+        isSubmitting={props.isSubmitting}
+        submitButtonVariant={props.submitButtonVariant}
+        submitButtonText={props.submitButtonText}
+        cancelButtonText={props.cancelButtonText}
+        onSubmit={props.onSubmit}
+        onCancel={props.onCancel}
+        variant={props.variant}
+      />
+    }
+  />
+);
 
 const FormModal: React.FC<FormModalProps> = ({
   show,

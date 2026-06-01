@@ -102,7 +102,7 @@ function BulkRankAssignmentFormFields({
                     isClearable
                     isSearchable
                     isLoading={isLoadingRanksForBulk}
-                    menuPortalTarget={typeof document !== 'undefined' ? document.body : null}
+                    menuPortalTarget={globalThis.document === undefined ? null : globalThis.document.body}
                     styles={{ menuPortal: (base) => ({ ...base, zIndex: 100000 }) }}
                 />
                 <Form.Text className="text-muted d-flex align-items-center gap-1 form-text mt-2">

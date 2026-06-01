@@ -376,6 +376,19 @@ function hasEditableProfileFields(profile: unknown): boolean {
   );
 }
 
+function resolveProfileSnapshot(
+  fetched: unknown,
+  currentUserProfile: unknown,
+): unknown {
+  if (fetched && hasEditableProfileFields(fetched)) {
+    return fetched;
+  }
+  if (hasEditableProfileFields(currentUserProfile)) {
+    return currentUserProfile;
+  }
+  return fetched ?? currentUserProfile;
+}
+
 function hydrateUserProfileTabFromCurrentUserEffect(
   profileSnapshot: any,
   countriesList: any[],
@@ -784,12 +797,7 @@ const UserProfileTab: React.FC<UserProfileTabProps> = ({
           return;
         }
 
-        const snapshot =
-          fetched && hasEditableProfileFields(fetched)
-            ? fetched
-            : hasEditableProfileFields(currentUser?.profile)
-              ? currentUser.profile
-              : fetched ?? currentUser?.profile;
+        const snapshot = resolveProfileSnapshot(fetched, currentUser?.profile);
 
         if (snapshot) {
           applyLoadedUserProfileSnapshot(snapshot, countries, {

@@ -72,6 +72,18 @@ export interface SelectCheckBoxProps {
 
 const MENU_PORTAL_Z_INDEX = 100000;
 
+function resolveMenuPortalTarget(
+  menuPortalTarget: HTMLElement | null | undefined,
+): HTMLElement | null {
+  if (menuPortalTarget !== undefined) {
+    return menuPortalTarget;
+  }
+  if (globalThis.document === undefined) {
+    return null;
+  }
+  return globalThis.document.body;
+}
+
 const SelectCheckBox: React.FC<SelectCheckBoxProps> = ({
   options,
   value,
@@ -89,12 +101,7 @@ const SelectCheckBox: React.FC<SelectCheckBoxProps> = ({
   closeMenuOnSelect = false,
   menuPortalTarget,
 }) => {
-  const resolvedMenuPortal =
-    menuPortalTarget === undefined
-      ? typeof document === 'undefined'
-        ? null
-        : document.body
-      : menuPortalTarget;
+  const resolvedMenuPortal = resolveMenuPortalTarget(menuPortalTarget);
 
   return (
     <Select<SelectCheckBoxOption, true>
