@@ -1544,11 +1544,12 @@
   }
 
   .workload-day-stat {
-    border: 1px solid #d1d5db;
+    border: 1px solid #b0bec5;
     border-radius: 8px;
     padding: 10px 12px;
     text-align: center;
     background: #ffffff;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
   }
 
   .workload-day-stat__label {
@@ -1675,12 +1676,12 @@
   }
 
   .workload-day-task-card {
-    border: 1px solid #cbd5e0;
+    border: 1px solid #b0bec5;
     border-radius: 8px;
     padding: 14px 16px;
     margin-bottom: 10px;
     background: #ffffff;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
   }
 
   .workload-day-task-card__title-row {
