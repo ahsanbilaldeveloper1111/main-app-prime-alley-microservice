@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Modal, Button, Form } from 'react-bootstrap';
+import { Button, Form, Modal } from 'react-bootstrap';
 import { toast } from 'react-toastify';
+import { MainSettingsFormSidebar } from '@components/main-settings/MainSettingsFormSidebar';
+import { useMainSettingsFormSidebar } from '@components/main-settings/mainSettingsFormContext';
 import { GetUserById, updateUserProfileData, DeleteUser } from '@utils/tms/tmsUserManagement';
 
 interface ChangeStatusModalProps {
@@ -18,6 +20,7 @@ const ChangeStatusModal: React.FC<ChangeStatusModalProps> = ({
     newStatus,
     onSuccess,
 }) => {
+    const preferSidebar = useMainSettingsFormSidebar();
     const [remarks, setRemarks] = useState('');
     const [loading, setLoading] = useState(false);
     const [submitting, setSubmitting] = useState(false);
@@ -84,35 +87,77 @@ const ChangeStatusModal: React.FC<ChangeStatusModalProps> = ({
 
     const userName = row?.name || row?.username || 'this user';
 
+    const bodyContent = loading ? (
+        <p className="text-muted mb-0">Loading user data...</p>
+    ) : (
+        <>
+            <p className="mb-3">
+                You are changing the status of user <strong>{userName}</strong> to{' '}
+                <strong>{newStatus}</strong>.
+            </p>
+            <Form.Group className="mb-0">
+                <Form.Label>Remarks</Form.Label>
+                <Form.Control
+                    as="textarea"
+                    rows={3}
+                    placeholder="Enter remarks (optional)"
+                    value={remarks}
+                    onChange={(e) => setRemarks(e.target.value)}
+                    disabled={submitting}
+                />
+            </Form.Group>
+        </>
+    );
+
+    const footer = (
+        <div className="main-settings-form-sidebar-footer w-100">
+            <div className="main-settings-form-sidebar-footer__actions">
+                <Button
+                    variant="outline-secondary"
+                    onClick={handleClose}
+                    disabled={submitting}
+                    className="contact-form-btn-cancel"
+                >
+                    Cancel
+                </Button>
+                <Button
+                    variant="primary"
+                    type="submit"
+                    form="change-user-status-form"
+                    disabled={loading || submitting || tmsUserId == null}
+                    className="contact-form-btn-create"
+                >
+                    {submitting ? 'Updating...' : 'Confirm'}
+                </Button>
+            </div>
+        </div>
+    );
+
+    if (preferSidebar) {
+        return (
+            <MainSettingsFormSidebar
+                show={show}
+                onHide={handleClose}
+                title="Change user status"
+                disableClose={submitting}
+                footer={footer}
+            >
+                {show ? (
+                    <Form id="change-user-status-form" onSubmit={handleSubmit}>
+                        {bodyContent}
+                    </Form>
+                ) : null}
+            </MainSettingsFormSidebar>
+        );
+    }
+
     return (
         <Modal show={show} onHide={handleClose} centered>
             <Modal.Header closeButton>
                 <Modal.Title>Change user status</Modal.Title>
             </Modal.Header>
             <Form onSubmit={handleSubmit}>
-                <Modal.Body>
-                    {loading ? (
-                        <p className="text-muted">Loading user data...</p>
-                    ) : (
-                        <>
-                            <p className="mb-3">
-                                You are changing the status of user <strong>{userName}</strong> to{' '}
-                                <strong>{newStatus}</strong>.
-                            </p>
-                            <Form.Group className="mb-0">
-                                <Form.Label>Remarks</Form.Label>
-                                <Form.Control
-                                    as="textarea"
-                                    rows={3}
-                                    placeholder="Enter remarks (optional)"
-                                    value={remarks}
-                                    onChange={(e) => setRemarks(e.target.value)}
-                                    disabled={submitting}
-                                />
-                            </Form.Group>
-                        </>
-                    )}
-                </Modal.Body>
+                <Modal.Body>{bodyContent}</Modal.Body>
                 <Modal.Footer>
                     <Button variant="secondary" onClick={handleClose} disabled={submitting}>
                         Cancel

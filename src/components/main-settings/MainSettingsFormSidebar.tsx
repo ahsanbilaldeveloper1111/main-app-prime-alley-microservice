@@ -27,7 +27,7 @@ export function MainSettingsFormSidebar({
   disableClose = false,
 }: MainSettingsFormSidebarProps) {
   useEffect(() => {
-    if (!show || typeof document === "undefined") return undefined;
+    if (!show || globalThis.document === undefined) return undefined;
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     return () => {
@@ -35,7 +35,7 @@ export function MainSettingsFormSidebar({
     };
   }, [show]);
 
-  if (!show || typeof document === "undefined") {
+  if (!show || globalThis.document === undefined) {
     return null;
   }
 

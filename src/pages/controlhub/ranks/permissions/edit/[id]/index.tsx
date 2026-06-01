@@ -9,6 +9,9 @@ import { ArrowLeft } from 'lucide-react'
 import { PermissionSwitch } from '@components/controlhub/PermissionSwitch'
 import { MAIN_SETTINGS_RANKS_AND_PERMISSIONS_PATH } from '@utils/controlhub/usersNavigation'
 import '@assets/scss/common.scss';
+import '@page-modules/controlhub/ranks/rankPermissionsPage.scss';
+import { RankPermissionsFilterPanel } from '@page-modules/controlhub/ranks/RankPermissionsFilterPanel';
+import { RankPermissionsMobileSaveBar } from '@page-modules/controlhub/ranks/RankPermissionsMobileSaveBar';
 
 interface Permission {
     id: number;
@@ -206,18 +209,18 @@ const EditRolePermission = () => {
     
 
     return (
-
-        <React.Fragment>
+        <div className="rank-permissions-page rank-permissions-page--assign">
             <BreadcrumbItem
                 mainTitle="Controlhub"
                 mainLink={MAIN_SETTINGS_RANKS_AND_PERMISSIONS_PATH}
                 subTitle="Permissions"
             />
 
-            <Row className="mb-3">
+            <Row className="rank-permissions-page__back">
                 <Col md={12}>
                     <Button
                         variant="outline-secondary"
+                        size="sm"
                         onClick={() => router.push(MAIN_SETTINGS_RANKS_AND_PERMISSIONS_PATH)}
                         className="d-flex align-items-center gap-2"
                     >
@@ -228,24 +231,23 @@ const EditRolePermission = () => {
             </Row>
 
            
-            <Row className="mb-3">
+            <Row className="rank-permissions-page__header">
             <Col md={12}>
                 <div className="page-header-title style-2">
-                <Row className="d-flex justify-content-between align-items-center">
-                    <Col md={7}>
-                      
-                      <h2 className="mb-0">Assign Permission to <b className='text-primary'>{roleName}</b></h2>
+                <Row className="rank-permissions-page__header-row g-2 align-items-lg-center">
+                    <Col xs={12} lg={7} className="min-w-0">
+                      <h2 className="mb-0 rank-permissions-page__title">
+                        <span className="rank-permissions-page__title-lead">Assign permission to </span>
+                        <span className="rank-permissions-page__title-name text-primary">{roleName}</span>
+                      </h2>
                     </Col>
-
-
-                    <Col md={5} className="d-flex justify-content-end">
-                      
-                    <div className="action-buttons">
+                    <Col xs={12} lg={5} className="min-w-0">
+                    <div className="action-buttons rank-permissions-page__header-actions">
                          <div className="search-container">
                             <i className="fas fa-search search-icon"></i>
                             <input type="text" className="search-bar" placeholder="Search permissions..." onChange={(e) => setSearchTerm(e.target.value)}/>
                         </div>
-                        <Button variant="primary" onClick={handleUpdateRole}>Update Permissions</Button>
+                        <Button variant="primary" size="sm" className="d-none d-sm-inline-flex rank-permissions-page__update-btn" onClick={handleUpdateRole}>Update Permissions</Button>
                     
                     </div>
 
@@ -257,10 +259,9 @@ const EditRolePermission = () => {
             </Col>
             </Row>
 
-            <Row className="mb-3">
-                <Col md={5}>
-                    <div className="d-flex align-items-center gap-2 flex-wrap">
-                        <span className="fw-semibold">Filter by Action:</span>
+            <Row className="rank-permissions-page__filters rank-permissions-page__filters--assign g-2 align-items-center">
+                <Col xs={12} md>
+                    <RankPermissionsFilterPanel label="Filter by action" ariaLabel="Filter by action">
                         <Button
                             variant={selectedAction === 'all' ? 'primary' : 'outline-primary'}
                             size="sm"
@@ -303,37 +304,34 @@ const EditRolePermission = () => {
                         >
                             Update
                         </Button>
-                    </div>
+                    </RankPermissionsFilterPanel>
                 </Col>
-                <Col md={5}>
-                    <div className="d-flex align-items-center gap-2 flex-wrap justify-content-end">
-                        <span className="fw-semibold">Severity Level:</span>
-                        <Button variant="outline-primary" size="sm" onClick={() => setSelectedSeverityLevel('')}>All</Button>
-                        <Button variant="outline-info" size="sm" onClick={() => setSelectedSeverityLevel('Low')}>Low</Button>
-                        <Button variant="outline-primary" size="sm" onClick={() => setSelectedSeverityLevel('Medium')}>Medium</Button>
-                        <Button variant="outline-warning" size="sm" onClick={() => setSelectedSeverityLevel('High')}>High</Button>
-                        <Button variant="outline-danger" size="sm" onClick={() => setSelectedSeverityLevel('Critical')}>Critical</Button>
+                <Col xs={12} md="auto" className="rank-permissions-page__filters-end">
+                    <div className="rank-permissions-page__filters-toolbar">
+                        <RankPermissionsFilterPanel inline label="Severity level" ariaLabel="Filter by severity level">
+                            <Button variant="outline-primary" size="sm" onClick={() => setSelectedSeverityLevel('')}>All</Button>
+                            <Button variant="outline-info" size="sm" onClick={() => setSelectedSeverityLevel('Low')}>Low</Button>
+                            <Button variant="outline-primary" size="sm" onClick={() => setSelectedSeverityLevel('Medium')}>Medium</Button>
+                            <Button variant="outline-warning" size="sm" onClick={() => setSelectedSeverityLevel('High')}>High</Button>
+                            <Button variant="outline-danger" size="sm" onClick={() => setSelectedSeverityLevel('Critical')}>Critical</Button>
+                        </RankPermissionsFilterPanel>
+                        <div className="rank-permissions-page__bulk-actions">
+                            <Button
+                                variant="outline-primary"
+                                size="sm"
+                                onClick={handleSelectAll}
+                            >
+                                Select All
+                            </Button>
+                            <Button
+                                variant="outline-primary"
+                                size="sm"
+                                onClick={handleUnselectAll}
+                            >
+                                Unselect All
+                            </Button>
+                        </div>
                     </div>
-                </Col>
-                <Col md={2} className="d-flex justify-content-end gap-2">
-                    <Button 
-                        variant="outline-primary" 
-                        size="sm" 
-                        onClick={handleSelectAll}
-                        className="d-flex align-items-center gap-1"
-                    >
-                        
-                        Select All
-                    </Button>
-                    <Button 
-                        variant="outline-primary" 
-                        size="sm" 
-                        onClick={handleUnselectAll}
-                        className="d-flex align-items-center gap-1"
-                    >
-                       
-                        Unselect All
-                    </Button>
                 </Col>
             </Row>
 
@@ -364,26 +362,23 @@ const EditRolePermission = () => {
                             <React.Fragment key={group.group}>
                                 {group.permissions.length > 0 && (
                                 
-                                        <Card className="p-3 mb-3">
+                                        <Card className="rank-permissions-page__group-card">
                                             <div className="roles-box">
-                                                <div className="roles-box-header clearfix">
-                                                    <span className="mb-2" style={{ float: "left" }}>
-                                                        <h6>{group.group}</h6>
-                                                    </span>
-                                                    <label className="enableSwitch" style={{ float: "right" }}>
-                                                        <Form.Check
-                                                            type="switch"
-                                                            label="Enable All"
-                                                            checked={group.enableAll}
-                                                            onChange={() => handleEnableAllChange(groupIdx)}
-                                                        />
-                                                    </label>
-                                                    <div className="clearfix"></div>
+                                                <div className="roles-box-header">
+                                                    <h6 className="mb-0 roles-box-header__title">{group.group}</h6>
+                                                    <Form.Check
+                                                        type="switch"
+                                                        id={`enable-all-${groupKey}`}
+                                                        className="roles-box-header__enable-all"
+                                                        label="Enable All"
+                                                        checked={group.enableAll}
+                                                        onChange={() => handleEnableAllChange(groupIdx)}
+                                                    />
                                                 </div>
 
                                                 {/* Regular Permissions Section */}
                                                 {nonSpecialPermissions.length > 0 && (
-                                                    <div className="mb-2">
+                                                    <div className="roles-box__section">
                                                         <div className="row">
                                                             {nonSpecialPermissions.map((perm) => renderPermissionSwitch(perm, 'regular'))}
                                                         </div>
@@ -392,8 +387,8 @@ const EditRolePermission = () => {
 
                                                 {/* Special Permissions Section */}
                                                 {specialPermissions.length > 0 && (
-                                                    <div className="mb-4">
-                                                        <h6 className="text-warning mb-4" style={{borderBottom: '1px #d6d6d6 solid',paddingBottom: '10px'}}>
+                                                    <div className="roles-box__section">
+                                                        <h6 className="text-warning rank-permissions-page__special-heading">
                                                             <i className="fas fa-star me-2" aria-hidden="true" />
                                                             {" "}Special Permissions
                                                         </h6>
@@ -411,7 +406,9 @@ const EditRolePermission = () => {
                     })}
                   </Col>
             </Row>
-        </React.Fragment>
+
+            <RankPermissionsMobileSaveBar onSave={handleUpdateRole} />
+        </div>
     )
 }
 EditRolePermission.getLayout = (page: ReactElement) => {

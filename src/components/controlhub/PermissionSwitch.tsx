@@ -31,16 +31,16 @@ export const PermissionSwitch: React.FC<PermissionSwitchProps> = ({
     onPermissionChange,
     getSeverityBadgeClass
 }) => (
-    <div className="col-md-4 mb-3">
+    <div className="col-12 col-md-6 col-lg-4 rank-permissions-page__perm-col">
         <OverlayTrigger
-            placement="right"
+            placement="top"
             overlay={
                 <Tooltip id={`tooltip-${tooltipIdPrefix}-${perm.id}`}>
                     {perm?.description || 'No description available'}
                 </Tooltip>
             }
         >
-            <div className="d-inline-block">
+            <div className="rank-permissions-page__perm-item">
                 <Form.Check
                     type="switch"
                     id={`${perm.key}_${groupKey}`}
@@ -53,9 +53,11 @@ export const PermissionSwitch: React.FC<PermissionSwitchProps> = ({
                     }}
                 />
                 {perm?.severity_level && perm?.severity_level !== "" && (
-                    <span className={`status-badge ${getSeverityBadgeClass(perm.severity_level)} ms-1 small`}>
-                        {perm?.severity_level}
-                    </span>
+                    <div className="rank-permissions-page__perm-meta">
+                        <span className={`status-badge ${getSeverityBadgeClass(perm.severity_level)} small`}>
+                            {perm?.severity_level}
+                        </span>
+                    </div>
                 )}
             </div>
         </OverlayTrigger>
