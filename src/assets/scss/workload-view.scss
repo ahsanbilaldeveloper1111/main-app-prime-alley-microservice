@@ -1544,7 +1544,7 @@
   }
 
   .workload-day-stat {
-    border: 1px solid #eaf0f6;
+    border: 1px solid #d1d5db;
     border-radius: 8px;
     padding: 10px 12px;
     text-align: center;
@@ -1657,12 +1657,13 @@
   }
 
   .workload-day-tasks__heading {
-    font-size: 0.68rem;
+    font-size: clamp(10px, 0.8vw, 11px);
     font-weight: 700;
     letter-spacing: 0.06em;
     text-transform: uppercase;
-    color: var(--bs-secondary-color, #6c757d);
-    margin-bottom: 0.65rem;
+    color: #718096;
+    margin-bottom: 10px;
+    font-family: "Lexend Deca", Helvetica, Arial, sans-serif;
   }
 
   .workload-day-tasks__empty {
@@ -1742,7 +1743,10 @@
   }
 
   .workload-day-total-summary {
-    font-size: 0.8rem;
+    font-size: clamp(11px, 0.85vw, 12px);
+    color: #718096;
+    font-family: "Lexend Deca", Helvetica, Arial, sans-serif;
+    margin-bottom: 8px;
   }
 
   .workload-day-estimate-form {
