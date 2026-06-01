@@ -2059,15 +2059,15 @@
 
   .workload-reassign-modal__row--due {
     align-items: flex-start;
-    flex-direction: column;
-    gap: 6px;
+    flex-direction: row;
+    gap: 12px;
   }
 
   .workload-reassign-modal__due-wrap {
     display: flex;
     flex-direction: column;
     gap: 4px;
-    width: 100%;
+    flex: 1;
   }
 
   .workload-reassign-modal__date-input {
