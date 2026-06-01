@@ -1,16 +1,13 @@
 import React, { useState } from "react";
 import {
   Alert,
-  Badge,
   Button,
-  Col,
   Form,
   Modal,
   Offcanvas,
-  Row,
   Spinner,
 } from "react-bootstrap";
-import { AlertTriangle, BarChart3, Clock } from "lucide-react";
+import { AlertTriangle, Clock } from "lucide-react";
 import type {
   WorkloadDayData,
   WorkloadGridCell,
@@ -31,7 +28,7 @@ import {
   workloadMemberInitials,
   workloadTaskProjectLabel,
 } from "@page-modules/planner/workload/workloadDomain";
-import { WorkloadPriorityBadge } from "./WorkloadPlannerSubviews";
+import { WorkloadBdg, WorkloadPriorityBadge } from "./WorkloadPlannerSubviews";
 
 type DayQuerySlice = Readonly<{
   isPending: boolean;
@@ -90,14 +87,14 @@ function WorkloadDayTaskMarkDoneButton({
 }>) {
   if (task.is_completed) return null;
   return (
-    <Button
-      size="sm"
-      variant="outline-success"
+    <button
+      type="button"
+      className="workload-day-action-btn workload-day-action-btn--success"
       disabled={isMarkingDone}
       onClick={() => onMarkDone(task)}
     >
       {isMarkingDone ? "Saving…" : "Mark done"}
-    </Button>
+    </button>
   );
 }
 
@@ -137,9 +134,10 @@ function WorkloadDayTaskCard({
           ) : null}
         </div>
         {showOrgBadge ? (
-          <Badge bg="light" text="dark" className="workload-day-task-card__org border">
+          <WorkloadBdg tone="green">
+            <i className="ti ti-building" style={{ fontSize: "10px" }} aria-hidden />
             Org
-          </Badge>
+          </WorkloadBdg>
         ) : null}
       </div>
 
@@ -157,26 +155,26 @@ function WorkloadDayTaskCard({
             {task.status_name}
           </span>
         ) : null}
-        <span className="workload-day-task-card__tag">{projectLabel}</span>
-        {dueDateLabel ? (
-          <span
-            className={`workload-day-task-card__tag ${
-              task.is_overdue ? "workload-day-task-card__tag--overdue" : ""
-            }`}
-          >
-            {dueDateLabel}
-          </span>
+        {!showOrgBadge && projectLabel && projectLabel !== "—" && projectLabel !== "Personal" ? (
+          <WorkloadBdg tone="gray">{projectLabel}</WorkloadBdg>
         ) : null}
-        {unestimated ? (
-          <span className="workload-day-task-card__tag workload-day-task-card__tag--warn">
-            <AlertTriangle size={12} aria-hidden />
-            No estimate
-          </span>
+        {dueDateLabel ? (
+          <WorkloadBdg tone={task.is_overdue ? "red" : "gray"}>
+            {dueDateLabel}
+          </WorkloadBdg>
         ) : (
-          <span className="workload-day-task-card__tag">
-            <Clock size={12} aria-hidden />
+          <WorkloadBdg tone="gray">No due date</WorkloadBdg>
+        )}
+        {unestimated ? (
+          <WorkloadBdg tone="orange">
+            <AlertTriangle size={10} aria-hidden />
+            No est.
+          </WorkloadBdg>
+        ) : (
+          <WorkloadBdg tone="gray">
+            <Clock size={10} aria-hidden />
             {formatWorkloadTaskEstimate(task)}
-          </span>
+          </WorkloadBdg>
         )}
       </div>
 
@@ -206,12 +204,12 @@ function WorkloadDayTaskCard({
       ) : null}
 
       <div className="workload-day-task-card__actions">
-        <Button size="sm" variant="outline-secondary" onClick={() => onReassign(task)}>
+        <button type="button" className="workload-day-action-btn" onClick={() => onReassign(task)}>
           Reassign
-        </Button>
-        <Button size="sm" variant="outline-secondary" onClick={() => onReschedule(task)}>
+        </button>
+        <button type="button" className="workload-day-action-btn" onClick={() => onReschedule(task)}>
           Reschedule
-        </Button>
+        </button>
         <WorkloadDayTaskMarkDoneButton
           task={task}
           isMarkingDone={isMarkingDone}
@@ -261,7 +259,7 @@ export function WorkloadDayOffcanvas({
       placement="end"
       className="workload-day-offcanvas"
     >
-      <Offcanvas.Header closeButton className="workload-day-offcanvas__header border-0 pb-0">
+      <Offcanvas.Header closeButton className="workload-day-offcanvas__header">
         {selected ? (
           <div className="workload-day-offcanvas__identity">
             <div className="workload-day-offcanvas__avatar">
@@ -269,7 +267,6 @@ export function WorkloadDayOffcanvas({
             </div>
             <div>
               <div className="workload-day-offcanvas__name-row">
-                <BarChart3 size={16} className="text-primary" aria-hidden />
                 <span className="workload-day-offcanvas__name">
                   {selectedMemberName} — {formatWorkloadDayDetailDate(selected.date)}
                 </span>
@@ -277,7 +274,7 @@ export function WorkloadDayOffcanvas({
             </div>
           </div>
         ) : (
-          <Offcanvas.Title>Day detail</Offcanvas.Title>
+          <span className="workload-day-offcanvas__name">Day detail</span>
         )}
       </Offcanvas.Header>
       <Offcanvas.Body className="workload-day-offcanvas__body pt-2">
@@ -289,44 +286,32 @@ export function WorkloadDayOffcanvas({
         {dayQuery.isError ? <Alert variant="danger">{formatError(dayQuery.error)}</Alert> : null}
         {selected && dayQuery.data ? (
           <>
-            <Row className="g-2 mb-3 workload-day-stats">
-              <Col xs={6}>
-                <div className="workload-day-stat">
-                  <div className="workload-day-stat__value workload-day-stat__value--accent">
-                    {formatWorkloadMinutes(estMinutes)}
-                  </div>
-                  <div className="workload-day-stat__label">Est. load</div>
+            <div className="workload-day-stats-grid">
+              <div className="workload-day-stat">
+                <div className="workload-day-stat__value workload-day-stat__value--accent">
+                  {formatWorkloadMinutes(estMinutes)}
                 </div>
-              </Col>
-              <Col xs={6}>
-                <div className="workload-day-stat">
-                  <div className="workload-day-stat__value">
-                    {formatWorkloadMinutes(capacityMinutes)}
-                  </div>
-                  <div className="workload-day-stat__label">Capacity</div>
+                <div className="workload-day-stat__label">Est. load</div>
+              </div>
+              <div className="workload-day-stat">
+                <div className="workload-day-stat__value">
+                  {formatWorkloadMinutes(capacityMinutes)}
                 </div>
-              </Col>
-              <Col xs={6}>
-                <div className="workload-day-stat">
-                  <div className="workload-day-stat__value workload-day-stat__value--accent">
-                    {formatWorkloadPercent(usedPercent)}
-                  </div>
-                  <div className="workload-day-stat__label">Used</div>
+                <div className="workload-day-stat__label">Capacity</div>
+              </div>
+              <div className="workload-day-stat">
+                <div className="workload-day-stat__value workload-day-stat__value--accent">
+                  {formatWorkloadPercent(usedPercent)}
                 </div>
-              </Col>
-              <Col xs={6}>
-                <div className="workload-day-stat">
-                  <div
-                    className={`workload-day-stat__value ${
-                      unestimatedCount > 0 ? "workload-day-stat__value--warn" : "workload-day-stat__value--accent"
-                    }`}
-                  >
-                    {unestimatedCount}
-                  </div>
-                  <div className="workload-day-stat__label">Unestimated</div>
+                <div className="workload-day-stat__label">Used</div>
+              </div>
+              <div className="workload-day-stat">
+                <div className={`workload-day-stat__value ${unestimatedCount > 0 ? "workload-day-stat__value--warn" : "workload-day-stat__value--accent"}`}>
+                  {unestimatedCount}
                 </div>
-              </Col>
-            </Row>
+                <div className="workload-day-stat__label">Unestimated</div>
+              </div>
+            </div>
 
             <p className="workload-day-total-summary small text-muted mb-2">
               {formatWorkloadDayTotalSummary(estMinutes, unestimatedCount)}
