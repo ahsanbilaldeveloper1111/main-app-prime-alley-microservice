@@ -29,6 +29,8 @@ export interface StatsCardData {
 interface StatsCardsProps {
   data: StatsCardData[];
   gridMinWidth?: string;
+  /** Fixed column count; when omitted uses auto-fit grid. */
+  columns?: number;
   /** Font size for the stat value (e.g. '24px', '36px'). Defaults to '36px'. */
   valueFontSize?: string;
 }
@@ -36,12 +38,17 @@ interface StatsCardsProps {
 const StatsCards: React.FC<StatsCardsProps> = ({ 
   data, 
   gridMinWidth = '200px',
+  columns,
   valueFontSize = '36px'
 }) => {
+  const gridTemplateColumns = columns
+    ? `repeat(${columns}, minmax(0, 1fr))`
+    : `repeat(auto-fit, minmax(${gridMinWidth}, 1fr))`;
+
   return (
     <div style={{
       display: 'grid',
-      gridTemplateColumns: `repeat(auto-fit, minmax(${gridMinWidth}, 1fr))`,
+      gridTemplateColumns,
       gap: '16px',
       marginBottom: '16px',
       background: '#FFFFFF',
