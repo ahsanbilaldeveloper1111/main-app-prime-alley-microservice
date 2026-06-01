@@ -1738,11 +1738,11 @@
   }
 
   .workload-unassigned-task {
-    border: 1px solid var(--bs-border-color, #dee2e6);
-    border-radius: 0.5rem;
-    padding: 0.75rem;
-    margin-bottom: 0.65rem;
-    background: var(--bs-body-bg, #fff);
+    border: 1px solid #eaf0f6;
+    border-radius: 8px;
+    padding: 12px 14px;
+    margin-bottom: 10px;
+    background: #ffffff;
   }
 
   .workload-unassigned-task__title {
@@ -1784,6 +1784,21 @@
     .form-select {
       flex: 1;
       min-width: 0;
+    }
+
+    .btn-primary {
+      background-color: #0066CC !important;
+      border-color: #0066CC !important;
+      font-family: "Lexend Deca", Helvetica, Arial, sans-serif;
+      font-size: 13px;
+      font-weight: 500;
+      padding: 6px 14px;
+      border-radius: 4px;
+
+      &:hover {
+        background-color: #0052A3 !important;
+        border-color: #0052A3 !important;
+      }
     }
   }
 
