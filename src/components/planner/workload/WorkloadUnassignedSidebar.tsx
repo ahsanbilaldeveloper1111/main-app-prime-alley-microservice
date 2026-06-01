@@ -83,7 +83,7 @@ function WorkloadUnassignedTaskRow({
             {formatWorkloadShortDueDate(task.due_date)}
           </WorkloadBdg>
         ) : (
-          <WorkloadBdg tone="orange">
+          <WorkloadBdg tone="gray">
             <Calendar size={10} aria-hidden />
             No due date
           </WorkloadBdg>
