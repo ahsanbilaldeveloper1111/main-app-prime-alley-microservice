@@ -7,6 +7,7 @@ import {
   formatWorkloadRangeLabel,
   formatWorkloadShortDueDate,
   formatWorkloadTaskEstimate,
+  isWorkloadOrganizationTask,
   isWorkloadTaskUnestimated,
   workloadBoardStatusBdgTone,
   workloadTaskProjectLabel,
@@ -54,6 +55,7 @@ export function WorkloadBoardTaskCard({
   onMove,
 }: WorkloadBoardTaskCardProps) {
   const unestimated = isWorkloadTaskUnestimated(task);
+  const isOrg = isWorkloadOrganizationTask(task);
   const statusLabel = task.status_name?.trim();
   const projectLabel = workloadTaskProjectLabel(task);
   const scheduleLabel = task.due_date
@@ -114,6 +116,11 @@ export function WorkloadBoardTaskCard({
       </div>
 
       <div className="workload-board-task-card__meta">
+        {isOrg ? (
+          <WorkloadBdg tone="green">
+            Org task
+          </WorkloadBdg>
+        ) : null}
         <WorkloadPriorityBadge priority={task.priority} />
         {projectLabel && projectLabel !== "—" ? (
           <WorkloadBdg tone="gray">{projectLabel}</WorkloadBdg>
