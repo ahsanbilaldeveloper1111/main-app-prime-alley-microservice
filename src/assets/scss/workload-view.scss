@@ -1300,8 +1300,13 @@
     justify-content: center;
     padding: 0.1rem;
     margin: 0;
-    color: #9ca3af;
+    color: transparent;
     line-height: 0;
+    transition: color 0.15s ease;
+  }
+
+  .workload-board-task-card:hover .workload-board-task-card__drag-handle {
+    color: #9ca3af;
   }
 
   .workload-board-task-card__title {
