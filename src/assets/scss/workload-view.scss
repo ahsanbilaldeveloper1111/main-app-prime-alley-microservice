@@ -733,6 +733,25 @@
     font-size: 0.65rem;
   }
 
+  .workload-member-cell__personal-ind {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: #fff7ed;
+    border: 1px solid #fed7aa;
+    color: #ea580c;
+    font-size: 9px;
+    font-weight: 700;
+    margin-left: 4px;
+    cursor: help;
+    vertical-align: middle;
+    flex-shrink: 0;
+    font-style: normal;
+  }
+
   button.workload-cell-btn {
     display: block;
     width: 100%;
@@ -843,6 +862,13 @@
     font-weight: 600;
     line-height: 1.2;
     margin: 3px 0 5px;
+  }
+
+  .workload-cell__unest-count {
+    font-size: 9px;
+    color: #ea580c;
+    font-weight: 500;
+    white-space: nowrap;
   }
 
   .workload-cell__pct--filled {

@@ -87,7 +87,16 @@ export function WorkloadMemberIdentity({
           {initials}
         </span>
         <div className="workload-member-cell__inline-text">
-          <span className="workload-member-cell__name">{label}</span>
+          <span className="workload-member-cell__name">
+            {label}
+            {/* TODO: replace static indicator with API field has_personal_todos when available */}
+            <span
+              className="workload-member-cell__personal-ind"
+              title="May have personal todos — capacity shown may be incomplete"
+            >
+              i
+            </span>
+          </span>
           {isOwner ? (
             <Badge bg="secondary" className="workload-member-cell__badge ms-1">
               Owner
@@ -107,7 +116,16 @@ export function WorkloadMemberIdentity({
         {initials}
       </span>
       <div className="workload-member-cell__text">
-        <div className="workload-member-cell__name">{label}</div>
+        <div className="workload-member-cell__name">
+          {label}
+          {/* TODO: replace static indicator with API field has_personal_todos when available */}
+          <span
+            className="workload-member-cell__personal-ind"
+            title="May have personal todos — capacity shown may be incomplete"
+          >
+            i
+          </span>
+        </div>
         {roleLabel ? <div className="workload-member-cell__role">{roleLabel}</div> : null}
         {isOwner ? (
           <Badge bg="secondary" className="workload-member-cell__badge">
@@ -127,20 +145,44 @@ export function WorkloadSummaryCardsRow({ data }: WorkloadSummaryCardsProps) {
   return (
     <div className="workload-summary-row">
       <div className="workload-summary-card">
-        <div className="workload-summary-card__value">{data.total_tasks_this_week}</div>
         <div className="workload-summary-card__label">Tasks this week</div>
+        <div className="workload-summary-card__value" style={{ color: "#0066CC" }}>
+          {data.total_tasks_this_week}
+        </div>
+        <div className="workload-summary-card__sub">
+          <span className="workload-summary-card__dot" style={{ background: "#0066CC" }} />
+          Assigned to team
+        </div>
       </div>
       <div className="workload-summary-card">
-        <div className="workload-summary-card__value">{data.overloaded_members}</div>
         <div className="workload-summary-card__label">Overloaded members</div>
+        <div className="workload-summary-card__value" style={{ color: data.overloaded_members > 0 ? "#dc2626" : "#141414" }}>
+          {data.overloaded_members}
+        </div>
+        <div className="workload-summary-card__sub">
+          <span className="workload-summary-card__dot" style={{ background: data.overloaded_members > 0 ? "#dc2626" : "#9ca3af" }} />
+          Above 100% capacity
+        </div>
       </div>
       <div className="workload-summary-card">
-        <div className="workload-summary-card__value">{data.unestimated_tasks}</div>
         <div className="workload-summary-card__label">Unestimated tasks</div>
+        <div className="workload-summary-card__value" style={{ color: data.unestimated_tasks > 0 ? "#ea580c" : "#141414" }}>
+          {data.unestimated_tasks}
+        </div>
+        <div className="workload-summary-card__sub">
+          <span className="workload-summary-card__dot" style={{ background: data.unestimated_tasks > 0 ? "#ea580c" : "#9ca3af" }} />
+          No time estimate set
+        </div>
       </div>
       <div className="workload-summary-card">
-        <div className="workload-summary-card__value">{data.critical_priority_tasks}</div>
         <div className="workload-summary-card__label">Critical priority</div>
+        <div className="workload-summary-card__value" style={{ color: data.critical_priority_tasks > 0 ? "#dc2626" : "#141414" }}>
+          {data.critical_priority_tasks}
+        </div>
+        <div className="workload-summary-card__sub">
+          <span className="workload-summary-card__dot" style={{ background: data.critical_priority_tasks > 0 ? "#dc2626" : "#9ca3af" }} />
+          Needs immediate attention
+        </div>
       </div>
     </div>
   );
@@ -315,6 +357,11 @@ function WorkloadGridCellButton({ cell, band, onSelect }: WorkloadGridCellButton
               }`}
             >
               {percentLabel}
+              {showUnestimatedDot && (cell?.unestimated_count ?? 0) > 0 ? (
+                <span className="workload-cell__unest-count">
+                  {` · ${cell.unestimated_count} unest.`}
+                </span>
+              ) : null}
             </div>
             <div className="workload-cell__bar">
               <div
