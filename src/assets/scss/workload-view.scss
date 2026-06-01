@@ -544,6 +544,17 @@
     flex-shrink: 0;
   }
 
+  .workload-legend__icon {
+    font-size: 12px;
+    line-height: 1;
+  }
+
+  .workload-legend__personal-icon {
+    font-size: 12px;
+    color: #ea580c;
+    line-height: 1;
+  }
+
   .workload-period-panel {
     border: 1px solid var(--border-color, #eaf0f6);
     border-radius: var(--border-radius-md, 12px);

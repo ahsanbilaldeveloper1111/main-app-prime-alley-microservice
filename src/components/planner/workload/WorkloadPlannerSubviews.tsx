@@ -87,16 +87,7 @@ export function WorkloadMemberIdentity({
           {initials}
         </span>
         <div className="workload-member-cell__inline-text">
-          <span className="workload-member-cell__name">
-            {label}
-            {/* TODO: replace static indicator with API field has_personal_todos when available */}
-            <span
-              className="workload-member-cell__personal-ind"
-              title="May have personal todos — capacity shown may be incomplete"
-            >
-              i
-            </span>
-          </span>
+          <span className="workload-member-cell__name">{label}</span>
           {isOwner ? (
             <Badge bg="secondary" className="workload-member-cell__badge ms-1">
               Owner
@@ -118,13 +109,6 @@ export function WorkloadMemberIdentity({
       <div className="workload-member-cell__text">
         <div className="workload-member-cell__name">
           {label}
-          {/* TODO: replace static indicator with API field has_personal_todos when available */}
-          <span
-            className="workload-member-cell__personal-ind"
-            title="May have personal todos — capacity shown may be incomplete"
-          >
-            i
-          </span>
         </div>
         {roleLabel ? <div className="workload-member-cell__role">{roleLabel}</div> : null}
         {isOwner ? (
@@ -252,6 +236,14 @@ export function WorkloadLegendRow({
             {item.label}
           </span>
         ))}
+        <span className="workload-legend__item">
+          <span className="workload-legend__icon" aria-hidden>🏢</span>
+          Org Tasks included
+        </span>
+        <span className="workload-legend__item">
+          <span className="workload-legend__personal-icon" aria-hidden>ⓘ</span>
+          Has personal todos (not counted)
+        </span>
       </div>
       <div className="workload-legend__actions">
         <button

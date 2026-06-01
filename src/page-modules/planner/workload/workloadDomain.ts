@@ -497,11 +497,10 @@ export const WORKLOAD_PRIORITY_LEGEND_ITEMS = (
 
 /** Grid legend (reference design + Postman `load_band`). */
 export const WORKLOAD_GRID_LEGEND_ITEMS = [
-  { id: "available", swatch: "#22c55e", label: "Available (0–70%)" },
-  { id: "comfortable", swatch: "#eab308", label: "Comfortable (70–90%)" },
-  { id: "near_full", swatch: "#f97316", label: "Near full (90–100%)" },
-  { id: "overloaded", swatch: "#ef4444", label: "Overloaded (>100%)" },
-  { id: "incomplete_data", swatch: "#9ca3af", label: "Incomplete data" },
+  { id: "comfortable", swatch: "#22c55e", label: "0–74% Comfortable" },
+  { id: "near_full", swatch: "#f97316", label: "75–99% Near Full" },
+  { id: "overloaded", swatch: "#ef4444", label: "100%+ Overloaded" },
+  { id: "unestimated", swatch: "#ea580c", label: "Has unestimated tasks" },
 ] as const;
 
 /** BEM-style modifier for cell backgrounds (see `workload-view.scss`). */
