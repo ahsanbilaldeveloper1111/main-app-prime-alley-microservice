@@ -1,6 +1,6 @@
 .workload-page {
   padding-bottom: 0;
-  background: #ffffff;
+  background: #f5f7fa;
   min-height: 100vh;
   border-radius: 0;
   display: flex;
@@ -22,7 +22,7 @@
     padding: 14px 24px;
     background: #ffffff;
     border-bottom: 1px solid #eaf0f6;
-    margin-bottom: 0;
+    margin-bottom: 4px;
   }
 
   .workload-page__title {
@@ -57,11 +57,11 @@
   .workload-filter-bar {
     background: #ffffff;
     border-bottom: 1px solid #eaf0f6;
-    padding: 0 20px;
+    padding: 6px 24px;
     height: 44px;
     display: flex;
     align-items: center;
-    margin-bottom: 0;
+    margin-bottom: 4px;
   }
 
   .workload-filter-bar__inner {
@@ -311,7 +311,7 @@
   .workload-summary-row {
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));
-    margin: 0;
+    margin: 4px 0;
     background: #ffffff;
     border-left: none;
     border-right: none;
@@ -474,8 +474,8 @@
     justify-content: space-between;
     align-items: center;
     gap: 0.75rem 1rem;
-    padding: 8px 24px;
-    margin: 0;
+    padding: 10px 24px;
+    margin: 4px 0;
     border-left: none;
     border-right: none;
     border-radius: 0;
@@ -601,6 +601,7 @@
     overflow-x: auto;
     background: var(--card-bg, #fff);
     margin: 0;
+    margin-top: 4px;
     border-left: none;
     border-right: none;
     border-radius: 0;
