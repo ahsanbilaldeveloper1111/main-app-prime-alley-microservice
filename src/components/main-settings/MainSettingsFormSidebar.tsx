@@ -62,9 +62,9 @@ export function MainSettingsFormSidebar({
           cursor: disableClose ? "default" : "pointer",
         }}
       />
-      <div
+      <dialog
+        open
         className="main-settings-form-sidebar main-settings-form-sidebar--open contact-sidebar-container"
-        role="dialog"
         aria-modal="true"
         aria-label={typeof title === "string" ? title : "Form panel"}
         style={{
@@ -130,7 +130,7 @@ export function MainSettingsFormSidebar({
             {footer}
           </div>
         ) : null}
-      </div>
+      </dialog>
     </>,
     document.body,
   );

@@ -10,7 +10,7 @@ function useMobileActionsViewport(): boolean {
   const [isMobile, setIsMobile] = useState(false);
 
   useEffect(() => {
-    if (typeof globalThis.window === "undefined") {
+    if (globalThis.window === undefined) {
       return undefined;
     }
     const mq = globalThis.window.matchMedia(MOBILE_ACTIONS_MEDIA_QUERY);
@@ -161,7 +161,7 @@ export function GenericTableMobileActionsMenu<T extends Record<string, any>>({
   }
 
   const menuPortal =
-    showMenu && isMobileViewport && typeof document !== "undefined"
+    showMenu && isMobileViewport && globalThis.document !== undefined
       ? createPortal(
           <div
             ref={menuRef}
