@@ -1,5 +1,5 @@
 import React, { useState, useRef, useCallback, useEffect } from "react";
-import { FileText, MapPin, Mail, ExternalLink, ChevronLeft, ChevronRight } from "lucide-react";
+import { FileText, MapPin, Mail, ExternalLink, ChevronLeft, ChevronRight, GripVertical, MoreHorizontal } from "lucide-react";
 import {
   buildBoundTableContextMenuItems,
   GtContextMenuItemList,
@@ -7,6 +7,7 @@ import {
   type TableAction,
 } from "@components/GenericTable";
 import "@assets/css/GenericTable.css";
+import "@assets/css/KanbanBoard.css";
 
 const FONT = "'Lexend Deca', Helvetica, Arial, sans-serif";
 const TEAL = "#006162";
@@ -27,6 +28,7 @@ export interface KanbanColumnDef {
   id: string;
   title: string;
   cards: KanbanCardData[];
+  color?: string;
 }
 
 export interface KanbanBoardProps {
@@ -48,6 +50,8 @@ export interface KanbanBoardProps {
   /** Right-click menu items (same rules as GenericTable row actions). */
   cardContextMenuItems?: (card: KanbanCardData) => BoundTableContextMenuItem[];
   searchValue?: string;
+  /** Optional height for the board container. Defaults to calc(100vh - 194px) */
+  boardHeight?: string;
 }
 
 // ─── Mini avatar ──────────────────────────────────────────────────────────────
@@ -78,10 +82,16 @@ const ActBtn: React.FC<{
   onClick: (e: React.MouseEvent) => void;
 }> = ({ icon, title, onClick }) => {
   const [hov, setHov] = useState(false);
+  const handleClick = (e: React.MouseEvent<HTMLButtonElement>) => {
+    e.stopPropagation();
+    onClick(e);
+  };
   return (
     <button
       title={title}
-      onClick={onClick}
+      type="button"
+      onClick={handleClick}
+      onMouseDown={(e) => e.stopPropagation()}
       onMouseEnter={() => setHov(true)}
       onMouseLeave={() => setHov(false)}
       style={{
@@ -104,49 +114,87 @@ const Card: React.FC<{
   columnId: string;
   onCardClick?: (c: KanbanCardData) => void;
   onCardAction?: (a: "view" | "pin" | "email" | "external", c: KanbanCardData) => void;
-  onCardContextMenu?: (e: React.MouseEvent<HTMLDivElement>, c: KanbanCardData) => void;
+  onCardContextMenu?: (e: React.MouseEvent<HTMLElement>, c: KanbanCardData) => void;
   onDragStart?: (e: React.DragEvent, id: string | number, colId: string) => void;
 }> = ({ card, columnId, onCardClick, onCardAction, onCardContextMenu, onDragStart }) => {
-  const [hov, setHov] = useState(false);
+  const openContextMenu = (clientX: number, clientY: number) => {
+    if (!onCardContextMenu) return;
+    onCardContextMenu(
+      {
+        preventDefault: () => {},
+        stopPropagation: () => {},
+        clientX,
+        clientY,
+      } as React.MouseEvent<HTMLElement>,
+      card,
+    );
+  };
 
   return (
-    <div
-      draggable
-      onDragStart={(e) => onDragStart?.(e, card.id, columnId)}
-      onContextMenu={(e) => onCardContextMenu?.(e, card)}
-      onMouseEnter={() => setHov(true)}
-      onMouseLeave={() => setHov(false)}
+    <li
+      className="kanban-board-card kanban-board-card-item"
       style={{
         background: "#fff",
         border: "1px solid #ccc",
         borderRadius: 8,
         padding: "11px 13px 12px",
         marginBottom: 11,
-        cursor: "grab",
-        boxShadow: hov
-          ? "0 2px 8px rgba(0,0,0,.10)"
-          : "0 1px 2px rgba(0,0,0,.05)",
-        transition: "box-shadow .12s",
+        boxShadow: "0 1px 2px rgba(0,0,0,.05)",
         fontFamily: FONT,
       }}
     >
+      <div style={{ display: "flex", alignItems: "flex-start", gap: 6 }}>
+        <button
+          type="button"
+          draggable
+          aria-label={`Drag ${card.name || "card"}`}
+          title="Drag to move"
+          onDragStart={(e) => onDragStart?.(e, card.id, columnId)}
+          style={{
+            background: "none",
+            border: "none",
+            cursor: "grab",
+            padding: "0 2px 0 0",
+            color: "#888",
+            display: "flex",
+            alignItems: "center",
+            flexShrink: 0,
+          }}
+        >
+          <GripVertical size={14} />
+        </button>
+
+        <div style={{ flex: 1, minWidth: 0 }}>
       {/* Name link */}
       <div style={{ marginBottom: 2 }}>
-        <span
-          onClick={(e) => { e.stopPropagation(); onCardClick?.(card); }}
-          onMouseEnter={(e) => (e.currentTarget.style.textDecoration = "underline")}
-          onMouseLeave={(e) => (e.currentTarget.style.textDecoration = "none")}
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onCardClick?.(card);
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.textDecoration = "underline";
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.textDecoration = "none";
+          }}
+          aria-label={`Open ${card.name || "record"}`}
           style={{
             fontSize: 14,
             fontWeight: 600,
-            color: TEAL,
+            color: "#0066CC",
             cursor: "pointer",
             fontFamily: FONT,
             lineHeight: "18px",
+            background: "none",
+            border: "none",
+            padding: 0,
+            textAlign: "left",
           }}
         >
           {card.name || "--"}
-        </span>
+        </button>
       </div>
 
       {/* Email row */}
@@ -159,7 +207,7 @@ const Card: React.FC<{
           <span
             title={card.email}
             style={{
-              fontSize: 11.5, color: TEAL, fontFamily: FONT,
+              fontSize: 11.5, color: "#4a5568", fontFamily: FONT,
               overflow: "hidden", textOverflow: "ellipsis",
               whiteSpace: "nowrap", maxWidth: 180, lineHeight: "18px",
             }}
@@ -182,7 +230,6 @@ const Card: React.FC<{
 
       {/* Action row */}
       <div
-        onClick={(e) => e.stopPropagation()}
         style={{
           display: "flex", alignItems: "center", justifyContent: "flex-end",
           gap: 0, paddingTop: 4, marginTop: 4,
@@ -192,8 +239,17 @@ const Card: React.FC<{
         <ActBtn icon={<MapPin      size={13} />} title="Pin"          onClick={() => onCardAction?.("pin",      card)} />
         <ActBtn icon={<Mail        size={13} />} title="Send email"   onClick={() => onCardAction?.("email",    card)} />
         <ActBtn icon={<ExternalLink size={13} />} title="Open record" onClick={() => onCardAction?.("external", card)} />
+        {onCardContextMenu && (
+          <ActBtn
+            icon={<MoreHorizontal size={13} />}
+            title="More actions"
+            onClick={(e) => openContextMenu(e.clientX, e.clientY)}
+          />
+        )}
       </div>
-    </div>
+        </div>
+      </div>
+    </li>
   );
 };
 
@@ -211,7 +267,8 @@ const ColumnHeader: React.FC<{
   isCollapsed: boolean;
   isLast: boolean;
   onToggle: () => void;
-}> = ({ title, count, isCollapsed, isLast, onToggle }) => {
+  color?: string;
+}> = ({ title, count, isCollapsed, isLast, onToggle, color }) => {
   const [hov, setHov] = useState(false);
 
   if (isCollapsed) {
@@ -223,11 +280,15 @@ const ColumnHeader: React.FC<{
           minHeight: 120,
         }}
       >
-        <div
+        <button
+          type="button"
           onClick={(e) => { e.stopPropagation(); onToggle(); }}
           onMouseEnter={() => setHov(true)}
           onMouseLeave={() => setHov(false)}
+          aria-label={`${title} (${count}) - Expand column`}
+          title={`${title} (${count}) - Click to expand`}
           style={{
+            width: "100%",
             height: HEADER_H,
             backgroundColor: "#f7f2f7",
             cursor: "pointer",
@@ -241,8 +302,8 @@ const ColumnHeader: React.FC<{
             boxShadow: hov ? "0 2px 4px rgba(0,0,0,0.1)" : "none",
             marginBottom: 8,
             border: "1px solid #ccc",
+            padding: 0,
           }}
-          title={`${title} (${count}) - Click to expand`}
         >
           <ChevronRight size={16} style={{ color: "#141414", marginBottom: 2 }} />
           {count > 0 && (
@@ -260,10 +321,13 @@ const ColumnHeader: React.FC<{
               {count}
             </span>
           )}
-        </div>
+        </button>
         {/* Vertical column name */}
-        <div
+        <button
+          type="button"
           onClick={(e) => { e.stopPropagation(); onToggle(); }}
+          aria-label={`${title} - Expand column`}
+          title={`${title} - Click to expand`}
           style={{
             writingMode: "vertical-rl",
             textOrientation: "mixed",
@@ -276,11 +340,13 @@ const ColumnHeader: React.FC<{
             margin: "8px auto",
             whiteSpace: "nowrap",
             userSelect: "none",
+            background: "none",
+            border: "none",
+            padding: 0,
           }}
-          title={`${title} - Click to expand`}
         >
           {title}
-        </div>
+        </button>
       </div>
     );
   }
@@ -295,7 +361,7 @@ const ColumnHeader: React.FC<{
         position: "relative",
         height: HEADER_H,
         flexShrink: 0,
-        backgroundColor: "#ccc",
+        backgroundColor: color || "#6c757d",
         borderTopLeftRadius: 0,
         clipPath: clipPathValue,
         zIndex: 1,
@@ -309,7 +375,7 @@ const ColumnHeader: React.FC<{
           left: 1,
           right: isLast ? 1 : 0,
           bottom: 1,
-          backgroundColor: "#f7f2f7",
+          backgroundColor: color ? `${color}22` : "#f7f2f7",
           borderTopLeftRadius: 0,
           display: "flex",
           alignItems: "center",
@@ -321,8 +387,6 @@ const ColumnHeader: React.FC<{
           cursor: "default",
           userSelect: "none",
         }}
-        onMouseEnter={() => setHov(true)}
-        onMouseLeave={() => setHov(false)}
       >
         <span style={{
           fontSize: 12,
@@ -352,8 +416,12 @@ const ColumnHeader: React.FC<{
         </span>
 
         <button
+          type="button"
           onClick={(e) => { e.stopPropagation(); onToggle(); }}
+          onMouseEnter={() => setHov(true)}
+          onMouseLeave={() => setHov(false)}
           title={isCollapsed ? "Expand" : "Collapse"}
+          aria-label={isCollapsed ? "Expand column" : "Collapse column"}
           style={{
             background: "none", border: "none", cursor: "pointer",
             padding: "2px 3px", borderRadius: 3,
@@ -380,7 +448,7 @@ const Column: React.FC<{
   onCardClick?: (c: KanbanCardData) => void;
   onCardAction?: (a: "view" | "pin" | "email" | "external", c: KanbanCardData) => void;
   onCardContextMenu?: (
-    e: React.MouseEvent<HTMLDivElement>,
+    e: React.MouseEvent<HTMLElement>,
     c: KanbanCardData,
   ) => void;
   onDragStart?: (e: React.DragEvent, id: string | number, colId: string) => void;
@@ -401,6 +469,7 @@ const Column: React.FC<{
         flexShrink: 0,
         width: isCollapsed ? 36 : COL_W,
         minWidth: isCollapsed ? 36 : COL_W,
+        flex: isCollapsed ? "0 0 36px" : "1 1 280px",
         maxHeight: "100%",
         overflow: "hidden",
         transition: "width .15s ease",
@@ -420,12 +489,15 @@ const Column: React.FC<{
           isCollapsed={isCollapsed}
           isLast={isLast}
           onToggle={onToggle}
+          color={col.color}
         />
       </div>
 
       {/* Cards area with 5px margin on all sides */}
       {!isCollapsed && (
-        <div
+        <ul
+          className="kanban-board-drop-list"
+          aria-label={`${col.title} cards`}
           onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
           onDragLeave={(e) => {
             const el = e.currentTarget;
@@ -466,7 +538,7 @@ const Column: React.FC<{
               />
             ))
           )}
-        </div>
+        </ul>
       )}
     </div>
   );
@@ -483,6 +555,7 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({
   onCardMove,
   cardContextMenuItems,
   searchValue,
+  boardHeight = "calc(100vh - 194px)",
 }) => {
   const [columns, setColumns]     = useState<KanbanColumnDef[]>(initialColumns);
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
@@ -657,7 +730,7 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({
         style={{
           display: "flex",
           flexDirection: "row",
-          height: "80vh",
+          height: boardHeight,
           width: "100%",
           overflowX: "auto",
           overflowY: "hidden",

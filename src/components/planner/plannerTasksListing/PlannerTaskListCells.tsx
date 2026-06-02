@@ -41,6 +41,7 @@ export function PlannerTaskTitleCell({
   onNavigate,
   onEditClick,
 }: PlannerTaskTitleCellProps) {
+  const isCompleted = row.status === "completed";
   return (
     <div className="task-title-cell ptl-title-cell">
       <a
@@ -48,6 +49,10 @@ export function PlannerTaskTitleCell({
         href={`/planner/tasks/${row.id}`}
         onClick={onNavigate}
         title={row.title}
+        style={{
+          color: isCompleted ? "#9ca3af" : undefined,
+          textDecoration: isCompleted ? "line-through" : undefined,
+        }}
       >
         {row.title}
       </a>
@@ -72,12 +77,10 @@ export function PlannerTaskPriorityCell({ row }: PlannerTaskPriorityCellProps) {
   }
   return (
     <div className="ptl-priority-row">
-      <span
-        className={`ptl-priority-dot ptl-priority-dot--${plannerPriorityDotModifier(row.priority)}`}
-      />
-      <span className="ptl-list-cell">
+      <div className={`ptl-priority-dot ptl-priority-dot--${plannerPriorityDotModifier(row.priority)}`} />
+      <div className="ptl-list-cell">
         {row.priority.charAt(0).toUpperCase() + row.priority.slice(1)}
-      </span>
+      </div>
     </div>
   );
 }
@@ -93,9 +96,9 @@ export function PlannerTaskDueDateCell({ row }: PlannerTaskDueDateCellProps) {
     apiDueTimeFromPlannerTaskRow(row),
   );
   return (
-    <span className={`ptl-list-cell ptl-due-date--${parts.tone}`}>
+    <div className={`ptl-list-cell ptl-due-date--${parts.tone}`}>
       {parts.label}
-    </span>
+    </div>
   );
 }
 
@@ -235,8 +238,32 @@ export function PlannerTaskAssigneeCell({
   return <TaskListingAssigneeCell label={display} />;
 }
 
+function resolveStatusBadgeColors(row: Task): { bg: string; text: string } {
+  // Future: when API provides color, use it
+  if (row.workflowStatus?.color) {
+    return { bg: row.workflowStatus.color + "22", text: row.workflowStatus.color };
+  }
+  // Fallback: name-based mapping
+  const name = (row.workflowStatus?.name || row.status || "").toLowerCase().trim();
+  if (name.includes("progress") || name.includes("in_progress")) return { bg: "#dbeafe", text: "#1e40af" };
+  if (name.includes("done") || name.includes("completed")) return { bg: "#d1fae5", text: "#065f46" };
+  if (name.includes("overdue")) return { bg: "#fee2e2", text: "#991b1b" };
+  if (name.includes("review")) return { bg: "#fef3c7", text: "#92400e" };
+  if (name.includes("new")) return { bg: "#ede9fe", text: "#5b21b6" };
+  if (name.includes("pending")) return { bg: "#fef9c3", text: "#854d0e" };
+  return { bg: "#e2e8f0", text: "#475569" };
+}
+
 export function PlannerTaskWorkflowStatusCell({ row }: Readonly<{ row: Task }>) {
-  return <span className="ptl-list-cell">{taskStatusColumnLabel(row)}</span>;
+  const { bg, text } = resolveStatusBadgeColors(row);
+  return (
+    <div
+      className="ptl-status-badge"
+      style={{ backgroundColor: bg, color: text }}
+    >
+      {taskStatusColumnLabel(row)}
+    </div>
+  );
 }
 
 export function PlannerTaskRepeatStatusCell({ row }: Readonly<{ row: Task }>) {

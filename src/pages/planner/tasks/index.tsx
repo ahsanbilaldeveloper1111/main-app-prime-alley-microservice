@@ -12,7 +12,7 @@ import BreadcrumbItem from "@common/BreadcrumbItem";
 import { toast } from "react-toastify";
 import { useRouter } from "next/router";
 import moment from "moment";
-import { ChevronDown, Plus } from "lucide-react";
+import { ChevronDown, Plus, X } from "lucide-react";
 import { Button, Form, Modal } from "react-bootstrap";
 import GenericTable, { TableColumn, TableAction } from "@components/GenericTable";
 import DeleteConfirmationModal from "@components/page-partials/DeleteConfirmationModal";
@@ -369,6 +369,8 @@ const TasksListingPage = ({
 
     const [fForm, setFForm] = useState(INITIAL_FILTER_FORM);
     const [openQuickFilter, setOpenQuickFilter] = useState<string | null>(null);
+    const [projectSearch, setProjectSearch] = useState("");
+    const [assigneeSearch, setAssigneeSearch] = useState("");
     const quickFilterRef = useRef<HTMLDivElement | null>(null);
 
     // ── Create/edit task sidebar ──────────────────────────────────────────────────
@@ -746,7 +748,7 @@ const TasksListingPage = ({
     // ── Columns ───────────────────────────────────────────────────────────────────
     const columns: TableColumn<Task>[] = useMemo(() => [
       {
-        key: "complete", label: "Done", sortable: false, type: "custom",
+        key: "complete", label: "Status", sortable: false, type: "custom",
         render: (row) => {
           const canToggleComplete = getTaskRowPermissions(row).canOpenTaskEdit;
           let completeBtnTitle = "Mark complete";
@@ -980,44 +982,57 @@ const TasksListingPage = ({
       {
         id: "project",
         label: fForm.project,
+        isActive: fForm.project !== "All Projects",
         icon: <ChevronDown size={12} />,
         onClick: () => setOpenQuickFilter((prev) => (prev === "project" ? null : "project")),
+        onClear: () => { setFForm((prev) => ({ ...prev, project: "All Projects" })); setProjectSearch(""); },
       },
       {
         id: "assigned_to",
         label: `Assigned to (${fForm.assignee.length})`,
+        isActive: fForm.assignee.length > 0,
         icon: <ChevronDown size={12} />,
         onClick: () => setOpenQuickFilter((prev) => (prev === "assigned_to" ? null : "assigned_to")),
+        onClear: () => { setFForm((prev) => ({ ...prev, assignee: [] })); setAssigneeSearch(""); },
       },
       {
         id: "task_type",
         label: fForm.task_type
           ? TASK_TYPE_OPTIONS.find((o) => o.value === fForm.task_type?.value)?.label || "Task type"
           : "Task type",
+        isActive: fForm.task_type != null,
         icon: <ChevronDown size={12} />,
         onClick: () => setOpenQuickFilter((prev) => (prev === "task_type" ? null : "task_type")),
+        onClear: () => setFForm((prev) => ({ ...prev, task_type: null })),
       },
       {
         id: "status",
         label: statusFilterPillLabel,
+        isActive: fForm.status !== ALL_STATUS_VALUE,
         icon: <ChevronDown size={12} />,
         onClick: () => setOpenQuickFilter((prev) => (prev === "status" ? null : "status")),
+        onClear: () => setFForm((prev) => ({ ...prev, status: ALL_STATUS_VALUE })),
       },
       {
         id: "priority",
         label: priorityFilterPillLabel,
+        isActive: fForm.priority != null,
         icon: <ChevronDown size={12} />,
         onClick: () => setOpenQuickFilter((prev) => (prev === "priority" ? null : "priority")),
+        onClear: () => setFForm((prev) => ({ ...prev, priority: null })),
       },
       {
         id: "due_date",
         label: dueDateFilterPillLabel,
+        isActive: !!(fForm.due_date_from || fForm.due_date_to),
         icon: <ChevronDown size={12} />,
         onClick: () => setOpenQuickFilter((prev) => (prev === "due_date" ? null : "due_date")),
+        onClear: () => setFForm((prev) => ({ ...prev, due_date_from: "", due_date_to: "" })),
       },
       {
         id: "queue",
         label: "Queue",
+        isActive: false,
         icon: <ChevronDown size={12} />,
         onClick: () => setOpenQuickFilter((prev) => (prev === "queue" ? null : "queue")),
       },
@@ -1029,19 +1044,30 @@ const TasksListingPage = ({
         dueDateFilterPillLabel,
       ],
     );
+
+    const hasActiveFilters = filterPills.some((p) => p.isActive);
   
     // ── Render ─────────────────────────────────────────────────────────────────────
     return (
       <React.Fragment>
   
         {/* ── Global style overrides ── */}
-        <style
-          dangerouslySetInnerHTML={{
-            __html: buildTaskListingPageStyleTag({
-              showTitleHoverEditButton: true,
-            }),
-          }}
-        />
+          <style
+            dangerouslySetInnerHTML={{
+              __html: buildTaskListingPageStyleTag({
+                showTitleHoverEditButton: true,
+                extraRules: `
+                  .tasks-page .ptl-tabs-row button {
+                    outline: none !important;
+                    box-shadow: none !important;
+                  }
+                  .tasks-page .ptl-tabs-row {
+                    border-bottom: 1px solid #e5e7eb;
+                  }
+                `,
+              }),
+            }}
+          />
   
         <BreadcrumbItem mainTitle="Planner" mainLink="/planner/dashboard" subTitle={breadcrumbSubTitle} />
   
@@ -1057,7 +1083,7 @@ const TasksListingPage = ({
               ROW 1 — Page title + top-right buttons
           ══════════════════════════════════════════════════════ */}
           <div style={{
-            padding: "14px 20px",
+            padding: "10px 20px",
             backgroundColor: "#fff",
             display: "flex",
             alignItems: "flex-start",
@@ -1086,9 +1112,9 @@ const TasksListingPage = ({
                   }}
                   style={{
                     ...TASK_LIST_BTN_OUTLINE,
-                    backgroundColor: "#000",
-                    background: "#000",
-                    borderColor: "#000",
+                    backgroundColor: "#0066CC",
+                    background: "#0066CC",
+                    borderColor: "#0066CC",
                     color: "#fff",
                     fontWeight: 600,
                   }}
@@ -1097,8 +1123,8 @@ const TasksListingPage = ({
                     e.currentTarget.style.background = "#333";
                   }}
                   onMouseLeave={e => {
-                    e.currentTarget.style.backgroundColor = "#000";
-                    e.currentTarget.style.background = "#000";
+                    e.currentTarget.style.backgroundColor = "#0066CC";
+                    e.currentTarget.style.background = "#0066CC";
                   }}
                 >Create task</button>
               )}
@@ -1111,14 +1137,12 @@ const TasksListingPage = ({
                       ────────── spacer ──────────  [+ Add view (4/50)]  [All Views]
           ══════════════════════════════════════════════════════ */}
           {!isTabLocked && (
-          <div style={{
+          <div className="ptl-tabs-row" style={{
             display: "flex",
             alignItems: "stretch",
             backgroundColor: "#fff",
-            
-         
-            height: 44,
             flexShrink: 0,
+            height: 44,
           }}>
             {(() => {
               const currentViewCount = allTabs.length;
@@ -1126,7 +1150,7 @@ const TasksListingPage = ({
               return (
                 <>
             {/* Tabs with equal width */}
-            {allTabs.map(tab => (
+            {allTabs.map((tab, index) => (
               <button
                 key={tab.id}
                 onClick={() => switchTab(tab.id)}
@@ -1134,20 +1158,21 @@ const TasksListingPage = ({
                   flex: 1,
                   display: "inline-flex",
                   alignItems: "center",
-                  justifyContent: "flex-start",
+                  justifyContent: "center",
                   padding: "0 20px",
-                  border: "none",
+                  borderLeft: index === 0 ? "1px solid #8A8A8A" : "none",
                   borderRight: "1px solid #8A8A8A",
                   borderTop: "1px solid #8A8A8A",
-                  backgroundColor: activeTab === tab.id ? "#f7f2f7" : "#fff",
-                  borderBottom: activeTab === tab.id ? "none" : "1px solid #8A8A8A",
-                  color: "#141414",
+                  backgroundColor: activeTab === tab.id ? "#f5f8fa" : "#fff",
+                  borderBottom: activeTab === tab.id ? "2px solid #0066CC" : "1px solid #8A8A8A",
+                  color: activeTab === tab.id ? "#0066CC" : "#141414",
                   fontSize: 13,
-                  fontWeight: activeTab === tab.id ? 500 : 400,
+                  fontWeight: activeTab === tab.id ? 600 : 400,
                   fontFamily: "Lexend Deca, Helvetica, Arial, sans-serif",
                   cursor: "pointer",
-                  height: "100%",
-                  gap: tab.id === "all" ? 10 : 0,
+                  height: 44,
+                  whiteSpace: "nowrap",
+                  gap: 6,
                 }}
               >
                 {tab.label}
@@ -1163,9 +1188,8 @@ const TasksListingPage = ({
                 alignItems: "center",
                 gap: 4,
                 padding: "0 16px",
-               border: "none",
-              //   borderLeft: "1px solid #e5e7eb",
-                borderTop: "none",
+                border: "none",
+                borderBottom: "1px solid #e5e7eb",
                 backgroundColor: "#fff",
                 color: "#374151",
                 fontSize: 13,
@@ -1173,10 +1197,8 @@ const TasksListingPage = ({
                 fontWeight: 400,
                 cursor: "pointer",
                 flexShrink: 0,
-                height: "100%",
+                height: 44,
                 whiteSpace: "nowrap",
-                borderRight: "none",
-                borderBottom: "1px solid #ccc",
               }}
             >
               <Plus size={14} />
@@ -1194,20 +1216,16 @@ const TasksListingPage = ({
                 style={{
                   display: "inline-flex",
                   alignItems: "center",
-                  padding: "0 16px",
+                  padding: "10px 16px",
                   border: "none",
-                  borderBottom: "1px solid #ccc",
-                  borderLeft: "none",
-                  borderTop: "none",
-                  borderRight: "none",
+                  borderBottom: "2px solid transparent",
                   backgroundColor: "#fff",
-                  color: "#2563eb",
+                  color: "#0066CC",
                   fontSize: 13,
                   fontWeight: 600,
                   fontFamily: "Lexend Deca, Helvetica, Arial, sans-serif",
                   cursor: "pointer",
                   flexShrink: 0,
-                  height: "100%",
                   whiteSpace: "nowrap",
                 }}
               >All Views</button>
@@ -1262,8 +1280,8 @@ const TasksListingPage = ({
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
-            padding: "10px 16px",
-            backgroundColor: "#fff",
+            padding: "8px 16px",
+            backgroundColor: "#f9fafb",
             borderBottom: "1px solid #e5e7eb",
             gap: 8,
             flexShrink: 0,
@@ -1272,14 +1290,31 @@ const TasksListingPage = ({
             {/* LEFT — filter pills (GenericTable style) */}
             <div className="gt-filter-pills" ref={quickFilterRef}>
               <div className="d-flex align-items-center gap-2 flex-wrap">
-                {filterPills.map((pill) => (
-                  <div key={pill.id} style={{ position: "relative" }}>
+                {filterPills.map((pill, idx) => (
+                  <div key={pill.id} style={{ position: "relative", display: "inline-flex", alignItems: "center" }}>
+                    {idx > 0 && filterPills[idx - 1].isActive && !pill.isActive && (
+                      <span style={{ color: "#cbd5e0", fontSize: 18, marginRight: 8, userSelect: "none" }}>|</span>
+                    )}
                     <button
-                      className="gt-filter-pill"
+                      className={`gt-filter-pill${pill.isActive ? " gt-filter-pill-active" : ""}`}
                       onClick={pill.onClick}
                     >
                       {pill.icon && <span className="me-1">{pill.icon}</span>}
                       <span>{pill.label}</span>
+                      {pill.isActive && pill.onClear && (
+                        <button
+                          type="button"
+                          className="gt-filter-pill-clear"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            pill.onClear?.();
+                          }}
+                          title="Clear filter"
+                        >
+                          <X size={12} aria-hidden />
+                        </button>
+                      )}
                     </button>
                     {pill.id === "project" && openQuickFilter === "project" && (
                       <div style={{
@@ -1287,36 +1322,75 @@ const TasksListingPage = ({
                         top: "calc(100% + 4px)",
                         left: 0,
                         zIndex: 30,
-                        minWidth: 220,
-                        maxHeight: 260,
-                        overflowY: "auto",
+                        minWidth: 240,
                         background: "#fff",
                         border: "1px solid #e5e7eb",
                         borderRadius: 8,
                         boxShadow: "0 10px 24px rgba(0,0,0,0.12)",
                         padding: 6,
                       }}>
-                        {projectOptions.map((option) => (
-                          <button
-                            key={option.value}
-                            onClick={() => {
-                              setFForm({ ...fForm, project: option.value });
-                              setOpenQuickFilter(null);
-                            }}
+                        <div style={{ padding: "4px 4px 6px" }}>
+                          <input
+                            autoFocus
+                            type="text"
+                            placeholder="Search projects..."
+                            value={projectSearch}
+                            onChange={e => setProjectSearch(e.target.value)}
                             style={{
                               width: "100%",
-                              textAlign: "left",
-                              border: "none",
-                              background: option.value === fForm.project ? "#f3f4f6" : "transparent",
-                              borderRadius: 6,
-                              padding: "8px 10px",
+                              border: "1px solid #cbd5e0",
+                              borderRadius: 4,
+                              padding: "6px 10px",
                               fontSize: 12,
                               fontFamily: "Lexend Deca, Helvetica, Arial, sans-serif",
+                              outline: "none",
                             }}
-                          >
-                            {option.label}
-                          </button>
-                        ))}
+                          />
+                        </div>
+                        <div style={{ maxHeight: 220, overflowY: "auto" }}>
+                          {projectOptions
+                            .filter(o => o.label.toLowerCase().includes(projectSearch.toLowerCase()))
+                            .map((option) => (
+                              <button
+                                key={option.value}
+                                onClick={() => {
+                                  setFForm({ ...fForm, project: option.value });
+                                  setOpenQuickFilter(null);
+                                  setProjectSearch("");
+                                }}
+                                style={{
+                                  width: "100%",
+                                  textAlign: "left",
+                                  border: "none",
+                                  background: option.value === fForm.project ? "#eef4ff" : "transparent",
+                                  borderRadius: 6,
+                                  padding: "8px 10px",
+                                  fontSize: 12,
+                                  fontFamily: "Lexend Deca, Helvetica, Arial, sans-serif",
+                                  display: "flex",
+                                  alignItems: "center",
+                                  justifyContent: "space-between",
+                                  color: option.value === fForm.project ? "#0066CC" : "#141414",
+                                  fontWeight: option.value === fForm.project ? 500 : 400,
+                                  cursor: "pointer",
+                                  transition: "background 0.15s ease",
+                                }}
+                                onMouseEnter={e => {
+                                  if (option.value !== fForm.project)
+                                    e.currentTarget.style.background = "#f5f8fa";
+                                }}
+                                onMouseLeave={e => {
+                                  if (option.value !== fForm.project)
+                                    e.currentTarget.style.background = "transparent";
+                                }}
+                              >
+                                <span>{option.label}</span>
+                                {option.value === fForm.project && option.value !== "All Projects" && (
+                                  <span style={{ color: "#0066CC", fontSize: 14, flexShrink: 0 }}>✓</span>
+                                )}
+                              </button>
+                            ))}
+                        </div>
                       </div>
                     )}
                     {pill.id === "assigned_to" && openQuickFilter === "assigned_to" && (
@@ -1325,34 +1399,60 @@ const TasksListingPage = ({
                         top: "calc(100% + 4px)",
                         left: 0,
                         zIndex: 30,
-                        minWidth: 220,
-                        maxHeight: 260,
-                        overflowY: "auto",
+                        minWidth: 240,
                         background: "#fff",
                         border: "1px solid #e5e7eb",
                         borderRadius: 8,
                         boxShadow: "0 10px 24px rgba(0,0,0,0.12)",
                         padding: 6,
                       }}>
+                        <div style={{ padding: "4px 4px 6px" }}>
+                          <input
+                            autoFocus
+                            type="text"
+                            placeholder="Search members..."
+                            value={assigneeSearch}
+                            onChange={e => setAssigneeSearch(e.target.value)}
+                            style={{
+                              width: "100%",
+                              border: "1px solid #cbd5e0",
+                              borderRadius: 4,
+                              padding: "6px 10px",
+                              fontSize: 13,
+                              fontFamily: "Lexend Deca, Helvetica, Arial, sans-serif",
+                              outline: "none",
+                            }}
+                          />
+                        </div>
+                        <div style={{ maxHeight: 220, overflowY: "auto" }}>
                         <button
                           onClick={() => {
                             setFForm((prev) => ({ ...prev, assignee: [] }));
-                            setOpenQuickFilter(null);
                           }}
                           style={{
                             width: "100%",
                             textAlign: "left",
                             border: "none",
-                            background: fForm.assignee.length === 0 ? "#f3f4f6" : "transparent",
+                            background: fForm.assignee.length === 0 ? "#eef4ff" : "transparent",
                             borderRadius: 6,
                             padding: "8px 10px",
-                            fontSize: 12,
+                            fontSize: 13,
                             fontFamily: "Lexend Deca, Helvetica, Arial, sans-serif",
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 8,
+                            color: fForm.assignee.length === 0 ? "#0066CC" : "#141414",
+                            fontWeight: fForm.assignee.length === 0 ? 500 : 400,
+                            cursor: "pointer",
                           }}
+                          onMouseEnter={e => { if (fForm.assignee.length > 0) e.currentTarget.style.background = "#f5f8fa"; }}
+                          onMouseLeave={e => { if (fForm.assignee.length > 0) e.currentTarget.style.background = "transparent"; }}
                         >
                           All assignees
                         </button>
-                        {assigneeOptions.map((option) => {
+                        {assigneeOptions
+                          .filter(o => o.label.toLowerCase().includes(assigneeSearch.toLowerCase()))
+                          .map((option) => {
                           const selected = fForm.assignee.includes(option.value);
                           return (
                             <button
@@ -1374,17 +1474,30 @@ const TasksListingPage = ({
                                 width: "100%",
                                 textAlign: "left",
                                 border: "none",
-                                background: selected ? "#f3f4f6" : "transparent",
+                                background: selected ? "#eef4ff" : "transparent",
                                 borderRadius: 6,
                                 padding: "8px 10px",
-                                fontSize: 12,
+                                fontSize: 13,
                                 fontFamily: "Lexend Deca, Helvetica, Arial, sans-serif",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "space-between",
+                                gap: 8,
+                                color: selected ? "#0066CC" : "#141414",
+                                fontWeight: selected ? 500 : 400,
+                                cursor: "pointer",
                               }}
+                              onMouseEnter={e => { if (!selected) e.currentTarget.style.background = "#f5f8fa"; }}
+                              onMouseLeave={e => { if (!selected) e.currentTarget.style.background = "transparent"; }}
                             >
-                              {option.label}
+                              <span>{option.label}</span>
+                              {selected && (
+                                <span style={{ color: "#0066CC", fontSize: 14, flexShrink: 0 }}>✓</span>
+                              )}
                             </button>
                           );
                         })}
+                        </div>
                       </div>
                     )}
                     {pill.id === "task_type" && openQuickFilter === "task_type" && (
@@ -1411,12 +1524,17 @@ const TasksListingPage = ({
                             width: "100%",
                             textAlign: "left",
                             border: "none",
-                            background: fForm.task_type ? "transparent" : "#f3f4f6",
+                            background: fForm.task_type ? "transparent" : "#eef4ff",
                             borderRadius: 6,
                             padding: "8px 10px",
-                            fontSize: 12,
+                            fontSize: 13,
                             fontFamily: "Lexend Deca, Helvetica, Arial, sans-serif",
+                            color: fForm.task_type ? "#141414" : "#0066CC",
+                            fontWeight: fForm.task_type ? 400 : 500,
+                            cursor: "pointer",
                           }}
+                          onMouseEnter={e => { if (fForm.task_type) e.currentTarget.style.background = "#f5f8fa"; }}
+                          onMouseLeave={e => { if (fForm.task_type) e.currentTarget.style.background = "transparent"; }}
                         >
                           All task types
                         </button>
@@ -1434,14 +1552,23 @@ const TasksListingPage = ({
                                 width: "100%",
                                 textAlign: "left",
                                 border: "none",
-                                background: selected ? "#f3f4f6" : "transparent",
+                                background: selected ? "#eef4ff" : "transparent",
                                 borderRadius: 6,
                                 padding: "8px 10px",
-                                fontSize: 12,
+                                fontSize: 13,
                                 fontFamily: "Lexend Deca, Helvetica, Arial, sans-serif",
+                                color: selected ? "#0066CC" : "#141414",
+                                fontWeight: selected ? 500 : 400,
+                                cursor: "pointer",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "space-between",
                               }}
+                              onMouseEnter={e => { if (!selected) e.currentTarget.style.background = "#f5f8fa"; }}
+                              onMouseLeave={e => { if (!selected) e.currentTarget.style.background = "transparent"; }}
                             >
-                              {option.label}
+                              <span>{option.label}</span>
+                              {selected && <span style={{ color: "#0066CC", fontSize: 14 }}>✓</span>}
                             </button>
                           );
                         })}
@@ -1473,14 +1600,23 @@ const TasksListingPage = ({
                               width: "100%",
                               textAlign: "left",
                               border: "none",
-                              background: option.value === fForm.status ? "#f3f4f6" : "transparent",
+                              background: option.value === fForm.status ? "#eef4ff" : "transparent",
                               borderRadius: 6,
                               padding: "8px 10px",
-                              fontSize: 12,
+                              fontSize: 13,
                               fontFamily: "Lexend Deca, Helvetica, Arial, sans-serif",
+                              color: option.value === fForm.status ? "#0066CC" : "#141414",
+                              fontWeight: option.value === fForm.status ? 500 : 400,
+                              cursor: "pointer",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "space-between",
                             }}
+                            onMouseEnter={e => { if (option.value !== fForm.status) e.currentTarget.style.background = "#f5f8fa"; }}
+                            onMouseLeave={e => { if (option.value !== fForm.status) e.currentTarget.style.background = "transparent"; }}
                           >
-                            {option.label}
+                            <span>{option.label}</span>
+                            {option.value === fForm.status && <span style={{ color: "#0066CC", fontSize: 14 }}>✓</span>}
                           </button>
                         ))}
                       </div>
@@ -1509,12 +1645,17 @@ const TasksListingPage = ({
                             width: "100%",
                             textAlign: "left",
                             border: "none",
-                            background: fForm.priority ? "transparent" : "#f3f4f6",
+                            background: fForm.priority ? "transparent" : "#eef4ff",
                             borderRadius: 6,
                             padding: "8px 10px",
-                            fontSize: 12,
+                            fontSize: 13,
                             fontFamily: "Lexend Deca, Helvetica, Arial, sans-serif",
+                            color: fForm.priority ? "#141414" : "#0066CC",
+                            fontWeight: fForm.priority ? 400 : 500,
+                            cursor: "pointer",
                           }}
+                          onMouseEnter={e => { if (fForm.priority) e.currentTarget.style.background = "#f5f8fa"; }}
+                          onMouseLeave={e => { if (fForm.priority) e.currentTarget.style.background = "transparent"; }}
                         >
                           All priorities
                         </button>
@@ -1534,14 +1675,23 @@ const TasksListingPage = ({
                                 width: "100%",
                                 textAlign: "left",
                                 border: "none",
-                                background: selected ? "#f3f4f6" : "transparent",
+                                background: selected ? "#eef4ff" : "transparent",
                                 borderRadius: 6,
                                 padding: "8px 10px",
-                                fontSize: 12,
+                                fontSize: 13,
                                 fontFamily: "Lexend Deca, Helvetica, Arial, sans-serif",
+                                color: selected ? "#0066CC" : "#141414",
+                                fontWeight: selected ? 500 : 400,
+                                cursor: "pointer",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "space-between",
                               }}
+                              onMouseEnter={e => { if (!selected) e.currentTarget.style.background = "#f5f8fa"; }}
+                              onMouseLeave={e => { if (!selected) e.currentTarget.style.background = "transparent"; }}
                             >
-                              {option.label}
+                              <span>{option.label}</span>
+                              {selected && <span style={{ color: "#0066CC", fontSize: 14 }}>✓</span>}
                             </button>
                           );
                         })}
@@ -1696,6 +1846,27 @@ const TasksListingPage = ({
                     )}
                   </div>
                 ))}
+                {hasActiveFilters && (
+                  <button
+                    type="button"
+                    onClick={resetCurrentFilters}
+                    style={{
+                      background: "none",
+                      border: "none",
+                      color: "#e53e3e",
+                      fontSize: 13,
+                      fontWeight: 500,
+                      fontFamily: "Lexend Deca, Helvetica, Arial, sans-serif",
+                      cursor: "pointer",
+                      padding: "4px 8px",
+                      textDecoration: "none",
+                    }}
+                    onMouseEnter={e => e.currentTarget.style.textDecoration = "underline"}
+                    onMouseLeave={e => e.currentTarget.style.textDecoration = "none"}
+                  >
+                    Clear all
+                  </button>
+                )}
               </div>
             </div>
   
@@ -1706,44 +1877,22 @@ const TasksListingPage = ({
                 onClick={applyCurrentFilters}
                 style={{
                   ...TASK_LIST_BTN_OUTLINE,
-                  backgroundColor: "#000",
-                  background: "#000",
-                  borderColor: "#000",
-                  color: "#fff",
-                  fontWeight: 600,
+                  backgroundColor: "#fff",
+                  background: "#fff",
+                  borderColor: "#8a8a8a",
+                  color: "#141414",
+                  fontWeight: 400,
                 }}
                 onMouseEnter={e => {
-                  e.currentTarget.style.backgroundColor = "#333";
-                  e.currentTarget.style.background = "#333";
+                  e.currentTarget.style.backgroundColor = "#f5f8fa";
+                  e.currentTarget.style.background = "#f5f8fa";
                 }}
                 onMouseLeave={e => {
-                  e.currentTarget.style.backgroundColor = "#000";
-                  e.currentTarget.style.background = "#000";
+                  e.currentTarget.style.backgroundColor = "#fff";
+                  e.currentTarget.style.background = "#fff";
                 }}
               >
                 Apply filters
-              </button>
-              <button
-                type="button"
-                onClick={resetCurrentFilters}
-                style={{
-                  ...TASK_LIST_BTN_OUTLINE,
-                  backgroundColor: "#000",
-                  background: "#000",
-                  borderColor: "#000",
-                  color: "#fff",
-                  fontWeight: 600,
-                }}
-                onMouseEnter={e => {
-                  e.currentTarget.style.backgroundColor = "#333";
-                  e.currentTarget.style.background = "#333";
-                }}
-                onMouseLeave={e => {
-                  e.currentTarget.style.backgroundColor = "#000";
-                  e.currentTarget.style.background = "#000";
-                }}
-              >
-                Reset filters
               </button>
             </div>
           </div>
@@ -1751,24 +1900,25 @@ const TasksListingPage = ({
           {/* ══════════════════════════════════════════════════════
               ROW 4 — Search + Edit columns
           ══════════════════════════════════════════════════════ */}
-          <TaskListingSearchRow
-            search={search}
-            onSearchChange={setSearch}
-            onSubmitSearch={() => {
-              setFilters((p) => ({ ...p, search }));
-              setPager((p) => ({ ...p, page: 1 }));
-            }}
-            wrapperClassName="ptl-search-row-border"
-            editColumnsSlot={
-              <PlannerTasksEditColumnsDropdown
-                columns={columns}
-                visibleTaskColumnKeys={visibleTaskColumnKeys}
-                toggleTaskColumnVisibility={toggleTaskColumnVisibility}
-                selectAllTaskColumns={selectAllTaskColumns}
-                resetTaskColumnsToDefault={resetTaskColumnsToDefault}
-              />
-            }
-          />
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 16px", borderBottom: "1px solid #e5e7eb", flexShrink: 0, backgroundColor: "#fff" }}>
+            <TaskListingSearchRow
+              search={search}
+              onSearchChange={setSearch}
+              onSubmitSearch={() => {
+                setFilters((p) => ({ ...p, search }));
+                setPager((p) => ({ ...p, page: 1 }));
+              }}
+              wrapperClassName="ptl-search-row-border"
+              wrapperStyle={{ padding: 0, border: "none", flex: 1 }}
+            />
+            <PlannerTasksEditColumnsDropdown
+              columns={columns}
+              visibleTaskColumnKeys={visibleTaskColumnKeys}
+              toggleTaskColumnVisibility={toggleTaskColumnVisibility}
+              selectAllTaskColumns={selectAllTaskColumns}
+              resetTaskColumnsToDefault={resetTaskColumnsToDefault}
+            />
+          </div>
   
           {/* ══════════════════════════════════════════════════════
               ROW 5 — Table (fills remaining height)

@@ -1133,16 +1133,17 @@ background: #fff !important;
 
 .gt-filter-pill-active,
 .gt-filter-pill.gt-filter-pill-active {
-  background: #0066CC !important;
-  border-color: #0066CC !important;
-  color: #fff !important;
+  background: #eff6ff !important;
+  border-color: #bfdbfe !important;
+  color: #0066CC !important;
+  font-weight: 600 !important;
 }
 
 .gt-filter-pill-active:hover,
 .gt-filter-pill.gt-filter-pill-active:hover {
-  background: #0052A3 !important;
-  border-color: #0052A3 !important;
-  color: #ffffff !important;
+  background: #dbeafe !important;
+  border-color: #93c5fd !important;
+  color: #0052A3 !important;
 }
 
 .gt-filter-pill-value {
@@ -1165,22 +1166,22 @@ background: #fff !important;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  margin-left: 6px;
+  margin-left: 4px;
   padding: 2px;
   border-radius: 4px;
   cursor: pointer;
-  opacity: 0.9;
-  transition: opacity 0.15s ease, background-color 0.15s ease;
-  color: #fff;
-  border: 1px solid #fff;
+  font-size: 14px;
+  font-weight: 400;
+  color: #0066CC;
+  border: none;
   background: transparent;
+  opacity: 0.8;
+  transition: opacity 0.15s ease;
 }
-
 .gt-filter-pill-clear:hover {
   opacity: 1;
-  background-color: rgba(255, 255, 255, 0.25);
+  background: transparent;
 }
-
 .gt-filter-pill-clear:focus {
   outline: none;
 }

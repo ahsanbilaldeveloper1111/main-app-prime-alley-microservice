@@ -4555,6 +4555,7 @@ const CrmCompanyManagement = () => {
 
             return (
               <GenericSidebar
+                sidebarMarginTop={sidebarMarginTop}
                 width={window.innerWidth < 1280 ? "360px" : "420px"}
                 isOpen={showCompanySidebar}
                 onClose={handleCloseCompanySidebar}

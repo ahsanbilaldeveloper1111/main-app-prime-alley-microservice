@@ -366,7 +366,7 @@ export const CreateQuoteSidebar: React.FC<CreateQuoteSidebarProps> = ({
             }}
             onMouseEnter={(e: React.MouseEvent<HTMLButtonElement>) => {
               if (isFormValid && !loading)
-                e.currentTarget.style.backgroundColor = "#000000";
+                e.currentTarget.style.backgroundColor = "#0066CC";
             }}
             onMouseLeave={(e: React.MouseEvent<HTMLButtonElement>) => {
               if (isFormValid && !loading)

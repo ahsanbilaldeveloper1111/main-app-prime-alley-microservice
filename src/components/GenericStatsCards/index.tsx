@@ -29,7 +29,6 @@ export interface StatsCardData {
 interface StatsCardsProps {
   data: StatsCardData[];
   gridMinWidth?: string;
-  /** Fixed column count; when omitted uses auto-fit grid. */
   columns?: number;
   /** Font size for the stat value (e.g. '24px', '36px'). Defaults to '36px'. */
   valueFontSize?: string;
@@ -37,7 +36,7 @@ interface StatsCardsProps {
 
 const StatsCards: React.FC<StatsCardsProps> = ({ 
   data, 
-  gridMinWidth = '200px',
+  gridMinWidth = 'clamp(120px, 12vw, 200px)',
   columns,
   valueFontSize = '36px'
 }) => {
@@ -48,20 +47,23 @@ const StatsCards: React.FC<StatsCardsProps> = ({
   return (
     <div style={{
       display: 'grid',
-      gridTemplateColumns,
+      gridTemplateColumns: columns ? `repeat(${columns}, 1fr)` : `repeat(auto-fit, minmax(${gridMinWidth}, 1fr))`,
       gap: '16px',
       marginBottom: '16px',
       background: '#FFFFFF',
       borderRadius: '10px',
-      border: '1px solid #cccccc'
+      border: '1px solid #cccccc',
+      overflow: 'hidden',
     }}>
       {data.map((card) => {
         const cardKey = card.title + '|' + String(card.value) + '|' + (card.subtitle || '') + '|' + (card.additionalText || '');
         const interactive = typeof card.onClick === 'function';
         const shellStyle: React.CSSProperties = {
-          padding: '20px 0 40px 0',
+          padding: '16px 12px',
           borderRadius: interactive ? '8px' : undefined,
           transition: interactive ? 'background-color 0.15s ease' : undefined,
+          overflow: 'hidden',
+          minWidth: 0,
           ...(interactive
             ? {
                 cursor: 'pointer' as const,
@@ -78,13 +80,19 @@ const StatsCards: React.FC<StatsCardsProps> = ({
         const cardBody = (
           <React.Fragment>
             {/* Title */}
-            <div style={{
-              fontSize: '14px',
-              color: '#141414',
-              fontWeight: '500',
-              marginBottom: '8px',
-              textAlign: 'center'
-            }}>
+            <div 
+              title={card.title}
+              style={{
+                fontSize: 'clamp(10px, 0.8vw, 12px)',
+                color: '#141414',
+                fontWeight: '500',
+                marginBottom: '8px',
+                textAlign: 'center',
+                overflow: 'hidden',
+                display: '-webkit-box',
+                WebkitLineClamp: 1,
+                WebkitBoxOrient: 'vertical' as const,
+              }}>
               {card.title}
             </div>
 
@@ -92,7 +100,7 @@ const StatsCards: React.FC<StatsCardsProps> = ({
             <div style={{
               fontSize: '28px',
               fontWeight: '500',
-              color: '#006162',
+              color: '#0066CC',
               lineHeight: '1',
               textAlign: 'center'
             }}>
@@ -119,6 +127,7 @@ const StatsCards: React.FC<StatsCardsProps> = ({
             {card.metric && (
               <div style={{
                 display: 'flex',
+                flexWrap: 'nowrap',
                 alignItems: 'center',
                 justifyContent: 'center',
                 width: '100%',
@@ -128,7 +137,7 @@ const StatsCards: React.FC<StatsCardsProps> = ({
                 textAlign: 'center',
                 marginTop: card.badge ? '8px' : '0'
               }}>
-                <Circle size={8} fill={card.metric.dotColor} color={card.metric.dotColor} />
+                <Circle size={8} fill={card.metric.dotColor} color={card.metric.dotColor} style={{ flexShrink: 0 }} />
                 <span>{card.metric.text}</span>
               </div>
             )}
@@ -148,17 +157,26 @@ const StatsCards: React.FC<StatsCardsProps> = ({
             {card.subtitle && (
               <div style={{
                 display: 'flex',
+                flexWrap: 'nowrap',
                 alignItems: 'center',
                 justifyContent: 'center',
                 width: '100%',
+                minWidth: 0,
+                overflow: 'hidden',
                 gap: '6px',
-                fontSize: '13px',
+                fontSize: 'clamp(9px, 0.7vw, 11px)',
                 color: '#374151',
                 textAlign: 'center',
                 marginTop: card.badge || card.metric ? '8px' : '0'
               }}>
-                <Circle size={8} fill="#6366F1" color="#6366F1" />
-                <span>{card.subtitle}</span>
+                <Circle size={8} fill="#0066CC" color="#0066CC" style={{ flexShrink: 0 }} />
+                <span 
+                  title={card.subtitle}
+                >
+                  {card.subtitle && card.subtitle.length > 15 
+                    ? card.subtitle.substring(0, 15) + '...' 
+                    : card.subtitle}
+                </span>
               </div>
             )}
           </React.Fragment>

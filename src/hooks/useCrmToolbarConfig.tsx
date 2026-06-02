@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import React, { useCallback, useMemo } from "react";
 import moment from "moment";
 import type { ToolbarConfig, FilterPill, TabConfig } from "@components/GenericTable";
 import { normalizeSearchQuery } from "@utils/Helper";
@@ -507,6 +507,11 @@ export function useCrmToolbarConfig(
     stages,
   ]);
 
+  const clearAllFilters = useCallback(() => {
+    handleFiltersChange({});
+    refresh();
+  }, [handleFiltersChange, refresh]);
+
   const resolvedTabs = useMemo((): TabConfig[] => {
     if (!isProspectsLikeEntity(entity) || !prospectsTabCountOverrides) return tabs;
     const { loading, totalRecords, activeFilter } = prospectsTabCountOverrides;
@@ -573,6 +578,7 @@ export function useCrmToolbarConfig(
       onSaveClick: () => {},
 
       filterPills,
+      clearAllFilters,
       showAdvancedFilters: true,
       onAdvancedFiltersClick: onFiltersClick,
 
@@ -599,6 +605,7 @@ export function useCrmToolbarConfig(
       onFiltersClick,
       onExportClick,
       filterPills,
+      clearAllFilters,
       rightActions,
       currentFilters,
       handleFiltersChange,

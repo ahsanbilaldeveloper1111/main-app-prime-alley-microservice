@@ -634,12 +634,28 @@ const EmailModal: React.FC<EmailModalProps> = ({
   };
 
   return (
-    <div
+    <React.Fragment>
+      <button
+        type="button"
+        aria-label="Close email modal"
+        onClick={onClose}
+        style={{
+          position: 'fixed',
+          inset: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.15)',
+          zIndex: 999,
+          border: 'none',
+          padding: 0,
+          margin: 0,
+          cursor: 'default',
+        }}
+      />
+      <div
       style={{
         position: "fixed",
         ...(isMaximized
-          ? { top: "60px", right: "20px", bottom: "20px", left: "20px" }
-          : { right: "15vh", bottom: "7.5vh", width: "650px", height: "550px" }),
+          ? { top: "74px", left: "50%", transform: "translateX(-50%)", width: "min(900px, calc(100vw - 84px))", maxHeight: "calc(100vh - 94px)" }
+          : { left: "50%", top: "50%", transform: "translate(-50%, -50%)", width: "min(650px, calc(100vw - 120px))", height: "min(550px, calc(100vh - 120px))"}),
         backgroundColor: "#ffffff",
         zIndex: 1000,
         display: "flex",
@@ -648,7 +664,7 @@ const EmailModal: React.FC<EmailModalProps> = ({
         borderRadius: "8px",
         border: "1px solid #cbd5e0",
         overflow: "hidden",
-        animation: "slideInUp 0.3s ease-out",
+        animation: "none",
       }}
     >
       {/* Header */}
@@ -1921,6 +1937,7 @@ const EmailModal: React.FC<EmailModalProps> = ({
         </div>
       </div>
     </div>
+    </React.Fragment>
   );
 };
 

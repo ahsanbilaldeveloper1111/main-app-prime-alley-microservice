@@ -1,23 +1,28 @@
 import BreadcrumbItem from "@common/BreadcrumbItem";
-import GenericListPage from "@components/GenericListPage";
+import GenericTable, { type TableAction, type TableColumn } from "@components/GenericTable";
 import PageHeader from "@components/PageHeader";
 import FormModal from "@components/page-partials/FormModal";
 import ConfirmModal from "@components/page-partials/ConfirmModal";
-import type { Column } from "@components/CustomDataTable";
-import type {
-  GenericListPageQueryOptions,
-  GenericListPageQueryParams,
-} from "@components/GenericListPage";
+import { TicketsSettingsEmbeddedToolbar } from "@page-modules/tickets/shared/TicketsSettingsEmbeddedToolbar";
+import type { SubCategoryRow } from "../useModuleSubCategoriesPage";
 import React from "react";
 import { Button } from "react-bootstrap";
 import type { TicketModulePickerRow, TicketSubmoduleRow } from "../../categories/moduleCategoriesTypes";
 
 export type ModuleSubCategoriesPageViewProps = Readonly<{
   showBreadcrumb?: boolean;
+  embeddedInMainSettings?: boolean;
   breadcrumbMainLink?: string;
-  memoizedFilters: { search: string };
-  columns: Column[];
-  getListQueryOptions: (params: GenericListPageQueryParams) => GenericListPageQueryOptions;
+  data: SubCategoryRow[];
+  loading: boolean;
+  columns: TableColumn<SubCategoryRow>[];
+  actions: TableAction<SubCategoryRow>[];
+  currentPage: number;
+  rowsPerPage: number;
+  totalRows: number;
+  searchValue: string;
+  onSearchChange: (value: string) => void;
+  onPaginationChange: (page: number, perPage: number) => void;
   showSubmoduleChildrenModal: boolean;
   onCloseSubCategoryModal: () => void;
   onOpenNewSubcategoryModal: () => void;
@@ -39,10 +44,18 @@ export type ModuleSubCategoriesPageViewProps = Readonly<{
 
 export const ModuleSubCategoriesPageView: React.FC<ModuleSubCategoriesPageViewProps> = ({
   showBreadcrumb = true,
+  embeddedInMainSettings = false,
   breadcrumbMainLink = "/main-settings/tickets/modules",
-  memoizedFilters,
+  data,
+  loading,
   columns,
-  getListQueryOptions,
+  actions,
+  currentPage,
+  rowsPerPage,
+  totalRows,
+  searchValue,
+  onSearchChange,
+  onPaginationChange,
   showSubmoduleChildrenModal,
   onCloseSubCategoryModal,
   onOpenNewSubcategoryModal,
@@ -61,29 +74,63 @@ export const ModuleSubCategoriesPageView: React.FC<ModuleSubCategoriesPageViewPr
   onCloseDeleteModal,
   onConfirmDelete,
 }) => (
-  <React.Fragment>
+  <div className={embeddedInMainSettings ? "tickets-settings-page" : undefined}>
     {showBreadcrumb ? (
-      <BreadcrumbItem mainTitle="Tickets" mainLink={breadcrumbMainLink} subTitle="Submodules" />
+      <BreadcrumbItem mainTitle="Tickets" mainLink={breadcrumbMainLink} subTitle="Sub Categories" />
     ) : null}
 
-    <PageHeader
-      title=""
-      buttons={
-        <Button variant="primary" type="button" onClick={onOpenNewSubcategoryModal}>
-          New SubCategory
-        </Button>
-      }
-    />
+    {embeddedInMainSettings ? (
+      <TicketsSettingsEmbeddedToolbar
+        searchValue={searchValue}
+        onSearchChange={onSearchChange}
+        searchPlaceholder="Search sub categories..."
+        actions={
+          <Button variant="primary" type="button" onClick={onOpenNewSubcategoryModal}>
+            New SubCategory
+          </Button>
+        }
+      />
+    ) : (
+      <PageHeader
+        title=""
+        buttons={
+          <Button variant="primary" type="button" onClick={onOpenNewSubcategoryModal}>
+            New SubCategory
+          </Button>
+        }
+      />
+    )}
 
-    <GenericListPage
+    <GenericTable<SubCategoryRow>
+      data={data}
       columns={columns}
-      getListQueryOptions={getListQueryOptions}
-      title="Submodules"
-      searchPlaceholder="Search submodules..."
-      defaultPageSize={15}
-      filters={memoizedFilters}
-      search={true}
-      tableStyle="table-style-2"
+      loading={loading}
+      actions={actions}
+      showActions={actions.length > 0}
+      actionsLabel="Actions"
+      pagination={{
+        currentPage,
+        rowsPerPage,
+        totalRows,
+        pageSizeOptions: [15, 25, 50, 100],
+      }}
+      onPaginationChange={onPaginationChange}
+      sortable={true}
+      hover={true}
+      emptyMessage="No sub categories found."
+      showToolbar={!embeddedInMainSettings}
+      toolbar={
+        embeddedInMainSettings
+          ? undefined
+          : {
+              showSearch: true,
+              searchValue,
+              searchPlaceholder: "Search sub categories...",
+              onSearchChange,
+            }
+      }
+      showToolbarActions={false}
+      uniqueKey="id"
     />
 
     <FormModal
@@ -173,5 +220,5 @@ export const ModuleSubCategoriesPageView: React.FC<ModuleSubCategoriesPageViewPr
       onConfirm={onConfirmDelete}
       onCancel={onCloseDeleteModal}
     />
-  </React.Fragment>
+  </div>
 );

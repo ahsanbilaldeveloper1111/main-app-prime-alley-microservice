@@ -1554,6 +1554,7 @@ export function CrmProspectsContactsListPage({
         {/* Prospect Detail Sidebar */}
         {showProspectSidebar && (
           <GenericSidebar
+            sidebarMarginTop={sidebarMarginTop}
             width={window.innerWidth < 1280 ? "360px" : "420px"}
             isOpen={showProspectSidebar}
             onClose={handleCloseProspectSidebar}

@@ -390,6 +390,43 @@ function TaskUrlInputOverlay({
   );
 }
 
+function getTaskModalPanelStyle(isMaximized: boolean): React.CSSProperties {
+  const shared: React.CSSProperties = {
+    position: 'fixed',
+    inset: 'unset',
+    backgroundColor: '#ffffff',
+    zIndex: 1000,
+    display: 'flex',
+    flexDirection: 'column',
+    boxShadow: '0 4px 24px rgba(0, 0, 0, 0.15)',
+    borderRadius: '8px',
+    border: '1px solid #cbd5e0',
+    overflow: 'hidden',
+    animation: 'none',
+  };
+
+  if (isMaximized) {
+    return {
+      ...shared,
+      top: '74px',
+      left: '50%',
+      transform: 'translateX(-50%)',
+      width: 'min(900px, calc(100vw - 84px))',
+      maxHeight: 'calc(100vh - 94px)',
+      height: 'auto',
+    };
+  }
+
+  return {
+    ...shared,
+    left: '50%',
+    top: '50%',
+    transform: 'translate(-50%, -50%)',
+    width: 'min(650px, calc(100vw - 120px))',
+    height: '650px',
+  };
+}
+
 const TaskModal: React.FC<TaskModalProps> = ({ // NOSONAR
   isOpen,
   onClose,
@@ -691,23 +728,22 @@ const TaskModal: React.FC<TaskModalProps> = ({ // NOSONAR
         onClose={() => setUrlModalType(null)}
         onInsertHtml={insertHtmlAtSelection}
       />
-      <div
+      <button
+        type="button"
+        aria-label="Close task modal"
+        onClick={onClose}
         style={{
           position: 'fixed',
-          inset: isMaximized ? '60px 20px 20px 20px' : 'auto 15vh 7.5vh auto',
-          height: isMaximized ? 'auto' : '650px',
-          width: isMaximized ? 'auto' : '650px',
-          backgroundColor: '#ffffff',
-          zIndex: 1000,
-          display: 'flex',
-          flexDirection: 'column',
-          boxShadow: '0 4px 24px rgba(0, 0, 0, 0.15)',
-          borderRadius: '8px',
-          border: '1px solid #cbd5e0',
-          overflow: 'hidden',
-          animation: 'slideInUp 0.3s ease-out',
+          inset: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.15)',
+          zIndex: 999,
+          border: 'none',
+          padding: 0,
+          margin: 0,
+          cursor: 'default',
         }}
-      >
+      />
+      <div style={getTaskModalPanelStyle(isMaximized)}>
         {/* Header */}
         <div
           style={{

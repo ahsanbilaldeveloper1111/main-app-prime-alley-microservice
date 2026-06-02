@@ -23,7 +23,7 @@ export interface Task {
   notes: string | null;
   repeat_status: string | null;
   status: "pending" | "completed" | "overdue";
-  workflowStatus: { id: number; name: string } | null;
+  workflowStatus: { id: number; name: string; color?: string } | null;
   rawData?: any;
 }
 

@@ -44,15 +44,21 @@
 }
 
 .ptl-btn-primary-dark:hover {
-  background-color: #333 !important;
+  background-color: #0052A3 !important;
 }
 
 .ptl-tabs-row {
   display: flex;
   align-items: stretch;
   background-color: #fff;
-  height: 44px;
+  height: clamp(36px, 3.5vw, 44px);
   flex-shrink: 0;
+}
+
+.ptl-tabs-row button {
+  height: clamp(36px, 3.5vw, 44px);
+  font-size: clamp(11px, 0.9vw, 13px);
+  padding: 0 clamp(12px, 1.2vw, 20px);
 }
 
 .ptl-tab-btn {
@@ -72,9 +78,10 @@
 }
 
 .ptl-tab-btn--active {
-  background-color: #f7f2f7;
-  border-bottom: none;
-  font-weight: 500;
+  background-color: #f5f8fa;
+  border-bottom: 2px solid #0066CC;
+  font-weight: 600;
+  color: #0066CC;
 }
 
 .ptl-tab-btn--inactive {
@@ -245,7 +252,7 @@
 }
 
 .ptl-title-link {
-  color: #2563eb;
+  color: #0066CC;
   font-weight: 400;
   font-size: 13px;
   cursor: pointer;
@@ -337,15 +344,16 @@
 }
 
 .ptl-edit-columns-toggle {
-  font-size: 12px;
+  font-size: clamp(11px, 0.85vw, 13px);
+  padding: clamp(5px, 0.4vw, 8px) clamp(8px, 0.8vw, 14px);
   background-color: #fff;
   border-color: #8a8a8a;
   color: #141414;
 }
 
 .ptl-filled-btn {
-  background-color: #000;
-  border: 1px solid #000;
+  background-color: #0066CC;
+  border: 1px solid #0066CC;
   color: #fff;
   font-weight: 600;
   text-decoration: none;
@@ -366,8 +374,8 @@
 }
 
 .ptl-filled-btn:hover {
-  background-color: #333;
-  border-color: #333;
+  background-color: #0052A3;
+  border-color: #0052A3;
 }
 
 .ptl-search-row-border {
@@ -398,4 +406,75 @@
 
 .ptl-edit-columns-menu {
   min-width: 240px;
+}
+
+/* Priority badges */
+.ptl-priority-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-family: "Lexend Deca", Helvetica, Arial, sans-serif;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.ptl-priority-badge--low {
+  background-color: #dcfce7 !important;
+  color: #166534;
+}
+
+.ptl-priority-badge--medium,
+.ptl-priority-badge--normal {
+  background-color: #fef3c7 !important;
+  color: #92400e;
+}
+
+.ptl-priority-badge--high {
+  background-color: #fee2e2 !important;
+  color: #991b1b;
+}
+
+.ptl-priority-badge--urgent {
+  background-color: #fce7f3 !important;
+  color: #9d174d;
+}
+
+/* Status badge */
+.ptl-status-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-family: "Lexend Deca", Helvetica, Arial, sans-serif;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.ptl-search-row-border input.task-search-input {
+  border-radius: 20px 0 0 20px !important;
+  border-right: none !important;
+}
+
+.ptl-search-row-border .btn-outline-secondary {
+  border-radius: 0 20px 20px 0 !important;
+  border-left: none !important;
+}
+
+.ptl-edit-columns-menu .form-check-input:checked {
+  background-color: #0066CC !important;
+  border-color: #0066CC !important;
+}
+
+.ptl-edit-columns-menu .form-check-input:focus {
+  border-color: #0066CC !important;
+  box-shadow: 0 0 0 0.2rem rgba(0, 102, 204, 0.25) !important;
+}
+
+/* Responsive filter pill sizing */
+.gt-filter-pill {
+  font-size: clamp(11px, 0.85vw, 13px) !important;
+  padding: clamp(4px, 0.4vw, 6px) clamp(8px, 0.8vw, 12px) !important;
 }

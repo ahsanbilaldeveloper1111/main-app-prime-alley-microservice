@@ -586,6 +586,7 @@ const HistoryPage = () => {
         />
         </div>
         <ActivityHistorySidebarPanel
+          sidebarMarginTop={sidebarMarginTop}
           showActivitySidebar={showActivitySidebar}
           setShowActivitySidebar={setShowActivitySidebar}
           selectedActivityRecord={selectedActivityRecord}

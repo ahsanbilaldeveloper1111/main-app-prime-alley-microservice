@@ -4251,6 +4251,7 @@ export function CrmDealsListScreenView({
                         }
                       }}
                       searchValue={dealsSearch}
+                      boardHeight={boardHeight}
                     />
                   ) : undefined
                 }
