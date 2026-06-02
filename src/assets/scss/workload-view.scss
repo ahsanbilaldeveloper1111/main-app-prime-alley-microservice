@@ -843,6 +843,7 @@
     margin: 0 0 4px;
     line-height: 1.3;
     font-size: 11px;
+    font-weight: 400;
     color: #4b5563;
     font-family: $planner-board-font;
   }
@@ -1174,17 +1175,17 @@
     }
 
     .workload-member-cell__name {
-      font-size: 13px;
+      font-size: clamp(12px, 0.9vw, 14px);
       font-weight: 600;
-      color: #111827;
-      font-family: $planner-board-font;
+      color: #141414;
+      font-family: "Lexend Deca", Helvetica, Arial, sans-serif;
     }
   }
 
   .workload-board__column-head-inner {
-    padding: 12px 14px;
-    background: $workload-board-column-bg;
-    border-bottom: none;
+    padding: 12px 14px 10px;
+    background: #ffffff;
+    border-bottom: 1px solid #eaf0f6;
   }
 
   .workload-board__progress-bar {
@@ -1192,6 +1193,10 @@
     height: 5px;
     margin-top: 0;
     background: #e5e7eb;
+
+    &.workload-cell--available {
+      display: none;
+    }
   }
 
   .workload-board__progress-bar .workload-cell__bar-fill {
