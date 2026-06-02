@@ -2,6 +2,8 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useSession } from "next-auth/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { isAxiosError } from "axios";
+import BreadcrumbItem from "@common/BreadcrumbItem";
+import { Container } from "react-bootstrap";
 import { toast } from "react-toastify";
 import "@assets/scss/common.scss";
 import { useHierarchyData } from "@components/filters/useHierarchyData";
@@ -320,32 +322,19 @@ const WorkloadPlannerPage: React.FC = () => {
     mutationFn: async ({
       task,
       toExtension,
-      dueDate,
-      estimateMinutes,
     }: {
       task: WorkloadTaskCard;
       toExtension: string;
-      dueDate?: string | null;
-      estimateMinutes?: number | null;
     }) => {
       if (!toExtension) throw new Error("Choose a team member.");
       await patchWorkloadTask(
         task.id,
         extension,
-        buildWorkloadTaskPatchBody(task, {
-          extension_numbers: [toExtension],
-          ...(dueDate ? { due_date: dueDate } : {}),
-          ...(estimateMinutes ? { estimated_duration_minutes: estimateMinutes } : {}),
-        }),
+        buildWorkloadTaskPatchBody(task, { extension_numbers: [toExtension] }),
       );
     },
     onSuccess: () => {
-      toast.success(
-        reassignTask?.due_date
-          ? "Task assigned successfully"
-          : "Task assigned. Set a due date so it appears in the grid.",
-        { autoClose: reassignTask?.due_date ? 3000 : 5000 }
-      );
+      toast.success("Task assigned");
       setReassignTask(null);
       setReassignOverloadConfirm(false);
       invalidateWorkload();
@@ -529,7 +518,12 @@ const WorkloadPlannerPage: React.FC = () => {
 
   return (
     <div className="workload-page">
-      <div className="workload-page__inner">
+      <Container fluid className="px-3 px-md-4 py-3">
+        <BreadcrumbItem
+          mainTitle="Planner"
+          mainLink="/planner/dashboard"
+          subTitle="Workload"
+        />
 
         <WorkloadPlannerPageHeader
           mainView={mainView}
@@ -617,7 +611,7 @@ const WorkloadPlannerPage: React.FC = () => {
             setSelectedCell({ extension, date, member, cell });
           }}
         />
-      </div>
+      </Container>
 
       <WorkloadDayOffcanvas
         selected={selectedCell}
@@ -666,8 +660,8 @@ const WorkloadPlannerPage: React.FC = () => {
           setReassignTask(null);
           setReassignOverloadConfirm(false);
         }}
-        onConfirm={(dueDate, estimateMinutes) => {
-          submitReassign(dueDate, estimateMinutes).catch(() => undefined);
+        onConfirm={() => {
+          submitReassign().catch(() => undefined);
         }}
       />
 
@@ -679,10 +673,9 @@ const WorkloadPlannerPage: React.FC = () => {
         hierarchyExtensions={hierarchyDataExtensions}
         assignTargets={assignTargets}
         setAssignTargets={setAssignTargets}
-        onRequestAssign={(task, toExtension) => {
-          setReassignTask(task);
-          setReassignTarget(toExtension);
-          setReassignOverloadConfirm(false);
+        assignMutation={{
+          isPending: assignMutation.isPending,
+          mutate: assignMutation.mutate,
         }}
         formatError={workloadErrorMessage}
       />
