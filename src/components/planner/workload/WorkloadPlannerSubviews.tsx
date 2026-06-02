@@ -66,6 +66,7 @@ type WorkloadMemberIdentityProps = Readonly<{
   member?: Pick<WorkloadGridMember, "name" | "display_name" | "role"> | null;
   isOwner?: boolean;
   displayMode?: "stacked" | "inline";
+  capacityMinutes?: number | null;
 }>;
 
 export function WorkloadMemberIdentity({
@@ -74,6 +75,7 @@ export function WorkloadMemberIdentity({
   member,
   isOwner,
   displayMode = "stacked",
+  capacityMinutes,
 }: WorkloadMemberIdentityProps) {
   const ext = extensionNumber.trim();
   const avatarColor = workloadMemberAvatarColor(ext);
@@ -108,6 +110,9 @@ export function WorkloadMemberIdentity({
       </span>
       <div className="workload-member-cell__text">
         <div className="workload-member-cell__name">{label}</div>
+        {capacityMinutes != null && capacityMinutes > 0 ? (
+          <div className="workload-member-cell__cap">{formatWorkloadMinutes(capacityMinutes)}/day</div>
+        ) : null}
         {roleLabel ? <div className="workload-member-cell__role">{roleLabel}</div> : null}
         {isOwner ? (
           <Badge bg="secondary" className="workload-member-cell__badge">
@@ -127,20 +132,44 @@ export function WorkloadSummaryCardsRow({ data }: WorkloadSummaryCardsProps) {
   return (
     <div className="workload-summary-row">
       <div className="workload-summary-card">
-        <div className="workload-summary-card__value">{data.total_tasks_this_week}</div>
         <div className="workload-summary-card__label">Tasks this week</div>
+        <div className="workload-summary-card__value" style={{ color: "#0066CC" }}>
+          {data.total_tasks_this_week}
+        </div>
+        <div className="workload-summary-card__sub">
+          <span className="workload-summary-card__dot" style={{ background: "#0066CC" }} />
+          Assigned to team
+        </div>
       </div>
       <div className="workload-summary-card">
-        <div className="workload-summary-card__value">{data.overloaded_members}</div>
         <div className="workload-summary-card__label">Overloaded members</div>
+        <div className="workload-summary-card__value" style={{ color: "#dc2626" }}>
+          {data.overloaded_members}
+        </div>
+        <div className="workload-summary-card__sub">
+          <span className="workload-summary-card__dot" style={{ background: "#dc2626" }} />
+          Above 100% capacity
+        </div>
       </div>
       <div className="workload-summary-card">
-        <div className="workload-summary-card__value">{data.unestimated_tasks}</div>
         <div className="workload-summary-card__label">Unestimated tasks</div>
+        <div className="workload-summary-card__value" style={{ color: "#ea580c" }}>
+          {data.unestimated_tasks}
+        </div>
+        <div className="workload-summary-card__sub">
+          <span className="workload-summary-card__dot" style={{ background: "#ea580c" }} />
+          No time estimate set
+        </div>
       </div>
       <div className="workload-summary-card">
-        <div className="workload-summary-card__value">{data.critical_priority_tasks}</div>
         <div className="workload-summary-card__label">Critical priority</div>
+        <div className="workload-summary-card__value" style={{ color: "#dc2626" }}>
+          {data.critical_priority_tasks}
+        </div>
+        <div className="workload-summary-card__sub">
+          <span className="workload-summary-card__dot" style={{ background: "#dc2626" }} />
+          Needs immediate attention
+        </div>
       </div>
     </div>
   );
@@ -210,6 +239,16 @@ export function WorkloadLegendRow({
             {item.label}
           </span>
         ))}
+        <span className="workload-legend__item">
+          <span className="workload-legend__org-icon" aria-hidden>
+            <i className="ti ti-building" style={{ fontSize: "12px", color: "#0f766e" }} />
+          </span>
+          Org Tasks included
+        </span>
+        <span className="workload-legend__item">
+          <span className="workload-legend__personal-icon" aria-hidden>ⓘ</span>
+          Has personal todos (not counted)
+        </span>
       </div>
       <div className="workload-legend__actions">
         <button
@@ -315,6 +354,11 @@ function WorkloadGridCellButton({ cell, band, onSelect }: WorkloadGridCellButton
               }`}
             >
               {percentLabel}
+              {showUnestimatedDot && (cell?.unestimated_count ?? 0) > 0 ? (
+                <span className="workload-cell__unest-count">
+                  {` · ${cell.unestimated_count} unest.`}
+                </span>
+              ) : null}
             </div>
             <div className="workload-cell__bar">
               <div
@@ -373,6 +417,13 @@ export function WorkloadGridPanel({
                   hierarchyExtensions={hierarchyExtensions}
                   member={member}
                   isOwner={member.is_owner}
+                  capacityMinutes={
+                    gridData.days.reduce<number | null>((found, day) => {
+                      if (found != null) return found;
+                      const c = cellMap.get(workloadCellKey(member.extension_number, day));
+                      return c?.effective_capacity_minutes ?? null;
+                    }, null) ?? 480
+                  }
                 />
               </td>
               {gridData.days.map((day) => {

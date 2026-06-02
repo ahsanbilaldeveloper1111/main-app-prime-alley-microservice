@@ -276,7 +276,7 @@ const TASK_AVATAR_COLORS = [
   "#667eea", "#fc8181", "#38b2ac", "#9f7aea",
 ];
 
-function getTaskAvatarColor(name: string): string {
+export function getTaskAvatarColor(name: string): string {
   if (!name) return TASK_AVATAR_COLORS[0];
   let hash = 0;
   for (let i = 0; i < name.length; i++) {

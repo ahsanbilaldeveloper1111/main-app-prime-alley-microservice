@@ -69,7 +69,7 @@ export function workloadGridCellVisualVariant(
 }
 
 export function workloadGridCellPercentLabel(loadPercent: number, variant: WorkloadGridCellVisualVariant): string {
-  if (variant === "zero") return "0% Planned";
+  if (variant === "zero") return "0%";
   const rounded = Math.round(loadPercent * 10) / 10;
   const base = `${rounded}%`;
   if (loadPercent > 100) return `${base} (over)`;
@@ -93,13 +93,14 @@ export function workloadCellBarFillClass(band: string): string {
 }
 
 const WORKLOAD_AVATAR_PALETTE = [
-  "#0d9488",
-  "#2563eb",
-  "#7c3aed",
-  "#db2777",
-  "#ea580c",
-  "#0891b2",
+  "#1a6fbd",
+  "#0e7490",
+  "#0f766e",
+  "#1d4ed8",
   "#4f46e5",
+  "#7c3aed",
+  "#0369a1",
+  "#065f46",
 ] as const;
 
 export function workloadMemberAvatarColor(extensionNumber: string): string {
@@ -496,11 +497,10 @@ export const WORKLOAD_PRIORITY_LEGEND_ITEMS = (
 
 /** Grid legend (reference design + Postman `load_band`). */
 export const WORKLOAD_GRID_LEGEND_ITEMS = [
-  { id: "available", swatch: "#22c55e", label: "Available (0–70%)" },
-  { id: "comfortable", swatch: "#eab308", label: "Comfortable (70–90%)" },
-  { id: "near_full", swatch: "#f97316", label: "Near full (90–100%)" },
-  { id: "overloaded", swatch: "#ef4444", label: "Overloaded (>100%)" },
-  { id: "incomplete_data", swatch: "#9ca3af", label: "Incomplete data" },
+  { id: "comfortable", swatch: "#22c55e", label: "0–74% Comfortable" },
+  { id: "near_full", swatch: "#f97316", label: "75–99% Near Full" },
+  { id: "overloaded", swatch: "#ef4444", label: "100%+ Overloaded" },
+  { id: "unestimated", swatch: "#ea580c", label: "Has unestimated tasks" },
 ] as const;
 
 /** BEM-style modifier for cell backgrounds (see `workload-view.scss`). */

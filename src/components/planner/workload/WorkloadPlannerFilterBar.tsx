@@ -1,5 +1,4 @@
-import React, { useMemo } from "react";
-import { Button, Card, Col, Form, Row } from "react-bootstrap";
+import React, { useMemo, useRef, useState } from "react";
 import { Inbox } from "lucide-react";
 import type { AssigneeMatch, WorkloadRangePreset } from "@utils/tasks";
 import type {
@@ -11,6 +10,23 @@ import {
   workloadProjectFilterSelectValue,
 } from "@page-modules/planner/workload/workloadDomain";
 import type { WorkloadProjectOption } from "./WorkloadPlannerChrome";
+
+function useFilterDropdown() {
+  const [openId, setOpenId] = useState<string | null>(null);
+  const ref = useRef<HTMLDivElement>(null);
+  React.useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        setOpenId(null);
+      }
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, []);
+  const toggle = (id: string) => setOpenId((prev) => (prev === id ? null : id));
+  const close = () => setOpenId(null);
+  return { openId, toggle, close, ref };
+}
 
 export type WorkloadPlannerFilterBarProps = Readonly<{
   range: WorkloadRangePreset;
@@ -69,8 +85,6 @@ export function WorkloadPlannerFilterBar({
   applyDisabled,
   isApplying,
 }: WorkloadPlannerFilterBarProps) {
-  const projectSelectValue = workloadProjectFilterSelectValue(projectFilter);
-
   const memberOptions = useMemo(() => {
     const options = [{ value: "all", label: "All members" }];
     for (const ext of memberExtensions) {
@@ -81,171 +95,268 @@ export function WorkloadPlannerFilterBar({
     }
     return options;
   }, [hierarchyExtensions, memberExtensions]);
+  const { openId, toggle, close, ref } = useFilterDropdown();
 
   return (
-    <Card className="workload-filters-card mb-3">
-      <Card.Body className="workload-filters-card__body">
-        <Row className="g-2 align-items-end workload-filters-card__row">
-          <Col xs={12} sm={6} md="auto" className="workload-filters-card__field">
-            <Form.Label className="small text-muted mb-1">Time period</Form.Label>
-            <Form.Select
-              size="sm"
-              value={range}
-              disabled={!enabled}
-              onChange={(e) => onRangeChange(e.target.value as WorkloadRangePreset)}
-            >
-              <option value="this_week">This week</option>
-              <option value="next_week">Next week</option>
-              <option value="custom">Custom range</option>
-            </Form.Select>
-          </Col>
+    <div className="workload-filter-bar" ref={ref}>
+      <div className="workload-filter-bar__inner">
 
-          {range === "custom" ? (
-            <>
-              <Col xs={6} sm={6} md="auto" className="workload-filters-card__field">
-                <Form.Label className="small text-muted mb-1">Start</Form.Label>
-                <Form.Control
-                  type="date"
-                  size="sm"
-                  value={customStart}
-                  disabled={!enabled}
-                  isInvalid={customRangeInvalid}
-                  onChange={(e) => onCustomStartChange(e.target.value)}
-                />
-              </Col>
-              <Col xs={6} sm={6} md="auto" className="workload-filters-card__field">
-                <Form.Label className="small text-muted mb-1">End</Form.Label>
-                <Form.Control
-                  type="date"
-                  size="sm"
-                  value={customEnd}
-                  disabled={!enabled}
-                  isInvalid={customRangeInvalid}
-                  onChange={(e) => onCustomEndChange(e.target.value)}
-                />
-              </Col>
-            </>
-          ) : null}
-
-          <Col xs={12} sm={6} md="auto" className="workload-filters-card__field">
-            <Form.Label className="small text-muted mb-1">Project</Form.Label>
-            <Form.Select
-              size="sm"
-              value={projectSelectValue}
-              disabled={!enabled}
-              onChange={(e) => {
-                const value = e.target.value;
-                if (value === "all") onProjectFilterChange("all");
-                else if (value === "none") onProjectFilterChange("none");
-                else onProjectFilterChange(Number.parseInt(value, 10));
-              }}
-            >
-              <option value="all">All projects</option>
-              <option value="none">No project (org)</option>
-              {projectOptions.map((p) => (
-                <option key={p.id} value={String(p.id)}>
-                  {p.name}
-                </option>
-              ))}
-            </Form.Select>
-          </Col>
-
-          <Col xs={12} sm={6} md="auto" className="workload-filters-card__field">
-            <Form.Label className="small text-muted mb-1">Member</Form.Label>
-            <Form.Select
-              size="sm"
-              value={memberFilter}
-              disabled={!enabled}
-              onChange={(e) => onMemberFilterChange(e.target.value)}
-            >
-              {memberOptions.map((opt) => (
-                <option key={opt.value} value={opt.value}>
-                  {opt.label}
-                </option>
-              ))}
-            </Form.Select>
-          </Col>
-
-          <Col xs={12} sm={6} md="auto" className="workload-filters-card__field">
-            <Form.Label className="small text-muted mb-1">Priority</Form.Label>
-            <Form.Select
-              size="sm"
-              value={priorityFilter}
-              disabled={!enabled}
-              onChange={(e) =>
-                onPriorityFilterChange(e.target.value as WorkloadPriorityFilterValue)
-              }
-            >
-              <option value="all">All priority</option>
-              <option value="critical">Critical only</option>
-              <option value="high_plus">High+</option>
-              <option value="medium_plus">Medium+</option>
-            </Form.Select>
-          </Col>
-
-          <Col xs={12} sm={6} md="auto" className="workload-filters-card__field">
-            <Form.Label className="small text-muted mb-1">Assignee match</Form.Label>
-            <Form.Select
-              size="sm"
-              value={assigneeMatch}
-              disabled={!enabled}
-              onChange={(e) => onAssigneeMatchChange(e.target.value as AssigneeMatch)}
-            >
-              <option value="primary">Primary assignee</option>
-              <option value="any">Any assignee</option>
-            </Form.Select>
-          </Col>
-
-          <Col xs={12} md="auto" className="workload-filters-card__apply-col">
-            <Form.Label
-              className="small text-muted mb-1 workload-filters-card__apply-label"
-              aria-hidden="true"
-            >
-              &nbsp;
-            </Form.Label>
-            <Button
-              variant="dark"
-              size="sm"
-              className="workload-filters-card__apply-btn"
-              disabled={applyDisabled}
-              onClick={onApply}
-            >
-              {isApplying ? "Applying…" : "Apply"}
-            </Button>
-          </Col>
-
-          <Col
-            xs={12}
-            md="auto"
-            className="workload-filters-card__actions d-flex flex-wrap align-items-end gap-2 ms-md-auto"
+        <div className="workload-filter-bar__pill-wrap">
+          <button
+            type="button"
+            className={`workload-filter-bar__pill-btn${range !== "this_week" ? " workload-filter-bar__pill-btn--active" : ""}`}
+            disabled={!enabled}
+            onClick={() => toggle("range")}
           >
-            {hasActiveFilters ? (
-              <Button
-                variant="link"
-                size="sm"
-                className="workload-filters-card__clear px-0"
-                disabled={!enabled}
-                onClick={onClearFilters}
-              >
-                Clear filters
-              </Button>
-            ) : null}
-            <Button
-              variant="outline-warning"
-              size="sm"
+            {range === "this_week" ? "This week" : range === "next_week" ? "Next week" : "Custom range"}
+            {range !== "this_week" ? (
+              <span
+                className="workload-filter-bar__pill-x"
+                onClick={(e) => { e.stopPropagation(); onRangeChange("this_week"); close(); }}
+              >×</span>
+            ) : (
+              <span className="workload-filter-bar__caret">▾</span>
+            )}
+          </button>
+          {openId === "range" && (
+            <div className="workload-filter-bar__dropdown">
+              {([
+                { value: "this_week", label: "This week" },
+                { value: "next_week", label: "Next week" },
+                { value: "custom", label: "Custom range" },
+              ] as const).map((opt) => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  className={`workload-filter-bar__dropdown-item${range === opt.value ? " workload-filter-bar__dropdown-item--active" : ""}`}
+                  onClick={() => { onRangeChange(opt.value); close(); }}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {range === "custom" && (
+          <>
+            <input
+              type="date"
+              className={`workload-filter-bar__date-input${customRangeInvalid ? " workload-filter-bar__date-input--invalid" : ""}`}
+              value={customStart}
               disabled={!enabled}
-              onClick={onOpenUnassigned}
-              className="workload-filters-card__unassigned"
-            >
-              <Inbox size={15} className="me-1" aria-hidden />
-              Unassigned
-              {unassignedCount != null && unassignedCount > 0 ? (
-                <span className="badge bg-warning text-dark ms-1">{unassignedCount}</span>
-              ) : null}
-            </Button>
-          </Col>
-        </Row>
-      </Card.Body>
-    </Card>
+              onChange={(e) => onCustomStartChange(e.target.value)}
+            />
+            <span className="workload-filter-bar__date-sep">—</span>
+            <input
+              type="date"
+              className={`workload-filter-bar__date-input${customRangeInvalid ? " workload-filter-bar__date-input--invalid" : ""}`}
+              value={customEnd}
+              disabled={!enabled}
+              onChange={(e) => onCustomEndChange(e.target.value)}
+            />
+          </>
+        )}
+
+        <div className="workload-filter-bar__pill-wrap">
+          <button
+            type="button"
+            className={`workload-filter-bar__pill-btn${projectFilter !== "all" ? " workload-filter-bar__pill-btn--active" : ""}`}
+            disabled={!enabled}
+            onClick={() => toggle("project")}
+          >
+            {projectFilter === "all"
+              ? "All projects"
+              : projectFilter === "none"
+              ? "No project (org)"
+              : (projectOptions.find((p) => p.id === projectFilter)?.name ?? "Project")}
+            {projectFilter !== "all" ? (
+              <span
+                className="workload-filter-bar__pill-x"
+                onClick={(e) => { e.stopPropagation(); onProjectFilterChange("all"); close(); }}
+              >×</span>
+            ) : (
+              <span className="workload-filter-bar__caret">▾</span>
+            )}
+          </button>
+          {openId === "project" && (
+            <div className="workload-filter-bar__dropdown">
+              {([
+                { value: "all", label: "All projects" },
+                { value: "none", label: "No project (org)" },
+              ] as const).map((opt) => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  className={`workload-filter-bar__dropdown-item${projectFilter === opt.value ? " workload-filter-bar__dropdown-item--active" : ""}`}
+                  onClick={() => { onProjectFilterChange(opt.value); close(); }}
+                >
+                  {opt.label}
+                </button>
+              ))}
+              {projectOptions.map((p) => (
+                <button
+                  key={p.id}
+                  type="button"
+                  className={`workload-filter-bar__dropdown-item${projectFilter === p.id ? " workload-filter-bar__dropdown-item--active" : ""}`}
+                  onClick={() => { onProjectFilterChange(p.id); close(); }}
+                >
+                  {p.name}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="workload-filter-bar__pill-wrap">
+          <button
+            type="button"
+            className={`workload-filter-bar__pill-btn${memberFilter !== "all" ? " workload-filter-bar__pill-btn--active" : ""}`}
+            disabled={!enabled}
+            onClick={() => toggle("member")}
+          >
+            {memberOptions.find((o) => o.value === memberFilter)?.label ?? "All members"}
+            {memberFilter !== "all" ? (
+              <span
+                className="workload-filter-bar__pill-x"
+                onClick={(e) => { e.stopPropagation(); onMemberFilterChange("all"); close(); }}
+              >×</span>
+            ) : (
+              <span className="workload-filter-bar__caret">▾</span>
+            )}
+          </button>
+          {openId === "member" && (
+            <div className="workload-filter-bar__dropdown">
+              {memberOptions.map((opt) => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  className={`workload-filter-bar__dropdown-item${memberFilter === opt.value ? " workload-filter-bar__dropdown-item--active" : ""}`}
+                  onClick={() => { onMemberFilterChange(opt.value); close(); }}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="workload-filter-bar__pill-wrap">
+          <button
+            type="button"
+            className={`workload-filter-bar__pill-btn${priorityFilter !== "all" ? " workload-filter-bar__pill-btn--active" : ""}`}
+            disabled={!enabled}
+            onClick={() => toggle("priority")}
+          >
+            {priorityFilter === "all"
+              ? "All priority"
+              : priorityFilter === "critical"
+              ? "Critical only"
+              : priorityFilter === "high_plus"
+              ? "High+"
+              : "Medium+"}
+            {priorityFilter !== "all" ? (
+              <span
+                className="workload-filter-bar__pill-x"
+                onClick={(e) => { e.stopPropagation(); onPriorityFilterChange("all"); close(); }}
+              >×</span>
+            ) : (
+              <span className="workload-filter-bar__caret">▾</span>
+            )}
+          </button>
+          {openId === "priority" && (
+            <div className="workload-filter-bar__dropdown">
+              {([
+                { value: "all", label: "All priority" },
+                { value: "critical", label: "Critical only" },
+                { value: "high_plus", label: "High+" },
+                { value: "medium_plus", label: "Medium+" },
+              ] as const).map((opt) => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  className={`workload-filter-bar__dropdown-item${priorityFilter === opt.value ? " workload-filter-bar__dropdown-item--active" : ""}`}
+                  onClick={() => { onPriorityFilterChange(opt.value); close(); }}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="workload-filter-bar__pill-wrap">
+          <button
+            type="button"
+            className={`workload-filter-bar__pill-btn${assigneeMatch !== "primary" ? " workload-filter-bar__pill-btn--active" : ""}`}
+            disabled={!enabled}
+            onClick={() => toggle("assignee")}
+          >
+            {assigneeMatch === "primary" ? "Primary assignee" : "Any assignee"}
+            {assigneeMatch !== "primary" ? (
+              <span
+                className="workload-filter-bar__pill-x"
+                onClick={(e) => { e.stopPropagation(); onAssigneeMatchChange("primary"); close(); }}
+              >×</span>
+            ) : (
+              <span className="workload-filter-bar__caret">▾</span>
+            )}
+          </button>
+          {openId === "assignee" && (
+            <div className="workload-filter-bar__dropdown">
+              {([
+                { value: "primary", label: "Primary assignee" },
+                { value: "any", label: "Any assignee" },
+              ] as const).map((opt) => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  className={`workload-filter-bar__dropdown-item${assigneeMatch === opt.value ? " workload-filter-bar__dropdown-item--active" : ""}`}
+                  onClick={() => { onAssigneeMatchChange(opt.value); close(); }}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="workload-filter-bar__sep" aria-hidden="true" />
+
+        <button
+          type="button"
+          className="workload-filter-bar__apply"
+          disabled={applyDisabled}
+          onClick={onApply}
+        >
+          {isApplying ? "Applying…" : "Apply"}
+        </button>
+
+        {hasActiveFilters && (
+          <button
+            type="button"
+            className="workload-filter-bar__clear"
+            disabled={!enabled}
+            onClick={onClearFilters}
+          >
+            Clear filters
+          </button>
+        )}
+
+        <button
+          type="button"
+          className="workload-filter-bar__unassigned"
+          disabled={!enabled}
+          onClick={onOpenUnassigned}
+        >
+          <Inbox size={15} aria-hidden />
+          Unassigned
+          {unassignedCount != null && unassignedCount > 0 && (
+            <span className="workload-filter-bar__badge">{unassignedCount}</span>
+          )}
+        </button>
+
+      </div>
+    </div>
   );
 }
