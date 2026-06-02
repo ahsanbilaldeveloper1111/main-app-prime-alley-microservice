@@ -61,9 +61,6 @@ export function CrmProspectsContactsAddContactsButton({
   return (
     <div
       style={{
-        position: "absolute",
-        right: "19px",
-        top: "18px",
         display: "flex",
         alignItems: "center",
         gap: "8px",
@@ -102,7 +99,7 @@ export function CrmProspectsContactsAddContactsButton({
         </button>
       )}
       {canCreate && (
-      <div style={{ width: "146px" }}>
+      <div style={{ width: "146px", position: "relative" }}>
         <button
           onClick={() => setShowAddContactsDropdown(!showAddContactsDropdown)}
           style={{
@@ -119,10 +116,10 @@ export function CrmProspectsContactsAddContactsButton({
             gap: "8px",
           }}
           onMouseEnter={(e) => {
-            e.currentTarget.style.backgroundColor = "#1a1a1a";
+            e.currentTarget.style.backgroundColor = "#0052A3";
           }}
           onMouseLeave={(e) => {
-            e.currentTarget.style.backgroundColor = "#000000";
+            e.currentTarget.style.backgroundColor = "#0066CC";
           }}
         >
           {config.addMenuButtonLabel}

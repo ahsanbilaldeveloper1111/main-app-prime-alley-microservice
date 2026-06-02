@@ -24,6 +24,219 @@ import {
   getActivityRecordIdNumber,
 } from "./activityHistoryRouting";
 
+type StageDefinition = {
+  name: string;
+  icon: React.ReactNode;
+  color: string;
+};
+
+type StageVisualState = {
+  circleBackground: string;
+  circleBoxShadow: string;
+  stageLabelColor: string;
+};
+
+function buildStageDefinitions(recordStages: StageData[]): StageDefinition[] {
+  return [
+    {
+      name: "Prospect",
+      icon: <Users size={14} />,
+      color: recordStages[0]?.color || "#9c27b0",
+    },
+    {
+      name: "Lead",
+      icon: <Target size={14} />,
+      color: recordStages[1]?.color || "#2196f3",
+    },
+    {
+      name: "Deal",
+      icon: <TrendingUp size={14} />,
+      color: recordStages[2]?.color || "#ff9800",
+    },
+    {
+      name: "Order",
+      icon: <ShoppingBag size={14} />,
+      color: recordStages[3]?.color || "#4caf50",
+    },
+  ];
+}
+
+function getStageVisualState(
+  isCurrent: boolean,
+  isCompleted: boolean,
+  color: string,
+): StageVisualState {
+  if (isCurrent) {
+    return {
+      circleBackground: `linear-gradient(135deg, ${color} 0%, ${color}dd 100%)`,
+      circleBoxShadow: `0 8px 24px ${color}66`,
+      stageLabelColor: color,
+    };
+  }
+  if (isCompleted) {
+    return {
+      circleBackground: color,
+      circleBoxShadow: `0 4px 12px ${color}44`,
+      stageLabelColor: "#374151",
+    };
+  }
+  return {
+    circleBackground: "#e3e8ef",
+    circleBoxShadow: "none",
+    stageLabelColor: "#9ca3af",
+  };
+}
+
+function getActivitySidebarWidth(): string {
+  const innerWidth = globalThis.window?.innerWidth;
+  if (innerWidth !== undefined && innerWidth < 1280) return "360px";
+  return "420px";
+}
+
+type ActivityStageProgressItemProps = Readonly<{
+  stage: StageDefinition;
+  index: number;
+  currentStageIndex: number;
+}>;
+
+function ActivityStageProgressItem({
+  stage,
+  index,
+  currentStageIndex,
+}: ActivityStageProgressItemProps) {
+  const isCompleted = index < currentStageIndex;
+  const isCurrent = index === currentStageIndex;
+  const { circleBackground, circleBoxShadow, stageLabelColor } =
+    getStageVisualState(isCurrent, isCompleted, stage.color);
+
+  return (
+    <div
+      className="d-flex flex-column align-items-center"
+      style={{ flex: 1 }}
+    >
+      <div
+        className="rounded-circle d-flex align-items-center justify-content-center mb-2"
+        style={{
+          width: isCurrent ? 44 : 36,
+          height: isCurrent ? 44 : 36,
+          background: circleBackground,
+          color: isCurrent || isCompleted ? "#fff" : "#9ca3af",
+          opacity: isCompleted && !isCurrent ? 0.88 : 1,
+          transition: "all 0.3s ease",
+          boxShadow: circleBoxShadow,
+        }}
+      >
+        {isCompleted && !isCurrent ? (
+          <CheckCircle size={16} strokeWidth={3} />
+        ) : (
+          stage.icon
+        )}
+      </div>
+      <span
+        className="fw-semibold text-center"
+        style={{
+          fontSize: isCurrent ? "clamp(11px, 0.9vw, 13px)" : "clamp(10px, 0.8vw, 12px)",
+          color: stageLabelColor,
+        }}
+      >
+        {stage.name}
+      </span>
+      {isCurrent && (
+        <Badge
+          className="mt-1"
+          style={{
+            backgroundColor: `${stage.color}22`,
+            color: stage.color,
+            fontSize: 9,
+            padding: "2px 8px",
+          }}
+        >
+          CURRENT
+        </Badge>
+      )}
+    </div>
+  );
+}
+
+function renderStageProgressContent(
+  loadingHistory: boolean,
+  recordStages: StageData[],
+  currentStageIndex: number,
+): React.ReactNode {
+  if (loadingHistory) {
+    return (
+      <div className="text-center py-4">
+        <Spinner
+          animation="border"
+          variant="primary"
+          size="sm"
+          role="status"
+        >
+          <span className="visually-hidden">Loading stages...</span>
+        </Spinner>
+      </div>
+    );
+  }
+  if (recordStages.length === 0) {
+    return (
+      <div className="text-center py-4 text-muted">
+        <TrendingUp size={48} className="mb-3 opacity-50" />
+        <div>No stage information available</div>
+      </div>
+    );
+  }
+
+  const stages = buildStageDefinitions(recordStages);
+
+  return (
+    <div className="position-relative" style={{ padding: "12px 0" }}>
+      <div
+        style={{
+          position: "absolute",
+          top: "50%",
+          left: "10%",
+          right: "10%",
+          height: "4px",
+          backgroundColor: "#e3e8ef",
+          borderRadius: "4px",
+          transform: "translateY(-50%)",
+          zIndex: 0,
+        }}
+      />
+      <div
+        style={{
+          position: "absolute",
+          top: "50%",
+          left: "10%",
+          width:
+            currentStageIndex > 0
+              ? `${(currentStageIndex / 3) * 80}%`
+              : "0%",
+          height: "4px",
+          background: "linear-gradient(90deg, #667eea 0%, #764ba2 100%)",
+          borderRadius: "4px",
+          transform: "translateY(-50%)",
+          zIndex: 0,
+          transition: "width 0.5s ease",
+        }}
+      />
+      <div
+        className="d-flex justify-content-between align-items-center position-relative"
+        style={{ zIndex: 1 }}
+      >
+        {stages.map((stage, idx) => (
+          <ActivityStageProgressItem
+            key={stage.name}
+            stage={stage}
+            index={idx}
+            currentStageIndex={currentStageIndex}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export type ActivityHistorySidebarPanelProps = Readonly<{
   showActivitySidebar: boolean;
   setShowActivitySidebar: (open: boolean) => void;
@@ -56,172 +269,15 @@ export function ActivityHistorySidebarPanel({
 }: ActivityHistorySidebarPanelProps) {
   if (!showActivitySidebar) return null;
 
-  const stageProgressCustomContent: React.ReactNode = (() => {
-    if (loadingHistory) {
-      return (
-        <div className="text-center py-4">
-          <Spinner
-            animation="border"
-            variant="primary"
-            size="sm"
-            role="status"
-          >
-            <span className="visually-hidden">Loading stages...</span>
-          </Spinner>
-        </div>
-      );
-    }
-    if (recordStages.length === 0) {
-      return (
-        <div className="text-center py-4 text-muted">
-          <TrendingUp size={48} className="mb-3 opacity-50" />
-          <div>No stage information available</div>
-        </div>
-      );
-    }
-    return (
-      <div className="position-relative" style={{ padding: "32px 0" }}>
-        <div
-          style={{
-            position: "absolute",
-            top: "50%",
-            left: "10%",
-            right: "10%",
-            height: "4px",
-            backgroundColor: "#e3e8ef",
-            borderRadius: "4px",
-            transform: "translateY(-50%)",
-            zIndex: 0,
-          }}
-        />
-        <div
-          style={{
-            position: "absolute",
-            top: "50%",
-            left: "10%",
-            width:
-              currentStageIndex > 0
-                ? `${(currentStageIndex / 3) * 80}%`
-                : "0%",
-            height: "4px",
-            background: "linear-gradient(90deg, #667eea 0%, #764ba2 100%)",
-            borderRadius: "4px",
-            transform: "translateY(-50%)",
-            zIndex: 0,
-            transition: "width 0.5s ease",
-          }}
-        />
-        <div
-          className="d-flex justify-content-between align-items-center position-relative"
-          style={{ zIndex: 1 }}
-        >
-          {[
-            {
-              name: "Prospect",
-              icon: <Users size={20} />,
-              color: "#9c27b0",
-            },
-            {
-              name: "Lead",
-              icon: <Target size={20} />,
-              color: "#2196f3",
-            },
-            {
-              name: "Deal",
-              icon: <TrendingUp size={20} />,
-              color: "#ff9800",
-            },
-            {
-              name: "Order",
-              icon: <ShoppingBag size={20} />,
-              color: "#4caf50",
-            },
-          ].map((stage, idx) => {
-            const isCompleted = idx < currentStageIndex;
-            const isCurrent = idx === currentStageIndex;
-
-            let circleBackground: string;
-            if (isCurrent) {
-              circleBackground = `linear-gradient(135deg, ${stage.color} 0%, ${stage.color}dd 100%)`;
-            } else if (isCompleted) {
-              circleBackground = stage.color;
-            } else {
-              circleBackground = "#e3e8ef";
-            }
-
-            let circleBoxShadow: string;
-            if (isCurrent) {
-              circleBoxShadow = `0 8px 24px ${stage.color}66`;
-            } else if (isCompleted) {
-              circleBoxShadow = `0 4px 12px ${stage.color}44`;
-            } else {
-              circleBoxShadow = "none";
-            }
-
-            let stageLabelColor: string;
-            if (isCurrent) {
-              stageLabelColor = stage.color;
-            } else if (isCompleted) {
-              stageLabelColor = "#374151";
-            } else {
-              stageLabelColor = "#9ca3af";
-            }
-
-            return (
-              <div
-                key={stage.name}
-                className="d-flex flex-column align-items-center"
-                style={{ flex: 1 }}
-              >
-                <div
-                  className="rounded-circle d-flex align-items-center justify-content-center mb-2"
-                  style={{
-                    width: isCurrent ? 64 : 52,
-                    height: isCurrent ? 64 : 52,
-                    background: circleBackground,
-                    color: isCurrent || isCompleted ? "#fff" : "#9ca3af",
-                    transition: "all 0.3s ease",
-                    boxShadow: circleBoxShadow,
-                  }}
-                >
-                  {isCompleted && !isCurrent ? (
-                    <CheckCircle size={24} strokeWidth={3} />
-                  ) : (
-                    stage.icon
-                  )}
-                </div>
-                <span
-                  className="fw-semibold text-center"
-                  style={{
-                    fontSize: isCurrent ? 15 : 13,
-                    color: stageLabelColor,
-                  }}
-                >
-                  {stage.name}
-                </span>
-                {isCurrent && (
-                  <Badge
-                    className="mt-1"
-                    style={{
-                      backgroundColor: `${stage.color}22`,
-                      color: stage.color,
-                      fontSize: 11,
-                      padding: "4px 10px",
-                    }}
-                  >
-                    CURRENT
-                  </Badge>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      </div>
-    );
-  })();
+  const stageProgressCustomContent = renderStageProgressContent(
+    loadingHistory,
+    recordStages,
+    currentStageIndex,
+  );
 
   return (
     <GenericSidebar
+      width={getActivitySidebarWidth()}
       isOpen={showActivitySidebar}
       onClose={() => setShowActivitySidebar(false)}
       title={selectedActivityRecord?.customer || "Activity Details"}

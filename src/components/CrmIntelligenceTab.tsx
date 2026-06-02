@@ -280,40 +280,40 @@ const CrmIntelligenceTabContent: React.FC<CrmIntelligenceTabProps> = ({
             backgroundColor: "#ffffff",
             border: "1px solid #eaf0f6",
             borderRadius: "5px",
-            padding: "20px",
+            padding: "14px 16px",
             marginBottom: "20px",
           }}
         >
           <div style={{ display: "flex", alignItems: "flex-start", gap: "20px", flexWrap: "nowrap" }}>
             <div style={{ flex: "1 1 auto", minWidth: "100px" }}>
-              <div style={{ fontSize: "13px", color: "#666", marginBottom: "6px" }}>
+              <div style={{ fontSize: "13px", color: "#666", marginBottom: "3px" }}>
                 Lifecycle stage
               </div>
-              <div style={{ fontSize: "14px", color: "#141414", fontWeight: "700" }}>{lifecycleStage}</div>
+              <div style={{ fontSize: "14px", color: "#141414", fontWeight: "500" }}>{lifecycleStage}</div>
             </div>
 
             <div style={{ flex: "1 1 auto", minWidth: "100px" }}>
-              <div style={{ fontSize: "13px", color: "#666", marginBottom: "6px" }}>Related company</div>
+              <div style={{ fontSize: "13px", color: "#666", marginBottom: "3px" }}>Related company</div>
               <div style={{ fontSize: "14px", color: "#141414", fontWeight: "400" }}>{relatedCompanyLegacy}</div>
             </div>
 
             <div style={{ flex: "1 1 auto", minWidth: "100px" }}>
-              <div style={{ fontSize: "13px", color: "#666", marginBottom: "6px" }}>Employment role</div>
+              <div style={{ fontSize: "13px", color: "#666", marginBottom: "3px" }}>Employment role</div>
               <div style={{ fontSize: "14px", color: "#141414", fontWeight: "400" }}>--</div>
             </div>
 
             <div style={{ flex: "1 1 auto", minWidth: "60px" }}>
-              <div style={{ fontSize: "13px", color: "#666", marginBottom: "6px" }}>City</div>
+              <div style={{ fontSize: "13px", color: "#666", marginBottom: "3px" }}>City</div>
               <div style={{ fontSize: "14px", color: "#141414", fontWeight: "400" }}>{cityVal}</div>
             </div>
 
             <div style={{ flex: "1 1 auto", minWidth: "60px" }}>
-              <div style={{ fontSize: "13px", color: "#666", marginBottom: "6px" }}>State</div>
+              <div style={{ fontSize: "13px", color: "#666", marginBottom: "3px" }}>State</div>
               <div style={{ fontSize: "14px", color: "#141414", fontWeight: "400" }}>{stateValLegacy}</div>
             </div>
 
             <div style={{ flex: "1 1 auto", minWidth: "60px" }}>
-              <div style={{ fontSize: "13px", color: "#666", marginBottom: "6px" }}>Region</div>
+              <div style={{ fontSize: "13px", color: "#666", marginBottom: "3px" }}>Region</div>
               <div style={{ fontSize: "14px", color: "#141414", fontWeight: "400" }}>{regionValLegacy}</div>
             </div>
 
@@ -357,17 +357,17 @@ const CrmIntelligenceTabContent: React.FC<CrmIntelligenceTabProps> = ({
 
         {/* Two Column Layout */}
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px" }}>
-          <div style={{ backgroundColor: "#ffffff", border: "1px solid #eaf0f6", borderRadius: "5px", padding: "20px" }}>
-            <div style={{ paddingBottom: "16px", borderBottom: "1px solid #eaf0f6", marginBottom: "16px" }}>
-              <div style={{ fontSize: "13px", color: "#666", marginBottom: "6px" }}>Industry</div>
+          <div style={{ backgroundColor: "#ffffff", border: "1px solid #eaf0f6", borderRadius: "5px", padding: "14px 16px" }}>
+            <div style={{ paddingBottom: "10px", borderBottom: "1px solid #eaf0f6", marginBottom: "10px" }}>
+              <div style={{ fontSize: "13px", color: "#666", marginBottom: "3px" }}>Industry</div>
               <div style={{ fontSize: "14px", color: "#141414", fontWeight: "400" }}>{industryValLegacy}</div>
             </div>
-            <div style={{ paddingBottom: "16px", borderBottom: "1px solid #eaf0f6", marginBottom: "16px" }}>
-              <div style={{ fontSize: "13px", color: "#666", marginBottom: "6px" }}>Company description</div>
+            <div style={{ paddingBottom: "10px", borderBottom: "1px solid #eaf0f6", marginBottom: "10px" }}>
+              <div style={{ fontSize: "13px", color: "#666", marginBottom: "3px" }}>Company description</div>
               <div style={{ fontSize: "14px", color: "#141414", fontWeight: "400" }}>{companyDescLegacy}</div>
             </div>
             <div>
-              <div style={{ fontSize: "13px", color: "#666", marginBottom: "6px" }}>Company keywords</div>
+              <div style={{ fontSize: "13px", color: "#666", marginBottom: "3px" }}>Company keywords</div>
               <div style={{ fontSize: "14px", color: "#141414", fontWeight: "400" }}>--</div>
             </div>
           </div>
@@ -379,7 +379,7 @@ const CrmIntelligenceTabContent: React.FC<CrmIntelligenceTabProps> = ({
 
             {/* Emails */}
             <div style={{ marginBottom: "20px" }}>
-              <div style={{ fontSize: "13px", color: "#666", marginBottom: "6px" }}>Emails</div>
+              <div style={{ fontSize: "13px", color: "#666", marginBottom: "3px" }}>Emails</div>
               <div style={{ fontSize: "14px", color: "#141414", fontWeight: "400", display: "flex", flexDirection: "column", gap: "6px" }}>
                 {renderLegacyEmails(structData, rawData, company)}
               </div>
@@ -387,7 +387,7 @@ const CrmIntelligenceTabContent: React.FC<CrmIntelligenceTabProps> = ({
 
             {/* Phones */}
             <div style={{ marginBottom: "20px" }}>
-              <div style={{ fontSize: "13px", color: "#666", marginBottom: "6px" }}>Phones</div>
+              <div style={{ fontSize: "13px", color: "#666", marginBottom: "3px" }}>Phones</div>
               <div style={{ fontSize: "14px", color: "#141414", fontWeight: "400", display: "flex", flexDirection: "column", gap: "6px" }}>
                 {allPhones.length === 0 ? (
                   "--"
@@ -410,17 +410,17 @@ const CrmIntelligenceTabContent: React.FC<CrmIntelligenceTabProps> = ({
 
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px", marginBottom: "20px" }}>
               <div>
-                <div style={{ fontSize: "13px", color: "#666", marginBottom: "6px" }}>Job sub role</div>
+                <div style={{ fontSize: "13px", color: "#666", marginBottom: "3px" }}>Job sub role</div>
                 <div style={{ fontSize: "14px", color: "#141414", fontWeight: "400" }}>--</div>
               </div>
               <div>
-                <div style={{ fontSize: "13px", color: "#666", marginBottom: "6px" }}>Job seniority</div>
+                <div style={{ fontSize: "13px", color: "#666", marginBottom: "3px" }}>Job seniority</div>
                 <div style={{ fontSize: "14px", color: "#141414", fontWeight: "400" }}>--</div>
               </div>
             </div>
 
             <div>
-              <div style={{ fontSize: "13px", color: "#666", marginBottom: "6px" }}>LinkedIn</div>
+              <div style={{ fontSize: "13px", color: "#666", marginBottom: "3px" }}>LinkedIn</div>
               <div style={{ fontSize: "14px", color: "#141414", fontWeight: "400" }}>
                 {firstLinkedIn === "--" ? (
                   "--"

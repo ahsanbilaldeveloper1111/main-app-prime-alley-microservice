@@ -108,7 +108,7 @@ export function buildCrmListPageScopedLayoutCss(
     ` {
           display: flex;
           flex-direction: column;
-          height: calc(100vh - 100px);
+          height: calc(100vh - 74px);
           overflow: hidden;
         }
         
@@ -125,6 +125,7 @@ export function buildCrmListPageScopedLayoutCss(
     config.scrollableContentClass +
     ` {
           flex: 1;
+          height: 100%;
           overflow-y: auto;
           overflow-x: hidden;
         }

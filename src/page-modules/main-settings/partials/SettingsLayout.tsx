@@ -1,5 +1,8 @@
-import React from 'react'
+import React, { useCallback, useEffect, useState } from 'react'
+import { Menu } from 'lucide-react'
+import { MainSettingsFormProvider } from '@components/main-settings/mainSettingsFormContext'
 import Sidebar from './Sidebar'
+import './main-settings-layout.scss'
 
 type SettingsLayoutProps = {
   activeSection: string
@@ -12,40 +15,62 @@ const SettingsLayout: React.FC<SettingsLayoutProps> = ({
   onNavigate,
   children,
 }) => {
+  const [mobileNavOpen, setMobileNavOpen] = useState(false)
+
+  const handleNavigate = useCallback(
+    (sectionId: string, subTabId?: string) => {
+      onNavigate(sectionId, subTabId)
+      setMobileNavOpen(false)
+    },
+    [onNavigate],
+  )
+
+  useEffect(() => {
+    if (!mobileNavOpen) {
+      return undefined
+    }
+
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+
+    return () => {
+      document.body.style.overflow = previousOverflow
+    }
+  }, [mobileNavOpen])
+
   return (
-    <>
-      <style
-        dangerouslySetInnerHTML={{
-          __html: `
-            .main-settings-content-wrapper {
-              overflow: hidden;
-              height: calc(100vh - 50px);
-            }
-          `,
-        }}
-      />
-      <div
-        style={{
-          display: 'flex',
-          height: '100vh',
-          overflow: 'hidden',
-          background: '#ffffff',
-          fontFamily: 'Lexend Deca, Helvetica, Arial, sans-serif',
-        }}
-      >
-        <Sidebar activeSection={activeSection} onNavigate={onNavigate} />
-        <main
-          style={{
-            flex: 1,
-            background: '#ffffff',
-            overflowY: 'auto',
-            height: '100%',
-          }}
-        >
+    <MainSettingsFormProvider>
+    <div className="main-settings-root">
+        {mobileNavOpen ? (
+          <button
+            type="button"
+            className="main-settings-sidebar-backdrop"
+            aria-label="Close settings menu"
+            onClick={() => setMobileNavOpen(false)}
+          />
+        ) : null}
+
+        <Sidebar
+          activeSection={activeSection}
+          onNavigate={handleNavigate}
+          isMobileOpen={mobileNavOpen}
+        />
+
+        <main className="main-settings-main">
+          <button
+            type="button"
+            className="main-settings-mobile-nav-toggle"
+            aria-expanded={mobileNavOpen}
+            aria-controls="main-settings-sidebar"
+            onClick={() => setMobileNavOpen((open) => !open)}
+          >
+            <Menu size={18} aria-hidden focusable={false} />
+            Settings menu
+          </button>
           {children}
         </main>
-      </div>
-    </>
+    </div>
+    </MainSettingsFormProvider>
   )
 }
 

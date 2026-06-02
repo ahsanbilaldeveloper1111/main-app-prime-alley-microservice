@@ -177,10 +177,10 @@ const OverviewTab: React.FC<OverviewTabProps> = ({
 
     return (
         <>
-            <Row>
+            <Row className="g-2">
                 <Col md={5}>
                     <Card>
-                        <Card.Body className="overview-card">
+                        <Card.Body className="overview-card py-2 px-3">
                             <Row className="align-items-center">
                                 <Col xs={3}>
                                     <div className="user-avatar">
@@ -203,8 +203,8 @@ const OverviewTab: React.FC<OverviewTabProps> = ({
                 </Col>
                 <Col md={7}>
                     <Card className="no-shadow">
-                        <Card.Body>
-                            <Row>
+                        <Card.Body className="py-2 px-3">
+                            <Row className="g-1">
                                 <Col md={6}>
                                     <p className="mb-0 small text-primary"><b>Status</b></p>
                                     <p className="mb-2 text-capitalize d-flex justify-content-between">

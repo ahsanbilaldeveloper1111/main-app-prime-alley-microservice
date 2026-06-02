@@ -1,5 +1,7 @@
 import React from "react";
 import { Button, Form, Modal } from "react-bootstrap";
+import { MainSettingsFormSidebar } from "@components/main-settings/MainSettingsFormSidebar";
+import { useMainSettingsFormSidebar } from "@components/main-settings/mainSettingsFormContext";
 import type {
   UserRequestCategoryField,
   UserRequestCategoryFieldPayload,
@@ -48,13 +50,12 @@ export default function RequestCategoryFieldModal(props: RequestCategoryFieldMod
     onSubmit,
   } = props;
 
-  return (
-    <Modal show={show} onHide={onHide} centered>
-      <Modal.Header closeButton>
-        <Modal.Title>{fieldModalTitle(editingField)}</Modal.Title>
-      </Modal.Header>
-      <Form onSubmit={onSubmit}>
-        <Modal.Body>
+  const preferSidebar = useMainSettingsFormSidebar();
+  const panelTitle = fieldModalTitle(editingField);
+  const formId = "request-category-field-form";
+  const submitDisabled = savingField || !isFieldFormReadyForSubmit(fieldForm);
+
+  const fieldFormBody = (
           <div className="row g-3">
             <div className="col-md-6">
               <Form.Group>
@@ -456,19 +457,47 @@ export default function RequestCategoryFieldModal(props: RequestCategoryFieldMod
               </div>
             )}
           </div>
-        </Modal.Body>
-        <Modal.Footer>
-          <Button variant="secondary" onClick={onHide}>
-            Cancel
-          </Button>
-          <Button
-            variant="primary"
-            type="submit"
-            disabled={savingField || !isFieldFormReadyForSubmit(fieldForm)}
-          >
-            {fieldModalPrimaryButtonLabel(savingField, editingField)}
-          </Button>
-        </Modal.Footer>
+  );
+
+  const fieldFormFooter = (
+    <>
+      <Button variant="secondary" type="button" onClick={onHide} disabled={savingField}>
+        Cancel
+      </Button>
+      <Button variant="primary" type="submit" form={preferSidebar ? formId : undefined} disabled={submitDisabled}>
+        {fieldModalPrimaryButtonLabel(savingField, editingField)}
+      </Button>
+    </>
+  );
+
+  if (preferSidebar) {
+    return (
+      <MainSettingsFormSidebar
+        show={show}
+        onHide={onHide}
+        title={panelTitle}
+        disableClose={savingField}
+        footer={
+          <div className="main-settings-form-sidebar-footer">
+            <div className="main-settings-form-sidebar-footer__actions">{fieldFormFooter}</div>
+          </div>
+        }
+      >
+        <Form id={formId} onSubmit={onSubmit}>
+          {fieldFormBody}
+        </Form>
+      </MainSettingsFormSidebar>
+    );
+  }
+
+  return (
+    <Modal show={show} onHide={onHide} centered>
+      <Modal.Header closeButton>
+        <Modal.Title>{panelTitle}</Modal.Title>
+      </Modal.Header>
+      <Form onSubmit={onSubmit}>
+        <Modal.Body>{fieldFormBody}</Modal.Body>
+        <Modal.Footer>{fieldFormFooter}</Modal.Footer>
       </Form>
     </Modal>
   );

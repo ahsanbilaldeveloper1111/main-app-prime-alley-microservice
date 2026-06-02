@@ -184,6 +184,21 @@ function getEmailPreviewHtml(content: string | undefined): string {
   return htmlMatch ? htmlMatch[1].trim() : raw;
 }
 
+function getActivityListItemButtonStyle(isSelected: boolean): React.CSSProperties {
+  return {
+    display: "block",
+    width: "100%",
+    textAlign: "left",
+    backgroundColor: "#fff",
+    border: `1px solid ${isSelected ? "#141414" : "#eaf0f6"}`,
+    borderRadius: "5px",
+    padding: "16px 20px",
+    cursor: "pointer",
+    font: "inherit",
+    color: "inherit",
+  };
+}
+
 /** Format raw audit value for display (pure, no hooks). */
 function formatValForAudit(v: unknown): string {
   if (v == null) return "—";
@@ -191,6 +206,17 @@ function formatValForAudit(v: unknown): string {
   if (typeof v === "object") return JSON.stringify(v);
   return String(v);
 }
+
+const formatIfDate = (val: string): string => {
+  if (!val || val === "—") return val;
+  const iso = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(val);
+  if (!iso) return val;
+  try {
+    return formatCrmPreviewDateTime(val);
+  } catch {
+    return val;
+  }
+};
 
 /** Resolve assigned_to ID/extension to display label (pure). */
 function resolveAssignedToLabel(
@@ -821,6 +847,19 @@ const CrmActivitiesPanelInnerRender: React.ForwardRefRenderFunction<
     return () => clearTimeout(t);
   }, [whatsappMessagesLoading, whatsappMessages]);
 
+  useEffect(() => {
+    const handleCloseAll = () => {
+      setShowEmailModal(false);
+      setShowNotesModal(false);
+      setShowMeetingModal(false);
+      setShowSmsModal(false);
+      setShowWhatsAppModal(false);
+      setEditMeetingModalOpen(false);
+    };
+    globalThis.addEventListener("close-all-activity-modals", handleCloseAll);
+    return () => globalThis.removeEventListener("close-all-activity-modals", handleCloseAll);
+  }, []);
+
   const handleNoteCreate = useCallback(
     async (payload: NotesModalSavePayload) => {
       const text = (payload.note ?? "").trim();
@@ -1352,7 +1391,7 @@ const CrmActivitiesPanelInnerRender: React.ForwardRefRenderFunction<
                   )}
                 </button>
               )}
-              <div style={{ flex: 1 }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
                 <div
                   style={{
                     display: "flex",
@@ -1364,7 +1403,7 @@ const CrmActivitiesPanelInnerRender: React.ForwardRefRenderFunction<
                   <h4
                     style={{
                       fontSize: "14px",
-                      fontWeight: "600",
+                      fontWeight: "500",
                       color: "#141414",
                       margin: 0,
                     }}
@@ -1375,8 +1414,8 @@ const CrmActivitiesPanelInnerRender: React.ForwardRefRenderFunction<
                 </div>
                 <p
                   style={{
-                    fontSize: "14px",
-                    color: "#141414",
+                    fontSize: "clamp(11px, 0.9vw, 13px)",
+                    color: "#718096",
                     margin: "4px 0",
                     lineHeight: "1.6",
                   }}
@@ -1392,11 +1431,16 @@ const CrmActivitiesPanelInnerRender: React.ForwardRefRenderFunction<
                               key={i}
                               style={{
                                 display: "block",
+                                wordBreak: "break-word",
+                                overflowWrap: "anywhere",
                                 marginTop: i ? "6px" : 0,
                               }}
                             >
-                              <strong>{c.field}</strong>: {c.oldVal} →{" "}
-                              {c.newVal}
+                              <span style={{ fontSize: "clamp(10px, 0.8vw, 12px)", color: "#718096", fontWeight: "500" }}>{c.field}</span>
+                              <span style={{ color: "#718096", fontWeight: "400" }}>: </span>
+                              <span style={{ color: "#718096" }}>{formatIfDate(c.oldVal)}</span>
+                              <span style={{ color: "#718096" }}> → </span>
+                              <span style={{ color: "#141414", fontWeight: "500" }}>{formatIfDate(c.newVal)}</span>
                             </span>
                           ))
                         : (activity.auditDescription ?? activity.description)}
@@ -1456,12 +1500,12 @@ const CrmActivitiesPanelInnerRender: React.ForwardRefRenderFunction<
               border: "none",
               borderBottom:
                 activityFilter === filter.id
-                  ? "2px solid #141414"
+                  ? "2px solid #0066CC"
                   : "2px solid transparent",
               cursor: "pointer",
               fontSize: "14px",
               fontWeight: activityFilter === filter.id ? "600" : "400",
-              color: "#141414",
+              color: activityFilter === filter.id ? "#141414" : "#718096",
               transition: "all 0.2s",
               marginBottom: "-2px",
             }}
@@ -1478,7 +1522,7 @@ const CrmActivitiesPanelInnerRender: React.ForwardRefRenderFunction<
             alignItems: "center",
             justifyContent: "flex-end",
             gap: "12px",
-            marginBottom: "20px",
+            marginBottom: "12px",
           }}
         >
           <button
@@ -1495,7 +1539,7 @@ const CrmActivitiesPanelInnerRender: React.ForwardRefRenderFunction<
               alignItems: "center",
               gap: "6px",
             }}
-            onClick={onOpenEmail ?? (() => setShowEmailModal(true))}
+            onClick={onOpenEmail ?? (() => { setShowNotesModal(false); setShowMeetingModal(false); setShowSmsModal(false); setShowWhatsAppModal(false); setShowEmailModal(true); })}
           >
             <Mail size={16} />
             Create email
@@ -1526,7 +1570,7 @@ const CrmActivitiesPanelInnerRender: React.ForwardRefRenderFunction<
               alignItems: "center",
               gap: "6px",
             }}
-            onClick={onOpenNote ?? (() => setShowNotesModal(true))}
+            onClick={onOpenNote ?? (() => { setShowEmailModal(false); setShowMeetingModal(false); setShowSmsModal(false); setShowWhatsAppModal(false); setShowNotesModal(true); })}
           >
             <ClipboardList size={16} />
             Create note
@@ -1557,7 +1601,7 @@ const CrmActivitiesPanelInnerRender: React.ForwardRefRenderFunction<
               alignItems: "center",
               gap: "6px",
             }}
-            onClick={onOpenMeeting ?? (() => setShowMeetingModal(true))}
+            onClick={onOpenMeeting ?? (() => { setShowEmailModal(false); setShowNotesModal(false); setShowSmsModal(false); setShowWhatsAppModal(false); setShowMeetingModal(true); })}
           >
             <Calendar size={16} />
             Create meeting
@@ -1733,24 +1777,11 @@ const CrmActivitiesPanelInnerRender: React.ForwardRefRenderFunction<
                     : stripped
                   : "—";
                 return (
-                  <div
+                  <button
+                    type="button"
                     key={String(email.id)}
-                    role="button"
-                    tabIndex={0}
                     onClick={() => setSelectedEmailId(email.id)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" || e.key === " ") {
-                        e.preventDefault();
-                        setSelectedEmailId(email.id);
-                      }
-                    }}
-                    style={{
-                      backgroundColor: "#fff",
-                      border: `1px solid ${isSelected ? "#141414" : "#eaf0f6"}`,
-                      borderRadius: "5px",
-                      padding: "16px 20px",
-                      cursor: "pointer",
-                    }}
+                    style={getActivityListItemButtonStyle(isSelected)}
                   >
                     <div
                       style={{
@@ -1836,7 +1867,7 @@ const CrmActivitiesPanelInnerRender: React.ForwardRefRenderFunction<
                         </div>
                       )}
                     </div>
-                  </div>
+                  </button>
                 );
               })}
               {emailsMeta &&
@@ -2832,8 +2863,8 @@ const CrmActivitiesPanelInnerRender: React.ForwardRefRenderFunction<
                           </p>
                           <p
                             style={{
-                              fontSize: "14px",
-                              color: "#141414",
+                              fontSize: "13px",
+                              color: "#718096",
                               margin: "4px 0",
                               lineHeight: "1.6",
                             }}
@@ -2986,29 +3017,20 @@ const CrmActivitiesPanelInnerRender: React.ForwardRefRenderFunction<
             >
               {smsList.map((sms) => {
                 const isSelected = selectedSmsId === sms.id;
+                const openSmsDetail = () => {
+                  setSelectedSmsId(sms.id);
+                  setShowEmailModal(false);
+                  setShowNotesModal(false);
+                  setShowMeetingModal(false);
+                  setShowWhatsAppModal(false);
+                  setShowSmsModal(true);
+                };
                 return (
-                  <div
+                  <button
+                    type="button"
                     key={sms.id}
-                    role="button"
-                    tabIndex={0}
-                    onClick={() => {
-                      setSelectedSmsId(sms.id);
-                      setShowSmsModal(true);
-                    }}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" || e.key === " ") {
-                        e.preventDefault();
-                        setSelectedSmsId(sms.id);
-                        setShowSmsModal(true);
-                      }
-                    }}
-                    style={{
-                      backgroundColor: "#fff",
-                      border: `1px solid ${isSelected ? "#141414" : "#eaf0f6"}`,
-                      borderRadius: "5px",
-                      padding: "16px 20px",
-                      cursor: "pointer",
-                    }}
+                    onClick={openSmsDetail}
+                    style={getActivityListItemButtonStyle(isSelected)}
                   >
                     <div
                       style={{
@@ -3027,15 +3049,8 @@ const CrmActivitiesPanelInnerRender: React.ForwardRefRenderFunction<
                             marginBottom: "4px",
                           }}
                         >
-                          <span
-                            style={{
-                              fontSize: "13px",
-                              fontWeight: "600",
-                              color: "#141414",
-                            }}
-                          >
-                            To: {sms.to}
-                          </span>
+                          <span style={{ fontSize: "clamp(10px, 0.8vw, 12px)", color: "#718096" }}>To: </span>
+                          <span style={{ fontSize: "clamp(11px, 0.9vw, 13px)", color: "#141414", fontWeight: "500" }}>{sms.to}</span>
                           {sms.status != null && (
                             <span
                               style={{
@@ -3094,7 +3109,7 @@ const CrmActivitiesPanelInnerRender: React.ForwardRefRenderFunction<
                         </div>
                       )}
                     </div>
-                  </div>
+                  </button>
                 );
               })}
               {smsMeta && (smsMeta.total > 0 || smsList.length > 0) && (
@@ -3296,45 +3311,28 @@ const CrmActivitiesPanelInnerRender: React.ForwardRefRenderFunction<
             >
               {whatsappChats.map((chat) => {
                 const isSelected = selectedWhatsAppChatId === chat.id;
+                const openWhatsAppDetail = () => {
+                  if (onWhatsAppChatClick) {
+                    onWhatsAppChatClick({
+                      id: chat.id,
+                      phone_number: chat.phone_number,
+                    });
+                    return;
+                  }
+                  setSelectedWhatsAppChatId(chat.id);
+                  setSelectedWhatsAppChat(chat);
+                  setShowEmailModal(false);
+                  setShowNotesModal(false);
+                  setShowMeetingModal(false);
+                  setShowSmsModal(false);
+                  setShowWhatsAppModal(true);
+                };
                 return (
-                  <div
+                  <button
+                    type="button"
                     key={chat.id}
-                    role="button"
-                    tabIndex={0}
-                    onClick={() => {
-                      if (onWhatsAppChatClick) {
-                        onWhatsAppChatClick({
-                          id: chat.id,
-                          phone_number: chat.phone_number,
-                        });
-                        return;
-                      }
-                      setSelectedWhatsAppChatId(chat.id);
-                      setSelectedWhatsAppChat(chat);
-                      setShowWhatsAppModal(true);
-                    }}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" || e.key === " ") {
-                        e.preventDefault();
-                        if (onWhatsAppChatClick) {
-                          onWhatsAppChatClick({
-                            id: chat.id,
-                            phone_number: chat.phone_number,
-                          });
-                          return;
-                        }
-                        setSelectedWhatsAppChatId(chat.id);
-                        setSelectedWhatsAppChat(chat);
-                        setShowWhatsAppModal(true);
-                      }
-                    }}
-                    style={{
-                      backgroundColor: "#fff",
-                      border: `1px solid ${isSelected ? "#141414" : "#eaf0f6"}`,
-                      borderRadius: "5px",
-                      padding: "16px 20px",
-                      cursor: "pointer",
-                    }}
+                    onClick={openWhatsAppDetail}
+                    style={getActivityListItemButtonStyle(isSelected)}
                   >
                     <div
                       style={{
@@ -3393,7 +3391,7 @@ const CrmActivitiesPanelInnerRender: React.ForwardRefRenderFunction<
                         </div>
                       )}
                     </div>
-                  </div>
+                  </button>
                 );
               })}
             </div>
@@ -3655,12 +3653,11 @@ const CrmActivitiesPanelInnerRender: React.ForwardRefRenderFunction<
                 <div style={{ padding: "20px" }}>
                   <div
                     style={{
-                      fontSize: "13px",
-                      color: "#718096",
                       marginBottom: "8px",
                     }}
                   >
-                    To: {selectedSms.to}
+                    <span style={{ fontSize: "clamp(10px, 0.8vw, 12px)", color: "#718096" }}>To: </span>
+                    <span style={{ fontSize: "clamp(11px, 0.9vw, 13px)", color: "#141414", fontWeight: "500" }}>{selectedSms.to}</span>
                   </div>
                   <div
                     style={{
@@ -3767,21 +3764,19 @@ const CrmActivitiesPanelInnerRender: React.ForwardRefRenderFunction<
                 <div style={{ padding: "20px" }}>
                   <div
                     style={{
-                      fontSize: "13px",
-                      color: "#718096",
                       marginBottom: "4px",
                     }}
                   >
-                    From: {fromDisplay}
+                    <span style={{ fontSize: "clamp(10px, 0.8vw, 12px)", color: "#718096" }}>From: </span>
+                    <span style={{ fontSize: "clamp(11px, 0.9vw, 13px)", color: "#141414", fontWeight: "500" }}>{fromDisplay}</span>
                   </div>
                   <div
                     style={{
-                      fontSize: "13px",
-                      color: "#718096",
                       marginBottom: "8px",
                     }}
                   >
-                    To: {toDisplay}
+                    <span style={{ fontSize: "clamp(10px, 0.8vw, 12px)", color: "#718096" }}>To: </span>
+                    <span style={{ fontSize: "clamp(11px, 0.9vw, 13px)", color: "#141414", fontWeight: "500" }}>{toDisplay}</span>
                   </div>
                   <div
                     style={{

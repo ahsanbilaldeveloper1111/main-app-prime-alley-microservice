@@ -2567,6 +2567,7 @@ const CrmOrders = () => { // NOSONAR
                 toolbar={ordersToolbarConfig}
                 // Stats cards for metrics
                 statsCards={ordersStatsCards}
+                metricsGridMinWidth="150px"
                 customBody={
                   ordersViewMode === "board" ? (
                     <KanbanBoard

@@ -174,6 +174,9 @@ export function CrmProspectsContactsListPage({
     number | null
   >(null);
 
+  const [tableMaxHeight, setTableMaxHeight] = useState("calc(100vh - 405px)");
+  const [sidebarMarginTop, setSidebarMarginTop] = useState<number>(0);
+
   const afterProspectsRemovedRef = useRef<(ids: readonly number[]) => void>(
     () => {},
   );
@@ -381,6 +384,50 @@ export function CrmProspectsContactsListPage({
       ];
     });
   }, [activeFilter, config.stats.convertedCardTitle, setCustomTabs]);
+
+  useEffect(() => {
+    const updateMaxHeight = () => {
+      const toolbarEl = document.querySelector<HTMLElement>(
+        ".gt-toolbar-container",
+      );
+      if (toolbarEl) {
+        const toolbarHeight = toolbarEl.getBoundingClientRect().height;
+        const headerHeight = 74;
+        const paginationHeight = 130;
+        const buffer = 0;
+        setTableMaxHeight(
+          `calc(100vh - ${headerHeight + toolbarHeight + paginationHeight + buffer}px)`,
+        );
+      }
+    };
+    const timer = setTimeout(updateMaxHeight, 100);
+    const observer = new ResizeObserver(updateMaxHeight);
+    const toolbarEl = document.querySelector<HTMLElement>(
+      ".gt-toolbar-container",
+    );
+    if (toolbarEl) observer.observe(toolbarEl);
+    window.addEventListener("resize", updateMaxHeight);
+    return () => {
+      clearTimeout(timer);
+      observer.disconnect();
+      window.removeEventListener("resize", updateMaxHeight);
+    };
+  }, []);
+
+  useEffect(() => {
+    const updateSidebarMarginTop = () => {
+      const tabsEl = document.querySelector<HTMLElement>('.gt-toolbar-tabs-section');
+      if (tabsEl) {
+        setSidebarMarginTop(Math.round(tabsEl.getBoundingClientRect().height));
+      }
+    };
+    const timer = setTimeout(updateSidebarMarginTop, 100);
+    window.addEventListener('resize', updateSidebarMarginTop);
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener('resize', updateSidebarMarginTop);
+    };
+  }, []);
 
   const prospectsCalculateEntryCounts = useCallback(async () => {
     return fetchCrmProspectsEntryCountsForFilters(assignmentFilters);
@@ -876,6 +923,19 @@ export function CrmProspectsContactsListPage({
     didInitialPreviewRestoreRef.current = true;
   }, []);
 
+  useEffect(() => {
+    const wrapper = document.querySelector(
+      ".main-content-wrapper",
+    ) as HTMLElement;
+    if (wrapper) {
+      const original = wrapper.style.overflow;
+      wrapper.style.overflow = "hidden";
+      return () => {
+        wrapper.style.overflow = original;
+      };
+    }
+  }, []);
+
   const showAdvancedFilterPills =
     showAdvancedFilters || hasAdvancedFiltersApplied;
 
@@ -909,11 +969,14 @@ export function CrmProspectsContactsListPage({
         title: config.stats.allCardTitle,
         value: prospectsAllCountDisplay ?? 0,
         icon: Users,
-        iconColor: "#6366F1",
+        iconColor: "#0066CC",
         iconBgColor: "#EEF2FF",
         ...(config.operationsEntityName === "prospects"
           ? {
-              additionalText: "Currently in the system",
+              metric: {
+                text: "Currently in the system",
+                dotColor: "#0066CC",
+              },
             }
           : {
               subtitle: config.stats.subtitleAssignedUnassigned(metrics),
@@ -926,11 +989,11 @@ export function CrmProspectsContactsListPage({
         title: "Upcoming",
         value: metrics.scheduled_records ?? 0,
         icon: Calendar,
-        iconColor: "#10B981",
+        iconColor: "#D97706",
         iconBgColor: "#D1FAE5",
         metric: {
           text: `${metrics.scheduled_next_hour_records ?? 0} in next hour`,
-          dotColor: "#F59E0B",
+          dotColor: "#D97706",
         },
         ...(config.operationsEntityName === "prospects"
           ? { onClick: handleProspectUpcomingMetricClick }
@@ -940,11 +1003,11 @@ export function CrmProspectsContactsListPage({
         title: "Overdue",
         value: metrics.overdue_scheduled_records ?? 0,
         icon: ClockIcon,
-        iconColor: "#F97316",
+        iconColor: "#DC2626",
         iconBgColor: "#FFEDD5",
         metric: {
           text: "Client-defined",
-          dotColor: "#F97316",
+          dotColor: "#DC2626",
         },
         ...(config.operationsEntityName === "prospects"
           ? { onClick: handleProspectOverdueMetricClick }
@@ -954,11 +1017,11 @@ export function CrmProspectsContactsListPage({
         title: config.stats.convertedCardTitle,
         value: metrics.converted_prospects_records ?? 0,
         icon: Target,
-        iconColor: "#8B5CF6",
+        iconColor: "#059669",
         iconBgColor: "#EDE9FE",
         metric: {
           text: "Has associated leads",
-          dotColor: "#8B5CF6",
+          dotColor: "#059669",
         },
         ...(config.operationsEntityName === "prospects"
           ? { onClick: handleProspectConvertedMetricClick }
@@ -968,11 +1031,11 @@ export function CrmProspectsContactsListPage({
         title: "Recently Contacted",
         value: metrics.recently_contacted_last_24h_records ?? 0,
         icon: MessageCircle,
-        iconColor: "#0EA5E9",
+        iconColor: "#0066CC",
         iconBgColor: "#E0F2FE",
         metric: {
           text: "In last 24 hrs",
-          dotColor: "#0EA5E9",
+          dotColor: "#0066CC",
         },
         ...(config.operationsEntityName === "prospects"
           ? { onClick: handleProspectRecentlyContactedMetricClick }
@@ -982,11 +1045,11 @@ export function CrmProspectsContactsListPage({
         title: "Not Contacted",
         value: metrics.not_contacted_records ?? 0,
         icon: XCircle,
-        iconColor: "#64748B",
+        iconColor: "#6B7280",
         iconBgColor: "#F1F5F9",
         metric: {
-          text: "No call attempt has occurred yet.",
-          dotColor: "#94A3B8",
+          text: "No attempts yet",
+          dotColor: "#4B5563",
         },
         ...(config.operationsEntityName === "prospects"
           ? { onClick: handleProspectNotContactedMetricClick }
@@ -1118,40 +1181,7 @@ export function CrmProspectsContactsListPage({
     extensions,
     onPaginationReset: () =>
       setPagination((prev) => ({ ...prev, currentPage: 1 })),
-    rightActions: (
-      <div className="d-flex align-items-center gap-2 flex-wrap justify-content-end">
-        {(hasAdvancedFiltersApplied ||
-          normalizeSearchQuery(prospectsSearch) ||
-          activeFilter !== "all" ||
-          Object.keys(currentFilters).length > 0) && (
-          <Button
-            type="button"
-            variant="outline-secondary"
-            size="sm"
-            onClick={handleResetListScope}
-          >
-            Reset filters
-          </Button>
-        )}
-        <CrmProspectsContactsAddContactsButton
-          addContactsRef={addContactsRef}
-          session={session}
-          extensions={extensions}
-          config={config}
-          selectedItems={selectedItems}
-          showAddContactsDropdown={showAddContactsDropdown}
-          setShowAddContactsDropdown={setShowAddContactsDropdown}
-          setEditingContactId={setEditingContactId}
-          setContactForm={
-            setContactForm as Dispatch<SetStateAction<CrmListContactFormState>>
-          }
-          setShowCreateContactSidebar={setShowCreateContactSidebar}
-          setShowUploadModal={setShowUploadModal}
-          setDeleteModalMode={setDeleteModalMode}
-          setShowDeleteModal={setShowDeleteModal}
-        />
-      </div>
-    ),
+    rightActions: null,
     prospectsTabCountOverrides: {
       loading,
       totalRecords,
@@ -1168,25 +1198,45 @@ export function CrmProspectsContactsListPage({
   return (
     <React.Fragment>
       <CrmListPageScopedLayoutStyles config={config.scopedLayout} />
-      <BreadcrumbItem
-        mainTitle="CRM"
-        mainLink="/crm/dashboard"
-        subTitle={config.breadcrumbSubTitle}
-      />
+      {/* Add prospects button - fixed top right */}
+      <div style={{ position: "fixed", top: "64px", right: "16px", zIndex: 100 }}>
+        <CrmProspectsContactsAddContactsButton
+          addContactsRef={addContactsRef}
+          session={session}
+          extensions={extensions}
+          config={config}
+          selectedItems={selectedItems}
+          showAddContactsDropdown={showAddContactsDropdown}
+          setShowAddContactsDropdown={setShowAddContactsDropdown}
+          setEditingContactId={setEditingContactId}
+          setContactForm={setContactForm as Dispatch<SetStateAction<CrmListContactFormState>>}
+          setShowCreateContactSidebar={setShowCreateContactSidebar}
+          setShowUploadModal={setShowUploadModal}
+          setDeleteModalMode={setDeleteModalMode}
+          setShowDeleteModal={setShowDeleteModal}
+        />
+      </div>
       {/* Main flex container for content and sidebar */}
       <div
         style={{
           display: "flex",
           gap: "0",
-          height: "calc(100vh)",
+          height: "calc(100vh - 74px)",
           overflow: "hidden",
         }}
       >
         {/* Main content area */}
-        <div className="prospects-scrollable-content" style={{ flex: 1 }}>
-          
+        <div
+          className="prospects-scrollable-content"
+          style={{ flex: 1, height: "100%", overflowY: "hidden" }}
+        >
+          <BreadcrumbItem
+            mainTitle="CRM"
+            mainLink="/crm/dashboard"
+            subTitle={config.breadcrumbSubTitle}
+          />
 
-          <div className="container-fluid">
+          <div className="container-fluid" style={{ height: "100%", display: "flex", flexDirection: "column" }}>
             <div
               className="prospects-table-wrapper"
               style={{
@@ -1194,6 +1244,7 @@ export function CrmProspectsContactsListPage({
                 overflow: "hidden",
                 display: "flex",
                 flexDirection: "column",
+                height: "100%",
               }}
             >
               <GenericTable
@@ -1219,6 +1270,7 @@ export function CrmProspectsContactsListPage({
                   onRowDoubleClick: (row) =>
                     prospectsTableRowDoubleClick(session, handleViewData, row),
                 })}
+                maxHeight={tableMaxHeight}
                 toolbar={{
                   ...prospectsToolbarConfig,
                   // Remove the "+ More" pill on this page
@@ -1226,7 +1278,7 @@ export function CrmProspectsContactsListPage({
                   // Hide Advanced filters button while the filters sidebar is open
                   showAdvancedFilters: !showFiltersSidebar,
                   // Keep pills visible by default so advanced pills can appear inline
-                  showFilterPills: true,
+                  showFilterPills: window.innerWidth >= 1920,
                   onAdvancedFiltersClick: () =>
                     setShowAdvancedFilters((prev) => !prev),
                   filterPills: mergeCrmProspectsToolbarFilterPills(
@@ -1237,6 +1289,8 @@ export function CrmProspectsContactsListPage({
                 }}
                 // Stats cards for metrics
                 statsCards={prospectsStatsCards}
+                metricsGridMinWidth="120px"
+                metricsColumns={6}
                 customBody={
                   config.enableBoardView
                     ? renderCrmProspectsKanbanTableCustomBody({
@@ -1500,6 +1554,7 @@ export function CrmProspectsContactsListPage({
         {/* Prospect Detail Sidebar */}
         {showProspectSidebar && (
           <GenericSidebar
+            width={window.innerWidth < 1280 ? "360px" : "420px"}
             isOpen={showProspectSidebar}
             onClose={handleCloseProspectSidebar}
             title={selectedProspect?.name || config.sidebar.fallbackTitle}

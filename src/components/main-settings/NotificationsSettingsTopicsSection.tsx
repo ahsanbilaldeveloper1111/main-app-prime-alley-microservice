@@ -1,7 +1,9 @@
-import React, { type ChangeEventHandler } from 'react'
+import { MAIN_SETTINGS_FONT_SIZE } from './mainSettingsTokens'
+import React, { type ChangeEventHandler, type CSSProperties } from 'react'
 import { ChevronIcon } from './AccountDefaultsTabPanels'
 import { NotificationsTopicCheckbox } from './NotificationsTopicCheckbox'
 import type { ChannelKey, NotificationTopic } from './notificationsSettingsTypes'
+import './notificationsSettingsTopics.scss'
 
 function TopicChannelHeaderIcon({ channelKey }: Readonly<{ channelKey: ChannelKey }>) {
   if (channelKey === 'popup') {
@@ -69,12 +71,20 @@ export const NotificationsSettingsTopicsSection: React.FC<NotificationsSettingsT
   getParentState,
   handleTopicCheckboxChange,
   handleSubtopicCheckboxChange,
-}) => (
-  <div>
-    <div style={{ fontSize: '20px', fontWeight: 600, color: '#141414', marginBottom: '4px', fontFamily: baseFont }}>
+}) => {
+  const tableStyle = {
+    '--notif-channel-col-width': `${colWidth}px`,
+  } as CSSProperties
+
+  return (
+  <div
+    className="notifications-topics-table"
+    style={tableStyle}
+  >
+    <div style={{ fontSize: MAIN_SETTINGS_FONT_SIZE.lg, fontWeight: 600, color: '#141414', marginBottom: '4px', fontFamily: baseFont }}>
       What you get notified about
     </div>
-    <div style={{ fontSize: '13px', fontWeight: 300, color: '#555', marginBottom: '20px', fontFamily: baseFont }}>
+    <div style={{ fontSize: MAIN_SETTINGS_FONT_SIZE.sm, fontWeight: 300, color: '#555', marginBottom: '20px', fontFamily: baseFont }}>
       Choose what topics matter to you and how you get notified about them.
     </div>
 
@@ -85,13 +95,13 @@ export const NotificationsSettingsTopicsSection: React.FC<NotificationsSettingsT
           placeholder="Search for notification topics"
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
+          className="notifications-topics-table__search-input"
           style={{
             paddingLeft: '20px',
             paddingRight: '20px',
             paddingTop: '8px',
             paddingBottom: '8px',
-            width: '640px',
-            fontSize: '16px',
+            fontSize: MAIN_SETTINGS_FONT_SIZE.md,
             height: '40px',
             fontWeight: 300,
             color: '#141414',
@@ -104,7 +114,7 @@ export const NotificationsSettingsTopicsSection: React.FC<NotificationsSettingsT
             e.currentTarget.style.borderColor = '#006162'
           }}
           onBlur={(e) => {
-            e.currentTarget.style.borderColor = '#d0d0d0'
+            e.currentTarget.style.borderColor = '#b8b8b8'
           }}
         />
         <svg
@@ -124,86 +134,78 @@ export const NotificationsSettingsTopicsSection: React.FC<NotificationsSettingsT
       </div>
     </div>
 
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '0', fontSize: '14px', fontWeight: 300 }}>
-        <button
-          type="button"
-          onClick={toggleExpandAll}
-          style={{
-            background: 'none',
-            border: 'none',
-            cursor: 'pointer',
-            color: '#006162',
-            fontSize: '14px',
-            fontFamily: baseFont,
-            fontWeight: 300,
-            padding: 0,
-            textDecoration: 'underline',
-          }}
-        >
-          {allExpanded ? 'Collapse all topics' : 'Expand all topics'}
-        </button>
-        <span style={{ margin: '0 8px', color: '#d0d0d0' }}>|</span>
-        <button
-          type="button"
-          onClick={turnOffAll}
-          style={{
-            background: 'none',
-            border: 'none',
-            cursor: 'pointer',
-            color: '#006162',
-            fontSize: '14px',
-            fontFamily: baseFont,
-            fontWeight: 300,
-            padding: 0,
-            textDecoration: 'underline',
-          }}
-        >
-          Turn off all topics
-        </button>
-        <span
-          style={{
-            marginLeft: '6px',
-            display: 'inline-flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            width: '15px',
-            height: '15px',
-            border: '1.5px solid #888',
-            borderRadius: '50%',
-            fontSize: '10px',
-            color: '#888',
-            cursor: 'default',
-          }}
-          title="Turning off all topics disables all notifications"
-        >
-          ?
-        </span>
-      </div>
+    <div className="notifications-topics-table__scroll">
+      <div className="notifications-topics-table__scroll-inner">
+      <div className="notifications-topics-table__grid-row notifications-topics-table__toolbar-row">
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0', fontSize: MAIN_SETTINGS_FONT_SIZE.base, fontWeight: 300 }}>
+          <button
+            type="button"
+            onClick={toggleExpandAll}
+            style={{
+              background: 'none',
+              border: 'none',
+              cursor: 'pointer',
+              color: '#006162',
+              fontSize: MAIN_SETTINGS_FONT_SIZE.base,
+              fontFamily: baseFont,
+              fontWeight: 300,
+              padding: 0,
+              textDecoration: 'underline',
+            }}
+          >
+            {allExpanded ? 'Collapse all topics' : 'Expand all topics'}
+          </button>
+          <span style={{ margin: '0 8px', color: '#d0d0d0' }}>|</span>
+          <button
+            type="button"
+            onClick={turnOffAll}
+            style={{
+              background: 'none',
+              border: 'none',
+              cursor: 'pointer',
+              color: '#006162',
+              fontSize: MAIN_SETTINGS_FONT_SIZE.base,
+              fontFamily: baseFont,
+              fontWeight: 300,
+              padding: 0,
+              textDecoration: 'underline',
+            }}
+          >
+            Turn off all topics
+          </button>
+          <span
+            style={{
+              marginLeft: '6px',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: '15px',
+              height: '15px',
+              border: '1.5px solid #888',
+              borderRadius: '50%',
+              fontSize: MAIN_SETTINGS_FONT_SIZE.xs,
+              color: '#888',
+              cursor: 'default',
+            }}
+            title="Turning off all topics disables all notifications"
+          >
+            ?
+          </span>
+        </div>
 
-      <div style={{ display: 'flex', alignItems: 'center' }}>
+        <div aria-hidden="true" />
+
         {tableChannels.map((ch) => (
           <div
             key={ch.key}
-            style={{
-              width: colWidth,
-              textAlign: 'center',
-              fontSize: '12px',
-              fontWeight: 400,
-              color: '#555',
-              fontFamily: baseFont,
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              gap: '2px',
-            }}
+            className="notifications-topics-table__channel-header"
+            style={{ fontFamily: baseFont }}
           >
             <TopicChannelHeaderIcon channelKey={ch.key} />
             <span>{ch.label}</span>
           </div>
         ))}
       </div>
-    </div>
 
     <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
       {filteredTopics.map((topic) => {
@@ -213,81 +215,42 @@ export const NotificationsSettingsTopicsSection: React.FC<NotificationsSettingsT
         return (
           <div
             key={topic.id}
-            style={{
-              border: '1px solid #8a8a8a',
-              borderRadius: '4px',
-              background: '#fff',
-              overflow: 'hidden',
-            }}
+            className="notifications-topics-table__topic-card"
           >
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                padding: '20px',
-                userSelect: 'none',
-              }}
-            >
+            <div className="notifications-topics-table__grid-row notifications-topics-table__parent-row">
               <button
                 type="button"
                 aria-expanded={isExpanded}
                 onClick={() => toggleTopicExpanded(topic.id)}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '10px',
-                  flex: 1,
-                  minWidth: 0,
-                  background: 'transparent',
-                  border: 'none',
-                  padding: 0,
-                  cursor: 'pointer',
-                  textAlign: 'left',
-                  fontFamily: baseFont,
-                }}
+                className="notifications-topics-table__topic-toggle"
+                style={{ fontFamily: baseFont }}
               >
                 <span style={{ display: 'inline-flex', alignItems: 'center', flexShrink: 0 }}>
                   <ChevronIcon expanded={isExpanded} />
                 </span>
-                <span style={{ fontSize: '16px', fontWeight: 500, color: '#141414' }}>{topic.label}</span>
+                <span style={{ fontSize: MAIN_SETTINGS_FONT_SIZE.md, fontWeight: 500, color: '#141414' }}>{topic.label}</span>
               </button>
 
-              <div style={{ flex: 1, display: 'flex', justifyContent: 'flex-end', paddingRight: '16px' }}>
-                {isExpanded && hasSubtopics && (
-                  <span
-                    style={{
-                      fontSize: '11px',
-                      fontWeight: 700,
-                      color: '#555',
-                      letterSpacing: '0.8px',
-                      fontFamily: baseFont,
-                      textTransform: 'uppercase',
-                    }}
-                  >
-                    POP-UP SOUND
-                  </span>
-                )}
+              <div className="notifications-topics-table__actions-heading" style={{ fontFamily: baseFont }}>
+                {isExpanded && hasSubtopics ? 'POP-UP SOUND' : null}
               </div>
 
-              <div style={{ display: 'flex', alignItems: 'center' }}>
-                {tableChannels.map((ch) => {
-                  const state = getParentState(topic, ch.key)
-                  return (
-                    <NotificationsTopicCheckbox
-                      key={ch.key}
-                      value={state}
-                      onChange={handleTopicCheckboxChange}
-                      id={`${topic.id}-${ch.key}`}
-                      inputProps={{
-                        'data-topic-id': topic.id,
-                        'data-channel': ch.key,
-                      }}
-                      colWidth={colWidth}
-                    />
-                  )
-                })}
-              </div>
+              {tableChannels.map((ch) => {
+                const state = getParentState(topic, ch.key)
+                return (
+                  <NotificationsTopicCheckbox
+                    key={ch.key}
+                    value={state}
+                    onChange={handleTopicCheckboxChange}
+                    id={`${topic.id}-${ch.key}`}
+                    inputProps={{
+                      'data-topic-id': topic.id,
+                      'data-channel': ch.key,
+                    }}
+                    colWidth={colWidth}
+                  />
+                )
+              })}
             </div>
 
             {isExpanded && hasSubtopics && (
@@ -295,20 +258,12 @@ export const NotificationsSettingsTopicsSection: React.FC<NotificationsSettingsT
                 {topic.subtopics!.map((sub) => (
                   <div
                     key={sub.id}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      borderTop: '1px solid #e8e8e8',
-                      padding: '14px 20px 14px 42px',
-                      background: '#fff',
-                      gap: '12px',
-                    }}
+                    className="notifications-topics-table__grid-row notifications-topics-table__subtopic-row"
                   >
-                    <div style={{ flex: 1, minWidth: 0 }}>
+                    <div className="notifications-topics-table__subtopic-copy">
                       <div
                         style={{
-                          fontSize: '14px',
+                          fontSize: MAIN_SETTINGS_FONT_SIZE.base,
                           fontWeight: 500,
                           color: '#141414',
                           fontFamily: baseFont,
@@ -318,24 +273,24 @@ export const NotificationsSettingsTopicsSection: React.FC<NotificationsSettingsT
                         {sub.label}
                       </div>
                       {sub.description && (
-                        <div style={{ fontSize: '12px', fontWeight: 300, color: '#888', fontFamily: baseFont }}>
+                        <div style={{ fontSize: MAIN_SETTINGS_FONT_SIZE.sm, fontWeight: 300, color: '#888', fontFamily: baseFont }}>
                           {sub.description}
                         </div>
                       )}
                     </div>
 
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+                    <div className="notifications-topics-table__subtopic-actions">
                       <button
                         type="button"
                         style={{
                           padding: '5px 14px',
-                          fontSize: '13px',
+                          fontSize: MAIN_SETTINGS_FONT_SIZE.sm,
                           fontFamily: baseFont,
                           fontWeight: 300,
                           color: '#141414',
                           background: '#fff',
-                          border: '1px solid #d0d0d0',
-                          borderRadius: '4px',
+                          border: '1px solid #b8b8b8',
+                          borderRadius: '8px',
                           cursor: 'pointer',
                         }}
                       >
@@ -345,8 +300,8 @@ export const NotificationsSettingsTopicsSection: React.FC<NotificationsSettingsT
                         style={{
                           display: 'flex',
                           alignItems: 'center',
-                          border: '1px solid #d0d0d0',
-                          borderRadius: '4px',
+                          border: '1px solid #b8b8b8',
+                          borderRadius: '8px',
                           overflow: 'hidden',
                         }}
                       >
@@ -360,7 +315,7 @@ export const NotificationsSettingsTopicsSection: React.FC<NotificationsSettingsT
                             height: '28px',
                             background: '#fff',
                             border: 'none',
-                            borderRight: '1px solid #d0d0d0',
+                            borderRight: '1px solid #b8b8b8',
                             cursor: 'pointer',
                             padding: 0,
                           }}
@@ -373,7 +328,7 @@ export const NotificationsSettingsTopicsSection: React.FC<NotificationsSettingsT
                           style={
                             {
                               padding: '4px 22px 4px 8px',
-                              fontSize: '12px',
+                              fontSize: MAIN_SETTINGS_FONT_SIZE.sm,
                               fontFamily: baseFont,
                               fontWeight: 300,
                               color: '#141414',
@@ -396,22 +351,20 @@ export const NotificationsSettingsTopicsSection: React.FC<NotificationsSettingsT
                       </div>
                     </div>
 
-                    <div style={{ display: 'flex', alignItems: 'center', flexShrink: 0 }}>
-                      {tableChannels.map((ch) => (
-                        <NotificationsTopicCheckbox
-                          key={ch.key}
-                          value={sub.channels[ch.key]}
-                          onChange={handleSubtopicCheckboxChange}
-                          id={`${sub.id}-${ch.key}`}
-                          inputProps={{
-                            'data-topic-id': topic.id,
-                            'data-subtopic-id': sub.id,
-                            'data-channel': ch.key,
-                          }}
-                          colWidth={colWidth}
-                        />
-                      ))}
-                    </div>
+                    {tableChannels.map((ch) => (
+                      <NotificationsTopicCheckbox
+                        key={ch.key}
+                        value={sub.channels[ch.key]}
+                        onChange={handleSubtopicCheckboxChange}
+                        id={`${sub.id}-${ch.key}`}
+                        inputProps={{
+                          'data-topic-id': topic.id,
+                          'data-subtopic-id': sub.id,
+                          'data-channel': ch.key,
+                        }}
+                        colWidth={colWidth}
+                      />
+                    ))}
                   </div>
                 ))}
               </div>
@@ -424,7 +377,7 @@ export const NotificationsSettingsTopicsSection: React.FC<NotificationsSettingsT
           style={{
             textAlign: 'center',
             color: '#888',
-            fontSize: '14px',
+            fontSize: MAIN_SETTINGS_FONT_SIZE.base,
             fontWeight: 300,
             padding: '40px',
             fontFamily: baseFont,
@@ -434,5 +387,8 @@ export const NotificationsSettingsTopicsSection: React.FC<NotificationsSettingsT
         </div>
       )}
     </div>
+      </div>
+    </div>
   </div>
-)
+  )
+}
