@@ -2767,7 +2767,6 @@ export function CrmLeadsViewFragment02() {
         {/* Lead Details Sidebar */}
         {showLeadSidebar && (
           <GenericSidebar
-            sidebarMarginTop={sidebarMarginTop}
             width={window.innerWidth < 1280 ? "360px" : "420px"}
             isOpen={showLeadSidebar}
             onClose={handleCloseLeadSidebar}
