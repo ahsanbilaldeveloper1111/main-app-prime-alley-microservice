@@ -4,7 +4,6 @@ import { AlertTriangle, Calendar, Clock, Inbox } from "lucide-react";
 import type { WorkloadTaskCard, WorkloadUnassignedData } from "@utils/tasks";
 import {
   formatWorkloadMemberAssignOption,
-  formatWorkloadMinutes,
   formatWorkloadShortDueDate,
   formatWorkloadTaskEstimate,
   isWorkloadTaskUnestimated,
