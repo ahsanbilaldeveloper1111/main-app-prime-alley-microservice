@@ -15,11 +15,16 @@ export function useWorkloadTeamScope(
   sessionUserId: string | null | undefined,
   sessionExtension: string,
   sessionStatus: string,
+  skipFetch = false,
 ): WorkloadTeamScopeResult {
   const [scope, setScope] = useState<WorkloadTeamScopeResult>(INITIAL);
 
   useEffect(() => {
     if (sessionStatus !== "authenticated") {
+      setScope(IDLE_UNAUTHENTICATED);
+      return;
+    }
+    if (skipFetch) {
       setScope(IDLE_UNAUTHENTICATED);
       return;
     }
@@ -51,7 +56,7 @@ export function useWorkloadTeamScope(
     return () => {
       cancelled = true;
     };
-  }, [sessionUserId, sessionExtension, sessionStatus]);
+  }, [sessionUserId, sessionExtension, sessionStatus, skipFetch]);
 
   return scope;
 }
