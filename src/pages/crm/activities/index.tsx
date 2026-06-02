@@ -147,6 +147,41 @@ const HistoryPage = () => {
   const [draftSelectedColumns, setDraftSelectedColumns] = useState<string[]>(
     [],
   );
+  const [tableMaxHeight, setTableMaxHeight] = useState("calc(100vh - 345px)");
+  const [sidebarMarginTop, setSidebarMarginTop] = useState<number>(0);
+
+  useEffect(() => {
+    const headerHeight = 74;
+    const paginationHeight = 130;
+    const updateMaxHeight = () => {
+      const toolbarEl = document.querySelector(".gt-toolbar-container");
+      if (!toolbarEl) return;
+      const toolbarHeight = toolbarEl.getBoundingClientRect().height;
+      setTableMaxHeight(
+        `calc(100vh - ${headerHeight + toolbarHeight + paginationHeight}px)`,
+      );
+    };
+    updateMaxHeight();
+    const observer = new ResizeObserver(updateMaxHeight);
+    const toolbarEl = document.querySelector(".gt-toolbar-container");
+    if (toolbarEl) observer.observe(toolbarEl);
+    return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => {
+    const updateSidebarMargin = () => {
+      const tabsEl = document.querySelector(".gt-toolbar-tabs-section");
+      if (!tabsEl) return;
+      setSidebarMarginTop(tabsEl.getBoundingClientRect().height);
+    };
+    updateSidebarMargin();
+    const timeout = setTimeout(updateSidebarMargin, 100);
+    window.addEventListener("resize", updateSidebarMargin);
+    return () => {
+      clearTimeout(timeout);
+      window.removeEventListener("resize", updateSidebarMargin);
+    };
+  }, []);
 
   const validHistoryFilters = ["all", "leads", "deals", "orders"];
 
@@ -307,7 +342,7 @@ const HistoryPage = () => {
           subTitle="Activity Management"
         />
         {/* Main flex container: content + sidebar (same layout as prospects) */}
-        <div className="crm-activities-layout">
+        <div className="crm-activities-layout" style={{ display: "flex", height: "calc(100vh - 74px)", overflow: "hidden" }}>
           {/* Main content area - table and modals */}
           <div className="crm-activities-main">
         {/* Activities Table */}
@@ -354,7 +389,7 @@ const HistoryPage = () => {
           hover={true}
           striped={false}
           fixedHeight={true}
-          maxHeight="calc(100vh - 345px)"
+          maxHeight={tableMaxHeight}
           showToolbar={true}
           toolbar={{
             showTabs: true,
@@ -551,6 +586,7 @@ const HistoryPage = () => {
         />
         </div>
         <ActivityHistorySidebarPanel
+          sidebarMarginTop={sidebarMarginTop}
           showActivitySidebar={showActivitySidebar}
           setShowActivitySidebar={setShowActivitySidebar}
           selectedActivityRecord={selectedActivityRecord}

@@ -42,6 +42,7 @@ import {
 import { toast } from "react-toastify";
 import "@assets/scss/common.scss";
 import DeleteConfirmationModal from "@components/page-partials/DeleteConfirmationModal";
+import { CrmSettingsPanelShell } from "@page-modules/crm/shared/CrmSettingsPanelShell";
 import { CrmDescriptionDetailsBlock, CrmTruncatedDescriptionCell } from "@components/crm/crmTruncatedDescriptionCell";
 import {
   CRM_DIALOG_FOOTER_ACTIONS_ROW_STYLE,
@@ -616,8 +617,6 @@ function DealTemplatesPage({ hideBreadcrumb, breadcrumbMainLink }: CrmPageDispla
                 position: "fixed",
                 top: 0,
                 right: 0,
-                width: "600px",
-                maxWidth: "100%",
                 height: "100vh",
                 backgroundColor: "#ffffff",
                 boxShadow: "-2px 0 8px rgba(0, 0, 0, 0.1)",
@@ -629,7 +628,6 @@ function DealTemplatesPage({ hideBreadcrumb, breadcrumbMainLink }: CrmPageDispla
               <div
                 className="contact-sidebar-header"
                 style={{
-                  padding: "20px 24px",
                   borderBottom: "1px solid #eaf0f6",
                   display: "flex",
                   alignItems: "center",
@@ -690,7 +688,6 @@ function DealTemplatesPage({ hideBreadcrumb, breadcrumbMainLink }: CrmPageDispla
                   style={{
                     flex: 1,
                     overflowY: "auto",
-                    padding: "40px",
                   }}
                 >
                   <p
@@ -972,7 +969,6 @@ function DealTemplatesPage({ hideBreadcrumb, breadcrumbMainLink }: CrmPageDispla
                 <div
                   className="contact-sidebar-footer"
                   style={{
-                    padding: "16px 24px",
                     borderTop: "1px solid #eaf0f6",
                     display: "flex",
                     gap: "12px",
@@ -1061,16 +1057,36 @@ function DealTemplatesPage({ hideBreadcrumb, breadcrumbMainLink }: CrmPageDispla
 
         {/* View Modal */}
         {viewingTemplate && (
-          <Modal
+          <CrmSettingsPanelShell
             show={showViewModal}
             onHide={() => setShowViewModal(false)}
-            centered
-            size="lg"
+            title="Deal Template Details"
+            footer={
+              <div
+                className="w-100 d-flex justify-content-end"
+                style={CRM_DIALOG_FOOTER_ACTIONS_ROW_STYLE}
+              >
+                <Button
+                  variant="primary"
+                  onClick={() => {
+                    setShowViewModal(false);
+                    handleOpenModal(viewingTemplate);
+                  }}
+                  style={CRM_DIALOG_PRIMARY_BUTTON_STYLE}
+                >
+                  <Edit size={16} aria-hidden />
+                  Edit
+                </Button>
+                <Button
+                  variant="outline-secondary"
+                  onClick={() => setShowViewModal(false)}
+                  style={CRM_DIALOG_SECONDARY_BUTTON_STYLE}
+                >
+                  Close
+                </Button>
+              </div>
+            }
           >
-            <Modal.Header closeButton>
-              <Modal.Title>Deal Template Details</Modal.Title>
-            </Modal.Header>
-            <Modal.Body style={{ maxHeight: "70vh", overflowY: "auto" }}>
               <div className="mb-3">
                 <Form.Label className="text-muted small">Name</Form.Label>
                 <div className="fw-semibold">{viewingTemplate.name}</div>
@@ -1145,33 +1161,7 @@ function DealTemplatesPage({ hideBreadcrumb, breadcrumbMainLink }: CrmPageDispla
                   <span className="text-muted fst-italic">No fields</span>
                 )}
               </div>
-            </Modal.Body>
-            <Modal.Footer className="border-0 pt-0">
-              <div
-                className="w-100 d-flex justify-content-end"
-                style={CRM_DIALOG_FOOTER_ACTIONS_ROW_STYLE}
-              >
-                <Button
-                  variant="primary"
-                  onClick={() => {
-                    setShowViewModal(false);
-                    handleOpenModal(viewingTemplate);
-                  }}
-                  style={CRM_DIALOG_PRIMARY_BUTTON_STYLE}
-                >
-                  <Edit size={16} aria-hidden />
-                  Edit
-                </Button>
-                <Button
-                  variant="outline-secondary"
-                  onClick={() => setShowViewModal(false)}
-                  style={CRM_DIALOG_SECONDARY_BUTTON_STYLE}
-                >
-                  Close
-                </Button>
-              </div>
-            </Modal.Footer>
-          </Modal>
+          </CrmSettingsPanelShell>
         )}
       </div>
     </React.Fragment>
