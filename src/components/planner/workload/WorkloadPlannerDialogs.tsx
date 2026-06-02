@@ -452,7 +452,7 @@ export function WorkloadReassignModal({
                   </span>
                 )}
               </div>
-              {!task.due_date ? (
+              {task.due_date ? null : (
                 <div className="workload-reassign-modal__row workload-reassign-modal__row--due">
                   <span className="workload-reassign-modal__label">Due date</span>
                   <div className="workload-reassign-modal__due-wrap">
@@ -467,7 +467,7 @@ export function WorkloadReassignModal({
                     </span>
                   </div>
                 </div>
-              ) : null}
+              )}
               <div className="workload-reassign-modal__row workload-reassign-modal__row--due">
                 <span className="workload-reassign-modal__label">Assign to</span>
                 <div className="workload-reassign-modal__due-wrap">

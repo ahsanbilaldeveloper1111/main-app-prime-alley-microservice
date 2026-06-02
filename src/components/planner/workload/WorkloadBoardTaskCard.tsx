@@ -126,17 +126,17 @@ export function WorkloadBoardTaskCard({
       <div className="workload-board-task-card__meta workload-board-task-card__meta--secondary">
         <WorkloadBdg tone={task.is_overdue && !task.is_completed ? "red" : "gray"}>
           <i className="ti ti-calendar" style={{ fontSize: "10px" }} aria-hidden />
-          {scheduleLabel}
+          <span>{scheduleLabel}</span>
         </WorkloadBdg>
         {unestimated ? (
           <WorkloadBdg tone="orange">
             <i className="ti ti-clock" style={{ fontSize: "10px" }} aria-hidden />
-            No est.
+            <span>No est.</span>
           </WorkloadBdg>
         ) : (
           <WorkloadBdg tone="gray">
             <i className="ti ti-clock" style={{ fontSize: "10px" }} aria-hidden />
-            {formatWorkloadTaskEstimate(task)}
+            <span>{formatWorkloadTaskEstimate(task)}</span>
           </WorkloadBdg>
         )}
       </div>
