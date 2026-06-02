@@ -7,6 +7,7 @@ import { CrmTruncatedDescriptionCell } from "@components/crm/crmTruncatedDescrip
 import {
   getTypeBadgeColor,
   getTypeDisplayName,
+  getStageTypeDotClassName,
   type StageRow,
 } from "@page-modules/crm/stages/stagesPageModel";
 
@@ -29,10 +30,7 @@ function buildNameColumn(): TableColumn<StageRow> {
     type: "custom",
     render: (stage) => (
       <div className="d-flex align-items-center gap-2">
-        <div
-          className="stages-table-name-dot"
-          style={{ backgroundColor: stage.color }}
-        />
+        <div className={getStageTypeDotClassName(stage.type)} aria-hidden />
         <span className="fw-semibold">{stage.name}</span>
       </div>
     ),

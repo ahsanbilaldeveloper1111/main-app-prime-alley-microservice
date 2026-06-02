@@ -138,7 +138,7 @@ export function WorkloadSummaryCardsRow({ data }: WorkloadSummaryCardsProps) {
         </div>
         <div className="workload-summary-card__sub">
           <span className="workload-summary-card__dot" style={{ background: "#0066CC" }} />
-          Assigned to team
+          <span>Assigned to team</span>
         </div>
       </div>
       <div className="workload-summary-card">
@@ -148,7 +148,7 @@ export function WorkloadSummaryCardsRow({ data }: WorkloadSummaryCardsProps) {
         </div>
         <div className="workload-summary-card__sub">
           <span className="workload-summary-card__dot" style={{ background: "#dc2626" }} />
-          Above 100% capacity
+          <span>Above 100% capacity</span>
         </div>
       </div>
       <div className="workload-summary-card">
@@ -158,7 +158,7 @@ export function WorkloadSummaryCardsRow({ data }: WorkloadSummaryCardsProps) {
         </div>
         <div className="workload-summary-card__sub">
           <span className="workload-summary-card__dot" style={{ background: "#ea580c" }} />
-          No time estimate set
+          <span>No time estimate set</span>
         </div>
       </div>
       <div className="workload-summary-card">
@@ -168,7 +168,7 @@ export function WorkloadSummaryCardsRow({ data }: WorkloadSummaryCardsProps) {
         </div>
         <div className="workload-summary-card__sub">
           <span className="workload-summary-card__dot" style={{ background: "#dc2626" }} />
-          Needs immediate attention
+          <span>Needs immediate attention</span>
         </div>
       </div>
     </div>
@@ -240,14 +240,16 @@ export function WorkloadLegendRow({
           </span>
         ))}
         <span className="workload-legend__item">
-          <span className="workload-legend__org-icon" aria-hidden>
+          <span className="workload-legend__org-icon" aria-hidden="true">
             <i className="ti ti-building" style={{ fontSize: "12px", color: "#0f766e" }} />
           </span>
-          Org Tasks included
+          <span>Org Tasks included</span>
         </span>
         <span className="workload-legend__item">
-          <span className="workload-legend__personal-icon" aria-hidden>ⓘ</span>
-          Has personal todos (not counted)
+          <span className="workload-legend__personal-icon" aria-hidden="true">
+            ⓘ
+          </span>
+          <span>Has personal todos (not counted)</span>
         </span>
       </div>
       <div className="workload-legend__actions">

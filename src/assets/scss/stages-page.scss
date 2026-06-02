@@ -1,6 +1,7 @@
+@use "crm-wcag-accents" as *;
 @import "./crm-page-shared.scss";
 
-// CRM Stages page — static layout only. Dynamic values (e.g. stage colors) stay inline in TSX.
+// CRM Stages page — layout and theme-based type dots; user-picked stage color stays in Color column only.
 
 // —— KPI analytics cards ——
 
@@ -73,11 +74,32 @@
   }
 }
 
-// —— Table: name column color dot (backgroundColor from row stays inline) ——
+// —— Table: name column dot by stage type (prospects campaign-chip pattern) ——
 .stages-table-name-dot {
   width: 10px;
   height: 10px;
   border-radius: 50%;
+  flex-shrink: 0;
+
+  &--lead {
+    background-color: $crm-wcag-blue;
+  }
+
+  &--deal {
+    background-color: #b45309;
+  }
+
+  &--order {
+    background-color: #15803d;
+  }
+
+  &--lost_reason {
+    background-color: #b91c1c;
+  }
+
+  &--neutral {
+    background-color: #64748b;
+  }
 }
 
 // —— Toolbar ——

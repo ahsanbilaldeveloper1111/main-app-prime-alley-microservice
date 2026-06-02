@@ -340,6 +340,49 @@ type MyDaySuggestedItemButtonProps = Readonly<{
   className?: string;
 }>;
 
+function resolveSuggestedItemBorder(hovered: boolean, inMyDay: boolean): string {
+  if (hovered && !inMyDay) return "1px solid #0066CC";
+  if (inMyDay) return "1px solid #bbf7d0";
+  return "1px solid #e2e8f0";
+}
+
+function resolveSuggestedItemBorderLeft(hovered: boolean, inMyDay: boolean): string {
+  if (inMyDay) return "3px solid #22c55e";
+  if (hovered && !inMyDay) return "3px solid #0066CC";
+  return "1px solid #e2e8f0";
+}
+
+function resolveSuggestedItemBackground(hovered: boolean, inMyDay: boolean): string {
+  if (hovered && !inMyDay) return "#f0f7ff";
+  if (inMyDay) return "#f9fafb";
+  return "#fff";
+}
+
+function resolvePriorityDotBackground(priorityKey: string): string {
+  if (priorityKey === "urgent" || priorityKey === "critical") return "#ef4444";
+  if (priorityKey === "high") return "#f97316";
+  if (priorityKey === "medium" || priorityKey === "normal") return "#eab308";
+  return "#22c55e";
+}
+
+function resolveSuggestedAddButtonBorder(inMyDay: boolean, hovered: boolean): string {
+  if (inMyDay) return "1px solid #22c55e";
+  if (hovered) return "1px solid #0066CC";
+  return "1px solid #e2e8f0";
+}
+
+function resolveSuggestedAddButtonBackground(inMyDay: boolean, hovered: boolean): string {
+  if (inMyDay) return "#f0fdf4";
+  if (hovered) return "#0066CC";
+  return "#fff";
+}
+
+function resolveSuggestedAddButtonColor(inMyDay: boolean, hovered: boolean): string {
+  if (inMyDay) return "#22c55e";
+  if (hovered) return "#fff";
+  return "#718096";
+}
+
 function MyDaySuggestedItemButton({
   task,
   inMyDay,
@@ -364,10 +407,10 @@ function MyDaySuggestedItemButton({
         width: "100%",
         textAlign: "left",
         padding: "clamp(9px, 1.2vw, 13px) clamp(10px, 1.5vw, 14px)",
-        border: hovered && !inMyDay ? "1px solid #0066CC" : inMyDay ? "1px solid #bbf7d0" : "1px solid #e2e8f0",
-        borderLeft: inMyDay ? "3px solid #22c55e" : hovered && !inMyDay ? "3px solid #0066CC" : "1px solid #e2e8f0",
+        border: resolveSuggestedItemBorder(hovered, inMyDay),
+        borderLeft: resolveSuggestedItemBorderLeft(hovered, inMyDay),
         borderRadius: 8,
-        background: hovered && !inMyDay ? "#f0f7ff" : inMyDay ? "#f9fafb" : "#fff",
+        background: resolveSuggestedItemBackground(hovered, inMyDay),
         cursor: inMyDay ? "not-allowed" : "pointer",
         opacity: inMyDay ? 0.65 : 1,
         fontFamily: "inherit",
@@ -391,9 +434,7 @@ function MyDaySuggestedItemButton({
           ) : null}
           <span className={`myday-tag myday-tag--priority priority-${priorityKey}`} style={{ fontSize: "clamp(10px, 0.9vw, 11px)" }}>
             <span style={{ width: 5, height: 5, borderRadius: "50%", display: "inline-block", flexShrink: 0, marginRight: 3,
-              background: priorityKey === "urgent" || priorityKey === "critical" ? "#ef4444" :
-                          priorityKey === "high" ? "#f97316" :
-                          priorityKey === "medium" || priorityKey === "normal" ? "#eab308" : "#22c55e"
+              background: resolvePriorityDotBackground(priorityKey),
             }} />
             {task.priority}
           </span>
@@ -408,9 +449,9 @@ function MyDaySuggestedItemButton({
         width: "clamp(22px, 2vw, 28px)",
         height: "clamp(22px, 2vw, 28px)",
         borderRadius: "50%",
-        border: inMyDay ? "1px solid #22c55e" : hovered ? "1px solid #0066CC" : "1px solid #e2e8f0",
-        background: inMyDay ? "#f0fdf4" : hovered ? "#0066CC" : "#fff",
-        color: inMyDay ? "#22c55e" : hovered ? "#fff" : "#718096",
+        border: resolveSuggestedAddButtonBorder(inMyDay, hovered),
+        background: resolveSuggestedAddButtonBackground(inMyDay, hovered),
+        color: resolveSuggestedAddButtonColor(inMyDay, hovered),
         display: "flex",
         alignItems: "center",
         justifyContent: "center",

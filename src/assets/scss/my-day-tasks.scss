@@ -286,7 +286,7 @@
 
   .myday-section-count {
     font-size: 11px;
-    color: #718096;
+    color: #475569;
     background: #f1f5f9;
     border: 1px solid #e2e8f0;
     padding: 2px 10px;
@@ -398,7 +398,7 @@
     right: 8px;
     border: none;
     background: #f8fafc;
-    color: #94a3b8;
+    color: #64748b;
     border-radius: 5px;
     width: 22px;
     height: 22px;
@@ -413,7 +413,7 @@
 
     &:hover {
       background: #fee2e2;
-      color: #ef4444;
+      color: #991b1b;
     }
   }
 
@@ -484,7 +484,7 @@
 
   .myday-tag--no-estimate {
     background: #fff7ed;
-    color: #ea580c;
+    color: #c2410c;
     border: 1px solid #fed7aa;
     cursor: pointer;
 
@@ -546,8 +546,8 @@
     }
 
     &.is-done {
-      background: #22c55e;
-      border-color: #22c55e;
+      background: #15803d;
+      border-color: #15803d;
       color: #fff;
     }
   }
@@ -1000,7 +1000,7 @@
     border-radius: 50%;
     border: 1px solid #e2e8f0;
     background: #fff;
-    color: #718096;
+    color: #64748b;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -1011,8 +1011,8 @@
 
     &.is-added {
       background: #f0fdf4;
-      border-color: #22c55e;
-      color: #22c55e;
+      border-color: #15803d;
+      color: #166534;
       cursor: default;
     }
   }

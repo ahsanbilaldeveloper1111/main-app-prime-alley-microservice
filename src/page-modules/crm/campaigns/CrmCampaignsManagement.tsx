@@ -2821,7 +2821,7 @@ const CrmCampaigns = ({ hideBreadcrumb, breadcrumbMainLink }: CrmPageDisplayProp
           }}
           title={selectedCampaign.name}
           footer={
-            !loading ? (
+            loading ? undefined : (
               <div
                 className="w-100 d-flex justify-content-end gap-2"
                 style={CRM_DIALOG_FOOTER_ACTIONS_ROW_STYLE}
@@ -2850,7 +2850,7 @@ const CrmCampaigns = ({ hideBreadcrumb, breadcrumbMainLink }: CrmPageDisplayProp
                   Close
                 </Button>
               </div>
-            ) : undefined
+            )
           }
         >
           <p className="text-muted small mb-3">Campaign Details</p>

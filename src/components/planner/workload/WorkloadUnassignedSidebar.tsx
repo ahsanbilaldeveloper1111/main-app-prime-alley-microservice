@@ -4,7 +4,6 @@ import { AlertTriangle, Calendar, Clock } from "lucide-react";
 import type { WorkloadTaskCard, WorkloadUnassignedData } from "@utils/tasks";
 import {
   formatWorkloadMemberAssignOption,
-  formatWorkloadMinutes,
   formatWorkloadShortDueDate,
   formatWorkloadTaskEstimate,
   isWorkloadOrganizationTask,
@@ -49,8 +48,8 @@ function WorkloadUnassignedTaskRow({
         {task.title}
         {isOrg ? (
           <WorkloadBdg tone="green" className="ms-2">
-            <i className="ti ti-building" style={{ fontSize: "10px" }} aria-hidden />
-            Org
+            <i className="ti ti-building" style={{ fontSize: "10px" }} aria-hidden="true" />
+            <span>Org</span>
           </WorkloadBdg>
         ) : null}
         {unestimated ? (

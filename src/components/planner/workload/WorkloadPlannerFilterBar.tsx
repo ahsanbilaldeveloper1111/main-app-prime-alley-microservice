@@ -5,18 +5,63 @@ import type {
   WorkloadPriorityFilterValue,
   WorkloadProjectFilterValue,
 } from "@page-modules/planner/workload/workloadDomain";
-import {
-  formatWorkloadMemberLabel,
-  workloadProjectFilterSelectValue,
-} from "@page-modules/planner/workload/workloadDomain";
+import { formatWorkloadMemberLabel } from "@page-modules/planner/workload/workloadDomain";
 import type { WorkloadProjectOption } from "./WorkloadPlannerChrome";
+
+function resolveRangePillLabel(range: WorkloadRangePreset): string {
+  if (range === "this_week") return "This week";
+  if (range === "next_week") return "Next week";
+  return "Custom range";
+}
+
+function resolveProjectFilterPillLabel(
+  projectFilter: WorkloadProjectFilterValue,
+  projectOptions: WorkloadProjectOption[],
+): string {
+  if (projectFilter === "all") return "All projects";
+  if (projectFilter === "none") return "No project (org)";
+  return projectOptions.find((p) => p.id === projectFilter)?.name ?? "Project";
+}
+
+function resolvePriorityFilterPillLabel(
+  priorityFilter: WorkloadPriorityFilterValue,
+): string {
+  if (priorityFilter === "all") return "All priority";
+  if (priorityFilter === "critical") return "Critical only";
+  if (priorityFilter === "high_plus") return "High+";
+  return "Medium+";
+}
+
+function FilterPillClearButton({
+  ariaLabel,
+  onClear,
+}: Readonly<{
+  ariaLabel: string;
+  onClear: () => void;
+}>) {
+  return (
+    <button
+      type="button"
+      className="workload-filter-bar__pill-x"
+      aria-label={ariaLabel}
+      onClick={(e) => {
+        e.stopPropagation();
+        onClear();
+      }}
+    >
+      ×
+    </button>
+  );
+}
 
 function useFilterDropdown() {
   const [openId, setOpenId] = useState<string | null>(null);
   const ref = useRef<HTMLDivElement>(null);
   React.useEffect(() => {
     function handleClick(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) {
+      const target = e.target;
+      if (!(target instanceof Node)) return;
+      if (ref.current && !ref.current.contains(target)) {
         setOpenId(null);
       }
     }
@@ -104,18 +149,21 @@ export function WorkloadPlannerFilterBar({
         <div className="workload-filter-bar__pill-wrap">
           <button
             type="button"
-            className={`workload-filter-bar__pill-btn${range !== "this_week" ? " workload-filter-bar__pill-btn--active" : ""}`}
+            className={`workload-filter-bar__pill-btn${range === "this_week" ? "" : " workload-filter-bar__pill-btn--active"}`}
             disabled={!enabled}
             onClick={() => toggle("range")}
           >
-            {range === "this_week" ? "This week" : range === "next_week" ? "Next week" : "Custom range"}
-            {range !== "this_week" ? (
-              <span
-                className="workload-filter-bar__pill-x"
-                onClick={(e) => { e.stopPropagation(); onRangeChange("this_week"); close(); }}
-              >×</span>
-            ) : (
+            {resolveRangePillLabel(range)}
+            {range === "this_week" ? (
               <span className="workload-filter-bar__caret">▾</span>
+            ) : (
+              <FilterPillClearButton
+                ariaLabel="Clear range filter"
+                onClear={() => {
+                  onRangeChange("this_week");
+                  close();
+                }}
+              />
             )}
           </button>
           {openId === "range" && (
@@ -161,22 +209,21 @@ export function WorkloadPlannerFilterBar({
         <div className="workload-filter-bar__pill-wrap">
           <button
             type="button"
-            className={`workload-filter-bar__pill-btn${projectFilter !== "all" ? " workload-filter-bar__pill-btn--active" : ""}`}
+            className={`workload-filter-bar__pill-btn${projectFilter === "all" ? "" : " workload-filter-bar__pill-btn--active"}`}
             disabled={!enabled}
             onClick={() => toggle("project")}
           >
-            {projectFilter === "all"
-              ? "All projects"
-              : projectFilter === "none"
-              ? "No project (org)"
-              : (projectOptions.find((p) => p.id === projectFilter)?.name ?? "Project")}
-            {projectFilter !== "all" ? (
-              <span
-                className="workload-filter-bar__pill-x"
-                onClick={(e) => { e.stopPropagation(); onProjectFilterChange("all"); close(); }}
-              >×</span>
-            ) : (
+            {resolveProjectFilterPillLabel(projectFilter, projectOptions)}
+            {projectFilter === "all" ? (
               <span className="workload-filter-bar__caret">▾</span>
+            ) : (
+              <FilterPillClearButton
+                ariaLabel="Clear project filter"
+                onClear={() => {
+                  onProjectFilterChange("all");
+                  close();
+                }}
+              />
             )}
           </button>
           {openId === "project" && (
@@ -211,18 +258,21 @@ export function WorkloadPlannerFilterBar({
         <div className="workload-filter-bar__pill-wrap">
           <button
             type="button"
-            className={`workload-filter-bar__pill-btn${memberFilter !== "all" ? " workload-filter-bar__pill-btn--active" : ""}`}
+            className={`workload-filter-bar__pill-btn${memberFilter === "all" ? "" : " workload-filter-bar__pill-btn--active"}`}
             disabled={!enabled}
             onClick={() => toggle("member")}
           >
             {memberOptions.find((o) => o.value === memberFilter)?.label ?? "All members"}
-            {memberFilter !== "all" ? (
-              <span
-                className="workload-filter-bar__pill-x"
-                onClick={(e) => { e.stopPropagation(); onMemberFilterChange("all"); close(); }}
-              >×</span>
-            ) : (
+            {memberFilter === "all" ? (
               <span className="workload-filter-bar__caret">▾</span>
+            ) : (
+              <FilterPillClearButton
+                ariaLabel="Clear member filter"
+                onClear={() => {
+                  onMemberFilterChange("all");
+                  close();
+                }}
+              />
             )}
           </button>
           {openId === "member" && (
@@ -244,24 +294,21 @@ export function WorkloadPlannerFilterBar({
         <div className="workload-filter-bar__pill-wrap">
           <button
             type="button"
-            className={`workload-filter-bar__pill-btn${priorityFilter !== "all" ? " workload-filter-bar__pill-btn--active" : ""}`}
+            className={`workload-filter-bar__pill-btn${priorityFilter === "all" ? "" : " workload-filter-bar__pill-btn--active"}`}
             disabled={!enabled}
             onClick={() => toggle("priority")}
           >
-            {priorityFilter === "all"
-              ? "All priority"
-              : priorityFilter === "critical"
-              ? "Critical only"
-              : priorityFilter === "high_plus"
-              ? "High+"
-              : "Medium+"}
-            {priorityFilter !== "all" ? (
-              <span
-                className="workload-filter-bar__pill-x"
-                onClick={(e) => { e.stopPropagation(); onPriorityFilterChange("all"); close(); }}
-              >×</span>
-            ) : (
+            {resolvePriorityFilterPillLabel(priorityFilter)}
+            {priorityFilter === "all" ? (
               <span className="workload-filter-bar__caret">▾</span>
+            ) : (
+              <FilterPillClearButton
+                ariaLabel="Clear priority filter"
+                onClear={() => {
+                  onPriorityFilterChange("all");
+                  close();
+                }}
+              />
             )}
           </button>
           {openId === "priority" && (
@@ -288,18 +335,21 @@ export function WorkloadPlannerFilterBar({
         <div className="workload-filter-bar__pill-wrap">
           <button
             type="button"
-            className={`workload-filter-bar__pill-btn${assigneeMatch !== "primary" ? " workload-filter-bar__pill-btn--active" : ""}`}
+            className={`workload-filter-bar__pill-btn${assigneeMatch === "primary" ? "" : " workload-filter-bar__pill-btn--active"}`}
             disabled={!enabled}
             onClick={() => toggle("assignee")}
           >
             {assigneeMatch === "primary" ? "Primary assignee" : "Any assignee"}
-            {assigneeMatch !== "primary" ? (
-              <span
-                className="workload-filter-bar__pill-x"
-                onClick={(e) => { e.stopPropagation(); onAssigneeMatchChange("primary"); close(); }}
-              >×</span>
-            ) : (
+            {assigneeMatch === "primary" ? (
               <span className="workload-filter-bar__caret">▾</span>
+            ) : (
+              <FilterPillClearButton
+                ariaLabel="Clear assignee filter"
+                onClear={() => {
+                  onAssigneeMatchChange("primary");
+                  close();
+                }}
+              />
             )}
           </button>
           {openId === "assignee" && (

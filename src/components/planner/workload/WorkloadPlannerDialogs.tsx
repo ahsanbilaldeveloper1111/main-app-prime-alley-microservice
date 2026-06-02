@@ -77,6 +77,15 @@ function resolveRescheduleCurrentLabel(
   return "—";
 }
 
+function resolveRescheduleSubmitLabel(
+  isSaving: boolean,
+  overloadSecondStep: boolean,
+): string {
+  if (isSaving) return "Saving…";
+  if (overloadSecondStep) return "Reschedule anyway";
+  return "Reschedule";
+}
+
 function WorkloadDayTaskMarkDoneButton({
   task,
   isMarkingDone,
@@ -138,8 +147,8 @@ function WorkloadDayTaskCard({
         </div>
         {showOrgBadge ? (
           <WorkloadBdg tone="green">
-            <i className="ti ti-building" style={{ fontSize: "10px" }} aria-hidden />
-            Org
+            <i className="ti ti-building" style={{ fontSize: "10px" }} aria-hidden="true" />
+            <span>Org</span>
           </WorkloadBdg>
         ) : null}
       </div>
@@ -523,6 +532,7 @@ export function WorkloadRescheduleModal({
   onSubmit,
 }: WorkloadRescheduleModalProps) {
   const currentLabel = resolveRescheduleCurrentLabel(currentDate, task);
+  const submitLabel = resolveRescheduleSubmitLabel(isSaving, overloadSecondStep);
 
   return (
     <Modal show={Boolean(task)} onHide={onClose} centered className="workload-reschedule-modal">
@@ -572,7 +582,7 @@ export function WorkloadRescheduleModal({
           Cancel
         </Button>
         <Button variant="primary" disabled={!rescheduleDate || isSaving} onClick={onSubmit}>
-          {isSaving ? "Saving…" : overloadSecondStep ? "Reschedule anyway" : "Reschedule"}
+          {submitLabel}
         </Button>
       </Modal.Footer>
     </Modal>

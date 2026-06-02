@@ -143,57 +143,7 @@ $add-form-dialog-padding: clamp(16px, 4vw, 32px);
     gap: 10px;
     border-top: 1px solid #eaf0f6;
     background: #fff;
-  }
-}
 
-// Footer actions inside Main Settings side panels — prevent horizontal overflow.
-.main-settings-form-sidebar-footer {
-  width: 100%;
-  min-width: 0;
-  max-width: 100%;
-  box-sizing: border-box;
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  gap: 10px;
-
-  .form-text {
-    min-width: 0;
-  }
-}
-
-.main-settings-form-sidebar-footer__actions {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 8px;
-  width: 100%;
-  min-width: 0;
-  max-width: 100%;
-  box-sizing: border-box;
-
-  .btn,
-  button {
-    max-width: 100%;
-    box-sizing: border-box;
-  }
-
-  .contact-form-btn-create,
-  .contact-form-btn-cancel {
-    flex: 1 1 calc(50% - 4px);
-    min-width: min(100%, 120px);
-
-    @media (min-width: 400px) {
-      flex: 0 1 auto;
-    }
-  }
-}
-
-.main-settings-form-sidebar {
-  overflow-x: hidden;
-
-  .main-settings-form-sidebar__footer {
     > * {
       width: 100%;
       min-width: 0;
