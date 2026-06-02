@@ -89,12 +89,7 @@ const SelectCheckBox: React.FC<SelectCheckBoxProps> = ({
   closeMenuOnSelect = false,
   menuPortalTarget,
 }) => {
-  const resolvedMenuPortal =
-    menuPortalTarget === undefined
-      ? typeof document === 'undefined'
-        ? null
-        : document.body
-      : menuPortalTarget;
+  const resolvedMenuPortal = resolveMenuPortalTarget(menuPortalTarget);
 
   return (
     <Select<SelectCheckBoxOption, true>
