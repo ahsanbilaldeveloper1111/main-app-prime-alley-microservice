@@ -266,7 +266,7 @@ const RanksPanel = () => {
                 }
             },
 
-            ...(session?.user?.is_admin === "1" ? [
+            ...(session?.user?.is_admin === "1" ? ([
                 {
                     key: 'company',
                     label: 'Created By',
@@ -290,7 +290,7 @@ const RanksPanel = () => {
                         </div>
                     )
                  }
-            ] : [])
+            ] satisfies TableColumn<RankRow>[]) : [])
         ];
     }, [session?.user?.is_admin]);
 
