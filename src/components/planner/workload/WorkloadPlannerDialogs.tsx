@@ -1,13 +1,16 @@
 import React, { useState } from "react";
 import {
   Alert,
+  Badge,
   Button,
+  Col,
   Form,
   Modal,
   Offcanvas,
+  Row,
   Spinner,
 } from "react-bootstrap";
-import { AlertTriangle, Clock } from "lucide-react";
+import { AlertTriangle, BarChart3, Clock } from "lucide-react";
 import type {
   WorkloadDayData,
   WorkloadGridCell,
@@ -20,7 +23,6 @@ import {
   formatWorkloadMemberLabel,
   formatWorkloadMinutes,
   formatWorkloadPercent,
-  formatWorkloadShortDueDate,
   isWorkloadOrganizationTask,
   formatWorkloadTaskEstimate,
   isWorkloadTaskUnestimated,
@@ -29,7 +31,7 @@ import {
   workloadMemberInitials,
   workloadTaskProjectLabel,
 } from "@page-modules/planner/workload/workloadDomain";
-import { WorkloadBdg, WorkloadPriorityBadge } from "./WorkloadPlannerSubviews";
+import { WorkloadPriorityBadge } from "./WorkloadPlannerSubviews";
 
 type DayQuerySlice = Readonly<{
   isPending: boolean;
@@ -77,15 +79,6 @@ function resolveRescheduleCurrentLabel(
   return "—";
 }
 
-function resolveRescheduleSubmitLabel(
-  isSaving: boolean,
-  overloadSecondStep: boolean,
-): string {
-  if (isSaving) return "Saving…";
-  if (overloadSecondStep) return "Reschedule anyway";
-  return "Reschedule";
-}
-
 function WorkloadDayTaskMarkDoneButton({
   task,
   isMarkingDone,
@@ -97,14 +90,14 @@ function WorkloadDayTaskMarkDoneButton({
 }>) {
   if (task.is_completed) return null;
   return (
-    <button
-      type="button"
-      className="workload-day-action-btn workload-day-action-btn--success"
+    <Button
+      size="sm"
+      variant="outline-success"
       disabled={isMarkingDone}
       onClick={() => onMarkDone(task)}
     >
       {isMarkingDone ? "Saving…" : "Mark done"}
-    </button>
+    </Button>
   );
 }
 
@@ -118,18 +111,16 @@ function WorkloadDayTaskCard({
   isSavingEstimate,
 }: WorkloadDayTaskCardProps) {
   const [estimateDraft, setEstimateDraft] = useState("");
-  const [estimateHoursDraft, setEstimateHoursDraft] = useState("");
   const unestimated = isWorkloadTaskUnestimated(task);
   const showOrgBadge = isWorkloadOrganizationTask(task);
   const projectLabel = workloadTaskProjectLabel(task);
-  const dueDateLabel = task.due_date ? formatWorkloadShortDueDate(task.due_date) : null;
+  const dueDateLabel = task.due_date?.slice(0, 10) ?? null;
 
   const handleSaveEstimate = () => {
-    const totalMinutes = (Number(estimateHoursDraft || 0) * 60) + Number(estimateDraft || 0);
-    if (!Number.isFinite(totalMinutes) || totalMinutes <= 0) return;
-    onSaveEstimate(task, totalMinutes);
+    const minutes = Number.parseInt(estimateDraft.trim(), 10);
+    if (!Number.isFinite(minutes) || minutes <= 0) return;
+    onSaveEstimate(task, minutes);
     setEstimateDraft("");
-    setEstimateHoursDraft("");
   };
 
   return (
@@ -146,38 +137,46 @@ function WorkloadDayTaskCard({
           ) : null}
         </div>
         {showOrgBadge ? (
-          <WorkloadBdg tone="green">
-            <i className="ti ti-building" style={{ fontSize: "10px" }} aria-hidden="true" />
-            <span>Org</span>
-          </WorkloadBdg>
+          <Badge bg="light" text="dark" className="workload-day-task-card__org border">
+            Org
+          </Badge>
         ) : null}
       </div>
 
       <div className="workload-day-task-card__tags">
         <WorkloadPriorityBadge priority={task.priority} />
         {task.status_name ? (
-          <WorkloadBdg tone="gray">{task.status_name}</WorkloadBdg>
+          <span
+            className="workload-day-task-card__tag"
+            style={
+              task.status_color
+                ? { backgroundColor: task.status_color, color: "#fff" }
+                : undefined
+            }
+          >
+            {task.status_name}
+          </span>
         ) : null}
-        {!showOrgBadge && projectLabel && projectLabel !== "—" && projectLabel !== "Personal" ? (
-          <WorkloadBdg tone="gray">{projectLabel}</WorkloadBdg>
-        ) : null}
+        <span className="workload-day-task-card__tag">{projectLabel}</span>
         {dueDateLabel ? (
-          <WorkloadBdg tone={task.is_overdue ? "red" : "gray"}>
+          <span
+            className={`workload-day-task-card__tag ${
+              task.is_overdue ? "workload-day-task-card__tag--overdue" : ""
+            }`}
+          >
             {dueDateLabel}
-          </WorkloadBdg>
-        ) : (
-          <WorkloadBdg tone="gray">No due date</WorkloadBdg>
-        )}
+          </span>
+        ) : null}
         {unestimated ? (
-          <WorkloadBdg tone="orange">
-            <AlertTriangle size={10} aria-hidden />
-            No est.
-          </WorkloadBdg>
+          <span className="workload-day-task-card__tag workload-day-task-card__tag--warn">
+            <AlertTriangle size={12} aria-hidden />
+            No estimate
+          </span>
         ) : (
-          <WorkloadBdg tone="gray">
-            <Clock size={10} aria-hidden />
+          <span className="workload-day-task-card__tag">
+            <Clock size={12} aria-hidden />
             {formatWorkloadTaskEstimate(task)}
-          </WorkloadBdg>
+          </span>
         )}
       </div>
 
@@ -185,46 +184,34 @@ function WorkloadDayTaskCard({
         <div className="workload-day-estimate-form">
           <span className="workload-day-estimate-form__label">Add time estimate:</span>
           <div className="workload-day-estimate-form__row">
-            <input
+            <Form.Control
+              size="sm"
               type="number"
-              min={0}
-              className="workload-day-estimate-form__input"
-              placeholder="hrs"
-              value={estimateHoursDraft}
-              onChange={(e) => setEstimateHoursDraft(e.target.value)}
-              disabled={isSavingEstimate}
-            />
-            <span className="workload-day-estimate-form__unit">h</span>
-            <input
-              type="number"
-              min={0}
-              max={59}
-              className="workload-day-estimate-form__input"
+              min={1}
               placeholder="mins"
               value={estimateDraft}
               onChange={(e) => setEstimateDraft(e.target.value)}
               disabled={isSavingEstimate}
             />
-            <span className="workload-day-estimate-form__unit">m</span>
-            <button
-              type="button"
-              className="workload-day-estimate-form__save-btn"
-              disabled={isSavingEstimate || (estimateDraft.trim() === "" && estimateHoursDraft.trim() === "")}
+            <Button
+              size="sm"
+              variant="warning"
+              disabled={isSavingEstimate || estimateDraft.trim() === ""}
               onClick={handleSaveEstimate}
             >
               {isSavingEstimate ? "Saving…" : "Save"}
-            </button>
+            </Button>
           </div>
         </div>
       ) : null}
 
       <div className="workload-day-task-card__actions">
-        <button type="button" className="workload-day-action-btn" onClick={() => onReassign(task)}>
+        <Button size="sm" variant="outline-secondary" onClick={() => onReassign(task)}>
           Reassign
-        </button>
-        <button type="button" className="workload-day-action-btn" onClick={() => onReschedule(task)}>
+        </Button>
+        <Button size="sm" variant="outline-secondary" onClick={() => onReschedule(task)}>
           Reschedule
-        </button>
+        </Button>
         <WorkloadDayTaskMarkDoneButton
           task={task}
           isMarkingDone={isMarkingDone}
@@ -274,7 +261,7 @@ export function WorkloadDayOffcanvas({
       placement="end"
       className="workload-day-offcanvas"
     >
-      <Offcanvas.Header closeButton className="workload-day-offcanvas__header">
+      <Offcanvas.Header closeButton className="workload-day-offcanvas__header border-0 pb-0">
         {selected ? (
           <div className="workload-day-offcanvas__identity">
             <div className="workload-day-offcanvas__avatar">
@@ -282,6 +269,7 @@ export function WorkloadDayOffcanvas({
             </div>
             <div>
               <div className="workload-day-offcanvas__name-row">
+                <BarChart3 size={16} className="text-primary" aria-hidden />
                 <span className="workload-day-offcanvas__name">
                   {selectedMemberName} — {formatWorkloadDayDetailDate(selected.date)}
                 </span>
@@ -289,7 +277,7 @@ export function WorkloadDayOffcanvas({
             </div>
           </div>
         ) : (
-          <span className="workload-day-offcanvas__name">Day detail</span>
+          <Offcanvas.Title>Day detail</Offcanvas.Title>
         )}
       </Offcanvas.Header>
       <Offcanvas.Body className="workload-day-offcanvas__body pt-2">
@@ -301,32 +289,44 @@ export function WorkloadDayOffcanvas({
         {dayQuery.isError ? <Alert variant="danger">{formatError(dayQuery.error)}</Alert> : null}
         {selected && dayQuery.data ? (
           <>
-            <div className="workload-day-stats-grid">
-              <div className="workload-day-stat">
-                <div className="workload-day-stat__value workload-day-stat__value--accent">
-                  {formatWorkloadMinutes(estMinutes)}
+            <Row className="g-2 mb-3 workload-day-stats">
+              <Col xs={6}>
+                <div className="workload-day-stat">
+                  <div className="workload-day-stat__value workload-day-stat__value--accent">
+                    {formatWorkloadMinutes(estMinutes)}
+                  </div>
+                  <div className="workload-day-stat__label">Est. load</div>
                 </div>
-                <div className="workload-day-stat__label">Est. load</div>
-              </div>
-              <div className="workload-day-stat">
-                <div className="workload-day-stat__value">
-                  {formatWorkloadMinutes(capacityMinutes)}
+              </Col>
+              <Col xs={6}>
+                <div className="workload-day-stat">
+                  <div className="workload-day-stat__value">
+                    {formatWorkloadMinutes(capacityMinutes)}
+                  </div>
+                  <div className="workload-day-stat__label">Capacity</div>
                 </div>
-                <div className="workload-day-stat__label">Capacity</div>
-              </div>
-              <div className="workload-day-stat">
-                <div className="workload-day-stat__value workload-day-stat__value--accent">
-                  {formatWorkloadPercent(usedPercent)}
+              </Col>
+              <Col xs={6}>
+                <div className="workload-day-stat">
+                  <div className="workload-day-stat__value workload-day-stat__value--accent">
+                    {formatWorkloadPercent(usedPercent)}
+                  </div>
+                  <div className="workload-day-stat__label">Used</div>
                 </div>
-                <div className="workload-day-stat__label">Used</div>
-              </div>
-              <div className="workload-day-stat">
-                <div className={`workload-day-stat__value ${unestimatedCount > 0 ? "workload-day-stat__value--warn" : "workload-day-stat__value--accent"}`}>
-                  {unestimatedCount}
+              </Col>
+              <Col xs={6}>
+                <div className="workload-day-stat">
+                  <div
+                    className={`workload-day-stat__value ${
+                      unestimatedCount > 0 ? "workload-day-stat__value--warn" : "workload-day-stat__value--accent"
+                    }`}
+                  >
+                    {unestimatedCount}
+                  </div>
+                  <div className="workload-day-stat__label">Unestimated</div>
                 </div>
-                <div className="workload-day-stat__label">Unestimated</div>
-              </div>
-            </div>
+              </Col>
+            </Row>
 
             <p className="workload-day-total-summary small text-muted mb-2">
               {formatWorkloadDayTotalSummary(estMinutes, unestimatedCount)}
@@ -369,7 +369,7 @@ type WorkloadReassignModalProps = Readonly<{
   memberName: string;
   isSaving: boolean;
   onClose: () => void;
-  onConfirm: (dueDate?: string | null, estimateMinutes?: number | null) => void;
+  onConfirm: () => void;
 }>;
 
 export function WorkloadReassignModal({
@@ -384,10 +384,6 @@ export function WorkloadReassignModal({
   onClose,
   onConfirm,
 }: WorkloadReassignModalProps) {
-  const [dueDateDraft, setDueDateDraft] = React.useState("");
-  const [estimateHours, setEstimateHours] = React.useState("");
-  const [estimateMins, setEstimateMins] = React.useState("");
-
   return (
     <Modal show={Boolean(task)} onHide={onClose} centered className="workload-reassign-modal">
       <Modal.Header closeButton>
@@ -396,97 +392,24 @@ export function WorkloadReassignModal({
       <Modal.Body>
         {task ? (
           <>
-            <div className="workload-reassign-modal__summary">
-              <div className="workload-reassign-modal__row">
-                <span className="workload-reassign-modal__label">Task</span>
-                <span className="workload-reassign-modal__value">{task.title}</span>
-              </div>
-              <div className="workload-reassign-modal__row">
-                <span className="workload-reassign-modal__label">Priority</span>
-                <span className="workload-reassign-modal__value">
-                  <WorkloadPriorityBadge priority={task.priority} />
-                </span>
-              </div>
-              {task.due_date ? (
-                <div className="workload-reassign-modal__row">
-                  <span className="workload-reassign-modal__label">Due date</span>
-                  <span className="workload-reassign-modal__value">
-                    {formatWorkloadShortDueDate(task.due_date)}
-                  </span>
-                </div>
-              ) : null}
-              <div className={`workload-reassign-modal__row${isWorkloadTaskUnestimated(task) ? " workload-reassign-modal__row--due" : ""}`}>
-                <span className="workload-reassign-modal__label">Estimate</span>
-                {isWorkloadTaskUnestimated(task) ? (
-                  <div className="workload-reassign-modal__due-wrap">
-                    <div className="workload-reassign-modal__estimate-inputs">
-                      <input
-                        type="number"
-                        min={0}
-                        className="workload-reassign-modal__date-input"
-                        placeholder="hrs"
-                        value={estimateHours}
-                        onChange={(e) => setEstimateHours(e.target.value)}
-                        style={{ maxWidth: "70px" }}
-                      />
-                      <span className="workload-reassign-modal__due-hint">h</span>
-                      <input
-                        type="number"
-                        min={0}
-                        max={59}
-                        className="workload-reassign-modal__date-input"
-                        placeholder="mins"
-                        value={estimateMins}
-                        onChange={(e) => setEstimateMins(e.target.value)}
-                        style={{ maxWidth: "70px" }}
-                      />
-                      <span className="workload-reassign-modal__due-hint">m</span>
-                    </div>
-                    <span className="workload-reassign-modal__due-hint">
-                      Optional — helps calculate capacity load
-                    </span>
-                  </div>
-                ) : (
-                  <span className="workload-reassign-modal__value">
-                    {formatWorkloadTaskEstimate(task)}
-                  </span>
-                )}
-              </div>
-              {task.due_date ? null : (
-                <div className="workload-reassign-modal__row workload-reassign-modal__row--due">
-                  <span className="workload-reassign-modal__label">Due date</span>
-                  <div className="workload-reassign-modal__due-wrap">
-                    <input
-                      type="date"
-                      className="workload-reassign-modal__date-input"
-                      value={dueDateDraft}
-                      onChange={(e) => setDueDateDraft(e.target.value)}
-                    />
-                    <span className="workload-reassign-modal__due-hint">
-                      Optional — helps show task in grid
-                    </span>
-                  </div>
-                </div>
-              )}
-              <div className="workload-reassign-modal__row workload-reassign-modal__row--due">
-                <span className="workload-reassign-modal__label">Assign to</span>
-                <div className="workload-reassign-modal__due-wrap">
-                  <select
-                    className="workload-reassign-modal__date-input"
-                    style={{ maxWidth: "220px", paddingRight: "28px" }}
-                    value={targetExtension}
-                    onChange={(e) => onTargetChange(e.target.value)}
-                  >
-                    <option value="">Select member…</option>
-                    {memberExtensions.map((ext) => (
-                      <option key={ext} value={ext}>
-                        {formatWorkloadMemberLabel(ext, hierarchyExtensions)}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-            </div>
+            <Form.Group className="mb-3">
+              <Form.Label className="small text-muted mb-1">Task</Form.Label>
+              <Form.Control plaintext readOnly value={task.title} className="fw-semibold px-0" />
+            </Form.Group>
+            <Form.Group>
+              <Form.Label>Select user</Form.Label>
+              <Form.Select
+                value={targetExtension}
+                onChange={(e) => onTargetChange(e.target.value)}
+              >
+                <option value="">Select member…</option>
+                {memberExtensions.map((ext) => (
+                  <option key={ext} value={ext}>
+                    {formatWorkloadMemberLabel(ext, hierarchyExtensions)}
+                  </option>
+                ))}
+              </Form.Select>
+            </Form.Group>
             {overloadConfirm ? (
               <Alert variant="warning" className="small mt-3 mb-0">
                 {memberName || "This member"} is already overloaded for that day. Assign anyway?
@@ -499,10 +422,7 @@ export function WorkloadReassignModal({
         <Button variant="secondary" onClick={onClose}>
           Cancel
         </Button>
-        <Button variant="primary" disabled={!targetExtension || isSaving} onClick={() => {
-          const totalMinutes = (Number(estimateHours || 0) * 60) + Number(estimateMins || 0);
-          onConfirm(dueDateDraft || null, totalMinutes > 0 ? totalMinutes : null);
-        }}>
+        <Button variant="primary" disabled={!targetExtension || isSaving} onClick={onConfirm}>
           {overloadConfirm ? "Assign anyway" : "Confirm"}
         </Button>
       </Modal.Footer>
@@ -532,7 +452,6 @@ export function WorkloadRescheduleModal({
   onSubmit,
 }: WorkloadRescheduleModalProps) {
   const currentLabel = resolveRescheduleCurrentLabel(currentDate, task);
-  const submitLabel = resolveRescheduleSubmitLabel(isSaving, overloadSecondStep);
 
   return (
     <Modal show={Boolean(task)} onHide={onClose} centered className="workload-reschedule-modal">
@@ -542,33 +461,22 @@ export function WorkloadRescheduleModal({
       <Modal.Body>
         {task ? (
           <>
-            <div className="workload-reassign-modal__summary">
-              <div className="workload-reassign-modal__row">
-                <span className="workload-reassign-modal__label">Task</span>
-                <span className="workload-reassign-modal__value">{task.title}</span>
-              </div>
-              <div className="workload-reassign-modal__row">
-                <span className="workload-reassign-modal__label">Priority</span>
-                <span className="workload-reassign-modal__value">
-                  <WorkloadPriorityBadge priority={task.priority} />
-                </span>
-              </div>
-              <div className="workload-reassign-modal__row">
-                <span className="workload-reassign-modal__label">Current date</span>
-                <span className="workload-reassign-modal__value">{currentLabel}</span>
-              </div>
-              <div className="workload-reassign-modal__row workload-reassign-modal__row--due">
-                <span className="workload-reassign-modal__label">New date</span>
-                <div className="workload-reassign-modal__due-wrap">
-                  <input
-                    type="date"
-                    className="workload-reassign-modal__date-input"
-                    value={rescheduleDate}
-                    onChange={(e) => onDateChange(e.target.value)}
-                  />
-                </div>
-              </div>
-            </div>
+            <Form.Group className="mb-3">
+              <Form.Label className="small text-muted mb-1">Current</Form.Label>
+              <Form.Control plaintext readOnly value={currentLabel} className="px-0" />
+            </Form.Group>
+            <Form.Group className="mb-3">
+              <Form.Label className="small text-muted mb-1">Task</Form.Label>
+              <Form.Control plaintext readOnly value={task.title} className="fw-semibold px-0" />
+            </Form.Group>
+            <Form.Group>
+              <Form.Label>New due date</Form.Label>
+              <Form.Control
+                type="date"
+                value={rescheduleDate}
+                onChange={(e) => onDateChange(e.target.value)}
+              />
+            </Form.Group>
             {overloadSecondStep ? (
               <Alert variant="warning" className="small mt-3 mb-0">
                 This change may overload capacity for that day. Confirm to apply anyway.
@@ -582,7 +490,7 @@ export function WorkloadRescheduleModal({
           Cancel
         </Button>
         <Button variant="primary" disabled={!rescheduleDate || isSaving} onClick={onSubmit}>
-          {submitLabel}
+          {overloadSecondStep ? "Reschedule anyway" : "Reschedule"}
         </Button>
       </Modal.Footer>
     </Modal>

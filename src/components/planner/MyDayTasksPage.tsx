@@ -340,47 +340,87 @@ type MyDaySuggestedItemButtonProps = Readonly<{
   className?: string;
 }>;
 
-function resolveSuggestedItemBorder(hovered: boolean, inMyDay: boolean): string {
-  if (hovered && !inMyDay) return "1px solid #0066CC";
-  if (inMyDay) return "1px solid #bbf7d0";
-  return "1px solid #e2e8f0";
+type MyDaySuggestedItemInteractionStyle = Readonly<{
+  border: string;
+  borderLeft: string;
+  background: string;
+  cursor: string;
+  opacity: number;
+}>;
+
+type MyDaySuggestedAddButtonColors = Readonly<{
+  border: string;
+  background: string;
+  color: string;
+}>;
+
+function resolveMyDaySuggestedItemInteractionStyle(
+  hovered: boolean,
+  inMyDay: boolean,
+): MyDaySuggestedItemInteractionStyle {
+  if (inMyDay) {
+    return {
+      border: "1px solid #bbf7d0",
+      borderLeft: "3px solid #22c55e",
+      background: "#f9fafb",
+      cursor: "not-allowed",
+      opacity: 0.65,
+    };
+  }
+  if (hovered) {
+    return {
+      border: "1px solid #0066CC",
+      borderLeft: "3px solid #0066CC",
+      background: "#f0f7ff",
+      cursor: "pointer",
+      opacity: 1,
+    };
+  }
+  return {
+    border: "1px solid #e2e8f0",
+    borderLeft: "1px solid #e2e8f0",
+    background: "#fff",
+    cursor: "pointer",
+    opacity: 1,
+  };
 }
 
-function resolveSuggestedItemBorderLeft(hovered: boolean, inMyDay: boolean): string {
-  if (inMyDay) return "3px solid #22c55e";
-  if (hovered && !inMyDay) return "3px solid #0066CC";
-  return "1px solid #e2e8f0";
+function resolveMyDaySuggestedAddButtonColors(
+  hovered: boolean,
+  inMyDay: boolean,
+): MyDaySuggestedAddButtonColors {
+  if (inMyDay) {
+    return {
+      border: "1px solid #22c55e",
+      background: "#f0fdf4",
+      color: "#22c55e",
+    };
+  }
+  if (hovered) {
+    return {
+      border: "1px solid #0066CC",
+      background: "#0066CC",
+      color: "#fff",
+    };
+  }
+  return {
+    border: "1px solid #e2e8f0",
+    background: "#fff",
+    color: "#718096",
+  };
 }
 
-function resolveSuggestedItemBackground(hovered: boolean, inMyDay: boolean): string {
-  if (hovered && !inMyDay) return "#f0f7ff";
-  if (inMyDay) return "#f9fafb";
-  return "#fff";
-}
-
-function resolvePriorityDotBackground(priorityKey: string): string {
-  if (priorityKey === "urgent" || priorityKey === "critical") return "#ef4444";
-  if (priorityKey === "high") return "#f97316";
-  if (priorityKey === "medium" || priorityKey === "normal") return "#eab308";
+function resolvePriorityDotColor(priorityKey: string): string {
+  if (priorityKey === "urgent" || priorityKey === "critical") {
+    return "#ef4444";
+  }
+  if (priorityKey === "high") {
+    return "#f97316";
+  }
+  if (priorityKey === "medium" || priorityKey === "normal") {
+    return "#eab308";
+  }
   return "#22c55e";
-}
-
-function resolveSuggestedAddButtonBorder(inMyDay: boolean, hovered: boolean): string {
-  if (inMyDay) return "1px solid #22c55e";
-  if (hovered) return "1px solid #0066CC";
-  return "1px solid #e2e8f0";
-}
-
-function resolveSuggestedAddButtonBackground(inMyDay: boolean, hovered: boolean): string {
-  if (inMyDay) return "#f0fdf4";
-  if (hovered) return "#0066CC";
-  return "#fff";
-}
-
-function resolveSuggestedAddButtonColor(inMyDay: boolean, hovered: boolean): string {
-  if (inMyDay) return "#22c55e";
-  if (hovered) return "#fff";
-  return "#718096";
 }
 
 function MyDaySuggestedItemButton({
@@ -392,13 +432,24 @@ function MyDaySuggestedItemButton({
   const priorityKey = task.priority.toLowerCase().replace(/\s+/g, "-");
   const dueLabel = formatSuggestionDueDate(task.dueDate);
   const [hovered, setHovered] = React.useState(false);
+  const interactionStyle = resolveMyDaySuggestedItemInteractionStyle(
+    hovered,
+    inMyDay,
+  );
+  const addButtonColors = resolveMyDaySuggestedAddButtonColors(hovered, inMyDay);
+  const priorityDotColor = resolvePriorityDotColor(priorityKey);
+
   return (
     <button
       type="button"
       className={`myday-suggested-item ${inMyDay ? "is-added" : ""}`}
       disabled={inMyDay}
       onClick={() => onAdd(task)}
-      onMouseEnter={() => !inMyDay && setHovered(true)}
+      onMouseEnter={() => {
+        if (!inMyDay) {
+          setHovered(true);
+        }
+      }}
       onMouseLeave={() => setHovered(false)}
       style={{
         display: "flex",
@@ -407,12 +458,12 @@ function MyDaySuggestedItemButton({
         width: "100%",
         textAlign: "left",
         padding: "clamp(9px, 1.2vw, 13px) clamp(10px, 1.5vw, 14px)",
-        border: resolveSuggestedItemBorder(hovered, inMyDay),
-        borderLeft: resolveSuggestedItemBorderLeft(hovered, inMyDay),
+        border: interactionStyle.border,
+        borderLeft: interactionStyle.borderLeft,
         borderRadius: 8,
-        background: resolveSuggestedItemBackground(hovered, inMyDay),
-        cursor: inMyDay ? "not-allowed" : "pointer",
-        opacity: inMyDay ? 0.65 : 1,
+        background: interactionStyle.background,
+        cursor: interactionStyle.cursor,
+        opacity: interactionStyle.opacity,
         fontFamily: "inherit",
         transition: "all 0.15s ease",
       }}
@@ -433,8 +484,14 @@ function MyDaySuggestedItemButton({
             <span style={{ fontSize: "clamp(10px, 0.9vw, 12px)", color: "#718096" }}>{dueLabel}</span>
           ) : null}
           <span className={`myday-tag myday-tag--priority priority-${priorityKey}`} style={{ fontSize: "clamp(10px, 0.9vw, 11px)" }}>
-            <span style={{ width: 5, height: 5, borderRadius: "50%", display: "inline-block", flexShrink: 0, marginRight: 3,
-              background: resolvePriorityDotBackground(priorityKey),
+            <span style={{
+              width: 5,
+              height: 5,
+              borderRadius: "50%",
+              display: "inline-block",
+              flexShrink: 0,
+              marginRight: 3,
+              background: priorityDotColor,
             }} />
             {task.priority}
           </span>
@@ -449,9 +506,9 @@ function MyDaySuggestedItemButton({
         width: "clamp(22px, 2vw, 28px)",
         height: "clamp(22px, 2vw, 28px)",
         borderRadius: "50%",
-        border: resolveSuggestedAddButtonBorder(inMyDay, hovered),
-        background: resolveSuggestedAddButtonBackground(inMyDay, hovered),
-        color: resolveSuggestedAddButtonColor(inMyDay, hovered),
+        border: addButtonColors.border,
+        background: addButtonColors.background,
+        color: addButtonColors.color,
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
