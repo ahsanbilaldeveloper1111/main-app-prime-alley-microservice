@@ -45,6 +45,7 @@ interface LayoutProps {
 const Layout = ({ children }: LayoutProps) => {
   const dispatch = useAppDispatch();
   const router = useRouter();
+  const isWorkloadPage = router.pathname.includes("workload");
   const { data: session, status } = useSession();
 	const { isOpen: isDialerOpen, closeDialer } = useDialerModal();
 
@@ -310,9 +311,9 @@ const Layout = ({ children }: LayoutProps) => {
           <div
             className="flex-grow-1 p-3 main-content-wrapper"
             style={{
-              overflowY: "auto",
+              overflowY: isWorkloadPage ? "visible" : "auto",
               width: mainContentWidth,
-              overflow: breezeMaximized ? "hidden" : "auto",
+              overflow: breezeMaximized ? "hidden" : isWorkloadPage ? "hidden" : "auto",
               transition: "width 0.3s ease-in-out",
             }}
           >

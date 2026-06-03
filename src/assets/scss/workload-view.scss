@@ -1392,8 +1392,8 @@
     display: flex;
     gap: 12px;
     overflow-x: auto;
-    overflow-y: hidden;
-    padding: 0.5rem 0.5rem 1rem;
+    overflow-y: visible;
+    padding: 0.5rem;
     align-items: stretch;
     justify-content: flex-start;
     min-width: 0;
@@ -1427,8 +1427,14 @@
     flex-direction: column;
     align-self: stretch;
     justify-content: flex-start;
-    height: auto;
-    max-height: min(80vh, calc(100vh - 14rem));
+    height: 700px;
+    max-height: 700px;
+
+    @media (min-height: 800px) {
+      height: calc(100vh - 348px);
+      max-height: calc(100vh - 348px);
+    }
+
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
     overflow: hidden;
   }
