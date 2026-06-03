@@ -1,5 +1,4 @@
-import React from "react";
-import { Button, Card, Col, Form, Row } from "react-bootstrap";
+import React, { useEffect, useRef, useState } from "react";
 import { formatWorkloadMemberLabel } from "@page-modules/planner/workload/workloadDomain";
 import type { ReportsDatePreset, ReportsProjectFilter } from "@page-modules/planner/reports/reportsDomain";
 import type { PlannerProjectListItem } from "@page-modules/planner/reports/projectReportsDomain";
@@ -45,115 +44,213 @@ export function WorkloadReportsFiltersCard({
   loadingOverview,
   onApply,
 }: WorkloadReportsFiltersCardProps) {
+  const [openPill, setOpenPill] = useState<string | null>(null);
+  const barRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (barRef.current && !barRef.current.contains(e.target as Node)) {
+        setOpenPill(null);
+      }
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, []);
+
+  const togglePill = (id: string) => {
+    setOpenPill((prev) => (prev === id ? null : id));
+  };
+
+  const DATE_PRESET_LABELS: Record<string, string> = {
+    last_7: "Last 7 days",
+    last_30: "Last 30 days",
+    this_month: "This month",
+    custom: "Custom range",
+  };
+
+  const selectedProjectLabel =
+    projectFilter === "all"
+      ? "All Projects"
+      : projectFilterOptions.find((p) => p.id === projectFilter)?.name ?? "Project";
+
   return (
-    <Card className="workload-reports-filters">
-      <Card.Body className="workload-reports-filters__body">
-        <Row className="g-2 align-items-end workload-reports-filters__row">
-          <Col xs={12} sm={6} md="auto" className="workload-reports-filters__field">
-            <Form.Label className="small text-muted mb-1">Time period</Form.Label>
-            <Form.Select
-              size="sm"
-              value={datePreset}
-              onChange={(e) => onDatePresetChange(e.target.value as ReportsDatePreset)}
-            >
-              <option value="last_7">Last 7 days</option>
-              <option value="last_30">Last 30 days</option>
-              <option value="this_month">This month</option>
-              <option value="custom">Custom range</option>
-            </Form.Select>
-          </Col>
-          {datePreset === "custom" ? (
-            <>
-              <Col xs={6} sm={6} md="auto" className="workload-reports-filters__field">
-                <Form.Label className="small text-muted mb-1">Start</Form.Label>
-                <Form.Control
-                  type="date"
-                  size="sm"
-                  value={customStart}
-                  onChange={(e) => onCustomStartChange(e.target.value)}
-                />
-              </Col>
-              <Col xs={6} sm={6} md="auto" className="workload-reports-filters__field">
-                <Form.Label className="small text-muted mb-1">End</Form.Label>
-                <Form.Control
-                  type="date"
-                  size="sm"
-                  value={customEnd}
-                  onChange={(e) => onCustomEndChange(e.target.value)}
-                />
-              </Col>
-            </>
+    <div className="reports-filter-bar" ref={barRef}>
+      <div className="reports-filter-bar__inner">
+        <div className="reports-filter-bar__pill-wrap">
+          <button
+            type="button"
+            className={`reports-filter-bar__pill-btn${datePreset !== "last_7" ? " reports-filter-bar__pill-btn--active" : ""}`}
+            onClick={() => togglePill("time")}
+            disabled={!enabled}
+          >
+            <i className="ti ti-calendar reports-filter-bar__pill-icon" aria-hidden="true" />
+            <span>{DATE_PRESET_LABELS[datePreset]}</span>
+            <span className="reports-filter-bar__caret">▾</span>
+          </button>
+          {openPill === "time" ? (
+            <div className="reports-filter-bar__dropdown">
+              {(["last_7", "last_30", "this_month", "custom"] as ReportsDatePreset[]).map((p) => (
+                <button
+                  key={p}
+                  type="button"
+                  className="reports-filter-bar__dropdown-item"
+                  onClick={() => {
+                    onDatePresetChange(p);
+                    setOpenPill(null);
+                  }}
+                >
+                  {DATE_PRESET_LABELS[p]}
+                </button>
+              ))}
+            </div>
           ) : null}
-          <Col xs={12} sm={6} md="auto" className="workload-reports-filters__field">
-            <Form.Label className="small text-muted mb-1">Project</Form.Label>
-            <Form.Select
-              size="sm"
-              value={projectFilter === "all" ? "all" : String(projectFilter)}
-              onChange={(e) => {
-                const v = e.target.value;
-                if (v === "all") {
+        </div>
+
+        {datePreset === "custom" ? (
+          <>
+            <input
+              type="date"
+              className="reports-filter-bar__date-input"
+              value={customStart}
+              onChange={(e) => onCustomStartChange(e.target.value)}
+              disabled={!enabled}
+            />
+            <span className="reports-filter-bar__date-sep">→</span>
+            <input
+              type="date"
+              className="reports-filter-bar__date-input"
+              value={customEnd}
+              onChange={(e) => onCustomEndChange(e.target.value)}
+              disabled={!enabled}
+            />
+          </>
+        ) : null}
+
+        <div className="reports-filter-bar__sep" aria-hidden="true" />
+
+        <div className="reports-filter-bar__pill-wrap">
+          <button
+            type="button"
+            className={`reports-filter-bar__pill-btn${projectFilter !== "all" ? " reports-filter-bar__pill-btn--active" : ""}`}
+            onClick={() => togglePill("project")}
+            disabled={!enabled}
+          >
+            <i className="ti ti-folder reports-filter-bar__pill-icon" aria-hidden="true" />
+            <span>{selectedProjectLabel}</span>
+            <span className="reports-filter-bar__caret">▾</span>
+          </button>
+          {openPill === "project" ? (
+            <div className="reports-filter-bar__dropdown">
+              <button
+                type="button"
+                className="reports-filter-bar__dropdown-item"
+                onClick={() => {
                   onProjectFilterChange("all");
-                  return;
-                }
-                const parsed = Number(v);
-                onProjectFilterChange(Number.isFinite(parsed) ? parsed : "all");
-              }}
-            >
-              <option value="all">All projects</option>
+                  setOpenPill(null);
+                }}
+              >
+                All projects
+              </button>
               {projectFilterOptions.map((p) => (
-                <option key={`${p.id}-${p.name}`} value={p.id}>
+                <button
+                  key={`${p.id}-${p.name}`}
+                  type="button"
+                  className="reports-filter-bar__dropdown-item"
+                  onClick={() => {
+                    onProjectFilterChange(p.id);
+                    setOpenPill(null);
+                  }}
+                >
                   {p.name}
-                </option>
+                </button>
               ))}
-            </Form.Select>
-          </Col>
-          <Col xs={12} sm={6} md="auto" className="workload-reports-filters__field">
-            <Form.Label className="small text-muted mb-1">Member</Form.Label>
-            <Form.Select
-              size="sm"
-              value={memberFilter}
-              onChange={(e) => onMemberFilterChange(e.target.value)}
-            >
-              <option value="all">All members</option>
+            </div>
+          ) : null}
+        </div>
+
+        <div className="reports-filter-bar__sep" aria-hidden="true" />
+
+        <div className="reports-filter-bar__pill-wrap">
+          <button
+            type="button"
+            className={`reports-filter-bar__pill-btn${memberFilter !== "all" ? " reports-filter-bar__pill-btn--active" : ""}`}
+            onClick={() => togglePill("member")}
+            disabled={!enabled}
+          >
+            <i className="ti ti-users reports-filter-bar__pill-icon" aria-hidden="true" />
+            <span>{memberFilter === "all" ? "All Members" : memberFilter}</span>
+            <span className="reports-filter-bar__caret">▾</span>
+          </button>
+          {openPill === "member" ? (
+            <div className="reports-filter-bar__dropdown">
+              <button
+                type="button"
+                className="reports-filter-bar__dropdown-item"
+                onClick={() => {
+                  onMemberFilterChange("all");
+                  setOpenPill(null);
+                }}
+              >
+                All members
+              </button>
               {memberExtensions.map((ext) => (
-                <option key={ext} value={ext}>
+                <button
+                  key={ext}
+                  type="button"
+                  className="reports-filter-bar__dropdown-item"
+                  onClick={() => {
+                    onMemberFilterChange(ext);
+                    setOpenPill(null);
+                  }}
+                >
                   {formatWorkloadMemberLabel(ext, hierarchyDataExtensions)}
-                </option>
+                </button>
               ))}
-            </Form.Select>
-          </Col>
-          <Col xs={12} sm={6} md="auto" className="workload-reports-filters__field">
-            <Form.Label className="small text-muted mb-1">Stale (days)</Form.Label>
-            <Form.Select
-              size="sm"
-              value={String(staleDays)}
-              onChange={(e) => onStaleDaysChange(Number(e.target.value))}
-            >
-              <option value="3">3+ days</option>
-              <option value="5">5+ days</option>
-              <option value="7">7+ days</option>
-              <option value="14">14+ days</option>
-            </Form.Select>
-          </Col>
-          <Col xs={12} md="auto" className="workload-reports-filters__apply-col">
-            <Form.Label
-              className="small text-muted mb-1 workload-reports-filters__apply-label"
-              aria-hidden="true"
-            >
-              &nbsp;
-            </Form.Label>
-            <Button
-              variant="dark"
-              size="sm"
-              className="workload-reports-filters__apply-btn"
-              disabled={!enabled || loadingOverview}
-              onClick={onApply}
-            >
-              Apply
-            </Button>
-          </Col>
-        </Row>
-      </Card.Body>
-    </Card>
+            </div>
+          ) : null}
+        </div>
+
+        <div className="reports-filter-bar__sep" aria-hidden="true" />
+
+        <div className="reports-filter-bar__pill-wrap">
+          <button
+            type="button"
+            className="reports-filter-bar__pill-btn"
+            onClick={() => togglePill("stale")}
+            disabled={!enabled}
+          >
+            <i className="ti ti-clock reports-filter-bar__pill-icon" aria-hidden="true" />
+            <span>Stale: {staleDays}+ days</span>
+            <span className="reports-filter-bar__caret">▾</span>
+          </button>
+          {openPill === "stale" ? (
+            <div className="reports-filter-bar__dropdown">
+              {[3, 5, 7, 14].map((value) => (
+                <button
+                  key={value}
+                  type="button"
+                  className="reports-filter-bar__dropdown-item"
+                  onClick={() => {
+                    onStaleDaysChange(value);
+                    setOpenPill(null);
+                  }}
+                >
+                  {value}+ days
+                </button>
+              ))}
+            </div>
+          ) : null}
+        </div>
+
+        <button
+          type="button"
+          className="reports-filter-bar__apply"
+          disabled={!enabled || loadingOverview}
+          onClick={onApply}
+        >
+          {loadingOverview ? "Loading…" : "Apply"}
+        </button>
+      </div>
+    </div>
   );
 }
