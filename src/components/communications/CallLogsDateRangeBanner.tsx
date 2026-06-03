@@ -41,7 +41,7 @@ const CallLogsDateRangeBanner: React.FC<
         >
           <Calendar size={16} />
         </span>
-        <div className="d-flex align-items-center gap-2">
+        <div className="d-flex align-items-center gap-2 communications-date-range-banner__label-row">
           <span
             className="text-muted"
             style={{
@@ -53,6 +53,7 @@ const CallLogsDateRangeBanner: React.FC<
             Selected Date Range
           </span>
           <span
+            className="communications-date-range-banner__dates"
             style={{
               fontSize: "13px",
               fontWeight: 600,

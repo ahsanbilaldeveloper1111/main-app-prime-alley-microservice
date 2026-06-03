@@ -29,43 +29,16 @@ export function TextMessagesListPage() {
     <React.Fragment>
       <CrmListPageScopedLayoutStyles config={COMMUNICATIONS_LIST_SCOPED_LAYOUT} />
       <TextMessagesListPageExtraStyles />
-      <div
-        className="prospects-page-container text-messages-page-container"
-        style={{
-          display: "flex",
-          gap: 0,
-          height: "calc(100vh - 74px)",
-          overflow: "hidden",
-        }}
-      >
-        <div
-          className="prospects-scrollable-content"
-          style={{ flex: 1, height: "100%", overflowY: "hidden" }}
-        >
+      <div className="prospects-page-container text-messages-page-container">
+        <div className="prospects-scrollable-content">
           <BreadcrumbItem
             mainTitle={TEXT_MESSAGES_BREADCRUMB.mainTitle}
             mainLink={TEXT_MESSAGES_BREADCRUMB.mainLink}
             subTitle={TEXT_MESSAGES_BREADCRUMB.subTitle}
           />
 
-          <div
-            className="container-fluid prospects-content-area"
-            style={{
-              height: "100%",
-              display: "flex",
-              flexDirection: "column",
-            }}
-          >
-            <div
-              className="prospects-table-wrapper text-messages-table-wrapper text-messages-page"
-              style={{
-                flex: 1,
-                overflow: "hidden",
-                display: "flex",
-                flexDirection: "column",
-                height: "100%",
-              }}
-            >
+          <div className="container-fluid prospects-content-area">
+            <div className="prospects-table-wrapper text-messages-table-wrapper text-messages-page">
               <TextMessagesView />
             </div>
           </div>

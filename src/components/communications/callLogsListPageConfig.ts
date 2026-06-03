@@ -92,6 +92,42 @@ function communicationsTableWrapperCss(wrapperClass: string): string {
       flex-wrap: wrap;
       row-gap: 8px;
     }
+
+    .prospects-table-wrapper.${wrapperClass} .gt-filter-pills {
+      flex-wrap: wrap !important;
+      flex-direction: column !important;
+      align-items: stretch !important;
+      padding-bottom: 12px;
+    }
+
+    .prospects-table-wrapper.${wrapperClass} .gt-filter-pills > .d-flex.align-items-center.gap-2.flex-wrap {
+      flex-wrap: wrap !important;
+      min-width: 0;
+      width: 100%;
+    }
+
+    .prospects-table-wrapper.${wrapperClass} .gt-filter-pills-right-actions {
+      position: static;
+      margin-left: 0;
+      width: 100%;
+      padding-left: 0;
+      box-shadow: none;
+      justify-content: flex-end;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+  }
+
+  @media (max-width: 576px) {
+    .prospects-table-wrapper.${wrapperClass} .gt-toolbar-tabs-dropdown,
+    .prospects-table-wrapper.${wrapperClass} .gt-tab-button {
+      max-width: 100%;
+    }
+
+    .prospects-table-wrapper.${wrapperClass} .gt-filter-pills-right-actions .btn {
+      flex: 1 1 auto;
+      min-width: 0;
+    }
   }
 `;
 }

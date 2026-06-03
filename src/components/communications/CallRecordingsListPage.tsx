@@ -34,19 +34,8 @@ export function CallRecordingsListPage() {
     <React.Fragment>
       <CrmListPageScopedLayoutStyles config={COMMUNICATIONS_LIST_SCOPED_LAYOUT} />
       <CallRecordingsListPageExtraStyles />
-      <div
-        className="prospects-page-container call-recordings-page-container"
-        style={{
-          display: "flex",
-          gap: 0,
-          height: "calc(100vh - 74px)",
-          overflow: "hidden",
-        }}
-      >
-        <div
-          className="prospects-scrollable-content"
-          style={{ flex: 1, height: "100%", overflowY: "hidden" }}
-        >
+      <div className="prospects-page-container call-recordings-page-container">
+        <div className="prospects-scrollable-content">
           <BreadcrumbItem
             mainTitle={CALL_RECORDINGS_BREADCRUMB.mainTitle}
             mainLink={CALL_RECORDINGS_BREADCRUMB.mainLink}
@@ -54,26 +43,10 @@ export function CallRecordingsListPage() {
             showPageLoader={showPageLoader}
           />
 
-          <div
-            className="container-fluid prospects-content-area"
-            style={{
-              height: "100%",
-              display: "flex",
-              flexDirection: "column",
-            }}
-          >
+          <div className="container-fluid prospects-content-area">
             <CallRecordingsDateRangeBannerConnected />
 
-            <div
-              className="prospects-table-wrapper call-recordings-table-wrapper"
-              style={{
-                flex: 1,
-                overflow: "hidden",
-                display: "flex",
-                flexDirection: "column",
-                height: "100%",
-              }}
-            >
+            <div className="prospects-table-wrapper call-recordings-table-wrapper">
               <CallRecordingsView />
             </div>
           </div>

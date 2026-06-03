@@ -33,7 +33,7 @@ const CallBarChartCard: React.FC<CallBarChartCardProps> = ({
   if (!show) return null;
 
   return (
-    <Col md={4}>
+    <Col xs={12} lg={4}>
       <div className="card">
         <div className="card-body">
           {dataLength === 0 ? (

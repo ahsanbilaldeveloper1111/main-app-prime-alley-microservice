@@ -55,12 +55,12 @@ const PageHeader: React.FC<PageHeaderProps> = ({
         <Col md={12}>
           <div className="page-header-title style-2 mt-0 mb-0">
             <Row className="d-flex justify-content-between align-items-center">
-              <Col md={5}>
+              <Col xs={12} lg={5}>
                 <h2 className="mb-0">Live Calls</h2>
               </Col>
 
-              <Col md={7} className="d-flex justify-content-end">
-                <div className="d-flex flex-wrap align-items-center gap-2 w-100 w-md-auto justify-content-start justify-content-md-end">
+              <Col xs={12} lg={7} className="d-flex justify-content-lg-end">
+                <div className="d-flex flex-wrap align-items-center gap-2 w-100 wallboards-live-header-actions justify-content-start justify-content-lg-end">
                   {session?.user?.permissions?.includes('view-live-wallboard-beta-cti') && (
                     <Link href="/live-monitoring">
                       <Button

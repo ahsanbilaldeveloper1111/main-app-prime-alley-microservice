@@ -17,19 +17,8 @@ export function WallboardsLiveListPage() {
   return (
     <React.Fragment>
       <CrmListPageScopedLayoutStyles config={COMMUNICATIONS_LIST_SCOPED_LAYOUT} />
-      <div
-        className="prospects-page-container wallboards-live-page-container"
-        style={{
-          display: "flex",
-          gap: 0,
-          height: "calc(100vh - 74px)",
-          overflow: "hidden",
-        }}
-      >
-        <div
-          className="prospects-scrollable-content"
-          style={{ flex: 1, height: "100%", overflowY: "auto" }}
-        >
+      <div className="prospects-page-container wallboards-live-page-container">
+        <div className="prospects-scrollable-content">
           <BreadcrumbItem
             mainTitle={WALLBOARD_BREADCRUMB.mainTitle}
             mainLink={WALLBOARD_BREADCRUMB.mainLink}

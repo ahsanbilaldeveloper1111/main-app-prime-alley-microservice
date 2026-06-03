@@ -36,19 +36,8 @@ export function CallAnalysisListPage() {
     <React.Fragment>
       <CrmListPageScopedLayoutStyles config={COMMUNICATIONS_LIST_SCOPED_LAYOUT} />
       <CallAnalysisListPageExtraStyles />
-      <div
-        className="prospects-page-container call-analysis-page-container"
-        style={{
-          display: "flex",
-          gap: 0,
-          height: "calc(100vh - 74px)",
-          overflow: "hidden",
-        }}
-      >
-        <div
-          className="prospects-scrollable-content"
-          style={{ flex: 1, height: "100%", overflowY: "hidden" }}
-        >
+      <div className="prospects-page-container call-analysis-page-container">
+        <div className="prospects-scrollable-content">
           <BreadcrumbItem
             mainTitle={CALL_ANALYSIS_BREADCRUMB.mainTitle}
             mainLink={CALL_ANALYSIS_BREADCRUMB.mainLink}
@@ -56,26 +45,10 @@ export function CallAnalysisListPage() {
             showPageLoader={showPageLoader}
           />
 
-          <div
-            className="container-fluid prospects-content-area"
-            style={{
-              height: "100%",
-              display: "flex",
-              flexDirection: "column",
-            }}
-          >
+          <div className="container-fluid prospects-content-area">
             <CallAnalysisDateRangeBannerConnected />
 
-            <div
-              className="prospects-table-wrapper call-analysis-table-wrapper"
-              style={{
-                flex: 1,
-                overflow: "hidden",
-                display: "flex",
-                flexDirection: "column",
-                height: "100%",
-              }}
-            >
+            <div className="prospects-table-wrapper call-analysis-table-wrapper">
               <CallAnalysisView />
             </div>
           </div>
