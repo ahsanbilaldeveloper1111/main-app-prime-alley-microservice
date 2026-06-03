@@ -1,0 +1,174 @@
+// Communications section — shared responsive layout for list pages, dashboard, and wallboard.
+
+$communications-page-top-offset: 74px;
+$communications-breakpoint-lg: 992px;
+$communications-breakpoint-md: 768px;
+$communications-breakpoint-sm: 576px;
+
+@mixin communications-list-page-containers {
+  .call-logs-page-container,
+  .call-recordings-page-container,
+  .call-analysis-page-container,
+  .text-messages-page-container,
+  .wallboards-live-page-container {
+    @content;
+  }
+}
+
+@include communications-list-page-containers {
+  display: flex;
+  gap: 0;
+  height: calc(100vh - #{$communications-page-top-offset});
+  overflow: hidden;
+
+  .prospects-scrollable-content {
+    flex: 1;
+    height: 100%;
+    overflow-x: hidden;
+    overflow-y: hidden;
+  }
+
+  .prospects-content-area {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .prospects-table-wrapper {
+    flex: 1;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+  }
+}
+
+.wallboards-live-page-container .prospects-scrollable-content {
+  overflow-y: auto;
+}
+
+// Date range banner above list tables
+.communications-date-range-banner {
+  flex-shrink: 0;
+
+  .communications-date-range-banner__label-row {
+    flex-wrap: wrap;
+    row-gap: 4px;
+  }
+
+  .communications-date-range-banner__dates {
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+
+  @media (max-width: $communications-breakpoint-md) {
+    padding: 10px !important;
+
+    .communications-date-range-banner__label-row {
+      flex-direction: column;
+      align-items: flex-start !important;
+    }
+  }
+}
+
+// Call dashboard
+.communications-dashboard-page {
+  .page-header-title .row {
+    row-gap: 12px;
+  }
+
+  .communications-dashboard-date-controls {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  @media (max-width: $communications-breakpoint-md) {
+    .action-buttons {
+      width: 100%;
+      justify-content: flex-start !important;
+    }
+
+    .communications-dashboard-date-controls {
+      width: 100%;
+    }
+  }
+}
+
+// Live wallboard header + filter bar
+.wallboards-live-page-container {
+  .page-header-title .row {
+    row-gap: 12px;
+  }
+
+  .wallboards-live-header-actions {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  @media (max-width: $communications-breakpoint-md) {
+    .wallboards-live-header-actions {
+      width: 100%;
+      justify-content: flex-start !important;
+    }
+  }
+}
+
+.wallboards-live-filter-bar {
+  @media (max-width: $communications-breakpoint-md) {
+    top: 0 !important;
+    position: relative !important;
+  }
+}
+
+// Tablet and below — allow natural page scroll instead of trapping content
+@media (max-width: $communications-breakpoint-lg) {
+  body:has(.call-logs-page-container),
+  body:has(.call-recordings-page-container),
+  body:has(.call-analysis-page-container),
+  body:has(.text-messages-page-container),
+  body:has(.wallboards-live-page-container) {
+    overflow: auto !important;
+
+    .main-content-wrapper {
+      overflow: auto !important;
+    }
+
+    .min-vh-100 {
+      height: auto !important;
+      min-height: 100vh !important;
+      overflow: visible !important;
+    }
+  }
+
+  @include communications-list-page-containers {
+    height: auto;
+    min-height: calc(100vh - #{$communications-page-top-offset});
+    overflow: visible;
+
+    .prospects-scrollable-content {
+      height: auto;
+      overflow-y: visible;
+    }
+
+    .prospects-content-area {
+      height: auto;
+      min-height: 0;
+      padding-left: 12px;
+      padding-right: 12px;
+    }
+
+    .prospects-table-wrapper {
+      height: auto;
+      min-height: 360px;
+    }
+  }
+}
+
+@media (max-width: $communications-breakpoint-sm) {
+  @include communications-list-page-containers {
+    .prospects-content-area {
+      padding-left: 8px;
+      padding-right: 8px;
+    }
+  }
+}

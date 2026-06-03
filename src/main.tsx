@@ -1,4 +1,5 @@
 import "@assets/scss/custom.scss";
+import "@assets/scss/communications-pages.scss";
 import "@assets/fonts/phosphor/duotone/style.css";
 import "nprogress/nprogress.css";
 import "./utils/i18n";

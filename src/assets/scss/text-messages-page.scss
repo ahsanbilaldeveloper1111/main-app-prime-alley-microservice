@@ -63,7 +63,18 @@
     }
 
     .gsm-message-cell {
-      min-width: 320px;
+      min-width: 280px;
+      max-width: none;
+    }
+  }
+
+  @media (max-width: 768px) {
+    .generic-table {
+      min-width: 720px;
+    }
+
+    .gsm-message-cell {
+      min-width: 240px;
     }
   }
 }

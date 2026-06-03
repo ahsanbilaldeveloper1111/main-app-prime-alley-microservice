@@ -1081,6 +1081,30 @@ button.preview-button:hover, button.preview-button:focus {
   opacity: 0.45;
   cursor: not-allowed;
 }
+
+/* Apply Filters in table filter rows — matches active tab count badge (#0066CC) */
+.gt-toolbar-btn.gt-apply-filters-btn {
+  background: #0066CC !important;
+  color: #ffffff !important;
+  border-color: #0066CC !important;
+  font-weight: 500 !important;
+}
+
+.gt-toolbar-btn.gt-apply-filters-btn:hover:not(:disabled) {
+  background: #0052A3 !important;
+  border-color: #0052A3 !important;
+  color: #ffffff !important;
+}
+
+.gt-toolbar-btn.gt-apply-filters-btn:focus-visible:not(:disabled) {
+  box-shadow: 0 0 0 2px rgba(0, 102, 204, 0.35);
+}
+
+.gt-toolbar-btn.gt-apply-filters-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
 .gt-toolbar-dropdown{
 background: #fff !important;
   padding: 7px 14px;

@@ -1,19 +1,10 @@
-import { type ReactElement } from "react";
-import type { NextPage } from "next";
-
+import React, { ReactElement } from "react";
 import Layout from "@layout/index";
+import { WallboardsLiveListPage } from "@components/communications/WallboardsLiveListPage";
 
-import "@assets/scss/common.scss";
-import "@assets/scss/live-calls.scss";
+/** Live wallboard is implemented in `WallboardsLiveListPage`. */
+const LiveCallDashboard = () => <WallboardsLiveListPage />;
 
-import WallboardsLiveView from "@components/communications/wallboards-live/WallboardsLiveView";
-
-const LiveCallDashboard: NextPage & {
-  getLayout?: (page: ReactElement) => React.ReactNode;
-} = () => <WallboardsLiveView />;
-
-LiveCallDashboard.getLayout = (page: ReactElement) => {
-  return <Layout>{page}</Layout>;
-};
+LiveCallDashboard.getLayout = (page: ReactElement) => <Layout>{page}</Layout>;
 
 export default LiveCallDashboard;

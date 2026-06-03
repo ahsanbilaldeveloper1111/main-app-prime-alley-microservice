@@ -6,7 +6,6 @@ import React, {
   useEffect,
   type SetStateAction,
 } from 'react'
-import BreadcrumbItem from '@common/BreadcrumbItem'
 import DeviceSelectionModal from '@components/DeviceSelectionModal'
 import PageLoader from '@components/PageLoader'
 import { useSession } from 'next-auth/react'
@@ -61,9 +60,20 @@ import { executeMonitoring } from '@components/live-calls/utils/monitoringHelper
 import { animateCardMove as animateCardMoveHelper } from '@components/live-calls/utils/animationHelpers'
 import { evaluateInitiatorMonitoringClear } from '@components/communications/wallboards-live/wallboardInitiatorMonitoringClear'
 
-const WallboardsLiveView: React.FC = () => {
+export interface WallboardsLiveViewProps {
+  onShowPageLoaderChange?: (loading: boolean) => void;
+}
+
+const WallboardsLiveView: React.FC<WallboardsLiveViewProps> = ({
+  onShowPageLoaderChange,
+}) => {
   const { data:session, status } = useSession();
-  const [showPageLoader, setShowPageLoader] = useState(false)
+  const setShowPageLoader = useCallback(
+    (loading: boolean) => {
+      onShowPageLoaderChange?.(loading);
+    },
+    [onShowPageLoaderChange],
+  );
   const {
     summaryData,
     dnsMap,
@@ -81,24 +91,64 @@ const WallboardsLiveView: React.FC = () => {
     requestCtiStreamRefresh,
   } = useCti()
 
-  // Default state for filters (add these state variables if they don't exist)
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedTeam, setSelectedTeam] = useState('all');
-  const [selectedStatus, setSelectedStatus] = useState('all');
-  const [sortBy, setSortBy] = useState('none');
-  const [showFilterBar, setShowFilterBar] = useState(false);
+  type WallboardFilters = {
+    searchQuery: string
+    selectedTeam: string
+    selectedStatus: string
+    sortBy: string
+  }
 
-  // Default filter functions (implement these based on your needs)
-  const applyFilters = () => {
-    // Implement filter logic here
-  };
+  const defaultWallboardFilters: WallboardFilters = {
+    searchQuery: '',
+    selectedTeam: 'all',
+    selectedStatus: 'all',
+    sortBy: 'none',
+  }
 
-  const clearFilters = () => {
-    setSearchQuery('');
-    setSelectedTeam('all');
-    setSelectedStatus('all');
-    setSortBy('none');
-  };
+  const [searchQuery, setSearchQuery] = useState(defaultWallboardFilters.searchQuery)
+  const [selectedTeam, setSelectedTeam] = useState(defaultWallboardFilters.selectedTeam)
+  const [selectedStatus, setSelectedStatus] = useState(defaultWallboardFilters.selectedStatus)
+  const [sortBy, setSortBy] = useState(defaultWallboardFilters.sortBy)
+  const [appliedSearchQuery, setAppliedSearchQuery] = useState(defaultWallboardFilters.searchQuery)
+  const [appliedSelectedTeam, setAppliedSelectedTeam] = useState(defaultWallboardFilters.selectedTeam)
+  const [appliedSelectedStatus, setAppliedSelectedStatus] = useState(defaultWallboardFilters.selectedStatus)
+  const [appliedSortBy, setAppliedSortBy] = useState(defaultWallboardFilters.sortBy)
+  const [showFilterBar, setShowFilterBar] = useState(false)
+
+  const applyFilters = useCallback(() => {
+    setAppliedSearchQuery(searchQuery)
+    setAppliedSelectedTeam(selectedTeam)
+    setAppliedSelectedStatus(selectedStatus)
+    setAppliedSortBy(sortBy)
+  }, [searchQuery, selectedTeam, selectedStatus, sortBy])
+
+  const clearFilters = useCallback(() => {
+    setSearchQuery(defaultWallboardFilters.searchQuery)
+    setSelectedTeam(defaultWallboardFilters.selectedTeam)
+    setSelectedStatus(defaultWallboardFilters.selectedStatus)
+    setSortBy(defaultWallboardFilters.sortBy)
+    setAppliedSearchQuery(defaultWallboardFilters.searchQuery)
+    setAppliedSelectedTeam(defaultWallboardFilters.selectedTeam)
+    setAppliedSelectedStatus(defaultWallboardFilters.selectedStatus)
+    setAppliedSortBy(defaultWallboardFilters.sortBy)
+  }, [])
+
+  const toggleFilterBar = useCallback(() => {
+    setShowFilterBar((prev) => {
+      if (!prev) {
+        setSearchQuery(appliedSearchQuery)
+        setSelectedTeam(appliedSelectedTeam)
+        setSelectedStatus(appliedSelectedStatus)
+        setSortBy(appliedSortBy)
+      }
+      return !prev
+    })
+  }, [
+    appliedSearchQuery,
+    appliedSelectedTeam,
+    appliedSelectedStatus,
+    appliedSortBy,
+  ])
 
   const [loading, setLoading] = useState(true)
   const [openMenuDn, setOpenMenuDn] = useState<string | null>(null)
@@ -1424,7 +1474,6 @@ const WallboardsLiveView: React.FC = () => {
 
   return (
     <div className="live-calls-wrapper">
-      <BreadcrumbItem mainTitle="CTI" mainLink="/cti" subTitle="Live Calls" showPageLoader={showPageLoader && !isReconnecting} />
 
       {/* Header */}
       <PageHeader
@@ -1435,7 +1484,7 @@ const WallboardsLiveView: React.FC = () => {
   expandAll={expandAll}
   collapseAll={collapseAll}
   showFilterBar={showFilterBar}
-  toggleFilterBar={() => setShowFilterBar(!showFilterBar)}
+  toggleFilterBar={toggleFilterBar}
  
   searchQuery={searchQuery}
   selectedTeam={selectedTeam}
@@ -1448,7 +1497,7 @@ const WallboardsLiveView: React.FC = () => {
   applyFilters={applyFilters}
   clearFilters={clearFilters}
   getUserTeams={getUserTeams}
-/>
+          />
 
           {/* Summary Dashboard */}
           <SummaryCards
@@ -1462,10 +1511,6 @@ const WallboardsLiveView: React.FC = () => {
             getUserDataExtensions={getUserDataExtensions}
           />
 
-          {/* Sticky Filter Bar */}
-         
-
-      {/* CTI Table */}
       <SectionsRenderer
         dnsMap={dnsMap}
         summaryData={summaryData}
@@ -1493,10 +1538,10 @@ const WallboardsLiveView: React.FC = () => {
         monitoringStartTime={monitoringStartTime}
         idleSinceByDn={idleSinceByDn}
         loading={loading}
-        selectedTeam={selectedTeam}
-        selectedStatus={selectedStatus}
-        sortBy={sortBy}
-        searchQuery={searchQuery}
+        selectedTeam={appliedSelectedTeam}
+        selectedStatus={appliedSelectedStatus}
+        sortBy={appliedSortBy}
+        searchQuery={appliedSearchQuery}
         collapsedSections={collapsedSections}
         toggleSection={toggleSection}
       />

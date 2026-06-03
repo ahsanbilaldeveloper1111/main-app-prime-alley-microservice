@@ -150,31 +150,29 @@ export function WorkloadBoardLegendBar() {
   return (
     <div className="workload-board-toolbar">
       <div className="workload-board-toolbar__legend-group">
-        <span className="workload-board-toolbar__legend-heading">Priority</span>
         <div className="workload-board-toolbar__legend">
-          {WORKLOAD_PRIORITY_LEGEND_ITEMS.map((item) => (
-            <span key={item.id} className="workload-board-toolbar__legend-item">
-              <span
-                className="workload-board-toolbar__swatch workload-board-toolbar__swatch--priority"
-                style={{ backgroundColor: item.color }}
-              />
+          {WORKLOAD_GRID_LEGEND_ITEMS.slice(0, 3).map((item) => (
+            <span key={item.id} className="workload-board-toolbar__legend-item" style={{ color: "#718096" }}>
+              <span className="workload-board-toolbar__swatch" style={{ backgroundColor: item.swatch }} />
               {item.label}
             </span>
           ))}
         </div>
       </div>
       <div className="workload-board-toolbar__legend-group">
-        <span className="workload-board-toolbar__legend-heading">Task status</span>
         <div className="workload-board-toolbar__legend">
-          {WORKLOAD_BOARD_STATUS_LEGEND.map((item) => (
-            <span key={item.label} className="workload-board-toolbar__legend-item">
-              <span
-                className="workload-board-toolbar__swatch"
-                style={{ backgroundColor: item.color }}
-              />
-              {item.label}
-            </span>
-          ))}
+          <span className="workload-board-toolbar__legend-item" style={{ color: "#718096" }}>
+            <span className="workload-board-toolbar__swatch" style={{ backgroundColor: "#ea580c" }} />
+            <span>Has unestimated tasks</span>
+          </span>
+          <span className="workload-board-toolbar__legend-item" style={{ color: "#718096" }}>
+            <i className="ti ti-building" style={{ fontSize: "11px", color: "#0f766e", marginRight: "4px" }} />
+            <span>Org Tasks included</span>
+          </span>
+          <span className="workload-board-toolbar__legend-item" style={{ color: "#718096" }}>
+            <span style={{ fontSize: "11px", marginRight: "4px", color: "#718096" }}>ⓘ</span>
+            <span>Has personal todos</span>
+          </span>
         </div>
       </div>
     </div>

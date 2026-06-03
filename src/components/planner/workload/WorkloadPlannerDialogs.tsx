@@ -518,25 +518,31 @@ export function WorkloadBoardDragConfirmModal({
   onConfirm,
 }: WorkloadBoardDragConfirmModalProps) {
   return (
-    <Modal show={Boolean(payload)} onHide={onClose} centered>
+    <Modal show={Boolean(payload)} onHide={onClose} centered className="workload-reassign-modal">
       <Modal.Header closeButton>
         <Modal.Title>Confirm move</Modal.Title>
       </Modal.Header>
       <Modal.Body>
         {payload ? (
           <>
-            <p className="mb-2">
-              Assign <strong>{payload.taskTitle}</strong> to <strong>{payload.memberName}</strong>
+            <div className="workload-reassign-modal__summary">
+              <div className="workload-reassign-modal__row">
+                <span className="workload-reassign-modal__label">Task</span>
+                <span className="workload-reassign-modal__value">{payload.taskTitle}</span>
+              </div>
+              <div className="workload-reassign-modal__row">
+                <span className="workload-reassign-modal__label">Assign to</span>
+                <span className="workload-reassign-modal__value">{payload.memberName}</span>
+              </div>
               {payload.dateLabel ? (
-                <>
-                  {" "}
-                  — due <strong>{payload.dateLabel}</strong>
-                </>
+                <div className="workload-reassign-modal__row">
+                  <span className="workload-reassign-modal__label">Due date</span>
+                  <span className="workload-reassign-modal__value">{payload.dateLabel}</span>
+                </div>
               ) : null}
-              ?
-            </p>
+            </div>
             {payload.overloadWarning ? (
-              <Alert variant="warning" className="small mb-0">
+              <Alert variant="warning" className="small mb-0 mt-3">
                 This member may be overloaded on that day. Proceed anyway?
               </Alert>
             ) : null}
@@ -544,7 +550,7 @@ export function WorkloadBoardDragConfirmModal({
         ) : null}
       </Modal.Body>
       <Modal.Footer>
-        <Button variant="secondary" onClick={onClose}>
+        <Button variant="secondary" onClick={onClose} className="workload-confirm-cancel-btn">
           Cancel
         </Button>
         <Button variant="primary" disabled={isSaving} onClick={onConfirm}>

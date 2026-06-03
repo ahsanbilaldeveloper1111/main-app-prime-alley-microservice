@@ -31,7 +31,7 @@ const FilterBar: React.FC<FilterBarProps> = ({
 }) => {
   return (
     <div
-      className="bg-white shadow-sm mb-4 rounded"
+      className="bg-white shadow-sm mb-4 rounded wallboards-live-filter-bar"
       style={{
         position: "sticky",
         top: "56px",

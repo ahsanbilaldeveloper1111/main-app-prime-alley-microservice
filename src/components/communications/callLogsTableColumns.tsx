@@ -42,9 +42,9 @@ export function getCallLogsTableColumns(): TableColumn<CallLogRow>[] {
       sortable: true,
       render: (row) =>
         row.is_answered === "Yes" ? (
-          <span className="status-badge success">Answered</span>
+          <span className="status-badge primary">Answered</span>
         ) : (
-          <span className="status-badge danger">Not Answered</span>
+          <span className="status-badge info">Not Answered</span>
         ),
     },
     {

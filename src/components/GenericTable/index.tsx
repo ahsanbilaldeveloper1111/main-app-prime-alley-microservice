@@ -434,6 +434,26 @@ export interface ToolbarTabsDropdownItem {
   disabled?: boolean;
 }
 
+function isToolbarTabsDropdownHrefActive(
+  pathname: string,
+  href: string,
+): boolean {
+  return pathname === href || pathname.startsWith(`${href}/`);
+}
+
+function resolveToolbarTabsDropdownToggleLabel(
+  pathname: string,
+  items: ToolbarTabsDropdownItem[],
+  fallbackLabel: string,
+): string {
+  const activeItem = items.find(
+    (item) =>
+      item.href != null &&
+      isToolbarTabsDropdownHrefActive(pathname, item.href),
+  );
+  return activeItem?.label ?? fallbackLabel;
+}
+
 export interface ToolbarConfig {
   // Search
   showSearch?: boolean;
@@ -592,6 +612,8 @@ export interface GenericTableProps<T = any> {
   statsCards?: StatsCardData[]; // Stats cards data to display above table
   metricsGridMinWidth?: string; // Grid min width for metrics cards layout
   metricsColumns?: number; // Fixed number of columns for metrics cards
+  /** When true, stats cards show on load; default is visible only at viewport >= 1920px. */
+  defaultShowMetrics?: boolean;
 
   // Hide toolbar actions (three dots menu)
   showToolbarActions?: boolean;
@@ -1418,6 +1440,7 @@ const GenericTable = <T extends Record<string, any>>({
   statsCards,
   metricsGridMinWidth = "200px",
   metricsColumns,
+  defaultShowMetrics,
   showToolbarActions = true,
   noBorder = false,
   customBody,
@@ -1584,8 +1607,16 @@ const GenericTable = <T extends Record<string, any>>({
     toolbar?.showFilterPills ?? false,
   );
 
-  // Metrics visibility: show by default when stats cards exist (toolbar "Metrics" toggles collapse).
-  const [showMetrics, setShowMetrics] = useState(() => window.innerWidth >= 1920);
+  // Metrics visibility: toolbar "Metrics" toggles collapse; optional defaultShowMetrics for list pages.
+  const [showMetrics, setShowMetrics] = useState(() => {
+    if (defaultShowMetrics !== undefined) {
+      return defaultShowMetrics;
+    }
+    if (globalThis.window === undefined) {
+      return true;
+    }
+    return globalThis.window.innerWidth >= 1920;
+  });
   const [openFilterPillId, setOpenFilterPillId] = useState<string | null>(null);
   const [filterPillSearch, setFilterPillSearch] = useState<
     Record<string, string>
@@ -1910,6 +1941,16 @@ const GenericTable = <T extends Record<string, any>>({
         toolbar.currentTableView === "table" ? "Table view" : "Board View";
     }
 
+    const tabsDropdownItems =
+      toolbar.tabsDropdownItems ?? defaultCrmDropdownItems;
+    const tabsDropdownToggleLabel = toolbar.tabsDropdownLabel
+      ? resolveToolbarTabsDropdownToggleLabel(
+          router.pathname,
+          tabsDropdownItems,
+          toolbar.tabsDropdownLabel,
+        )
+      : undefined;
+
     return (
       <div className="gt-toolbar-container">
         {/* Tabs Section */}
@@ -1924,10 +1965,10 @@ const GenericTable = <T extends Record<string, any>>({
                     size="sm"
                     className="gt-toolbar-dropdown"
                   >
-                    <span>{toolbar.tabsDropdownLabel}</span>
+                    <span>{tabsDropdownToggleLabel}</span>
                   </Dropdown.Toggle>
                   <Dropdown.Menu style={{ zIndex: "99" }}>
-                    {(toolbar.tabsDropdownItems ?? defaultCrmDropdownItems).map(
+                    {tabsDropdownItems.map(
                       (item) => {
                         const handleItemClick = () => {
                           if (item.disabled) {
@@ -1942,9 +1983,17 @@ const GenericTable = <T extends Record<string, any>>({
                           }
                         };
 
+                        const isActiveItem =
+                          item.href != null &&
+                          isToolbarTabsDropdownHrefActive(
+                            router.pathname,
+                            item.href,
+                          );
+
                         return (
                           <Dropdown.Item
                             key={item.label}
+                            active={isActiveItem}
                             disabled={item.disabled}
                             onClick={handleItemClick}
                           >
