@@ -80,7 +80,7 @@ export function ReportsBoardDashboardKpiRow({
 function resolveDonutStatusColor(statusName: string): string {
   const status = statusName.toLowerCase();
   if (status.includes("complete") || status.includes("done")) return "#22c55e";
-  if (status.includes("progress")) return "#3b82f6";
+  if (status.includes("progress")) return "#0066CC";
   if (status.includes("pending")) return "#ef4444";
   if (status.includes("todo") || status.includes("to_do")) return "#94a3b8";
   return "#94a3b8";
@@ -219,7 +219,7 @@ export function ReportsWeeklyTrendChart({
           <XAxis dataKey="label" tick={{ fontSize: 11 }} interval="preserveStartEnd" />
           <YAxis allowDecimals={false} tick={{ fontSize: 11 }} width={32} />
           <Tooltip />
-          <Bar dataKey="tasks" fill="#3b82f6" radius={[4, 4, 0, 0]} maxBarSize={48} />
+          <Bar dataKey="tasks" fill="#0066CC" radius={[4, 4, 0, 0]} maxBarSize={48} />
         </BarChart>
       </ResponsiveContainer>
     </div>
