@@ -687,13 +687,13 @@
   }
 
   .reports-project-row__health--ok {
-    background: #dcfce7;
-    color: #15803d;
+    background: #ecfdf5;
+    color: #065f46;
   }
 
   .reports-project-row__health--risk {
-    background: #fee2e2;
-    color: #b91c1c;
+    background: #fef2f2;
+    color: #991b1b;
   }
 
   .reports-project-row__pct {
@@ -765,23 +765,23 @@
     font-size: 0.68rem;
     font-weight: 600;
     padding: 0.12rem 0.4rem;
-    border-radius: 0.25rem;
+    border-radius: 20px;
     white-space: nowrap;
   }
 
   .reports-overdue-project-row__badge--danger {
-    background: #fee2e2;
-    color: #b91c1c;
+    background: #fef2f2;
+    color: #991b1b;
   }
 
   .reports-overdue-project-row__badge--warning {
-    background: #ffedd5;
-    color: #c2410c;
+    background: #fffbeb;
+    color: #92400e;
   }
 
   .reports-overdue-project-row__badge--muted {
-    background: #f3f4f6;
-    color: #4b5563;
+    background: #f5f7fa;
+    color: #374151;
   }
 
   .reports-panel--chart {
