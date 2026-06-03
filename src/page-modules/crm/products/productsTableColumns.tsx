@@ -133,45 +133,47 @@ function buildActionsColumn(
   params: Omit<BuildProductsTableColumnsParams, "selectedColumns">,
 ): TableColumn<ProductDisplayData> {
   const { canEdit, canDelete, onView, onEdit, onDelete } = params;
-  const label = product.productName || "product";
   return {
     key: "actions",
     label: "Actions",
     sortable: false,
     align: "center",
     type: "custom",
-    render: () => (
-      <CrmTableRowActions
-        actions={[
-          {
-            label: `View ${label}`,
-            icon: <Eye size={22} aria-hidden />,
-            tone: "success",
-            onClick: () => onView(product),
-          },
-          ...(canEdit
-            ? [
-                {
-                  label: `Edit ${label}`,
-                  icon: <Edit size={22} aria-hidden />,
-                  tone: "primary" as const,
-                  onClick: () => onEdit(product),
-                },
-              ]
-            : []),
-          ...(canDelete
-            ? [
-                {
-                  label: `Delete ${label}`,
-                  icon: <Trash2 size={22} aria-hidden />,
-                  tone: "danger" as const,
-                  onClick: () => onDelete(product),
-                },
-              ]
-            : []),
-        ]}
-      />
-    ),
+    render: (product) => {
+      const label = product.productName || "product";
+      return (
+        <CrmTableRowActions
+          actions={[
+            {
+              label: `View ${label}`,
+              icon: <Eye size={22} aria-hidden />,
+              tone: "success",
+              onClick: () => onView(product),
+            },
+            ...(canEdit
+              ? [
+                  {
+                    label: `Edit ${label}`,
+                    icon: <Edit size={22} aria-hidden />,
+                    tone: "primary" as const,
+                    onClick: () => onEdit(product),
+                  },
+                ]
+              : []),
+            ...(canDelete
+              ? [
+                  {
+                    label: `Delete ${label}`,
+                    icon: <Trash2 size={22} aria-hidden />,
+                    tone: "danger" as const,
+                    onClick: () => onDelete(product),
+                  },
+                ]
+              : []),
+          ]}
+        />
+      );
+    },
   };
 }
 

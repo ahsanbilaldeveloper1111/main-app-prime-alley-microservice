@@ -3,7 +3,7 @@ import { SettingsEmbeddedTableWrap } from "@components/main-settings/settingsEmb
 import React from "react";
 
 /** GenericTable with Smart CRM chrome for Main Settings embedded pages. */
-export function EmbeddedSettingsTable<T = unknown>({
+export function EmbeddedSettingsTable<T extends Record<string, any> = Record<string, any>>({
   embedded,
   toolbar,
   showToolbar,
