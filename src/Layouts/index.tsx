@@ -251,6 +251,13 @@ const Layout = ({ children }: LayoutProps) => {
     return "calc(100% - 400px)";
   }, [showBreezeAssistant, breezeMaximized]);
 
+  const mainContentOverflow = useMemo(() => {
+    if (breezeMaximized || isWorkloadPage) {
+      return "hidden";
+    }
+    return "auto";
+  }, [breezeMaximized, isWorkloadPage]);
+
   return (
     <>
       <LayoutGlobalStyles />
@@ -313,7 +320,7 @@ const Layout = ({ children }: LayoutProps) => {
             style={{
               overflowY: isWorkloadPage ? "visible" : "auto",
               width: mainContentWidth,
-              overflow: breezeMaximized ? "hidden" : isWorkloadPage ? "hidden" : "auto",
+              overflow: mainContentOverflow,
               transition: "width 0.3s ease-in-out",
             }}
           >

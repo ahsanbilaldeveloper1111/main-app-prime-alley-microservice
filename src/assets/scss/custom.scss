@@ -218,8 +218,10 @@ button.nav-tab-link {
   box-shadow: 0 0 10px #2585f8, 0 0 5px #2585f8 !important;
 }
 .Toastify {
-    position: absolute;
-    z-index: 9999999;
+  position: absolute;
+  z-index: 9999999;
+  height: 0 !important;
+  overflow: hidden;
 }
 body .nextjs-toast{
     display: none !important;
@@ -859,11 +861,6 @@ body:has(.crm-activities-layout) {
     height: 100%;
     overflow: hidden;
   }
-}
-
-.Toastify {
-  height: 0 !important;
-  overflow: hidden;
 }
 
 body:has(.workload-page) .main-content-wrapper {

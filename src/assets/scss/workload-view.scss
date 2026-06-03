@@ -938,13 +938,10 @@
 
   .workload-board-task-card__date-label {
     font-size: clamp(10px, 0.75vw, 11px);
-    color: #718096;
-    font-family: "Lexend Deca", Helvetica, Arial, sans-serif;
-    font-weight: 500;
-    flex-shrink: 0;
-    font-size: 10px;
     color: #9ca3af;
     font-family: $planner-board-font;
+    font-weight: 500;
+    flex-shrink: 0;
   }
 
   .workload-board-task-card__date-select {

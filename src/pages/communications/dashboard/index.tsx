@@ -26,21 +26,19 @@ const CallDashboard = () => {
   }, [dispatch]);
 
   return (
-    <>
-      <div className="communications-dashboard-page">
-        <CallDashboardBreadcrumb />
+    <div className="communications-dashboard-page">
+      <CallDashboardBreadcrumb />
 
-        <CallDashboardPageHeader />
+      <CallDashboardPageHeader />
 
-        <CallStatsSummaryCards />
+      <CallStatsSummaryCards />
 
-        <CallDashboardBarChartsRow />
+      <CallDashboardBarChartsRow />
 
-        <CallDashboardStatsTablesRow />
+      <CallDashboardStatsTablesRow />
 
-        <CallDashboardChartModalsRow />
-      </div>
-    </>
+      <CallDashboardChartModalsRow />
+    </div>
   );
 };
 
