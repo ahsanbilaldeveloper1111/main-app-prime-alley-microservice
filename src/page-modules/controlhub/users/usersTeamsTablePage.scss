@@ -1,0 +1,836 @@
+// Users & Teams list tables — mobile card layout (Teams, Groups, Ranks).
+
+.users-teams-table-page {
+  min-width: 0;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+
+  .generic-table-container {
+    min-width: 0;
+    max-width: 100%;
+    overflow: visible;
+  }
+
+  .generic-table-card {
+    max-width: 100%;
+    overflow: hidden;
+  }
+
+  .generic-table-responsive {
+    width: 100%;
+    max-width: 100%;
+    margin: 0;
+    box-sizing: border-box;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    border-radius: 8px 8px 0 0;
+  }
+
+  // Global GenericTable sortable headers use min-width: 245px — breaks Users & Teams columns
+  .generic-table-th {
+    overflow: hidden;
+    max-width: 100%;
+  }
+
+  .generic-table-th.sortable {
+    min-width: 0 !important;
+    max-width: none;
+    padding: 0.6rem 0.75rem !important;
+  }
+
+  .generic-table-th .th-content {
+    justify-content: flex-start;
+    gap: 6px;
+    min-width: 0;
+    max-width: 100%;
+
+    > span:first-child {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      min-width: 0;
+      flex: 1 1 auto;
+    }
+  }
+
+  .generic-table-actions-header .d-flex {
+    min-width: 0;
+    flex-wrap: nowrap;
+  }
+
+  .generic-table-td {
+    vertical-align: middle !important;
+  }
+
+  // Restore pill/badge styling stripped by .generic-table-td span rules in GenericTable.css
+  .generic-table-td .status-badge,
+  .generic-table-td .status-badge * {
+    font-size: 0.75rem !important;
+    font-weight: 600 !important;
+    box-shadow: none !important;
+    border: none !important;
+  }
+
+  .generic-table-td .status-badge.primary {
+    background-color: rgba(37, 131, 242, 0.1) !important;
+    color: var(--primary-accent, #2583f2) !important;
+  }
+
+  .generic-table-td .status-badge.info {
+    background-color: rgba(118, 118, 118, 0.1) !important;
+    color: var(--light-text, #767676) !important;
+  }
+
+  .generic-table-td[data-col-key='actions'] .dropdown,
+  .generic-table-td[data-col-key='actions'] .gt-row-actions--desktop {
+    display: inline-flex;
+    justify-content: center;
+    width: 100%;
+  }
+
+  // Action buttons: override btn-sm + Settings.css so icons fit (default btn-action-style-2 is 32px)
+  --users-teams-action-btn-size: var(--ms-action-btn-size, 40px);
+  --users-teams-action-icon-size: var(--ms-action-icon-size, 22px);
+
+  // Desktop row actions only — do NOT match .gt-mobile-actions-more-btn (see media queries below)
+  .generic-table-td[data-col-key='actions'] .btn.btn-action-style-2:not(.gt-mobile-actions-more-btn),
+  .generic-table-td[data-col-key='actions'] .btn.btn-sm.btn-action-style-2:not(.gt-mobile-actions-more-btn) {
+    width: var(--users-teams-action-btn-size) !important;
+    height: var(--users-teams-action-btn-size) !important;
+    min-width: var(--users-teams-action-btn-size) !important;
+    min-height: var(--users-teams-action-btn-size) !important;
+    padding: 0 !important;
+    align-items: center !important;
+    justify-content: center !important;
+    flex-shrink: 0;
+    border: 1px solid #dee2e6 !important;
+    border-radius: 3px !important;
+    line-height: 1 !important;
+    color: inherit;
+
+    svg {
+      width: var(--users-teams-action-icon-size) !important;
+      height: var(--users-teams-action-icon-size) !important;
+      min-width: var(--users-teams-action-icon-size);
+      min-height: var(--users-teams-action-icon-size);
+      display: block !important;
+      flex-shrink: 0;
+      visibility: visible !important;
+      opacity: 1 !important;
+      font-size: var(--users-teams-action-icon-size) !important;
+      background: transparent !important;
+      border: none !important;
+      box-shadow: none !important;
+    }
+  }
+
+  .generic-table-td[data-col-key='actions'] .gt-row-actions--desktop {
+    gap: 6px;
+  }
+
+  @media (min-width: 768px) {
+    .generic-table-td[data-col-key='actions'] .gt-row-actions--desktop {
+      display: inline-flex !important;
+    }
+
+    .generic-table-td[data-col-key='actions'] .gt-mobile-actions-more-btn,
+    .gt-mobile-actions-popup {
+      display: none !important;
+    }
+  }
+
+  @media (max-width: 767.98px) {
+    .generic-table-td[data-col-key='actions'] .gt-row-actions--desktop {
+      display: none !important;
+    }
+
+    .generic-table-td[data-col-key='actions'] .gt-mobile-actions-more-btn.btn-action-style-2 {
+      display: inline-flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      width: var(--users-teams-action-btn-size) !important;
+      height: var(--users-teams-action-btn-size) !important;
+      min-width: var(--users-teams-action-btn-size) !important;
+      min-height: var(--users-teams-action-btn-size) !important;
+      padding: 0 !important;
+      border: 1px solid #dee2e6 !important;
+
+      svg {
+        width: var(--users-teams-action-icon-size) !important;
+        height: var(--users-teams-action-icon-size) !important;
+      }
+    }
+  }
+
+  .generic-table-td[data-col-key='actions'] .btn.text-primary svg {
+    color: var(--primary-accent, #2583f2) !important;
+    stroke: var(--primary-accent, #2583f2) !important;
+  }
+
+  .generic-table-td[data-col-key='actions'] .btn.text-info svg {
+    color: #0dcaf0 !important;
+    stroke: #0dcaf0 !important;
+  }
+
+  .generic-table-td[data-col-key='actions'] .btn.text-success svg {
+    color: #198754 !important;
+    stroke: #198754 !important;
+  }
+
+  .generic-table-td[data-col-key='actions'] .btn.text-warning svg {
+    color: #ffc107 !important;
+    stroke: #ffc107 !important;
+  }
+
+  .generic-table-td[data-col-key='actions'] .btn.text-danger svg {
+    color: #dc3545 !important;
+    stroke: #dc3545 !important;
+  }
+
+  .generic-table-td[data-col-key='actions'] .btn.text-secondary svg {
+    color: #6c757d !important;
+    stroke: #6c757d !important;
+  }
+
+  .gt-toolbar-container {
+    max-width: 100%;
+  }
+
+  .gt-toolbar-main {
+    box-sizing: border-box;
+  }
+
+  .gt-toolbar-search {
+    max-width: 100%;
+    min-width: 0;
+  }
+
+  .gt-filter-pills {
+    flex-wrap: wrap;
+    max-width: 100%;
+  }
+
+  .gt-row-actions--desktop,
+  .users-directory-row-actions--desktop {
+    flex-direction: row;
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .generic-table-actions-cell,
+  .generic-table-td[data-col-key='actions'],
+  .generic-table-td[data-col-key='Action'] {
+    width: 1%;
+    min-width: max-content;
+    white-space: nowrap;
+  }
+}
+
+@media (min-width: 768px) and (max-width: 991.98px) {
+  .users-teams-table-page .generic-table {
+    min-width: 640px;
+  }
+
+  .users-teams-table-page.users-teams-table-page--ranks .generic-table,
+  .users-teams-table-page.users-teams-table-page--user-directory .generic-table {
+    min-width: 52rem;
+  }
+}
+
+@media (max-width: 767.98px) {
+  .users-teams-table-page {
+    .generic-table-card {
+      overflow: visible;
+    }
+
+    .generic-table-responsive {
+      overflow: visible;
+      border: none;
+      margin: 0;
+      border-radius: 0;
+    }
+
+    .generic-table {
+      min-width: 0;
+      width: 100%;
+      border-collapse: separate;
+      border-spacing: 0 14px;
+    }
+
+    .generic-table-header {
+      display: none;
+    }
+
+    .generic-table tbody {
+      display: block;
+    }
+
+    .generic-table-row {
+      display: block;
+      position: relative;
+      margin-bottom: 14px;
+      padding: 14px 48px 14px 14px;
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      background-color: #fff;
+      box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+    }
+
+    .generic-table-row:has(.gt-mobile-actions-more-btn[aria-expanded="true"]) {
+      z-index: 20;
+    }
+
+    .generic-table-row:hover .generic-table-td {
+      background-color: transparent;
+    }
+
+    .generic-table-td {
+      display: block;
+      padding: 6px 0 !important;
+      border: none !important;
+      position: static !important;
+      box-shadow: none !important;
+      min-width: 0 !important;
+      max-width: none !important;
+      text-align: left !important;
+    }
+
+    // Default: name + actions only
+    .generic-table-th[data-col-key]:not([data-col-key="name"]):not([data-col-key="actions"]),
+    .generic-table-td[data-col-key]:not([data-col-key="name"]):not([data-col-key="actions"]) {
+      display: none;
+    }
+
+    .generic-table-td[data-col-key="name"] {
+      font-weight: 600;
+      font-size: 0.9375rem;
+      padding-bottom: 6px !important;
+      margin-bottom: 2px;
+    }
+
+    .generic-table-td[data-col-key="actions"] {
+      position: absolute !important;
+      top: 8px;
+      right: 8px;
+      margin: 0;
+      padding: 0 !important;
+      border: none !important;
+      width: auto;
+      z-index: 2;
+      overflow: visible !important;
+
+      .gt-mobile-actions-more-btn {
+        min-width: 36px;
+        min-height: 36px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 8px;
+      }
+    }
+
+    .gt-mobile-actions-popup {
+      z-index: 1070 !important;
+      min-width: 11rem;
+      box-shadow: 0 8px 24px rgba(15, 23, 42, 0.12);
+    }
+
+    .gt-toolbar-main {
+      padding: 10px 12px;
+    }
+
+    .gt-toolbar-search input {
+      font-size: 0.875rem;
+    }
+
+    .generic-table-pagination {
+      display: flex !important;
+      flex-direction: column;
+      align-items: stretch;
+      gap: 10px;
+      padding: 10px 12px;
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      margin-top: 4px;
+
+      .pagination-info {
+        width: 100%;
+        flex-wrap: wrap;
+      }
+
+      > .text-muted.small {
+        text-align: left;
+        white-space: normal;
+        word-break: break-word;
+        width: 100%;
+        margin: 0;
+      }
+
+      .pagination-buttons {
+        width: 100%;
+        justify-content: center;
+        flex-wrap: wrap;
+        gap: 6px;
+      }
+    }
+  }
+
+  .users-teams-table-page.users-teams-table-page--ranks {
+    .generic-table-th[data-col-key="user_type"],
+    .generic-table-td[data-col-key="user_type"],
+    .generic-table-th[data-col-key="severity_level"],
+    .generic-table-td[data-col-key="severity_level"],
+    .generic-table-th[data-col-key="user_assigned_count"],
+    .generic-table-td[data-col-key="user_assigned_count"],
+    .generic-table-th[data-col-key="company"],
+    .generic-table-td[data-col-key="company"] {
+      display: block !important;
+    }
+
+    .generic-table-row {
+      padding: 14px 52px 14px 14px;
+    }
+
+    .generic-table-td[data-col-key="name"] {
+      padding-right: 0 !important;
+      padding-bottom: 8px !important;
+      word-break: break-word;
+    }
+
+    .generic-table-td[data-col-key="user_type"] {
+      color: #64748b;
+      font-size: 0.8125rem;
+      padding-top: 8px !important;
+      padding-bottom: 4px !important;
+
+      &::before {
+        content: "User type";
+        display: block;
+        font-size: 0.6875rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+        color: #94a3b8;
+        margin-bottom: 6px;
+      }
+
+      .status-badge {
+        display: inline-flex;
+      }
+    }
+
+    .generic-table-td[data-col-key="company"] {
+      font-size: 0.8125rem;
+      padding-top: 8px !important;
+      padding-bottom: 4px !important;
+
+      &::before {
+        content: "Created by";
+        display: block;
+        font-size: 0.6875rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+        color: #94a3b8;
+        margin-bottom: 6px;
+      }
+    }
+
+    .generic-table-td[data-col-key="severity_level"] {
+      padding-top: 10px !important;
+      padding-bottom: 6px !important;
+
+      &::before {
+        content: "Severity";
+        display: block;
+        font-size: 0.6875rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+        color: #94a3b8;
+        margin-bottom: 8px;
+      }
+
+      .ranks-severity-badges {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        max-width: 100%;
+      }
+
+      .ranks-severity-badge {
+        font-size: 0.625rem !important;
+        padding: 2px 6px;
+      }
+    }
+
+    .generic-table-td[data-col-key="user_assigned_count"] {
+      font-size: 0.8125rem;
+      padding-top: 8px !important;
+      padding-bottom: 4px !important;
+
+      &::before {
+        content: "Assigned users";
+        display: block;
+        font-size: 0.6875rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+        color: #94a3b8;
+        margin-bottom: 6px;
+      }
+
+      .status-badge {
+        display: inline-flex;
+      }
+    }
+  }
+}
+
+// Ranks & Permissions — desktop/tablet table columns (card layout on mobile)
+.users-teams-table-page.users-teams-table-page--ranks {
+  @media (min-width: 768px) {
+    .generic-table {
+      width: 100%;
+      min-width: 52rem;
+      table-layout: auto;
+    }
+  }
+
+  @media (min-width: 992px) {
+    .generic-table {
+      min-width: 56rem;
+    }
+  }
+
+  @media (max-width: 767.98px) {
+    .generic-table {
+      min-width: 0 !important;
+      width: 100%;
+      table-layout: auto;
+    }
+
+    .generic-table-responsive {
+      overflow: visible;
+    }
+
+    .generic-table-th[data-col-key="user_assigned_count"],
+    .generic-table-td[data-col-key="user_assigned_count"] {
+      text-align: left !important;
+    }
+
+    .generic-table-th[data-col-key="severity_level"],
+    .generic-table-td[data-col-key="severity_level"] {
+      min-width: 0 !important;
+      white-space: normal;
+    }
+  }
+
+  @media (min-width: 768px) {
+    .generic-table-th[data-col-key="name"],
+    .generic-table-td[data-col-key="name"] {
+      min-width: 8rem;
+    }
+
+    .generic-table-th[data-col-key="user_type"],
+    .generic-table-td[data-col-key="user_type"] {
+      min-width: 7rem;
+      white-space: nowrap;
+    }
+
+    .generic-table-th[data-col-key="severity_level"],
+    .generic-table-td[data-col-key="severity_level"] {
+      min-width: 12rem;
+      vertical-align: middle !important;
+    }
+
+    .generic-table-th[data-col-key="company"],
+    .generic-table-td[data-col-key="company"] {
+      min-width: 7rem;
+    }
+
+    .generic-table-th[data-col-key="user_assigned_count"],
+    .generic-table-td[data-col-key="user_assigned_count"] {
+      min-width: 6.5rem;
+      text-align: center !important;
+      white-space: nowrap;
+    }
+
+    .generic-table-th[data-col-key="user_assigned_count"] .th-content {
+      justify-content: center;
+    }
+
+    .generic-table-th[data-col-key="actions"],
+    .generic-table-td[data-col-key="actions"],
+    .generic-table-actions-header {
+      width: 1%;
+      min-width: max-content;
+      text-align: center !important;
+      vertical-align: middle !important;
+    }
+
+    .generic-table-th[data-col-key="actions"] .th-content,
+    .generic-table-actions-header .th-content {
+      justify-content: center;
+    }
+  }
+
+  .ranks-severity-badges {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px;
+    max-width: 100%;
+  }
+
+  .ranks-severity-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    min-height: 1.5rem;
+    padding: 2px 8px;
+    border-radius: 9999px;
+    font-size: 0.6875rem !important;
+    font-weight: 600 !important;
+    line-height: 1.2;
+    cursor: help;
+    white-space: nowrap;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06) !important;
+    background-color: var(--ranks-severity-bg) !important;
+    color: var(--ranks-severity-text) !important;
+  }
+
+  .ranks-severity-badge__label,
+  .ranks-severity-badge__count {
+    font-size: inherit !important;
+    font-weight: inherit !important;
+    color: inherit !important;
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+  }
+
+  .ranks-severity-badge__count {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 1.125rem;
+    height: 1.125rem;
+    padding: 0 4px;
+    border-radius: 9999px;
+    background: rgba(255, 255, 255, 0.55) !important;
+    font-size: 0.625rem !important;
+    font-weight: 700 !important;
+  }
+}
+
+@media (max-width: 575.98px) {
+  .users-teams-table-page {
+    .generic-table-pagination {
+      padding: 8px 10px;
+
+      .pagination-buttons .btn {
+        min-width: 28px;
+        height: 28px;
+        padding: 2px 6px;
+      }
+    }
+  }
+}
+
+// User Directory — same table chrome as Ranks & Permissions
+.users-teams-table-page.users-teams-table-page--user-directory {
+  @media (min-width: 768px) {
+    .generic-table {
+      width: 100%;
+      min-width: 52rem;
+      table-layout: auto;
+    }
+
+    .generic-table-th[data-col-key='name'],
+    .generic-table-td[data-col-key='name'] {
+      min-width: 8rem;
+    }
+
+    .generic-table-th[data-col-key='username'],
+    .generic-table-td[data-col-key='username'] {
+      min-width: 7rem;
+    }
+
+    .generic-table-th[data-col-key='phone'],
+    .generic-table-td[data-col-key='phone'] {
+      min-width: 6rem;
+      white-space: nowrap;
+    }
+
+    .generic-table-th[data-col-key='Role'],
+    .generic-table-td[data-col-key='Role'],
+    .generic-table-th[data-col-key='Status'],
+    .generic-table-td[data-col-key='Status'] {
+      min-width: 6.5rem;
+    }
+
+    .generic-table-th[data-col-key='Action'],
+    .generic-table-td[data-col-key='Action'],
+    .generic-table-actions-header {
+      width: 1%;
+      min-width: max-content;
+      text-align: center !important;
+      vertical-align: middle !important;
+    }
+
+    .generic-table-th[data-col-key='Action'] .th-content,
+    .generic-table-actions-header .th-content {
+      justify-content: center;
+    }
+  }
+
+  @media (max-width: 767.98px) {
+    .generic-table-th[data-col-key='Action'],
+    .generic-table-td[data-col-key='Action'] {
+      display: block !important;
+    }
+
+    .generic-table-th[data-col-key='username'],
+    .generic-table-td[data-col-key='username'],
+    .generic-table-th[data-col-key='phone'],
+    .generic-table-td[data-col-key='phone'],
+    .generic-table-th[data-col-key='Role'],
+    .generic-table-td[data-col-key='Role'],
+    .generic-table-th[data-col-key='Status'],
+    .generic-table-td[data-col-key='Status'] {
+      display: block !important;
+    }
+
+    .generic-table-row {
+      padding: 14px 52px 14px 14px;
+    }
+
+    .generic-table-td[data-col-key='name'] {
+      padding-right: 0 !important;
+      padding-bottom: 8px !important;
+      word-break: break-word;
+    }
+
+    .generic-table-td[data-col-key='username'] {
+      color: #64748b;
+      font-size: 0.8125rem;
+      padding-top: 4px !important;
+      padding-bottom: 4px !important;
+
+      &::before {
+        content: "Username";
+        display: block;
+        font-size: 0.6875rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+        color: #94a3b8;
+        margin-bottom: 6px;
+      }
+    }
+
+    .generic-table-td[data-col-key='phone'] {
+      font-size: 0.8125rem;
+      padding-top: 8px !important;
+      padding-bottom: 4px !important;
+
+      &::before {
+        content: "Extension";
+        display: block;
+        font-size: 0.6875rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+        color: #94a3b8;
+        margin-bottom: 6px;
+      }
+    }
+
+    .generic-table-td[data-col-key='Role'] {
+      font-size: 0.8125rem;
+      padding-top: 8px !important;
+      padding-bottom: 4px !important;
+
+      &::before {
+        content: "Rank";
+        display: block;
+        font-size: 0.6875rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+        color: #94a3b8;
+        margin-bottom: 6px;
+      }
+    }
+
+    .generic-table-td[data-col-key='Status'] {
+      font-size: 0.8125rem;
+      padding-top: 8px !important;
+      padding-bottom: 4px !important;
+
+      &::before {
+        content: "Status";
+        display: block;
+        font-size: 0.6875rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+        color: #94a3b8;
+        margin-bottom: 6px;
+      }
+    }
+
+    .generic-table-td[data-col-key='Action'] {
+      position: absolute !important;
+      top: 8px;
+      right: 8px;
+      margin: 0;
+      padding: 0 !important;
+      border: none !important;
+      width: auto;
+      z-index: 2;
+      overflow: visible !important;
+
+      .users-directory-more-btn,
+      .users-directory-row-actions--desktop .btn-action-style-2 {
+        min-width: var(--users-teams-action-btn-size);
+        min-height: var(--users-teams-action-btn-size);
+      }
+
+      .users-directory-more-btn {
+        display: inline-flex !important;
+        align-items: center;
+        justify-content: center;
+        border-radius: 8px;
+        border: 1px solid #dee2e6 !important;
+
+        &::after {
+          display: none;
+        }
+      }
+
+      .users-directory-row-actions--desktop {
+        display: none !important;
+      }
+    }
+
+    .users-directory-actions-popup {
+      z-index: 1070 !important;
+      min-width: 11rem;
+      box-shadow: 0 8px 24px rgba(15, 23, 42, 0.12);
+    }
+  }
+
+  @media (min-width: 768px) {
+    .generic-table-td[data-col-key='Action'] .users-directory-row-actions--desktop {
+      display: inline-flex !important;
+    }
+
+    .generic-table-td[data-col-key='Action'] .users-directory-more-btn {
+      display: none !important;
+    }
+  }
+}

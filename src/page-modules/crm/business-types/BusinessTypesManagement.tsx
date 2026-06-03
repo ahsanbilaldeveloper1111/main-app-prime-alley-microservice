@@ -2,23 +2,16 @@ import "@assets/scss/datatable-style.scss";
 import React from "react";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 import GenericTable from "@components/GenericTable";
-import { Button, Form, Modal, Spinner } from "react-bootstrap";
-import { AlertCircle, Check } from "lucide-react";
 import "@assets/scss/common.scss";
 import DeleteConfirmationModal from "@components/page-partials/DeleteConfirmationModal";
-import {
-  CRM_DIALOG_FOOTER_ACTIONS_ROW_STYLE,
-  CRM_DIALOG_PRIMARY_BUTTON_STYLE,
-  CRM_DIALOG_SECONDARY_BUTTON_STYLE,
-} from "@components/crm/crmDialogActionButtonStyles";
+import { BusinessTypeFormModal } from "@page-modules/crm/business-types/BusinessTypeFormModal";
 import {
   DEFAULT_BUSINESS_TYPES_TABLE_COLUMNS,
-  modalTitle,
-  primarySubmitLabel,
   useBusinessTypesPage,
 } from "@hooks/useBusinessTypesPage";
 import type { CrmPageDisplayProps } from "@page-modules/crm/crmPageDisplayProps";
 import type { BusinessTypeData } from "@utils/crm";
+import { CrmSettingsTableWrap } from "@page-modules/crm/shared/CrmSettingsTableWrap";
 
 const BusinessTypes = ({ hideBreadcrumb, breadcrumbMainLink }: CrmPageDisplayProps = {}) => {
   const {
@@ -56,6 +49,7 @@ const BusinessTypes = ({ hideBreadcrumb, breadcrumbMainLink }: CrmPageDisplayPro
         />
       )}
       <div>
+        <CrmSettingsTableWrap hideBreadcrumb={hideBreadcrumb}>
         <GenericTable<BusinessTypeData>
           data={businessTypes}
           columns={businessTableColumns}
@@ -82,92 +76,20 @@ const BusinessTypes = ({ hideBreadcrumb, breadcrumbMainLink }: CrmPageDisplayPro
           }
           uniqueKey="id"
           showToolbarActions={false}
+          hover
+          size="md"
         />
+        </CrmSettingsTableWrap>
 
-        <Modal
+        <BusinessTypeFormModal
           show={showModal}
-          onHide={() => {
-            if (submitting) return;
-            setShowModal(false);
-          }}
-          centered
-        >
-          <Modal.Header closeButton={!submitting}>
-            <Modal.Title>{modalTitle(editingBusinessType)}</Modal.Title>
-          </Modal.Header>
-          <Form onSubmit={handleSubmit}>
-            <Modal.Body>
-              <Form.Group className="mb-3">
-                <Form.Label>
-                  Name <span className="text-danger">*</span>
-                </Form.Label>
-                <Form.Control
-                  type="text"
-                  value={formData.name}
-                  onChange={(e) => setFormData((prev) => ({ ...prev, name: e.target.value }))}
-                  placeholder="Enter business type name"
-                  required
-                />
-              </Form.Group>
-              <Form.Group className="mb-0">
-                <Form.Label>Description</Form.Label>
-                <Form.Control
-                  as="textarea"
-                  rows={3}
-                  value={formData.description}
-                  onChange={(e) =>
-                    setFormData((prev) => ({ ...prev, description: e.target.value }))
-                  }
-                  placeholder="Enter business type description"
-                />
-              </Form.Group>
-            </Modal.Body>
-            <Modal.Footer className="border-top flex-column align-items-stretch gap-3">
-              <Form.Text className="text-muted d-flex align-items-center gap-1 mb-0">
-                <AlertCircle size={14} aria-hidden />
-                <span style={{ fontSize: "0.813rem" }}>
-                  Fields marked with <span className="text-danger fw-bold">*</span> are required
-                </span>
-              </Form.Text>
-              <div
-                style={{
-                  ...CRM_DIALOG_FOOTER_ACTIONS_ROW_STYLE,
-                  justifyContent: "flex-end",
-                  width: "100%",
-                }}
-              >
-                <Button
-                  variant="primary"
-                  type="submit"
-                  disabled={submitting}
-                  style={{
-                    ...CRM_DIALOG_PRIMARY_BUTTON_STYLE,
-                    width: "168px",
-                    justifyContent: "center",
-                  }}
-                >
-                  <span style={{ width: 16, display: "inline-flex", justifyContent: "center" }}>
-                    {submitting ? (
-                      <Spinner size="sm" aria-hidden />
-                    ) : (
-                      <Check size={16} aria-hidden />
-                    )}
-                  </span>
-                  {primarySubmitLabel(submitting, editingBusinessType)}
-                </Button>
-                <Button
-                  variant="outline-secondary"
-                  type="button"
-                  onClick={() => setShowModal(false)}
-                  disabled={submitting}
-                  style={{ ...CRM_DIALOG_SECONDARY_BUTTON_STYLE, width: "120px", justifyContent: "center" }}
-                >
-                  Cancel
-                </Button>
-              </div>
-            </Modal.Footer>
-          </Form>
-        </Modal>
+          submitting={submitting}
+          editingBusinessType={editingBusinessType}
+          formData={formData}
+          setFormData={setFormData}
+          onHide={() => setShowModal(false)}
+          onSubmit={handleSubmit}
+        />
 
         <DeleteConfirmationModal
           show={showDeleteModal}

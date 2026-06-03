@@ -7,6 +7,8 @@ import { viewRank } from '@utils/roles'
 import { MAIN_SETTINGS_RANKS_AND_PERMISSIONS_PATH } from '@utils/controlhub/usersNavigation'
 import { ArrowLeft } from 'lucide-react'
 import '@assets/scss/common.scss';
+import '@page-modules/controlhub/ranks/rankPermissionsPage.scss';
+import { RankPermissionsFilterPanel } from '@page-modules/controlhub/ranks/RankPermissionsFilterPanel';
 
 interface Permission {
     id: number;
@@ -99,18 +101,18 @@ const ViewRolePermission = () => {
     };
 
     return (
-
-        <React.Fragment>
+        <div className="rank-permissions-page">
             <BreadcrumbItem
                 mainTitle="Controlhub"
                 mainLink={MAIN_SETTINGS_RANKS_AND_PERMISSIONS_PATH}
                 subTitle="Permissions"
             />
 
-            <Row className="mb-3">
+            <Row className="rank-permissions-page__back">
                 <Col md={12}>
                     <Button
                         variant="outline-secondary"
+                        size="sm"
                         onClick={() => router.push(MAIN_SETTINGS_RANKS_AND_PERMISSIONS_PATH)}
                         className="d-flex align-items-center gap-2"
                     >
@@ -120,19 +122,18 @@ const ViewRolePermission = () => {
                 </Col>
             </Row>
 
-            <Row className="mb-3">
+            <Row className="rank-permissions-page__header">
             <Col md={12}>
                 <div className="page-header-title style-2">
-                <Row className="d-flex justify-content-between align-items-center">
-                    <Col md={8}>
-                      
-                      <h2 className="mb-0">View Permission for <b className='text-primary'>{roleName}</b></h2>
+                <Row className="rank-permissions-page__header-row g-2 align-items-lg-center">
+                    <Col xs={12} lg={8} className="min-w-0">
+                      <h2 className="mb-0 rank-permissions-page__title">
+                        <span className="rank-permissions-page__title-lead">View permission for </span>
+                        <span className="rank-permissions-page__title-name text-primary">{roleName}</span>
+                      </h2>
                     </Col>
-
-
-                    <Col md={4} className="d-flex justify-content-end">
-                      
-                    <div className="action-buttons">
+                    <Col xs={12} lg={4} className="min-w-0">
+                    <div className="action-buttons rank-permissions-page__header-actions">
                     <div className="search-container">
                             <i className="fas fa-search search-icon"></i>
                             <input type="text" className="search-bar" placeholder="Search permissions..." onChange={(e) => setSearchTerm(e.target.value)}/>
@@ -148,10 +149,9 @@ const ViewRolePermission = () => {
             </Col>
             </Row>
 
-            <Row className="mb-3">
-                <Col md={6}>
-                    <div className="d-flex align-items-center gap-2 flex-wrap">
-                        <span className="fw-semibold">Filter by Action:</span>
+            <Row className="rank-permissions-page__filters g-2 align-items-lg-end">
+                <Col xs={12} lg={6}>
+                    <RankPermissionsFilterPanel label="Filter by action" ariaLabel="Filter by action">
                         <Button
                             variant={selectedAction === 'all' ? 'primary' : 'outline-primary'}
                             size="sm"
@@ -194,11 +194,10 @@ const ViewRolePermission = () => {
                         >
                             Update
                         </Button>
-                    </div>
+                    </RankPermissionsFilterPanel>
                 </Col>
-                <Col md={6}>
-                    <div className="d-flex align-items-center gap-2 flex-wrap justify-content-end">
-                        <span className="fw-semibold">Severity Level:</span>
+                <Col xs={12} lg={6} className="rank-permissions-page__filter-col--severity">
+                    <RankPermissionsFilterPanel label="Severity level" ariaLabel="Filter by severity level">
                         <Button 
                             variant={selectedSeverityLevel === '' ? 'primary' : 'outline-primary'} 
                             size="sm" 
@@ -234,7 +233,7 @@ const ViewRolePermission = () => {
                         >
                             Critical
                         </Button>
-                    </div>
+                    </RankPermissionsFilterPanel>
                 </Col>
             </Row>
 
@@ -249,31 +248,27 @@ const ViewRolePermission = () => {
                             return (
                                 <React.Fragment key={group.group}>
                                     {group.permissions.some(perm => perm.enabled) && (
-                                            <Card className="p-3 mb-3">
+                                            <Card className="rank-permissions-page__group-card">
                                                 <div className="roles-box">
-                                                    <div className="roles-box-header clearfix">
-                                                        <span className="mb-2" style={{ float: "left" }}>
-                                                            <h6>{group.group}</h6>
-                                                        </span>
-                                                        <div className="clearfix"></div>
+                                                    <div className="roles-box-header">
+                                                        <h6 className="mb-0">{group.group}</h6>
                                                     </div>
 
                                                     {/* Regular Permissions Section */}
                                                     {nonSpecialPermissions.length > 0 && (
-                                                        <div className="mb-2">
-                                                           
+                                                        <div className="roles-box__section">
                                                             <div className="row">
                                                                 {nonSpecialPermissions
                                                                     .filter((perm: Permission) => perm.enabled)
                                                                     .map((perm: Permission) => (
-                                                                    <div className="col-md-4 mb-3" key={perm.id}>
+                                                                    <div className="col-12 col-md-6 col-lg-4 rank-permissions-page__perm-col" key={perm.id}>
                                                                         <OverlayTrigger
-                                                                            placement="right"
+                                                                            placement="top"
                                                                             overlay={<Tooltip id={`tooltip-regular-${perm.id}`}>
                                                                                 {perm?.description || 'No description available'}
                                                                             </Tooltip>}
                                                                         >
-                                                                            <div className='d-inline-block'>
+                                                                            <div className="rank-permissions-page__perm-item">
                                                                                 <Form.Check
                                                                                     type="switch"
                                                                                     id={`regular-${perm.id}`}
@@ -282,9 +277,11 @@ const ViewRolePermission = () => {
                                                                                     checked={perm.enabled}
                                                                                 />
                                                                                 {perm?.severity_level && perm?.severity_level !== "" && (
-                                                                                    <span className={`status-badge ${getSeverityBadgeClass(perm.severity_level)} ms-1 small`}>
+                                                                                    <div className="rank-permissions-page__perm-meta">
+                                                                                    <span className={`status-badge ${getSeverityBadgeClass(perm.severity_level)} small`}>
                                                                                         {perm?.severity_level}
                                                                                     </span>
+                                                                                    </div>
                                                                                 )}
                                                                             </div>
                                                                         </OverlayTrigger>
@@ -296,8 +293,8 @@ const ViewRolePermission = () => {
 
                                                     {/* Special Permissions Section */}
                                                     {specialPermissions.length > 0 && (
-                                                        <div className="mb-4">
-                                                            <h6 className="text-warning mb-4" style={{borderBottom: '1px #d6d6d6 solid',paddingBottom: '10px'}}>
+                                                        <div className="roles-box__section">
+                                                            <h6 className="text-warning rank-permissions-page__special-heading">
                                                                 <i className="fas fa-star me-2" aria-hidden></i>
                                                                 {" "}Special Permissions
                                                             </h6>
@@ -305,14 +302,14 @@ const ViewRolePermission = () => {
                                                                 {specialPermissions
                                                                     .filter((perm: Permission) => perm.enabled)
                                                                     .map((perm: Permission) => (
-                                                                    <div className="col-md-4 mb-3" key={perm.id}>
+                                                                    <div className="col-12 col-md-6 col-lg-4 rank-permissions-page__perm-col" key={perm.id}>
                                                                         <OverlayTrigger
-                                                                            placement="right"
+                                                                            placement="top"
                                                                             overlay={<Tooltip id={`tooltip-special-${perm.id}`}>
                                                                                 {perm?.description || 'No description available'}
                                                                             </Tooltip>}
                                                                         >
-                                                                            <div className='d-inline-block'>
+                                                                            <div className="rank-permissions-page__perm-item">
                                                                                 <Form.Check
                                                                                     type="switch"
                                                                                     id={`special-${perm.id}`}
@@ -321,9 +318,11 @@ const ViewRolePermission = () => {
                                                                                     checked={perm.enabled}
                                                                                 />
                                                                                 {perm?.severity_level && perm?.severity_level !== "" && (
-                                                                                    <span className={`status-badge ${getSeverityBadgeClass(perm.severity_level)} ms-1 small`}>
+                                                                                    <div className="rank-permissions-page__perm-meta">
+                                                                                    <span className={`status-badge ${getSeverityBadgeClass(perm.severity_level)} small`}>
                                                                                         {perm?.severity_level}
                                                                                     </span>
+                                                                                    </div>
                                                                                 )}
                                                                             </div>
                                                                         </OverlayTrigger>
@@ -339,7 +338,7 @@ const ViewRolePermission = () => {
                             );
                         })
                     ) : (
-                        <Card className="p-5 text-center">
+                        <Card className="rank-permissions-page__empty text-center">
                             <div className="empty-state">
                                 <i className="fas fa-lock fa-3x text-muted mb-3"></i>
                                 <h5 className="text-muted">No Enabled Permissions Found</h5>
@@ -349,7 +348,7 @@ const ViewRolePermission = () => {
                     )}
                   </Col>
             </Row>
-        </React.Fragment>
+        </div>
     )
 }
 ViewRolePermission.getLayout = (page: ReactElement) => {

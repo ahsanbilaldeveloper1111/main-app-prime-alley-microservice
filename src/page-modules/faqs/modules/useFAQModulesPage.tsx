@@ -1,4 +1,6 @@
-import type { TableAction, TableColumn } from "@components/GenericTable";
+import { appendSettingsActionsColumn } from "@components/main-settings/settingsEmbeddedTable";
+import type { TableColumn } from "@components/GenericTable";
+import type { CrmTableRowAction } from "@page-modules/crm/shared/CrmTableRowActions";
 import { useFAQModulesListQuery } from "@page-modules/faqs/useFAQModulesListQuery";
 import { faqsKeys } from "@query/keys";
 import { createFAQModule, deleteFAQModule, updateFAQModule } from "@utils/faqs";
@@ -228,7 +230,7 @@ export function useFAQModulesPage() {
 
   const isSubmitting = createMutation.isPending || updateMutation.isPending;
 
-  const columns: TableColumn<FAQModuleRow>[] = useMemo(
+  const baseColumns: TableColumn<FAQModuleRow>[] = useMemo(
     () => [
       {
         key: "name",
@@ -264,31 +266,29 @@ export function useFAQModulesPage() {
     [],
   );
 
-  const actions: TableAction<FAQModuleRow>[] = useMemo(
-    () => [
-      {
-        label: "Edit",
-        icon: <Edit size={16} />,
-        variant: "light",
-        className: "btn-action-style-2 p-1 text-primary",
-        onClick: handleEditModule,
-      },
-      {
-        label: "Delete",
-        icon: <Trash2 size={16} />,
-        variant: "light",
-        className: "btn-action-style-2 p-1 text-danger",
-        onClick: handleDeleteModule,
-      },
-    ],
-    [handleEditModule, handleDeleteModule],
+  const columns = useMemo(
+    () =>
+      appendSettingsActionsColumn<FAQModuleRow>(baseColumns, (row): CrmTableRowAction[] => [
+        {
+          label: `Edit ${row.name}`,
+          icon: <Edit size={22} aria-hidden />,
+          tone: "primary",
+          onClick: () => handleEditModule(row),
+        },
+        {
+          label: `Delete ${row.name}`,
+          icon: <Trash2 size={22} aria-hidden />,
+          tone: "danger",
+          onClick: () => handleDeleteModule(row),
+        },
+      ]),
+    [baseColumns, handleEditModule, handleDeleteModule],
   );
 
   return {
     data,
     loading,
     columns,
-    actions,
     currentPage,
     rowsPerPage,
     totalRows,

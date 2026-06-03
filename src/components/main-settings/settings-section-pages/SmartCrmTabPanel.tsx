@@ -6,8 +6,7 @@ import ProductsPanel from '@page-modules/crm/products/ProductsPanel'
 import StagesPanel from '@page-modules/crm/stages/StagesPanel'
 import React from 'react'
 
-/** Each tab: Smart CRM admin panel; list search uses `useDebouncedSearchInput` (400ms). */
-export function SmartCrmTabPanel({ activeTab }: Readonly<{ activeTab: string }>) {
+function renderSmartCrmPanel(activeTab: string): React.ReactNode {
   switch (activeTab) {
     case 'stages':
       return <StagesPanel />
@@ -24,4 +23,13 @@ export function SmartCrmTabPanel({ activeTab }: Readonly<{ activeTab: string }>)
     default:
       return null
   }
+}
+
+/** Each tab: Smart CRM admin panel; list search uses `useDebouncedSearchInput` (400ms). */
+export function SmartCrmTabPanel({ activeTab }: Readonly<{ activeTab: string }>) {
+  return (
+    <div className="smart-crm-settings-panel">
+      {renderSmartCrmPanel(activeTab)}
+    </div>
+  )
 }

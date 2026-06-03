@@ -1,7 +1,9 @@
 import '@assets/scss/datatable-style.scss';
+import '@page-modules/controlhub/users/usersTeamsTablePage.scss';
 import React, { useState, useCallback, useMemo, useRef, type ReactElement } from 'react';
 import BreadcrumbItem from '@common/BreadcrumbItem';
 import { useUsersTeamsPanelChrome } from '@page-modules/controlhub/users/useUsersTeamsPanelChrome';
+import { UsersTeamsEmbeddedToolbar } from '@page-modules/controlhub/users/UsersTeamsEmbeddedToolbar';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import {
     updateTeam,
@@ -203,7 +205,8 @@ function TeamMembersTable({
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 const TeamsPanel = () => {
-    const { showBreadcrumb, breadcrumbMainLink } = useUsersTeamsPanelChrome('supervisor-teams');
+    const { showBreadcrumb, breadcrumbMainLink, embeddedInMainSettings } =
+        useUsersTeamsPanelChrome('supervisor-teams');
     const { data: session } = useSession();
     const queryClient = useQueryClient();
 
@@ -846,8 +849,16 @@ const TeamsPanel = () => {
         );
     }
 
+    const addTeamButton =
+        canAdd ? (
+            <Button variant="primary" type="button" onClick={() => setShowCreateTeamModal(true)}>
+                Add Team
+            </Button>
+        ) : null;
+
     return (
-        <React.Fragment>
+        <div className={embeddedInMainSettings ? 'users-teams-settings-panel' : undefined}>
+            <div className="users-teams-table-page users-teams-table-page--supervisor-teams">
             {showBreadcrumb ? (
                 <BreadcrumbItem
                     mainTitle="Controlhub"
@@ -856,26 +867,30 @@ const TeamsPanel = () => {
                 />
             ) : null}
 
-            <Row className="mb-3">
-                <Col md={12}>
-                    <div className="page-header-title style-2">
-                        <Row className="d-flex justify-content-between align-items-center">
-                            <Col md={4} />
-                            <Col md={8} className="d-flex justify-content-end">
-                                <div className="action-buttons">
-                                    {canAdd && (
-                                        <Button variant="primary" onClick={() => setShowCreateTeamModal(true)}>
-                                            Add Team
-                                        </Button>
-                                    )}
-                                </div>
-                            </Col>
-                        </Row>
-                    </div>
-                </Col>
-            </Row>
+            {embeddedInMainSettings ? (
+                <div className="users-teams-settings-page">
+                    <UsersTeamsEmbeddedToolbar
+                        searchValue={searchValue}
+                        onSearchChange={handleSearchChange}
+                        searchPlaceholder="Search teams..."
+                        actions={addTeamButton}
+                    />
+                </div>
+            ) : (
+                <Row className="mb-3">
+                    <Col md={12}>
+                        <div className="page-header-title style-2">
+                            <Row className="d-flex justify-content-between align-items-center">
+                                <Col md={4} />
+                                <Col md={8} className="d-flex justify-content-end">
+                                    <div className="action-buttons">{addTeamButton}</div>
+                                </Col>
+                            </Row>
+                        </div>
+                    </Col>
+                </Row>
+            )}
 
-            {/* Main data table */}
             <GenericTable<TeamRow>
                 data={tableData}
                 columns={columns}
@@ -891,18 +906,23 @@ const TeamsPanel = () => {
                     pageSizeOptions: [15, 25, 50, 100],
                 }}
                 onPaginationChange={handlePaginationChange}
-                showToolbar
-                toolbar={{
-                    showSearch: true,
-                    searchValue,
-                    searchPlaceholder: 'Search teams...',
-                    onSearchChange: handleSearchChange,
-                }}
+                showToolbar={!embeddedInMainSettings}
+                toolbar={
+                    embeddedInMainSettings
+                        ? undefined
+                        : {
+                              showSearch: true,
+                              searchValue,
+                              searchPlaceholder: 'Search teams...',
+                              onSearchChange: handleSearchChange,
+                          }
+                }
                 showToolbarActions={false}
                 emptyMessage="No teams found"
                 hover
                 size="md"
             />
+            </div>
 
             {/* ── Edit Team Modal ── */}
             <FormModal
@@ -1331,7 +1351,7 @@ const TeamsPanel = () => {
                 requiredConfirmationText="remove"
                 loading={isLoadingRemoveUsers}
             />
-        </React.Fragment>
+        </div>
     );
 };
 

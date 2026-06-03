@@ -68,9 +68,19 @@ export const useUsersData = (
     [queryClient, currentFilters, roleId],
   );
 
-  const handleFiltersChange = (filters: Record<string, unknown>) => {
-    setCurrentFilters(filters);
-  };
+  const handleFiltersChange = useCallback((filters: Record<string, unknown>) => {
+    setCurrentFilters((prev) => {
+      const prevKeys = Object.keys(prev);
+      const nextKeys = Object.keys(filters);
+      if (
+        prevKeys.length === nextKeys.length &&
+        nextKeys.every((key) => prev[key] === filters[key])
+      ) {
+        return prev;
+      }
+      return filters;
+    });
+  }, []);
 
   const summaryCards: SummaryCard[] = useMemo(
     () => [

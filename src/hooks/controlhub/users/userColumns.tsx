@@ -1,12 +1,6 @@
 import React, { useMemo } from 'react';
 import { Column } from '@components/CustomDataTable';
-import { FiEdit } from 'react-icons/fi';
-import DatatableActionButton from '@components/DatatableActionButton';
-import { Button, Dropdown } from 'react-bootstrap';
-import { Eye, Key } from 'lucide-react';
-import { buildUserEditPath } from '@utils/controlhub/usersNavigation';
-
-const STATUS_OPTIONS = ['processing', 'completed', 'deleted'] as const;
+import { UserDirectoryRowActions } from '@page-modules/controlhub/users/partials/UserDirectoryRowActions';
 
 interface UseUserColumnsOptions {
     onResetPassword?: (username: string) => void;
@@ -15,7 +9,7 @@ interface UseUserColumnsOptions {
 }
 
 export const useUserColumns = (session: any, customFieldColumns: Column[], options?: UseUserColumnsOptions) => {
-    const { onResetPassword, onChangeStatus, onStatusOptionSelect } = options || {};
+    const { onResetPassword, onStatusOptionSelect } = options || {};
     // Memoize base columns to prevent recreation on every render
     const baseColumns: Column[] = useMemo(() => [
         { key: 'name', name: 'Display Name', selector: (row: any) => row.name, sortable: true },
@@ -75,51 +69,14 @@ export const useUserColumns = (session: any, customFieldColumns: Column[], optio
         selector: (row: any) => row.id,
         sortable: false,
         cell: (props: any) => (
-            <div className="d-flex gap-3">
-                
-                {session?.user?.permissions?.includes('reset-password-users') && (
-                <Button 
-                variant="light" size="sm" 
-                className="btn-action-style-2 p-1 text-primary" 
-                title="Reset Password"
-                onClick={() => onResetPassword && onResetPassword(props.username)}
-              >
-                <Key className="text-primary" size={16} />
-              </Button>
-              )}
-
-                {session?.user?.permissions?.includes('edit-users') && (
-                    <Button variant="light"  className="btn-action-style-2 p-1 text-primary" title="View" onClick={() => {
-                        if (typeof globalThis !== 'undefined' && globalThis.window) {
-                            globalThis.window.location.href = buildUserEditPath(props.encId);
-                        }
-                    }}>
-                        <Eye size={16} />
-                    </Button>
-                )}
-
-{session?.user?.permissions?.includes('change-status-users') && (
-                    <Dropdown align="end" onSelect={(status) => {
-                        if (!status) return;
-                        if (onStatusOptionSelect) {
-                            onStatusOptionSelect(props, status);
-                        }
-                    }}>
-                        <Dropdown.Toggle variant="outline-primary" size="sm" className="" title="Status" id={`status-dropdown-${props.encId}`}>
-                            Change Status
-                        </Dropdown.Toggle>
-                        <Dropdown.Menu>
-                            {STATUS_OPTIONS.filter((status) => status.toLowerCase() !== (props.status || '').toLowerCase()).map((status) => (
-                                <Dropdown.Item key={status} eventKey={status}>
-                                    {status}
-                                </Dropdown.Item>
-                            ))}
-                        </Dropdown.Menu>
-                    </Dropdown>
-                )}
-            </div>
+            <UserDirectoryRowActions
+                row={props}
+                permissions={session?.user?.permissions}
+                onResetPassword={onResetPassword}
+                onStatusOptionSelect={onStatusOptionSelect}
+            />
         ),
-    }), [session?.user?.permissions, onResetPassword, onChangeStatus, onStatusOptionSelect]);
+    }), [session?.user?.permissions, onResetPassword, onStatusOptionSelect]);
 
     // Memoize the columns array to prevent unnecessary re-renders
     const columns: Column[] = useMemo(() => {

@@ -1,9 +1,11 @@
 import React from 'react'
 import type { Tab } from './types'
 import {
+  accountDefaultsTabBarStyle,
   accountDefaultsTabRowStyle,
   getAccountDefaultsTabButtonStyle,
 } from './accountDefaultsPageStyles'
+import { MainSettingsOverflowTabBar } from './MainSettingsOverflowTabBar'
 
 export type AccountDefaultsTabBarProps = {
   tabs: readonly Tab[]
@@ -16,20 +18,12 @@ export const AccountDefaultsTabBar: React.FC<AccountDefaultsTabBarProps> = ({
   activeTabId,
   onSelect,
 }) => (
-  <div style={accountDefaultsTabRowStyle}>
-    {tabs.map((tab: Tab, index: number) => {
-      const isActive = activeTabId === tab.id
-      const isLast = index === tabs.length - 1
-      return (
-        <button
-          key={tab.id}
-          type="button"
-          onClick={() => onSelect(tab.id)}
-          style={getAccountDefaultsTabButtonStyle(isActive, isLast)}
-        >
-          {tab.label}
-        </button>
-      )
-    })}
-  </div>
+  <MainSettingsOverflowTabBar
+    tabs={tabs}
+    activeTabId={activeTabId}
+    onSelect={onSelect}
+    tabBarStyle={accountDefaultsTabBarStyle}
+    tabRowStyle={accountDefaultsTabRowStyle}
+    getTabButtonStyle={getAccountDefaultsTabButtonStyle}
+  />
 )

@@ -1,4 +1,5 @@
-import { getTeamUsers } from "@utils/teams";
+import axiosInstance from "@utils/axios";
+import { fetchUsersDirectoryList, getParentUsers } from "@utils/users";
 import type { AssigneeMatch, WorkloadQueryBase, WorkloadRangePreset } from "@utils/tasks";
 import { workloadProjectFilterQuery } from "@page-modules/planner/workload/workloadDomain";
 import type { WorkloadProjectFilterValue } from "@page-modules/planner/workload/workloadDomain";
@@ -23,6 +24,8 @@ const IDLE_SCOPE: WorkloadTeamScopeResult = {
 type TeamUserRow = Readonly<{
   id?: number | string;
   phone?: string | null;
+  phone_no?: string | null;
+  phone_number?: string | null;
   extension?: string | null;
   extension_number?: string | null;
 }>;
@@ -38,7 +41,13 @@ function readTeamUserId(row: unknown): string {
 function readTeamUserExtension(row: unknown): string {
   if (row == null || typeof row !== "object") return "";
   const record = row as TeamUserRow;
-  const candidates = [record.extension_number, record.extension, record.phone];
+  const candidates = [
+    record.extension_number,
+    record.extension,
+    record.phone,
+    record.phone_no,
+    record.phone_number,
+  ];
   for (const value of candidates) {
     if (typeof value === "string" && value.trim()) return value.trim();
     if (typeof value === "number" && Number.isFinite(value)) return String(value);
@@ -192,6 +201,63 @@ export function buildWorkloadGridBoardQuery(input: BuildWorkloadQueryInput): Wor
   return base;
 }
 
+type DirectoryUserRow = Readonly<{
+  extension?: string | number | null;
+  extension_number?: string | number | null;
+  phone?: string | number | null;
+  phone_no?: string | null;
+  phone_number?: string | number | null;
+}>;
+
+function readDirectoryUserExtension(row: unknown): string {
+  if (row == null || typeof row !== "object") return "";
+  const record = row as DirectoryUserRow;
+  const candidates = [
+    record.extension_number,
+    record.extension,
+    record.phone,
+    record.phone_no,
+    record.phone_number,
+  ];
+  for (const value of candidates) {
+    if (typeof value === "string" && value.trim()) return value.trim();
+    if (typeof value === "number" && Number.isFinite(value)) return String(value);
+  }
+  return "";
+}
+
+function collectExtensionsFromUserRows(rows: readonly unknown[]): string[] {
+  const extensions = new Set<string>();
+  for (const row of rows) {
+    const ext = readDirectoryUserExtension(row);
+    if (ext) extensions.add(ext);
+  }
+  return [...extensions];
+}
+
+/** Company-wide roster for root / company admin (all users, including those with no tasks). */
+export async function fetchCompanyWorkloadRoster(): Promise<string[]> {
+  try {
+    const parentUsers = await getParentUsers();
+    if (Array.isArray(parentUsers) && parentUsers.length > 0) {
+      const fromParent = collectExtensionsFromUserRows(parentUsers);
+      if (fromParent.length > 0) return fromParent;
+    }
+  } catch {
+    // Fall through to paginated directory list.
+  }
+
+  try {
+    const directory = await fetchUsersDirectoryList();
+    const fromDirectory = collectExtensionsFromUserRows(directory);
+    if (fromDirectory.length > 0) return fromDirectory;
+  } catch {
+    return [];
+  }
+
+  return [];
+}
+
 export async function fetchWorkloadTeamScope(
   sessionUserId: string,
   sessionExtension = "",
@@ -201,9 +267,23 @@ export async function fetchWorkloadTeamScope(
   if (!selfId && !viewerExt) return IDLE_SCOPE;
 
   const numericId = Number(selfId);
-  const raw = await getTeamUsers(
-    undefined,
-    Number.isFinite(numericId) ? numericId : undefined,
-  );
-  return parseWorkloadTeamScope(raw, selfId, viewerExt);
+  const id = Number.isFinite(numericId) ? numericId : undefined;
+  if (!id) {
+    return parseWorkloadTeamScope(null, selfId, viewerExt);
+  }
+  try {
+    // Use a workload-specific fetch so team-scope failures don't toast
+    // (e.g. backend "Group Not Found" for users without a team).
+    const response = await axiosInstance.post("teams/users", { id });
+    const payload = (response?.data as { data?: unknown } | undefined)?.data;
+    return parseWorkloadTeamScope(payload, selfId, viewerExt);
+  } catch {
+    // Fall back to viewer-only scope; UI will still render with padding logic.
+    return {
+      loading: false,
+      isTeamOwner: false,
+      isTeamMemberOnly: false,
+      teamExtensions: viewerExt ? [viewerExt] : [],
+    };
+  }
 }

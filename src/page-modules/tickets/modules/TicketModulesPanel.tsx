@@ -8,11 +8,12 @@ import { useTicketModulesPage } from "@page-modules/tickets/modules/useTicketMod
 import { useTicketsPanelChrome } from "@page-modules/tickets/shared/useTicketsPanelChrome";
 
 const TicketModulesPanel = () => {
-  const { showBreadcrumb, breadcrumbMainLink } = useTicketsPanelChrome("modules");
+  const { showBreadcrumb, breadcrumbMainLink, embeddedInMainSettings } =
+    useTicketsPanelChrome("modules");
   const ctx = useTicketModulesPage();
 
   return (
-    <React.Fragment>
+    <div className={embeddedInMainSettings ? "tickets-settings-panel" : undefined}>
       {showBreadcrumb ? (
         <BreadcrumbItem
           mainTitle="Tickets"
@@ -25,7 +26,7 @@ const TicketModulesPanel = () => {
         data={ctx.data}
         loading={ctx.loading}
         columns={ctx.columns}
-        actions={ctx.actions}
+        embeddedInMainSettings={embeddedInMainSettings}
         currentPage={ctx.currentPage}
         rowsPerPage={ctx.rowsPerPage}
         totalRows={ctx.totalRows}
@@ -70,7 +71,7 @@ const TicketModulesPanel = () => {
         onCloseSubmoduleModal={ctx.closeSubmoduleModal}
         onDeleteSubmodule={ctx.handleDeleteSubmodule}
       />
-    </React.Fragment>
+    </div>
   );
 };
 

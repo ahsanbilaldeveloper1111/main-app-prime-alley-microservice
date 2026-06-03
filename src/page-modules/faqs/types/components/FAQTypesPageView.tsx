@@ -79,33 +79,30 @@ export const FAQTypesPageView: React.FC<FAQTypesPageViewProps> = ({
         <BreadcrumbItem mainTitle="FAQs" mainLink={breadcrumbMainLink} subTitle="Types" />
       ) : null}
 
-      <Row className="mb-3">
-        <Col md={12}>
-          <div className="page-header-title style-2">
-            <Row className="d-flex justify-content-between align-items-center">
-              <Col md={6} />
-              <Col md={6} className="d-flex justify-content-end align-items-center">
-                <div style={{ minWidth: "250px" }}>
-                  <Select
-                    options={topicOptions}
-                    value={topicOptions.find((opt) => opt.value === selectedTopic)}
-                    onChange={(option: { value: number | null } | null) =>
-                      onTopicChange(option?.value ?? null)
-                    }
-                    placeholder="Filter by topic..."
-                    isLoading={isLoadingTopics}
-                    isClearable={true}
-                  />
-                </div>
-              </Col>
-            </Row>
+      <Row className="mb-3 g-2">
+        <Col xs={12}>
+          <div className="page-header-title style-2 mb-0">
+            <div className="d-flex flex-column flex-sm-row justify-content-sm-end align-items-stretch align-items-sm-center gap-2 w-100">
+              <div className="faq-types-settings-filter ms-sm-auto">
+                <Select
+                  options={topicOptions}
+                  value={topicOptions.find((opt) => opt.value === selectedTopic)}
+                  onChange={(option: { value: number | null } | null) =>
+                    onTopicChange(option?.value ?? null)
+                  }
+                  placeholder="Filter by topic..."
+                  isLoading={isLoadingTopics}
+                  isClearable={true}
+                />
+              </div>
+            </div>
           </div>
         </Col>
       </Row>
 
       <Row>
-        <Col md={12}>
-          <Card>
+        <Col xs={12}>
+          <Card className="faq-types-settings-card">
             <Card.Body>{renderCardBody()}</Card.Body>
           </Card>
         </Col>

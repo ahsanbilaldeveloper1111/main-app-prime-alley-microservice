@@ -4,10 +4,10 @@ import "@assets/scss/tabs.scss";
 import "@page-modules/workforce/request-categories/requestCategoriesPage.scss";
 import React, { ReactElement } from "react";
 import Layout from "@layout/index";
-import { RequestCategoriesPageView } from "@page-modules/workforce/request-categories/components/RequestCategoriesPageView";
+import { RequestCategoriesPanel } from "@page-modules/workforce/request-categories/RequestCategoriesPanel";
 
 const RequestCategories = () => {
-  return <RequestCategoriesPageView />;
+  return <RequestCategoriesPanel />;
 };
 
 RequestCategories.getLayout = (page: ReactElement) => {

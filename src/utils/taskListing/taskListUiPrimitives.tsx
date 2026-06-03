@@ -280,7 +280,7 @@ export function getTaskAvatarColor(name: string): string {
   if (!name) return TASK_AVATAR_COLORS[0];
   let hash = 0;
   for (let i = 0; i < name.length; i++) {
-    hash = name.charCodeAt(i) + ((hash << 5) - hash);
+    hash = (name.codePointAt(i) ?? 0) + ((hash << 5) - hash);
   }
   return TASK_AVATAR_COLORS[Math.abs(hash) % TASK_AVATAR_COLORS.length];
 }

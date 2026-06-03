@@ -200,8 +200,8 @@ export interface UseCrmToolbarConfigOptions {
   onTabRemove: (tabId: string) => void;
   tabsDropdownLabel: string;
 
-  // Toolbar actions
-  onFiltersClick: () => void;
+  // Toolbar actions — omit to use GenericTable default (toggle filter pills row)
+  onFiltersClick?: () => void;
   onExportClick: () => void;
   onEditColumnsClick: () => void;
   showImport?: boolean;
@@ -570,7 +570,7 @@ export function useCrmToolbarConfig(
       showPipelineDropdown: false,
       pipelineLabel: "All Pipelines",
       showFiltersButton: true,
-      onFiltersClick,
+      ...(onFiltersClick ? { onFiltersClick } : {}),
       showSortButton: true,
       showExportButton,
       onExportClick,
@@ -580,7 +580,7 @@ export function useCrmToolbarConfig(
       filterPills,
       clearAllFilters,
       showAdvancedFilters: true,
-      onAdvancedFiltersClick: onFiltersClick,
+      ...(onFiltersClick ? { onAdvancedFiltersClick: onFiltersClick } : {}),
 
       rightActions,
     }),

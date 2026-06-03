@@ -1,4 +1,6 @@
-import type { TableAction, TableColumn } from "@components/GenericTable";
+import { appendSettingsActionsColumn } from "@components/main-settings/settingsEmbeddedTable";
+import type { TableColumn } from "@components/GenericTable";
+import type { CrmTableRowAction } from "@page-modules/crm/shared/CrmTableRowActions";
 import { useTicketHierarchyExtensionsQuery } from "@page-modules/tickets/useTicketHierarchyExtensionsQuery";
 import { useTicketModulesListQuery } from "@page-modules/tickets/useTicketModulesListQuery";
 import { ticketsKeys } from "@query/keys";
@@ -265,7 +267,7 @@ export function useTicketModulesPage() {
     setSelectedModuleColor(e.target.value);
   }, []);
 
-  const columns: TableColumn<TicketModule>[] = useMemo(
+  const baseColumns: TableColumn<TicketModule>[] = useMemo(
     () => [
       {
         key: "name",
@@ -352,45 +354,54 @@ export function useTicketModulesPage() {
   );
 
   const canViewList = permissions?.includes("ticket-modules-tickets") ?? false;
+  const canEdit = permissions?.includes("edit-ticket-module-tickets") ?? false;
+  const canDelete = permissions?.includes("delete-ticket-module-tickets") ?? false;
 
-  const actions: TableAction<TicketModule>[] = useMemo(() => {
-    const canEdit = permissions?.includes("edit-ticket-module-tickets");
-    const canDelete = permissions?.includes("delete-ticket-module-tickets");
-
-    const acts: TableAction<TicketModule>[] = [];
-
-    if (canEdit) {
-      acts.push({
-        label: "Edit",
-        icon: <Edit size={16} />,
-        variant: "light",
-        className: "btn-action-style-2 p-1 text-primary",
-        onClick: handleEditModule,
-      });
+  const columns = useMemo(() => {
+    if (!canEdit && !canDelete && !canViewList) {
+      return baseColumns;
     }
-
-    if (canViewList) {
-      acts.push({
-        label: "Submodules",
-        icon: <Package size={16} />,
-        variant: "light",
-        className: "btn-action-style-2 p-1 text-info",
-        onClick: openSubmoduleModal,
-      });
-    }
-
-    if (canDelete) {
-      acts.push({
-        label: "Delete",
-        icon: <Trash2 size={16} />,
-        variant: "light",
-        className: "btn-action-style-2 p-1 text-danger",
-        onClick: handleDeleteModule,
-      });
-    }
-
-    return acts;
-  }, [permissions, handleEditModule, handleDeleteModule, openSubmoduleModal, canViewList]);
+    return appendSettingsActionsColumn<TicketModule>(baseColumns, (row): CrmTableRowAction[] => [
+      ...(canEdit
+        ? [
+            {
+              label: `Edit ${row.name}`,
+              icon: <Edit size={22} aria-hidden />,
+              tone: "primary" as const,
+              onClick: () => handleEditModule(row),
+            },
+          ]
+        : []),
+      ...(canViewList
+        ? [
+            {
+              label: `Submodules for ${row.name}`,
+              icon: <Package size={22} aria-hidden />,
+              tone: "info" as const,
+              onClick: () => openSubmoduleModal(row),
+            },
+          ]
+        : []),
+      ...(canDelete
+        ? [
+            {
+              label: `Delete ${row.name}`,
+              icon: <Trash2 size={22} aria-hidden />,
+              tone: "danger" as const,
+              onClick: () => handleDeleteModule(row),
+            },
+          ]
+        : []),
+    ]);
+  }, [
+    baseColumns,
+    canEdit,
+    canDelete,
+    canViewList,
+    handleEditModule,
+    handleDeleteModule,
+    openSubmoduleModal,
+  ]);
 
   const canCreate = permissions?.includes("create-ticket-module-tickets") ?? false;
 
@@ -399,7 +410,6 @@ export function useTicketModulesPage() {
     data,
     loading,
     columns,
-    actions,
     currentPage,
     rowsPerPage,
     totalRows,

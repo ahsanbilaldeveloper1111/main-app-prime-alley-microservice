@@ -834,7 +834,6 @@ export function CrmProspectsContactsListPage({
 
   const {
     handleCloseSidebar: handleCloseProspectSidebarCore,
-    handleOpenFiltersSidebar,
     handleCloseFiltersSidebar,
     handlePreviewClick: handlePreviewClickCore,
     handleFirstColumnClick,
@@ -1166,7 +1165,6 @@ export function CrmProspectsContactsListPage({
       resetActiveFilterIfRemovedTabMatches(tabId, activeFilter, handleFilterChange);
     },
     tabsDropdownLabel: config.toolbar.tabsDropdownLabel,
-    onFiltersClick: handleOpenFiltersSidebar,
     onExportClick: () => setShowExportModal(true),
     onEditColumnsClick: () => setShowColumnEditor(true),
     showImport: true,

@@ -1,4 +1,6 @@
-import type { TableAction, TableColumn } from "@components/GenericTable";
+import { appendSettingsActionsColumn } from "@components/main-settings/settingsEmbeddedTable";
+import type { TableColumn } from "@components/GenericTable";
+import type { CrmTableRowAction } from "@page-modules/crm/shared/CrmTableRowActions";
 import { useTicketTypesListQuery } from "@page-modules/tickets/useTicketTypesListQuery";
 import { ticketsKeys } from "@query/keys";
 import { CreateType, DeleteType, UpdateType } from "@utils/ticket-types";
@@ -147,7 +149,7 @@ export function useTicketTypesPage() {
     setSelectedTypeDescription(e.target.value);
   }, []);
 
-  const columns: TableColumn<TicketType>[] = useMemo(
+  const baseColumns: TableColumn<TicketType>[] = useMemo(
     () => [
       {
         key: "name",
@@ -181,34 +183,36 @@ export function useTicketTypesPage() {
     [],
   );
 
-  const actions: TableAction<TicketType>[] = useMemo(() => {
-    const canEdit = permissions?.includes("update-ticket-types-tickets");
-    const canDelete = permissions?.includes("delete-ticket-type-tickets");
+  const canEdit = permissions?.includes("update-ticket-types-tickets") ?? false;
+  const canDelete = permissions?.includes("delete-ticket-type-tickets") ?? false;
 
-    const acts: TableAction<TicketType>[] = [];
-
-    if (canEdit) {
-      acts.push({
-        label: "Edit",
-        icon: <Edit size={16} />,
-        variant: "light",
-        className: "btn-action-style-2 p-1 text-primary",
-        onClick: handleEditType,
-      });
+  const columns = useMemo(() => {
+    if (!canEdit && !canDelete) {
+      return baseColumns;
     }
-
-    if (canDelete) {
-      acts.push({
-        label: "Delete",
-        icon: <Trash2 size={16} />,
-        variant: "light",
-        className: "btn-action-style-2 p-1 text-danger",
-        onClick: handleDeleteType,
-      });
-    }
-
-    return acts;
-  }, [permissions, handleEditType, handleDeleteType]);
+    return appendSettingsActionsColumn<TicketType>(baseColumns, (row): CrmTableRowAction[] => [
+      ...(canEdit
+        ? [
+            {
+              label: `Edit ${row.name}`,
+              icon: <Edit size={22} aria-hidden />,
+              tone: "primary" as const,
+              onClick: () => handleEditType(row),
+            },
+          ]
+        : []),
+      ...(canDelete
+        ? [
+            {
+              label: `Delete ${row.name}`,
+              icon: <Trash2 size={22} aria-hidden />,
+              tone: "danger" as const,
+              onClick: () => handleDeleteType(row),
+            },
+          ]
+        : []),
+    ]);
+  }, [baseColumns, canEdit, canDelete, handleEditType, handleDeleteType]);
 
   const canViewList = permissions?.includes("view-ticket-types-tickets") ?? false;
   const canCreate = permissions?.includes("add-ticket-type-tickets") ?? false;
@@ -217,7 +221,6 @@ export function useTicketTypesPage() {
     data,
     loading,
     columns,
-    actions,
     currentPage,
     rowsPerPage,
     totalRows,

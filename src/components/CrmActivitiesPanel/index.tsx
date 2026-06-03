@@ -184,6 +184,21 @@ function getEmailPreviewHtml(content: string | undefined): string {
   return htmlMatch ? htmlMatch[1].trim() : raw;
 }
 
+function getActivityListItemButtonStyle(isSelected: boolean): React.CSSProperties {
+  return {
+    display: "block",
+    width: "100%",
+    textAlign: "left",
+    backgroundColor: "#fff",
+    border: `1px solid ${isSelected ? "#141414" : "#eaf0f6"}`,
+    borderRadius: "5px",
+    padding: "16px 20px",
+    cursor: "pointer",
+    font: "inherit",
+    color: "inherit",
+  };
+}
+
 /** Format raw audit value for display (pure, no hooks). */
 function formatValForAudit(v: unknown): string {
   if (v == null) return "—";
@@ -841,8 +856,8 @@ const CrmActivitiesPanelInnerRender: React.ForwardRefRenderFunction<
       setShowWhatsAppModal(false);
       setEditMeetingModalOpen(false);
     };
-    window.addEventListener("close-all-activity-modals", handleCloseAll);
-    return () => window.removeEventListener("close-all-activity-modals", handleCloseAll);
+    globalThis.addEventListener("close-all-activity-modals", handleCloseAll);
+    return () => globalThis.removeEventListener("close-all-activity-modals", handleCloseAll);
   }, []);
 
   const handleNoteCreate = useCallback(
@@ -1762,24 +1777,11 @@ const CrmActivitiesPanelInnerRender: React.ForwardRefRenderFunction<
                     : stripped
                   : "—";
                 return (
-                  <div
+                  <button
+                    type="button"
                     key={String(email.id)}
-                    role="button"
-                    tabIndex={0}
                     onClick={() => setSelectedEmailId(email.id)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" || e.key === " ") {
-                        e.preventDefault();
-                        setSelectedEmailId(email.id);
-                      }
-                    }}
-                    style={{
-                      backgroundColor: "#fff",
-                      border: `1px solid ${isSelected ? "#141414" : "#eaf0f6"}`,
-                      borderRadius: "5px",
-                      padding: "16px 20px",
-                      cursor: "pointer",
-                    }}
+                    style={getActivityListItemButtonStyle(isSelected)}
                   >
                     <div
                       style={{
@@ -1865,7 +1867,7 @@ const CrmActivitiesPanelInnerRender: React.ForwardRefRenderFunction<
                         </div>
                       )}
                     </div>
-                  </div>
+                  </button>
                 );
               })}
               {emailsMeta &&
@@ -3015,29 +3017,20 @@ const CrmActivitiesPanelInnerRender: React.ForwardRefRenderFunction<
             >
               {smsList.map((sms) => {
                 const isSelected = selectedSmsId === sms.id;
+                const openSmsDetail = () => {
+                  setSelectedSmsId(sms.id);
+                  setShowEmailModal(false);
+                  setShowNotesModal(false);
+                  setShowMeetingModal(false);
+                  setShowWhatsAppModal(false);
+                  setShowSmsModal(true);
+                };
                 return (
-                  <div
+                  <button
+                    type="button"
                     key={sms.id}
-                    role="button"
-                    tabIndex={0}
-                    onClick={() => {
-                      setSelectedSmsId(sms.id);
-                      setShowEmailModal(false); setShowNotesModal(false); setShowMeetingModal(false); setShowWhatsAppModal(false); setShowSmsModal(true);
-                    }}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" || e.key === " ") {
-                        e.preventDefault();
-                        setSelectedSmsId(sms.id);
-                        setShowEmailModal(false); setShowNotesModal(false); setShowMeetingModal(false); setShowWhatsAppModal(false); setShowSmsModal(true);
-                      }
-                    }}
-                    style={{
-                      backgroundColor: "#fff",
-                      border: `1px solid ${isSelected ? "#141414" : "#eaf0f6"}`,
-                      borderRadius: "5px",
-                      padding: "16px 20px",
-                      cursor: "pointer",
-                    }}
+                    onClick={openSmsDetail}
+                    style={getActivityListItemButtonStyle(isSelected)}
                   >
                     <div
                       style={{
@@ -3116,7 +3109,7 @@ const CrmActivitiesPanelInnerRender: React.ForwardRefRenderFunction<
                         </div>
                       )}
                     </div>
-                  </div>
+                  </button>
                 );
               })}
               {smsMeta && (smsMeta.total > 0 || smsList.length > 0) && (
@@ -3318,45 +3311,28 @@ const CrmActivitiesPanelInnerRender: React.ForwardRefRenderFunction<
             >
               {whatsappChats.map((chat) => {
                 const isSelected = selectedWhatsAppChatId === chat.id;
+                const openWhatsAppDetail = () => {
+                  if (onWhatsAppChatClick) {
+                    onWhatsAppChatClick({
+                      id: chat.id,
+                      phone_number: chat.phone_number,
+                    });
+                    return;
+                  }
+                  setSelectedWhatsAppChatId(chat.id);
+                  setSelectedWhatsAppChat(chat);
+                  setShowEmailModal(false);
+                  setShowNotesModal(false);
+                  setShowMeetingModal(false);
+                  setShowSmsModal(false);
+                  setShowWhatsAppModal(true);
+                };
                 return (
-                  <div
+                  <button
+                    type="button"
                     key={chat.id}
-                    role="button"
-                    tabIndex={0}
-                    onClick={() => {
-                      if (onWhatsAppChatClick) {
-                        onWhatsAppChatClick({
-                          id: chat.id,
-                          phone_number: chat.phone_number,
-                        });
-                        return;
-                      }
-                      setSelectedWhatsAppChatId(chat.id);
-                      setSelectedWhatsAppChat(chat);
-                      setShowEmailModal(false); setShowNotesModal(false); setShowMeetingModal(false); setShowSmsModal(false); setShowWhatsAppModal(true);
-                    }}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" || e.key === " ") {
-                        e.preventDefault();
-                        if (onWhatsAppChatClick) {
-                          onWhatsAppChatClick({
-                            id: chat.id,
-                            phone_number: chat.phone_number,
-                          });
-                          return;
-                        }
-                        setSelectedWhatsAppChatId(chat.id);
-                        setSelectedWhatsAppChat(chat);
-                        setShowEmailModal(false); setShowNotesModal(false); setShowMeetingModal(false); setShowSmsModal(false); setShowWhatsAppModal(true);
-                      }
-                    }}
-                    style={{
-                      backgroundColor: "#fff",
-                      border: `1px solid ${isSelected ? "#141414" : "#eaf0f6"}`,
-                      borderRadius: "5px",
-                      padding: "16px 20px",
-                      cursor: "pointer",
-                    }}
+                    onClick={openWhatsAppDetail}
+                    style={getActivityListItemButtonStyle(isSelected)}
                   >
                     <div
                       style={{
@@ -3415,7 +3391,7 @@ const CrmActivitiesPanelInnerRender: React.ForwardRefRenderFunction<
                         </div>
                       )}
                     </div>
-                  </div>
+                  </button>
                 );
               })}
             </div>

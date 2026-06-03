@@ -1,5 +1,6 @@
 import '@assets/scss/datatable-style.scss';
-import React, { useState, useCallback } from 'react';
+import '@page-modules/controlhub/users/usersTeamsTablePage.scss';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import BreadcrumbItem from '@common/BreadcrumbItem';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/router';
@@ -8,6 +9,9 @@ import '@assets/scss/tabs.scss';
 import '@assets/scss/common.scss';
 
 import UsersHeader from '@page-modules/controlhub/users/partials/UsersHeader';
+import { UsersDirectoryToolbarActions } from '@page-modules/controlhub/users/partials/UsersDirectoryToolbarActions';
+import { UsersTeamsEmbeddedToolbar } from '@page-modules/controlhub/users/UsersTeamsEmbeddedToolbar';
+import { useDebouncedValue } from '@hooks/useDebouncedValue';
 import OverviewTab from '@page-modules/controlhub/users/partials/OverviewTab';
 import UserDetailsModal from '@page-modules/controlhub/users/partials/UserDetailsModal';
 import SyncLdapUsersModal from '@page-modules/controlhub/users/partials/SyncLdapUsersModal';
@@ -19,12 +23,16 @@ import { useUsersData } from '@hooks/controlhub/users/useUsersData';
 import { useLdapSync } from '@hooks/controlhub/users/useLdapSync';
 import { useUserModal } from '@hooks/controlhub/users/useUserModal';
 import { useUsersTeamsPanelChrome } from '@page-modules/controlhub/users/useUsersTeamsPanelChrome';
+import { MainSettingsFormProvider } from '@components/main-settings/mainSettingsFormContext';
 
 const UsersDirectory = () => {
   const { data: session } = useSession();
   const router = useRouter();
   const roleId = router.query.role_id as string | undefined;
-  const { showBreadcrumb, breadcrumbMainLink } = useUsersTeamsPanelChrome('user-directory');
+  const { showBreadcrumb, breadcrumbMainLink, embeddedInMainSettings } =
+    useUsersTeamsPanelChrome('user-directory');
+  const [embeddedSearchValue, setEmbeddedSearchValue] = useState('');
+  const debouncedEmbeddedSearch = useDebouncedValue(embeddedSearchValue, 400);
 
   const [listRefreshToken, setListRefreshToken] = useState(0);
   const [showResetPasswordModal, setShowResetPasswordModal] = useState(false);
@@ -89,25 +97,66 @@ const UsersDirectory = () => {
 
   const { showUserModal, selectedUsers, closeUserModal } = useUserModal();
 
+  const currentFiltersRef = useRef(currentFilters);
+  const handleFiltersChangeRef = useRef(handleFiltersChange);
+  currentFiltersRef.current = currentFilters;
+  handleFiltersChangeRef.current = handleFiltersChange;
+
+  useEffect(() => {
+    if (!embeddedInMainSettings) {
+      return;
+    }
+    const search = debouncedEmbeddedSearch.trim() ? debouncedEmbeddedSearch : undefined;
+    const prev = currentFiltersRef.current;
+    if (prev.search === search) {
+      return;
+    }
+    handleFiltersChangeRef.current({
+      ...prev,
+      search,
+    });
+  }, [debouncedEmbeddedSearch, embeddedInMainSettings]);
+
+  const directoryToolbarActions = (
+    <UsersDirectoryToolbarActions syncLdapUsers={syncLdapUsers} embedded />
+  );
+
   return (
+    <MainSettingsFormProvider preferSidebarForms>
     <ProtectedRoute requiredPermissions={['view-users']}>
       {showBreadcrumb ? (
         <BreadcrumbItem mainTitle="Controlhub" mainLink={breadcrumbMainLink} subTitle="Users" />
       ) : null}
 
-      <UsersHeader syncLdapUsers={syncLdapUsers} />
+      <div className={embeddedInMainSettings ? 'users-teams-settings-panel' : undefined}>
+        <div className="users-teams-table-page users-teams-table-page--user-directory">
+          {embeddedInMainSettings ? (
+            <div className="users-teams-settings-page">
+              <UsersTeamsEmbeddedToolbar
+                searchValue={embeddedSearchValue}
+                onSearchChange={setEmbeddedSearchValue}
+                searchPlaceholder="Search users..."
+                actions={directoryToolbarActions}
+              />
+            </div>
+          ) : (
+            <UsersHeader syncLdapUsers={syncLdapUsers} />
+          )}
 
-      <div className="tab-content">
-        <div className="tab-pane fade show active" role="tabpanel">
-          <OverviewTab
-            columns={columns}
-            fetchUsers={fetchUsers}
-            customFieldColumns={customFieldColumns}
-            currentFilters={currentFilters}
-            handleFiltersChange={handleFiltersChange}
-            listRefreshToken={listRefreshToken}
-            hasListPermission={session?.user?.permissions?.includes('list-users') || false}
-          />
+          <div className="tab-content">
+            <div className="tab-pane fade show active" role="tabpanel">
+              <OverviewTab
+                columns={columns}
+                fetchUsers={fetchUsers}
+                customFieldColumns={customFieldColumns}
+                currentFilters={currentFilters}
+                handleFiltersChange={handleFiltersChange}
+                listRefreshToken={listRefreshToken}
+                hasListPermission={session?.user?.permissions?.includes('list-users') || false}
+                embeddedInMainSettings={embeddedInMainSettings}
+              />
+            </div>
+          </div>
         </div>
       </div>
 
@@ -139,6 +188,7 @@ const UsersDirectory = () => {
         onSuccess={handleAfterStatusChange}
       />
     </ProtectedRoute>
+    </MainSettingsFormProvider>
   );
 };
 
