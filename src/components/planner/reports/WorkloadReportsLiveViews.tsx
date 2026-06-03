@@ -3,6 +3,7 @@ import { Badge, Col, Row } from "react-bootstrap";
 import type {
   LiveDashboardKpi,
   LiveMemberRow,
+  LiveStaleTaskRow,
   LiveTaskDetailRow,
 } from "@page-modules/planner/reports/teamLiveViewDomain";
 
@@ -95,11 +96,13 @@ export function ReportsTeamLivePanel({
   memberRows,
   overdueTasks,
   inProgressTasks,
+  staleTaskRows,
 }: Readonly<{
   kpiCards: LiveDashboardKpi[];
   memberRows: LiveMemberRow[];
   overdueTasks: LiveTaskDetailRow[];
   inProgressTasks: LiveTaskDetailRow[];
+  staleTaskRows: LiveStaleTaskRow[];
 }>) {
   return (
     <>
@@ -124,6 +127,39 @@ export function ReportsTeamLivePanel({
           </div>
         </Col>
       </Row>
+
+      <div className="reports-panel mb-3">
+        <div className="reports-panel__header-row">
+          <div>
+            <h2 className="reports-panel__title">Stuck Tasks</h2>
+            <p className="reports-panel__subtitle">Tasks with no progress beyond threshold</p>
+          </div>
+        </div>
+        {staleTaskRows.length === 0 ? (
+          <p className="small text-muted mb-0 px-3 pb-3">No stuck tasks for this period.</p>
+        ) : (
+          <div className="reports-live-stale-tasks">
+            {staleTaskRows.map((row) => (
+              <div key={row.id} className="reports-live-stale-tasks__row">
+                <span
+                  className="reports-live-stale-tasks__avatar"
+                  style={{ width: 24, height: 24, borderRadius: "50%", background: row.avatarColor, display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: 9, fontWeight: 700, color: "#fff", flexShrink: 0 }}
+                  aria-hidden
+                >
+                  {row.initials}
+                </span>
+                <span
+                  className="reports-live-stale-tasks__dot"
+                  style={{ width: 8, height: 8, borderRadius: "50%", background: row.priorityDot, flexShrink: 0 }}
+                  aria-hidden
+                />
+                <span className="reports-live-stale-tasks__title">{row.title}</span>
+                <span className="reports-live-stale-tasks__time">{row.timeLabel}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
 
       <div className="reports-panel">
         <h2 className="reports-panel__title">Overdue Tasks</h2>

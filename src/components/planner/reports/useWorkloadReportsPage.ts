@@ -55,6 +55,7 @@ import {
   buildLiveInProgressTaskRows,
   buildLiveMemberRows,
   buildLiveOverdueTaskRows,
+  buildLiveStaleTaskRows,
   resolveLiveTopAssigneeSource,
 } from "@page-modules/planner/reports/teamLiveViewDomain";
 
@@ -340,6 +341,17 @@ export function useWorkloadReportsPage() {
     [data, hierarchyDataExtensions, hierarchyDataUsers],
   );
 
+  const liveStaleTaskRows = useMemo(
+    () =>
+      data
+        ? buildLiveStaleTaskRows(
+            data.stale_in_progress_tasks ?? [],
+            staleDays,
+          )
+        : [],
+    [data, staleDays],
+  );
+
   const liveKpiCards = useMemo(() => {
     if (!data) return [];
     return buildLiveDashboardKpis(
@@ -471,6 +483,7 @@ export function useWorkloadReportsPage() {
     liveMembers,
     liveOverdueTasks,
     liveInProgressTasks,
+    liveStaleTaskRows,
     completionRateChartPoints,
     overdueTrendChartPoints,
     completionChartSubtitle,

@@ -68,6 +68,7 @@ export type LiveStaleTaskRow = Readonly<{
   initials: string;
   avatarColor: string;
   timeLabel: string;
+  priorityDot: string;
 }>;
 
 export type LiveRecentActivityRow = Readonly<{
@@ -228,6 +229,14 @@ function isStaleForThreshold(task: TaskReportsTaskRow, staleDays: number): boole
   return dayCount >= staleDays;
 }
 
+function resolveStalePriorityDot(priority: string | null | undefined): string {
+  const p = (priority ?? "").toLowerCase();
+  if (p.includes("critical")) return "#ef4444";
+  if (p.includes("high")) return "#f97316";
+  if (p.includes("medium")) return "#f59e0b";
+  return "#22c55e";
+}
+
 export function buildLiveStaleTaskRows(
   tasks: TaskReportsTaskRow[],
   staleDays: number,
@@ -240,6 +249,7 @@ export function buildLiveStaleTaskRows(
       initials: memberInitialsFromText(task.title),
       avatarColor: workloadMemberAvatarColor(String(task.id)),
       timeLabel: formatLiveTimeSuffix(task.last_updated_at, "Stale"),
+      priorityDot: resolveStalePriorityDot(task.priority),
     }));
 }
 
