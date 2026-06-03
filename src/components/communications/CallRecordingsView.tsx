@@ -25,7 +25,6 @@ import {
   Phone,
   PhoneIncoming,
   PhoneOutgoing,
-  Calendar,
 } from "lucide-react";
 import CircularProgressCircle from "@components/CircularProgressCircle";
 
@@ -37,10 +36,8 @@ import {
   formatDuration,
   GlobalDateFormat,
   GlobalTimeFormat,
-  GlobalDateTimeFormat,
   encodeAnalysisData,
   convertDateTimeWithOffsetToLocal,
-  formatDateTimeToLocal,
 } from "@utils/Helper";
 import { formatFilterDateTimeLabel } from "@utils/communicationsDateUtils";
 import {
@@ -77,6 +74,10 @@ import {
   exportCallRecordingsExcelThunk,
   resetCallRecordingsFiltersThunk,
 } from "@toolkit/callRecordingsList/thunks";
+import {
+  CALL_RECORDINGS_TOOLBAR,
+  COMMUNICATIONS_TABS_DROPDOWN_ITEMS,
+} from "@components/communications/callLogsListPageConfig";
 
 const ReactApexChart = dynamic(() => import("react-apexcharts"), {
   ssr: false,
@@ -264,8 +265,6 @@ const CallRecordingsView: React.FC = () => {
   const currentChartTitle = useAppSelector(
     (s) => s.callRecordingsList.currentChartTitle,
   );
-  const startDateTime = useAppSelector((s) => s.callRecordingsList.startDateTime);
-  const endDateTime = useAppSelector((s) => s.callRecordingsList.endDateTime);
 
   const filtersKey = useMemo(
     () => JSON.stringify(appliedFilters),
@@ -330,7 +329,6 @@ const CallRecordingsView: React.FC = () => {
   const tableLoading = listPending || listFetching;
 
   const showAnalytics = false;
-  const [showDateRange] = useState(true);
 
   const {
     hierarchyDataExtensions,
@@ -616,13 +614,6 @@ const CallRecordingsView: React.FC = () => {
     ],
   );
 
-  const selectedStartDateTime = String(
-    appliedFilters.start_date ?? startDateTime ?? "",
-  );
-  const selectedEndDateTime = String(
-    appliedFilters.end_date ?? endDateTime ?? "",
-  );
-
   const handleOpenChartModal = useCallback(
     (title: string) => {
       dispatch(setCurrentChartTitle(title));
@@ -642,18 +633,21 @@ const CallRecordingsView: React.FC = () => {
   const tableToolbar = useMemo(() => {
     return {
       showTabs: true,
+      tabsDropdownLabel: CALL_RECORDINGS_TOOLBAR.tabsDropdownLabel,
+      tabsDropdownItems: COMMUNICATIONS_TABS_DROPDOWN_ITEMS,
       tabs: [
         {
-          id: "call-recordings-title",
-          label: "Call Recordings",
+          id: "all",
+          label: CALL_RECORDINGS_TOOLBAR.allTabLabel,
+          count: pagination.totalRows,
           removable: false,
         },
       ],
-      activeTab: "call-recordings-title",
+      activeTab: "all",
       onTabChange: () => {},
       showSearch: true,
       searchValue,
-      searchPlaceholder: "Search by username, extension, phone...",
+      searchPlaceholder: CALL_RECORDINGS_TOOLBAR.searchPlaceholder,
       onSearchChange: (value: string) => dispatch(setSearchValue(value)),
       onSearch: () => {
         const st = store.getState().callRecordingsList;
@@ -667,7 +661,7 @@ const CallRecordingsView: React.FC = () => {
       showFiltersButton: canViewCallRecordings,
       showExportButton: canExportCallRecordings,
       onExportClick: handleExportExcel,
-      showFilterPills: true,
+      showFilterPills: false,
       showMoreFiltersButton: false,
       filterPills: [
         buildCallDirectionFilterPill(
@@ -720,57 +714,6 @@ const CallRecordingsView: React.FC = () => {
         handleApplyFiltersClick,
         "call-recordings",
       ),
-      rightActions: (
-        <div className="d-flex align-items-center gap-2 call-recordings-date-range-wrap">
-          {showDateRange &&
-            selectedStartDateTime &&
-            selectedEndDateTime &&
-            moment.utc(selectedStartDateTime).isValid() &&
-            moment.utc(selectedEndDateTime).isValid() && (
-              <div
-                className="d-flex align-items-center gap-2 call-recordings-date-chip"
-                style={{
-                  background: "#f8fafc",
-                  border: "1px solid #e2e8f0",
-                  borderRadius: "10px",
-                  padding: "6px 10px",
-                }}
-              >
-                <span
-                  className="d-inline-flex align-items-center justify-content-center"
-                  style={{
-                    width: "24px",
-                    height: "24px",
-                    borderRadius: "6px",
-                    background: "#eef2ff",
-                    color: "#4f46e5",
-                  }}
-                >
-                  <Calendar size={14} />
-                </span>
-                <span
-                  className="call-recordings-date-text"
-                  style={{
-                    fontSize: "12px",
-                    fontWeight: 600,
-                    color: "#0f172a",
-                    whiteSpace: "nowrap",
-                  }}
-                >
-                  {formatDateTimeToLocal(
-                    selectedStartDateTime,
-                    GlobalDateTimeFormat,
-                  )}{" "}
-                  -{" "}
-                  {formatDateTimeToLocal(
-                    selectedEndDateTime,
-                    GlobalDateTimeFormat,
-                  )}
-                </span>
-              </div>
-            )}
-        </div>
-      ),
     };
   }, [
     canExportCallRecordings,
@@ -789,9 +732,7 @@ const CallRecordingsView: React.FC = () => {
     handleApplyFiltersClick,
     hasUnappliedFilterChanges,
     hasNonDefaultFilters,
-    showDateRange,
-    selectedStartDateTime,
-    selectedEndDateTime,
+    pagination.totalRows,
   ]);
 
   const handleDownload = async (props: RecordingRow) => {

@@ -20,7 +20,7 @@ const CallLogsDateRangeBanner: React.FC<
 
   return (
     <div
-      className="mb-3 d-flex align-items-center justify-content-between flex-wrap gap-2"
+      className="call-logs-date-range-banner communications-date-range-banner mb-3 d-flex align-items-center justify-content-between flex-wrap gap-2"
       style={{
         background: "#f8fafc",
         border: "1px solid #e2e8f0",

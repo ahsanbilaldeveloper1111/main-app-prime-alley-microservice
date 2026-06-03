@@ -15,8 +15,6 @@ import { DownloadCallRecording } from "@utils/calls";
 import { toast } from "react-toastify";
 import {
   ModuleSlug,
-  formatDateTimeToLocal,
-  GlobalDateTimeFormat,
   formatDuration,
   encodeAnalysisData,
   GlobalDateFormat,
@@ -27,7 +25,6 @@ import { useHierarchyData } from "@components/filters/useHierarchyData";
 import AudioPlayer, { type AudioPlayerRef } from "@components/AudioPlayer";
 import axiosInstance from "@utils/axios";
 import CircularProgressCircle from "@components/CircularProgressCircle";
-import { Calendar } from "lucide-react";
 import type { RootState } from "@toolkit/index";
 import { useAppDispatch, useAppSelector } from "@toolkit/hooks";
 import {
@@ -40,6 +37,10 @@ import {
   fetchCallAnalysisListThunk,
   runCallAnalysisFetchForRefreshKeyThunk,
 } from "@toolkit/callAnalysisList/thunks";
+import {
+  CALL_ANALYSIS_TOOLBAR,
+  COMMUNICATIONS_TABS_DROPDOWN_ITEMS,
+} from "@components/communications/callLogsListPageConfig";
 
 type AnalysisRow = Record<string, unknown> & {
   uuid?: string;
@@ -287,24 +288,24 @@ const CallAnalysisView: React.FC = () => {
     return "";
   };
 
-  const selectedStartDateTime = String(filters?.start_datetime ?? "");
-  const selectedEndDateTime = String(filters?.end_datetime ?? "");
-
   const tableToolbar = useMemo(
     () => ({
       showTabs: true,
+      tabsDropdownLabel: CALL_ANALYSIS_TOOLBAR.tabsDropdownLabel,
+      tabsDropdownItems: COMMUNICATIONS_TABS_DROPDOWN_ITEMS,
       tabs: [
         {
-          id: "call-analysis-title",
-          label: "Call Analysis",
+          id: "all",
+          label: CALL_ANALYSIS_TOOLBAR.allTabLabel,
+          count: pagination.totalRows,
           removable: false,
         },
       ],
-      activeTab: "call-analysis-title",
+      activeTab: "all",
       onTabChange: () => {},
       showSearch: true,
       searchValue,
-      searchPlaceholder: "Search call recordings...",
+      searchPlaceholder: CALL_ANALYSIS_TOOLBAR.searchPlaceholder,
       onSearchChange: (value: string) => dispatch(setSearchValue(value)),
       onSearch: () => {
         const st =
@@ -324,7 +325,7 @@ const CallAnalysisView: React.FC = () => {
         );
       },
       showFiltersButton: true,
-      showFilterPills: true,
+      showFilterPills: false,
       showMoreFiltersButton: false,
       filterPills: [
         {
@@ -551,56 +552,6 @@ const CallAnalysisView: React.FC = () => {
           ),
         },
       ],
-      rightActions: (
-        <div className="d-flex align-items-center gap-2 call-analysis-date-range-wrap">
-          {selectedStartDateTime &&
-            selectedEndDateTime &&
-            moment.utc(selectedStartDateTime).isValid() &&
-            moment.utc(selectedEndDateTime).isValid() && (
-              <div
-                className="d-flex align-items-center gap-2 call-analysis-date-chip"
-                style={{
-                  background: "#f8fafc",
-                  border: "1px solid #e2e8f0",
-                  borderRadius: "10px",
-                  padding: "6px 10px",
-                }}
-              >
-                <span
-                  className="d-inline-flex align-items-center justify-content-center"
-                  style={{
-                    width: "24px",
-                    height: "24px",
-                    borderRadius: "6px",
-                    background: "#eef2ff",
-                    color: "#4f46e5",
-                  }}
-                >
-                  <Calendar size={14} />
-                </span>
-                <span
-                  className="call-analysis-date-text"
-                  style={{
-                    fontSize: "12px",
-                    fontWeight: 600,
-                    color: "#0f172a",
-                    whiteSpace: "nowrap",
-                  }}
-                >
-                  {formatDateTimeToLocal(
-                    selectedStartDateTime,
-                    GlobalDateTimeFormat,
-                  )}{" "}
-                  -{" "}
-                  {formatDateTimeToLocal(
-                    selectedEndDateTime,
-                    GlobalDateTimeFormat,
-                  )}
-                </span>
-              </div>
-            )}
-        </div>
-      ),
     }),
     [
       searchValue,
@@ -609,8 +560,7 @@ const CallAnalysisView: React.FC = () => {
       dispatch,
       store,
       applyFilters,
-      selectedStartDateTime,
-      selectedEndDateTime,
+      pagination.totalRows,
     ],
   );
 

@@ -563,6 +563,19 @@ body:has(.prospects-scrollable-content) {
     height: 100% !important;
   }
 
+  .generic-table-responsive {
+    width: 97% !important;
+    margin: 14px 25px !important;
+    border: 1px solid #ccc !important;
+    border-radius: 15px 15px 0 0 !important;
+    box-shadow: none !important;
+  }
+
+  .gt-toolbar-container + .generic-table-card .generic-table-responsive {
+    border-radius: 0 !important;
+    border-top: none !important;
+  }
+
   .prospects-table-wrapper {
     flex: 1 !important;
     display: flex !important;
@@ -577,6 +590,49 @@ body:has(.prospects-scrollable-content) {
 
   .gt-toolbar-tabs-section {
     flex-shrink: 0 !important;
+  }
+
+  .gt-toolbar-actions .btn.gt-toolbar-btn,
+  .gt-filter-pills-right-actions .gt-toolbar-btn {
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 6px !important;
+    padding: 6px 15px !important;
+    font-size: 12px !important;
+    font-weight: 300 !important;
+    color: #000 !important;
+    background: #fff !important;
+    border: 1px solid #8a8a8a !important;
+    border-radius: 4px !important;
+    box-shadow: none !important;
+  }
+
+  .gt-toolbar-actions .btn.gt-toolbar-btn--primary {
+    background: #141414 !important;
+    color: #ffffff !important;
+    border-color: #141414 !important;
+    font-weight: 500 !important;
+  }
+
+  .gt-toolbar-actions .btn.gt-toolbar-btn--primary:hover:not(:disabled) {
+    background: #2d2d2d !important;
+    border-color: #2d2d2d !important;
+    color: #ffffff !important;
+  }
+
+  .gt-filter-pills-right-actions .gt-apply-filters-btn,
+  .gt-filter-pills-right-actions [class$='-apply-filters-btn'] {
+    background: #0066CC !important;
+    color: #ffffff !important;
+    border-color: #0066CC !important;
+    font-weight: 500 !important;
+  }
+
+  .gt-filter-pills-right-actions .gt-apply-filters-btn:hover:not(:disabled),
+  .gt-filter-pills-right-actions [class$='-apply-filters-btn']:hover:not(:disabled) {
+    background: #0052A3 !important;
+    border-color: #0052A3 !important;
+    color: #ffffff !important;
   }
 
   .prospects-scrollable-content {

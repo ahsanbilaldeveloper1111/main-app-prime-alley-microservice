@@ -58,7 +58,7 @@ export function renderApplyResetFilterActions(
         type="button"
         onClick={onApply}
         disabled={!hasUnappliedFilterChanges}
-        className={`gt-toolbar-btn gt-toolbar-btn--primary ${classPrefix}-apply-filters-btn`}
+        className={`gt-toolbar-btn gt-apply-filters-btn ${classPrefix}-apply-filters-btn`}
       >
         Apply Filters
       </button>

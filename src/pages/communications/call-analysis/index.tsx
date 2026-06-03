@@ -1,32 +1,11 @@
 import "@assets/scss/datatable-style.scss";
-import { type ReactElement } from "react";
-import type { NextPage } from "next";
-
+import React, { ReactElement } from "react";
 import Layout from "@layout/index";
+import { CallAnalysisListPage } from "@components/communications/CallAnalysisListPage";
 
-import "@assets/scss/common.scss";
-import "@assets/scss/report-style.scss";
-import "@assets/scss/tabs.scss";
-import "@assets/scss/call-analysis-page.scss";
+/** Call analysis list is implemented in `CallAnalysisListPage`. */
+const AnalyzeRecordings = () => <CallAnalysisListPage />;
 
-import {
-  CallAnalysisBreadcrumb,
-  CallAnalysisView,
-} from "@components/communications";
-
-const AnalyzeRecordings: NextPage & {
-  getLayout?: (page: React.ReactElement) => React.ReactNode;
-} = () => {
-  return (
-    <div className="call-analysis-page">
-      <CallAnalysisBreadcrumb />
-      <CallAnalysisView />
-    </div>
-  );
-};
-
-AnalyzeRecordings.getLayout = (page: ReactElement) => {
-  return <Layout>{page}</Layout>;
-};
+AnalyzeRecordings.getLayout = (page: ReactElement) => <Layout>{page}</Layout>;
 
 export default AnalyzeRecordings;
