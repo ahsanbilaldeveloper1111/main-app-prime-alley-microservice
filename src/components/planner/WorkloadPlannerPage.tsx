@@ -74,6 +74,7 @@ import {
   WORKLOAD_MOCK_BOARD_DATA,
   WORKLOAD_MOCK_GRID_DATA,
 } from "./workload/workloadOnboarding";
+import { startWorkloadTour } from "./workload/useWorkloadTour";
 
 type MainView = "grid" | "board";
 
@@ -150,8 +151,15 @@ const WorkloadPlannerPage: React.FC = () => {
   function handleOnboardingComplete(choice: "sample" | "fresh" | null) {
     if (choice === "sample") {
       setUseMockData(true);
+      setTimeout(() => startWorkloadTour(mainView, () => {}), 600);
     }
     setShowOnboarding(false);
+  }
+
+  function handleStartTour() {
+    startWorkloadTour(mainView, () => {
+      // tour complete — nothing extra needed
+    });
   }
 
   const appliedRangeValid = useMemo(

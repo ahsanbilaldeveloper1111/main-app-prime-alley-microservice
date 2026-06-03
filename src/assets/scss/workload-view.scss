@@ -834,14 +834,14 @@
     border-color: #86efac;
   }
 
-  .workload-cell-btn--near_full .workload-cell-card--filled {
+  .workload-cell--near_full .workload-cell-card--filled {
     background: #fff7ed;
-    border-color: #fdba74;
+    border-color: #f97316;
   }
 
-  .workload-cell-btn--overloaded .workload-cell-card--filled {
+  .workload-cell--overloaded .workload-cell-card--filled {
     background: #fef2f2;
-    border-color: #fca5a5;
+    border-color: #ef4444;
   }
 
   .workload-cell-btn--incomplete_data .workload-cell-card--zero {
@@ -874,11 +874,11 @@
     color: #15803d;
   }
 
-  .workload-cell-btn--near_full .workload-cell__time--filled {
+  .workload-cell--near_full .workload-cell__time--filled {
     color: #c2410c;
   }
 
-  .workload-cell-btn--overloaded .workload-cell__time--filled {
+  .workload-cell--overloaded .workload-cell__time--filled {
     color: #b91c1c;
   }
 
@@ -908,11 +908,11 @@
     color: #15803d;
   }
 
-  .workload-cell-btn--near_full .workload-cell__pct--filled {
+  .workload-cell--near_full .workload-cell__pct--filled {
     color: #c2410c;
   }
 
-  .workload-cell-btn--overloaded .workload-cell__pct--filled {
+  .workload-cell--overloaded .workload-cell__pct--filled {
     color: #b91c1c;
   }
 
