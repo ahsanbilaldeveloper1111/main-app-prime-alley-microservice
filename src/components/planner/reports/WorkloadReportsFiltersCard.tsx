@@ -45,6 +45,7 @@ export function WorkloadReportsFiltersCard({
   onApply,
 }: WorkloadReportsFiltersCardProps) {
   const [openPill, setOpenPill] = useState<string | null>(null);
+  const [scopeFilter, setScopeFilter] = useState<"team" | "project">("team");
   const barRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -76,6 +77,30 @@ export function WorkloadReportsFiltersCard({
   return (
     <div className="reports-filter-bar" ref={barRef}>
       <div className="reports-filter-bar__inner">
+        <div className="reports-filter-bar__pill-wrap">
+          <button
+            type="button"
+            className={`reports-filter-bar__pill-btn${scopeFilter === "team" ? " reports-filter-bar__pill-btn--active" : ""}`}
+            onClick={() => setScopeFilter("team")}
+            disabled={!enabled}
+          >
+            <i className="ti ti-users reports-filter-bar__pill-icon" aria-hidden="true" />
+            <span>My Team</span>
+          </button>
+        </div>
+        <div className="reports-filter-bar__pill-wrap">
+          <button
+            type="button"
+            className={`reports-filter-bar__pill-btn${scopeFilter === "project" ? " reports-filter-bar__pill-btn--active" : ""}`}
+            onClick={() => setScopeFilter("project")}
+            disabled={!enabled}
+          >
+            <i className="ti ti-topology-star reports-filter-bar__pill-icon" aria-hidden="true" />
+            <span>By Project</span>
+          </button>
+        </div>
+        <div className="reports-filter-bar__sep" aria-hidden="true" />
+
         <div className="reports-filter-bar__pill-wrap">
           <button
             type="button"
