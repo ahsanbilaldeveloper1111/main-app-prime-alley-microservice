@@ -74,7 +74,7 @@ import {
   WORKLOAD_MOCK_BOARD_DATA,
   WORKLOAD_MOCK_GRID_DATA,
 } from "./workload/workloadOnboarding";
-import { startWorkloadTour } from "./workload/useWorkloadTour";
+import { startWorkloadTour, getGridTourSeen, getBoardTourSeen } from "./workload/useWorkloadTour";
 
 type MainView = "grid" | "board";
 
@@ -147,19 +147,25 @@ const WorkloadPlannerPage: React.FC = () => {
     () => !getOnboardingStatus(),
   );
   const [useMockData, setUseMockData] = useState(false);
+  const [showBoardHint, setShowBoardHint] = useState(true);
 
   function handleOnboardingComplete(choice: "sample" | "fresh" | null) {
     if (choice === "sample") {
       setUseMockData(true);
-      setTimeout(() => startWorkloadTour(mainView, () => {}), 600);
+      setTimeout(() => startWorkloadTour("grid", () => {}), 600);
     }
     setShowOnboarding(false);
   }
 
-  function handleStartTour() {
-    startWorkloadTour(mainView, () => {
-      // tour complete — nothing extra needed
-    });
+  function handleMainViewChange(view: MainView) {
+    setMainView(view);
+    writeWorkloadMainViewPreference(view);
+    if (view === "board" && !getBoardTourSeen()) {
+      setTimeout(() => startWorkloadTour("board", () => {}), 600);
+    }
+    if (view === "grid" && !getGridTourSeen()) {
+      setTimeout(() => startWorkloadTour("grid", () => {}), 600);
+    }
   }
 
   const appliedRangeValid = useMemo(
@@ -198,6 +204,23 @@ const WorkloadPlannerPage: React.FC = () => {
   useEffect(() => {
     writeWorkloadMainViewPreference(mainView);
   }, [mainView]);
+
+  useEffect(() => {
+    const originalScrollbar = document.body.style.paddingRight;
+    const observer = new MutationObserver(() => {
+      if (document.body.classList.contains('modal-open')) {
+        document.body.style.paddingRight = "0px";
+      }
+    });
+    observer.observe(document.body, {
+      attributes: true,
+      attributeFilter: ["class", "style"],
+    });
+    return () => {
+      observer.disconnect();
+      document.body.style.paddingRight = originalScrollbar;
+    };
+  }, []);
 
   const handleDraftRangeChange = useCallback((value: WorkloadRangePreset) => {
     setDraftFilters((prev) => {
@@ -564,7 +587,7 @@ const WorkloadPlannerPage: React.FC = () => {
           <button
             type="button"
             className="workload-demo-banner__exit"
-            onClick={() => setUseMockData(false)}
+            onClick={() => { setUseMockData(false); window.scrollTo(0, 0); }}
           >
             Exit demo → view real data
           </button>
@@ -574,7 +597,7 @@ const WorkloadPlannerPage: React.FC = () => {
 
         <WorkloadPlannerPageHeader
           mainView={mainView}
-          onMainViewChange={setMainView}
+          onMainViewChange={handleMainViewChange}
           enabled={queriesEnabled}
         />
 
@@ -634,6 +657,21 @@ const WorkloadPlannerPage: React.FC = () => {
           mainView={mainView}
           workloadErrorMessage={workloadErrorMessage}
         />
+
+        {mainView === "board" && useMockData && showBoardHint ? (
+          <div className="workload-board-hint">
+            <i className="ti ti-info-circle" aria-hidden="true" />
+            <span><strong>Drag</strong> cards between columns to reassign &nbsp;·&nbsp; <strong>Move to</strong> changes due date &nbsp;·&nbsp; <strong>View</strong> opens the full task</span>
+            <button
+              type="button"
+              className="workload-board-hint__close"
+              onClick={() => setShowBoardHint(false)}
+              aria-label="Dismiss"
+            >
+              <i className="ti ti-x" aria-hidden="true" />
+            </button>
+          </div>
+        ) : null}
 
         <WorkloadPlannerDataViews
           loadingMain={loadingMain}
