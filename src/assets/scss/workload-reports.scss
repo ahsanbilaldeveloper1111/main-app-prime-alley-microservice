@@ -215,18 +215,26 @@
 
   .reports-kpi-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
-    gap: 12px;
-    margin-bottom: 1rem;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    margin: 0 0 4px;
+    background: #ffffff;
+    border-bottom: 1px solid #eaf0f6;
+    gap: 0;
   }
 
   .reports-kpi-card {
-    background: #fff;
-    border: 1px solid #eaf0f6;
-    border-radius: 6px;
-    padding: 14px 1.1rem 1rem;
+    padding: 16px 20px;
+    border-right: 1px solid #eaf0f6;
+    background: #ffffff;
+    border-top: none;
+    border-bottom: none;
+    border-left: none;
+    border-radius: 0;
     box-shadow: none;
-    border-top: 3px solid var(--reports-kpi-accent, #0066CC);
+
+    &:last-child {
+      border-right: none;
+    }
   }
 
   .reports-kpi-card--completed {
@@ -255,30 +263,38 @@
   }
 
   .reports-kpi-card__label {
-    font-size: 0.78rem;
-    color: #6b7280;
-    margin-bottom: 0.25rem;
+    font-size: clamp(10px, 0.85vw, 12px);
+    font-weight: 500;
+    color: #141414;
+    margin-bottom: 8px;
     font-family: "Lexend Deca", Helvetica, Arial, sans-serif;
   }
 
   .reports-kpi-card__value {
-    font-size: 1.75rem;
+    font-size: clamp(20px, 1.8vw, 28px);
     font-weight: 700;
-    line-height: 1.1;
-    color: #111827;
+    line-height: 1;
+    color: #141414;
+    margin-bottom: 6px;
     font-family: "Lexend Deca", Helvetica, Arial, sans-serif;
   }
 
   .reports-kpi-card__sub {
-    font-size: 0.72rem;
-    color: #9ca3af;
-    margin-top: 0.35rem;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: clamp(10px, 0.75vw, 11px);
+    color: #718096;
+    font-family: "Lexend Deca", Helvetica, Arial, sans-serif;
   }
 
   .reports-kpi-card__delta {
-    font-size: 0.72rem;
-    margin-top: 0.25rem;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: clamp(10px, 0.75vw, 11px);
     font-weight: 600;
+    margin-top: 0;
   }
 
   .reports-kpi-card__delta--up {
@@ -287,6 +303,13 @@
 
   .reports-kpi-card__delta--down {
     color: #dc2626;
+  }
+
+  .reports-kpi-card__dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    flex-shrink: 0;
   }
 
   .reports-panel {
