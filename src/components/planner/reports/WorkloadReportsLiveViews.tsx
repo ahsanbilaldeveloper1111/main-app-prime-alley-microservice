@@ -1,48 +1,10 @@
 import React from "react";
 import { Badge, Col, Row } from "react-bootstrap";
-import {
-  CartesianGrid,
-  Line,
-  LineChart,
-  ResponsiveContainer,
-} from "recharts";
 import type {
   LiveDashboardKpi,
   LiveMemberRow,
   LiveTaskDetailRow,
 } from "@page-modules/planner/reports/teamLiveViewDomain";
-
-const KPI_SPARKLINE_COLORS: Record<LiveDashboardKpi["accent"], string> = {
-  default: "#3b82f6",
-  in_progress: "#f59e0b",
-  overdue: "#ef4444",
-  completed: "#22c55e",
-  pending: "#f59e0b",
-};
-
-function ReportsKpiSparkline({
-  points,
-  color,
-}: Readonly<{ points: number[]; color: string }>) {
-  const data = points.map((value, index) => ({ index, value }));
-  return (
-    <div className="reports-kpi-sparkline" aria-hidden>
-      <ResponsiveContainer width="100%" height={36}>
-        <LineChart data={data} margin={{ top: 4, right: 0, left: 0, bottom: 0 }}>
-          <CartesianGrid vertical={false} horizontal={false} />
-          <Line
-            type="monotone"
-            dataKey="value"
-            stroke={color}
-            strokeWidth={2}
-            dot={false}
-            activeDot={false}
-          />
-        </LineChart>
-      </ResponsiveContainer>
-    </div>
-  );
-}
 
 export function ReportsLiveDashboardKpiRow({
   cards,
@@ -52,14 +14,11 @@ export function ReportsLiveDashboardKpiRow({
       {cards.map((card) => (
         <div
           key={card.label}
-          className={`reports-kpi-card reports-kpi-card--sparkline reports-kpi-card--${card.accent === "in_progress" ? "in-progress" : card.accent}`}
+          className={`reports-kpi-card reports-kpi-card--${card.accent === "in_progress" ? "in-progress" : card.accent}`}
         >
           <div className="reports-kpi-card__label">{card.label}</div>
           <div className="reports-kpi-card__value">{card.value}</div>
-          <ReportsKpiSparkline
-            points={card.sparkline}
-            color={KPI_SPARKLINE_COLORS[card.accent]}
-          />
+          {card.sub ? <div className="reports-kpi-card__sub">{card.sub}</div> : null}
         </div>
       ))}
     </div>
