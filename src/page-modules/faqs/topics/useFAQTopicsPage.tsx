@@ -1,4 +1,7 @@
-import type { TableAction, TableColumn } from "@components/GenericTable";
+import { appendSettingsActionsColumn } from "@components/main-settings/settingsEmbeddedTable";
+import type { TableColumn } from "@components/GenericTable";
+import type { CrmTableRowAction } from "@page-modules/crm/shared/CrmTableRowActions";
+import { Edit, Trash2 } from "lucide-react";
 import { useAllFAQModulesQuery } from "@page-modules/faqs/useAllFAQModulesQuery";
 import { useFAQTopicsListQuery } from "@page-modules/faqs/useFAQTopicsListQuery";
 import { faqsKeys } from "@query/keys";
@@ -177,7 +180,7 @@ export function useFAQTopicsPage() {
     setCurrentPage(1);
   }, []);
 
-  const columns: TableColumn<FAQTopicRow>[] = useMemo(
+  const baseColumns: TableColumn<FAQTopicRow>[] = useMemo(
     () => [
       {
         key: "name",
@@ -207,18 +210,23 @@ export function useFAQTopicsPage() {
     [],
   );
 
-  const actions: TableAction<FAQTopicRow>[] = useMemo(
-    () => [
-      {
-        label: "Edit",
-        onClick: openEditSidebar,
-      },
-      {
-        label: "Delete",
-        onClick: handleDeleteTopic,
-      },
-    ],
-    [openEditSidebar, handleDeleteTopic],
+  const columns = useMemo(
+    () =>
+      appendSettingsActionsColumn<FAQTopicRow>(baseColumns, (row): CrmTableRowAction[] => [
+        {
+          label: `Edit ${row.name}`,
+          icon: <Edit size={22} aria-hidden />,
+          tone: "primary",
+          onClick: () => openEditSidebar(row),
+        },
+        {
+          label: `Delete ${row.name}`,
+          icon: <Trash2 size={22} aria-hidden />,
+          tone: "danger",
+          onClick: () => handleDeleteTopic(row),
+        },
+      ]),
+    [baseColumns, openEditSidebar, handleDeleteTopic],
   );
 
   const isSubmitting = createMutation.isPending || updateMutation.isPending;
@@ -227,7 +235,6 @@ export function useFAQTopicsPage() {
     data,
     loading,
     columns,
-    actions,
     currentPage,
     rowsPerPage,
     totalRows,

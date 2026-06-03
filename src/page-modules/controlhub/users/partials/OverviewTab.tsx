@@ -15,6 +15,7 @@ interface OverviewTabProps {
     listRefreshToken?: number;
     hasListPermission: boolean;
     showFilters?: boolean;
+    embeddedInMainSettings?: boolean;
 }
 
 const OverviewTab: React.FC<OverviewTabProps> = ({
@@ -26,6 +27,7 @@ const OverviewTab: React.FC<OverviewTabProps> = ({
     listRefreshToken = 0,
     hasListPermission,
     showFilters = true,
+    embeddedInMainSettings = false,
 }) => {
     const { data: session } = useSession();
     const canShowFilters =
@@ -44,6 +46,7 @@ const OverviewTab: React.FC<OverviewTabProps> = ({
                 listRefreshToken={listRefreshToken}
                 hasPermission={hasListPermission}
                 showFilters={canShowFilters}
+                embeddedInMainSettings={embeddedInMainSettings}
             />
 
             <Row className="mt-3">

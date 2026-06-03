@@ -7,7 +7,9 @@ import {
   CreateSubmoduleChild,
   DeleteSubmoduleChild,
 } from "@utils/ticket-module";
-import type { TableAction, TableColumn } from "@components/GenericTable";
+import { appendSettingsActionsColumn } from "@components/main-settings/settingsEmbeddedTable";
+import type { TableColumn } from "@components/GenericTable";
+import type { CrmTableRowAction } from "@page-modules/crm/shared/CrmTableRowActions";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useMemo, useState } from "react";
 import { toast } from "react-toastify";
@@ -140,7 +142,7 @@ export function useModuleSubCategoriesPage() {
     setCurrentPage(1);
   }, []);
 
-  const columns = useMemo<TableColumn<SubCategoryRow>[]>(
+  const baseColumns = useMemo<TableColumn<SubCategoryRow>[]>(
     () => [
       {
         key: "name",
@@ -186,24 +188,23 @@ export function useModuleSubCategoriesPage() {
     [],
   );
 
-  const actions: TableAction<SubCategoryRow>[] = useMemo(
-    () => [
-      {
-        label: "Delete",
-        icon: <Trash2 size={16} />,
-        variant: "light",
-        className: "btn-action-style-2 p-1 text-danger",
-        onClick: handleDeleteSubCategoryRow,
-      },
-    ],
-    [handleDeleteSubCategoryRow],
+  const columns = useMemo(
+    () =>
+      appendSettingsActionsColumn<SubCategoryRow>(baseColumns, (row): CrmTableRowAction[] => [
+        {
+          label: `Delete ${row.name}`,
+          icon: <Trash2 size={22} aria-hidden />,
+          tone: "danger",
+          onClick: () => handleDeleteSubCategoryRow(row),
+        },
+      ]),
+    [baseColumns, handleDeleteSubCategoryRow],
   );
 
   return {
     data,
     loading,
     columns,
-    actions,
     currentPage,
     rowsPerPage,
     totalRows,

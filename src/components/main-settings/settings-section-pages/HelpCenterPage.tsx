@@ -39,7 +39,13 @@ export const HelpCenterPage: React.FC<ControlledTabsProps> = ({
   const { allowedTabs, activeTab, selectTab } = useSettingsSectionTabs(routeActiveTab, onTabChange, helpCenterTabs, 'modules')
 
   return (
-    <SettingsSectionTabShell title="Help Center" allowedTabs={allowedTabs} activeTab={activeTab} onSelectTab={selectTab}>
+    <SettingsSectionTabShell
+      title="Help Center"
+      allowedTabs={allowedTabs}
+      activeTab={activeTab}
+      onSelectTab={selectTab}
+      dense
+    >
       <HelpCenterTabPanel activeTab={activeTab} />
     </SettingsSectionTabShell>
   )

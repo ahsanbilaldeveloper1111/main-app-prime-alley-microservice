@@ -1,9 +1,10 @@
 import BreadcrumbItem from "@common/BreadcrumbItem";
-import GenericTable, { type TableAction, type TableColumn } from "@components/GenericTable";
+import GenericTable, { type TableColumn } from "@components/GenericTable";
+import { SettingsEmbeddedTableWrap } from "@components/main-settings/settingsEmbeddedTable";
+import { SettingsEmbeddedToolbar } from "@components/main-settings/SettingsEmbeddedToolbar";
 import FormModal from "@components/page-partials/FormModal";
 import ConfirmModal from "@components/page-partials/ConfirmModal";
 import PageHeader from "@components/PageHeader";
-import { TicketsSettingsEmbeddedToolbar } from "@page-modules/tickets/shared/TicketsSettingsEmbeddedToolbar";
 import React from "react";
 import { Button } from "react-bootstrap";
 import { Info } from "lucide-react";
@@ -16,7 +17,6 @@ export type ModuleCategoriesPageViewProps = Readonly<{
   data: TicketSubmoduleRow[];
   loading: boolean;
   columns: TableColumn<TicketSubmoduleRow>[];
-  actions: TableAction<TicketSubmoduleRow>[];
   currentPage: number;
   rowsPerPage: number;
   totalRows: number;
@@ -46,7 +46,6 @@ export const ModuleCategoriesPageView: React.FC<ModuleCategoriesPageViewProps> =
   data,
   loading,
   columns,
-  actions,
   currentPage,
   rowsPerPage,
   totalRows,
@@ -74,12 +73,12 @@ export const ModuleCategoriesPageView: React.FC<ModuleCategoriesPageViewProps> =
     ) : null}
 
     {embeddedInMainSettings ? (
-      <TicketsSettingsEmbeddedToolbar
+      <SettingsEmbeddedToolbar
         searchValue={searchValue}
         onSearchChange={onSearchChange}
         searchPlaceholder="Search categories..."
         actions={
-          <Button variant="primary" onClick={onOpenCreateModal} type="button">
+          <Button variant="primary" size="sm" onClick={onOpenCreateModal} type="button">
             New Category
           </Button>
         }
@@ -95,37 +94,56 @@ export const ModuleCategoriesPageView: React.FC<ModuleCategoriesPageViewProps> =
       />
     )}
 
-    <GenericTable<TicketSubmoduleRow>
-      data={data}
-      columns={columns}
-      loading={loading}
-      actions={actions}
-      showActions={actions.length > 0}
-      actionsLabel="Actions"
-      pagination={{
-        currentPage,
-        rowsPerPage,
-        totalRows,
-        pageSizeOptions: [15, 25, 50, 100],
-      }}
-      onPaginationChange={onPaginationChange}
-      sortable={true}
-      hover={true}
-      emptyMessage="No categories found."
-      showToolbar={!embeddedInMainSettings}
-      toolbar={
-        embeddedInMainSettings
-          ? undefined
-          : {
-              showSearch: true,
-              searchValue,
-              searchPlaceholder: "Search categories...",
-              onSearchChange,
-            }
-      }
-      showToolbarActions={false}
-      uniqueKey="id"
-    />
+    {embeddedInMainSettings ? (
+      <SettingsEmbeddedTableWrap>
+        <GenericTable<TicketSubmoduleRow>
+          data={data}
+          columns={columns}
+          loading={loading}
+          showActions={false}
+          pagination={{
+            currentPage,
+            rowsPerPage,
+            totalRows,
+            pageSizeOptions: [15, 25, 50, 100],
+          }}
+          onPaginationChange={onPaginationChange}
+          sortable
+          hover
+          size="md"
+          emptyMessage="No categories found."
+          showToolbar={false}
+          showToolbarActions={false}
+          uniqueKey="id"
+        />
+      </SettingsEmbeddedTableWrap>
+    ) : (
+      <GenericTable<TicketSubmoduleRow>
+        data={data}
+        columns={columns}
+        loading={loading}
+        showActions={false}
+        pagination={{
+          currentPage,
+          rowsPerPage,
+          totalRows,
+          pageSizeOptions: [15, 25, 50, 100],
+        }}
+        onPaginationChange={onPaginationChange}
+        sortable
+        hover
+        emptyMessage="No categories found."
+        showToolbar
+        toolbar={{
+          showSearch: true,
+          searchValue,
+          searchPlaceholder: "Search categories...",
+          onSearchChange,
+        }}
+        showToolbarActions={false}
+        uniqueKey="id"
+      />
+    )}
 
     <FormModal
       show={showCreateModal}

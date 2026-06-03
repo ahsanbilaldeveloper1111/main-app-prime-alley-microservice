@@ -1,5 +1,5 @@
 import React from "react";
-import { Badge, Button } from "react-bootstrap";
+import { Badge } from "react-bootstrap";
 import { Edit, Eye, RotateCcw, Trash2 } from "lucide-react";
 import type { TableColumn } from "@components/GenericTable";
 import CrmColorCell from "@components/crm/crmColorCell";
@@ -10,6 +10,7 @@ import {
   getStageTypeDotClassName,
   type StageRow,
 } from "@page-modules/crm/stages/stagesPageModel";
+import { CrmTableRowActions } from "@page-modules/crm/shared/CrmTableRowActions";
 
 export interface BuildStagesTableColumnsParams {
   selectedColumns: string[];
@@ -98,28 +99,22 @@ function renderDeletedActions(
   onRestore: (s: StageRow) => void,
 ): React.ReactNode {
   return (
-    <>
-      <Button
-        variant="link"
-        size="sm"
-        className="p-1"
-        title="View"
-        onClick={() => onView(stage)}
-        aria-label={"View stage " + stage.name}
-      >
-        <Eye size={16} aria-hidden />
-      </Button>
-      <Button
-        variant="link"
-        size="sm"
-        className="p-1 text-success"
-        title="Restore"
-        onClick={() => onRestore(stage)}
-        aria-label={"Restore stage " + stage.name}
-      >
-        <RotateCcw size={16} aria-hidden />
-      </Button>
-    </>
+    <CrmTableRowActions
+      actions={[
+        {
+          label: `View stage ${stage.name}`,
+          icon: <Eye size={22} aria-hidden />,
+          tone: "success",
+          onClick: () => onView(stage),
+        },
+        {
+          label: `Restore stage ${stage.name}`,
+          icon: <RotateCcw size={22} aria-hidden />,
+          tone: "success",
+          onClick: () => onRestore(stage),
+        },
+      ]}
+    />
   );
 }
 
@@ -132,42 +127,36 @@ function renderActiveActions(
   onDelete: (s: StageRow) => void,
 ): React.ReactNode {
   return (
-    <>
-      <Button
-        variant="link"
-        size="sm"
-        className="p-1"
-        title="View"
-        onClick={() => onView(stage)}
-        aria-label={"View stage " + stage.name}
-      >
-        <Eye size={16} aria-hidden />
-      </Button>
-      {canEdit && (
-        <Button
-          variant="link"
-          size="sm"
-          className="p-1"
-          title="Edit Stage"
-          onClick={() => onEdit(stage)}
-          aria-label={"Edit stage " + stage.name}
-        >
-          <Edit size={16} aria-hidden />
-        </Button>
-      )}
-      {canDelete && (
-        <Button
-          variant="link"
-          size="sm"
-          className="p-1 text-danger"
-          title="Delete Stage"
-          onClick={() => onDelete(stage)}
-          aria-label={"Delete stage " + stage.name}
-        >
-          <Trash2 size={16} aria-hidden />
-        </Button>
-      )}
-    </>
+    <CrmTableRowActions
+      actions={[
+        {
+          label: `View stage ${stage.name}`,
+          icon: <Eye size={22} aria-hidden />,
+          tone: "success",
+          onClick: () => onView(stage),
+        },
+        ...(canEdit
+          ? [
+              {
+                label: `Edit stage ${stage.name}`,
+                icon: <Edit size={22} aria-hidden />,
+                tone: "primary" as const,
+                onClick: () => onEdit(stage),
+              },
+            ]
+          : []),
+        ...(canDelete
+          ? [
+              {
+                label: `Delete stage ${stage.name}`,
+                icon: <Trash2 size={22} aria-hidden />,
+                tone: "danger" as const,
+                onClick: () => onDelete(stage),
+              },
+            ]
+          : []),
+      ]}
+    />
   );
 }
 
@@ -181,13 +170,11 @@ function buildActionsColumn(
     label: "Actions",
     sortable: false,
     type: "custom",
-    render: (stage) => (
-      <div className="d-flex gap-1">
-        {activeFilter === "deleted"
-          ? renderDeletedActions(stage, onView, onRestore)
-          : renderActiveActions(stage, canEdit, canDelete, onView, onEdit, onDelete)}
-      </div>
-    ),
+    align: "center",
+    render: (stage) =>
+      activeFilter === "deleted"
+        ? renderDeletedActions(stage, onView, onRestore)
+        : renderActiveActions(stage, canEdit, canDelete, onView, onEdit, onDelete),
   };
 }
 

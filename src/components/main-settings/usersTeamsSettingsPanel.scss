@@ -1,91 +1,28 @@
 // Embedded Users & Teams panels inside Main Settings (Teams, Groups, Ranks).
+@import './settingsEmbeddedToolbar.scss';
+@import './settingsEmbeddedPageShell.scss';
 
 .users-teams-settings-panel {
   min-width: 0;
   width: 100%;
+  max-width: 100%;
   box-sizing: border-box;
+  overflow-x: clip;
 
   .users-teams-settings-page {
-    min-width: 0;
-    width: 100%;
+    @include settings-embedded-page-shell;
   }
 
   .users-teams-settings-page__toolbar {
-    display: flex;
-    flex-direction: column;
-    align-items: stretch;
-    gap: 10px;
-    margin-bottom: 12px;
-
-    @media (min-width: 768px) {
-      flex-direction: row;
-      align-items: center;
-      justify-content: flex-end;
-      gap: 12px;
-    }
+    @extend .settings-embedded-page__toolbar;
   }
 
   .users-teams-settings-page__toolbar-search {
-    flex: 1 1 auto;
-    min-width: 0;
-    width: 100%;
-
-    .search-container {
-      position: relative;
-      display: flex;
-      align-items: center;
-      width: 100%;
-    }
-
-    .search-icon {
-      position: absolute;
-      left: 12px;
-      color: #64748b;
-      font-size: var(--ms-font-sm);
-      pointer-events: none;
-    }
-
-    .search-bar {
-      width: 100%;
-      max-width: 100%;
-      box-sizing: border-box;
-      padding: 8px 12px 8px 36px;
-      border-radius: 8px;
-      border: 1px solid #b8b8b8;
-      font-size: var(--ms-font-input);
-      font-family: Lexend Deca, Helvetica, Arial, sans-serif;
-      font-weight: 300;
-      color: #141414;
-      background: #fff;
-
-      &:focus {
-        outline: none;
-        border-color: #141414;
-        box-shadow: none;
-      }
-    }
+    @extend .settings-embedded-page__toolbar-search;
   }
 
   .users-teams-settings-page__toolbar-actions {
-    flex: 0 0 auto;
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-    width: 100%;
-
-    @media (min-width: 768px) {
-      width: auto;
-      justify-content: flex-end;
-    }
-
-    .btn {
-      flex: 1 1 auto;
-      min-width: 0;
-
-      @media (min-width: 768px) {
-        flex: 0 0 auto;
-      }
-    }
+    @extend .settings-embedded-page__toolbar-actions;
   }
 
   .users-teams-table-page .generic-table-responsive {

@@ -19,6 +19,7 @@ interface UsersListProps {
   listRefreshToken?: number;
   hasPermission: boolean;
   showFilters: boolean;
+  embeddedInMainSettings?: boolean;
 }
 
 type UsersPaginationState = {
@@ -65,6 +66,7 @@ const UsersList: React.FC<UsersListProps> = ({
   listRefreshToken = 0,
   hasPermission,
   showFilters,
+  embeddedInMainSettings = false,
 }) => {
   const [rows, setRows] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
@@ -110,11 +112,14 @@ const UsersList: React.FC<UsersListProps> = ({
   }, [currentFilters, setSearchInputValue, setSearchQueryValue]);
 
   useEffect(() => {
+    if (embeddedInMainSettings) {
+      return;
+    }
     handleFiltersChangeRef.current({
       ...pendingFiltersRef.current,
       search: searchQuery.trim() ? searchQuery : undefined,
     });
-  }, [searchQuery]);
+  }, [searchQuery, embeddedInMainSettings]);
 
   useEffect(() => {
     setPagination((prev) =>
@@ -237,7 +242,7 @@ const UsersList: React.FC<UsersListProps> = ({
 
   const toolbarConfig = useMemo<ToolbarConfig>(
     () => ({
-      showSearch: true,
+      showSearch: !embeddedInMainSettings,
       searchValue: searchInput,
       searchPlaceholder: "Search users...",
       onSearchChange: handleSearchChange,
@@ -257,7 +262,15 @@ const UsersList: React.FC<UsersListProps> = ({
         </Button>
       ) : undefined,
     }),
-    [searchInput, handleSearchChange, flushSearchToFilters, showFilters, filterPills, handleResetFilters],
+    [
+      embeddedInMainSettings,
+      searchInput,
+      handleSearchChange,
+      flushSearchToFilters,
+      showFilters,
+      filterPills,
+      handleResetFilters,
+    ],
   );
 
   if (!hasPermission) {
@@ -274,14 +287,17 @@ const UsersList: React.FC<UsersListProps> = ({
         emptyMessage="No users found"
         showActions={false}
         actions={[]}
-        showToolbar
+        showToolbar={embeddedInMainSettings ? showFilters : true}
         toolbar={toolbarConfig}
         pagination={{
           currentPage: pagination.currentPage,
           rowsPerPage: pagination.rowsPerPage,
           totalRows: pagination.totalRows,
-          pageSizeOptions: [15, 30, 50, 100],
+          pageSizeOptions: [15, 25, 50, 100],
         }}
+        showToolbarActions={false}
+        hover
+        size="md"
         onPaginationChange={(page, rowsPerPage) => {
           setPagination((prev) => ({
             ...prev,
@@ -297,7 +313,6 @@ const UsersList: React.FC<UsersListProps> = ({
         customizableColumns
         defaultSelectedColumns={columns.map((col) => col.key)}
         columnStorageKey="datatable-columns-users"
-        showToolbarActions={false}
       />
 
       <SimpleCanvas

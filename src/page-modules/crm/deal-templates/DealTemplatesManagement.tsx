@@ -53,6 +53,8 @@ import { useCrmSettingsTableState } from "@hooks/useCrmSettingsTableState";
 import { useDebouncedSearchInput } from "@hooks/useDebouncedSearchInput";
 import { HEADER_CONSTANTS } from "@constants/headerConstants";
 import type { CrmPageDisplayProps } from "@page-modules/crm/crmPageDisplayProps";
+import { CrmSettingsTableWrap } from "@page-modules/crm/shared/CrmSettingsTableWrap";
+import { CrmTableRowActions } from "@page-modules/crm/shared/CrmTableRowActions";
 import { crmAppKeys } from "@query/keys";
 
 const { PERMISSIONS } = HEADER_CONSTANTS;
@@ -456,45 +458,41 @@ function DealTemplatesPage({ hideBreadcrumb, breadcrumbMainLink }: CrmPageDispla
         key: "actions",
         label: "Actions",
         sortable: false,
-        align: "right",
+        align: "center",
         type: "custom",
         width: "170px",
-        render: (template) => (
-          <div className="d-flex justify-content-end gap-2">
-            <Button
-              variant="outline-info"
-              size="sm"
-              onClick={() => handleView(template)}
-              aria-label={"View deal template " + (template.name ?? "")}
-            >
-              <Eye size={14} />
-            </Button>
-            {session?.user?.permissions?.includes(
-              PERMISSIONS.EDIT_CRM_DEAL_TEMPLATES,
-            ) && (
-              <Button
-                variant="outline-primary"
-                size="sm"
-                onClick={() => handleOpenModal(template)}
-                aria-label={"Edit deal template " + (template.name ?? "")}
-              >
-                <Edit size={14} />
-              </Button>
-            )}
-            {session?.user?.permissions?.includes(
-              PERMISSIONS.DELETE_CRM_DEAL_TEMPLATES,
-            ) && (
-              <Button
-                variant="outline-danger"
-                size="sm"
-                onClick={() => handlePromptDelete(template)}
-                aria-label={"Delete deal template " + (template.name ?? "")}
-              >
-                <Trash2 size={14} />
-              </Button>
-            )}
-          </div>
-        ),
+        render: (template) => {
+          const name = template.name ?? "";
+          const actions = [
+            {
+              label: `View deal template ${name}`,
+              icon: <Eye size={22} aria-hidden />,
+              tone: "success" as const,
+              onClick: () => handleView(template),
+            },
+            ...(session?.user?.permissions?.includes(PERMISSIONS.EDIT_CRM_DEAL_TEMPLATES)
+              ? [
+                  {
+                    label: `Edit deal template ${name}`,
+                    icon: <Edit size={22} aria-hidden />,
+                    tone: "primary" as const,
+                    onClick: () => handleOpenModal(template),
+                  },
+                ]
+              : []),
+            ...(session?.user?.permissions?.includes(PERMISSIONS.DELETE_CRM_DEAL_TEMPLATES)
+              ? [
+                  {
+                    label: `Delete deal template ${name}`,
+                    icon: <Trash2 size={22} aria-hidden />,
+                    tone: "danger" as const,
+                    onClick: () => handlePromptDelete(template),
+                  },
+                ]
+              : []),
+          ];
+          return <CrmTableRowActions actions={actions} />;
+        },
       },
     ],
     [
@@ -550,6 +548,7 @@ function DealTemplatesPage({ hideBreadcrumb, breadcrumbMainLink }: CrmPageDispla
         />
       )}
       <div>
+        <CrmSettingsTableWrap hideBreadcrumb={hideBreadcrumb}>
         <GenericTable<DealTemplateData>
           data={templates}
           columns={templatesTableColumns}
@@ -583,7 +582,10 @@ function DealTemplatesPage({ hideBreadcrumb, breadcrumbMainLink }: CrmPageDispla
           }
           uniqueKey="id"
           showToolbarActions={false}
+          hover
+          size="md"
         />
+        </CrmSettingsTableWrap>
 
         {/* Create/Edit Sidebar */}
         {showModal && (
