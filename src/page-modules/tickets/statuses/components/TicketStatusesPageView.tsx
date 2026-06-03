@@ -85,34 +85,33 @@ export const TicketStatusesPageView: React.FC<TicketStatusesPageViewProps> = ({
     </Button>
   ) : null;
 
+  let pageToolbar: React.ReactNode;
+  if (embeddedInMainSettings) {
+    pageToolbar = (
+      <SettingsEmbeddedToolbar
+        searchValue={searchValue}
+        onSearchChange={onSearchChange}
+        searchPlaceholder="Search statuses..."
+        actions={addButton}
+      />
+    );
+  } else {
+    pageToolbar = (
+      <PageHeader
+        title=""
+        description=""
+        showSearch={false}
+        searchPlaceholder="Search statuses..."
+        searchValue={searchValue}
+        onSearchChange={onSearchChange}
+        buttons={addButton}
+      />
+    );
+  }
+
   return (
     <div className={embeddedInMainSettings ? "tickets-settings-page" : undefined}>
-      {embeddedInMainSettings ? (
-        addButton ? (
-          <SettingsEmbeddedToolbar
-            searchValue={searchValue}
-            onSearchChange={onSearchChange}
-            searchPlaceholder="Search statuses..."
-            actions={addButton}
-          />
-        ) : (
-          <SettingsEmbeddedToolbar
-            searchValue={searchValue}
-            onSearchChange={onSearchChange}
-            searchPlaceholder="Search statuses..."
-          />
-        )
-      ) : (
-        <PageHeader
-          title=""
-          description=""
-          showSearch={false}
-          searchPlaceholder="Search statuses..."
-          searchValue={searchValue}
-          onSearchChange={onSearchChange}
-          buttons={addButton}
-        />
-      )}
+      {pageToolbar}
 
       {canViewList ? (
         <EmbeddedSettingsTable<TicketStatus>
