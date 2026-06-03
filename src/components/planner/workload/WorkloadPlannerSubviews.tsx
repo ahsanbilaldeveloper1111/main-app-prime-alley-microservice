@@ -163,15 +163,15 @@ export function WorkloadBoardLegendBar() {
         <div className="workload-board-toolbar__legend">
           <span className="workload-board-toolbar__legend-item" style={{ color: "#718096" }}>
             <span className="workload-board-toolbar__swatch" style={{ backgroundColor: "#ea580c" }} />
-            Has unestimated tasks
+            <span>Has unestimated tasks</span>
           </span>
           <span className="workload-board-toolbar__legend-item" style={{ color: "#718096" }}>
             <i className="ti ti-building" style={{ fontSize: "11px", color: "#0f766e", marginRight: "4px" }} />
-            Org Tasks included
+            <span>Org Tasks included</span>
           </span>
           <span className="workload-board-toolbar__legend-item" style={{ color: "#718096" }}>
             <span style={{ fontSize: "11px", marginRight: "4px", color: "#718096" }}>ⓘ</span>
-            Has personal todos
+            <span>Has personal todos</span>
           </span>
         </div>
       </div>
