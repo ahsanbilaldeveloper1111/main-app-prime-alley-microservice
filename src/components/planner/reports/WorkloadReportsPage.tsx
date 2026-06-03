@@ -1,7 +1,6 @@
 import React from "react";
 import { Alert, Button, Container } from "react-bootstrap";
 import { Download, RefreshCw } from "lucide-react";
-import BreadcrumbItem from "@common/BreadcrumbItem";
 import { TASK_REPORTS_MAX_DATE_RANGE_DAYS } from "@utils/reportsApiConstants";
 import { ReportsViewTabs } from "./WorkloadReportsProjectViews";
 import { WorkloadReportsFiltersCard } from "./WorkloadReportsFiltersCard";
@@ -14,8 +13,6 @@ const WorkloadReportsPage: React.FC = () => {
   return (
     <div className="workload-reports-page">
       <Container fluid className="px-0 py-0">
-        <BreadcrumbItem mainTitle="Planner" mainLink="/planner/dashboard" subTitle="Reports" />
-
         <div className="workload-reports-page__header">
           <div>
             <h1 className="workload-reports-page__title">Reports</h1>
