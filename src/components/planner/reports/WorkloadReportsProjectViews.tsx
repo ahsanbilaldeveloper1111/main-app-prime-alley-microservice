@@ -19,7 +19,7 @@ type ReportsViewTabsProps = Readonly<{
 
 export function ReportsViewTabs({ activeView, onChange }: ReportsViewTabsProps) {
   return (
-    <Nav variant="tabs" className="reports-view-tabs mb-3">
+    <Nav variant="tabs" className="reports-view-tabs">
       <Nav.Item>
         <Nav.Link
           active={activeView === "team"}
@@ -71,7 +71,7 @@ export function ReportsTeamSubTabs({ activeSubView, onChange }: ReportsTeamSubTa
         className={`reports-sub-tab-btn${activeSubView === "board" ? " reports-sub-tab-btn--active" : ""}`}
         onClick={() => onChange("board")}
       >
-        Board
+        Report View
       </button>
     </div>
   );
@@ -134,9 +134,9 @@ export function ReportsProjectKpiRow({
 }
 
 function projectProgressTone(progress: number): string {
-  if (progress >= 100) return "success";
-  if (progress >= 70) return "primary";
-  return "warning";
+  if (progress >= 75) return "success";
+  if (progress >= 50) return "warning";
+  return "delay";
 }
 
 export function ReportsProjectDetailList({
