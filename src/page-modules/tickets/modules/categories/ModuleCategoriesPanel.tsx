@@ -20,7 +20,6 @@ const ModuleCategoriesPanel = () => {
         data={c.data}
         loading={c.loading}
         columns={c.columns}
-        actions={c.actions}
         currentPage={c.currentPage}
         rowsPerPage={c.rowsPerPage}
         totalRows={c.totalRows}

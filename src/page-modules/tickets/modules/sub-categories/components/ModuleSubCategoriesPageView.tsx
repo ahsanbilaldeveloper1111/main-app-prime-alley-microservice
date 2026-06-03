@@ -1,9 +1,10 @@
 import BreadcrumbItem from "@common/BreadcrumbItem";
-import GenericTable, { type TableAction, type TableColumn } from "@components/GenericTable";
+import { EmbeddedSettingsTable } from "@components/main-settings/EmbeddedSettingsTable";
+import type { TableColumn } from "@components/GenericTable";
+import { SettingsEmbeddedToolbar } from "@components/main-settings/SettingsEmbeddedToolbar";
 import PageHeader from "@components/PageHeader";
 import FormModal from "@components/page-partials/FormModal";
 import ConfirmModal from "@components/page-partials/ConfirmModal";
-import { TicketsSettingsEmbeddedToolbar } from "@page-modules/tickets/shared/TicketsSettingsEmbeddedToolbar";
 import type { SubCategoryRow } from "../useModuleSubCategoriesPage";
 import React from "react";
 import { Button } from "react-bootstrap";
@@ -16,7 +17,6 @@ export type ModuleSubCategoriesPageViewProps = Readonly<{
   data: SubCategoryRow[];
   loading: boolean;
   columns: TableColumn<SubCategoryRow>[];
-  actions: TableAction<SubCategoryRow>[];
   currentPage: number;
   rowsPerPage: number;
   totalRows: number;
@@ -49,7 +49,6 @@ export const ModuleSubCategoriesPageView: React.FC<ModuleSubCategoriesPageViewPr
   data,
   loading,
   columns,
-  actions,
   currentPage,
   rowsPerPage,
   totalRows,
@@ -80,12 +79,12 @@ export const ModuleSubCategoriesPageView: React.FC<ModuleSubCategoriesPageViewPr
     ) : null}
 
     {embeddedInMainSettings ? (
-      <TicketsSettingsEmbeddedToolbar
+      <SettingsEmbeddedToolbar
         searchValue={searchValue}
         onSearchChange={onSearchChange}
         searchPlaceholder="Search sub categories..."
         actions={
-          <Button variant="primary" type="button" onClick={onOpenNewSubcategoryModal}>
+          <Button variant="primary" size="sm" type="button" onClick={onOpenNewSubcategoryModal}>
             New SubCategory
           </Button>
         }
@@ -101,13 +100,12 @@ export const ModuleSubCategoriesPageView: React.FC<ModuleSubCategoriesPageViewPr
       />
     )}
 
-    <GenericTable<SubCategoryRow>
+    <EmbeddedSettingsTable<SubCategoryRow>
+      embedded={embeddedInMainSettings}
       data={data}
       columns={columns}
       loading={loading}
-      actions={actions}
-      showActions={actions.length > 0}
-      actionsLabel="Actions"
+      emptyMessage="No sub categories found."
       pagination={{
         currentPage,
         rowsPerPage,
@@ -115,22 +113,13 @@ export const ModuleSubCategoriesPageView: React.FC<ModuleSubCategoriesPageViewPr
         pageSizeOptions: [15, 25, 50, 100],
       }}
       onPaginationChange={onPaginationChange}
-      sortable={true}
-      hover={true}
-      emptyMessage="No sub categories found."
-      showToolbar={!embeddedInMainSettings}
-      toolbar={
-        embeddedInMainSettings
-          ? undefined
-          : {
-              showSearch: true,
-              searchValue,
-              searchPlaceholder: "Search sub categories...",
-              onSearchChange,
-            }
-      }
-      showToolbarActions={false}
       uniqueKey="id"
+      toolbar={{
+        showSearch: true,
+        searchValue,
+        searchPlaceholder: "Search sub categories...",
+        onSearchChange,
+      }}
     />
 
     <FormModal

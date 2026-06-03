@@ -12,5 +12,6 @@ export function useWorkforcePanelChrome(tab: WorkforceSettingsTab = "request-cat
   return {
     showBreadcrumb: shouldShowWorkforceAdminBreadcrumb(pathname),
     breadcrumbMainLink: resolveWorkforceHubPath(tab, pathname),
+    embeddedInMainSettings: !shouldShowWorkforceAdminBreadcrumb(pathname),
   };
 }

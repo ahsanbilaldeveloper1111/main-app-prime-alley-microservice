@@ -1,22 +1,23 @@
 import BreadcrumbItem from "@common/BreadcrumbItem";
 import ConfirmModal from "@components/page-partials/ConfirmModal";
 import SuccessfulModal from "@components/page-partials/SuccessfulModal";
-import GenericTable from "@components/GenericTable";
+import type { TableColumn } from "@components/GenericTable";
+import { EmbeddedSettingsTable } from "@components/main-settings/EmbeddedSettingsTable";
+import { SettingsEmbeddedToolbar } from "@components/main-settings/SettingsEmbeddedToolbar";
 import { Button } from "react-bootstrap";
 import { Plus } from "lucide-react";
 import React from "react";
 import { CREATE_ITEM_CONFIG, EDIT_ITEM_CONFIG } from "../faqItemsTypes";
 import { FaqItemSidebar } from "./FaqItemSidebar";
 import type { FAQItemRow } from "../useFAQItemsPage";
-import type { TableAction, TableColumn } from "@components/GenericTable";
 import type { FAQItemFormData } from "../faqItemsTypes";
 
 export type FaqItemsPageViewProps = Readonly<{
+  embeddedInMainSettings?: boolean;
   tableData: FAQItemRow[];
   totalRows: number;
   isLoading: boolean;
   columns: TableColumn<FAQItemRow>[];
-  actions: TableAction<FAQItemRow>[];
   currentPage: number;
   rowsPerPage: number;
   searchValue: string;
@@ -51,11 +52,11 @@ export type FaqItemsPageViewProps = Readonly<{
 }>;
 
 export const FaqItemsPageView: React.FC<FaqItemsPageViewProps> = ({
+  embeddedInMainSettings = false,
   tableData,
   totalRows,
   isLoading,
   columns,
-  actions,
   currentPage,
   rowsPerPage,
   searchValue,
@@ -88,27 +89,36 @@ export const FaqItemsPageView: React.FC<FaqItemsPageViewProps> = ({
   showBreadcrumb = true,
   breadcrumbMainLink = "/main-settings/help-center/items",
 }) => {
+  const addButton = (
+    <Button variant="primary" size="sm" onClick={onOpenCreate}>
+      <Plus size={16} className="me-1" />
+      Add FAQ
+    </Button>
+  );
+
   return (
-    <React.Fragment>
+    <div className={embeddedInMainSettings ? "faqs-settings-page" : undefined}>
       {showBreadcrumb ? (
         <BreadcrumbItem mainTitle="FAQs" mainLink={breadcrumbMainLink} subTitle="FAQ Items" />
       ) : null}
 
-      <div className="page-header-title style-2 mb-3">
-        <div className="d-flex justify-content-end">
-          <Button variant="primary" onClick={onOpenCreate}>
-            <Plus size={16} className="me-1" />
-            Add FAQ
-          </Button>
+      {embeddedInMainSettings ? (
+        <SettingsEmbeddedToolbar
+          searchValue={searchValue}
+          onSearchChange={onSearchChange}
+          searchPlaceholder="Search FAQs..."
+          actions={addButton}
+        />
+      ) : (
+        <div className="page-header-title style-2 mb-3">
+          <div className="d-flex justify-content-end">{addButton}</div>
         </div>
-      </div>
+      )}
 
-      <GenericTable<FAQItemRow>
+      <EmbeddedSettingsTable<FAQItemRow>
+        embedded={embeddedInMainSettings}
         data={tableData}
         columns={columns}
-        actions={actions}
-        showActions={true}
-        actionsLabel="Actions"
         loading={isLoading}
         emptyMessage="No FAQs found"
         pagination={{
@@ -118,17 +128,15 @@ export const FaqItemsPageView: React.FC<FaqItemsPageViewProps> = ({
           pageSizeOptions: [15, 25, 50, 100],
         }}
         onPaginationChange={onPaginationChange}
-        sortable={true}
-        showToolbar={true}
+        sortable
+        hover
+        uniqueKey="id"
         toolbar={{
           showSearch: true,
           searchValue,
           searchPlaceholder: "Search FAQs...",
           onSearchChange,
         }}
-        uniqueKey="id"
-        hover={true}
-        showToolbarActions={false}
       />
 
       <FaqItemSidebar
@@ -184,6 +192,6 @@ export const FaqItemsPageView: React.FC<FaqItemsPageViewProps> = ({
         title={successModalTitle}
         description={successModalDescription}
       />
-    </React.Fragment>
+    </div>
   );
 };

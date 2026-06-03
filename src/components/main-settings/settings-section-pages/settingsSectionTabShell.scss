@@ -84,7 +84,16 @@
   &__content {
     min-width: 0;
     width: 100%;
+    max-width: 100%;
+    overflow-x: clip;
     font-size: var(--ms-font-base);
+    box-sizing: border-box;
+  }
+
+  &--dense &__content {
+    @media (max-width: 767.98px) {
+      padding-top: 0;
+    }
   }
 
   &__no-permission {

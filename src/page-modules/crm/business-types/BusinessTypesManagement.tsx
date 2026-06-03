@@ -11,6 +11,7 @@ import {
 } from "@hooks/useBusinessTypesPage";
 import type { CrmPageDisplayProps } from "@page-modules/crm/crmPageDisplayProps";
 import type { BusinessTypeData } from "@utils/crm";
+import { CrmSettingsTableWrap } from "@page-modules/crm/shared/CrmSettingsTableWrap";
 
 const BusinessTypes = ({ hideBreadcrumb, breadcrumbMainLink }: CrmPageDisplayProps = {}) => {
   const {
@@ -48,6 +49,7 @@ const BusinessTypes = ({ hideBreadcrumb, breadcrumbMainLink }: CrmPageDisplayPro
         />
       )}
       <div>
+        <CrmSettingsTableWrap hideBreadcrumb={hideBreadcrumb}>
         <GenericTable<BusinessTypeData>
           data={businessTypes}
           columns={businessTableColumns}
@@ -74,7 +76,10 @@ const BusinessTypes = ({ hideBreadcrumb, breadcrumbMainLink }: CrmPageDisplayPro
           }
           uniqueKey="id"
           showToolbarActions={false}
+          hover
+          size="md"
         />
+        </CrmSettingsTableWrap>
 
         <BusinessTypeFormModal
           show={showModal}

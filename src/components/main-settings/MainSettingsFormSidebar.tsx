@@ -71,12 +71,14 @@ export function MainSettingsFormSidebar({
           position: "fixed",
           top: 0,
           right: 0,
+          left: "auto",
           height: "100dvh",
           backgroundColor: "#ffffff",
           boxShadow: "-4px 0 24px rgba(0, 0, 0, 0.12)",
           zIndex: SIDEBAR_Z_INDEX,
           display: "flex",
           flexDirection: "column",
+          margin: 0,
         }}
       >
         <div

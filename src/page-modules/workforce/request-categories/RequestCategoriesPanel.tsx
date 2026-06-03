@@ -7,8 +7,7 @@ import { RequestCategoriesPageView } from "@page-modules/workforce/request-categ
 import { useWorkforcePanelChrome } from "@page-modules/workforce/request-categories/useWorkforcePanelChrome";
 
 export function RequestCategoriesPanel() {
-  const { showBreadcrumb } = useWorkforcePanelChrome("request-categories");
-  const embeddedInMainSettings = !showBreadcrumb;
+  const { showBreadcrumb, embeddedInMainSettings } = useWorkforcePanelChrome("request-categories");
 
   return (
     <div className={embeddedInMainSettings ? "workforce-settings-panel" : undefined}>
