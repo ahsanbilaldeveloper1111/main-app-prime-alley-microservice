@@ -13,7 +13,7 @@ const WorkloadReportsPage: React.FC = () => {
 
   return (
     <div className="workload-reports-page">
-      <Container fluid className="px-3 px-md-4 py-3">
+      <Container fluid className="px-0 py-0">
         <BreadcrumbItem mainTitle="Planner" mainLink="/planner/dashboard" subTitle="Reports" />
 
         <div className="workload-reports-page__header">
