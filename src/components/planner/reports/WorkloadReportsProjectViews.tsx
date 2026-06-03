@@ -58,27 +58,21 @@ type ReportsTeamSubTabsProps = Readonly<{
 
 export function ReportsTeamSubTabs({ activeSubView, onChange }: ReportsTeamSubTabsProps) {
   return (
-    <div className="reports-team-sub-tabs-wrap mb-3">
-      <Nav variant="pills" className="reports-team-sub-tabs gap-1">
-        <Nav.Item>
-          <Nav.Link
-            active={activeSubView === "live"}
-            onClick={() => onChange("live")}
-            className="reports-team-sub-tabs__link"
-          >
-            Live View
-          </Nav.Link>
-        </Nav.Item>
-        <Nav.Item>
-          <Nav.Link
-            active={activeSubView === "board"}
-            onClick={() => onChange("board")}
-            className="reports-team-sub-tabs__link"
-          >
-            Board
-          </Nav.Link>
-        </Nav.Item>
-      </Nav>
+    <div className="reports-team-sub-tabs-wrap">
+      <button
+        type="button"
+        className={`reports-sub-tab-btn${activeSubView === "live" ? " reports-sub-tab-btn--active" : ""}`}
+        onClick={() => onChange("live")}
+      >
+        Live View
+      </button>
+      <button
+        type="button"
+        className={`reports-sub-tab-btn${activeSubView === "board" ? " reports-sub-tab-btn--active" : ""}`}
+        onClick={() => onChange("board")}
+      >
+        Board
+      </button>
     </div>
   );
 }
