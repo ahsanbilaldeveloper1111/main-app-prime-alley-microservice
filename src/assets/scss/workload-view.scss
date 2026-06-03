@@ -2230,6 +2230,17 @@
     font-family: "Lexend Deca", Helvetica, Arial, sans-serif;
     word-break: break-word;
   }
+
+  .workload-confirm-cancel-btn {
+    background: #fff !important;
+    color: #141414 !important;
+    border: 1px solid #d0d7de !important;
+    font-family: "Lexend Deca", Helvetica, Arial, sans-serif;
+
+    &:hover {
+      background: #f5f8fa !important;
+    }
+  }
 }
 
 .workload-reschedule-modal {
