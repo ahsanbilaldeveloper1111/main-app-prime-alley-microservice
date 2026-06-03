@@ -96,7 +96,9 @@ const WorkloadReportsPage: React.FC = () => {
 
         <ReportsViewTabs activeView={vm.mainView} onChange={vm.setMainView} />
 
-        <WorkloadReportsPageContent vm={vm} overviewQuery={vm.overviewQuery} />
+        <div className="workload-reports-page__content">
+          <WorkloadReportsPageContent vm={vm} overviewQuery={vm.overviewQuery} />
+        </div>
       </Container>
     </div>
   );
