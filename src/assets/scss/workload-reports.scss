@@ -8,16 +8,20 @@
   .workload-reports-page__header {
     display: flex;
     flex-wrap: wrap;
-    align-items: flex-start;
+    align-items: center;
     justify-content: space-between;
     gap: 1rem;
-    margin-bottom: 1rem;
+    padding: 14px 24px;
+    background: #ffffff;
+    border-bottom: 1px solid #eaf0f6;
+    margin-bottom: 0;
   }
 
   .workload-reports-page__title {
-    font-size: 1.35rem;
-    font-weight: 600;
-    margin: 0 0 0.25rem;
+    font-size: clamp(16px, 1.2vw, 20px);
+    font-weight: 700;
+    margin: 0 0 2px;
+    color: #141414;
     font-family: "Lexend Deca", Helvetica, Arial, sans-serif;
   }
 
@@ -216,8 +220,7 @@
     background: #fff;
     border: 1px solid #eaf0f6;
     border-radius: 6px;
-    padding: 1rem 1.1rem;
-    padding-top: 14px;
+    padding: 14px 1.1rem 1rem;
     box-shadow: none;
     border-top: 3px solid var(--reports-kpi-accent, #0066CC);
   }
@@ -531,19 +534,40 @@
   }
 
   .reports-view-tabs {
-    border-bottom: 1px solid #e5e7eb;
+    background: #ffffff;
+    border-bottom: 1px solid #eaf0f6 !important;
+    padding: 0 24px;
+    margin-bottom: 0 !important;
+    display: flex;
+    gap: 0;
+
+    .nav-item {
+      margin: 0;
+    }
 
     .nav-link {
-      font-size: 0.85rem;
-      font-weight: 600;
-      color: #6b7280;
-      border: none;
-      padding: 0.55rem 1rem;
+      font-family: "Lexend Deca", Helvetica, Arial, sans-serif;
+      font-size: 12px;
+      font-weight: 500;
+      color: #718096;
+      padding: 10px 16px;
+      border: none !important;
+      border-bottom: 2px solid transparent !important;
+      border-radius: 0 !important;
+      margin-bottom: -1px;
+      background: transparent !important;
+      transition: color 0.15s ease, border-color 0.15s ease;
+
+      &:hover {
+        color: #374151;
+        border-bottom-color: #d0d7de !important;
+      }
 
       &.active {
-        color: #2563eb;
-        border-bottom: 2px solid #2563eb;
-        background: transparent;
+        color: #0066CC !important;
+        font-weight: 600;
+        border-bottom-color: #0066CC !important;
+        background: transparent !important;
       }
     }
   }
