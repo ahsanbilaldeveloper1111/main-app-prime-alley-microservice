@@ -1,3 +1,4 @@
+import { MAIN_SETTINGS_FONT_SIZE } from './mainSettingsTokens'
 import React, { useMemo, useState } from 'react'
 import GenericTable, { type TableColumn } from '@components/GenericTable'
 import '../../assets/css/Settings.css'
@@ -13,7 +14,7 @@ function buildCurrencyColumns(baseFont: string): TableColumn<Currency>[] {
       label: 'Name',
       type: 'custom',
       render: (row: Currency) => (
-        <span style={{ fontFamily: baseFont, fontSize: '14px', fontWeight: 300, color: '#141414' }}>{row.name}</span>
+        <span style={{ fontFamily: baseFont, fontSize: MAIN_SETTINGS_FONT_SIZE.base, fontWeight: 300, color: '#141414' }}>{row.name}</span>
       ),
     },
     {
@@ -29,7 +30,7 @@ function buildCurrencyColumns(baseFont: string): TableColumn<Currency>[] {
               padding: '3px 12px',
               border: '1.5px solid #1a7a5e',
               borderRadius: '20px',
-              fontSize: '13px',
+              fontSize: MAIN_SETTINGS_FONT_SIZE.sm,
               fontWeight: 500,
               color: '#1a7a5e',
               fontFamily: baseFont,
@@ -39,7 +40,7 @@ function buildCurrencyColumns(baseFont: string): TableColumn<Currency>[] {
             Company Currency
           </span>
         ) : (
-          <span style={{ fontFamily: baseFont, fontSize: '14px', fontWeight: 300, color: '#141414' }}>{row.exchangeRate}</span>
+          <span style={{ fontFamily: baseFont, fontSize: MAIN_SETTINGS_FONT_SIZE.base, fontWeight: 300, color: '#141414' }}>{row.exchangeRate}</span>
         ),
     },
     {
@@ -47,7 +48,7 @@ function buildCurrencyColumns(baseFont: string): TableColumn<Currency>[] {
       label: 'Format',
       type: 'custom',
       render: (row: Currency) => (
-        <span style={{ fontFamily: baseFont, fontSize: '14px', fontWeight: 300, color: '#141414' }}>{row.format}</span>
+        <span style={{ fontFamily: baseFont, fontSize: MAIN_SETTINGS_FONT_SIZE.base, fontWeight: 300, color: '#141414' }}>{row.format}</span>
       ),
     },
     {
@@ -56,11 +57,11 @@ function buildCurrencyColumns(baseFont: string): TableColumn<Currency>[] {
       type: 'custom',
       render: (row: Currency) => (
         <div>
-          <div style={{ fontFamily: baseFont, fontSize: '14px', fontWeight: 300, color: '#141414' }}>{row.lastUpdatedDate}</div>
-          <div style={{ fontFamily: baseFont, fontSize: '13px', fontWeight: 300, color: '#555' }}>{row.lastUpdatedSource}</div>
+          <div style={{ fontFamily: baseFont, fontSize: MAIN_SETTINGS_FONT_SIZE.base, fontWeight: 300, color: '#141414' }}>{row.lastUpdatedDate}</div>
+          <div style={{ fontFamily: baseFont, fontSize: MAIN_SETTINGS_FONT_SIZE.sm, fontWeight: 300, color: '#555' }}>{row.lastUpdatedSource}</div>
           {row.updatedBy ? (
             <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginTop: '2px' }}>
-              <span style={{ fontFamily: baseFont, fontSize: '12px', fontWeight: 300, color: '#888' }}>by</span>
+              <span style={{ fontFamily: baseFont, fontSize: MAIN_SETTINGS_FONT_SIZE.sm, fontWeight: 300, color: '#888' }}>by</span>
               <span
                 style={{
                   width: '18px',
@@ -70,7 +71,7 @@ function buildCurrencyColumns(baseFont: string): TableColumn<Currency>[] {
                   display: 'inline-flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  fontSize: '9px',
+                  fontSize: MAIN_SETTINGS_FONT_SIZE.xs,
                   fontWeight: 700,
                   color: '#fff',
                   flexShrink: 0,
@@ -78,7 +79,7 @@ function buildCurrencyColumns(baseFont: string): TableColumn<Currency>[] {
               >
                 RH
               </span>
-              <span style={{ fontFamily: baseFont, fontSize: '13px', fontWeight: 400, color: '#141414' }}>{row.updatedBy}</span>
+              <span style={{ fontFamily: baseFont, fontSize: MAIN_SETTINGS_FONT_SIZE.sm, fontWeight: 400, color: '#141414' }}>{row.updatedBy}</span>
             </div>
           ) : null}
         </div>
@@ -102,13 +103,13 @@ const CurrencyTabPanel: React.FC = () => {
 
   return (
     <div>
-      <p style={{ fontFamily: baseFont, fontSize: '14px', color: '#555', fontWeight: 300, marginBottom: '8px' }}>These defaults will be used for deals and properties.</p>
+      <p style={{ fontFamily: baseFont, fontSize: MAIN_SETTINGS_FONT_SIZE.base, color: '#555', fontWeight: 300, marginBottom: '8px' }}>These defaults will be used for deals and properties.</p>
 
       <Divider />
 
       <div
         style={{
-          border: '1px solid #e0e0e0',
+          border: '1px solid #c4c4c4',
           borderRadius: '6px',
           padding: '20px 24px',
           marginBottom: '32px',
@@ -120,14 +121,14 @@ const CurrencyTabPanel: React.FC = () => {
       >
         <div style={{ flex: 1 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px', flexWrap: 'wrap' }}>
-            <span style={{ fontFamily: baseFont, fontSize: '14px', fontWeight: 600, color: '#141414' }}>Schedule automatic exchange rate updates.</span>
+            <span style={{ fontFamily: baseFont, fontSize: MAIN_SETTINGS_FONT_SIZE.base, fontWeight: 600, color: '#141414' }}>Schedule automatic exchange rate updates.</span>
             <a
               href="/main-settings/help-center"
               style={{
                 display: 'inline-flex',
                 alignItems: 'center',
                 fontFamily: baseFont,
-                fontSize: '14px',
+                fontSize: MAIN_SETTINGS_FONT_SIZE.base,
                 fontWeight: 500,
                 color: '#0091ae',
                 textDecoration: 'none',
@@ -138,7 +139,7 @@ const CurrencyTabPanel: React.FC = () => {
               Learn more <ExternalLinkIcon />
             </a>
           </div>
-          <div style={{ fontFamily: baseFont, fontSize: '13px', fontWeight: 300, color: '#555', marginBottom: '14px' }}>
+          <div style={{ fontFamily: baseFont, fontSize: MAIN_SETTINGS_FONT_SIZE.sm, fontWeight: 300, color: '#555', marginBottom: '14px' }}>
             <strong style={{ fontWeight: 600, color: '#141414' }}>Frequency:</strong> Monthly &nbsp;|&nbsp;{' '}
             <strong style={{ fontWeight: 600, color: '#141414' }}>Update status:</strong> Completed on 03/03/2026 + Next update on 03/04/2026
           </div>
@@ -146,17 +147,17 @@ const CurrencyTabPanel: React.FC = () => {
             type="button"
             style={{
               padding: '6px 14px',
-              fontSize: '13px',
+              fontSize: MAIN_SETTINGS_FONT_SIZE.sm,
               fontFamily: baseFont,
               fontWeight: 300,
               color: '#141414',
               background: '#fff',
-              border: '1px solid #d0d0d0',
-              borderRadius: '4px',
+              border: '1px solid #b8b8b8',
+              borderRadius: '8px',
               cursor: 'pointer',
             }}
             onMouseEnter={(e) => (e.currentTarget.style.borderColor = '#141414')}
-            onMouseLeave={(e) => (e.currentTarget.style.borderColor = '#d0d0d0')}
+            onMouseLeave={(e) => (e.currentTarget.style.borderColor = '#b8b8b8')}
           >
             View history
           </button>
@@ -172,13 +173,13 @@ const CurrencyTabPanel: React.FC = () => {
               justifyContent: 'center',
               gap: '5px',
               padding: '7px 14px',
-              fontSize: '13px',
+              fontSize: MAIN_SETTINGS_FONT_SIZE.sm,
               fontFamily: baseFont,
               fontWeight: 500,
               color: '#fff',
               background: autoUpdateEnabled ? '#141414' : '#a0a0a0',
               border: 'none',
-              borderRadius: '4px',
+              borderRadius: '8px',
               cursor: 'pointer',
               transition: 'background 0.15s',
             }}
@@ -199,13 +200,13 @@ const CurrencyTabPanel: React.FC = () => {
               width: '34px',
               height: '34px',
               background: '#fff',
-              border: '1px solid #d0d0d0',
-              borderRadius: '4px',
+              border: '1px solid #b8b8b8',
+              borderRadius: '8px',
               cursor: 'pointer',
               padding: 0,
             }}
             onMouseEnter={(e) => (e.currentTarget.style.borderColor = '#141414')}
-            onMouseLeave={(e) => (e.currentTarget.style.borderColor = '#d0d0d0')}
+            onMouseLeave={(e) => (e.currentTarget.style.borderColor = '#b8b8b8')}
             title="Edit schedule"
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#555" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -217,23 +218,23 @@ const CurrencyTabPanel: React.FC = () => {
       </div>
 
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
-        <h2 style={{ fontFamily: baseFont, fontSize: '22px', fontWeight: 700, color: '#141414', margin: 0 }}>All Currencies</h2>
+        <h2 style={{ fontFamily: baseFont, fontSize: MAIN_SETTINGS_FONT_SIZE.icon, fontWeight: 700, color: '#141414', margin: 0 }}>All Currencies</h2>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           <button
             type="button"
             style={{
               padding: '9px 20px',
-              fontSize: '14px',
+              fontSize: MAIN_SETTINGS_FONT_SIZE.base,
               fontWeight: 600,
               fontFamily: baseFont,
               color: '#141414',
               background: '#fff',
-              border: '1px solid #d0d0d0',
-              borderRadius: '4px',
+              border: '1px solid #b8b8b8',
+              borderRadius: '8px',
               cursor: 'pointer',
             }}
             onMouseEnter={(e) => (e.currentTarget.style.borderColor = '#141414')}
-            onMouseLeave={(e) => (e.currentTarget.style.borderColor = '#d0d0d0')}
+            onMouseLeave={(e) => (e.currentTarget.style.borderColor = '#b8b8b8')}
           >
             Exchange rate log
           </button>
@@ -242,13 +243,13 @@ const CurrencyTabPanel: React.FC = () => {
             onClick={() => setShowAddModal(true)}
             style={{
               padding: '9px 20px',
-              fontSize: '14px',
+              fontSize: MAIN_SETTINGS_FONT_SIZE.base,
               fontWeight: 600,
               fontFamily: baseFont,
               color: '#fff',
               background: '#141414',
               border: 'none',
-              borderRadius: '4px',
+              borderRadius: '8px',
               cursor: 'pointer',
             }}
             onMouseEnter={(e) => (e.currentTarget.style.background = '#333')}
@@ -263,11 +264,11 @@ const CurrencyTabPanel: React.FC = () => {
         style={{
           background: '#eaf4fb',
           border: '1px solid #b8dcf0',
-          borderRadius: '4px',
+          borderRadius: '8px',
           padding: '14px 18px',
           marginBottom: '0px',
           fontFamily: baseFont,
-          fontSize: '14px',
+          fontSize: MAIN_SETTINGS_FONT_SIZE.base,
           fontWeight: 300,
           color: '#141414',
           lineHeight: '1.6',

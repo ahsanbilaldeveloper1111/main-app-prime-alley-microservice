@@ -86,6 +86,73 @@ function formatDisplayDate(isoLocal: string): string {
   return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())} GMT${sign}${Math.abs(offset)}`;
 }
 
+function getLogCallModalPanelStyle(isMaximized: boolean): React.CSSProperties {
+  const shared: React.CSSProperties = {
+    position: 'fixed',
+    inset: 'unset',
+    height: 'auto',
+    backgroundColor: '#ffffff',
+    zIndex: 1000,
+    display: 'flex',
+    flexDirection: 'column',
+    boxShadow: '0 4px 24px rgba(0,0,0,0.15)',
+    borderRadius: '8px',
+    border: '1px solid #cbd5e0',
+    overflow: 'hidden',
+  };
+
+  if (isMaximized) {
+    return {
+      ...shared,
+      top: '74px',
+      left: '50%',
+      transform: 'translateX(-50%)',
+      width: 'min(900px, calc(100vw - 84px))',
+      maxHeight: 'calc(100vh - 94px)',
+    };
+  }
+
+  return {
+    ...shared,
+    left: '50%',
+    top: '50%',
+    transform: 'translate(-50%, -50%)',
+    width: 'min(650px, calc(100vw - 120px))',
+  };
+}
+
+function useDraftSavedIndicator(callText: string) {
+  const [isDraftSaved, setIsDraftSaved] = useState(false);
+
+  useEffect(() => {
+    if (callText.trim()) {
+      const timer = setTimeout(() => setIsDraftSaved(true), 1000);
+      return () => clearTimeout(timer);
+    }
+    setIsDraftSaved(false);
+  }, [callText]);
+
+  return { isDraftSaved, setIsDraftSaved };
+}
+
+const LogCallModalBackdrop: React.FC<{ onClose: () => void }> = ({ onClose }) => (
+  <button
+    type="button"
+    aria-label="Close log call modal"
+    onClick={onClose}
+    style={{
+      position: 'fixed',
+      inset: 0,
+      backgroundColor: 'rgba(0, 0, 0, 0.15)',
+      zIndex: 999,
+      border: 'none',
+      padding: 0,
+      margin: 0,
+      cursor: 'default',
+    }}
+  />
+);
+
 // ── Component ─────────────────────────────────────────────────────────────────
 
 const LogCallModal: React.FC<LogCallModalProps> = ({
@@ -100,7 +167,7 @@ const LogCallModal: React.FC<LogCallModalProps> = ({
   const [callDirection, setCallDirection] = useState('');
   const [activityDate, setActivityDate] = useState(formatDateTimeLocal(new Date()));
   const [createTask, setCreateTask] = useState(false);
-  const [isDraftSaved, setIsDraftSaved] = useState(false);
+  const { isDraftSaved, setIsDraftSaved } = useDraftSavedIndicator(callText);
   const [isMaximized, setIsMaximized] = useState(false);
   const [attachments, setAttachments] = useState<File[]>([]);
   const [showContactInput, setShowContactInput] = useState(false);
@@ -117,15 +184,6 @@ const LogCallModal: React.FC<LogCallModalProps> = ({
       setTimeout(() => textareaRef.current?.focus(), 50);
     }
   }, [isOpen]);
-
-  useEffect(() => {
-    if (callText.trim()) {
-      const timer = setTimeout(() => setIsDraftSaved(true), 1000);
-      return () => clearTimeout(timer);
-    } else {
-      setIsDraftSaved(false);
-    }
-  }, [callText]);
 
   useEffect(() => {
     if (showContactInput && contactInputRef.current) {
@@ -317,31 +375,9 @@ const LogCallModal: React.FC<LogCallModalProps> = ({
 
   return (
     <>
-      <div style={{
-        position: 'fixed',
-        inset: 0,
-        backgroundColor: 'rgba(0, 0, 0, 0.15)',
-        zIndex: 999,
-      }} onClick={handleClose} />
+      <LogCallModalBackdrop onClose={handleClose} />
 
-      <div
-        style={{
-          position: 'fixed',
-          inset: isMaximized ? 'unset' : 'unset',
-          ...(isMaximized ? { top: '74px', left: '50%', transform: 'translateX(-50%)', width: 'min(900px, calc(100vw - 84px))', maxHeight: 'calc(100vh - 94px)' } : { left: '50%', top: '50%', transform: 'translate(-50%, -50%)', width: 'min(650px, calc(100vw - 120px))' }),
-          height: isMaximized ? 'auto' : 'auto',
-          width: isMaximized ? 'auto' : 'min(650px, calc(100vw - 120px))',
-          backgroundColor: '#ffffff',
-          zIndex: 1000,
-          display: 'flex',
-          flexDirection: 'column',
-          boxShadow: '0 4px 24px rgba(0,0,0,0.15)',
-          borderRadius: '8px',
-          border: '1px solid #cbd5e0',
-          overflow: 'hidden',
-        }}
-        onClick={(e) => e.stopPropagation()}
-      >
+      <div style={getLogCallModalPanelStyle(isMaximized)}>
         {/* ── Header ── */}
         <div
           style={{
@@ -437,7 +473,7 @@ const LogCallModal: React.FC<LogCallModalProps> = ({
                   onClick={() => setShowContactInput(true)}
                   style={{
                     background: 'transparent', border: 'none', cursor: 'pointer',
-                    fontSize: '14px', fontWeight: contacts.length === 0 ? '600' : '600',
+                    fontSize: '14px', fontWeight: '600',
                     color: '#141414', padding: '0', fontFamily: 'inherit',
                     display: 'flex', alignItems: 'center', gap: '2px',
                   }}

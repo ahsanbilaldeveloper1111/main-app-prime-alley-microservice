@@ -1,4 +1,6 @@
-import type { TableAction, TableColumn } from "@components/GenericTable";
+import { appendSettingsActionsColumn } from "@components/main-settings/settingsEmbeddedTable";
+import type { TableColumn } from "@components/GenericTable";
+import type { CrmTableRowAction } from "@page-modules/crm/shared/CrmTableRowActions";
 import { useAllFAQTopicsQuery } from "@page-modules/faqs/useAllFAQTopicsQuery";
 import { useFAQItemsListQuery } from "@page-modules/faqs/useFAQItemsListQuery";
 import { faqsKeys } from "@query/keys";
@@ -222,7 +224,7 @@ export function useFAQItemsPage() {
     setCurrentPage(1);
   }, []);
 
-  const columns: TableColumn<FAQItemRow>[] = useMemo(
+  const baseColumns: TableColumn<FAQItemRow>[] = useMemo(
     () => [
       {
         key: "question",
@@ -289,24 +291,23 @@ export function useFAQItemsPage() {
     [],
   );
 
-  const actions: TableAction<FAQItemRow>[] = useMemo(
-    () => [
-      {
-        label: "Edit",
-        icon: <Edit size={16} />,
-        onClick: handleEditItem,
-        variant: "light",
-        className: "btn-action-style-2 p-1 text-primary",
-      },
-      {
-        label: "Delete",
-        icon: <Trash2 size={16} />,
-        onClick: handleDeleteItem,
-        variant: "light",
-        className: "btn-action-style-2 p-1 text-danger",
-      },
-    ],
-    [handleEditItem, handleDeleteItem],
+  const columns = useMemo(
+    () =>
+      appendSettingsActionsColumn<FAQItemRow>(baseColumns, (row): CrmTableRowAction[] => [
+        {
+          label: `Edit ${row.question}`,
+          icon: <Edit size={22} aria-hidden />,
+          tone: "primary",
+          onClick: () => handleEditItem(row),
+        },
+        {
+          label: `Delete ${row.question}`,
+          icon: <Trash2 size={22} aria-hidden />,
+          tone: "danger",
+          onClick: () => handleDeleteItem(row),
+        },
+      ]),
+    [baseColumns, handleEditItem, handleDeleteItem],
   );
 
   const isSubmitting = createMutation.isPending || updateMutation.isPending;
@@ -316,7 +317,6 @@ export function useFAQItemsPage() {
     totalRows,
     isLoading,
     columns,
-    actions,
     currentPage,
     rowsPerPage,
     searchValue,

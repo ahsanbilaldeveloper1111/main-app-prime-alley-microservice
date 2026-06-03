@@ -1,6 +1,7 @@
+import { CRM_AVATAR_PALETTE, CRM_THEME } from "@utils/crmThemeColors";
+
 /** Coerce CRM/API values to a display string for avatars (never throws). */
-export function crmAvatarDisplayString(value: unknown): string {
-  if (value == null || value === "") return "";
+export function crmAvatarDisplayString(value: unknown): string {  if (value == null || value === "") return "";
   if (typeof value === "string") return value;
   if (typeof value === "number" || typeof value === "boolean" || typeof value === "bigint") {
     return String(value);
@@ -56,14 +57,9 @@ export function stableStringHash(input: string): number {
   return Math.abs(hash);
 }
 
-const AVATAR_PALETTE = [
-  "#1a6fbd", "#0e7490", "#0f766e", "#1d4ed8",
-  "#4f46e5", "#7c3aed", "#0369a1", "#065f46",
-];
-
 export function getRandomColor(name: unknown): string {
   const s = crmAvatarDisplayString(name);
-  if (!s) return "#6c757d";
+  if (!s) return CRM_THEME.muted;
   const hash = stableStringHash(s);
-  return AVATAR_PALETTE[hash % AVATAR_PALETTE.length];
+  return CRM_AVATAR_PALETTE[hash % CRM_AVATAR_PALETTE.length];
 }

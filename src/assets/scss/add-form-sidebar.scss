@@ -1,0 +1,273 @@
+// Responsive slide-in add/edit forms used across Main Settings sections.
+
+$add-form-sidebar-desktop-width: 600px;
+$add-form-sidebar-tablet-max: 1199.98px;
+$add-form-sidebar-mobile-max: 767.98px;
+$add-form-sidebar-tablet-width: 70vw;
+$add-form-sidebar-mobile-width: 100vw;
+$add-form-sidebar-content-padding: clamp(16px, 4vw, 32px) clamp(16px, 3vw, 24px);
+$add-form-sidebar-header-padding: clamp(14px, 2.5vw, 20px) clamp(16px, 3vw, 24px);
+$add-form-sidebar-footer-padding: clamp(12px, 2vw, 16px) clamp(16px, 3vw, 24px);
+$add-form-dialog-padding: clamp(16px, 4vw, 32px);
+
+@mixin add-form-sidebar-width {
+  width: $add-form-sidebar-desktop-width !important;
+  max-width: $add-form-sidebar-desktop-width !important;
+
+  @media (max-width: $add-form-sidebar-tablet-max) {
+    width: $add-form-sidebar-tablet-width !important;
+    max-width: $add-form-sidebar-tablet-width !important;
+  }
+
+  @media (max-width: $add-form-sidebar-mobile-max) {
+    width: $add-form-sidebar-mobile-width !important;
+    max-width: $add-form-sidebar-mobile-width !important;
+  }
+}
+
+.contact-sidebar-container,
+.create-lead-sidebar-container,
+.stages-create-sidebar {
+  @include add-form-sidebar-width;
+  height: 100vh;
+  height: 100dvh;
+  box-sizing: border-box;
+}
+
+.contact-sidebar-header,
+.stages-create-header {
+  padding: $add-form-sidebar-header-padding !important;
+  box-sizing: border-box;
+}
+
+.contact-sidebar-content,
+.products-sidebar-content,
+.stages-create-content {
+  padding: $add-form-sidebar-content-padding !important;
+  box-sizing: border-box;
+  -webkit-overflow-scrolling: touch;
+}
+
+.contact-sidebar-footer,
+.products-sidebar-footer,
+.stages-create-footer {
+  padding: $add-form-sidebar-footer-padding !important;
+  box-sizing: border-box;
+  flex-wrap: wrap;
+  gap: 12px;
+
+  .contact-form-btn-create,
+  .contact-form-btn-cancel,
+  .stages-create-submit,
+  .stages-create-cancel {
+    flex: 1 1 calc(50% - 6px);
+    min-width: min(100%, 120px);
+
+    @media (min-width: 400px) {
+      flex: 0 0 auto;
+    }
+  }
+}
+
+.contact-sidebar-title,
+.stages-create-title {
+  font-size: clamp(1rem, 2.6vw, 1.25rem) !important;
+  word-break: break-word;
+}
+
+.main-settings-form-dialog {
+  box-sizing: border-box;
+  width: min(480px, calc(100vw - 32px)) !important;
+  max-width: min(480px, calc(100vw - 32px)) !important;
+  padding: $add-form-dialog-padding !important;
+  margin: 0;
+
+  @media (max-width: $add-form-sidebar-tablet-max) {
+    width: $add-form-sidebar-tablet-width !important;
+    max-width: $add-form-sidebar-tablet-width !important;
+  }
+
+  @media (max-width: $add-form-sidebar-mobile-max) {
+    width: $add-form-sidebar-mobile-width !important;
+    max-width: $add-form-sidebar-mobile-width !important;
+  }
+}
+
+.main-settings-form-sidebar {
+  border: none;
+  padding: 0;
+  margin: 0;
+  max-width: none;
+  max-height: none;
+  color: inherit;
+  @include add-form-sidebar-width;
+  height: 100vh;
+  height: 100dvh;
+  box-sizing: border-box;
+  overflow-x: hidden;
+
+  &--open {
+    position: fixed !important;
+    inset: 0 0 0 auto !important;
+    margin: 0 !important;
+    transform: none !important;
+  }
+
+  &--closed {
+    right: calc(-1 * #{$add-form-sidebar-desktop-width}) !important;
+
+    @media (max-width: $add-form-sidebar-tablet-max) {
+      right: calc(-1 * #{$add-form-sidebar-tablet-width}) !important;
+    }
+
+    @media (max-width: $add-form-sidebar-mobile-max) {
+      right: calc(-1 * #{$add-form-sidebar-mobile-width}) !important;
+    }
+  }
+
+  &__header {
+    padding: $add-form-sidebar-header-padding !important;
+    box-sizing: border-box;
+  }
+
+  &__body {
+    padding: $add-form-sidebar-content-padding !important;
+    box-sizing: border-box;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  &__footer {
+    padding: $add-form-sidebar-footer-padding !important;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    flex-shrink: 0;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    overflow-x: hidden;
+    gap: 10px;
+    border-top: 1px solid #eaf0f6;
+    background: #fff;
+
+    > * {
+      width: 100%;
+      min-width: 0;
+      max-width: 100%;
+      box-sizing: border-box;
+    }
+
+    .d-flex.justify-content-end,
+    .d-flex.justify-content-between {
+      flex-wrap: wrap !important;
+      justify-content: flex-end !important;
+      gap: 8px;
+      width: 100%;
+      min-width: 0;
+      max-width: 100%;
+    }
+
+    .industries-modal-footer-hint-row {
+      flex-wrap: wrap !important;
+      align-items: flex-start;
+      gap: 10px;
+
+      .industries-form-hint-text {
+        min-width: 0;
+        flex: 1 1 100%;
+      }
+    }
+
+    .industries-crm-dialog-footer,
+    .industries-crm-dialog-footer--nowrap {
+      flex-wrap: wrap !important;
+      justify-content: flex-end;
+      width: 100%;
+      min-width: 0;
+      max-width: 100%;
+      margin-left: auto;
+    }
+
+    .industries-crm-btn-primary--min148,
+    .industries-crm-btn-primary--min170 {
+      min-width: 0;
+      flex: 1 1 calc(50% - 4px);
+      max-width: 100%;
+
+      @media (min-width: 400px) {
+        flex: 0 1 auto;
+        min-width: min(148px, 100%);
+      }
+    }
+
+    .industries-crm-btn-secondary {
+      flex: 1 1 calc(50% - 4px);
+      max-width: 100%;
+
+      @media (min-width: 400px) {
+        flex: 0 1 auto;
+      }
+    }
+  }
+}
+
+// Footer actions inside Main Settings side panels — prevent horizontal overflow.
+.main-settings-form-sidebar-footer {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+
+  .form-text {
+    min-width: 0;
+  }
+}
+
+.main-settings-form-sidebar-footer__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+
+  .btn,
+  button {
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+
+  .contact-form-btn-create,
+  .contact-form-btn-cancel {
+    flex: 1 1 calc(50% - 4px);
+    min-width: min(100%, 120px);
+
+    @media (min-width: 400px) {
+      flex: 0 1 auto;
+    }
+  }
+}
+
+.main-settings-root {
+  .modal-header {
+    padding: $add-form-sidebar-header-padding;
+  }
+
+  .modal-body {
+    padding: $add-form-sidebar-content-padding;
+  }
+
+  .modal-footer {
+    padding: $add-form-sidebar-footer-padding;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+}

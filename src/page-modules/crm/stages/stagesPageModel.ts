@@ -1,4 +1,7 @@
 import type { StageData } from "@utils/crm";
+import { resolveStageThemeColor } from "@utils/crmThemeColors";
+
+export { resolveStageThemeColor as resolveStageDotColor };
 
 export type StageType = "lead" | "deal" | "order" | "lost_reason";
 
@@ -45,12 +48,21 @@ export function getTypeBadgeColor(type: string): string {
   return TYPE_BADGE_COLORS[type as StageType] ?? "secondary";
 }
 
+/** CSS modifier for stage name dot (same semantic mapping as `TYPE_BADGE_COLORS`). */
+export function getStageTypeDotClassName(type: string): string {
+  const key = type as StageType;
+  if (key in TYPE_BADGE_COLORS) {
+    return `stages-table-name-dot stages-table-name-dot--${key}`;
+  }
+  return "stages-table-name-dot stages-table-name-dot--neutral";
+}
+
 export const INITIAL_STAGE_FORM: StageFormState = {
   name: "",
   sequence: 1,
   is_won: false,
   fold: false,
-  color: "#6c757d",
+  color: resolveStageThemeColor("lead"),
   description: "",
   is_default: false,
   active: true,

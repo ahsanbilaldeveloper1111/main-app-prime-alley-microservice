@@ -2,6 +2,8 @@
 .generic-table-container {
   width: 100%;
   overflow: hidden;
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
 }
 /* Card */
 .generic-table-card {
@@ -106,11 +108,12 @@ button.gt-first-column-trigger {
 th.generic-table-th:not(:last-child) {
   border-inline-end: 1px solid #ccc;
 }
-/* Actions Header */
+/* Actions Header — width grows with icon count; keep buttons in one row */
 .generic-table-actions-header {
-  min-width: 80px;
-  width: 80px;
+  width: 1%;
+  min-width: max-content;
   text-align: center;
+  white-space: nowrap;
 }
 
 /* Table Body */
@@ -184,17 +187,38 @@ button.preview-button:hover, button.preview-button:focus {
 
 /* Actions Cell */
 .generic-table-actions-cell {
-  min-width: 80px;
-  width: 80px;
+  width: 1%;
+  min-width: max-content;
   text-align: center;
   white-space: nowrap;
+  vertical-align: middle;
 }
 
 .generic-table-actions {
-  display: flex;
+  display: inline-flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  gap: 4px;
+  max-width: 100%;
+}
+
+.gt-row-actions--desktop {
+  display: inline-flex !important;
+  flex-direction: row !important;
+  flex-wrap: nowrap !important;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+
+.generic-table-td[data-col-key='actions'] .gt-row-actions--desktop,
+.generic-table-td[data-col-key='Action'] .users-directory-row-actions--desktop {
+  flex-direction: row !important;
+  flex-wrap: nowrap !important;
+  align-items: center;
+  gap: 4px;
 }
 
 /* Loading & Empty States */
@@ -829,6 +853,21 @@ button.preview-button:hover, button.preview-button:focus {
   padding: 2px 2px 0;
   margin-bottom: -1px;
 }
+
+.gt-toolbar-tabs-row {
+  flex-wrap: wrap;
+}
+
+.gt-toolbar-tabs-list {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.gt-toolbar-tabs-actions {
+  margin-left: auto;
+  flex: 0 0 auto;
+}
+
 .members-table-wrapper .gt-toolbar-tabs-section {
  margin-left: 15px;
 }
@@ -1299,6 +1338,43 @@ background: #fff !important;
     font-size: 13px;
   }
 
+  .gt-toolbar-tabs-section {
+    overflow: visible;
+    padding: 10px 12px 0;
+  }
+
+  .gt-toolbar-tabs-row {
+    flex-direction: column;
+    align-items: stretch !important;
+    gap: 10px;
+  }
+
+  .gt-toolbar-tabs-list {
+    flex: 0 0 auto;
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    flex-wrap: nowrap;
+    padding-bottom: 2px;
+  }
+
+  .gt-toolbar-tabs-actions {
+    margin-left: 0;
+    width: 100%;
+  }
+
+  .gt-toolbar-tabs-actions > .d-flex {
+    flex-wrap: wrap;
+    width: 100%;
+    gap: 8px;
+  }
+
+  .gt-toolbar-tabs-actions .btn,
+  .gt-toolbar-tabs-actions button {
+    flex: 1 1 auto;
+    min-width: fit-content;
+  }
+
   .gt-toolbar-main {
     flex-direction: column;
     align-items: stretch;
@@ -1378,6 +1454,10 @@ background: #fff !important;
 
 @media (max-width: 576px) {
   .gt-toolbar-tabs-section {
+    overflow: visible;
+  }
+
+  .gt-toolbar-tabs-list {
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
   }
@@ -1427,10 +1507,6 @@ background: #fff !important;
   }
 }
 
-.generic-table-container {
-  scrollbar-width: thin;
-  scrollbar-color: transparent transparent;
-}
 .generic-table-container:hover {
   scrollbar-color: #CBD5E1 transparent;
 }

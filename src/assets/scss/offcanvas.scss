@@ -1,3 +1,37 @@
+.user-directory-preview-canvas {
+      .offcanvas-header.user-directory-preview-canvas__header {
+            min-height: auto;
+            padding: 0.5rem 0.75rem;
+      }
+
+      .offcanvas-body.user-directory-preview-canvas__body {
+            padding: 0.75rem;
+      }
+
+      .data-item .sbox {
+            margin-bottom: 0.35rem;
+
+            p.small {
+                  margin-bottom: 0.15rem;
+            }
+
+            h5 {
+                  margin-bottom: 0;
+            }
+      }
+
+      .uAvatar {
+            margin: 0 0 0.75rem;
+            gap: 8px;
+
+            .iBox {
+                  width: 44px;
+                  height: 44px;
+                  font-size: 13px;
+            }
+      }
+}
+
 .data-item {
       .sbox{
             // border-bottom: 1px #d5d5d5 solid;

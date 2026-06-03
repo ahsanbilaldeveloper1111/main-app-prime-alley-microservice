@@ -10,13 +10,13 @@ import GenericTable from "@components/GenericTable";
 import PageHeader from "@components/PageHeader";
 import {
   buildChildrenRequestCategoryActions,
-  buildMainRequestCategoryActions,
+  buildMainRequestCategoryTableColumns,
   buildRequestCategoryFieldsActions,
   buildRequestCategoryFieldsColumns,
-  MAIN_REQUEST_CATEGORY_COLUMNS,
   CHILD_REQUEST_CATEGORY_COLUMNS,
   REQUEST_CATEGORIES_NESTED_TABLE_LAYOUT,
 } from "@page-modules/workforce/request-categories/partials/requestCategoriesGenericTableBlocks";
+import { WorkforceSettingsTableWrap } from "@page-modules/workforce/shared/WorkforceSettingsTableWrap";
 import {
   categoryModalTitle,
   categorySaveButtonLabel,
@@ -26,6 +26,7 @@ import {
 import RequestCategoryFieldModal from "@page-modules/workforce/request-categories/partials/RequestCategoryFieldModal";
 import { SubCategoryWorkflowForm } from "@page-modules/workforce/request-categories/partials/RequestCategoriesWorkflowForm";
 import DeleteConfirmationModal from "@components/page-partials/DeleteConfirmationModal";
+import { sanitizeSearchInputLive } from "@utils/Helper";
 import type { UserRequestCategory, UserRequestCategoryField } from "@utils/staffManagement";
 import { Plus } from "lucide-react";
 import React, { useMemo, type ReactNode } from "react";
@@ -98,7 +99,63 @@ function RequestCategoriesLargeModal({
   );
 }
 
-export function RequestCategoriesPageView() {
+function RequestCategoriesSearchInput({
+  searchValue,
+  onSearchChange,
+  placeholder,
+}: Readonly<{
+  searchValue: string;
+  onSearchChange: (value: string) => void;
+  placeholder: string;
+}>) {
+  return (
+    <div className="search-container">
+      <i className="fas fa-search search-icon" aria-hidden />
+      <input
+        type="text"
+        className="search-bar"
+        placeholder={placeholder}
+        value={searchValue}
+        onChange={(e) => onSearchChange(sanitizeSearchInputLive(e.target.value))}
+        onPaste={(e) => {
+          const target = e.currentTarget;
+          globalThis.setTimeout(() => {
+            onSearchChange(sanitizeSearchInputLive(target.value));
+          }, 0);
+        }}
+      />
+    </div>
+  );
+}
+
+function RequestCategoriesAddButton({
+  canManage,
+  onClick,
+}: Readonly<{
+  canManage: boolean;
+  onClick: () => void;
+}>) {
+  if (!canManage) {
+    return null;
+  }
+
+  return (
+    <Button variant="primary" onClick={onClick}>
+      <Plus size={18} className="me-1" />
+      Add Category
+    </Button>
+  );
+}
+
+export type RequestCategoriesPageViewProps = Readonly<{
+  hideBreadcrumb?: boolean;
+  embeddedInMainSettings?: boolean;
+}>;
+
+export function RequestCategoriesPageView({
+  hideBreadcrumb = false,
+  embeddedInMainSettings = false,
+}: RequestCategoriesPageViewProps = {}) {
   const ctx = useRequestCategoriesPage();
 
   const {
@@ -163,9 +220,9 @@ export function RequestCategoriesPageView() {
     openDeleteFieldModal,
   } = ctx;
 
-  const mainTableActions = useMemo(
+  const mainTableColumns = useMemo(
     () =>
-      buildMainRequestCategoryActions(canManage, {
+      buildMainRequestCategoryTableColumns(canManage, {
         openEditCategory,
         openChildrenModal,
         openDeleteCategory,
@@ -227,48 +284,87 @@ export function RequestCategoriesPageView() {
 
   return (
     <div className="request-categories-page">
-      <BreadcrumbItem mainTitle="" mainLink="" subTitle="Request Categories" />
-      <PageHeader
-        title=""
-        showSearch={true}
-        searchPlaceholder="Search categories..."
-        searchValue={searchValue}
-        onSearchChange={(value) => setSearchValue(value)}
-        buttons={
-          <>
-            {canManage && (
-              <Button variant="primary" onClick={openCreateCategory}>
-                <Plus size={18} className="me-1" />
-                Add Category
-              </Button>
-            )}
-          </>
-        }
-      />
+      {hideBreadcrumb ? null : (
+        <BreadcrumbItem mainTitle="" mainLink="" subTitle="Request Categories" />
+      )}
 
-      <GenericTable<UserRequestCategory>
-        data={categories}
-        columns={MAIN_REQUEST_CATEGORY_COLUMNS}
-        actions={mainTableActions}
-        showActions
-        loading={loading}
-        emptyMessage="No request categories yet. Create one to get started."
-        pagination={
-          pagination
-            ? {
-                currentPage: pagination.page,
-                rowsPerPage: pagination.limit,
-                totalRows: pagination.total,
-              }
-            : undefined
-        }
-        onPaginationChange={(p, rowsPerPage) => {
-          setPage(p);
-          setLimit(rowsPerPage);
-        }}
-        uniqueKey="id"
-        showToolbarActions={false}
-      />
+      {embeddedInMainSettings ? (
+        <div className="request-categories-page__toolbar">
+          <div className="request-categories-page__toolbar-search">
+            <RequestCategoriesSearchInput
+              searchValue={searchValue}
+              onSearchChange={setSearchValue}
+              placeholder="Search categories..."
+            />
+          </div>
+          <div className="request-categories-page__toolbar-actions">
+            <RequestCategoriesAddButton canManage={canManage} onClick={openCreateCategory} />
+          </div>
+        </div>
+      ) : (
+        <PageHeader
+          title=""
+          showSearch={true}
+          searchPlaceholder="Search categories..."
+          searchValue={searchValue}
+          onSearchChange={(value) => setSearchValue(value)}
+          buttons={
+            <RequestCategoriesAddButton canManage={canManage} onClick={openCreateCategory} />
+          }
+        />
+      )}
+
+      {embeddedInMainSettings ? (
+        <WorkforceSettingsTableWrap>
+          <GenericTable<UserRequestCategory>
+            data={categories}
+            columns={mainTableColumns}
+            showActions={false}
+            loading={loading}
+            emptyMessage="No request categories yet. Create one to get started."
+            pagination={
+              pagination
+                ? {
+                    currentPage: pagination.page,
+                    rowsPerPage: pagination.limit,
+                    totalRows: pagination.total,
+                  }
+                : undefined
+            }
+            onPaginationChange={(p, rowsPerPage) => {
+              setPage(p);
+              setLimit(rowsPerPage);
+            }}
+            uniqueKey="id"
+            showToolbarActions={false}
+            hover
+            size="md"
+          />
+        </WorkforceSettingsTableWrap>
+      ) : (
+        <GenericTable<UserRequestCategory>
+          data={categories}
+          columns={mainTableColumns}
+          showActions={false}
+          loading={loading}
+          emptyMessage="No request categories yet. Create one to get started."
+          pagination={
+            pagination
+              ? {
+                  currentPage: pagination.page,
+                  rowsPerPage: pagination.limit,
+                  totalRows: pagination.total,
+                }
+              : undefined
+          }
+          onPaginationChange={(p, rowsPerPage) => {
+            setPage(p);
+            setLimit(rowsPerPage);
+          }}
+          uniqueKey="id"
+          showToolbarActions={false}
+        />
+      )}
 
       <CategoryEditSidebar
         isOpen={showCategoryModal}

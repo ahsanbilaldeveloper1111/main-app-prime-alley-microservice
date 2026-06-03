@@ -4,8 +4,10 @@ import {
   formatTrackingLabel,
   requestCategoryFieldTypeLabel,
 } from "@page-modules/workforce/request-categories/requestCategoriesDomain";
+import { CrmTableRowActions } from "@page-modules/crm/shared/CrmTableRowActions";
 import type { UserRequestCategory, UserRequestCategoryField } from "@utils/staffManagement";
 import { ChevronDown, ChevronUp, FolderTree, List, Pencil, Trash2 } from "lucide-react";
+import React from "react";
 
 export const REQUEST_CATEGORIES_NESTED_TABLE_LAYOUT = {
   showActions: true,
@@ -123,25 +125,61 @@ function trashOutlineDangerAction<T>(onClick: (row: T) => void): TableAction<T> 
   };
 }
 
-export function buildMainRequestCategoryActions(
+export type MainRequestCategoryActionHandlers = Readonly<{
+  openEditCategory: (c: UserRequestCategory) => void;
+  openChildrenModal: (c: UserRequestCategory) => void;
+  openDeleteCategory: (c: UserRequestCategory) => void;
+}>;
+
+function renderMainRequestCategoryRowActions(
+  row: UserRequestCategory,
+  handlers: MainRequestCategoryActionHandlers,
+): React.ReactNode {
+  return (
+    <CrmTableRowActions
+      actions={[
+        {
+          label: `Edit ${row.name}`,
+          icon: <Pencil size={22} aria-hidden />,
+          tone: "primary",
+          onClick: () => handlers.openEditCategory(row),
+        },
+        {
+          label: `Sub-categories for ${row.name}`,
+          icon: <FolderTree size={22} aria-hidden />,
+          tone: "info",
+          onClick: () => handlers.openChildrenModal(row),
+        },
+        {
+          label: `Delete ${row.name}`,
+          icon: <Trash2 size={22} aria-hidden />,
+          tone: "danger",
+          onClick: () => handlers.openDeleteCategory(row),
+        },
+      ]}
+    />
+  );
+}
+
+/** Main categories table columns including Ranks-style row actions when `canManage`. */
+export function buildMainRequestCategoryTableColumns(
   canManage: boolean,
-  handlers: Readonly<{
-    openEditCategory: (c: UserRequestCategory) => void;
-    openChildrenModal: (c: UserRequestCategory) => void;
-    openDeleteCategory: (c: UserRequestCategory) => void;
-  }>,
-): TableAction<UserRequestCategory>[] {
-  const show = () => canManage;
+  handlers: MainRequestCategoryActionHandlers,
+): TableColumn<UserRequestCategory>[] {
+  if (!canManage) {
+    return MAIN_REQUEST_CATEGORY_COLUMNS;
+  }
   return [
-    { ...pencilOutlineAction(handlers.openEditCategory), show },
+    ...MAIN_REQUEST_CATEGORY_COLUMNS,
     {
-      label: "Sub-categories",
-      icon: <FolderTree size={14} />,
-      onClick: handlers.openChildrenModal,
-      variant: "outline-secondary",
-      show,
+      key: "actions",
+      label: "Actions",
+      sortable: false,
+      align: "center",
+      type: "custom",
+      width: "180px",
+      render: (row: UserRequestCategory) => renderMainRequestCategoryRowActions(row, handlers),
     },
-    { ...trashOutlineDangerAction(handlers.openDeleteCategory), show },
   ];
 }
 

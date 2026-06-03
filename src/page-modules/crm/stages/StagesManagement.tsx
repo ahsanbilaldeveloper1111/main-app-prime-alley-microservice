@@ -26,6 +26,7 @@ import { StageRestoreModal } from "@page-modules/crm/stages/StageRestoreModal";
 import { StageViewModal } from "@page-modules/crm/stages/StageViewModal";
 import { StagesAnalyticsSection } from "@page-modules/crm/stages/StagesAnalyticsSection";
 import { buildStagesTableColumns } from "@page-modules/crm/stages/stagesTableColumns";
+import { CrmSettingsTableWrap } from "@page-modules/crm/shared/CrmSettingsTableWrap";
 
 const { PERMISSIONS } = HEADER_CONSTANTS;
 
@@ -204,7 +205,10 @@ const StagesManagement = ({ hideBreadcrumb, breadcrumbMainLink }: CrmPageDisplay
           <StagesAnalyticsSection analyticsData={analyticsData} />
         )}
 
-        <div className="stages-table-wrapper mb-4">
+        <CrmSettingsTableWrap
+          hideBreadcrumb={hideBreadcrumb}
+          standaloneWrapperClass="stages-table-wrapper mb-4"
+        >
           <GenericTable<StageRow>
             data={paginatedStages}
             columns={stagesTableColumns}
@@ -230,8 +234,10 @@ const StagesManagement = ({ hideBreadcrumb, breadcrumbMainLink }: CrmPageDisplay
             showToolbarActions={false}
             uniqueKey="id"
             onPreviewClick={(stage) => openStageView(stage)}
+            hover
+            size="md"
           />
-        </div>
+        </CrmSettingsTableWrap>
       </div>
 
       {showCreateModal && (

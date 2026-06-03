@@ -1,5 +1,7 @@
 import PageHeader from "@components/PageHeader";
-import GenericTable, { type TableAction, type TableColumn } from "@components/GenericTable";
+import type { TableColumn } from "@components/GenericTable";
+import { EmbeddedSettingsTable } from "@components/main-settings/EmbeddedSettingsTable";
+import { SettingsEmbeddedToolbar } from "@components/main-settings/SettingsEmbeddedToolbar";
 import ConfirmModal from "@components/page-partials/ConfirmModal";
 import FormModal from "@components/page-partials/FormModal";
 import type { TicketType } from "../ticketTypesTypes";
@@ -8,10 +10,10 @@ import { Button, Form } from "react-bootstrap";
 import { Plus, Info, Ticket } from "lucide-react";
 
 type TicketTypesPageViewProps = Readonly<{
+  embeddedInMainSettings?: boolean;
   data: TicketType[];
   loading: boolean;
   columns: TableColumn<TicketType>[];
-  actions: TableAction<TicketType>[];
   currentPage: number;
   rowsPerPage: number;
   totalRows: number;
@@ -41,10 +43,10 @@ type TicketTypesPageViewProps = Readonly<{
 }>;
 
 export const TicketTypesPageView: React.FC<TicketTypesPageViewProps> = ({
+  embeddedInMainSettings = false,
   data,
   loading,
   columns,
-  actions,
   currentPage,
   rowsPerPage,
   totalRows,
@@ -71,32 +73,41 @@ export const TicketTypesPageView: React.FC<TicketTypesPageViewProps> = ({
   onCloseDeleteTypeModal,
   onCloseCreateTypeModal,
   onOpenCreateTypeModal,
-}) => (
-  <>
-    <PageHeader
-      title=""
-      description=""
-      showSearch={false}
-      buttons={
-        canCreate ? (
-          <Button variant="primary" onClick={onOpenCreateTypeModal} className="shadow-sm">
-            <Plus size={18} className="me-2" />
-            Add Type
-          </Button>
-        ) : undefined
-      }
-      leftGrid={3}
-      rightGrid={9}
-    />
+}) => {
+  const addButton = canCreate ? (
+    <Button variant="primary" size="sm" onClick={onOpenCreateTypeModal} className="shadow-sm">
+      <Plus size={18} className="me-2" aria-hidden />
+      Add Type
+    </Button>
+  ) : null;
 
-    {canViewList && (
-      <GenericTable<TicketType>
+  return (
+  <div className={embeddedInMainSettings ? "tickets-settings-page" : undefined}>
+    {embeddedInMainSettings ? (
+      <SettingsEmbeddedToolbar
+        searchValue={searchValue}
+        onSearchChange={onSearchChange}
+        searchPlaceholder="Search types..."
+        actions={addButton}
+      />
+    ) : (
+      <PageHeader
+        title=""
+        description=""
+        showSearch={false}
+        buttons={addButton}
+        leftGrid={3}
+        rightGrid={9}
+      />
+    )}
+
+    {canViewList ? (
+      <EmbeddedSettingsTable<TicketType>
+        embedded={embeddedInMainSettings}
         data={data}
         columns={columns}
         loading={loading}
-        actions={actions}
-        showActions={actions.length > 0}
-        actionsLabel="Actions"
+        emptyMessage="No ticket types found."
         pagination={{
           currentPage,
           rowsPerPage,
@@ -104,20 +115,15 @@ export const TicketTypesPageView: React.FC<TicketTypesPageViewProps> = ({
           pageSizeOptions: [15, 25, 50, 100],
         }}
         onPaginationChange={onPaginationChange}
-        sortable={true}
-        hover={true}
-        emptyMessage="No ticket types found."
-        showToolbar={true}
+        uniqueKey="id"
         toolbar={{
           showSearch: true,
           searchValue,
           searchPlaceholder: "Search types...",
-          onSearchChange: onSearchChange,
+          onSearchChange,
         }}
-        showToolbarActions={false}
-        uniqueKey="id"
       />
-    )}
+    ) : null}
 
     {showEditTypeModal && (
       <FormModal
@@ -286,5 +292,6 @@ export const TicketTypesPageView: React.FC<TicketTypesPageViewProps> = ({
         onCancel={onCloseCreateTypeModal}
       />
     )}
-  </>
-);
+  </div>
+  );
+};

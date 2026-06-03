@@ -1,0 +1,47 @@
+@import './smartCrmTablePage.scss';
+@import './settingsEmbeddedToolbar.scss';
+@import './settingsEmbeddedPageShell.scss';
+
+.faqs-settings-panel {
+  min-width: 0;
+  width: 100%;
+  max-width: 100%;
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  overflow-x: clip;
+
+  > .smart-crm-table-page,
+  > div > .smart-crm-table-page {
+    margin-top: 0;
+  }
+
+  .faqs-settings-page {
+    @include settings-embedded-page-shell;
+  }
+
+  .page-header-title.style-2 {
+    @media (max-width: 767.98px) {
+      margin-bottom: 0.75rem !important;
+    }
+  }
+
+  // FAQ Types tab — topic filter + badge list
+  .faq-types-settings-filter {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+
+    @media (min-width: 576px) {
+      max-width: 20rem;
+    }
+
+    @media (min-width: 768px) {
+      max-width: 280px;
+    }
+  }
+
+  .faq-types-settings-card .d-flex.flex-wrap {
+    gap: 0.5rem;
+  }
+}
