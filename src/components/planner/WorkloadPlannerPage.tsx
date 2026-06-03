@@ -3,7 +3,6 @@ import { useSession } from "next-auth/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { isAxiosError } from "axios";
 import BreadcrumbItem from "@common/BreadcrumbItem";
-import { Container } from "react-bootstrap";
 import { toast } from "react-toastify";
 import "@assets/scss/common.scss";
 import { useHierarchyData } from "@components/filters/useHierarchyData";
@@ -776,7 +775,7 @@ const WorkloadPlannerPage: React.FC = () => {
             setSelectedCell({ extension, date, member, cell });
           }}
         />
-      </Container>
+      </div>
 
       <WorkloadDayOffcanvas
         selected={selectedCell}
