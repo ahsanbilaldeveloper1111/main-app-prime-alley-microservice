@@ -124,22 +124,20 @@ export function WorkloadReportsFiltersCard({
             disabled={!enabled}
           >
             <span className="reports-filter-bar__pill-label">Time period</span>
+            <span className="reports-filter-bar__pill-sep">:</span>
+            <span className="reports-filter-bar__pill-value">{DATE_PRESET_LABELS[datePreset]}</span>
             {datePreset !== "last_7" ? (
-              <>
-                <span className="reports-filter-bar__pill-sep">:</span>
-                <span className="reports-filter-bar__pill-value">{DATE_PRESET_LABELS[datePreset]}</span>
-                <button
-                  type="button"
-                  className="reports-filter-bar__pill-x"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onDatePresetChange("last_7");
-                    setOpenPill(null);
-                  }}
-                >
-                  ×
-                </button>
-              </>
+              <button
+                type="button"
+                className="reports-filter-bar__pill-x"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDatePresetChange("last_7");
+                  setOpenPill(null);
+                }}
+              >
+                ×
+              </button>
             ) : null}
             <span className="reports-filter-bar__caret">▾</span>
           </button>
