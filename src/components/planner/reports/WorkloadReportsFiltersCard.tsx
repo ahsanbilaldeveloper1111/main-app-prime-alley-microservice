@@ -139,7 +139,7 @@ export function WorkloadReportsFiltersCard({
                 ×
               </button>
             ) : null}
-            <i className="ti ti-chevron-down reports-filter-bar__caret" aria-hidden="true" />
+            <span className="reports-filter-bar__caret">▾</span>
           </button>
           {openPill === "time" ? (
             <div className="reports-filter-bar__dropdown">
@@ -221,7 +221,7 @@ export function WorkloadReportsFiltersCard({
                 </button>
               </>
             ) : null}
-            <i className="ti ti-chevron-down reports-filter-bar__caret" aria-hidden="true" />
+            <span className="reports-filter-bar__caret">▾</span>
           </button>
           {openPill === "project" ? (
             <div className="reports-filter-bar__dropdown reports-filter-bar__dropdown--wide">
@@ -295,7 +295,7 @@ export function WorkloadReportsFiltersCard({
                 </button>
               </>
             ) : null}
-            <i className="ti ti-chevron-down reports-filter-bar__caret" aria-hidden="true" />
+            <span className="reports-filter-bar__caret">▾</span>
           </button>
           {openPill === "member" ? (
             <div className="reports-filter-bar__dropdown reports-filter-bar__dropdown--wide">
