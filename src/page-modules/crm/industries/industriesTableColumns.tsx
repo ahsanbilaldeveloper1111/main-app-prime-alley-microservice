@@ -66,7 +66,17 @@ export function buildIndustriesTableColumns(
       type: "custom",
       width: "240px",
       render: (industry) => (
-        <div className="fw-semibold">{industry.name}</div>
+        <div
+          className="fw-semibold"
+          title={industry.name}
+          style={{
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap",
+          }}
+        >
+          {industry.name}
+        </div>
       ),
     },
     {

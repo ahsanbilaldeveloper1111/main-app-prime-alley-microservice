@@ -30,9 +30,27 @@ function buildNameColumn(): TableColumn<StageRow> {
     sortable: false,
     type: "custom",
     render: (stage) => (
-      <div className="d-flex align-items-center gap-2">
-        <div className={getStageTypeDotClassName(stage.type)} aria-hidden />
-        <span className="fw-semibold">{stage.name}</span>
+      <div
+        className="d-flex align-items-center gap-2"
+        style={{ minWidth: 0, maxWidth: "100%", overflow: "hidden" }}
+      >
+        <div
+          className={getStageTypeDotClassName(stage.type)}
+          aria-hidden
+          style={{ flexShrink: 0 }}
+        />
+        <span
+          className="fw-semibold"
+          title={stage.name}
+          style={{
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap",
+            minWidth: 0,
+          }}
+        >
+          {stage.name}
+        </span>
       </div>
     ),
   };

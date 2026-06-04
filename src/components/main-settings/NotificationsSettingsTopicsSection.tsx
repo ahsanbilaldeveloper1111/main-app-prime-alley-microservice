@@ -8,7 +8,7 @@ import './notificationsSettingsTopics.scss'
 function TopicChannelHeaderIcon({ channelKey }: Readonly<{ channelKey: ChannelKey }>) {
   if (channelKey === 'popup') {
     return (
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#555" strokeWidth="2">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6c757d" strokeWidth="2">
         <rect x="2" y="3" width="20" height="14" rx="2" />
         <path d="M8 21h8M12 17v4" />
       </svg>
@@ -16,7 +16,7 @@ function TopicChannelHeaderIcon({ channelKey }: Readonly<{ channelKey: ChannelKe
   }
   if (channelKey === 'browser') {
     return (
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#555" strokeWidth="2">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6c757d" strokeWidth="2">
         <rect x="2" y="3" width="20" height="14" rx="2" />
         <line x1="8" y1="21" x2="16" y2="21" />
         <line x1="12" y1="17" x2="12" y2="21" />
@@ -25,14 +25,14 @@ function TopicChannelHeaderIcon({ channelKey }: Readonly<{ channelKey: ChannelKe
   }
   if (channelKey === 'bell') {
     return (
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#555" strokeWidth="2">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6c757d" strokeWidth="2">
         <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
         <path d="M13.73 21a2 2 0 0 1-3.46 0" />
       </svg>
     )
   }
   return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#555" strokeWidth="2">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6c757d" strokeWidth="2">
       <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
       <polyline points="22,6 12,13 2,6" />
     </svg>
@@ -84,7 +84,7 @@ export const NotificationsSettingsTopicsSection: React.FC<NotificationsSettingsT
     <div style={{ fontSize: MAIN_SETTINGS_FONT_SIZE.lg, fontWeight: 600, color: '#141414', marginBottom: '4px', fontFamily: baseFont }}>
       What you get notified about
     </div>
-    <div style={{ fontSize: MAIN_SETTINGS_FONT_SIZE.sm, fontWeight: 300, color: '#555', marginBottom: '20px', fontFamily: baseFont }}>
+    <div style={{ fontSize: MAIN_SETTINGS_FONT_SIZE.sm, fontWeight: 400, color: '#6c757d', marginBottom: '20px', fontFamily: baseFont }}>
       Choose what topics matter to you and how you get notified about them.
     </div>
 
@@ -103,7 +103,7 @@ export const NotificationsSettingsTopicsSection: React.FC<NotificationsSettingsT
             paddingBottom: '8px',
             fontSize: MAIN_SETTINGS_FONT_SIZE.md,
             height: '40px',
-            fontWeight: 300,
+            fontWeight: 400,
             color: '#141414',
             border: '1px solid #8a8a8a',
             borderRadius: '20px',
@@ -111,7 +111,7 @@ export const NotificationsSettingsTopicsSection: React.FC<NotificationsSettingsT
             outline: 'none',
           }}
           onFocus={(e) => {
-            e.currentTarget.style.borderColor = '#006162'
+            e.currentTarget.style.borderColor = '#86b7fe'
           }}
           onBlur={(e) => {
             e.currentTarget.style.borderColor = '#b8b8b8'
@@ -122,7 +122,7 @@ export const NotificationsSettingsTopicsSection: React.FC<NotificationsSettingsT
           height="14"
           viewBox="0 0 24 24"
           fill="none"
-          stroke="#888"
+          stroke="#6c757d"
           strokeWidth="2"
           strokeLinecap="round"
           strokeLinejoin="round"
@@ -137,7 +137,7 @@ export const NotificationsSettingsTopicsSection: React.FC<NotificationsSettingsT
     <div className="notifications-topics-table__scroll">
       <div className="notifications-topics-table__scroll-inner">
       <div className="notifications-topics-table__grid-row notifications-topics-table__toolbar-row">
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0', fontSize: MAIN_SETTINGS_FONT_SIZE.base, fontWeight: 300 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0', fontSize: MAIN_SETTINGS_FONT_SIZE.base, fontWeight: 400 }}>
           <button
             type="button"
             onClick={toggleExpandAll}
@@ -145,10 +145,10 @@ export const NotificationsSettingsTopicsSection: React.FC<NotificationsSettingsT
               background: 'none',
               border: 'none',
               cursor: 'pointer',
-              color: '#006162',
+              color: '#0066CC',
               fontSize: MAIN_SETTINGS_FONT_SIZE.base,
               fontFamily: baseFont,
-              fontWeight: 300,
+              fontWeight: 400,
               padding: 0,
               textDecoration: 'underline',
             }}
@@ -163,10 +163,10 @@ export const NotificationsSettingsTopicsSection: React.FC<NotificationsSettingsT
               background: 'none',
               border: 'none',
               cursor: 'pointer',
-              color: '#006162',
+              color: '#0066CC',
               fontSize: MAIN_SETTINGS_FONT_SIZE.base,
               fontFamily: baseFont,
-              fontWeight: 300,
+              fontWeight: 400,
               padding: 0,
               textDecoration: 'underline',
             }}
@@ -181,10 +181,10 @@ export const NotificationsSettingsTopicsSection: React.FC<NotificationsSettingsT
               justifyContent: 'center',
               width: '15px',
               height: '15px',
-              border: '1.5px solid #888',
+              border: '1.5px solid #6c757d',
               borderRadius: '50%',
               fontSize: MAIN_SETTINGS_FONT_SIZE.xs,
-              color: '#888',
+              color: '#6c757d',
               cursor: 'default',
             }}
             title="Turning off all topics disables all notifications"
@@ -273,7 +273,7 @@ export const NotificationsSettingsTopicsSection: React.FC<NotificationsSettingsT
                         {sub.label}
                       </div>
                       {sub.description && (
-                        <div style={{ fontSize: MAIN_SETTINGS_FONT_SIZE.sm, fontWeight: 300, color: '#888', fontFamily: baseFont }}>
+                        <div style={{ fontSize: MAIN_SETTINGS_FONT_SIZE.sm, fontWeight: 400, color: '#6c757d', fontFamily: baseFont }}>
                           {sub.description}
                         </div>
                       )}
@@ -286,7 +286,7 @@ export const NotificationsSettingsTopicsSection: React.FC<NotificationsSettingsT
                           padding: '5px 14px',
                           fontSize: MAIN_SETTINGS_FONT_SIZE.sm,
                           fontFamily: baseFont,
-                          fontWeight: 300,
+                          fontWeight: 400,
                           color: '#141414',
                           background: '#fff',
                           border: '1px solid #b8b8b8',
@@ -320,7 +320,7 @@ export const NotificationsSettingsTopicsSection: React.FC<NotificationsSettingsT
                             padding: 0,
                           }}
                         >
-                          <svg width="8" height="10" viewBox="0 0 8 10" fill="#555">
+                          <svg width="8" height="10" viewBox="0 0 8 10" fill="#6c757d">
                             <path d="M0 0L8 5L0 10V0Z" />
                           </svg>
                         </button>
@@ -330,7 +330,7 @@ export const NotificationsSettingsTopicsSection: React.FC<NotificationsSettingsT
                               padding: '4px 22px 4px 8px',
                               fontSize: MAIN_SETTINGS_FONT_SIZE.sm,
                               fontFamily: baseFont,
-                              fontWeight: 300,
+                              fontWeight: 400,
                               color: '#141414',
                               border: 'none',
                               background: '#fff',
@@ -376,9 +376,9 @@ export const NotificationsSettingsTopicsSection: React.FC<NotificationsSettingsT
         <div
           style={{
             textAlign: 'center',
-            color: '#888',
+            color: '#6c757d',
             fontSize: MAIN_SETTINGS_FONT_SIZE.base,
-            fontWeight: 300,
+            fontWeight: 400,
             padding: '40px',
             fontFamily: baseFont,
           }}

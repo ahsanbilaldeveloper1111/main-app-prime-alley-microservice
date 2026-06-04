@@ -49,11 +49,24 @@
 
   .gt-tab-button {
     margin-left: 12px;
-    white-space: nowrap;
-    flex-shrink: 0;
+    min-width: 0;
+    max-width: min(100%, 180px);
+    flex-shrink: 1;
 
     &:first-child {
       margin-left: 0;
+    }
+
+    .gt-tab-label {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      min-width: 0;
+    }
+
+    .gt-tab-icon,
+    .gt-tab-count {
+      flex-shrink: 0;
     }
   }
 
@@ -82,5 +95,22 @@
       width: 100%;
       flex-wrap: wrap;
     }
+
+    .stages-toolbar-btn--add.btn-primary,
+    .products-toolbar-add-btn.btn-primary,
+    .crm-campaigns-toolbar-add-btn.btn-primary {
+      width: 100%;
+
+      @media (min-width: 576px) {
+        width: auto;
+      }
+    }
+  }
+
+  .crm-campaigns-toolbar-add-btn {
+    height: 33px;
+    font-size: 0.875rem;
+    padding: 0 12px;
+    border-radius: 8px;
   }
 }

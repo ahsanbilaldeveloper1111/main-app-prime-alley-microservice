@@ -121,8 +121,21 @@ export function useStagesManagement() {
     },
   });
 
+  const archivedStagesQuery = useQuery({
+    queryKey: [...crmAppKeys.crmStages.all(), "archivedForCounts", refreshKey] as const,
+    queryFn: async () => {
+      try {
+        return await getStages(undefined, { include_archived: true });
+      } catch (error: unknown) {
+        consumeHandledApiError(error, "StagesManagement.fetchArchivedStagesForCounts");
+        throw error;
+      }
+    },
+  });
+
   const stagesData = filteredStagesQuery.data ?? [];
   const allStagesData = allStagesQuery.data ?? [];
+  const archivedStagesData = archivedStagesQuery.data ?? [];
   const loadingStages = filteredStagesQuery.isFetching;
 
   const [showRestoreModal, setShowRestoreModal] = useState(false);
@@ -349,10 +362,10 @@ export function useStagesManagement() {
       deal: allStagesData.filter((s) => s.type === "deal").length,
       order: allStagesData.filter((s) => s.type === "order").length,
       lost_reason: allStagesData.filter((s) => s.type === "lost_reason").length,
-      deleted: 0,
+      deleted: archivedStagesData.length,
     };
     return counts;
-  }, [allStagesData]);
+  }, [allStagesData, archivedStagesData]);
 
   const handleToolbarTabChange = useCallback(
     (tabId: string) => {

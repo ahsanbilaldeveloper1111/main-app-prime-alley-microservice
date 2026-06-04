@@ -1,5 +1,5 @@
 import React from 'react'
-import { MAIN_SETTINGS_FONT_SIZE, mainSettingsPageTitleStyle } from './mainSettingsTokens'
+import { MAIN_SETTINGS_COLOR, MAIN_SETTINGS_FONT_SIZE, mainSettingsPageTitleStyle } from './mainSettingsTokens'
 import type { ChannelKey } from './notificationsSettingsTypes'
 
 export type NotificationsSettingsHowSectionProps = {
@@ -42,18 +42,18 @@ export const NotificationsSettingsHowSection: React.FC<NotificationsSettingsHowS
           padding: '12px 20px',
           marginBottom: '28px',
           fontSize: MAIN_SETTINGS_FONT_SIZE.base,
-          fontWeight: 300,
+          fontWeight: 400,
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <strong style={{ fontWeight: 600 }}>Want to create your own notification?</strong>
-          <span style={{ color: '#555' }}>
+          <span style={{ color: '#6c757d' }}>
             You can create custom notifications in{' '}
             <button
               type="button"
               onClick={() => null}
               style={{
-                color: '#006162',
+                color: '#0066CC',
                 textDecoration: 'underline',
                 background: 'transparent',
                 border: 'none',
@@ -71,7 +71,7 @@ export const NotificationsSettingsHowSection: React.FC<NotificationsSettingsHowS
               padding: '5px 12px',
               fontSize: MAIN_SETTINGS_FONT_SIZE.sm,
               fontFamily: baseFont,
-              fontWeight: 300,
+              fontWeight: 400,
               color: '#141414',
               background: '#fff',
               border: '1px solid #b8b8b8',
@@ -89,7 +89,7 @@ export const NotificationsSettingsHowSection: React.FC<NotificationsSettingsHowS
             background: 'none',
             border: 'none',
             cursor: 'pointer',
-            color: '#888',
+            color: '#6c757d',
             fontSize: MAIN_SETTINGS_FONT_SIZE.lg,
             lineHeight: 1,
             padding: '0 4px',
@@ -110,7 +110,7 @@ export const NotificationsSettingsHowSection: React.FC<NotificationsSettingsHowS
       >
         Notifications
       </h1>
-      <p style={{ fontSize: MAIN_SETTINGS_FONT_SIZE.base, fontWeight: 300, color: '#555', marginBottom: '24px' }}>
+      <p style={{ fontSize: MAIN_SETTINGS_FONT_SIZE.base, fontWeight: 400, color: '#6c757d', marginBottom: '24px' }}>
         These preferences will only be applied to you.
       </p>
     </div>
@@ -118,7 +118,7 @@ export const NotificationsSettingsHowSection: React.FC<NotificationsSettingsHowS
     <div style={{ fontSize: MAIN_SETTINGS_FONT_SIZE.lg, fontWeight: 600, color: '#141414', marginBottom: '4px', fontFamily: baseFont }}>
       How you get notified
     </div>
-    <div style={{ fontSize: MAIN_SETTINGS_FONT_SIZE.sm, fontWeight: 300, color: '#555', marginBottom: '20px', fontFamily: baseFont }}>
+    <div style={{ fontSize: MAIN_SETTINGS_FONT_SIZE.sm, fontWeight: 400, color: '#6c757d', marginBottom: '20px', fontFamily: baseFont }}>
       Choose where you want to see your notifications.
     </div>
 
@@ -137,7 +137,7 @@ export const NotificationsSettingsHowSection: React.FC<NotificationsSettingsHowS
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
           <strong style={{ fontSize: MAIN_SETTINGS_FONT_SIZE.base, fontWeight: 600, fontFamily: baseFont }}>Allow browser notifications</strong>
-          <span style={{ fontSize: MAIN_SETTINGS_FONT_SIZE.sm, fontWeight: 300, color: '#555', fontFamily: baseFont }}>
+          <span style={{ fontSize: MAIN_SETTINGS_FONT_SIZE.sm, fontWeight: 400, color: '#6c757d', fontFamily: baseFont }}>
             Give permission to send notifications to this browser
           </span>
         </div>
@@ -148,7 +148,7 @@ export const NotificationsSettingsHowSection: React.FC<NotificationsSettingsHowS
             padding: '7px 16px',
             fontSize: MAIN_SETTINGS_FONT_SIZE.sm,
             fontFamily: baseFont,
-            fontWeight: 300,
+            fontWeight: 400,
             color: '#141414',
             background: '#fff',
             border: '1px solid #b8b8b8',
@@ -187,7 +187,7 @@ export const NotificationsSettingsHowSection: React.FC<NotificationsSettingsHowS
               style={{
                 width: '30px',
                 height: '100%',
-                background: channelEnabled[ch.key] ? '#141414' : '#f0f0f0',
+                background: channelEnabled[ch.key] ? MAIN_SETTINGS_COLOR.primary : '#f0f0f0',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -208,7 +208,7 @@ export const NotificationsSettingsHowSection: React.FC<NotificationsSettingsHowS
               <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
                 <path
                   d="M2 6.5L5 9.5L11 3.5"
-                  stroke={channelEnabled[ch.key] ? '#141414' : '#d0d0d0'}
+                  stroke={channelEnabled[ch.key] ? MAIN_SETTINGS_COLOR.primary : '#d0d0d0'}
                   strokeWidth="1.8"
                   strokeLinecap="round"
                   strokeLinejoin="round"
@@ -229,7 +229,7 @@ export const NotificationsSettingsHowSection: React.FC<NotificationsSettingsHowS
             >
               {ch.label}
             </div>
-            <div style={{ fontSize: MAIN_SETTINGS_FONT_SIZE.sm, fontWeight: 300, color: '#555', fontFamily: baseFont }}>{ch.description}</div>
+            <div style={{ fontSize: MAIN_SETTINGS_FONT_SIZE.sm, fontWeight: 400, color: '#6c757d', fontFamily: baseFont }}>{ch.description}</div>
 
             {ch.key === 'popup' && (
               <div style={{ marginTop: '12px' }}>
@@ -241,7 +241,7 @@ export const NotificationsSettingsHowSection: React.FC<NotificationsSettingsHowS
                     marginBottom: '10px',
                     fontSize: MAIN_SETTINGS_FONT_SIZE.sm,
                     fontWeight: 400,
-                    color: '#555',
+                    color: '#6c757d',
                     fontFamily: baseFont,
                   }}
                 >
@@ -250,7 +250,7 @@ export const NotificationsSettingsHowSection: React.FC<NotificationsSettingsHowS
                     height="16"
                     viewBox="0 0 24 24"
                     fill="none"
-                    stroke="#555"
+                    stroke="#6c757d"
                     strokeWidth="2"
                     strokeLinecap="round"
                     strokeLinejoin="round"
@@ -269,7 +269,7 @@ export const NotificationsSettingsHowSection: React.FC<NotificationsSettingsHowS
                         padding: '8px 32px 8px 12px',
                         fontSize: MAIN_SETTINGS_FONT_SIZE.sm,
                         fontFamily: baseFont,
-                        fontWeight: 300,
+                        fontWeight: 400,
                         color: '#141414',
                         border: '1px solid #b8b8b8',
                         borderRadius: '8px',
@@ -298,7 +298,7 @@ export const NotificationsSettingsHowSection: React.FC<NotificationsSettingsHowS
                       padding: '8px 16px',
                       fontSize: MAIN_SETTINGS_FONT_SIZE.sm,
                       fontFamily: baseFont,
-                      fontWeight: 300,
+                      fontWeight: 400,
                       color: '#141414',
                       background: '#fff',
                       border: '1px solid #b8b8b8',

@@ -1,7 +1,13 @@
 import React from "react";
 import { Button, Form, Modal } from "react-bootstrap";
 import { Plus } from "lucide-react";
-import { TOTAL_VIEWS, POSSIBLE_TABS, persistVisibleTabIds } from "./plannerTasksListingDomain";
+import type { ListTasksSummary } from "@utils/tasks";
+import {
+  TOTAL_VIEWS,
+  POSSIBLE_TABS,
+  persistVisibleTabIds,
+  resolvePlannerTaskTabCount,
+} from "./plannerTasksListingDomain";
 import "./plannerTasksListing.scss";
 
 type Tab = (typeof POSSIBLE_TABS)[number];
@@ -15,6 +21,7 @@ export type PlannerTasksTabsBarProps = {
   showAddViewModal: boolean;
   setShowAddViewModal: React.Dispatch<React.SetStateAction<boolean>>;
   toggleVisibleTab: (tabId: string, isVisible: boolean, isOnlyOne: boolean) => void;
+  listSummary?: ListTasksSummary | null;
 };
 
 export function PlannerTasksTabsBar({
@@ -26,6 +33,7 @@ export function PlannerTasksTabsBar({
   showAddViewModal,
   setShowAddViewModal,
   toggleVisibleTab,
+  listSummary,
 }: Readonly<PlannerTasksTabsBarProps>) {
   const currentViewCount = allTabs.length;
   const showRestoreAllTabsButton = visibleTabIds.length < POSSIBLE_TABS.length;
@@ -40,9 +48,12 @@ export function PlannerTasksTabsBar({
             onClick={() => switchTab(tab.id)}
             className={`ptl-tab-btn ${
               activeTab === tab.id ? "ptl-tab-btn--active" : "ptl-tab-btn--inactive"
-            } ${tab.id === "all" ? "ptl-tab-btn--all" : "ptl-tab-btn--default"}`}
+            }`}
           >
             {tab.label}
+            <span className="ptl-tab-count">
+              {resolvePlannerTaskTabCount(tab.id, listSummary)}
+            </span>
           </button>
         ))}
 

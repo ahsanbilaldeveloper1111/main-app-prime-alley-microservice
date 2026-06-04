@@ -885,6 +885,16 @@ button.preview-button:hover, button.preview-button:focus {
   color: #000000 !important;
   cursor: pointer;
   transition: all 0.2s ease;
+  min-width: 0;
+  max-width: min(100%, 220px);
+}
+
+.gt-tab-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+  flex: 1 1 auto;
 }
 
 .gt-tab-button:hover {
@@ -905,6 +915,7 @@ button.preview-button:hover, button.preview-button:focus {
 .gt-tab-icon {
   display: inline-flex;
   align-items: center;
+  flex-shrink: 0;
 }
 
 .gt-tab-count {
@@ -917,6 +928,7 @@ button.preview-button:hover, button.preview-button:focus {
   border-radius: 12px;
   background: #cbd6e2;
   color: #1a5aa3;
+  flex-shrink: 0;
 }
 
 .gt-tab-button.active .gt-tab-count {

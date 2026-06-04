@@ -5,7 +5,7 @@ import React, {
   useMemo,
   useEffect,
 } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQueries, useQuery } from "@tanstack/react-query";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 import GenericTable, { TableColumn, ToolbarConfig } from "@components/GenericTable";
 import {
@@ -482,16 +482,60 @@ function deriveEditorStateFromCampaignApi(
   };
 }
 
+type CampaignFiltersState = {
+  status: string[];
+  dateFrom: string | null;
+  dateTo: string | null;
+  userExtensions: string[] | null;
+  hasUnassignedProspects: boolean | null;
+  tags: string[] | null;
+};
+
+const CAMPAIGN_TAB_COUNT_IDS = [
+  "all",
+  "active",
+  "inactive",
+  "assigned",
+  "unassigned",
+] as const;
+
+type CampaignTabCountId = (typeof CAMPAIGN_TAB_COUNT_IDS)[number];
+
+async function fetchCampaignTabCountTotal(
+  tabId: CampaignTabCountId,
+  campaignFilters: CampaignFiltersState,
+  memoizedFilters: Record<string, unknown>,
+  search: string,
+): Promise<number> {
+  const filtersForTab: CampaignFiltersState = {
+    ...campaignFilters,
+    hasUnassignedProspects:
+      tabId === "assigned"
+        ? false
+        : tabId === "unassigned"
+          ? true
+          : null,
+  };
+  const activeFilterForBuild =
+    tabId === "assigned" || tabId === "unassigned" ? "all" : tabId;
+  const filters = buildCrmCampaignListFilters(
+    activeFilterForBuild,
+    filtersForTab,
+    memoizedFilters,
+  );
+  const response = await getCampaigns({
+    page: 1,
+    per_page: 1,
+    search: search || undefined,
+    filters,
+    module_slug: ModuleSlug.CRM_CAMPAIGNS,
+  });
+  return response.total ?? 0;
+}
+
 function buildCrmCampaignListFilters(
   activeFilter: string,
-  campaignFilters: {
-    status: string[];
-    dateFrom: string | null;
-    dateTo: string | null;
-    userExtensions: string[] | null;
-    hasUnassignedProspects: boolean | null;
-    tags: string[] | null;
-  },
+  campaignFilters: CampaignFiltersState,
   memoizedFilters: Record<string, any>,
 ): Record<string, any> {
   let statusFilter: string[] = [];
@@ -658,7 +702,13 @@ type ToolbarFactoryArgs = {
   handleFiltersChange: (filters: Record<string, any>) => void;
   setCampaignsPagination: React.Dispatch<React.SetStateAction<{ currentPage: number; rowsPerPage: number; sortBy: string; sortOrder: "asc" | "desc" }>>;
   setRefreshKey: React.Dispatch<React.SetStateAction<number>>;
-  filterCounts: { all: number; active: number; inactive: number };
+  filterCounts: {
+    all: number;
+    active: number;
+    inactive: number;
+    assigned: number;
+    unassigned: number;
+  };
   activeFilter: string;
   setActiveFilter: (v: string) => void;
   setCampaignFilters: React.Dispatch<React.SetStateAction<{
@@ -701,8 +751,18 @@ function createCrmCampaignsToolbarConfig(a: ToolbarFactoryArgs): ToolbarConfig {
       { id: "all", label: "All Campaigns", count: a.filterCounts.all, removable: false },
       { id: "active", label: "Active", count: a.filterCounts.active, removable: false },
       { id: "inactive", label: "Inactive", count: a.filterCounts.inactive, removable: false },
-      { id: "assigned", label: "With Assigned Records", removable: false },
-      { id: "unassigned", label: "With Unassigned Records", removable: false },
+      {
+        id: "assigned",
+        label: "With Assigned Records",
+        count: a.filterCounts.assigned,
+        removable: false,
+      },
+      {
+        id: "unassigned",
+        label: "With Unassigned Records",
+        count: a.filterCounts.unassigned,
+        removable: false,
+      },
     ],
     activeTab: a.activeFilter,
     onTabChange: (tabId) => {
@@ -931,21 +991,12 @@ function createCrmCampaignsToolbarConfig(a: ToolbarFactoryArgs): ToolbarConfig {
           PERMISSIONS.CREATE_CRM_CAMPAIGNS,
         ) && (
           <Button
+            variant="primary"
+            type="button"
+            className="crm-campaigns-toolbar-add-btn d-inline-flex align-items-center gap-2"
             onClick={a.handleCreateCampaign}
-            style={{
-              backgroundColor: "#4f46e5",
-              border: "none",
-              borderRadius: "8px",
-              color: "#ffffff",
-              height: "33px",
-              fontSize: "0.875rem",
-              padding: "0 12px",
-              display: "inline-flex",
-              alignItems: "center",
-              gap: "6px",
-            }}
           >
-            <Plus size={15} />
+            <Plus size={15} aria-hidden />
             New Campaign
           </Button>
         )}
@@ -1441,6 +1492,27 @@ const CrmCampaigns = ({ hideBreadcrumb, breadcrumbMainLink }: CrmPageDisplayProp
   const totalCampaigns =
     campaignsListQuery.data?.total ?? campaignsListQuery.data?.data?.length ?? 0;
 
+  const campaignTabCountQueries = useQueries({
+    queries: CAMPAIGN_TAB_COUNT_IDS.map((tabId) => ({
+      queryKey: [
+        ...crmAppKeys.campaigns.all(),
+        "tabCount",
+        tabId,
+        refreshKey,
+        campaignsSearchQuery,
+        campaignFiltersKey,
+      ] as const,
+      queryFn: async () =>
+        fetchCampaignTabCountTotal(
+          tabId,
+          campaignFilters,
+          memoizedFilters,
+          campaignsSearchQuery,
+        ),
+      enabled: listCampaignsPermission,
+    })),
+  });
+
   useEffect(() => {
     if (campaignsListQuery.isError) {
       toast.error("Failed to load campaigns");
@@ -1899,14 +1971,7 @@ const CrmCampaigns = ({ hideBreadcrumb, breadcrumbMainLink }: CrmPageDisplayProp
             maxWidth: "100%",
             overflow: "hidden",
             textOverflow: "ellipsis",
-            whiteSpace: "normal",
-            wordBreak: "break-word",
-            overflowWrap: "anywhere",
-            display: "-webkit-box",
-            WebkitLineClamp: 2,
-            WebkitBoxOrient: "vertical",
-            lineHeight: 1.35,
-            paddingBottom: "2px",
+            whiteSpace: "nowrap",
           }}
         >
           {campaign.name || "Unnamed Campaign"}
@@ -2023,12 +2088,22 @@ const CrmCampaigns = ({ hideBreadcrumb, breadcrumbMainLink }: CrmPageDisplayProp
     return actions;
   }, [session?.user?.permissions, handleViewCampaign, handleEditCampaign, handleDeleteCampaign]);
 
-  // Filter counts for tabs
-  const filterCounts = useMemo(() => ({
-    all: totalCampaigns,
-    active: metrics.active_campaigns,
-    inactive: metrics.inactive_campaigns,
-  }), [totalCampaigns, metrics]);
+  const filterCounts = useMemo(
+    () => ({
+      all: campaignTabCountQueries[0]?.data ?? 0,
+      active: campaignTabCountQueries[1]?.data ?? 0,
+      inactive: campaignTabCountQueries[2]?.data ?? 0,
+      assigned: campaignTabCountQueries[3]?.data ?? 0,
+      unassigned: campaignTabCountQueries[4]?.data ?? 0,
+    }),
+    [
+      campaignTabCountQueries[0]?.data,
+      campaignTabCountQueries[1]?.data,
+      campaignTabCountQueries[2]?.data,
+      campaignTabCountQueries[3]?.data,
+      campaignTabCountQueries[4]?.data,
+    ],
+  );
 
   const toolbarConfig = useMemo<ToolbarConfig>(
     () =>

@@ -136,7 +136,7 @@ export const MainSettingsOverflowTabBar: React.FC<MainSettingsOverflowTabBarProp
       : ({ '--ms-tab-btn-height': `${tabButtonHeight}px` } as CSSProperties)
 
   const getNavButtonStyle = (variant: 'prev' | 'next'): CSSProperties | undefined => {
-    const tabBorder = '1px solid #c4c4c4'
+    const tabBorder = '1px solid #8A8A8A'
     const measuredHeightStyle =
       tabButtonHeight == null
         ? undefined

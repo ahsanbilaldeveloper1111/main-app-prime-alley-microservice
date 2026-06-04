@@ -74,7 +74,7 @@ export const NotificationProfilesCreateModal: React.FC<NotificationProfilesCreat
               padding: '8px 12px',
               fontSize: MAIN_SETTINGS_FONT_SIZE.base,
               fontFamily: baseFont,
-              fontWeight: 300,
+              fontWeight: 400,
               color: '#141414',
               border: '1px solid #b8b8b8',
               borderRadius: '8px',
@@ -85,7 +85,7 @@ export const NotificationProfilesCreateModal: React.FC<NotificationProfilesCreat
             } as React.CSSProperties
           }
           onFocus={(e) => {
-            e.currentTarget.style.borderColor = '#0091ae'
+            e.currentTarget.style.borderColor = '#86b7fe'
           }}
           onBlur={(e) => {
             e.currentTarget.style.borderColor = '#b8b8b8'

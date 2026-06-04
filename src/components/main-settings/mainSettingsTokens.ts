@@ -9,20 +9,88 @@ export const MAIN_SETTINGS_RADIUS = {
   full: '50%',
 } as const
 
+/** Matches CRM / Prospects (Lexend Deca + Bootstrap-scale type). */
 export const MAIN_SETTINGS_FONT = 'Lexend Deca, Helvetica, Arial, sans-serif'
 
-/** Responsive font sizes for Main Settings UI (driven by CSS vars on `.main-settings-root`). */
+/**
+ * Font sizes aligned with Prospects / Bootstrap ($font-size-base: 0.875rem).
+ * Values resolve from CSS vars on `.main-settings-root`.
+ */
 export const MAIN_SETTINGS_FONT_SIZE = {
-  xs: 'var(--ms-font-xs, clamp(0.625rem, 1.8vw, 0.6875rem))',
-  sm: 'var(--ms-font-sm, clamp(0.75rem, 2vw, 0.8125rem))',
-  base: 'var(--ms-font-base, clamp(0.8125rem, 2.2vw, 0.875rem))',
-  md: 'var(--ms-font-md, clamp(0.875rem, 2.4vw, 1rem))',
-  lg: 'var(--ms-font-lg, clamp(1rem, 2.6vw, 1.25rem))',
-  xl: 'var(--ms-font-xl, clamp(1.125rem, 2.8vw, 1.5rem))',
-  input: 'var(--ms-font-input, clamp(0.875rem, 2.4vw, 1rem))',
-  icon: 'var(--ms-font-icon, clamp(1.125rem, 3vw, 1.375rem))',
-  display: 'var(--ms-font-display, clamp(1.75rem, 5vw, 2.5rem))',
+  xs: 'var(--ms-font-xs, 0.75rem)',
+  sm: 'var(--ms-font-sm, 0.8125rem)',
+  base: 'var(--ms-font-base, 0.875rem)',
+  md: 'var(--ms-font-md, 1rem)',
+  lg: 'var(--ms-font-lg, 1.25rem)',
+  xl: 'var(--ms-font-xl, 1.5rem)',
+  input: 'var(--ms-font-input, 0.875rem)',
+  /** Toolbar / table row action icons in Main Settings (`--ms-action-icon-size`). */
+  actionIcon: 'var(--ms-action-icon-size, 1rem)',
+  icon: 'var(--ms-font-icon, 1.375rem)',
+  display: 'var(--ms-font-display, 2.5rem)',
 } as const
+
+/** Font weights aligned with CRM list / form patterns. */
+export const MAIN_SETTINGS_FONT_WEIGHT = {
+  normal: 400,
+  medium: 500,
+  semibold: 600,
+  bold: 700,
+} as const
+
+/** Theme colors aligned with global `.btn-primary` (Prospects / Bootstrap). */
+export const MAIN_SETTINGS_COLOR = {
+  primary: '#0066CC',
+  primaryHover: '#0052A3',
+  primaryFocusRing: 'rgba(0, 102, 204, 0.25)',
+  /** Bootstrap-style control focus (matches CRM react-select). */
+  inputFocusBorder: '#86b7fe',
+  inputFocusShadow: '0 0 0 0.2rem rgba(13, 110, 253, 0.25)',
+  text: '#141414',
+  textMuted: '#6c757d',
+  /** @deprecated Use textMuted — kept for gradual migration */
+  textSecondary: '#6c757d',
+  white: '#ffffff',
+  border: '#dee2e6',
+  /** Segmented tab bar — matches Planner Tasks (`ptl-tab-btn`). */
+  tabBorder: '#8A8A8A',
+  tabInactiveBg: '#ffffff',
+  tabInactiveText: '#141414',
+  tabActiveBg: '#f5f8fa',
+  tabActiveText: '#0066CC',
+} as const
+
+/** Section heading (h2) inside a settings panel. */
+export const mainSettingsSectionTitleStyle: CSSProperties = {
+  fontFamily: MAIN_SETTINGS_FONT,
+  fontSize: MAIN_SETTINGS_FONT_SIZE.lg,
+  fontWeight: MAIN_SETTINGS_FONT_WEIGHT.semibold,
+  color: MAIN_SETTINGS_COLOR.text,
+  lineHeight: 1.25,
+  margin: 0,
+}
+
+/** Muted helper / description copy. */
+export const mainSettingsMutedTextStyle: CSSProperties = {
+  fontFamily: MAIN_SETTINGS_FONT,
+  fontSize: MAIN_SETTINGS_FONT_SIZE.base,
+  fontWeight: MAIN_SETTINGS_FONT_WEIGHT.normal,
+  color: MAIN_SETTINGS_COLOR.textMuted,
+  lineHeight: 1.5,
+}
+
+/** Outline secondary button (Prospects `btn-outline-primary` pattern). */
+export const mainSettingsOutlineButtonStyle: CSSProperties = {
+  fontFamily: MAIN_SETTINGS_FONT,
+  fontSize: MAIN_SETTINGS_FONT_SIZE.base,
+  fontWeight: MAIN_SETTINGS_FONT_WEIGHT.normal,
+  color: MAIN_SETTINGS_COLOR.primary,
+  background: MAIN_SETTINGS_COLOR.white,
+  border: `1px solid ${MAIN_SETTINGS_COLOR.primary}`,
+  borderRadius: MAIN_SETTINGS_RADIUS.md,
+  cursor: 'pointer',
+  padding: '9px 22px',
+}
 
 /** Shared border colors for Main Settings UI. */
 export const MAIN_SETTINGS_BORDER = {
@@ -40,13 +108,33 @@ export const MAIN_SETTINGS_BORDER = {
 export const mainSettingsPageTitleStyle: CSSProperties = {
   fontFamily: MAIN_SETTINGS_FONT,
   fontSize: MAIN_SETTINGS_FONT_SIZE.xl,
-  fontWeight: 400,
-  color: '#141414',
+  fontWeight: MAIN_SETTINGS_FONT_WEIGHT.semibold,
+  color: MAIN_SETTINGS_COLOR.text,
   marginBottom: '16px',
   letterSpacing: 0,
+  lineHeight: 1.25,
 }
 
-const MAIN_SETTINGS_TAB_BORDER = `1px solid ${MAIN_SETTINGS_BORDER.strong}`
+/** Primary action button (same as Prospects `variant="primary"`). */
+export const mainSettingsPrimaryButtonStyle: CSSProperties = {
+  fontFamily: MAIN_SETTINGS_FONT,
+  fontSize: MAIN_SETTINGS_FONT_SIZE.base,
+  fontWeight: MAIN_SETTINGS_FONT_WEIGHT.normal,
+  color: '#ffffff',
+  background: MAIN_SETTINGS_COLOR.primary,
+  border: `1px solid ${MAIN_SETTINGS_COLOR.primary}`,
+  borderRadius: MAIN_SETTINGS_RADIUS.md,
+  cursor: 'pointer',
+  padding: '9px 22px',
+}
+
+/** Text links inside Main Settings forms. */
+export const mainSettingsLinkStyle: CSSProperties = {
+  color: MAIN_SETTINGS_COLOR.primary,
+  textDecoration: 'none',
+}
+
+const MAIN_SETTINGS_TAB_BORDER = `1px solid ${MAIN_SETTINGS_COLOR.tabBorder}`
 
 export type MainSettingsTabButtonStyleOptions = Readonly<{
   isActive: boolean
@@ -80,23 +168,27 @@ export function getMainSettingsTabButtonStyle({
   isFirst,
   isLast,
   fontFamily,
-  fontSize = MAIN_SETTINGS_FONT_SIZE.base,
+  fontSize = MAIN_SETTINGS_FONT_SIZE.sm,
   padding = '10px 20px',
-  fontWeight = 300,
+  fontWeight,
 }: MainSettingsTabButtonStyleOptions): CSSProperties {
   return {
     padding,
-    background: isActive ? '#ffffff' : 'whitesmoke',
+    background: isActive ? MAIN_SETTINGS_COLOR.tabActiveBg : MAIN_SETTINGS_COLOR.tabInactiveBg,
     borderTop: MAIN_SETTINGS_TAB_BORDER,
     borderLeft: isFirst ? MAIN_SETTINGS_TAB_BORDER : 'none',
-    borderRight: isLast ? MAIN_SETTINGS_TAB_BORDER : 'none',
-    borderBottom: isActive ? '1px solid #ffffff' : 'none',
+    borderRight: MAIN_SETTINGS_TAB_BORDER,
+    borderBottom: isActive
+      ? `2px solid ${MAIN_SETTINGS_COLOR.primary}`
+      : `1px solid ${MAIN_SETTINGS_COLOR.tabBorder}`,
     marginBottom: isActive ? '-1px' : 0,
     cursor: 'pointer',
     fontFamily,
     fontSize,
-    fontWeight,
-    color: '#141414',
+    fontWeight:
+      fontWeight ??
+      (isActive ? MAIN_SETTINGS_FONT_WEIGHT.semibold : MAIN_SETTINGS_FONT_WEIGHT.normal),
+    color: isActive ? MAIN_SETTINGS_COLOR.tabActiveText : MAIN_SETTINGS_COLOR.tabInactiveText,
     whiteSpace: 'nowrap',
     transition: 'background 0.15s',
     position: 'relative',

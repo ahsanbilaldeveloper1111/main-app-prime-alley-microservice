@@ -67,6 +67,7 @@ function ProductsPage(props: CrmPageDisplayProps = {}) {
     requestDeleteProduct,
     openProductView,
     totalProducts,
+    productFilterCounts,
   } = page;
 
   const canEditProduct =
@@ -112,18 +113,21 @@ function ProductsPage(props: CrmPageDisplayProps = {}) {
           id: "all",
           label: "All Products",
           icon: <Package size={14} />,
+          count: productFilterCounts.all,
           removable: false,
         },
         {
           id: "active",
           label: "Active",
           icon: <CheckCircle size={14} />,
+          count: productFilterCounts.active,
           removable: false,
         },
         {
           id: "inactive",
           label: "Inactive",
           icon: <X size={14} />,
+          count: productFilterCounts.inactive,
           removable: false,
         },
       ],
@@ -144,10 +148,12 @@ function ProductsPage(props: CrmPageDisplayProps = {}) {
         <div className="d-flex gap-2">
           {canCreateProduct && (
             <Button
+              variant="primary"
+              type="button"
               onClick={() => handleOpenProductModal()}
-              className="products-toolbar-add-btn"
+              className="products-toolbar-add-btn d-inline-flex align-items-center gap-2"
             >
-              <PlusCircle size={15} />
+              <PlusCircle size={15} aria-hidden />
               Add Product
             </Button>
           )}
@@ -158,6 +164,7 @@ function ProductsPage(props: CrmPageDisplayProps = {}) {
       productFilterPills,
       productsSearch,
       activeFilter,
+      productFilterCounts,
       handleProductsSearchChange,
       handleProductsSearchSubmit,
       canCreateProduct,

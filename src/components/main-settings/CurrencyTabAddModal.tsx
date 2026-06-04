@@ -37,7 +37,7 @@ export const CurrencyTabAddModal: React.FC<CurrencyTabAddModalProps> = ({ onClos
     padding: '8px 36px 8px 12px',
     fontSize: MAIN_SETTINGS_FONT_SIZE.base,
     fontFamily: ACCOUNT_DEFAULTS_FONT,
-    fontWeight: 300,
+    fontWeight: 400,
     color: '#141414',
     border: '1px solid #b8b8b8',
     borderRadius: '8px',
@@ -55,7 +55,7 @@ export const CurrencyTabAddModal: React.FC<CurrencyTabAddModalProps> = ({ onClos
     padding: '8px 12px',
     fontSize: MAIN_SETTINGS_FONT_SIZE.base,
     fontFamily: ACCOUNT_DEFAULTS_FONT,
-    fontWeight: 300,
+    fontWeight: 400,
     color: '#141414',
     border: '1px solid #b8b8b8',
     borderRadius: '8px',
@@ -111,7 +111,7 @@ export const CurrencyTabAddModal: React.FC<CurrencyTabAddModalProps> = ({ onClos
               onChange={(e) => setSelected(e.target.value)}
               style={selectStyle}
               onFocus={(e) => {
-                e.currentTarget.style.borderColor = '#0091ae'
+                e.currentTarget.style.borderColor = '#86b7fe'
               }}
               onBlur={(e) => {
                 e.currentTarget.style.borderColor = '#b8b8b8'
@@ -133,7 +133,7 @@ export const CurrencyTabAddModal: React.FC<CurrencyTabAddModalProps> = ({ onClos
                 top: '50%',
                 transform: 'translateY(-50%)',
                 pointerEvents: 'none',
-                color: '#555',
+                color: '#6c757d',
                 fontSize: MAIN_SETTINGS_FONT_SIZE.sm,
               }}
             >
@@ -164,7 +164,7 @@ export const CurrencyTabAddModal: React.FC<CurrencyTabAddModalProps> = ({ onClos
             onChange={(e) => setRate(e.target.value)}
             style={inputStyle}
             onFocus={(e) => {
-              e.currentTarget.style.borderColor = '#0091ae'
+              e.currentTarget.style.borderColor = '#86b7fe'
             }}
             onBlur={(e) => {
               e.currentTarget.style.borderColor = '#b8b8b8'
@@ -174,8 +174,8 @@ export const CurrencyTabAddModal: React.FC<CurrencyTabAddModalProps> = ({ onClos
             style={{
               fontFamily: ACCOUNT_DEFAULTS_FONT,
               fontSize: MAIN_SETTINGS_FONT_SIZE.sm,
-              fontWeight: 300,
-              color: '#888',
+              fontWeight: 400,
+              color: '#6c757d',
               marginTop: '6px',
             }}
           >

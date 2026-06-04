@@ -60,6 +60,7 @@
   display: inline-flex;
   align-items: center;
   justify-content: flex-start;
+  gap: 6px;
   padding: 0 clamp(12px, 1.2vw, 20px);
   border: none;
   border-right: 1px solid #8a8a8a;
@@ -84,12 +85,23 @@
   font-weight: 400;
 }
 
-.ptl-tab-btn--all {
-  gap: 10px;
+.ptl-tab-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3px 8px;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 12px;
+  background: #cbd6e2;
+  color: #1a5aa3;
+  flex-shrink: 0;
 }
 
-.ptl-tab-btn--default {
-  gap: 0;
+.ptl-tab-btn--active .ptl-tab-count,
+.ptl-tabs-row button[data-active="true"] .ptl-tab-count {
+  background: #0066CC;
+  color: #fff;
 }
 
 .ptl-add-view-btn {

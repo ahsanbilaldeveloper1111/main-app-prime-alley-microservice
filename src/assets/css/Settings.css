@@ -1,40 +1,47 @@
-.settings-user-defaults-wrapper input, .settings-user-defaults-wrapper select, .settings-general-tab-content-wrapper input, .settings-general-tab-content-wrapper select {
-    width: 450px !important;
-    height: 40px !important;
-    font-weight: 300 !important;
-    font-size: var(--ms-font-input, 1rem) !important;
-    color: #141414 !important;
-   
+.settings-user-defaults-wrapper input,
+.settings-user-defaults-wrapper select,
+.settings-general-tab-content-wrapper input,
+.settings-general-tab-content-wrapper select {
+  width: 450px !important;
+  height: 40px !important;
+  font-family: Lexend Deca, Helvetica, Arial, sans-serif !important;
+  font-weight: 400 !important;
+  font-size: var(--ms-font-input, 0.875rem) !important;
+  color: #141414 !important;
 }
+
 .generic-table-card {
-    border: none !important;
-    
+  border: none !important;
 }
+
 .generic-table-responsive {
-    margin: 14px 0 !important;
-    box-shadow: none !important;
-    border-radius: 0 !important;
-    width: 100% !important;
-    margin-top: 0px !important;
-    
+  margin: 14px 0 !important;
+  box-shadow: none !important;
+  border-radius: 0 !important;
+  width: 100% !important;
+  margin-top: 0px !important;
 }
+
 .gt-filter-pills {
-    padding-bottom: 13px !important;
+  padding-bottom: 13px !important;
 }
 
 .generic-table-td button {
-    border: none;
-    color: #141414;
+  border: none;
+  color: #141414;
 }
+
 .action-buttons button {
-    padding: 9px 13px;
-    
-    border-radius: 4px !important;
-    font-size: var(--ms-font-sm, 0.75rem) !important;
-    font-weight: 500 !important;
-    background: #0066CC !important;
-    color: rgb(255, 255, 255);
+  padding: 9px 13px;
+  border-radius: 4px !important;
+  font-family: Lexend Deca, Helvetica, Arial, sans-serif !important;
+  font-size: var(--ms-font-sm, 0.8125rem) !important;
+  font-weight: 400 !important;
+  background: #0066cc !important;
+  border-color: #0066cc !important;
+  color: #ffffff !important;
 }
+
 div:has(> .generic-table-container) {
-    padding: 0px !important;
-  }
+  padding: 0px !important;
+}
