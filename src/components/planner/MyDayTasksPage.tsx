@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import moment from "moment";
 import { useSession } from "next-auth/react";
 import { Button, Form, Modal } from "react-bootstrap";
-import { Circle, CircleCheckBig, History, Pencil, Plus, Search, X } from "lucide-react";
+import { CircleCheckBig, History, Pencil, Plus, Search, X } from "lucide-react";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 import CreateTaskSidebar from "@components/CreatePlannerTaskSidebar";
 import { MyDayTeamSection } from "@components/planner/my-day/MyDayTeamSection";
@@ -1147,7 +1147,7 @@ function useMyDayTasksPageController() {
           await addTaskToMyDay({
             task_id: taskId,
             plan_date: today,
-            ...(estimatedMinutes != null ? { estimated_minutes: estimatedMinutes } : {}),
+            ...(estimatedMinutes == null ? {} : { estimated_minutes: estimatedMinutes }),
           });
         } catch {
           toast.error("Task created but could not be added to My Day");
@@ -1994,7 +1994,7 @@ function MyDaySuggestionsPanel({ vm }: MyDayTasksPageViewProps) {
             checked={vm.suggestionOverdueOnly}
             onChange={(e) => vm.setSuggestionOverdueOnly(e.target.checked)}
           />
-          Overdue only
+          <span>Overdue only</span>
         </label>
       </div>
       <div className="myday-search-wrap">
@@ -2221,9 +2221,9 @@ function MyDayTasksPageView({ vm }: MyDayTasksPageViewProps) {
           ) : null}
           <MyDayTodayTasksSection vm={vm} />
           <MyDayCompletedSection vm={vm} />
-          {!vm.loading ? (
+          {vm.loading ? null : (
             <MyDayDailySummaryPanel stats={vm.dailySummaryStats} showCapacityBar />
-          ) : null}
+          )}
         </div>
         <MyDaySuggestionsPanel vm={vm} />
       </div>
