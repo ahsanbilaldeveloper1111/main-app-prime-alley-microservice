@@ -53,12 +53,6 @@
   background-color: #fff;
   height: clamp(36px, 3.5vw, 44px);
   flex-shrink: 0;
-
-  button {
-    height: clamp(36px, 3.5vw, 44px);
-    font-size: clamp(11px, 0.9vw, 13px);
-    padding: 0 clamp(12px, 1.2vw, 20px);
-  }
 }
 
 .ptl-tab-btn {
@@ -66,15 +60,15 @@
   display: inline-flex;
   align-items: center;
   justify-content: flex-start;
-  padding: 0 20px;
+  padding: 0 clamp(12px, 1.2vw, 20px);
   border: none;
   border-right: 1px solid #8a8a8a;
   border-top: 1px solid #8a8a8a;
   color: #141414;
-  font-size: 13px;
+  font-size: clamp(11px, 0.9vw, 13px);
   font-family: "Lexend Deca", Helvetica, Arial, sans-serif;
   cursor: pointer;
-  height: 100%;
+  height: clamp(36px, 3.5vw, 44px);
 }
 
 .ptl-tab-btn--active {
@@ -345,10 +339,10 @@
 
 .ptl-edit-columns-toggle {
   font-size: clamp(11px, 0.85vw, 13px);
+  padding: clamp(5px, 0.4vw, 8px) clamp(8px, 0.8vw, 14px);
   background-color: #fff;
   border-color: #8a8a8a;
   color: #141414;
-  padding: clamp(5px, 0.4vw, 8px) clamp(8px, 0.8vw, 14px);
 }
 
 .ptl-filled-btn {
@@ -473,7 +467,6 @@
   box-shadow: 0 0 0 0.2rem rgba(0, 102, 204, 0.25) !important;
 }
 
-/* Responsive filter pill sizing */
 .gt-filter-pill {
   font-size: clamp(11px, 0.85vw, 13px) !important;
   padding: clamp(4px, 0.4vw, 6px) clamp(8px, 0.8vw, 12px) !important;
