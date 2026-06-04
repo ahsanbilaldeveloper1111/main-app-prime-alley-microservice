@@ -19,6 +19,7 @@ import { useCrmSettingsTableState } from "@hooks/useCrmSettingsTableState";
 import { useDebouncedSearchInput } from "@hooks/useDebouncedSearchInput";
 import { HEADER_CONSTANTS } from "@constants/headerConstants";
 import { CrmTruncatedDescriptionCell } from "@components/crm/crmTruncatedDescriptionCell";
+import { CrmTableRowActions } from "@page-modules/crm/shared/CrmTableRowActions";
 import { crmAppKeys } from "@query/keys";
 
 const { PERMISSIONS } = HEADER_CONSTANTS;
@@ -241,33 +242,35 @@ export function useBusinessTypesPage() {
         key: "actions",
         label: "Actions",
         sortable: false,
-        align: "right",
+        align: "center",
         type: "custom",
         width: "160px",
-        render: (bt) => (
-          <div className="d-flex justify-content-end gap-2">
-            {session?.user?.permissions?.includes(PERMISSIONS.EDIT_CRM_BUSINESS_TYPES) && (
-              <Button
-                variant="outline-primary"
-                size="sm"
-                onClick={() => handleOpenModal(bt)}
-                aria-label={"Edit business type " + (bt.name ?? "")}
-              >
-                <Edit size={14} aria-hidden />
-              </Button>
-            )}
-            {session?.user?.permissions?.includes(PERMISSIONS.DELETE_CRM_BUSINESS_TYPES) && (
-              <Button
-                variant="outline-danger"
-                size="sm"
-                onClick={() => openDeleteModal(bt)}
-                aria-label={"Delete business type " + (bt.name ?? "")}
-              >
-                <Trash2 size={14} aria-hidden />
-              </Button>
-            )}
-          </div>
-        ),
+        render: (bt) => {
+          const name = bt.name ?? "";
+          const actions = [
+            ...(session?.user?.permissions?.includes(PERMISSIONS.EDIT_CRM_BUSINESS_TYPES)
+              ? [
+                  {
+                    label: `Edit business type ${name}`,
+                    icon: <Edit size={22} aria-hidden />,
+                    tone: "primary" as const,
+                    onClick: () => handleOpenModal(bt),
+                  },
+                ]
+              : []),
+            ...(session?.user?.permissions?.includes(PERMISSIONS.DELETE_CRM_BUSINESS_TYPES)
+              ? [
+                  {
+                    label: `Delete business type ${name}`,
+                    icon: <Trash2 size={22} aria-hidden />,
+                    tone: "danger" as const,
+                    onClick: () => openDeleteModal(bt),
+                  },
+                ]
+              : []),
+          ];
+          return <CrmTableRowActions actions={actions} />;
+        },
       },
     ],
     [session?.user?.permissions, handleOpenModal, openDeleteModal],

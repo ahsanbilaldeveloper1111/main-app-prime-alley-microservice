@@ -1,95 +1,56 @@
-// Embedded Workforce panels inside Main Settings (Request Categories, etc.).
+@import './smartCrmTablePage.scss';
+@import './settingsEmbeddedToolbar.scss';
+@import './settingsEmbeddedPageShell.scss';
 
+// Workforce tabs inside Main Settings — tight layout + shared table chrome.
 .workforce-settings-panel {
   min-width: 0;
   width: 100%;
+  max-width: 100%;
+  margin: 0;
+  padding: 0;
   box-sizing: border-box;
+  overflow-x: clip;
+
+  > .smart-crm-table-page,
+  > div > .smart-crm-table-page {
+    margin-top: 0;
+  }
 
   .request-categories-page {
-    min-width: 0;
-    width: 100%;
-  }
-
-  .request-categories-page__toolbar {
-    display: flex;
-    flex-direction: column;
-    align-items: stretch;
-    gap: 10px;
-    margin-bottom: 12px;
-
-    @media (min-width: 768px) {
-      flex-direction: row;
-      align-items: center;
-      justify-content: flex-end;
-      gap: 12px;
-    }
-  }
-
-  .request-categories-page__toolbar-search {
-    flex: 1 1 auto;
-    min-width: 0;
-    width: 100%;
-
-    .search-container {
-      position: relative;
-      display: flex;
-      align-items: center;
-      width: 100%;
-    }
-
-    .search-icon {
-      position: absolute;
-      left: 12px;
-      color: #64748b;
-      font-size: var(--ms-font-sm);
-      pointer-events: none;
-    }
-
-    .search-bar {
-      width: 100%;
-      max-width: 100%;
-      box-sizing: border-box;
-      padding: 8px 12px 8px 36px;
-      border-radius: 8px;
-      border: 1px solid #b8b8b8;
-      font-size: var(--ms-font-input);
-      font-family: Lexend Deca, Helvetica, Arial, sans-serif;
-      font-weight: 300;
-      color: #141414;
-      background: #fff;
-
-      &:focus {
-        outline: none;
-        border-color: #141414;
-        box-shadow: none;
-      }
-    }
-  }
-
-  .request-categories-page__toolbar-actions {
-    flex: 0 0 auto;
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-    width: 100%;
-
-    @media (min-width: 768px) {
-      width: auto;
-      justify-content: flex-end;
-    }
-
-    .btn {
-      width: 100%;
-
-      @media (min-width: 768px) {
-        width: auto;
-      }
-    }
+    @include settings-embedded-page-shell;
   }
 
   .generic-table-card,
   .generic-table-responsive {
     min-width: 0;
     max-width: 100%;
+  }
+
+  .gt-toolbar-tabs-section {
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    max-width: 100%;
+  }
+
+  .gt-toolbar-tabs-row {
+    flex-wrap: wrap;
+    row-gap: 8px;
+    min-width: 0;
+  }
+
+  @media (max-width: 767.98px) {
+    .gt-toolbar-tabs-actions,
+    .gt-toolbar-actions {
+      width: 100%;
+      margin-left: 0;
+    }
+
+    .gt-toolbar-tabs-actions > .d-flex,
+    .gt-toolbar-actions > .d-flex {
+      width: 100%;
+      flex-wrap: wrap;
+    }
   }
 }

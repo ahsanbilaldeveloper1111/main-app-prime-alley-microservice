@@ -1,7 +1,5 @@
 import React from "react";
 import { Button, Modal } from "react-bootstrap";
-import { MainSettingsFormSidebar } from "@components/main-settings/MainSettingsFormSidebar";
-import { useMainSettingsFormSidebar } from "@components/main-settings/mainSettingsFormContext";
 import { PlannerStatusFormFields } from "./PlannerStatusFormFields";
 import type { PlannerStatusFormState } from "./plannerStatusesDomain";
 
@@ -36,33 +34,6 @@ export function PlannerStatusFormModal({
     primaryLabel = "Create";
   } else {
     primaryLabel = "Update";
-  }
-
-  const preferSidebar = useMainSettingsFormSidebar();
-
-  if (preferSidebar) {
-    return (
-      <MainSettingsFormSidebar
-        show={show}
-        onHide={onHide}
-        title={title}
-        disableClose={processing}
-        footer={
-          <div className="main-settings-form-sidebar-footer">
-            <div className="main-settings-form-sidebar-footer__actions">
-              <Button variant="outline-secondary" type="button" onClick={onHide} disabled={processing}>
-                Cancel
-              </Button>
-              <Button variant="primary" type="button" onClick={() => void onSubmit()} disabled={processing}>
-                {primaryLabel}
-              </Button>
-            </div>
-          </div>
-        }
-      >
-        <PlannerStatusFormFields formData={formData} setFormData={setFormData} />
-      </MainSettingsFormSidebar>
-    );
   }
 
   return (

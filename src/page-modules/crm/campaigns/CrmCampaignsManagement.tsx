@@ -91,6 +91,7 @@ import { MainSettingsFormSidebar } from "@components/main-settings/MainSettingsF
 import moment from "moment";
 import { HEADER_CONSTANTS } from "@constants/headerConstants";
 import type { CrmPageDisplayProps } from "@page-modules/crm/crmPageDisplayProps";
+import { CrmSettingsTableWrap } from "@page-modules/crm/shared/CrmSettingsTableWrap";
 import { crmAppKeys } from "@query/keys";
 
 const { PERMISSIONS } = HEADER_CONSTANTS;
@@ -2108,6 +2109,7 @@ const CrmCampaigns = ({ hideBreadcrumb, breadcrumbMainLink }: CrmPageDisplayProp
 
       {/* Campaigns Table via GenericTable */}
       {session?.user?.permissions?.includes(PERMISSIONS.VIEW_CRM_CAMPAIGNS) && (
+        <CrmSettingsTableWrap hideBreadcrumb={hideBreadcrumb}>
         <GenericTable<any>
           data={campaignsData}
           columns={campaignsTableColumns}
@@ -2133,7 +2135,10 @@ const CrmCampaigns = ({ hideBreadcrumb, breadcrumbMainLink }: CrmPageDisplayProp
           toolbar={toolbarConfig}
           showToolbarActions={false}
           uniqueKey="id"
+          hover
+          size="md"
         />
+        </CrmSettingsTableWrap>
       )}
 
       {/* Create/Edit Campaign Sidebar */}

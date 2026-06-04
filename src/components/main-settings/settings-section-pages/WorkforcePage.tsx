@@ -29,7 +29,13 @@ export const WorkforcePage: React.FC<ControlledTabsProps> = ({
   )
 
   return (
-    <SettingsSectionTabShell title="Workforce" allowedTabs={allowedTabs} activeTab={activeTab} onSelectTab={selectTab}>
+    <SettingsSectionTabShell
+      title="Workforce"
+      allowedTabs={allowedTabs}
+      activeTab={activeTab}
+      onSelectTab={selectTab}
+      dense
+    >
       <WorkforceTabPanel activeTab={activeTab} />
     </SettingsSectionTabShell>
   )

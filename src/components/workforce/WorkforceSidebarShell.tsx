@@ -20,7 +20,6 @@ const sidebarPanelStyle: CSSProperties = {
   position: "fixed",
   top: 0,
   right: 0,
-  width: "600px",
   height: "100vh",
   backgroundColor: "#ffffff",
   boxShadow: "-2px 0 8px rgba(0, 0, 0, 0.1)",
@@ -30,7 +29,6 @@ const sidebarPanelStyle: CSSProperties = {
 };
 
 const sidebarHeaderStyle: CSSProperties = {
-  padding: "20px 24px",
   borderBottom: "1px solid #eaf0f6",
   display: "flex",
   alignItems: "center",
@@ -64,11 +62,9 @@ const sidebarFormStyle: CSSProperties = {
 const sidebarContentStyle: CSSProperties = {
   flex: 1,
   overflowY: "auto",
-  padding: "40px",
 };
 
 const sidebarFooterStyle: CSSProperties = {
-  padding: "16px 24px",
   borderTop: "1px solid #eaf0f6",
   display: "flex",
   gap: "12px",
@@ -127,18 +123,18 @@ const WorkforceSidebarShell: React.FC<WorkforceSidebarShellProps> = ({
         aria-hidden="true"
       />
 
-      <div className={className} style={sidebarPanelStyle}>
-        <div style={sidebarHeaderStyle}>
-          <h2 style={sidebarTitleStyle}>{title}</h2>
+      <div className={["contact-sidebar-container", className].filter(Boolean).join(" ")} style={sidebarPanelStyle}>
+        <div className="contact-sidebar-header" style={sidebarHeaderStyle}>
+          <h2 className="contact-sidebar-title" style={sidebarTitleStyle}>{title}</h2>
           <button type="button" onClick={onClose} style={sidebarCloseButtonStyle}>
             <X size={24} />
           </button>
         </div>
 
         <Form onSubmit={onSubmit} style={sidebarFormStyle}>
-          <div style={sidebarContentStyle}>{children}</div>
+          <div className="contact-sidebar-content" style={sidebarContentStyle}>{children}</div>
 
-          <div style={sidebarFooterStyle}>
+          <div className="contact-sidebar-footer" style={sidebarFooterStyle}>
             <button type="submit" disabled={primaryDisabled} style={getPrimaryButtonStyle(primaryDisabled)}>
               {submitting ? submittingLabel : submitLabel}
             </button>

@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import React, { useCallback, useMemo } from "react";
 import moment from "moment";
 import type { ToolbarConfig, FilterPill, TabConfig } from "@components/GenericTable";
 import { normalizeSearchQuery } from "@utils/Helper";
@@ -200,8 +200,8 @@ export interface UseCrmToolbarConfigOptions {
   onTabRemove: (tabId: string) => void;
   tabsDropdownLabel: string;
 
-  // Toolbar actions
-  onFiltersClick: () => void;
+  // Toolbar actions — omit to use GenericTable default (toggle filter pills row)
+  onFiltersClick?: () => void;
   onExportClick: () => void;
   onEditColumnsClick: () => void;
   showImport?: boolean;
@@ -507,6 +507,11 @@ export function useCrmToolbarConfig(
     stages,
   ]);
 
+  const clearAllFilters = useCallback(() => {
+    handleFiltersChange({});
+    refresh();
+  }, [handleFiltersChange, refresh]);
+
   const resolvedTabs = useMemo((): TabConfig[] => {
     if (!isProspectsLikeEntity(entity) || !prospectsTabCountOverrides) return tabs;
     const { loading, totalRecords, activeFilter } = prospectsTabCountOverrides;
@@ -565,7 +570,7 @@ export function useCrmToolbarConfig(
       showPipelineDropdown: false,
       pipelineLabel: "All Pipelines",
       showFiltersButton: true,
-      onFiltersClick,
+      ...(onFiltersClick ? { onFiltersClick } : {}),
       showSortButton: true,
       showExportButton,
       onExportClick,
@@ -573,8 +578,9 @@ export function useCrmToolbarConfig(
       onSaveClick: () => {},
 
       filterPills,
+      clearAllFilters,
       showAdvancedFilters: true,
-      onAdvancedFiltersClick: onFiltersClick,
+      ...(onFiltersClick ? { onAdvancedFiltersClick: onFiltersClick } : {}),
 
       rightActions,
     }),
@@ -599,6 +605,7 @@ export function useCrmToolbarConfig(
       onFiltersClick,
       onExportClick,
       filterPills,
+      clearAllFilters,
       rightActions,
       currentFilters,
       handleFiltersChange,

@@ -1052,7 +1052,6 @@ const CreateUserProfile = ({
                     position: "fixed",
                     top: 0,
                     right: 0,
-                    width: "600px",
                     height: "100vh",
                     backgroundColor: "#ffffff",
                     boxShadow: "-2px 0 8px rgba(0, 0, 0, 0.1)",
@@ -1064,7 +1063,6 @@ const CreateUserProfile = ({
                 <div
                     className="contact-sidebar-header"
                     style={{
-                        padding: "20px 24px",
                         borderBottom: "1px solid #eaf0f6",
                         display: "flex",
                         alignItems: "center",
@@ -1105,7 +1103,6 @@ const CreateUserProfile = ({
                     style={{
                         flex: 1,
                         overflowY: "auto",
-                        padding: "24px",
                     }}
                 >
                     <div

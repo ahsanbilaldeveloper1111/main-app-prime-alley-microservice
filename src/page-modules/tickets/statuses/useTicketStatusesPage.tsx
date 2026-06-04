@@ -1,4 +1,6 @@
-import type { TableAction, TableColumn } from "@components/GenericTable";
+import { appendSettingsActionsColumn } from "@components/main-settings/settingsEmbeddedTable";
+import type { TableColumn } from "@components/GenericTable";
+import type { CrmTableRowAction } from "@page-modules/crm/shared/CrmTableRowActions";
 import { ticketsKeys } from "@query/keys";
 import { useTicketStatusesListQuery } from "@page-modules/tickets/useTicketStatusesListQuery";
 import { CreateStatus, DeleteStatus, UpdateStatus } from "@utils/ticket-statuses";
@@ -146,7 +148,7 @@ export function useTicketStatusesPage() {
     setCurrentPage(1);
   }, []);
 
-  const columns: TableColumn<TicketStatus>[] = useMemo(
+  const baseColumns: TableColumn<TicketStatus>[] = useMemo(
     () => [
       {
         key: "name",
@@ -209,34 +211,36 @@ export function useTicketStatusesPage() {
     []
   );
 
-  const actions: TableAction<TicketStatus>[] = useMemo(() => {
-    const canEdit = permissions?.includes("edit-ticket-status-tickets");
-    const canDelete = permissions?.includes("delete-ticket-status-tickets");
+  const canEdit = permissions?.includes("edit-ticket-status-tickets") ?? false;
+  const canDelete = permissions?.includes("delete-ticket-status-tickets") ?? false;
 
-    const acts: TableAction<TicketStatus>[] = [];
-
-    if (canEdit) {
-      acts.push({
-        label: "Edit",
-        icon: <Edit size={16} />,
-        variant: "light",
-        className: "btn-action-style-2 p-1 text-primary",
-        onClick: handleEditStatus,
-      });
+  const columns = useMemo(() => {
+    if (!canEdit && !canDelete) {
+      return baseColumns;
     }
-
-    if (canDelete) {
-      acts.push({
-        label: "Delete",
-        icon: <Trash2 size={16} />,
-        variant: "light",
-        className: "btn-action-style-2 p-1 text-danger",
-        onClick: handleDeleteStatus,
-      });
-    }
-
-    return acts;
-  }, [permissions, handleEditStatus, handleDeleteStatus]);
+    return appendSettingsActionsColumn<TicketStatus>(baseColumns, (row): CrmTableRowAction[] => [
+      ...(canEdit
+        ? [
+            {
+              label: `Edit ${row.name}`,
+              icon: <Edit size={22} aria-hidden />,
+              tone: "primary" as const,
+              onClick: () => handleEditStatus(row),
+            },
+          ]
+        : []),
+      ...(canDelete
+        ? [
+            {
+              label: `Delete ${row.name}`,
+              icon: <Trash2 size={22} aria-hidden />,
+              tone: "danger" as const,
+              onClick: () => handleDeleteStatus(row),
+            },
+          ]
+        : []),
+    ]);
+  }, [baseColumns, canEdit, canDelete, handleEditStatus, handleDeleteStatus]);
 
   const canViewList = permissions?.includes("ticket-statuses-tickets") ?? false;
   const canCreate = permissions?.includes("create-ticket-status-tickets") ?? false;
@@ -245,7 +249,6 @@ export function useTicketStatusesPage() {
     data,
     loading,
     columns,
-    actions,
     currentPage,
     rowsPerPage,
     totalRows,

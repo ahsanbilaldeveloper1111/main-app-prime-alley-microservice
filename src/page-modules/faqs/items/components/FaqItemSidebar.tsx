@@ -347,11 +347,11 @@ export const FaqItemSidebar: React.FC<FaqItemSidebarProps> = ({
       />
 
       <div
+        className="contact-sidebar-container"
         style={{
           position: "fixed",
           top: 0,
           right: 0,
-          width: "600px",
           height: "100vh",
           backgroundColor: "#ffffff",
           boxShadow: "-2px 0 8px rgba(0, 0, 0, 0.1)",
@@ -361,8 +361,8 @@ export const FaqItemSidebar: React.FC<FaqItemSidebarProps> = ({
         }}
       >
         <div
+          className="contact-sidebar-header"
           style={{
-            padding: "20px 24px",
             borderBottom: "1px solid #eaf0f6",
             display: "flex",
             alignItems: "center",
@@ -396,7 +396,7 @@ export const FaqItemSidebar: React.FC<FaqItemSidebarProps> = ({
           onSubmit={handleFormSubmit}
           style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}
         >
-          <div style={{ flex: 1, overflowY: "auto", padding: "40px" }}>
+          <div className="contact-sidebar-content" style={{ flex: 1, overflowY: "auto" }}>
             <ItemTopicField
               topicOptions={topicOptions}
               value={formData.topic_id}
@@ -424,8 +424,8 @@ export const FaqItemSidebar: React.FC<FaqItemSidebarProps> = ({
           </div>
 
           <div
+            className="contact-sidebar-footer"
             style={{
-              padding: "16px 24px",
               borderTop: "1px solid #eaf0f6",
               display: "flex",
               gap: "12px",

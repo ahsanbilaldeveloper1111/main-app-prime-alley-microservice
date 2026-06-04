@@ -1,5 +1,7 @@
 import PageHeader from "@components/PageHeader";
-import GenericTable, { type TableAction, type TableColumn } from "@components/GenericTable";
+import type { TableColumn } from "@components/GenericTable";
+import { EmbeddedSettingsTable } from "@components/main-settings/EmbeddedSettingsTable";
+import { SettingsEmbeddedToolbar } from "@components/main-settings/SettingsEmbeddedToolbar";
 import FormModal from "@components/page-partials/FormModal";
 import ConfirmModal from "@components/page-partials/ConfirmModal";
 import type { TicketModule } from "../ticketModulesTypes";
@@ -13,11 +15,11 @@ type ExtRow = { id?: string | number; display_name?: string };
 type UserExtensionOption = { value: string; label: string };
 
 export type TicketModulesPageViewProps = Readonly<{
+  embeddedInMainSettings?: boolean;
   extensions: ExtRow[];
   data: TicketModule[];
   loading: boolean;
   columns: TableColumn<TicketModule>[];
-  actions: TableAction<TicketModule>[];
   currentPage: number;
   rowsPerPage: number;
   totalRows: number;
@@ -64,11 +66,11 @@ export type TicketModulesPageViewProps = Readonly<{
 }>;
 
 export const TicketModulesPageView: React.FC<TicketModulesPageViewProps> = ({
+  embeddedInMainSettings = false,
   extensions,
   data,
   loading,
   columns,
-  actions,
   currentPage,
   rowsPerPage,
   totalRows,
@@ -112,27 +114,33 @@ export const TicketModulesPageView: React.FC<TicketModulesPageViewProps> = ({
   submodules,
   onCloseSubmoduleModal,
   onDeleteSubmodule,
-}) => (
-  <>
-    <PageHeader
-      title=""
-      buttons={
-        canCreate ? (
-          <Button variant="primary" onClick={onOpenCreateModuleModal}>
-            New Module
-          </Button>
-        ) : undefined
-      }
-    />
+}) => {
+  const addButton = canCreate ? (
+    <Button variant="primary" size="sm" onClick={onOpenCreateModuleModal}>
+      New Module
+    </Button>
+  ) : null;
 
-    {canViewList && (
-      <GenericTable<TicketModule>
+  return (
+  <div className={embeddedInMainSettings ? "tickets-settings-page" : undefined}>
+    {embeddedInMainSettings ? (
+      <SettingsEmbeddedToolbar
+        searchValue={searchValue}
+        onSearchChange={onSearchChange}
+        searchPlaceholder="Search modules..."
+        actions={addButton}
+      />
+    ) : (
+      <PageHeader title="" buttons={addButton} />
+    )}
+
+    {canViewList ? (
+      <EmbeddedSettingsTable<TicketModule>
+        embedded={embeddedInMainSettings}
         data={data}
         columns={columns}
         loading={loading}
-        actions={actions}
-        showActions={actions.length > 0}
-        actionsLabel="Actions"
+        emptyMessage="No modules found."
         pagination={{
           currentPage,
           rowsPerPage,
@@ -140,20 +148,15 @@ export const TicketModulesPageView: React.FC<TicketModulesPageViewProps> = ({
           pageSizeOptions: [15, 25, 50, 100],
         }}
         onPaginationChange={onPaginationChange}
-        sortable={true}
-        hover={true}
-        emptyMessage="No modules found."
-        showToolbar={true}
+        uniqueKey="id"
         toolbar={{
           showSearch: true,
           searchValue,
           searchPlaceholder: "Search modules...",
-          onSearchChange: onSearchChange,
+          onSearchChange,
         }}
-        showToolbarActions={false}
-        uniqueKey="id"
       />
-    )}
+    ) : null}
 
     <FormModal
       show={showEditModuleModal}
@@ -678,5 +681,6 @@ export const TicketModulesPageView: React.FC<TicketModulesPageViewProps> = ({
       submitButtonVariant="primary"
       cancelButtonVariant="secondary"
     />
-  </>
-);
+  </div>
+  );
+};

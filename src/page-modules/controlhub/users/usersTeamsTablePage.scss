@@ -90,8 +90,8 @@
   }
 
   // Action buttons: override btn-sm + Settings.css so icons fit (default btn-action-style-2 is 32px)
-  --users-teams-action-btn-size: 40px;
-  --users-teams-action-icon-size: 22px;
+  --users-teams-action-btn-size: var(--ms-action-btn-size, 40px);
+  --users-teams-action-icon-size: var(--ms-action-icon-size, 22px);
 
   // Desktop row actions only — do NOT match .gt-mobile-actions-more-btn (see media queries below)
   .generic-table-td[data-col-key='actions'] .btn.btn-action-style-2:not(.gt-mobile-actions-more-btn),
@@ -233,7 +233,8 @@
     min-width: 640px;
   }
 
-  .users-teams-table-page.users-teams-table-page--ranks .generic-table {
+  .users-teams-table-page.users-teams-table-page--ranks .generic-table,
+  .users-teams-table-page.users-teams-table-page--user-directory .generic-table {
     min-width: 52rem;
   }
 }
@@ -635,6 +636,201 @@
         height: 28px;
         padding: 2px 6px;
       }
+    }
+  }
+}
+
+// User Directory — same table chrome as Ranks & Permissions
+.users-teams-table-page.users-teams-table-page--user-directory {
+  @media (min-width: 768px) {
+    .generic-table {
+      width: 100%;
+      min-width: 52rem;
+      table-layout: auto;
+    }
+
+    .generic-table-th[data-col-key='name'],
+    .generic-table-td[data-col-key='name'] {
+      min-width: 8rem;
+    }
+
+    .generic-table-th[data-col-key='username'],
+    .generic-table-td[data-col-key='username'] {
+      min-width: 7rem;
+    }
+
+    .generic-table-th[data-col-key='phone'],
+    .generic-table-td[data-col-key='phone'] {
+      min-width: 6rem;
+      white-space: nowrap;
+    }
+
+    .generic-table-th[data-col-key='Role'],
+    .generic-table-td[data-col-key='Role'],
+    .generic-table-th[data-col-key='Status'],
+    .generic-table-td[data-col-key='Status'] {
+      min-width: 6.5rem;
+    }
+
+    .generic-table-th[data-col-key='Action'],
+    .generic-table-td[data-col-key='Action'],
+    .generic-table-actions-header {
+      width: 1%;
+      min-width: max-content;
+      text-align: center !important;
+      vertical-align: middle !important;
+    }
+
+    .generic-table-th[data-col-key='Action'] .th-content,
+    .generic-table-actions-header .th-content {
+      justify-content: center;
+    }
+  }
+
+  @media (max-width: 767.98px) {
+    .generic-table-th[data-col-key='Action'],
+    .generic-table-td[data-col-key='Action'] {
+      display: block !important;
+    }
+
+    .generic-table-th[data-col-key='username'],
+    .generic-table-td[data-col-key='username'],
+    .generic-table-th[data-col-key='phone'],
+    .generic-table-td[data-col-key='phone'],
+    .generic-table-th[data-col-key='Role'],
+    .generic-table-td[data-col-key='Role'],
+    .generic-table-th[data-col-key='Status'],
+    .generic-table-td[data-col-key='Status'] {
+      display: block !important;
+    }
+
+    .generic-table-row {
+      padding: 14px 52px 14px 14px;
+    }
+
+    .generic-table-td[data-col-key='name'] {
+      padding-right: 0 !important;
+      padding-bottom: 8px !important;
+      word-break: break-word;
+    }
+
+    .generic-table-td[data-col-key='username'] {
+      color: #64748b;
+      font-size: 0.8125rem;
+      padding-top: 4px !important;
+      padding-bottom: 4px !important;
+
+      &::before {
+        content: "Username";
+        display: block;
+        font-size: 0.6875rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+        color: #94a3b8;
+        margin-bottom: 6px;
+      }
+    }
+
+    .generic-table-td[data-col-key='phone'] {
+      font-size: 0.8125rem;
+      padding-top: 8px !important;
+      padding-bottom: 4px !important;
+
+      &::before {
+        content: "Extension";
+        display: block;
+        font-size: 0.6875rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+        color: #94a3b8;
+        margin-bottom: 6px;
+      }
+    }
+
+    .generic-table-td[data-col-key='Role'] {
+      font-size: 0.8125rem;
+      padding-top: 8px !important;
+      padding-bottom: 4px !important;
+
+      &::before {
+        content: "Rank";
+        display: block;
+        font-size: 0.6875rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+        color: #94a3b8;
+        margin-bottom: 6px;
+      }
+    }
+
+    .generic-table-td[data-col-key='Status'] {
+      font-size: 0.8125rem;
+      padding-top: 8px !important;
+      padding-bottom: 4px !important;
+
+      &::before {
+        content: "Status";
+        display: block;
+        font-size: 0.6875rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+        color: #94a3b8;
+        margin-bottom: 6px;
+      }
+    }
+
+    .generic-table-td[data-col-key='Action'] {
+      position: absolute !important;
+      top: 8px;
+      right: 8px;
+      margin: 0;
+      padding: 0 !important;
+      border: none !important;
+      width: auto;
+      z-index: 2;
+      overflow: visible !important;
+
+      .users-directory-more-btn,
+      .users-directory-row-actions--desktop .btn-action-style-2 {
+        min-width: var(--users-teams-action-btn-size);
+        min-height: var(--users-teams-action-btn-size);
+      }
+
+      .users-directory-more-btn {
+        display: inline-flex !important;
+        align-items: center;
+        justify-content: center;
+        border-radius: 8px;
+        border: 1px solid #dee2e6 !important;
+
+        &::after {
+          display: none;
+        }
+      }
+
+      .users-directory-row-actions--desktop {
+        display: none !important;
+      }
+    }
+
+    .users-directory-actions-popup {
+      z-index: 1070 !important;
+      min-width: 11rem;
+      box-shadow: 0 8px 24px rgba(15, 23, 42, 0.12);
+    }
+  }
+
+  @media (min-width: 768px) {
+    .generic-table-td[data-col-key='Action'] .users-directory-row-actions--desktop {
+      display: inline-flex !important;
+    }
+
+    .generic-table-td[data-col-key='Action'] .users-directory-more-btn {
+      display: none !important;
     }
   }
 }

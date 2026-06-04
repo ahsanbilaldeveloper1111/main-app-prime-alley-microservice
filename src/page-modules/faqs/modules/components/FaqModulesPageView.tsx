@@ -1,7 +1,9 @@
 import BreadcrumbItem from "@common/BreadcrumbItem";
 import ConfirmModal from "@components/page-partials/ConfirmModal";
 import SuccessfulModal from "@components/page-partials/SuccessfulModal";
-import GenericTable from "@components/GenericTable";
+import type { TableColumn } from "@components/GenericTable";
+import { EmbeddedSettingsTable } from "@components/main-settings/EmbeddedSettingsTable";
+import { SettingsEmbeddedToolbar } from "@components/main-settings/SettingsEmbeddedToolbar";
 import { Button, Form, InputGroup, Modal } from "react-bootstrap";
 import { Info, Layers, Plus, Search, X } from "lucide-react";
 import React from "react";
@@ -11,7 +13,6 @@ import {
   type FAQModuleRow,
   type ModuleSidebarConfig,
 } from "../faqModulesTypes";
-import type { TableAction, TableColumn } from "@components/GenericTable";
 
 interface ModuleNameFieldProps {
   id: string;
@@ -293,11 +294,11 @@ const FAQModuleSidebar: React.FC<FAQModuleSidebarProps> = ({
       />
 
       <div
+        className="contact-sidebar-container"
         style={{
           position: "fixed",
           top: 0,
           right: 0,
-          width: "600px",
           height: "100vh",
           backgroundColor: "#ffffff",
           boxShadow: "-2px 0 8px rgba(0, 0, 0, 0.1)",
@@ -307,8 +308,8 @@ const FAQModuleSidebar: React.FC<FAQModuleSidebarProps> = ({
         }}
       >
         <div
+          className="contact-sidebar-header"
           style={{
-            padding: "20px 24px",
             borderBottom: "1px solid #eaf0f6",
             display: "flex",
             alignItems: "center",
@@ -342,7 +343,7 @@ const FAQModuleSidebar: React.FC<FAQModuleSidebarProps> = ({
           onSubmit={handleFormSubmit}
           style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}
         >
-          <div style={{ flex: 1, overflowY: "auto", padding: "40px" }}>
+          <div className="contact-sidebar-content" style={{ flex: 1, overflowY: "auto" }}>
             <ModuleNameField id={config.nameInputId} value={name} onChange={onNameChange} hint={nameHint} />
             <ModuleDescriptionField
               id={config.descInputId}
@@ -358,8 +359,8 @@ const FAQModuleSidebar: React.FC<FAQModuleSidebarProps> = ({
           </div>
 
           <div
+            className="contact-sidebar-footer"
             style={{
-              padding: "16px 24px",
               borderTop: "1px solid #eaf0f6",
               display: "flex",
               gap: "12px",
@@ -518,10 +519,10 @@ const IconPickerBody: React.FC<IconPickerBodyProps> = ({
 );
 
 export type FaqModulesPageViewProps = Readonly<{
+  embeddedInMainSettings?: boolean;
   data: FAQModuleRow[];
   loading: boolean;
   columns: TableColumn<FAQModuleRow>[];
-  actions: TableAction<FAQModuleRow>[];
   currentPage: number;
   rowsPerPage: number;
   totalRows: number;
@@ -569,10 +570,10 @@ export type FaqModulesPageViewProps = Readonly<{
 }>;
 
 export const FaqModulesPageView: React.FC<FaqModulesPageViewProps> = ({
+  embeddedInMainSettings = false,
   data,
   loading,
   columns,
-  actions,
   currentPage,
   rowsPerPage,
   totalRows,
@@ -618,28 +619,38 @@ export const FaqModulesPageView: React.FC<FaqModulesPageViewProps> = ({
   showBreadcrumb = true,
   breadcrumbMainLink = "/main-settings/help-center/modules",
 }) => {
+  const addButton = (
+    <Button variant="primary" size="sm" onClick={onOpenCreateSidebar}>
+      <Plus size={16} className="me-1" />
+      Add Module
+    </Button>
+  );
+
   return (
-    <React.Fragment>
+    <div className={embeddedInMainSettings ? "faqs-settings-page" : undefined}>
       {showBreadcrumb ? (
         <BreadcrumbItem mainTitle="FAQs" mainLink={breadcrumbMainLink} subTitle="Modules" />
       ) : null}
 
-      <div className="page-header-title style-2 mb-3">
-        <div className="d-flex justify-content-end">
-          <Button variant="primary" onClick={onOpenCreateSidebar}>
-            <Plus size={16} className="me-1" />
-            Add Module
-          </Button>
+      {embeddedInMainSettings ? (
+        <SettingsEmbeddedToolbar
+          searchValue={searchValue}
+          onSearchChange={onSearchChange}
+          searchPlaceholder="Search modules..."
+          actions={addButton}
+        />
+      ) : (
+        <div className="page-header-title style-2 mb-3">
+          <div className="d-flex justify-content-end">{addButton}</div>
         </div>
-      </div>
+      )}
 
-      <GenericTable<FAQModuleRow>
+      <EmbeddedSettingsTable<FAQModuleRow>
+        embedded={embeddedInMainSettings}
         data={data}
         columns={columns}
         loading={loading}
-        actions={actions}
-        showActions={true}
-        actionsLabel="Actions"
+        emptyMessage="No FAQ modules found."
         pagination={{
           currentPage,
           rowsPerPage,
@@ -647,18 +658,15 @@ export const FaqModulesPageView: React.FC<FaqModulesPageViewProps> = ({
           pageSizeOptions: [15, 25, 50, 100],
         }}
         onPaginationChange={onPaginationChange}
-        sortable={true}
-        hover={true}
-        emptyMessage="No FAQ modules found."
-        showToolbar={true}
+        sortable
+        hover
+        uniqueKey="id"
         toolbar={{
           showSearch: true,
           searchValue,
           searchPlaceholder: "Search modules...",
           onSearchChange,
         }}
-        showToolbarActions={false}
-        uniqueKey="id"
       />
 
       <FAQModuleSidebar
@@ -735,6 +743,6 @@ export const FaqModulesPageView: React.FC<FaqModulesPageViewProps> = ({
           </Button>
         </Modal.Footer>
       </Modal>
-    </React.Fragment>
+    </div>
   );
 };

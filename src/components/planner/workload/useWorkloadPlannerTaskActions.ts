@@ -10,7 +10,12 @@ import type { WorkloadBoardDropIntent } from "./WorkloadBoardPanel";
 import type { WorkloadSelectedCellState } from "./workloadPlannerPageHelpers";
 
 type AssignMutation = Readonly<{
-  mutate: (vars: { task: WorkloadTaskCard; toExtension: string }) => void;
+  mutate: (vars: {
+    task: WorkloadTaskCard;
+    toExtension: string;
+    dueDate?: string | null;
+    estimateMinutes?: number | null;
+  }) => void;
 }>;
 
 type RescheduleMutation = Readonly<{

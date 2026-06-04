@@ -28,6 +28,7 @@ type GenericListPagePropsBase = {
     refreshKey?: number;
     search?: boolean;
     pagination?: boolean;
+    showPageSizeSelector?: boolean;
     rowClick?: boolean;
     showCanvas?: boolean;
     rowSelection?: boolean;
@@ -100,6 +101,7 @@ const GenericListPage: React.FC<GenericListPageProps> = (props) => {
         refreshKey = 0,
         search = true,
         pagination = true,
+        showPageSizeSelector = pagination,
         rowClick = false,
         showCanvas = false,
         rowSelection = false,
@@ -289,7 +291,7 @@ const GenericListPage: React.FC<GenericListPageProps> = (props) => {
                 onSearch={handleSearch}
                 showSearch={search}
                 pagination={pagination}
-                showPageSizeSelector={pagination}
+                showPageSizeSelector={showPageSizeSelector}
                 rowSelection={rowSelection}
                 onSelectionChange={onSelectionChange}
                 keyField={keyField}

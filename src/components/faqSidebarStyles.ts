@@ -14,7 +14,6 @@ export const faqSidebarStyles = {
       position: 'fixed' as const,
       top: 0,
       right: 0,
-      width: '600px',
       height: '100vh',
       backgroundColor: '#ffffff',
       boxShadow: '-2px 0 8px rgba(0, 0, 0, 0.1)',
@@ -23,7 +22,6 @@ export const faqSidebarStyles = {
       flexDirection: 'column' as const,
     },
     header: {
-      padding: '20px 24px',
       borderBottom: '1px solid #eaf0f6',
       display: 'flex' as const,
       alignItems: 'center' as const,
@@ -58,10 +56,8 @@ export const faqSidebarStyles = {
     body: {
       flex: 1,
       overflowY: 'auto' as const,
-      padding: '40px',
     },
     footer: {
-      padding: '16px 24px',
       borderTop: '1px solid #eaf0f6',
       display: 'flex' as const,
       gap: '12px',

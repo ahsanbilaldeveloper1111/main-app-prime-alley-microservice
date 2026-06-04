@@ -12,11 +12,8 @@ import {
 } from "lucide-react";
 import { getInitials, getRandomColor } from "@utils/crmNameAvatar";
 import { stripTrailingParenthetical } from "@utils/displayName";
-import type {
-  CrmDataItem,
-  HistoryChainRecord,
-  StageData,
-} from "@utils/crm";
+import type { CrmDataItem, HistoryChainRecord, StageData } from "@utils/crm";
+import { CRM_ACTIVITY_PIPELINE_COLORS } from "@utils/crmThemeColors";
 import type { ActivityRecord } from "./activityHistoryPageTypes";
 import {
   buildActivityDetailsRoute,
@@ -36,27 +33,27 @@ type StageVisualState = {
   stageLabelColor: string;
 };
 
-function buildStageDefinitions(recordStages: StageData[]): StageDefinition[] {
+function buildStageDefinitions(): StageDefinition[] {
   return [
     {
       name: "Prospect",
       icon: <Users size={14} />,
-      color: recordStages[0]?.color || "#9c27b0",
+      color: CRM_ACTIVITY_PIPELINE_COLORS.prospect,
     },
     {
       name: "Lead",
       icon: <Target size={14} />,
-      color: recordStages[1]?.color || "#2196f3",
+      color: CRM_ACTIVITY_PIPELINE_COLORS.lead,
     },
     {
       name: "Deal",
       icon: <TrendingUp size={14} />,
-      color: recordStages[2]?.color || "#ff9800",
+      color: CRM_ACTIVITY_PIPELINE_COLORS.deal,
     },
     {
       name: "Order",
       icon: <ShoppingBag size={14} />,
-      color: recordStages[3]?.color || "#4caf50",
+      color: CRM_ACTIVITY_PIPELINE_COLORS.order,
     },
   ];
 }
@@ -186,7 +183,7 @@ function renderStageProgressContent(
     );
   }
 
-  const stages = buildStageDefinitions(recordStages);
+  const stages = buildStageDefinitions();
 
   return (
     <div className="position-relative" style={{ padding: "12px 0" }}>
@@ -253,6 +250,7 @@ export type ActivityHistorySidebarPanelProps = Readonly<{
   historyChain: HistoryChainRecord[];
   crmData: CrmDataItem | null;
   router: NextRouter;
+  sidebarMarginTop?: number;
 }>;
 
 export function ActivityHistorySidebarPanel({
@@ -266,6 +264,7 @@ export function ActivityHistorySidebarPanel({
   historyChain,
   crmData,
   router,
+  sidebarMarginTop = 0,
 }: ActivityHistorySidebarPanelProps) {
   if (!showActivitySidebar) return null;
 
@@ -277,6 +276,7 @@ export function ActivityHistorySidebarPanel({
 
   return (
     <GenericSidebar
+      sidebarMarginTop={sidebarMarginTop}
       width={getActivitySidebarWidth()}
       isOpen={showActivitySidebar}
       onClose={() => setShowActivitySidebar(false)}

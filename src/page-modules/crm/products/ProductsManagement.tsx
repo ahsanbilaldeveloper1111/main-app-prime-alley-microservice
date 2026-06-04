@@ -21,6 +21,7 @@ import {
 import ProductsFormSidebar from "@page-modules/crm/products/ProductsFormSidebar";
 import ProductsViewModal from "@page-modules/crm/products/ProductsViewModal";
 import { buildProductsTableColumns } from "@page-modules/crm/products/productsTableColumns";
+import { CrmSettingsTableWrap } from "@page-modules/crm/shared/CrmSettingsTableWrap";
 
 const { PERMISSIONS } = HEADER_CONSTANTS;
 
@@ -226,7 +227,10 @@ function ProductsPage(props: CrmPageDisplayProps = {}) {
           />
         )}
 
-        <div className="products-table-wrapper mb-4">
+        <CrmSettingsTableWrap
+          hideBreadcrumb={hideBreadcrumb}
+          standaloneWrapperClass="products-table-wrapper mb-4"
+        >
           <GenericTable<ProductDisplayData>
             data={displayProducts}
             columns={productsTableColumns}
@@ -252,8 +256,10 @@ function ProductsPage(props: CrmPageDisplayProps = {}) {
             toolbar={productsToolbarConfig}
             showToolbarActions={false}
             uniqueKey="id"
+            hover
+            size="md"
           />
-        </div>
+        </CrmSettingsTableWrap>
       </div>
     </React.Fragment>
   );

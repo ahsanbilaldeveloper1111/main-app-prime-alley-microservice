@@ -1,35 +1,11 @@
 import "@assets/scss/datatable-style.scss";
-import { type ReactElement } from "react";
-
+import React, { ReactElement } from "react";
 import Layout from "@layout/index";
+import { CallLogsListPage } from "@components/communications/CallLogsListPage";
 
-import "@assets/scss/common.scss";
+/** Call logs list, stats, and filters are implemented in `CallLogsListPage`. */
+const CallLogs = () => <CallLogsListPage />;
 
-import {
-  CallLogsBreadcrumb,
-  CallLogsDateRangeBannerConnected,
-  CallLogsTableSection,
-} from "@components/communications";
-
-const CallLogs = () => {
-  return (
-    <div className="call-logs-page">
-      <style
-        dangerouslySetInnerHTML={{
-          __html: `.call-logs-page .gt-toolbar-tabs-section .gt-tab-button { margin-left: 12px; }`,
-        }}
-      />
-      <CallLogsBreadcrumb />
-
-      <CallLogsDateRangeBannerConnected />
-
-      <CallLogsTableSection />
-    </div>
-  );
-};
-
-CallLogs.getLayout = (page: ReactElement) => {
-  return <Layout>{page}</Layout>;
-};
+CallLogs.getLayout = (page: ReactElement) => <Layout>{page}</Layout>;
 
 export default CallLogs;

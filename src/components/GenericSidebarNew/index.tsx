@@ -262,7 +262,7 @@ const RecentActivitiesSection = ({
             style={{
               marginTop: "12px",
               padding: "8px 16px",
-              backgroundColor: "#0091ae",
+              backgroundColor: "#0066CC",
               color: "white",
               border: "none",
               borderRadius: "4px",
@@ -331,24 +331,19 @@ const RecentActivitiesSection = ({
             <div
               key={entry.id ?? index}
               style={{
-                padding: "10px 0",
-                marginBottom: index < displayTrail.length - 1 ? "10px" : 0,
+                padding: "10px 12px",
+                marginBottom: index < displayTrail.length - 1 ? "8px" : 0,
                 minWidth: 0,
+                border: "1px solid #e2e8f0",
+                borderRadius: "6px",
+                backgroundColor: "#ffffff",
               }}
             >
               <p
-                style={{
-                  fontSize: "14px",
-                  color: "#141414",
-                  margin: "0 0 8px 0",
-                  lineHeight: "1.6",
-                  whiteSpace: "pre-wrap",
-                  overflowWrap: "break-word",
-                  wordBreak: "break-word",
-                }}
+                style={{ fontSize: "13px", color: "#141414", margin: "0 0 4px 0", fontWeight: "500" }}
                 dangerouslySetInnerHTML={{ __html: description }}
               />
-              <span style={{ fontSize: "12px", color: "#718096" }}>
+              <span style={{ fontSize: "11px", color: "#718096" }}>
                 {timestampWithUser}
               </span>
             </div>
@@ -361,7 +356,7 @@ const RecentActivitiesSection = ({
           style={{
             marginTop: "8px",
             padding: "8px 16px",
-            backgroundColor: "#0091ae",
+            backgroundColor: "#0066CC",
             color: "white",
             border: "none",
             borderRadius: "4px",
@@ -581,7 +576,7 @@ function renderCallsSection(options: {
               style={{
                 marginTop: "8px",
                 padding: "8px 16px",
-                backgroundColor: "#0091ae",
+                backgroundColor: "#0066CC",
                 color: "white",
                 border: "none",
                 borderRadius: "4px",
@@ -629,7 +624,7 @@ function renderCallsSection(options: {
             style={{
               marginTop: "12px",
               padding: "8px 16px",
-              backgroundColor: "#0091ae",
+              backgroundColor: "#0066CC",
               color: "white",
               border: "none",
               borderRadius: "4px",
@@ -682,7 +677,7 @@ function renderGenericSectionContent(
             style={{
               marginTop: "12px",
               padding: "8px 16px",
-              backgroundColor: "#0091ae",
+              backgroundColor: "#0066CC",
               color: "white",
               border: "none",
               borderRadius: "4px",
@@ -786,7 +781,7 @@ function renderGenericSectionContent(
             }}
             style={{
               padding: "8px 16px",
-              backgroundColor: "#0091ae",
+              backgroundColor: "#0066CC",
               color: "white",
               border: "none",
               borderRadius: "4px",
@@ -995,6 +990,7 @@ export interface GenericSidebarProps {
   onLogSms?: () => void;
   onLogWhatsApp?: () => void;
   onLogMeeting?: () => void;
+  sidebarMarginTop?: string | number;
 }
 
 // ============================================================================
@@ -1456,9 +1452,10 @@ const NotesModal: React.FC<NotesModalProps> = ({
     <div
       style={{
         position: "fixed",
-        inset: isMaximized ? "60px 20px 20px 20px" : "auto 15vh 0.5vh auto",
+        inset: "unset",
+        ...(isMaximized ? { top: "74px", left: "50%", transform: "translateX(-50%)", width: "min(900px, calc(100vw - 84px))", maxHeight: "calc(100vh - 94px)" } : { left: "50%", top: "50%", transform: "translate(-50%, -50%)", width: "min(650px, calc(100vw - 120px))" }),
         height: isMaximized ? "auto" : "512px",
-        width: isMaximized ? "auto" : "650px",
+        width: isMaximized ? "auto" : "min(650px, calc(100vw - 120px))",
         backgroundColor: "#ffffff",
         zIndex: 1000,
         display: "flex",
@@ -1467,7 +1464,7 @@ const NotesModal: React.FC<NotesModalProps> = ({
         borderRadius: "8px",
         border: "1px solid #cbd5e0",
         overflow: "hidden",
-        animation: "slideInUp 0.3s ease-out",
+        animation: "none",
       }}
     >
       {/* Header */}
@@ -2510,7 +2507,7 @@ const UrlInputModal: React.FC<UrlInputModalProps> = ({
           onClick={handleSubmit}
           style={{
             padding: "8px 16px",
-            backgroundColor: "#0091ae",
+            backgroundColor: "#0066CC",
             color: "#ffffff",
             border: "none",
             borderRadius: "4px",
@@ -3028,9 +3025,10 @@ const TaskModal: React.FC<TaskModalProps> = ({
       <div
         style={{
           position: "fixed",
-          inset: isMaximized ? "60px 20px 20px 20px" : "auto 15vh 7.5vh auto",
+          inset: "unset",
+          ...(isMaximized ? { top: "74px", left: "50%", transform: "translateX(-50%)", width: "min(900px, calc(100vw - 84px))", maxHeight: "calc(100vh - 94px)" } : { left: "50%", top: "50%", transform: "translate(-50%, -50%)", width: "min(650px, calc(100vw - 120px))" }),
           height: isMaximized ? "auto" : "650px",
-          width: isMaximized ? "auto" : "650px",
+          width: isMaximized ? "auto" : "min(650px, calc(100vw - 120px))",
           backgroundColor: "#ffffff",
           zIndex: 1000,
           display: "flex",
@@ -3039,7 +3037,7 @@ const TaskModal: React.FC<TaskModalProps> = ({
           borderRadius: "8px",
           border: "1px solid #cbd5e0",
           overflow: "hidden",
-          animation: "slideInUp 0.3s ease-out",
+          animation: "none",
         }}
       >
         {/* Header */}
@@ -6166,6 +6164,7 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
   onLogSms,
   onLogWhatsApp,
   onLogMeeting,
+  sidebarMarginTop = 0,
 }) => {
   const router = useRouter();
   const emailContextPayload = buildEmailContextPayload(contextPayload);
@@ -6202,7 +6201,10 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
   // Always show the section; when summary is missing/empty, the UI will display a fallback message.
   const recordSummary: RecordSummaryDisplay = {
     content: (crmSummary?.summary ?? "").trim(),
-    timestamp: "",
+    timestamp: crmSummary ? `Generated ${new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit" })}` : "",
+    onRefresh: () => {
+      globalThis.window?.dispatchEvent(new CustomEvent("breeze-summary:refresh"));
+    },
     onCopy: () => {
       void copyToClipboard(crmSummary?.summary ?? "");
     },
@@ -6341,11 +6343,11 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
       return;
     }
     syncActionsMenuPosition();
-    window.addEventListener("resize", syncActionsMenuPosition);
-    window.addEventListener("scroll", syncActionsMenuPosition, true);
+    globalThis.addEventListener("resize", syncActionsMenuPosition);
+    globalThis.addEventListener("scroll", syncActionsMenuPosition, true);
     return () => {
-      window.removeEventListener("resize", syncActionsMenuPosition);
-      window.removeEventListener("scroll", syncActionsMenuPosition, true);
+      globalThis.removeEventListener("resize", syncActionsMenuPosition);
+      globalThis.removeEventListener("scroll", syncActionsMenuPosition, true);
     };
   }, [showActionsDropdown, syncActionsMenuPosition]);
 
@@ -6383,7 +6385,9 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
       dockInParent
         ? {
             width,
-            backgroundColor: "#f0f0f0",
+            backgroundColor: "#ffffff",
+            border: "1px solid #cccccc",
+            borderRadius: "10px",
             display: "flex",
             flexDirection: "column",
             flex: 1,
@@ -6399,15 +6403,17 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
           }
         : {
             width,
-            backgroundColor: "#f0f0f0",
+            backgroundColor: "#ffffff",
+            border: "1px solid #cccccc",
+            borderRadius: "10px",
             display: "flex",
             flexDirection: "column",
-            height: "calc(100vh - 43px)",
-            maxHeight: "calc(100vh - 43px)",
+            height: `calc(100% - ${sidebarMarginTop}px)`,
+            maxHeight: `calc(100% - ${sidebarMarginTop}px)`,
             overflow: "hidden",
             animation: "slideInRight 0.3s ease-out",
             flexShrink: 0,
-            marginTop: "43px",
+            marginTop: sidebarMarginTop,
             position: "relative",
           },
     [dockInParent, width],
@@ -6432,7 +6438,7 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
             flex: 1,
             minHeight: 0,
             overflowY: "auto",
-            backgroundColor: "#f0f0f0",
+            backgroundColor: "#ffffff",
             borderBottom: "1px solid #cccccc",
             borderRadius: "0 0 10px 10px",
           }
@@ -6440,8 +6446,8 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
             flex: 1,
             minHeight: 0,
             overflowY: "auto",
-            backgroundColor: "#f0f0f0",
-            maxHeight: "calc(100vh - 217px)",
+            backgroundColor: "#ffffff",
+            maxHeight: "100%",
             borderBottom: "1px solid #cccccc",
             borderRadius: "0 0 10px 10px",
           },
@@ -6917,6 +6923,7 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
     };
     const logHandler = logHandlerByAction[actionId];
     if (logHandler) {
+      globalThis.dispatchEvent(new CustomEvent("close-all-activity-modals"));
       logHandler();
       return;
     }
@@ -7704,11 +7711,8 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
         key={section.id}
         style={{
           backgroundColor: "#ffffff",
-          borderRadius: "10px",
-          marginBottom: "12px",
           overflow: "hidden",
-          boxShadow: "0 1px 3px rgba(0, 0, 0, 0.06)",
-          border: "1px solid #cccccc",
+          borderTop: "1px solid #d1d5db",
         }}
       >
         {/* Section Header */}
@@ -7718,7 +7722,7 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
-            padding: "14px 20px",
+            padding: "10px 16px",
             cursor: section.collapsible ? "pointer" : "default",
             backgroundColor: "#ffffff",
             borderBottom: isCollapsed ? "none" : "1px solid #eaf0f6",
@@ -7905,7 +7909,7 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
 
         {/* Section Content */}
         {!isCollapsed && (
-          <div style={{ padding: "20px", paddingRight: "10px" }}>
+          <div style={{ padding: "12px 16px" }}>
             {section.id === "notes" ? (
               (() => {
                 if (sidebarNotesLoading) {
@@ -8019,7 +8023,7 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
                           style={{
                             marginTop: "12px",
                             padding: "8px 16px",
-                            backgroundColor: "#0091ae",
+                            backgroundColor: "#0066CC",
                             color: "white",
                             border: "none",
                             borderRadius: "4px",
@@ -8146,14 +8150,14 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            padding: 11px 10px;
+            padding: 7px 8px;
             background: #ffffff;
             border: 1px solid #8a8a8a;
             border-radius: 50%;
             cursor: pointer;
             transition: all 0.2s ease;
-            width: 40px;
-            height: 40px;
+            width: 32px;
+            height: 32px;
             position: relative;
           }
 
@@ -8292,14 +8296,18 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
         className="generic-sidebar-new-container"
         style={dockedOuterStyle}
       >
+        <div style={dockedBodyColumnStyle}>
+          <div
+            className="sidebar-scrollbar"
+            style={{ ...dockedScrollBodyStyle, position: "relative", zIndex: 1 }}
+          >
         {!hideTopHeadingBar && (
           <div
             style={{
-              padding: "20px 24px",
-              border: "1px solid #cccccc",
+              padding: "16px 20px",
+              borderBottom: "1px solid #d1d5db",
               backgroundColor: "#ffffff",
               flexShrink: 0,
-              borderRadius: "10px 10px 0 0",
             }}
           >
             <div
@@ -8313,7 +8321,7 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
               <div style={{ flex: 1, minWidth: 0 }}>
                 <h2
                   style={{
-                    fontSize: "20px",
+                    fontSize: "15px",
                     fontWeight: "500",
                     color: "#141414",
                     margin: 0,
@@ -8325,7 +8333,7 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
                   <p
                     style={{
                       margin: "6px 0 0",
-                      fontSize: "14px",
+                      fontSize: "13px",
                       color: "#718096",
                       fontWeight: 400,
                     }}
@@ -8366,33 +8374,12 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
             </div>
           </div>
         )}
-
-        <div style={dockedBodyColumnStyle}>
-          {/* z-index keeps header Actions menu above the scroll sibling (later siblings paint on top by default). */}
-          <div
-            style={{
-              flexShrink: 0,
-              position: "relative",
-              zIndex: 5,
-            }}
-          >
           {/* Contact & Actions Section */}
           <div
             style={{
               backgroundColor: "#ffffff",
-              padding: "16px 24px",
-              marginBottom: "12px",
-              borderLeft: "1px solid #cccccc",
-              borderRight: "1px solid #cccccc",
-              borderBottom: "1px solid #cccccc",
-              ...(hideTopHeadingBar
-                ? {
-                    borderTop: "1px solid #cccccc",
-                    borderRadius: "10px",
-                  }
-                : {
-                    borderRadius: "0 0 10px 10px",
-                  }),
+              padding: "10px 16px",
+              borderTop: "1px solid #d1d5db",
             }}
           >
             {/* Record Link and Actions */}
@@ -8401,8 +8388,13 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "space-between",
-                marginBottom: "16px",
-                paddingBottom: "10px",
+                paddingBottom: "12px",
+                borderBottom: "1px solid #d1d5db",
+                marginBottom: "0px",
+                marginLeft: "-24px",
+                marginRight: "-24px",
+                paddingLeft: "24px",
+                paddingRight: "24px",
               }}
             >
               {recordLink && (
@@ -8697,13 +8689,13 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
             )}
 
             {/* Avatar and Name Section */}
-            <div style={{ marginBottom: "16px" }}>
+            <div style={{ marginBottom: "8px", paddingTop: "12px" }}>
               <div
                 style={{
                   display: "flex",
                   alignItems: "flex-start",
                   gap: "12px",
-                  marginBottom: "12px",
+                  marginBottom: "8px",
                 }}
               >
                 {avatar && (
@@ -8712,13 +8704,13 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
                       width: "40px",
                       height: "37px",
                       borderRadius: "26px",
-                      background: "#efe7f0",
+                      background: avatar.gradient || "#efe7f0",
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "center",
                       fontSize: "10px",
                       fontWeight: "400",
-                      color: "#141414",
+                      color: "#ffffff",
                       flexShrink: 0,
                       backgroundImage: avatar.imageUrl
                         ? `url(${avatar.imageUrl})`
@@ -8735,7 +8727,7 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
                 <div style={{ flex: 1 }}>
                   <h1
                     style={{
-                      fontSize: "22px",
+                      fontSize: "16px",
                       fontWeight: "500",
                       color: "#141414",
                       margin: "0 0 4px 0",
@@ -8905,7 +8897,7 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                gap: "23px",
+                gap: "16px",
                 paddingTop: "5px",
                 flexWrap: "wrap",
               }}
@@ -8927,7 +8919,7 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
                       disabled={action.disabled}
                     >
                       <ActionIcon
-                        size={20}
+                        size={16}
                         color={action.disabled ? "#cbd5e0" : "#718096"}
                       />
                     </button>
@@ -8937,21 +8929,14 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
               })}
             </div>
           </div>
-          </div>
 
-          <div
-            className="sidebar-scrollbar"
-            style={{ ...dockedScrollBodyStyle, position: "relative", zIndex: 1 }}
-          >
           {/* Record summary (from API crm_summary) */}
           {recordSummary && (
             <div
               style={{
                 backgroundColor: "#ffffff",
-                borderRadius: "10px",
-                marginBottom: "12px",
                 overflow: "hidden",
-                border: "1px solid #cccccc",
+                borderTop: "1px solid #d1d5db",
               }}
             >
               <button
@@ -9020,18 +9005,26 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
               {!collapsedSections.has("breeze-summary") && (
                 <div
                   style={{
-                    padding: "20px",
+                    padding: "8px 12px",
                   }}
                 >
+                  <div
+                    style={{
+                      border: "1px solid #ff9fcc",
+                      borderRadius: "8px",
+                      padding: "10px 12px",
+                      backgroundColor: "#ffffff",
+                    }}
+                  >
                   {(recordSummary.timestamp || recordSummary.onRefresh) && (
                     <div
                       style={{
                         display: "flex",
                         alignItems: "center",
                         gap: "6px",
-                        fontSize: "13px",
-                        color: "#141414",
-                        marginBottom: "12px",
+                        fontSize: "12px",
+                        color: "#718096",
+                        marginBottom: "8px",
                       }}
                     >
                       {recordSummary.timestamp && (
@@ -9063,8 +9056,8 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
                       color: recordSummary.content ? "#141414" : "#718096",
                       lineHeight: "1.6",
                       marginBottom: "16px",
-                      border: recordSummary.content ? "1px solid #ff9fcc" : "none",
-                      padding: recordSummary.content ? "18px 20px" : "0 20px",
+                      border: "none",
+                      padding: recordSummary.content ? "8px 0" : "0",
                       borderRadius: "5px",
                       overflowWrap: "break-word",
                       wordBreak: "break-word",
@@ -9081,7 +9074,7 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
                           display: "flex",
                           alignItems: "center",
                           gap: "8px",
-                          paddingTop: "12px",
+                          paddingTop: "8px",
                           borderTop: "1px solid #fee",
                         }}
                       >
@@ -9162,7 +9155,7 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
                       <button
                         onClick={() => recordSummary.onAskQuestion?.()}
                         style={{
-                          marginTop: "16px",
+                          marginTop: "8px",
                           width: "36%",
                           padding: "6px 0",
                           backgroundColor: "transparent",
@@ -9190,7 +9183,8 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
                       </button>
                     </>
                   )}
-                </div>
+                  </div>
+              </div>
               )}
             </div>
           )}

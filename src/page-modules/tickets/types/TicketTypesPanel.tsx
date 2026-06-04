@@ -8,12 +8,12 @@ import { useTicketTypesPage } from "@page-modules/tickets/types/useTicketTypesPa
 import { useTicketsPanelChrome } from "@page-modules/tickets/shared/useTicketsPanelChrome";
 
 const TicketTypesPanel = () => {
-  const { showBreadcrumb, breadcrumbMainLink } = useTicketsPanelChrome("types");
+  const { showBreadcrumb, breadcrumbMainLink, embeddedInMainSettings } =
+    useTicketsPanelChrome("types");
   const {
     data,
     loading,
     columns,
-    actions,
     currentPage,
     rowsPerPage,
     totalRows,
@@ -43,7 +43,7 @@ const TicketTypesPanel = () => {
   } = useTicketTypesPage();
 
   return (
-    <React.Fragment>
+    <div className={embeddedInMainSettings ? "tickets-settings-panel" : undefined}>
       {showBreadcrumb ? (
         <BreadcrumbItem
           mainTitle="Tickets"
@@ -52,10 +52,10 @@ const TicketTypesPanel = () => {
         />
       ) : null}
       <TicketTypesPageView
+        embeddedInMainSettings={embeddedInMainSettings}
         data={data}
         loading={loading}
         columns={columns}
-        actions={actions}
         currentPage={currentPage}
         rowsPerPage={rowsPerPage}
         totalRows={totalRows}
@@ -83,7 +83,7 @@ const TicketTypesPanel = () => {
         onCloseCreateTypeModal={closeCreateTypeModal}
         onOpenCreateTypeModal={openCreateTypeModal}
       />
-    </React.Fragment>
+    </div>
   );
 };
 

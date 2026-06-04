@@ -1,20 +1,21 @@
 import BreadcrumbItem from "@common/BreadcrumbItem";
 import ConfirmModal from "@components/page-partials/ConfirmModal";
 import SuccessfulModal from "@components/page-partials/SuccessfulModal";
-import GenericTable from "@components/GenericTable";
+import type { TableColumn } from "@components/GenericTable";
+import { EmbeddedSettingsTable } from "@components/main-settings/EmbeddedSettingsTable";
+import { SettingsEmbeddedToolbar } from "@components/main-settings/SettingsEmbeddedToolbar";
 import { FaqFormSidebar } from "@components/faqFormSidebar";
 import { FaqLabeledSelect, FaqLabeledTextInput, FaqLabeledTextarea } from "@components/faqFormFields";
 import { Button } from "react-bootstrap";
 import { Plus, Tag } from "lucide-react";
 import React from "react";
-import type { TableAction, TableColumn } from "@components/GenericTable";
 import type { FAQTopicRow } from "../useFAQTopicsPage";
 
 export type FAQTopicsPageViewProps = Readonly<{
+  embeddedInMainSettings?: boolean;
   data: FAQTopicRow[];
   loading: boolean;
   columns: TableColumn<FAQTopicRow>[];
-  actions: TableAction<FAQTopicRow>[];
   currentPage: number;
   rowsPerPage: number;
   totalRows: number;
@@ -48,10 +49,10 @@ export type FAQTopicsPageViewProps = Readonly<{
 }>;
 
 export const FAQTopicsPageView: React.FC<FAQTopicsPageViewProps> = ({
+  embeddedInMainSettings = false,
   data,
   loading,
   columns,
-  actions,
   currentPage,
   rowsPerPage,
   totalRows,
@@ -83,28 +84,38 @@ export const FAQTopicsPageView: React.FC<FAQTopicsPageViewProps> = ({
   showBreadcrumb = true,
   breadcrumbMainLink = "/main-settings/help-center/topics",
 }) => {
+  const addButton = (
+    <Button variant="primary" size="sm" onClick={onOpenCreateSidebar}>
+      <Plus size={16} className="me-1" />
+      Add Topic
+    </Button>
+  );
+
   return (
-    <React.Fragment>
+    <div className={embeddedInMainSettings ? "faqs-settings-page" : undefined}>
       {showBreadcrumb ? (
         <BreadcrumbItem mainTitle="FAQs" mainLink={breadcrumbMainLink} subTitle="Topics" />
       ) : null}
 
-      <div className="page-header-title style-2 mb-3">
-        <div className="d-flex justify-content-end">
-          <Button variant="primary" onClick={onOpenCreateSidebar}>
-            <Plus size={16} className="me-1" />
-            Add Topic
-          </Button>
+      {embeddedInMainSettings ? (
+        <SettingsEmbeddedToolbar
+          searchValue={searchValue}
+          onSearchChange={onSearchChange}
+          searchPlaceholder="Search topics..."
+          actions={addButton}
+        />
+      ) : (
+        <div className="page-header-title style-2 mb-3">
+          <div className="d-flex justify-content-end">{addButton}</div>
         </div>
-      </div>
+      )}
 
-      <GenericTable<FAQTopicRow>
+      <EmbeddedSettingsTable<FAQTopicRow>
+        embedded={embeddedInMainSettings}
         data={data}
         columns={columns}
         loading={loading}
-        actions={actions}
-        showActions={true}
-        actionsLabel="Actions"
+        emptyMessage="No FAQ topics found."
         pagination={{
           currentPage,
           rowsPerPage,
@@ -112,18 +123,15 @@ export const FAQTopicsPageView: React.FC<FAQTopicsPageViewProps> = ({
           pageSizeOptions: [15, 25, 50, 100],
         }}
         onPaginationChange={onPaginationChange}
-        sortable={true}
-        hover={true}
-        emptyMessage="No FAQ topics found."
-        showToolbar={true}
+        sortable
+        hover
+        uniqueKey="id"
         toolbar={{
           showSearch: true,
           searchValue,
           searchPlaceholder: "Search topics...",
           onSearchChange,
         }}
-        showToolbarActions={false}
-        uniqueKey="id"
       />
 
       <FaqFormSidebar
@@ -193,6 +201,6 @@ export const FAQTopicsPageView: React.FC<FAQTopicsPageViewProps> = ({
         title={successModalTitle}
         description={successModalDescription}
       />
-    </React.Fragment>
+    </div>
   );
 };

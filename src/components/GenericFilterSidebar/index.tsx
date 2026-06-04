@@ -256,15 +256,15 @@ const GenericFilterSidebar: React.FC<GenericFilterSidebarProps> = ({
                   fontWeight: '500',
                   borderRadius: '6px',
                   border: 'none',
-                  backgroundColor: '#4f46e5',
+                  backgroundColor: '#0066CC',
                   color: '#ffffff',
                   transition: 'all 0.2s'
                 }}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = '#4338ca';
+                  e.currentTarget.style.backgroundColor = '#0052A3';
                 }}
                 onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = '#4f46e5';
+                  e.currentTarget.style.backgroundColor = '#0066CC';
                 }}
               >
                 <Check size={16} />

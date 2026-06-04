@@ -26,7 +26,7 @@ const CallDashboard = () => {
   }, [dispatch]);
 
   return (
-    <>
+    <div className="communications-dashboard-page">
       <CallDashboardBreadcrumb />
 
       <CallDashboardPageHeader />
@@ -38,7 +38,7 @@ const CallDashboard = () => {
       <CallDashboardStatsTablesRow />
 
       <CallDashboardChartModalsRow />
-    </>
+    </div>
   );
 };
 

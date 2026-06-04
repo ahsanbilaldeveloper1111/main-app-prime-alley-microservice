@@ -59,8 +59,8 @@ const TASK_TITLE_MAX_LENGTH = 150;
 
 /** Shared visual tokens for create / edit task sidebar */
 const PLANNER_TASK_SIDEBAR = {
-  accent: "#141414",
-  accentSoft: "rgba(20, 20, 20, 0.06)",
+  accent: "#0066CC",
+  accentSoft: "rgba(0, 102, 204, 0.08)",
   surface: "#ffffff",
   surfaceMuted: "#f8fafc",
   border: "#e5e7eb",
@@ -1353,7 +1353,7 @@ function PlannerSidebarFooter({
           ...(isSubmitting
             ? { backgroundColor: "#94a3b8" }
             : {
-                backgroundImage: `linear-gradient(135deg, ${PLANNER_TASK_SIDEBAR.accent} 0%, #4338ca 100%)`,
+                backgroundColor: "#0066CC",
               }),
           border: "none",
           borderRadius: 10,
@@ -3348,8 +3348,17 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
     fontSize: "13px",
     color: PLANNER_TASK_SIDEBAR.text,
     fontWeight: 600,
-    marginBottom: 6,
+    marginBottom: 4,
     letterSpacing: "0.01em",
+  };
+
+  const helperTextStyle: React.CSSProperties = {
+    fontSize: "11px",
+    color: "#718096",
+    marginBottom: 6,
+    marginTop: 0,
+    fontFamily: "Lexend Deca, Helvetica, Arial, sans-serif",
+    fontWeight: 400,
   };
   const dueTimeFieldLabelStyle: React.CSSProperties = {
     ...labelStyle,
@@ -3413,7 +3422,7 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
         >
           <h2
             style={{
-              fontSize: 30,
+              fontSize: 20,
               fontWeight: 600,
               margin: 0,
               display: "flex",
@@ -3421,9 +3430,9 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
               gap: 8,
               color: PLANNER_TASK_SIDEBAR.text,
               letterSpacing: "0",
+              fontFamily: "Lexend Deca, Helvetica, Arial, sans-serif",
             }}
           >
-            <ListTodo size={20} color={PLANNER_TASK_SIDEBAR.textMuted} strokeWidth={2} />
             {getSidebarTitle(formData.taskType, isEdit, isRecurringConversionMode)}
           </h2>
           <div className="d-flex align-items-center gap-2">
@@ -3500,6 +3509,7 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
                       />
                       Title <span style={{ color: "#ef4444" }}>*</span>
                     </Form.Label>
+                    <div style={helperTextStyle}>Give your task a clear, descriptive name.</div>
                     <Form.Control
                       type="text"
                       placeholder="Enter task title"
@@ -3535,6 +3545,7 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
                     <Form.Label style={labelStyle}>
                       Task Type <span style={{ color: "#ef4444" }}>*</span>
                     </Form.Label>
+                    <div style={helperTextStyle}>Regular, recurring, or to-do?</div>
                     <Form.Select
                       value={taskTypeSelectHtmlValue(formData.taskType, taskTypeOptions)}
                       onChange={handleTaskTypeChange}
@@ -3560,6 +3571,7 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
                     <Form.Label style={labelStyle}>
                       Priority <span style={{ color: "#ef4444" }}>*</span>
                     </Form.Label>
+                    <div style={helperTextStyle}>How urgent is this task?</div>
                     <Form.Select
                       value={formData.priorityId || 0}
                       onChange={(e) =>
@@ -3596,6 +3608,7 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
                       <Form.Label style={labelStyle}>
                         Associate with records
                       </Form.Label>
+                    <div style={helperTextStyle}>Link this task to a parent task to create a relationship.</div>
                       <PlannerSidebarLinkedRecordChipsStrip
                         records={selectedLinkedRecords}
                         onRemove={removeLinkedRecordById}
@@ -3610,23 +3623,25 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
                           style={{ fontSize: "14px" }}
                         />
                       </div>
-                      <div
-                        style={{
-                          maxHeight: 200,
-                          overflowY: "auto",
-                          backgroundColor: "#f8fafc",
-                          border: "1px solid #e2e8f0",
-                          borderRadius: 4,
-                        }}
-                      >
-                        <PlannerSidebarLinkedRecordsBody
-                          loadingLinkedRecords={loadingLinkedRecords}
-                          linkedRecordsForDisplay={linkedRecordsForDisplay}
-                          searchQuery={searchQuery}
-                          linkedRecordIds={formData.linkedRecordIds}
-                          toggleLinkedRecord={toggleLinkedRecord}
-                        />
-                      </div>
+                      {searchQuery.trim().length > 0 && (
+                        <div
+                          style={{
+                            maxHeight: 200,
+                            overflowY: "auto",
+                            backgroundColor: "#f8fafc",
+                            border: "1px solid #e2e8f0",
+                            borderRadius: 4,
+                          }}
+                        >
+                          <PlannerSidebarLinkedRecordsBody
+                            loadingLinkedRecords={loadingLinkedRecords}
+                            linkedRecordsForDisplay={linkedRecordsForDisplay}
+                            searchQuery={searchQuery}
+                            linkedRecordIds={formData.linkedRecordIds}
+                            toggleLinkedRecord={toggleLinkedRecord}
+                          />
+                        </div>
+                      )}
                     </Form.Group>
                   </Col>
                 )}
@@ -3662,6 +3677,16 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
                               />
                               Assigned To
                             </Form.Label>
+                          </div>
+                          <div style={helperTextStyle}>Who is responsible for completing this task?</div>
+                          <div
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "space-between",
+                              marginBottom: 8,
+                            }}
+                          >
                             {!isLimitedTaskEdit && (
                               <button
                                 type="button"
@@ -3887,6 +3912,16 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
                               />
                               Watchers
                             </Form.Label>
+                          </div>
+                          <div style={helperTextStyle}>Who should be notified of updates on this task?</div>
+                          <div
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "space-between",
+                              marginBottom: 8,
+                            }}
+                          >
                             {!isLimitedTaskEdit && (
                               <button
                                 type="button"
@@ -3944,8 +3979,8 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
                                     gap: 8,
                                     padding: "6px 12px",
                                     borderRadius: 6,
-                                    backgroundColor: "#f0fdf4",
-                                    border: "1px solid #bbf7d0",
+                                    backgroundColor: "#eef4ff",
+                                    border: "1px solid #bfdbfe",
                                     fontSize: "0.875rem",
                                     color: "#141414",
                                     fontWeight: 500,
@@ -3964,8 +3999,8 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
                                     gap: 8,
                                     padding: "6px 12px",
                                     borderRadius: 6,
-                                    backgroundColor: "#f0fdf4",
-                                    border: "1px solid #bbf7d0",
+                                    backgroundColor: "#eef4ff",
+                                    border: "1px solid #bfdbfe",
                                     fontSize: "0.875rem",
                                     cursor: "pointer",
                                     font: "inherit",
@@ -4072,6 +4107,7 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
                         <span style={{ color: "#ef4444" }}> *</span>
                       )}
                     </Form.Label>
+                    <div style={helperTextStyle}>When should work begin?</div>
                     <Form.Control
                       type="date"
                       min={
@@ -4095,6 +4131,7 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
                     <Calendar size={16} className="me-2" style={{ verticalAlign: "middle" }} />
                     Due Date
                   </Form.Label>
+                    <div style={helperTextStyle}>When must this be completed?</div>
                   <Form.Control
                     type="date"
                     min={dueDateMin}
@@ -4143,6 +4180,7 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
                     <Form.Label style={labelStyle}>
                       Estimated duration (optional)
                     </Form.Label>
+                    <div style={helperTextStyle}>How long will this task take? (in minutes)</div>
                     <Form.Control
                       type="number"
                       min={0}
@@ -4540,6 +4578,7 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
                     />
                     Description
                   </Form.Label>
+                  <div style={helperTextStyle}>Add details, context, or instructions for this task.</div>
                   <RichTextEditor
                     buttonSize="sm"
                     value={formData.description || ""}
@@ -4573,6 +4612,7 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
                             </span>
                           )}
                         </Form.Label>
+                        <div style={helperTextStyle}>Which project does this task belong to?</div>
                         <Form.Select
                           value={formData.projectId || ""}
                           onChange={handleProjectSelectChange}
@@ -4603,6 +4643,7 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
                         />
                         Status
                       </Form.Label>
+                      <div style={helperTextStyle}>Current state of this task.</div>
                       <Form.Select
                         value={formData.statusId ?? ""}
                         onChange={(e) =>

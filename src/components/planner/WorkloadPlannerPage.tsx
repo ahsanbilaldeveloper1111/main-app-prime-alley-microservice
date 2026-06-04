@@ -3,7 +3,6 @@ import { useSession } from "next-auth/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { isAxiosError } from "axios";
 import BreadcrumbItem from "@common/BreadcrumbItem";
-import { Container } from "react-bootstrap";
 import { toast } from "react-toastify";
 import "@assets/scss/common.scss";
 import { useHierarchyData } from "@components/filters/useHierarchyData";
@@ -73,6 +72,13 @@ import {
   resolveWorkloadMemberExtensions,
   type WorkloadSelectedCellState,
 } from "./workload/workloadPlannerPageHelpers";
+import { WorkloadOnboardingModal } from "./workload/WorkloadOnboardingModal";
+import {
+  getOnboardingStatus,
+  WORKLOAD_MOCK_BOARD_DATA,
+  WORKLOAD_MOCK_GRID_DATA,
+} from "./workload/workloadOnboarding";
+import { startWorkloadTour, getGridTourSeen, getBoardTourSeen } from "./workload/useWorkloadTour";
 
 type MainView = "grid" | "board";
 
@@ -194,6 +200,30 @@ const WorkloadPlannerPage: React.FC = () => {
     useState<WorkloadBoardDropIntent | null>(null);
   const [boardDropOverload, setBoardDropOverload] = useState(false);
   const [showWorkloadPerDay, setShowWorkloadPerDay] = useState(true);
+  const [showOnboarding, setShowOnboarding] = useState<boolean>(
+    () => !getOnboardingStatus(),
+  );
+  const [useMockData, setUseMockData] = useState(false);
+  const [showBoardHint, setShowBoardHint] = useState(true);
+
+  function handleOnboardingComplete(choice: "sample" | "fresh" | null) {
+    if (choice === "sample") {
+      setUseMockData(true);
+      setTimeout(() => startWorkloadTour("grid", () => {}), 600);
+    }
+    setShowOnboarding(false);
+  }
+
+  function handleMainViewChange(view: MainView) {
+    setMainView(view);
+    writeWorkloadMainViewPreference(view);
+    if (view === "board" && !getBoardTourSeen()) {
+      setTimeout(() => startWorkloadTour("board", () => {}), 600);
+    }
+    if (view === "grid" && !getGridTourSeen()) {
+      setTimeout(() => startWorkloadTour("grid", () => {}), 600);
+    }
+  }
 
   const appliedRangeValid = useMemo(
     () => isWorkloadPlannerDraftRangeValid(appliedFilters),
@@ -264,6 +294,23 @@ const WorkloadPlannerPage: React.FC = () => {
     writeWorkloadMainViewPreference(mainView);
   }, [mainView]);
 
+  useEffect(() => {
+    const originalScrollbar = document.body.style.paddingRight;
+    const observer = new MutationObserver(() => {
+      if (document.body.classList.contains('modal-open')) {
+        document.body.style.paddingRight = "0px";
+      }
+    });
+    observer.observe(document.body, {
+      attributes: true,
+      attributeFilter: ["class", "style"],
+    });
+    return () => {
+      observer.disconnect();
+      document.body.style.paddingRight = originalScrollbar;
+    };
+  }, []);
+
   const handleDraftRangeChange = useCallback((value: WorkloadRangePreset) => {
     setDraftFilters((prev) => {
       if (value === "custom") {
@@ -304,6 +351,9 @@ const WorkloadPlannerPage: React.FC = () => {
     queryFn: () => getWorkloadBoard(gridBoardQueryBase),
     enabled: queriesEnabled && mainView === "board",
   });
+
+  const effectiveGridData = useMockData ? WORKLOAD_MOCK_GRID_DATA : gridQuery.data;
+  const effectiveBoardData = useMockData ? WORKLOAD_MOCK_BOARD_DATA : boardQuery.data;
 
   const dayQuery = useQuery({
     queryKey: plannerKeys.workload.day({
@@ -368,41 +418,19 @@ const WorkloadPlannerPage: React.FC = () => {
 
   const displayGridData = useMemo(
     () =>
-      resolveWorkloadGridDisplayData(gridQuery.data, {
+      resolveWorkloadGridDisplayData(effectiveGridData, {
         viewerExtension: extension,
         memberFilter: appliedFilters.memberFilter,
         rangeFallback: gridRangeFallback,
         teamExtensionNumbers:
           rosterExtensions.length > 0 ? rosterExtensions : undefined,
       }),
-    [
-      gridQuery.data,
-      extension,
-      appliedFilters.memberFilter,
-      gridRangeFallback,
-      rosterExtensions,
-    ],
+    [effectiveGridData, extension, appliedFilters.memberFilter, gridRangeFallback],
   );
 
   const cellMap = useMemo(
-    () => buildCellMap(displayGridData?.cells ?? gridQuery.data?.cells),
-    [displayGridData?.cells, gridQuery.data?.cells],
-  );
-
-  const displayBoardData = useMemo(
-    () =>
-      resolveWorkloadBoardDisplayData(boardQuery.data, {
-        viewerExtension: extension,
-        memberFilter: appliedFilters.memberFilter,
-        teamExtensionNumbers:
-          rosterExtensions.length > 0 ? rosterExtensions : undefined,
-      }),
-    [
-      boardQuery.data,
-      extension,
-      appliedFilters.memberFilter,
-      rosterExtensions,
-    ],
+    () => buildCellMap(displayGridData?.cells ?? effectiveGridData?.cells),
+    [displayGridData?.cells, effectiveGridData?.cells],
   );
 
   const memberExtensions = useMemo(
@@ -410,9 +438,9 @@ const WorkloadPlannerPage: React.FC = () => {
       resolveWorkloadMemberExtensions(
         displayGridData,
         extension,
-        displayBoardData?.columns,
+        effectiveBoardData?.columns,
       ),
-    [displayGridData, extension, displayBoardData?.columns],
+    [displayGridData, extension, effectiveBoardData?.columns],
   );
 
   const displayPeriodMembers = useMemo(
@@ -567,7 +595,7 @@ const WorkloadPlannerPage: React.FC = () => {
   } = useWorkloadPlannerTaskActions({
     extension,
     assigneeMatch: appliedFilters.assigneeMatch,
-    boardRangeStart: boardQuery.data?.range.start,
+    boardRangeStart: effectiveBoardData?.range.start,
     reassignTask,
     reassignTarget,
     reassignOverloadConfirm,
@@ -631,16 +659,24 @@ const WorkloadPlannerPage: React.FC = () => {
 
   return (
     <div className="workload-page">
-      <Container fluid className="px-3 px-md-4 py-3">
-        <BreadcrumbItem
-          mainTitle="Planner"
-          mainLink="/planner/dashboard"
-          subTitle="Workload"
-        />
+      {useMockData ? (
+        <div className="workload-demo-banner">
+          <i className="ti ti-info-circle" aria-hidden="true" />
+          You are viewing sample data.
+          <button
+            type="button"
+            className="workload-demo-banner__exit"
+            onClick={() => { setUseMockData(false); window.scrollTo(0, 0); }}
+          >
+            Exit demo → view real data
+          </button>
+        </div>
+      ) : null}
+      <div className="workload-page__inner">
 
         <WorkloadPlannerPageHeader
           mainView={mainView}
-          onMainViewChange={setMainView}
+          onMainViewChange={handleMainViewChange}
           enabled={queriesEnabled}
         />
 
@@ -701,6 +737,21 @@ const WorkloadPlannerPage: React.FC = () => {
           workloadErrorMessage={workloadErrorMessage}
         />
 
+        {mainView === "board" && useMockData && showBoardHint ? (
+          <div className="workload-board-hint">
+            <i className="ti ti-info-circle" aria-hidden="true" />
+            <span><strong>Drag</strong> cards between columns to reassign &nbsp;·&nbsp; <strong>Move to</strong> changes due date &nbsp;·&nbsp; <strong>View</strong> opens the full task</span>
+            <button
+              type="button"
+              className="workload-board-hint__close"
+              onClick={() => setShowBoardHint(false)}
+              aria-label="Dismiss"
+            >
+              <i className="ti ti-x" aria-hidden="true" />
+            </button>
+          </div>
+        ) : null}
+
         <WorkloadPlannerDataViews
           loadingMain={loadingMain}
           enabled={queriesEnabled}
@@ -708,7 +759,7 @@ const WorkloadPlannerPage: React.FC = () => {
           summaryData={summaryQuery.data}
           gridData={displayGridData}
           periodMembers={displayPeriodMembers}
-          boardData={displayBoardData}
+          boardData={effectiveBoardData}
           cellMap={cellMap}
           hierarchyExtensions={hierarchyDataExtensions}
           priorityFilter={appliedFilters.priorityFilter}
@@ -724,7 +775,7 @@ const WorkloadPlannerPage: React.FC = () => {
             setSelectedCell({ extension, date, member, cell });
           }}
         />
-      </Container>
+      </div>
 
       <WorkloadDayOffcanvas
         selected={selectedCell}
@@ -834,6 +885,11 @@ const WorkloadPlannerPage: React.FC = () => {
           setBoardDropOverload(false);
         }}
         onConfirm={confirmBoardDrop}
+      />
+
+      <WorkloadOnboardingModal
+        show={showOnboarding}
+        onComplete={handleOnboardingComplete}
       />
     </div>
   );

@@ -502,17 +502,33 @@ const MeetingModal: React.FC<MeetingModalProps> = ({
   ];
 
   return (
-    <div
+    <React.Fragment>
+      <button
+        type="button"
+        aria-label="Close meeting modal"
+        onClick={onClose}
+        style={{
+          position: 'fixed',
+          inset: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.15)',
+          zIndex: 999,
+          border: 'none',
+          padding: 0,
+          margin: 0,
+          cursor: 'default',
+        }}
+      />
+      <div
       style={{
         position: 'fixed',
         ...(isMaximized
-          ? { top: '60px', right: '20px', bottom: '20px', left: '20px' }
+          ? { top: '74px', left: '50%', transform: 'translateX(-50%)', width: 'min(1200px, calc(100vw - 84px))', maxHeight: 'calc(100vh - 94px)' }
           : {
-              top: '50%',
               left: '50%',
+              top: '50%',
               transform: 'translate(-50%, -50%)',
-              width: '1320px',
-              height: '750px',
+              width: 'min(1000px, calc(100vw - 120px))',
+              height: 'min(650px, calc(100vh - 120px))',
             }),
         backgroundColor: '#ffffff',
         zIndex: 1000,
@@ -1533,6 +1549,7 @@ const MeetingModal: React.FC<MeetingModalProps> = ({
         </div>
       </div>
     </div>
+    </React.Fragment>
   );
 };
 

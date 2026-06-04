@@ -1,6 +1,7 @@
+@use "crm-wcag-accents" as *;
 @import "./crm-page-shared.scss";
 
-// CRM Stages page — static layout only. Dynamic values (e.g. stage colors) stay inline in TSX.
+// CRM Stages page — layout and theme-based type dots; user-picked stage color stays in Color column only.
 
 // —— KPI analytics cards ——
 
@@ -73,11 +74,32 @@
   }
 }
 
-// —— Table: name column color dot (backgroundColor from row stays inline) ——
+// —— Table: name column dot by stage type (prospects campaign-chip pattern) ——
 .stages-table-name-dot {
   width: 10px;
   height: 10px;
   border-radius: 50%;
+  flex-shrink: 0;
+
+  &--lead {
+    background-color: $crm-wcag-blue;
+  }
+
+  &--deal {
+    background-color: #b45309;
+  }
+
+  &--order {
+    background-color: #15803d;
+  }
+
+  &--lost_reason {
+    background-color: #b91c1c;
+  }
+
+  &--neutral {
+    background-color: #64748b;
+  }
 }
 
 // —— Toolbar ——
@@ -123,9 +145,9 @@
   position: fixed;
   top: 0;
   right: 0;
-  width: 600px;
   max-width: 100%;
   height: 100vh;
+  height: 100dvh;
   background-color: #ffffff;
   box-shadow: -2px 0 8px rgba(0, 0, 0, 0.1);
   z-index: 999999;
@@ -134,7 +156,6 @@
 }
 
 .stages-create-header {
-  padding: 20px 24px;
   border-bottom: 1px solid #eaf0f6;
   display: flex;
   align-items: center;
@@ -172,7 +193,6 @@
 .stages-create-content {
   flex: 1;
   overflow-y: auto;
-  padding: 40px;
 }
 
 .stages-create-intro {
@@ -183,7 +203,6 @@
 }
 
 .stages-create-footer {
-  padding: 16px 24px;
   border-top: 1px solid #eaf0f6;
   display: flex;
   gap: 12px;

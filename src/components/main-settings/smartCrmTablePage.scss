@@ -1,0 +1,274 @@
+// Smart CRM list tables in Main Settings — aligned with Users & Teams / Ranks table chrome.
+@import './settingsEmbeddedPageShell.scss';
+
+.smart-crm-table-page {
+  min-width: 0;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+
+  .generic-table-container {
+    min-width: 0;
+    max-width: 100%;
+    overflow: visible;
+  }
+
+  .generic-table-card {
+    max-width: 100%;
+    overflow: hidden;
+    border: 1px solid #e5e7eb !important;
+    border-radius: 8px;
+    box-shadow: none !important;
+  }
+
+  .generic-table-responsive {
+    width: 100%;
+    max-width: 100%;
+    margin: 0;
+    box-sizing: border-box;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px 8px 0 0;
+  }
+
+  .generic-table-th {
+    overflow: hidden;
+    max-width: 100%;
+  }
+
+  .generic-table-th.sortable {
+    min-width: 0 !important;
+    max-width: none;
+    padding: 0.6rem 0.75rem !important;
+  }
+
+  .generic-table-th .th-content {
+    justify-content: flex-start;
+    gap: 6px;
+    min-width: 0;
+    max-width: 100%;
+
+    > span:first-child {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      min-width: 0;
+      flex: 1 1 auto;
+    }
+  }
+
+  .generic-table-actions-header .d-flex {
+    min-width: 0;
+    flex-wrap: nowrap;
+  }
+
+  .generic-table-td {
+    vertical-align: middle !important;
+  }
+
+  .generic-table-td .status-badge,
+  .generic-table-td .status-badge * {
+    font-size: 0.75rem !important;
+    font-weight: 600 !important;
+    box-shadow: none !important;
+    border: none !important;
+  }
+
+  .generic-table-td .status-badge.primary {
+    background-color: rgba(37, 131, 242, 0.1) !important;
+    color: var(--primary-accent, #2583f2) !important;
+  }
+
+  .generic-table-td .status-badge.info {
+    background-color: rgba(118, 118, 118, 0.1) !important;
+    color: var(--light-text, #767676) !important;
+  }
+
+  .generic-table-td[data-col-key='actions'] .dropdown,
+  .generic-table-td[data-col-key='actions'] .gt-row-actions--desktop {
+    display: inline-flex;
+    justify-content: center;
+    width: 100%;
+  }
+
+  --smart-crm-action-btn-size: var(--ms-action-btn-size, 40px);
+  --smart-crm-action-icon-size: var(--ms-action-icon-size, 22px);
+
+  .generic-table-td[data-col-key='actions'] .btn.btn-action-style-2:not(.gt-mobile-actions-more-btn),
+  .generic-table-td[data-col-key='actions'] .btn.btn-sm.btn-action-style-2:not(.gt-mobile-actions-more-btn) {
+    width: var(--smart-crm-action-btn-size) !important;
+    height: var(--smart-crm-action-btn-size) !important;
+    min-width: var(--smart-crm-action-btn-size) !important;
+    min-height: var(--smart-crm-action-btn-size) !important;
+    padding: 0 !important;
+    align-items: center !important;
+    justify-content: center !important;
+    flex-shrink: 0;
+    border: 1px solid #dee2e6 !important;
+    border-radius: 3px !important;
+    line-height: 1 !important;
+    color: inherit;
+
+    svg {
+      width: var(--smart-crm-action-icon-size) !important;
+      height: var(--smart-crm-action-icon-size) !important;
+      min-width: var(--smart-crm-action-icon-size);
+      min-height: var(--smart-crm-action-icon-size);
+      display: block !important;
+      flex-shrink: 0;
+      visibility: visible !important;
+      opacity: 1 !important;
+    }
+  }
+
+  .generic-table-td[data-col-key='actions'] .gt-row-actions--desktop {
+    gap: 6px;
+  }
+
+  @media (min-width: 768px) {
+    .generic-table-td[data-col-key='actions'] .gt-row-actions--desktop {
+      display: inline-flex !important;
+    }
+
+    .generic-table-td[data-col-key='actions'] .gt-mobile-actions-more-btn,
+    .gt-mobile-actions-popup {
+      display: none !important;
+    }
+  }
+
+  @media (max-width: 767.98px) {
+    .generic-table-td[data-col-key='actions'] .gt-row-actions--desktop {
+      display: none !important;
+    }
+
+    .generic-table-td[data-col-key='actions'] .gt-mobile-actions-more-btn.btn-action-style-2 {
+      display: inline-flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      width: var(--smart-crm-action-btn-size) !important;
+      height: var(--smart-crm-action-btn-size) !important;
+      min-width: var(--smart-crm-action-btn-size) !important;
+      min-height: var(--smart-crm-action-btn-size) !important;
+      padding: 0 !important;
+      border: 1px solid #dee2e6 !important;
+
+      svg {
+        width: var(--smart-crm-action-icon-size) !important;
+        height: var(--smart-crm-action-icon-size) !important;
+      }
+    }
+  }
+
+  .gt-toolbar-container {
+    max-width: 100%;
+  }
+
+  .gt-toolbar-main {
+    box-sizing: border-box;
+  }
+
+  .gt-toolbar-search {
+    max-width: 100%;
+    min-width: 0;
+  }
+
+  .gt-filter-pills {
+    flex-wrap: wrap;
+    max-width: 100%;
+  }
+
+  .generic-table-actions-cell,
+  .generic-table-td[data-col-key='actions'],
+  .generic-table-td[data-col-key='Action'] {
+    width: 1%;
+    min-width: max-content;
+    white-space: nowrap;
+  }
+
+  @media (max-width: 767.98px) {
+    .generic-table-th[data-col-key='actions'],
+    .generic-table-td[data-col-key='actions'] {
+      width: 52px;
+      min-width: 52px;
+      max-width: 52px;
+    }
+  }
+
+  .generic-table-pagination {
+    border: 1px solid #e5e7eb;
+    border-top: none;
+    border-radius: 0 0 8px 8px;
+  }
+
+  // Non-action cells: allow wrapping on narrow widths
+  .generic-table-td:not([data-col-key='actions']):not([data-col-key='Action']) {
+    word-break: break-word;
+    overflow-wrap: anywhere;
+  }
+
+  @media (max-width: 991.98px) {
+    .generic-table-th,
+    .generic-table-td {
+      padding-left: 0.5rem !important;
+      padding-right: 0.5rem !important;
+    }
+  }
+
+  @media (max-width: 767.98px) {
+    .generic-table-card {
+      overflow: visible;
+    }
+
+    .generic-table-responsive {
+      overflow-x: auto;
+      overflow-y: hidden;
+      -webkit-overflow-scrolling: touch;
+      overscroll-behavior-x: contain;
+      border-radius: 8px 8px 0 0;
+    }
+
+    .generic-table {
+      min-width: 36rem;
+      width: max-content;
+      max-width: none;
+    }
+
+    .generic-table-th[data-col-key='actions'],
+    .generic-table-td[data-col-key='actions'] {
+      position: sticky;
+      right: 0;
+      z-index: 2;
+      background-color: #fff;
+      box-shadow: -6px 0 10px rgba(15, 23, 42, 0.06);
+    }
+
+    .generic-table-row:hover .generic-table-td[data-col-key='actions'] {
+      background-color: #fff;
+    }
+
+    .generic-table-th[data-col-key='actions'] {
+      z-index: 3;
+    }
+  }
+
+  @media (max-width: 575.98px) {
+    .generic-table {
+      min-width: 32rem;
+    }
+
+    --smart-crm-action-btn-size: 34px;
+    --smart-crm-action-icon-size: 18px;
+  }
+}
+
+@media (min-width: 768px) and (max-width: 991.98px) {
+  .smart-crm-table-page .generic-table-responsive {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .smart-crm-table-page .generic-table {
+    min-width: 640px;
+  }
+}

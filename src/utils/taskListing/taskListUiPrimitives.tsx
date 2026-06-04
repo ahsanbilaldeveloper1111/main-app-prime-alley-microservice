@@ -83,8 +83,8 @@ export function TaskCompleteCircleButton({
       onClick={onClick}
       title={title}
       style={{
-        background: "transparent",
-        border: "1.5px solid #9ca3af",
+        background: isCompleted ? "#16a34a" : "transparent",
+        border: isCompleted ? "1.5px solid #16a34a" : "1.5px solid #9ca3af",
         borderRadius: "50%",
         width: 20,
         height: 20,
@@ -100,7 +100,7 @@ export function TaskCompleteCircleButton({
         <svg width="10" height="8" viewBox="0 0 10 8" fill="none" aria-hidden>
           <path
             d="M1 4L3.5 6.5L9 1"
-            stroke="#6b7280"
+            stroke="#ffffff"
             strokeWidth="1.5"
             strokeLinecap="round"
             strokeLinejoin="round"
@@ -202,11 +202,12 @@ export function TaskListingSearchRow({
     padding: "8px 16px",
     backgroundColor: "#fff",
     flexShrink: 0,
+    gap: 12,
     ...wrapperStyle,
   };
   return (
     <div className={wrapperClassName} style={rowStyle}>
-      <div style={{ display: "flex", alignItems: "center", gap: 0 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 0, flexGrow: 1 }}>
         <div style={{ position: "relative" }}>
           <FiSearch
             size={14}
@@ -229,7 +230,7 @@ export function TaskListingSearchRow({
               if (e.key === "Enter") onSubmitSearch();
             }}
             style={{
-              height: 41,
+              height: 36,
               width: 260,
               padding: "0 12px 0 34px",
               border: "1px solid #d1d5db",
@@ -247,8 +248,8 @@ export function TaskListingSearchRow({
           variant="outline-secondary"
           onClick={onSubmitSearch}
           style={{
-            height: 41,
-            padding: "0 16px",
+            height: 36,
+            padding: "0 14px",
             borderRadius: "0 20px 20px 0",
             border: "1px solid #d1d5db",
             borderLeft: "none",
@@ -258,6 +259,8 @@ export function TaskListingSearchRow({
             alignItems: "center",
             fontSize: 13,
             fontFamily: "Lexend Deca, Helvetica, Arial, sans-serif",
+            outline: "none",
+            boxShadow: "none",
           }}
         >
           <FiSearch size={15} />
@@ -266,6 +269,20 @@ export function TaskListingSearchRow({
       {editColumnsSlot}
     </div>
   );
+}
+
+const TASK_AVATAR_COLORS = [
+  "#4299e1", "#48bb78", "#ed64a6", "#f6ad55",
+  "#667eea", "#fc8181", "#38b2ac", "#9f7aea",
+];
+
+export function getTaskAvatarColor(name: string): string {
+  if (!name) return TASK_AVATAR_COLORS[0];
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) {
+    hash = (name.codePointAt(i) ?? 0) + ((hash << 5) - hash);
+  }
+  return TASK_AVATAR_COLORS[Math.abs(hash) % TASK_AVATAR_COLORS.length];
 }
 
 export type TaskListingAssigneeCellProps = Readonly<{
@@ -284,7 +301,7 @@ export function TaskListingAssigneeCell({ label }: TaskListingAssigneeCellProps)
           width: 22,
           height: 22,
           borderRadius: "50%",
-          background: "#10b981",
+          background: getTaskAvatarColor(label),
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
@@ -319,8 +336,8 @@ export function buildTaskListingPageStyleTag(options?: {
 }): string {
   const hoverRules = options?.showTitleHoverEditButton
     ? `
-          .tasks-page .task-title-cell .task-edit-btn { visibility: hidden; }
-          .tasks-page .task-title-cell:hover .task-edit-btn { visibility: visible; }
+          .tasks-page .task-title-cell .ptl-title-edit-btn { visibility: hidden; }
+          .tasks-page .task-title-cell:hover .ptl-title-edit-btn { visibility: visible; }
   `
     : "";
   const extra = options?.extraRules ?? "";
