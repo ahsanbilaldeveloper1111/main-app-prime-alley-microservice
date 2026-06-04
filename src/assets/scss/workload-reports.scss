@@ -140,10 +140,10 @@
   }
 
   .reports-filter-bar__caret {
-    font-size: 9px;
-    color: inherit;
+    font-size: 10px;
+    color: #9ca3af;
     margin-left: 2px;
-    opacity: 0.9;
+    flex-shrink: 0;
   }
 
   .reports-filter-bar__divider {
