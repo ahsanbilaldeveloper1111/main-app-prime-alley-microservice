@@ -18,6 +18,7 @@ import type {
   ProjectBreakdownBarSegment,
 } from "@page-modules/planner/reports/historicalReportsDomain";
 import { extractMemberTrendWeekHeaders } from "@page-modules/planner/reports/historicalReportsDomain";
+import { ReportsEmptyState } from "./WorkloadReportsViews";
 
 type ReportsMetricTrendChartProps = Readonly<{
   title: string;
@@ -48,7 +49,11 @@ export function ReportsOverdueTrendChart({
       <h2 className="reports-panel__title">{title}</h2>
       <p className="reports-panel__subtitle">{subtitle}</p>
       {points.length === 0 ? (
-        <p className="small text-muted mb-0">No overdue trend data for this period.</p>
+        <ReportsEmptyState
+          icon="ti-calendar-check"
+          title="No overdue data"
+          subtitle="No overdue tasks recorded in this period"
+        />
       ) : (
         <div className="reports-trend-chart">
           <ResponsiveContainer width="100%" height="100%">
@@ -91,7 +96,11 @@ export function ReportsMetricTrendChart({
       <h2 className="reports-panel__title">{title}</h2>
       <p className="reports-panel__subtitle">{subtitle}</p>
       {points.length === 0 ? (
-        <p className="small text-muted mb-0">No trend data for this period.</p>
+        <ReportsEmptyState
+          icon="ti-trending-up"
+          title="No trend data"
+          subtitle="Try adjusting the date range to see completion trends"
+        />
       ) : (
         <div className="reports-trend-chart">
           <ResponsiveContainer width="100%" height="100%">
@@ -167,7 +176,13 @@ export function ReportsProjectBreakdownBar({
 }: Readonly<{ segments: ProjectBreakdownBarSegment[] }>) {
   const total = segments.reduce((sum, segment) => sum + segment.value, 0);
   if (segments.length === 0 || total <= 0) {
-    return <p className="small text-muted mb-0">No project data for this period.</p>;
+    return (
+      <ReportsEmptyState
+        icon="ti-topology-star"
+        title="No project data"
+        subtitle="No project activity found for this period"
+      />
+    );
   }
   return (
     <>
@@ -205,7 +220,13 @@ export function ReportsHistoricalMemberTrendTable({
   weekHeaders,
 }: Readonly<{ rows: HistoricalMemberTrendRow[]; weekHeaders: string[] }>) {
   if (rows.length === 0) {
-    return <p className="small text-muted mb-0">No member trend data for this period.</p>;
+    return (
+      <ReportsEmptyState
+        icon="ti-users"
+        title="No member trends"
+        subtitle="No member activity recorded in the last 4 weeks"
+      />
+    );
   }
   const headers =
     weekHeaders.length > 0 ? weekHeaders : extractMemberTrendWeekHeaders(rows);

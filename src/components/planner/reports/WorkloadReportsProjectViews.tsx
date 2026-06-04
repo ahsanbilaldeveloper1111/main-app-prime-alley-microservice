@@ -1,5 +1,4 @@
 import React from "react";
-import { Nav } from "react-bootstrap";
 import {
   formatProjectHealthStatsLine,
   type OverdueByProjectEntry,
@@ -11,6 +10,7 @@ import {
   type ReportsMainView,
   type ReportsTeamSubView,
 } from "@page-modules/planner/reports/projectReportsDomain";
+import { ReportsEmptyState } from "./WorkloadReportsViews";
 
 type ReportsViewTabsProps = Readonly<{
   activeView: ReportsMainView;
@@ -18,36 +18,32 @@ type ReportsViewTabsProps = Readonly<{
 }>;
 
 export function ReportsViewTabs({ activeView, onChange }: ReportsViewTabsProps) {
+  const tabs: { id: ReportsMainView; label: string }[] = [
+    { id: "team", label: "Team Overview" },
+    { id: "project", label: "Project View" },
+    { id: "historical", label: "Historical Trends" },
+  ];
+
   return (
-    <Nav variant="tabs" className="reports-view-tabs">
-      <Nav.Item>
-        <Nav.Link
-          active={activeView === "team"}
-          onClick={() => onChange("team")}
-          className={activeView === "team" ? "active" : ""}
+    <div className="reports-tabs-row">
+      {tabs.map((tab) => (
+        <button
+          key={tab.id}
+          type="button"
+          className={`reports-tabs-row__tab${activeView === tab.id ? " reports-tabs-row__tab--active" : ""}`}
+          onClick={() => onChange(tab.id)}
         >
-          Team Overview
-        </Nav.Link>
-      </Nav.Item>
-      <Nav.Item>
-        <Nav.Link
-          active={activeView === "project"}
-          onClick={() => onChange("project")}
-          className={activeView === "project" ? "active" : ""}
-        >
-          Project View
-        </Nav.Link>
-      </Nav.Item>
-      <Nav.Item>
-        <Nav.Link
-          active={activeView === "historical"}
-          onClick={() => onChange("historical")}
-          className={activeView === "historical" ? "active" : ""}
-        >
-          Historical Trends
-        </Nav.Link>
-      </Nav.Item>
-    </Nav>
+          {tab.label}
+        </button>
+      ))}
+      <button type="button" className="reports-tabs-row__action">
+        <i className="ti ti-plus" style={{ fontSize: "13px" }} aria-hidden="true" />
+        Add view
+      </button>
+      <button type="button" className="reports-tabs-row__action reports-tabs-row__action--primary">
+        All Views
+      </button>
+    </div>
   );
 }
 
@@ -143,7 +139,13 @@ export function ReportsProjectDetailList({
   rows,
 }: Readonly<{ rows: ProjectReportRow[] }>) {
   if (rows.length === 0) {
-    return <p className="small text-muted mb-0">No projects in this period.</p>;
+    return (
+      <ReportsEmptyState
+        icon="ti-topology-star"
+        title="No projects found"
+        subtitle="No project activity in this period"
+      />
+    );
   }
   return (
     <div className="reports-project-list">
@@ -192,7 +194,13 @@ export function ReportsTasksByProject({
 }: Readonly<{ segments: ProjectTaskCountSegment[] }>) {
   const total = segments.reduce((sum, segment) => sum + segment.value, 0);
   if (segments.length === 0 || total <= 0) {
-    return <p className="small text-muted mb-0">No task counts by project for this period.</p>;
+    return (
+      <ReportsEmptyState
+        icon="ti-chart-bar"
+        title="No project data"
+        subtitle="No tasks found across projects for this period"
+      />
+    );
   }
   return (
     <>

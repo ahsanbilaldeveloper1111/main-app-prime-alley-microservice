@@ -28,7 +28,7 @@ import {
   workloadMemberAvatarColor,
   workloadMemberInitials,
 } from "@page-modules/planner/workload/workloadDomain";
-import { ReportsKpiCard, ReportsMemberPerformanceBars } from "./WorkloadReportsViews";
+import { ReportsEmptyState, ReportsKpiCard, ReportsMemberPerformanceBars } from "./WorkloadReportsViews";
 
 function resolveCompletionRate(summary: TaskReportsSummary): number {
   if (summary.completion_rate != null && Number.isFinite(summary.completion_rate)) {
@@ -111,7 +111,13 @@ export function ReportsTaskDistributionDonut({
 }>) {
   const total = rows.reduce((sum, row) => sum + row.count, 0);
   if (rows.length === 0 || total <= 0) {
-    return <p className="small text-muted mb-0">No status data for this period.</p>;
+    return (
+      <ReportsEmptyState
+        icon="ti-chart-donut"
+        title="No status data"
+        subtitle="No task status data available for this period"
+      />
+    );
   }
   const data = rows.map((row) => ({
     name: normalizeDonutLabel(row.status_name),
@@ -166,7 +172,13 @@ export function ReportsBoardMemberActivity({
   hierarchyExtensions?: unknown[] | null;
 }>) {
   if (rows.length === 0) {
-    return <p className="small text-muted mb-0">No member activity for this period.</p>;
+    return (
+      <ReportsEmptyState
+        icon="ti-users"
+        title="No member activity"
+        subtitle="No tasks assigned in this period"
+      />
+    );
   }
   const maxTotal = Math.max(
     ...rows.map((row) => row.total_tasks ?? row.task_count ?? 0),
@@ -209,7 +221,13 @@ export function ReportsWeeklyTrendChart({
   points,
 }: Readonly<{ points: TaskReportsTrendPoint[] }>) {
   if (points.length === 0) {
-    return <p className="small text-muted mb-0">No trend data for this period.</p>;
+    return (
+      <ReportsEmptyState
+        icon="ti-chart-bar"
+        title="No trend data"
+        subtitle="Try adjusting the date range to see delivery trends"
+      />
+    );
   }
   const data = points.map((point) => ({
     label: formatReportsDateLabel(point.date),
