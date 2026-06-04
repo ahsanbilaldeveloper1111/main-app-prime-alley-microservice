@@ -5,8 +5,6 @@ import {
   BarChart,
   CartesianGrid,
   Cell,
-  Line,
-  LineChart,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -29,7 +27,11 @@ type ReportsMetricTrendChartProps = Readonly<{
   percentAxis?: boolean;
 }>;
 
-const OVERDUE_WEEK_BAR_COLORS = ["#eab308", "#ef4444", "#8b5cf6", "#22c55e"] as const;
+function resolveOverdueBarColor(value: number): string {
+  if (value <= 3) return "#22c55e";
+  if (value <= 6) return "#f59e0b";
+  return "#ef4444";
+}
 
 export function ReportsOverdueTrendChart({
   title,
@@ -59,7 +61,7 @@ export function ReportsOverdueTrendChart({
                 {points.map((point, index) => (
                   <Cell
                     key={point.label}
-                    fill={OVERDUE_WEEK_BAR_COLORS[index % OVERDUE_WEEK_BAR_COLORS.length]}
+                    fill={resolveOverdueBarColor(point.value)}
                   />
                 ))}
               </Bar>
@@ -93,11 +95,11 @@ export function ReportsMetricTrendChart({
       ) : (
         <div className="reports-trend-chart">
           <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={points} margin={{ top: 8, right: 12, left: 0, bottom: 4 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+            <BarChart data={points} margin={{ top: 8, right: 12, left: 0, bottom: 4 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" vertical={false} />
               <XAxis dataKey="label" tick={{ fontSize: 11 }} interval="preserveStartEnd" />
               <YAxis
-                allowDecimals={percentAxis}
+                allowDecimals={false}
                 tick={{ fontSize: 11 }}
                 width={percentAxis ? 36 : 32}
                 domain={percentAxis ? [0, 100] : [0, "auto"]}
@@ -108,15 +110,15 @@ export function ReportsMetricTrendChart({
                   percentAxis ? `${value}%` : `${value}${valueSuffix}`
                 }
               />
-              <Line
-                type="monotone"
-                dataKey="value"
-                stroke="#2563eb"
-                strokeWidth={2}
-                dot={{ r: 3, fill: "#2563eb" }}
-                activeDot={{ r: 5 }}
-              />
-            </LineChart>
+              <Bar dataKey="value" radius={[4, 4, 0, 0]} maxBarSize={48}>
+                {points.map((point, index) => (
+                  <Cell
+                    key={point.label}
+                    fill={index === points.length - 1 ? "#0066CC" : "#bfdbfe"}
+                  />
+                ))}
+              </Bar>
+            </BarChart>
           </ResponsiveContainer>
         </div>
       )}
