@@ -505,7 +505,16 @@ export function extractMemberTrendWeekHeaders(
   rows: HistoricalMemberTrendRow[],
 ): string[] {
   const first = rows.find((row) => row.weekCells.length > 0);
-  return first?.weekCells.map((cell) => cell.label) ?? [];
+  const labels = first?.weekCells.map((cell) => cell.label) ?? [];
+  if (labels.length === 0) return [];
+  const relativeLabels = ["Wk 1", "Wk 2", "Wk 3", "This Wk"];
+  return labels.map((_, index) => {
+    const offset = labels.length - index;
+    if (offset === 1) return "This Wk";
+    if (offset === 2) return "Wk 3";
+    if (offset === 3) return "Wk 2";
+    return "Wk 1";
+  });
 }
 
 export function buildHistoricalMemberTrendRows(
