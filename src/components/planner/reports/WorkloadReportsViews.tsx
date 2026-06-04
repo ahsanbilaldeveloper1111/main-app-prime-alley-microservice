@@ -84,7 +84,10 @@ export function ReportsKpiCard({ label, value, sub, delta, accent = "default" }:
   const deltaClass = resolveKpiDeltaClass(delta);
   return (
     <div className={`reports-kpi-card ${accentClass}`.trim()}>
-      <div className="reports-kpi-card__label">{label}</div>
+      <div className="reports-kpi-card__label">
+        <span className="reports-kpi-card__dot" aria-hidden="true" />
+        {label}
+      </div>
       <div className="reports-kpi-card__value">{value}</div>
       <div className="reports-kpi-card__sub">{sub}</div>
       {delta ? (

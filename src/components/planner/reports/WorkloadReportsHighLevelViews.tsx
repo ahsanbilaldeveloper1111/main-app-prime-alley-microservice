@@ -22,7 +22,10 @@ export function ReportsHighLevelKpiRow({ cards }: Readonly<{ cards: HighLevelKpi
     <div className="reports-kpi-grid">
       {cards.map((card) => (
         <div key={card.label} className={`reports-kpi-card ${resolveKpiAccentClass(card.accent)}`.trim()}>
-          <div className="reports-kpi-card__label">{card.label}</div>
+          <div className="reports-kpi-card__label">
+            <span className="reports-kpi-card__dot" aria-hidden="true" />
+            {card.label}
+          </div>
           <div className="reports-kpi-card__value">{card.value}</div>
           <div className="reports-kpi-card__sub">{card.sub}</div>
         </div>
