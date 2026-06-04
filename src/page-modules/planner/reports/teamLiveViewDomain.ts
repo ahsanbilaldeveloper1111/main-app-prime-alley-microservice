@@ -48,6 +48,7 @@ export type LiveTaskDetailRow = Readonly<{
   badge: string;
   badgeTone: "primary" | "danger" | "success";
   timeLabel: string;
+  projectLabel: string;
 }>;
 
 export type LiveTopAssigneeRow = Readonly<{
@@ -537,6 +538,7 @@ function mapTaskToDetailRow(
       badge: "Overdue",
       badgeTone: "danger",
       timeLabel: formatOverdueTimeLabel(task),
+      projectLabel: task.project_name?.trim() || "Org Task",
     };
   }
   return {
@@ -546,6 +548,7 @@ function mapTaskToDetailRow(
     badge: task.status_name?.trim() || "In Progress",
     badgeTone: "primary",
     timeLabel: formatInProgressTimeLabel(task),
+    projectLabel: task.project_name?.trim() || "Org Task",
   };
 }
 

@@ -83,6 +83,9 @@ export function ReportsLiveTaskDetailList({
               {row.assigneeLabel}
             </span>
             <Badge bg={resolveTaskBadgeBg(row.badgeTone)}>{row.badge}</Badge>
+            <span className="reports-list-badge reports-list-badge--default" style={{ fontSize: "10px" }}>
+              {row.projectLabel}
+            </span>
             <span className="reports-live-task-detail-list__time">{row.timeLabel}</span>
           </div>
         </div>
