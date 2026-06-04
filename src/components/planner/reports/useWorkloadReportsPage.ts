@@ -100,7 +100,7 @@ export function useWorkloadReportsPage() {
     ModuleSlug.WORK_PLANNER,
   );
 
-  const [datePreset, setDatePreset] = useState<ReportsDatePreset>("last_30");
+  const [datePreset, setDatePreset] = useState<ReportsDatePreset>("last_7");
   const [customStart, setCustomStart] = useState("");
   const [customEnd, setCustomEnd] = useState("");
   const [projectFilter, setProjectFilter] = useState<ReportsProjectFilter>("all");
