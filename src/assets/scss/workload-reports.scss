@@ -61,7 +61,7 @@
   .reports-filter-bar__pill-btn {
     display: inline-flex;
     align-items: center;
-    gap: 5px;
+    gap: 4px;
     padding: 5px 10px;
     height: 30px;
     font-size: clamp(11px, 0.85vw, 13px);
@@ -73,7 +73,7 @@
     border-radius: 4px;
     cursor: pointer;
     white-space: nowrap;
-    transition: color 0.15s ease, background 0.15s ease;
+    transition: color 0.15s ease, background 0.15s ease, border-color 0.15s ease;
 
     &:hover:not(:disabled) {
       background: #f8fafc;
@@ -87,28 +87,89 @@
 
     &--active {
       color: #0066CC;
-      font-weight: 600;
-      background: #eff6ff;
-      border: 1px solid #bfdbfe;
+      font-weight: 500;
+      background: #ffffff;
+      border: 1px solid #0066CC;
       border-radius: 4px;
 
       &:hover:not(:disabled) {
-        background: #dbeafe;
-        border-color: #93c5fd;
+        background: #f5f8ff;
+        border-color: #0052A3;
         color: #0052A3;
       }
     }
   }
 
-  .reports-filter-bar__pill-icon {
-    font-size: 13px;
-    flex-shrink: 0;
+  .reports-filter-bar__pill-label {
+    font-size: clamp(11px, 0.85vw, 13px);
+    font-weight: 500;
+    color: inherit;
+  }
+
+  .reports-filter-bar__pill-sep {
+    color: inherit;
+    margin: 0 2px;
+  }
+
+  .reports-filter-bar__pill-value {
+    font-size: clamp(11px, 0.85vw, 13px);
+    font-weight: 400;
+    color: inherit;
+    max-width: 120px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .reports-filter-bar__pill-x {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: none;
+    border: none;
+    color: #0066CC;
+    font-size: 15px;
+    line-height: 1;
+    padding: 0 2px;
+    cursor: pointer;
+    margin-left: 1px;
+
+    &:hover {
+      color: #991b1b;
+    }
   }
 
   .reports-filter-bar__caret {
     font-size: 9px;
-    color: #9ca3af;
+    color: inherit;
     margin-left: 2px;
+    opacity: 0.9;
+  }
+
+  .reports-filter-bar__divider {
+    color: #d0d7de;
+    font-size: 13px;
+    padding: 0 6px;
+    user-select: none;
+    flex-shrink: 0;
+    align-self: center;
+  }
+
+  .reports-filter-bar__clear-all {
+    background: none;
+    border: none;
+    color: #dc2626;
+    font-size: clamp(11px, 0.85vw, 13px);
+    font-weight: 500;
+    font-family: "Lexend Deca", Helvetica, Arial, sans-serif;
+    cursor: pointer;
+    padding: 0 8px;
+    white-space: nowrap;
+    margin-left: 4px;
+
+    &:hover {
+      color: #991b1b;
+    }
   }
 
   .reports-filter-bar__dropdown {
@@ -125,6 +186,45 @@
     display: flex;
     flex-direction: column;
     gap: 1px;
+  }
+
+  .reports-filter-bar__dropdown--wide {
+    min-width: 240px;
+    padding: 0;
+  }
+
+  .reports-filter-bar__search-wrap {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 8px;
+    border-bottom: 1px solid #eaf0f6;
+  }
+
+  .reports-filter-bar__search-icon {
+    font-size: 13px;
+    color: #9ca3af;
+    flex-shrink: 0;
+  }
+
+  .reports-filter-bar__search-input {
+    flex: 1;
+    border: none;
+    outline: none;
+    font-size: 12px;
+    font-family: "Lexend Deca", Helvetica, Arial, sans-serif;
+    color: #141414;
+    background: transparent;
+
+    &::placeholder {
+      color: #9ca3af;
+    }
+  }
+
+  .reports-filter-bar__dropdown-list {
+    max-height: 200px;
+    overflow-y: auto;
+    padding: 4px;
   }
 
   .reports-filter-bar__dropdown-item {
@@ -146,6 +246,36 @@
     &:hover {
       background: #f5f8fa;
       color: #141414;
+    }
+
+    &--check {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      text-align: left;
+    }
+
+    &--selected {
+      background: #eff6ff;
+      color: #0066CC;
+    }
+  }
+
+  .reports-filter-bar__checkbox {
+    width: 14px;
+    height: 14px;
+    border-radius: 3px;
+    border: 1px solid #d0d7de;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    background: #ffffff;
+
+    &--checked {
+      background: #0066CC;
+      border-color: #0066CC;
+      color: #ffffff;
     }
   }
 
@@ -176,15 +306,6 @@
     font-size: 12px;
     color: #9ca3af;
     padding: 0 2px;
-  }
-
-  .reports-filter-bar__sep {
-    width: 1px;
-    height: 20px;
-    background: #d1d5db;
-    flex-shrink: 0;
-    margin: 0 8px;
-    align-self: center;
   }
 
   .reports-filter-bar__apply {
