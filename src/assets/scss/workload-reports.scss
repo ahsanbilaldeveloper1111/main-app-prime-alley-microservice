@@ -27,6 +27,7 @@
 
   .workload-reports-page__content {
     padding: 20px 24px;
+    padding-top: 16px;
   }
 
   .reports-empty-state {
@@ -68,7 +69,7 @@
   }
 
   .reports-filter-bar {
-    background: #ffffff;
+    background: #f5f8fa;
     border: none;
     border-bottom: 1px solid #d0d7de;
     border-radius: 0;
