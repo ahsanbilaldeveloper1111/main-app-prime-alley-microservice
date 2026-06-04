@@ -54,23 +54,28 @@ export function ReportsBoardDashboardKpiRow({
 
   return (
     <div className="reports-kpi-grid">
-      <ReportsKpiCard label="Total Tasks" value={total} sub="All tasks in range" accent="default" />
       <ReportsKpiCard
-        label="Completed"
-        value={`${rate}%`}
-        sub="Tasks Completed"
+        label="Total Active Tasks"
+        value={total}
+        sub="Incomplete tasks in system"
+        accent="default"
+      />
+      <ReportsKpiCard
+        label="Completion Rate"
+        value={rate > 0 ? `${rate}%` : "—"}
+        sub="Tasks completed on time"
         accent="completed"
       />
       <ReportsKpiCard
-        label="In Progress"
-        value={inProgress}
-        sub="Tasks in Progress"
-        accent="in_progress"
+        label="Overdue Tasks"
+        value={resolveSummaryMetric(summary, "overdue_tasks")}
+        sub="Past due and not completed"
+        accent="overdue"
       />
       <ReportsKpiCard
-        label="Pending"
-        value={pending}
-        sub="Pending Tasks"
+        label="Stuck Tasks"
+        value={inProgress}
+        sub="In progress beyond threshold"
         accent="pending"
       />
     </div>
