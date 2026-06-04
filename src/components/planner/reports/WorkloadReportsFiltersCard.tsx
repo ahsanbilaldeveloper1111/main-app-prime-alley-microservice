@@ -54,11 +54,16 @@ export function WorkloadReportsFiltersCard({
   onApply,
 }: WorkloadReportsFiltersCardProps) {
   const [openPill, setOpenPill] = useState<string | null>(null);
+  const [pendingDatePreset, setPendingDatePreset] = useState(datePreset);
   const [selectedProjects, setSelectedProjects] = useState<number[]>([]);
   const [selectedMembers, setSelectedMembers] = useState<string[]>([]);
   const [projectSearch, setProjectSearch] = useState("");
   const [memberSearch, setMemberSearch] = useState("");
   const barRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    setPendingDatePreset(datePreset);
+  }, [datePreset]);
 
   useEffect(() => {
     function handleClick(e: MouseEvent) {
@@ -75,9 +80,10 @@ export function WorkloadReportsFiltersCard({
   };
 
   const hasActiveFilters =
-    selectedProjects.length > 0 || selectedMembers.length > 0 || datePreset !== "last_7";
+    selectedProjects.length > 0 || selectedMembers.length > 0 || pendingDatePreset !== "last_7";
 
   const handleApply = () => {
+    onDatePresetChange(pendingDatePreset);
     if (selectedProjects.length > 0) {
       onProjectFilterChange(selectedProjects[0]);
     } else {
@@ -96,6 +102,7 @@ export function WorkloadReportsFiltersCard({
     setSelectedMembers([]);
     setProjectSearch("");
     setMemberSearch("");
+    setPendingDatePreset("last_7");
     onDatePresetChange("last_7");
     onProjectFilterChange("all");
     onMemberFilterChange("all");
@@ -119,20 +126,20 @@ export function WorkloadReportsFiltersCard({
         <div className="reports-filter-bar__pill-wrap">
           <button
             type="button"
-            className={`reports-filter-bar__pill-btn${datePreset !== "last_7" ? " reports-filter-bar__pill-btn--active" : ""}`}
+            className={`reports-filter-bar__pill-btn${pendingDatePreset !== "last_7" ? " reports-filter-bar__pill-btn--active" : ""}`}
             onClick={() => togglePill("time")}
             disabled={!enabled}
           >
             <span className="reports-filter-bar__pill-label">Time period</span>
             <span className="reports-filter-bar__pill-sep">:</span>
-            <span className="reports-filter-bar__pill-value">{DATE_PRESET_LABELS[datePreset]}</span>
-            {datePreset !== "last_7" ? (
+            <span className="reports-filter-bar__pill-value">{DATE_PRESET_LABELS[pendingDatePreset]}</span>
+            {pendingDatePreset !== "last_7" ? (
               <button
                 type="button"
                 className="reports-filter-bar__pill-x"
                 onClick={(e) => {
                   e.stopPropagation();
-                  onDatePresetChange("last_7");
+                  setPendingDatePreset("last_7");
                   setOpenPill(null);
                 }}
               >
@@ -147,13 +154,13 @@ export function WorkloadReportsFiltersCard({
                 <button
                   key={p}
                   type="button"
-                  className={`reports-filter-bar__dropdown-item${p === datePreset ? " reports-filter-bar__dropdown-item--selected" : ""}`}
+                  className={`reports-filter-bar__dropdown-item${p === pendingDatePreset ? " reports-filter-bar__dropdown-item--selected" : ""}`}
                   onClick={() => {
-                    onDatePresetChange(p);
+                    setPendingDatePreset(p);
                     setOpenPill(null);
                   }}
                 >
-                  {datePreset === p ? (
+                  {pendingDatePreset === p ? (
                     <i
                       className="ti ti-check"
                       style={{ fontSize: "11px", marginRight: "6px", color: "#0066CC" }}
@@ -169,7 +176,7 @@ export function WorkloadReportsFiltersCard({
           ) : null}
         </div>
 
-        {datePreset === "custom" ? (
+        {pendingDatePreset === "custom" ? (
           <>
             <input
               type="date"
