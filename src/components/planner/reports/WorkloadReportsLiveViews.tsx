@@ -100,12 +100,18 @@ export function ReportsTeamLivePanel({
   overdueTasks,
   inProgressTasks,
   staleTaskRows,
+  staleDays,
+  onStaleDaysChange,
+  onApplyStale,
 }: Readonly<{
   kpiCards: LiveDashboardKpi[];
   memberRows: LiveMemberRow[];
   overdueTasks: LiveTaskDetailRow[];
   inProgressTasks: LiveTaskDetailRow[];
   staleTaskRows: LiveStaleTaskRow[];
+  staleDays: number;
+  onStaleDaysChange: (days: number) => void;
+  onApplyStale: () => void;
 }>) {
   return (
     <>
@@ -136,6 +142,22 @@ export function ReportsTeamLivePanel({
           <div>
             <h2 className="reports-panel__title">Stuck Tasks</h2>
             <p className="reports-panel__subtitle">Tasks with no progress beyond threshold</p>
+          </div>
+          <div className="reports-stuck-threshold">
+            <i className="ti ti-settings" style={{ fontSize: "12px" }} aria-hidden="true" />
+            <span>Threshold:</span>
+            <input
+              type="number"
+              className="reports-threshold-bar__input"
+              value={staleDays}
+              min={1}
+              max={30}
+              onChange={(e) => onStaleDaysChange(Number(e.target.value))}
+            />
+            <span>days</span>
+            <button type="button" className="reports-threshold-bar__apply" onClick={onApplyStale}>
+              Apply
+            </button>
           </div>
         </div>
         {staleTaskRows.length === 0 ? (
