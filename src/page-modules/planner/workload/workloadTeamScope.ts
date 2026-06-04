@@ -349,6 +349,47 @@ export async function fetchCompanyWorkloadRoster(
   return [];
 }
 
+function addTrimmedExtension(allowlist: Set<string>, ext: string): void {
+  const normalized = ext.trim();
+  if (normalized) allowlist.add(normalized);
+}
+
+function addTrimmedExtensions(
+  allowlist: Set<string>,
+  extensions: readonly string[],
+): void {
+  for (const ext of extensions) addTrimmedExtension(allowlist, ext);
+}
+
+function readHierarchyRowExtension(row: unknown): string {
+  if (row == null || typeof row !== "object") return "";
+  const record = row as Record<string, unknown>;
+  const candidates = [
+    record.extension_number,
+    record.extension,
+    record.phone,
+    record.id,
+  ];
+  for (const value of candidates) {
+    const normalized = readStringCandidate(value);
+    if (normalized) return normalized;
+  }
+  return "";
+}
+
+function collectCompanyScopedHierarchyExtensions(
+  rows: readonly unknown[],
+  scope: WorkloadCompanyScope,
+): string[] {
+  const extensions: string[] = [];
+  for (const row of rows) {
+    if (!userRowMatchesCompanyScope(row, scope)) continue;
+    const ext = readHierarchyRowExtension(row);
+    if (ext) extensions.push(ext);
+  }
+  return extensions;
+}
+
 /** Extensions that may appear in workload member lists for the logged-in user's company. */
 export function buildWorkloadCompanyExtensionAllowlist(input: Readonly<{
   companyScope: WorkloadCompanyScope | null;
@@ -360,37 +401,21 @@ export function buildWorkloadCompanyExtensionAllowlist(input: Readonly<{
   if (!input.companyScope) return undefined;
 
   const allowlist = new Set<string>();
-  const add = (ext: string) => {
-    const normalized = ext.trim();
-    if (normalized) allowlist.add(normalized);
-  };
-
-  for (const ext of input.companyRoster ?? []) add(ext);
-  for (const ext of input.teamExtensions ?? []) add(ext);
+  addTrimmedExtensions(allowlist, input.companyRoster ?? []);
+  addTrimmedExtensions(allowlist, input.teamExtensions ?? []);
 
   if (Array.isArray(input.hierarchyExtensions)) {
-    for (const row of input.hierarchyExtensions) {
-      if (!userRowMatchesCompanyScope(row, input.companyScope)) continue;
-      if (row == null || typeof row !== "object") continue;
-      const record = row as Record<string, unknown>;
-      const candidates = [
-        record.extension_number,
-        record.extension,
-        record.phone,
-        record.id,
-      ];
-      for (const value of candidates) {
-        const normalized = readStringCandidate(value);
-        if (normalized) {
-          add(normalized);
-          break;
-        }
-      }
-    }
+    addTrimmedExtensions(
+      allowlist,
+      collectCompanyScopedHierarchyExtensions(
+        input.hierarchyExtensions,
+        input.companyScope,
+      ),
+    );
   }
 
   const viewer = input.viewerExtension?.trim();
-  if (viewer) add(viewer);
+  if (viewer) addTrimmedExtension(allowlist, viewer);
 
   return allowlist.size > 0 ? allowlist : undefined;
 }

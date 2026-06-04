@@ -158,7 +158,7 @@ export function WorkloadSummaryCardsRow({ data }: WorkloadSummaryCardsProps) {
             className="workload-summary-card__dot"
             style={{ background: "#0066CC" }}
           />
-          Assigned to team
+          {" Assigned to team"}
         </div>
       </div>
       <div className="workload-summary-card">
@@ -174,7 +174,7 @@ export function WorkloadSummaryCardsRow({ data }: WorkloadSummaryCardsProps) {
             className="workload-summary-card__dot"
             style={{ background: "#dc2626" }}
           />
-          Above 100% capacity
+          {" Above 100% capacity"}
         </div>
       </div>
       <div className="workload-summary-card">
@@ -190,7 +190,7 @@ export function WorkloadSummaryCardsRow({ data }: WorkloadSummaryCardsProps) {
             className="workload-summary-card__dot"
             style={{ background: "#ea580c" }}
           />
-          No time estimate set
+          {" No time estimate set"}
         </div>
       </div>
       <div className="workload-summary-card">
@@ -206,7 +206,7 @@ export function WorkloadSummaryCardsRow({ data }: WorkloadSummaryCardsProps) {
             className="workload-summary-card__dot"
             style={{ background: "#dc2626" }}
           />
-          Needs immediate attention
+          {" Needs immediate attention"}
         </div>
       </div>
     </div>
@@ -314,13 +314,13 @@ export function WorkloadLegendRow({
               style={{ fontSize: "12px", color: "#0f766e" }}
             />
           </span>
-          Org Tasks included
+          {" Org Tasks included"}
         </span>
         <span className="workload-legend__item">
           <span className="workload-legend__personal-icon" aria-hidden>
             ⓘ
           </span>
-          Has personal todos (not counted)
+          {" Has personal todos (not counted)"}
         </span>
       </div>
       <div className="workload-legend__actions">

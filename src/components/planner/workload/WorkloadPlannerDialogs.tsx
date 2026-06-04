@@ -77,6 +77,15 @@ function resolveRescheduleCurrentLabel(
   return "—";
 }
 
+function resolveRescheduleSubmitLabel(
+  isSaving: boolean,
+  overloadSecondStep: boolean,
+): string {
+  if (isSaving) return "Saving…";
+  if (overloadSecondStep) return "Reschedule anyway";
+  return "Reschedule";
+}
+
 function WorkloadDayTaskMarkDoneButton({
   task,
   isMarkingDone,
@@ -139,7 +148,7 @@ function WorkloadDayTaskCard({
         {showOrgBadge ? (
           <WorkloadBdg tone="green">
             <i className="ti ti-building" style={{ fontSize: "10px" }} aria-hidden />
-            Org
+            {" Org"}
           </WorkloadBdg>
         ) : null}
       </div>
@@ -162,7 +171,7 @@ function WorkloadDayTaskCard({
         {unestimated ? (
           <WorkloadBdg tone="orange">
             <AlertTriangle size={10} aria-hidden />
-            No est.
+            {" No est."}
           </WorkloadBdg>
         ) : (
           <WorkloadBdg tone="gray">
@@ -443,7 +452,7 @@ export function WorkloadReassignModal({
                   </span>
                 )}
               </div>
-              {!task.due_date ? (
+              {task.due_date ? null : (
                 <div className="workload-reassign-modal__row workload-reassign-modal__row--due">
                   <span className="workload-reassign-modal__label">Due date</span>
                   <div className="workload-reassign-modal__due-wrap">
@@ -458,7 +467,7 @@ export function WorkloadReassignModal({
                     </span>
                   </div>
                 </div>
-              ) : null}
+              )}
               <div className="workload-reassign-modal__row workload-reassign-modal__row--due">
                 <span className="workload-reassign-modal__label">Assign to</span>
                 <div className="workload-reassign-modal__due-wrap">
@@ -523,6 +532,7 @@ export function WorkloadRescheduleModal({
   onSubmit,
 }: WorkloadRescheduleModalProps) {
   const currentLabel = resolveRescheduleCurrentLabel(currentDate, task);
+  const submitLabel = resolveRescheduleSubmitLabel(isSaving, overloadSecondStep);
 
   return (
     <Modal show={Boolean(task)} onHide={onClose} centered className="workload-reschedule-modal">
@@ -572,7 +582,7 @@ export function WorkloadRescheduleModal({
           Cancel
         </Button>
         <Button variant="primary" disabled={!rescheduleDate || isSaving} onClick={onSubmit}>
-          {isSaving ? "Saving…" : overloadSecondStep ? "Reschedule anyway" : "Reschedule"}
+          {submitLabel}
         </Button>
       </Modal.Footer>
     </Modal>
