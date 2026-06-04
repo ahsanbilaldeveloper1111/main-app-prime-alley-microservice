@@ -28,7 +28,7 @@ import {
   workloadMemberAvatarColor,
   workloadMemberInitials,
 } from "@page-modules/planner/workload/workloadDomain";
-import { ReportsKpiCard } from "./WorkloadReportsViews";
+import { ReportsKpiCard, ReportsMemberWiseTasks } from "./WorkloadReportsViews";
 
 function resolveCompletionRate(summary: TaskReportsSummary): number {
   if (summary.completion_rate != null && Number.isFinite(summary.completion_rate)) {
@@ -251,9 +251,9 @@ export function ReportsTeamBoardPanel({
       <Row className="g-3 mb-3">
         <Col lg={6}>
           <div className="reports-panel">
-            <h2 className="reports-panel__title">Recent Activity</h2>
-            <p className="reports-panel__subtitle">Team member workload in selected range</p>
-            <ReportsBoardMemberActivity
+            <h2 className="reports-panel__title">Member Performance</h2>
+            <p className="reports-panel__subtitle">Completion rate per member this period</p>
+            <ReportsMemberWiseTasks
               rows={memberRows}
               hierarchyExtensions={hierarchyExtensions}
             />
@@ -269,8 +269,8 @@ export function ReportsTeamBoardPanel({
       </Row>
 
       <div className="reports-panel">
-        <h2 className="reports-panel__title">Weekly Trends</h2>
-        <p className="reports-panel__subtitle">Task volume over the selected period</p>
+        <h2 className="reports-panel__title">Weekly Delivery</h2>
+        <p className="reports-panel__subtitle">Tasks completed per day this week</p>
         <ReportsWeeklyTrendChart points={trends} />
       </div>
     </>
