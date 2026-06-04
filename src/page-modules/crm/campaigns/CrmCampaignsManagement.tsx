@@ -501,6 +501,25 @@ const CAMPAIGN_TAB_COUNT_IDS = [
 
 type CampaignTabCountId = (typeof CAMPAIGN_TAB_COUNT_IDS)[number];
 
+function resolveHasUnassignedProspectsForTab(
+  tabId: CampaignTabCountId,
+): boolean | null {
+  if (tabId === "assigned") {
+    return false;
+  }
+  if (tabId === "unassigned") {
+    return true;
+  }
+  return null;
+}
+
+function resolveActiveFilterForTabCount(tabId: CampaignTabCountId): string {
+  if (tabId === "assigned" || tabId === "unassigned") {
+    return "all";
+  }
+  return tabId;
+}
+
 async function fetchCampaignTabCountTotal(
   tabId: CampaignTabCountId,
   campaignFilters: CampaignFiltersState,
@@ -509,15 +528,9 @@ async function fetchCampaignTabCountTotal(
 ): Promise<number> {
   const filtersForTab: CampaignFiltersState = {
     ...campaignFilters,
-    hasUnassignedProspects:
-      tabId === "assigned"
-        ? false
-        : tabId === "unassigned"
-          ? true
-          : null,
+    hasUnassignedProspects: resolveHasUnassignedProspectsForTab(tabId),
   };
-  const activeFilterForBuild =
-    tabId === "assigned" || tabId === "unassigned" ? "all" : tabId;
+  const activeFilterForBuild = resolveActiveFilterForTabCount(tabId);
   const filters = buildCrmCampaignListFilters(
     activeFilterForBuild,
     filtersForTab,

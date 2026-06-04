@@ -30,7 +30,7 @@ export const generalSettingsStyles: Record<string, CSSProperties> = {
   },
   notice: {
     fontSize: MAIN_SETTINGS_FONT_SIZE.base,
-    color: MAIN_SETTINGS_COLOR.textSecondary,
+    color: MAIN_SETTINGS_COLOR.textMuted,
     fontWeight: MAIN_SETTINGS_FONT_WEIGHT.normal,
     marginBottom: '20px',
   },
@@ -48,7 +48,7 @@ export const generalSettingsStyles: Record<string, CSSProperties> = {
   sectionSubtitle: {
     fontSize: MAIN_SETTINGS_FONT_SIZE.sm,
     fontWeight: MAIN_SETTINGS_FONT_WEIGHT.normal,
-    color: MAIN_SETTINGS_COLOR.textSecondary,
+    color: MAIN_SETTINGS_COLOR.textMuted,
     marginBottom: '16px',
   },
   fieldGroup: {
@@ -97,7 +97,7 @@ export const generalSettingsStyles: Record<string, CSSProperties> = {
   } as CSSProperties,
   helpText: {
     fontSize: MAIN_SETTINGS_FONT_SIZE.sm,
-    color: MAIN_SETTINGS_COLOR.textSecondary,
+    color: MAIN_SETTINGS_COLOR.textMuted,
     fontWeight: MAIN_SETTINGS_FONT_WEIGHT.normal,
     marginTop: '6px',
     lineHeight: '1.5',

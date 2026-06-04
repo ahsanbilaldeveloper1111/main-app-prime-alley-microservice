@@ -1,7 +1,6 @@
-import { MAIN_SETTINGS_FONT_SIZE } from '../mainSettingsTokens'
+import { MAIN_SETTINGS_FONT, MAIN_SETTINGS_FONT_SIZE } from '../mainSettingsTokens'
 import React from 'react'
 import { Divider } from '../accountDefaultsTabPrimitives'
-import { MAIN_SETTINGS_FONT } from '../mainSettingsTokens'
 import { settingsSectionShellStyle, settingsSectionTitleStyle } from './settingsSectionPageStyles'
 
 export const GenericPage: React.FC<Readonly<{ title: string }>> = ({ title }) => (
