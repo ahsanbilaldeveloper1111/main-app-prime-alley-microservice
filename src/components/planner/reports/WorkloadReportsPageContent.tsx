@@ -103,6 +103,10 @@ function WorkloadReportsTeamView({
           memberRows={vm.liveMembers}
           overdueTasks={vm.liveOverdueTasks}
           inProgressTasks={vm.liveInProgressTasks}
+          staleTaskRows={vm.liveStaleTaskRows}
+          staleDays={vm.staleDays}
+          onStaleDaysChange={vm.setStaleDays}
+          onApplyStale={vm.handleRefetchOverview}
         />
       ) : null}
       {teamSubView === "board" ? (
