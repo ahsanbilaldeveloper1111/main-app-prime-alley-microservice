@@ -417,19 +417,19 @@ export function buildLiveDashboardKpis(
 
   return [
     {
-      label: "Total Tasks",
+      label: "Total Active Tasks",
       value: total,
-      sub: "Tasks created in selected range",
+      sub: "Incomplete tasks in system",
       delta: formatReportsDelta(vs.total_tasks),
       accent: "default",
       sparkline: buildKpiSparkline(trends, pickCreated, total),
     },
     {
-      label: "In Progress",
+      label: "Stuck Tasks",
       value: inProgress,
-      sub: "Tasks currently in progress",
+      sub: "In progress beyond threshold",
       delta: formatReportsDelta(vs.in_progress_tasks),
-      accent: "in_progress",
+      accent: "pending",
       sparkline: buildKpiSparkline(trends, pickPending, inProgress),
     },
     {
@@ -441,12 +441,12 @@ export function buildLiveDashboardKpis(
       sparkline: buildKpiSparkline(trends, pickPending, overdue),
     },
     {
-      label: "Completed Tasks",
-      value: completed,
+      label: "Completion Rate",
+      value: completionRate >= 0 ? `${completionRate}%` : "—",
       sub:
         completionRate >= 0
-          ? `${completionRate}% completion rate in range`
-          : "Finished in selected range",
+          ? "Tasks completed on time"
+          : "No completion data",
       delta:
         formatReportsDelta(vs.completed_tasks) ??
         formatReportsDelta(vs.completion_rate),
