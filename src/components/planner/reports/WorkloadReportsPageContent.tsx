@@ -2,7 +2,6 @@ import React from "react";
 import { Alert, Col, Row } from "react-bootstrap";
 import type { UseQueryResult } from "@tanstack/react-query";
 import type { TaskReportsOverview } from "@utils/taskReports";
-import type { ReportsTeamSubView } from "@page-modules/planner/reports/projectReportsDomain";
 import { ReportsErrorBlock, ReportsLoadingBlock } from "./WorkloadReportsViews";
 import { ReportsTeamLivePanel } from "./WorkloadReportsLiveViews";
 import { ReportsTeamBoardPanelWrapper } from "./WorkloadReportsTeamViews";
@@ -56,14 +55,7 @@ type ActiveViewProps = Readonly<{
 
 function WorkloadReportsActiveView({ vm, data }: ActiveViewProps) {
   if (vm.mainView === "team") {
-    return (
-      <WorkloadReportsTeamView
-        vm={vm}
-        data={data}
-        teamSubView={vm.teamSubView}
-        onTeamSubViewChange={vm.setTeamSubView}
-      />
-    );
+    return <WorkloadReportsTeamView vm={vm} data={data} />;
   }
   if (vm.mainView === "project") {
     return <WorkloadReportsProjectView vm={vm} />;
@@ -85,31 +77,46 @@ function WorkloadReportsActiveView({ vm, data }: ActiveViewProps) {
   return null;
 }
 
-function WorkloadReportsTeamView({
-  vm,
-  data,
-  teamSubView,
-  onTeamSubViewChange,
-}: ActiveViewProps & {
-  teamSubView: ReportsTeamSubView;
-  onTeamSubViewChange: (view: ReportsTeamSubView) => void;
-}) {
+function WorkloadReportsTeamView({ vm, data }: ActiveViewProps) {
   return (
     <>
-      <ReportsTeamSubTabs activeSubView={teamSubView} onChange={onTeamSubViewChange} />
-      {teamSubView === "live" ? (
+      <div className="reports-subbar">
+        <div className="reports-subbar__tabs">
+          <ReportsTeamSubTabs activeSubView={vm.teamSubView} onChange={vm.setTeamSubView} />
+        </div>
+        {vm.teamSubView === "live" ? (
+          <div className="reports-subbar__threshold">
+            <i className="ti ti-settings" style={{ fontSize: "12px" }} aria-hidden="true" />
+            <span>Stuck threshold:</span>
+            <input
+              type="number"
+              className="reports-threshold-bar__input"
+              value={vm.staleDays ?? 3}
+              min={1}
+              max={30}
+              onChange={(e) => vm.setStaleDays(Number(e.target.value))}
+            />
+            <span>days</span>
+            <button
+              type="button"
+              className="reports-threshold-bar__apply"
+              onClick={vm.handleRefetchOverview}
+            >
+              Apply
+            </button>
+          </div>
+        ) : null}
+      </div>
+      {vm.teamSubView === "live" ? (
         <ReportsTeamLivePanel
           kpiCards={vm.liveKpiCards}
           memberRows={vm.liveMembers}
           overdueTasks={vm.liveOverdueTasks}
           inProgressTasks={vm.liveInProgressTasks}
           staleTaskRows={vm.liveStaleTaskRows}
-          staleDays={vm.staleDays}
-          onStaleDaysChange={vm.setStaleDays}
-          onApplyStale={vm.handleRefetchOverview}
         />
       ) : null}
-      {teamSubView === "board" ? (
+      {vm.teamSubView === "board" ? (
         <ReportsTeamBoardPanelWrapper
           data={data}
           memberRows={vm.teamMemberRows}

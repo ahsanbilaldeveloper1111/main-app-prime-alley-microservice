@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React from "react";
 import { Badge, Col, Row } from "react-bootstrap";
 import type {
   LiveDashboardKpi,
@@ -100,47 +100,15 @@ export function ReportsTeamLivePanel({
   overdueTasks,
   inProgressTasks,
   staleTaskRows,
-  staleDays,
-  onStaleDaysChange,
-  onApplyStale,
 }: Readonly<{
   kpiCards: LiveDashboardKpi[];
   memberRows: LiveMemberRow[];
   overdueTasks: LiveTaskDetailRow[];
   inProgressTasks: LiveTaskDetailRow[];
   staleTaskRows: LiveStaleTaskRow[];
-  staleDays: number;
-  onStaleDaysChange: (days: number) => void;
-  onApplyStale: () => void;
 }>) {
-  const [inputDays, setInputDays] = useState(staleDays);
-
   return (
     <>
-      <div className="reports-threshold-bar">
-        <i className="ti ti-settings" style={{ fontSize: "13px" }} aria-hidden="true" />
-        <span>Stuck threshold:</span>
-        <input
-          type="number"
-          className="reports-threshold-bar__input"
-          value={inputDays}
-          min={1}
-          max={30}
-          onChange={(e) => setInputDays(Number(e.target.value))}
-        />
-        <span>days in progress or overdue → flagged as stuck</span>
-        <button
-          type="button"
-          className="reports-threshold-bar__apply"
-          onClick={() => {
-            onStaleDaysChange(inputDays);
-            onApplyStale();
-          }}
-        >
-          Apply
-        </button>
-      </div>
-
       <ReportsLiveDashboardKpiRow cards={kpiCards} />
 
       <Row className="g-3 mb-3">

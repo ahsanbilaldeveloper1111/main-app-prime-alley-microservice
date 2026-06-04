@@ -358,26 +358,25 @@
   }
 
   .reports-threshold-bar__input {
-    width: 44px;
+    width: 40px;
     background: #ffffff;
     border: 1px solid #d0d7de;
     border-radius: 4px;
     color: #141414;
     font-size: 11px;
-    padding: 3px 6px;
+    padding: 2px 4px;
     text-align: center;
     font-family: "Lexend Deca", Helvetica, Arial, sans-serif;
     outline: none;
 
     &:focus {
       border-color: #0066CC;
-      box-shadow: 0 0 0 2px rgba(0, 102, 204, 0.12);
     }
   }
 
   .reports-threshold-bar__apply {
-    height: 26px;
-    padding: 0 10px;
+    height: 24px;
+    padding: 0 8px;
     font-size: 11px;
     font-weight: 500;
     font-family: "Lexend Deca", Helvetica, Arial, sans-serif;
@@ -807,46 +806,64 @@
     }
   }
 
-  .reports-team-sub-tabs-wrap {
+  .reports-subbar {
     display: flex;
     align-items: center;
-    gap: 4px;
-    margin-bottom: 16px;
+    justify-content: space-between;
+    background: #ffffff;
+    border-bottom: 1px solid #eaf0f6;
+    padding: 0 24px 0 0;
+    height: 38px;
+    flex-shrink: 0;
+  }
+
+  .reports-subbar__tabs {
+    display: flex;
+    align-items: stretch;
+    height: 38px;
+  }
+
+  .reports-subbar__threshold {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    color: #718096;
+    font-family: "Lexend Deca", Helvetica, Arial, sans-serif;
+  }
+
+  .reports-team-sub-tabs-wrap {
+    display: flex;
+    align-items: stretch;
+    height: 38px;
   }
 
   .reports-sub-tab-btn {
     display: inline-flex;
     align-items: center;
-    padding: 5px 12px;
-    height: 30px;
-    font-size: clamp(11px, 0.85vw, 13px);
+    padding: 0 16px;
+    background: transparent;
+    border: none;
+    border-bottom: 2px solid transparent;
+    color: #718096;
+    font-size: 12px;
     font-weight: 500;
     font-family: "Lexend Deca", Helvetica, Arial, sans-serif;
-    color: #374151;
-    background: #ffffff;
-    border: 1px solid #eaf0f6;
-    border-radius: 4px;
     cursor: pointer;
+    height: 38px;
     white-space: nowrap;
-    transition: color 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+    margin-bottom: -1px;
+    transition: color 0.15s ease, border-color 0.15s ease;
 
     &:hover {
-      background: #f5f8fa;
-      color: #0066CC;
-      border-color: #bfdbfe;
+      color: #374151;
+      border-bottom-color: #d0d7de;
     }
 
     &--active {
-      background: #0066CC;
-      border-color: #0066CC;
-      color: #ffffff;
+      color: #0066CC;
       font-weight: 600;
-
-      &:hover {
-        background: #0052A3;
-        border-color: #0052A3;
-        color: #ffffff;
-      }
+      border-bottom-color: #0066CC;
     }
   }
 
