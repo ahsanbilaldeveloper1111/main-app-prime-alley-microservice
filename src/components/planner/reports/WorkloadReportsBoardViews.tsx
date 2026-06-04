@@ -28,7 +28,7 @@ import {
   workloadMemberAvatarColor,
   workloadMemberInitials,
 } from "@page-modules/planner/workload/workloadDomain";
-import { ReportsKpiCard, ReportsMemberWiseTasks } from "./WorkloadReportsViews";
+import { ReportsKpiCard, ReportsMemberPerformanceBars } from "./WorkloadReportsViews";
 
 function resolveCompletionRate(summary: TaskReportsSummary): number {
   if (summary.completion_rate != null && Number.isFinite(summary.completion_rate)) {
@@ -253,7 +253,7 @@ export function ReportsTeamBoardPanel({
           <div className="reports-panel">
             <h2 className="reports-panel__title">Member Performance</h2>
             <p className="reports-panel__subtitle">Completion rate per member this period</p>
-            <ReportsMemberWiseTasks
+            <ReportsMemberPerformanceBars
               rows={memberRows}
               hierarchyExtensions={hierarchyExtensions}
             />

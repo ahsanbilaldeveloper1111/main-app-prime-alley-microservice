@@ -455,6 +455,54 @@ export function ReportsMemberWiseTasks({
   );
 }
 
+export function ReportsMemberPerformanceBars({
+  rows,
+  hierarchyExtensions,
+}: Readonly<{
+  rows: TaskReportsAssigneeRow[];
+  hierarchyExtensions?: unknown[] | null;
+}>) {
+  if (rows.length === 0) {
+    return <p className="small text-muted mb-0">No member data for this period.</p>;
+  }
+  return (
+    <div className="reports-member-perf-list">
+      {rows.map((row) => {
+        const ext = row.extension_number ?? "";
+        const label = formatReportsMemberLabel(row, hierarchyExtensions);
+        const done = row.done_count ?? row.completed_tasks ?? 0;
+        const total = row.total_tasks ?? row.task_count ?? 1;
+        const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+        const barColor = pct >= 80 ? "#22c55e" : pct >= 60 ? "#f59e0b" : "#ef4444";
+        return (
+          <div key={ext || label} className="reports-member-perf-row">
+            <span
+              className="reports-assignee-row__avatar"
+              style={{ backgroundColor: workloadMemberAvatarColor(ext) }}
+              aria-hidden
+            >
+              {workloadMemberInitials(ext, hierarchyExtensions, row)}
+            </span>
+            <div className="reports-member-perf-row__meta">
+              <div className="reports-member-perf-row__name">{label}</div>
+              <div className="reports-member-perf-row__sub">{done}/{total} tasks complete</div>
+              <div className="reports-member-perf-bar">
+                <div
+                  className="reports-member-perf-bar__fill"
+                  style={{ width: `${pct}%`, backgroundColor: barColor }}
+                />
+              </div>
+            </div>
+            <span className="reports-member-perf-row__pct" style={{ color: barColor }}>
+              {pct}%
+            </span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 const STATUS_DONUT_COLORS = ["#22c55e", "#3b82f6", "#f59e0b", "#ef4444", "#8b5cf6", "#64748b"];
 
 export function ReportsStatusDonutChart({

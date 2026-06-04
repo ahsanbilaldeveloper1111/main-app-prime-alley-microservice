@@ -1104,6 +1104,57 @@
     text-align: right;
   }
 
+  .reports-member-perf-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.65rem;
+  }
+
+  .reports-member-perf-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .reports-member-perf-row__meta {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .reports-member-perf-row__name {
+    font-size: 12px;
+    font-weight: 600;
+    color: #141414;
+    margin-bottom: 1px;
+  }
+
+  .reports-member-perf-row__sub {
+    font-size: 10px;
+    color: #718096;
+    margin-bottom: 4px;
+  }
+
+  .reports-member-perf-bar {
+    height: 5px;
+    background: #eaf0f6;
+    border-radius: 3px;
+    overflow: hidden;
+  }
+
+  .reports-member-perf-bar__fill {
+    height: 100%;
+    border-radius: 3px;
+    min-width: 2px;
+  }
+
+  .reports-member-perf-row__pct {
+    font-size: 13px;
+    font-weight: 700;
+    min-width: 2.5rem;
+    text-align: right;
+    flex-shrink: 0;
+  }
+
   .reports-status-donut {
     display: flex;
     gap: 1rem;
