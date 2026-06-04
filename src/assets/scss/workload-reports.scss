@@ -30,7 +30,7 @@
   }
 
   .reports-filter-bar {
-    background: #ffffff;
+    background: #f5f8fa;
     border: none;
     border-bottom: 1px solid #eaf0f6;
     border-radius: 0;
@@ -88,13 +88,11 @@
     &--active {
       color: #0066CC;
       font-weight: 500;
-      background: #ffffff;
-      border: 1px solid #0066CC;
-      border-radius: 4px;
+      background: transparent;
+      border: none;
 
       &:hover:not(:disabled) {
         background: #f5f8ff;
-        border-color: #0052A3;
         color: #0052A3;
       }
     }
