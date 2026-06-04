@@ -27,12 +27,20 @@ import {
   type MyDayTasksMeta,
   type MyDayTasksPayload,
 } from "@utils/tasks";
+import { MyDayDailySummaryPanel } from "@components/planner/my-day/MyDayDailySummaryPanel";
 import { MyDayHistoryModal } from "@components/planner/MyDayHistoryModal";
+import { buildLiveMyDayStats } from "@page-modules/planner/my-day/myDayHistoryDomain";
 import { useHierarchyData } from "@components/filters/useHierarchyData";
 import { formatDateGlobal, ModuleSlug } from "@utils/Helper";
+import type {
+  CreateTaskFormData,
+  PlannerSidebarCreateSuccessMeta,
+} from "@components/CreatePlannerTaskSidebar";
 import {
   formatCapacityOverageMessageFromStats,
+  formatMyDayHeaderDateLabel,
   formatMyDayHeaderMetaLine,
+  filterMyDaySuggestionTasks,
   resolveCapacityStatsFromPayload,
   formatRolloverPromptCopy,
   formatSuggestionDueDate,
@@ -43,6 +51,7 @@ import {
   readRolloverIgnoreCount,
   readTaskPriorityLabel,
   readHasEstimateFromRow,
+  readMyDayTaskCompletedFromRow,
   resolveEstimateMinutesFromRow,
   normalizeMyDaySuggestionsPayload,
   resolveMyDayReporteeExtensions,
@@ -91,6 +100,20 @@ type MyDaySuggestionGroup = Readonly<{
 
 /** Spec §3.6: lead with 30m / 1h / 2h chips; extra presets for custom flows. */
 const ESTIMATE_PRESETS = [30, 60, 120, 15, 90, 180] as const;
+
+const MY_DAY_SUGGESTION_PRIORITY_FILTERS = [
+  { value: "", label: "All priorities" },
+  { value: "urgent", label: "Urgent" },
+  { value: "high", label: "High" },
+  { value: "normal", label: "Normal" },
+  { value: "low", label: "Low" },
+] as const;
+
+function parseEstimateMinutesFromCreateForm(formData: CreateTaskFormData): number | undefined {
+  const parsed = Number.parseInt(formData.estimatedDurationMinutes.trim(), 10);
+  if (!Number.isFinite(parsed) || parsed <= 0) return undefined;
+  return parsed;
+}
 
 function swallowAsyncError(promise: Promise<unknown>): void {
   promise.catch(() => undefined);
@@ -290,7 +313,7 @@ function mapMyDayTaskRow(
     title,
     dueDate: dueRaw,
     priority: readTaskPriorityLabel(row.priority),
-    isCompleted: row.is_completed === true || row.completed === true,
+    isCompleted: readMyDayTaskCompletedFromRow(row),
     estimateMinutes: estimate,
     hasEstimate,
     projectName: project.label,
@@ -556,9 +579,17 @@ function useMyDayTasksPageController() {
   const [scheduleLaterDate, setScheduleLaterDate] = useState("");
   const [isEmptyByDesign, setIsEmptyByDesign] = useState(false);
   const [rolloverPreviousDate, setRolloverPreviousDate] = useState<string | null>(null);
+  const [suggestionPriorityFilter, setSuggestionPriorityFilter] = useState("");
+  const [suggestionOverdueOnly, setSuggestionOverdueOnly] = useState(false);
+  const [suggestionCategoryFilter, setSuggestionCategoryFilter] = useState<
+    MyDaySuggestionCategory | "all"
+  >("all");
+  const [showUncompleteConfirm, setShowUncompleteConfirm] = useState(false);
+  const [pendingUncompleteTask, setPendingUncompleteTask] = useState<MyDayTask | null>(null);
   const suggestionsRequestRef = useRef(0);
   const tasksRef = useRef<MyDayTask[]>([]);
   const suggestionsPanelRef = useRef<HTMLElement>(null);
+  const suggestionSearchRef = useRef<HTMLInputElement>(null);
 
   const today = useMemo(() => moment().format("YYYY-MM-DD"), []);
   const todayStart = useMemo(() => moment().startOf("day"), []);
@@ -781,14 +812,39 @@ function useMyDayTasksPageController() {
     [capacityMinutes, capacityStats, summary.planned],
   );
 
+  const dailySummaryStats = useMemo(
+    () =>
+      buildLiveMyDayStats(tasks, tasksMeta, capacityMinutes, plannedMinutes, {
+        capacityUsedPercent: capacityStats.capacityUsedPercent,
+      }),
+    [capacityMinutes, capacityStats.capacityUsedPercent, plannedMinutes, tasks, tasksMeta],
+  );
+
+  const suggestionFilters = useMemo(
+    () => ({
+      priority: suggestionPriorityFilter,
+      overdueOnly: suggestionOverdueOnly,
+      category: suggestionCategoryFilter,
+    }),
+    [suggestionCategoryFilter, suggestionOverdueOnly, suggestionPriorityFilter],
+  );
+
+  const filteredSuggestedTasks = useMemo(
+    () =>
+      filterMyDaySuggestionTasks(suggestedTasks, suggestionFilters, todayStart, {
+        hideAlreadyInMyDay: true,
+      }),
+    [suggestedTasks, suggestionFilters, todayStart],
+  );
+
   const groupedSuggestions = useMemo(
-    () => groupSuggestionsByCategory(suggestedTasks),
-    [suggestedTasks],
+    () => groupSuggestionsByCategory(filteredSuggestedTasks),
+    [filteredSuggestedTasks],
   );
 
   const headerDateLabel = useMemo(() => {
     const iso = planDate || today;
-    return formatDateGlobal(iso) || moment(iso).format("D MMMM, YYYY");
+    return formatMyDayHeaderDateLabel(iso) || formatDateGlobal(iso);
   }, [planDate, today]);
 
   const headerMetaLine = useMemo(() => {
@@ -837,9 +893,7 @@ function useMyDayTasksPageController() {
           prev.active_count == null ? prev.active_count : prev.active_count + 1,
       }));
     }
-    setSuggestedTasks((prev) =>
-      prev.map((row) => (row.id === task.id ? { ...row, alreadyInMyDay: true } : row)),
-    );
+    setSuggestedTasks((prev) => prev.filter((row) => row.id !== task.id));
   }, []);
 
   const applyOptimisticMyDayRemove = useCallback((taskId: number) => {
@@ -883,10 +937,58 @@ function useMyDayTasksPageController() {
 
   const handleToggleComplete = useCallback(
     async (task: MyDayTask) => {
-      await toggleMyDayTaskComplete(task.id);
-      refreshMyDayPage().catch(() => undefined);
+      if (task.isCompleted) {
+        setPendingUncompleteTask(task);
+        setShowUncompleteConfirm(true);
+        return;
+      }
+      try {
+        await toggleMyDayTaskComplete(task.id, {
+          completeScope: "my_day",
+          planDate: planDate || today,
+        });
+        await refreshMyDayPage();
+      } catch {
+        toast.error("Failed to update task");
+      }
     },
-    [refreshMyDayPage],
+    [planDate, refreshMyDayPage, today],
+  );
+
+  const confirmMarkIncomplete = useCallback(async () => {
+    if (pendingUncompleteTask == null) return;
+    try {
+      await toggleMyDayTaskComplete(pendingUncompleteTask.id, {
+        completeScope: "my_day",
+        planDate: planDate || today,
+      });
+      setShowUncompleteConfirm(false);
+      setPendingUncompleteTask(null);
+      await refreshMyDayPage();
+    } catch {
+      toast.error("Failed to mark task incomplete");
+    }
+  }, [pendingUncompleteTask, planDate, refreshMyDayPage, today]);
+
+  const handleMyDayCreateSuccess = useCallback(
+    async (formData: CreateTaskFormData, meta?: PlannerSidebarCreateSuccessMeta) => {
+      setShowCreateSidebar(false);
+      const taskId = meta?.createdTaskId;
+      if (taskId != null && taskId > 0) {
+        const estimatedMinutes = parseEstimateMinutesFromCreateForm(formData);
+        try {
+          await addTaskToMyDay({
+            task_id: taskId,
+            plan_date: today,
+            ...(estimatedMinutes != null ? { estimated_minutes: estimatedMinutes } : {}),
+          });
+        } catch {
+          toast.error("Task created but could not be added to My Day");
+        }
+      }
+      await refreshMyDayPage();
+    },
+    [refreshMyDayPage, today],
   );
 
   const handleOpenEstimateModal = useCallback((task: MyDayTask) => {
@@ -895,8 +997,9 @@ function useMyDayTasksPageController() {
     setShowEstimateModal(true);
   }, []);
 
-  const scrollToSuggestions = useCallback(() => {
+  const focusSuggestionsSearch = useCallback(() => {
     suggestionsPanelRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    globalThis.setTimeout(() => suggestionSearchRef.current?.focus(), 280);
   }, []);
 
   const confirmEstimateAndAdd = useCallback(async () => {
@@ -1209,6 +1312,7 @@ function useMyDayTasksPageController() {
     completedTasksCount,
     summary,
     capacityOverageMessage,
+    dailySummaryStats,
     groupedSuggestions,
     headerDateLabel,
     headerMetaLine,
@@ -1216,7 +1320,20 @@ function useMyDayTasksPageController() {
     refreshMyDayPage,
     toggleCarryOverSelection,
     handleOpenEstimateModal,
-    scrollToSuggestions,
+    focusSuggestionsSearch,
+    suggestionSearchRef,
+    suggestionPriorityFilter,
+    setSuggestionPriorityFilter,
+    suggestionOverdueOnly,
+    setSuggestionOverdueOnly,
+    suggestionCategoryFilter,
+    setSuggestionCategoryFilter,
+    showUncompleteConfirm,
+    setShowUncompleteConfirm,
+    pendingUncompleteTask,
+    setPendingUncompleteTask,
+    confirmMarkIncomplete,
+    handleMyDayCreateSuccess,
     confirmEstimateAndAdd,
     skipEstimateAndAddToMyDay,
     handleSaveDefaultCapacity,
@@ -1436,8 +1553,8 @@ function MyDayTodayTasksSection({ vm }: MyDayTasksPageViewProps) {
     <div className="myday-table-card">
       <div className="myday-section-header">
         <div className="myday-section-title">Today&apos;s Tasks</div>
-        <Button variant="outline-primary" size="sm" onClick={vm.scrollToSuggestions}>
-          Add to My Day
+        <Button variant="outline-primary" size="sm" onClick={vm.focusSuggestionsSearch}>
+          Browse suggestions
         </Button>
       </div>
       {showLoading ? <p className="myday-empty-state">Loading My Day tasks...</p> : null}
@@ -1472,9 +1589,47 @@ function MyDaySuggestionsPanel({ vm }: MyDayTasksPageViewProps) {
   return (
     <aside ref={vm.suggestionsPanelRef} id="myday-suggestions-panel" className="myday-suggested">
       <h4>Suggested for Today</h4>
+      <div className="myday-suggestion-filters">
+        <select
+          className="form-select form-select-sm"
+          value={vm.suggestionPriorityFilter}
+          onChange={(e) => vm.setSuggestionPriorityFilter(e.target.value)}
+          aria-label="Filter suggestions by priority"
+        >
+          {MY_DAY_SUGGESTION_PRIORITY_FILTERS.map((option) => (
+            <option key={option.value || "all"} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+        <select
+          className="form-select form-select-sm"
+          value={vm.suggestionCategoryFilter}
+          onChange={(e) =>
+            vm.setSuggestionCategoryFilter(e.target.value as MyDaySuggestionCategory | "all")
+          }
+          aria-label="Filter suggestions by type"
+        >
+          <option value="all">All types</option>
+          {MY_DAY_SUGGESTION_CATEGORY_ORDER.map((category) => (
+            <option key={category} value={category}>
+              {MY_DAY_CATEGORY_LABELS[category] ?? category.replaceAll("_", " ")}
+            </option>
+          ))}
+        </select>
+        <label className="myday-suggestion-filters__overdue">
+          <input
+            type="checkbox"
+            checked={vm.suggestionOverdueOnly}
+            onChange={(e) => vm.setSuggestionOverdueOnly(e.target.checked)}
+          />
+          Overdue only
+        </label>
+      </div>
       <div className="myday-search-wrap">
         <Search size={14} />
         <input
+          ref={vm.suggestionSearchRef}
           type="text"
           placeholder="Search tasks..."
           value={vm.suggestedSearch}
@@ -1515,12 +1670,45 @@ function MyDayTasksPageModals({ vm }: MyDayTasksPageViewProps) {
       <CreateTaskSidebar
         isOpen={vm.showCreateSidebar}
         onClose={() => vm.setShowCreateSidebar(false)}
-        onCreate={async () => {
-          vm.setShowCreateSidebar(false);
-          await vm.refreshMyDayPage();
-        }}
+        onCreate={vm.handleMyDayCreateSuccess}
+        defaultPlanDate={vm.today}
         extensions={vm.hierarchyDataExtensions as never}
       />
+      <Modal
+        show={vm.showUncompleteConfirm}
+        onHide={() => {
+          vm.setShowUncompleteConfirm(false);
+          vm.setPendingUncompleteTask(null);
+        }}
+        centered
+      >
+        <Modal.Header closeButton>
+          <Modal.Title>Mark task incomplete?</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <p className="mb-0">
+            Mark &ldquo;{vm.pendingUncompleteTask?.title}&rdquo; as incomplete for today?
+          </p>
+        </Modal.Body>
+        <Modal.Footer>
+          <Button
+            variant="secondary"
+            onClick={() => {
+              vm.setShowUncompleteConfirm(false);
+              vm.setPendingUncompleteTask(null);
+            }}
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={() => {
+              vm.confirmMarkIncomplete().catch(() => undefined);
+            }}
+          >
+            Mark incomplete
+          </Button>
+        </Modal.Footer>
+      </Modal>
       <Modal
         show={vm.showEstimateModal}
         onHide={() => {
@@ -1659,6 +1847,9 @@ function MyDayTasksPageView({ vm }: MyDayTasksPageViewProps) {
             />
           ) : null}
           <MyDayCompletedSection vm={vm} />
+          {!vm.loading ? (
+            <MyDayDailySummaryPanel stats={vm.dailySummaryStats} showCapacityBar />
+          ) : null}
         </div>
         <MyDaySuggestionsPanel vm={vm} />
       </div>

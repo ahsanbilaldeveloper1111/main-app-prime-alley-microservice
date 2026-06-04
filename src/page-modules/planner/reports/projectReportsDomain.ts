@@ -4,7 +4,7 @@ import type {
   TaskReportsTaskRow,
 } from "@utils/taskReports";
 
-export type ReportsMainView = "team" | "project" | "historical";
+export type ReportsMainView = "team" | "project" | "historical" | "my_day_monthly";
 
 export type ReportsTeamSubView = "live" | "board";
 

@@ -171,7 +171,8 @@ function resolveTeamMemberExtensionNumbers(
 }
 
 /**
- * Team owner (root): no `extension_number` / `extension_numbers` — server resolves the team from JWT.
+ * Root / company admin (`isTeamOwner` on scope): no `extension_number` / `extension_numbers`.
+ * Server loads all assignees with tasks in range from JWT.
  */
 export function buildWorkloadSummaryQuery(input: BuildWorkloadQueryInput): WorkloadQueryBase {
   const base = buildWorkloadQueryBase(input);
@@ -186,8 +187,8 @@ export function buildWorkloadSummaryQuery(input: BuildWorkloadQueryInput): Workl
 }
 
 /**
- * Team owner (root): no extension params.
- * Otherwise: `extension_numbers[]` for grid/board scope.
+ * Root / company admin: no extension params on grid/board/summary.
+ * Non-root: `extension_numbers[]` (e.g. `["536"]` or full team roster).
  */
 export function buildWorkloadGridBoardQuery(input: BuildWorkloadQueryInput): WorkloadQueryBase {
   const base = buildWorkloadQueryBase(input);
