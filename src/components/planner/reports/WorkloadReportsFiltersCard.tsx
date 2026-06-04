@@ -352,7 +352,7 @@ export function WorkloadReportsFiltersCard({
 
         <button
           type="button"
-          className="reports-filter-bar__apply"
+          className={`reports-filter-bar__apply${hasActiveFilters ? " reports-filter-bar__apply--ready" : ""}`}
           disabled={!enabled || loadingOverview}
           onClick={handleApply}
         >
