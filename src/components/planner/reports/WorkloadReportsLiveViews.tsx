@@ -6,6 +6,7 @@ import type {
   LiveStaleTaskRow,
   LiveTaskDetailRow,
 } from "@page-modules/planner/reports/teamLiveViewDomain";
+import { ReportsEmptyState } from "./WorkloadReportsViews";
 
 export function ReportsLiveDashboardKpiRow({
   cards,
@@ -30,7 +31,13 @@ export function ReportsLiveTaskByMember({
   rows,
 }: Readonly<{ rows: LiveMemberRow[] }>) {
   if (rows.length === 0) {
-    return <p className="small text-muted mb-0">No member data for this period.</p>;
+    return (
+      <ReportsEmptyState
+        icon="ti-users"
+        title="No member activity"
+        subtitle="No tasks assigned in this period"
+      />
+    );
   }
   return (
     <div className="reports-live-task-by-member">
@@ -61,10 +68,10 @@ function resolveTaskBadgeBg(tone: LiveTaskDetailRow["badgeTone"]): string {
 
 export function ReportsLiveTaskDetailList({
   rows,
-  emptyLabel,
-}: Readonly<{ rows: LiveTaskDetailRow[]; emptyLabel: string }>) {
+  emptyState,
+}: Readonly<{ rows: LiveTaskDetailRow[]; emptyState: React.ReactNode }>) {
   if (rows.length === 0) {
-    return <p className="small text-muted mb-0">{emptyLabel}</p>;
+    return emptyState;
   }
   return (
     <div className="reports-live-task-detail-list">
@@ -131,7 +138,13 @@ export function ReportsTeamLivePanel({
             <p className="reports-panel__subtitle">Tasks currently being worked on</p>
             <ReportsLiveTaskDetailList
               rows={inProgressTasks}
-              emptyLabel="No in-progress tasks for this period."
+              emptyState={
+                <ReportsEmptyState
+                  icon="ti-player-play"
+                  title="Nothing in progress"
+                  subtitle="No tasks are currently being worked on"
+                />
+              }
             />
           </div>
         </Col>
@@ -161,7 +174,11 @@ export function ReportsTeamLivePanel({
           </div>
         </div>
         {staleTaskRows.length === 0 ? (
-          <p className="small text-muted mb-0 px-3 pb-3">No stuck tasks for this period.</p>
+          <ReportsEmptyState
+            icon="ti-circle-check"
+            title="All clear"
+            subtitle="No tasks stuck beyond the threshold"
+          />
         ) : (
           <div className="reports-live-stale-tasks">
             {staleTaskRows.map((row) => (
@@ -193,7 +210,13 @@ export function ReportsTeamLivePanel({
         </p>
         <ReportsLiveTaskDetailList
           rows={overdueTasks}
-          emptyLabel="No overdue tasks for this period."
+          emptyState={
+            <ReportsEmptyState
+              icon="ti-calendar-check"
+              title="No overdue tasks"
+              subtitle="Everything is on track for this period"
+            />
+          }
         />
       </div>
     </>

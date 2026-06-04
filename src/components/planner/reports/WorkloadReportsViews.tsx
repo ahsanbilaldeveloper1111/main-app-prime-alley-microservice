@@ -36,6 +36,26 @@ import {
   workloadMemberInitials,
 } from "@page-modules/planner/workload/workloadDomain";
 
+export function ReportsEmptyState({
+  icon,
+  title,
+  subtitle,
+}: Readonly<{
+  icon: string;
+  title: string;
+  subtitle: string;
+}>) {
+  return (
+    <div className="reports-empty-state">
+      <div className="reports-empty-state__icon">
+        <i className={`ti ${icon}`} aria-hidden="true" />
+      </div>
+      <div className="reports-empty-state__title">{title}</div>
+      <div className="reports-empty-state__subtitle">{subtitle}</div>
+    </div>
+  );
+}
+
 type KpiCardProps = Readonly<{
   label: string;
   value: string | number;
