@@ -425,7 +425,29 @@ const WorkloadPlannerPage: React.FC = () => {
         teamExtensionNumbers:
           rosterExtensions.length > 0 ? rosterExtensions : undefined,
       }),
-    [effectiveGridData, extension, appliedFilters.memberFilter, gridRangeFallback],
+    [
+      effectiveGridData,
+      extension,
+      appliedFilters.memberFilter,
+      gridRangeFallback,
+      rosterExtensions,
+    ],
+  );
+
+  const displayBoardData = useMemo(
+    () =>
+      resolveWorkloadBoardDisplayData(effectiveBoardData, {
+        viewerExtension: extension,
+        memberFilter: appliedFilters.memberFilter,
+        teamExtensionNumbers:
+          rosterExtensions.length > 0 ? rosterExtensions : undefined,
+      }),
+    [
+      effectiveBoardData,
+      extension,
+      appliedFilters.memberFilter,
+      rosterExtensions,
+    ],
   );
 
   const cellMap = useMemo(
@@ -438,9 +460,9 @@ const WorkloadPlannerPage: React.FC = () => {
       resolveWorkloadMemberExtensions(
         displayGridData,
         extension,
-        effectiveBoardData?.columns,
+        displayBoardData?.columns,
       ),
-    [displayGridData, extension, effectiveBoardData?.columns],
+    [displayGridData, extension, displayBoardData?.columns],
   );
 
   const displayPeriodMembers = useMemo(
@@ -759,7 +781,7 @@ const WorkloadPlannerPage: React.FC = () => {
           summaryData={summaryQuery.data}
           gridData={displayGridData}
           periodMembers={displayPeriodMembers}
-          boardData={effectiveBoardData}
+          boardData={displayBoardData}
           cellMap={cellMap}
           hierarchyExtensions={hierarchyDataExtensions}
           priorityFilter={appliedFilters.priorityFilter}
@@ -837,10 +859,10 @@ const WorkloadPlannerPage: React.FC = () => {
         hierarchyExtensions={hierarchyDataExtensions}
         assignTargets={assignTargets}
         setAssignTargets={setAssignTargets}
-        assignMutation={{
-          isPending: assignMutation.isPending,
-          mutate: assignMutation.mutate,
+        onRequestAssign={(task, toExtension) => {
+          assignMutation.mutate({ task, toExtension });
         }}
+        assignPending={assignMutation.isPending}
         formatError={workloadErrorMessage}
       />
 

@@ -95,13 +95,14 @@ export function workloadCellBarFillClass(band: string): string {
 }
 
 const WORKLOAD_AVATAR_PALETTE = [
-  "#0d9488",
-  "#2563eb",
-  "#7c3aed",
-  "#db2777",
-  "#ea580c",
-  "#0891b2",
+  "#1a6fbd",
+  "#0e7490",
+  "#0f766e",
+  "#1d4ed8",
   "#4f46e5",
+  "#7c3aed",
+  "#0369a1",
+  "#065f46",
 ] as const;
 
 export function workloadMemberAvatarColor(extensionNumber: string): string {
@@ -515,22 +516,22 @@ export function workloadCellKey(extensionNumber: string, isoDate: string): strin
   return `${extensionNumber}|${isoDate}`;
 }
 
-/** Collect assignee extensions from grid API payload (members, root list, or cells). */
+/** Collect assignee extensions from grid API payload (members, root list, and cells). */
 export function collectWorkloadMemberExtensionsFromGrid(grid: WorkloadGridData): string[] {
-  const fromMembers = (grid.members ?? [])
-    .map((m) => m.extension_number?.trim())
-    .filter((ext): ext is string => Boolean(ext));
-  if (fromMembers.length > 0) return [...new Set(fromMembers)];
-
-  const fromRoot = (grid.extension_numbers ?? [])
-    .map((ext) => String(ext).trim())
-    .filter(Boolean);
-  if (fromRoot.length > 0) return [...new Set(fromRoot)];
-
-  const fromCells = (grid.cells ?? [])
-    .map((c) => c.extension_number?.trim())
-    .filter((ext): ext is string => Boolean(ext));
-  return [...new Set(fromCells)];
+  const extensions = new Set<string>();
+  for (const member of grid.members ?? []) {
+    const ext = member.extension_number?.trim();
+    if (ext) extensions.add(ext);
+  }
+  for (const ext of grid.extension_numbers ?? []) {
+    const normalized = String(ext).trim();
+    if (normalized) extensions.add(normalized);
+  }
+  for (const cell of grid.cells ?? []) {
+    const ext = cell.extension_number?.trim();
+    if (ext) extensions.add(ext);
+  }
+  return [...extensions];
 }
 
 function buildWorkloadGridMemberRow(
@@ -581,15 +582,25 @@ function resolveWorkloadGridExtensionList(
     return [memberFilter];
   }
 
-  // Root / company admin: full roster must win over API members (often only users with tasks).
+  const fromGrid = collectWorkloadMemberExtensionsFromGrid(grid);
   const teamRoster = (options.teamExtensionNumbers ?? [])
     .map((ext) => ext.trim())
     .filter(Boolean);
+
   if (teamRoster.length > 0) {
-    return [...new Set(teamRoster)];
+    const merged: string[] = [];
+    const seen = new Set<string>();
+    const add = (ext: string) => {
+      const normalized = ext.trim();
+      if (!normalized || seen.has(normalized)) return;
+      seen.add(normalized);
+      merged.push(normalized);
+    };
+    for (const ext of teamRoster) add(ext);
+    for (const ext of fromGrid) add(ext);
+    return merged;
   }
 
-  const fromGrid = collectWorkloadMemberExtensionsFromGrid(grid);
   if (fromGrid.length > 0) {
     return fromGrid;
   }
