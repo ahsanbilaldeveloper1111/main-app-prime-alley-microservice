@@ -243,7 +243,10 @@ export function ReportsOverdueByProject({
       <div>
         {entries.map((entry) => (
           <div key={entry.projectName} className="reports-overdue-project-row">
-            <div className="reports-overdue-project-row__project">{entry.projectName}</div>
+            <div>
+              <div className="reports-overdue-project-row__project">{entry.projectName}</div>
+              <div className="reports-overdue-project-row__task">{entry.count} {entry.count === 1 ? "task" : "tasks"} overdue</div>
+            </div>
             <span
               className={`reports-overdue-project-row__badge reports-overdue-project-row__badge--${entry.tone}`}
             >
