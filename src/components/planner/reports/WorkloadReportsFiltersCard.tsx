@@ -350,6 +350,10 @@ export function WorkloadReportsFiltersCard({
           </button>
         ) : null}
 
+        <span className="reports-filter-bar__divider" aria-hidden="true">
+          |
+        </span>
+
         <button
           type="button"
           className={`reports-filter-bar__apply${hasActiveFilters ? " reports-filter-bar__apply--ready" : ""}`}
