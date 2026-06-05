@@ -1,4 +1,4 @@
-﻿import React, { useState, useMemo, useRef, useEffect, useId } from "react";
+﻿import React, { useMemo, useId } from "react";
 import {
   Table,
   Form,
@@ -25,6 +25,9 @@ import { GenericTableToolbarSection } from "./GenericTableToolbarSection";
 import { GenericTablePaginationControls } from "./GenericTablePagination";
 import { GenericTableHeader } from "./GenericTableHeader";
 import { GenericTableColumnCustomizerDropdown } from "./GenericTableColumnCustomizerDropdown";
+import { useGenericTableContextMenu } from "./useGenericTableContextMenu";
+import { useGenericTableRowSelection } from "./useGenericTableRowSelection";
+import { useGenericTableToolbarUiState } from "./useGenericTableToolbarUiState";
 
 import type { ToolbarConfig } from "./genericTableTypes";
 
@@ -1157,68 +1160,27 @@ const GenericTable = <T extends Record<string, any>>({
     (!customizableColumns ||
       effectiveSelectedColumns.includes(ACTION_COLUMN_KEY));
 
-  // Context menu (rightâ€‘click) state
-  const [contextMenu, setContextMenu] = useState<{
-    x: number;
-    y: number;
-    row: T;
-  } | null>(null);
-  const contextMenuRef = useRef<HTMLDivElement>(null);
+  const { contextMenu, setContextMenu, contextMenuRef } =
+    useGenericTableContextMenu<T>();
 
-  // Hover state for preview button
-  const [hoveredRowIndex, setHoveredRowIndex] = useState<number | null>(null);
+  const {
+    showFilterPills,
+    setShowFilterPills,
+    showMetrics,
+    setShowMetrics,
+    openFilterPillId,
+    setOpenFilterPillId,
+    filterPillSearch,
+    setFilterPillSearch,
+    hoveredRowIndex,
+    setHoveredRowIndex,
+    filterPillMenuPopperConfig,
+  } = useGenericTableToolbarUiState({ toolbar, defaultShowMetrics });
 
-  // Filter pills visibility state (hidden by default)
-  const [showFilterPills, setShowFilterPills] = useState(
-    toolbar?.showFilterPills ?? false,
+  const getBoundContextMenuItems = useMemo(
+    () => (row: T) => buildBoundTableContextMenuItems(actions, row),
+    [actions],
   );
-
-  // Metrics visibility: toolbar "Metrics" toggles collapse; optional defaultShowMetrics for list pages.
-  const [showMetrics, setShowMetrics] = useState(() => {
-    if (defaultShowMetrics !== undefined) {
-      return defaultShowMetrics;
-    }
-    if (globalThis.window === undefined) {
-      return true;
-    }
-    return globalThis.window.innerWidth >= 1920;
-  });
-  const [openFilterPillId, setOpenFilterPillId] = useState<string | null>(null);
-  const [filterPillSearch, setFilterPillSearch] = useState<
-    Record<string, string>
-  >({});
-
-  useEffect(() => {
-    if (toolbar?.showFilterPills !== undefined) {
-      setShowFilterPills(toolbar.showFilterPills);
-    }
-  }, [toolbar?.showFilterPills]);
-
-  const getBoundContextMenuItems = useMemo(() => {
-    return (row: T) => buildBoundTableContextMenuItems(actions, row);
-  }, [actions]);
-
-  // Close context menu on outside click or Escape
-  useEffect(() => {
-    if (!contextMenu) return;
-    const close = () => setContextMenu(null);
-    const onMouseDown = (e: MouseEvent) => {
-      if (
-        contextMenuRef.current &&
-        !contextMenuRef.current.contains(e.target as Node)
-      )
-        close();
-    };
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") close();
-    };
-    document.addEventListener("mousedown", onMouseDown);
-    document.addEventListener("keydown", onKeyDown);
-    return () => {
-      document.removeEventListener("mousedown", onMouseDown);
-      document.removeEventListener("keydown", onKeyDown);
-    };
-  }, [contextMenu]);
 
   // Filter visible columns (use effective so controlled parent updates apply)
   const visibleColumns = useMemo(() => {
@@ -1261,45 +1223,13 @@ const GenericTable = <T extends Record<string, any>>({
       onSort,
     });
 
-  // Check if a row is selected
-  const isSelected = (row: T) => {
-    return selectedRows.some(
-      (selectedRow) =>
-        selectedRow[uniqueKey as keyof T] === row[uniqueKey as keyof T],
-    );
-  };
-
-  const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const branch = String(e.target.checked) as "true" | "false";
-    const selectAllHandlers: Record<"true" | "false", () => void> = {
-      true: () => onSelectionChange?.(sortedData),
-      false: () => onSelectionChange?.([]),
-    };
-    selectAllHandlers[branch]();
-  };
-
-  const applyRowCheckboxChange = (
-    row: T,
-    e: React.ChangeEvent<HTMLInputElement>,
-  ) => {
-    e.stopPropagation();
-    const branch = String(e.target.checked) as "true" | "false";
-    const rowCheckboxHandlers: Record<"true" | "false", () => void> = {
-      true: () => onSelectionChange?.([...selectedRows, row]),
-      false: () =>
-        onSelectionChange?.(
-          selectedRows.filter(
-            (r) => r[uniqueKey as keyof T] !== row[uniqueKey as keyof T],
-          ),
-        ),
-    };
-    rowCheckboxHandlers[branch]();
-  };
-
-  const filterPillMenuPopperConfig = useMemo(
-    () => DROPDOWN_MENU_POPPER_CONFIG,
-    [],
-  );
+  const { isSelected, handleSelectAll, applyRowCheckboxChange } =
+    useGenericTableRowSelection({
+      selectedRows,
+      uniqueKey,
+      onSelectionChange,
+      sortedData,
+    });
 
   const renderColumnCustomizer = (toggleId: string) => (
     <GenericTableColumnCustomizerDropdown
