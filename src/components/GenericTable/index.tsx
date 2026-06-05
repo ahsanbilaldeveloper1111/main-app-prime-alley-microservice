@@ -3,6 +3,7 @@ import React, {
   useMemo,
   useRef,
   useEffect,
+  useLayoutEffect,
   useId,
   useCallback,
 } from "react";
@@ -30,6 +31,7 @@ import {
   Filter,
   MoreVertical,
   Menu,
+  RotateCcw,
 } from "lucide-react";
 import "@assets/css/GenericTable.css";
 import { DROPDOWN_MENU_POPPER_CONFIG } from "./dropdownMenuPopperConfig";
@@ -53,6 +55,268 @@ function isGenericTableInteractiveClickTarget(target: EventTarget | null): boole
 
 function isGenericTableActionColumnKey(columnKey: string): boolean {
   return columnKey === ACTION_COLUMN_KEY || columnKey === "Action";
+}
+
+const GENERIC_TABLE_MIN_COLUMN_WIDTH_PX = 72;
+const GENERIC_TABLE_COLUMN_WIDTHS_STORAGE_SUFFIX = "-widths";
+const GENERIC_TABLE_CHECKBOX_COLUMN_KEY = "__select__";
+const GENERIC_TABLE_COLUMN_PICKER_WIDTH_PX = 52;
+const GENERIC_TABLE_SELECT_COLUMN_WIDTH_PX = 40;
+const GENERIC_TABLE_DEFAULT_COLUMN_WIDTH_PX = 96;
+const GENERIC_TABLE_COLUMN_RESIZE_DRAG_THRESHOLD_PX = 3;
+const GENERIC_TABLE_ACTIONS_COLUMN_BUTTON_PX = 36;
+const GENERIC_TABLE_ACTIONS_COLUMN_PADDING_PX = 16;
+
+function parseGenericTablePxWidth(width: string | undefined): number | undefined {
+  if (!width) return undefined;
+  const match = /^(\d+(?:\.\d+)?)px$/i.exec(width.trim());
+  return match ? Number.parseFloat(match[1]) : undefined;
+}
+
+function readStoredGenericTableColumnWidths(
+  storageKey: string | undefined,
+): Record<string, number> {
+  if (!storageKey || globalThis.window === undefined) return {};
+  try {
+    const raw = globalThis.localStorage.getItem(
+      `${storageKey}${GENERIC_TABLE_COLUMN_WIDTHS_STORAGE_SUFFIX}`,
+    );
+    if (!raw) return {};
+    const parsed: unknown = JSON.parse(raw);
+    if (typeof parsed !== "object" || parsed === null) return {};
+    return Object.fromEntries(
+      Object.entries(parsed).filter(
+        ([, value]) =>
+          typeof value === "number" &&
+          value >= GENERIC_TABLE_MIN_COLUMN_WIDTH_PX,
+      ),
+    ) as Record<string, number>;
+  } catch {
+    return {};
+  }
+}
+
+function getPersistableGenericTableColumnWidths(
+  widths: Record<string, number>,
+): Record<string, number> {
+  return Object.fromEntries(
+    Object.entries(widths).filter(
+      ([key]) => key !== GENERIC_TABLE_CHECKBOX_COLUMN_KEY,
+    ),
+  );
+}
+
+function resolveGenericTableColumnResizeMinWidthPx(
+  columnKey: string,
+  actionsCount: number,
+): number {
+  if (columnKey === ACTION_COLUMN_KEY) {
+    return estimateGenericTableActionsColumnMinWidthPx(actionsCount);
+  }
+  return GENERIC_TABLE_MIN_COLUMN_WIDTH_PX;
+}
+
+function writeStoredGenericTableColumnWidths(
+  storageKey: string | undefined,
+  widths: Record<string, number>,
+) {
+  if (!storageKey || globalThis.window === undefined) return;
+  const persistableWidths = getPersistableGenericTableColumnWidths(widths);
+  const storageItemKey = `${storageKey}${GENERIC_TABLE_COLUMN_WIDTHS_STORAGE_SUFFIX}`;
+  if (Object.keys(persistableWidths).length === 0) {
+    globalThis.localStorage.removeItem(storageItemKey);
+    return;
+  }
+  globalThis.localStorage.setItem(
+    storageItemKey,
+    JSON.stringify(persistableWidths),
+  );
+}
+
+function clearStoredGenericTableColumnWidths(storageKey: string | undefined) {
+  if (!storageKey || globalThis.window === undefined) return;
+  globalThis.localStorage.removeItem(
+    `${storageKey}${GENERIC_TABLE_COLUMN_WIDTHS_STORAGE_SUFFIX}`,
+  );
+}
+
+function estimateGenericTableActionsColumnMinWidthPx(
+  actionCount: number,
+): number {
+  if (actionCount <= 0) return 0;
+  return Math.max(
+    GENERIC_TABLE_MIN_COLUMN_WIDTH_PX,
+    actionCount * GENERIC_TABLE_ACTIONS_COLUMN_BUTTON_PX +
+      GENERIC_TABLE_ACTIONS_COLUMN_PADDING_PX,
+  );
+}
+
+function snapshotGenericTableHeaderWidths(
+  table: HTMLTableElement,
+): Record<string, number> {
+  const widths: Record<string, number> = {};
+  table.querySelectorAll<HTMLTableCellElement>("thead th").forEach((header) => {
+    const measuredWidth = Math.max(
+      GENERIC_TABLE_MIN_COLUMN_WIDTH_PX,
+      Math.round(header.getBoundingClientRect().width),
+    );
+    const key = header.dataset.colKey;
+    if (key) {
+      widths[key] = measuredWidth;
+      return;
+    }
+    if (header.querySelector('.form-check-input[type="checkbox"]')) {
+      widths[GENERIC_TABLE_CHECKBOX_COLUMN_KEY] = measuredWidth;
+    }
+  });
+  return widths;
+}
+
+function computeResizedGenericTableWidthPx({
+  columnWidths,
+  selectable,
+  visibleColumns,
+  showColumnPickerPlaceholder,
+  actionsColumnVisible,
+  actionsCount,
+}: {
+  columnWidths: Record<string, number>;
+  selectable: boolean;
+  visibleColumns: TableColumn[];
+  showColumnPickerPlaceholder: boolean;
+  actionsColumnVisible: boolean;
+  actionsCount: number;
+}): number | undefined {
+  if (Object.keys(columnWidths).length === 0) return undefined;
+
+  let total = 0;
+  if (selectable) {
+    total +=
+      columnWidths[GENERIC_TABLE_CHECKBOX_COLUMN_KEY] ??
+      GENERIC_TABLE_SELECT_COLUMN_WIDTH_PX;
+  }
+
+  visibleColumns.forEach((col) => {
+    total +=
+      columnWidths[col.key] ??
+      parseGenericTablePxWidth(col.width) ??
+      GENERIC_TABLE_DEFAULT_COLUMN_WIDTH_PX;
+  });
+
+  if (showColumnPickerPlaceholder) {
+    total += GENERIC_TABLE_COLUMN_PICKER_WIDTH_PX;
+  }
+
+  if (actionsColumnVisible) {
+    total +=
+      columnWidths[ACTION_COLUMN_KEY] ??
+      estimateGenericTableActionsColumnMinWidthPx(actionsCount);
+  }
+
+  return total;
+}
+
+function buildGenericTableActionsColumnWidthStyle(
+  actionCount: number,
+  columnWidths: Record<string, number>,
+  active: boolean,
+): React.CSSProperties | undefined {
+  if (!active || actionCount <= 0) return undefined;
+  const widthPx =
+    columnWidths[ACTION_COLUMN_KEY] ??
+    estimateGenericTableActionsColumnMinWidthPx(actionCount);
+  return buildFixedGenericTableColumnWidthStyle(widthPx);
+}
+
+function isGenericTableActionsColumnWidthCustom(
+  columnWidths: Record<string, number>,
+): boolean {
+  return columnWidths[ACTION_COLUMN_KEY] !== undefined;
+}
+
+function isGenericTableColumnWidthCustom(
+  col: TableColumn,
+  columnWidths: Record<string, number>,
+): boolean {
+  return columnWidths[col.key] !== undefined;
+}
+
+function buildFixedGenericTableColumnWidthStyle(
+  widthPx: number,
+): React.CSSProperties {
+  return {
+    width: `${widthPx}px`,
+    minWidth: `${widthPx}px`,
+    maxWidth: `${widthPx}px`,
+  };
+}
+
+function buildGenericTableColumnWidthStyle(
+  col: TableColumn,
+  columnWidths: Record<string, number>,
+): React.CSSProperties | undefined {
+  const resizedWidth = columnWidths[col.key];
+  if (resizedWidth !== undefined) {
+    return buildFixedGenericTableColumnWidthStyle(resizedWidth);
+  }
+  if (col.width) {
+    return {
+      width: col.width,
+      maxWidth: col.width,
+      minWidth: 0,
+      overflow: "hidden",
+    };
+  }
+  return undefined;
+}
+
+function GenericTableColumnWidthResetButton({
+  columnKey,
+  onResizeReset,
+}: Readonly<{
+  columnKey: string;
+  onResizeReset: (columnKey: string) => void;
+}>) {
+  return (
+    <button
+      type="button"
+      className="generic-table-th__reset-width"
+      aria-label={`Reset ${columnKey} column width`}
+      title="Reset column width"
+      tabIndex={-1}
+      onClick={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        onResizeReset(columnKey);
+      }}
+      onMouseDown={(e) => e.stopPropagation()}
+    >
+      <RotateCcw size={11} aria-hidden />
+    </button>
+  );
+}
+
+function GenericTableColumnResizeHandle({
+  columnKey,
+  onResizeStart,
+}: Readonly<{
+  columnKey: string;
+  onResizeStart: (columnKey: string, event: React.MouseEvent) => void;
+}>) {
+  return (
+    <button
+      type="button"
+      className="generic-table-th__resize-handle"
+      aria-label={`Resize ${columnKey} column`}
+      title="Drag to resize"
+      tabIndex={-1}
+      onMouseDown={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        onResizeStart(columnKey, e);
+      }}
+    />
+  );
 }
 
 // Type definitions
@@ -589,6 +853,8 @@ export interface GenericTableProps<T = any> {
   defaultSelectedColumns?: string[];
   onColumnChange?: (selectedColumns: string[]) => void;
   columnStorageKey?: string;
+  /** When true (default), data column headers can be resized by dragging. */
+  resizableColumns?: boolean;
   /**
    * Keeps the actions column visible. Defaults to true when row actions are enabled.
    * Set false to let users hide Actions via the column picker.
@@ -1221,6 +1487,7 @@ function GenericTableBodyDataCell<T extends Record<string, any>>({
   onFirstColumnClick,
   onPreviewClick,
   hoveredRowIndex,
+  columnWidthStyle,
 }: Readonly<{
   col: TableColumn<T>;
   row: T;
@@ -1229,6 +1496,7 @@ function GenericTableBodyDataCell<T extends Record<string, any>>({
   onFirstColumnClick?: (row: T, index: number) => void;
   onPreviewClick?: (row: T, index: number) => void;
   hoveredRowIndex: number | null;
+  columnWidthStyle?: React.CSSProperties;
 }>) {
   const cellContent = renderGenericTableCellContent(col, row, index);
   const firstColumnClickable = colIdx === 0 && onFirstColumnClick !== undefined;
@@ -1243,14 +1511,7 @@ function GenericTableBodyDataCell<T extends Record<string, any>>({
         verticalAlign: "top",
         textAlign: col.align || "left",
         position: colIdx === 0 ? "relative" : undefined,
-        ...(col.width
-          ? {
-              width: col.width,
-              maxWidth: col.width,
-              minWidth: 0,
-              overflow: "hidden",
-            }
-          : {}),
+        ...columnWidthStyle,
       }}
     >
       {firstColumnClickable ? (
@@ -1437,6 +1698,7 @@ const GenericTable = <T extends Record<string, any>>({
   defaultSelectedColumns,
   onColumnChange,
   columnStorageKey,
+  resizableColumns = true,
   pinActionsColumn: pinActionsColumnProp,
   onRowClick,
   onRowDoubleClick,
@@ -1620,6 +1882,148 @@ const GenericTable = <T extends Record<string, any>>({
   // Hover state for preview button
   const [hoveredRowIndex, setHoveredRowIndex] = useState<number | null>(null);
 
+  const [columnWidths, setColumnWidths] = useState<Record<string, number>>(
+    () => readStoredGenericTableColumnWidths(columnStorageKey),
+  );
+  const columnResizeDragRef = useRef<{
+    columnKey: string;
+    startX: number;
+    startWidth: number;
+  } | null>(null);
+  const tableScrollRef = useRef<HTMLDivElement>(null);
+  const columnWidthsHydratedRef = useRef(false);
+
+  const handleColumnResizeStart = useCallback(
+    (columnKey: string, event: React.MouseEvent) => {
+      if (!resizableColumns) return;
+      const table = (event.currentTarget as HTMLElement).closest("table");
+      const th = (event.currentTarget as HTMLElement).closest("th");
+      if (!table || !th) return;
+
+      const minWidthPx = resolveGenericTableColumnResizeMinWidthPx(
+        columnKey,
+        actions.length,
+      );
+      const startWidth = Math.max(
+        minWidthPx,
+        Math.round(th.getBoundingClientRect().width),
+      );
+      let didDrag = false;
+
+      columnResizeDragRef.current = {
+        columnKey,
+        startX: event.clientX,
+        startWidth,
+      };
+
+      const onMouseMove = (moveEvent: MouseEvent) => {
+        const drag = columnResizeDragRef.current;
+        if (!drag) return;
+
+        const deltaX = moveEvent.clientX - drag.startX;
+        if (!didDrag) {
+          if (Math.abs(deltaX) < GENERIC_TABLE_COLUMN_RESIZE_DRAG_THRESHOLD_PX) {
+            return;
+          }
+          didDrag = true;
+          const snappedWidths = snapshotGenericTableHeaderWidths(table);
+          setColumnWidths((prev) => ({
+            ...snappedWidths,
+            ...prev,
+            [drag.columnKey]: drag.startWidth,
+          }));
+          columnWidthsHydratedRef.current = true;
+          document.body.classList.add("generic-table-col-resizing");
+        }
+
+        const minWidthPx = resolveGenericTableColumnResizeMinWidthPx(
+          drag.columnKey,
+          actions.length,
+        );
+        const nextWidth = Math.max(
+          minWidthPx,
+          drag.startWidth + deltaX,
+        );
+        setColumnWidths((prev) => ({ ...prev, [drag.columnKey]: nextWidth }));
+      };
+
+      const onMouseUp = () => {
+        document.removeEventListener("mousemove", onMouseMove);
+        document.removeEventListener("mouseup", onMouseUp);
+        document.body.classList.remove("generic-table-col-resizing");
+        if (didDrag && columnStorageKey) {
+          setColumnWidths((prev) => {
+            writeStoredGenericTableColumnWidths(columnStorageKey, prev);
+            return prev;
+          });
+        }
+        columnResizeDragRef.current = null;
+      };
+
+      document.addEventListener("mousemove", onMouseMove);
+      document.addEventListener("mouseup", onMouseUp);
+    },
+    [resizableColumns, columnStorageKey, actions.length],
+  );
+
+  const persistColumnWidths = useCallback(
+    (widths: Record<string, number>) => {
+      if (columnStorageKey) {
+        writeStoredGenericTableColumnWidths(columnStorageKey, widths);
+      }
+    },
+    [columnStorageKey],
+  );
+
+  const handleColumnWidthReset = useCallback(
+    (columnKey: string) => {
+      setColumnWidths((prev) => {
+        if (prev[columnKey] === undefined) {
+          return prev;
+        }
+        const next = { ...prev };
+        delete next[columnKey];
+        persistColumnWidths(next);
+        return next;
+      });
+    },
+    [persistColumnWidths],
+  );
+
+  const handleResetAllColumnWidths = useCallback(() => {
+    setColumnWidths({});
+    clearStoredGenericTableColumnWidths(columnStorageKey);
+  }, [columnStorageKey]);
+
+  const hasCustomColumnWidths = useMemo(
+    () =>
+      Object.keys(getPersistableGenericTableColumnWidths(columnWidths)).length >
+      0,
+    [columnWidths],
+  );
+
+  const actionsColumnWidthStyle = useMemo(
+    () =>
+      buildGenericTableActionsColumnWidthStyle(
+        actions.length,
+        columnWidths,
+        resizableColumns && hasCustomColumnWidths && actionsColumnVisible,
+      ),
+    [
+      actions.length,
+      columnWidths,
+      resizableColumns,
+      hasCustomColumnWidths,
+      actionsColumnVisible,
+    ],
+  );
+
+  const getColumnWidthStyle = useCallback(
+    (col: TableColumn<T>) =>
+      buildGenericTableColumnWidthStyle(col, columnWidths),
+    [columnWidths],
+  );
+
   // Filter pills visibility state (hidden by default)
   const [showFilterPills, setShowFilterPills] = useState(
     toolbar?.showFilterPills ?? false,
@@ -1681,6 +2085,73 @@ const GenericTable = <T extends Record<string, any>>({
   /** No data columns and no actions column: still show the picker (e.g. optional row without actions). */
   const showColumnPickerPlaceholder =
     customizableColumns && visibleColumns.length === 0 && !actionsColumnVisible;
+
+  useLayoutEffect(() => {
+    if (!resizableColumns || !hasCustomColumnWidths) {
+      columnWidthsHydratedRef.current = false;
+      return;
+    }
+
+    const table = tableScrollRef.current?.querySelector("table");
+    if (!table) return;
+
+    const persistable = getPersistableGenericTableColumnWidths(columnWidths);
+    if (Object.keys(persistable).length === 0) return;
+
+    if (columnWidthsHydratedRef.current) return;
+
+    const hasMissingDataColumn = visibleColumns.some(
+      (col) => columnWidths[col.key] === undefined,
+    );
+    if (!hasMissingDataColumn) {
+      columnWidthsHydratedRef.current = true;
+      return;
+    }
+
+    const snapped = snapshotGenericTableHeaderWidths(table);
+    setColumnWidths((prev) => ({ ...snapped, ...prev }));
+    columnWidthsHydratedRef.current = true;
+  }, [
+    resizableColumns,
+    hasCustomColumnWidths,
+    visibleColumns,
+    columnWidths,
+  ]);
+
+  const checkboxColumnWidthStyle = useMemo((): React.CSSProperties => {
+    if (!selectable) return { width: "40px" };
+    if (!hasCustomColumnWidths) return { width: "40px" };
+    const widthPx =
+      columnWidths[GENERIC_TABLE_CHECKBOX_COLUMN_KEY] ??
+      GENERIC_TABLE_SELECT_COLUMN_WIDTH_PX;
+    return buildFixedGenericTableColumnWidthStyle(widthPx);
+  }, [selectable, hasCustomColumnWidths, columnWidths]);
+
+  const resizedTableWidthPx = useMemo(() => {
+    if (!resizableColumns) return undefined;
+    return computeResizedGenericTableWidthPx({
+      columnWidths,
+      selectable,
+      visibleColumns,
+      showColumnPickerPlaceholder,
+      actionsColumnVisible,
+      actionsCount: actions.length,
+    });
+  }, [
+    resizableColumns,
+    columnWidths,
+    selectable,
+    visibleColumns,
+    showColumnPickerPlaceholder,
+    actionsColumnVisible,
+    actions.length,
+  ]);
+
+  const resizedTableStyle = useMemo((): React.CSSProperties | undefined => {
+    if (!resizableColumns || !hasCustomColumnWidths) return undefined;
+    if (resizedTableWidthPx === undefined) return undefined;
+    return buildFixedGenericTableColumnWidthStyle(resizedTableWidthPx);
+  }, [resizableColumns, hasCustomColumnWidths, resizedTableWidthPx]);
 
   // Sortable columns for toolbar Sort dropdown
   const sortableColumns = useMemo(
@@ -1834,6 +2305,26 @@ const GenericTable = <T extends Record<string, any>>({
     [],
   );
 
+  const renderResetAllColumnWidthsButton = () => {
+    if (!resizableColumns || !hasCustomColumnWidths) {
+      return null;
+    }
+
+    return (
+      <div className="generic-table-width-reset-bar">
+        <Button
+          variant="link"
+          size="sm"
+          className="generic-table-reset-all-widths-btn"
+          onClick={handleResetAllColumnWidths}
+        >
+          <RotateCcw size={14} aria-hidden />
+          Reset column widths
+        </Button>
+      </div>
+    );
+  };
+
   const renderColumnCustomizerDropdown = (toggleId: string) => (
     <Dropdown
       drop="down"
@@ -1911,6 +2402,11 @@ const GenericTable = <T extends Record<string, any>>({
         >
           Reset to Default
         </Dropdown.Item>
+        {resizableColumns && hasCustomColumnWidths && (
+          <Dropdown.Item onClick={handleResetAllColumnWidths}>
+            Reset column widths
+          </Dropdown.Item>
+        )}
       </Dropdown.Menu>
     </Dropdown>
   );
@@ -2568,7 +3064,7 @@ const GenericTable = <T extends Record<string, any>>({
           {selectable && (
             <td
               className="generic-table-td"
-              style={{ width: "40px" }}
+              style={checkboxColumnWidthStyle}
               onClick={(e) => e.stopPropagation()}
             >
               <Form.Check
@@ -2591,6 +3087,7 @@ const GenericTable = <T extends Record<string, any>>({
               onFirstColumnClick={onFirstColumnClick}
               onPreviewClick={onPreviewClick}
               hoveredRowIndex={hoveredRowIndex}
+              columnWidthStyle={getColumnWidthStyle(col)}
             />
           ))}
           {showColumnPickerPlaceholder && (
@@ -2600,6 +3097,7 @@ const GenericTable = <T extends Record<string, any>>({
             <td
               className="generic-table-td generic-table-actions-cell"
               data-col-key={ACTION_COLUMN_KEY}
+              style={actionsColumnWidthStyle}
               onMouseDown={(e) => e.stopPropagation()}
               onClick={(e) => e.stopPropagation()}
             >
@@ -2618,7 +3116,9 @@ const GenericTable = <T extends Record<string, any>>({
   };
 
   return (
-    <div className="generic-table-container">
+    <div
+      className={`generic-table-container${resizableColumns ? " generic-table-container--column-resize" : ""}${hasCustomColumnWidths ? " generic-table-container--column-resize-active" : ""}`}
+    >
       {/* Right‑click context menu */}
       {contextMenu && (
         <div
@@ -2649,8 +3149,10 @@ const GenericTable = <T extends Record<string, any>>({
           }
         >
           <Card.Body className="p-0">
+            {renderResetAllColumnWidthsButton()}
             <div
-              className={`generic-table-responsive ${fixedHeight ? "fixed-height-table" : ""}`}
+              ref={tableScrollRef}
+              className={`generic-table-responsive ${fixedHeight ? "fixed-height-table" : ""}${resizableColumns ? " generic-table-responsive--column-resize" : ""}${hasCustomColumnWidths ? " generic-table-responsive--column-resize-active" : ""}`}
               style={
                 fixedHeight
                   ? {
@@ -2665,14 +3167,15 @@ const GenericTable = <T extends Record<string, any>>({
                 striped={striped}
                 bordered={bordered}
                 size={size}
-                className="generic-table mb-0"
+                className={`generic-table mb-0 generic-table--compact${resizableColumns ? " generic-table--column-resize" : ""}${hasCustomColumnWidths ? " generic-table--column-resize-active" : ""}`}
+                style={resizedTableStyle}
               >
                 <thead className="generic-table-header">
                   <tr>
                     {selectable && (
                       <th
                         className="generic-table-th"
-                        style={{ width: "40px" }}
+                        style={checkboxColumnWidthStyle}
                       >
                         <Form.Check
                           type="checkbox"
@@ -2698,9 +3201,16 @@ const GenericTable = <T extends Record<string, any>>({
                           className={`generic-table-th ${col.sortable !== false && sortable ? "sortable" : ""}`}
                           style={{
                             textAlign: col.align || "left",
-                            ...(col.width ? { width: col.width } : {}),
+                            ...getColumnWidthStyle(col),
                           }}
                           onClick={(e) => {
+                            if (
+                              (e.target as HTMLElement).closest(
+                                ".generic-table-th__resize-handle, .generic-table-th__reset-width",
+                              )
+                            ) {
+                              return;
+                            }
                             if (
                               showCustomizerInDataHeader &&
                               (e.target as HTMLElement).closest(".dropdown")
@@ -2724,6 +3234,23 @@ const GenericTable = <T extends Record<string, any>>({
                                 columnCustomizerHeaderId,
                               )}
                           </div>
+                          {resizableColumns && (
+                            <>
+                              {isGenericTableColumnWidthCustom(
+                                col,
+                                columnWidths,
+                              ) && (
+                                <GenericTableColumnWidthResetButton
+                                  columnKey={col.key}
+                                  onResizeReset={handleColumnWidthReset}
+                                />
+                              )}
+                              <GenericTableColumnResizeHandle
+                                columnKey={col.key}
+                                onResizeStart={handleColumnResizeStart}
+                              />
+                            </>
+                          )}
                         </th>
                       );
                     })}
@@ -2744,6 +3271,7 @@ const GenericTable = <T extends Record<string, any>>({
                       <th
                         className="generic-table-th generic-table-actions-header"
                         data-col-key={ACTION_COLUMN_KEY}
+                        style={actionsColumnWidthStyle}
                       >
                         <div className="d-flex align-items-center justify-content-center gap-1 w-100">
                           <span className="text-center">{actionsLabel}</span>
@@ -2752,6 +3280,22 @@ const GenericTable = <T extends Record<string, any>>({
                               columnCustomizerActionsHeaderId,
                             )}
                         </div>
+                        {resizableColumns && (
+                          <>
+                            {isGenericTableActionsColumnWidthCustom(
+                              columnWidths,
+                            ) && (
+                              <GenericTableColumnWidthResetButton
+                                columnKey={ACTION_COLUMN_KEY}
+                                onResizeReset={handleColumnWidthReset}
+                              />
+                            )}
+                            <GenericTableColumnResizeHandle
+                              columnKey={ACTION_COLUMN_KEY}
+                              onResizeStart={handleColumnResizeStart}
+                            />
+                          </>
+                        )}
                       </th>
                     )}
                   </tr>
