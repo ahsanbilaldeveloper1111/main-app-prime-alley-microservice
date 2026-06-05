@@ -37,6 +37,10 @@
     max-width: 100%;
   }
 
+  .generic-table--column-resize .generic-table-th {
+    max-width: none !important;
+  }
+
   .generic-table-th.sortable {
     min-width: 0 !important;
     max-width: none;

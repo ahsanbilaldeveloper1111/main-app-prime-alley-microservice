@@ -7,10 +7,11 @@
   width: 100%;
   max-width: 100%;
   box-sizing: border-box;
-  overflow-x: clip;
+  overflow-x: visible;
 
   .users-teams-settings-page {
     @include settings-embedded-page-shell;
+    overflow-x: visible;
   }
 
   .users-teams-settings-page__toolbar {

@@ -17,6 +17,15 @@
     overflow: hidden;
   }
 
+  .generic-table-container--column-resize-active .generic-table-card {
+    overflow: visible !important;
+  }
+
+  .generic-table-responsive--column-resize-active {
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch;
+  }
+
   .generic-table-responsive {
     width: 100%;
     max-width: 100%;
@@ -31,6 +40,10 @@
   .generic-table-th {
     overflow: hidden;
     max-width: 100%;
+  }
+
+  .generic-table--column-resize .generic-table-th {
+    max-width: none !important;
   }
 
   .generic-table-th.sortable {
