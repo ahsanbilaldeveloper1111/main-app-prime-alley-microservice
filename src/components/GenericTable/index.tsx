@@ -13,7 +13,6 @@ import {
 import "@assets/css/GenericTable.css";
 import { DROPDOWN_MENU_POPPER_CONFIG } from "./dropdownMenuPopperConfig";
 import { GenericTableMobileActionsMenu } from "./GenericTableMobileActionsMenu";
-import { StatsCardData } from "@components/GenericStatsCards";
 import {
   GENERIC_TABLE_ACTION_COLUMN_KEY,
 } from "./genericTableColumnResize";
@@ -34,7 +33,7 @@ import {
   shouldRenderDefaultTableBody,
 } from "./genericTableClassNames";
 
-import type { ToolbarConfig } from "./genericTableTypes";
+import type { GenericTableProps } from "./genericTableProps";
 
 export type {
   TabConfig,
@@ -42,6 +41,8 @@ export type {
   ToolbarTabsDropdownItem,
   ToolbarConfig,
 } from "./genericTableTypes";
+
+export type { GenericTableProps, PaginationConfig } from "./genericTableProps";
 
 const ACTION_COLUMN_KEY = GENERIC_TABLE_ACTION_COLUMN_KEY;
 
@@ -397,99 +398,6 @@ export const GtContextMenuItemList: React.FC<{
     )}
   </>
 );
-
-export interface PaginationConfig {
-  currentPage: number;
-  rowsPerPage: number;
-  totalRows: number;
-  pageSizeOptions?: number[];
-}
-
-export interface GenericTableProps<T = any> {
-  // Data
-  data: T[];
-  columns: TableColumn<T>[];
-
-  // Pagination
-  pagination?: PaginationConfig;
-  onPaginationChange?: (page: number, rowsPerPage: number) => void;
-
-  // Sorting
-  sortable?: boolean;
-  defaultSortBy?: string;
-  defaultSortOrder?: "asc" | "desc";
-  onSort?: (column: string, direction: "asc" | "desc") => void;
-
-  // Actions
-  actions?: TableAction<T>[];
-  showActions?: boolean;
-  actionsLabel?: string;
-
-  // Selection
-  selectable?: boolean;
-  selectedRows?: T[];
-  onSelectionChange?: (selected: T[]) => void;
-
-  // Column customization
-  customizableColumns?: boolean;
-  /** When provided, column selection is controlled by the parent (e.g. from ColumnEditorModal) */
-  selectedColumns?: string[];
-  defaultSelectedColumns?: string[];
-  onColumnChange?: (selectedColumns: string[]) => void;
-  columnStorageKey?: string;
-  /** When true (default), data column headers can be resized by dragging. */
-  resizableColumns?: boolean;
-  /**
-   * Keeps the actions column visible. Defaults to true when row actions are enabled.
-   * Set false to let users hide Actions via the column picker.
-   */
-  pinActionsColumn?: boolean;
-
-  // Row interactions
-  onRowClick?: (row: T, index: number) => void;
-  onRowDoubleClick?: (row: T, index: number) => void;
-  onPreviewClick?: (row: T, index: number) => void; // Preview button click handler
-  onFirstColumnClick?: (row: T, index: number) => void; // First column click handler
-  rowClassName?: (row: T, index: number) => string;
-
-  // Styling
-  striped?: boolean;
-  hover?: boolean;
-  bordered?: boolean;
-  size?: "sm" | "md" | "lg";
-
-  // Loading & Empty states
-  loading?: boolean;
-  emptyMessage?: string | React.ReactNode;
-  loadingMessage?: string | React.ReactNode;
-
-  // Toolbar configuration
-  toolbar?: ToolbarConfig;
-  showToolbar?: boolean;
-
-  // Misc
-  uniqueKey?: string; // Key to use for row key (default: 'id')
-
-  // Fixed height mode
-  fixedHeight?: boolean; // Enable fixed height with scrollable body
-  maxHeight?: string; // Max height for the table body (e.g., 'calc(100vh - 300px)')
-
-  // Stats cards
-  statsCards?: StatsCardData[]; // Stats cards data to display above table
-  metricsGridMinWidth?: string; // Grid min width for metrics cards layout
-  metricsColumns?: number; // Fixed number of columns for metrics cards
-  /** When true, stats cards show on load; default is visible only at viewport >= 1920px. */
-  defaultShowMetrics?: boolean;
-
-  // Hide toolbar actions (three dots menu)
-  showToolbarActions?: boolean;
-
-  // Remove border from table card
-  noBorder?: boolean;
-
-  /** When provided (e.g. when currentTableView === 'board'), render this instead of the table */
-  customBody?: React.ReactNode;
-}
 
 function safeStringifyValue(val: unknown): string {
   if (val === null || val === undefined) return "";

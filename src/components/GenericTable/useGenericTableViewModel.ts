@@ -9,7 +9,7 @@ import { useGenericTableRowSelection } from "./useGenericTableRowSelection";
 import { useGenericTableSorting } from "./useGenericTableSorting";
 import { useGenericTableToolbarSearch } from "./useGenericTableToolbarSearch";
 import { useGenericTableToolbarUiState } from "./useGenericTableToolbarUiState";
-import type { GenericTableProps } from "./index";
+import type { GenericTableProps } from "./genericTableProps";
 
 const ACTION_COLUMN_KEY = GENERIC_TABLE_ACTION_COLUMN_KEY;
 
