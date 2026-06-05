@@ -14,12 +14,15 @@ export function useGenericTableContextMenu<T>() {
     }
     const close = () => setContextMenu(null);
     const onMouseDown = (e: MouseEvent) => {
-      if (
-        contextMenuRef.current &&
-        !contextMenuRef.current.contains(e.target as Node)
-      ) {
-        close();
+      const menuEl = contextMenuRef.current;
+      if (!menuEl) {
+        return;
       }
+      const { target } = e;
+      if (target instanceof Node && menuEl.contains(target)) {
+        return;
+      }
+      close();
     };
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {

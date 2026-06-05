@@ -1,4 +1,4 @@
-﻿import React, { useMemo, useId } from "react";
+﻿import React, { useMemo, useCallback } from "react";
 import {
   Table,
   Form,
@@ -16,18 +16,23 @@ import { GenericTableMobileActionsMenu } from "./GenericTableMobileActionsMenu";
 import { StatsCardData } from "@components/GenericStatsCards";
 import {
   GENERIC_TABLE_ACTION_COLUMN_KEY,
-  useGenericTableColumnResize,
 } from "./genericTableColumnResize";
-import { useGenericTableColumnSelection } from "./useGenericTableColumnSelection";
-import { useGenericTableSorting } from "./useGenericTableSorting";
-import { useGenericTableToolbarSearch } from "./useGenericTableToolbarSearch";
 import { GenericTableToolbarSection } from "./GenericTableToolbarSection";
 import { GenericTablePaginationControls } from "./GenericTablePagination";
 import { GenericTableHeader } from "./GenericTableHeader";
 import { GenericTableColumnCustomizerDropdown } from "./GenericTableColumnCustomizerDropdown";
-import { useGenericTableContextMenu } from "./useGenericTableContextMenu";
-import { useGenericTableRowSelection } from "./useGenericTableRowSelection";
-import { useGenericTableToolbarUiState } from "./useGenericTableToolbarUiState";
+import {
+  useGenericTableViewModel,
+  type GenericTableViewModel,
+} from "./useGenericTableViewModel";
+import {
+  getGenericTableCardClassName,
+  getGenericTableClassName,
+  getGenericTableContainerClassName,
+  getGenericTableResponsiveClassName,
+  getGenericTableScrollStyle,
+  shouldRenderDefaultTableBody,
+} from "./genericTableClassNames";
 
 import type { ToolbarConfig } from "./genericTableTypes";
 
@@ -1079,91 +1084,63 @@ function GenericTableBodyRows<T extends Record<string, any>>({
   });
 }
 
-const GenericTable = <T extends Record<string, any>>({
-  data,
-  columns,
-  pagination,
-  onPaginationChange,
-  sortable = true,
-  defaultSortBy = "",
-  defaultSortOrder = "asc",
-  onSort,
-  actions = [],
-  showActions = true,
-  actionsLabel = "Actions",
-  selectable = false,
-  selectedRows = [],
-  onSelectionChange,
-  customizableColumns = false,
-  selectedColumns: selectedColumnsProp,
-  defaultSelectedColumns,
-  onColumnChange,
-  columnStorageKey,
-  resizableColumns = true,
-  pinActionsColumn: pinActionsColumnProp,
-  onRowClick,
-  onRowDoubleClick,
-  onPreviewClick,
-  onFirstColumnClick,
-  rowClassName,
-  striped = false,
-  hover = true,
-  bordered = false,
-  size = "md",
-  loading = false,
-  emptyMessage = "No data available",
-  loadingMessage = "Loading...",
-  toolbar,
-  showToolbar = false,
-  uniqueKey = "id",
-  fixedHeight = false,
-  maxHeight = "calc(100vh - 300px)",
-  statsCards,
-  metricsGridMinWidth = "200px",
-  metricsColumns,
-  defaultShowMetrics,
-  showToolbarActions = true,
-  noBorder = false,
-  customBody,
-}: GenericTableProps<T>) => {
-  const columnCustomizerHeaderId = useId();
-  const columnCustomizerPlaceholderId = useId();
-  const columnCustomizerActionsHeaderId = useId();
-
+function GenericTableView<T extends Record<string, any>>({
+  vm,
+}: Readonly<{ vm: GenericTableViewModel<T> }>) {
   const {
+    pagination,
+    onPaginationChange,
+    actions,
+    actionsLabel,
+    selectable,
+    customizableColumns,
+    selectedColumnsProp,
+    defaultSelectedColumns,
+    onColumnChange,
+    columnStorageKey,
+    resizableColumns,
+    pinActionsColumn,
+    onRowClick,
+    onRowDoubleClick,
+    onPreviewClick,
+    onFirstColumnClick,
+    rowClassName,
+    striped,
+    hover,
+    bordered,
+    size,
+    loading,
+    emptyMessage,
+    loadingMessage,
+    toolbar,
+    showToolbar,
+    uniqueKey,
+    fixedHeight,
+    maxHeight,
+    statsCards,
+    metricsGridMinWidth,
+    metricsColumns,
+    showToolbarActions,
+    noBorder,
+    customBody,
+    baseActionsEnabled,
+    actionsColumnVisible,
+    visibleColumns,
+    showColumnPickerPlaceholder,
+    columnCustomizerHeaderId,
+    columnCustomizerPlaceholderId,
+    columnCustomizerActionsHeaderId,
     debounceToolbarSearch,
     toolbarSearchDraft,
     setToolbarSearchDraft,
     flushDebouncedToolbarSearch,
-  } = useGenericTableToolbarSearch({ showToolbar, toolbar });
-
-  const baseActionsEnabled = showActions && actions.length > 0;
-  const pinActionsColumn = pinActionsColumnProp ?? baseActionsEnabled;
-
-  const {
     columnCatalog,
     setSelectedColumns,
     effectiveSelectedColumns,
     handleColumnToggle,
-  } = useGenericTableColumnSelection({
-    columns,
-    selectedColumnsProp,
-    defaultSelectedColumns,
-    columnStorageKey,
-    pinActionsColumn,
-    baseActionsEnabled,
-    onColumnChange,
-  });
-
-  const actionsColumnVisible =
-    baseActionsEnabled &&
-    (!customizableColumns ||
-      effectiveSelectedColumns.includes(ACTION_COLUMN_KEY));
-
-  const { contextMenu, setContextMenu, contextMenuRef } =
-    useGenericTableContextMenu<T>();
-
-  const {
+    contextMenu,
+    setContextMenu,
+    contextMenuRef,
     showFilterPills,
     setShowFilterPills,
     showMetrics,
@@ -1175,24 +1152,6 @@ const GenericTable = <T extends Record<string, any>>({
     hoveredRowIndex,
     setHoveredRowIndex,
     filterPillMenuPopperConfig,
-  } = useGenericTableToolbarUiState({ toolbar, defaultShowMetrics });
-
-  const getBoundContextMenuItems = useMemo(
-    () => (row: T) => buildBoundTableContextMenuItems(actions, row),
-    [actions],
-  );
-
-  // Filter visible columns (use effective so controlled parent updates apply)
-  const visibleColumns = useMemo(() => {
-    if (!customizableColumns) return columns;
-    return columns.filter((col) => effectiveSelectedColumns.includes(col.key));
-  }, [columns, effectiveSelectedColumns, customizableColumns]);
-
-  /** No data columns and no actions column: still show the picker (e.g. optional row without actions). */
-  const showColumnPickerPlaceholder =
-    customizableColumns && visibleColumns.length === 0 && !actionsColumnVisible;
-
-  const {
     tableScrollRef,
     columnWidths,
     hasCustomColumnWidths,
@@ -1203,59 +1162,170 @@ const GenericTable = <T extends Record<string, any>>({
     getColumnWidthStyle,
     checkboxColumnWidthStyle,
     resizedTableStyle,
-  } = useGenericTableColumnResize({
+    sortable,
+    sortBy,
+    sortOrder,
+    sortableColumns,
+    sortedData,
+    handleSort,
+    isSelected,
+    handleSelectAll,
+    applyRowCheckboxChange,
+  } = vm;
+
+  const getBoundContextMenuItems = useMemo(
+    () => (row: T) => buildBoundTableContextMenuItems(actions, row),
+    [actions],
+  );
+
+  const renderColumnCustomizer = useCallback(
+    (toggleId: string) => (
+      <GenericTableColumnCustomizerDropdown
+        toggleId={toggleId}
+        columnCatalog={columnCatalog}
+        effectiveSelectedColumns={effectiveSelectedColumns}
+        baseActionsEnabled={baseActionsEnabled}
+        actionsLabel={actionsLabel}
+        pinActionsColumn={pinActionsColumn}
+        onColumnToggle={handleColumnToggle}
+        selectedColumnsProp={selectedColumnsProp}
+        setSelectedColumns={setSelectedColumns}
+        defaultSelectedColumns={defaultSelectedColumns}
+        columnStorageKey={columnStorageKey}
+        onColumnChange={onColumnChange}
+        resizableColumns={resizableColumns}
+        hasCustomColumnWidths={hasCustomColumnWidths}
+        onResetAllColumnWidths={handleResetAllColumnWidths}
+      />
+    ),
+    [
+      columnCatalog,
+      effectiveSelectedColumns,
+      baseActionsEnabled,
+      actionsLabel,
+      pinActionsColumn,
+      handleColumnToggle,
+      selectedColumnsProp,
+      setSelectedColumns,
+      defaultSelectedColumns,
+      columnStorageKey,
+      onColumnChange,
+      resizableColumns,
+      hasCustomColumnWidths,
+      handleResetAllColumnWidths,
+    ],
+  );
+
+  const cardClassName = getGenericTableCardClassName(noBorder);
+  const containerClassName = getGenericTableContainerClassName(
     resizableColumns,
-    columnStorageKey,
-    actionsCount: actions.length,
-    actionsColumnVisible,
-    selectable,
-    visibleColumns,
-    showColumnPickerPlaceholder,
-  });
+    hasCustomColumnWidths,
+  );
+  const responsiveClassName = getGenericTableResponsiveClassName(
+    fixedHeight,
+    resizableColumns,
+    hasCustomColumnWidths,
+  );
+  const tableClassName = getGenericTableClassName(
+    resizableColumns,
+    hasCustomColumnWidths,
+  );
+  const scrollStyle = getGenericTableScrollStyle(fixedHeight, maxHeight);
+  const showDefaultTable = shouldRenderDefaultTableBody(customBody);
 
-  const { sortBy, sortOrder, sortableColumns, sortedData, handleSort } =
-    useGenericTableSorting({
-      data,
-      visibleColumns,
-      sortable,
-      defaultSortBy,
-      defaultSortOrder,
-      onSort,
-    });
-
-  const { isSelected, handleSelectAll, applyRowCheckboxChange } =
-    useGenericTableRowSelection({
-      selectedRows,
-      uniqueKey,
-      onSelectionChange,
-      sortedData,
-    });
-
-  const renderColumnCustomizer = (toggleId: string) => (
-    <GenericTableColumnCustomizerDropdown
-      toggleId={toggleId}
-      columnCatalog={columnCatalog}
-      effectiveSelectedColumns={effectiveSelectedColumns}
-      baseActionsEnabled={baseActionsEnabled}
-      actionsLabel={actionsLabel}
-      pinActionsColumn={pinActionsColumn}
-      onColumnToggle={handleColumnToggle}
-      selectedColumnsProp={selectedColumnsProp}
-      setSelectedColumns={setSelectedColumns}
-      defaultSelectedColumns={defaultSelectedColumns}
-      columnStorageKey={columnStorageKey}
-      onColumnChange={onColumnChange}
-      resizableColumns={resizableColumns}
-      hasCustomColumnWidths={hasCustomColumnWidths}
-      onResetAllColumnWidths={handleResetAllColumnWidths}
-    />
+  const tableSection = (
+    <>
+      {resizableColumns && hasCustomColumnWidths && (
+        <div className="generic-table-width-reset-bar">
+          <Button
+            variant="link"
+            size="sm"
+            className="generic-table-reset-all-widths-btn"
+            onClick={handleResetAllColumnWidths}
+          >
+            <RotateCcw size={14} aria-hidden />
+            Reset column widths
+          </Button>
+        </div>
+      )}
+      <div ref={tableScrollRef} className={responsiveClassName} style={scrollStyle}>
+        <Table
+          hover={hover}
+          striped={striped}
+          bordered={bordered}
+          size={size}
+          className={tableClassName}
+          style={resizedTableStyle}
+        >
+          <GenericTableHeader
+            selectable={selectable}
+            sortedData={sortedData}
+            isSelected={isSelected}
+            onSelectAll={handleSelectAll}
+            checkboxColumnWidthStyle={checkboxColumnWidthStyle}
+            visibleColumns={visibleColumns}
+            sortable={sortable}
+            sortBy={sortBy}
+            sortOrder={sortOrder}
+            onSort={handleSort}
+            customizableColumns={customizableColumns}
+            actionsColumnVisible={actionsColumnVisible}
+            columnCustomizerHeaderId={columnCustomizerHeaderId}
+            columnCustomizerPlaceholderId={columnCustomizerPlaceholderId}
+            columnCustomizerActionsHeaderId={columnCustomizerActionsHeaderId}
+            renderColumnCustomizer={renderColumnCustomizer}
+            resizableColumns={resizableColumns}
+            columnWidths={columnWidths}
+            getColumnWidthStyle={getColumnWidthStyle}
+            onColumnWidthReset={handleColumnWidthReset}
+            onColumnResizeStart={handleColumnResizeStart}
+            showColumnPickerPlaceholder={showColumnPickerPlaceholder}
+            actionsLabel={actionsLabel}
+            actionsColumnWidthStyle={actionsColumnWidthStyle}
+          />
+          <tbody>
+            <GenericTableBodyRows
+              selectable={selectable}
+              visibleColumns={visibleColumns}
+              showColumnPickerPlaceholder={showColumnPickerPlaceholder}
+              actionsColumnVisible={actionsColumnVisible}
+              loading={loading}
+              loadingMessage={loadingMessage}
+              sortedData={sortedData}
+              emptyMessage={emptyMessage}
+              uniqueKey={uniqueKey}
+              onRowClick={onRowClick}
+              onRowDoubleClick={onRowDoubleClick}
+              rowClassName={rowClassName}
+              actions={actions}
+              getBoundContextMenuItems={getBoundContextMenuItems}
+              setContextMenu={setContextMenu}
+              setHoveredRowIndex={setHoveredRowIndex}
+              isSelected={isSelected}
+              applyRowCheckboxChange={applyRowCheckboxChange}
+              checkboxColumnWidthStyle={checkboxColumnWidthStyle}
+              getColumnWidthStyle={getColumnWidthStyle}
+              onFirstColumnClick={onFirstColumnClick}
+              onPreviewClick={onPreviewClick}
+              hoveredRowIndex={hoveredRowIndex}
+              actionsColumnWidthStyle={actionsColumnWidthStyle}
+            />
+          </tbody>
+        </Table>
+      </div>
+      {pagination && (
+        <div className="p-3">
+          <GenericTablePaginationControls
+            pagination={pagination}
+            onPaginationChange={onPaginationChange}
+          />
+        </div>
+      )}
+    </>
   );
 
   return (
-    <div
-      className={`generic-table-container${resizableColumns ? " generic-table-container--column-resize" : ""}${hasCustomColumnWidths ? " generic-table-container--column-resize-active" : ""}`}
-    >
-      {/* Rightâ€‘click context menu */}
+    <div className={containerClassName}>
       {contextMenu && (
         <div
           ref={contextMenuRef}
@@ -1272,7 +1342,6 @@ const GenericTable = <T extends Record<string, any>>({
         </div>
       )}
 
-      {/* Toolbar */}
       {showToolbar && toolbar && (
         <GenericTableToolbarSection
           toolbar={toolbar}
@@ -1300,130 +1369,22 @@ const GenericTable = <T extends Record<string, any>>({
         />
       )}
 
-      {/* Table or custom body (e.g. Board view) */}
-      {customBody === undefined || customBody === null ? (
-        <Card
-          className={
-            noBorder
-              ? "border-0 shadow-none generic-table-card"
-              : "border-1 shadow-sm generic-table-card"
-          }
-        >
-          <Card.Body className="p-0">
-            {resizableColumns && hasCustomColumnWidths && (
-              <div className="generic-table-width-reset-bar">
-                <Button
-                  variant="link"
-                  size="sm"
-                  className="generic-table-reset-all-widths-btn"
-                  onClick={handleResetAllColumnWidths}
-                >
-                  <RotateCcw size={14} aria-hidden />
-                  Reset column widths
-                </Button>
-              </div>
-            )}
-            <div
-              ref={tableScrollRef}
-              className={`generic-table-responsive ${fixedHeight ? "fixed-height-table" : ""}${resizableColumns ? " generic-table-responsive--column-resize" : ""}${hasCustomColumnWidths ? " generic-table-responsive--column-resize-active" : ""}`}
-              style={
-                fixedHeight
-                  ? {
-                      maxHeight,
-                      overflow: "auto",
-                    }
-                  : {}
-              }
-            >
-              <Table
-                hover={hover}
-                striped={striped}
-                bordered={bordered}
-                size={size}
-                className={`generic-table mb-0 generic-table--compact${resizableColumns ? " generic-table--column-resize" : ""}${hasCustomColumnWidths ? " generic-table--column-resize-active" : ""}`}
-                style={resizedTableStyle}
-              >
-                <GenericTableHeader
-                  selectable={selectable}
-                  sortedData={sortedData}
-                  isSelected={isSelected}
-                  onSelectAll={handleSelectAll}
-                  checkboxColumnWidthStyle={checkboxColumnWidthStyle}
-                  visibleColumns={visibleColumns}
-                  sortable={sortable}
-                  sortBy={sortBy}
-                  sortOrder={sortOrder}
-                  onSort={handleSort}
-                  customizableColumns={customizableColumns}
-                  actionsColumnVisible={actionsColumnVisible}
-                  columnCustomizerHeaderId={columnCustomizerHeaderId}
-                  columnCustomizerPlaceholderId={columnCustomizerPlaceholderId}
-                  columnCustomizerActionsHeaderId={
-                    columnCustomizerActionsHeaderId
-                  }
-                  renderColumnCustomizer={renderColumnCustomizer}
-                  resizableColumns={resizableColumns}
-                  columnWidths={columnWidths}
-                  getColumnWidthStyle={getColumnWidthStyle}
-                  onColumnWidthReset={handleColumnWidthReset}
-                  onColumnResizeStart={handleColumnResizeStart}
-                  showColumnPickerPlaceholder={showColumnPickerPlaceholder}
-                  actionsLabel={actionsLabel}
-                  actionsColumnWidthStyle={actionsColumnWidthStyle}
-                />
-                <tbody>
-                  <GenericTableBodyRows
-                    selectable={selectable}
-                    visibleColumns={visibleColumns}
-                    showColumnPickerPlaceholder={showColumnPickerPlaceholder}
-                    actionsColumnVisible={actionsColumnVisible}
-                    loading={loading}
-                    loadingMessage={loadingMessage}
-                    sortedData={sortedData}
-                    emptyMessage={emptyMessage}
-                    uniqueKey={uniqueKey}
-                    onRowClick={onRowClick}
-                    onRowDoubleClick={onRowDoubleClick}
-                    rowClassName={rowClassName}
-                    actions={actions}
-                    getBoundContextMenuItems={getBoundContextMenuItems}
-                    setContextMenu={setContextMenu}
-                    setHoveredRowIndex={setHoveredRowIndex}
-                    isSelected={isSelected}
-                    applyRowCheckboxChange={applyRowCheckboxChange}
-                    checkboxColumnWidthStyle={checkboxColumnWidthStyle}
-                    getColumnWidthStyle={getColumnWidthStyle}
-                    onFirstColumnClick={onFirstColumnClick}
-                    onPreviewClick={onPreviewClick}
-                    hoveredRowIndex={hoveredRowIndex}
-                    actionsColumnWidthStyle={actionsColumnWidthStyle}
-                  />
-                </tbody>
-              </Table>
-            </div>
-            {pagination && (
-              <div className="p-3">
-                <GenericTablePaginationControls
-                  pagination={pagination}
-                  onPaginationChange={onPaginationChange}
-                />
-              </div>
-            )}
-          </Card.Body>
+      {showDefaultTable ? (
+        <Card className={cardClassName}>
+          <Card.Body className="p-0">{tableSection}</Card.Body>
         </Card>
       ) : (
-        <Card
-          className={
-            noBorder
-              ? "border-0 shadow-none generic-table-card"
-              : "border-1 shadow-sm generic-table-card"
-          }
-        >
+        <Card className={cardClassName}>
           <Card.Body className="p-0">{customBody}</Card.Body>
         </Card>
       )}
     </div>
   );
+}
+
+const GenericTable = <T extends Record<string, any>>(props: GenericTableProps<T>) => {
+  const vm = useGenericTableViewModel(props);
+  return <GenericTableView vm={vm} />;
 };
 
 export default GenericTable;
