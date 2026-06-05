@@ -997,10 +997,7 @@ function useMyDayTasksPageController() {
   );
 
   const filteredSuggestedTasks = useMemo(
-    () =>
-      filterMyDaySuggestionTasks(suggestedTasks, suggestionFilters, todayStart, {
-        hideAlreadyInMyDay: true,
-      }),
+    () => filterMyDaySuggestionTasks(suggestedTasks, suggestionFilters, todayStart),
     [suggestedTasks, suggestionFilters, todayStart],
   );
 
@@ -1060,7 +1057,11 @@ function useMyDayTasksPageController() {
           prev.active_count == null ? prev.active_count : prev.active_count + 1,
       }));
     }
-    setSuggestedTasks((prev) => prev.filter((row) => row.id !== task.id));
+    setSuggestedTasks((prev) =>
+      prev.map((row) =>
+        row.id === task.id ? { ...row, alreadyInMyDay: true } : row,
+      ),
+    );
   }, []);
 
   const applyOptimisticMyDayRemove = useCallback((taskId: number) => {
@@ -1090,6 +1091,11 @@ function useMyDayTasksPageController() {
             ? meta.completed_count
             : Math.max(0, meta.completed_count - 1),
       }));
+      setSuggestedTasks((suggested) =>
+        suggested.map((row) =>
+          row.id === taskId ? { ...row, alreadyInMyDay: false } : row,
+        ),
+      );
       return prev.filter((row) => row.id !== taskId);
     });
   }, []);

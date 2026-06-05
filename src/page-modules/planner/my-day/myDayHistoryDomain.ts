@@ -1,4 +1,5 @@
 import {
+  readMyDayTaskCompletedFromRow,
   resolveEstimateMinutesFromRow,
   resolveMyDayTaskCount,
   resolveProjectFromRow,
@@ -180,7 +181,7 @@ export function mapHistoryRowsFromDailyLog(log: MyDayDailyLogPayload): MyDayHist
       push(mapHistoryTaskRow(record, "Deleted"));
       continue;
     }
-    const completed = record.is_completed === true || record.completed === true;
+    const completed = readMyDayTaskCompletedFromRow(record);
     push(mapHistoryTaskRow(record, completed ? "Completed" : "Active"));
   }
 
