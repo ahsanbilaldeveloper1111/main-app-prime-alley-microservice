@@ -32,12 +32,28 @@ import {
   Menu,
 } from "lucide-react";
 import "@assets/css/GenericTable.css";
+import { DROPDOWN_MENU_POPPER_CONFIG } from "./dropdownMenuPopperConfig";
 import { GenericTableMobileActionsMenu } from "./GenericTableMobileActionsMenu";
 import StatsCards, { StatsCardData } from "@components/GenericStatsCards";
 import { useRouter } from "next/router";
 import { sanitizeSearchInputLive } from "@utils/Helper";
 
 const ACTION_COLUMN_KEY = "actions";
+
+function isGenericTableInteractiveClickTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof Element)) {
+    return false;
+  }
+  return Boolean(
+    target.closest(
+      'button, a, input, select, textarea, label, .dropdown-menu, .dropdown, [role="menu"], [role="menuitem"]',
+    ),
+  );
+}
+
+function isGenericTableActionColumnKey(columnKey: string): boolean {
+  return columnKey === ACTION_COLUMN_KEY || columnKey === "Action";
+}
 
 // Type definitions
 export interface TableColumn<T = any> {
@@ -1221,8 +1237,8 @@ function GenericTableBodyDataCell<T extends Record<string, any>>({
     <td
       className="generic-table-td"
       data-col-key={col.key}
-      onClick={col.key === "Action" ? (e) => e.stopPropagation() : undefined}
-      onMouseDown={col.key === "Action" ? (e) => e.stopPropagation() : undefined}
+      onClick={isGenericTableActionColumnKey(col.key) ? (e) => e.stopPropagation() : undefined}
+      onMouseDown={isGenericTableActionColumnKey(col.key) ? (e) => e.stopPropagation() : undefined}
       style={{
         verticalAlign: "top",
         textAlign: col.align || "left",
@@ -1317,6 +1333,8 @@ function GenericTableRowActionsCell<T extends Record<string, any>>({
                 {action.icon}
               </Dropdown.Toggle>
               <Dropdown.Menu
+                renderOnMount
+                popperConfig={DROPDOWN_MENU_POPPER_CONFIG}
                 onMouseDown={(e) => {
                   e.stopPropagation();
                 }}
@@ -1807,35 +1825,12 @@ const GenericTable = <T extends Record<string, any>>({
   };
 
   const columnSelectorMenuPopperConfig = useMemo(
-    () => ({ strategy: "fixed" as const }),
+    () => DROPDOWN_MENU_POPPER_CONFIG,
     [],
   );
 
   const filterPillMenuPopperConfig = useMemo(
-    () => ({
-      strategy: "fixed" as const,
-      modifiers: [
-        {
-          name: "preventOverflow",
-          options: {
-            boundary: "viewport",
-            padding: 8,
-            altAxis: true,
-          },
-        },
-        {
-          name: "flip",
-          options: {
-            fallbackPlacements: [
-              "bottom-start",
-              "top-start",
-              "bottom-end",
-              "top-end",
-            ],
-          },
-        },
-      ],
-    }),
+    () => DROPDOWN_MENU_POPPER_CONFIG,
     [],
   );
 
@@ -1967,7 +1962,11 @@ const GenericTable = <T extends Record<string, any>>({
                   >
                     <span>{tabsDropdownToggleLabel}</span>
                   </Dropdown.Toggle>
-                  <Dropdown.Menu style={{ zIndex: "99" }}>
+                  <Dropdown.Menu
+                    renderOnMount
+                    popperConfig={DROPDOWN_MENU_POPPER_CONFIG}
+                    style={{ zIndex: 1080 }}
+                  >
                     {tabsDropdownItems.map(
                       (item) => {
                         const handleItemClick = () => {
@@ -2019,7 +2018,9 @@ const GenericTable = <T extends Record<string, any>>({
                     {tab.icon && (
                       <span className="gt-tab-icon">{tab.icon}</span>
                     )}
-                    <span>{tab.label}</span>
+                    <span className="gt-tab-label" title={tab.label}>
+                      {tab.label}
+                    </span>
                     {tab.count !== undefined && (
                       <span className="gt-tab-count">{tab.count}</span>
                     )}
@@ -2119,7 +2120,7 @@ const GenericTable = <T extends Record<string, any>>({
                   <Menu size={16} className="me-1" />
                   <span>{tableViewToggleLabel}</span>
                 </Dropdown.Toggle>
-                <Dropdown.Menu>
+                <Dropdown.Menu renderOnMount popperConfig={DROPDOWN_MENU_POPPER_CONFIG}>
                   {toolbar.currentTableView !== undefined &&
                   toolbar.onTableViewChange ? (
                     <>
@@ -2173,7 +2174,11 @@ const GenericTable = <T extends Record<string, any>>({
                 >
                   <span>{toolbar.pipelineLabel || "All Pipelines"}</span>
                 </Dropdown.Toggle>
-                <Dropdown.Menu onClick={toolbar.onPipelineClick}>
+                <Dropdown.Menu
+                  renderOnMount
+                  popperConfig={DROPDOWN_MENU_POPPER_CONFIG}
+                  onClick={toolbar.onPipelineClick}
+                >
                   <Dropdown.Item>All Pipelines</Dropdown.Item>
                   <Dropdown.Item>Sales Pipeline</Dropdown.Item>
                   <Dropdown.Item>Marketing Pipeline</Dropdown.Item>
@@ -2221,7 +2226,7 @@ const GenericTable = <T extends Record<string, any>>({
                   >
                     Sort
                   </Dropdown.Toggle>
-                  <Dropdown.Menu>
+                  <Dropdown.Menu renderOnMount popperConfig={DROPDOWN_MENU_POPPER_CONFIG}>
                     {sortableColumns.length === 0 ? (
                       <Dropdown.Item disabled>
                         No sortable columns
@@ -2275,7 +2280,7 @@ const GenericTable = <T extends Record<string, any>>({
                 >
                   <MoreVertical size={16} />
                 </Dropdown.Toggle>
-                <Dropdown.Menu align="end">
+                <Dropdown.Menu align="end" renderOnMount popperConfig={DROPDOWN_MENU_POPPER_CONFIG}>
                   {toolbar.showImport && (
                     <Dropdown.Item onClick={toolbar.onImportClick}>
                       Import
@@ -2540,7 +2545,12 @@ const GenericTable = <T extends Record<string, any>>({
       return (
         <tr
           key={rowKey}
-          onClick={() => onRowClick?.(row, index)}
+          onClick={(e) => {
+            if (isGenericTableInteractiveClickTarget(e.target)) {
+              return;
+            }
+            onRowClick?.(row, index);
+          }}
           onDoubleClick={() => onRowDoubleClick?.(row, index)}
           onMouseEnter={() => setHoveredRowIndex(index)}
           onMouseLeave={() => setHoveredRowIndex(null)}

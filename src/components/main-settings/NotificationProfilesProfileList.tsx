@@ -43,7 +43,7 @@ export const NotificationProfilesProfileList: React.FC<NotificationProfilesProfi
               background: 'none',
               border: 'none',
               cursor: 'pointer',
-              color: '#888',
+              color: '#6c757d',
               fontSize: MAIN_SETTINGS_FONT_SIZE.lg,
               lineHeight: 1,
               padding: '0 4px',

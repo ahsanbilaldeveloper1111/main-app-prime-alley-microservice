@@ -54,7 +54,7 @@ export const GeneralSettingsTasksTab: React.FC<GeneralSettingsTasksTabProps> = (
         </label>
         <select
           id="general-due-date"
-          style={{ ...s.select, width: '240px', height: '40px', fontWeight: 300 }}
+          style={{ ...s.select, width: '240px', height: '40px' }}
           value={dueDate}
           onChange={(e) => setDueDate(e.target.value)}
         >
@@ -78,7 +78,7 @@ export const GeneralSettingsTasksTab: React.FC<GeneralSettingsTasksTabProps> = (
               left: '10px',
               top: '50%',
               transform: 'translateY(-50%)',
-              color: '#888',
+              color: '#6c757d',
               fontSize: MAIN_SETTINGS_FONT_SIZE.base,
               pointerEvents: 'none',
               zIndex: 1,
@@ -94,7 +94,7 @@ export const GeneralSettingsTasksTab: React.FC<GeneralSettingsTasksTabProps> = (
                 padding: '8px 12px 8px 34px',
                 fontSize: MAIN_SETTINGS_FONT_SIZE.md,
                 height: '40px',
-                fontWeight: 300,
+                fontWeight: 400,
                 color: '#141414',
                 border: '1px solid #b8b8b8',
                 borderRadius: '8px',

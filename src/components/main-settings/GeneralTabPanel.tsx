@@ -14,7 +14,7 @@ const GeneralTabContent: React.FC = () => (
       style={{
         fontFamily: ACCOUNT_DEFAULTS_FONT,
         fontSize: MAIN_SETTINGS_FONT_SIZE.base,
-        color: '#555',
+        color: '#6c757d',
         marginBottom: '24px',
       }}
     >
@@ -53,13 +53,13 @@ const GeneralTabContent: React.FC = () => (
       style={{
         fontFamily: ACCOUNT_DEFAULTS_FONT,
         fontSize: MAIN_SETTINGS_FONT_SIZE.base,
-        color: '#555',
+        color: '#6c757d',
         marginBottom: '24px',
       }}
     >
       This information will be used as a default where needed. If you&apos;re looking to update your company information for
       billing, visit{' '}
-      <a href="/main-settings/billing" style={{ color: '#0091ae', textDecoration: 'none' }}>
+      <a href="/main-settings/billing" style={{ color: '#0066CC', textDecoration: 'none' }}>
         Account &amp; Billing
       </a>
       {'.'}

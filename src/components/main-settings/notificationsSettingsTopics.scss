@@ -39,7 +39,7 @@
   gap: 2px;
   font-size: var(--ms-font-sm, 0.8125rem);
   font-weight: 400;
-  color: #555;
+  color: #6c757d;
 }
 
 .notifications-topics-table__topic-card {
@@ -69,9 +69,9 @@
 .notifications-topics-table__actions-heading {
   justify-self: end;
   padding-right: 4px;
-  font-size: var(--ms-font-xs, 0.6875rem);
-  font-weight: 700;
-  color: #555;
+  font-size: var(--ms-font-xs, 0.75rem);
+  font-weight: 600;
+  color: #6c757d;
   letter-spacing: 0.8px;
   text-transform: uppercase;
   white-space: nowrap;

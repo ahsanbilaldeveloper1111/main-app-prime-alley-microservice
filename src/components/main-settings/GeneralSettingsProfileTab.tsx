@@ -99,7 +99,7 @@ export const GeneralSettingsProfileTab: React.FC<GeneralSettingsProfileTabProps>
           value={userName}
           onChange={(e) => setUserName(e.target.value)}
           onFocus={(e) => {
-            e.currentTarget.style.borderColor = '#006162'
+            e.currentTarget.style.borderColor = '#86b7fe'
           }}
           onBlur={(e) => {
             e.currentTarget.style.borderColor = '#b8b8b8'
@@ -126,7 +126,7 @@ export const GeneralSettingsProfileTab: React.FC<GeneralSettingsProfileTabProps>
           Date, time, and number format{' '}
           <span style={s.helpIcon} title="Sets date/time/number format based on locale">?</span>
         </label>
-        <div style={{ fontSize: MAIN_SETTINGS_FONT_SIZE.sm, color: '#555', fontWeight: 300, marginBottom: '8px' }}>
+        <div style={{ fontSize: MAIN_SETTINGS_FONT_SIZE.sm, color: '#6c757d', fontWeight: 400, marginBottom: '8px' }}>
           Format: 2 March 2026, 02/03/2026, 19:41 GMT, and 1,234.56
         </div>
         <select
@@ -177,7 +177,7 @@ export const GeneralSettingsProfileTab: React.FC<GeneralSettingsProfileTabProps>
               outline: 'none',
             }}
             onFocus={(e) => {
-              e.currentTarget.style.borderColor = '#006162'
+              e.currentTarget.style.borderColor = '#86b7fe'
             }}
             onBlur={(e) => {
               e.currentTarget.style.borderColor = '#b8b8b8'
@@ -232,7 +232,7 @@ export const GeneralSettingsProfileTab: React.FC<GeneralSettingsProfileTabProps>
             value={phoneNumber}
             onChange={(e) => setPhoneNumber(e.target.value)}
             onFocus={(e) => {
-              e.currentTarget.style.borderColor = '#006162'
+              e.currentTarget.style.borderColor = '#86b7fe'
             }}
             onBlur={(e) => {
               e.currentTarget.style.borderColor = '#b8b8b8'
@@ -251,7 +251,7 @@ export const GeneralSettingsProfileTab: React.FC<GeneralSettingsProfileTabProps>
           style={{
             ...s.link,
             fontSize: MAIN_SETTINGS_FONT_SIZE.base,
-            fontWeight: 300,
+            fontWeight: 400,
             background: 'transparent',
             border: 'none',
             padding: 0,

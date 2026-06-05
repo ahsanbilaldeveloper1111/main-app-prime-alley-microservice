@@ -6,7 +6,7 @@ import "@assets/scss/tabs.scss";
 import React, { useMemo } from "react";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 import GenericTable, { type ToolbarConfig } from "@components/GenericTable";
-import { Form } from "react-bootstrap";
+import { Form, Button } from "react-bootstrap";
 import { BarChart3, Plus } from "lucide-react";
 import FormModal from "@components/page-partials/FormModal";
 import SuccessfulModal from "@components/page-partials/SuccessfulModal";
@@ -143,7 +143,7 @@ const StagesManagement = ({ hideBreadcrumb, breadcrumbMainLink }: CrmPageDisplay
           count: filterCounts.lost_reason,
           removable: false,
         },
-        { id: "deleted", label: "Deleted", removable: false },
+        { id: "deleted", label: "Deleted", count: filterCounts.deleted, removable: false },
       ],
       activeTab: activeFilter,
       onTabChange: handleToolbarTabChange,
@@ -160,14 +160,15 @@ const StagesManagement = ({ hideBreadcrumb, breadcrumbMainLink }: CrmPageDisplay
             Analytics
           </button>
           {canCreateStages && (
-            <button
+            <Button
+              variant="primary"
               type="button"
               className="stages-toolbar-btn stages-toolbar-btn--add"
               onClick={openCreateStageModal}
             >
               <Plus size={15} aria-hidden />
               Add Custom Stage
-            </button>
+            </Button>
           )}
         </div>
       ),

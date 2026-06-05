@@ -22,7 +22,20 @@ function buildProductNameColumn(): TableColumn<ProductDisplayData> {
     sortable: false,
     type: "custom",
     render: (product) => (
-      <span className="fw-semibold">{product.productName}</span>
+      <span
+        className="fw-semibold"
+        title={product.productName}
+        style={{
+          display: "block",
+          minWidth: 0,
+          maxWidth: "100%",
+          overflow: "hidden",
+          textOverflow: "ellipsis",
+          whiteSpace: "nowrap",
+        }}
+      >
+        {product.productName}
+      </span>
     ),
   };
 }
@@ -48,7 +61,7 @@ function buildPriceColumn(): TableColumn<ProductDisplayData> {
     sortable: false,
     type: "custom",
     render: (product) => (
-      <span className="fw-semibold text-success">
+      <span className="products-table-price">
         {product.currency} {product.price.toFixed(2)}
       </span>
     ),

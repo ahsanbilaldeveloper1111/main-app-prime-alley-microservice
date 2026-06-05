@@ -14,9 +14,9 @@ const HelpDot: React.FC = () => (
       width: '16px',
       height: '16px',
       borderRadius: '50%',
-      border: '1.5px solid #888',
+      border: '1.5px solid #6c757d',
       fontSize: MAIN_SETTINGS_FONT_SIZE.xs,
-      color: '#888',
+      color: '#6c757d',
       cursor: 'default',
       lineHeight: 1,
     }}
@@ -66,7 +66,7 @@ export const InputField: React.FC<{ label: string; value?: string; helpIcon?: bo
         background: '#fff',
         boxSizing: 'border-box',
       }}
-      onFocus={(e) => (e.currentTarget.style.borderColor = '#0091ae')}
+      onFocus={(e) => (e.currentTarget.style.borderColor = '#86b7fe')}
       onBlur={(e) => (e.currentTarget.style.borderColor = '#b8b8b8')}
     />
   </div>
@@ -112,7 +112,7 @@ export const SelectField: React.FC<{ label: string; value?: string; options: str
           top: '50%',
           transform: 'translateY(-50%)',
           pointerEvents: 'none',
-          color: '#555',
+          color: '#6c757d',
           fontSize: MAIN_SETTINGS_FONT_SIZE.sm,
         }}
       >
@@ -156,7 +156,7 @@ export const ChevronIcon: React.FC<{ expanded: boolean }> = ({ expanded }) => (
     height="12"
     viewBox="0 0 12 12"
     fill="none"
-    stroke="#555"
+    stroke="#6c757d"
     strokeWidth="2"
     strokeLinecap="round"
     strokeLinejoin="round"
@@ -188,7 +188,7 @@ export const FeatureSectionHeading: React.FC<{ title: string; children: React.Re
       style={{
         fontFamily: ACCOUNT_DEFAULTS_FONT,
         fontSize: MAIN_SETTINGS_FONT_SIZE.lg,
-        fontWeight: 700,
+        fontWeight: 600,
         color: '#141414',
         marginBottom: '6px',
       }}
@@ -199,7 +199,7 @@ export const FeatureSectionHeading: React.FC<{ title: string; children: React.Re
       style={{
         fontFamily: ACCOUNT_DEFAULTS_FONT,
         fontSize: MAIN_SETTINGS_FONT_SIZE.input,
-        fontWeight: 300,
+        fontWeight: 400,
         color: '#141414',
         lineHeight: '1.6',
         margin: 0,

@@ -85,80 +85,7 @@
     color: var(--light-text, #767676) !important;
   }
 
-  .generic-table-td[data-col-key='actions'] .dropdown,
-  .generic-table-td[data-col-key='actions'] .gt-row-actions--desktop {
-    display: inline-flex;
-    justify-content: center;
-    width: 100%;
-  }
-
-  --smart-crm-action-btn-size: var(--ms-action-btn-size, 40px);
-  --smart-crm-action-icon-size: var(--ms-action-icon-size, 22px);
-
-  .generic-table-td[data-col-key='actions'] .btn.btn-action-style-2:not(.gt-mobile-actions-more-btn),
-  .generic-table-td[data-col-key='actions'] .btn.btn-sm.btn-action-style-2:not(.gt-mobile-actions-more-btn) {
-    width: var(--smart-crm-action-btn-size) !important;
-    height: var(--smart-crm-action-btn-size) !important;
-    min-width: var(--smart-crm-action-btn-size) !important;
-    min-height: var(--smart-crm-action-btn-size) !important;
-    padding: 0 !important;
-    align-items: center !important;
-    justify-content: center !important;
-    flex-shrink: 0;
-    border: 1px solid #dee2e6 !important;
-    border-radius: 3px !important;
-    line-height: 1 !important;
-    color: inherit;
-
-    svg {
-      width: var(--smart-crm-action-icon-size) !important;
-      height: var(--smart-crm-action-icon-size) !important;
-      min-width: var(--smart-crm-action-icon-size);
-      min-height: var(--smart-crm-action-icon-size);
-      display: block !important;
-      flex-shrink: 0;
-      visibility: visible !important;
-      opacity: 1 !important;
-    }
-  }
-
-  .generic-table-td[data-col-key='actions'] .gt-row-actions--desktop {
-    gap: 6px;
-  }
-
-  @media (min-width: 768px) {
-    .generic-table-td[data-col-key='actions'] .gt-row-actions--desktop {
-      display: inline-flex !important;
-    }
-
-    .generic-table-td[data-col-key='actions'] .gt-mobile-actions-more-btn,
-    .gt-mobile-actions-popup {
-      display: none !important;
-    }
-  }
-
-  @media (max-width: 767.98px) {
-    .generic-table-td[data-col-key='actions'] .gt-row-actions--desktop {
-      display: none !important;
-    }
-
-    .generic-table-td[data-col-key='actions'] .gt-mobile-actions-more-btn.btn-action-style-2 {
-      display: inline-flex !important;
-      align-items: center !important;
-      justify-content: center !important;
-      width: var(--smart-crm-action-btn-size) !important;
-      height: var(--smart-crm-action-btn-size) !important;
-      min-width: var(--smart-crm-action-btn-size) !important;
-      min-height: var(--smart-crm-action-btn-size) !important;
-      padding: 0 !important;
-      border: 1px solid #dee2e6 !important;
-
-      svg {
-        width: var(--smart-crm-action-icon-size) !important;
-        height: var(--smart-crm-action-icon-size) !important;
-      }
-    }
-  }
+  // Row action button sizing: main-settings-layout.scss (@include main-settings-table-row-action-buttons)
 
   .gt-toolbar-container {
     max-width: 100%;
@@ -201,10 +128,38 @@
     border-radius: 0 0 8px 8px;
   }
 
-  // Non-action cells: allow wrapping on narrow widths
+  // Non-action cells: single-line ellipsis so long names/descriptions do not blow out layout
+  .generic-table {
+    table-layout: fixed;
+    width: 100%;
+  }
+
   .generic-table-td:not([data-col-key='actions']):not([data-col-key='Action']) {
-    word-break: break-word;
-    overflow-wrap: anywhere;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 0;
+  }
+
+  .generic-table-td:not([data-col-key='actions']):not([data-col-key='Action']) > * {
+    min-width: 0;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .generic-table-td .d-flex {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .generic-table-td .d-flex > :not(:first-child),
+  .generic-table-td .fw-semibold {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
   }
 
   @media (max-width: 991.98px) {
@@ -256,9 +211,6 @@
     .generic-table {
       min-width: 32rem;
     }
-
-    --smart-crm-action-btn-size: 34px;
-    --smart-crm-action-icon-size: 18px;
   }
 }
 

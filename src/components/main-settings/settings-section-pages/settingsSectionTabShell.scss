@@ -13,7 +13,7 @@
     margin: 0 0 clamp(8px, 2vw, 16px);
     font-family: Lexend Deca, Helvetica, Arial, sans-serif;
     font-size: var(--ms-font-xl);
-    font-weight: 400;
+    font-weight: 600;
     color: #141414;
     letter-spacing: 0;
     line-height: 1.25;
@@ -29,7 +29,7 @@
     width: 100%;
     align-items: flex-end;
     margin-bottom: clamp(12px, 2vw, 20px);
-    border-bottom: 1px solid #c4c4c4;
+    border-bottom: 1px solid #8a8a8a;
     overflow: hidden;
     --ms-tab-btn-padding-y: clamp(8px, 1.5vw, 10px);
     --ms-tab-btn-padding-x: clamp(10px, 2vw, 20px);
@@ -50,34 +50,32 @@
   &__tab-btn {
     flex: 0 0 auto;
     padding: var(--ms-tab-btn-padding-y) var(--ms-tab-btn-padding-x);
-    background: whitesmoke;
-    border-top: 1px solid #c4c4c4;
+    background: #ffffff;
+    border-top: 1px solid #8a8a8a;
     border-left: none;
-    border-right: none;
-    border-bottom: none;
+    border-right: 1px solid #8a8a8a;
+    border-bottom: 1px solid #8a8a8a;
     cursor: pointer;
     font-family: Lexend Deca, Helvetica, Arial, sans-serif;
-    font-size: var(--ms-font-base);
-    font-weight: 300;
+    font-size: var(--ms-font-sm);
+    font-weight: 400;
     color: #141414;
     white-space: nowrap;
-    transition: background 0.15s;
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
     position: relative;
     box-sizing: border-box;
 
     &:first-child {
-      border-left: 1px solid #c4c4c4;
-    }
-
-    &:last-child {
-      border-right: 1px solid #c4c4c4;
+      border-left: 1px solid #8a8a8a;
     }
 
     &--active {
-      background: #ffffff;
-      border-bottom: 1px solid #ffffff;
+      background: #f5f8fa;
+      color: #0066cc;
+      border-bottom: 2px solid #0066cc;
       margin-bottom: -1px;
       z-index: 1;
+      font-weight: 600;
     }
   }
 
@@ -97,7 +95,7 @@
   }
 
   &__no-permission {
-    color: #6b7280;
+    color: #6c757d;
     font-size: var(--ms-font-base);
   }
 }
@@ -149,23 +147,23 @@
     line-height: 1;
     cursor: pointer;
     background: whitesmoke;
-    border-top: 1px solid #c4c4c4 !important;
+    border-top: 1px solid #8a8a8a !important;
     border-bottom: none !important;
     color: #141414;
     transition: background 0.15s, color 0.15s;
 
     &--prev {
-      border-left: 1px solid #c4c4c4 !important;
-      border-right: 1px solid #c4c4c4 !important;
+      border-left: 1px solid #8a8a8a !important;
+      border-right: 1px solid #8a8a8a !important;
     }
 
     &--next {
-      border-left: 1px solid #c4c4c4 !important;
-      border-right: 1px solid #c4c4c4 !important;
+      border-left: 1px solid #8a8a8a !important;
+      border-right: 1px solid #8a8a8a !important;
     }
 
     &:hover:not(:disabled) {
-      background: #f0f0f0;
+      background: #f5f8fa;
     }
 
     &:disabled {
