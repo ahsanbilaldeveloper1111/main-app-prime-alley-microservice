@@ -132,6 +132,50 @@ function isSuggestionInMyDay(task: SuggestedTask, myDayTaskIds: ReadonlySet<numb
   return myDayTaskIds.has(task.id) || task.alreadyInMyDay === true;
 }
 
+function updateSuggestionMyDayFlag(
+  suggestions: SuggestedTask[],
+  taskId: number,
+  alreadyInMyDay: boolean,
+): SuggestedTask[] {
+  return suggestions.map((row) =>
+    row.id === taskId ? { ...row, alreadyInMyDay } : row,
+  );
+}
+
+function applyRemovedTaskPlannedMinutes(
+  removed: MyDayTask,
+  setPlannedMinutes: React.Dispatch<React.SetStateAction<number>>,
+  setTasksMeta: React.Dispatch<React.SetStateAction<MyDayTasksMeta>>,
+): void {
+  const minutes = Math.max(0, removed.estimateMinutes);
+  if (minutes <= 0) return;
+  setPlannedMinutes((planned) => Math.max(0, planned - minutes));
+  setTasksMeta((meta) => ({
+    ...meta,
+    planned_minutes:
+      meta.planned_minutes == null
+        ? meta.planned_minutes
+        : Math.max(0, meta.planned_minutes - minutes),
+  }));
+}
+
+function applyRemovedTaskCountMeta(
+  removed: MyDayTask,
+  setTasksMeta: React.Dispatch<React.SetStateAction<MyDayTasksMeta>>,
+): void {
+  setTasksMeta((meta) => ({
+    ...meta,
+    active_count:
+      removed.isCompleted || meta.active_count == null
+        ? meta.active_count
+        : Math.max(0, meta.active_count - 1),
+    completed_count:
+      removed.isCompleted === false || meta.completed_count == null
+        ? meta.completed_count
+        : Math.max(0, meta.completed_count - 1),
+  }));
+}
+
 const MAX_CAPACITY_DURATION_INPUT_LENGTH = 40;
 
 function tokenizeCapacityDurationInput(value: string): string[] {
@@ -1057,45 +1101,16 @@ function useMyDayTasksPageController() {
           prev.active_count == null ? prev.active_count : prev.active_count + 1,
       }));
     }
-    setSuggestedTasks((prev) =>
-      prev.map((row) =>
-        row.id === task.id ? { ...row, alreadyInMyDay: true } : row,
-      ),
-    );
+    setSuggestedTasks((prev) => updateSuggestionMyDayFlag(prev, task.id, true));
   }, []);
 
   const applyOptimisticMyDayRemove = useCallback((taskId: number) => {
+    setSuggestedTasks((prev) => updateSuggestionMyDayFlag(prev, taskId, false));
     setTasks((prev) => {
       const removed = prev.find((row) => row.id === taskId);
       if (removed === undefined) return prev;
-
-      const minutes = Math.max(0, removed.estimateMinutes);
-      if (minutes > 0) {
-        setPlannedMinutes((planned) => Math.max(0, planned - minutes));
-        setTasksMeta((meta) => ({
-          ...meta,
-          planned_minutes:
-            meta.planned_minutes == null
-              ? meta.planned_minutes
-              : Math.max(0, meta.planned_minutes - minutes),
-        }));
-      }
-      setTasksMeta((meta) => ({
-        ...meta,
-        active_count:
-          removed.isCompleted || meta.active_count == null
-            ? meta.active_count
-            : Math.max(0, meta.active_count - 1),
-        completed_count:
-          removed.isCompleted === false || meta.completed_count == null
-            ? meta.completed_count
-            : Math.max(0, meta.completed_count - 1),
-      }));
-      setSuggestedTasks((suggested) =>
-        suggested.map((row) =>
-          row.id === taskId ? { ...row, alreadyInMyDay: false } : row,
-        ),
-      );
+      applyRemovedTaskPlannedMinutes(removed, setPlannedMinutes, setTasksMeta);
+      applyRemovedTaskCountMeta(removed, setTasksMeta);
       return prev.filter((row) => row.id !== taskId);
     });
   }, []);
