@@ -1,5 +1,7 @@
 import {
+  readMyDayTaskCompletedFromRow,
   resolveEstimateMinutesFromRow,
+  resolveMyDayTaskCount,
   resolveProjectFromRow,
   toMinutesDisplay,
 } from "@page-modules/planner/my-day/myDayDomain";
@@ -35,7 +37,62 @@ export type MyDayPastDayStats = Readonly<{
   completedMinutes: number;
   originalCapacityMinutes: number;
   capacityUsedPercent: number;
+  completionRatePercent: number;
 }>;
+
+export function resolveMyDayCompletionRatePercent(
+  tasksPlanned: number,
+  tasksCompleted: number,
+): number {
+  if (tasksPlanned <= 0) return 0;
+  return Math.round((tasksCompleted / tasksPlanned) * 1000) / 10;
+}
+
+/** Live stats for the current My Day plan (bottom-of-page daily summary). */
+export function buildLiveMyDayStats(
+  tasks: ReadonlyArray<{ isCompleted: boolean; estimateMinutes: number }>,
+  meta: MyDayTasksMeta,
+  capacityMinutes: number,
+  plannedMinutesFromApi: number,
+  options?: Readonly<{ capacityUsedPercent?: number | null }>,
+): MyDayPastDayStats {
+  const completedRows = tasks.filter((task) => task.isCompleted);
+  const tasksPlanned = resolveMyDayTaskCount(tasks.length, meta);
+  const tasksCompleted = readNumber(
+    meta.tasks_completed,
+    meta.completed_count,
+    completedRows.length,
+  );
+  const plannedFromEstimates = tasks.reduce(
+    (sum, task) => sum + Math.max(0, task.estimateMinutes),
+    0,
+  );
+  const plannedMinutes = readNumber(
+    meta.planned_minutes,
+    plannedFromEstimates > 0 ? plannedFromEstimates : plannedMinutesFromApi,
+  );
+  const completedMinutes = completedRows.reduce(
+    (sum, task) => sum + Math.max(0, task.estimateMinutes),
+    0,
+  );
+  const originalCapacityMinutes = Math.max(1, capacityMinutes);
+  const fromApi = options?.capacityUsedPercent;
+  let capacityUsedPercent =
+    fromApi != null && Number.isFinite(fromApi) ? Math.max(0, Number(fromApi)) : 0;
+  if (capacityUsedPercent <= 0) {
+    capacityUsedPercent = Math.round((plannedMinutes / originalCapacityMinutes) * 1000) / 10;
+  }
+
+  return {
+    tasksPlanned,
+    tasksCompleted,
+    plannedMinutes,
+    completedMinutes,
+    originalCapacityMinutes,
+    capacityUsedPercent,
+    completionRatePercent: resolveMyDayCompletionRatePercent(tasksPlanned, tasksCompleted),
+  };
+}
 
 function readTitle(row: Record<string, unknown>, id: number | null): string {
   const title = typeof row.title === "string" ? row.title.trim() : "";
@@ -124,7 +181,7 @@ export function mapHistoryRowsFromDailyLog(log: MyDayDailyLogPayload): MyDayHist
       push(mapHistoryTaskRow(record, "Deleted"));
       continue;
     }
-    const completed = record.is_completed === true || record.completed === true;
+    const completed = readMyDayTaskCompletedFromRow(record);
     push(mapHistoryTaskRow(record, completed ? "Completed" : "Active"));
   }
 
@@ -351,6 +408,7 @@ export function buildPastDayStats(
     completedMinutes,
     originalCapacityMinutes,
     capacityUsedPercent,
+    completionRatePercent: resolveMyDayCompletionRatePercent(tasksPlanned, tasksCompleted),
   };
 }
 

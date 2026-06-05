@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import moment from "moment";
 import { useSession } from "next-auth/react";
 import { Button, Form, Modal } from "react-bootstrap";
-import { Circle, CircleCheckBig, History, Pencil, Plus, Search, X } from "lucide-react";
+import { CircleCheckBig, History, Pencil, Plus, Search, X } from "lucide-react";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 import CreateTaskSidebar from "@components/CreatePlannerTaskSidebar";
 import { MyDayTeamSection } from "@components/planner/my-day/MyDayTeamSection";
@@ -27,12 +27,20 @@ import {
   type MyDayTasksMeta,
   type MyDayTasksPayload,
 } from "@utils/tasks";
+import { MyDayDailySummaryPanel } from "@components/planner/my-day/MyDayDailySummaryPanel";
 import { MyDayHistoryModal } from "@components/planner/MyDayHistoryModal";
+import { buildLiveMyDayStats } from "@page-modules/planner/my-day/myDayHistoryDomain";
 import { useHierarchyData } from "@components/filters/useHierarchyData";
 import { formatDateGlobal, ModuleSlug } from "@utils/Helper";
+import type {
+  CreateTaskFormData,
+  PlannerSidebarCreateSuccessMeta,
+} from "@components/CreatePlannerTaskSidebar";
 import {
   formatCapacityOverageMessageFromStats,
+  formatMyDayHeaderDateLabel,
   formatMyDayHeaderMetaLine,
+  filterMyDaySuggestionTasks,
   resolveCapacityStatsFromPayload,
   formatRolloverPromptCopy,
   formatSuggestionDueDate,
@@ -43,6 +51,7 @@ import {
   readRolloverIgnoreCount,
   readTaskPriorityLabel,
   readHasEstimateFromRow,
+  readMyDayTaskCompletedFromRow,
   resolveEstimateMinutesFromRow,
   normalizeMyDaySuggestionsPayload,
   resolveMyDayReporteeExtensions,
@@ -92,6 +101,20 @@ type MyDaySuggestionGroup = Readonly<{
 /** Spec §3.6: lead with 30m / 1h / 2h chips; extra presets for custom flows. */
 const ESTIMATE_PRESETS = [30, 60, 120, 15, 90, 180] as const;
 
+const MY_DAY_SUGGESTION_PRIORITY_FILTERS = [
+  { value: "", label: "All priorities" },
+  { value: "urgent", label: "Urgent" },
+  { value: "high", label: "High" },
+  { value: "normal", label: "Normal" },
+  { value: "low", label: "Low" },
+] as const;
+
+function parseEstimateMinutesFromCreateForm(formData: CreateTaskFormData): number | undefined {
+  const parsed = Number.parseInt(formData.estimatedDurationMinutes.trim(), 10);
+  if (!Number.isFinite(parsed) || parsed <= 0) return undefined;
+  return parsed;
+}
+
 function swallowAsyncError(promise: Promise<unknown>): void {
   promise.catch(() => undefined);
 }
@@ -107,6 +130,50 @@ function resolveMyDayCapacityUsedMinutes(tasks: MyDayTask[], plannedMinutes: num
 
 function isSuggestionInMyDay(task: SuggestedTask, myDayTaskIds: ReadonlySet<number>): boolean {
   return myDayTaskIds.has(task.id) || task.alreadyInMyDay === true;
+}
+
+function updateSuggestionMyDayFlag(
+  suggestions: SuggestedTask[],
+  taskId: number,
+  alreadyInMyDay: boolean,
+): SuggestedTask[] {
+  return suggestions.map((row) =>
+    row.id === taskId ? { ...row, alreadyInMyDay } : row,
+  );
+}
+
+function applyRemovedTaskPlannedMinutes(
+  removed: MyDayTask,
+  setPlannedMinutes: React.Dispatch<React.SetStateAction<number>>,
+  setTasksMeta: React.Dispatch<React.SetStateAction<MyDayTasksMeta>>,
+): void {
+  const minutes = Math.max(0, removed.estimateMinutes);
+  if (minutes <= 0) return;
+  setPlannedMinutes((planned) => Math.max(0, planned - minutes));
+  setTasksMeta((meta) => ({
+    ...meta,
+    planned_minutes:
+      meta.planned_minutes == null
+        ? meta.planned_minutes
+        : Math.max(0, meta.planned_minutes - minutes),
+  }));
+}
+
+function applyRemovedTaskCountMeta(
+  removed: MyDayTask,
+  setTasksMeta: React.Dispatch<React.SetStateAction<MyDayTasksMeta>>,
+): void {
+  setTasksMeta((meta) => ({
+    ...meta,
+    active_count:
+      removed.isCompleted || meta.active_count == null
+        ? meta.active_count
+        : Math.max(0, meta.active_count - 1),
+    completed_count:
+      removed.isCompleted === false || meta.completed_count == null
+        ? meta.completed_count
+        : Math.max(0, meta.completed_count - 1),
+  }));
 }
 
 const MAX_CAPACITY_DURATION_INPUT_LENGTH = 40;
@@ -290,7 +357,7 @@ function mapMyDayTaskRow(
     title,
     dueDate: dueRaw,
     priority: readTaskPriorityLabel(row.priority),
-    isCompleted: row.is_completed === true || row.completed === true,
+    isCompleted: readMyDayTaskCompletedFromRow(row),
     estimateMinutes: estimate,
     hasEstimate,
     projectName: project.label,
@@ -723,9 +790,17 @@ function useMyDayTasksPageController() {
   const [scheduleLaterDate, setScheduleLaterDate] = useState("");
   const [isEmptyByDesign, setIsEmptyByDesign] = useState(false);
   const [rolloverPreviousDate, setRolloverPreviousDate] = useState<string | null>(null);
+  const [suggestionPriorityFilter, setSuggestionPriorityFilter] = useState("");
+  const [suggestionOverdueOnly, setSuggestionOverdueOnly] = useState(false);
+  const [suggestionCategoryFilter, setSuggestionCategoryFilter] = useState<
+    MyDaySuggestionCategory | "all"
+  >("all");
+  const [showUncompleteConfirm, setShowUncompleteConfirm] = useState(false);
+  const [pendingUncompleteTask, setPendingUncompleteTask] = useState<MyDayTask | null>(null);
   const suggestionsRequestRef = useRef(0);
   const tasksRef = useRef<MyDayTask[]>([]);
   const suggestionsPanelRef = useRef<HTMLElement>(null);
+  const suggestionSearchRef = useRef<HTMLInputElement>(null);
 
   const today = useMemo(() => moment().format("YYYY-MM-DD"), []);
   const todayStart = useMemo(() => moment().startOf("day"), []);
@@ -948,14 +1023,36 @@ function useMyDayTasksPageController() {
     [capacityMinutes, capacityStats, summary.planned],
   );
 
+  const dailySummaryStats = useMemo(
+    () =>
+      buildLiveMyDayStats(tasks, tasksMeta, capacityMinutes, plannedMinutes, {
+        capacityUsedPercent: capacityStats.capacityUsedPercent,
+      }),
+    [capacityMinutes, capacityStats.capacityUsedPercent, plannedMinutes, tasks, tasksMeta],
+  );
+
+  const suggestionFilters = useMemo(
+    () => ({
+      priority: suggestionPriorityFilter,
+      overdueOnly: suggestionOverdueOnly,
+      category: suggestionCategoryFilter,
+    }),
+    [suggestionCategoryFilter, suggestionOverdueOnly, suggestionPriorityFilter],
+  );
+
+  const filteredSuggestedTasks = useMemo(
+    () => filterMyDaySuggestionTasks(suggestedTasks, suggestionFilters, todayStart),
+    [suggestedTasks, suggestionFilters, todayStart],
+  );
+
   const groupedSuggestions = useMemo(
-    () => groupSuggestionsByCategory(suggestedTasks),
-    [suggestedTasks],
+    () => groupSuggestionsByCategory(filteredSuggestedTasks),
+    [filteredSuggestedTasks],
   );
 
   const headerDateLabel = useMemo(() => {
     const iso = planDate || today;
-    return formatDateGlobal(iso) || moment(iso).format("D MMMM, YYYY");
+    return formatMyDayHeaderDateLabel(iso) || formatDateGlobal(iso);
   }, [planDate, today]);
 
   const headerMetaLine = useMemo(() => {
@@ -1004,38 +1101,16 @@ function useMyDayTasksPageController() {
           prev.active_count == null ? prev.active_count : prev.active_count + 1,
       }));
     }
-    setSuggestedTasks((prev) =>
-      prev.map((row) => (row.id === task.id ? { ...row, alreadyInMyDay: true } : row)),
-    );
+    setSuggestedTasks((prev) => updateSuggestionMyDayFlag(prev, task.id, true));
   }, []);
 
   const applyOptimisticMyDayRemove = useCallback((taskId: number) => {
+    setSuggestedTasks((prev) => updateSuggestionMyDayFlag(prev, taskId, false));
     setTasks((prev) => {
       const removed = prev.find((row) => row.id === taskId);
       if (removed === undefined) return prev;
-
-      const minutes = Math.max(0, removed.estimateMinutes);
-      if (minutes > 0) {
-        setPlannedMinutes((planned) => Math.max(0, planned - minutes));
-        setTasksMeta((meta) => ({
-          ...meta,
-          planned_minutes:
-            meta.planned_minutes == null
-              ? meta.planned_minutes
-              : Math.max(0, meta.planned_minutes - minutes),
-        }));
-      }
-      setTasksMeta((meta) => ({
-        ...meta,
-        active_count:
-          removed.isCompleted || meta.active_count == null
-            ? meta.active_count
-            : Math.max(0, meta.active_count - 1),
-        completed_count:
-          removed.isCompleted === false || meta.completed_count == null
-            ? meta.completed_count
-            : Math.max(0, meta.completed_count - 1),
-      }));
+      applyRemovedTaskPlannedMinutes(removed, setPlannedMinutes, setTasksMeta);
+      applyRemovedTaskCountMeta(removed, setTasksMeta);
       return prev.filter((row) => row.id !== taskId);
     });
   }, []);
@@ -1050,10 +1125,58 @@ function useMyDayTasksPageController() {
 
   const handleToggleComplete = useCallback(
     async (task: MyDayTask) => {
-      await toggleMyDayTaskComplete(task.id);
-      refreshMyDayPage().catch(() => undefined);
+      if (task.isCompleted) {
+        setPendingUncompleteTask(task);
+        setShowUncompleteConfirm(true);
+        return;
+      }
+      try {
+        await toggleMyDayTaskComplete(task.id, {
+          completeScope: "my_day",
+          planDate: planDate || today,
+        });
+        await refreshMyDayPage();
+      } catch {
+        toast.error("Failed to update task");
+      }
     },
-    [refreshMyDayPage],
+    [planDate, refreshMyDayPage, today],
+  );
+
+  const confirmMarkIncomplete = useCallback(async () => {
+    if (pendingUncompleteTask == null) return;
+    try {
+      await toggleMyDayTaskComplete(pendingUncompleteTask.id, {
+        completeScope: "my_day",
+        planDate: planDate || today,
+      });
+      setShowUncompleteConfirm(false);
+      setPendingUncompleteTask(null);
+      await refreshMyDayPage();
+    } catch {
+      toast.error("Failed to mark task incomplete");
+    }
+  }, [pendingUncompleteTask, planDate, refreshMyDayPage, today]);
+
+  const handleMyDayCreateSuccess = useCallback(
+    async (formData: CreateTaskFormData, meta?: PlannerSidebarCreateSuccessMeta) => {
+      setShowCreateSidebar(false);
+      const taskId = meta?.createdTaskId;
+      if (taskId != null && taskId > 0) {
+        const estimatedMinutes = parseEstimateMinutesFromCreateForm(formData);
+        try {
+          await addTaskToMyDay({
+            task_id: taskId,
+            plan_date: today,
+            ...(estimatedMinutes == null ? {} : { estimated_minutes: estimatedMinutes }),
+          });
+        } catch {
+          toast.error("Task created but could not be added to My Day");
+        }
+      }
+      await refreshMyDayPage();
+    },
+    [refreshMyDayPage, today],
   );
 
   const handleOpenEstimateModal = useCallback((task: MyDayTask) => {
@@ -1062,8 +1185,9 @@ function useMyDayTasksPageController() {
     setShowEstimateModal(true);
   }, []);
 
-  const scrollToSuggestions = useCallback(() => {
+  const focusSuggestionsSearch = useCallback(() => {
     suggestionsPanelRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    globalThis.setTimeout(() => suggestionSearchRef.current?.focus(), 280);
   }, []);
 
   const confirmEstimateAndAdd = useCallback(async () => {
@@ -1376,6 +1500,7 @@ function useMyDayTasksPageController() {
     completedTasksCount,
     summary,
     capacityOverageMessage,
+    dailySummaryStats,
     groupedSuggestions,
     headerDateLabel,
     headerMetaLine,
@@ -1383,7 +1508,20 @@ function useMyDayTasksPageController() {
     refreshMyDayPage,
     toggleCarryOverSelection,
     handleOpenEstimateModal,
-    scrollToSuggestions,
+    focusSuggestionsSearch,
+    suggestionSearchRef,
+    suggestionPriorityFilter,
+    setSuggestionPriorityFilter,
+    suggestionOverdueOnly,
+    setSuggestionOverdueOnly,
+    suggestionCategoryFilter,
+    setSuggestionCategoryFilter,
+    showUncompleteConfirm,
+    setShowUncompleteConfirm,
+    pendingUncompleteTask,
+    setPendingUncompleteTask,
+    confirmMarkIncomplete,
+    handleMyDayCreateSuccess,
     confirmEstimateAndAdd,
     skipEstimateAndAddToMyDay,
     handleSaveDefaultCapacity,
@@ -1603,87 +1741,159 @@ function MyDayTodayTasksSection({ vm }: MyDayTasksPageViewProps) {
   const hasTasks = vm.activeTasks.length > 0;
   return (
     <div className="myday-table-card">
-      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
+          marginBottom: 12,
+          flexWrap: "wrap",
+        }}
+      >
         <button
           type="button"
           onClick={() => hasTasks && setIsOpen(!isOpen)}
-          style={{ display: "flex", alignItems: "center", gap: 8, background: "none", border: "none", cursor: hasTasks ? "pointer" : "default", padding: 0, fontFamily: "Lexend Deca, Helvetica, Arial, sans-serif", flex: 1 }}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            background: "none",
+            border: "none",
+            cursor: hasTasks ? "pointer" : "default",
+            padding: 0,
+            fontFamily: "Lexend Deca, Helvetica, Arial, sans-serif",
+            flex: 1,
+          }}
         >
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2"
-            style={{ transform: isOpen ? "rotate(90deg)" : "none", transition: "transform 0.2s ease", flexShrink: 0, opacity: hasTasks ? 1 : 0.3 }}>
-            <polyline points="9 18 15 12 9 6" />
-          </svg>
-          <span style={{ fontSize: 10, fontWeight: 600, color: "#718096", textTransform: "uppercase", letterSpacing: "0.06em", whiteSpace: "nowrap" }}>
-            Today&apos;s Tasks
-          </span>
-          {hasTasks && (
-            <span style={{ fontSize: 11, color: "#0066CC", background: "#eff6ff", border: "1px solid #bfdbfe", padding: "1px 8px", borderRadius: 20, fontWeight: 500 }}>
-              {vm.activeTasks.length}
-            </span>
-          )}
-          <div style={{ flex: 1, height: 1, background: "#eaf0f6", marginLeft: 4 }} />
-        </button>
-        {null}
-      </div>
-      {isOpen && (
-        <>
-      {showLoading ? (
-        <div className="myday-empty-state">
-          <div style={{ fontSize: 32, opacity: 0.2 }}>⏳</div>
-          <div style={{ fontSize: 13, fontWeight: 500, color: "#4a5568" }}>Loading tasks...</div>
-        </div>
-      ) : null}
-      {showEmpty ? (
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "clamp(16px, 2.5vw, 28px) 16px", gap: 10, minHeight: "clamp(140px, 20vh, 220px)" }}>
-          <svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ opacity: 0.18 }}>
-            <circle cx="32" cy="32" r="28" stroke="#0066CC" strokeWidth="2.5"/>
-            <path d="M20 32h24M32 20v24" stroke="#0066CC" strokeWidth="2.5" strokeLinecap="round"/>
-            <circle cx="32" cy="14" r="3" fill="#0066CC"/>
-            <circle cx="50" cy="32" r="3" fill="#0066CC"/>
-            <circle cx="32" cy="50" r="3" fill="#0066CC"/>
-            <circle cx="14" cy="32" r="3" fill="#0066CC"/>
-          </svg>
-          <div style={{ fontSize: 14, fontWeight: 500, color: "#4a5568" }}>No tasks planned for today</div>
-          <div style={{ fontSize: 12, color: "#718096", maxWidth: 220, lineHeight: 1.6, textAlign: "center" }}>
-            Add tasks from the suggestions panel or create a new one
-          </div>
-          <button
-            type="button"
-            onClick={() => {
-              vm.scrollToSuggestions();
-              setTimeout(() => {
-                const searchInput = document.querySelector('#myday-suggestions-panel input[type="text"]') as HTMLInputElement | null;
-                if (searchInput) {
-                  searchInput.focus();
-                  searchInput.style.transition = "box-shadow 0.2s ease";
-                  searchInput.style.boxShadow = "0 0 0 3px rgba(0,102,204,0.25)";
-                  setTimeout(() => { searchInput.style.boxShadow = ""; }, 1500);
-                }
-              }, 300);
-            }}
+          <svg
+            width="13"
+            height="13"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="#94a3b8"
+            strokeWidth="2"
             style={{
-              marginTop: 4,
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 6,
-              fontSize: 12,
-              fontWeight: 500,
-              color: "#fff",
-              background: "#0066CC",
-              border: "none",
-              borderRadius: 7,
-              padding: "7px 16px",
-              cursor: "pointer",
-              fontFamily: "Lexend Deca, Helvetica, Arial, sans-serif",
+              transform: isOpen ? "rotate(90deg)" : "none",
+              transition: "transform 0.2s ease",
+              flexShrink: 0,
+              opacity: hasTasks ? 1 : 0.3,
             }}
           >
-            + Browse Suggestions
-          </button>
-        </div>
-      ) : null}
-      <MyDayTaskList tasks={vm.activeTasks} handlers={handlers} />
+            <polyline points="9 18 15 12 9 6" />
+          </svg>
+          <span
+            style={{
+              fontSize: 10,
+              fontWeight: 600,
+              color: "#718096",
+              textTransform: "uppercase",
+              letterSpacing: "0.06em",
+              whiteSpace: "nowrap",
+            }}
+          >
+            Today&apos;s Tasks
+          </span>
+          {hasTasks ? (
+            <span
+              style={{
+                fontSize: 11,
+                color: "#0066CC",
+                background: "#eff6ff",
+                border: "1px solid #bfdbfe",
+                padding: "1px 8px",
+                borderRadius: 20,
+                fontWeight: 500,
+              }}
+            >
+              {vm.activeTasks.length}
+            </span>
+          ) : null}
+          <div style={{ flex: 1, height: 1, background: "#eaf0f6", marginLeft: 4 }} />
+        </button>
+        <Button variant="outline-primary" size="sm" onClick={vm.focusSuggestionsSearch}>
+          Browse suggestions
+        </Button>
+      </div>
+      {isOpen ? (
+        <>
+          {showLoading ? (
+            <div className="myday-empty-state">
+              <div style={{ fontSize: 32, opacity: 0.2 }}>⏳</div>
+              <div style={{ fontSize: 13, fontWeight: 500, color: "#4a5568" }}>Loading tasks...</div>
+            </div>
+          ) : null}
+          {showEmpty ? (
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                justifyContent: "center",
+                padding: "clamp(16px, 2.5vw, 28px) 16px",
+                gap: 10,
+                minHeight: "clamp(140px, 20vh, 220px)",
+              }}
+            >
+              <svg
+                width="64"
+                height="64"
+                viewBox="0 0 64 64"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+                style={{ opacity: 0.18 }}
+              >
+                <circle cx="32" cy="32" r="28" stroke="#0066CC" strokeWidth="2.5" />
+                <path
+                  d="M20 32h24M32 20v24"
+                  stroke="#0066CC"
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                />
+                <circle cx="32" cy="14" r="3" fill="#0066CC" />
+                <circle cx="50" cy="32" r="3" fill="#0066CC" />
+                <circle cx="32" cy="50" r="3" fill="#0066CC" />
+                <circle cx="14" cy="32" r="3" fill="#0066CC" />
+              </svg>
+              <div style={{ fontSize: 14, fontWeight: 500, color: "#4a5568" }}>
+                No tasks planned for today
+              </div>
+              <div
+                style={{
+                  fontSize: 12,
+                  color: "#718096",
+                  maxWidth: 220,
+                  lineHeight: 1.6,
+                  textAlign: "center",
+                }}
+              >
+                Add tasks from the suggestions panel or create a new one
+              </div>
+              <button
+                type="button"
+                onClick={vm.focusSuggestionsSearch}
+                style={{
+                  marginTop: 4,
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 6,
+                  fontSize: 12,
+                  fontWeight: 500,
+                  color: "#fff",
+                  background: "#0066CC",
+                  border: "none",
+                  borderRadius: 7,
+                  padding: "7px 16px",
+                  cursor: "pointer",
+                  fontFamily: "Lexend Deca, Helvetica, Arial, sans-serif",
+                }}
+              >
+                + Browse Suggestions
+              </button>
+            </div>
+          ) : null}
+          <MyDayTaskList tasks={vm.activeTasks} handlers={handlers} />
         </>
-      )}
+      ) : null}
     </div>
   );
 }
@@ -1771,9 +1981,47 @@ function MyDaySuggestionsPanel({ vm }: MyDayTasksPageViewProps) {
   return (
     <aside ref={vm.suggestionsPanelRef} id="myday-suggestions-panel" className="myday-suggested">
       <h4>Suggested for Today</h4>
+      <div className="myday-suggestion-filters">
+        <select
+          className="form-select form-select-sm"
+          value={vm.suggestionPriorityFilter}
+          onChange={(e) => vm.setSuggestionPriorityFilter(e.target.value)}
+          aria-label="Filter suggestions by priority"
+        >
+          {MY_DAY_SUGGESTION_PRIORITY_FILTERS.map((option) => (
+            <option key={option.value || "all"} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+        <select
+          className="form-select form-select-sm"
+          value={vm.suggestionCategoryFilter}
+          onChange={(e) =>
+            vm.setSuggestionCategoryFilter(e.target.value as MyDaySuggestionCategory | "all")
+          }
+          aria-label="Filter suggestions by type"
+        >
+          <option value="all">All types</option>
+          {MY_DAY_SUGGESTION_CATEGORY_ORDER.map((category) => (
+            <option key={category} value={category}>
+              {MY_DAY_CATEGORY_LABELS[category] ?? category.replaceAll("_", " ")}
+            </option>
+          ))}
+        </select>
+        <label className="myday-suggestion-filters__overdue">
+          <input
+            type="checkbox"
+            checked={vm.suggestionOverdueOnly}
+            onChange={(e) => vm.setSuggestionOverdueOnly(e.target.checked)}
+          />
+          <span>Overdue only</span>
+        </label>
+      </div>
       <div className="myday-search-wrap">
         <Search size={14} />
         <input
+          ref={vm.suggestionSearchRef}
           type="text"
           placeholder="Search tasks..."
           value={vm.suggestedSearch}
@@ -1815,12 +2063,45 @@ function MyDayTasksPageModals({ vm }: MyDayTasksPageViewProps) {
       <CreateTaskSidebar
         isOpen={vm.showCreateSidebar}
         onClose={() => vm.setShowCreateSidebar(false)}
-        onCreate={async () => {
-          vm.setShowCreateSidebar(false);
-          await vm.refreshMyDayPage();
-        }}
+        onCreate={vm.handleMyDayCreateSuccess}
+        defaultPlanDate={vm.today}
         extensions={vm.hierarchyDataExtensions as never}
       />
+      <Modal
+        show={vm.showUncompleteConfirm}
+        onHide={() => {
+          vm.setShowUncompleteConfirm(false);
+          vm.setPendingUncompleteTask(null);
+        }}
+        centered
+      >
+        <Modal.Header closeButton>
+          <Modal.Title>Mark task incomplete?</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <p className="mb-0">
+            Mark &ldquo;{vm.pendingUncompleteTask?.title}&rdquo; as incomplete for today?
+          </p>
+        </Modal.Body>
+        <Modal.Footer>
+          <Button
+            variant="secondary"
+            onClick={() => {
+              vm.setShowUncompleteConfirm(false);
+              vm.setPendingUncompleteTask(null);
+            }}
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={() => {
+              vm.confirmMarkIncomplete().catch(() => undefined);
+            }}
+          >
+            Mark incomplete
+          </Button>
+        </Modal.Footer>
+      </Modal>
       <Modal
         show={vm.showEstimateModal}
         onHide={() => {
@@ -1961,6 +2242,9 @@ function MyDayTasksPageView({ vm }: MyDayTasksPageViewProps) {
           ) : null}
           <MyDayTodayTasksSection vm={vm} />
           <MyDayCompletedSection vm={vm} />
+          {vm.loading ? null : (
+            <MyDayDailySummaryPanel stats={vm.dailySummaryStats} showCapacityBar />
+          )}
         </div>
         <MyDaySuggestionsPanel vm={vm} />
       </div>

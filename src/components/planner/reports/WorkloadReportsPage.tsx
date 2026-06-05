@@ -73,26 +73,28 @@ const WorkloadReportsPage: React.FC = () => {
           </Alert>
         ) : null}
 
-        <WorkloadReportsFiltersCard
-          datePreset={vm.datePreset}
-          onDatePresetChange={vm.setDatePreset}
-          customStart={vm.customStart}
-          onCustomStartChange={vm.setCustomStart}
-          customEnd={vm.customEnd}
-          onCustomEndChange={vm.setCustomEnd}
-          projectFilter={vm.projectFilter}
-          onProjectFilterChange={vm.setProjectFilter}
-          projectFilterOptions={vm.projectFilterOptions}
-          memberFilter={vm.memberFilter}
-          onMemberFilterChange={vm.setMemberFilter}
-          memberExtensions={vm.memberExtensions}
-          hierarchyDataExtensions={vm.hierarchyDataExtensions}
-          staleDays={vm.staleDays}
-          onStaleDaysChange={vm.setStaleDays}
-          enabled={vm.enabled}
-          loadingOverview={vm.loadingOverview}
-          onApply={vm.handleRefetchOverview}
-        />
+        {vm.mainView === "my_day_monthly" ? null : (
+          <WorkloadReportsFiltersCard
+            datePreset={vm.datePreset}
+            onDatePresetChange={vm.setDatePreset}
+            customStart={vm.customStart}
+            onCustomStartChange={vm.setCustomStart}
+            customEnd={vm.customEnd}
+            onCustomEndChange={vm.setCustomEnd}
+            projectFilter={vm.projectFilter}
+            onProjectFilterChange={vm.setProjectFilter}
+            projectFilterOptions={vm.projectFilterOptions}
+            memberFilter={vm.memberFilter}
+            onMemberFilterChange={vm.setMemberFilter}
+            memberExtensions={vm.memberExtensions}
+            hierarchyDataExtensions={vm.hierarchyDataExtensions}
+            staleDays={vm.staleDays}
+            onStaleDaysChange={vm.setStaleDays}
+            enabled={vm.enabled}
+            loadingOverview={vm.loadingOverview}
+            onApply={vm.handleRefetchOverview}
+          />
+        )}
 
         <ReportsViewTabs activeView={vm.mainView} onChange={vm.setMainView} />
 

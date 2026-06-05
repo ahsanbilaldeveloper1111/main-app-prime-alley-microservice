@@ -1689,13 +1689,32 @@ export const removeTaskFromMyDay = async (
   return parseMyDayResponseData(response);
 };
 
+export type MyDayCompleteScope = "my_day" | "task";
+
+export type ToggleMyDayTaskCompleteOptions = Readonly<{
+  extensionNumber?: string;
+  /** Default `my_day` — plan-day only; does not complete the project task on the board. */
+  completeScope?: MyDayCompleteScope;
+  /** Which My Day row to update (`Y-m-d`). Defaults to today on the server. */
+  planDate?: string;
+}>;
+
 export const toggleMyDayTaskComplete = async (
   taskId: number,
-  extensionNumber?: string,
+  options: ToggleMyDayTaskCompleteOptions = {},
 ): Promise<unknown> => {
+  const { extensionNumber, completeScope = "my_day", planDate } = options;
   const query = buildMyDayQuery({ extension_number: extensionNumber });
+  const body: { complete_scope: MyDayCompleteScope; plan_date?: string } = {
+    complete_scope: completeScope,
+  };
+  const planDateTrimmed = planDate?.trim();
+  if (planDateTrimmed) {
+    body.plan_date = planDateTrimmed;
+  }
   const response = await axiosInstance.patch(
     buildMyDayUrl(`work-planner/my-day/complete/${taskId}`, query),
+    body,
   );
   return parseMyDayResponseData(response);
 };

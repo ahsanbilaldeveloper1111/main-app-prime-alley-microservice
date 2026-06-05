@@ -47,6 +47,15 @@ export function ReportsViewTabs({ activeView, onChange }: ReportsViewTabsProps) 
           Historical Trends
         </Nav.Link>
       </Nav.Item>
+      <Nav.Item>
+        <Nav.Link
+          active={activeView === "my_day_monthly"}
+          onClick={() => onChange("my_day_monthly")}
+          className={activeView === "my_day_monthly" ? "active" : ""}
+        >
+          My Day Monthly
+        </Nav.Link>
+      </Nav.Item>
     </Nav>
   );
 }

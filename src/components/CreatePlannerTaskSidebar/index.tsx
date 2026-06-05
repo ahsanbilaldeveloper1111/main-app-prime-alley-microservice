@@ -33,6 +33,7 @@ import RichTextEditor from "@page-modules/help-center/partials/RichTextEditor";
 import TaskSecondaryTabs from "@components/planner/workPlannerPagePartials/TaskSecondaryTabs";
 import { PlannerAddToMyDayHeaderButton } from "@components/planner/plannerTasksListing/PlannerAddToMyDayHeaderButton";
 import type { PlannerTaskEditScope } from "@planner/taskRowPermissions";
+import { resolvePlannerCreatedTaskId } from "@page-modules/planner/my-day/myDayDomain";
 
 // ─── Types (from createtask-modal) ─────────────────────────────────────────────
 
@@ -119,11 +120,15 @@ interface Extension {
   extension_number?: string;
 }
 
+export type PlannerSidebarCreateSuccessMeta = Readonly<{
+  createdTaskId: number | null;
+}>;
+
 interface CreateTaskSidebarProps {
   isOpen?: boolean;
   onClose?: () => void;
-  onCreate?: (data: CreateTaskFormData) => void;
-  onCreateAndOpen?: (data: CreateTaskFormData) => void;
+  onCreate?: (data: CreateTaskFormData, meta?: PlannerSidebarCreateSuccessMeta) => void;
+  onCreateAndOpen?: (data: CreateTaskFormData, meta?: PlannerSidebarCreateSuccessMeta) => void;
   extensions?: Extension[];
   labels?: Label[];
   project?: Project;
@@ -147,6 +152,8 @@ interface CreateTaskSidebarProps {
   canAddToMyDay?: boolean;
   alreadyInMyDay?: boolean;
   onAddToMyDay?: () => void;
+  /** When creating from My Day, seed due/start date to the active plan date. */
+  defaultPlanDate?: string;
 }
 
 /** Minimal task shape used when editing in the sidebar (API / normalized task). */
@@ -250,7 +257,7 @@ interface TaskListRow {
   reference?: string;
 }
 
-interface CreateTaskFormData {
+export interface CreateTaskFormData {
   title: string;
   description: string;
   taskType: PlannerTaskTypeOrUnset;
@@ -2062,6 +2069,23 @@ function validatePlannerSidebarDueTimeRequiresDueDate(
   return false;
 }
 
+function validatePlannerSidebarStartDateMinBoundary(
+  formData: CreateTaskFormData,
+): boolean {
+  if (formData.taskType === "recurring") {
+    return true;
+  }
+  if (!formData.startDate.trim()) {
+    return true;
+  }
+  const today = todayLocalIsoDate();
+  if (formData.startDate < today) {
+    toast.error("Start date cannot be in the past");
+    return false;
+  }
+  return true;
+}
+
 function validatePlannerSidebarDueDateMinBoundary(
   formData: CreateTaskFormData,
 ): boolean {
@@ -2119,6 +2143,9 @@ function validatePlannerSidebarFormForSubmit(
   if (!validatePlannerSidebarDueTimeRequiresDueDate(formData, taskTypeEff)) {
     return false;
   }
+  if (!validatePlannerSidebarStartDateMinBoundary(formData)) {
+    return false;
+  }
   if (!validatePlannerSidebarDueDateMinBoundary(formData)) {
     return false;
   }
@@ -2153,11 +2180,16 @@ async function persistPlannerSidebarEditTask(
   );
 }
 
+type PlannerSidebarPersistOutcome = Readonly<{
+  ok: boolean;
+  createdTaskId: number | null;
+}>;
+
 async function persistPlannerSidebarCreateTask(
   ctx: PersistPlannerSidebarContext,
   taskTypeEff: PlannerTaskType,
   payload: Record<string, unknown>,
-): Promise<boolean> {
+): Promise<PlannerSidebarPersistOutcome> {
   if (taskTypeEff === "recurring") {
     const recurringPayload: Parameters<typeof createRecurringTask>[0] = {
       ...(payload as unknown as Parameters<typeof createRecurringTask>[0]),
@@ -2169,16 +2201,27 @@ async function persistPlannerSidebarCreateTask(
       recurringPayload.project_id = ctx.formData.projectId;
       recurringPayload.label_ids = ctx.formData.labelIds || [];
     }
-    return Boolean(await createRecurringTask(recurringPayload));
+    const created = await createRecurringTask(recurringPayload);
+    return {
+      ok: Boolean(created),
+      createdTaskId: resolvePlannerCreatedTaskId(created),
+    };
   }
   const withTz = { ...payload, timezone: getAutoTimezone() };
-  return Boolean(await createTask(withTz as Parameters<typeof createTask>[0]));
+  const created = await createTask(withTz as Parameters<typeof createTask>[0]);
+  if (!created) {
+    return { ok: false, createdTaskId: null };
+  }
+  return {
+    ok: true,
+    createdTaskId: resolvePlannerCreatedTaskId(created),
+  };
 }
 
 async function persistPlannerSidebarTaskFromPayload(
   payloadInput: Record<string, unknown>,
   ctx: PersistPlannerSidebarContext,
-): Promise<boolean> {
+): Promise<PlannerSidebarPersistOutcome> {
   const taskTypeEff = clampTaskTypeToAllowed(
     ctx.formData.taskType as PlannerTaskType,
     ctx.taskTypeOptions,
@@ -2199,7 +2242,8 @@ async function persistPlannerSidebarTaskFromPayload(
     payload = applyLimitedEditLockAssigneesAndWatchers(payload, locked);
   }
   if (ctx.isEdit && ctx.editTask?.id != null) {
-    return persistPlannerSidebarEditTask(ctx.editTask.id, taskTypeEff, payload);
+    const ok = await persistPlannerSidebarEditTask(ctx.editTask.id, taskTypeEff, payload);
+    return { ok, createdTaskId: null };
   }
   return persistPlannerSidebarCreateTask(ctx, taskTypeEff, payload);
 }
@@ -2315,11 +2359,28 @@ function shouldDeferPlannerSidebarOpenUntilProjectsLoaded(
   );
 }
 
+function applyMyDayDefaultPlanDateToForm(
+  data: CreateTaskFormData,
+  defaultPlanDate?: string,
+): CreateTaskFormData {
+  const planDate = defaultPlanDate?.trim() ?? "";
+  if (!planDate || data.taskType === "recurring") {
+    return data;
+  }
+  return mergeFormDataWithDueDateClamp({
+    ...data,
+    startDate: data.startDate.trim() ? data.startDate : planDate,
+    dueDate: data.dueDate.trim() ? data.dueDate : planDate,
+  });
+}
+
 function mergeOpenedPlannerSidebarFormData(
   rawInitial: CreateTaskFormData,
   taskTypeOptions: readonly PlannerTaskType[],
+  defaultPlanDate?: string,
 ): CreateTaskFormData {
-  const mergedOpen = mergeFormDataWithDueDateClamp(rawInitial);
+  const withPlanDate = applyMyDayDefaultPlanDateToForm(rawInitial, defaultPlanDate);
+  const mergedOpen = mergeFormDataWithDueDateClamp(withPlanDate);
   return {
     ...mergedOpen,
     taskType:
@@ -2360,8 +2421,8 @@ async function submitPlannerSidebarTask(params: {
   validateBeforeSubmit: () => boolean;
   setIsSubmitting: (value: boolean) => void;
   buildPayload: () => PlannerSidebarPayload;
-  persistTaskFromPayload: (payload: PlannerSidebarPayload) => Promise<boolean>;
-  onSuccess?: (data: CreateTaskFormData) => void;
+  persistTaskFromPayload: (payload: PlannerSidebarPayload) => Promise<PlannerSidebarPersistOutcome>;
+  onSuccess?: (data: CreateTaskFormData, meta?: PlannerSidebarCreateSuccessMeta) => void;
   formData: CreateTaskFormData;
   onClose?: () => void;
   isEdit: boolean;
@@ -2387,9 +2448,9 @@ async function submitPlannerSidebarTask(params: {
   setIsSubmitting(true);
   try {
     const payload = buildPayload();
-    const ok = await persistTaskFromPayload(payload);
-    if (ok) {
-      onSuccess?.(formData);
+    const outcome = await persistTaskFromPayload(payload);
+    if (outcome.ok) {
+      onSuccess?.(formData, { createdTaskId: outcome.createdTaskId });
       onClose?.();
     }
   } catch (error) {
@@ -2406,9 +2467,11 @@ function computePlannerSidebarStartDateChange(
   if (prev.taskType === "recurring") {
     return { ...prev, startDate: newStart };
   }
-  const minDue = minDueDateFromTodayAndStart(newStart);
+  const today = todayLocalIsoDate();
+  const clampedStart = newStart && newStart < today ? today : newStart;
+  const minDue = minDueDateFromTodayAndStart(clampedStart);
   const nextDue = clampDueDateToMin(prev.dueDate, minDue);
-  return { ...prev, startDate: newStart, dueDate: nextDue };
+  return { ...prev, startDate: clampedStart, dueDate: nextDue };
 }
 
 function emptyPlannerSidebarFormWhenClosed(
@@ -2700,6 +2763,7 @@ type PlannerSidebarFormOpenLifecycleParams = Readonly<{
   setSearchQuery: React.Dispatch<React.SetStateAction<string>>;
   setFormData: React.Dispatch<React.SetStateAction<CreateTaskFormData>>;
   openAsRecurringConversion: boolean;
+  defaultPlanDate?: string;
 }>;
 
 function usePlannerSidebarFormOpenLifecycle(
@@ -2734,6 +2798,7 @@ function usePlannerSidebarFormOpenLifecycle(
         mergeOpenedPlannerSidebarFormData(
           getInitialFormData(),
           taskTypeOptions,
+          params.defaultPlanDate,
         ),
       );
     } else {
@@ -2755,6 +2820,7 @@ function usePlannerSidebarFormOpenLifecycle(
     params.selectedStatusForTask,
     params.taskTypeOptions,
     params.openAsRecurringConversion,
+    params.defaultPlanDate,
   ]);
 }
 
@@ -2859,6 +2925,7 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
   canAddToMyDay = false,
   alreadyInMyDay = false,
   onAddToMyDay,
+  defaultPlanDate,
 }) => {
   const normalizedTaskTypeOptions =
     useNormalizedPlannerTaskTypeOptions(taskTypeChoices);
@@ -3001,6 +3068,7 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
     setSearchQuery,
     setFormData,
     openAsRecurringConversion,
+    defaultPlanDate,
   });
 
   usePlannerSidebarBodyScrollLock(isOpen);
@@ -3088,7 +3156,7 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
 
   const persistTaskFromPayload = async (
     payloadInput: ReturnType<typeof buildPayload>,
-  ): Promise<boolean> =>
+  ): Promise<PlannerSidebarPersistOutcome> =>
     persistPlannerSidebarTaskFromPayload(payloadInput, {
       formData,
       taskTypeOptions,
@@ -3791,6 +3859,21 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
                                     )}
                                   </button>
                                 ))}
+                              <div
+                                className="p-2 border-top"
+                                style={{ backgroundColor: "white" }}
+                              >
+                                <button
+                                  type="button"
+                                  className="btn btn-primary btn-sm w-100"
+                                  onClick={() => {
+                                    setShowAssigneeDropdown(false);
+                                    setAssigneeSearchQuery("");
+                                  }}
+                                >
+                                  Done
+                                </button>
+                              </div>
                             </div>
                           )}
                         </Form.Group>
@@ -4027,6 +4110,11 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
                     <div style={helperTextStyle}>When should work begin?</div>
                     <Form.Control
                       type="date"
+                      min={
+                        formData.taskType === "recurring"
+                          ? undefined
+                          : todayLocalIsoDate()
+                      }
                       value={formData.startDate}
                       onChange={handleStartDateInputChange}
                       className="py-2"
