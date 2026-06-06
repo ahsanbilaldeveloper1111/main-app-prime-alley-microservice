@@ -259,6 +259,9 @@ export function ReportsProjectDetailList({
 export function ReportsTasksByProject({
   segments,
 }: Readonly<{ segments: ProjectTaskCountSegment[] }>) {
+  const [showAll, setShowAll] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+
   const total = segments.reduce((sum, segment) => sum + segment.value, 0);
   if (segments.length === 0 || total <= 0) {
     return (
@@ -269,35 +272,87 @@ export function ReportsTasksByProject({
       />
     );
   }
+
+  const sorted = [...segments].sort((a, b) => b.value - a.value);
+  const maxValue = sorted[0]?.value ?? 1;
+  const displayed = sorted.slice(0, 8);
+
   return (
     <>
-      <div className="reports-project-breakdown-bar" aria-hidden>
-        {segments.map((segment) => (
-          <span
-            key={segment.name}
-            className="reports-project-breakdown-bar__segment"
-            style={{
-              width: `${(segment.value / total) * 100}%`,
-              backgroundColor: segment.color,
-            }}
-            title={`${segment.name}: ${segment.value} tasks`}
-          />
+      <div style={{ display: "flex", flexDirection: "column", gap: "10px", padding: "4px 16px" }}>
+        {displayed.map((segment) => (
+          <div key={segment.name} style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+            <div style={{ fontSize: "12px", fontWeight: 500, color: "#141414", fontFamily: "Lexend Deca, sans-serif", width: "35%", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              {segment.name}
+            </div>
+            <div style={{ flex: 1, height: "5px", background: "#e2e8f0", borderRadius: "999px", overflow: "hidden" }}>
+              <div style={{
+                height: "100%",
+                width: `${Math.round((segment.value / maxValue) * 100)}%`,
+                backgroundColor: segment.color,
+                borderRadius: "999px",
+                minWidth: "4px",
+              }} />
+            </div>
+            <div style={{ fontSize: "12px", fontWeight: 600, color: "#374151", fontFamily: "Lexend Deca, sans-serif", minWidth: "2rem", textAlign: "right" }}>
+              {segment.value}
+            </div>
+          </div>
         ))}
       </div>
-      <ul className="reports-project-breakdown-bar__legend">
-        {segments.map((segment) => (
-          <li key={segment.name}>
-            <span
-              className="reports-project-breakdown-bar__dot"
-              style={{ backgroundColor: segment.color }}
-            />
-            <span>{segment.name}</span>
-            <span className="reports-project-breakdown-bar__count">
-              {segment.value} {segment.value === 1 ? "task" : "tasks"}
-            </span>
-          </li>
-        ))}
-      </ul>
+      <div style={{ padding: "10px 0 0", borderTop: "1px solid #eaf0f6", marginTop: "8px", textAlign: "center" }}>
+        <button
+          onClick={() => setShowAll(true)}
+          style={{ background: "none", border: "none", color: "#0066CC", fontSize: "12px", fontWeight: 500, cursor: "pointer", fontFamily: "Lexend Deca, sans-serif" }}
+        >
+          View All ({segments.length} projects)
+        </button>
+      </div>
+      {showAll ? ReactDOM.createPortal(
+        <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, zIndex: 9999, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center" }}
+          onClick={() => setShowAll(false)}>
+          <div style={{ background: "#fff", borderRadius: "8px", width: "min(640px, 90vw)", maxHeight: "80vh", display: "flex", flexDirection: "column", boxShadow: "0 8px 32px rgba(0,0,0,0.18)" }}
+            onClick={(e) => e.stopPropagation()}>
+            <div style={{ padding: "16px 20px", borderBottom: "1px solid #eaf0f6", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <div>
+                <div style={{ fontSize: "13px", fontWeight: 700, color: "#141414", fontFamily: "Lexend Deca, sans-serif" }}>Tasks by Project</div>
+                <div style={{ fontSize: "11px", color: "#718096", marginTop: "2px", fontFamily: "Lexend Deca, sans-serif" }}>{segments.length} projects</div>
+              </div>
+              <button onClick={() => setShowAll(false)} style={{ background: "none", border: "none", cursor: "pointer", color: "#718096", fontSize: "18px" }}>×</button>
+            </div>
+            <div style={{ padding: "8px 20px", borderBottom: "1px solid #eaf0f6" }}>
+              <input
+                type="text"
+                placeholder="Search project..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                style={{ width: "100%", padding: "6px 10px", fontSize: "12px", border: "1px solid #eaf0f6", borderRadius: "4px", fontFamily: "Lexend Deca, sans-serif", outline: "none", color: "#141414", background: "#f5f8fa" }}
+              />
+            </div>
+            <div style={{ overflowY: "auto", flex: 1, padding: "12px 20px" }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                {sorted
+                  .filter((s) => s.name.toLowerCase().includes(searchQuery.toLowerCase()))
+                  .map((segment, idx) => (
+                    <div key={segment.name} style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                      <span style={{ fontSize: "11px", color: "#9ca3af", minWidth: "20px", fontFamily: "Lexend Deca, sans-serif" }}>{idx + 1}</span>
+                      <div style={{ fontSize: "12px", fontWeight: 500, color: "#141414", fontFamily: "Lexend Deca, sans-serif", width: "40%", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {segment.name}
+                      </div>
+                      <div style={{ flex: 1, height: "5px", background: "#e2e8f0", borderRadius: "999px", overflow: "hidden" }}>
+                        <div style={{ height: "100%", width: `${Math.round((segment.value / maxValue) * 100)}%`, backgroundColor: segment.color, borderRadius: "999px", minWidth: "4px" }} />
+                      </div>
+                      <div style={{ fontSize: "12px", fontWeight: 600, color: "#374151", fontFamily: "Lexend Deca, sans-serif", minWidth: "2rem", textAlign: "right" }}>
+                        {segment.value}
+                      </div>
+                    </div>
+                  ))}
+              </div>
+            </div>
+          </div>
+        </div>,
+        document.body,
+      ) : null}
     </>
   );
 }
