@@ -587,17 +587,14 @@ export function ReportsMemberPerformanceBars({
         );
       })}
     </div>
-    {sortedRows.length > 10 ? (
-      <div style={{ padding: "10px 16px", borderTop: "1px solid #eaf0f6", textAlign: "center" }}>
-        <button
-          type="button"
-          onClick={() => setShowAll(true)}
-          style={{ background: "none", border: "none", color: "#0066CC", fontSize: "12px", fontWeight: 500, cursor: "pointer", fontFamily: "Lexend Deca, sans-serif" }}
-        >
-          View All ({sortedRows.length} members)
-        </button>
-      </div>
-    ) : null}
+    <div style={{ padding: "10px 16px", borderTop: "1px solid #eaf0f6", textAlign: "center" }}>
+      <button
+        onClick={() => setShowAll(true)}
+        style={{ background: "none", border: "none", color: "#0066CC", fontSize: "12px", fontWeight: 500, cursor: "pointer", fontFamily: "Lexend Deca, sans-serif" }}
+      >
+        View All ({sortedRows.length} members)
+      </button>
+    </div>
     {showAll ? ReactDOM.createPortal(
       <div style={{
         position: "fixed", top: 0, left: 0, right: 0, bottom: 0,

@@ -32,6 +32,8 @@ export function ReportsLiveTaskByMember({
   rows,
 }: Readonly<{ rows: LiveMemberRow[] }>) {
   const [modal, setModal] = useState<{ type: string; member: string; tasks: any[] } | null>(null);
+  const [showAllMembers, setShowAllMembers] = useState(false);
+  const [memberSearch, setMemberSearch] = useState("");
 
   if (rows.length === 0) {
     return (
@@ -42,10 +44,11 @@ export function ReportsLiveTaskByMember({
       />
     );
   }
+  const displayedMembers = rows.slice(0, 10);
   return (
     <>
     <div className="reports-live-task-by-member">
-      {rows.map((row) => (
+      {displayedMembers.map((row) => (
         <div key={row.key} className="reports-live-task-by-member__row">
           <span
             className="reports-assignee-row__avatar reports-assignee-row__avatar--sm"
@@ -122,6 +125,77 @@ export function ReportsLiveTaskByMember({
         </div>
       ))}
     </div>
+    <div style={{ padding: "10px 16px", borderTop: "1px solid #eaf0f6", textAlign: "center" }}>
+      <button
+        type="button"
+        onClick={() => setShowAllMembers(true)}
+        style={{ background: "none", border: "none", color: "#0066CC", fontSize: "12px", fontWeight: 500, cursor: "pointer", fontFamily: "Lexend Deca, sans-serif" }}
+      >
+        View All ({rows.length} members)
+      </button>
+    </div>
+    {showAllMembers ? ReactDOM.createPortal(
+      <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, zIndex: 9999, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center" }}
+        onClick={() => setShowAllMembers(false)}>
+        <div style={{ background: "#fff", borderRadius: "8px", width: "min(640px, 90vw)", maxHeight: "80vh", display: "flex", flexDirection: "column", boxShadow: "0 8px 32px rgba(0,0,0,0.18)" }}
+          onClick={(e) => e.stopPropagation()}>
+          <div style={{ padding: "16px 20px", borderBottom: "1px solid #eaf0f6", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <div>
+              <div style={{ fontSize: "13px", fontWeight: 700, color: "#141414", fontFamily: "Lexend Deca, sans-serif" }}>Team Members</div>
+              <div style={{ fontSize: "11px", color: "#718096", marginTop: "2px", fontFamily: "Lexend Deca, sans-serif" }}>{rows.length} members</div>
+            </div>
+            <button type="button" onClick={() => setShowAllMembers(false)} style={{ background: "none", border: "none", cursor: "pointer", color: "#718096", fontSize: "18px" }}>×</button>
+          </div>
+          <div style={{ padding: "8px 20px", borderBottom: "1px solid #eaf0f6" }}>
+            <input
+              type="text"
+              placeholder="Search member..."
+              value={memberSearch}
+              onChange={(e) => setMemberSearch(e.target.value)}
+              style={{ width: "100%", padding: "6px 10px", fontSize: "12px", border: "1px solid #eaf0f6", borderRadius: "4px", fontFamily: "Lexend Deca, sans-serif", outline: "none", color: "#141414", background: "#f5f8fa" }}
+            />
+          </div>
+          <div style={{ overflowY: "auto", flex: 1 }}>
+            {rows
+              .filter((row) => row.memberLabel.toLowerCase().includes(memberSearch.toLowerCase()))
+              .map((row, idx) => (
+                <div key={row.key} style={{ display: "flex", alignItems: "center", gap: "10px", padding: "10px 20px", borderBottom: "1px solid #f3f4f6" }}
+                  onMouseEnter={(e) => { e.currentTarget.style.background = "#f5f7fa"; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}>
+                  <span style={{ fontSize: "11px", color: "#9ca3af", minWidth: "20px", fontFamily: "Lexend Deca, sans-serif" }}>{idx + 1}</span>
+                  <span
+                    style={{
+                      backgroundColor: row.avatarColor,
+                      borderRadius: "50%",
+                      color: "#fff",
+                      width: "2rem",
+                      height: "2rem",
+                      display: "inline-flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      fontSize: "0.65rem",
+                      fontWeight: 700,
+                      flexShrink: 0,
+                    }}
+                    aria-hidden
+                  >
+                    {row.initials}
+                  </span>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: "13px", fontWeight: 500, color: "#141414", fontFamily: "Lexend Deca, sans-serif" }}>{row.memberLabel}</div>
+                    <div style={{ display: "flex", gap: "6px", marginTop: "4px", flexWrap: "wrap" }}>
+                      <span className="reports-list-badge reports-list-badge--default">{row.totalTasks} tasks</span>
+                      {row.inProgressTasks > 0 ? <span className="reports-list-badge reports-list-badge--info">{row.inProgressTasks} in progress</span> : null}
+                      {row.overdueTasks > 0 ? <span className="reports-list-badge reports-list-badge--critical">{row.overdueTasks} overdue</span> : null}
+                    </div>
+                  </div>
+                </div>
+              ))}
+          </div>
+        </div>
+      </div>,
+      document.body,
+    ) : null}
     {modal ? ReactDOM.createPortal(
       <div style={{
         position: "fixed",
@@ -226,12 +300,17 @@ export function ReportsLiveTaskDetailList({
   rows,
   emptyState,
 }: Readonly<{ rows: LiveTaskDetailRow[]; emptyState: React.ReactNode }>) {
+  const [showAll, setShowAll] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+
   if (rows.length === 0) {
     return emptyState;
   }
+  const displayedRows = rows.slice(0, 10);
   return (
+    <>
     <div className="reports-live-task-detail-list">
-      {rows.map((row) => (
+      {displayedRows.map((row) => (
         <div key={row.id} className="reports-live-task-detail-list__row">
           <div className="reports-live-task-detail-list__title">{row.title}</div>
           <div style={{ display: "flex", alignItems: "center", gap: "8px", flexShrink: 0 }}>
@@ -253,6 +332,78 @@ export function ReportsLiveTaskDetailList({
         </div>
       ))}
     </div>
+    <div style={{ padding: "10px 16px", borderTop: "1px solid #eaf0f6", textAlign: "center" }}>
+      <button
+        onClick={() => setShowAll(true)}
+        style={{ background: "none", border: "none", color: "#0066CC", fontSize: "12px", fontWeight: 500, cursor: "pointer", fontFamily: "Lexend Deca, sans-serif" }}
+      >
+        View All ({rows.length} tasks)
+      </button>
+    </div>
+    {showAll ? ReactDOM.createPortal(
+      <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, zIndex: 9999, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center" }}
+        onClick={() => setShowAll(false)}>
+        <div style={{ background: "#fff", borderRadius: "8px", width: "min(680px, 90vw)", maxHeight: "80vh", display: "flex", flexDirection: "column", boxShadow: "0 8px 32px rgba(0,0,0,0.18)" }}
+          onClick={(e) => e.stopPropagation()}>
+          <div style={{ padding: "16px 20px", borderBottom: "1px solid #eaf0f6", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <div>
+              <div style={{ fontSize: "13px", fontWeight: 700, color: "#141414", fontFamily: "Lexend Deca, sans-serif" }}>All Tasks</div>
+              <div style={{ fontSize: "11px", color: "#718096", marginTop: "2px", fontFamily: "Lexend Deca, sans-serif" }}>{rows.length} tasks</div>
+            </div>
+            <button type="button" onClick={() => setShowAll(false)} style={{ background: "none", border: "none", cursor: "pointer", color: "#718096", fontSize: "18px" }}>×</button>
+          </div>
+          <div style={{ padding: "8px 20px", borderBottom: "1px solid #eaf0f6" }}>
+            <input
+              type="text"
+              placeholder="Search task..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              style={{ width: "100%", padding: "6px 10px", fontSize: "12px", border: "1px solid #eaf0f6", borderRadius: "4px", fontFamily: "Lexend Deca, sans-serif", outline: "none", color: "#141414", background: "#f5f8fa" }}
+            />
+          </div>
+          <div style={{ overflowY: "auto", flex: 1 }}>
+            {rows
+              .filter((row) => row.title.toLowerCase().includes(searchQuery.toLowerCase()) || row.assigneeLabel.toLowerCase().includes(searchQuery.toLowerCase()))
+              .map((row, idx) => (
+                <div key={row.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 20px", borderBottom: "1px solid #f3f4f6" }}
+                  onMouseEnter={(e) => { e.currentTarget.style.background = "#f5f7fa"; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "10px", flex: 1, minWidth: 0 }}>
+                    <span style={{ fontSize: "11px", color: "#9ca3af", minWidth: "20px", fontFamily: "Lexend Deca, sans-serif" }}>{idx + 1}</span>
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ fontSize: "13px", fontWeight: 500, color: "#141414", fontFamily: "Lexend Deca, sans-serif" }}>{row.title}</div>
+                      <div style={{ fontSize: "11px", color: "#718096", marginTop: "2px", fontFamily: "Lexend Deca, sans-serif" }}>{row.projectLabel}</div>
+                    </div>
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px", flexShrink: 0 }}>
+                    <span style={{ fontSize: "11px", color: "#374151", fontFamily: "Lexend Deca, sans-serif" }}>{row.assigneeLabel}</span>
+                    <span
+                      style={{
+                        backgroundColor: row.assigneeAvatarColor,
+                        borderRadius: "50%",
+                        color: "#fff",
+                        width: "2rem",
+                        height: "2rem",
+                        display: "inline-flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        fontSize: "0.65rem",
+                        fontWeight: 700,
+                        flexShrink: 0,
+                      }}
+                      aria-hidden
+                    >
+                      {row.assigneeInitials}
+                    </span>
+                  </div>
+                </div>
+              ))}
+          </div>
+        </div>
+      </div>,
+      document.body,
+    ) : null}
+    </>
   );
 }
 
