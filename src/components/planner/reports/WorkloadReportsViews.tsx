@@ -47,6 +47,7 @@ import {
   workloadMemberAvatarColor,
   workloadMemberInitials,
 } from "@page-modules/planner/workload/workloadDomain";
+import { ReportsModalOverlay } from "./ReportsModalOverlay";
 
 const REPORTS_EMPTY_ICON_MAP: Record<string, LucideIcon> = {
   "ti-users": Users,
@@ -502,6 +503,13 @@ export function ReportsMemberWiseTasks({
   );
 }
 
+function resolveMemberPerfBarColor(pct: number): string {
+  if (pct === 0) return "#9ca3af";
+  if (pct >= 75) return "#16a34a";
+  if (pct >= 50) return "#f59e0b";
+  return "#ef4444";
+}
+
 export function ReportsMemberPerformanceBars({
   rows,
   hierarchyExtensions,
@@ -577,13 +585,7 @@ export function ReportsMemberPerformanceBars({
         const done = row.done_count ?? row.completed_tasks ?? 0;
         const total = row.total_tasks ?? row.task_count ?? 1;
         const pct = total > 0 ? Math.round((done / total) * 100) : 0;
-        const barColor = pct === 0
-          ? "#9ca3af"
-          : pct >= 75
-            ? "#16a34a"
-            : pct >= 50
-              ? "#f59e0b"
-              : "#ef4444";
+        const barColor = resolveMemberPerfBarColor(pct);
         return (
           <div key={ext || label} className="reports-member-perf-row">
             <span
@@ -612,95 +614,91 @@ export function ReportsMemberPerformanceBars({
     </div>
     <div style={{ padding: "10px 16px", borderTop: "1px solid #eaf0f6", textAlign: "center" }}>
       <button
+        type="button"
         onClick={() => setShowAll(true)}
         style={{ background: "none", border: "none", color: "#0066CC", fontSize: "12px", fontWeight: 500, cursor: "pointer", fontFamily: "Lexend Deca, sans-serif" }}
       >
         View All ({sortedRows.length} members)
       </button>
     </div>
-    {showAll ? ReactDOM.createPortal(
-      <div style={{
-        position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
-        zIndex: 9999, background: "rgba(0,0,0,0.5)",
-        display: "flex", alignItems: "center", justifyContent: "center",
-      }} onClick={() => setShowAll(false)}>
-        <div style={{
-          background: "#fff", borderRadius: "8px",
-          width: "min(640px, 90vw)", maxHeight: "80vh",
-          display: "flex", flexDirection: "column",
-          boxShadow: "0 8px 32px rgba(0,0,0,0.18)",
-        }} onClick={(e) => e.stopPropagation()}>
-          <div style={{ padding: "16px 20px", borderBottom: "1px solid #eaf0f6", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-            <div>
-              <div style={{ fontSize: "13px", fontWeight: 700, color: "#141414", fontFamily: "Lexend Deca, sans-serif" }}>Member Performance</div>
-              <div style={{ fontSize: "11px", color: "#718096", marginTop: "2px", fontFamily: "Lexend Deca, sans-serif" }}>All {sortedRows.length} members</div>
-            </div>
-            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-              <div style={{ display: "flex", border: "1px solid #eaf0f6", borderRadius: "4px", overflow: "hidden" }}>
-                <button type="button" style={{ padding: "4px 10px", fontSize: "11px", border: "none", cursor: "pointer", fontFamily: "Lexend Deca, sans-serif", fontWeight: 500, background: modalSortOrder === "worst" ? "#0066CC" : "#fff", color: modalSortOrder === "worst" ? "#fff" : "#374151" }} onClick={() => setModalSortOrder("worst")}>↑ Ascending</button>
-                <button type="button" style={{ padding: "4px 10px", fontSize: "11px", border: "none", cursor: "pointer", fontFamily: "Lexend Deca, sans-serif", fontWeight: 500, background: modalSortOrder === "best" ? "#0066CC" : "#fff", color: modalSortOrder === "best" ? "#fff" : "#374151", borderLeft: "1px solid #eaf0f6" }} onClick={() => setModalSortOrder("best")}>↓ Descending</button>
+    {showAll
+      ? ReactDOM.createPortal(
+          <ReportsModalOverlay
+            ariaLabel="Member Performance"
+            onClose={() => setShowAll(false)}
+            dialogClassName="reports-modal-dialog--members"
+          >
+            <div style={{ padding: "16px 20px", borderBottom: "1px solid #eaf0f6", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <div>
+                <div style={{ fontSize: "13px", fontWeight: 700, color: "#141414", fontFamily: "Lexend Deca, sans-serif" }}>Member Performance</div>
+                <div style={{ fontSize: "11px", color: "#718096", marginTop: "2px", fontFamily: "Lexend Deca, sans-serif" }}>All {sortedRows.length} members</div>
               </div>
-              <button type="button" onClick={() => setShowAll(false)} style={{ background: "none", border: "none", cursor: "pointer", color: "#718096", fontSize: "18px" }}>×</button>
-            </div>
-          </div>
-          <div style={{ padding: "8px 20px", borderBottom: "1px solid #eaf0f6" }}>
-            <input
-              type="text"
-              placeholder="Search member..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              style={{
-                width: "100%", padding: "6px 10px", fontSize: "12px",
-                border: "1px solid #eaf0f6", borderRadius: "4px",
-                fontFamily: "Lexend Deca, sans-serif", outline: "none",
-                color: "#141414", background: "#f5f8fa",
-              }}
-            />
-          </div>
-          <div style={{ overflowY: "auto", flex: 1, padding: "8px 0" }}>
-            {modalRows.map((row, idx) => {
-              const ext = row.extension_number?.trim() ?? "";
-              const label = formatReportsMemberLabel(row, hierarchyExtensions);
-              const total = row.total_tasks ?? row.task_count ?? 0;
-              const done = row.done_count ?? row.completed_tasks ?? 0;
-              const pct = total > 0 ? Math.round((done / total) * 100) : 0;
-              const barColor = pct === 0 ? "#9ca3af" : pct >= 75 ? "#16a34a" : pct >= 50 ? "#f59e0b" : "#ef4444";
-              return (
-                <div key={ext || label} style={{ display: "flex", alignItems: "center", gap: "10px", padding: "10px 20px", borderBottom: "1px solid #f3f4f6" }}>
-                  <span style={{ fontSize: "11px", color: "#9ca3af", minWidth: "20px", fontFamily: "Lexend Deca, sans-serif" }}>{idx + 1}</span>
-                  <span
-                    style={{
-                      backgroundColor: workloadMemberAvatarColor(ext),
-                      borderRadius: "50%",
-                      color: "#fff",
-                      width: "2rem",
-                      height: "2rem",
-                      display: "inline-flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      fontSize: "0.65rem",
-                      fontWeight: 700,
-                      flexShrink: 0,
-                    }}
-                    aria-hidden
-                  >
-                    {workloadMemberInitials(ext, hierarchyExtensions, row)}
-                  </span>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: "13px", fontWeight: 500, color: "#141414", fontFamily: "Lexend Deca, sans-serif", marginBottom: "4px" }}>{label}</div>
-                    <div style={{ height: "5px", background: "#eaf0f6", borderRadius: "3px", overflow: "hidden" }}>
-                      <div style={{ height: "100%", width: `${pct}%`, backgroundColor: barColor, borderRadius: "3px", minWidth: pct > 0 ? "2px" : "0" }} />
-                    </div>
-                  </div>
-                  <span style={{ fontSize: "13px", fontWeight: 700, color: barColor, minWidth: "2.5rem", textAlign: "right", fontFamily: "Lexend Deca, sans-serif" }}>{pct}%</span>
+              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                <div style={{ display: "flex", border: "1px solid #eaf0f6", borderRadius: "4px", overflow: "hidden" }}>
+                  <button type="button" style={{ padding: "4px 10px", fontSize: "11px", border: "none", cursor: "pointer", fontFamily: "Lexend Deca, sans-serif", fontWeight: 500, background: modalSortOrder === "worst" ? "#0066CC" : "#fff", color: modalSortOrder === "worst" ? "#fff" : "#374151" }} onClick={() => setModalSortOrder("worst")}>↑ Ascending</button>
+                  <button type="button" style={{ padding: "4px 10px", fontSize: "11px", border: "none", cursor: "pointer", fontFamily: "Lexend Deca, sans-serif", fontWeight: 500, background: modalSortOrder === "best" ? "#0066CC" : "#fff", color: modalSortOrder === "best" ? "#fff" : "#374151", borderLeft: "1px solid #eaf0f6" }} onClick={() => setModalSortOrder("best")}>↓ Descending</button>
                 </div>
-              );
-            })}
-          </div>
-        </div>
-      </div>,
-      document.body,
-    ) : null}
+                <button type="button" onClick={() => setShowAll(false)} style={{ background: "none", border: "none", cursor: "pointer", color: "#718096", fontSize: "18px" }}>×</button>
+              </div>
+            </div>
+            <div style={{ padding: "8px 20px", borderBottom: "1px solid #eaf0f6" }}>
+              <input
+                type="text"
+                placeholder="Search member..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                style={{
+                  width: "100%", padding: "6px 10px", fontSize: "12px",
+                  border: "1px solid #eaf0f6", borderRadius: "4px",
+                  fontFamily: "Lexend Deca, sans-serif", outline: "none",
+                  color: "#141414", background: "#f5f8fa",
+                }}
+              />
+            </div>
+            <div style={{ overflowY: "auto", flex: 1, padding: "8px 0" }}>
+              {modalRows.map((row, idx) => {
+                const ext = row.extension_number?.trim() ?? "";
+                const label = formatReportsMemberLabel(row, hierarchyExtensions);
+                const total = row.total_tasks ?? row.task_count ?? 0;
+                const done = row.done_count ?? row.completed_tasks ?? 0;
+                const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+                const barColor = resolveMemberPerfBarColor(pct);
+                return (
+                  <div key={ext || label} style={{ display: "flex", alignItems: "center", gap: "10px", padding: "10px 20px", borderBottom: "1px solid #f3f4f6" }}>
+                    <span style={{ fontSize: "11px", color: "#9ca3af", minWidth: "20px", fontFamily: "Lexend Deca, sans-serif" }}>{idx + 1}</span>
+                    <span
+                      style={{
+                        backgroundColor: workloadMemberAvatarColor(ext),
+                        borderRadius: "50%",
+                        color: "#fff",
+                        width: "2rem",
+                        height: "2rem",
+                        display: "inline-flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        fontSize: "0.65rem",
+                        fontWeight: 700,
+                        flexShrink: 0,
+                      }}
+                      aria-hidden
+                    >
+                      {workloadMemberInitials(ext, hierarchyExtensions, row)}
+                    </span>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: "13px", fontWeight: 500, color: "#141414", fontFamily: "Lexend Deca, sans-serif", marginBottom: "4px" }}>{label}</div>
+                      <div style={{ height: "5px", background: "#eaf0f6", borderRadius: "3px", overflow: "hidden" }}>
+                        <div style={{ height: "100%", width: `${pct}%`, backgroundColor: barColor, borderRadius: "3px", minWidth: pct > 0 ? "2px" : "0" }} />
+                      </div>
+                    </div>
+                    <span style={{ fontSize: "13px", fontWeight: 700, color: barColor, minWidth: "2.5rem", textAlign: "right", fontFamily: "Lexend Deca, sans-serif" }}>{pct}%</span>
+                  </div>
+                );
+              })}
+            </div>
+          </ReportsModalOverlay>,
+          document.body,
+        )
+      : null}
     </>
   );
 }

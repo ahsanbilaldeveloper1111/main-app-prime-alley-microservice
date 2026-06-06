@@ -507,7 +507,6 @@ export function extractMemberTrendWeekHeaders(
   const first = rows.find((row) => row.weekCells.length > 0);
   const labels = first?.weekCells.map((cell) => cell.label) ?? [];
   if (labels.length === 0) return [];
-  const relativeLabels = ["Wk 1", "Wk 2", "Wk 3", "This Wk"];
   return labels.map((_, index) => {
     const offset = labels.length - index;
     if (offset === 1) return "This Wk";

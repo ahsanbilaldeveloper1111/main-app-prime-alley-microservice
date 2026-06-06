@@ -105,6 +105,8 @@ export interface TaskReportsAssigneeRow {
   completed_count?: number;
   overdue_count?: number;
   completion_percent?: number;
+  project_name?: string | null;
+  primary_project_name?: string | null;
 }
 
 export interface TaskReportsTaskRow {

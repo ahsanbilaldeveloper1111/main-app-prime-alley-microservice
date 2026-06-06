@@ -313,8 +313,9 @@ export function useWorkloadReportsPage() {
         liveMemberSource,
         hierarchyDataExtensions,
         hierarchyDataUsers,
+        data ?? null,
       ),
-    [liveMemberSource, hierarchyDataExtensions, hierarchyDataUsers],
+    [liveMemberSource, hierarchyDataExtensions, hierarchyDataUsers, data],
   );
 
   const liveOverdueTasks = useMemo(

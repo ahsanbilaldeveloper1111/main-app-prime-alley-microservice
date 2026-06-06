@@ -13,6 +13,7 @@ import {
   type ReportsTeamSubView,
 } from "@page-modules/planner/reports/projectReportsDomain";
 import { ReportsEmptyState } from "./WorkloadReportsViews";
+import { ReportsModalOverlay } from "./ReportsModalOverlay";
 
 type ReportsViewTabsProps = Readonly<{
   activeView: ReportsMainView;
@@ -144,6 +145,16 @@ function projectProgressTone(progress: number): string {
   return "delay";
 }
 
+function projectProgressBarColor(tone: string): string {
+  if (tone === "success") return "#16a34a";
+  if (tone === "warning") return "#f59e0b";
+  return "#ef4444";
+}
+
+function resolveProjectHealthClass(health: ProjectReportRow["health"]): string {
+  return health === "at_risk" ? "reports-project-row__health--risk" : "reports-project-row__health--ok";
+}
+
 export function ReportsProjectDetailList({
   rows,
 }: Readonly<{ rows: ProjectReportRow[] }>) {
@@ -167,8 +178,7 @@ export function ReportsProjectDetailList({
       <div className="reports-project-list">
         {displayedRows.map((row) => {
           const tone = projectProgressTone(row.progressPercent);
-          const healthClass =
-            row.health === "at_risk" ? "reports-project-row__health--risk" : "reports-project-row__health--ok";
+          const healthClass = resolveProjectHealthClass(row.health);
           return (
             <div key={row.id} className="reports-project-row">
               <div className="reports-project-row__head">
@@ -211,55 +221,61 @@ export function ReportsProjectDetailList({
           View All ({rows.length} projects)
         </button>
       </div>
-      {showAll ? ReactDOM.createPortal(
-        <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, zIndex: 9999, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center" }}
-          onClick={() => setShowAll(false)}>
-          <div style={{ background: "#fff", borderRadius: "8px", width: "min(680px, 90vw)", maxHeight: "80vh", display: "flex", flexDirection: "column", boxShadow: "0 8px 32px rgba(0,0,0,0.18)" }}
-            onClick={(e) => e.stopPropagation()}>
-            <div style={{ padding: "16px 20px", borderBottom: "1px solid #eaf0f6", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-              <div>
-                <div style={{ fontSize: "13px", fontWeight: 700, color: "#141414", fontFamily: "Lexend Deca, sans-serif" }}>Project Health</div>
-                <div style={{ fontSize: "11px", color: "#718096", marginTop: "2px", fontFamily: "Lexend Deca, sans-serif" }}>{rows.length} projects</div>
+      {showAll
+        ? ReactDOM.createPortal(
+            <ReportsModalOverlay
+              ariaLabel="Project Health"
+              onClose={() => setShowAll(false)}
+              dialogClassName="reports-modal-dialog--all-tasks"
+            >
+              <div style={{ padding: "16px 20px", borderBottom: "1px solid #eaf0f6", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                <div>
+                  <div style={{ fontSize: "13px", fontWeight: 700, color: "#141414", fontFamily: "Lexend Deca, sans-serif" }}>Project Health</div>
+                  <div style={{ fontSize: "11px", color: "#718096", marginTop: "2px", fontFamily: "Lexend Deca, sans-serif" }}>{rows.length} projects</div>
+                </div>
+                <button type="button" onClick={() => setShowAll(false)} style={{ background: "none", border: "none", cursor: "pointer", color: "#718096", fontSize: "18px" }}>×</button>
               </div>
-              <button type="button" onClick={() => setShowAll(false)} style={{ background: "none", border: "none", cursor: "pointer", color: "#718096", fontSize: "18px" }}>×</button>
-            </div>
-            <div style={{ padding: "8px 20px", borderBottom: "1px solid #eaf0f6" }}>
-              <input
-                type="text"
-                placeholder="Search project..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                style={{ width: "100%", padding: "6px 10px", fontSize: "12px", border: "1px solid #eaf0f6", borderRadius: "4px", fontFamily: "Lexend Deca, sans-serif", outline: "none", color: "#141414", background: "#f5f8fa" }}
-              />
-            </div>
-            <div style={{ overflowY: "auto", flex: 1 }}>
-              {rows
-                .filter((row) => row.name.toLowerCase().includes(searchQuery.toLowerCase()))
-                .map((row, idx) => {
-                  const tone = projectProgressTone(row.progressPercent);
-                  const healthClass = row.health === "at_risk" ? "reports-project-row__health--risk" : "reports-project-row__health--ok";
-                  return (
-                    <div key={row.id} style={{ padding: "10px 20px", borderBottom: "1px solid #f3f4f6" }}
-                      onMouseEnter={(e) => { e.currentTarget.style.background = "#f5f7fa"; }}
-                      onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "6px" }}>
-                        <span style={{ fontSize: "11px", color: "#9ca3af", minWidth: "20px", fontFamily: "Lexend Deca, sans-serif" }}>{idx + 1}</span>
-                        <span style={{ width: "8px", height: "8px", borderRadius: "50%", backgroundColor: row.color, flexShrink: 0, display: "inline-block" }} />
-                        <span style={{ fontSize: "13px", fontWeight: 500, color: "#141414", fontFamily: "Lexend Deca, sans-serif", flex: 1 }}>{row.name}</span>
-                        <span className={`reports-project-row__health ${healthClass}`}>{row.healthLabel}</span>
-                        <span style={{ fontSize: "13px", fontWeight: 600, color: "#374151", minWidth: "2.5rem", textAlign: "right", fontFamily: "Lexend Deca, sans-serif" }}>{row.progressPercent}%</span>
+              <div style={{ padding: "8px 20px", borderBottom: "1px solid #eaf0f6" }}>
+                <input
+                  type="text"
+                  placeholder="Search project..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  style={{ width: "100%", padding: "6px 10px", fontSize: "12px", border: "1px solid #eaf0f6", borderRadius: "4px", fontFamily: "Lexend Deca, sans-serif", outline: "none", color: "#141414", background: "#f5f8fa" }}
+                />
+              </div>
+              <div style={{ overflowY: "auto", flex: 1 }}>
+                {rows
+                  .filter((row) => row.name.toLowerCase().includes(searchQuery.toLowerCase()))
+                  .map((row, idx) => {
+                    const tone = projectProgressTone(row.progressPercent);
+                    const healthClass = resolveProjectHealthClass(row.health);
+                    const progressBarColor = projectProgressBarColor(tone);
+
+                    return (
+                      <div
+                        key={row.id}
+                        className="reports-modal-list-row"
+                        style={{ padding: "10px 20px", borderBottom: "1px solid #f3f4f6" }}
+                      >
+                        <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "6px" }}>
+                          <span style={{ fontSize: "11px", color: "#9ca3af", minWidth: "20px", fontFamily: "Lexend Deca, sans-serif" }}>{idx + 1}</span>
+                          <span style={{ width: "8px", height: "8px", borderRadius: "50%", backgroundColor: row.color, flexShrink: 0, display: "inline-block" }} />
+                          <span style={{ fontSize: "13px", fontWeight: 500, color: "#141414", fontFamily: "Lexend Deca, sans-serif", flex: 1 }}>{row.name}</span>
+                          <span className={`reports-project-row__health ${healthClass}`}>{row.healthLabel}</span>
+                          <span style={{ fontSize: "13px", fontWeight: 600, color: "#374151", minWidth: "2.5rem", textAlign: "right", fontFamily: "Lexend Deca, sans-serif" }}>{row.progressPercent}%</span>
+                        </div>
+                        <div style={{ height: "5px", background: "#e2e8f0", borderRadius: "999px", overflow: "hidden", marginLeft: "28px" }}>
+                          <div style={{ height: "100%", width: `${Math.min(100, Math.max(0, row.progressPercent))}%`, background: progressBarColor, borderRadius: "999px" }} />
+                        </div>
                       </div>
-                      <div style={{ height: "5px", background: "#e2e8f0", borderRadius: "999px", overflow: "hidden", marginLeft: "28px" }}>
-                        <div style={{ height: "100%", width: `${Math.min(100, Math.max(0, row.progressPercent))}%`, background: tone === "success" ? "#16a34a" : tone === "warning" ? "#f59e0b" : "#ef4444", borderRadius: "999px" }} />
-                      </div>
-                    </div>
-                  );
-                })}
-            </div>
-          </div>
-        </div>,
-        document.body,
-      ) : null}
+                    );
+                  })}
+              </div>
+            </ReportsModalOverlay>,
+            document.body,
+          )
+        : null}
     </>
   );
 }
@@ -310,57 +326,60 @@ export function ReportsTasksByProject({
       </div>
       <div style={{ padding: "10px 0 0", borderTop: "1px solid #eaf0f6", marginTop: "8px", textAlign: "center" }}>
         <button
+          type="button"
           onClick={() => setShowAll(true)}
           style={{ background: "none", border: "none", color: "#0066CC", fontSize: "12px", fontWeight: 500, cursor: "pointer", fontFamily: "Lexend Deca, sans-serif" }}
         >
           View All ({segments.length} projects)
         </button>
       </div>
-      {showAll ? ReactDOM.createPortal(
-        <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, zIndex: 9999, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center" }}
-          onClick={() => setShowAll(false)}>
-          <div style={{ background: "#fff", borderRadius: "8px", width: "min(640px, 90vw)", maxHeight: "80vh", display: "flex", flexDirection: "column", boxShadow: "0 8px 32px rgba(0,0,0,0.18)" }}
-            onClick={(e) => e.stopPropagation()}>
-            <div style={{ padding: "16px 20px", borderBottom: "1px solid #eaf0f6", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-              <div>
-                <div style={{ fontSize: "13px", fontWeight: 700, color: "#141414", fontFamily: "Lexend Deca, sans-serif" }}>Tasks by Project</div>
-                <div style={{ fontSize: "11px", color: "#718096", marginTop: "2px", fontFamily: "Lexend Deca, sans-serif" }}>{segments.length} projects</div>
+      {showAll
+        ? ReactDOM.createPortal(
+            <ReportsModalOverlay
+              ariaLabel="Tasks by Project"
+              onClose={() => setShowAll(false)}
+              dialogClassName="reports-modal-dialog--members"
+            >
+              <div style={{ padding: "16px 20px", borderBottom: "1px solid #eaf0f6", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                <div>
+                  <div style={{ fontSize: "13px", fontWeight: 700, color: "#141414", fontFamily: "Lexend Deca, sans-serif" }}>Tasks by Project</div>
+                  <div style={{ fontSize: "11px", color: "#718096", marginTop: "2px", fontFamily: "Lexend Deca, sans-serif" }}>{segments.length} projects</div>
+                </div>
+                <button type="button" onClick={() => setShowAll(false)} style={{ background: "none", border: "none", cursor: "pointer", color: "#718096", fontSize: "18px" }}>×</button>
               </div>
-              <button onClick={() => setShowAll(false)} style={{ background: "none", border: "none", cursor: "pointer", color: "#718096", fontSize: "18px" }}>×</button>
-            </div>
-            <div style={{ padding: "8px 20px", borderBottom: "1px solid #eaf0f6" }}>
-              <input
-                type="text"
-                placeholder="Search project..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                style={{ width: "100%", padding: "6px 10px", fontSize: "12px", border: "1px solid #eaf0f6", borderRadius: "4px", fontFamily: "Lexend Deca, sans-serif", outline: "none", color: "#141414", background: "#f5f8fa" }}
-              />
-            </div>
-            <div style={{ overflowY: "auto", flex: 1, padding: "12px 20px" }}>
-              <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-                {sorted
-                  .filter((s) => s.name.toLowerCase().includes(searchQuery.toLowerCase()))
-                  .map((segment, idx) => (
-                    <div key={segment.name} style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                      <span style={{ fontSize: "11px", color: "#9ca3af", minWidth: "20px", fontFamily: "Lexend Deca, sans-serif" }}>{idx + 1}</span>
-                      <div style={{ fontSize: "12px", fontWeight: 500, color: "#141414", fontFamily: "Lexend Deca, sans-serif", width: "40%", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                        {segment.name}
-                      </div>
-                      <div style={{ flex: 1, height: "5px", background: "#e2e8f0", borderRadius: "999px", overflow: "hidden" }}>
-                        <div style={{ height: "100%", width: `${Math.round((segment.value / maxValue) * 100)}%`, backgroundColor: segment.color, borderRadius: "999px", minWidth: "4px" }} />
-                      </div>
-                      <div style={{ fontSize: "12px", fontWeight: 600, color: "#374151", fontFamily: "Lexend Deca, sans-serif", minWidth: "2rem", textAlign: "right" }}>
-                        {segment.value}
-                      </div>
-                    </div>
-                  ))}
+              <div style={{ padding: "8px 20px", borderBottom: "1px solid #eaf0f6" }}>
+                <input
+                  type="text"
+                  placeholder="Search project..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  style={{ width: "100%", padding: "6px 10px", fontSize: "12px", border: "1px solid #eaf0f6", borderRadius: "4px", fontFamily: "Lexend Deca, sans-serif", outline: "none", color: "#141414", background: "#f5f8fa" }}
+                />
               </div>
-            </div>
-          </div>
-        </div>,
-        document.body,
-      ) : null}
+              <div style={{ overflowY: "auto", flex: 1, padding: "12px 20px" }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                  {sorted
+                    .filter((s) => s.name.toLowerCase().includes(searchQuery.toLowerCase()))
+                    .map((segment, idx) => (
+                      <div key={segment.name} style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                        <span style={{ fontSize: "11px", color: "#9ca3af", minWidth: "20px", fontFamily: "Lexend Deca, sans-serif" }}>{idx + 1}</span>
+                        <div style={{ fontSize: "12px", fontWeight: 500, color: "#141414", fontFamily: "Lexend Deca, sans-serif", width: "40%", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                          {segment.name}
+                        </div>
+                        <div style={{ flex: 1, height: "5px", background: "#e2e8f0", borderRadius: "999px", overflow: "hidden" }}>
+                          <div style={{ height: "100%", width: `${Math.round((segment.value / maxValue) * 100)}%`, backgroundColor: segment.color, borderRadius: "999px", minWidth: "4px" }} />
+                        </div>
+                        <div style={{ fontSize: "12px", fontWeight: 600, color: "#374151", fontFamily: "Lexend Deca, sans-serif", minWidth: "2rem", textAlign: "right" }}>
+                          {segment.value}
+                        </div>
+                      </div>
+                    ))}
+                </div>
+              </div>
+            </ReportsModalOverlay>,
+            document.body,
+          )
+        : null}
     </>
   );
 }

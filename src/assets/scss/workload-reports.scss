@@ -44,7 +44,7 @@
     height: 40px;
     border-radius: 50%;
     background: #f5f7fa;
-    color: #9ca3af;
+    color: #64748b;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -382,7 +382,7 @@
     border-radius: 4px;
     margin-bottom: 16px;
     font-size: 11px;
-    color: #718096;
+    color: #475569;
     font-family: "Lexend Deca", Helvetica, Arial, sans-serif;
   }
 
@@ -1060,7 +1060,7 @@
 
   .reports-project-row__health--ok {
     background: #ecfdf5;
-    color: #16a34a;
+    color: #15803d;
   }
 
   .reports-project-row__health--risk {
@@ -1342,6 +1342,65 @@
   .reports-list-badge--default {
     background: #f3f4f6;
     color: #4b5563;
+  }
+
+  .reports-list-badge-btn {
+    border: none;
+    cursor: pointer;
+    font-family: inherit;
+
+    &:hover {
+      text-decoration: underline;
+    }
+  }
+
+  .reports-modal-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    width: 100%;
+    max-width: none;
+    height: 100%;
+    max-height: none;
+    margin: 0;
+    padding: 0;
+    border: none;
+    background: transparent;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    &::backdrop {
+      background: rgba(0, 0, 0, 0.5);
+    }
+  }
+
+  .reports-modal-dialog {
+    background: #fff;
+    border-radius: 8px;
+    max-height: 80vh;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.18);
+  }
+
+  .reports-modal-dialog--members {
+    width: min(640px, 90vw);
+  }
+
+  .reports-modal-dialog--tasks {
+    width: min(600px, 90vw);
+    overflow: hidden;
+  }
+
+  .reports-modal-dialog--all-tasks {
+    width: min(680px, 90vw);
+  }
+
+  .reports-modal-list-row {
+    &:hover {
+      background: #f5f7fa;
+    }
   }
 
   .reports-pending-table {

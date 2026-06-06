@@ -130,11 +130,70 @@ function resolveAssigneeTotal(row: TaskReportsAssigneeRow): number {
   return pending + inProgress + done + overdue;
 }
 
+function collectLiveOverviewTasks(overview: TaskReportsOverview): TaskReportsTaskRow[] {
+  return [
+    ...overview.pending_tasks,
+    ...overview.stale_in_progress_tasks,
+    ...overview.transfer_tasks,
+  ];
+}
+
+function buildMemberPrimaryProjectMap(tasks: TaskReportsTaskRow[]): Map<string, string> {
+  const countsByExtension = new Map<string, Map<string, number>>();
+
+  for (const task of tasks) {
+    const ext = task.assignee_extension?.trim();
+    if (!ext) continue;
+
+    const projectName = task.project_name?.trim() || "Org Task";
+    const projectCounts = countsByExtension.get(ext) ?? new Map<string, number>();
+    projectCounts.set(projectName, (projectCounts.get(projectName) ?? 0) + 1);
+    countsByExtension.set(ext, projectCounts);
+  }
+
+  const primaryProjectByExtension = new Map<string, string>();
+  for (const [ext, projectCounts] of countsByExtension) {
+    let bestProject = "Org Task";
+    let bestCount = 0;
+    for (const [projectName, count] of projectCounts) {
+      if (count > bestCount) {
+        bestCount = count;
+        bestProject = projectName;
+      }
+    }
+    primaryProjectByExtension.set(ext, bestProject);
+  }
+
+  return primaryProjectByExtension;
+}
+
+function resolveMemberProjectLabel(
+  row: TaskReportsAssigneeRow,
+  projectByExtension: Map<string, string>,
+): string {
+  const fromApi =
+    row.project_name?.trim() ||
+    row.primary_project_name?.trim();
+  if (fromApi) return fromApi;
+
+  const ext = row.extension_number?.trim() ?? "";
+  if (ext && projectByExtension.has(ext)) {
+    return projectByExtension.get(ext)!;
+  }
+
+  return "—";
+}
+
 export function buildLiveMemberRows(
   rows: TaskReportsAssigneeRow[],
   hierarchyExtensions?: unknown[] | null,
   hierarchyUsers?: unknown[] | null,
+  overview?: TaskReportsOverview | null,
 ): LiveMemberRow[] {
+  const projectByExtension = overview
+    ? buildMemberPrimaryProjectMap(collectLiveOverviewTasks(overview))
+    : new Map<string, string>();
+
   return rows
     .filter((row) => resolveAssigneeTotal(row) > 0)
     .map((row) => {
@@ -157,7 +216,7 @@ export function buildLiveMemberRows(
         statsLine: `Tasks: ${totalTasks} | Completed: ${completedTasks}`,
         inProgressTasks: row.in_progress_count ?? 0,
         overdueTasks: resolveAssigneeOverdue(row),
-        projectLabel: "General Tasks", // TODO: Replace with dynamic project_name from API — not available at member level yet
+        projectLabel: resolveMemberProjectLabel(row, projectByExtension),
       };
     });
 }
