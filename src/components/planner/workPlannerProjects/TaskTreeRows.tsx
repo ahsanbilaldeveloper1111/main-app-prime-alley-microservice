@@ -1,10 +1,10 @@
 import React, { memo, useCallback, useState, type CSSProperties } from "react";
 import { ChevronRight, ChevronDown as ChevronDownIcon, Eye, type LucideIcon } from "lucide-react";
 import { formatDateGlobal } from "@utils/Helper";
-import { countAssignees, type SubTask, type Task } from "@planner/workPlannerProjectsDomain";
+import { type SubTask, type Task } from "@planner/workPlannerProjectsDomain";
 import {
-  computeOpenSubtaskCount,
   getSubtaskBadgeCounts,
+  plannerChildTasksToSubTasks,
 } from "@components/planner/workPlannerProjects/taskTreeUtils";
 import { TASK_STATUS_ICONS, taskStatusClassSuffix } from "@components/planner/workPlannerProjects/taskTreeStatus";
 
@@ -22,6 +22,18 @@ export interface TaskRowProps {
 
 function runTaskPreview(task: Task, onPreview: TaskRowProps["onPreview"]): void {
   Promise.resolve(onPreview(task)).catch(() => undefined);
+}
+
+function formatTaskAssigneeLabel(task: {
+  assignee?: string;
+  assigneeExtensionNumbers?: string[];
+}): string {
+  const label = task.assignee?.trim();
+  if (label) {
+    return label;
+  }
+  const ext = task.assigneeExtensionNumbers?.[0]?.trim();
+  return ext ?? "—";
 }
 
 type TaskRowNameCellProps = {
@@ -137,8 +149,7 @@ const TaskRowInner: React.FC<TaskRowProps> = ({
   const subtasksLoaded = Boolean(task.subtasks && task.subtasks.length > 0);
   const hasSubtaskCounts = task.sub_task_count != null && task.sub_task_count > 0;
   const hasSubtasks = hasChildTasks || subtasksLoaded || hasSubtaskCounts;
-  const openSubtaskCount = computeOpenSubtaskCount(task);
-  const subtaskBadge = getSubtaskBadgeCounts(task);
+  const subtaskBadge = hasChildTasks ? null : getSubtaskBadgeCounts(task);
   const StatusIcon = TASK_STATUS_ICONS[task.status];
   const indentLeft = depth * 24;
   const nameCellPad = 40 + indentLeft + 8;
@@ -173,13 +184,9 @@ const TaskRowInner: React.FC<TaskRowProps> = ({
           hovered={hovered}
         />
 
-        <td>
-          <div className="member-avatar bg-primary">
-            {countAssignees(task.assigneeExtensionNumbers, task.assignee)}
-          </div>
-        </td>
+        <td className="wp-task-cell-muted">{formatTaskAssigneeLabel(task)}</td>
 
-        <td className="wp-task-cell-muted">{openSubtaskCount ?? "—"}</td>
+        <td className="wp-task-cell-muted">—</td>
 
         <td className="wp-task-cell-muted">
           {task.status === "overdue" ? (
@@ -279,11 +286,7 @@ const SubtaskRowInner: React.FC<SubtaskRowProps> = ({
         </div>
       </td>
 
-      <td>
-        <div className="member-avatar bg-primary">
-          {countAssignees(subtask.assigneeExtensionNumbers, subtask.assignee)}
-        </div>
-      </td>
+      <td className="wp-task-cell-muted">{formatTaskAssigneeLabel(subtask)}</td>
       <td className="wp-task-cell-muted wp-task-cell-muted--faint">—</td>
       <td className="wp-task-cell-muted">
         {subtask.status === "overdue" ? <span className="wp-overdue-text">Overdue</span> : "—"}
@@ -329,15 +332,13 @@ function TaskRowExpandedBranches({
   if (hasChildTasks && childTasks && childTasks.length > 0) {
     return (
       <>
-        {childTasks.map((child) => (
-          <TaskRow
-            key={child.id}
-            task={child}
+        {plannerChildTasksToSubTasks(childTasks).map((sub) => (
+          <SubtaskRow
+            key={sub.id}
+            subtask={sub}
             depth={depth + 1}
-            onPreview={onPreview}
-            expandedTasks={expandedTasks}
-            onToggleTask={onToggleTask}
             canPreviewEditTask={canPreviewEditTask}
+            parentTask={task}
             onPreviewSubtask={onPreviewSubtask}
           />
         ))}

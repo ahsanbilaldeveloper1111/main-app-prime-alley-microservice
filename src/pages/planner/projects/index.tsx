@@ -59,6 +59,7 @@ const WorkPlannerProjects = () => {
                   statsCards={p.statsCardsData}
                   columns={p.projectTableColumns}
                   actions={p.projectTableActions}
+                  onProjectsRefresh={p.refreshProjectsList}
                 />
               </div>
 
