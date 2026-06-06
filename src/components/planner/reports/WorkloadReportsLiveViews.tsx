@@ -99,24 +99,6 @@ export function ReportsLiveTaskDetailList({
         <div key={row.id} className="reports-live-task-detail-list__row">
           <div className="reports-live-task-detail-list__title">{row.title}</div>
           <div style={{ display: "flex", alignItems: "center", gap: "8px", flexShrink: 0 }}>
-            <span
-              style={{
-                backgroundColor: row.assigneeAvatarColor,
-                width: "1.65rem",
-                height: "1.65rem",
-                borderRadius: "50%",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                fontSize: "0.62rem",
-                fontWeight: 700,
-                color: "#fff",
-                flexShrink: 0,
-              }}
-              aria-hidden
-            >
-              {row.assigneeInitials}
-            </span>
             <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "3px" }}>
               <span className="reports-live-task-detail-list__assignee-name">{row.assigneeLabel}</span>
               <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
