@@ -1,7 +1,7 @@
 import moment from "moment";
 import { toMinutesDisplay } from "@page-modules/planner/my-day/myDayDomain";
 import { buildPastDayStats, resolveMyDayCompletionRatePercent } from "@page-modules/planner/my-day/myDayHistoryDomain";
-import type { MyDayDailyLogPayload } from "@utils/tasks";
+import type { MyDayDailyLogPayload, MyDayMonthlyReportApiPayload } from "@utils/tasks";
 
 export type MyDayMonthlyReport = Readonly<{
   monthLabel: string;
@@ -40,6 +40,46 @@ export function resolveMyDayMonthlyReportMonthBounds(monthIso: string): Readonly
     monthStart,
     monthEnd,
     monthLabel: monthStart.format("MMMM YYYY"),
+  };
+}
+
+function readNonNegativeInt(value: unknown): number {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed < 0) return 0;
+  return Math.floor(parsed);
+}
+
+function readNonNegativeNumber(value: unknown): number {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed < 0) return 0;
+  return parsed;
+}
+
+/** Maps server monthly-report payload to UI model (Postman: `GET /my-day/monthly-report`). */
+export function mapMyDayMonthlyReportFromApi(
+  payload: MyDayMonthlyReportApiPayload,
+  monthIso: string,
+): MyDayMonthlyReport {
+  const resolvedMonth = typeof payload.month === "string" && payload.month.trim() !== ""
+    ? payload.month.trim()
+    : monthIso;
+  const { monthLabel, monthEnd } = resolveMyDayMonthlyReportMonthBounds(resolvedMonth);
+  const averageCompletionRatePercent = readNonNegativeNumber(
+    payload.average_completion_rate_percent,
+  );
+
+  return {
+    monthLabel,
+    workingDays: readNonNegativeInt(payload.working_days),
+    balancedDays: readNonNegativeInt(payload.balanced_days),
+    overloadedDays: readNonNegativeInt(payload.overloaded_days),
+    lightDays: readNonNegativeInt(payload.light_days),
+    averagePlannedMinutesPerDay: readNonNegativeInt(payload.average_planned_per_day_minutes),
+    averageCompletionRatePercent:
+      averageCompletionRatePercent % 1 === 0
+        ? Math.round(averageCompletionRatePercent)
+        : Math.round(averageCompletionRatePercent * 10) / 10,
+    daysInMonth: monthEnd.date(),
   };
 }
 

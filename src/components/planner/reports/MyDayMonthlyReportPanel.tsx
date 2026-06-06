@@ -1,13 +1,34 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import moment from "moment";
 import { Alert, Form, Spinner } from "react-bootstrap";
 import {
-  buildMyDayMonthlyReport,
   formatAverageCompletionRateLabel,
   formatAveragePlannedPerDayLabel,
+  mapMyDayMonthlyReportFromApi,
+  resolveMyDayMonthlyReportMonthBounds,
   type MyDayMonthlyReport,
 } from "@page-modules/planner/my-day/myDayMonthlyReportDomain";
-import { listMyDayDailyLogs } from "@utils/tasks";
+import { getMyDayMonthlyReport } from "@utils/tasks";
+
+const EMPTY_MONTHLY_REPORT: MyDayMonthlyReport = {
+  monthLabel: "",
+  workingDays: 0,
+  balancedDays: 0,
+  overloadedDays: 0,
+  lightDays: 0,
+  averagePlannedMinutesPerDay: 0,
+  averageCompletionRatePercent: 0,
+  daysInMonth: 0,
+};
+
+function emptyMonthlyReportForMonth(monthIso: string): MyDayMonthlyReport {
+  const { monthLabel, monthEnd } = resolveMyDayMonthlyReportMonthBounds(monthIso);
+  return {
+    ...EMPTY_MONTHLY_REPORT,
+    monthLabel,
+    daysInMonth: monthEnd.date(),
+  };
+}
 
 function MyDayMonthlyReportGrid({ report }: Readonly<{ report: MyDayMonthlyReport }>) {
   return (
@@ -48,43 +69,27 @@ export function MyDayMonthlyReportPanel() {
   const [monthIso, setMonthIso] = useState(() => moment().format("YYYY-MM"));
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [logs, setLogs] = useState<Awaited<ReturnType<typeof listMyDayDailyLogs>>>([]);
-
-  const monthBounds = useMemo(() => {
-    const start = moment(monthIso, "YYYY-MM", true).startOf("month");
-    const end = start.clone().endOf("month");
-    return {
-      from: start.format("YYYY-MM-DD"),
-      to: end.format("YYYY-MM-DD"),
-    };
-  }, [monthIso]);
+  const [report, setReport] = useState<MyDayMonthlyReport>(() =>
+    emptyMonthlyReportForMonth(moment().format("YYYY-MM")),
+  );
 
   const loadMonth = useCallback(async () => {
     setLoading(true);
     setLoadError(null);
     try {
-      const fetched = await listMyDayDailyLogs({
-        from: monthBounds.from,
-        to: monthBounds.to,
-        limit: 62,
-      });
-      setLogs(fetched);
+      const payload = await getMyDayMonthlyReport({ month: monthIso });
+      setReport(mapMyDayMonthlyReportFromApi(payload, monthIso));
     } catch {
-      setLogs([]);
+      setReport(emptyMonthlyReportForMonth(monthIso));
       setLoadError("Unable to load My Day history for this month.");
     } finally {
       setLoading(false);
     }
-  }, [monthBounds.from, monthBounds.to]);
+  }, [monthIso]);
 
   useEffect(() => {
     loadMonth().catch(() => undefined);
   }, [loadMonth]);
-
-  const report = useMemo(
-    () => buildMyDayMonthlyReport(logs, monthIso),
-    [logs, monthIso],
-  );
 
   return (
     <div className="reports-panel myday-monthly-report">
