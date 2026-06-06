@@ -207,7 +207,7 @@ const EmployeesDashboard = () => {
   const quickActions = useMemo(() => {
     const items: { icon: LucideIcon; color: string; text: string; onClick: () => void }[] = [];
     if (canQuickAddEmployee) {
-      items.push({ icon: Plus, color: "#6366F1", text: "Add Employee", onClick: handleAddEmployee });
+      items.push({ icon: Plus, color: "#0066CC", text: "Add Employee", onClick: handleAddEmployee });
     }
     if (canQuickNewRequest) {
       items.push({ icon: Calendar, color: "#10B981", text: "New Request", onClick: handleNewRequest });

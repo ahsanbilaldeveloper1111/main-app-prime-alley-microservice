@@ -2,11 +2,13 @@ import "@assets/scss/datatable-style.scss";
 import React, { ReactElement, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/router";
 import Layout from "@layout/index";
-import BreadcrumbItem from "@common/BreadcrumbItem";
 
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
 import "@assets/scss/workforce-user-request.scss";
+import "@page-modules/workforce/shared/workforcePages.scss";
+import { WorkforceListPageShell } from "@page-modules/workforce/shared/WorkforceListPageShell";
+import { renderApplyFilterActions } from "@utils/communicationsStagedFilters";
 import { useSession } from "next-auth/react";
 import {
   getUserRequestCategories,
@@ -367,13 +369,13 @@ function getApprovalRequestTypeIconName(
 function getApprovalRequestTypeIcon(iconType: string): React.ReactNode {
   switch (iconType) {
     case "leave":
-      return <Calendar size={16} color="#6366f1" />;
+      return <Calendar size={16} color="#0066CC" />;
     case "document":
       return <FileText size={16} color="#8b5cf6" />;
     case "onboarding":
       return <UserPlus size={16} color="#10b981" />;
     case "profile":
-      return <User size={16} color="#6366f1" />;
+      return <User size={16} color="#0066CC" />;
     default:
       return <File size={16} color="#6b7280" />;
   }
@@ -603,43 +605,6 @@ function RequestedByDropdownContent({
           );
         })}
       </div>
-      <div style={{ display: "flex", gap: "8px" }}>
-        <button
-          type="button"
-          onClick={() => {
-            setCurrentPage(1);
-            setRequestedBySearchTerm("");
-          }}
-          style={{
-            border: "none",
-            backgroundColor: "#6366f1",
-            color: "white",
-            borderRadius: "6px",
-            padding: "6px 10px",
-            fontSize: "12px",
-          }}
-        >
-          Apply
-        </button>
-        <button
-          type="button"
-          onClick={() => {
-            setSelectedRequestedByUserId(null);
-            setRequestedBySearchTerm("");
-            setCurrentPage(1);
-          }}
-          style={{
-            border: "1px solid #d1d5db",
-            backgroundColor: "white",
-            color: "#374151",
-            borderRadius: "6px",
-            padding: "6px 10px",
-            fontSize: "12px",
-          }}
-        >
-          Clear
-        </button>
-      </div>
     </div>
   );
 }
@@ -664,7 +629,6 @@ function TypeDropdownContent({
           type="button"
           onClick={() => {
             setSelectedType("");
-            setCurrentPage(1);
           }}
           style={{
             textAlign: "left",
@@ -684,7 +648,6 @@ function TypeDropdownContent({
             type="button"
             onClick={() => {
               setSelectedType(type);
-              setCurrentPage(1);
             }}
             style={{
               textAlign: "left",
@@ -706,43 +669,60 @@ function TypeDropdownContent({
 
 type ApprovalFilterPillsArgs = {
   selectedType: string;
+  appliedType: string;
   setSelectedType: (value: string) => void;
+  setAppliedType: (value: string) => void;
   setCurrentPage: (page: number) => void;
   typeDropdownContent: React.ReactNode;
   selectedRequestedByUserId: string | null;
+  appliedRequestedByUserId: string | null;
   setSelectedRequestedByUserId: (value: string | null) => void;
+  setAppliedRequestedByUserId: (value: string | null) => void;
   setRequestedBySearchTerm: (value: string) => void;
   selectedRequestedByName: string;
   requestedByDropdownContent: React.ReactNode;
   selectedDate: string;
+  appliedDate: string;
   setSelectedDate: (value: string) => void;
+  setAppliedDate: (value: string) => void;
   dateOptions: string[];
 };
 
 function createApprovalFilterPills({
   selectedType,
+  appliedType,
   setSelectedType,
+  setAppliedType,
   setCurrentPage,
   typeDropdownContent,
   selectedRequestedByUserId,
+  appliedRequestedByUserId,
   setSelectedRequestedByUserId,
+  setAppliedRequestedByUserId,
   setRequestedBySearchTerm,
   selectedRequestedByName,
   requestedByDropdownContent,
   selectedDate,
+  appliedDate,
   setSelectedDate,
+  setAppliedDate,
   dateOptions,
 }: Readonly<ApprovalFilterPillsArgs>): FilterPill[] {
+  const typeKey = selectedType || appliedType;
+  const requestedByKey = selectedRequestedByUserId ?? appliedRequestedByUserId;
+  const dateKey = selectedDate || appliedDate;
+
   return [
     {
       id: "approval-type",
       label: "Type",
       showDropdown: true,
-      active: Boolean(selectedType),
-      activeLabel: selectedType || undefined,
-      onClear: selectedType
+      active: Boolean(typeKey),
+      activeLabel: typeKey || undefined,
+      onClear: typeKey
         ? () => {
             setSelectedType("");
+            setAppliedType("");
             setCurrentPage(1);
           }
         : undefined,
@@ -752,11 +732,12 @@ function createApprovalFilterPills({
       id: "approval-requested-by",
       label: "Requested by",
       showDropdown: true,
-      active: Boolean(selectedRequestedByUserId),
+      active: Boolean(requestedByKey),
       activeLabel: selectedRequestedByName || undefined,
-      onClear: selectedRequestedByUserId
+      onClear: requestedByKey
         ? () => {
             setSelectedRequestedByUserId(null);
+            setAppliedRequestedByUserId(null);
             setRequestedBySearchTerm("");
             setCurrentPage(1);
           }
@@ -768,11 +749,12 @@ function createApprovalFilterPills({
       label: "Dates",
       showDropdown: true,
       searchable: false,
-      active: Boolean(selectedDate),
-      activeLabel: selectedDate || undefined,
-      onClear: selectedDate
+      active: Boolean(dateKey),
+      activeLabel: dateKey || undefined,
+      onClear: dateKey
         ? () => {
             setSelectedDate("");
+            setAppliedDate("");
             setCurrentPage(1);
           }
         : undefined,
@@ -782,7 +764,6 @@ function createApprovalFilterPills({
           value: "__all__",
           onClick: () => {
             setSelectedDate("");
-            setCurrentPage(1);
           },
         },
         ...dateOptions.map((option) => ({
@@ -790,7 +771,6 @@ function createApprovalFilterPills({
           value: option,
           onClick: () => {
             setSelectedDate(option);
-            setCurrentPage(1);
           },
         })),
       ],
@@ -811,6 +791,9 @@ type ApprovalToolbarArgs = {
   openCreateModal: () => void;
   disableCreateRequest: boolean;
   onClearFilters: () => void;
+  hasUnappliedFilterChanges: boolean;
+  onApplyFilters: () => void;
+  hasActiveFilters: boolean;
 };
 
 function createApprovalToolbar({
@@ -826,6 +809,9 @@ function createApprovalToolbar({
   openCreateModal,
   disableCreateRequest,
   onClearFilters,
+  hasUnappliedFilterChanges,
+  onApplyFilters,
+  hasActiveFilters,
 }: Readonly<ApprovalToolbarArgs>): ToolbarConfig {
   return {
     showSearch: true,
@@ -845,6 +831,12 @@ function createApprovalToolbar({
     showFilterPills: true,
     filterPills,
     showMoreFiltersButton: false,
+    clearAllFilters: hasActiveFilters ? onClearFilters : undefined,
+    filterPillsRightActions: renderApplyFilterActions(
+      hasUnappliedFilterChanges,
+      onApplyFilters,
+      "approval-requests",
+    ),
     rightActions: canCreateRequest ? (
       <button
         type="button"
@@ -868,40 +860,6 @@ function createApprovalToolbar({
         New Request
       </button>
     ) : undefined,
-    customActions: (
-      <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-        <button
-          type="button"
-          onClick={onSearch}
-          style={{
-            border: "none",
-            backgroundColor: "#141414",
-            color: "white",
-            borderRadius: "6px",
-            padding: "7px 12px",
-            fontSize: "13px",
-            fontWeight: 500,
-          }}
-        >
-          Search
-        </button>
-        <button
-          type="button"
-          onClick={onClearFilters}
-          style={{
-            border: "1px solid #d1d5db",
-            backgroundColor: "white",
-            color: "#374151",
-            borderRadius: "6px",
-            padding: "7px 12px",
-            fontSize: "13px",
-            fontWeight: 500,
-          }}
-        >
-          Clear
-        </button>
-      </div>
-    ),
   };
 }
 
@@ -1004,7 +962,7 @@ function ApprovalSummarySection({
                   borderRadius: "999px",
                   backgroundColor: "#eef2ff",
                   border: "1px solid #e0e7ff",
-                  color: "#3730a3",
+                  color: "#0066CC",
                   fontSize: "12px",
                   fontWeight: 600,
                 }}
@@ -1810,10 +1768,14 @@ const ApprovalRequest = () => {
 
   const [activeTab, setActiveTab] = useState<"All" | "Pending" | "Approved" | "Rejected">("All");
   const [searchTerm, setSearchTerm] = useState("");
+  const [appliedSearch, setAppliedSearch] = useState("");
   const [selectedType, setSelectedType] = useState("");
+  const [appliedType, setAppliedType] = useState("");
   const [selectedRequestedByUserId, setSelectedRequestedByUserId] = useState<string | null>(null);
+  const [appliedRequestedByUserId, setAppliedRequestedByUserId] = useState<string | null>(null);
   const [requestedBySearchTerm, setRequestedBySearchTerm] = useState("");
   const [selectedDate, setSelectedDate] = useState("");
+  const [appliedDate, setAppliedDate] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [rowsPerPage, setRowsPerPage] = useState(15);
   const rowsPerPageRef = useRef(rowsPerPage);
@@ -1939,12 +1901,12 @@ const ApprovalRequest = () => {
           limit: rowsPerPage,
           status,
         };
-        if (searchTerm?.trim()) params.search = searchTerm.trim();
-        const category = selectedType ? categories.find((c) => (c.name ?? c.code ?? String(c.id)) === selectedType) : undefined;
+        if (appliedSearch?.trim()) params.search = appliedSearch.trim();
+        const category = appliedType ? categories.find((c) => (c.name ?? c.code ?? String(c.id)) === appliedType) : undefined;
         if (category?.id != null) params.user_request_category_id = category.id;
-        const requestedByTrimmed = selectedRequestedByUserId?.trim();
+        const requestedByTrimmed = appliedRequestedByUserId?.trim();
         if (requestedByTrimmed) params.user_ids = [requestedByTrimmed];
-        const dateRange = getWorkforceTableDatePresetRange(selectedDate ?? "");
+        const dateRange = getWorkforceTableDatePresetRange(appliedDate ?? "");
         if (dateRange) {
           params.created_at_from = dateRange.from;
           params.created_at_to = dateRange.to;
@@ -1961,7 +1923,7 @@ const ApprovalRequest = () => {
         setLoadingRequests(false);
       }
     },
-    [activeTab, searchTerm, selectedType, selectedRequestedByUserId, selectedDate, categories, rowsPerPage]
+    [activeTab, appliedSearch, appliedType, appliedRequestedByUserId, appliedDate, categories, rowsPerPage]
   );
 
   const handlePaginationChange = useCallback((page: number, limit: number) => {
@@ -1977,9 +1939,42 @@ const ApprovalRequest = () => {
     loadRequests(currentPage);
   }, [currentPage, loadRequests]);
 
-  useEffect(() => {
+  const handleApplyFilters = useCallback(() => {
+    setAppliedSearch(searchTerm);
+    setAppliedType(selectedType);
+    setAppliedRequestedByUserId(selectedRequestedByUserId);
+    setAppliedDate(selectedDate);
     setCurrentPage(1);
-  }, [selectedRequestedByUserId, selectedDate]);
+  }, [searchTerm, selectedType, selectedRequestedByUserId, selectedDate]);
+
+  const hasUnappliedFilterChanges = useMemo(
+    () =>
+      searchTerm !== appliedSearch ||
+      selectedType !== appliedType ||
+      selectedRequestedByUserId !== appliedRequestedByUserId ||
+      selectedDate !== appliedDate,
+    [
+      searchTerm,
+      appliedSearch,
+      selectedType,
+      appliedType,
+      selectedRequestedByUserId,
+      appliedRequestedByUserId,
+      selectedDate,
+      appliedDate,
+    ],
+  );
+
+  const hasActiveFilters = useMemo(
+    () =>
+      Boolean(
+        appliedSearch.trim() ||
+          appliedType ||
+          appliedRequestedByUserId ||
+          appliedDate,
+      ),
+    [appliedSearch, appliedType, appliedRequestedByUserId, appliedDate],
+  );
 
   // Open sidebar when navigating from notification with ?openId= (target_id)
   useEffect(() => {
@@ -2169,26 +2164,36 @@ const ApprovalRequest = () => {
   const types = typeOptionsFromCategories.length > 0 ? typeOptionsFromCategories : ["Leave", "Document", "Onboarding", "Profile"];
   const requestedByUsers = Array.isArray(mainAppUsers) ? mainAppUsers : [];
   const selectedRequestedByName =
-    selectedRequestedByUserId == null
+    selectedRequestedByUserId == null && appliedRequestedByUserId == null
       ? ""
-      : (findMainAppUserByRequestUserId(requestedByUsers, selectedRequestedByUserId)?.name ??
-        selectedRequestedByUserId);
+      : String(
+          findMainAppUserByRequestUserId(
+            requestedByUsers,
+            selectedRequestedByUserId ?? appliedRequestedByUserId,
+          )?.name ??
+            selectedRequestedByUserId ??
+            appliedRequestedByUserId ??
+            "",
+        );
   const dateOptions = ["Today", "Last 7 days", "Last 30 days", "All time"];
   const totalRequests = requestsPagination?.total ?? 0;
   const canCreateRequest =
     session?.user?.permissions?.includes(PERMISSIONS.ADD_APPROVAL_REQUEST_STAFF_MANAGEMENT) ?? false;
 
   const handleRunSearch = useCallback(() => {
-    setCurrentPage(1);
-    loadRequests(1);
-  }, [loadRequests]);
+    handleApplyFilters();
+  }, [handleApplyFilters]);
 
   const handleClearFilters = useCallback(() => {
     setSearchTerm("");
+    setAppliedSearch("");
     setSelectedType("");
+    setAppliedType("");
     setSelectedRequestedByUserId(null);
+    setAppliedRequestedByUserId(null);
     setRequestedBySearchTerm("");
     setSelectedDate("");
+    setAppliedDate("");
     setCurrentPage(1);
   }, []);
 
@@ -2260,25 +2265,34 @@ const ApprovalRequest = () => {
     () =>
       createApprovalFilterPills({
         selectedType,
+        appliedType,
         setSelectedType,
+        setAppliedType,
         setCurrentPage,
         typeDropdownContent,
         selectedRequestedByUserId,
+        appliedRequestedByUserId,
         setSelectedRequestedByUserId,
+        setAppliedRequestedByUserId,
         setRequestedBySearchTerm,
         selectedRequestedByName,
         requestedByDropdownContent,
         selectedDate,
+        appliedDate,
         setSelectedDate,
+        setAppliedDate,
         dateOptions,
       }),
     [
       selectedType,
+      appliedType,
       typeDropdownContent,
       selectedRequestedByUserId,
+      appliedRequestedByUserId,
       selectedRequestedByName,
       requestedByDropdownContent,
       selectedDate,
+      appliedDate,
       dateOptions,
     ]
   );
@@ -2298,6 +2312,9 @@ const ApprovalRequest = () => {
         openCreateModal,
         disableCreateRequest: categories.length === 0 || loadingCategories,
         onClearFilters: handleClearFilters,
+        hasUnappliedFilterChanges,
+        onApplyFilters: handleApplyFilters,
+        hasActiveFilters,
       }),
     [
       searchTerm,
@@ -2310,6 +2327,9 @@ const ApprovalRequest = () => {
       categories.length,
       loadingCategories,
       handleClearFilters,
+      hasUnappliedFilterChanges,
+      handleApplyFilters,
+      hasActiveFilters,
     ]
   );
 
@@ -2368,9 +2388,9 @@ const ApprovalRequest = () => {
 
   return (
     <React.Fragment>
-      <BreadcrumbItem mainTitle="" mainLink="" subTitle="Customer Dashboard" />
-      <div className="approval-page-shell" style={{ display: "flex", gap: 0, height: "calc(100vh)", overflow: "hidden" }}>
-        <ApprovalRequestsTableSection
+      <WorkforceListPageShell breadcrumbSubTitle="Approval Requests" tableWrapperClass="workforce-approval-table-wrapper">
+        <div className="approval-page-shell" style={{ display: "flex", gap: 0, height: "calc(100vh)", overflow: "hidden" }}>
+          <ApprovalRequestsTableSection
           requests={requests}
           requestColumns={requestColumns}
           loadingRequests={loadingRequests}
@@ -2394,7 +2414,7 @@ const ApprovalRequest = () => {
             avatar={{
               initials: getDisplayName(selectedRequest.user_id).slice(0, 2).toUpperCase(),
               name: getDisplayName(selectedRequest.user_id),
-              gradient: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+              gradient: "#0066CC",
             }}
             quickActions={[
               {
@@ -2425,7 +2445,8 @@ const ApprovalRequest = () => {
             sections={approvalSidebarSections}
           />
         ) : null}
-      </div>
+        </div>
+      </WorkforceListPageShell>
 
       <NewRequestModal
         show={showCreateModal}
@@ -2479,7 +2500,7 @@ const ApprovalRequest = () => {
                 onClick={closeSidebarDialog}
                 style={{
                   padding: "10px 24px",
-                  backgroundColor: "#6366f1",
+                  backgroundColor: "#0066CC",
                   color: "white",
                   border: "none",
                   borderRadius: "8px",

@@ -31,7 +31,7 @@ export function buildEmployeeTableColumns({
         return (
           <div className="employees-page__cell-employee">
             <div className="employees-page__cell-avatar">
-              <User size={20} color="#6366f1" />
+              <User size={20} color="#0066CC" />
             </div>
             <div>
               <div className="employees-page__cell-name">{getDisplayName(profile)}</div>

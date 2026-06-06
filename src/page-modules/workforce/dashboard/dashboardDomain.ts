@@ -39,9 +39,9 @@ export type ApprovalsAgingBuckets = {
 export type DepartmentHeadcountRow = { department_id: number; count: number };
 
 export const DEPARTMENT_CHART_COLORS = [
-  "#6366F1",
+  "#0066CC",
   "#10B981",
-  "#8B5CF6",
+  "#0EA5E9",
   "#F59E0B",
   "#EC4899",
   "#06B6D4",

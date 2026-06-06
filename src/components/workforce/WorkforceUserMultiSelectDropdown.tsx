@@ -20,7 +20,7 @@ const labelRowStyle: React.CSSProperties = {
 
 const applyButtonStyle: React.CSSProperties = {
   border: "none",
-  backgroundColor: "#6366f1",
+  backgroundColor: "#0066CC",
   color: "white",
   borderRadius: "6px",
   padding: "6px 10px",
@@ -52,6 +52,8 @@ export type WorkforceUserMultiSelectDropdownProps = Readonly<{
   onClear: () => void;
   /** When set, the user list scrolls inside a fixed-height panel (e.g. 220). */
   listMaxHeightPx?: number;
+  /** Inline Apply/Clear in dropdown — off when toolbar uses Apply filters. */
+  showFooterActions?: boolean;
 }>;
 
 export function WorkforceUserMultiSelectDropdown(
@@ -66,6 +68,7 @@ export function WorkforceUserMultiSelectDropdown(
     onApply,
     onClear,
     listMaxHeightPx,
+    showFooterActions = false,
   } = props;
 
   const listScrolls =
@@ -104,14 +107,16 @@ export function WorkforceUserMultiSelectDropdown(
           );
         })}
       </div>
-      <div style={{ display: "flex", gap: "8px" }}>
-        <button type="button" onClick={onApply} style={applyButtonStyle}>
-          Apply
-        </button>
-        <button type="button" onClick={onClear} style={clearButtonStyle}>
-          Clear
-        </button>
-      </div>
+      {showFooterActions ? (
+        <div style={{ display: "flex", gap: "8px" }}>
+          <button type="button" onClick={onApply} style={applyButtonStyle}>
+            Apply
+          </button>
+          <button type="button" onClick={onClear} style={clearButtonStyle}>
+            Clear
+          </button>
+        </div>
+      ) : null}
     </div>
   );
 }

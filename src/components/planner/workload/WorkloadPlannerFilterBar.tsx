@@ -383,7 +383,7 @@ export function WorkloadPlannerFilterBar({
           disabled={applyDisabled}
           onClick={onApply}
         >
-          {isApplying ? "Applying…" : "Apply"}
+          {isApplying ? "Applying…" : "Apply filters"}
         </button>
 
         {hasActiveFilters && (
@@ -393,7 +393,7 @@ export function WorkloadPlannerFilterBar({
             disabled={!enabled}
             onClick={onClearFilters}
           >
-            Clear filters
+            Clear all
           </button>
         )}
 

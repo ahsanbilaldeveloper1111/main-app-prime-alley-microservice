@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import ReactDOM from "react-dom";
+import { ChevronRight, Folder, Settings } from "lucide-react";
 import { Badge, Col, Row } from "react-bootstrap";
 import type {
   LiveDashboardKpi,
@@ -61,7 +62,7 @@ export function ReportsLiveTaskByMember({
             <div className="reports-live-task-by-member__name">{row.memberLabel}</div>
             {row.projectLabel !== "—" ? (
               <div className="reports-live-task-by-member__stats">
-                <i className="ti ti-folder" style={{ fontSize: "11px", marginRight: "4px" }} aria-hidden="true" />
+                <Folder size={11} style={{ marginRight: "4px" }} aria-hidden />
                 {row.projectLabel}
               </div>
             ) : null}
@@ -277,7 +278,7 @@ export function ReportsLiveTaskByMember({
                   <span style={{ fontSize: "11px", color: modal.type === "overdue" ? "#991b1b" : "#718096", fontFamily: "Lexend Deca, sans-serif" }}>
                     {task.due}
                   </span>
-                  <i className="ti ti-chevron-right" style={{ fontSize: "14px", color: "#9ca3af" }} />
+                  <ChevronRight size={14} style={{ color: "#9ca3af" }} aria-hidden />
                 </div>
               </div>
             ))}
@@ -463,7 +464,7 @@ export function ReportsTeamLivePanel({
             <p className="reports-panel__subtitle">Tasks with no progress beyond threshold</p>
           </div>
           <div className="reports-stuck-threshold">
-            <i className="ti ti-settings" style={{ fontSize: "12px" }} aria-hidden="true" />
+            <Settings size={12} aria-hidden />
             <span>Threshold:</span>
             <input
               type="number"
@@ -475,7 +476,7 @@ export function ReportsTeamLivePanel({
             />
             <span>days</span>
             <button type="button" className="reports-threshold-bar__apply" onClick={onApplyStale}>
-              Apply
+              Apply filters
             </button>
           </div>
         </div>

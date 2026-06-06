@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { Alert, Button, Container } from "react-bootstrap";
-import { Download } from "lucide-react";
+import { ChevronDown, Download } from "lucide-react";
 import { TASK_REPORTS_MAX_DATE_RANGE_DAYS } from "@utils/reportsApiConstants";
 import { ReportsViewTabs } from "./WorkloadReportsProjectViews";
 import { WorkloadReportsFiltersCard } from "./WorkloadReportsFiltersCard";
@@ -31,7 +31,7 @@ const WorkloadReportsPage: React.FC = () => {
               >
                 <Download size={16} className="me-1" />
                 Export
-                <i className="ti ti-chevron-down" style={{ fontSize: "11px", marginLeft: "4px" }} />
+                <ChevronDown size={11} style={{ marginLeft: "4px" }} aria-hidden />
               </Button>
               {exportOpen ? (
                 <div style={{

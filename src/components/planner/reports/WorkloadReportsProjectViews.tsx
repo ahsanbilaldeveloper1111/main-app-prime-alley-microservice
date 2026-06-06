@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import ReactDOM from "react-dom";
+import { Plus } from "lucide-react";
 import {
   formatProjectHealthStatsLine,
   type OverdueByProjectEntry,
@@ -45,7 +46,7 @@ export function ReportsViewTabs({ activeView, onChange }: ReportsViewTabsProps) 
         My Day Monthly
       </button>
       <button type="button" className="reports-tabs-row__action">
-        <i className="ti ti-plus" style={{ fontSize: "13px" }} aria-hidden="true" />
+        <Plus size={13} aria-hidden />
         Add view
       </button>
       <button type="button" className="reports-tabs-row__action reports-tabs-row__action--primary">

@@ -7,7 +7,7 @@ import {
   Offcanvas,
   Spinner,
 } from "react-bootstrap";
-import { AlertTriangle, Clock } from "lucide-react";
+import { AlertTriangle, Building2, Clock } from "lucide-react";
 import type {
   WorkloadDayData,
   WorkloadGridCell,
@@ -147,7 +147,7 @@ function WorkloadDayTaskCard({
         </div>
         {showOrgBadge ? (
           <WorkloadBdg tone="green">
-            <i className="ti ti-building" style={{ fontSize: "10px" }} aria-hidden />
+            <Building2 size={10} aria-hidden />
             {" Org"}
           </WorkloadBdg>
         ) : null}

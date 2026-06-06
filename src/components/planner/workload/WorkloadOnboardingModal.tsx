@@ -1,4 +1,14 @@
 import React, { useState, useEffect } from "react";
+import type { LucideIcon } from "lucide-react";
+import {
+  AlertTriangle,
+  ArrowLeftRight,
+  Calendar,
+  Database,
+  LayoutGrid,
+  Plus,
+  X,
+} from "lucide-react";
 import { setOnboardingComplete } from "./workloadOnboarding";
 
 type OnboardingChoice = "sample" | "fresh" | null;
@@ -8,24 +18,28 @@ type Props = Readonly<{
   onComplete: (choice: OnboardingChoice) => void;
 }>;
 
-const FEATURES = [
+const FEATURES: ReadonlyArray<{
+  icon: LucideIcon;
+  title: string;
+  desc: string;
+}> = [
   {
-    icon: "ti-layout-columns",
+    icon: LayoutGrid,
     title: "Two views",
     desc: "Spreadsheet for capacity overview, Board for task-level management.",
   },
   {
-    icon: "ti-switch-horizontal",
+    icon: ArrowLeftRight,
     title: "Drag to reassign",
     desc: "In Board view, drag a task card to another member column to reassign it.",
   },
   {
-    icon: "ti-calendar",
+    icon: Calendar,
     title: "Reschedule easily",
     desc: 'Use "Move to" on any card to change the due date without opening the task.',
   },
   {
-    icon: "ti-alert-triangle",
+    icon: AlertTriangle,
     title: "Overload warnings",
     desc: "Red cells and alerts appear when a member exceeds 100% capacity.",
   },
@@ -86,7 +100,7 @@ export function WorkloadOnboardingModal({ show, onComplete }: Props) {
             onClick={handleSkip}
             aria-label="Close"
           >
-            <i className="ti ti-x" aria-hidden="true" />
+            <X size={18} aria-hidden />
           </button>
         </div>
 
@@ -96,7 +110,7 @@ export function WorkloadOnboardingModal({ show, onComplete }: Props) {
               {FEATURES.map((f) => (
                 <div key={f.title} className="workload-onboarding-modal__feature-item">
                   <div className="workload-onboarding-modal__feature-icon">
-                    <i className={`ti ${f.icon}`} aria-hidden="true" />
+                    <f.icon size={20} aria-hidden />
                   </div>
                   <div className="workload-onboarding-modal__feature-text">
                     <div className="workload-onboarding-modal__feature-title">{f.title}</div>
@@ -112,7 +126,7 @@ export function WorkloadOnboardingModal({ show, onComplete }: Props) {
                 className="workload-onboarding-modal__choice-card"
                 onClick={() => handleChoice("sample")}
               >
-                <i className="ti ti-database" aria-hidden="true" />
+                <Database size={24} aria-hidden />
                 <div className="workload-onboarding-modal__choice-title">Load sample data</div>
                 <div className="workload-onboarding-modal__choice-desc">
                   See the page with realistic tasks and members — great for exploring features.
@@ -123,7 +137,7 @@ export function WorkloadOnboardingModal({ show, onComplete }: Props) {
                 className="workload-onboarding-modal__choice-card"
                 onClick={() => handleChoice("fresh")}
               >
-                <i className="ti ti-plus" aria-hidden="true" />
+                <Plus size={24} aria-hidden />
                 <div className="workload-onboarding-modal__choice-title">Fresh start</div>
                 <div className="workload-onboarding-modal__choice-desc">
                   Start with your real team data. You can always explore sample data later.

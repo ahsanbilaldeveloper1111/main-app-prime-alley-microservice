@@ -49,11 +49,11 @@ export function serializeEmployeesListScopeKey(scope: EmployeesListQueryScope): 
 }
 
 export const DEPARTMENT_HEADCOUNT_CHART_COLORS = [
-  "#6366f1",
+  "#0066CC",
   "#10b981",
   "#f59e0b",
   "#ec4899",
-  "#8b5cf6",
+  "#0EA5E9",
   "#06b6d4",
   "#84cc16",
   "#f97316",

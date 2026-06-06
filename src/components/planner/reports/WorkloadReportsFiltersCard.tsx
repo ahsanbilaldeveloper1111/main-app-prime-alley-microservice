@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
+import { Check, Search } from "lucide-react";
 import { formatWorkloadMemberLabel } from "@page-modules/planner/workload/workloadDomain";
 import type { ReportsDatePreset, ReportsProjectFilter } from "@page-modules/planner/reports/reportsDomain";
 import type { PlannerProjectListItem } from "@page-modules/planner/reports/projectReportsDomain";
@@ -67,7 +68,12 @@ export function WorkloadReportsFiltersCard({
 
   useEffect(() => {
     function handleClick(e: MouseEvent) {
-      if (barRef.current && !barRef.current.contains(e.target as Node)) {
+      const target = e.target;
+      if (
+        barRef.current &&
+        target instanceof Node &&
+        !barRef.current.contains(target)
+      ) {
         setOpenPill(null);
       }
     }
@@ -161,10 +167,10 @@ export function WorkloadReportsFiltersCard({
                   }}
                 >
                   {pendingDatePreset === p ? (
-                    <i
-                      className="ti ti-check"
-                      style={{ fontSize: "11px", marginRight: "6px", color: "#0066CC" }}
-                      aria-hidden="true"
+                    <Check
+                      size={11}
+                      style={{ marginRight: "6px", color: "#0066CC" }}
+                      aria-hidden
                     />
                   ) : (
                     <span style={{ width: "17px", display: "inline-block" }} />
@@ -233,7 +239,7 @@ export function WorkloadReportsFiltersCard({
           {openPill === "project" ? (
             <div className="reports-filter-bar__dropdown reports-filter-bar__dropdown--wide">
               <div className="reports-filter-bar__search-wrap">
-                <i className="ti ti-search reports-filter-bar__search-icon" aria-hidden="true" />
+                <Search size={13} className="reports-filter-bar__search-icon" aria-hidden />
                 <input
                   type="text"
                   className="reports-filter-bar__search-input"
@@ -259,7 +265,7 @@ export function WorkloadReportsFiltersCard({
                       className={`reports-filter-bar__checkbox${selectedProjects.includes(p.id) ? " reports-filter-bar__checkbox--checked" : ""}`}
                     >
                       {selectedProjects.includes(p.id) ? (
-                        <i className="ti ti-check" style={{ fontSize: "10px" }} aria-hidden="true" />
+                        <Check size={10} aria-hidden />
                       ) : null}
                     </span>
                     {p.name}
@@ -307,7 +313,7 @@ export function WorkloadReportsFiltersCard({
           {openPill === "member" ? (
             <div className="reports-filter-bar__dropdown reports-filter-bar__dropdown--wide">
               <div className="reports-filter-bar__search-wrap">
-                <i className="ti ti-search reports-filter-bar__search-icon" aria-hidden="true" />
+                <Search size={13} className="reports-filter-bar__search-icon" aria-hidden />
                 <input
                   type="text"
                   className="reports-filter-bar__search-input"
@@ -333,7 +339,7 @@ export function WorkloadReportsFiltersCard({
                       className={`reports-filter-bar__checkbox${selectedMembers.includes(ext) ? " reports-filter-bar__checkbox--checked" : ""}`}
                     >
                       {selectedMembers.includes(ext) ? (
-                        <i className="ti ti-check" style={{ fontSize: "10px" }} aria-hidden="true" />
+                        <Check size={10} aria-hidden />
                       ) : null}
                     </span>
                     {formatWorkloadMemberLabel(ext, hierarchyDataExtensions)}
@@ -344,24 +350,20 @@ export function WorkloadReportsFiltersCard({
           ) : null}
         </div>
 
+        <button
+          type="button"
+          className="reports-filter-bar__apply"
+          disabled={!enabled || loadingOverview}
+          onClick={handleApply}
+        >
+          {loadingOverview ? "Loading…" : "Apply filters"}
+        </button>
+
         {hasActiveFilters ? (
           <button type="button" className="reports-filter-bar__clear-all" onClick={handleClearAll}>
             Clear all
           </button>
         ) : null}
-
-        <span className="reports-filter-bar__divider" aria-hidden="true">
-          |
-        </span>
-
-        <button
-          type="button"
-          className={`reports-filter-bar__apply${hasActiveFilters ? " reports-filter-bar__apply--ready" : ""}`}
-          disabled={!enabled || loadingOverview}
-          onClick={handleApply}
-        >
-          {loadingOverview ? "Loading…" : "Apply"}
-        </button>
 
       </div>
     </div>

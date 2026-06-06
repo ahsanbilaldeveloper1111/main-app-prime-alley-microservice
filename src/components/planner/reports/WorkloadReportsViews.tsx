@@ -1,5 +1,16 @@
 import React, { useState } from "react";
 import ReactDOM from "react-dom";
+import type { LucideIcon } from "lucide-react";
+import {
+  BarChart3,
+  CalendarCheck,
+  CheckCircle2,
+  Loader2,
+  Network,
+  PieChart as PieChartIcon,
+  TrendingUp,
+  Users,
+} from "lucide-react";
 import { Alert, Badge, Spinner, Table } from "react-bootstrap";
 import {
   CartesianGrid,
@@ -37,6 +48,17 @@ import {
   workloadMemberInitials,
 } from "@page-modules/planner/workload/workloadDomain";
 
+const REPORTS_EMPTY_ICON_MAP: Record<string, LucideIcon> = {
+  "ti-users": Users,
+  "ti-loader": Loader2,
+  "ti-circle-check": CheckCircle2,
+  "ti-calendar-check": CalendarCheck,
+  "ti-trending-up": TrendingUp,
+  "ti-topology-star": Network,
+  "ti-chart-donut": PieChartIcon,
+  "ti-chart-bar": BarChart3,
+};
+
 export function ReportsEmptyState({
   icon,
   title,
@@ -46,10 +68,11 @@ export function ReportsEmptyState({
   title: string;
   subtitle: string;
 }>) {
+  const EmptyIcon = REPORTS_EMPTY_ICON_MAP[icon] ?? BarChart3;
   return (
     <div className="reports-empty-state">
       <div className="reports-empty-state__icon">
-        <i className={`ti ${icon}`} aria-hidden="true" />
+        <EmptyIcon size={32} aria-hidden />
       </div>
       <div className="reports-empty-state__title">{title}</div>
       <div className="reports-empty-state__subtitle">{subtitle}</div>
@@ -233,7 +256,7 @@ export function ReportsKpiRow({
 }
 
 function statusIconStyle(color: string | null | undefined): React.CSSProperties {
-  const bg = color?.trim() || "#6366f1";
+  const bg = color?.trim() || "#0066CC";
   return { backgroundColor: bg };
 }
 
@@ -267,7 +290,7 @@ export function ReportsStatusBreakdown({
                 className="reports-status-row__bar-fill"
                 style={{
                   width: `${Math.min(100, Math.max(0, pct))}%`,
-                  backgroundColor: row.status_color?.trim() || "#6366f1",
+                  backgroundColor: row.status_color?.trim() || "#0066CC",
                 }}
               />
             </div>
@@ -904,9 +927,9 @@ export function ReportsTrendChart({
           <Line
             type="monotone"
             dataKey="value"
-            stroke="#2563eb"
+            stroke="#0066CC"
             strokeWidth={2}
-            dot={{ r: 3, fill: "#2563eb" }}
+            dot={{ r: 3, fill: "#0066CC" }}
             activeDot={{ r: 5 }}
           />
         </LineChart>
