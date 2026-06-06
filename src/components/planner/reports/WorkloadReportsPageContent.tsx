@@ -84,28 +84,6 @@ function WorkloadReportsTeamView({ vm, data }: ActiveViewProps) {
         <div className="reports-subbar__tabs">
           <ReportsTeamSubTabs activeSubView={vm.teamSubView} onChange={vm.setTeamSubView} />
         </div>
-        {vm.teamSubView === "live" ? (
-          <div className="reports-subbar__threshold">
-            <i className="ti ti-settings" style={{ fontSize: "12px" }} aria-hidden="true" />
-            <span>Stuck threshold:</span>
-            <input
-              type="number"
-              className="reports-threshold-bar__input"
-              value={vm.staleDays ?? 3}
-              min={1}
-              max={30}
-              onChange={(e) => vm.setStaleDays(Number(e.target.value))}
-            />
-            <span>days</span>
-            <button
-              type="button"
-              className="reports-threshold-bar__apply"
-              onClick={vm.handleRefetchOverview}
-            >
-              Apply
-            </button>
-          </div>
-        ) : null}
       </div>
       {vm.teamSubView === "live" ? (
         <ReportsTeamLivePanel
@@ -114,6 +92,9 @@ function WorkloadReportsTeamView({ vm, data }: ActiveViewProps) {
           overdueTasks={vm.liveOverdueTasks}
           inProgressTasks={vm.liveInProgressTasks}
           staleTaskRows={vm.liveStaleTaskRows}
+          staleDays={vm.staleDays}
+          onStaleDaysChange={vm.setStaleDays}
+          onApplyStale={vm.handleRefetchOverview}
         />
       ) : null}
       {vm.teamSubView === "board" ? (

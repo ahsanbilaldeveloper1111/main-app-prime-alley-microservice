@@ -37,6 +37,9 @@ export type LiveMemberRow = Readonly<{
   totalTasks: number;
   completedTasks: number;
   statsLine: string;
+  inProgressTasks: number;
+  overdueTasks: number;
+  projectLabel: string;
 }>;
 
 export type LiveTaskDetailRow = Readonly<{
@@ -152,6 +155,9 @@ export function buildLiveMemberRows(
         totalTasks,
         completedTasks,
         statsLine: `Tasks: ${totalTasks} | Completed: ${completedTasks}`,
+        inProgressTasks: row.in_progress_count ?? 0,
+        overdueTasks: resolveAssigneeOverdue(row),
+        projectLabel: "—",
       };
     });
 }

@@ -52,7 +52,27 @@ export function ReportsLiveTaskByMember({
           </span>
           <div className="reports-live-task-by-member__meta">
             <div className="reports-live-task-by-member__name">{row.memberLabel}</div>
-            <div className="reports-live-task-by-member__stats">{row.statsLine}</div>
+            {row.projectLabel !== "—" ? (
+              <div className="reports-live-task-by-member__stats">
+                <i className="ti ti-map-pin" style={{ fontSize: "11px", marginRight: "4px" }} aria-hidden="true" />
+                {row.projectLabel}
+              </div>
+            ) : null}
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", marginTop: "6px" }}>
+              <span className="reports-list-badge reports-list-badge--default">
+                {row.totalTasks} tasks
+              </span>
+              {row.inProgressTasks > 0 ? (
+                <span className="reports-list-badge reports-list-badge--info">
+                  {row.inProgressTasks} in progress
+                </span>
+              ) : null}
+              {row.overdueTasks > 0 ? (
+                <span className="reports-list-badge reports-list-badge--critical">
+                  {row.overdueTasks} overdue
+                </span>
+              ) : null}
+            </div>
           </div>
         </div>
       ))}
@@ -140,7 +160,7 @@ export function ReportsTeamLivePanel({
               rows={inProgressTasks}
               emptyState={
                 <ReportsEmptyState
-                  icon="ti-player-play"
+                  icon="ti-loader"
                   title="Nothing in progress"
                   subtitle="No tasks are currently being worked on"
                 />

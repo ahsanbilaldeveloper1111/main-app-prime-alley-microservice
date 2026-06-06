@@ -73,7 +73,8 @@
     border-bottom: 1px solid #d0d7de;
     border-radius: 0;
     padding: 8px 24px;
-    height: 48px;
+    height: auto;
+    min-height: 48px;
     display: flex;
     align-items: center;
     margin-bottom: 4px;
@@ -84,7 +85,7 @@
     display: flex;
     align-items: center;
     gap: 2px;
-    flex-wrap: nowrap;
+    flex-wrap: wrap;
     width: 100%;
     height: 100%;
   }
@@ -438,6 +439,40 @@
     gap: 0;
   }
 
+  @media (max-width: 991px) {
+    .reports-kpi-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .reports-kpi-card {
+      border-right: 1px solid #eaf0f6;
+      border-bottom: 1px solid #eaf0f6;
+
+      &:nth-child(2n) {
+        border-right: none;
+      }
+
+      &:nth-last-child(-n+2) {
+        border-bottom: none;
+      }
+    }
+  }
+
+  @media (max-width: 575px) {
+    .reports-kpi-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .reports-kpi-card {
+      border-right: none;
+      border-bottom: 1px solid #eaf0f6;
+
+      &:last-child {
+        border-bottom: none;
+      }
+    }
+  }
+
   .reports-kpi-card {
     --reports-kpi-accent: #0066CC;
     padding: 14px 20px;
@@ -539,7 +574,7 @@
     border-radius: 6px;
     padding: 0;
     margin-bottom: 1rem;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
     height: 100%;
     overflow: hidden;
 
@@ -890,6 +925,7 @@
     justify-content: flex-start;
     gap: 0;
     margin-top: 4px;
+    margin-bottom: 12px;
     background: #ffffff;
     border-bottom: 1px solid #eaf0f6;
     padding: 0 24px 0 0;
@@ -982,6 +1018,7 @@
     align-items: center;
     gap: 0.5rem;
     margin-bottom: 0.35rem;
+    padding: 0.75rem 0 0.25rem;
   }
 
   .reports-project-row__title-block {
@@ -1020,7 +1057,7 @@
 
   .reports-project-row__health--ok {
     background: #ecfdf5;
-    color: #065f46;
+    color: #16a34a;
   }
 
   .reports-project-row__health--risk {
@@ -1038,7 +1075,7 @@
 
   .reports-project-row__bar {
     height: 0.5rem;
-    background: #eaf0f6;
+    background: #e2e8f0;
     border-radius: 999px;
     overflow: hidden;
   }
@@ -1058,7 +1095,7 @@
   }
 
   .reports-project-row__bar-fill--success {
-    background: #22c55e;
+    background: #16a34a;
   }
 
   .reports-project-row__bar-fill--primary {
