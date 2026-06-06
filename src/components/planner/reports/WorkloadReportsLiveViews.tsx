@@ -54,7 +54,7 @@ export function ReportsLiveTaskByMember({
             <div className="reports-live-task-by-member__name">{row.memberLabel}</div>
             {row.projectLabel !== "—" ? (
               <div className="reports-live-task-by-member__stats">
-                <i className="ti ti-map-pin" style={{ fontSize: "11px", marginRight: "4px" }} aria-hidden="true" />
+                <i className="ti ti-folder" style={{ fontSize: "11px", marginRight: "4px" }} aria-hidden="true" />
                 {row.projectLabel}
               </div>
             ) : null}
@@ -98,22 +98,32 @@ export function ReportsLiveTaskDetailList({
       {rows.map((row) => (
         <div key={row.id} className="reports-live-task-detail-list__row">
           <div className="reports-live-task-detail-list__title">{row.title}</div>
-          <div className="reports-live-task-detail-list__assignee">
+          <div style={{ display: "flex", alignItems: "center", gap: "8px", flexShrink: 0 }}>
             <span
-              className="reports-assignee-row__avatar reports-assignee-row__avatar--sm"
-              style={{ backgroundColor: row.assigneeAvatarColor }}
+              style={{
+                backgroundColor: row.assigneeAvatarColor,
+                width: "1.65rem",
+                height: "1.65rem",
+                borderRadius: "50%",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontSize: "0.62rem",
+                fontWeight: 700,
+                color: "#fff",
+                flexShrink: 0,
+              }}
               aria-hidden
             >
               {row.assigneeInitials}
             </span>
-            <span className="reports-live-task-detail-list__assignee-name">
-              {row.assigneeLabel}
-            </span>
-            <Badge bg={resolveTaskBadgeBg(row.badgeTone)}>{row.badge}</Badge>
-            <span className="reports-list-badge reports-list-badge--default" style={{ fontSize: "10px" }}>
-              {row.projectLabel}
-            </span>
-            <span className="reports-live-task-detail-list__time">{row.timeLabel}</span>
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "3px" }}>
+              <span className="reports-live-task-detail-list__assignee-name">{row.assigneeLabel}</span>
+              <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
+                <span className="reports-list-badge reports-list-badge--info" style={{ fontSize: "10px" }}>{row.projectLabel}</span>
+                <span className="reports-live-task-detail-list__time">2 hours ago</span>
+              </div>
+            </div>
           </div>
         </div>
       ))}
@@ -147,8 +157,8 @@ export function ReportsTeamLivePanel({
       <Row className="g-3 mb-3">
         <Col lg={6}>
           <div className="reports-panel">
-            <h2 className="reports-panel__title">Task by Member</h2>
-            <p className="reports-panel__subtitle">Workload and completion per team member</p>
+            <h2 className="reports-panel__title">Team Members</h2>
+            <p className="reports-panel__subtitle">Who is working on what right now</p>
             <ReportsLiveTaskByMember rows={memberRows} />
           </div>
         </Col>

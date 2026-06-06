@@ -157,7 +157,7 @@ export function buildLiveMemberRows(
         statsLine: `Tasks: ${totalTasks} | Completed: ${completedTasks}`,
         inProgressTasks: row.in_progress_count ?? 0,
         overdueTasks: resolveAssigneeOverdue(row),
-        projectLabel: "—",
+        projectLabel: "General Tasks", // TODO: Replace with dynamic project_name from API — not available at member level yet
       };
     });
 }
