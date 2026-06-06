@@ -221,7 +221,6 @@ const CallLogsTableSection: React.FC = () => {
   const {
     handleApplyFiltersClick,
     hasUnappliedFilterChanges,
-    hasNonDefaultFilters,
   } = useStagedFiltersActions(
     currentFilters,
     appliedFilters,
@@ -258,7 +257,6 @@ const CallLogsTableSection: React.FC = () => {
         handleApplyFiltersClick,
         handleResetFiltersClick,
         hasUnappliedFilterChanges,
-        hasNonDefaultFilters,
         allTabCount: totalCalls ?? tablePagination.totalRows,
       }),
     [
@@ -276,7 +274,6 @@ const CallLogsTableSection: React.FC = () => {
       handleApplyFiltersClick,
       handleResetFiltersClick,
       hasUnappliedFilterChanges,
-      hasNonDefaultFilters,
       totalCalls,
       tablePagination.totalRows,
     ],

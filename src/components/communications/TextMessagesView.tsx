@@ -15,7 +15,8 @@ import moment from "moment";
 import { useSession } from "next-auth/react";
 import { toast } from "react-toastify";
 import { GlobalDateTimeFormat } from "@utils/Helper";
-import { renderApplyResetFilterActions } from "@utils/communicationsStagedFilters";
+import { CheckCircle, Clock, Copy } from "lucide-react";
+import { renderApplyFilterActions } from "@utils/communicationsStagedFilters";
 import { TEXT_MESSAGES_TOOLBAR } from "@components/communications/callLogsListPageConfig";
 
 const defaultTextMessageFilters: Record<string, unknown> = { is_read: "" };
@@ -332,11 +333,7 @@ const TextMessagesView: React.FC = () => {
               aria-label="Copy message"
               title="Copy message"
             >
-              <i
-                className="ph-duotone ph-copy"
-                style={{ fontSize: "1rem" }}
-                aria-hidden="true"
-              />
+              <Copy size={16} aria-hidden />
             </button>
             {isUnread(row) && (
               <button
@@ -346,11 +343,7 @@ const TextMessagesView: React.FC = () => {
                 aria-label="Mark as read"
                 title="Mark as read"
               >
-                <i
-                  className="ph-duotone ph-check-circle"
-                  style={{ fontSize: "1rem" }}
-                  aria-hidden="true"
-                />
+                <CheckCircle size={16} aria-hidden />
               </button>
             )}
           </div>
@@ -384,12 +377,6 @@ const TextMessagesView: React.FC = () => {
     [currentFilters, appliedFilters],
   );
 
-  const hasNonDefaultFilters = useMemo(
-    () =>
-      JSON.stringify(appliedFilters) !== JSON.stringify(defaultTextMessageFilters),
-    [appliedFilters],
-  );
-
   const getReadStatusActiveLabel = (
     readStatus: unknown,
   ): string | undefined => {
@@ -400,6 +387,7 @@ const TextMessagesView: React.FC = () => {
 
   const tableToolbar = useMemo(
     () => ({
+      clearAllFilters: handleResetFiltersClick,
       showTabs: true,
       tabs: [
         {
@@ -448,10 +436,8 @@ const TextMessagesView: React.FC = () => {
           ],
         },
       ],
-      filterPillsRightActions: renderApplyResetFilterActions(
-        hasNonDefaultFilters,
+      filterPillsRightActions: renderApplyFilterActions(
         hasUnappliedFilterChanges,
-        handleResetFiltersClick,
         handleApplyFiltersClick,
         "text-messages",
       ),
@@ -460,7 +446,6 @@ const TextMessagesView: React.FC = () => {
       tablePagination.totalRows,
       currentFilters,
       stageFilters,
-      hasNonDefaultFilters,
       hasUnappliedFilterChanges,
       handleResetFiltersClick,
       handleApplyFiltersClick,
@@ -525,7 +510,7 @@ const TextMessagesView: React.FC = () => {
             <>
               <div className="mb-3">
                 <small className="text-muted">
-                  <i className="ph-duotone ph-clock me-1" aria-hidden="true" />
+                  <Clock size={14} className="me-1" aria-hidden />
                   {selectedMessage.received_at
                     ? moment(selectedMessage.received_at).fromNow()
                     : ""}
@@ -577,7 +562,7 @@ const TextMessagesView: React.FC = () => {
             variant="outline-secondary"
             onClick={() => handleCopyMessage(selectedMessage?.text || "")}
           >
-            <i className="ph-duotone ph-copy me-1" aria-hidden="true" /> Copy
+            <Copy size={16} className="me-1" aria-hidden /> Copy
             Message
           </Button>
           {selectedMessage && isUnread(selectedMessage) && (

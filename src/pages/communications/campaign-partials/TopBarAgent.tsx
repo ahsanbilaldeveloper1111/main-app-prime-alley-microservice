@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from "react";
+﻿import React, { useRef, useEffect } from "react";
 import { Search, ChevronDown, CheckCircle, User, LogOut } from "lucide-react";
 
 interface StatusOption {
@@ -30,7 +30,7 @@ interface TopBarProps {
   handleLogout: () => void;
   /** When provided, called on status change (e.g. to call API); parent should update state on success */
   onStatusChange?: (newState: string) => void | Promise<void>;
-  /** When provided and teams are TeamOption[], called when user selects a different team (unlink → storage → link flow). */
+  /** When provided and teams are TeamOption[], called when user selects a different team (unlink â†’ storage â†’ link flow). */
   onTeamChange?: (teamName: string, teamId: number) => void | Promise<void>;
 }
 
@@ -94,7 +94,7 @@ const TopBar: React.FC<TopBarProps> = ({
       setAgentStatus(status);
       const statusLabel = statusOptions.find((s) => s.value === status)?.label;
       if (statusLabel) {
-        alert(`✅ Status changed to ${statusLabel}`);
+        alert(`âœ… Status changed to ${statusLabel}`);
       }
     }
   };
@@ -130,8 +130,8 @@ const TopBar: React.FC<TopBarProps> = ({
 
         .search-box input:focus {
           outline: none;
-          border-color: #667eea;
-          box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+          border-color: #0066CC;
+          box-shadow: 0 0 0 3px rgba(0, 102, 204, 0.1);
         }
 
         .search-icon {
@@ -157,12 +157,12 @@ const TopBar: React.FC<TopBarProps> = ({
 
         .team-selector select:focus {
           outline: none;
-          border-color: #667eea;
-          box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+          border-color: #0066CC;
+          box-shadow: 0 0 0 3px rgba(0, 102, 204, 0.1);
         }
 
         .team-selector select:hover {
-          border-color: #667eea;
+          border-color: #0066CC;
         }
 
         .top-right-controls {
@@ -197,14 +197,14 @@ const TopBar: React.FC<TopBarProps> = ({
         }
 
         .status-selector:hover {
-          border-color: #667eea;
-          box-shadow: 0 2px 8px rgba(102, 126, 234, 0.15);
+          border-color: #0066CC;
+          box-shadow: 0 2px 8px rgba(0, 102, 204, 0.15);
         }
 
         .status-selector:focus-visible {
           outline: none;
-          border-color: #667eea;
-          box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+          border-color: #0066CC;
+          box-shadow: 0 0 0 3px rgba(0, 102, 204, 0.1);
         }
 
         .status-indicator {
@@ -271,14 +271,14 @@ const TopBar: React.FC<TopBarProps> = ({
         }
 
         .dropdown-item.active {
-          background: #ede9fe;
-          color: #7c3aed;
+          background: #EEF2FF;
+          color: #0066CC;
         }
 
         .user-menu-button {
           width: 44px;
           height: 44px;
-          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+          background: linear-gradient(135deg, #0066CC 0%, #0052A3 100%);
           border: none;
           border-radius: 10px;
           cursor: pointer;
@@ -289,12 +289,12 @@ const TopBar: React.FC<TopBarProps> = ({
           color: white;
           font-weight: 600;
           font-size: 14px;
-          box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+          box-shadow: 0 2px 8px rgba(0, 102, 204, 0.3);
         }
 
         .user-menu-button:hover {
           transform: translateY(-2px);
-          box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+          box-shadow: 0 4px 12px rgba(0, 102, 204, 0.4);
         }
       `}</style>
 

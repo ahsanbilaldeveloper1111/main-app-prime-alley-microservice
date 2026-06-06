@@ -1,4 +1,4 @@
-import "@assets/scss/datatable-style.scss";
+﻿import "@assets/scss/datatable-style.scss";
 import React, {
   ReactElement,
   useState,
@@ -12,7 +12,7 @@ import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 import GenericListPage from "@components/GenericListPage";
 import { Row, Col } from "react-bootstrap";
-import { useSession } from 'next-auth/react';
+import { useSession } from "next-auth/react";
 import {
   Users,
   Settings,
@@ -51,14 +51,20 @@ import {
   Mic,
   MicOff,
   LogOut,
-} from 'lucide-react';
-import { LineChart, Line, ResponsiveContainer, AreaChart, Area } from 'recharts';
+} from "lucide-react";
+import {
+  LineChart,
+  Line,
+  ResponsiveContainer,
+  AreaChart,
+  Area,
+} from "recharts";
 
-import CallWidget from '../campaign-partials/CallWidget';
-import WrapUpModal from '../campaign-partials/WrapUp';
-import TopBar, { type TeamOption } from '../campaign-partials/TopBarAgent';
-import FinesseAuthGate from '../campaign-partials/FinesseAuthGate';
-import { toast } from 'react-toastify';
+import CallWidget from "../campaign-partials/CallWidget";
+import WrapUpModal from "../campaign-partials/WrapUp";
+import TopBar, { type TeamOption } from "../campaign-partials/TopBarAgent";
+import FinesseAuthGate from "../campaign-partials/FinesseAuthGate";
+import { toast } from "react-toastify";
 import {
   getFinesseUserTeam,
   getFinesseUserData,
@@ -77,10 +83,13 @@ import {
   mergeClusterIntoStoredUserFromTeamPayload,
   isFinesseAgentOfflineLikeState,
   getFinesseEffectiveAgentStateFromStatePayload,
-} from '@utils/finesse';
-import { mergeTeamUsersFromRoster, mergeRosterPayloads } from '@utils/finesseRosterMerge';
-import { useFinesseStomp } from '@hooks/live-calls/useFinesseStomp';
-import { useFinesseCampaignPreview } from '@hooks/live-calls/useFinesseCampaignPreview';
+} from "@utils/finesse";
+import {
+  mergeTeamUsersFromRoster,
+  mergeRosterPayloads,
+} from "@utils/finesseRosterMerge";
+import { useFinesseStomp } from "@hooks/live-calls/useFinesseStomp";
+import { useFinesseCampaignPreview } from "@hooks/live-calls/useFinesseCampaignPreview";
 import { HEADER_CONSTANTS } from "@constants/headerConstants";
 import { usePermissions } from "@utils/permissionUtils";
 
@@ -88,13 +97,13 @@ import {
   formatFinesseStateDuration,
   getCampaignAgentStateColor,
   mapEffectiveFinesseStateToTopBarReadyToggle,
-} from '@utils/communications/campaign-shared/finesseAgentDisplay';
+} from "@utils/communications/campaign-shared/finesseAgentDisplay";
 import type {
   CampaignConsoleActionMenuPortalState,
   CampaignConsoleDisplayAgent,
   CampaignConsoleTeamApiResponse,
   CampaignConsoleTeamUser,
-} from '@utils/communications/campaign-shared/campaignConsoleTypes';
+} from "@utils/communications/campaign-shared/campaignConsoleTypes";
 
 type TeamUser = CampaignConsoleTeamUser;
 type TeamApiResponse = CampaignConsoleTeamApiResponse;
@@ -104,543 +113,618 @@ type ActionMenuPortalState = CampaignConsoleActionMenuPortalState;
 const { PERMISSIONS } = HEADER_CONSTANTS;
 
 const LiveCallsAgentsManagement = () => {
-      const { data: session } = useSession();
-      const { hasPermission } = usePermissions();
-      const canChangeUserStatus = hasPermission(
-        PERMISSIONS.CAN_CHANGE_USER_STATUS_TMS,
+  const { data: session } = useSession();
+  const { hasPermission } = usePermissions();
+  const canChangeUserStatus = hasPermission(
+    PERMISSIONS.CAN_CHANGE_USER_STATUS_TMS,
+  );
+  const canForceSignOut = hasPermission(PERMISSIONS.CAN_FORCE_SIGN_OUT_TMS);
+  const [teams, setTeams] = useState<TeamOption[]>([]);
+  const [selectedTeam, setSelectedTeam] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [includeLoggedOut, setIncludeLoggedOut] = useState(false);
+  const [selectedAgents, setSelectedAgents] = useState<string[]>([]);
+  const [teamDataLoading, setTeamDataLoading] = useState(false);
+  const [teamData, setTeamData] = useState<
+    TeamApiResponse["responseData"] | null
+  >(null);
+  const [teamDataError, setTeamDataError] = useState<string | null>(null);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
+  /** Bumps when cluster id is persisted from API so EventSource reconnects with roster params. */
+  const [streamConfigBump, setStreamConfigBump] = useState(0);
+  const [, setLiveTimeTick] = useState(0);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [viewMode, setViewMode] = useState("table");
+  const [filterStatus, setFilterStatus] = useState("all");
+  const [agentStatus, setAgentStatus] = useState("READY");
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [bulkActionLoading, setBulkActionLoading] = useState(false);
+  const [showStatusDropdown, setShowStatusDropdown] = useState(false);
+  const [showUserMenu, setShowUserMenu] = useState(false);
+  const [actionMenuPortal, setActionMenuPortal] =
+    useState<ActionMenuPortalState | null>(null);
+  const [finesseSseToken, setFinesseSseToken] = useState<string | null>(null);
+
+  const {
+    handlePreviewEvent,
+    getFinesseContext,
+    callWidgetProps,
+    wrapUpModalProps,
+  } = useFinesseCampaignPreview(session, {
+    selectedTeam,
+    includeTeamRow: false,
+  });
+
+  const statusDropdownRef = useRef<HTMLDivElement>(null);
+  const userMenuRef = useRef<HTMLDivElement>(null);
+
+  const openAgentActionMenu = useCallback(
+    (e: React.MouseEvent<HTMLButtonElement>, agent: DisplayAgent) => {
+      e.stopPropagation();
+      const btn = e.currentTarget;
+      const r = btn.getBoundingClientRect();
+      const menuWidth = 200;
+      let left = r.right - menuWidth;
+      left = Math.max(
+        12,
+        Math.min(left, globalThis.window.innerWidth - menuWidth - 12),
       );
-      const canForceSignOut = hasPermission(PERMISSIONS.CAN_FORCE_SIGN_OUT_TMS);
-      const [teams, setTeams] = useState<TeamOption[]>([]);
-      const [selectedTeam, setSelectedTeam] = useState('');
-      const [searchQuery, setSearchQuery] = useState('');
-      const [includeLoggedOut, setIncludeLoggedOut] = useState(false);
-      const [selectedAgents, setSelectedAgents] = useState<string[]>([]);
-      const [teamDataLoading, setTeamDataLoading] = useState(false);
-      const [teamData, setTeamData] = useState<TeamApiResponse['responseData'] | null>(null);
-      const [teamDataError, setTeamDataError] = useState<string | null>(null);
-      const [refreshTrigger, setRefreshTrigger] = useState(0);
-      /** Bumps when cluster id is persisted from API so EventSource reconnects with roster params. */
-      const [streamConfigBump, setStreamConfigBump] = useState(0);
-      const [, setLiveTimeTick] = useState(0);
-      const [sidebarOpen, setSidebarOpen] = useState(true);
-      const [viewMode, setViewMode] = useState('table');
-      const [filterStatus, setFilterStatus] = useState('all');
-      const [agentStatus, setAgentStatus] = useState('READY');
-      const [isRefreshing, setIsRefreshing] = useState(false);
-      const [bulkActionLoading, setBulkActionLoading] = useState(false);
-      const [showStatusDropdown, setShowStatusDropdown] = useState(false);
-      const [showUserMenu, setShowUserMenu] = useState(false);
-      const [actionMenuPortal, setActionMenuPortal] = useState<ActionMenuPortalState | null>(null);
-      const [finesseSseToken, setFinesseSseToken] = useState<string | null>(null);
-
-      const {
-        handlePreviewEvent,
-        getFinesseContext,
-        callWidgetProps,
-        wrapUpModalProps,
-      } = useFinesseCampaignPreview(session, {
-        selectedTeam,
-        includeTeamRow: false,
-      });
-
-      const statusDropdownRef = useRef<HTMLDivElement>(null);
-      const userMenuRef = useRef<HTMLDivElement>(null);
-    
-      const openAgentActionMenu = useCallback((e: React.MouseEvent<HTMLButtonElement>, agent: DisplayAgent) => {
-        e.stopPropagation();
-        const btn = e.currentTarget;
-        const r = btn.getBoundingClientRect();
-        const menuWidth = 200;
-        let left = r.right - menuWidth;
-        left = Math.max(12, Math.min(left, globalThis.window.innerWidth - menuWidth - 12));
-        const top = r.bottom + 6;
-        const maxHeight = Math.max(140, globalThis.window.innerHeight - top - 12);
-        setActionMenuPortal((prev) =>
-          prev?.agent.id === agent.id ? null : { agent, top, left, maxHeight },
-        );
-      }, []);
-
-      // Close dropdowns when clicking outside
-      useEffect(() => {
-        const handleClickOutside = (event: MouseEvent) => {
-          const t = event.target as HTMLElement | null;
-          if (!t) return;
-          if (t.closest('[data-campaign-console-action-menu]')) return;
-          if (t.closest('[data-campaign-console-action-trigger]')) return;
-          if (statusDropdownRef.current && !statusDropdownRef.current.contains(event.target as Node)) {
-            setShowStatusDropdown(false);
-          }
-          if (userMenuRef.current && !userMenuRef.current.contains(event.target as Node)) {
-            setShowUserMenu(false);
-          }
-          setActionMenuPortal(null);
-        };
-
-        document.addEventListener('mousedown', handleClickOutside);
-        return () => document.removeEventListener('mousedown', handleClickOutside);
-      }, []);
-
-      useEffect(() => {
-        if (!actionMenuPortal) return;
-        const close = () => setActionMenuPortal(null);
-        globalThis.window.addEventListener('scroll', close, true);
-        globalThis.window.addEventListener('resize', close);
-        return () => {
-          globalThis.window.removeEventListener('scroll', close, true);
-          globalThis.window.removeEventListener('resize', close);
-        };
-      }, [actionMenuPortal]);
-    
-      // Tick every second so "time in state" increases for each agent
-      useEffect(() => {
-        const interval = setInterval(() => {
-          setLiveTimeTick((t) => t + 1);
-        }, 1000);
-        return () => clearInterval(interval);
-      }, []);
-
-      // Populate teams from storage; selected team from FINESSE_SELECTED_TEAM_ID_KEY (getStoredTeamId)
-      const hydrateTeamsFromStorage = useCallback(() => {
-        const data = getFinesseUserData();
-        if (data?.teams?.length) {
-          setTeams(data.teams);
-          const storedTeamId = getStoredTeamId();
-          const match = data.teams.find((t) => t.id === storedTeamId);
-          setSelectedTeam(match?.name ?? data.teamName ?? data.teams[0].name ?? '');
-        } else {
-          setTeams([]);
-          setSelectedTeam('');
-        }
-      }, []);
-      useEffect(() => {
-        hydrateTeamsFromStorage();
-      }, [hydrateTeamsFromStorage]);
-
-      useEffect(() => {
-        if (!session?.user) {
-          setFinesseSseToken(null);
-          return;
-        }
-        if (globalThis.window === undefined) return;
-        setFinesseSseToken(getFinesseToken());
-      }, [session?.user]);
-
-      const rosterClusterId = useMemo(
-        () => getFinesseClusterId(),
-        [refreshTrigger, selectedTeam, streamConfigBump],
+      const top = r.bottom + 6;
+      const maxHeight = Math.max(140, globalThis.window.innerHeight - top - 12);
+      setActionMenuPortal((prev) =>
+        prev?.agent.id === agent.id ? null : { agent, top, left, maxHeight },
       );
-      const streamTeamId = useMemo(
-        () => getEffectiveTeamId(getFinesseUserData()),
-        [refreshTrigger, selectedTeam, streamConfigBump],
-      );
-      const sseFinesseUserId = useMemo(() => {
-        const d = getFinesseUserData();
-        return d?.loginId ?? d?.loginName ?? null;
-      }, [refreshTrigger, selectedTeam, streamConfigBump]);
+    },
+    [],
+  );
 
-      /** Offline / logged-out rows only when “Include logged out” is checked (stream may still carry them in teamData). */
-      const teamUsersForDisplay = useMemo(() => {
-        const users = teamData?.users ?? [];
-        if (includeLoggedOut) return users;
-        return users.filter((u) => {
-          const st = u.state;
-          const pend = u.pendingState;
-          return (
-            !isFinesseAgentOfflineLikeState(st) &&
-            !isFinesseAgentOfflineLikeState(pend)
-          );
-        });
-      }, [teamData?.users, includeLoggedOut]);
-
-      const rosterSyncDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-      /** Latest roster STOMP payload; reapplied after REST refetch so API lag cannot revert LOGOUT/offline. */
-      const lastRosterPayloadRef = useRef<unknown>(null);
-
-      useEffect(() => {
-        lastRosterPayloadRef.current = null;
-      }, [streamTeamId, rosterClusterId]);
-
-      const refetchTeamFromStream = useCallback(() => {
-        const d = getFinesseUserData();
-        const username = d?.loginId ?? d?.loginName;
-        const teamId = getEffectiveTeamId(d);
-        if (!username || teamId == null) return;
-        /** Always include logged-out agents so logout matches roster and is not overwritten. */
-        getFinesseUserTeam(username, teamId, true)
-          .then((res: TeamApiResponse) => {
-            const payload = res?.responseData ?? (res as unknown as { responseData?: TeamApiResponse['responseData'] })?.responseData;
-            if (payload) {
-              const last = lastRosterPayloadRef.current;
-              const merged =
-                last == null ? payload : mergeTeamUsersFromRoster(payload, last);
-              setTeamData(merged ?? payload);
-              if (mergeClusterIntoStoredUserFromTeamPayload(payload)) {
-                setStreamConfigBump((b) => b + 1);
-              }
-            }
-          })
-          .catch(() => {});
-      }, []);
-
-      const scheduleTeamSyncFromRoster = useCallback(() => {
-        if (rosterSyncDebounceRef.current) clearTimeout(rosterSyncDebounceRef.current);
-        rosterSyncDebounceRef.current = setTimeout(() => {
-          rosterSyncDebounceRef.current = null;
-          refetchTeamFromStream();
-        }, 400);
-      }, [refetchTeamFromStream]);
-
-      useEffect(() => () => {
-        if (rosterSyncDebounceRef.current) clearTimeout(rosterSyncDebounceRef.current);
-      }, []);
-
-      const handleTeamRosterEvent = useCallback(
-        (raw: unknown) => {
-          if (
-            raw != null &&
-            typeof raw === 'object' &&
-            Reflect.get(raw, '__finesseRosterUnparsed') === true
-          ) {
-            scheduleTeamSyncFromRoster();
-            return;
-          }
-          lastRosterPayloadRef.current = mergeRosterPayloads(
-            lastRosterPayloadRef.current,
-            raw,
-          );
-          setTeamData((prev) =>
-            mergeTeamUsersFromRoster(prev, lastRosterPayloadRef.current),
-          );
-          /** Debounced REST sync picks up newly logged-in agents; refetch applies `lastRosterPayloadRef` overlay so LOGOUT is not reverted by stale READY. */
-          scheduleTeamSyncFromRoster();
-        },
-        [scheduleTeamSyncFromRoster],
-      );
-
-      useFinesseStomp({
-        token: finesseSseToken,
-        finesseUserId: sseFinesseUserId,
-        clusterId: rosterClusterId,
-        teamId: streamTeamId,
-        onStateEvent: (p) => {
-          const raw = typeof p?.state === 'string' ? p.state.trim() : '';
-          if (!raw) return;
-          setAgentStatus(mapEffectiveFinesseStateToTopBarReadyToggle(raw));
-        },
-        onPreviewEvent: handlePreviewEvent,
-        onErrorEvent: (p) =>
-          toast.error((p as { message?: string })?.message ?? 'Finesse error'),
-        onAuthError: (msg) => toast.error(msg),
-        onRosterEvent: handleTeamRosterEvent,
-        onStompConnected: refetchTeamFromStream,
-      });
-      // When gate authenticates on same page (no reload), re-hydrate teams and refetch
-      useEffect(() => {
-        if (globalThis.window === undefined) return;
-        const onAuthenticated = () => {
-          hydrateTeamsFromStorage();
-          setRefreshTrigger((t) => t + 1);
-        };
-        globalThis.window.addEventListener('finesse-authenticated', onAuthenticated);
-        return () =>
-          globalThis.window.removeEventListener('finesse-authenticated', onAuthenticated);
-      }, [hydrateTeamsFromStorage]);
-
-      // Fetch user team details using teamId from storage (FINESSE_SELECTED_TEAM_ID_KEY)
-      useEffect(() => {
-        const data = getFinesseUserData();
-        const username = data?.loginId ?? data?.loginName;
-        const teamId = getEffectiveTeamId(data);
-        if (!username || teamId == null) {
-          setTeamData(null);
-          setTeamDataError(null);
-          return;
-        }
-        setTeamDataLoading(true);
-        setTeamDataError(null);
-        getFinesseUserTeam(username, teamId, includeLoggedOut)
-          .then((res: TeamApiResponse) => {
-            const payload = res?.responseData ?? (res as unknown as { responseData?: TeamApiResponse['responseData'] })?.responseData;
-            setTeamData(payload ?? null);
-            if (payload && mergeClusterIntoStoredUserFromTeamPayload(payload)) {
-              setStreamConfigBump((b) => b + 1);
-            }
-          })
-          .catch((err) => {
-            setTeamDataError(err?.message ?? 'Failed to load team');
-            setTeamData(null);
-          })
-          .finally(() => {
-            setTeamDataLoading(false);
-          });
-      }, [refreshTrigger, includeLoggedOut]);
-
-      /** Keep TopBar in sync with REST team row / stored user when SSE is delayed or missing. */
-      useEffect(() => {
-        const username = getFinesseUserData()?.loginId ?? getFinesseUserData()?.loginName;
-        const users = teamData?.users ?? [];
-        const row =
-          username && users.length
-            ? users.find((u) => u.loginId === username)
-            : undefined;
-        const effFromRow =
-          row == null ? undefined : getFinesseEffectiveAgentStateFromStatePayload(row);
-        const effFromStore = getFinesseEffectiveAgentStateFromStatePayload(
-          getFinesseUserData(),
-        );
-        const eff = effFromRow ?? effFromStore;
-        if (eff == null || eff === '') return;
-        setAgentStatus(mapEffectiveFinesseStateToTopBarReadyToggle(eff));
-      }, [teamData]);
-
-      const handleTeamChange = async (newTeamName: string, newTeamId: number) => {
-        if (Number(getStoredTeamId()) === newTeamId) return;
-        const previousTeamName = selectedTeam;
-        const stored = getFinesseUserData();
-        const usernameForCheck =
-          stored?.loginId ??
-          stored?.loginName ??
-          (session?.user as { username?: string } | undefined)?.username ??
-          '';
-        const switchCheck = await assertFinesseTeamSwitchable(newTeamId, usernameForCheck || undefined, [
-          teams,
-          stored?.teams,
-        ]);
-        if (!switchCheck.ok) {
-          toast.error(switchCheck.message);
-          setSelectedTeam(previousTeamName);
-          return;
-        }
-        const { username, teamId } = getFinesseContext();
-        if (username && teamId != null) {
-          try {
-            await finesseUnlink(username, teamId);
-          } catch (err: unknown) {
-            toast.error(getFinesseApiErrorMessage(err, 'Unlink failed'));
-            setSelectedTeam(previousTeamName);
-            return;
-          }
-        }
-        setStoredTeamId(newTeamId);
-        clearFinesseUserData();
-        if (globalThis.window !== undefined) {
-          globalThis.window.dispatchEvent(
-            new CustomEvent('finesse-require-reauth', { detail: { manualConnect: false } }),
-          );
-        }
-      };
-
-      const handleLogout = async () => {
-        const { username, teamId } = getFinesseContext();
-        if (username && teamId != null) {
-          try {
-            await finesseUnlink(username, teamId);
-          } catch (err: unknown) {
-            const msg = (err as { response?: { data?: { message?: string } }; message?: string })?.response?.data?.message ?? (err as Error)?.message ?? 'Unlink failed';
-            toast.error(msg ?? 'Failed to unlink from Finesse');
-          }
-        }
-        clearFinesseUserData();
-        setFinesseManualReconnectRequired();
-        if (globalThis.window !== undefined) {
-          globalThis.window.dispatchEvent(
-            new CustomEvent('finesse-require-reauth', { detail: { manualConnect: true } }),
-          );
-        }
-      };
-
-      const handleAgentStatusChange = async (newState: string) => {
-        const { username, teamId } = getFinesseContext();
-        if (!username || teamId == null) {
-          toast.error('User not found.');
-          return;
-        }
-        const state = newState === 'READY' || newState === 'NOT_READY' ? newState : 'READY';
-        try {
-          await finesseSetState(teamId, username, state);
-          setAgentStatus(state);
-        } catch (err: unknown) {
-          toast.error(getFinesseApiErrorMessage(err, 'Failed to update agent state.'));
-        }
-      };
-    
-      const statusOptions = [
-        { value: 'READY', label: 'Ready', color: '#10b981', icon: CheckCircle },
-        { value: 'NOT_READY', label: 'Not Ready', color: '#ef4444', icon: XCircle }
-      ];
-
-      // Derive agents from API team response (no dummy data)
-      const agents: DisplayAgent[] = teamUsersForDisplay.map((u) => ({
-        id: u.loginId,
-        loginId: u.loginId,
-        name: [u.firstName, u.lastName].filter(Boolean).join(' ').trim() || u.loginId,
-        state: u.state ?? 'UNKNOWN',
-        stateColor: getCampaignAgentStateColor(u.state ?? "", {
-          treatLoginAsReady: true,
-        }),
-        timeInState: formatFinesseStateDuration(u.stateChangeTime),
-        extension: u.extension ?? '—'
-      }));
-
-      const filteredAgents = agents.filter((agent) => {
-        const q = searchQuery.toLowerCase();
-        const matchesSearch =
-          agent.name.toLowerCase().includes(q) || agent.loginId.toLowerCase().includes(q);
-        const matchesStatus =
-          filterStatus === 'all' ||
-          (filterStatus === 'ready' && agent.state === 'READY') ||
-          (filterStatus === 'notready' && agent.state === 'NOT_READY') ||
-          (filterStatus === 'offline' && isFinesseAgentOfflineLikeState(agent.state));
-        return matchesSearch && matchesStatus;
-      });
-
-      const teamDataAvailable = !teamDataLoading && teamData != null;
-    
-      const handleSelectAgent = (id: string) => {
-        setSelectedAgents((prev) =>
-          prev.includes(id) ? prev.filter((a) => a !== id) : [...prev, id]
-        );
-      };
-
-      const handleSelectAll = () => {
-        if (selectedAgents.length === filteredAgents.length) {
-          setSelectedAgents([]);
-        } else {
-          setSelectedAgents(filteredAgents.map((a) => a.id));
-        }
-      };
-
-      const handleRefresh = () => {
-        setIsRefreshing(true);
-        setRefreshTrigger((t) => t + 1);
-        setTimeout(() => setIsRefreshing(false), 800);
-      };
-    
-      const handleStatusChange = async (status: string) => {
+  // Close dropdowns when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const t = event.target as HTMLElement | null;
+      if (!t) return;
+      if (t.closest("[data-campaign-console-action-menu]")) return;
+      if (t.closest("[data-campaign-console-action-trigger]")) return;
+      if (
+        statusDropdownRef.current &&
+        !statusDropdownRef.current.contains(event.target as Node)
+      ) {
         setShowStatusDropdown(false);
-        await handleAgentStatusChange(status);
-      };
-    
-      /** POST /api/v1/finesse/teams/{teamId}/users/{loginId}/state — body `{ newState: "READY" | "NOT_READY" }` */
-      const handleBulkStatusChange = async (newStatus: string) => {
-        if (!canChangeUserStatus) {
-          toast.error('You do not have permission to change agent status.');
-          return;
-        }
-        if (selectedAgents.length === 0) {
-          toast.warn('Please select at least one agent to change status.');
-          return;
-        }
-        const newState: 'READY' | 'NOT_READY' = newStatus === 'READY' ? 'READY' : 'NOT_READY';
-        const data = getFinesseUserData();
-        const teamId = getEffectiveTeamId(data);
-        if (teamId == null) {
-          toast.error('Team not available.');
-          return;
-        }
-        const count = selectedAgents.length;
-        const label = newState === 'READY' ? 'Ready' : 'Not Ready';
-        setBulkActionLoading(true);
-        try {
-          const results = await Promise.allSettled(
-            selectedAgents.map((loginId) => finesseSetState(teamId, loginId, newState)),
-          );
-          const rejected = results.filter(
-            (r): r is PromiseRejectedResult => r.status === 'rejected',
-          );
-          setRefreshTrigger((t) => t + 1);
-          setSelectedAgents([]);
-          if (rejected.length === 0) {
-            toast.success(`Updated ${count} agent(s) to ${label}.`);
-          } else {
-            toast.error(
-              getFinesseApiErrorMessage(
-                rejected[0].reason,
-                `Failed to update agent state (${rejected.length}/${count}).`,
-              ),
-            );
+      }
+      if (
+        userMenuRef.current &&
+        !userMenuRef.current.contains(event.target as Node)
+      ) {
+        setShowUserMenu(false);
+      }
+      setActionMenuPortal(null);
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  useEffect(() => {
+    if (!actionMenuPortal) return;
+    const close = () => setActionMenuPortal(null);
+    globalThis.window.addEventListener("scroll", close, true);
+    globalThis.window.addEventListener("resize", close);
+    return () => {
+      globalThis.window.removeEventListener("scroll", close, true);
+      globalThis.window.removeEventListener("resize", close);
+    };
+  }, [actionMenuPortal]);
+
+  // Tick every second so "time in state" increases for each agent
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setLiveTimeTick((t) => t + 1);
+    }, 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Populate teams from storage; selected team from FINESSE_SELECTED_TEAM_ID_KEY (getStoredTeamId)
+  const hydrateTeamsFromStorage = useCallback(() => {
+    const data = getFinesseUserData();
+    if (data?.teams?.length) {
+      setTeams(data.teams);
+      const storedTeamId = getStoredTeamId();
+      const match = data.teams.find((t) => t.id === storedTeamId);
+      setSelectedTeam(match?.name ?? data.teamName ?? data.teams[0].name ?? "");
+    } else {
+      setTeams([]);
+      setSelectedTeam("");
+    }
+  }, []);
+  useEffect(() => {
+    hydrateTeamsFromStorage();
+  }, [hydrateTeamsFromStorage]);
+
+  useEffect(() => {
+    if (!session?.user) {
+      setFinesseSseToken(null);
+      return;
+    }
+    if (globalThis.window === undefined) return;
+    setFinesseSseToken(getFinesseToken());
+  }, [session?.user]);
+
+  const rosterClusterId = useMemo(
+    () => getFinesseClusterId(),
+    [refreshTrigger, selectedTeam, streamConfigBump],
+  );
+  const streamTeamId = useMemo(
+    () => getEffectiveTeamId(getFinesseUserData()),
+    [refreshTrigger, selectedTeam, streamConfigBump],
+  );
+  const sseFinesseUserId = useMemo(() => {
+    const d = getFinesseUserData();
+    return d?.loginId ?? d?.loginName ?? null;
+  }, [refreshTrigger, selectedTeam, streamConfigBump]);
+
+  /** Offline / logged-out rows only when â€œInclude logged outâ€ is checked (stream may still carry them in teamData). */
+  const teamUsersForDisplay = useMemo(() => {
+    const users = teamData?.users ?? [];
+    if (includeLoggedOut) return users;
+    return users.filter((u) => {
+      const st = u.state;
+      const pend = u.pendingState;
+      return (
+        !isFinesseAgentOfflineLikeState(st) &&
+        !isFinesseAgentOfflineLikeState(pend)
+      );
+    });
+  }, [teamData?.users, includeLoggedOut]);
+
+  const rosterSyncDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null,
+  );
+  /** Latest roster STOMP payload; reapplied after REST refetch so API lag cannot revert LOGOUT/offline. */
+  const lastRosterPayloadRef = useRef<unknown>(null);
+
+  useEffect(() => {
+    lastRosterPayloadRef.current = null;
+  }, [streamTeamId, rosterClusterId]);
+
+  const refetchTeamFromStream = useCallback(() => {
+    const d = getFinesseUserData();
+    const username = d?.loginId ?? d?.loginName;
+    const teamId = getEffectiveTeamId(d);
+    if (!username || teamId == null) return;
+    /** Always include logged-out agents so logout matches roster and is not overwritten. */
+    getFinesseUserTeam(username, teamId, true)
+      .then((res: TeamApiResponse) => {
+        const payload =
+          res?.responseData ??
+          (res as unknown as { responseData?: TeamApiResponse["responseData"] })
+            ?.responseData;
+        if (payload) {
+          const last = lastRosterPayloadRef.current;
+          const merged =
+            last == null ? payload : mergeTeamUsersFromRoster(payload, last);
+          setTeamData(merged ?? payload);
+          if (mergeClusterIntoStoredUserFromTeamPayload(payload)) {
+            setStreamConfigBump((b) => b + 1);
           }
-        } finally {
-          setBulkActionLoading(false);
         }
-      };
+      })
+      .catch(() => {});
+  }, []);
 
-      const handleSingleAgentStatusChange = async (agentLoginId: string, newStatus: string) => {
-        if (!canChangeUserStatus) {
-          toast.error('You do not have permission to change agent status.');
-          setActionMenuPortal(null);
-          return;
-        }
-        const newState: 'READY' | 'NOT_READY' = newStatus === 'READY' ? 'READY' : 'NOT_READY';
-        const data = getFinesseUserData();
-        const teamId = getEffectiveTeamId(data);
-        if (teamId == null) {
-          toast.error('Team not available.');
-          setActionMenuPortal(null);
-          return;
-        }
-        try {
-          await finesseSetState(teamId, agentLoginId, newState);
-          const label = newState === 'READY' ? 'Ready' : 'Not Ready';
-          toast.success(`Status updated to ${label}.`);
-          setRefreshTrigger((t) => t + 1);
-        } catch (err: unknown) {
-          toast.error(getFinesseApiErrorMessage(err, 'Failed to update agent state.'));
-        } finally {
-          setActionMenuPortal(null);
-        }
-      };
+  const scheduleTeamSyncFromRoster = useCallback(() => {
+    if (rosterSyncDebounceRef.current)
+      clearTimeout(rosterSyncDebounceRef.current);
+    rosterSyncDebounceRef.current = setTimeout(() => {
+      rosterSyncDebounceRef.current = null;
+      refetchTeamFromStream();
+    }, 400);
+  }, [refetchTeamFromStream]);
 
-      const handleForceSignOutAgent = useCallback(async (agentLoginId: string) => {
-        if (!canForceSignOut) {
-          toast.error('You do not have permission to force sign-out.');
-          setActionMenuPortal(null);
-          return;
+  useEffect(
+    () => () => {
+      if (rosterSyncDebounceRef.current)
+        clearTimeout(rosterSyncDebounceRef.current);
+    },
+    [],
+  );
+
+  const handleTeamRosterEvent = useCallback(
+    (raw: unknown) => {
+      if (
+        raw != null &&
+        typeof raw === "object" &&
+        Reflect.get(raw, "__finesseRosterUnparsed") === true
+      ) {
+        scheduleTeamSyncFromRoster();
+        return;
+      }
+      lastRosterPayloadRef.current = mergeRosterPayloads(
+        lastRosterPayloadRef.current,
+        raw,
+      );
+      setTeamData((prev) =>
+        mergeTeamUsersFromRoster(prev, lastRosterPayloadRef.current),
+      );
+      /** Debounced REST sync picks up newly logged-in agents; refetch applies `lastRosterPayloadRef` overlay so LOGOUT is not reverted by stale READY. */
+      scheduleTeamSyncFromRoster();
+    },
+    [scheduleTeamSyncFromRoster],
+  );
+
+  useFinesseStomp({
+    token: finesseSseToken,
+    finesseUserId: sseFinesseUserId,
+    clusterId: rosterClusterId,
+    teamId: streamTeamId,
+    onStateEvent: (p) => {
+      const raw = typeof p?.state === "string" ? p.state.trim() : "";
+      if (!raw) return;
+      setAgentStatus(mapEffectiveFinesseStateToTopBarReadyToggle(raw));
+    },
+    onPreviewEvent: handlePreviewEvent,
+    onErrorEvent: (p) =>
+      toast.error((p as { message?: string })?.message ?? "Finesse error"),
+    onAuthError: (msg) => toast.error(msg),
+    onRosterEvent: handleTeamRosterEvent,
+    onStompConnected: refetchTeamFromStream,
+  });
+  // When gate authenticates on same page (no reload), re-hydrate teams and refetch
+  useEffect(() => {
+    if (globalThis.window === undefined) return;
+    const onAuthenticated = () => {
+      hydrateTeamsFromStorage();
+      setRefreshTrigger((t) => t + 1);
+    };
+    globalThis.window.addEventListener(
+      "finesse-authenticated",
+      onAuthenticated,
+    );
+    return () =>
+      globalThis.window.removeEventListener(
+        "finesse-authenticated",
+        onAuthenticated,
+      );
+  }, [hydrateTeamsFromStorage]);
+
+  // Fetch user team details using teamId from storage (FINESSE_SELECTED_TEAM_ID_KEY)
+  useEffect(() => {
+    const data = getFinesseUserData();
+    const username = data?.loginId ?? data?.loginName;
+    const teamId = getEffectiveTeamId(data);
+    if (!username || teamId == null) {
+      setTeamData(null);
+      setTeamDataError(null);
+      return;
+    }
+    setTeamDataLoading(true);
+    setTeamDataError(null);
+    getFinesseUserTeam(username, teamId, includeLoggedOut)
+      .then((res: TeamApiResponse) => {
+        const payload =
+          res?.responseData ??
+          (res as unknown as { responseData?: TeamApiResponse["responseData"] })
+            ?.responseData;
+        setTeamData(payload ?? null);
+        if (payload && mergeClusterIntoStoredUserFromTeamPayload(payload)) {
+          setStreamConfigBump((b) => b + 1);
         }
-        const stored = getFinesseUserData();
-        const supervisorFinesseUserId =
-          stored?.loginId ?? stored?.loginName ?? '';
-        const teamId = getEffectiveTeamId(stored);
-        if (!supervisorFinesseUserId.trim()) {
-          toast.error('Supervisor user not found.');
-          setActionMenuPortal(null);
-          return;
-        }
-        if (teamId == null) {
-          toast.error('Team not available.');
-          setActionMenuPortal(null);
-          return;
-        }
-        if (agentLoginId === supervisorFinesseUserId) {
-          toast.warn('You cannot force sign-out your own session from another agent row.');
-          setActionMenuPortal(null);
-          return;
-        }
-        try {
-          await finesseForceSignOut({
-            teamId,
-            finesseUserId: agentLoginId,
-            supervisorFinesseUserId,
-          });
-          toast.success('Agent signed out of Finesse.');
-          setRefreshTrigger((t) => t + 1);
-        } catch (err: unknown) {
-          toast.error(getFinesseApiErrorMessage(err, 'Force sign-out failed.'));
-        } finally {
-          setActionMenuPortal(null);
-        }
-      }, [canForceSignOut]);
-    
+      })
+      .catch((err) => {
+        setTeamDataError(err?.message ?? "Failed to load team");
+        setTeamData(null);
+      })
+      .finally(() => {
+        setTeamDataLoading(false);
+      });
+  }, [refreshTrigger, includeLoggedOut]);
+
+  /** Keep TopBar in sync with REST team row / stored user when SSE is delayed or missing. */
+  useEffect(() => {
+    const username =
+      getFinesseUserData()?.loginId ?? getFinesseUserData()?.loginName;
+    const users = teamData?.users ?? [];
+    const row =
+      username && users.length
+        ? users.find((u) => u.loginId === username)
+        : undefined;
+    const effFromRow =
+      row == null
+        ? undefined
+        : getFinesseEffectiveAgentStateFromStatePayload(row);
+    const effFromStore =
+      getFinesseEffectiveAgentStateFromStatePayload(getFinesseUserData());
+    const eff = effFromRow ?? effFromStore;
+    if (eff == null || eff === "") return;
+    setAgentStatus(mapEffectiveFinesseStateToTopBarReadyToggle(eff));
+  }, [teamData]);
+
+  const handleTeamChange = async (newTeamName: string, newTeamId: number) => {
+    if (Number(getStoredTeamId()) === newTeamId) return;
+    const previousTeamName = selectedTeam;
+    const stored = getFinesseUserData();
+    const usernameForCheck =
+      stored?.loginId ??
+      stored?.loginName ??
+      (session?.user as { username?: string } | undefined)?.username ??
+      "";
+    const switchCheck = await assertFinesseTeamSwitchable(
+      newTeamId,
+      usernameForCheck || undefined,
+      [teams, stored?.teams],
+    );
+    if (!switchCheck.ok) {
+      toast.error(switchCheck.message);
+      setSelectedTeam(previousTeamName);
+      return;
+    }
+    const { username, teamId } = getFinesseContext();
+    if (username && teamId != null) {
+      try {
+        await finesseUnlink(username, teamId);
+      } catch (err: unknown) {
+        toast.error(getFinesseApiErrorMessage(err, "Unlink failed"));
+        setSelectedTeam(previousTeamName);
+        return;
+      }
+    }
+    setStoredTeamId(newTeamId);
+    clearFinesseUserData();
+    if (globalThis.window !== undefined) {
+      globalThis.window.dispatchEvent(
+        new CustomEvent("finesse-require-reauth", {
+          detail: { manualConnect: false },
+        }),
+      );
+    }
+  };
+
+  const handleLogout = async () => {
+    const { username, teamId } = getFinesseContext();
+    if (username && teamId != null) {
+      try {
+        await finesseUnlink(username, teamId);
+      } catch (err: unknown) {
+        const msg =
+          (
+            err as {
+              response?: { data?: { message?: string } };
+              message?: string;
+            }
+          )?.response?.data?.message ??
+          (err as Error)?.message ??
+          "Unlink failed";
+        toast.error(msg ?? "Failed to unlink from Finesse");
+      }
+    }
+    clearFinesseUserData();
+    setFinesseManualReconnectRequired();
+    if (globalThis.window !== undefined) {
+      globalThis.window.dispatchEvent(
+        new CustomEvent("finesse-require-reauth", {
+          detail: { manualConnect: true },
+        }),
+      );
+    }
+  };
+
+  const handleAgentStatusChange = async (newState: string) => {
+    const { username, teamId } = getFinesseContext();
+    if (!username || teamId == null) {
+      toast.error("User not found.");
+      return;
+    }
+    const state =
+      newState === "READY" || newState === "NOT_READY" ? newState : "READY";
+    try {
+      await finesseSetState(teamId, username, state);
+      setAgentStatus(state);
+    } catch (err: unknown) {
+      toast.error(
+        getFinesseApiErrorMessage(err, "Failed to update agent state."),
+      );
+    }
+  };
+
+  const statusOptions = [
+    { value: "READY", label: "Ready", color: "#10b981", icon: CheckCircle },
+    { value: "NOT_READY", label: "Not Ready", color: "#ef4444", icon: XCircle },
+  ];
+
+  // Derive agents from API team response (no dummy data)
+  const agents: DisplayAgent[] = teamUsersForDisplay.map((u) => ({
+    id: u.loginId,
+    loginId: u.loginId,
+    name:
+      [u.firstName, u.lastName].filter(Boolean).join(" ").trim() || u.loginId,
+    state: u.state ?? "UNKNOWN",
+    stateColor: getCampaignAgentStateColor(u.state ?? "", {
+      treatLoginAsReady: true,
+    }),
+    timeInState: formatFinesseStateDuration(u.stateChangeTime),
+    extension: u.extension ?? "â€”",
+  }));
+
+  const filteredAgents = agents.filter((agent) => {
+    const q = searchQuery.toLowerCase();
+    const matchesSearch =
+      agent.name.toLowerCase().includes(q) ||
+      agent.loginId.toLowerCase().includes(q);
+    const matchesStatus =
+      filterStatus === "all" ||
+      (filterStatus === "ready" && agent.state === "READY") ||
+      (filterStatus === "notready" && agent.state === "NOT_READY") ||
+      (filterStatus === "offline" &&
+        isFinesseAgentOfflineLikeState(agent.state));
+    return matchesSearch && matchesStatus;
+  });
+
+  const teamDataAvailable = !teamDataLoading && teamData != null;
+
+  const handleSelectAgent = (id: string) => {
+    setSelectedAgents((prev) =>
+      prev.includes(id) ? prev.filter((a) => a !== id) : [...prev, id],
+    );
+  };
+
+  const handleSelectAll = () => {
+    if (selectedAgents.length === filteredAgents.length) {
+      setSelectedAgents([]);
+    } else {
+      setSelectedAgents(filteredAgents.map((a) => a.id));
+    }
+  };
+
+  const handleRefresh = () => {
+    setIsRefreshing(true);
+    setRefreshTrigger((t) => t + 1);
+    setTimeout(() => setIsRefreshing(false), 800);
+  };
+
+  const handleStatusChange = async (status: string) => {
+    setShowStatusDropdown(false);
+    await handleAgentStatusChange(status);
+  };
+
+  /** POST /api/v1/finesse/teams/{teamId}/users/{loginId}/state â€” body `{ newState: "READY" | "NOT_READY" }` */
+  const handleBulkStatusChange = async (newStatus: string) => {
+    if (!canChangeUserStatus) {
+      toast.error("You do not have permission to change agent status.");
+      return;
+    }
+    if (selectedAgents.length === 0) {
+      toast.warn("Please select at least one agent to change status.");
+      return;
+    }
+    const newState: "READY" | "NOT_READY" =
+      newStatus === "READY" ? "READY" : "NOT_READY";
+    const data = getFinesseUserData();
+    const teamId = getEffectiveTeamId(data);
+    if (teamId == null) {
+      toast.error("Team not available.");
+      return;
+    }
+    const count = selectedAgents.length;
+    const label = newState === "READY" ? "Ready" : "Not Ready";
+    setBulkActionLoading(true);
+    try {
+      const results = await Promise.allSettled(
+        selectedAgents.map((loginId) =>
+          finesseSetState(teamId, loginId, newState),
+        ),
+      );
+      const rejected = results.filter(
+        (r): r is PromiseRejectedResult => r.status === "rejected",
+      );
+      setRefreshTrigger((t) => t + 1);
+      setSelectedAgents([]);
+      if (rejected.length === 0) {
+        toast.success(`Updated ${count} agent(s) to ${label}.`);
+      } else {
+        toast.error(
+          getFinesseApiErrorMessage(
+            rejected[0].reason,
+            `Failed to update agent state (${rejected.length}/${count}).`,
+          ),
+        );
+      }
+    } finally {
+      setBulkActionLoading(false);
+    }
+  };
+
+  const handleSingleAgentStatusChange = async (
+    agentLoginId: string,
+    newStatus: string,
+  ) => {
+    if (!canChangeUserStatus) {
+      toast.error("You do not have permission to change agent status.");
+      setActionMenuPortal(null);
+      return;
+    }
+    const newState: "READY" | "NOT_READY" =
+      newStatus === "READY" ? "READY" : "NOT_READY";
+    const data = getFinesseUserData();
+    const teamId = getEffectiveTeamId(data);
+    if (teamId == null) {
+      toast.error("Team not available.");
+      setActionMenuPortal(null);
+      return;
+    }
+    try {
+      await finesseSetState(teamId, agentLoginId, newState);
+      const label = newState === "READY" ? "Ready" : "Not Ready";
+      toast.success(`Status updated to ${label}.`);
+      setRefreshTrigger((t) => t + 1);
+    } catch (err: unknown) {
+      toast.error(
+        getFinesseApiErrorMessage(err, "Failed to update agent state."),
+      );
+    } finally {
+      setActionMenuPortal(null);
+    }
+  };
+
+  const handleForceSignOutAgent = useCallback(
+    async (agentLoginId: string) => {
+      if (!canForceSignOut) {
+        toast.error("You do not have permission to force sign-out.");
+        setActionMenuPortal(null);
+        return;
+      }
+      const stored = getFinesseUserData();
+      const supervisorFinesseUserId =
+        stored?.loginId ?? stored?.loginName ?? "";
+      const teamId = getEffectiveTeamId(stored);
+      if (!supervisorFinesseUserId.trim()) {
+        toast.error("Supervisor user not found.");
+        setActionMenuPortal(null);
+        return;
+      }
+      if (teamId == null) {
+        toast.error("Team not available.");
+        setActionMenuPortal(null);
+        return;
+      }
+      if (agentLoginId === supervisorFinesseUserId) {
+        toast.warn(
+          "You cannot force sign-out your own session from another agent row.",
+        );
+        setActionMenuPortal(null);
+        return;
+      }
+      try {
+        await finesseForceSignOut({
+          teamId,
+          finesseUserId: agentLoginId,
+          supervisorFinesseUserId,
+        });
+        toast.success("Agent signed out of Finesse.");
+        setRefreshTrigger((t) => t + 1);
+      } catch (err: unknown) {
+        toast.error(getFinesseApiErrorMessage(err, "Force sign-out failed."));
+      } finally {
+        setActionMenuPortal(null);
+      }
+    },
+    [canForceSignOut],
+  );
+
   return (
-    <FinesseAuthGate subTitle="Live Calls Agents Management" pageLabel="Live Calls Agents">
-    <React.Fragment>
-      <BreadcrumbItem mainTitle="Campaign Console" mainLink="/communications/campaign-console" subTitle="Campaign Console" />
+    <FinesseAuthGate
+      subTitle="Live Calls Agents Management"
+      pageLabel="Live Calls Agents"
+    >
+      <React.Fragment>
+        <BreadcrumbItem
+          mainTitle="Campaign Console"
+          mainLink="/communications/campaign-console"
+          subTitle="Campaign Console"
+        />
 
-      
-      <style>{`
+        <style>{`
         
      .campaign-info-bar {
-          background: linear-gradient(135deg, #667eea 0%, #667eea 100%);
+          background: linear-gradient(135deg, #0066CC 0%, #0066CC 100%);
           color: white;
           padding: 16px 32px;
           display: flex;
@@ -703,8 +787,8 @@ const LiveCallsAgentsManagement = () => {
 
         .search-box input:focus {
           outline: none;
-          border-color: #667eea;
-          box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+          border-color: #0066CC;
+          box-shadow: 0 0 0 3px rgba(0, 102, 204, 0.1);
         }
 
         .team-selector select {
@@ -722,12 +806,12 @@ const LiveCallsAgentsManagement = () => {
 
         .team-selector select:focus {
           outline: none;
-          border-color: #667eea;
-          box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+          border-color: #0066CC;
+          box-shadow: 0 0 0 3px rgba(0, 102, 204, 0.1);
         }
 
         .team-selector select:hover {
-          border-color: #667eea;
+          border-color: #0066CC;
         }
 
         .team-selector {
@@ -749,12 +833,12 @@ const LiveCallsAgentsManagement = () => {
 
         .team-selector select:focus {
           outline: none;
-          border-color: #667eea;
-          box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+          border-color: #0066CC;
+          box-shadow: 0 0 0 3px rgba(0, 102, 204, 0.1);
         }
 
         .team-selector select:hover {
-          border-color: #667eea;
+          border-color: #0066CC;
         }
 
         .search-icon {
@@ -792,8 +876,8 @@ const LiveCallsAgentsManagement = () => {
         }
 
         .status-selector:hover {
-          border-color: #667eea;
-          box-shadow: 0 2px 8px rgba(102, 126, 234, 0.15);
+          border-color: #0066CC;
+          box-shadow: 0 2px 8px rgba(0, 102, 204, 0.15);
         }
 
         .status-indicator {
@@ -858,8 +942,8 @@ const LiveCallsAgentsManagement = () => {
         }
 
         .dropdown-item.active {
-          background: #ede9fe;
-          color: #7c3aed;
+          background: #EEF2FF;
+          color: #0066CC;
         }
 
         .icon-button {
@@ -873,13 +957,13 @@ const LiveCallsAgentsManagement = () => {
           align-items: center;
           justify-content: center;
           transition: all 0.2s;
-          color: #64748b;
+          color: #6c757d;
         }
 
         .icon-button:hover {
-          border-color: #667eea;
-          color: #667eea;
-          box-shadow: 0 2px 8px rgba(102, 126, 234, 0.15);
+          border-color: #0066CC;
+          color: #0066CC;
+          box-shadow: 0 2px 8px rgba(0, 102, 204, 0.15);
         }
 
         .icon-button.refreshing {
@@ -898,7 +982,7 @@ const LiveCallsAgentsManagement = () => {
         .user-menu-button {
           width: 44px;
           height: 44px;
-          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+          background: linear-gradient(135deg, #0066CC 0%, #0052A3 100%);
           border: none;
           border-radius: 10px;
           cursor: pointer;
@@ -909,12 +993,12 @@ const LiveCallsAgentsManagement = () => {
           color: white;
           font-weight: 600;
           font-size: 14px;
-          box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+          box-shadow: 0 2px 8px rgba(0, 102, 204, 0.3);
         }
 
         .user-menu-button:hover {
           transform: translateY(-2px);
-          box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+          box-shadow: 0 4px 12px rgba(0, 102, 204, 0.4);
         }
 
         .btn {
@@ -931,14 +1015,14 @@ const LiveCallsAgentsManagement = () => {
         }
 
         .btn-primary {
-          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+          background: linear-gradient(135deg, #0066CC 0%, #0052A3 100%);
           color: white;
-          box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+          box-shadow: 0 4px 12px rgba(0, 102, 204, 0.4);
         }
 
         .btn-primary:hover {
           transform: translateY(-2px);
-          box-shadow: 0 6px 16px rgba(102, 126, 234, 0.5);
+          box-shadow: 0 6px 16px rgba(0, 102, 204, 0.5);
         }
 
        .btn-wrap-up {
@@ -976,12 +1060,12 @@ const LiveCallsAgentsManagement = () => {
         .page-title {
           font-size: 32px;
           font-weight: 700;
-          color: #1e293b;
+          color: #141414;
           margin-bottom: 8px;
         }
 
         .page-subtitle {
-          color: #64748b;
+          color: #6c757d;
           font-size: 16px;
         }
 
@@ -1010,7 +1094,7 @@ const LiveCallsAgentsManagement = () => {
           left: 0;
           right: 0;
           height: 4px;
-          background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+          background: linear-gradient(90deg, #0066CC 0%, #0052A3 100%);
           opacity: 0;
           transition: opacity 0.3s;
         }
@@ -1047,13 +1131,13 @@ const LiveCallsAgentsManagement = () => {
         .stat-value {
           font-size: 36px;
           font-weight: 700;
-          color: #1e293b;
+          color: #141414;
           margin-bottom: 4px;
           line-height: 1;
         }
 
         .stat-label {
-          color: #64748b;
+          color: #6c757d;
           font-size: 14px;
           font-weight: 500;
           margin-bottom: 12px;
@@ -1084,7 +1168,7 @@ const LiveCallsAgentsManagement = () => {
           padding-top: 16px;
           border-top: 1px solid #f1f5f9;
           font-size: 13px;
-          color: #64748b;
+          color: #6c757d;
           display: flex;
           align-items: center;
           gap: 6px;
@@ -1115,7 +1199,7 @@ const LiveCallsAgentsManagement = () => {
         .card-title {
           font-size: 20px;
           font-weight: 600;
-          color: #1e293b;
+          color: #141414;
         }
 
         .filters {
@@ -1145,7 +1229,7 @@ const LiveCallsAgentsManagement = () => {
         }
 
         .dropdown-toggle:hover {
-          border-color: #667eea;
+          border-color: #0066CC;
         }
 
         .checkbox-label {
@@ -1170,8 +1254,8 @@ const LiveCallsAgentsManagement = () => {
         }
 
         .checkbox.checked {
-          background: #667eea;
-          border-color: #667eea;
+          background: #0066CC;
+          border-color: #0066CC;
         }
 
         input[type="checkbox"].checkbox {
@@ -1217,7 +1301,7 @@ const LiveCallsAgentsManagement = () => {
           text-align: left;
           font-weight: 600;
           font-size: 13px;
-          color: #64748b;
+          color: #6c757d;
           text-transform: uppercase;
           letter-spacing: 0.5px;
           border-bottom: 1px solid #e5e7eb;
@@ -1233,7 +1317,7 @@ const LiveCallsAgentsManagement = () => {
         }
 
         tbody tr.selected {
-          background: #ede9fe;
+          background: #EEF2FF;
         }
 
         tbody td {
@@ -1252,7 +1336,7 @@ const LiveCallsAgentsManagement = () => {
           width: 40px;
           height: 40px;
           border-radius: 10px;
-          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+          background: linear-gradient(135deg, #0066CC 0%, #0052A3 100%);
           display: flex;
           align-items: center;
           justify-content: center;
@@ -1264,13 +1348,13 @@ const LiveCallsAgentsManagement = () => {
         .agent-details h4 {
           font-size: 15px;
           font-weight: 600;
-          color: #1e293b;
+          color: #141414;
           margin-bottom: 2px;
         }
 
         .agent-details p {
           font-size: 13px;
-          color: #64748b;
+          color: #6c757d;
         }
 
         .status-badge {
@@ -1294,12 +1378,12 @@ const LiveCallsAgentsManagement = () => {
           align-items: center;
           justify-content: center;
           transition: all 0.2s;
-          color: #64748b;
+          color: #6c757d;
           position: relative;
         }
 
         .action-btn:hover {
-          background: #667eea;
+          background: #0066CC;
           color: white;
         }
 
@@ -1373,8 +1457,8 @@ const LiveCallsAgentsManagement = () => {
         }
 
         .info-card {
-          background: linear-gradient(135deg, #667eea15 0%, #764ba215 100%);
-          border: 2px dashed #667eea40;
+          background: linear-gradient(135deg, rgba(0, 102, 204, 0.08) 0%, rgba(0, 82, 163, 0.08) 100%);
+          border: 2px dashed rgba(0, 102, 204, 0.25);
           border-radius: 12px;
           padding: 32px;
           margin-top: 24px;
@@ -1384,7 +1468,7 @@ const LiveCallsAgentsManagement = () => {
         .info-card-title {
           font-size: 18px;
           font-weight: 600;
-          color: #1e293b;
+          color: #141414;
           margin-bottom: 8px;
           display: flex;
           align-items: center;
@@ -1393,13 +1477,13 @@ const LiveCallsAgentsManagement = () => {
         }
 
         .info-card-text {
-          color: #64748b;
+          color: #6c757d;
           font-size: 14px;
           line-height: 1.6;
         }
 
         .bulk-action-bar {
-          background: linear-gradient(135deg, #667eea 0%, #667eea 100%);
+          background: linear-gradient(135deg, #0066CC 0%, #0066CC 100%);
           padding: 12px 24px;
           display: flex;
           align-items: center;
@@ -1435,7 +1519,7 @@ const LiveCallsAgentsManagement = () => {
 
         .bulk-action-btn:hover {
           background: white;
-          color: #667eea;
+          color: #0066CC;
         }
 
         .call-widget {
@@ -1463,7 +1547,7 @@ const LiveCallsAgentsManagement = () => {
         }
 
         .call-widget-header {
-          background: linear-gradient(135deg, #667eea 0%, #667eea 100%);
+          background: linear-gradient(135deg, #0066CC 0%, #0066CC 100%);
           color: white;
           padding: 20px;
           display: flex;
@@ -1483,7 +1567,7 @@ const LiveCallsAgentsManagement = () => {
         .call-timer {
           font-size: 32px;
           font-weight: 700;
-          color: #1e293b;
+          color: #141414;
           margin: 0;
         }
 
@@ -1521,12 +1605,12 @@ const LiveCallsAgentsManagement = () => {
         }
 
         .call-info-label {
-          color: #64748b;
+          color: #6c757d;
           font-weight: 500;
         }
 
         .call-info-value {
-          color: #1e293b;
+          color: #141414;
           font-weight: 600;
         }
 
@@ -1543,7 +1627,7 @@ const LiveCallsAgentsManagement = () => {
           border: none;
           border-radius: 12px;
           background: #f8fafc;
-          color: #64748b;
+          color: #6c757d;
           cursor: pointer;
           transition: all 0.2s;
           display: flex;
@@ -1561,7 +1645,7 @@ const LiveCallsAgentsManagement = () => {
         }
 
         .call-control-btn.active {
-          background: #667eea;
+          background: #0066CC;
           color: white;
         }
 
@@ -1646,13 +1730,13 @@ const LiveCallsAgentsManagement = () => {
           background: transparent;
           border-radius: 8px;
           cursor: pointer;
-          color: #64748b;
+          color: #6c757d;
           transition: all 0.2s;
         }
 
         .view-toggle button.active {
           background: white;
-          color: #667eea;
+          color: #0066CC;
           box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
         }
 
@@ -1693,83 +1777,96 @@ const LiveCallsAgentsManagement = () => {
         }
       `}</style>
 
-      <Row>
-        <Col md={12}>
-          <TopBar
-            searchQuery={searchQuery}
-            setSearchQuery={setSearchQuery}
-            selectedTeam={selectedTeam}
-            setSelectedTeam={setSelectedTeam}
-            teams={teams}
-            agentStatus={agentStatus}
-            setAgentStatus={setAgentStatus}
-            showStatusDropdown={showStatusDropdown}
-            setShowStatusDropdown={setShowStatusDropdown}
-            showUserMenu={showUserMenu}
-            setShowUserMenu={setShowUserMenu}
-            statusOptions={statusOptions}
-            handleLogout={handleLogout}
-            onStatusChange={handleStatusChange}
-            onTeamChange={teams.length > 0 ? handleTeamChange : undefined}
-          />
-        </Col>
-      </Row>
+        <Row>
+          <Col md={12}>
+            <TopBar
+              searchQuery={searchQuery}
+              setSearchQuery={setSearchQuery}
+              selectedTeam={selectedTeam}
+              setSelectedTeam={setSelectedTeam}
+              teams={teams}
+              agentStatus={agentStatus}
+              setAgentStatus={setAgentStatus}
+              showStatusDropdown={showStatusDropdown}
+              setShowStatusDropdown={setShowStatusDropdown}
+              showUserMenu={showUserMenu}
+              setShowUserMenu={setShowUserMenu}
+              statusOptions={statusOptions}
+              handleLogout={handleLogout}
+              onStatusChange={handleStatusChange}
+              onTeamChange={teams.length > 0 ? handleTeamChange : undefined}
+            />
+          </Col>
+        </Row>
 
-      {/* Page Header */}
-      <div className="page-header">
-            <h1 className="page-title">Campaign Console</h1>
-            <p className="page-subtitle">Monitor campaign status, availability, and manage team operations in real-time</p>
-          </div>
+        {/* Page Header */}
+        <div className="page-header">
+          <h1 className="page-title">Campaign Console</h1>
+          <p className="page-subtitle">
+            Monitor campaign status, availability, and manage team operations in
+            real-time
+          </p>
+        </div>
 
-          {/* Main Card */}
-          <div className="card">
-            {selectedAgents.length > 0 && (
-              <div className="bulk-action-bar">
-                <div className="bulk-action-text">
-                  {selectedAgents.length} agent(s) selected
-                </div>
-                <div className="bulk-action-buttons">
-                  <button 
-                    className="bulk-action-btn"
-                    type="button"
-                    disabled={bulkActionLoading || !canChangeUserStatus}
-                    title={canChangeUserStatus ? undefined : 'You do not have permission to change agent status'}
-                    onClick={() => {
-                      handleBulkStatusChange('READY').catch(() => undefined);
-                    }}
-                  >
-                    <CheckCircle size={16} />
-                    Set Ready
-                  </button>
-                  <button 
-                    className="bulk-action-btn"
-                    type="button"
-                    disabled={bulkActionLoading || !canChangeUserStatus}
-                    title={canChangeUserStatus ? undefined : 'You do not have permission to change agent status'}
-                    onClick={() => {
-                      handleBulkStatusChange('NOT_READY').catch(() => undefined);
-                    }}
-                  >
-                    <XCircle size={16} />
-                    Set Not Ready
-                  </button>
-                  <button 
-                    className="bulk-action-btn"
-                    onClick={() => setSelectedAgents([])}
-                  >
-                    <X size={16} />
-                    Clear
-                  </button>
-                </div>
+        {/* Main Card */}
+        <div className="card">
+          {selectedAgents.length > 0 && (
+            <div className="bulk-action-bar">
+              <div className="bulk-action-text">
+                {selectedAgents.length} agent(s) selected
               </div>
-            )}
-            <div className="card-header">
-              <div>
-                <h2 className="card-title">Active Agents ({filteredAgents.length})</h2>
+              <div className="bulk-action-buttons">
+                <button
+                  className="bulk-action-btn"
+                  type="button"
+                  disabled={bulkActionLoading || !canChangeUserStatus}
+                  title={
+                    canChangeUserStatus
+                      ? undefined
+                      : "You do not have permission to change agent status"
+                  }
+                  onClick={() => {
+                    handleBulkStatusChange("READY").catch(() => undefined);
+                  }}
+                >
+                  <CheckCircle size={16} />
+                  Set Ready
+                </button>
+                <button
+                  className="bulk-action-btn"
+                  type="button"
+                  disabled={bulkActionLoading || !canChangeUserStatus}
+                  title={
+                    canChangeUserStatus
+                      ? undefined
+                      : "You do not have permission to change agent status"
+                  }
+                  onClick={() => {
+                    handleBulkStatusChange("NOT_READY").catch(() => undefined);
+                  }}
+                >
+                  <XCircle size={16} />
+                  Set Not Ready
+                </button>
+                <button
+                  className="bulk-action-btn"
+                  onClick={() => setSelectedAgents([])}
+                >
+                  <X size={16} />
+                  Clear
+                </button>
               </div>
-              
-              <div className="filters">
-                {/* <div className="view-toggle">
+            </div>
+          )}
+          <div className="card-header">
+            <div>
+              <h2 className="card-title">
+                Active Agents ({filteredAgents.length})
+              </h2>
+            </div>
+
+            <div className="filters">
+              {/* <div className="view-toggle">
                   <button
                     className={viewMode === 'table' ? 'active' : ''}
                     onClick={() => setViewMode('table')}
@@ -1784,7 +1881,7 @@ const LiveCallsAgentsManagement = () => {
                   </button>
                 </div> */}
 
-                {/* <div className="dropdown">
+              {/* <div className="dropdown">
                   <select
                     className="dropdown-toggle"
                     value={filterStatus}
@@ -1799,113 +1896,135 @@ const LiveCallsAgentsManagement = () => {
                   </select>
                 </div> */}
 
-                <label className="checkbox-label">
-                  <div
-                    className={`checkbox ${includeLoggedOut ? 'checked' : ''}`}
-                    onClick={() => setIncludeLoggedOut(!includeLoggedOut)}
-                  >
-                    {includeLoggedOut && <CheckCircle size={14} color="white" />}
-                  </div>
-                  <span>Show Offline Agents</span>
-                </label>
-                
-                <button 
-                  className="icon-button"
-                  onClick={handleRefresh}
-                  title="Refresh Agent List"
-                  style={{ marginLeft: '8px' }}
+              <label className="checkbox-label">
+                <div
+                  className={`checkbox ${includeLoggedOut ? "checked" : ""}`}
+                  onClick={() => setIncludeLoggedOut(!includeLoggedOut)}
                 >
-                  <RefreshCw size={18} className={isRefreshing ? 'refreshing' : ''} />
-                </button>
-              </div>
+                  {includeLoggedOut && <CheckCircle size={14} color="white" />}
+                </div>
+                <span>Show Offline Agents</span>
+              </label>
+
+              <button
+                className="icon-button"
+                onClick={handleRefresh}
+                title="Refresh Agent List"
+                style={{ marginLeft: "8px" }}
+              >
+                <RefreshCw
+                  size={18}
+                  className={isRefreshing ? "refreshing" : ""}
+                />
+              </button>
             </div>
+          </div>
 
-            {teamDataLoading && (
+          {teamDataLoading && (
+            <div className="info-card" style={{ marginTop: 0 }}>
+              <div className="info-card-title">
+                <RefreshCw
+                  size={20}
+                  className="refreshing"
+                  style={{ animation: "spin 1s linear infinite" }}
+                />
+                Loading team agentsâ€¦
+              </div>
+              <p className="info-card-text">
+                Fetching agents for the selected team.
+              </p>
+            </div>
+          )}
+
+          {!teamDataLoading && teamDataError && (
+            <div
+              className="info-card"
+              style={{ marginTop: 0, borderColor: "#fecaca" }}
+            >
+              <div className="info-card-title" style={{ color: "#dc2626" }}>
+                <AlertCircle size={20} />
+                Unable to load team
+              </div>
+              <p className="info-card-text">{teamDataError}</p>
+            </div>
+          )}
+
+          {teamDataAvailable && !teamData?.users?.length && (
+            <div className="info-card" style={{ marginTop: 0 }}>
+              <div className="info-card-title">
+                <AlertCircle size={20} color="#0066CC" />
+                No agents in this team
+              </div>
+              <p className="info-card-text">
+                The selected team has no users. Choose another team or try again
+                later.
+              </p>
+            </div>
+          )}
+
+          {teamDataAvailable &&
+            (teamData?.users?.length ?? 0) > 0 &&
+            teamUsersForDisplay.length === 0 &&
+            !includeLoggedOut && (
               <div className="info-card" style={{ marginTop: 0 }}>
                 <div className="info-card-title">
-                  <RefreshCw size={20} className="refreshing" style={{ animation: 'spin 1s linear infinite' }} />
-                  Loading team agents…
+                  <AlertCircle size={20} color="#0066CC" />
+                  All agents are offline
                 </div>
-                <p className="info-card-text">Fetching agents for the selected team.</p>
+                <p className="info-card-text">
+                  Enable &quot;Include logged out&quot; above to see offline
+                  agents.
+                </p>
               </div>
             )}
 
-            {!teamDataLoading && teamDataError && (
-              <div className="info-card" style={{ marginTop: 0, borderColor: '#fecaca' }}>
-                <div className="info-card-title" style={{ color: '#dc2626' }}>
-                  <AlertCircle size={20} />
-                  Unable to load team
-                </div>
-                <p className="info-card-text">{teamDataError}</p>
-              </div>
-            )}
-
-            {teamDataAvailable && !teamData?.users?.length && (
-              <div className="info-card" style={{ marginTop: 0 }}>
-                <div className="info-card-title">
-                  <AlertCircle size={20} color="#667eea" />
-                  No agents in this team
-                </div>
-                <p className="info-card-text">The selected team has no users. Choose another team or try again later.</p>
-              </div>
-            )}
-
-            {teamDataAvailable &&
-              (teamData?.users?.length ?? 0) > 0 &&
-              teamUsersForDisplay.length === 0 &&
-              !includeLoggedOut && (
-                <div className="info-card" style={{ marginTop: 0 }}>
-                  <div className="info-card-title">
-                    <AlertCircle size={20} color="#667eea" />
-                    All agents are offline
-                  </div>
-                  <p className="info-card-text">
-                    Enable &quot;Include logged out&quot; above to see offline agents.
-                  </p>
-                </div>
-              )}
-
-            {teamDataAvailable && teamUsersForDisplay.length > 0 && (
+          {teamDataAvailable && teamUsersForDisplay.length > 0 && (
             <div className="table-container">
               <table>
                 <thead>
                   <tr>
-                    <th style={{ width: '50px' }}>
+                    <th style={{ width: "50px" }}>
                       <div className="checkbox-wrap">
                         <input
                           type="checkbox"
-                          className={`checkbox ${selectedAgents.length === filteredAgents.length && filteredAgents.length > 0 ? 'checked' : ''}`}
+                          className={`checkbox ${selectedAgents.length === filteredAgents.length && filteredAgents.length > 0 ? "checked" : ""}`}
                           checked={
-                            selectedAgents.length === filteredAgents.length && filteredAgents.length > 0
+                            selectedAgents.length === filteredAgents.length &&
+                            filteredAgents.length > 0
                           }
                           onChange={handleSelectAll}
                           aria-label="Select all agents"
                         />
-                        {selectedAgents.length === filteredAgents.length && filteredAgents.length > 0 && (
-                          <span className="checkbox-check-overlay">
-                            <CheckCircle size={14} color="white" />
-                          </span>
-                        )}
+                        {selectedAgents.length === filteredAgents.length &&
+                          filteredAgents.length > 0 && (
+                            <span className="checkbox-check-overlay">
+                              <CheckCircle size={14} color="white" />
+                            </span>
+                          )}
                       </div>
                     </th>
                     <th>Agent</th>
                     <th>Status</th>
-                    <th >Duration</th>
+                    <th>Duration</th>
                     <th>Extension</th>
-                    <th style={{ width: '80px', textAlign: 'center' }}>Actions</th>
+                    <th style={{ width: "80px", textAlign: "center" }}>
+                      Actions
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
                   {filteredAgents.map((agent) => (
                     <tr
                       key={agent.id}
-                      className={selectedAgents.includes(agent.id) ? 'selected' : ''}
+                      className={
+                        selectedAgents.includes(agent.id) ? "selected" : ""
+                      }
                     >
                       <td>
                         <div className="checkbox-wrap">
                           <input
                             type="checkbox"
-                            className={`checkbox ${selectedAgents.includes(agent.id) ? 'checked' : ''}`}
+                            className={`checkbox ${selectedAgents.includes(agent.id) ? "checked" : ""}`}
                             checked={selectedAgents.includes(agent.id)}
                             onChange={() => handleSelectAgent(agent.id)}
                             aria-label={`Select ${agent.name}`}
@@ -1929,29 +2048,42 @@ const LiveCallsAgentsManagement = () => {
                           className="status-badge"
                           style={{
                             background: `${agent.stateColor}20`,
-                            color: agent.stateColor
+                            color: agent.stateColor,
                           }}
                         >
                           <span
                             style={{
-                              width: '6px',
-                              height: '6px',
-                              borderRadius: '50%',
-                              background: agent.stateColor
+                              width: "6px",
+                              height: "6px",
+                              borderRadius: "50%",
+                              background: agent.stateColor,
                             }}
                           />
-                          {agent.state}{agent.label ? ` (${agent.label})` : ''}
+                          {agent.state}
+                          {agent.label ? ` (${agent.label})` : ""}
                         </span>
                       </td>
                       <td>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                          <Clock size={16} color="#64748b" />
+                        <div
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "6px",
+                          }}
+                        >
+                          <Clock size={16} color="#6c757d" />
                           {agent.timeInState}
                         </div>
                       </td>
                       <td>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                          <Phone size={16} color="#64748b" />
+                        <div
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "6px",
+                          }}
+                        >
+                          <Phone size={16} color="#6c757d" />
                           {agent.extension}
                         </div>
                       </td>
@@ -1973,13 +2105,13 @@ const LiveCallsAgentsManagement = () => {
                 </tbody>
               </table>
             </div>
-            )}
-            
-            {/* Info Card when showing few agents (only when team data is loaded) */}
-            {/* {teamDataAvailable && filteredAgents.length < 3 && (
+          )}
+
+          {/* Info Card when showing few agents (only when team data is loaded) */}
+          {/* {teamDataAvailable && filteredAgents.length < 3 && (
               <div className="info-card">
                 <div className="info-card-title">
-                  <AlertCircle size={20} color="#667eea" />
+                  <AlertCircle size={20} color="#0066CC" />
                   Limited Agent List
                 </div>
                 <p className="info-card-text">
@@ -1989,90 +2121,106 @@ const LiveCallsAgentsManagement = () => {
                 </p>
               </div>
             )} */}
-          </div>
+        </div>
 
-      {typeof document !== 'undefined' &&
-        actionMenuPortal &&
-        createPortal(
-          <div
-            data-campaign-console-action-menu
-            className="action-menu action-menu--fixed-portal"
-            style={{
-              position: 'fixed',
-              top: actionMenuPortal.top,
-              left: actionMenuPortal.left,
-              maxHeight: actionMenuPortal.maxHeight,
-              overflowY: 'auto',
-              zIndex: 100050,
-              minWidth: 180,
-            }}
-            role="menu"
-          >
-            <button
-              type="button"
-              className="action-menu-item"
-              disabled={!canChangeUserStatus}
-              title={canChangeUserStatus ? undefined : 'You do not have permission to change agent status'}
-              onClick={(e) => {
-                e.stopPropagation();
-                if (!canChangeUserStatus) return;
-                const a = actionMenuPortal.agent;
-                if (a.state === 'OFFLINE') {
-                  toast.warn('Cannot change status of offline agents');
-                  setActionMenuPortal(null);
-                } else {
-                  handleSingleAgentStatusChange(a.loginId, 'READY').catch(() => undefined);
+        {typeof document !== "undefined" &&
+          actionMenuPortal &&
+          createPortal(
+            <div
+              data-campaign-console-action-menu
+              className="action-menu action-menu--fixed-portal"
+              style={{
+                position: "fixed",
+                top: actionMenuPortal.top,
+                left: actionMenuPortal.left,
+                maxHeight: actionMenuPortal.maxHeight,
+                overflowY: "auto",
+                zIndex: 100050,
+                minWidth: 180,
+              }}
+              role="menu"
+            >
+              <button
+                type="button"
+                className="action-menu-item"
+                disabled={!canChangeUserStatus}
+                title={
+                  canChangeUserStatus
+                    ? undefined
+                    : "You do not have permission to change agent status"
                 }
-              }}
-            >
-              <CheckCircle size={16} color="#10b981" />
-              <span>Ready</span>
-            </button>
-            <button
-              type="button"
-              className="action-menu-item"
-              disabled={!canChangeUserStatus}
-              title={canChangeUserStatus ? undefined : 'You do not have permission to change agent status'}
-              onClick={(e) => {
-                e.stopPropagation();
-                if (!canChangeUserStatus) return;
-                const a = actionMenuPortal.agent;
-                if (a.state === 'OFFLINE') {
-                  toast.warn('Cannot change status of offline agents');
-                  setActionMenuPortal(null);
-                } else {
-                  handleSingleAgentStatusChange(a.loginId, 'NOT_READY').catch(() => undefined);
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (!canChangeUserStatus) return;
+                  const a = actionMenuPortal.agent;
+                  if (a.state === "OFFLINE") {
+                    toast.warn("Cannot change status of offline agents");
+                    setActionMenuPortal(null);
+                  } else {
+                    handleSingleAgentStatusChange(a.loginId, "READY").catch(
+                      () => undefined,
+                    );
+                  }
+                }}
+              >
+                <CheckCircle size={16} color="#10b981" />
+                <span>Ready</span>
+              </button>
+              <button
+                type="button"
+                className="action-menu-item"
+                disabled={!canChangeUserStatus}
+                title={
+                  canChangeUserStatus
+                    ? undefined
+                    : "You do not have permission to change agent status"
                 }
-              }}
-            >
-              <XCircle size={16} color="#ef4444" />
-              <span>Not Ready</span>
-            </button>
-            <button
-              type="button"
-              className="action-menu-item danger"
-              disabled={!canForceSignOut}
-              title={canForceSignOut ? undefined : 'You do not have permission to force sign-out'}
-              onClick={(e) => {
-                e.stopPropagation();
-                if (!canForceSignOut) return;
-                handleForceSignOutAgent(actionMenuPortal.agent.loginId).catch(() => undefined);
-              }}
-            >
-              <LogOut size={16} />
-              <span>Force sign out</span>
-            </button>
-          </div>,
-          document.body,
-        )}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (!canChangeUserStatus) return;
+                  const a = actionMenuPortal.agent;
+                  if (a.state === "OFFLINE") {
+                    toast.warn("Cannot change status of offline agents");
+                    setActionMenuPortal(null);
+                  } else {
+                    handleSingleAgentStatusChange(a.loginId, "NOT_READY").catch(
+                      () => undefined,
+                    );
+                  }
+                }}
+              >
+                <XCircle size={16} color="#ef4444" />
+                <span>Not Ready</span>
+              </button>
+              <button
+                type="button"
+                className="action-menu-item danger"
+                disabled={!canForceSignOut}
+                title={
+                  canForceSignOut
+                    ? undefined
+                    : "You do not have permission to force sign-out"
+                }
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (!canForceSignOut) return;
+                  handleForceSignOutAgent(actionMenuPortal.agent.loginId).catch(
+                    () => undefined,
+                  );
+                }}
+              >
+                <LogOut size={16} />
+                <span>Force sign out</span>
+              </button>
+            </div>,
+            document.body,
+          )}
 
-      {/* Call Widget — Finesse preview (campaign) dialogs */}
-      <CallWidget {...callWidgetProps} />
+        {/* Call Widget â€” Finesse preview (campaign) dialogs */}
+        <CallWidget {...callWidgetProps} />
 
-      <WrapUpModal {...wrapUpModalProps} />
-  
-
-    </React.Fragment>
+        <WrapUpModal {...wrapUpModalProps} />
+      </React.Fragment>
     </FinesseAuthGate>
   );
 };

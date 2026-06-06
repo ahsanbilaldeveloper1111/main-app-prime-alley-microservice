@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { X, Minimize2 } from 'lucide-react';
 
 export interface WrapUpReasonOption {
@@ -162,7 +162,7 @@ const WrapUpModal: React.FC<WrapUpModalProps> = ({ isOpen, onClose, onSubmit, on
         .modal-title {
           font-size: 20px;
           font-weight: 600;
-          color: #1e293b;
+          color: #141414;
         }
 
         .modal-actions {
@@ -181,7 +181,7 @@ const WrapUpModal: React.FC<WrapUpModalProps> = ({ isOpen, onClose, onSubmit, on
           align-items: center;
           justify-content: center;
           transition: all 0.2s;
-          color: #64748b;
+          color: #6c757d;
         }
 
         .icon-btn:hover {
@@ -203,7 +203,7 @@ const WrapUpModal: React.FC<WrapUpModalProps> = ({ isOpen, onClose, onSubmit, on
           display: block;
           font-size: 14px;
           font-weight: 600;
-          color: #1e293b;
+          color: #141414;
           margin-bottom: 8px;
         }
 
@@ -222,7 +222,7 @@ const WrapUpModal: React.FC<WrapUpModalProps> = ({ isOpen, onClose, onSubmit, on
           border: 2px solid #e5e7eb;
           border-radius: 10px;
           font-size: 14px;
-          color: #64748b;
+          color: #6c757d;
           cursor: pointer;
           transition: all 0.2s;
           background: white;
@@ -236,8 +236,8 @@ const WrapUpModal: React.FC<WrapUpModalProps> = ({ isOpen, onClose, onSubmit, on
         }
 
         .dropdown-select.active {
-          border-color: #667eea;
-          box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+          border-color: #0066CC;
+          box-shadow: 0 0 0 3px rgba(0, 102, 204, 0.1);
         }
 
         .dropdown-icon {
@@ -296,8 +296,8 @@ const WrapUpModal: React.FC<WrapUpModalProps> = ({ isOpen, onClose, onSubmit, on
         }
 
         .dropdown-option.selected {
-          background: #ede9fe;
-          color: #7c3aed;
+          background: #EEF2FF;
+          color: #0066CC;
           font-weight: 600;
         }
 
@@ -313,8 +313,8 @@ const WrapUpModal: React.FC<WrapUpModalProps> = ({ isOpen, onClose, onSubmit, on
         }
 
         .dropdown-option.selected .checkbox-custom {
-          background: #7c3aed;
-          border-color: #7c3aed;
+          background: #0066CC;
+          border-color: #0066CC;
         }
 
         .checkbox-check {
@@ -351,7 +351,7 @@ const WrapUpModal: React.FC<WrapUpModalProps> = ({ isOpen, onClose, onSubmit, on
         .wrap-up-checkbox-option input[type="checkbox"] {
           width: 18px;
           height: 18px;
-          accent-color: #7c3aed;
+          accent-color: #0066CC;
           cursor: pointer;
         }
 
@@ -362,7 +362,7 @@ const WrapUpModal: React.FC<WrapUpModalProps> = ({ isOpen, onClose, onSubmit, on
 
         .wrap-up-checkbox-label {
           font-weight: 500;
-          color: #1e293b;
+          color: #141414;
         }
 
         .variables-section {
@@ -372,7 +372,7 @@ const WrapUpModal: React.FC<WrapUpModalProps> = ({ isOpen, onClose, onSubmit, on
         .variables-header {
           font-size: 14px;
           font-weight: 600;
-          color: #1e293b;
+          color: #141414;
           margin-bottom: 12px;
         }
 
@@ -401,7 +401,7 @@ const WrapUpModal: React.FC<WrapUpModalProps> = ({ isOpen, onClose, onSubmit, on
           text-align: left;
           font-size: 12px;
           font-weight: 600;
-          color: #64748b;
+          color: #6c757d;
           text-transform: uppercase;
           letter-spacing: 0.5px;
           border-bottom: 1px solid #e5e7eb;
@@ -433,8 +433,8 @@ const WrapUpModal: React.FC<WrapUpModalProps> = ({ isOpen, onClose, onSubmit, on
 
         .variable-input:focus {
           outline: none;
-          border-color: #667eea;
-          box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+          border-color: #0066CC;
+          box-shadow: 0 0 0 3px rgba(0, 102, 204, 0.1);
         }
 
         .modal-footer {
@@ -526,13 +526,13 @@ const WrapUpModal: React.FC<WrapUpModalProps> = ({ isOpen, onClose, onSubmit, on
           </div>
 
           <div className="modal-body">
-            {/* Wrap Up Selection – checkboxes, multiple selection, labels from API */}
+            {/* Wrap Up Selection â€“ checkboxes, multiple selection, labels from API */}
             <div className="form-group">
               <label className="form-label">
                 Wrap Up <span className="required">*</span>
               </label>
               {maxReasons > 0 && (
-                <div className="wrap-up-hint" style={{ fontSize: 12, color: '#64748b', marginBottom: 8 }}>
+                <div className="wrap-up-hint" style={{ fontSize: 12, color: '#6c757d', marginBottom: 8 }}>
                   Maximum of {maxReasons} reasons can be selected.
                 </div>
               )}
@@ -551,7 +551,7 @@ const WrapUpModal: React.FC<WrapUpModalProps> = ({ isOpen, onClose, onSubmit, on
               </div>
             </div>
 
-            {/* Call Variables – from API config when provided */}
+            {/* Call Variables â€“ from API config when provided */}
             {variableKeys.length > 0 && (
               <div className="variables-section">
                 <div className="variables-header">Call Variables</div>
@@ -679,8 +679,8 @@ const WrapUpExample = () => {
         borderRadius: '12px',
         border: '2px solid #e5e7eb'
       }}>
-        <h3 style={{ marginBottom: '12px', color: '#1e293b' }}>Integration Instructions:</h3>
-        <ol style={{ color: '#64748b', lineHeight: '1.8' }}>
+        <h3 style={{ marginBottom: '12px', color: '#141414' }}>Integration Instructions:</h3>
+        <ol style={{ color: '#6c757d', lineHeight: '1.8' }}>
           <li>Copy the <code>WrapUpModal</code> component</li>
           <li>Import it in your campaigns page</li>
           <li>Add state: <code>const [isWrapUpOpen, setIsWrapUpOpen] = useState(false)</code></li>

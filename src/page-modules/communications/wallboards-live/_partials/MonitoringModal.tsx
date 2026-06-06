@@ -1,6 +1,6 @@
 import React from 'react'
 import { Button, Modal } from 'react-bootstrap'
-import { FiX } from 'react-icons/fi'
+import { Lock, X } from 'lucide-react'
 import { ShowPopup, ActiveMonitoring } from '@components/live-calls/utils/types'
 
 interface MonitoringModalProps {
@@ -269,9 +269,7 @@ function MonitoringModalBody({
   if (!hasMonitoringPermissions) {
     return (
       <div className="text-center text-muted">
-        <i className="material-icons-two-tone mb-2" style={{ fontSize: '2rem' }}>
-          lock
-        </i>
+        <Lock size={32} className="mb-2" aria-hidden />
         <p>You do not have permission to monitor calls.</p>
         <small>Contact your administrator to request monitoring permissions.</small>
       </div>
@@ -372,7 +370,12 @@ const MonitoringModal: React.FC<Readonly<MonitoringModalProps>> = ({
             <span className="small">Agent - {showPopup?.dn} - Monitoring</span>
           </div>
         </Modal.Title>
-        <FiX size={20} onClick={onHide} style={{ cursor: 'pointer' }} />
+        <X
+          size={20}
+          onClick={onHide}
+          style={{ cursor: 'pointer' }}
+          aria-label="Close"
+        />
       </Modal.Header>
       <Modal.Body>
         <MonitoringModalBody

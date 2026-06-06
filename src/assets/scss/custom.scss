@@ -607,8 +607,7 @@ body:has(.prospects-scrollable-content) {
     flex-shrink: 0 !important;
   }
 
-  .gt-toolbar-actions .btn.gt-toolbar-btn,
-  .gt-filter-pills-right-actions .gt-toolbar-btn {
+  .gt-toolbar-actions .btn.gt-toolbar-btn {
     display: inline-flex !important;
     align-items: center !important;
     gap: 6px !important;
@@ -635,19 +634,24 @@ body:has(.prospects-scrollable-content) {
     color: #ffffff !important;
   }
 
-  .gt-filter-pills-right-actions .gt-apply-filters-btn,
-  .gt-filter-pills-right-actions [class$='-apply-filters-btn'] {
-    background: #0066CC !important;
-    color: #ffffff !important;
-    border-color: #0066CC !important;
+  .gt-filter-pills .gt-filter-pill-add.gt-apply-filters-btn,
+  .gt-filter-pills .gt-filter-pill-add[class$='-apply-filters-btn'] {
+    color: #0066CC !important;
+    background: transparent !important;
+    border: none !important;
     font-weight: 500 !important;
   }
 
-  .gt-filter-pills-right-actions .gt-apply-filters-btn:hover:not(:disabled),
-  .gt-filter-pills-right-actions [class$='-apply-filters-btn']:hover:not(:disabled) {
-    background: #0052A3 !important;
-    border-color: #0052A3 !important;
-    color: #ffffff !important;
+  .gt-filter-pills .gt-filter-pill-add.gt-apply-filters-btn:hover:not(:disabled),
+  .gt-filter-pills .gt-filter-pill-add[class$='-apply-filters-btn']:hover:not(:disabled) {
+    color: #0052A3 !important;
+    background: #f5f8fa !important;
+  }
+
+  .gt-filter-pills .gt-filter-pill-add.gt-apply-filters-btn:disabled,
+  .gt-filter-pills .gt-filter-pill-add[class$='-apply-filters-btn']:disabled {
+    color: #9ca3af !important;
+    background: transparent !important;
   }
 
   .prospects-scrollable-content {
