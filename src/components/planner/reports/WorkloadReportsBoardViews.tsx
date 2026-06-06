@@ -86,7 +86,7 @@ function resolveDonutStatusColor(statusName: string): string {
   const status = statusName.toLowerCase();
   if (status.includes("complete") || status.includes("done")) return "#22c55e";
   if (status.includes("progress")) return "#0066CC";
-  if (status.includes("pending")) return "#ef4444";
+  if (status.includes("pending")) return "#94a3b8";
   if (status.includes("todo") || status.includes("to_do")) return "#94a3b8";
   return "#94a3b8";
 }
@@ -127,9 +127,9 @@ export function ReportsTaskDistributionDonut({
   const centerDisplay = centerValue ?? total;
 
   return (
-    <div className="reports-status-donut">
+    <div className="reports-status-donut" style={{ flexDirection: "column", alignItems: "center" }}>
       <div className="reports-status-donut__chart">
-        <ResponsiveContainer width="100%" height={220}>
+        <ResponsiveContainer width="100%" height={280}>
           <PieChart>
             <Pie
               data={data}
@@ -151,7 +151,7 @@ export function ReportsTaskDistributionDonut({
           <div className="reports-status-donut__center-label">{centerLabel}</div>
         </div>
       </div>
-      <ul className="reports-status-donut__legend">
+      <ul className="reports-status-donut__legend" style={{ display: "flex", flexDirection: "row", justifyContent: "center", gap: "1rem" }}>
         {data.map((entry) => (
           <li key={entry.name}>
             <span className="reports-status-donut__dot" style={{ backgroundColor: entry.color }} />

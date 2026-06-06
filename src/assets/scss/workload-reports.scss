@@ -1454,6 +1454,7 @@
     display: flex;
     gap: 1rem;
     align-items: center;
+    justify-content: center;
     flex-wrap: wrap;
   }
 
@@ -1461,7 +1462,7 @@
     position: relative;
     flex: 1;
     min-width: 12rem;
-    height: 220px;
+    height: 280px;
   }
 
   .reports-status-donut__center {
