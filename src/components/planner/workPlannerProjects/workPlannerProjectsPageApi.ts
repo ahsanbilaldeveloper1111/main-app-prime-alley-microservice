@@ -57,6 +57,8 @@ export type LoadProjectsFromApiArgs = {
   setStats: Dispatch<SetStateAction<ProjectStatsState>>;
   /** When false, skip applying results (unmounted or superseded request). */
   shouldApplyResults: () => boolean;
+  /** When true, clear the table loading state for this request generation. */
+  isActiveRequest: () => boolean;
 };
 
 type SuccessfulProjectsListPayload = {
@@ -137,9 +139,12 @@ export async function loadProjectsFromApi({
   setPagination,
   setStats,
   shouldApplyResults,
+  isActiveRequest,
 }: LoadProjectsFromApiArgs): Promise<void> {
   try {
-    setLoading(true);
+    if (isActiveRequest()) {
+      setLoading(true);
+    }
     const response = await listProjects(buildListProjectsParams(filters, pagination));
 
     if (!shouldApplyResults()) {
@@ -157,7 +162,7 @@ export async function loadProjectsFromApi({
       setProjects([]);
     }
   } finally {
-    if (shouldApplyResults()) {
+    if (isActiveRequest()) {
       setLoading(false);
     }
   }
