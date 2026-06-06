@@ -253,6 +253,21 @@ function resolveTeamMemberExtensionNumbers(
   return merged.length > 0 ? merged : undefined;
 }
 
+/** Team roster for grid/board display filters; falls back to viewer-only when roster is empty. */
+export function resolveWorkloadDisplayTeamExtensions(
+  rosterExtensions: readonly string[],
+  viewerExtension: string,
+): string[] | undefined {
+  if (rosterExtensions.length > 0) {
+    return [...rosterExtensions];
+  }
+  const trimmed = viewerExtension.trim();
+  if (trimmed) {
+    return [trimmed];
+  }
+  return undefined;
+}
+
 /**
  * Root / company admin (`isTeamOwner` on scope): no `extension_number` / `extension_numbers`.
  * Server loads all assignees with tasks in range from JWT.

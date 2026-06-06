@@ -51,6 +51,7 @@ import {
   fetchCompanyWorkloadRoster,
   mergeViewerWorkloadExtension,
   readWorkloadCompanyScopeFromSession,
+  resolveWorkloadDisplayTeamExtensions,
 } from "@page-modules/planner/workload/workloadTeamScope";
 import { WorkloadPlannerAlertStack } from "./workload/WorkloadPlannerSubviews";
 import { WorkloadPlannerDataViews } from "./workload/WorkloadPlannerDataViews";
@@ -460,18 +461,18 @@ const WorkloadPlannerPage: React.FC = () => {
     [appliedFilters, appliedRangeValid],
   );
 
+  const gridTeamExtensionNumbers = useMemo(
+    () => resolveWorkloadDisplayTeamExtensions(rosterExtensions, extension),
+    [rosterExtensions, extension],
+  );
+
   const displayGridData = useMemo(
     () =>
       resolveWorkloadGridDisplayData(effectiveGridData, {
         viewerExtension: extension,
         memberFilter: appliedFilters.memberFilter,
         rangeFallback: gridRangeFallback,
-        teamExtensionNumbers:
-          rosterExtensions.length > 0
-            ? rosterExtensions
-            : extension.trim()
-              ? [extension.trim()]
-              : undefined,
+        teamExtensionNumbers: gridTeamExtensionNumbers,
         companyExtensionAllowlist,
       }),
     [
@@ -479,7 +480,7 @@ const WorkloadPlannerPage: React.FC = () => {
       extension,
       appliedFilters.memberFilter,
       gridRangeFallback,
-      rosterExtensions,
+      gridTeamExtensionNumbers,
       companyExtensionAllowlist,
     ],
   );
@@ -489,19 +490,14 @@ const WorkloadPlannerPage: React.FC = () => {
       resolveWorkloadBoardDisplayData(effectiveBoardData, {
         viewerExtension: extension,
         memberFilter: appliedFilters.memberFilter,
-        teamExtensionNumbers:
-          rosterExtensions.length > 0
-            ? rosterExtensions
-            : extension.trim()
-              ? [extension.trim()]
-              : undefined,
+        teamExtensionNumbers: gridTeamExtensionNumbers,
         companyExtensionAllowlist,
       }),
     [
       effectiveBoardData,
       extension,
       appliedFilters.memberFilter,
-      rosterExtensions,
+      gridTeamExtensionNumbers,
       companyExtensionAllowlist,
     ],
   );
