@@ -64,4 +64,5 @@ export type WorkPlannerProjectsPageViewModel = {
   confirmDelete: () => Promise<void>;
   applyOwnerExtensionsRef: MutableRefObject<(extensions: string[]) => void>;
   clearOwnerFilterRef: MutableRefObject<() => void>;
+  refreshProjectsList: () => Promise<void>;
 };

@@ -225,7 +225,20 @@ function buildWorkloadQueryBase(input: BuildWorkloadQueryInput): WorkloadQueryBa
   return base;
 }
 
-/** Non-root grid/board: `extension_numbers[]` from team roster (not only the viewer). */
+/** Always include the viewer on non-root workload scope (solo user or team roster). */
+export function mergeViewerWorkloadExtension(
+  teamExtensions: readonly string[],
+  viewerExtension: string,
+): string[] {
+  const merged = new Set(
+    teamExtensions.map((ext) => ext.trim()).filter(Boolean),
+  );
+  const viewer = viewerExtension.trim();
+  if (viewer) merged.add(viewer);
+  return [...merged];
+}
+
+/** Non-root grid/board: team roster plus the viewer's own extension (always). */
 function resolveTeamMemberExtensionNumbers(
   input: BuildWorkloadQueryInput,
 ): string[] | undefined {
@@ -233,11 +246,24 @@ function resolveTeamMemberExtensionNumbers(
     const single = input.memberFilter.trim();
     return single ? [single] : undefined;
   }
-  const roster = input.teamScope.teamExtensions
-    .map((ext) => ext.trim())
-    .filter(Boolean);
-  if (roster.length > 0) {
-    return [...new Set(roster)];
+  const merged = mergeViewerWorkloadExtension(
+    input.teamScope.teamExtensions,
+    input.viewerExtension,
+  );
+  return merged.length > 0 ? merged : undefined;
+}
+
+/** Team roster for grid/board display filters; falls back to viewer-only when roster is empty. */
+export function resolveWorkloadDisplayTeamExtensions(
+  rosterExtensions: readonly string[],
+  viewerExtension: string,
+): string[] | undefined {
+  if (rosterExtensions.length > 0) {
+    return [...rosterExtensions];
+  }
+  const trimmed = viewerExtension.trim();
+  if (trimmed) {
+    return [trimmed];
   }
   return undefined;
 }
@@ -260,7 +286,7 @@ export function buildWorkloadSummaryQuery(input: BuildWorkloadQueryInput): Workl
 
 /**
  * Root / company admin: no extension params on grid/board/summary.
- * Non-root: `extension_numbers[]` (e.g. `["536"]` or full team roster).
+ * Non-root: `extension_numbers[]` (team roster + viewer's own extension).
  */
 export function buildWorkloadGridBoardQuery(input: BuildWorkloadQueryInput): WorkloadQueryBase {
   const base = buildWorkloadQueryBase(input);

@@ -18,8 +18,6 @@ import {
   formatDateGlobal,
   formatDateTimeGlobal,
 } from "@utils/Helper";
-import { getProject } from "@utils/tasks";
-import { WORK_PLANNER_PROJECT_DETAIL_RELATIONS } from "@planner/workPlannerProjectRelations";
 
 ﻿export interface ApiProject {
   id: number;
@@ -359,6 +357,78 @@ function collectWatcherExtensionNumbers(api: Record<string, unknown>): string[] 
   return out;
 }
 
+function normalizeProjectStatusesFromApi(raw: unknown): Array<Record<string, unknown>> {
+  if (!Array.isArray(raw)) {
+    return [];
+  }
+  return raw.filter((s): s is Record<string, unknown> => s != null && typeof s === "object");
+}
+
+function extractTasksArrayFromApi(value: unknown): Record<string, unknown>[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return value.filter((t): t is Record<string, unknown> => t !== null && typeof t === "object");
+}
+
+function parentTaskIdFromApi(raw: Record<string, unknown>): string {
+  const parent = raw.parent_task_id;
+  if (parent == null) {
+    return "";
+  }
+  return stringifyApiScalar(parent).trim();
+}
+
+/** Builds root task rows (+ nested `children`) from flat list `tasks[]` on the projects list API. */
+function buildPlannerTaskTreeFromList(
+  rawTasks: Record<string, unknown>[],
+  projectId: string,
+  statuses: Array<Record<string, unknown>>,
+): Task[] {
+  if (rawTasks.length === 0) {
+    return [];
+  }
+
+  const byId = new Map<string, Task>();
+  for (const raw of rawTasks) {
+    const id = stringifyApiScalar(raw.id);
+    if (id === "") {
+      continue;
+    }
+    byId.set(id, mapApiTaskToPlannerTask(raw, projectId, statuses));
+  }
+
+  const nestedChildIds = new Set<string>();
+  for (const raw of rawTasks) {
+    const id = stringifyApiScalar(raw.id);
+    const parentId = parentTaskIdFromApi(raw);
+    if (parentId === "" || parentId === "0") {
+      continue;
+    }
+    const parent = byId.get(parentId);
+    const child = byId.get(id);
+    if (parent == null || child == null) {
+      continue;
+    }
+    const children = [...(parent.children ?? []), child];
+    byId.set(parentId, { ...parent, children });
+    nestedChildIds.add(id);
+  }
+
+  return [...byId.values()].filter((task) => !nestedChildIds.has(task.id));
+}
+
+/** Maps embedded list payload (`project.apiData.tasks`) for expanded project rows — no extra API call. */
+export function resolveExpandedProjectTasksFromProject(project: Project): Task[] {
+  const api = project.apiData;
+  if (!api) {
+    return [];
+  }
+  const statuses = normalizeProjectStatusesFromApi(api.statuses);
+  const rawTasks = extractTasksArrayFromApi(api.tasks);
+  return buildPlannerTaskTreeFromList(rawTasks, project.id, statuses);
+}
+
 /** Distinct assignee extensions from API, or 1 when only a legacy display name exists. */
 export function countAssignees(
   extensionNumbers: string[] | undefined,
@@ -455,17 +525,4 @@ export function mapApiTaskToPlannerTask(
     watcherExtensionNumbers:
       watcherExtensionNumbers.length > 0 ? watcherExtensionNumbers : undefined,
   };
-}
-
-export async function fetchTasksForExpandedProject(projectId: string): Promise<Task[]> {
-  const data = await getProject(projectId, Array.from(WORK_PLANNER_PROJECT_DETAIL_RELATIONS), {
-    sub_task_count: true,
-  });
-  if (!data || typeof data !== "object") return [];
-  const payload = data as { tasks?: unknown[]; statuses?: Array<Record<string, unknown>> };
-  const rawTasks = Array.isArray(payload.tasks) ? payload.tasks : [];
-  const statuses = Array.isArray(payload.statuses) ? payload.statuses : [];
-  return rawTasks
-    .filter((t): t is Record<string, unknown> => t !== null && typeof t === "object")
-    .map((t) => mapApiTaskToPlannerTask(t, projectId, statuses));
 }

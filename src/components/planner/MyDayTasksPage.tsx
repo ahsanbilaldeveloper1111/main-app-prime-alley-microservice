@@ -1185,11 +1185,6 @@ function useMyDayTasksPageController() {
     setShowEstimateModal(true);
   }, []);
 
-  const focusSuggestionsSearch = useCallback(() => {
-    suggestionsPanelRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-    globalThis.setTimeout(() => suggestionSearchRef.current?.focus(), 280);
-  }, []);
-
   const confirmEstimateAndAdd = useCallback(async () => {
     if (pendingEstimateTask == null) return;
     const parsed = Number.parseInt(estimateInput.trim(), 10);
@@ -1508,7 +1503,6 @@ function useMyDayTasksPageController() {
     refreshMyDayPage,
     toggleCarryOverSelection,
     handleOpenEstimateModal,
-    focusSuggestionsSearch,
     suggestionSearchRef,
     suggestionPriorityFilter,
     setSuggestionPriorityFilter,
@@ -1741,30 +1735,22 @@ function MyDayTodayTasksSection({ vm }: MyDayTasksPageViewProps) {
   const hasTasks = vm.activeTasks.length > 0;
   return (
     <div className="myday-table-card">
-      <div
+      <button
+        type="button"
+        onClick={() => hasTasks && setIsOpen(!isOpen)}
         style={{
           display: "flex",
           alignItems: "center",
           gap: 8,
+          width: "100%",
           marginBottom: 12,
-          flexWrap: "wrap",
+          background: "none",
+          border: "none",
+          cursor: hasTasks ? "pointer" : "default",
+          padding: 0,
+          fontFamily: "Lexend Deca, Helvetica, Arial, sans-serif",
         }}
       >
-        <button
-          type="button"
-          onClick={() => hasTasks && setIsOpen(!isOpen)}
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 8,
-            background: "none",
-            border: "none",
-            cursor: hasTasks ? "pointer" : "default",
-            padding: 0,
-            fontFamily: "Lexend Deca, Helvetica, Arial, sans-serif",
-            flex: 1,
-          }}
-        >
           <svg
             width="13"
             height="13"
@@ -1809,11 +1795,7 @@ function MyDayTodayTasksSection({ vm }: MyDayTasksPageViewProps) {
             </span>
           ) : null}
           <div style={{ flex: 1, height: 1, background: "#eaf0f6", marginLeft: 4 }} />
-        </button>
-        <Button variant="outline-primary" size="sm" onClick={vm.focusSuggestionsSearch}>
-          Browse suggestions
-        </Button>
-      </div>
+      </button>
       {isOpen ? (
         <>
           {showLoading ? (
@@ -1868,27 +1850,6 @@ function MyDayTodayTasksSection({ vm }: MyDayTasksPageViewProps) {
               >
                 Add tasks from the suggestions panel or create a new one
               </div>
-              <button
-                type="button"
-                onClick={vm.focusSuggestionsSearch}
-                style={{
-                  marginTop: 4,
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: 6,
-                  fontSize: 12,
-                  fontWeight: 500,
-                  color: "#fff",
-                  background: "#0066CC",
-                  border: "none",
-                  borderRadius: 7,
-                  padding: "7px 16px",
-                  cursor: "pointer",
-                  fontFamily: "Lexend Deca, Helvetica, Arial, sans-serif",
-                }}
-              >
-                + Browse Suggestions
-              </button>
             </div>
           ) : null}
           <MyDayTaskList tasks={vm.activeTasks} handlers={handlers} />

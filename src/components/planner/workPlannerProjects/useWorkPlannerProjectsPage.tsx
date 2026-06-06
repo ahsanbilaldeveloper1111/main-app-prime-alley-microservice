@@ -141,6 +141,7 @@ export function useWorkPlannerProjectsPage(): WorkPlannerProjectsPageViewModel {
   const sidebarDetailRequestRef = useRef(0);
 
   useEffect(() => {
+    mountedRef.current = true;
     return () => {
       mountedRef.current = false;
     };
@@ -162,7 +163,9 @@ export function useWorkPlannerProjectsPage(): WorkPlannerProjectsPageViewModel {
         setProjects,
         setPagination,
         setStats,
-        shouldApplyResults: () => mountedRef.current && listRequestGenRef.current === id,
+        shouldApplyResults: () =>
+          mountedRef.current && listRequestGenRef.current === id,
+        isActiveRequest: () => listRequestGenRef.current === id,
       });
     },
     [pagination.page, pagination.limit],
@@ -802,6 +805,10 @@ export function useWorkPlannerProjectsPage(): WorkPlannerProjectsPageViewModel {
     [router, sessionUserPhoneOrExtension, handleEditProject, handleDeleteProject],
   );
 
+  const refreshProjectsList = useCallback(async () => {
+    await fetchProjects(appliedFilters);
+  }, [fetchProjects, appliedFilters]);
+
   return {
     hierarchyDataExtensions,
     sessionPlannerProjectCrud,
@@ -856,5 +863,6 @@ export function useWorkPlannerProjectsPage(): WorkPlannerProjectsPageViewModel {
     confirmDelete,
     applyOwnerExtensionsRef,
     clearOwnerFilterRef,
+    refreshProjectsList,
   };
 }
