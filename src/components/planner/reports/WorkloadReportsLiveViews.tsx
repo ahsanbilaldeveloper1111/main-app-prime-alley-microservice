@@ -1,4 +1,5 @@
-import React from "react";
+import React, { useState } from "react";
+import ReactDOM from "react-dom";
 import { Badge, Col, Row } from "react-bootstrap";
 import type {
   LiveDashboardKpi,
@@ -30,6 +31,8 @@ export function ReportsLiveDashboardKpiRow({
 export function ReportsLiveTaskByMember({
   rows,
 }: Readonly<{ rows: LiveMemberRow[] }>) {
+  const [modal, setModal] = useState<{ type: string; member: string; tasks: any[] } | null>(null);
+
   if (rows.length === 0) {
     return (
       <ReportsEmptyState
@@ -40,6 +43,7 @@ export function ReportsLiveTaskByMember({
     );
   }
   return (
+    <>
     <div className="reports-live-task-by-member">
       {rows.map((row) => (
         <div key={row.key} className="reports-live-task-by-member__row">
@@ -63,12 +67,39 @@ export function ReportsLiveTaskByMember({
                 {row.totalTasks} tasks
               </span>
               {row.inProgressTasks > 0 ? (
-                <span className="reports-list-badge reports-list-badge--info">
+                <span
+                  className="reports-list-badge reports-list-badge--info"
+                  style={{ cursor: "pointer", textDecoration: "none" }}
+                  onMouseEnter={(e) => { e.currentTarget.style.textDecoration = "underline"; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.textDecoration = "none"; }}
+                  onClick={() => setModal({
+                    type: "in_progress",
+                    member: row.memberLabel,
+                    tasks: [
+                      { id: 1, title: "Fix login bug", project: "Auth Service", due: "Jun 1, 2026" },
+                      { id: 2, title: "Update API docs", project: "Dev Portal", due: "Jun 3, 2026" },
+                    ],
+                  })}
+                >
                   {row.inProgressTasks} in progress
                 </span>
               ) : null}
               {row.overdueTasks > 0 ? (
-                <span className="reports-list-badge reports-list-badge--critical">
+                <span
+                  className="reports-list-badge reports-list-badge--critical"
+                  style={{ cursor: "pointer", textDecoration: "none" }}
+                  onMouseEnter={(e) => { e.currentTarget.style.textDecoration = "underline"; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.textDecoration = "none"; }}
+                  onClick={() => setModal({
+                    type: "overdue",
+                    member: row.memberLabel,
+                    tasks: [
+                      { id: 1, title: "Q2 Report submission", project: "Finance", due: "May 28, 2026" },
+                      { id: 2, title: "Client feedback review", project: "CRM", due: "May 30, 2026" },
+                      { id: 3, title: "Deploy hotfix", project: "Infrastructure", due: "Jun 1, 2026" },
+                    ],
+                  })}
+                >
                   {row.overdueTasks} overdue
                 </span>
               ) : null}
@@ -77,6 +108,85 @@ export function ReportsLiveTaskByMember({
         </div>
       ))}
     </div>
+    {modal ? ReactDOM.createPortal(
+      <div style={{
+        position: "fixed",
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        zIndex: 9999,
+        background: "rgba(0,0,0,0.5)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+      }}
+        onClick={() => setModal(null)}
+      >
+        <div style={{
+          background: "#fff",
+          borderRadius: "8px",
+          width: "min(600px, 90vw)",
+          maxHeight: "80vh",
+          overflow: "hidden",
+          display: "flex",
+          flexDirection: "column",
+          boxShadow: "0 8px 32px rgba(0,0,0,0.18)",
+        }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div style={{
+            padding: "16px 20px", borderBottom: "1px solid #eaf0f6",
+            display: "flex", alignItems: "center", justifyContent: "space-between",
+          }}>
+            <div>
+              <div style={{ fontSize: "13px", fontWeight: 700, color: "#141414", fontFamily: "Lexend Deca, sans-serif" }}>
+                {modal.type === "overdue" ? "Overdue Tasks" : "In Progress Tasks"}
+              </div>
+              <div style={{ fontSize: "11px", color: "#718096", marginTop: "2px", fontFamily: "Lexend Deca, sans-serif" }}>
+                {modal.member}
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setModal(null)}
+              style={{ background: "none", border: "none", cursor: "pointer", color: "#718096", fontSize: "18px", lineHeight: 1 }}
+            >
+              ×
+            </button>
+          </div>
+          <div style={{ overflowY: "auto", flex: 1 }}>
+            {modal.tasks.map((task) => (
+              <div key={task.id} style={{
+                display: "flex", alignItems: "center", justifyContent: "space-between",
+                padding: "12px 20px", borderBottom: "1px solid #f3f4f6",
+                cursor: "pointer",
+              }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = "#f5f7fa"; }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
+              >
+                <div>
+                  <div style={{ fontSize: "13px", fontWeight: 500, color: "#141414", fontFamily: "Lexend Deca, sans-serif" }}>
+                    {task.title}
+                  </div>
+                  <div style={{ fontSize: "11px", color: "#718096", marginTop: "2px", fontFamily: "Lexend Deca, sans-serif" }}>
+                    {task.project}
+                  </div>
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: "10px", flexShrink: 0 }}>
+                  <span style={{ fontSize: "11px", color: modal.type === "overdue" ? "#991b1b" : "#718096", fontFamily: "Lexend Deca, sans-serif" }}>
+                    {task.due}
+                  </span>
+                  <i className="ti ti-chevron-right" style={{ fontSize: "14px", color: "#9ca3af" }} />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>,
+      document.body,
+    ) : null}
+    </>
   );
 }
 
