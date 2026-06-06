@@ -76,17 +76,6 @@ function communicationsTableWrapperCss(wrapperClass: string): string {
     min-width: max-content;
   }
 
-  .prospects-table-wrapper.${wrapperClass} .gt-filter-pills-right-actions {
-    flex-shrink: 0;
-    margin-left: auto;
-    position: sticky;
-    right: 0;
-    z-index: 4;
-    padding-left: 12px;
-    background-color: #ffffff;
-    box-shadow: -12px 0 14px -10px rgba(0, 0, 0, 0.18);
-  }
-
   @media (max-width: 992px) {
     .prospects-table-wrapper.${wrapperClass} .gt-toolbar-tabs-section > .d-flex {
       flex-wrap: wrap;
@@ -105,28 +94,12 @@ function communicationsTableWrapperCss(wrapperClass: string): string {
       min-width: 0;
       width: 100%;
     }
-
-    .prospects-table-wrapper.${wrapperClass} .gt-filter-pills-right-actions {
-      position: static;
-      margin-left: 0;
-      width: 100%;
-      padding-left: 0;
-      box-shadow: none;
-      justify-content: flex-end;
-      flex-wrap: wrap;
-      gap: 8px;
-    }
   }
 
   @media (max-width: 576px) {
     .prospects-table-wrapper.${wrapperClass} .gt-toolbar-tabs-dropdown,
     .prospects-table-wrapper.${wrapperClass} .gt-tab-button {
       max-width: 100%;
-    }
-
-    .prospects-table-wrapper.${wrapperClass} .gt-filter-pills-right-actions .btn {
-      flex: 1 1 auto;
-      min-width: 0;
     }
   }
 `;

@@ -73,11 +73,7 @@ class SentryErrorBoundary extends Component<
   }
 }
 
-function GlobalRejectionGuard({
-  children,
-}: {
-  readonly children: ReactNode;
-}) {
+function GlobalRejectionGuard({ children }: { readonly children: ReactNode }) {
   useEffect(() => {
     if (typeof globalThis === "undefined") return;
     const target = globalThis as typeof globalThis & {

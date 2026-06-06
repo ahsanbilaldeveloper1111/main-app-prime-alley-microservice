@@ -2,6 +2,11 @@ import React from "react";
 import moment from "moment";
 import { Calendar } from "lucide-react";
 import { formatDateTimeToLocal, GlobalDateTimeFormat } from "@utils/Helper";
+import {
+  COMMUNICATIONS_COLOR,
+  COMMUNICATIONS_SELECTED_BG,
+  COMMUNICATIONS_STAT_COLORS,
+} from "@utils/communications/communicationsThemeTokens";
 
 export interface CallLogsDateRangeBannerProps {
   startDateTime: string;
@@ -35,8 +40,8 @@ const CallLogsDateRangeBanner: React.FC<
             width: "30px",
             height: "30px",
             borderRadius: "8px",
-            background: "#eef2ff",
-            color: "#4f46e5",
+            background: COMMUNICATIONS_SELECTED_BG,
+            color: COMMUNICATIONS_STAT_COLORS.primary.iconColor,
           }}
         >
           <Calendar size={16} />
@@ -57,7 +62,7 @@ const CallLogsDateRangeBanner: React.FC<
             style={{
               fontSize: "13px",
               fontWeight: 600,
-              color: "#0f172a",
+              color: COMMUNICATIONS_COLOR.text,
             }}
           >
             {formatDateTimeToLocal(startDateTime, GlobalDateTimeFormat)} —{" "}

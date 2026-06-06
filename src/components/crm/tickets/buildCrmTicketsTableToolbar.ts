@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import type { FilterPill, TabConfig, ToolbarConfig } from "@components/GenericTable";
-import { renderApplyResetFilterActions } from "@utils/communicationsStagedFilters";
+import { renderApplyFilterActions } from "@utils/communicationsStagedFilters";
 
 const CRM_TICKETS_SEARCH_DEBOUNCE_MS = 400;
 
@@ -14,7 +14,6 @@ export interface BuildCrmTicketsTableToolbarParams {
   handleApplyFiltersClick: () => void;
   handleResetFiltersClick: () => void;
   hasUnappliedFilterChanges: boolean;
-  hasNonDefaultFilters: boolean;
   rightActions: ReactNode;
 }
 
@@ -28,10 +27,10 @@ export function buildCrmTicketsTableToolbar({
   handleApplyFiltersClick,
   handleResetFiltersClick,
   hasUnappliedFilterChanges,
-  hasNonDefaultFilters,
   rightActions,
 }: BuildCrmTicketsTableToolbarParams): ToolbarConfig {
   return {
+    clearAllFilters: handleResetFiltersClick,
     showSearch: true,
     searchValue,
     searchPlaceholder: "Search tickets...",
@@ -46,10 +45,8 @@ export function buildCrmTicketsTableToolbar({
     showFilterPills: true,
     showMoreFiltersButton: false,
     filterPills,
-    filterPillsRightActions: renderApplyResetFilterActions(
-      hasNonDefaultFilters,
+    filterPillsRightActions: renderApplyFilterActions(
       hasUnappliedFilterChanges,
-      handleResetFiltersClick,
       handleApplyFiltersClick,
       "crm-tickets",
     ),

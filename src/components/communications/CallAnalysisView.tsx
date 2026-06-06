@@ -11,6 +11,12 @@ import moment from "moment";
 import { useStore } from "react-redux";
 import GenericTable, { type TableAction, type TableColumn } from "@components/GenericTable";
 import { type StatsCardData } from "@components/GenericStatsCards";
+import {
+  AlertCircle,
+  BarChart3,
+  Download,
+  Play,
+} from "lucide-react";
 import { DownloadCallRecording } from "@utils/calls";
 import { toast } from "react-toastify";
 import {
@@ -756,8 +762,8 @@ const CallAnalysisView: React.FC = () => {
     if (audioError) {
       return (
         <div className="p-4">
-          <div className="alert alert-warning">
-            <i className="ph-duotone ph-warning-circle" aria-hidden="true" />{" "}
+          <div className="alert alert-warning d-flex align-items-center gap-2">
+            <AlertCircle size={16} aria-hidden />
             <span>File not found</span>
           </div>
         </div>
@@ -948,12 +954,11 @@ const CallAnalysisView: React.FC = () => {
               aria-label="Play"
               title="Play"
             >
-              <i
+              <Play
+                size={16}
                 data-tooltip-id="my-tooltip"
                 data-tooltip-content="Play"
-                className="ph-duotone ph-play"
-                style={{ fontSize: "1rem" }}
-                aria-hidden="true"
+                aria-hidden
               />
             </button>
             <div style={{ display: "inline-flex", alignItems: "center" }}>
@@ -977,12 +982,11 @@ const CallAnalysisView: React.FC = () => {
                   aria-label="Download"
                   title="Download"
                 >
-                  <i
+                  <Download
+                    size={16}
                     data-tooltip-id="my-tooltip"
                     data-tooltip-content="Download"
-                    className="ph-duotone ph-arrow-line-down"
-                    style={{ fontSize: "1rem" }}
-                    aria-hidden="true"
+                    aria-hidden
                   />
                 </button>
               )}
@@ -996,12 +1000,11 @@ const CallAnalysisView: React.FC = () => {
               aria-label="Call Analysis"
               title="Call Analysis"
             >
-              <i
+              <BarChart3
+                size={16}
                 data-tooltip-id="my-tooltip"
                 data-tooltip-content="Call Analysis"
-                className="ph-duotone ph-chart-bar"
-                style={{ fontSize: "1rem" }}
-                aria-hidden="true"
+                aria-hidden
               />
             </button>
           </div>

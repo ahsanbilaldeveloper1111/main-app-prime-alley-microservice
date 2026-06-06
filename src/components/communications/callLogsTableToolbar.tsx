@@ -12,9 +12,7 @@ import {
   createDateTimeDropdownContent,
   createTextFilterDropdownContent,
 } from "@utils/communicationsFilterDropdowns";
-import {
-  renderApplyResetFilterActions,
-} from "@utils/communicationsStagedFilters";
+import { renderApplyFilterActions } from "@utils/communicationsStagedFilters";
 import { formatFilterDateTimeLabel } from "@utils/communicationsDateUtils";
 import {
   CALL_LOGS_TOOLBAR,
@@ -48,7 +46,6 @@ export interface BuildCallLogsTableToolbarParams {
   handleApplyFiltersClick: () => void;
   handleResetFiltersClick: () => void;
   hasUnappliedFilterChanges: boolean;
-  hasNonDefaultFilters: boolean;
   /** Total records for the active tab badge (prospects `All prospects` count). */
   allTabCount?: number;
 }
@@ -69,10 +66,10 @@ export function buildCallLogsTableToolbar({
   handleApplyFiltersClick,
   handleResetFiltersClick,
   hasUnappliedFilterChanges,
-  hasNonDefaultFilters,
   allTabCount,
 }: BuildCallLogsTableToolbarParams): ToolbarConfig {
   return {
+    clearAllFilters: handleResetFiltersClick,
     showTabs: true,
     tabsDropdownLabel: CALL_LOGS_TOOLBAR.tabsDropdownLabel,
     tabsDropdownItems: COMMUNICATIONS_TABS_DROPDOWN_ITEMS,
@@ -213,10 +210,8 @@ export function buildCallLogsTableToolbar({
         createDateTimeDropdownContent,
       ),
     ],
-    filterPillsRightActions: renderApplyResetFilterActions(
-      hasNonDefaultFilters,
+    filterPillsRightActions: renderApplyFilterActions(
       hasUnappliedFilterChanges,
-      handleResetFiltersClick,
       handleApplyFiltersClick,
       "call-logs",
     ),

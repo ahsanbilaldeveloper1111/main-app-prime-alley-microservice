@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import {
   PhoneCall,
   PhoneOff,
@@ -39,7 +39,7 @@ export type CallWidgetProps = Readonly<{
   previewStateLabel?: string;
   /** Contact grid from callVariables + contactHeader mapping */
   previewContactRows?: PreviewContactRow[];
-  /** e.g. ['ACCEPT','REJECT','CLOSE','RECLASSIFY'] – when both REJECT and CLOSE present, show dropdown */
+  /** e.g. ['ACCEPT','REJECT','CLOSE','RECLASSIFY'] â€“ when both REJECT and CLOSE present, show dropdown */
   previewActions?: string[];
   /** When set, Reject area uses this with action 'REJECT' or 'CLOSE' instead of handleRejectCall */
   onRejectWithAction?: (action: 'REJECT' | 'CLOSE') => void;
@@ -201,7 +201,7 @@ function CallWidgetMetaRows({
             color: callStatus === 'Connected' ? '#10b981' : '#f59e0b',
           }}
         >
-          {previewStateLabel || callStatus || '—'}
+          {previewStateLabel || callStatus || 'â€”'}
         </span>
       </div>
       <div className="call-info-item">
@@ -478,7 +478,7 @@ function RingingCallPanel({
                           textAlign: 'left',
                           cursor: 'pointer',
                           fontSize: 13,
-                          color: '#64748b',
+                          color: '#6c757d',
                         }}
                         onClick={() => {
                           setShowRejectMenu(false);
@@ -612,7 +612,7 @@ const CallWidget: React.FC<CallWidgetProps> = ({
         }
 
         .call-widget-header {
-          background: linear-gradient(135deg, #667eea 0%, #667eea 100%);
+          background: linear-gradient(135deg, #0066CC 0%, #0066CC 100%);
           color: white;
           padding: 14px 16px;
           display: flex;
@@ -632,7 +632,7 @@ const CallWidget: React.FC<CallWidgetProps> = ({
         .call-timer {
           font-size: 28px;
           font-weight: 700;
-          color: #1e293b;
+          color: #141414;
           margin: 8px 0;
         }
 
@@ -670,12 +670,12 @@ const CallWidget: React.FC<CallWidgetProps> = ({
         }
 
         .call-info-label {
-          color: #64748b;
+          color: #6c757d;
           font-weight: 500;
         }
 
         .call-info-value {
-          color: #1e293b;
+          color: #141414;
           font-weight: 600;
         }
 
@@ -688,7 +688,7 @@ const CallWidget: React.FC<CallWidgetProps> = ({
           font-weight: 700;
           text-transform: uppercase;
           letter-spacing: 0.04em;
-          color: #64748b;
+          color: #6c757d;
           margin-bottom: 8px;
         }
 
@@ -711,7 +711,7 @@ const CallWidget: React.FC<CallWidgetProps> = ({
         }
 
         .call-contact-label {
-          color: #64748b;
+          color: #6c757d;
           font-weight: 600;
           flex-shrink: 0;
           max-width: 48%;
@@ -739,8 +739,8 @@ const CallWidget: React.FC<CallWidgetProps> = ({
         }
 
         .btn-reclassify:hover {
-          border-color: #667eea;
-          color: #667eea;
+          border-color: #0066CC;
+          color: #0066CC;
         }
 
         .call-controls {
@@ -756,7 +756,7 @@ const CallWidget: React.FC<CallWidgetProps> = ({
           border: none;
           border-radius: 10px;
           background: #f8fafc;
-          color: #64748b;
+          color: #6c757d;
           cursor: pointer;
           transition: all 0.2s;
           display: flex;
@@ -780,7 +780,7 @@ const CallWidget: React.FC<CallWidgetProps> = ({
         }
 
         .call-control-btn.active {
-          background: #667eea;
+          background: #0066CC;
           color: white;
         }
 

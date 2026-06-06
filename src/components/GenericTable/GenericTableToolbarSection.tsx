@@ -552,6 +552,7 @@ export function GenericTableToolbarSection({
                   <span>Advanced filters</span>
                 </button>
               )}
+              {toolbar.filterPillsRightActions}
               {toolbar.filterPills.some((pill) => pill.active) && (
                 <button
                   className="gt-filter-pill-add"
@@ -560,11 +561,6 @@ export function GenericTableToolbarSection({
                 >
                   <span>Clear all</span>
                 </button>
-              )}
-              {toolbar.filterPillsRightActions && (
-                <div className="gt-filter-pills-right-actions d-flex align-items-center gap-2 ms-auto">
-                  {toolbar.filterPillsRightActions}
-                </div>
               )}
             </div>
           </div>
