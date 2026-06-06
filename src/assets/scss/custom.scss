@@ -872,6 +872,10 @@ body:has(.workload-page) .main-content-wrapper {
   overflow-x: hidden !important;
   overflow-y: auto !important;
 }
+body:has(.workload-page).modal-open {
+  padding-right: 0 !important;
+  overflow: auto !important;
+}
 
 body:has(.workload-page) .min-vh-100 {
   min-height: 100vh !important;
@@ -891,4 +895,8 @@ body:has(.workload-page) .min-vh-100 {
     max-height: calc(100vh - 48px);
     overflow-y: auto !important;
   }
+}
+
+body:has(.workload-page) {
+  padding-right: 0 !important;
 }

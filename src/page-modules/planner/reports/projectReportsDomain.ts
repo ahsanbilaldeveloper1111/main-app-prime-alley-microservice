@@ -198,7 +198,7 @@ function resolveBreakdownDelayPercent(
   if (row.delay_percent != null && Number.isFinite(row.delay_percent)) {
     return Math.min(100, Math.max(0, Math.round(row.delay_percent)));
   }
-  return Math.max(0, 100 - progress);
+  return 0;
 }
 
 function mapBreakdownToProjectRow(

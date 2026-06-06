@@ -1,8 +1,8 @@
 ﻿.workload-page {
-  padding-bottom: 1.5rem;
+  padding: 20px 24px 1.5rem;
   background: #f5f7fa;
   min-height: 0;
-  border-radius: 0;
+  border-radius: 0.5rem;
   display: flex;
   flex-direction: column;
   font-family: "Lexend Deca", Helvetica, Arial, sans-serif;
@@ -259,25 +259,26 @@
 
   .workload-filter-bar__apply {
     height: 30px;
-    padding: 0 14px;
+    padding: 0 8px;
     font-size: clamp(11px, 0.85vw, 13px);
     font-weight: 500;
     font-family: "Lexend Deca", Helvetica, Arial, sans-serif;
-    background-color: #0066CC;
-    border: 1px solid #0066CC;
+    color: #0066CC;
+    background: transparent;
+    border: none;
     border-radius: 4px;
-    color: #ffffff;
     cursor: pointer;
     white-space: nowrap;
-    transition: background-color 0.15s ease;
+    transition: color 0.15s ease, background 0.15s ease;
 
     &:hover:not(:disabled) {
-      background-color: #0052A3;
-      border-color: #0052A3;
+      color: #0052A3;
+      background: #f5f8fa;
     }
 
     &:disabled {
-      opacity: 0.6;
+      color: #9ca3af;
+      opacity: 0.7;
       cursor: not-allowed;
     }
   }
@@ -1924,7 +1925,8 @@
   }
 
   .workload-unassigned-offcanvas__title-icon {
-    font-size: 18px;
+    display: inline-flex;
+    align-items: center;
     color: #0066CC;
     line-height: 1;
   }
@@ -2091,8 +2093,8 @@
 }
 
 .workload-bdg--violet {
-  background: #f5f3ff;
-  color: #5b21b6;
+  background: #eef2ff;
+  color: #0066CC;
 }
 
 .workload-bdg--gray {

@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useSession } from "next-auth/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { isAxiosError } from "axios";
+import { Info, X } from "lucide-react";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 import { toast } from "react-toastify";
 import "@assets/scss/common.scss";
@@ -736,7 +737,7 @@ const WorkloadPlannerPage: React.FC = () => {
     <div className="workload-page">
       {useMockData ? (
         <div className="workload-demo-banner">
-          <i className="ti ti-info-circle" aria-hidden="true" />
+          <Info size={18} aria-hidden />
           You are viewing sample data.
           <button
             type="button"
@@ -815,7 +816,7 @@ const WorkloadPlannerPage: React.FC = () => {
 
         {mainView === "board" && useMockData && showBoardHint ? (
           <div className="workload-board-hint">
-            <i className="ti ti-info-circle" aria-hidden="true" />
+            <Info size={18} aria-hidden />
             <span><strong>Drag</strong> cards between columns to reassign &nbsp;·&nbsp; <strong>Move to</strong> changes due date &nbsp;·&nbsp; <strong>View</strong> opens the full task</span>
             <button
               type="button"
@@ -823,7 +824,7 @@ const WorkloadPlannerPage: React.FC = () => {
               onClick={() => setShowBoardHint(false)}
               aria-label="Dismiss"
             >
-              <i className="ti ti-x" aria-hidden="true" />
+              <X size={16} aria-hidden />
             </button>
           </div>
         ) : null}

@@ -7,7 +7,6 @@ import React, {
   useState,
 } from "react";
 import Layout from "@layout/index";
-import BreadcrumbItem from "@common/BreadcrumbItem";
 import GenericTable, { FilterPill, ToolbarConfig } from "@components/GenericTable";
 
 import "@assets/scss/common.scss";
@@ -36,6 +35,8 @@ import { toast } from "react-toastify";
 import { workforceKeys } from "@query/keys";
 
 import { hierarchyLabel } from "@page-modules/workforce/employees/employeesDomain";
+import { WorkforceListPageShell } from "@page-modules/workforce/shared/WorkforceListPageShell";
+import { renderApplyFilterActions } from "@utils/communicationsStagedFilters";
 import {
   CONTRACT_TYPES,
   EMPLOYMENT_TYPES,
@@ -65,6 +66,7 @@ import { useJourneyDetailQuery } from "@page-modules/workforce/journey/useJourne
 import AddJourneyStepModal from "@page-modules/workforce/journey/partials/AddJourneyStepModal";
 import EditJourneyStepModal from "@page-modules/workforce/journey/partials/EditJourneyStepModal";
 
+import "@page-modules/workforce/shared/workforcePages.scss";
 import "@page-modules/workforce/journey/journeyPage.scss";
 
 const { PERMISSIONS } = HEADER_CONSTANTS;
@@ -609,15 +611,8 @@ const EmployeesOnboarding = () => {
         rows={journeyUserDropdownRows}
         selectedIds={selectedUserIds}
         onToggle={toggleSelectedUserId}
-        onApply={() => {
-          setAppliedUserIds(selectedUserIds);
-          setCurrentPage(1);
-        }}
-        onClear={() => {
-          setSelectedUserIds([]);
-          setAppliedUserIds([]);
-          setCurrentPage(1);
-        }}
+        onApply={() => undefined}
+        onClear={() => undefined}
       />
     ),
     [journeyUserDropdownRows, selectedUserIds, toggleSelectedUserId, userSearchTerm],
@@ -676,48 +671,6 @@ const EmployeesOnboarding = () => {
     ],
   );
 
-  const onboardingToolbar = useMemo<ToolbarConfig>(
-    () => ({
-      showTabs: true,
-      tabs: [
-        {
-          id: "employees-journey",
-          label: "Employees Journey",
-          count: journeysPagination?.total,
-        },
-      ],
-      activeTab: "employees-journey",
-      showSearch: true,
-      searchValue: searchTerm,
-      searchPlaceholder: "Search by extension or designation",
-      onSearchChange: setSearchTerm,
-      onSearch: handleApply,
-      showFiltersButton: true,
-      showFilterPills: false,
-      filterPills,
-      showMoreFiltersButton: false,
-      customActions: (
-        <div className="journey-page__toolbar-actions">
-          <button
-            type="button"
-            className="journey-page__toolbar-btn journey-page__toolbar-btn--primary"
-            onClick={handleApply}
-          >
-            Apply
-          </button>
-          <button
-            type="button"
-            className="journey-page__toolbar-btn journey-page__toolbar-btn--outline"
-            onClick={resetFilters}
-          >
-            Clear
-          </button>
-        </div>
-      ),
-    }),
-    [searchTerm, filterPills, journeysPagination?.total, handleApply, resetFilters],
-  );
-
   const hasAppliedFilters = useMemo(
     () =>
       hasAppliedJourneyFilters({
@@ -738,6 +691,68 @@ const EmployeesOnboarding = () => {
     ],
   );
 
+  const hasUnappliedFilterChanges = useMemo(
+    () =>
+      searchTerm !== appliedSearch ||
+      selectedDepartment !== appliedDepartment ||
+      selectedEmploymentType !== appliedEmploymentType ||
+      selectedContract !== appliedContract ||
+      JSON.stringify(selectedUserIds) !== JSON.stringify(appliedUserIds) ||
+      selectedStatus !== appliedStatus,
+    [
+      searchTerm,
+      appliedSearch,
+      selectedDepartment,
+      appliedDepartment,
+      selectedEmploymentType,
+      appliedEmploymentType,
+      selectedContract,
+      appliedContract,
+      selectedUserIds,
+      appliedUserIds,
+      selectedStatus,
+      appliedStatus,
+    ],
+  );
+
+  const onboardingToolbar = useMemo<ToolbarConfig>(
+    () => ({
+      showTabs: true,
+      tabs: [
+        {
+          id: "employees-journey",
+          label: "Employees Journey",
+          count: journeysPagination?.total,
+        },
+      ],
+      activeTab: "employees-journey",
+      showSearch: true,
+      searchValue: searchTerm,
+      searchPlaceholder: "Search by extension or designation",
+      onSearchChange: setSearchTerm,
+      onSearch: handleApply,
+      showFiltersButton: true,
+      showFilterPills: true,
+      filterPills,
+      showMoreFiltersButton: false,
+      clearAllFilters: hasAppliedFilters ? resetFilters : undefined,
+      filterPillsRightActions: renderApplyFilterActions(
+        hasUnappliedFilterChanges,
+        handleApply,
+        "journey",
+      ),
+    }),
+    [
+      searchTerm,
+      filterPills,
+      journeysPagination?.total,
+      handleApply,
+      resetFilters,
+      hasAppliedFilters,
+      hasUnappliedFilterChanges,
+    ],
+  );
+
   const sidebarQuickActions = useMemo(
     () =>
       getJourneySidebarQuickActions({
@@ -750,10 +765,10 @@ const EmployeesOnboarding = () => {
 
   return (
     <React.Fragment>
-      <BreadcrumbItem mainTitle="" mainLink="" subTitle="Employees Journey" />
-      <div className="journey-page__shell">
-        <div className="journey-page__table-pane">
-          <GenericTable<OnboardingEmployee>
+      <WorkforceListPageShell breadcrumbSubTitle="Employees Journey" tableWrapperClass="workforce-journey-table-wrapper">
+        <div className="journey-page__shell">
+          <div className="journey-page__table-pane">
+            <GenericTable<OnboardingEmployee>
             data={employees}
             columns={onboardingColumns}
             actions={onboardingActions}
@@ -819,8 +834,10 @@ const EmployeesOnboarding = () => {
             sections={journeySidebarSections}
           />
         )}
+        </div>
+      </WorkforceListPageShell>
 
-        <AddJourneyStepModal
+      <AddJourneyStepModal
           show={showAddStepForm}
           journeyId={journeyId}
           stepCount={journeySteps.length}
@@ -851,7 +868,6 @@ const EmployeesOnboarding = () => {
           itemType="journey"
           loading={deleteJourneyMutation.isPending}
         />
-      </div>
     </React.Fragment>
   );
 };

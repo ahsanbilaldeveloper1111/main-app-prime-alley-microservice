@@ -1,6 +1,6 @@
 import React from "react";
 import { Alert, Button, Form, Offcanvas, Spinner } from "react-bootstrap";
-import { AlertTriangle, Calendar, Clock } from "lucide-react";
+import { AlertTriangle, Building2, Calendar, Clock, Inbox } from "lucide-react";
 import type { WorkloadTaskCard, WorkloadUnassignedData } from "@utils/tasks";
 import {
   formatWorkloadMemberAssignOption,
@@ -48,7 +48,7 @@ function WorkloadUnassignedTaskRow({
         {task.title}
         {isOrg ? (
           <WorkloadBdg tone="green" className="ms-2">
-            <i className="ti ti-building" style={{ fontSize: "10px" }} aria-hidden />
+            <Building2 size={10} aria-hidden />
             {" Org"}
           </WorkloadBdg>
         ) : null}
@@ -155,7 +155,7 @@ export function WorkloadUnassignedSidebar({
       <Offcanvas.Header closeButton className="workload-unassigned-offcanvas__header">
         <div className="workload-unassigned-offcanvas__title-block">
           <div className="workload-unassigned-offcanvas__title-row">
-            <i className="ti ti-inbox workload-unassigned-offcanvas__title-icon" aria-hidden />
+            <Inbox size={18} className="workload-unassigned-offcanvas__title-icon" aria-hidden />
             <span className="workload-unassigned-offcanvas__title-text">Unassigned Tasks</span>
           </div>
           <p className="workload-unassigned-offcanvas__subtitle">

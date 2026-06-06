@@ -50,13 +50,13 @@ const DashboardStats: React.FC<DashboardStatsProps> = ({ onViewCalendar, params 
       <div className="employees-dashboard-stats__card">
         <div className="employees-dashboard-stats__top-row">
           <div className="employees-dashboard-stats__icon-wrap employees-dashboard-stats__icon-wrap--indigo">
-            <Users size={24} color="#6366F1" strokeWidth={2} />
+            <Users size={24} color="#0066CC" strokeWidth={2} />
           </div>
           <div className="employees-dashboard-stats__big-number">{counters?.employees?.total ?? 0}</div>
         </div>
         <div className="employees-dashboard-stats__label">Total Employees</div>
         <div className="employees-dashboard-stats__sub-row">
-          <Circle size={8} fill="#6366F1" color="#6366F1" />
+          <Circle size={8} fill="#0066CC" color="#0066CC" />
           <span>
             {counters?.employees?.active ?? 0} Active / {counters?.employees?.inactive ?? 0} Inactive
           </span>
@@ -105,7 +105,7 @@ const DashboardStats: React.FC<DashboardStatsProps> = ({ onViewCalendar, params 
       <div className="employees-dashboard-stats__card">
         <div className="employees-dashboard-stats__top-row">
           <div className="employees-dashboard-stats__icon-wrap employees-dashboard-stats__icon-wrap--violet">
-            <Send size={24} color="#8B5CF6" strokeWidth={2} />
+            <Send size={24} color="#0EA5E9" strokeWidth={2} />
           </div>
           <div className="employees-dashboard-stats__big-number">{counters?.journey?.in_progress ?? 0}</div>
         </div>

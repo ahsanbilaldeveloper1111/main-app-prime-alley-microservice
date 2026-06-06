@@ -5,8 +5,6 @@ import {
   BarChart,
   CartesianGrid,
   Cell,
-  Line,
-  LineChart,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -20,6 +18,7 @@ import type {
   ProjectBreakdownBarSegment,
 } from "@page-modules/planner/reports/historicalReportsDomain";
 import { extractMemberTrendWeekHeaders } from "@page-modules/planner/reports/historicalReportsDomain";
+import { ReportsEmptyState } from "./WorkloadReportsViews";
 
 type ReportsMetricTrendChartProps = Readonly<{
   title: string;
@@ -29,7 +28,11 @@ type ReportsMetricTrendChartProps = Readonly<{
   percentAxis?: boolean;
 }>;
 
-const OVERDUE_WEEK_BAR_COLORS = ["#eab308", "#ef4444", "#8b5cf6", "#22c55e"] as const;
+function resolveOverdueBarColor(value: number): string {
+  if (value <= 3) return "#22c55e";
+  if (value <= 6) return "#f59e0b";
+  return "#ef4444";
+}
 
 export function ReportsOverdueTrendChart({
   title,
@@ -46,7 +49,11 @@ export function ReportsOverdueTrendChart({
       <h2 className="reports-panel__title">{title}</h2>
       <p className="reports-panel__subtitle">{subtitle}</p>
       {points.length === 0 ? (
-        <p className="small text-muted mb-0">No overdue trend data for this period.</p>
+        <ReportsEmptyState
+          icon="ti-calendar-check"
+          title="No overdue data"
+          subtitle="No overdue tasks recorded in this period"
+        />
       ) : (
         <div className="reports-trend-chart">
           <ResponsiveContainer width="100%" height="100%">
@@ -59,7 +66,7 @@ export function ReportsOverdueTrendChart({
                 {points.map((point, index) => (
                   <Cell
                     key={point.label}
-                    fill={OVERDUE_WEEK_BAR_COLORS[index % OVERDUE_WEEK_BAR_COLORS.length]}
+                    fill={resolveOverdueBarColor(point.value)}
                   />
                 ))}
               </Bar>
@@ -89,15 +96,19 @@ export function ReportsMetricTrendChart({
       <h2 className="reports-panel__title">{title}</h2>
       <p className="reports-panel__subtitle">{subtitle}</p>
       {points.length === 0 ? (
-        <p className="small text-muted mb-0">No trend data for this period.</p>
+        <ReportsEmptyState
+          icon="ti-trending-up"
+          title="No trend data"
+          subtitle="Try adjusting the date range to see completion trends"
+        />
       ) : (
         <div className="reports-trend-chart">
           <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={points} margin={{ top: 8, right: 12, left: 0, bottom: 4 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+            <BarChart data={points} margin={{ top: 8, right: 12, left: 0, bottom: 4 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" vertical={false} />
               <XAxis dataKey="label" tick={{ fontSize: 11 }} interval="preserveStartEnd" />
               <YAxis
-                allowDecimals={percentAxis}
+                allowDecimals={false}
                 tick={{ fontSize: 11 }}
                 width={percentAxis ? 36 : 32}
                 domain={percentAxis ? [0, 100] : [0, "auto"]}
@@ -108,15 +119,15 @@ export function ReportsMetricTrendChart({
                   percentAxis ? `${value}%` : `${value}${valueSuffix}`
                 }
               />
-              <Line
-                type="monotone"
-                dataKey="value"
-                stroke="#2563eb"
-                strokeWidth={2}
-                dot={{ r: 3, fill: "#2563eb" }}
-                activeDot={{ r: 5 }}
-              />
-            </LineChart>
+              <Bar dataKey="value" radius={[4, 4, 0, 0]} maxBarSize={48}>
+                {points.map((point, index) => (
+                  <Cell
+                    key={point.label}
+                    fill={index === points.length - 1 ? "#0066CC" : "#bfdbfe"}
+                  />
+                ))}
+              </Bar>
+            </BarChart>
           </ResponsiveContainer>
         </div>
       )}
@@ -165,7 +176,13 @@ export function ReportsProjectBreakdownBar({
 }: Readonly<{ segments: ProjectBreakdownBarSegment[] }>) {
   const total = segments.reduce((sum, segment) => sum + segment.value, 0);
   if (segments.length === 0 || total <= 0) {
-    return <p className="small text-muted mb-0">No project data for this period.</p>;
+    return (
+      <ReportsEmptyState
+        icon="ti-topology-star"
+        title="No project data"
+        subtitle="No project activity found for this period"
+      />
+    );
   }
   return (
     <>
@@ -203,7 +220,13 @@ export function ReportsHistoricalMemberTrendTable({
   weekHeaders,
 }: Readonly<{ rows: HistoricalMemberTrendRow[]; weekHeaders: string[] }>) {
   if (rows.length === 0) {
-    return <p className="small text-muted mb-0">No member trend data for this period.</p>;
+    return (
+      <ReportsEmptyState
+        icon="ti-users"
+        title="No member trends"
+        subtitle="No member activity recorded in the last 4 weeks"
+      />
+    );
   }
   const headers =
     weekHeaders.length > 0 ? weekHeaders : extractMemberTrendWeekHeaders(rows);

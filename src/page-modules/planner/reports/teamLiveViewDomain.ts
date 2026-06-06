@@ -37,6 +37,9 @@ export type LiveMemberRow = Readonly<{
   totalTasks: number;
   completedTasks: number;
   statsLine: string;
+  inProgressTasks: number;
+  overdueTasks: number;
+  projectLabel: string;
 }>;
 
 export type LiveTaskDetailRow = Readonly<{
@@ -48,6 +51,7 @@ export type LiveTaskDetailRow = Readonly<{
   badge: string;
   badgeTone: "primary" | "danger" | "success";
   timeLabel: string;
+  projectLabel: string;
 }>;
 
 export type LiveTopAssigneeRow = Readonly<{
@@ -68,6 +72,7 @@ export type LiveStaleTaskRow = Readonly<{
   initials: string;
   avatarColor: string;
   timeLabel: string;
+  priorityDot: string;
 }>;
 
 export type LiveRecentActivityRow = Readonly<{
@@ -125,11 +130,70 @@ function resolveAssigneeTotal(row: TaskReportsAssigneeRow): number {
   return pending + inProgress + done + overdue;
 }
 
+function collectLiveOverviewTasks(overview: TaskReportsOverview): TaskReportsTaskRow[] {
+  return [
+    ...overview.pending_tasks,
+    ...overview.stale_in_progress_tasks,
+    ...overview.transfer_tasks,
+  ];
+}
+
+function buildMemberPrimaryProjectMap(tasks: TaskReportsTaskRow[]): Map<string, string> {
+  const countsByExtension = new Map<string, Map<string, number>>();
+
+  for (const task of tasks) {
+    const ext = task.assignee_extension?.trim();
+    if (!ext) continue;
+
+    const projectName = task.project_name?.trim() || "Org Task";
+    const projectCounts = countsByExtension.get(ext) ?? new Map<string, number>();
+    projectCounts.set(projectName, (projectCounts.get(projectName) ?? 0) + 1);
+    countsByExtension.set(ext, projectCounts);
+  }
+
+  const primaryProjectByExtension = new Map<string, string>();
+  for (const [ext, projectCounts] of countsByExtension) {
+    let bestProject = "Org Task";
+    let bestCount = 0;
+    for (const [projectName, count] of projectCounts) {
+      if (count > bestCount) {
+        bestCount = count;
+        bestProject = projectName;
+      }
+    }
+    primaryProjectByExtension.set(ext, bestProject);
+  }
+
+  return primaryProjectByExtension;
+}
+
+function resolveMemberProjectLabel(
+  row: TaskReportsAssigneeRow,
+  projectByExtension: Map<string, string>,
+): string {
+  const fromApi =
+    row.project_name?.trim() ||
+    row.primary_project_name?.trim();
+  if (fromApi) return fromApi;
+
+  const ext = row.extension_number?.trim() ?? "";
+  if (ext && projectByExtension.has(ext)) {
+    return projectByExtension.get(ext)!;
+  }
+
+  return "—";
+}
+
 export function buildLiveMemberRows(
   rows: TaskReportsAssigneeRow[],
   hierarchyExtensions?: unknown[] | null,
   hierarchyUsers?: unknown[] | null,
+  overview?: TaskReportsOverview | null,
 ): LiveMemberRow[] {
+  const projectByExtension = overview
+    ? buildMemberPrimaryProjectMap(collectLiveOverviewTasks(overview))
+    : new Map<string, string>();
+
   return rows
     .filter((row) => resolveAssigneeTotal(row) > 0)
     .map((row) => {
@@ -150,6 +214,9 @@ export function buildLiveMemberRows(
         totalTasks,
         completedTasks,
         statsLine: `Tasks: ${totalTasks} | Completed: ${completedTasks}`,
+        inProgressTasks: row.in_progress_count ?? 0,
+        overdueTasks: resolveAssigneeOverdue(row),
+        projectLabel: resolveMemberProjectLabel(row, projectByExtension),
       };
     });
 }
@@ -228,6 +295,14 @@ function isStaleForThreshold(task: TaskReportsTaskRow, staleDays: number): boole
   return dayCount >= staleDays;
 }
 
+function resolveStalePriorityDot(priority: string | null | undefined): string {
+  const p = (priority ?? "").toLowerCase();
+  if (p.includes("critical")) return "#ef4444";
+  if (p.includes("high")) return "#f97316";
+  if (p.includes("medium")) return "#f59e0b";
+  return "#22c55e";
+}
+
 export function buildLiveStaleTaskRows(
   tasks: TaskReportsTaskRow[],
   staleDays: number,
@@ -240,6 +315,7 @@ export function buildLiveStaleTaskRows(
       initials: memberInitialsFromText(task.title),
       avatarColor: workloadMemberAvatarColor(String(task.id)),
       timeLabel: formatLiveTimeSuffix(task.last_updated_at, "Stale"),
+      priorityDot: resolveStalePriorityDot(task.priority),
     }));
 }
 
@@ -406,19 +482,19 @@ export function buildLiveDashboardKpis(
 
   return [
     {
-      label: "Total Tasks",
+      label: "Total Active Tasks",
       value: total,
-      sub: "Tasks created in selected range",
+      sub: "Incomplete tasks in system",
       delta: formatReportsDelta(vs.total_tasks),
       accent: "default",
       sparkline: buildKpiSparkline(trends, pickCreated, total),
     },
     {
-      label: "In Progress",
+      label: "Stuck Tasks",
       value: inProgress,
-      sub: "Tasks currently in progress",
+      sub: "In progress beyond threshold",
       delta: formatReportsDelta(vs.in_progress_tasks),
-      accent: "in_progress",
+      accent: "pending",
       sparkline: buildKpiSparkline(trends, pickPending, inProgress),
     },
     {
@@ -430,12 +506,12 @@ export function buildLiveDashboardKpis(
       sparkline: buildKpiSparkline(trends, pickPending, overdue),
     },
     {
-      label: "Completed Tasks",
-      value: completed,
+      label: "Completion Rate",
+      value: completionRate >= 0 ? `${completionRate}%` : "—",
       sub:
         completionRate >= 0
-          ? `${completionRate}% completion rate in range`
-          : "Finished in selected range",
+          ? "Tasks completed on time"
+          : "No completion data",
       delta:
         formatReportsDelta(vs.completed_tasks) ??
         formatReportsDelta(vs.completion_rate),
@@ -527,6 +603,7 @@ function mapTaskToDetailRow(
       badge: "Overdue",
       badgeTone: "danger",
       timeLabel: formatOverdueTimeLabel(task),
+      projectLabel: task.project_name?.trim() || "Org Task",
     };
   }
   return {
@@ -536,6 +613,7 @@ function mapTaskToDetailRow(
     badge: task.status_name?.trim() || "In Progress",
     badgeTone: "primary",
     timeLabel: formatInProgressTimeLabel(task),
+    projectLabel: task.project_name?.trim() || "Org Task",
   };
 }
 

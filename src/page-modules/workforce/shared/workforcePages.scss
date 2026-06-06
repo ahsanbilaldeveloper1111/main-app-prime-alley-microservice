@@ -1,0 +1,34 @@
+// Shared workforce page chrome — aligned with CRM Prospects / Main Settings.
+
+.workforce-page-container {
+  font-family: "Lexend Deca", Helvetica, Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  color: #141414;
+}
+
+.workforce-page-container .gt-filter-pills .gt-filter-pill-add.gt-apply-filters-btn,
+.workforce-page-container .gt-filter-pills .gt-filter-pill-add[class$="-apply-filters-btn"] {
+  color: #0066CC;
+  background: transparent;
+  border: none;
+  font-weight: 500;
+
+  &:hover:not(:disabled) {
+    color: #0052A3;
+    background: #f5f8fa;
+  }
+
+  &:disabled {
+    color: #9ca3af;
+    background: transparent;
+  }
+}
+
+.workforce-static-page {
+  font-family: "Lexend Deca", Helvetica, Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  color: #141414;
+  padding: 20px 24px;
+  box-sizing: border-box;
+  min-height: 100%;
+}
