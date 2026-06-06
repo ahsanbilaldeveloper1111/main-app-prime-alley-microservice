@@ -44,7 +44,7 @@ export function ReportsLiveTaskByMember({
       {rows.map((row) => (
         <div key={row.key} className="reports-live-task-by-member__row">
           <span
-            className="reports-assignee-row__avatar"
+            className="reports-assignee-row__avatar reports-assignee-row__avatar--sm"
             style={{ backgroundColor: row.avatarColor }}
             aria-hidden
           >
@@ -106,6 +106,13 @@ export function ReportsLiveTaskDetailList({
                 <span className="reports-live-task-detail-list__time">2 hours ago</span>
               </div>
             </div>
+            <span
+              className="reports-assignee-row__avatar reports-assignee-row__avatar--sm"
+              style={{ backgroundColor: row.assigneeAvatarColor }}
+              aria-hidden
+            >
+              {row.assigneeInitials}
+            </span>
           </div>
         </div>
       ))}

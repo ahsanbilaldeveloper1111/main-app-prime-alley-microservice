@@ -580,7 +580,7 @@
     max-height: 400px;
 
     > :not(.reports-panel__title):not(.reports-panel__subtitle):not(.reports-panel__header-row):not(.reports-panel__head) {
-      padding: 0.85rem 1.1rem 1rem;
+      padding: 0 1.1rem;
       overflow-y: auto;
       max-height: calc(400px - 60px);
     }
