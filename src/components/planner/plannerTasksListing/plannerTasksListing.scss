@@ -51,7 +51,7 @@
   display: flex;
   align-items: stretch;
   background-color: #fff;
-  height: 44px;
+  height: clamp(36px, 3.5vw, 44px);
   flex-shrink: 0;
 }
 
@@ -60,15 +60,16 @@
   display: inline-flex;
   align-items: center;
   justify-content: flex-start;
-  padding: 0 20px;
+  gap: 6px;
+  padding: 0 clamp(12px, 1.2vw, 20px);
   border: none;
   border-right: 1px solid #8a8a8a;
   border-top: 1px solid #8a8a8a;
   color: #141414;
-  font-size: 13px;
+  font-size: clamp(11px, 0.9vw, 13px);
   font-family: "Lexend Deca", Helvetica, Arial, sans-serif;
   cursor: pointer;
-  height: 100%;
+  height: clamp(36px, 3.5vw, 44px);
 }
 
 .ptl-tab-btn--active {
@@ -84,12 +85,23 @@
   font-weight: 400;
 }
 
-.ptl-tab-btn--all {
-  gap: 10px;
+.ptl-tab-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3px 8px;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 12px;
+  background: #cbd6e2;
+  color: #1a5aa3;
+  flex-shrink: 0;
 }
 
-.ptl-tab-btn--default {
-  gap: 0;
+.ptl-tab-btn--active .ptl-tab-count,
+.ptl-tabs-row button[data-active="true"] .ptl-tab-count {
+  background: #0066CC;
+  color: #fff;
 }
 
 .ptl-add-view-btn {
@@ -338,7 +350,8 @@
 }
 
 .ptl-edit-columns-toggle {
-  font-size: 12px;
+  font-size: clamp(11px, 0.85vw, 13px);
+  padding: clamp(5px, 0.4vw, 8px) clamp(8px, 0.8vw, 14px);
   background-color: #fff;
   border-color: #8a8a8a;
   color: #141414;
@@ -464,22 +477,6 @@
 .ptl-edit-columns-menu .form-check-input:focus {
   border-color: #0066CC !important;
   box-shadow: 0 0 0 0.2rem rgba(0, 102, 204, 0.25) !important;
-}
-
-/* Responsive tab and button sizing */
-.ptl-tabs-row {
-  height: clamp(36px, 3.5vw, 44px) !important;
-}
-
-.ptl-tabs-row button {
-  height: clamp(36px, 3.5vw, 44px) !important;
-  font-size: clamp(11px, 0.9vw, 13px) !important;
-  padding: 0 clamp(12px, 1.2vw, 20px) !important;
-}
-
-.ptl-edit-columns-toggle {
-  font-size: clamp(11px, 0.85vw, 13px) !important;
-  padding: clamp(5px, 0.4vw, 8px) clamp(8px, 0.8vw, 14px) !important;
 }
 
 .gt-filter-pill {

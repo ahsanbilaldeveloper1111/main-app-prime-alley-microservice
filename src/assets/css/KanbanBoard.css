@@ -1,0 +1,17 @@
+.kanban-board-card {
+  transition: box-shadow 0.12s;
+}
+
+.kanban-board-card:hover {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.kanban-board-drop-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.kanban-board-card-item {
+  list-style: none;
+}

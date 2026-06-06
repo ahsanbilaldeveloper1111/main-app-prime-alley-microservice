@@ -294,6 +294,31 @@ export const TASK_VIEW_TAB_IDS = new Set<string>(POSSIBLE_TABS.map((t) => t.id))
 export const DEFAULT_VISIBLE_TAB_IDS = ["all", "due_today", "overdue", "upcoming"];
 export const SAVED_VIEW_STORAGE_KEY = "planner_tasks_visible_tabs";
 
+/** Tab badge count from list-tasks `summary` (matches each view tab filter). */
+export function resolvePlannerTaskTabCount(
+  tabId: string,
+  summary?: ListTasksSummary | null,
+): number {
+  if (!summary) return 0;
+
+  switch (tabId) {
+    case "all":
+      return summary.total ?? 0;
+    case "due_today":
+      return summary.todayDue ?? 0;
+    case "overdue":
+      return summary.overdue ?? 0;
+    case "upcoming":
+      return summary.scheduled ?? 0;
+    case "completed":
+      return summary.completed ?? 0;
+    case "pending":
+      return summary.pending ?? 0;
+    default:
+      return 0;
+  }
+}
+
 export function stripHtmlTags(input: string): string {
   const out: string[] = [];
   const tagBuffer: string[] = [];

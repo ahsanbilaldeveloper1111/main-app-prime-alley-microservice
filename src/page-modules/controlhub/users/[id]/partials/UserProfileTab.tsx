@@ -1,9 +1,9 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { Card, Col, Row, Button, Form } from "react-bootstrap";
 import FormModal from "@components/page-partials/FormModal";
 import { Country, State, City } from "country-state-city";
 import { languages as languagesData } from "@config/languages";
-import { updateUserProfile } from "@utils/users";
+import { getUserProfileData, updateUserProfile } from "@utils/users";
 import parsePhoneNumber from "libphonenumber-js";
 import { toast } from "react-toastify";
 import Select from "react-select";
@@ -362,6 +362,33 @@ function applyLoadedUserProfileSnapshot(
   setters.setSelectedStateCode(stateIso);
 }
 
+function hasEditableProfileFields(profile: unknown): boolean {
+  if (!profile || typeof profile !== "object") {
+    return false;
+  }
+  const row = profile as Record<string, unknown>;
+  return Boolean(
+    row.first_name ||
+      row.email ||
+      row.title ||
+      row.last_name ||
+      row.phone_number,
+  );
+}
+
+function resolveProfileSnapshot(
+  fetched: unknown,
+  currentUserProfile: unknown,
+): unknown {
+  if (fetched && hasEditableProfileFields(fetched)) {
+    return fetched;
+  }
+  if (hasEditableProfileFields(currentUserProfile)) {
+    return currentUserProfile;
+  }
+  return fetched ?? currentUserProfile;
+}
+
 function hydrateUserProfileTabFromCurrentUserEffect(
   profileSnapshot: any,
   countriesList: any[],
@@ -711,64 +738,102 @@ const UserProfileTab: React.FC<UserProfileTabProps> = ({
     loadCountries();
   }, []);
 
-  // Load states when country changes
+  // Load states when country changes (lists only; clearing is handled in change handlers)
   useEffect(() => {
-    const loadStates = () => {
-      if (selectedCountryCode) {
-        try {
-          const statesData = State.getStatesOfCountry(selectedCountryCode);
-          setStates(statesData);
-          if (profileFormData.country) {
-            setSelectedStateCode("");
-            setCities([]);
-            setProfileFormData({ ...profileFormData, state: "", city: "" });
-          }
-        } catch (error) {
-          console.error("Error loading states:", error);
-          setStates([]);
-        }
-      } else {
-        setStates([]);
-      }
-    };
-    loadStates();
+    if (!selectedCountryCode) {
+      setStates([]);
+      return;
+    }
+    try {
+      setStates(State.getStatesOfCountry(selectedCountryCode));
+    } catch (error) {
+      console.error("Error loading states:", error);
+      setStates([]);
+    }
   }, [selectedCountryCode]);
 
-  // Load cities when state changes
+  // Load cities when state changes (lists only; clearing is handled in change handlers)
   useEffect(() => {
-    const loadCities = () => {
-      if (selectedCountryCode && selectedStateCode) {
-        try {
-          const citiesData = City.getCitiesOfState(
-            selectedCountryCode,
-            selectedStateCode,
-          );
-          setCities(citiesData);
-          if (profileFormData.state) {
-            setProfileFormData({ ...profileFormData, city: "" });
-          }
-        } catch (error) {
-          console.error("Error loading cities:", error);
-          setCities([]);
-        }
-      } else {
-        setCities([]);
-      }
-    };
-    loadCities();
+    if (!selectedCountryCode || !selectedStateCode) {
+      setCities([]);
+      return;
+    }
+    try {
+      setCities(
+        City.getCitiesOfState(selectedCountryCode, selectedStateCode),
+      );
+    } catch (error) {
+      console.error("Error loading cities:", error);
+      setCities([]);
+    }
   }, [selectedCountryCode, selectedStateCode]);
 
-  // Load profile data from currentUser.profile when component mounts or currentUser changes
-  React.useEffect(() => {
-    hydrateUserProfileTabFromCurrentUserEffect(currentUser?.profile, countries, {
-      setIsLoadingProfile,
+  const syncEditFormFromLoadedProfile = useCallback(() => {
+    if (!profileData || countries.length === 0) {
+      return;
+    }
+    applyLoadedUserProfileSnapshot(profileData, countries, {
       setProfileData,
       setProfileFormData,
       setProfilePicturePreview,
       setSelectedCountryCode,
       setSelectedStateCode,
     });
-  }, [currentUser?.profile, countries]);
+  }, [profileData, countries]);
+
+  // Full profile for display/edit: users/view often omits fields; fetch dedicated endpoint
+  React.useEffect(() => {
+    if (!currentUser?.id || countries.length === 0) {
+      return;
+    }
+
+    let cancelled = false;
+
+    const loadProfile = async () => {
+      setIsLoadingProfile(true);
+      try {
+        const fetched = await getUserProfileData(String(currentUser.id));
+        if (cancelled) {
+          return;
+        }
+
+        const snapshot = resolveProfileSnapshot(fetched, currentUser?.profile);
+
+        if (snapshot) {
+          applyLoadedUserProfileSnapshot(snapshot, countries, {
+            setProfileData,
+            setProfileFormData,
+            setProfilePicturePreview,
+            setSelectedCountryCode,
+            setSelectedStateCode,
+          });
+        }
+      } catch (error) {
+        if (!cancelled) {
+          console.error("Error loading profile data:", error);
+          if (hasEditableProfileFields(currentUser?.profile)) {
+            applyLoadedUserProfileSnapshot(currentUser.profile, countries, {
+              setProfileData,
+              setProfileFormData,
+              setProfilePicturePreview,
+              setSelectedCountryCode,
+              setSelectedStateCode,
+            });
+          }
+        }
+      } finally {
+        if (!cancelled) {
+          setIsLoadingProfile(false);
+        }
+      }
+    };
+
+    void loadProfile();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [currentUser?.id, currentUser?.profile, countries]);
 
   const handleCloseEditProfileModal = () => {
     setShowEditProfileModal(false);
@@ -976,10 +1041,10 @@ const UserProfileTab: React.FC<UserProfileTabProps> = ({
   };
   return (
     <>
-      <Row className="mt-3">
+      <Row className="mt-2 user-view-profile-section">
         <Col md={12}>
-          <Card>
-            <Card.Header className="d-flex justify-content-between align-items-center">
+          <Card className="user-view-profile-card">
+            <Card.Header className="d-flex justify-content-between align-items-center py-2 px-3">
               <h5 className="mb-0">User Profile</h5>
 
               {session?.user?.permissions?.includes("update-profile-users") && (
@@ -987,6 +1052,7 @@ const UserProfileTab: React.FC<UserProfileTabProps> = ({
                   variant="primary"
                   size="sm"
                   onClick={() => {
+                    syncEditFormFromLoadedProfile();
                     setShowEditProfileModal(true);
                     setValidationErrors({});
                   }}

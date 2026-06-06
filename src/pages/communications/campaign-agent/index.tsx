@@ -1,4 +1,4 @@
-import "@assets/scss/datatable-style.scss";
+﻿import "@assets/scss/datatable-style.scss";
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
 import React, {
@@ -307,8 +307,8 @@ const CampaignAgentPage = () => {
     .join(" ")
     .trim();
   const loginLabel =
-    agentProfile?.loginId ?? agentProfile?.loginName ?? finesseUsername ?? "—";
-  const teamLabel = agentProfile?.teamName ?? selectedTeam ?? "—";
+    agentProfile?.loginId ?? agentProfile?.loginName ?? finesseUsername ?? "â€”";
+  const teamLabel = agentProfile?.teamName ?? selectedTeam ?? "â€”";
   const reasonLabel = formatFinesseReasonLabel(agentProfile?.reasonCode);
 
   const topBarTeams = useMemo((): TeamOption[] => {
@@ -372,7 +372,7 @@ const CampaignAgentPage = () => {
                   width: 52,
                   height: 52,
                   borderRadius: 14,
-                  background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+                  background: "linear-gradient(135deg, #0066CC 0%, #0052A3 100%)",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
@@ -413,7 +413,7 @@ const CampaignAgentPage = () => {
           {profileLoading && !agentProfile ? (
             <div
               className="d-flex justify-content-center align-items-center py-5"
-              style={{ color: "#64748b" }}
+              style={{ color: "#6c757d" }}
             >
               <Loader size={32} style={{ animation: "spin 1s linear infinite" }} />
             </div>
@@ -431,7 +431,7 @@ const CampaignAgentPage = () => {
                 </div>
                 <div className="detail-tile">
                   <div className="detail-label">Extension</div>
-                  <div className="detail-value">{agentProfile?.extension ?? "—"}</div>
+                  <div className="detail-value">{agentProfile?.extension ?? "â€”"}</div>
                 </div>
                 <div className="detail-tile">
                   <div className="detail-label">Team</div>
@@ -455,7 +455,7 @@ const CampaignAgentPage = () => {
                           background: getCampaignAgentStateColor(agentProfile?.state ?? agentStatus),
                         }}
                       />
-                      {agentProfile?.state ?? agentStatus ?? "—"}
+                      {agentProfile?.state ?? agentStatus ?? "â€”"}
                     </span>
                   </div>
                 </div>
@@ -467,14 +467,14 @@ const CampaignAgentPage = () => {
                 </div>
                 <div className="detail-tile">
                   <div className="detail-label">Reason / not-ready</div>
-                  <div className="detail-value">{reasonLabel ?? "—"}</div>
+                  <div className="detail-value">{reasonLabel ?? "â€”"}</div>
                 </div>
                 <div className="detail-tile">
                   <div className="detail-label">Roles</div>
                   <div className="detail-value">
                     {agentProfile?.roles?.length
                       ? agentProfile.roles.join(", ")
-                      : "—"}
+                      : "â€”"}
                   </div>
                 </div>
               </div>

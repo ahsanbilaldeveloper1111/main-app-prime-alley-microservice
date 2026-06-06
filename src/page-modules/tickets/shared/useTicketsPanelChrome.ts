@@ -9,8 +9,11 @@ export function useTicketsPanelChrome(tab: TicketsSettingsTab) {
   const router = useRouter();
   const pathname = router.pathname;
 
+  const showBreadcrumb = shouldShowTicketsAdminBreadcrumb(pathname);
+
   return {
-    showBreadcrumb: shouldShowTicketsAdminBreadcrumb(pathname),
+    showBreadcrumb,
     breadcrumbMainLink: resolveTicketsHubPath(tab, pathname),
+    embeddedInMainSettings: !showBreadcrumb,
   };
 }

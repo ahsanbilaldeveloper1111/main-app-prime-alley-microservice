@@ -221,7 +221,6 @@ const CallLogsTableSection: React.FC = () => {
   const {
     handleApplyFiltersClick,
     hasUnappliedFilterChanges,
-    hasNonDefaultFilters,
   } = useStagedFiltersActions(
     currentFilters,
     appliedFilters,
@@ -258,7 +257,7 @@ const CallLogsTableSection: React.FC = () => {
         handleApplyFiltersClick,
         handleResetFiltersClick,
         hasUnappliedFilterChanges,
-        hasNonDefaultFilters,
+        allTabCount: totalCalls ?? tablePagination.totalRows,
       }),
     [
       canExportCallLogs,
@@ -275,11 +274,14 @@ const CallLogsTableSection: React.FC = () => {
       handleApplyFiltersClick,
       handleResetFiltersClick,
       hasUnappliedFilterChanges,
-      hasNonDefaultFilters,
+      totalCalls,
+      tablePagination.totalRows,
     ],
   );
 
   const tableLoading = listPending || listFetching;
+
+  const tableMaxHeight = "calc(100vh - 405px)";
 
   if (!canViewCallLogs) {
     return null;
@@ -293,10 +295,17 @@ const CallLogsTableSection: React.FC = () => {
       emptyMessage="No call logs found."
       loadingMessage="Loading call logs..."
       showToolbar={true}
-      toolbar={tableToolbar}
+      toolbar={{
+        ...tableToolbar,
+        showMoreFiltersButton: false,
+      }}
       showToolbarActions={false}
       statsCards={statsCardsData}
-      metricsGridMinWidth="180px"
+      metricsGridMinWidth="120px"
+      metricsColumns={4}
+      fixedHeight
+      maxHeight={tableMaxHeight}
+      size="md"
       pagination={{
         currentPage: tablePagination.currentPage,
         rowsPerPage: tablePagination.rowsPerPage,

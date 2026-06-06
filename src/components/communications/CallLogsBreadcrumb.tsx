@@ -1,5 +1,6 @@
 import React from "react";
 import BreadcrumbItem from "@common/BreadcrumbItem";
+import { CALL_LOGS_BREADCRUMB } from "@components/communications/callLogsListPageConfig";
 import { useAppSelector } from "@toolkit/hooks";
 
 const CallLogsBreadcrumb: React.FC = () => {
@@ -9,9 +10,9 @@ const CallLogsBreadcrumb: React.FC = () => {
 
   return (
     <BreadcrumbItem
-      mainTitle=""
-      mainLink=""
-      subTitle="Call Logs"
+      mainTitle={CALL_LOGS_BREADCRUMB.mainTitle}
+      mainLink={CALL_LOGS_BREADCRUMB.mainLink}
+      subTitle={CALL_LOGS_BREADCRUMB.subTitle}
       showPageLoader={showPageLoader}
     />
   );

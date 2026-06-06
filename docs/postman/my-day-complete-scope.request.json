@@ -1,0 +1,40 @@
+{
+  "name": "Toggle task complete \u2014 my_day (default)",
+  "request": {
+    "method": "PATCH",
+    "header": [
+      {
+        "key": "Accept",
+        "value": "application/json"
+      },
+      {
+        "key": "Content-Type",
+        "value": "application/json"
+      }
+    ],
+    "body": {
+      "mode": "raw",
+      "raw": "{\n  \"complete_scope\": \"my_day\",\n  \"plan_date\": \"{{plan_date}}\"\n}"
+    },
+    "url": {
+      "raw": "{{base_url}}/api/tasks/my-day/complete/{{task_id}}?extension_number={{extension_number}}",
+      "host": [
+        "{{base_url}}"
+      ],
+      "path": [
+        "api",
+        "tasks",
+        "my-day",
+        "complete",
+        "{{task_id}}"
+      ],
+      "query": [
+        {
+          "key": "extension_number",
+          "value": "{{extension_number}}"
+        }
+      ]
+    },
+    "description": "**complete_scope** (body, default `my_day`):\n- `my_day` \u2014 sets `my_day_entries.my_day_completed_at` for plan_date only; does not complete the project task on the board.\n- `task` \u2014 toggles `tasks.is_completed` and syncs My Day for that plan date.\n\nResponse fields: `my_day_completed_at`, `my_day_complete_only`, `is_completed_for_my_day`."
+  }
+}

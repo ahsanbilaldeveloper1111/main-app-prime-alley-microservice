@@ -1,0 +1,22 @@
+@import './smartCrmTablePage.scss';
+@import './settingsEmbeddedToolbar.scss';
+@import './settingsEmbeddedPageShell.scss';
+
+.tickets-settings-panel {
+  min-width: 0;
+  width: 100%;
+  max-width: 100%;
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  overflow-x: clip;
+
+  > .smart-crm-table-page,
+  > div > .smart-crm-table-page {
+    margin-top: 0;
+  }
+
+  .tickets-settings-page {
+    @include settings-embedded-page-shell;
+  }
+}

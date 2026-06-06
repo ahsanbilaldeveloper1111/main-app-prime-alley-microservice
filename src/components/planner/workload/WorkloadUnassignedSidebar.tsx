@@ -4,7 +4,6 @@ import { AlertTriangle, Calendar, Clock } from "lucide-react";
 import type { WorkloadTaskCard, WorkloadUnassignedData } from "@utils/tasks";
 import {
   formatWorkloadMemberAssignOption,
-  formatWorkloadMinutes,
   formatWorkloadShortDueDate,
   formatWorkloadTaskEstimate,
   isWorkloadOrganizationTask,
@@ -50,7 +49,7 @@ function WorkloadUnassignedTaskRow({
         {isOrg ? (
           <WorkloadBdg tone="green" className="ms-2">
             <i className="ti ti-building" style={{ fontSize: "10px" }} aria-hidden />
-            Org
+            {" Org"}
           </WorkloadBdg>
         ) : null}
         {unestimated ? (
@@ -126,6 +125,7 @@ export type WorkloadUnassignedSidebarProps = Readonly<{
   assignTargets: Record<number, string>;
   setAssignTargets: React.Dispatch<React.SetStateAction<Record<number, string>>>;
   onRequestAssign: (task: WorkloadTaskCard, toExtension: string) => void;
+  assignPending?: boolean;
   formatError: (err: unknown) => string;
 }>;
 
@@ -138,6 +138,7 @@ export function WorkloadUnassignedSidebar({
   assignTargets,
   setAssignTargets,
   onRequestAssign,
+  assignPending = false,
   formatError,
 }: WorkloadUnassignedSidebarProps) {
   const count = unassignedQuery.data?.count ?? unassignedQuery.data?.tasks.length ?? 0;
@@ -189,7 +190,7 @@ export function WorkloadUnassignedSidebar({
               if (!toExtension) return;
               onRequestAssign(task, toExtension);
             }}
-            isAssigning={false}
+            isAssigning={assignPending}
           />
         ))}
       </Offcanvas.Body>

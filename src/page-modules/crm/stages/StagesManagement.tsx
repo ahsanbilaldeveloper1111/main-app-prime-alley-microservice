@@ -6,7 +6,7 @@ import "@assets/scss/tabs.scss";
 import React, { useMemo } from "react";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 import GenericTable, { type ToolbarConfig } from "@components/GenericTable";
-import { Form } from "react-bootstrap";
+import { Form, Button } from "react-bootstrap";
 import { BarChart3, Plus } from "lucide-react";
 import FormModal from "@components/page-partials/FormModal";
 import SuccessfulModal from "@components/page-partials/SuccessfulModal";
@@ -26,6 +26,7 @@ import { StageRestoreModal } from "@page-modules/crm/stages/StageRestoreModal";
 import { StageViewModal } from "@page-modules/crm/stages/StageViewModal";
 import { StagesAnalyticsSection } from "@page-modules/crm/stages/StagesAnalyticsSection";
 import { buildStagesTableColumns } from "@page-modules/crm/stages/stagesTableColumns";
+import { CrmSettingsTableWrap } from "@page-modules/crm/shared/CrmSettingsTableWrap";
 
 const { PERMISSIONS } = HEADER_CONSTANTS;
 
@@ -142,7 +143,7 @@ const StagesManagement = ({ hideBreadcrumb, breadcrumbMainLink }: CrmPageDisplay
           count: filterCounts.lost_reason,
           removable: false,
         },
-        { id: "deleted", label: "Deleted", removable: false },
+        { id: "deleted", label: "Deleted", count: filterCounts.deleted, removable: false },
       ],
       activeTab: activeFilter,
       onTabChange: handleToolbarTabChange,
@@ -159,14 +160,15 @@ const StagesManagement = ({ hideBreadcrumb, breadcrumbMainLink }: CrmPageDisplay
             Analytics
           </button>
           {canCreateStages && (
-            <button
+            <Button
+              variant="primary"
               type="button"
               className="stages-toolbar-btn stages-toolbar-btn--add"
               onClick={openCreateStageModal}
             >
               <Plus size={15} aria-hidden />
               Add Custom Stage
-            </button>
+            </Button>
           )}
         </div>
       ),
@@ -204,7 +206,10 @@ const StagesManagement = ({ hideBreadcrumb, breadcrumbMainLink }: CrmPageDisplay
           <StagesAnalyticsSection analyticsData={analyticsData} />
         )}
 
-        <div className="stages-table-wrapper mb-4">
+        <CrmSettingsTableWrap
+          hideBreadcrumb={hideBreadcrumb}
+          standaloneWrapperClass="stages-table-wrapper mb-4"
+        >
           <GenericTable<StageRow>
             data={paginatedStages}
             columns={stagesTableColumns}
@@ -230,8 +235,10 @@ const StagesManagement = ({ hideBreadcrumb, breadcrumbMainLink }: CrmPageDisplay
             showToolbarActions={false}
             uniqueKey="id"
             onPreviewClick={(stage) => openStageView(stage)}
+            hover
+            size="md"
           />
-        </div>
+        </CrmSettingsTableWrap>
       </div>
 
       {showCreateModal && (

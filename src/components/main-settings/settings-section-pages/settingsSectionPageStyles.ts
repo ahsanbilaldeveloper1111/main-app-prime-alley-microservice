@@ -1,46 +1,43 @@
 import type { CSSProperties } from 'react'
-
-export const SETTINGS_SECTION_FONT = 'Lexend Deca, Helvetica, Arial, sans-serif'
+import {
+  getMainSettingsTabButtonStyle,
+  MAIN_SETTINGS_FONT,
+  mainSettingsPageTitleStyle,
+  mainSettingsTabBarStyle,
+  mainSettingsTabRowStyle,
+} from '../mainSettingsTokens'
 
 export const settingsSectionShellStyle: CSSProperties = {
-  padding: '32px 40px',
+  padding: 'clamp(16px, 3vw, 20px) clamp(12px, 4vw, 24px)',
   flex: 1,
 }
 
 export const settingsSectionTitleStyle: CSSProperties = {
-  fontFamily: SETTINGS_SECTION_FONT,
-  fontSize: '24px',
-  fontWeight: 'bold',
-  color: '#141414',
-  marginBottom: '24px',
-  letterSpacing: 0,
+  ...mainSettingsPageTitleStyle,
+  fontFamily: MAIN_SETTINGS_FONT,
+}
+
+export const settingsSectionTabBarStyle: CSSProperties = {
+  ...mainSettingsTabBarStyle,
 }
 
 export const settingsSectionTabRowStyle: CSSProperties = {
-  display: 'flex',
-  marginBottom: '32px',
-  overflow: 'hidden',
+  ...mainSettingsTabRowStyle,
 }
 
-export function settingsSectionTabButtonStyle(isActive: boolean, isLast: boolean): CSSProperties {
-  return {
-    padding: '12px 28px',
-    background: isActive ? '#ffffff' : 'whitesmoke',
-    border: '1px solid #e0e0e0',
-    borderRight: isLast ? '1px solid #e0e0e0' : 'none',
-    borderBottom: isActive ? '2px solid #ffffff' : '2px solid #e0e0e0',
-    cursor: 'pointer',
-    fontFamily: SETTINGS_SECTION_FONT,
-    fontSize: '14px',
-    fontWeight: 300,
-    color: '#141414',
-    whiteSpace: 'nowrap',
-    transition: 'background 0.15s',
-    position: 'relative',
-    top: '1px',
-  }
+export function settingsSectionTabButtonStyle(
+  isActive: boolean,
+  isFirst: boolean,
+  isLast: boolean,
+): CSSProperties {
+  return getMainSettingsTabButtonStyle({
+    isActive,
+    isFirst,
+    isLast,
+    fontFamily: MAIN_SETTINGS_FONT,
+  })
 }
 
 export const settingsSectionNoPermissionStyle: CSSProperties = {
-  color: '#6b7280',
+  color: '#6c757d',
 }

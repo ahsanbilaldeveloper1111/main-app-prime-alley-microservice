@@ -1,7 +1,80 @@
-import { getTeamUsers } from "@utils/teams";
+import axiosInstance from "@utils/axios";
+import { fetchUsersDirectoryList, getParentUsers } from "@utils/users";
+import { getMainAppUsers, setStaffManagementCompanyIdentifier } from "@utils/staffManagement";
 import type { AssigneeMatch, WorkloadQueryBase, WorkloadRangePreset } from "@utils/tasks";
 import { workloadProjectFilterQuery } from "@page-modules/planner/workload/workloadDomain";
 import type { WorkloadProjectFilterValue } from "@page-modules/planner/workload/workloadDomain";
+
+export type WorkloadCompanyScope = Readonly<{
+  companyId: string;
+  companyIdentifier: string;
+}>;
+
+function readStringCandidate(value: unknown): string {
+  if (typeof value === "string" && value.trim()) return value.trim();
+  if (typeof value === "number" && Number.isFinite(value)) return String(value);
+  return "";
+}
+
+/** Logged-in user's company (id + identifier from session). */
+export function readWorkloadCompanyScopeFromSession(
+  user: unknown,
+): WorkloadCompanyScope | null {
+  if (user == null || typeof user !== "object") return null;
+  const record = user as Record<string, unknown>;
+  const companyId = readStringCandidate(record.company_id);
+  const companyIdentifier = readStringCandidate(record.company_identifier);
+  if (!companyId && !companyIdentifier) return null;
+  return { companyId, companyIdentifier };
+}
+
+/** True when a directory / hierarchy user row belongs to the viewer's company. */
+export function userRowMatchesCompanyScope(
+  row: unknown,
+  scope: WorkloadCompanyScope,
+): boolean {
+  if (row == null || typeof row !== "object") return false;
+  const record = row as Record<string, unknown>;
+
+  const directId = readStringCandidate(record.company_id);
+  const directIdentifier = readStringCandidate(record.company_identifier);
+  if (scope.companyId && directId && directId === scope.companyId) return true;
+  if (
+    scope.companyIdentifier &&
+    directIdentifier &&
+    directIdentifier === scope.companyIdentifier
+  ) {
+    return true;
+  }
+  if (directId || directIdentifier) return false;
+
+  const company = record.company;
+  if (company != null && typeof company === "object") {
+    const nested = company as Record<string, unknown>;
+    const nestedId =
+      readStringCandidate(nested.id) || readStringCandidate(nested.company_id);
+    const nestedIdentifier =
+      readStringCandidate(nested.identifier) ||
+      readStringCandidate(nested.company_identifier) ||
+      readStringCandidate(nested.tenant_id);
+    if (scope.companyId && nestedId) return nestedId === scope.companyId;
+    if (scope.companyIdentifier && nestedIdentifier) {
+      return nestedIdentifier === scope.companyIdentifier;
+    }
+    return false;
+  }
+
+  // Rows without company metadata are treated as in-scope (JWT/module-scoped lists).
+  return true;
+}
+
+function filterUserRowsForCompanyScope(
+  rows: readonly unknown[],
+  scope: WorkloadCompanyScope | null,
+): unknown[] {
+  if (!scope) return [...rows];
+  return rows.filter((row) => userRowMatchesCompanyScope(row, scope));
+}
 
 export type WorkloadTeamScopeResult = Readonly<{
   loading: boolean;
@@ -23,6 +96,8 @@ const IDLE_SCOPE: WorkloadTeamScopeResult = {
 type TeamUserRow = Readonly<{
   id?: number | string;
   phone?: string | null;
+  phone_no?: string | null;
+  phone_number?: string | null;
   extension?: string | null;
   extension_number?: string | null;
 }>;
@@ -38,7 +113,13 @@ function readTeamUserId(row: unknown): string {
 function readTeamUserExtension(row: unknown): string {
   if (row == null || typeof row !== "object") return "";
   const record = row as TeamUserRow;
-  const candidates = [record.extension_number, record.extension, record.phone];
+  const candidates = [
+    record.extension_number,
+    record.extension,
+    record.phone,
+    record.phone_no,
+    record.phone_number,
+  ];
   for (const value of candidates) {
     if (typeof value === "string" && value.trim()) return value.trim();
     if (typeof value === "number" && Number.isFinite(value)) return String(value);
@@ -144,7 +225,20 @@ function buildWorkloadQueryBase(input: BuildWorkloadQueryInput): WorkloadQueryBa
   return base;
 }
 
-/** Non-root grid/board: `extension_numbers[]` from team roster (not only the viewer). */
+/** Always include the viewer on non-root workload scope (solo user or team roster). */
+export function mergeViewerWorkloadExtension(
+  teamExtensions: readonly string[],
+  viewerExtension: string,
+): string[] {
+  const merged = new Set(
+    teamExtensions.map((ext) => ext.trim()).filter(Boolean),
+  );
+  const viewer = viewerExtension.trim();
+  if (viewer) merged.add(viewer);
+  return [...merged];
+}
+
+/** Non-root grid/board: team roster plus the viewer's own extension (always). */
 function resolveTeamMemberExtensionNumbers(
   input: BuildWorkloadQueryInput,
 ): string[] | undefined {
@@ -152,17 +246,31 @@ function resolveTeamMemberExtensionNumbers(
     const single = input.memberFilter.trim();
     return single ? [single] : undefined;
   }
-  const roster = input.teamScope.teamExtensions
-    .map((ext) => ext.trim())
-    .filter(Boolean);
-  if (roster.length > 0) {
-    return [...new Set(roster)];
+  const merged = mergeViewerWorkloadExtension(
+    input.teamScope.teamExtensions,
+    input.viewerExtension,
+  );
+  return merged.length > 0 ? merged : undefined;
+}
+
+/** Team roster for grid/board display filters; falls back to viewer-only when roster is empty. */
+export function resolveWorkloadDisplayTeamExtensions(
+  rosterExtensions: readonly string[],
+  viewerExtension: string,
+): string[] | undefined {
+  if (rosterExtensions.length > 0) {
+    return [...rosterExtensions];
+  }
+  const trimmed = viewerExtension.trim();
+  if (trimmed) {
+    return [trimmed];
   }
   return undefined;
 }
 
 /**
- * Team owner (root): no `extension_number` / `extension_numbers` — server resolves the team from JWT.
+ * Root / company admin (`isTeamOwner` on scope): no `extension_number` / `extension_numbers`.
+ * Server loads all assignees with tasks in range from JWT.
  */
 export function buildWorkloadSummaryQuery(input: BuildWorkloadQueryInput): WorkloadQueryBase {
   const base = buildWorkloadQueryBase(input);
@@ -177,8 +285,8 @@ export function buildWorkloadSummaryQuery(input: BuildWorkloadQueryInput): Workl
 }
 
 /**
- * Team owner (root): no extension params.
- * Otherwise: `extension_numbers[]` for grid/board scope.
+ * Root / company admin: no extension params on grid/board/summary.
+ * Non-root: `extension_numbers[]` (team roster + viewer's own extension).
  */
 export function buildWorkloadGridBoardQuery(input: BuildWorkloadQueryInput): WorkloadQueryBase {
   const base = buildWorkloadQueryBase(input);
@@ -192,6 +300,153 @@ export function buildWorkloadGridBoardQuery(input: BuildWorkloadQueryInput): Wor
   return base;
 }
 
+type DirectoryUserRow = Readonly<{
+  extension?: string | number | null;
+  extension_number?: string | number | null;
+  phone?: string | number | null;
+  phone_no?: string | null;
+  phone_number?: string | number | null;
+}>;
+
+function readDirectoryUserExtension(row: unknown): string {
+  if (row == null || typeof row !== "object") return "";
+  const record = row as DirectoryUserRow;
+  const candidates = [
+    record.extension_number,
+    record.extension,
+    record.phone,
+    record.phone_no,
+    record.phone_number,
+  ];
+  for (const value of candidates) {
+    if (typeof value === "string" && value.trim()) return value.trim();
+    if (typeof value === "number" && Number.isFinite(value)) return String(value);
+  }
+  return "";
+}
+
+function collectExtensionsFromUserRows(rows: readonly unknown[]): string[] {
+  const extensions = new Set<string>();
+  for (const row of rows) {
+    const ext = readDirectoryUserExtension(row);
+    if (ext) extensions.add(ext);
+  }
+  return [...extensions];
+}
+
+/** Company-wide roster for root / company admin (same company as the logged-in user). */
+export async function fetchCompanyWorkloadRoster(
+  companyScope: WorkloadCompanyScope | null = null,
+): Promise<string[]> {
+  if (companyScope?.companyIdentifier) {
+    setStaffManagementCompanyIdentifier(companyScope.companyIdentifier);
+    try {
+      const staffUsers = await getMainAppUsers(companyScope.companyIdentifier);
+      const scopedStaff = filterUserRowsForCompanyScope(
+        Array.isArray(staffUsers) ? staffUsers : [],
+        companyScope,
+      );
+      const fromStaff = collectExtensionsFromUserRows(scopedStaff);
+      if (fromStaff.length > 0) return fromStaff;
+    } catch {
+      // Fall through to filtered directory sources.
+    }
+  }
+
+  try {
+    const parentUsers = await getParentUsers();
+    if (Array.isArray(parentUsers) && parentUsers.length > 0) {
+      const scoped = filterUserRowsForCompanyScope(parentUsers, companyScope);
+      const fromParent = collectExtensionsFromUserRows(scoped);
+      if (fromParent.length > 0) return fromParent;
+    }
+  } catch {
+    // Fall through to paginated directory list.
+  }
+
+  try {
+    const directory = await fetchUsersDirectoryList();
+    const scoped = filterUserRowsForCompanyScope(directory, companyScope);
+    const fromDirectory = collectExtensionsFromUserRows(scoped);
+    if (fromDirectory.length > 0) return fromDirectory;
+  } catch {
+    return [];
+  }
+
+  return [];
+}
+
+function addTrimmedExtension(allowlist: Set<string>, ext: string): void {
+  const normalized = ext.trim();
+  if (normalized) allowlist.add(normalized);
+}
+
+function addTrimmedExtensions(
+  allowlist: Set<string>,
+  extensions: readonly string[],
+): void {
+  for (const ext of extensions) addTrimmedExtension(allowlist, ext);
+}
+
+function readHierarchyRowExtension(row: unknown): string {
+  if (row == null || typeof row !== "object") return "";
+  const record = row as Record<string, unknown>;
+  const candidates = [
+    record.extension_number,
+    record.extension,
+    record.phone,
+    record.id,
+  ];
+  for (const value of candidates) {
+    const normalized = readStringCandidate(value);
+    if (normalized) return normalized;
+  }
+  return "";
+}
+
+function collectCompanyScopedHierarchyExtensions(
+  rows: readonly unknown[],
+  scope: WorkloadCompanyScope,
+): string[] {
+  const extensions: string[] = [];
+  for (const row of rows) {
+    if (!userRowMatchesCompanyScope(row, scope)) continue;
+    const ext = readHierarchyRowExtension(row);
+    if (ext) extensions.push(ext);
+  }
+  return extensions;
+}
+
+/** Extensions that may appear in workload member lists for the logged-in user's company. */
+export function buildWorkloadCompanyExtensionAllowlist(input: Readonly<{
+  companyScope: WorkloadCompanyScope | null;
+  companyRoster?: readonly string[];
+  hierarchyExtensions?: unknown[] | null;
+  teamExtensions?: readonly string[];
+  viewerExtension?: string;
+}>): ReadonlySet<string> | undefined {
+  if (!input.companyScope) return undefined;
+
+  const allowlist = new Set<string>();
+  addTrimmedExtensions(allowlist, input.companyRoster ?? []);
+  addTrimmedExtensions(allowlist, input.teamExtensions ?? []);
+
+  if (Array.isArray(input.hierarchyExtensions)) {
+    addTrimmedExtensions(
+      allowlist,
+      collectCompanyScopedHierarchyExtensions(
+        input.hierarchyExtensions,
+        input.companyScope,
+      ),
+    );
+  }
+
+  const viewer = input.viewerExtension?.trim();
+  if (viewer) addTrimmedExtension(allowlist, viewer);
+
+  return allowlist.size > 0 ? allowlist : undefined;
+}
+
 export async function fetchWorkloadTeamScope(
   sessionUserId: string,
   sessionExtension = "",
@@ -201,9 +456,23 @@ export async function fetchWorkloadTeamScope(
   if (!selfId && !viewerExt) return IDLE_SCOPE;
 
   const numericId = Number(selfId);
-  const raw = await getTeamUsers(
-    undefined,
-    Number.isFinite(numericId) ? numericId : undefined,
-  );
-  return parseWorkloadTeamScope(raw, selfId, viewerExt);
+  const id = Number.isFinite(numericId) ? numericId : undefined;
+  if (!id) {
+    return parseWorkloadTeamScope(null, selfId, viewerExt);
+  }
+  try {
+    // Use a workload-specific fetch so team-scope failures don't toast
+    // (e.g. backend "Group Not Found" for users without a team).
+    const response = await axiosInstance.post("teams/users", { id });
+    const payload = (response?.data as { data?: unknown } | undefined)?.data;
+    return parseWorkloadTeamScope(payload, selfId, viewerExt);
+  } catch {
+    // Fall back to viewer-only scope; UI will still render with padding logic.
+    return {
+      loading: false,
+      isTeamOwner: false,
+      isTeamMemberOnly: false,
+      teamExtensions: viewerExt ? [viewerExt] : [],
+    };
+  }
 }

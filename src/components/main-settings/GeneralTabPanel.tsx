@@ -1,3 +1,4 @@
+import { MAIN_SETTINGS_FONT_SIZE } from './mainSettingsTokens'
 import React from 'react'
 import '../../assets/css/Settings.css'
 import { Divider, InputField, SelectField, ACCOUNT_DEFAULTS_FONT } from './accountDefaultsTabPrimitives'
@@ -12,8 +13,8 @@ const GeneralTabContent: React.FC = () => (
     <p
       style={{
         fontFamily: ACCOUNT_DEFAULTS_FONT,
-        fontSize: '14px',
-        color: '#555',
+        fontSize: MAIN_SETTINGS_FONT_SIZE.base,
+        color: '#6c757d',
         marginBottom: '24px',
       }}
     >
@@ -40,7 +41,7 @@ const GeneralTabContent: React.FC = () => (
     <h2
       style={{
         fontFamily: ACCOUNT_DEFAULTS_FONT,
-        fontSize: '20px',
+        fontSize: MAIN_SETTINGS_FONT_SIZE.lg,
         fontWeight: 600,
         color: '#141414',
         marginBottom: '8px',
@@ -51,14 +52,14 @@ const GeneralTabContent: React.FC = () => (
     <p
       style={{
         fontFamily: ACCOUNT_DEFAULTS_FONT,
-        fontSize: '14px',
-        color: '#555',
+        fontSize: MAIN_SETTINGS_FONT_SIZE.base,
+        color: '#6c757d',
         marginBottom: '24px',
       }}
     >
       This information will be used as a default where needed. If you&apos;re looking to update your company information for
       billing, visit{' '}
-      <a href="/main-settings/billing" style={{ color: '#0091ae', textDecoration: 'none' }}>
+      <a href="/main-settings/billing" style={{ color: '#0066CC', textDecoration: 'none' }}>
         Account &amp; Billing
       </a>
       {'.'}

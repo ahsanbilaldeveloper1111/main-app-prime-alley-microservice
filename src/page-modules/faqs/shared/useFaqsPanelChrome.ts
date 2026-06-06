@@ -12,5 +12,6 @@ export function useFaqsPanelChrome(subTab: FaqsHelpCenterTab) {
   return {
     showBreadcrumb: shouldShowFaqsAdminBreadcrumb(pathname),
     breadcrumbMainLink: resolveFaqsHubPath(subTab, pathname),
+    embeddedInMainSettings: !shouldShowFaqsAdminBreadcrumb(pathname),
   };
 }

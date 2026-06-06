@@ -1,3 +1,4 @@
+import { MAIN_SETTINGS_FONT_SIZE } from './mainSettingsTokens'
 import React, { useState } from 'react'
 import { ACCOUNT_DEFAULTS_FONT, Divider, FeatureSectionHeading } from './accountDefaultsTabPrimitives'
 
@@ -8,7 +9,7 @@ export const FeatureReleasesTabContent: React.FC = () => {
 
   return (
     <div>
-      <p style={{ fontFamily: baseFont, fontSize: '14px', color: '#555', fontWeight: 300, marginBottom: '8px' }}>
+      <p style={{ fontFamily: baseFont, fontSize: MAIN_SETTINGS_FONT_SIZE.base, color: '#6c757d', fontWeight: 400, marginBottom: '8px' }}>
         Set defaults related to Feature Releases.
       </p>
 
@@ -19,7 +20,7 @@ export const FeatureReleasesTabContent: React.FC = () => {
         more time to test changes and prepare users. Upcoming release dates can be found in the{' '}
         <a
           href="/main-settings/product-updates"
-          style={{ color: '#0091ae', fontWeight: 600, textDecoration: 'none' }}
+          style={{ color: '#0066CC', fontWeight: 600, textDecoration: 'none' }}
           onMouseEnter={(e) => (e.currentTarget.style.textDecoration = 'underline')}
           onMouseLeave={(e) => (e.currentTarget.style.textDecoration = 'none')}
         >
@@ -48,9 +49,9 @@ export const FeatureReleasesTabContent: React.FC = () => {
           style={{
             width: '18px',
             height: '18px',
-            border: `1.5px solid ${gradualRelease ? '#141414' : '#aaa'}`,
-            borderRadius: '3px',
-            background: gradualRelease ? '#141414' : '#fff',
+            border: `1.5px solid ${gradualRelease ? '#0066CC' : '#aaa'}`,
+            borderRadius: '6px',
+            background: gradualRelease ? '#0066CC' : '#fff',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -66,15 +67,15 @@ export const FeatureReleasesTabContent: React.FC = () => {
           )}
         </div>
         <div>
-          <div style={{ fontFamily: baseFont, fontSize: '14px', fontWeight: 400, color: '#141414', lineHeight: '1.5' }}>
+          <div style={{ fontFamily: baseFont, fontSize: MAIN_SETTINGS_FONT_SIZE.base, fontWeight: 400, color: '#141414', lineHeight: '1.5' }}>
             Put this account at the end of gradual feature releases
           </div>
           <div
             style={{
               fontFamily: baseFont,
-              fontSize: '13px',
-              fontWeight: 300,
-              color: '#555',
+              fontSize: MAIN_SETTINGS_FONT_SIZE.sm,
+              fontWeight: 400,
+              color: '#6c757d',
               marginTop: '3px',
               lineHeight: '1.5',
             }}
@@ -108,9 +109,9 @@ export const FeatureReleasesTabContent: React.FC = () => {
           style={{
             width: '18px',
             height: '18px',
-            border: `1.5px solid ${emailNotifications ? '#141414' : '#aaa'}`,
-            borderRadius: '3px',
-            background: emailNotifications ? '#141414' : '#fff',
+            border: `1.5px solid ${emailNotifications ? '#0066CC' : '#aaa'}`,
+            borderRadius: '6px',
+            background: emailNotifications ? '#0066CC' : '#fff',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -124,7 +125,7 @@ export const FeatureReleasesTabContent: React.FC = () => {
             </svg>
           )}
         </div>
-        <span style={{ fontFamily: baseFont, fontSize: '14px', fontWeight: 400, color: '#141414' }}>
+        <span style={{ fontFamily: baseFont, fontSize: MAIN_SETTINGS_FONT_SIZE.base, fontWeight: 400, color: '#141414' }}>
           Turn on email notifications
         </span>
       </button>

@@ -33,7 +33,7 @@ import RichTextEditor from "@page-modules/help-center/partials/RichTextEditor";
 import TaskSecondaryTabs from "@components/planner/workPlannerPagePartials/TaskSecondaryTabs";
 import { PlannerAddToMyDayHeaderButton } from "@components/planner/plannerTasksListing/PlannerAddToMyDayHeaderButton";
 import type { PlannerTaskEditScope } from "@planner/taskRowPermissions";
-import { getTaskAvatarColor } from "@utils/taskListing/taskListUiPrimitives";
+import { resolvePlannerCreatedTaskId } from "@page-modules/planner/my-day/myDayDomain";
 
 // ─── Types (from createtask-modal) ─────────────────────────────────────────────
 
@@ -120,11 +120,15 @@ interface Extension {
   extension_number?: string;
 }
 
+export type PlannerSidebarCreateSuccessMeta = Readonly<{
+  createdTaskId: number | null;
+}>;
+
 interface CreateTaskSidebarProps {
   isOpen?: boolean;
   onClose?: () => void;
-  onCreate?: (data: CreateTaskFormData) => void;
-  onCreateAndOpen?: (data: CreateTaskFormData) => void;
+  onCreate?: (data: CreateTaskFormData, meta?: PlannerSidebarCreateSuccessMeta) => void;
+  onCreateAndOpen?: (data: CreateTaskFormData, meta?: PlannerSidebarCreateSuccessMeta) => void;
   extensions?: Extension[];
   labels?: Label[];
   project?: Project;
@@ -148,6 +152,8 @@ interface CreateTaskSidebarProps {
   canAddToMyDay?: boolean;
   alreadyInMyDay?: boolean;
   onAddToMyDay?: () => void;
+  /** When creating from My Day, seed due/start date to the active plan date. */
+  defaultPlanDate?: string;
 }
 
 /** Minimal task shape used when editing in the sidebar (API / normalized task). */
@@ -251,7 +257,7 @@ interface TaskListRow {
   reference?: string;
 }
 
-interface CreateTaskFormData {
+export interface CreateTaskFormData {
   title: string;
   description: string;
   taskType: PlannerTaskTypeOrUnset;
@@ -2063,6 +2069,23 @@ function validatePlannerSidebarDueTimeRequiresDueDate(
   return false;
 }
 
+function validatePlannerSidebarStartDateMinBoundary(
+  formData: CreateTaskFormData,
+): boolean {
+  if (formData.taskType === "recurring") {
+    return true;
+  }
+  if (!formData.startDate.trim()) {
+    return true;
+  }
+  const today = todayLocalIsoDate();
+  if (formData.startDate < today) {
+    toast.error("Start date cannot be in the past");
+    return false;
+  }
+  return true;
+}
+
 function validatePlannerSidebarDueDateMinBoundary(
   formData: CreateTaskFormData,
 ): boolean {
@@ -2120,6 +2143,9 @@ function validatePlannerSidebarFormForSubmit(
   if (!validatePlannerSidebarDueTimeRequiresDueDate(formData, taskTypeEff)) {
     return false;
   }
+  if (!validatePlannerSidebarStartDateMinBoundary(formData)) {
+    return false;
+  }
   if (!validatePlannerSidebarDueDateMinBoundary(formData)) {
     return false;
   }
@@ -2154,11 +2180,16 @@ async function persistPlannerSidebarEditTask(
   );
 }
 
+type PlannerSidebarPersistOutcome = Readonly<{
+  ok: boolean;
+  createdTaskId: number | null;
+}>;
+
 async function persistPlannerSidebarCreateTask(
   ctx: PersistPlannerSidebarContext,
   taskTypeEff: PlannerTaskType,
   payload: Record<string, unknown>,
-): Promise<boolean> {
+): Promise<PlannerSidebarPersistOutcome> {
   if (taskTypeEff === "recurring") {
     const recurringPayload: Parameters<typeof createRecurringTask>[0] = {
       ...(payload as unknown as Parameters<typeof createRecurringTask>[0]),
@@ -2170,16 +2201,27 @@ async function persistPlannerSidebarCreateTask(
       recurringPayload.project_id = ctx.formData.projectId;
       recurringPayload.label_ids = ctx.formData.labelIds || [];
     }
-    return Boolean(await createRecurringTask(recurringPayload));
+    const created = await createRecurringTask(recurringPayload);
+    return {
+      ok: Boolean(created),
+      createdTaskId: resolvePlannerCreatedTaskId(created),
+    };
   }
   const withTz = { ...payload, timezone: getAutoTimezone() };
-  return Boolean(await createTask(withTz as Parameters<typeof createTask>[0]));
+  const created = await createTask(withTz as Parameters<typeof createTask>[0]);
+  if (!created) {
+    return { ok: false, createdTaskId: null };
+  }
+  return {
+    ok: true,
+    createdTaskId: resolvePlannerCreatedTaskId(created),
+  };
 }
 
 async function persistPlannerSidebarTaskFromPayload(
   payloadInput: Record<string, unknown>,
   ctx: PersistPlannerSidebarContext,
-): Promise<boolean> {
+): Promise<PlannerSidebarPersistOutcome> {
   const taskTypeEff = clampTaskTypeToAllowed(
     ctx.formData.taskType as PlannerTaskType,
     ctx.taskTypeOptions,
@@ -2200,7 +2242,8 @@ async function persistPlannerSidebarTaskFromPayload(
     payload = applyLimitedEditLockAssigneesAndWatchers(payload, locked);
   }
   if (ctx.isEdit && ctx.editTask?.id != null) {
-    return persistPlannerSidebarEditTask(ctx.editTask.id, taskTypeEff, payload);
+    const ok = await persistPlannerSidebarEditTask(ctx.editTask.id, taskTypeEff, payload);
+    return { ok, createdTaskId: null };
   }
   return persistPlannerSidebarCreateTask(ctx, taskTypeEff, payload);
 }
@@ -2316,11 +2359,28 @@ function shouldDeferPlannerSidebarOpenUntilProjectsLoaded(
   );
 }
 
+function applyMyDayDefaultPlanDateToForm(
+  data: CreateTaskFormData,
+  defaultPlanDate?: string,
+): CreateTaskFormData {
+  const planDate = defaultPlanDate?.trim() ?? "";
+  if (!planDate || data.taskType === "recurring") {
+    return data;
+  }
+  return mergeFormDataWithDueDateClamp({
+    ...data,
+    startDate: data.startDate.trim() ? data.startDate : planDate,
+    dueDate: data.dueDate.trim() ? data.dueDate : planDate,
+  });
+}
+
 function mergeOpenedPlannerSidebarFormData(
   rawInitial: CreateTaskFormData,
   taskTypeOptions: readonly PlannerTaskType[],
+  defaultPlanDate?: string,
 ): CreateTaskFormData {
-  const mergedOpen = mergeFormDataWithDueDateClamp(rawInitial);
+  const withPlanDate = applyMyDayDefaultPlanDateToForm(rawInitial, defaultPlanDate);
+  const mergedOpen = mergeFormDataWithDueDateClamp(withPlanDate);
   return {
     ...mergedOpen,
     taskType:
@@ -2361,8 +2421,8 @@ async function submitPlannerSidebarTask(params: {
   validateBeforeSubmit: () => boolean;
   setIsSubmitting: (value: boolean) => void;
   buildPayload: () => PlannerSidebarPayload;
-  persistTaskFromPayload: (payload: PlannerSidebarPayload) => Promise<boolean>;
-  onSuccess?: (data: CreateTaskFormData) => void;
+  persistTaskFromPayload: (payload: PlannerSidebarPayload) => Promise<PlannerSidebarPersistOutcome>;
+  onSuccess?: (data: CreateTaskFormData, meta?: PlannerSidebarCreateSuccessMeta) => void;
   formData: CreateTaskFormData;
   onClose?: () => void;
   isEdit: boolean;
@@ -2388,9 +2448,9 @@ async function submitPlannerSidebarTask(params: {
   setIsSubmitting(true);
   try {
     const payload = buildPayload();
-    const ok = await persistTaskFromPayload(payload);
-    if (ok) {
-      onSuccess?.(formData);
+    const outcome = await persistTaskFromPayload(payload);
+    if (outcome.ok) {
+      onSuccess?.(formData, { createdTaskId: outcome.createdTaskId });
       onClose?.();
     }
   } catch (error) {
@@ -2407,9 +2467,11 @@ function computePlannerSidebarStartDateChange(
   if (prev.taskType === "recurring") {
     return { ...prev, startDate: newStart };
   }
-  const minDue = minDueDateFromTodayAndStart(newStart);
+  const today = todayLocalIsoDate();
+  const clampedStart = newStart && newStart < today ? today : newStart;
+  const minDue = minDueDateFromTodayAndStart(clampedStart);
   const nextDue = clampDueDateToMin(prev.dueDate, minDue);
-  return { ...prev, startDate: newStart, dueDate: nextDue };
+  return { ...prev, startDate: clampedStart, dueDate: nextDue };
 }
 
 function emptyPlannerSidebarFormWhenClosed(
@@ -2701,6 +2763,7 @@ type PlannerSidebarFormOpenLifecycleParams = Readonly<{
   setSearchQuery: React.Dispatch<React.SetStateAction<string>>;
   setFormData: React.Dispatch<React.SetStateAction<CreateTaskFormData>>;
   openAsRecurringConversion: boolean;
+  defaultPlanDate?: string;
 }>;
 
 function usePlannerSidebarFormOpenLifecycle(
@@ -2735,6 +2798,7 @@ function usePlannerSidebarFormOpenLifecycle(
         mergeOpenedPlannerSidebarFormData(
           getInitialFormData(),
           taskTypeOptions,
+          params.defaultPlanDate,
         ),
       );
     } else {
@@ -2756,6 +2820,7 @@ function usePlannerSidebarFormOpenLifecycle(
     params.selectedStatusForTask,
     params.taskTypeOptions,
     params.openAsRecurringConversion,
+    params.defaultPlanDate,
   ]);
 }
 
@@ -2860,6 +2925,7 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
   canAddToMyDay = false,
   alreadyInMyDay = false,
   onAddToMyDay,
+  defaultPlanDate,
 }) => {
   const normalizedTaskTypeOptions =
     useNormalizedPlannerTaskTypeOptions(taskTypeChoices);
@@ -2906,8 +2972,6 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
   const [showAssigneeDropdown, setShowAssigneeDropdown] = useState(false);
   const [watcherSearchQuery, setWatcherSearchQuery] = useState("");
   const [showWatcherDropdown, setShowWatcherDropdown] = useState(false);
-  const assigneeDropdownRef = React.useRef<HTMLDivElement>(null);
-  const watcherDropdownRef = React.useRef<HTMLDivElement>(null);
   const {
     fetchedProjects,
     loadingProjects,
@@ -2990,19 +3054,6 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
     );
   }, [isOpen, fetchLinkRecordsForSearch]);
 
-  useEffect(() => {
-    const handleOutsideClick = (e: MouseEvent) => {
-      if (assigneeDropdownRef.current && !assigneeDropdownRef.current.contains(e.target as Node)) {
-        setShowAssigneeDropdown(false);
-      }
-      if (watcherDropdownRef.current && !watcherDropdownRef.current.contains(e.target as Node)) {
-        setShowWatcherDropdown(false);
-      }
-    };
-    document.addEventListener("mousedown", handleOutsideClick);
-    return () => document.removeEventListener("mousedown", handleOutsideClick);
-  }, []);
-
   usePlannerSidebarFormOpenLifecycle({
     isOpen,
     isEdit,
@@ -3017,6 +3068,7 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
     setSearchQuery,
     setFormData,
     openAsRecurringConversion,
+    defaultPlanDate,
   });
 
   usePlannerSidebarBodyScrollLock(isOpen);
@@ -3104,7 +3156,7 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
 
   const persistTaskFromPayload = async (
     payloadInput: ReturnType<typeof buildPayload>,
-  ): Promise<boolean> =>
+  ): Promise<PlannerSidebarPersistOutcome> =>
     persistPlannerSidebarTaskFromPayload(payloadInput, {
       formData,
       taskTypeOptions,
@@ -3438,7 +3490,7 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
               minHeight: 0,
               overflowY: "auto",
               padding: "14px 18px 22px",
-              backgroundColor: "#f5f7fa",
+              backgroundColor: conversionBodyTone,
             }}
           >
           <Form onSubmit={(e) => { e.preventDefault(); handleCreate(); }}>
@@ -3448,9 +3500,13 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
 
               <Row>
                 <Col xs={12}>
-                  <div style={{ fontSize: "13px", fontWeight: 600, letterSpacing: "0.04em", textTransform: "uppercase", color: "#4a5568", borderBottom: "1px solid #e2e8f0", paddingBottom: "8px", marginBottom: "14px", marginTop: "8px" }}>Task Details</div>
                   <Form.Group className={groupClass}>
                     <Form.Label style={labelStyle}>
+                      <FileText
+                        size={16}
+                        className="me-2"
+                        style={{ verticalAlign: "middle" }}
+                      />
                       Title <span style={{ color: "#ef4444" }}>*</span>
                     </Form.Label>
                     <div style={helperTextStyle}>Give your task a clear, descriptive name.</div>
@@ -3591,7 +3647,6 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
                 )}
 
                 <Col xs={12}>
-                  <div style={{ fontSize: "13px", fontWeight: 600, letterSpacing: "0.04em", textTransform: "uppercase", color: "#4a5568", borderBottom: "1px solid #e2e8f0", paddingBottom: "8px", marginBottom: "14px", marginTop: "8px" }}>People</div>
                   {!isRecurringConversionMode &&
                     formData.taskType !== "todo" && (
                       <fieldset
@@ -3615,10 +3670,63 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
                             <Form.Label
                               style={{ ...labelStyle, marginBottom: 0 }}
                             >
+                              <Users
+                                size={16}
+                                className="me-2"
+                                style={{ verticalAlign: "middle" }}
+                              />
                               Assigned To
                             </Form.Label>
                           </div>
                           <div style={helperTextStyle}>Who is responsible for completing this task?</div>
+                          <div
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "space-between",
+                              marginBottom: 8,
+                            }}
+                          >
+                            {!isLimitedTaskEdit && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setShowAssigneeDropdown(
+                                    !showAssigneeDropdown,
+                                  );
+                                  if (!showAssigneeDropdown)
+                                    setAssigneeSearchQuery("");
+                                }}
+                                style={{
+                                  backgroundColor: "rgb(255, 255, 255)",
+                                  borderColor: "rgb(138, 138, 138)",
+                                  color: "rgb(20, 20, 20)",
+                                  textDecoration: "none",
+                                  borderRadius: 4,
+                                  borderWidth: 1,
+                                  borderStyle: "solid",
+                                  verticalAlign: "middle",
+                                  paddingBlock: "8px",
+                                  paddingInline: "16px",
+                                  maxWidth: "100%",
+                                  fontFamily:
+                                    '"Lexend Deca", Helvetica, Arial, sans-serif',
+                                  fontSize: "12px",
+                                  fontWeight: 300,
+                                  letterSpacing: "0px",
+                                  lineHeight: "14px",
+                                  textUnderlineOffset: "24%",
+                                  display: "inline-flex",
+                                  alignItems: "center",
+                                  gap: 6,
+                                  cursor: "pointer",
+                                }}
+                              >
+                                <Plus size={14} />
+                                Add Assignee
+                              </button>
+                            )}
+                          </div>
                           <div
                             style={{
                               display: "flex",
@@ -3628,92 +3736,58 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
                               marginBottom: 8,
                             }}
                           >
-                            {selectedAssignees.map((user) => (
-                              <div
-                                key={`pre-${user.id}`}
-                                title={user.name}
-                                style={{ position: "relative", display: "inline-block" }}
-                              >
-                                <div
+                            {selectedAssignees.map((user) =>
+                              isLimitedTaskEdit ? (
+                                <span
+                                  key={user.id}
                                   style={{
-                                    width: 36,
-                                    height: 36,
-                                    borderRadius: "50%",
-                                    background: getTaskAvatarColor(user.name),
-                                    display: "flex",
+                                    display: "inline-flex",
                                     alignItems: "center",
-                                    justifyContent: "center",
-                                    fontSize: 13,
-                                    fontWeight: 600,
-                                    color: "#fff",
-                                    cursor: isLimitedTaskEdit ? "default" : "pointer",
-                                    border: "2px solid #fff",
-                                    boxShadow: "0 1px 3px rgba(0,0,0,0.15)",
+                                    gap: 8,
+                                    padding: "6px 12px",
+                                    borderRadius: 6,
+                                    backgroundColor: "#edf6ff",
+                                    border: "1px solid #bfdbfe",
+                                    fontSize: "0.875rem",
+                                    color: "#141414",
+                                    fontWeight: 500,
                                   }}
-                                  onClick={() => !isLimitedTaskEdit && toggleAssignee(user.id)}
                                 >
-                                  {user.name.charAt(0).toUpperCase()}
-                                </div>
-                                {!isLimitedTaskEdit && (
-                                  <div
+                                  {user.name}
+                                </span>
+                              ) : (
+                                <button
+                                  key={user.id}
+                                  type="button"
+                                  onClick={() => toggleAssignee(user.id)}
+                                  style={{
+                                    display: "inline-flex",
+                                    alignItems: "center",
+                                    gap: 8,
+                                    padding: "6px 12px",
+                                    borderRadius: 6,
+                                    backgroundColor: "#edf6ff",
+                                    border: "1px solid #bfdbfe",
+                                    fontSize: "0.875rem",
+                                    cursor: "pointer",
+                                    font: "inherit",
+                                  }}
+                                >
+                                  <span
                                     style={{
-                                      position: "absolute",
-                                      top: -4,
-                                      right: -4,
-                                      width: 16,
-                                      height: 16,
-                                      borderRadius: "50%",
-                                      backgroundColor: "#ef4444",
-                                      display: "flex",
-                                      alignItems: "center",
-                                      justifyContent: "center",
-                                      cursor: "pointer",
-                                      border: "1px solid #fff",
+                                      color: "#141414",
+                                      fontWeight: 500,
                                     }}
-                                    onClick={() => toggleAssignee(user.id)}
                                   >
-                                    <X size={9} color="#fff" />
-                                  </div>
-                                )}
-                              </div>
-                            ))}
-                            {!isLimitedTaskEdit && (
-                              <button
-                                type="button"
-                                title="Add Assignee"
-                                onClick={() => {
-                                  setShowAssigneeDropdown(!showAssigneeDropdown);
-                                  if (!showAssigneeDropdown) setAssigneeSearchQuery("");
-                                }}
-                                style={{
-                                  width: 36,
-                                  height: 36,
-                                  borderRadius: "50%",
-                                  border: "2px dashed #cbd5e0",
-                                  backgroundColor: "transparent",
-                                  display: "flex",
-                                  alignItems: "center",
-                                  justifyContent: "center",
-                                  cursor: "pointer",
-                                  color: "#718096",
-                                  transition: "all 0.15s ease",
-                                }}
-                                onMouseEnter={e => {
-                                  e.currentTarget.style.borderColor = "#0066CC";
-                                  e.currentTarget.style.color = "#0066CC";
-                                }}
-                                onMouseLeave={e => {
-                                  e.currentTarget.style.borderColor = "#cbd5e0";
-                                  e.currentTarget.style.color = "#718096";
-                                }}
-                              >
-                                <Plus size={16} />
-                              </button>
+                                    {user.name}
+                                  </span>
+                                  <X size={14} style={{ color: "#64748b" }} />
+                                </button>
+                              ),
                             )}
                           </div>
                           {showAssigneeDropdown && !isLimitedTaskEdit && (
                             <div
-                              ref={assigneeDropdownRef}
                               style={{
                                 border: "1px solid #e2e8f0",
                                 borderRadius: 4,
@@ -3758,16 +3832,12 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
                                           ? "#edf6ff"
                                           : "white",
                                       border: "none",
-                                      borderBottom: "1px solid #f0f0f0",
+                                      borderBottom: "1px solid #d5d5d5",
                                       width: "100%",
-                                      display: "flex",
-                                      alignItems: "center",
-                                      gap: 10,
                                       textAlign: "left",
                                       font: "inherit",
                                     }}
                                   >
-                                    <div style={{ width: 28, height: 28, borderRadius: "50%", background: getTaskAvatarColor(user.name), display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 600, color: "#fff", flexShrink: 0 }}>{user.name.charAt(0).toUpperCase()}</div>
                                     <span
                                       style={{
                                         fontSize: "13px",
@@ -3776,9 +3846,34 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
                                     >
                                       {user.name}
                                     </span>
-                                    {formData.assigneeIds.includes(user.id) && <span style={{ marginLeft: "auto", color: "#0066CC" }}>✓</span>}
+                                    {formData.assigneeIds.includes(user.id) && (
+                                      <Check
+                                        size={18}
+                                        className="text-primary ms-2"
+                                        style={{
+                                          flexShrink: 0,
+                                          display: "inline",
+                                          verticalAlign: "middle",
+                                        }}
+                                      />
+                                    )}
                                   </button>
                                 ))}
+                              <div
+                                className="p-2 border-top"
+                                style={{ backgroundColor: "white" }}
+                              >
+                                <button
+                                  type="button"
+                                  className="btn btn-primary btn-sm w-100"
+                                  onClick={() => {
+                                    setShowAssigneeDropdown(false);
+                                    setAssigneeSearchQuery("");
+                                  }}
+                                >
+                                  Done
+                                </button>
+                              </div>
                             </div>
                           )}
                         </Form.Group>
@@ -3810,10 +3905,61 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
                             <Form.Label
                               style={{ ...labelStyle, marginBottom: 0 }}
                             >
+                              <Eye
+                                size={16}
+                                className="me-2"
+                                style={{ verticalAlign: "middle" }}
+                              />
                               Watchers
                             </Form.Label>
                           </div>
                           <div style={helperTextStyle}>Who should be notified of updates on this task?</div>
+                          <div
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "space-between",
+                              marginBottom: 8,
+                            }}
+                          >
+                            {!isLimitedTaskEdit && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setShowWatcherDropdown(!showWatcherDropdown);
+                                  if (!showWatcherDropdown)
+                                    setWatcherSearchQuery("");
+                                }}
+                                style={{
+                                  backgroundColor: "rgb(255, 255, 255)",
+                                  borderColor: "rgb(138, 138, 138)",
+                                  color: "rgb(20, 20, 20)",
+                                  textDecoration: "none",
+                                  borderRadius: 4,
+                                  borderWidth: 1,
+                                  borderStyle: "solid",
+                                  verticalAlign: "middle",
+                                  paddingBlock: "8px",
+                                  paddingInline: "16px",
+                                  maxWidth: "100%",
+                                  fontFamily:
+                                    '"Lexend Deca", Helvetica, Arial, sans-serif',
+                                  fontSize: "12px",
+                                  fontWeight: 300,
+                                  letterSpacing: "0px",
+                                  lineHeight: "14px",
+                                  textUnderlineOffset: "24%",
+                                  display: "inline-flex",
+                                  alignItems: "center",
+                                  gap: 6,
+                                  cursor: "pointer",
+                                }}
+                              >
+                                <Plus size={14} />
+                                Add Watcher
+                              </button>
+                            )}
+                          </div>
                           <div
                             style={{
                               display: "flex",
@@ -3823,92 +3969,58 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
                               marginBottom: 8,
                             }}
                           >
-                            {selectedWatchers.map((user) => (
-                              <div
-                                key={`pre-${user.id}`}
-                                title={user.name}
-                                style={{ position: "relative", display: "inline-block" }}
-                              >
-                                <div
+                            {selectedWatchers.map((user) =>
+                              isLimitedTaskEdit ? (
+                                <span
+                                  key={user.id}
                                   style={{
-                                    width: 36,
-                                    height: 36,
-                                    borderRadius: "50%",
-                                    background: getTaskAvatarColor(user.name),
-                                    display: "flex",
+                                    display: "inline-flex",
                                     alignItems: "center",
-                                    justifyContent: "center",
-                                    fontSize: 13,
-                                    fontWeight: 600,
-                                    color: "#fff",
-                                    cursor: isLimitedTaskEdit ? "default" : "pointer",
-                                    border: "2px solid #fff",
-                                    boxShadow: "0 1px 3px rgba(0,0,0,0.15)",
+                                    gap: 8,
+                                    padding: "6px 12px",
+                                    borderRadius: 6,
+                                    backgroundColor: "#eef4ff",
+                                    border: "1px solid #bfdbfe",
+                                    fontSize: "0.875rem",
+                                    color: "#141414",
+                                    fontWeight: 500,
                                   }}
-                                  onClick={() => !isLimitedTaskEdit && toggleWatcher(user.id)}
                                 >
-                                  {user.name.charAt(0).toUpperCase()}
-                                </div>
-                                {!isLimitedTaskEdit && (
-                                  <div
+                                  {user.name}
+                                </span>
+                              ) : (
+                                <button
+                                  key={user.id}
+                                  type="button"
+                                  onClick={() => toggleWatcher(user.id)}
+                                  style={{
+                                    display: "inline-flex",
+                                    alignItems: "center",
+                                    gap: 8,
+                                    padding: "6px 12px",
+                                    borderRadius: 6,
+                                    backgroundColor: "#eef4ff",
+                                    border: "1px solid #bfdbfe",
+                                    fontSize: "0.875rem",
+                                    cursor: "pointer",
+                                    font: "inherit",
+                                  }}
+                                >
+                                  <span
                                     style={{
-                                      position: "absolute",
-                                      top: -4,
-                                      right: -4,
-                                      width: 16,
-                                      height: 16,
-                                      borderRadius: "50%",
-                                      backgroundColor: "#ef4444",
-                                      display: "flex",
-                                      alignItems: "center",
-                                      justifyContent: "center",
-                                      cursor: "pointer",
-                                      border: "1px solid #fff",
+                                      color: "#141414",
+                                      fontWeight: 500,
                                     }}
-                                    onClick={() => toggleWatcher(user.id)}
                                   >
-                                    <X size={9} color="#fff" />
-                                  </div>
-                                )}
-                              </div>
-                            ))}
-                            {!isLimitedTaskEdit && (
-                              <button
-                                type="button"
-                                title="Add Watcher"
-                                onClick={() => {
-                                  setShowWatcherDropdown(!showWatcherDropdown);
-                                  if (!showWatcherDropdown) setWatcherSearchQuery("");
-                                }}
-                                style={{
-                                  width: 36,
-                                  height: 36,
-                                  borderRadius: "50%",
-                                  border: "2px dashed #cbd5e0",
-                                  backgroundColor: "transparent",
-                                  display: "flex",
-                                  alignItems: "center",
-                                  justifyContent: "center",
-                                  cursor: "pointer",
-                                  color: "#718096",
-                                  transition: "all 0.15s ease",
-                                }}
-                                onMouseEnter={e => {
-                                  e.currentTarget.style.borderColor = "#0066CC";
-                                  e.currentTarget.style.color = "#0066CC";
-                                }}
-                                onMouseLeave={e => {
-                                  e.currentTarget.style.borderColor = "#cbd5e0";
-                                  e.currentTarget.style.color = "#718096";
-                                }}
-                              >
-                                <Plus size={16} />
-                              </button>
+                                    {user.name}
+                                  </span>
+                                  <X size={14} style={{ color: "#64748b" }} />
+                                </button>
+                              ),
                             )}
                           </div>
                           {showWatcherDropdown && !isLimitedTaskEdit && (
                             <div
-                              ref={watcherDropdownRef}
                               style={{
                                 border: "1px solid #e2e8f0",
                                 borderRadius: 4,
@@ -3951,16 +4063,12 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
                                           ? "#f0fdf4"
                                           : "white",
                                       border: "none",
-                                      borderBottom: "1px solid #f0f0f0",
+                                      borderBottom: "1px solid #d5d5d5",
                                       width: "100%",
-                                      display: "flex",
-                                      alignItems: "center",
-                                      gap: 10,
                                       textAlign: "left",
                                       font: "inherit",
                                     }}
                                   >
-                                    <div style={{ width: 28, height: 28, borderRadius: "50%", background: getTaskAvatarColor(user.name), display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 600, color: "#fff", flexShrink: 0 }}>{user.name.charAt(0).toUpperCase()}</div>
                                     <span
                                       style={{
                                         fontSize: "13px",
@@ -3969,7 +4077,17 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
                                     >
                                       {user.name}
                                     </span>
-                                    {formData.watcherIds.includes(user.id) && <span style={{ marginLeft: "auto", color: "#0066CC" }}>✓</span>}
+                                    {formData.watcherIds.includes(user.id) && (
+                                      <Check
+                                        size={18}
+                                        style={{
+                                          flexShrink: 0,
+                                          display: "inline",
+                                          verticalAlign: "middle",
+                                          color: "#22c55e",
+                                        }}
+                                      />
+                                    )}
                                   </button>
                                 ))}
                             </div>
@@ -3980,13 +4098,10 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
                 </Col>
 
               {!isRecurringConversionMode && (
-                <>
-                <Col xs={12}>
-                  <div style={{ fontSize: "13px", fontWeight: 600, letterSpacing: "0.04em", textTransform: "uppercase", color: "#4a5568", borderBottom: "1px solid #e2e8f0", paddingBottom: "8px", marginBottom: "14px", marginTop: "8px" }}>Schedule</div>
-                </Col>
                 <Col xs={12} md={6}>
                   <Form.Group className={groupClass}>
-                      <Form.Label style={labelStyle}>
+                    <Form.Label style={labelStyle}>
+                      <Calendar size={16} className="me-2" style={{ verticalAlign: "middle" }} />
                       Start Date
                       {formData.taskType === "recurring" && (
                         <span style={{ color: "#ef4444" }}> *</span>
@@ -3995,6 +4110,11 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
                     <div style={helperTextStyle}>When should work begin?</div>
                     <Form.Control
                       type="date"
+                      min={
+                        formData.taskType === "recurring"
+                          ? undefined
+                          : todayLocalIsoDate()
+                      }
                       value={formData.startDate}
                       onChange={handleStartDateInputChange}
                       className="py-2"
@@ -4003,12 +4123,12 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
                     />
                   </Form.Group>
                 </Col>
-                </>
               )}
               {formData.taskType !== "recurring" && (
               <Col xs={12} md={6}>
                 <Form.Group className={groupClass}>
                   <Form.Label style={labelStyle}>
+                    <Calendar size={16} className="me-2" style={{ verticalAlign: "middle" }} />
                     Due Date
                   </Form.Label>
                     <div style={helperTextStyle}>When must this be completed?</div>
@@ -4450,8 +4570,12 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
 
               {!isRecurringConversionMode && (
                 <Form.Group className={groupClass}>
-                  <div style={{ fontSize: "13px", fontWeight: 600, letterSpacing: "0.04em", textTransform: "uppercase", color: "#4a5568", borderBottom: "1px solid #e2e8f0", paddingBottom: "8px", marginBottom: "14px", marginTop: "8px" }}>More Details</div>
                   <Form.Label style={labelStyle}>
+                    <FileText
+                      size={16}
+                      className="me-2"
+                      style={{ verticalAlign: "middle" }}
+                    />
                     Description
                   </Form.Label>
                   <div style={helperTextStyle}>Add details, context, or instructions for this task.</div>
@@ -4475,6 +4599,11 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
                     <Col xs={12} className="mb-3">
                       <Form.Group className={groupClass}>
                         <Form.Label style={labelStyle}>
+                          <FolderOpen
+                            size={16}
+                            className="me-2"
+                            style={{ verticalAlign: "middle" }}
+                          />
                           Project
                           {formData.taskType === "recurring" && (
                             <span style={{ fontWeight: 400, color: "#6b7280" }}>
@@ -4507,6 +4636,11 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
                   <Col xs={6} className="mb-3">
                     <Form.Group className={groupClass}>
                       <Form.Label style={labelStyle}>
+                        <ListTodo
+                          size={16}
+                          className="me-2"
+                          style={{ verticalAlign: "middle" }}
+                        />
                         Status
                       </Form.Label>
                       <div style={helperTextStyle}>Current state of this task.</div>

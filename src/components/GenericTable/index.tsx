@@ -1,42 +1,56 @@
-import React, {
-  useState,
-  useMemo,
-  useRef,
-  useEffect,
-  useId,
-  useCallback,
-} from "react";
-import {
-  Table,
-  Form,
-  Button,
-  Dropdown,
-  Card,
-  InputGroup,
-} from "react-bootstrap";
-import {
-  ArrowUpDown,
-  ArrowUp,
-  ArrowDown,
-  Check,
-  ChevronLeft,
-  ChevronRight,
-  ChevronsLeft,
-  ChevronsRight,
-  Layers,
-  Search,
-  X,
-  Plus,
-  Filter,
-  MoreVertical,
-  Menu,
-} from "lucide-react";
+﻿import React, { useMemo, useCallback } from "react";
+import { Table, Form, Button, Dropdown, Card } from "react-bootstrap";
+import { ChevronRight, RotateCcw } from "lucide-react";
 import "@assets/css/GenericTable.css";
-import StatsCards, { StatsCardData } from "@components/GenericStatsCards";
-import { useRouter } from "next/router";
-import { sanitizeSearchInputLive } from "@utils/Helper";
+import { DROPDOWN_MENU_POPPER_CONFIG } from "./dropdownMenuPopperConfig";
+import { GenericTableMobileActionsMenu } from "./GenericTableMobileActionsMenu";
+import { GENERIC_TABLE_ACTION_COLUMN_KEY } from "./genericTableColumnResize";
+import { GenericTableToolbarSection } from "./GenericTableToolbarSection";
+import { GenericTablePaginationControls } from "./GenericTablePagination";
+import { GenericTableHeader } from "./GenericTableHeader";
+import { GenericTableColumnCustomizerDropdown } from "./GenericTableColumnCustomizerDropdown";
+import {
+  useGenericTableViewModel,
+  type GenericTableViewModel,
+} from "./useGenericTableViewModel";
+import {
+  getGenericTableCardClassName,
+  getGenericTableClassName,
+  getGenericTableContainerClassName,
+  getGenericTableResponsiveClassName,
+  getGenericTableScrollStyle,
+  shouldRenderDefaultTableBody,
+} from "./genericTableClassNames";
 
-const ACTION_COLUMN_KEY = "actions";
+import type { GenericTableProps } from "./genericTableProps";
+
+export type {
+  TabConfig,
+  FilterPill,
+  ToolbarTabsDropdownItem,
+  ToolbarConfig,
+} from "./genericTableTypes";
+
+export type { GenericTableProps, PaginationConfig } from "./genericTableProps";
+
+const ACTION_COLUMN_KEY = GENERIC_TABLE_ACTION_COLUMN_KEY;
+
+function isGenericTableInteractiveClickTarget(
+  target: EventTarget | null,
+): boolean {
+  if (!(target instanceof Element)) {
+    return false;
+  }
+  return Boolean(
+    target.closest(
+      'button, a, input, select, textarea, label, .dropdown-menu, .dropdown, [role="menu"], [role="menuitem"]',
+    ),
+  );
+}
+
+function isGenericTableActionColumnKey(columnKey: string): boolean {
+  return columnKey === ACTION_COLUMN_KEY || columnKey === "Action";
+}
 
 // Type definitions
 export interface TableColumn<T = any> {
@@ -364,7 +378,7 @@ function renderGtContextMenuItemRow(
   );
 }
 
-/** Shared markup for context menu rows (GenericTable right‑click + Kanban card menu). */
+/** Shared markup for context menu rows (GenericTable rightâ€‘click + Kanban card menu). */
 export const GtContextMenuItemList: React.FC<{
   items: GtContextMenuItemRow[];
   onClose: () => void;
@@ -375,230 +389,6 @@ export const GtContextMenuItemList: React.FC<{
     )}
   </>
 );
-
-export interface PaginationConfig {
-  currentPage: number;
-  rowsPerPage: number;
-  totalRows: number;
-  pageSizeOptions?: number[];
-}
-
-export interface TabConfig {
-  id: string;
-  label: string;
-  count?: number;
-  icon?: React.ReactNode;
-  removable?: boolean;
-}
-
-export interface FilterPill {
-  id: string;
-  label: string;
-  icon?: React.ReactNode;
-  onClick?: () => void;
-  showDropdown?: boolean;
-  searchable?: boolean;
-  /** Custom dropdown content (use instead of `dropdownOptions` when you need rich controls). */
-  dropdownContent?:
-    | React.ReactNode
-    | ((context: { closeMenu: () => void }) => React.ReactNode);
-  /** When true, pill is shown as active (filter applied) */
-  active?: boolean;
-  /** When filter is applied, show this label (e.g. selected owner name, "Today", "Hot Lead") */
-  activeLabel?: string;
-  /** When true and activeLabel exists, show only the activeLabel instead of `label: activeLabel`. */
-  activeLabelOnly?: boolean;
-  /** When filter is active, called when the clear (X) icon is clicked to remove the filter */
-  onClear?: () => void;
-  /** When true, dropdown stays open while selecting options. */
-  multiSelect?: boolean;
-  /** Optional select-all handler for multi-select filter pills. */
-  onSelectAll?: () => void;
-  /** Select-all button label for multi-select filter pills. */
-  selectAllLabel?: string;
-  dropdownOptions?: Array<{
-    label: string;
-    value: string;
-    selected?: boolean;
-    onClick?: () => void;
-  }>;
-  /** Override the default `Dropdown.Menu` inline styles (e.g. remove maxHeight/overflow for portalled selects). */
-  dropdownMenuStyle?: React.CSSProperties;
-}
-
-export interface ToolbarTabsDropdownItem {
-  label: string;
-  href?: string;
-  onClick?: () => void;
-  disabled?: boolean;
-}
-
-export interface ToolbarConfig {
-  // Search
-  showSearch?: boolean;
-  searchValue?: string;
-  searchPlaceholder?: string;
-  onSearchChange?: (value: string) => void;
-  onSearch?: () => void;
-  /**
-   * When > 0, `onSearchChange` is called after typing pauses (reduces API calls).
-   * Omit or set `0` for immediate updates (e.g. client-side filtering or parent-managed debounce).
-   */
-  searchDebounceMs?: number;
-
-  // Tabs
-  showTabs?: boolean;
-  tabs?: TabConfig[];
-  activeTab?: string;
-  onTabChange?: (tabId: string) => void;
-  onTabAdd?: () => void;
-  onTabRemove?: (tabId: string) => void;
-  tabsDropdownLabel?: string;
-  tabsDropdownItems?: ToolbarTabsDropdownItem[];
-
-  // View controls
-  showViewSwitcher?: boolean;
-  currentView?: "table" | "grid" | "list";
-  onViewChange?: (view: "table" | "grid" | "list") => void;
-
-  // Edit columns
-  showEditColumns?: boolean;
-  onEditColumnsClick?: () => void;
-
-  // Filters
-  showFiltersButton?: boolean;
-  onFiltersClick?: () => void;
-  showFilterPills?: boolean;
-  filterPills?: FilterPill[];
-  clearAllFilters?: () => void;
-  /** Controls whether the "+ More" pill is rendered in the filter pills row (defaults to true). */
-  showMoreFiltersButton?: boolean;
-  showAdvancedFilters?: boolean;
-  onAdvancedFiltersClick?: () => void;
-  /** When true, shows `advancedFiltersContent` inline beneath the filter pills row. */
-  advancedFiltersOpen?: boolean;
-  /** Inline advanced filters panel content (rendered when `advancedFiltersOpen` is true). */
-  advancedFiltersContent?: React.ReactNode;
-  /** Custom actions rendered at the end of the filter pills row (e.g., Apply/Reset buttons). */
-  filterPillsRightActions?: React.ReactNode;
-
-  // Sort
-  showSortButton?: boolean;
-  onSortClick?: () => void;
-
-  // Export
-  showExportButton?: boolean;
-  onExportClick?: () => void;
-
-  // Save
-  showSaveButton?: boolean;
-  onSaveClick?: () => void;
-
-  // Custom actions
-  customActions?: React.ReactNode;
-  rightActions?: React.ReactNode; // Right-aligned custom actions (e.g., Add Contacts button)
-
-  // Table view dropdown
-  showTableViewDropdown?: boolean;
-  tableViewLabel?: string;
-  onTableViewClick?: () => void;
-  /** When set, dropdown shows only "Table view" and "Board View"; label = current, menu = other option only */
-  currentTableView?: "table" | "board";
-  onTableViewChange?: (view: "table" | "board") => void;
-
-  // Pipelines/Groups dropdown
-  showPipelineDropdown?: boolean;
-  pipelineLabel?: string;
-  onPipelineClick?: () => void;
-
-  showImport?: boolean;
-  onImportClick?: () => void;
-
-  /** Path opened from the toolbar ⋮ → Settings item (default: Smart CRM settings). */
-  toolbarSettingsPath?: string;
-}
-
-export interface GenericTableProps<T = any> {
-  // Data
-  data: T[];
-  columns: TableColumn<T>[];
-
-  // Pagination
-  pagination?: PaginationConfig;
-  onPaginationChange?: (page: number, rowsPerPage: number) => void;
-
-  // Sorting
-  sortable?: boolean;
-  defaultSortBy?: string;
-  defaultSortOrder?: "asc" | "desc";
-  onSort?: (column: string, direction: "asc" | "desc") => void;
-
-  // Actions
-  actions?: TableAction<T>[];
-  showActions?: boolean;
-  actionsLabel?: string;
-
-  // Selection
-  selectable?: boolean;
-  selectedRows?: T[];
-  onSelectionChange?: (selected: T[]) => void;
-
-  // Column customization
-  customizableColumns?: boolean;
-  /** When provided, column selection is controlled by the parent (e.g. from ColumnEditorModal) */
-  selectedColumns?: string[];
-  defaultSelectedColumns?: string[];
-  onColumnChange?: (selectedColumns: string[]) => void;
-  columnStorageKey?: string;
-  /**
-   * Keeps the actions column visible. Defaults to true when row actions are enabled.
-   * Set false to let users hide Actions via the column picker.
-   */
-  pinActionsColumn?: boolean;
-
-  // Row interactions
-  onRowClick?: (row: T, index: number) => void;
-  onRowDoubleClick?: (row: T, index: number) => void;
-  onPreviewClick?: (row: T, index: number) => void; // Preview button click handler
-  onFirstColumnClick?: (row: T, index: number) => void; // First column click handler
-  rowClassName?: (row: T, index: number) => string;
-
-  // Styling
-  striped?: boolean;
-  hover?: boolean;
-  bordered?: boolean;
-  size?: "sm" | "md" | "lg";
-
-  // Loading & Empty states
-  loading?: boolean;
-  emptyMessage?: string | React.ReactNode;
-  loadingMessage?: string | React.ReactNode;
-
-  // Toolbar configuration
-  toolbar?: ToolbarConfig;
-  showToolbar?: boolean;
-
-  // Misc
-  uniqueKey?: string; // Key to use for row key (default: 'id')
-
-  // Fixed height mode
-  fixedHeight?: boolean; // Enable fixed height with scrollable body
-  maxHeight?: string; // Max height for the table body (e.g., 'calc(100vh - 300px)')
-
-  // Stats cards
-  statsCards?: StatsCardData[]; // Stats cards data to display above table
-  metricsGridMinWidth?: string; // Grid min width for metrics cards layout
-  metricsColumns?: number; // Fixed number of columns for metrics cards
-
-  // Hide toolbar actions (three dots menu)
-  showToolbarActions?: boolean;
-
-  // Remove border from table card
-  noBorder?: boolean;
-
-  /** When provided (e.g. when currentTableView === 'board'), render this instead of the table */
-  customBody?: React.ReactNode;
-}
 
 function safeStringifyValue(val: unknown): string {
   if (val === null || val === undefined) return "";
@@ -620,22 +410,6 @@ function truncateGtText(text: string | number, maxLength = 20): string {
   const str = String(text ?? "");
   if (str.length <= maxLength) return str;
   return `${str.slice(0, maxLength)}...`;
-}
-
-function parseStoredColumnKeys(
-  raw: string | null,
-  defaults: string[],
-): string[] | null {
-  if (!raw) return null;
-  try {
-    const parsed: unknown = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return null;
-    const keys = parsed.filter((c): c is string => typeof c === "string");
-    const allowed = new Set(defaults);
-    return keys.filter((key) => allowed.has(key));
-  } catch {
-    return null;
-  }
 }
 
 type GenericTableContextMenuItem<T extends Record<string, any>> = {
@@ -800,142 +574,6 @@ function renderGenericTableCellContent<T extends Record<string, any>>(
   }
 }
 
-function filterPillOptionsForQuery(
-  pill: FilterPill,
-  filterPillSearch: Record<string, string>,
-): NonNullable<FilterPill["dropdownOptions"]> {
-  const opts = pill.dropdownOptions ?? [];
-  if (opts.length === 0) return [];
-  const q = (filterPillSearch[pill.id] ?? "").trim().toLowerCase();
-  if (!pill.searchable || q.length === 0) return opts;
-  return opts.filter(
-    (o) =>
-      (o.label ?? "").toLowerCase().includes(q) ||
-      String(o.value ?? "")
-        .toLowerCase()
-        .includes(q),
-  );
-}
-
-function GenericTableFilterPillMenuBody({
-  pill,
-  filterPillSearch,
-  setFilterPillSearch,
-  closeMenu,
-}: Readonly<{
-  pill: FilterPill;
-  filterPillSearch: Record<string, string>;
-  setFilterPillSearch: React.Dispatch<
-    React.SetStateAction<Record<string, string>>
-  >;
-  closeMenu: () => void;
-}>) {
-  if (pill.dropdownContent) {
-    return (
-      <div className="px-2 py-2">
-        {typeof pill.dropdownContent === "function"
-          ? pill.dropdownContent({ closeMenu })
-          : pill.dropdownContent}
-      </div>
-    );
-  }
-
-  const hasOptions = Boolean(
-    pill.dropdownOptions && pill.dropdownOptions.length > 0,
-  );
-  const optionsToShow = hasOptions
-    ? filterPillOptionsForQuery(pill, filterPillSearch)
-    : [];
-
-  const clearPillQuery = () => {
-    setFilterPillSearch((prev) => ({ ...prev, [pill.id]: "" }));
-  };
-
-  return (
-    <>
-      {pill.searchable && hasOptions && (
-        <div className="px-2 pb-2">
-          <Form.Control
-            size="sm"
-            type="text"
-            placeholder="Search..."
-            value={filterPillSearch[pill.id] ?? ""}
-            onChange={(e) =>
-              setFilterPillSearch((prev) => ({
-                ...prev,
-                [pill.id]: e.target.value,
-              }))
-            }
-            autoFocus
-          />
-        </div>
-      )}
-      {pill.multiSelect && pill.onSelectAll && hasOptions && (
-        <>
-          <Dropdown.Item
-            key={`${pill.id}:__select_all__`}
-            className="fw-semibold"
-            onClick={() => {
-              pill.onSelectAll?.();
-            }}
-          >
-            {pill.selectAllLabel ?? "Select all"}
-          </Dropdown.Item>
-          <Dropdown.Divider className="my-0" />
-        </>
-      )}
-      {hasOptions ? (
-        <>
-          {optionsToShow.map((option) => (
-            <Dropdown.Item
-              key={`${pill.id}:${option.value}:${option.label}`}
-              onClick={() => {
-                (option.onClick || pill.onClick)?.();
-                clearPillQuery();
-                if (!pill.multiSelect) {
-                  closeMenu();
-                }
-              }}
-            >
-              <div className="d-flex align-items-center justify-content-between gap-2">
-                <span>{option.label}</span>
-                {option.selected && <Check size={14} aria-hidden />}
-              </div>
-            </Dropdown.Item>
-          ))}
-        </>
-      ) : (
-        <>
-          <Dropdown.Item
-            onClick={() => {
-              pill.onClick?.();
-              closeMenu();
-            }}
-          >
-            All
-          </Dropdown.Item>
-          <Dropdown.Item
-            onClick={() => {
-              pill.onClick?.();
-              closeMenu();
-            }}
-          >
-            Active
-          </Dropdown.Item>
-          <Dropdown.Item
-            onClick={() => {
-              pill.onClick?.();
-              closeMenu();
-            }}
-          >
-            Inactive
-          </Dropdown.Item>
-        </>
-      )}
-    </>
-  );
-}
-
 function GenericTableFirstColumnTrigger({
   children,
   onActivate,
@@ -989,6 +627,7 @@ function GenericTableBodyDataCell<T extends Record<string, any>>({
   onFirstColumnClick,
   onPreviewClick,
   hoveredRowIndex,
+  columnWidthStyle,
 }: Readonly<{
   col: TableColumn<T>;
   row: T;
@@ -997,6 +636,7 @@ function GenericTableBodyDataCell<T extends Record<string, any>>({
   onFirstColumnClick?: (row: T, index: number) => void;
   onPreviewClick?: (row: T, index: number) => void;
   hoveredRowIndex: number | null;
+  columnWidthStyle?: React.CSSProperties;
 }>) {
   const cellContent = renderGenericTableCellContent(col, row, index);
   const firstColumnClickable = colIdx === 0 && onFirstColumnClick !== undefined;
@@ -1004,18 +644,22 @@ function GenericTableBodyDataCell<T extends Record<string, any>>({
   return (
     <td
       className="generic-table-td"
+      data-col-key={col.key}
+      onClick={
+        isGenericTableActionColumnKey(col.key)
+          ? (e) => e.stopPropagation()
+          : undefined
+      }
+      onMouseDown={
+        isGenericTableActionColumnKey(col.key)
+          ? (e) => e.stopPropagation()
+          : undefined
+      }
       style={{
         verticalAlign: "top",
         textAlign: col.align || "left",
         position: colIdx === 0 ? "relative" : undefined,
-        ...(col.width
-          ? {
-              width: col.width,
-              maxWidth: col.width,
-              minWidth: 0,
-              overflow: "hidden",
-            }
-          : {}),
+        ...columnWidthStyle,
       }}
     >
       {firstColumnClickable ? (
@@ -1055,1376 +699,550 @@ function GenericTableRowActionsCell<T extends Record<string, any>>({
   rowStableKey: string;
   actions: TableAction<T>[];
 }>) {
+  const hasDesktopActions = actions.some((action) => {
+    if (action.show && !action.show(row)) return false;
+    if (action.render) return true;
+    if (action.dropdown) {
+      return action.dropdown.options.some(
+        (option) => !option.show || option.show(row),
+      );
+    }
+    return true;
+  });
+
   return (
     <>
-      {actions.map((action, actionIndex) => {
-        if (action.show && !action.show(row)) return null;
-        const actionStableKey = `gt-act-${rowStableKey}-${action.label}`;
+      {hasDesktopActions ? (
+        <div className="gt-row-actions gt-row-actions--desktop d-none d-md-flex align-items-center flex-nowrap">
+          {actions.map((action, actionIndex) => {
+            if (action.show && !action.show(row)) return null;
+            const actionStableKey = `gt-act-${rowStableKey}-${action.label}`;
 
-        if (action.render) {
-          return (
-            <React.Fragment key={actionStableKey}>
-              {action.render(row)}
-            </React.Fragment>
-          );
-        }
+            if (action.render) {
+              return (
+                <React.Fragment key={actionStableKey}>
+                  {action.render(row)}
+                </React.Fragment>
+              );
+            }
 
-        if (action.dropdown) {
-          const visibleOptions = action.dropdown.options.filter(
-            (option) => !option.show || option.show(row),
-          );
+            if (action.dropdown) {
+              const visibleOptions = action.dropdown.options.filter(
+                (option) => !option.show || option.show(row),
+              );
 
-          if (visibleOptions.length === 0) return null;
+              if (visibleOptions.length === 0) return null;
 
-          return (
-            <Dropdown key={actionStableKey} drop="down" align="end">
-              <Dropdown.Toggle
+              return (
+                <Dropdown key={actionStableKey} drop="down" align="end">
+                  <Dropdown.Toggle
+                    variant={action.variant || "link"}
+                    size="sm"
+                    className={action.className || ""}
+                    id={`dropdown-${rowStableKey}-${action.label}`}
+                  >
+                    {action.icon}
+                  </Dropdown.Toggle>
+                  <Dropdown.Menu
+                    renderOnMount
+                    popperConfig={DROPDOWN_MENU_POPPER_CONFIG}
+                    onMouseDown={(e) => {
+                      e.stopPropagation();
+                    }}
+                  >
+                    {visibleOptions.map((option, optionIndex) => {
+                      const optKey = `${actionStableKey}-opt-${option.label}`;
+                      const menuItem = (
+                        <Dropdown.Item
+                          key={optKey}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            option.onClick(row);
+                          }}
+                          className={option.className}
+                        >
+                          {option.icon && (
+                            <span className="me-2">{option.icon}</span>
+                          )}
+                          {option.label}
+                        </Dropdown.Item>
+                      );
+
+                      if (option.divider) {
+                        return (
+                          <React.Fragment key={`${optKey}-div`}>
+                            {menuItem}
+                            <Dropdown.Divider />
+                          </React.Fragment>
+                        );
+                      }
+
+                      return menuItem;
+                    })}
+                  </Dropdown.Menu>
+                </Dropdown>
+              );
+            }
+
+            const isDisabled = action.disabled?.(row);
+            const buttonEl = (
+              <Button
+                key={actionStableKey}
                 variant={action.variant || "link"}
                 size="sm"
-                className={action.className || ""}
-                id={`dropdown-${rowStableKey}-${action.label}`}
-              >
-                {action.icon}
-              </Dropdown.Toggle>
-              <Dropdown.Menu
-                onMouseDown={(e) => {
+                disabled={isDisabled}
+                onClick={(e) => {
                   e.stopPropagation();
-                }}
-              >
-                {visibleOptions.map((option, optionIndex) => {
-                  const optKey = `${actionStableKey}-opt-${option.label}`;
-                  const menuItem = (
-                    <Dropdown.Item
-                      key={optKey}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        option.onClick(row);
-                      }}
-                      className={option.className}
-                    >
-                      {option.icon && (
-                        <span className="me-2">{option.icon}</span>
-                      )}
-                      {option.label}
-                    </Dropdown.Item>
-                  );
-
-                  if (option.divider) {
-                    return (
-                      <React.Fragment key={`${optKey}-div`}>
-                        {menuItem}
-                        <Dropdown.Divider />
-                      </React.Fragment>
-                    );
+                  if (isDisabled) {
+                    return;
                   }
-
-                  return menuItem;
-                })}
-              </Dropdown.Menu>
-            </Dropdown>
-          );
-        }
-
-        const isDisabled = action.disabled?.(row);
-        const buttonEl = (
-          <Button
-            key={actionStableKey}
-            variant={action.variant || "link"}
-            size="sm"
-            disabled={isDisabled}
-            onClick={(e) => {
-              e.stopPropagation();
-              if (isDisabled) {
-                return;
-              }
-              action.onClick?.(row);
-            }}
-            className={`p-1 ${
-              isDisabled
-                ? `gt-action-disabled ${action.disabledClassName ?? ""}`
-                : action.className || ""
-            }`}
-            title={isDisabled ? undefined : action.label}
-          >
-            {action.icon || action.label}
-          </Button>
-        );
-        if (isDisabled && action.disabledTitle) {
-          return (
-            <span
-              key={actionStableKey}
-              className="gt-action-disabled-wrapper"
-              title={action.disabledTitle}
-            >
-              {buttonEl}
-            </span>
-          );
-        }
-        return buttonEl;
-      })}
+                  action.onClick?.(row);
+                }}
+                className={`p-1 ${
+                  isDisabled
+                    ? `gt-action-disabled ${action.disabledClassName ?? ""}`
+                    : action.className || ""
+                }`}
+                title={isDisabled ? undefined : action.label}
+              >
+                {action.icon || action.label}
+              </Button>
+            );
+            if (isDisabled && action.disabledTitle) {
+              return (
+                <span
+                  key={actionStableKey}
+                  className="gt-action-disabled-wrapper"
+                  title={action.disabledTitle}
+                >
+                  {buttonEl}
+                </span>
+              );
+            }
+            return buttonEl;
+          })}
+        </div>
+      ) : null}
+      <GenericTableMobileActionsMenu
+        row={row}
+        rowStableKey={rowStableKey}
+        actions={actions}
+      />
     </>
   );
 }
 
-const GenericTable = <T extends Record<string, any>>({
-  data,
-  columns,
-  pagination,
-  onPaginationChange,
-  sortable = true,
-  defaultSortBy = "",
-  defaultSortOrder = "asc",
-  onSort,
-  actions = [],
-  showActions = true,
-  actionsLabel = "Actions",
-  selectable = false,
-  selectedRows = [],
-  onSelectionChange,
-  customizableColumns = false,
-  selectedColumns: selectedColumnsProp,
-  defaultSelectedColumns,
-  onColumnChange,
-  columnStorageKey,
-  pinActionsColumn: pinActionsColumnProp,
-  onRowClick,
-  onRowDoubleClick,
-  onPreviewClick,
-  onFirstColumnClick,
-  rowClassName,
-  striped = false,
-  hover = true,
-  bordered = false,
-  size = "md",
-  loading = false,
-  emptyMessage = "No data available",
-  loadingMessage = "Loading...",
-  toolbar,
-  showToolbar = false,
-  uniqueKey = "id",
-  fixedHeight = false,
-  maxHeight = "calc(100vh - 300px)",
-  statsCards,
-  metricsGridMinWidth = "200px",
-  metricsColumns,
-  showToolbarActions = true,
-  noBorder = false,
-  customBody,
-}: GenericTableProps<T>) => {
-  const router = useRouter();
-  const columnCustomizerHeaderId = useId();
-  const columnCustomizerPlaceholderId = useId();
-  const columnCustomizerActionsHeaderId = useId();
-
-  const toolbarSearchDebounceMs = toolbar?.searchDebounceMs ?? 0;
-  const debounceToolbarSearch = Boolean(
-    showToolbar &&
-      toolbar?.showSearch &&
-      toolbar?.onSearchChange &&
-      toolbarSearchDebounceMs > 0,
-  );
-  const [toolbarSearchDraft, setToolbarSearchDraft] = useState(
-    () => toolbar?.searchValue ?? "",
-  );
-  useEffect(() => {
-    if (!debounceToolbarSearch) return;
-    setToolbarSearchDraft(toolbar?.searchValue ?? "");
-  }, [debounceToolbarSearch, toolbar?.searchValue]);
-
-  const onToolbarSearchChangeRef = useRef(toolbar?.onSearchChange);
-  onToolbarSearchChangeRef.current = toolbar?.onSearchChange;
-
-  useEffect(() => {
-    if (!debounceToolbarSearch) return;
-    const t = globalThis.setTimeout(() => {
-      onToolbarSearchChangeRef.current?.(toolbarSearchDraft);
-    }, toolbarSearchDebounceMs);
-    return () => globalThis.clearTimeout(t);
-  }, [debounceToolbarSearch, toolbarSearchDraft, toolbarSearchDebounceMs]);
-
-  // Sorting state (synced from props when parent controls sort, e.g. server-side)
-  const [sortBy, setSortBy] = useState(defaultSortBy);
-  const [sortOrder, setSortOrder] = useState<"asc" | "desc">(defaultSortOrder);
-  const baseActionsEnabled = showActions && actions.length > 0;
-  const pinActionsColumn = pinActionsColumnProp ?? baseActionsEnabled;
-  const allSelectableColumnKeys = useMemo(() => {
-    const keys = columns.map((c) => c.key);
-    if (baseActionsEnabled) keys.push(ACTION_COLUMN_KEY);
-    return keys;
-  }, [columns, baseActionsEnabled]);
-
-  useEffect(() => {
-    setSortBy(defaultSortBy);
-    setSortOrder(defaultSortOrder);
-  }, [defaultSortBy, defaultSortOrder]);
-
-  // Column selection state (uncontrolled when selectedColumns prop is not provided)
-  const [selectedColumns, setSelectedColumns] = useState<string[]>(() => {
-    if (selectedColumnsProp !== undefined) return selectedColumnsProp;
-    const defaults = defaultSelectedColumns || allSelectableColumnKeys;
-    if (columnStorageKey && globalThis.window !== undefined) {
-      const stored = parseStoredColumnKeys(
-        globalThis.localStorage.getItem(columnStorageKey),
-        defaults,
-      );
-      if (stored) {
-        if (
-          pinActionsColumn &&
-          baseActionsEnabled &&
-          !stored.includes(ACTION_COLUMN_KEY)
-        ) {
-          return [...stored, ACTION_COLUMN_KEY];
-        }
-        return stored;
-      }
-    }
-    return defaults.filter((key) => allSelectableColumnKeys.includes(key));
-  });
-
-  // Sync internal column selection when parent controls it (e.g. ColumnEditorModal apply)
-  const effectiveSelectedColumns = useMemo(() => {
-    const base = selectedColumnsProp ?? selectedColumns;
-    if (
-      pinActionsColumn &&
-      baseActionsEnabled &&
-      !base.includes(ACTION_COLUMN_KEY)
-    ) {
-      return [...base, ACTION_COLUMN_KEY];
-    }
-    return base;
-  }, [
-    selectedColumnsProp,
-    selectedColumns,
-    pinActionsColumn,
-    baseActionsEnabled,
-  ]);
-  // Keep a stable master list for the selector so hidden columns stay re-selectable.
-  const [columnCatalog, setColumnCatalog] = useState(columns);
-  useEffect(() => {
-    setColumnCatalog((prev) => {
-      const mergedByKey = new Map(prev.map((col) => [col.key, col]));
-      columns.forEach((col) => {
-        mergedByKey.set(col.key, col);
-      });
-      return Array.from(mergedByKey.values());
-    });
-  }, [columns]);
-  useEffect(() => {
-    setSelectedColumns((prev) => {
-      const source = selectedColumnsProp ?? prev;
-      const next = source.filter((key) =>
-        allSelectableColumnKeys.includes(key),
-      );
-      return next;
-    });
-  }, [allSelectableColumnKeys, selectedColumnsProp]);
-  useEffect(() => {
-    if (selectedColumnsProp !== undefined) {
-      setSelectedColumns(
-        selectedColumnsProp.filter((key) =>
-          allSelectableColumnKeys.includes(key),
-        ),
-      );
-    }
-  }, [selectedColumnsProp, allSelectableColumnKeys]);
-
-  useEffect(() => {
-    if (!pinActionsColumn || !baseActionsEnabled || selectedColumnsProp !== undefined) {
-      return;
-    }
-    setSelectedColumns((prev) => {
-      if (prev.includes(ACTION_COLUMN_KEY)) {
-        return prev;
-      }
-      const next = [...prev, ACTION_COLUMN_KEY];
-      if (columnStorageKey && globalThis.window !== undefined) {
-        globalThis.localStorage.setItem(
-          columnStorageKey,
-          JSON.stringify(next),
-        );
-      }
-      return next;
-    });
-  }, [
-    pinActionsColumn,
-    baseActionsEnabled,
-    selectedColumnsProp,
-    columnStorageKey,
-  ]);
-
-  const actionsColumnVisible =
-    baseActionsEnabled &&
-    (!customizableColumns ||
-      effectiveSelectedColumns.includes(ACTION_COLUMN_KEY));
-
-  // Context menu (right‑click) state
-  const [contextMenu, setContextMenu] = useState<{
-    x: number;
-    y: number;
-    row: T;
-  } | null>(null);
-  const contextMenuRef = useRef<HTMLDivElement>(null);
-
-  // Hover state for preview button
-  const [hoveredRowIndex, setHoveredRowIndex] = useState<number | null>(null);
-
-  // Filter pills visibility state (hidden by default)
-  const [showFilterPills, setShowFilterPills] = useState(
-    toolbar?.showFilterPills ?? false,
-  );
-
-  // Metrics visibility: show by default when stats cards exist (toolbar "Metrics" toggles collapse).
-  const [showMetrics, setShowMetrics] = useState(() => window.innerWidth >= 1920);
-  const [openFilterPillId, setOpenFilterPillId] = useState<string | null>(null);
-  const [filterPillSearch, setFilterPillSearch] = useState<
-    Record<string, string>
-  >({});
-
-  useEffect(() => {
-    if (toolbar?.showFilterPills !== undefined) {
-      setShowFilterPills(toolbar.showFilterPills);
-    }
-  }, [toolbar?.showFilterPills]);
-
-  const getBoundContextMenuItems = useMemo(() => {
-    return (row: T) => buildBoundTableContextMenuItems(actions, row);
-  }, [actions]);
-
-  // Close context menu on outside click or Escape
-  useEffect(() => {
-    if (!contextMenu) return;
-    const close = () => setContextMenu(null);
-    const onMouseDown = (e: MouseEvent) => {
-      if (
-        contextMenuRef.current &&
-        !contextMenuRef.current.contains(e.target as Node)
-      )
-        close();
-    };
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") close();
-    };
-    document.addEventListener("mousedown", onMouseDown);
-    document.addEventListener("keydown", onKeyDown);
-    return () => {
-      document.removeEventListener("mousedown", onMouseDown);
-      document.removeEventListener("keydown", onKeyDown);
-    };
-  }, [contextMenu]);
-
-  // Filter visible columns (use effective so controlled parent updates apply)
-  const visibleColumns = useMemo(() => {
-    if (!customizableColumns) return columns;
-    return columns.filter((col) => effectiveSelectedColumns.includes(col.key));
-  }, [columns, effectiveSelectedColumns, customizableColumns]);
-
-  /** No data columns and no actions column: still show the picker (e.g. optional row without actions). */
-  const showColumnPickerPlaceholder =
-    customizableColumns && visibleColumns.length === 0 && !actionsColumnVisible;
-
-  // Sortable columns for toolbar Sort dropdown
-  const sortableColumns = useMemo(
-    () =>
-      visibleColumns.filter(
-        (col) => sortable && col.sortable !== false && col.key,
-      ),
-    [visibleColumns, sortable],
-  );
-
-  const sortColumnDef = useMemo(
-    () => visibleColumns.find((col) => col.key === sortBy),
-    [visibleColumns, sortBy],
-  );
-
-  const getRowSortValue = useCallback(
-    (row: T): unknown => {
-      if (!sortBy) {
-        return "";
-      }
-      const fieldKey = sortColumnDef?.sortKey ?? sortBy;
-      return row[fieldKey as keyof T] ?? row[sortBy as keyof T] ?? "";
-    },
-    [sortBy, sortColumnDef?.sortKey],
-  );
-
-  const compareSortValues = useCallback(
-    (aVal: unknown, bVal: unknown): number => {
-      const aText = safeStringifyValue(aVal).trim();
-      const bText = safeStringifyValue(bVal).trim();
-
-      if (sortColumnDef?.type === "date") {
-        const aTime = Date.parse(aText);
-        const bTime = Date.parse(bText);
-        if (!Number.isNaN(aTime) && !Number.isNaN(bTime)) {
-          return sortOrder === "asc" ? aTime - bTime : bTime - aTime;
-        }
-      }
-
-      const aStr = aText.toLowerCase();
-      const bStr = bText.toLowerCase();
-      if (aStr < bStr) return sortOrder === "asc" ? -1 : 1;
-      if (aStr > bStr) return sortOrder === "asc" ? 1 : -1;
-      return 0;
-    },
-    [sortColumnDef?.type, sortOrder],
-  );
-
-  // Sort data (client-side if no onSort provided) — before selection handlers that depend on it
-  const sortedData = useMemo(() => {
-    if (onSort || !sortBy) return data;
-
-    return [...data].sort((a, b) =>
-      compareSortValues(getRowSortValue(a), getRowSortValue(b)),
-    );
-  }, [data, sortBy, onSort, compareSortValues, getRowSortValue]);
-
-  // Check if a row is selected
-  const isSelected = (row: T) => {
-    return selectedRows.some(
-      (selectedRow) =>
-        selectedRow[uniqueKey as keyof T] === row[uniqueKey as keyof T],
-    );
-  };
-
-  const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const branch = String(e.target.checked) as "true" | "false";
-    const selectAllHandlers: Record<"true" | "false", () => void> = {
-      true: () => onSelectionChange?.(sortedData),
-      false: () => onSelectionChange?.([]),
-    };
-    selectAllHandlers[branch]();
-  };
-
-  const applyRowCheckboxChange = (
+type GenericTableBodyRowsProps<T extends Record<string, any>> = Readonly<{
+  selectable: boolean;
+  visibleColumns: TableColumn<T>[];
+  showColumnPickerPlaceholder: boolean;
+  actionsColumnVisible: boolean;
+  loading: boolean;
+  loadingMessage: React.ReactNode;
+  sortedData: T[];
+  emptyMessage: React.ReactNode;
+  uniqueKey: string;
+  onRowClick?: (row: T, index: number) => void;
+  onRowDoubleClick?: (row: T, index: number) => void;
+  rowClassName?: (row: T, index: number) => string;
+  actions: TableAction<T>[];
+  getBoundContextMenuItems: (
+    row: T,
+  ) => ReturnType<typeof buildBoundTableContextMenuItems<T>>;
+  setContextMenu: React.Dispatch<
+    React.SetStateAction<{ x: number; y: number; row: T } | null>
+  >;
+  setHoveredRowIndex: React.Dispatch<React.SetStateAction<number | null>>;
+  isSelected: (row: T) => boolean;
+  applyRowCheckboxChange: (
     row: T,
     e: React.ChangeEvent<HTMLInputElement>,
-  ) => {
-    e.stopPropagation();
-    const branch = String(e.target.checked) as "true" | "false";
-    const rowCheckboxHandlers: Record<"true" | "false", () => void> = {
-      true: () => onSelectionChange?.([...selectedRows, row]),
-      false: () =>
-        onSelectionChange?.(
-          selectedRows.filter(
-            (r) => r[uniqueKey as keyof T] !== row[uniqueKey as keyof T],
-          ),
-        ),
-    };
-    rowCheckboxHandlers[branch]();
-  };
+  ) => void;
+  checkboxColumnWidthStyle: React.CSSProperties | undefined;
+  getColumnWidthStyle: (col: TableColumn<T>) => React.CSSProperties | undefined;
+  onFirstColumnClick?: (row: T, index: number) => void;
+  onPreviewClick?: (row: T, index: number) => void;
+  hoveredRowIndex: number | null;
+  actionsColumnWidthStyle: React.CSSProperties | undefined;
+}>;
 
-  // Handle sorting
-  const handleSort = (column: string) => {
-    if (!sortable) return;
+function GenericTableBodyRows<T extends Record<string, any>>({
+  selectable,
+  visibleColumns,
+  showColumnPickerPlaceholder,
+  actionsColumnVisible,
+  loading,
+  loadingMessage,
+  sortedData,
+  emptyMessage,
+  uniqueKey,
+  onRowClick,
+  onRowDoubleClick,
+  rowClassName,
+  actions,
+  getBoundContextMenuItems,
+  setContextMenu,
+  setHoveredRowIndex,
+  isSelected,
+  applyRowCheckboxChange,
+  checkboxColumnWidthStyle,
+  getColumnWidthStyle,
+  onFirstColumnClick,
+  onPreviewClick,
+  hoveredRowIndex,
+  actionsColumnWidthStyle,
+}: GenericTableBodyRowsProps<T>) {
+  const colSpan =
+    (selectable ? 1 : 0) +
+    visibleColumns.length +
+    (showColumnPickerPlaceholder ? 1 : 0) +
+    (actionsColumnVisible ? 1 : 0);
 
-    const newDirection =
-      sortBy === column && sortOrder === "asc" ? "desc" : "asc";
-    setSortBy(column);
-    setSortOrder(newDirection);
-
-    if (onSort) {
-      onSort(column, newDirection);
-    }
-  };
-
-  // Render sort icon
-  const renderSortIcon = (column: string) => {
-    if (sortBy !== column) {
-      return <ArrowUpDown size={14} className="ms-1 text-muted" />;
-    }
-    return sortOrder === "asc" ? (
-      <ArrowUp size={14} className="ms-1" />
-    ) : (
-      <ArrowDown size={14} className="ms-1" />
+  if (loading) {
+    return (
+      <tr>
+        <td colSpan={colSpan} className="text-center py-4">
+          <div className="generic-table-loading">{loadingMessage}</div>
+        </td>
+      </tr>
     );
-  };
+  }
 
-  // Handle column selection (when controlled, parent updates via onColumnChange)
-  const handleColumnToggle = (columnKey: string) => {
-    if (pinActionsColumn && columnKey === ACTION_COLUMN_KEY) {
-      return;
-    }
-    const current = effectiveSelectedColumns;
-    if (current.includes(columnKey) && current.length <= 1) {
-      return;
-    }
-    const newSelected = current.includes(columnKey)
-      ? current.filter((k) => k !== columnKey)
-      : [...current, columnKey];
+  if (sortedData.length === 0) {
+    return (
+      <tr>
+        <td colSpan={colSpan} className="text-center py-4">
+          <div className="generic-table-empty">{emptyMessage}</div>
+        </td>
+      </tr>
+    );
+  }
 
-    setSelectedColumns(newSelected);
-    if (columnStorageKey) {
-      globalThis.localStorage.setItem(
-        columnStorageKey,
-        JSON.stringify(newSelected),
-      );
-    }
-    if (onColumnChange) {
-      onColumnChange(newSelected);
-    }
-  };
-
-  const columnSelectorMenuPopperConfig = useMemo(
-    () => ({ strategy: "fixed" as const }),
-    [],
-  );
-
-  const filterPillMenuPopperConfig = useMemo(
-    () => ({
-      strategy: "fixed" as const,
-      modifiers: [
-        {
-          name: "preventOverflow",
-          options: {
-            boundary: "viewport",
-            padding: 8,
-            altAxis: true,
-          },
-        },
-        {
-          name: "flip",
-          options: {
-            fallbackPlacements: [
-              "bottom-start",
-              "top-start",
-              "bottom-end",
-              "top-end",
-            ],
-          },
-        },
-      ],
-    }),
-    [],
-  );
-
-  const renderColumnCustomizerDropdown = (toggleId: string) => (
-    <Dropdown
-      drop="down"
-      align="end"
-      autoClose="outside"
-      onClick={(e: React.MouseEvent) => e.stopPropagation()}
-    >
-      <Dropdown.Toggle
-        variant="link"
-        size="sm"
-        className="d-inline-flex align-items-center p-1 text-secondary text-decoration-none border-0"
-        id={toggleId}
-        style={{ minWidth: "auto" }}
+  return sortedData.map((row, index) => {
+    const rowKey = String(row[uniqueKey as keyof T] || index);
+    const isClickable = Boolean(onRowClick || onRowDoubleClick);
+    return (
+      <tr
+        key={rowKey}
+        onClick={(e) => {
+          if (isGenericTableInteractiveClickTarget(e.target)) {
+            return;
+          }
+          onRowClick?.(row, index);
+        }}
+        onDoubleClick={() => onRowDoubleClick?.(row, index)}
+        onMouseEnter={() => setHoveredRowIndex(index)}
+        onMouseLeave={() => setHoveredRowIndex(null)}
+        onContextMenu={(e) => {
+          if (actions.length === 0) return;
+          const items = getBoundContextMenuItems(row);
+          if (items.length === 0) return;
+          e.preventDefault();
+          e.stopPropagation();
+          setContextMenu({ x: e.clientX, y: e.clientY, row });
+        }}
+        className={`generic-table-row ${rowClassName?.(row, index) || ""} ${isClickable ? "clickable" : ""}`}
       >
-        <Layers size={18} />
-      </Dropdown.Toggle>
-      <Dropdown.Menu
-        align="end"
-        className="column-selector-menu"
-        renderOnMount
-        popperConfig={columnSelectorMenuPopperConfig}
-      >
-        {columnCatalog.map((c) => (
-          <Dropdown.Item key={c.key} as="div">
+        {selectable && (
+          <td
+            className="generic-table-td"
+            style={checkboxColumnWidthStyle}
+            onClick={(e) => e.stopPropagation()}
+          >
             <Form.Check
               type="checkbox"
-              label={c.label || c.key}
-              checked={effectiveSelectedColumns.includes(c.key)}
-              onChange={() => handleColumnToggle(c.key)}
+              checked={isSelected(row)}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                e.stopPropagation();
+                applyRowCheckboxChange(row, e);
+              }}
             />
-          </Dropdown.Item>
+          </td>
+        )}
+        {visibleColumns.map((col, colIdx) => (
+          <GenericTableBodyDataCell
+            key={col.key}
+            col={col}
+            row={row}
+            index={index}
+            colIdx={colIdx}
+            onFirstColumnClick={onFirstColumnClick}
+            onPreviewClick={onPreviewClick}
+            hoveredRowIndex={hoveredRowIndex}
+            columnWidthStyle={getColumnWidthStyle(col)}
+          />
         ))}
-        {baseActionsEnabled && (
-          <Dropdown.Item key={ACTION_COLUMN_KEY} as="div">
-            <Form.Check
-              type="checkbox"
-              label={actionsLabel}
-              checked={effectiveSelectedColumns.includes(ACTION_COLUMN_KEY)}
-              disabled={pinActionsColumn}
-              onChange={() => handleColumnToggle(ACTION_COLUMN_KEY)}
-            />
-          </Dropdown.Item>
+        {showColumnPickerPlaceholder && (
+          <td className="generic-table-td" style={{ width: "52px" }} />
         )}
-        <Dropdown.Divider />
-        <Dropdown.Item
-          onClick={() => {
-            const allKeys = columnCatalog.map((c) => c.key);
-            if (baseActionsEnabled && !allKeys.includes(ACTION_COLUMN_KEY)) {
-              allKeys.push(ACTION_COLUMN_KEY);
-            }
-            if (selectedColumnsProp === undefined) setSelectedColumns(allKeys);
-            if (columnStorageKey)
-              globalThis.localStorage.setItem(
-                columnStorageKey,
-                JSON.stringify(allKeys),
-              );
-            if (onColumnChange) onColumnChange(allKeys);
-          }}
-        >
-          Select All
-        </Dropdown.Item>
-        <Dropdown.Item
-          onClick={() => {
-            const defaultKeys =
-              defaultSelectedColumns || columnCatalog.map((c) => c.key);
-            if (selectedColumnsProp === undefined)
-              setSelectedColumns(defaultKeys);
-            if (columnStorageKey)
-              globalThis.localStorage.setItem(
-                columnStorageKey,
-                JSON.stringify(defaultKeys),
-              );
-            if (onColumnChange) onColumnChange(defaultKeys);
-          }}
-        >
-          Reset to Default
-        </Dropdown.Item>
-      </Dropdown.Menu>
-    </Dropdown>
+        {actionsColumnVisible && (
+          <td
+            className="generic-table-td generic-table-actions-cell"
+            data-col-key={ACTION_COLUMN_KEY}
+            style={actionsColumnWidthStyle}
+            onMouseDown={(e) => e.stopPropagation()}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="generic-table-actions">
+              <GenericTableRowActionsCell
+                row={row}
+                rowStableKey={rowKey}
+                actions={actions}
+              />
+            </div>
+          </td>
+        )}
+      </tr>
+    );
+  });
+}
+
+function GenericTableView<T extends Record<string, any>>({
+  vm,
+}: Readonly<{ vm: GenericTableViewModel<T> }>) {
+  const {
+    pagination,
+    onPaginationChange,
+    actions,
+    actionsLabel,
+    selectable,
+    customizableColumns,
+    selectedColumnsProp,
+    defaultSelectedColumns,
+    onColumnChange,
+    columnStorageKey,
+    resizableColumns,
+    pinActionsColumn,
+    onRowClick,
+    onRowDoubleClick,
+    onPreviewClick,
+    onFirstColumnClick,
+    rowClassName,
+    striped,
+    hover,
+    bordered,
+    size,
+    loading,
+    emptyMessage,
+    loadingMessage,
+    toolbar,
+    showToolbar,
+    uniqueKey,
+    fixedHeight,
+    maxHeight,
+    statsCards,
+    metricsGridMinWidth,
+    metricsColumns,
+    showToolbarActions,
+    noBorder,
+    customBody,
+    baseActionsEnabled,
+    actionsColumnVisible,
+    visibleColumns,
+    showColumnPickerPlaceholder,
+    columnCustomizerHeaderId,
+    columnCustomizerPlaceholderId,
+    columnCustomizerActionsHeaderId,
+    debounceToolbarSearch,
+    toolbarSearchDraft,
+    setToolbarSearchDraft,
+    flushDebouncedToolbarSearch,
+    columnCatalog,
+    setSelectedColumns,
+    effectiveSelectedColumns,
+    handleColumnToggle,
+    contextMenu,
+    setContextMenu,
+    contextMenuRef,
+    showFilterPills,
+    setShowFilterPills,
+    showMetrics,
+    setShowMetrics,
+    openFilterPillId,
+    setOpenFilterPillId,
+    filterPillSearch,
+    setFilterPillSearch,
+    hoveredRowIndex,
+    setHoveredRowIndex,
+    filterPillMenuPopperConfig,
+    tableScrollRef,
+    columnWidths,
+    hasCustomColumnWidths,
+    handleColumnResizeStart,
+    handleColumnWidthReset,
+    handleResetAllColumnWidths,
+    actionsColumnWidthStyle,
+    getColumnWidthStyle,
+    checkboxColumnWidthStyle,
+    resizedTableStyle,
+    sortable,
+    sortBy,
+    sortOrder,
+    sortableColumns,
+    sortedData,
+    handleSort,
+    isSelected,
+    handleSelectAll,
+    applyRowCheckboxChange,
+  } = vm;
+
+  const getBoundContextMenuItems = useMemo(
+    () => (row: T) => buildBoundTableContextMenuItems(actions, row),
+    [actions],
   );
 
-  // Default CRM dropdown items (backward compatibility fallback)
-  const defaultCrmDropdownItems: ToolbarTabsDropdownItem[] = [
-    { label: "Prospects", href: "/crm/prospects" },
-    { label: "Leads", href: "/crm/leads" },
-    { label: "Deals", href: "/crm/deals" },
-    { label: "Orders", href: "/crm/orders" },
-    { label: "Company", href: "/crm/companies" },
-    { label: "Inbox", href: "/crm/inbox" },
-    { label: "Approvals", href: "/crm/approvals" },
-  ];
+  const renderColumnCustomizer = useCallback(
+    (toggleId: string) => (
+      <GenericTableColumnCustomizerDropdown
+        toggleId={toggleId}
+        columnCatalog={columnCatalog}
+        effectiveSelectedColumns={effectiveSelectedColumns}
+        baseActionsEnabled={baseActionsEnabled}
+        actionsLabel={actionsLabel}
+        pinActionsColumn={pinActionsColumn}
+        onColumnToggle={handleColumnToggle}
+        selectedColumnsProp={selectedColumnsProp}
+        setSelectedColumns={setSelectedColumns}
+        defaultSelectedColumns={defaultSelectedColumns}
+        columnStorageKey={columnStorageKey}
+        onColumnChange={onColumnChange}
+        resizableColumns={resizableColumns}
+        hasCustomColumnWidths={hasCustomColumnWidths}
+        onResetAllColumnWidths={handleResetAllColumnWidths}
+      />
+    ),
+    [
+      columnCatalog,
+      effectiveSelectedColumns,
+      baseActionsEnabled,
+      actionsLabel,
+      pinActionsColumn,
+      handleColumnToggle,
+      selectedColumnsProp,
+      setSelectedColumns,
+      defaultSelectedColumns,
+      columnStorageKey,
+      onColumnChange,
+      resizableColumns,
+      hasCustomColumnWidths,
+      handleResetAllColumnWidths,
+    ],
+  );
 
-  // Render toolbar
-  const renderToolbar = () => {
-    if (!showToolbar || !toolbar) return null;
+  const cardClassName = getGenericTableCardClassName(noBorder);
+  const containerClassName = getGenericTableContainerClassName(
+    resizableColumns,
+    hasCustomColumnWidths,
+  );
+  const responsiveClassName = getGenericTableResponsiveClassName(
+    fixedHeight,
+    resizableColumns,
+    hasCustomColumnWidths,
+  );
+  const tableClassName = getGenericTableClassName(
+    resizableColumns,
+    hasCustomColumnWidths,
+  );
+  const scrollStyle = getGenericTableScrollStyle(fixedHeight, maxHeight);
+  const showDefaultTable = shouldRenderDefaultTableBody(customBody);
 
-    let tableViewToggleLabel: string = toolbar.tableViewLabel || "Table view";
-    if (toolbar.currentTableView !== undefined) {
-      tableViewToggleLabel =
-        toolbar.currentTableView === "table" ? "Table view" : "Board View";
-    }
-
-    return (
-      <div className="gt-toolbar-container">
-        {/* Tabs Section */}
-        {toolbar.showTabs && toolbar.tabs && toolbar.tabs.length > 0 && (
-          <div className="gt-toolbar-tabs-section">
-            <div className="d-flex align-items-center gap-3">
-              {/* Dropdown: use provided items or fall back to default CRM items */}
-              {toolbar.tabsDropdownLabel && (
-                <Dropdown>
-                  <Dropdown.Toggle
-                    variant="outline-secondary"
-                    size="sm"
-                    className="gt-toolbar-dropdown"
-                  >
-                    <span>{toolbar.tabsDropdownLabel}</span>
-                  </Dropdown.Toggle>
-                  <Dropdown.Menu style={{ zIndex: "99" }}>
-                    {(toolbar.tabsDropdownItems ?? defaultCrmDropdownItems).map(
-                      (item) => {
-                        const handleItemClick = () => {
-                          if (item.disabled) {
-                            return;
-                          }
-                          if (item.onClick) {
-                            item.onClick();
-                            return;
-                          }
-                          if (item.href) {
-                            router.push(item.href);
-                          }
-                        };
-
-                        return (
-                          <Dropdown.Item
-                            key={item.label}
-                            disabled={item.disabled}
-                            onClick={handleItemClick}
-                          >
-                            {item.label}
-                          </Dropdown.Item>
-                        );
-                      },
-                    )}
-                  </Dropdown.Menu>
-                </Dropdown>
-              )}
-
-              {/* Tabs */}
-              <div className="d-flex align-items-center gap-2">
-                {toolbar.tabs.map((tab) => (
-                  <button
-                    key={tab.id}
-                    onClick={() => toolbar.onTabChange?.(tab.id)}
-                    className={`gt-tab-button ${
-                      toolbar.activeTab === tab.id ? "active" : ""
-                    }`}
-                  >
-                    {tab.icon && (
-                      <span className="gt-tab-icon">{tab.icon}</span>
-                    )}
-                    <span>{tab.label}</span>
-                    {tab.count !== undefined && (
-                      <span className="gt-tab-count">{tab.count}</span>
-                    )}
-                    {tab.removable && (
-                      <button
-                        className="gt-tab-close"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          toolbar.onTabRemove?.(tab.id);
-                        }}
-                      >
-                        <X size={12} />
-                      </button>
-                    )}
-                  </button>
-                ))}
-                {toolbar.onTabAdd && (
-                  <button
-                    className="gt-tab-add-button"
-                    onClick={toolbar.onTabAdd}
-                  >
-                    <Plus size={16} />
-                  </button>
-                )}
-              </div>
-
-              {/* Right-aligned custom actions (e.g., Add Contacts) */}
-              {toolbar.rightActions && (
-                <div style={{ marginLeft: "auto" }}>{toolbar.rightActions}</div>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* Search and Toolbar Actions */}
-        <div className="gt-toolbar-main">
-          {/* Left: Search */}
-          {toolbar.showSearch && (
-            <div className="gt-toolbar-search">
-              <InputGroup size="sm">
-                <InputGroup.Text className="gt-search-icon">
-                  <Search size={16} />
-                </InputGroup.Text>
-                <Form.Control
-                  type="text"
-                  placeholder={toolbar.searchPlaceholder || "Search"}
-                  value={
-                    debounceToolbarSearch
-                      ? toolbarSearchDraft
-                      : toolbar.searchValue || ""
-                  }
-                  onChange={(e) => {
-                    const v = sanitizeSearchInputLive(e.target.value);
-                    if (debounceToolbarSearch) {
-                      setToolbarSearchDraft(v);
-                    } else {
-                      toolbar.onSearchChange?.(v);
-                    }
-                  }}
-                  onPaste={(e) => {
-                    const target = e.currentTarget;
-                    globalThis.setTimeout(() => {
-                      const v = sanitizeSearchInputLive(target.value);
-                      if (debounceToolbarSearch) {
-                        setToolbarSearchDraft(v);
-                      } else {
-                        toolbar.onSearchChange?.(v);
-                      }
-                    }, 0);
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && toolbar.onSearch) {
-                      if (debounceToolbarSearch) {
-                        onToolbarSearchChangeRef.current?.(
-                          sanitizeSearchInputLive(toolbarSearchDraft),
-                        );
-                      }
-                      toolbar.onSearch();
-                    }
-                  }}
-                  className="gt-search-input"
-                />
-              </InputGroup>
-            </div>
-          )}
-
-          {/* Right: Toolbar Actions */}
-          <div className="gt-toolbar-actions">
-            {/* Table View Dropdown */}
-            {toolbar.showTableViewDropdown && (
-              <Dropdown>
-                <Dropdown.Toggle
-                  variant="outline-secondary"
-                  size="sm"
-                  className="gt-toolbar-btn"
-                >
-                  <Menu size={16} className="me-1" />
-                  <span>{tableViewToggleLabel}</span>
-                </Dropdown.Toggle>
-                <Dropdown.Menu>
-                  {toolbar.currentTableView !== undefined &&
-                  toolbar.onTableViewChange ? (
-                    <>
-                      {toolbar.currentTableView === "table" && (
-                        <Dropdown.Item
-                          onClick={() => toolbar.onTableViewChange?.("board")}
-                        >
-                          Board View
-                        </Dropdown.Item>
-                      )}
-                      {toolbar.currentTableView === "board" && (
-                        <Dropdown.Item
-                          onClick={() => toolbar.onTableViewChange?.("table")}
-                        >
-                          Table view
-                        </Dropdown.Item>
-                      )}
-                    </>
-                  ) : (
-                    <>
-                      <Dropdown.Item onClick={toolbar.onTableViewClick}>
-                        Table
-                      </Dropdown.Item>
-                      <Dropdown.Item>Grid</Dropdown.Item>
-                      <Dropdown.Item>List</Dropdown.Item>
-                    </>
-                  )}
-                </Dropdown.Menu>
-              </Dropdown>
-            )}
-
-            {/* Edit Columns */}
-            {toolbar.showEditColumns && (
-              <Button
-                variant="outline-secondary"
-                size="sm"
-                className="gt-toolbar-btn"
-                onClick={toolbar.onEditColumnsClick}
-              >
-                Edit columns
-              </Button>
-            )}
-
-            {/* Pipeline Dropdown */}
-            {toolbar.showPipelineDropdown && (
-              <Dropdown>
-                <Dropdown.Toggle
-                  variant="outline-secondary"
-                  size="sm"
-                  className="gt-toolbar-btn"
-                >
-                  <span>{toolbar.pipelineLabel || "All Pipelines"}</span>
-                </Dropdown.Toggle>
-                <Dropdown.Menu onClick={toolbar.onPipelineClick}>
-                  <Dropdown.Item>All Pipelines</Dropdown.Item>
-                  <Dropdown.Item>Sales Pipeline</Dropdown.Item>
-                  <Dropdown.Item>Marketing Pipeline</Dropdown.Item>
-                </Dropdown.Menu>
-              </Dropdown>
-            )}
-
-            {/* Filters */}
-            {toolbar.showFiltersButton && (
-              <Button
-                variant="outline-secondary"
-                size="sm"
-                className="gt-toolbar-btn"
-                onClick={() => setShowFilterPills(!showFilterPills)}
-              >
-                Filters
-              </Button>
-            )}
-
-            {/* Sort */}
-            {toolbar.showSortButton &&
-              (toolbar.onSortClick ? (
-                <Button
-                  variant="outline-secondary"
-                  size="sm"
-                  className="gt-toolbar-btn"
-                  onClick={toolbar.onSortClick}
-                >
-                  Sort
-                </Button>
-              ) : (
-                <Dropdown align="end">
-                  <Dropdown.Toggle
-                    variant="outline-secondary"
-                    size="sm"
-                    className="gt-toolbar-btn"
-                  >
-                    Sort
-                  </Dropdown.Toggle>
-                  <Dropdown.Menu>
-                    {sortableColumns.length === 0 ? (
-                      <Dropdown.Item disabled>
-                        No sortable columns
-                      </Dropdown.Item>
-                    ) : (
-                      sortableColumns.map((col) => (
-                        <Dropdown.Item
-                          key={col.key}
-                          onClick={() => handleSort(col.key)}
-                        >
-                          {col.label}
-                          {sortBy === col.key &&
-                            (sortOrder === "asc" ? " ↑" : " ↓")}
-                        </Dropdown.Item>
-                      ))
-                    )}
-                  </Dropdown.Menu>
-                </Dropdown>
-              ))}
-
-            {statsCards && statsCards.length > 0 && (
-              <Button
-                variant="outline-secondary"
-                size="sm"
-                className="gt-toolbar-btn"
-                onClick={() => setShowMetrics(!showMetrics)}
-              >
-                Metrics
-              </Button>
-            )}
-
-            {/* Export */}
-            {toolbar.showExportButton && (
-              <Button
-                variant="outline-secondary"
-                size="sm"
-                className="gt-toolbar-btn"
-                onClick={toolbar.onExportClick}
-              >
-                Export
-              </Button>
-            )}
-
-            {/* Actions Menu */}
-            {showToolbarActions && (
-              <Dropdown>
-                <Dropdown.Toggle
-                  variant="outline-secondary"
-                  size="sm"
-                  className="gt-toolbar-btn gt-icon-btn"
-                >
-                  <MoreVertical size={16} />
-                </Dropdown.Toggle>
-                <Dropdown.Menu align="end">
-                  {toolbar.showImport && (
-                    <Dropdown.Item onClick={toolbar.onImportClick}>
-                      Import
-                    </Dropdown.Item>
-                  )}
-                  <Dropdown.Divider />
-                  <Dropdown.Item
-                    onClick={() => {
-                      const path =
-                        toolbar.toolbarSettingsPath ??
-                        "/main-settings/smart-crm";
-                      if (globalThis.window === undefined) {
-                         router.push(path);
-                        return;
-                      }
-                      const win = globalThis.open(
-                        path,
-                        "_blank",
-                        "noopener,noreferrer",
-                      );
-                      if (win != null) {
-                        win.opener = null;
-                      }
-                    }}
-                  >
-                    Settings
-                  </Dropdown.Item>
-                </Dropdown.Menu>
-              </Dropdown>
-            )}
-
-            {/* Custom Actions */}
-            {toolbar.customActions}
-
-            {/* Right-aligned actions (shown here when no tabs section is rendered) */}
-            {(!toolbar.showTabs ||
-              !toolbar.tabs ||
-              toolbar.tabs.length === 0) &&
-              toolbar.rightActions}
-          </div>
-        </div>
-
-        {/* Filter Pills */}
-        {showFilterPills &&
-          toolbar.filterPills &&
-          toolbar.filterPills.length > 0 && (
-            <div className="gt-filter-pills">
-              <div className="d-flex align-items-center gap-2 flex-wrap">
-                {(() => {
-                  const activePills = toolbar.filterPills.filter(p => p.active);
-                  const inactivePills = toolbar.filterPills.filter(p => !p.active);
-                  const allPills = [...activePills, ...inactivePills];
-                  const separatorIndex = activePills.length > 0 && inactivePills.length > 0 ? activePills.length : -1;
-                  return allPills.map((pill, idx) => (
-                    <React.Fragment key={pill.id}>
-                      {idx === separatorIndex && (
-                        <span style={{ color: '#cbd5e1', fontSize: '16px', userSelect: 'none' }}>|</span>
-                      )}
-                      {pill.showDropdown ? (
-                    <Dropdown
-                      show={openFilterPillId === pill.id}
-                      autoClose={pill.multiSelect ? "outside" : true}
-                      onToggle={(nextShow) =>
-                        setOpenFilterPillId(nextShow ? pill.id : null)
-                      }
-                    >
-                      <Dropdown.Toggle
-                        variant={pill.active ? "primary" : "outline-secondary"}
-                        size="sm"
-                        className={`gt-filter-pill${pill.active ? " gt-filter-pill-active" : ""}`}
-                      >
-                        {pill.icon && <span className="me-1">{pill.icon}</span>}
-                        <span>
-                          {pill.active &&
-                          pill.activeLabel &&
-                          pill.activeLabelOnly
-                            ? pill.activeLabel
-                            : pill.label}
-                        </span>
-                        {pill.active &&
-                          pill.activeLabel &&
-                          !pill.activeLabelOnly && (
-                            <span className="gt-filter-pill-value">
-                              : {pill.activeLabel}
-                            </span>
-                          )}
-                        {pill.active && !pill.activeLabel && (
-                          <span
-                            className="gt-filter-pill-dot"
-                            title="Filter applied"
-                          />
-                        )}
-                        {pill.active && pill.onClear && (
-                          <button
-                            type="button"
-                            className="gt-filter-pill-clear"
-                            onClick={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              pill.onClear?.();
-                            }}
-                            title="Clear filter"
-                            aria-label="Clear filter"
-                          >
-                            <X size={14} aria-hidden />
-                          </button>
-                        )}
-                      </Dropdown.Toggle>
-                      <Dropdown.Menu
-                        renderOnMount
-                        style={
-                          pill.dropdownMenuStyle ?? {
-                            maxHeight: "280px",
-                            overflowY: "auto",
-                            overflowX: "hidden",
-                            maxWidth: "min(320px, calc(100vw - 24px))",
-                          }
-                        }
-                        popperConfig={filterPillMenuPopperConfig}
-                        onMouseDown={(e) => e.stopPropagation()}
-                      >
-                        <GenericTableFilterPillMenuBody
-                          pill={pill}
-                          filterPillSearch={filterPillSearch}
-                          setFilterPillSearch={setFilterPillSearch}
-                          closeMenu={() => setOpenFilterPillId(null)}
-                        />
-                      </Dropdown.Menu>
-                    </Dropdown>
-                  ) : (
-                    <button
-                      className="gt-filter-pill"
-                      onClick={pill.onClick}
-                    >
-                      {pill.icon && <span className="me-1">{pill.icon}</span>}
-                      <span>{pill.label}</span>
-                    </button>
-                  )}
-                    </React.Fragment>
-                  ));
-                })()}
-                {toolbar.showMoreFiltersButton !== false && (
-                  <button className="gt-filter-pill-add">
-                    <Plus size={14} className="me-1" />
-                    <span>More</span>
-                  </button>
-                )}
-                {toolbar.showAdvancedFilters && (
-                  <span style={{ color: '#cbd5e1', fontSize: '16px', userSelect: 'none' }}>|</span>
-                )}
-                {toolbar.showAdvancedFilters && (
-                  <button
-                    className="gt-filter-pill-add"
-                    onClick={toolbar.onAdvancedFiltersClick}
-                  >
-                    <Filter size={14} className="me-1" />
-                    <span>Advanced filters</span>
-                  </button>
-                )}
-                {toolbar.filterPills && toolbar.filterPills.some(p => p.active) && (
-                  <button
-                    className="gt-filter-pill-add"
-                    style={{ color: '#DC2626' }}
-                    onClick={() => {
-                      if (toolbar.clearAllFilters) {
-                        toolbar.clearAllFilters();
-                      } else {
-                        toolbar.filterPills?.filter(p => p.active && p.onClear).forEach(p => p.onClear?.());
-                      }
-                    }}
-                  >
-                    <span>Clear all</span>
-                  </button>
-                )}
-                {toolbar.filterPillsRightActions && (
-                  <div className="gt-filter-pills-right-actions d-flex align-items-center gap-2 ms-auto">
-                    {toolbar.filterPillsRightActions}
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
-        {toolbar?.advancedFiltersOpen && toolbar.advancedFiltersContent && (
-          <div className="gt-advanced-filters">
-            {toolbar.advancedFiltersContent}
-          </div>
-        )}
-
-        {/* Stats Cards */}
-        {showMetrics && statsCards && statsCards.length > 0 && (
-          <div
-            style={{
-              paddingTop: "16px",
-              paddingLeft: "25px",
-              paddingRight: "25px",
-              backgroundColor: "#ffffff",
-              paddingBottom: "1px",
-              borderLeft: "1px solid #cccccc",
-              borderRight: "1px solid #cccccc",
-            }}
-          >
-            <StatsCards data={statsCards} gridMinWidth={metricsGridMinWidth} columns={metricsColumns}/>
-          </div>
-        )}
-      </div>
-    );
-  };
-
-  // Pagination controls
-  const renderPaginationControls = () => {
-    if (!pagination) return null;
-
-    const {
-      currentPage,
-      rowsPerPage,
-      totalRows,
-      pageSizeOptions = [10, 25, 50, 100],
-    } = pagination;
-    const totalPages = totalRows === 0 ? 1 : Math.ceil(totalRows / rowsPerPage);
-    const startRow = totalRows === 0 ? 0 : (currentPage - 1) * rowsPerPage + 1;
-    const endRow =
-      totalRows === 0 ? 0 : Math.min(currentPage * rowsPerPage, totalRows);
-
-    return (
-      <div className="generic-table-pagination">
-        <div className="pagination-info">
-          <span className="text-muted small">Show</span>
-          <Form.Select
-            size="sm"
-            value={rowsPerPage}
-            onChange={(e) => onPaginationChange?.(1, Number(e.target.value))}
-            className="pagination-select"
-          >
-            {pageSizeOptions.map((size) => (
-              <option key={size} value={size}>
-                {size}
-              </option>
-            ))}
-          </Form.Select>
-          <span className="text-muted small">entries</span>
-        </div>
-
-        <div className="text-muted small">
-          Showing {startRow} to {endRow} of {totalRows} entries
-        </div>
-
-        <div className="pagination-buttons">
+  const tableSection = (
+    <>
+      {resizableColumns && hasCustomColumnWidths && (
+        <div className="generic-table-width-reset-bar">
           <Button
+            variant="link"
             size="sm"
-            variant="outline-secondary"
-            disabled={currentPage === 1}
-            onClick={() => onPaginationChange?.(1, rowsPerPage)}
+            className="generic-table-reset-all-widths-btn"
+            onClick={handleResetAllColumnWidths}
           >
-            <ChevronsLeft size={14} />
-          </Button>
-          <Button
-            size="sm"
-            variant="outline-secondary"
-            disabled={currentPage === 1}
-            onClick={() => onPaginationChange?.(currentPage - 1, rowsPerPage)}
-          >
-            <ChevronLeft size={14} />
-          </Button>
-
-          {Array.from({ length: totalPages }, (_, index) => {
-            const pageNum = index + 1;
-            if (
-              pageNum === 1 ||
-              pageNum === totalPages ||
-              (pageNum >= currentPage - 1 && pageNum <= currentPage + 1)
-            ) {
-              return (
-                <Button
-                  key={pageNum}
-                  size="sm"
-                  variant={
-                    currentPage === pageNum ? "primary" : "outline-secondary"
-                  }
-                  onClick={() => onPaginationChange?.(pageNum, rowsPerPage)}
-                >
-                  {pageNum}
-                </Button>
-              );
-            }
-            if (pageNum === currentPage - 2 || pageNum === currentPage + 2) {
-              return (
-                <span key={pageNum} className="px-2">
-                  ...
-                </span>
-              );
-            }
-            return null;
-          })}
-
-          <Button
-            size="sm"
-            variant="outline-secondary"
-            disabled={currentPage === totalPages}
-            onClick={() => onPaginationChange?.(currentPage + 1, rowsPerPage)}
-          >
-            <ChevronRight size={14} />
-          </Button>
-          <Button
-            size="sm"
-            variant="outline-secondary"
-            disabled={currentPage === totalPages}
-            onClick={() => onPaginationChange?.(totalPages, rowsPerPage)}
-          >
-            <ChevronsRight size={14} />
+            <RotateCcw size={14} aria-hidden />
+            Reset column widths
           </Button>
         </div>
-      </div>
-    );
-  };
-
-  const renderTableBodyContent = (): React.ReactNode => {
-    const colSpan =
-      (selectable ? 1 : 0) +
-      visibleColumns.length +
-      (showColumnPickerPlaceholder ? 1 : 0) +
-      (actionsColumnVisible ? 1 : 0);
-
-    if (loading) {
-      return (
-        <tr>
-          <td colSpan={colSpan} className="text-center py-4">
-            <div className="generic-table-loading">{loadingMessage}</div>
-          </td>
-        </tr>
-      );
-    }
-
-    if (sortedData.length === 0) {
-      return (
-        <tr>
-          <td colSpan={colSpan} className="text-center py-4">
-            <div className="generic-table-empty">{emptyMessage}</div>
-          </td>
-        </tr>
-      );
-    }
-
-    return sortedData.map((row, index) => {
-      const rowKey = String(row[uniqueKey as keyof T] || index);
-      const isClickable = Boolean(onRowClick || onRowDoubleClick);
-      return (
-        <tr
-          key={rowKey}
-          onClick={() => onRowClick?.(row, index)}
-          onDoubleClick={() => onRowDoubleClick?.(row, index)}
-          onMouseEnter={() => setHoveredRowIndex(index)}
-          onMouseLeave={() => setHoveredRowIndex(null)}
-          onContextMenu={(e) => {
-            // Context menu is independent of the visible actions column (e.g. showActions={false}).
-            if (actions.length === 0) return;
-            const items = getBoundContextMenuItems(row);
-            if (items.length === 0) return;
-            e.preventDefault();
-            e.stopPropagation();
-            setContextMenu({ x: e.clientX, y: e.clientY, row });
-          }}
-          className={`generic-table-row ${rowClassName?.(row, index) || ""} ${isClickable ? "clickable" : ""}`}
+      )}
+      <div
+        ref={tableScrollRef}
+        className={responsiveClassName}
+        style={scrollStyle}
+      >
+        <Table
+          hover={hover}
+          striped={striped}
+          bordered={bordered}
+          size={size}
+          className={tableClassName}
+          style={resizedTableStyle}
         >
-          {selectable && (
-            <td
-              className="generic-table-td"
-              style={{ width: "40px" }}
-              onClick={(e) => e.stopPropagation()}
-            >
-              <Form.Check
-                type="checkbox"
-                checked={isSelected(row)}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
-                  e.stopPropagation();
-                  applyRowCheckboxChange(row, e);
-                }}
-              />
-            </td>
-          )}
-          {visibleColumns.map((col, colIdx) => (
-            <GenericTableBodyDataCell
-              key={col.key}
-              col={col}
-              row={row}
-              index={index}
-              colIdx={colIdx}
+          <GenericTableHeader
+            selectable={selectable}
+            sortedData={sortedData}
+            isSelected={isSelected}
+            onSelectAll={handleSelectAll}
+            checkboxColumnWidthStyle={checkboxColumnWidthStyle}
+            visibleColumns={visibleColumns}
+            sortable={sortable}
+            sortBy={sortBy}
+            sortOrder={sortOrder}
+            onSort={handleSort}
+            customizableColumns={customizableColumns}
+            actionsColumnVisible={actionsColumnVisible}
+            columnCustomizerHeaderId={columnCustomizerHeaderId}
+            columnCustomizerPlaceholderId={columnCustomizerPlaceholderId}
+            columnCustomizerActionsHeaderId={columnCustomizerActionsHeaderId}
+            renderColumnCustomizer={renderColumnCustomizer}
+            resizableColumns={resizableColumns}
+            columnWidths={columnWidths}
+            getColumnWidthStyle={getColumnWidthStyle}
+            onColumnWidthReset={handleColumnWidthReset}
+            onColumnResizeStart={handleColumnResizeStart}
+            showColumnPickerPlaceholder={showColumnPickerPlaceholder}
+            actionsLabel={actionsLabel}
+            actionsColumnWidthStyle={actionsColumnWidthStyle}
+          />
+          <tbody>
+            <GenericTableBodyRows
+              selectable={selectable}
+              visibleColumns={visibleColumns}
+              showColumnPickerPlaceholder={showColumnPickerPlaceholder}
+              actionsColumnVisible={actionsColumnVisible}
+              loading={loading}
+              loadingMessage={loadingMessage}
+              sortedData={sortedData}
+              emptyMessage={emptyMessage}
+              uniqueKey={uniqueKey}
+              onRowClick={onRowClick}
+              onRowDoubleClick={onRowDoubleClick}
+              rowClassName={rowClassName}
+              actions={actions}
+              getBoundContextMenuItems={getBoundContextMenuItems}
+              setContextMenu={setContextMenu}
+              setHoveredRowIndex={setHoveredRowIndex}
+              isSelected={isSelected}
+              applyRowCheckboxChange={applyRowCheckboxChange}
+              checkboxColumnWidthStyle={checkboxColumnWidthStyle}
+              getColumnWidthStyle={getColumnWidthStyle}
               onFirstColumnClick={onFirstColumnClick}
               onPreviewClick={onPreviewClick}
               hoveredRowIndex={hoveredRowIndex}
+              actionsColumnWidthStyle={actionsColumnWidthStyle}
             />
-          ))}
-          {showColumnPickerPlaceholder && (
-            <td className="generic-table-td" style={{ width: "52px" }} />
-          )}
-          {actionsColumnVisible && (
-            <td
-              className="generic-table-td generic-table-actions-cell"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="generic-table-actions">
-                <GenericTableRowActionsCell
-                  row={row}
-                  rowStableKey={rowKey}
-                  actions={actions}
-                />
-              </div>
-            </td>
-          )}
-        </tr>
-      );
-    });
-  };
+          </tbody>
+        </Table>
+      </div>
+      {pagination && (
+        <div className="p-3">
+          <GenericTablePaginationControls
+            pagination={pagination}
+            onPaginationChange={onPaginationChange}
+          />
+        </div>
+      )}
+    </>
+  );
 
   return (
-    <div className="generic-table-container">
-      {/* Right‑click context menu */}
+    <div className={containerClassName}>
       {contextMenu && (
         <div
           ref={contextMenuRef}
@@ -2441,143 +1259,51 @@ const GenericTable = <T extends Record<string, any>>({
         </div>
       )}
 
-      {/* Toolbar */}
-      {renderToolbar()}
+      {showToolbar && toolbar && (
+        <GenericTableToolbarSection
+          toolbar={toolbar}
+          debounceToolbarSearch={debounceToolbarSearch}
+          toolbarSearchDraft={toolbarSearchDraft}
+          setToolbarSearchDraft={setToolbarSearchDraft}
+          flushDebouncedToolbarSearch={flushDebouncedToolbarSearch}
+          sortableColumns={sortableColumns}
+          sortBy={sortBy}
+          sortOrder={sortOrder}
+          onSortColumn={handleSort}
+          showFilterPills={showFilterPills}
+          setShowFilterPills={setShowFilterPills}
+          openFilterPillId={openFilterPillId}
+          setOpenFilterPillId={setOpenFilterPillId}
+          filterPillSearch={filterPillSearch}
+          setFilterPillSearch={setFilterPillSearch}
+          filterPillMenuPopperConfig={filterPillMenuPopperConfig}
+          showToolbarActions={showToolbarActions}
+          statsCards={statsCards}
+          showMetrics={showMetrics}
+          setShowMetrics={setShowMetrics}
+          metricsGridMinWidth={metricsGridMinWidth}
+          metricsColumns={metricsColumns}
+        />
+      )}
 
-      {/* Table or custom body (e.g. Board view) */}
-      {customBody === undefined || customBody === null ? (
-        <Card
-          className={
-            noBorder
-              ? "border-0 shadow-none generic-table-card"
-              : "border-1 shadow-sm generic-table-card"
-          }
-        >
-          <Card.Body className="p-0">
-            <div
-              className={`generic-table-responsive ${fixedHeight ? "fixed-height-table" : ""}`}
-              style={
-                fixedHeight
-                  ? {
-                      maxHeight,
-                      overflow: "auto",
-                    }
-                  : {}
-              }
-            >
-              <Table
-                hover={hover}
-                striped={striped}
-                bordered={bordered}
-                size={size}
-                className="generic-table mb-0"
-              >
-                <thead className="generic-table-header">
-                  <tr>
-                    {selectable && (
-                      <th
-                        className="generic-table-th"
-                        style={{ width: "40px" }}
-                      >
-                        <Form.Check
-                          type="checkbox"
-                          checked={
-                            sortedData.length > 0 &&
-                            sortedData.every((row) => isSelected(row))
-                          }
-                          onChange={handleSelectAll}
-                        />
-                      </th>
-                    )}
-                    {visibleColumns.map((col, colIndex) => {
-                      const isLastColumn =
-                        colIndex === visibleColumns.length - 1;
-                      const showCustomizerInDataHeader =
-                        customizableColumns &&
-                        isLastColumn &&
-                        !actionsColumnVisible;
-                      return (
-                        <th
-                          key={col.key}
-                          className={`generic-table-th ${col.sortable !== false && sortable ? "sortable" : ""}`}
-                          style={{
-                            textAlign: col.align || "left",
-                            ...(col.width ? { width: col.width } : {}),
-                          }}
-                          onClick={(e) => {
-                            if (
-                              showCustomizerInDataHeader &&
-                              (e.target as HTMLElement).closest(".dropdown")
-                            )
-                              return;
-                            col.sortable !== false &&
-                              sortable &&
-                              handleSort(col.key);
-                          }}
-                        >
-                          <div className="th-content d-flex align-items-center justify-content-between">
-                            {/* Left Side - Column Name */}
-                            <span>{col.label}</span>
-
-                            {/* Right Side - Sort Icon */}
-                            {col.sortable !== false &&
-                              sortable &&
-                              renderSortIcon(col.key)}
-                            {showCustomizerInDataHeader &&
-                              renderColumnCustomizerDropdown(
-                                columnCustomizerHeaderId,
-                              )}
-                          </div>
-                        </th>
-                      );
-                    })}
-                    {showColumnPickerPlaceholder && (
-                      <th
-                        className="generic-table-th"
-                        style={{ width: "52px" }}
-                        aria-label="Column visibility"
-                      >
-                        <div className="d-flex align-items-center justify-content-center">
-                          {renderColumnCustomizerDropdown(
-                            columnCustomizerPlaceholderId,
-                          )}
-                        </div>
-                      </th>
-                    )}
-                    {actionsColumnVisible && (
-                      <th className="generic-table-th generic-table-actions-header">
-                        <div className="d-flex align-items-center justify-content-center gap-1 w-100">
-                          <span className="text-center">{actionsLabel}</span>
-                          {customizableColumns &&
-                            renderColumnCustomizerDropdown(
-                              columnCustomizerActionsHeaderId,
-                            )}
-                        </div>
-                      </th>
-                    )}
-                  </tr>
-                </thead>
-                <tbody>{renderTableBodyContent()}</tbody>
-              </Table>
-            </div>
-            {pagination && (
-              <div className="p-3">{renderPaginationControls()}</div>
-            )}
-          </Card.Body>
+      {showDefaultTable ? (
+        <Card className={cardClassName}>
+          <Card.Body className="p-0">{tableSection}</Card.Body>
         </Card>
       ) : (
-        <Card
-          className={
-            noBorder
-              ? "border-0 shadow-none generic-table-card"
-              : "border-1 shadow-sm generic-table-card"
-          }
-        >
+        <Card className={cardClassName}>
           <Card.Body className="p-0">{customBody}</Card.Body>
         </Card>
       )}
     </div>
   );
+}
+
+const GenericTable = <T extends Record<string, any>>(
+  props: GenericTableProps<T>,
+) => {
+  const vm = useGenericTableViewModel(props);
+  return <GenericTableView vm={vm} />;
 };
 
 export default GenericTable;

@@ -43,7 +43,13 @@ export const TicketsPage: React.FC<ControlledTabsProps> = ({
   const { allowedTabs, activeTab, selectTab } = useSettingsSectionTabs(routeActiveTab, onTabChange, ticketsTabs, 'statuses')
 
   return (
-    <SettingsSectionTabShell title="Tickets" allowedTabs={allowedTabs} activeTab={activeTab} onSelectTab={selectTab}>
+    <SettingsSectionTabShell
+      title="Tickets"
+      allowedTabs={allowedTabs}
+      activeTab={activeTab}
+      onSelectTab={selectTab}
+      dense
+    >
       <TicketsTabPanel activeTab={activeTab} />
     </SettingsSectionTabShell>
   )

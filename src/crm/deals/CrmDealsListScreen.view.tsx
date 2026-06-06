@@ -2550,7 +2550,6 @@ export function CrmDealsListScreenView({
     listVariant === "approvals" ? "table" : "board",
   );
   const [boardHeight, setBoardHeight] = useState("calc(100vh - 194px)");
-  const toolbarRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const el = document.querySelector(".gt-toolbar-container");

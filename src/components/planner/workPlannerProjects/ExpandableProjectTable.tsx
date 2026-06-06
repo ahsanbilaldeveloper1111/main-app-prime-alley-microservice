@@ -25,7 +25,7 @@ import {
   canManageProjectFromMembers,
 } from "@planner/projectMemberRole";
 import {
-  fetchTasksForExpandedProject,
+  resolveExpandedProjectTasksFromProject,
   type Project,
   type SubTask,
   type Task,
@@ -46,7 +46,6 @@ import { TaskRow } from "@components/planner/workPlannerProjects/TaskTreeRows";
 import {
   createProjectRowActionsToggleHandler,
   mapTableProjectToPlannerSidebarProject,
-  projectIdFromSidebarEditTask,
   type CreatePlannerSidebarTaskProp,
 } from "@components/planner/workPlannerProjects/expandableProjectTableHelpers";
 import "@components/planner/workPlannerProjects/workPlannerProjectsPage.scss";
@@ -66,12 +65,10 @@ type CreateTaskSidebarSubmitPayload = Parameters<
 
 function projectExpandToggleClickHandler(
   project: Project,
-  handleToggleProject: (project: Project, e: React.MouseEvent) => Promise<void>,
+  handleToggleProject: (project: Project, e: React.MouseEvent) => void,
 ): MouseEventHandler<HTMLButtonElement> {
   return (e) => {
-    handleToggleProject(project, e).catch((err) => {
-      console.error("[WorkPlannerProjects] handleToggleProject failed", err);
-    });
+    handleToggleProject(project, e);
   };
 }
 
@@ -146,6 +143,8 @@ export interface ExpandableProjectTableProps {
   columns: TableColumn<Project>[];
   actions: TableAction<Project>[];
   sessionUserPhoneOrExtension: string;
+  /** Refetch projects list after a task is created from an expanded row. */
+  onProjectsRefresh?: () => void | Promise<void>;
 }
 
 export const ExpandableProjectTable: React.FC<ExpandableProjectTableProps> = ({
@@ -163,15 +162,14 @@ export const ExpandableProjectTable: React.FC<ExpandableProjectTableProps> = ({
   columns,
   actions,
   sessionUserPhoneOrExtension,
+  onProjectsRefresh,
 }) => {
   const { hasPermission } = usePermissions();
   const canPreviewEditTask = hasPermission(PERMISSIONS.EDIT_TASKS_WORK_PLANNER);
   const sessionCanCreatePlannerTask = hasPermission(PERMISSIONS.CREATE_TASKS_WORK_PLANNER);
 
   const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set());
-  const [projectTasks, setProjectTasks] = useState<Record<string, Task[]>>({});
   const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set());
-  const [loadingTasks, setLoadingTasks] = useState<Set<string>>(new Set());
   const [fetchedEditTask, setFetchedEditTask] = useState<CreatePlannerSidebarTaskProp | null>(null);
   const loadingSidebarEditTaskRef = useRef(false);
   const [createTaskForProject, setCreateTaskForProject] = useState<Project | null>(null);
@@ -179,58 +177,21 @@ export const ExpandableProjectTable: React.FC<ExpandableProjectTableProps> = ({
   const [openProjectActionsId, setOpenProjectActionsId] = useState<string | null>(null);
   const [hoveredProjectId, setHoveredProjectId] = useState<string | null>(null);
 
-  const taskFetchGenByProjectRef = useRef<Record<string, number>>({});
   const previewTaskRequestRef = useRef(0);
 
-  const fetchAndStoreProjectTasks = useCallback(async (projectId: string) => {
-    const nextGen = (taskFetchGenByProjectRef.current[projectId] ?? 0) + 1;
-    taskFetchGenByProjectRef.current[projectId] = nextGen;
-
-    setLoadingTasks((prev) => new Set(prev).add(projectId));
-    try {
-      const tasks = await fetchTasksForExpandedProject(projectId);
-      if (taskFetchGenByProjectRef.current[projectId] !== nextGen) {
-        return;
-      }
-      setProjectTasks((prev) => ({ ...prev, [projectId]: tasks }));
-    } catch (err) {
-      console.error("[WorkPlannerProjects] Failed to load tasks for project", projectId, err);
-      if (taskFetchGenByProjectRef.current[projectId] !== nextGen) {
-        return;
-      }
-      setProjectTasks((prev) => ({ ...prev, [projectId]: [] }));
-    } finally {
-      if (taskFetchGenByProjectRef.current[projectId] === nextGen) {
-        setLoadingTasks((prev) => {
-          const next = new Set(prev);
-          next.delete(projectId);
-          return next;
-        });
-      }
-    }
-  }, []);
-
-  const handleToggleProject = useCallback(
-    async (project: Project, e: React.MouseEvent) => {
-      e.stopPropagation();
-      const projectId = project.id;
-      let shouldFetch = false;
-      setExpandedProjects((prev) => {
-        const next = new Set(prev);
-        if (next.has(projectId)) {
-          next.delete(projectId);
-          return next;
-        }
+  const handleToggleProject = useCallback((project: Project, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const projectId = project.id;
+    setExpandedProjects((prev) => {
+      const next = new Set(prev);
+      if (next.has(projectId)) {
+        next.delete(projectId);
+      } else {
         next.add(projectId);
-        shouldFetch = true;
-        return next;
-      });
-      if (shouldFetch) {
-        await fetchAndStoreProjectTasks(projectId);
       }
-    },
-    [fetchAndStoreProjectTasks],
-  );
+      return next;
+    });
+  }, []);
 
   const handleToggleTask = useCallback((taskId: string) => {
     setExpandedTasks((prev) => {
@@ -307,19 +268,7 @@ export const ExpandableProjectTable: React.FC<ExpandableProjectTableProps> = ({
     rows: React.ReactNode[],
     project: Project,
     tasks: Task[],
-    isLoadingTasks: boolean,
   ) => {
-    if (isLoadingTasks) {
-      rows.push(
-        <tr key={`loading-${project.id}`} className="wp-nested-row-muted">
-          <td colSpan={6} className="wp-nested-row-loading">
-            <Spinner animation="border" size="sm" className="me-2 wp-spinner-muted" />
-            <span className="wp-nested-row-loading-text">Loading tasks...</span>
-          </td>
-        </tr>,
-      );
-      return;
-    }
     if (tasks.length === 0) {
       rows.push(
         <tr key={`empty-${project.id}`} className="wp-nested-row-muted">
@@ -394,8 +343,7 @@ export const ExpandableProjectTable: React.FC<ExpandableProjectTableProps> = ({
 
     projects.forEach((project) => {
       const isExpanded = expandedProjects.has(project.id);
-      const isLoadingTasksRow = loadingTasks.has(project.id);
-      const tasks = projectTasks[project.id] || [];
+      const tasks = isExpanded ? resolveExpandedProjectTasksFromProject(project) : [];
 
       rows.push(
         <tr
@@ -519,7 +467,7 @@ export const ExpandableProjectTable: React.FC<ExpandableProjectTableProps> = ({
       );
 
       if (isExpanded) {
-        appendExpandedProjectRows(rows, project, tasks, isLoadingTasksRow);
+        appendExpandedProjectRows(rows, project, tasks);
       }
     });
 
@@ -533,27 +481,13 @@ export const ExpandableProjectTable: React.FC<ExpandableProjectTableProps> = ({
   }, []);
 
   const handleCreateTaskSidebarSubmit = useCallback(
-    async (data: CreateTaskSidebarSubmitPayload) => {
-      const projectIdNum =
-        data.projectId ??
-        projectIdFromSidebarEditTask(fetchedEditTask) ??
-        createTaskForProject?.apiData?.id ??
-        null;
-      if (projectIdNum != null) {
-        const projectIdStr = String(projectIdNum);
-        if (expandedProjects.has(projectIdStr)) {
-          await fetchAndStoreProjectTasks(projectIdStr);
-        }
-      }
+    async (_data: CreateTaskSidebarSubmitPayload) => {
       closeCreateSidebar();
+      if (onProjectsRefresh) {
+        await onProjectsRefresh();
+      }
     },
-    [
-      fetchedEditTask,
-      createTaskForProject,
-      expandedProjects,
-      fetchAndStoreProjectTasks,
-      closeCreateSidebar,
-    ],
+    [closeCreateSidebar, onProjectsRefresh],
   );
 
   return (

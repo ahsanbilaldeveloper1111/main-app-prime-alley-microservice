@@ -1,9 +1,10 @@
 import React from "react";
-import { Badge, Button } from "react-bootstrap";
+import { Badge } from "react-bootstrap";
 import { Edit, Eye, Trash2 } from "lucide-react";
 import type { TableColumn } from "@components/GenericTable";
 import { CrmTruncatedDescriptionCell } from "@components/crm/crmTruncatedDescriptionCell";
 import type { ProductDisplayData } from "@page-modules/crm/products/productsPageModel";
+import { CrmTableRowActions } from "@page-modules/crm/shared/CrmTableRowActions";
 
 export interface BuildProductsTableColumnsParams {
   selectedColumns: string[];
@@ -21,7 +22,20 @@ function buildProductNameColumn(): TableColumn<ProductDisplayData> {
     sortable: false,
     type: "custom",
     render: (product) => (
-      <span className="fw-semibold">{product.productName}</span>
+      <span
+        className="fw-semibold"
+        title={product.productName}
+        style={{
+          display: "block",
+          minWidth: 0,
+          maxWidth: "100%",
+          overflow: "hidden",
+          textOverflow: "ellipsis",
+          whiteSpace: "nowrap",
+        }}
+      >
+        {product.productName}
+      </span>
     ),
   };
 }
@@ -47,7 +61,7 @@ function buildPriceColumn(): TableColumn<ProductDisplayData> {
     sortable: false,
     type: "custom",
     render: (product) => (
-      <span className="fw-semibold text-success">
+      <span className="products-table-price">
         {product.currency} {product.price.toFixed(2)}
       </span>
     ),
@@ -136,42 +150,43 @@ function buildActionsColumn(
     key: "actions",
     label: "Actions",
     sortable: false,
+    align: "center",
     type: "custom",
-    render: (product) => (
-      <div className="d-flex gap-1">
-        <Button
-          variant="link"
-          size="sm"
-          className="p-1"
-          title="View"
-          onClick={() => onView(product)}
-        >
-          <Eye size={16} />
-        </Button>
-        {canEdit && (
-          <Button
-            variant="link"
-            size="sm"
-            className="p-1"
-            title="Edit"
-            onClick={() => onEdit(product)}
-          >
-            <Edit size={16} />
-          </Button>
-        )}
-        {canDelete && (
-          <Button
-            variant="link"
-            size="sm"
-            className="p-1 text-danger"
-            title="Delete"
-            onClick={() => onDelete(product)}
-          >
-            <Trash2 size={16} />
-          </Button>
-        )}
-      </div>
-    ),
+    render: (product) => {
+      const label = product.productName || "product";
+      return (
+        <CrmTableRowActions
+          actions={[
+            {
+              label: `View ${label}`,
+              icon: <Eye size={22} aria-hidden />,
+              tone: "success",
+              onClick: () => onView(product),
+            },
+            ...(canEdit
+              ? [
+                  {
+                    label: `Edit ${label}`,
+                    icon: <Edit size={22} aria-hidden />,
+                    tone: "primary" as const,
+                    onClick: () => onEdit(product),
+                  },
+                ]
+              : []),
+            ...(canDelete
+              ? [
+                  {
+                    label: `Delete ${label}`,
+                    icon: <Trash2 size={22} aria-hidden />,
+                    tone: "danger" as const,
+                    onClick: () => onDelete(product),
+                  },
+                ]
+              : []),
+          ]}
+        />
+      );
+    },
   };
 }
 

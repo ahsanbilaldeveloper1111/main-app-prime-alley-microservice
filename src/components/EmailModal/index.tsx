@@ -635,12 +635,21 @@ const EmailModal: React.FC<EmailModalProps> = ({
 
   return (
     <React.Fragment>
-      <div style={{
-        position: 'fixed',
-        inset: 0,
-        backgroundColor: 'rgba(0, 0, 0, 0.15)',
-        zIndex: 999,
-      }} onClick={onClose} />
+      <button
+        type="button"
+        aria-label="Close email modal"
+        onClick={onClose}
+        style={{
+          position: 'fixed',
+          inset: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.15)',
+          zIndex: 999,
+          border: 'none',
+          padding: 0,
+          margin: 0,
+          cursor: 'default',
+        }}
+      />
       <div
       style={{
         position: "fixed",

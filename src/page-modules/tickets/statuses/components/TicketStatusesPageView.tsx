@@ -1,5 +1,7 @@
 import PageHeader from "@components/PageHeader";
-import GenericTable, { type TableAction, type TableColumn } from "@components/GenericTable";
+import type { TableColumn } from "@components/GenericTable";
+import { EmbeddedSettingsTable } from "@components/main-settings/EmbeddedSettingsTable";
+import { SettingsEmbeddedToolbar } from "@components/main-settings/SettingsEmbeddedToolbar";
 import ConfirmModal from "@components/page-partials/ConfirmModal";
 import type { StatusSidebarConfig, TicketStatus } from "../ticketStatusesTypes";
 import React from "react";
@@ -8,10 +10,10 @@ import { FiPlus } from "react-icons/fi";
 import { StatusSidebar } from "./StatusSidebar";
 
 type TicketStatusesPageViewProps = Readonly<{
+  embeddedInMainSettings?: boolean;
   data: TicketStatus[];
   loading: boolean;
   columns: TableColumn<TicketStatus>[];
-  actions: TableAction<TicketStatus>[];
   currentPage: number;
   rowsPerPage: number;
   totalRows: number;
@@ -43,10 +45,10 @@ type TicketStatusesPageViewProps = Readonly<{
 }>;
 
 export const TicketStatusesPageView: React.FC<TicketStatusesPageViewProps> = ({
+  embeddedInMainSettings = false,
   data,
   loading,
   columns,
-  actions,
   currentPage,
   rowsPerPage,
   totalRows,
@@ -75,95 +77,107 @@ export const TicketStatusesPageView: React.FC<TicketStatusesPageViewProps> = ({
   showDeleteStatusModal,
   onCloseDeleteStatusModal,
   onSubmitDeleteStatus,
-}) => (
-  <>
-    <PageHeader
-      title=""
-      description=""
-      showSearch={false}
-      searchPlaceholder="Search statuses..."
-      searchValue={searchValue}
-      onSearchChange={onSearchChange}
-      buttons={
-        canCreate ? (
-          <Button variant="primary" onClick={onOpenCreateStatusSidebar}>
-            <FiPlus className="me-2" />
-            Add Status
-          </Button>
-        ) : undefined
-      }
-    />
+}) => {
+  const addButton = canCreate ? (
+    <Button variant="primary" size="sm" onClick={onOpenCreateStatusSidebar}>
+      <FiPlus className="me-2" aria-hidden />
+      Add Status
+    </Button>
+  ) : null;
 
-    {canViewList && (
-      <GenericTable<TicketStatus>
-        data={data}
-        columns={columns}
-        loading={loading}
-        actions={actions}
-        showActions={actions.length > 0}
-        actionsLabel="Actions"
-        pagination={{
-          currentPage,
-          rowsPerPage,
-          totalRows,
-          pageSizeOptions: [15, 25, 50, 100],
-        }}
-        onPaginationChange={onPaginationChange}
-        sortable={true}
-        hover={true}
-        emptyMessage="No statuses found."
-        showToolbar={true}
-        toolbar={{
-          showSearch: true,
-          searchValue,
-          searchPlaceholder: "Search statuses...",
-          onSearchChange,
-        }}
-        showToolbarActions={false}
-        uniqueKey="id"
+  let pageToolbar: React.ReactNode;
+  if (embeddedInMainSettings) {
+    pageToolbar = (
+      <SettingsEmbeddedToolbar
+        searchValue={searchValue}
+        onSearchChange={onSearchChange}
+        searchPlaceholder="Search statuses..."
+        actions={addButton}
       />
-    )}
+    );
+  } else {
+    pageToolbar = (
+      <PageHeader
+        title=""
+        description=""
+        showSearch={false}
+        searchPlaceholder="Search statuses..."
+        searchValue={searchValue}
+        onSearchChange={onSearchChange}
+        buttons={addButton}
+      />
+    );
+  }
 
-    <StatusSidebar
-      isOpen={showCreateStatusSidebar}
-      config={createSidebarConfig}
-      name={newStatusName}
-      color={newStatusColor}
-      onNameChange={onNewStatusNameChange}
-      onColorChange={onNewStatusColorChange}
-      onSubmit={async () => {
-        await onSubmitCreateStatus();
-      }}
-      onClose={onCloseCreateStatusSidebar}
-    />
+  return (
+    <div className={embeddedInMainSettings ? "tickets-settings-page" : undefined}>
+      {pageToolbar}
 
-    <StatusSidebar
-      isOpen={showEditStatusModal}
-      config={editSidebarConfig}
-      name={selectedStatusName}
-      color={selectedStatusColor}
-      onNameChange={onEditStatusNameChange}
-      onColorChange={onEditStatusColorChange}
-      onSubmit={async () => {
-        await onSubmitEditStatus();
-      }}
-      onClose={onCloseEditStatusModal}
-    />
+      {canViewList ? (
+        <EmbeddedSettingsTable<TicketStatus>
+          embedded={embeddedInMainSettings}
+          data={data}
+          columns={columns}
+          loading={loading}
+          emptyMessage="No statuses found."
+          pagination={{
+            currentPage,
+            rowsPerPage,
+            totalRows,
+            pageSizeOptions: [15, 25, 50, 100],
+          }}
+          onPaginationChange={onPaginationChange}
+          uniqueKey="id"
+          toolbar={{
+            showSearch: true,
+            searchValue,
+            searchPlaceholder: "Search statuses...",
+            onSearchChange,
+          }}
+        />
+      ) : null}
 
-    <ConfirmModal
-      show={showDeleteStatusModal}
-      onHide={onCloseDeleteStatusModal}
-      title="Delete Status?"
-      description="Are you sure you want to delete status {targetName}? This action cannot be undone."
-      targetName={selectedStatusName || ""}
-      confirmButtonText="Delete Status"
-      cancelButtonText="Cancel"
-      onConfirm={async () => {
-        await onSubmitDeleteStatus();
-      }}
-      onCancel={onCloseDeleteStatusModal}
-      confirmButtonVariant="danger"
-      cancelButtonVariant="secondary"
-    />
-  </>
-);
+      <StatusSidebar
+        isOpen={showCreateStatusSidebar}
+        config={createSidebarConfig}
+        name={newStatusName}
+        color={newStatusColor}
+        onNameChange={onNewStatusNameChange}
+        onColorChange={onNewStatusColorChange}
+        onSubmit={async () => {
+          await onSubmitCreateStatus();
+        }}
+        onClose={onCloseCreateStatusSidebar}
+      />
+
+      <StatusSidebar
+        isOpen={showEditStatusModal}
+        config={editSidebarConfig}
+        name={selectedStatusName}
+        color={selectedStatusColor}
+        onNameChange={onEditStatusNameChange}
+        onColorChange={onEditStatusColorChange}
+        onSubmit={async () => {
+          await onSubmitEditStatus();
+        }}
+        onClose={onCloseEditStatusModal}
+      />
+
+      <ConfirmModal
+        show={showDeleteStatusModal}
+        onHide={onCloseDeleteStatusModal}
+        title="Delete Status?"
+        description="Are you sure you want to delete status {targetName}? This action cannot be undone."
+        targetName={selectedStatusName || ""}
+        confirmButtonText="Delete Status"
+        cancelButtonText="Cancel"
+        onConfirm={async () => {
+          await onSubmitDeleteStatus();
+        }}
+        onCancel={onCloseDeleteStatusModal}
+        confirmButtonVariant="danger"
+        cancelButtonVariant="secondary"
+      />
+    </div>
+  );
+};

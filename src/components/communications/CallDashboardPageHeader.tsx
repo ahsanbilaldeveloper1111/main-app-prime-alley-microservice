@@ -1,4 +1,5 @@
 import React from 'react';
+import { RefreshCw } from 'lucide-react';
 import { Button, Col, Form, Row } from 'react-bootstrap';
 import moment from 'moment';
 import { useAppDispatch, useAppSelector } from '../../toolkit/hooks';
@@ -23,12 +24,12 @@ const CallDashboardPageHeader: React.FC = () => {
       <Col md={12}>
         <div className="page-header-title style-2">
           <Row className="d-flex justify-content-between align-items-center">
-            <Col md={4}>
+            <Col xs={12} lg={4}>
               <h2 className="mb-0">Call Dashboard</h2>
             </Col>
-            <Col md={8} className="d-flex justify-content-end">
+            <Col xs={12} lg={8} className="d-flex justify-content-lg-end">
               <div className="action-buttons">
-                <div className="d-flex align-items-center gap-2">
+                <div className="d-flex align-items-center gap-2 communications-dashboard-date-controls">
                   {showDateRange && (
                     <>
                       Date Range:{' '}
@@ -93,7 +94,7 @@ const CallDashboardPageHeader: React.FC = () => {
                         title="Refresh"
                         aria-label="Refresh"
                       >
-                        <i className="material-icons-two-tone">refresh</i>
+                        <RefreshCw size={16} aria-hidden />
                       </button>
                     </>
                   )}

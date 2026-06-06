@@ -5,7 +5,6 @@ import React, {
   useRef,
   useState,
 } from "react";
-import BreadcrumbItem from "@common/BreadcrumbItem";
 import { Button, Modal } from "react-bootstrap";
 import GenericTable, {
   type TableAction,
@@ -16,6 +15,11 @@ import moment from "moment";
 import { useSession } from "next-auth/react";
 import { toast } from "react-toastify";
 import { GlobalDateTimeFormat } from "@utils/Helper";
+import { CheckCircle, Clock, Copy } from "lucide-react";
+import { renderApplyFilterActions } from "@utils/communicationsStagedFilters";
+import { TEXT_MESSAGES_TOOLBAR } from "@components/communications/callLogsListPageConfig";
+
+const defaultTextMessageFilters: Record<string, unknown> = { is_read: "" };
 
 export interface GsmInboxRow {
   id: number;
@@ -59,9 +63,14 @@ const TextMessagesView: React.FC = () => {
   const { data: session } = useSession();
   const [refreshKey, setRefreshKey] = useState<number>(0);
   const [currentFilters, setCurrentFilters] = useState<Record<string, unknown>>(
-    {},
+    defaultTextMessageFilters,
   );
-  const currentFiltersRef = useRef<Record<string, unknown>>({});
+  const [appliedFilters, setAppliedFilters] = useState<Record<string, unknown>>(
+    defaultTextMessageFilters,
+  );
+  const currentFiltersRef = useRef<Record<string, unknown>>(
+    defaultTextMessageFilters,
+  );
   const [readItems, setReadItems] = useState<Set<number>>(new Set());
   const [tableData, setTableData] = useState<GsmInboxRow[]>([]);
   const [tableLoading, setTableLoading] = useState(false);
@@ -324,11 +333,7 @@ const TextMessagesView: React.FC = () => {
               aria-label="Copy message"
               title="Copy message"
             >
-              <i
-                className="ph-duotone ph-copy"
-                style={{ fontSize: "1rem" }}
-                aria-hidden="true"
-              />
+              <Copy size={16} aria-hidden />
             </button>
             {isUnread(row) && (
               <button
@@ -338,11 +343,7 @@ const TextMessagesView: React.FC = () => {
                 aria-label="Mark as read"
                 title="Mark as read"
               >
-                <i
-                  className="ph-duotone ph-check-circle"
-                  style={{ fontSize: "1rem" }}
-                  aria-hidden="true"
-                />
+                <CheckCircle size={16} aria-hidden />
               </button>
             )}
           </div>
@@ -353,10 +354,28 @@ const TextMessagesView: React.FC = () => {
   );
 
   const applyFilters = useCallback((nextFilters: Record<string, unknown>) => {
-    setCurrentFilters(nextFilters);
+    setAppliedFilters(nextFilters);
     currentFiltersRef.current = nextFilters;
     setRefreshKey((prev) => prev + 1);
   }, []);
+
+  const stageFilters = useCallback((nextFilters: Record<string, unknown>) => {
+    setCurrentFilters(nextFilters);
+  }, []);
+
+  const handleApplyFiltersClick = useCallback(() => {
+    applyFilters({ ...currentFilters });
+  }, [applyFilters, currentFilters]);
+
+  const handleResetFiltersClick = useCallback(() => {
+    setCurrentFilters(defaultTextMessageFilters);
+    applyFilters(defaultTextMessageFilters);
+  }, [applyFilters]);
+
+  const hasUnappliedFilterChanges = useMemo(
+    () => JSON.stringify(currentFilters) !== JSON.stringify(appliedFilters),
+    [currentFilters, appliedFilters],
+  );
 
   const getReadStatusActiveLabel = (
     readStatus: unknown,
@@ -368,19 +387,21 @@ const TextMessagesView: React.FC = () => {
 
   const tableToolbar = useMemo(
     () => ({
+      clearAllFilters: handleResetFiltersClick,
       showTabs: true,
       tabs: [
         {
-          id: "text-messages-title",
-          label: "Text Messages",
+          id: "all",
+          label: TEXT_MESSAGES_TOOLBAR.allTabLabel,
+          count: tablePagination.totalRows,
           removable: false,
         },
       ],
-      activeTab: "text-messages-title",
+      activeTab: "all",
       onTabChange: () => {},
       showSearch: false,
-      showFiltersButton: false,
-      showFilterPills: true,
+      showFiltersButton: true,
+      showFilterPills: false,
       showMoreFiltersButton: false,
       filterPills: [
         {
@@ -391,37 +412,48 @@ const TextMessagesView: React.FC = () => {
             currentFilters.is_read !== undefined &&
             currentFilters.is_read !== "",
           activeLabel: getReadStatusActiveLabel(currentFilters.is_read),
-          onClear: () => applyFilters({ ...currentFilters, is_read: "" }),
+          onClear: () =>
+            stageFilters({ ...currentFilters, is_read: "" }),
           dropdownOptions: [
             {
               label: "Unread",
               value: "0",
               onClick: () =>
-                applyFilters({ ...currentFilters, is_read: "0" }),
+                stageFilters({ ...currentFilters, is_read: "0" }),
             },
             {
               label: "Read",
               value: "1",
               onClick: () =>
-                applyFilters({ ...currentFilters, is_read: "1" }),
+                stageFilters({ ...currentFilters, is_read: "1" }),
             },
             {
               label: "All",
               value: "",
               onClick: () =>
-                applyFilters({ ...currentFilters, is_read: "" }),
+                stageFilters({ ...currentFilters, is_read: "" }),
             },
           ],
         },
       ],
+      filterPillsRightActions: renderApplyFilterActions(
+        hasUnappliedFilterChanges,
+        handleApplyFiltersClick,
+        "text-messages",
+      ),
     }),
-    [currentFilters, applyFilters],
+    [
+      tablePagination.totalRows,
+      currentFilters,
+      stageFilters,
+      hasUnappliedFilterChanges,
+      handleResetFiltersClick,
+      handleApplyFiltersClick,
+    ],
   );
 
   return (
-    <div className="text-messages-page">
-      <BreadcrumbItem mainTitle="" mainLink="" subTitle="Text Messages" />
-
+    <>
       {session?.user?.permissions?.includes("list-gsm-inbox") && (
         <GenericTable<GsmInboxRow>
           data={tableData}
@@ -458,8 +490,7 @@ const TextMessagesView: React.FC = () => {
           sortable={true}
           hover={true}
           striped={false}
-          fixedHeight={true}
-          maxHeight="calc(100vh - 320px)"
+          fixedHeight
           uniqueKey="id"
         />
       )}
@@ -479,7 +510,7 @@ const TextMessagesView: React.FC = () => {
             <>
               <div className="mb-3">
                 <small className="text-muted">
-                  <i className="ph-duotone ph-clock me-1" aria-hidden="true" />
+                  <Clock size={14} className="me-1" aria-hidden />
                   {selectedMessage.received_at
                     ? moment(selectedMessage.received_at).fromNow()
                     : ""}
@@ -531,7 +562,7 @@ const TextMessagesView: React.FC = () => {
             variant="outline-secondary"
             onClick={() => handleCopyMessage(selectedMessage?.text || "")}
           >
-            <i className="ph-duotone ph-copy me-1" aria-hidden="true" /> Copy
+            <Copy size={16} className="me-1" aria-hidden /> Copy
             Message
           </Button>
           {selectedMessage && isUnread(selectedMessage) && (
@@ -552,7 +583,7 @@ const TextMessagesView: React.FC = () => {
           </Button>
         </Modal.Footer>
       </Modal>
-    </div>
+    </>
   );
 };
 

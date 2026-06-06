@@ -5,7 +5,7 @@ import React, {
   useMemo,
   useEffect,
 } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQueries, useQuery } from "@tanstack/react-query";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 import GenericTable, { TableColumn, ToolbarConfig } from "@components/GenericTable";
 import {
@@ -83,9 +83,15 @@ import {
 } from "@components/crm/crmDialogActionButtonStyles";
 import { useCrmSettingsTableState } from "@hooks/useCrmSettingsTableState";
 import { useDebouncedSearchInput } from "@hooks/useDebouncedSearchInput";
+import {
+  CrmSettingsPanelShell,
+  useCrmSettingsPrefersSidebar,
+} from "@page-modules/crm/shared/CrmSettingsPanelShell";
+import { MainSettingsFormSidebar } from "@components/main-settings/MainSettingsFormSidebar";
 import moment from "moment";
 import { HEADER_CONSTANTS } from "@constants/headerConstants";
 import type { CrmPageDisplayProps } from "@page-modules/crm/crmPageDisplayProps";
+import { CrmSettingsTableWrap } from "@page-modules/crm/shared/CrmSettingsTableWrap";
 import { crmAppKeys } from "@query/keys";
 
 const { PERMISSIONS } = HEADER_CONSTANTS;
@@ -476,16 +482,73 @@ function deriveEditorStateFromCampaignApi(
   };
 }
 
+type CampaignFiltersState = {
+  status: string[];
+  dateFrom: string | null;
+  dateTo: string | null;
+  userExtensions: string[] | null;
+  hasUnassignedProspects: boolean | null;
+  tags: string[] | null;
+};
+
+const CAMPAIGN_TAB_COUNT_IDS = [
+  "all",
+  "active",
+  "inactive",
+  "assigned",
+  "unassigned",
+] as const;
+
+type CampaignTabCountId = (typeof CAMPAIGN_TAB_COUNT_IDS)[number];
+
+function resolveHasUnassignedProspectsForTab(
+  tabId: CampaignTabCountId,
+): boolean | null {
+  if (tabId === "assigned") {
+    return false;
+  }
+  if (tabId === "unassigned") {
+    return true;
+  }
+  return null;
+}
+
+function resolveActiveFilterForTabCount(tabId: CampaignTabCountId): string {
+  if (tabId === "assigned" || tabId === "unassigned") {
+    return "all";
+  }
+  return tabId;
+}
+
+async function fetchCampaignTabCountTotal(
+  tabId: CampaignTabCountId,
+  campaignFilters: CampaignFiltersState,
+  memoizedFilters: Record<string, unknown>,
+  search: string,
+): Promise<number> {
+  const filtersForTab: CampaignFiltersState = {
+    ...campaignFilters,
+    hasUnassignedProspects: resolveHasUnassignedProspectsForTab(tabId),
+  };
+  const activeFilterForBuild = resolveActiveFilterForTabCount(tabId);
+  const filters = buildCrmCampaignListFilters(
+    activeFilterForBuild,
+    filtersForTab,
+    memoizedFilters,
+  );
+  const response = await getCampaigns({
+    page: 1,
+    per_page: 1,
+    search: search || undefined,
+    filters,
+    module_slug: ModuleSlug.CRM_CAMPAIGNS,
+  });
+  return response.total ?? 0;
+}
+
 function buildCrmCampaignListFilters(
   activeFilter: string,
-  campaignFilters: {
-    status: string[];
-    dateFrom: string | null;
-    dateTo: string | null;
-    userExtensions: string[] | null;
-    hasUnassignedProspects: boolean | null;
-    tags: string[] | null;
-  },
+  campaignFilters: CampaignFiltersState,
   memoizedFilters: Record<string, any>,
 ): Record<string, any> {
   let statusFilter: string[] = [];
@@ -652,7 +715,13 @@ type ToolbarFactoryArgs = {
   handleFiltersChange: (filters: Record<string, any>) => void;
   setCampaignsPagination: React.Dispatch<React.SetStateAction<{ currentPage: number; rowsPerPage: number; sortBy: string; sortOrder: "asc" | "desc" }>>;
   setRefreshKey: React.Dispatch<React.SetStateAction<number>>;
-  filterCounts: { all: number; active: number; inactive: number };
+  filterCounts: {
+    all: number;
+    active: number;
+    inactive: number;
+    assigned: number;
+    unassigned: number;
+  };
   activeFilter: string;
   setActiveFilter: (v: string) => void;
   setCampaignFilters: React.Dispatch<React.SetStateAction<{
@@ -695,8 +764,18 @@ function createCrmCampaignsToolbarConfig(a: ToolbarFactoryArgs): ToolbarConfig {
       { id: "all", label: "All Campaigns", count: a.filterCounts.all, removable: false },
       { id: "active", label: "Active", count: a.filterCounts.active, removable: false },
       { id: "inactive", label: "Inactive", count: a.filterCounts.inactive, removable: false },
-      { id: "assigned", label: "With Assigned Records", removable: false },
-      { id: "unassigned", label: "With Unassigned Records", removable: false },
+      {
+        id: "assigned",
+        label: "With Assigned Records",
+        count: a.filterCounts.assigned,
+        removable: false,
+      },
+      {
+        id: "unassigned",
+        label: "With Unassigned Records",
+        count: a.filterCounts.unassigned,
+        removable: false,
+      },
     ],
     activeTab: a.activeFilter,
     onTabChange: (tabId) => {
@@ -925,21 +1004,12 @@ function createCrmCampaignsToolbarConfig(a: ToolbarFactoryArgs): ToolbarConfig {
           PERMISSIONS.CREATE_CRM_CAMPAIGNS,
         ) && (
           <Button
+            variant="primary"
+            type="button"
+            className="crm-campaigns-toolbar-add-btn d-inline-flex align-items-center gap-2"
             onClick={a.handleCreateCampaign}
-            style={{
-              backgroundColor: "#4f46e5",
-              border: "none",
-              borderRadius: "8px",
-              color: "#ffffff",
-              height: "33px",
-              fontSize: "0.875rem",
-              padding: "0 12px",
-              display: "inline-flex",
-              alignItems: "center",
-              gap: "6px",
-            }}
           >
-            <Plus size={15} />
+            <Plus size={15} aria-hidden />
             New Campaign
           </Button>
         )}
@@ -1166,6 +1236,7 @@ const DEFAULT_CAMPAIGN_SELECTED_COLUMNS: string[] = [
 ];
 
 const CrmCampaigns = ({ hideBreadcrumb, breadcrumbMainLink }: CrmPageDisplayProps = {}) => { // NOSONAR
+  const preferSidebar = useCrmSettingsPrefersSidebar();
   const { data: session } = useSession();
 
   const [refreshKey, setRefreshKey] = useState(0);
@@ -1433,6 +1504,27 @@ const CrmCampaigns = ({ hideBreadcrumb, breadcrumbMainLink }: CrmPageDisplayProp
   };
   const totalCampaigns =
     campaignsListQuery.data?.total ?? campaignsListQuery.data?.data?.length ?? 0;
+
+  const campaignTabCountQueries = useQueries({
+    queries: CAMPAIGN_TAB_COUNT_IDS.map((tabId) => ({
+      queryKey: [
+        ...crmAppKeys.campaigns.all(),
+        "tabCount",
+        tabId,
+        refreshKey,
+        campaignsSearchQuery,
+        campaignFiltersKey,
+      ] as const,
+      queryFn: async () =>
+        fetchCampaignTabCountTotal(
+          tabId,
+          campaignFilters,
+          memoizedFilters,
+          campaignsSearchQuery,
+        ),
+      enabled: listCampaignsPermission,
+    })),
+  });
 
   useEffect(() => {
     if (campaignsListQuery.isError) {
@@ -1892,14 +1984,7 @@ const CrmCampaigns = ({ hideBreadcrumb, breadcrumbMainLink }: CrmPageDisplayProp
             maxWidth: "100%",
             overflow: "hidden",
             textOverflow: "ellipsis",
-            whiteSpace: "normal",
-            wordBreak: "break-word",
-            overflowWrap: "anywhere",
-            display: "-webkit-box",
-            WebkitLineClamp: 2,
-            WebkitBoxOrient: "vertical",
-            lineHeight: 1.35,
-            paddingBottom: "2px",
+            whiteSpace: "nowrap",
           }}
         >
           {campaign.name || "Unnamed Campaign"}
@@ -2016,12 +2101,22 @@ const CrmCampaigns = ({ hideBreadcrumb, breadcrumbMainLink }: CrmPageDisplayProp
     return actions;
   }, [session?.user?.permissions, handleViewCampaign, handleEditCampaign, handleDeleteCampaign]);
 
-  // Filter counts for tabs
-  const filterCounts = useMemo(() => ({
-    all: totalCampaigns,
-    active: metrics.active_campaigns,
-    inactive: metrics.inactive_campaigns,
-  }), [totalCampaigns, metrics]);
+  const filterCounts = useMemo(
+    () => ({
+      all: campaignTabCountQueries[0]?.data ?? 0,
+      active: campaignTabCountQueries[1]?.data ?? 0,
+      inactive: campaignTabCountQueries[2]?.data ?? 0,
+      assigned: campaignTabCountQueries[3]?.data ?? 0,
+      unassigned: campaignTabCountQueries[4]?.data ?? 0,
+    }),
+    [
+      campaignTabCountQueries[0]?.data,
+      campaignTabCountQueries[1]?.data,
+      campaignTabCountQueries[2]?.data,
+      campaignTabCountQueries[3]?.data,
+      campaignTabCountQueries[4]?.data,
+    ],
+  );
 
   const toolbarConfig = useMemo<ToolbarConfig>(
     () =>
@@ -2102,6 +2197,7 @@ const CrmCampaigns = ({ hideBreadcrumb, breadcrumbMainLink }: CrmPageDisplayProp
 
       {/* Campaigns Table via GenericTable */}
       {session?.user?.permissions?.includes(PERMISSIONS.VIEW_CRM_CAMPAIGNS) && (
+        <CrmSettingsTableWrap hideBreadcrumb={hideBreadcrumb}>
         <GenericTable<any>
           data={campaignsData}
           columns={campaignsTableColumns}
@@ -2127,7 +2223,10 @@ const CrmCampaigns = ({ hideBreadcrumb, breadcrumbMainLink }: CrmPageDisplayProp
           toolbar={toolbarConfig}
           showToolbarActions={false}
           uniqueKey="id"
+          hover
+          size="md"
         />
+        </CrmSettingsTableWrap>
       )}
 
       {/* Create/Edit Campaign Sidebar */}
@@ -2157,8 +2256,6 @@ const CrmCampaigns = ({ hideBreadcrumb, breadcrumbMainLink }: CrmPageDisplayProp
               position: "fixed",
               top: 0,
               right: 0,
-              width: "600px",
-              maxWidth: "100%",
               height: "100vh",
               backgroundColor: "#ffffff",
               boxShadow: "-2px 0 8px rgba(0, 0, 0, 0.1)",
@@ -2170,7 +2267,6 @@ const CrmCampaigns = ({ hideBreadcrumb, breadcrumbMainLink }: CrmPageDisplayProp
             <div
               className="contact-sidebar-header"
               style={{
-                padding: "20px 24px",
                 borderBottom: "1px solid #eaf0f6",
                 display: "flex",
                 alignItems: "center",
@@ -2217,7 +2313,6 @@ const CrmCampaigns = ({ hideBreadcrumb, breadcrumbMainLink }: CrmPageDisplayProp
               style={{
                 flex: 1,
                 overflowY: "auto",
-                padding: "40px",
               }}
             >
               {/* Campaign Name + Status */}
@@ -2735,7 +2830,6 @@ const CrmCampaigns = ({ hideBreadcrumb, breadcrumbMainLink }: CrmPageDisplayProp
             <div
               className="contact-sidebar-footer"
               style={{
-                padding: "16px 24px",
                 borderTop: "1px solid #eaf0f6",
                 display: "flex",
                 gap: "12px",
@@ -2810,9 +2904,174 @@ const CrmCampaigns = ({ hideBreadcrumb, breadcrumbMainLink }: CrmPageDisplayProp
         </>
       )}
 
-      {/* View Campaign Modal */}
-      <Modal show={showViewModal} onHide={() => setShowViewModal(false)} size="xl" centered>
-        {selectedCampaign && (
+      {/* View Campaign Modal / Sidebar */}
+      {selectedCampaign && preferSidebar && (
+        <MainSettingsFormSidebar
+          show={showViewModal}
+          onHide={() => {
+            setShowViewModal(false);
+            setSelectedCampaign(null);
+          }}
+          title={selectedCampaign.name}
+          footer={
+            loading ? undefined : (
+              <div
+                className="w-100 d-flex justify-content-end gap-2"
+                style={CRM_DIALOG_FOOTER_ACTIONS_ROW_STYLE}
+              >
+                {session?.user?.permissions?.includes(PERMISSIONS.EDIT_CRM_CAMPAIGNS) && (
+                  <Button
+                    variant="primary"
+                    onClick={() => {
+                      setShowViewModal(false);
+                      handleEditCampaign(selectedCampaign);
+                    }}
+                    style={CRM_DIALOG_PRIMARY_BUTTON_STYLE}
+                  >
+                    <Edit size={16} aria-hidden />
+                    Edit Campaign
+                  </Button>
+                )}
+                <Button
+                  variant="outline-secondary"
+                  onClick={() => {
+                    setShowViewModal(false);
+                    setSelectedCampaign(null);
+                  }}
+                  style={CRM_DIALOG_SECONDARY_BUTTON_STYLE}
+                >
+                  Close
+                </Button>
+              </div>
+            )
+          }
+        >
+          <p className="text-muted small mb-3">Campaign Details</p>
+          {loading ? (
+            <output className="text-center py-4 d-block" aria-live="polite">
+              <span className="spinner-border d-inline-block" aria-hidden />
+              <span className="visually-hidden">Loading...</span>
+            </output>
+          ) : (
+            <>
+                  <div style={{ fontSize: "16px", fontWeight: 600, color: "#1f2937", marginBottom: "20px", paddingBottom: "10px", borderBottom: "2px solid #f8f9fa", display: "flex", alignItems: "center", gap: "10px" }}>
+                    <Megaphone size={18} style={{ color: "#4680ff" }} /> Campaign Information
+                  </div>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))", gap: "20px", marginBottom: "30px" }}>
+                    {[
+                      { label: "Campaign Name", value: selectedCampaign.name },
+                      { label: "Status", value: <Badge bg={selectedCampaign.status === "active" ? "success" : "secondary"} style={{ padding: "6px 14px", borderRadius: "20px", fontSize: "12px", fontWeight: 600 }}>{selectedCampaign.status?.charAt(0).toUpperCase() + selectedCampaign.status?.slice(1) || "Inactive"}</Badge> },
+                    ].map((item) => (
+                      <div key={item.label} style={{ background: "#f8f9fa", padding: "16px", borderRadius: "10px", minWidth: 0 }}>
+                        <div style={{ fontSize: "12px", fontWeight: 600, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "6px" }}>{item.label}</div>
+                        <div style={{ fontSize: "15px", color: "#1f2937", fontWeight: 500, minWidth: 0, overflowWrap: "anywhere", wordBreak: "break-word" }}>{item.value}</div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div style={{ fontSize: "12px", fontWeight: 600, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "6px" }}>Description</div>
+                  <CrmDescriptionDetailsBlock
+                    text={selectedCampaign.description}
+                    emptyDisplay="No description"
+                  />
+
+                  <div style={{ fontSize: "16px", fontWeight: 600, color: "#1f2937", marginBottom: "20px", paddingBottom: "10px", borderBottom: "2px solid #f8f9fa", display: "flex", alignItems: "center", gap: "10px" }}>
+                    <Calendar size={18} style={{ color: "#4680ff" }} /> Date Information
+                  </div>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))", gap: "20px", marginBottom: "30px" }}>
+                    <div style={{ background: "#f8f9fa", padding: "16px", borderRadius: "10px" }}>
+                      <div style={{ fontSize: "12px", fontWeight: 600, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "6px" }}>Date Range</div>
+                      <div style={{ fontSize: "15px", color: "#1f2937", fontWeight: 500 }}>
+                        {viewModalDateRangeText(selectedCampaign)}
+                      </div>
+                    </div>
+                    <div style={{ background: "#f8f9fa", padding: "16px", borderRadius: "10px" }}>
+                      <div style={{ fontSize: "12px", fontWeight: 600, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "6px" }}>Created Date</div>
+                      <div style={{ fontSize: "15px", color: "#1f2937", fontWeight: 500 }}>{selectedCampaign.created_at ? formatDateForTable(selectedCampaign.created_at) : "N/A"}</div>
+                    </div>
+                  </div>
+
+                  {selectedCampaign.user_extensions?.length > 0 && (
+                    <>
+                      <div style={{ fontSize: "16px", fontWeight: 600, color: "#1f2937", marginBottom: "20px", paddingBottom: "10px", borderBottom: "2px solid #f8f9fa", display: "flex", alignItems: "center", gap: "10px" }}>
+                        <Users size={18} style={{ color: "#4680ff" }} /> Campaign Users ({selectedCampaign.user_extensions.length})
+                      </div>
+                      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "12px", marginBottom: "30px" }}>
+                        {selectedCampaign.user_extensions.map((ue: { user_extension: unknown }) => {
+                          const ext = extensions.find((e: { id?: unknown; extension?: unknown; display_name?: string; name?: string }) =>
+                            sameExtensionId(e.id, ue.user_extension),
+                          );
+                          return (
+                            <div key={`ue-${String(ue.user_extension)}`} style={{ background: "#f8f9fa", padding: "12px", borderRadius: "8px", fontSize: "14px", fontWeight: 500 }}>
+                              {ext?.display_name || ext?.name || `Extension ${ue.user_extension}`}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </>
+                  )}
+
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))", gap: "20px", marginBottom: "30px" }}>
+                    <div style={{ background: "#f8f9fa", padding: "16px", borderRadius: "10px" }}>
+                      <div style={{ fontSize: "12px", fontWeight: 600, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "6px" }}>Product Groups</div>
+                      <div style={{ fontSize: "15px", color: "#1f2937", fontWeight: 500 }}>
+                        {selectedCampaign.industries?.length > 0
+                          ? selectedCampaign.industries.map((ind: any) => (
+                              <Badge key={ind.id} bg="info" className="me-1">{ind.name}</Badge>
+                            ))
+                          : <span className="text-muted">None</span>}
+                      </div>
+                    </div>
+                    <div style={{ background: "#f8f9fa", padding: "16px", borderRadius: "10px" }}>
+                      <div style={{ fontSize: "12px", fontWeight: 600, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "6px" }}>Deal Template</div>
+                      <div style={{ fontSize: "15px", color: "#1f2937", fontWeight: 500 }}>
+                        {selectedCampaign.deal_template?.name
+                          ? <Badge bg="info">{selectedCampaign.deal_template.name}</Badge>
+                          : <span className="text-muted">None</span>}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div style={{ fontSize: "16px", fontWeight: 600, color: "#1f2937", marginBottom: "20px", paddingBottom: "10px", borderBottom: "2px solid #f8f9fa", display: "flex", alignItems: "center", gap: "10px" }}>
+                    <FileText size={18} style={{ color: "#4680ff" }} /> Campaign Fields ({selectedCampaign.fields?.length || 0})
+                  </div>
+                  {selectedCampaign.fields?.length > 0 ? (
+                    <div className="table-responsive mb-4">
+                      <table className="table table-bordered">
+                        <thead>
+                          <tr><th>Field Name</th><th>Type</th><th>Required</th><th>Options</th></tr>
+                        </thead>
+                        <tbody>
+                          {selectedCampaign.fields.map((field: any, index: number) => {
+                            const fieldKey = campaignFieldRowKey(field, index);
+                            return (
+                            <tr key={fieldKey}>
+                              <td>{field.field_name}</td>
+                              <td><Badge bg="primary" className="text-capitalize">{getFieldTypeText(field.field_type)}</Badge></td>
+                              <td>{field.is_required ? <Badge bg="danger">Required</Badge> : <Badge bg="secondary">Optional</Badge>}</td>
+                              <td>
+                                {field.field_type === "dropdown" && field.field_options
+                                  ? field.field_options.map((opt: string, i: number) => (
+                                    <Badge key={campaignFieldOptionKey(fieldKey, i)} bg="info" className="me-1">{opt}</Badge>
+                                  ))
+                                  : <span className="text-muted">N/A</span>}
+                              </td>
+                            </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : (
+                    <Alert variant="info" className="mb-4">No custom fields defined for this campaign.</Alert>
+                  )}
+            </>
+          )}
+        </MainSettingsFormSidebar>
+      )}
+
+      {selectedCampaign && !preferSidebar && (
+        <Modal show={showViewModal} onHide={() => setShowViewModal(false)} size="xl" centered>
           <>
             <div style={{ color: "black", padding: "30px", position: "relative", borderTopLeftRadius: "8px", borderTopRightRadius: "8px", borderBottom: "1px solid #e5e7eb" }}>
               <button
@@ -2988,8 +3247,8 @@ const CrmCampaigns = ({ hideBreadcrumb, breadcrumbMainLink }: CrmPageDisplayProp
               )}
             </Modal.Body>
           </>
-        )}
-      </Modal>
+        </Modal>
+      )}
 
       {/* Delete Confirmation Modal */}
       <DeleteConfirmationModal
@@ -3002,15 +3261,40 @@ const CrmCampaigns = ({ hideBreadcrumb, breadcrumbMainLink }: CrmPageDisplayProp
         additionalInfo={<p className="text-muted small mb-0">This action will also delete all associated campaign fields.</p>}
       />
 
-      {/* Upload Modal */}
+      {/* Upload Modal / Sidebar */}
       {session?.user?.permissions?.includes(
         PERMISSIONS.CREATE_CRM_DATA_MANAGEMENT,
       ) && (
-        <Modal show={showUploadModal} onHide={() => setShowUploadModal(false)} size="lg" centered>
-          <Modal.Header closeButton className="border-bottom bg-light">
-            <Modal.Title>Upload CSV - Import Prospects</Modal.Title>
-          </Modal.Header>
-          <Modal.Body className="p-4">
+        <CrmSettingsPanelShell
+          show={showUploadModal}
+          onHide={() => setShowUploadModal(false)}
+          title="Upload CSV - Import Prospects"
+          modalSize="lg"
+          footer={
+            <>
+              <Form.Text className="text-muted d-flex align-items-center gap-1 mb-0 me-auto">
+                <AlertCircle size={14} />
+                <span style={{ fontSize: "0.813rem" }}>
+                  Fields marked with <span className="text-danger fw-bold">*</span> are required
+                </span>
+              </Form.Text>
+              <Button variant="secondary" onClick={() => { setShowUploadModal(false); setSelectedFile(null); setFieldTags([]); setUploadSelectedCampaigns([]); setAutoDistributeToUsers(false); }}>Cancel</Button>
+              <Button variant="primary" onClick={handleUpload} disabled={uploading || !selectedFile}>
+                {uploading ? (
+                  <output className="d-inline-flex align-items-center gap-2 mb-0" aria-live="polite">
+                    <span className="spinner-border spinner-border-sm" aria-hidden />
+                    <span>Uploading...</span>
+                  </output>
+                ) : (
+                  <span className="d-inline-flex align-items-center gap-1">
+                    <Download size={16} aria-hidden />
+                    <span>Upload & Import</span>
+                  </span>
+                )}
+              </Button>
+            </>
+          }
+        >
             <div className="alert alert-info mb-4">
               <AlertCircleIcon size={18} className="me-2" />
               <strong>📋 Import Guidelines:</strong>
@@ -3048,41 +3332,50 @@ const CrmCampaigns = ({ hideBreadcrumb, breadcrumbMainLink }: CrmPageDisplayProp
               </Form.Group>
               <div className="alert alert-warning"><small><strong>Note:</strong> The data will be uploaded even if some fields remain empty.</small></div>
             </Form>
-          </Modal.Body>
-          <Modal.Footer>
+        </CrmSettingsPanelShell>
+      )}
+
+      {/* Data Assignment Modal / Sidebar */}
+      <CrmSettingsPanelShell
+        show={showDataAssignmentModal}
+        onHide={handleDataAssignmentModalClose}
+        title="Data Assignment"
+        titleIcon={
+          <div className="p-2 bg-primary bg-opacity-10 rounded-3">
+            <Target size={20} className="text-primary" />
+          </div>
+        }
+        modalSize="lg"
+        modalBackdrop="static"
+        disableClose={assigningData}
+        footer={
+          <>
             <Form.Text className="text-muted d-flex align-items-center gap-1 mb-0 me-auto">
               <AlertCircle size={14} />
               <span style={{ fontSize: "0.813rem" }}>
                 Fields marked with <span className="text-danger fw-bold">*</span> are required
               </span>
             </Form.Text>
-            <Button variant="secondary" onClick={() => { setShowUploadModal(false); setSelectedFile(null); setFieldTags([]); setUploadSelectedCampaigns([]); setAutoDistributeToUsers(false); }}>Cancel</Button>
-            <Button variant="primary" onClick={handleUpload} disabled={uploading || !selectedFile}>
-              {uploading ? (
+            <Button variant="light" onClick={handleDataAssignmentModalClose} disabled={assigningData} className="px-4 fw-semibold">Cancel</Button>
+            <Button variant="primary" disabled={assigningData || !assignmentTargetType || recordsToAssign === 0 || recordsToAssign > getMaxRecords() || (assignmentTargetType === "campaigns" && (!distributionMode || assignToCampaigns.length === 0)) || (assignmentTargetType === "users" && (!distributionMode || selectedUserExtensions.length === 0))} onClick={handleDataAssignmentSubmit} className="px-4 fw-semibold d-flex align-items-center gap-2">
+              {assigningData ? (
                 <output className="d-inline-flex align-items-center gap-2 mb-0" aria-live="polite">
                   <span className="spinner-border spinner-border-sm" aria-hidden />
-                  <span>Uploading...</span>
+                  <span>Assigning...</span>
                 </output>
               ) : (
                 <span className="d-inline-flex align-items-center gap-1">
-                  <Download size={16} aria-hidden />
-                  <span>Upload & Import</span>
+                  <UserPlus size={18} aria-hidden />
+                  <span>
+                    Assign
+                    {recordsToAssign > 0 ? ` ${recordsToAssign.toLocaleString()} Records` : " Records"}
+                  </span>
                 </span>
               )}
             </Button>
-          </Modal.Footer>
-        </Modal>
-      )}
-
-      {/* Data Assignment Modal */}
-      <Modal show={showDataAssignmentModal} onHide={handleDataAssignmentModalClose} size="lg" centered backdrop="static">
-        <Modal.Header closeButton style={{ borderBottom: "1px solid #ccc" }} className="pb-2">
-          <Modal.Title className="d-flex align-items-center gap-2 fs-5 fw-bold text-dark">
-            <div className="p-2 bg-primary bg-opacity-10 rounded-3"><Target size={20} className="text-primary" /></div>
-            Data Assignment
-          </Modal.Title>
-        </Modal.Header>
-        <Modal.Body className="px-4 pb-4">
+          </>
+        }
+      >
           <div className="alert alert-primary border-0 d-flex align-items-start mb-4 shadow-sm" style={{ background: "linear-gradient(135deg, rgba(79, 70, 229, 0.05) 0%, rgba(99, 102, 241, 0.05) 100%)", borderLeft: "4px solid #4f46e5" }}>
             <AlertCircle size={20} className="text-primary mt-1 me-2 flex-shrink-0" />
             <div><strong className="d-block mb-1 text-dark">Smart Data Assignment</strong><span className="text-muted small">Configure filters and assignment criteria to distribute prospects efficiently.</span></div>
@@ -3266,33 +3559,7 @@ const CrmCampaigns = ({ hideBreadcrumb, breadcrumbMainLink }: CrmPageDisplayProp
               </div>
             </div>
           </Form>
-        </Modal.Body>
-        <Modal.Footer className="border-0 pt-0 px-4 pb-4">
-          <Form.Text className="text-muted d-flex align-items-center gap-1 mb-0 me-auto">
-            <AlertCircle size={14} />
-            <span style={{ fontSize: "0.813rem" }}>
-              Fields marked with <span className="text-danger fw-bold">*</span> are required
-            </span>
-          </Form.Text>
-          <Button variant="light" onClick={handleDataAssignmentModalClose} disabled={assigningData} className="px-4 fw-semibold">Cancel</Button>
-          <Button variant="primary" disabled={assigningData || !assignmentTargetType || recordsToAssign === 0 || recordsToAssign > getMaxRecords() || (assignmentTargetType === "campaigns" && (!distributionMode || assignToCampaigns.length === 0)) || (assignmentTargetType === "users" && (!distributionMode || selectedUserExtensions.length === 0))} onClick={handleDataAssignmentSubmit} className="px-4 fw-semibold d-flex align-items-center gap-2">
-            {assigningData ? (
-              <output className="d-inline-flex align-items-center gap-2 mb-0" aria-live="polite">
-                <span className="spinner-border spinner-border-sm" aria-hidden />
-                <span>Assigning...</span>
-              </output>
-            ) : (
-              <span className="d-inline-flex align-items-center gap-1">
-                <UserPlus size={18} aria-hidden />
-                <span>
-                  Assign
-                  {recordsToAssign > 0 ? ` ${recordsToAssign.toLocaleString()} Records` : " Records"}
-                </span>
-              </span>
-            )}
-          </Button>
-        </Modal.Footer>
-      </Modal>
+      </CrmSettingsPanelShell>
 
       <SuccessfulModal show={showSuccessfulModal} onHide={() => setShowSuccessfulModal(false)} title={successModalTitle} description={successModalDescription} />
     </React.Fragment>

@@ -1,5 +1,4 @@
 import React from "react";
-import { Button } from "react-bootstrap";
 import { Edit, Eye, Trash2 } from "lucide-react";
 import type { TableColumn } from "@components/GenericTable";
 import { CrmTruncatedDescriptionCell } from "@components/crm/crmTruncatedDescriptionCell";
@@ -8,6 +7,7 @@ import {
   GlobalDateFormat,
 } from "@utils/Helper";
 import type { IndustryData } from "@utils/crm";
+import { CrmTableRowActions } from "@page-modules/crm/shared/CrmTableRowActions";
 
 export interface BuildIndustriesTableColumnsParams {
   canEdit: boolean;
@@ -22,35 +22,36 @@ function renderIndustryActions(
   params: BuildIndustriesTableColumnsParams,
 ): React.ReactNode {
   const { canEdit, canDelete, onView, onEdit, onDelete } = params;
-  return (
-    <div className="d-flex justify-content-end gap-2">
-      <Button
-        variant="outline-info"
-        size="sm"
-        onClick={() => onView(industry)}
-      >
-        <Eye size={14} />
-      </Button>
-      {canEdit && (
-        <Button
-          variant="outline-primary"
-          size="sm"
-          onClick={() => onEdit(industry)}
-        >
-          <Edit size={14} />
-        </Button>
-      )}
-      {canDelete && (
-        <Button
-          variant="outline-danger"
-          size="sm"
-          onClick={() => onDelete(industry)}
-        >
-          <Trash2 size={14} />
-        </Button>
-      )}
-    </div>
-  );
+  const actions = [
+    {
+      label: `View product group ${industry.name}`,
+      icon: <Eye size={22} aria-hidden />,
+      tone: "success" as const,
+      onClick: () => onView(industry),
+    },
+    ...(canEdit
+      ? [
+          {
+            label: `Edit product group ${industry.name}`,
+            icon: <Edit size={22} aria-hidden />,
+            tone: "primary" as const,
+            onClick: () => onEdit(industry),
+          },
+        ]
+      : []),
+    ...(canDelete
+      ? [
+          {
+            label: `Delete product group ${industry.name}`,
+            icon: <Trash2 size={22} aria-hidden />,
+            tone: "danger" as const,
+            onClick: () => onDelete(industry),
+          },
+        ]
+      : []),
+  ];
+
+  return <CrmTableRowActions actions={actions} />;
 }
 
 /** Builds the column list for the industries / product groups table. */
@@ -65,7 +66,17 @@ export function buildIndustriesTableColumns(
       type: "custom",
       width: "240px",
       render: (industry) => (
-        <div className="fw-semibold">{industry.name}</div>
+        <div
+          className="fw-semibold"
+          title={industry.name}
+          style={{
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap",
+          }}
+        >
+          {industry.name}
+        </div>
       ),
     },
     {
@@ -94,7 +105,7 @@ export function buildIndustriesTableColumns(
       key: "actions",
       label: "Actions",
       sortable: false,
-      align: "right",
+      align: "center",
       type: "custom",
       width: "160px",
       render: (industry) => renderIndustryActions(industry, params),

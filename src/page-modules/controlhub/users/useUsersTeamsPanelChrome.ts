@@ -9,8 +9,11 @@ export function useUsersTeamsPanelChrome(tab: UsersTeamsTab = "user-directory") 
   const router = useRouter();
   const pathname = router.pathname;
 
+  const showBreadcrumb = shouldShowUsersTeamsBreadcrumb(pathname);
+
   return {
-    showBreadcrumb: shouldShowUsersTeamsBreadcrumb(pathname),
+    showBreadcrumb,
     breadcrumbMainLink: resolveUsersTeamsTabPath(tab, pathname),
+    embeddedInMainSettings: !showBreadcrumb,
   };
 }

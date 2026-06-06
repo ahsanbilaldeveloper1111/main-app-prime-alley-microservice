@@ -1,3 +1,4 @@
+import { MAIN_SETTINGS_FONT_SIZE } from './mainSettingsTokens'
 import React from 'react'
 import { ACCOUNT_DEFAULTS_FONT } from './accountDefaultsTabPrimitives'
 import type { NotificationProfile } from './notificationProfilesTypes'
@@ -25,10 +26,10 @@ export const NotificationProfilesProfileList: React.FC<NotificationProfilesProfi
             alignItems: 'center',
             justifyContent: 'space-between',
             padding: '14px 18px',
-            border: '1px solid #e0e0e0',
-            borderRadius: '4px',
+            border: '1px solid #c4c4c4',
+            borderRadius: '8px',
             fontFamily: baseFont,
-            fontSize: '14px',
+            fontSize: MAIN_SETTINGS_FONT_SIZE.base,
             fontWeight: 400,
             color: '#141414',
             background: '#fff',
@@ -42,8 +43,8 @@ export const NotificationProfilesProfileList: React.FC<NotificationProfilesProfi
               background: 'none',
               border: 'none',
               cursor: 'pointer',
-              color: '#888',
-              fontSize: '18px',
+              color: '#6c757d',
+              fontSize: MAIN_SETTINGS_FONT_SIZE.lg,
               lineHeight: 1,
               padding: '0 4px',
               fontFamily: baseFont,

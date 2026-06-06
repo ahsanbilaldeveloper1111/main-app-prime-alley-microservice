@@ -1,4 +1,4 @@
-import "@assets/scss/datatable-style.scss";
+﻿import "@assets/scss/datatable-style.scss";
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
 import React, {
@@ -207,7 +207,7 @@ const LiveCallsCampaignsManagement = () => {
       );
   }, [hydrateFromStorage]);
 
-  // Fetch Finesse user and map to TopBar (teams, selectedTeam, agentStatus) – runs when past FinesseAuthGate / after hydrate
+  // Fetch Finesse user and map to TopBar (teams, selectedTeam, agentStatus) â€“ runs when past FinesseAuthGate / after hydrate
   useEffect(() => {
     if (!finesseHydrated) return;
     const data = getFinesseUserData();
@@ -266,7 +266,7 @@ const LiveCallsCampaignsManagement = () => {
     loadUser();
   }, [finesseHydrated, finesseUsername, session?.user]);
 
-  // Load import statuses in background – runs when past FinesseAuthGate / after hydrate
+  // Load import statuses in background â€“ runs when past FinesseAuthGate / after hydrate
   useEffect(() => {
     if (!finesseHydrated) return;
     const data = getFinesseUserData();
@@ -457,26 +457,28 @@ const LiveCallsCampaignsManagement = () => {
     [finesseHydrated, finesseDataForCap?.loginId, finesseDataForCap?.settings],
   );
 
-  const handleRosterEvent = useCallback((raw: unknown) => {
-    const d = getFinesseUserData();
-    const self =
-      d?.loginId ?? d?.loginName ?? finesseUsername ?? "";
-    if (!self) return;
-    const patch = findRosterEntryForLogin(raw, self);
-    if (!patch) return;
-    const display = resolveRosterAgentDisplayState(patch);
-    if (!display) return;
-    setAgentStatus(display);
-    const prev = getFinesseUserData();
-    if (!prev) return;
-    setFinesseUserData({
-      ...prev,
-      state: display,
-      ...(patch.stateChangeTime == null
-        ? {}
-        : { stateChangeTime: patch.stateChangeTime }),
-    });
-  }, [finesseUsername]);
+  const handleRosterEvent = useCallback(
+    (raw: unknown) => {
+      const d = getFinesseUserData();
+      const self = d?.loginId ?? d?.loginName ?? finesseUsername ?? "";
+      if (!self) return;
+      const patch = findRosterEntryForLogin(raw, self);
+      if (!patch) return;
+      const display = resolveRosterAgentDisplayState(patch);
+      if (!display) return;
+      setAgentStatus(display);
+      const prev = getFinesseUserData();
+      if (!prev) return;
+      setFinesseUserData({
+        ...prev,
+        state: display,
+        ...(patch.stateChangeTime == null
+          ? {}
+          : { stateChangeTime: patch.stateChangeTime }),
+      });
+    },
+    [finesseUsername],
+  );
 
   useEffect(() => {
     if (!session?.user) return;
@@ -688,22 +690,23 @@ const LiveCallsCampaignsManagement = () => {
     return [];
   }, []);
 
-  const loadUploadModalRemainingFromApi =
-    useCallback(async (): Promise<number | null> => {
-      if (selectedCampaignId == null) return null;
-      const { username, teamId } = getFinesseContext();
-      if (!username || teamId == null) return null;
-      try {
-        const resp = await getFinesseCampaignContacts(
-          teamId,
-          username,
-          selectedCampaignId,
-        );
-        return extractRemainingContactsCount(resp);
-      } catch {
-        return null;
-      }
-    }, [getFinesseContext, selectedCampaignId]);
+  const loadUploadModalRemainingFromApi = useCallback(async (): Promise<
+    number | null
+  > => {
+    if (selectedCampaignId == null) return null;
+    const { username, teamId } = getFinesseContext();
+    if (!username || teamId == null) return null;
+    try {
+      const resp = await getFinesseCampaignContacts(
+        teamId,
+        username,
+        selectedCampaignId,
+      );
+      return extractRemainingContactsCount(resp);
+    } catch {
+      return null;
+    }
+  }, [getFinesseContext, selectedCampaignId]);
 
   // Load columns config + remaining contacts when upload modal opens
   useEffect(() => {
@@ -718,11 +721,7 @@ const LiveCallsCampaignsManagement = () => {
       setUploadModalRemainingCount(null);
 
       const [configOutcome, count] = await Promise.all([
-        getFinesseCampaignContactsConfig(
-          teamId,
-          username,
-          selectedCampaignId,
-        )
+        getFinesseCampaignContactsConfig(teamId, username, selectedCampaignId)
           .then((r) => ({ ok: true as const, r }))
           .catch(() => ({ ok: false as const })),
         loadUploadModalRemainingFromApi(),
@@ -1035,7 +1034,7 @@ const LiveCallsCampaignsManagement = () => {
                     margin: 0,
                     fontSize: "22px",
                     fontWeight: 700,
-                    color: "#1e293b",
+                    color: "#141414",
                   }}
                 >
                   Insufficient Capabilities
@@ -1043,7 +1042,7 @@ const LiveCallsCampaignsManagement = () => {
               </div>
               <p
                 style={{
-                  color: "#64748b",
+                  color: "#6c757d",
                   fontSize: "14px",
                   marginBottom: "24px",
                 }}
@@ -1077,7 +1076,7 @@ const LiveCallsCampaignsManagement = () => {
         
 
         .campaign-info-bar {
-          background: linear-gradient(135deg, #667eea 0%, #667eea 100%);
+          background: linear-gradient(135deg, #0066CC 0%, #0066CC 100%);
           color: white;
           padding: 16px 32px;
           display: flex;
@@ -1136,7 +1135,7 @@ const LiveCallsCampaignsManagement = () => {
         }
 
         .call-widget-header {
-          background: linear-gradient(135deg, #667eea 0%, #667eea 100%);
+          background: linear-gradient(135deg, #0066CC 0%, #0066CC 100%);
           color: white;
           padding: 20px;
           display: flex;
@@ -1156,7 +1155,7 @@ const LiveCallsCampaignsManagement = () => {
         .call-timer {
           font-size: 32px;
           font-weight: 700;
-          color: #1e293b;
+          color: #141414;
           margin: 0;
         }
 
@@ -1194,12 +1193,12 @@ const LiveCallsCampaignsManagement = () => {
         }
 
         .call-info-label {
-          color: #64748b;
+          color: #6c757d;
           font-weight: 500;
         }
 
         .call-info-value {
-          color: #1e293b;
+          color: #141414;
           font-weight: 600;
         }
 
@@ -1216,7 +1215,7 @@ const LiveCallsCampaignsManagement = () => {
           border: none;
           border-radius: 12px;
           background: #f8fafc;
-          color: #64748b;
+          color: #6c757d;
           cursor: pointer;
           transition: all 0.2s;
           display: flex;
@@ -1234,7 +1233,7 @@ const LiveCallsCampaignsManagement = () => {
         }
 
         .call-control-btn.active {
-          background: #667eea;
+          background: #0066CC;
           color: white;
         }
 
@@ -1322,8 +1321,8 @@ const LiveCallsCampaignsManagement = () => {
 
         .search-box input:focus {
           outline: none;
-          border-color: #667eea;
-          box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+          border-color: #0066CC;
+          box-shadow: 0 0 0 3px rgba(0, 102, 204, 0.1);
         }
 
         .team-selector {
@@ -1345,12 +1344,12 @@ const LiveCallsCampaignsManagement = () => {
 
         .team-selector select:focus {
           outline: none;
-          border-color: #667eea;
-          box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+          border-color: #0066CC;
+          box-shadow: 0 0 0 3px rgba(0, 102, 204, 0.1);
         }
 
         .team-selector select:hover {
-          border-color: #667eea;
+          border-color: #0066CC;
         }
 
         .search-icon {
@@ -1387,8 +1386,8 @@ const LiveCallsCampaignsManagement = () => {
         }
 
         .status-selector:hover {
-          border-color: #667eea;
-          box-shadow: 0 2px 8px rgba(102, 126, 234, 0.15);
+          border-color: #0066CC;
+          box-shadow: 0 2px 8px rgba(0, 102, 204, 0.15);
         }
 
         .status-indicator {
@@ -1451,8 +1450,8 @@ const LiveCallsCampaignsManagement = () => {
         }
 
         .dropdown-item.active {
-          background: #ede9fe;
-          color: #7c3aed;
+          background: #EEF2FF;
+          color: #0066CC;
         }
 
         .icon-button {
@@ -1466,13 +1465,13 @@ const LiveCallsCampaignsManagement = () => {
           align-items: center;
           justify-content: center;
           transition: all 0.2s;
-          color: #64748b;
+          color: #6c757d;
         }
 
         .icon-button:hover {
-          border-color: #667eea;
-          color: #667eea;
-          box-shadow: 0 2px 8px rgba(102, 126, 234, 0.15);
+          border-color: #0066CC;
+          color: #0066CC;
+          box-shadow: 0 2px 8px rgba(0, 102, 204, 0.15);
         }
 
         .icon-button.refreshing {
@@ -1491,7 +1490,7 @@ const LiveCallsCampaignsManagement = () => {
         .user-menu-button {
           width: 44px;
           height: 44px;
-          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+          background: linear-gradient(135deg, #0066CC 0%, #0052A3 100%);
           border: none;
           border-radius: 10px;
           cursor: pointer;
@@ -1502,12 +1501,12 @@ const LiveCallsCampaignsManagement = () => {
           color: white;
           font-weight: 600;
           font-size: 14px;
-          box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+          box-shadow: 0 2px 8px rgba(0, 102, 204, 0.3);
         }
 
         .user-menu-button:hover {
           transform: translateY(-2px);
-          box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+          box-shadow: 0 4px 12px rgba(0, 102, 204, 0.4);
         }
 
         .content-area {
@@ -1521,12 +1520,12 @@ const LiveCallsCampaignsManagement = () => {
         .page-title {
           font-size: 32px;
           font-weight: 700;
-          color: #1e293b;
+          color: #141414;
           margin-bottom: 8px;
         }
 
         .page-subtitle {
-          color: #64748b;
+          color: #6c757d;
           font-size: 16px;
         }
 
@@ -1544,14 +1543,14 @@ const LiveCallsCampaignsManagement = () => {
         }
 
         .btn-primary {
-          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+          background: linear-gradient(135deg, #0066CC 0%, #0052A3 100%);
           color: white;
-          box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+          box-shadow: 0 4px 12px rgba(0, 102, 204, 0.4);
         }
 
         .btn-primary:hover {
           transform: translateY(-2px);
-          box-shadow: 0 6px 16px rgba(102, 126, 234, 0.5);
+          box-shadow: 0 6px 16px rgba(0, 102, 204, 0.5);
         }
 
         .btn-secondary {
@@ -1561,8 +1560,8 @@ const LiveCallsCampaignsManagement = () => {
         }
 
         .btn-secondary:hover {
-          border-color: #667eea;
-          color: #667eea;
+          border-color: #0066CC;
+          color: #0066CC;
         }
 
         .btn-wrap-up {
@@ -1615,7 +1614,7 @@ const LiveCallsCampaignsManagement = () => {
         .card-title {
           font-size: 20px;
           font-weight: 600;
-          color: #1e293b;
+          color: #141414;
         }
 
         .filters {
@@ -1644,7 +1643,7 @@ const LiveCallsCampaignsManagement = () => {
           text-align: left;
           font-weight: 600;
           font-size: 13px;
-          color: #64748b;
+          color: #6c757d;
           text-transform: uppercase;
           letter-spacing: 0.5px;
           border-bottom: 1px solid #e5e7eb;
@@ -1660,7 +1659,7 @@ const LiveCallsCampaignsManagement = () => {
         }
 
         tbody tr.selected {
-          background: #ede9fe;
+          background: #EEF2FF;
         }
 
         tbody td {
@@ -1671,7 +1670,7 @@ const LiveCallsCampaignsManagement = () => {
 
         .campaign-name {
           font-weight: 600;
-          color: #1e293b;
+          color: #141414;
           display: flex;
           align-items: center;
           gap: 8px;
@@ -1746,8 +1745,8 @@ const LiveCallsCampaignsManagement = () => {
         .time-input:focus {
           outline: none;
           background: white;
-          border-color: #667eea;
-          box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+          border-color: #0066CC;
+          box-shadow: 0 0 0 3px rgba(0, 102, 204, 0.1);
         }
 
         .timezone-text {
@@ -1759,7 +1758,7 @@ const LiveCallsCampaignsManagement = () => {
         .contacts-remaining {
           font-size: 18px;
           font-weight: 700;
-          color: #1e293b;
+          color: #141414;
         }
 
         .toggle-switch {
@@ -1803,11 +1802,11 @@ const LiveCallsCampaignsManagement = () => {
           align-items: center;
           justify-content: center;
           transition: all 0.2s;
-          color: #64748b;
+          color: #6c757d;
         }
 
         .action-btn:hover {
-          background: #667eea;
+          background: #0066CC;
           color: white;
         }
 
@@ -1879,8 +1878,8 @@ const LiveCallsCampaignsManagement = () => {
         }
 
         .checkbox.checked {
-          background: #667eea;
-          border-color: #667eea;
+          background: #0066CC;
+          border-color: #0066CC;
         }
 
         .modal-overlay {
@@ -1935,7 +1934,7 @@ const LiveCallsCampaignsManagement = () => {
           display: flex;
           justify-content: space-between;
           align-items: center;
-          background: linear-gradient(135deg, #667eea 0%, #667eea 100%);
+          background: linear-gradient(135deg, #0066CC 0%, #0066CC 100%);
           color: white;
         }
 
@@ -1981,7 +1980,7 @@ const LiveCallsCampaignsManagement = () => {
         .modal-section-title {
           font-size: 18px;
           font-weight: 600;
-          color: #1e293b;
+          color: #141414;
           margin-bottom: 16px;
           display: flex;
           align-items: center;
@@ -1999,20 +1998,20 @@ const LiveCallsCampaignsManagement = () => {
         }
 
         .upload-area:hover {
-          border-color: #667eea;
+          border-color: #0066CC;
           background: #f1f5f9;
         }
 
         .upload-area.active {
-          border-color: #667eea;
-          background: #ede9fe;
+          border-color: #0066CC;
+          background: #EEF2FF;
         }
 
         .upload-icon {
           width: 64px;
           height: 64px;
           margin: 0 auto 16px;
-          background: linear-gradient(135deg, #667eea 0%, #667eea 100%);
+          background: linear-gradient(135deg, #0066CC 0%, #0066CC 100%);
           border-radius: 16px;
           display: flex;
           align-items: center;
@@ -2023,13 +2022,13 @@ const LiveCallsCampaignsManagement = () => {
         .upload-text {
           font-size: 16px;
           font-weight: 600;
-          color: #1e293b;
+          color: #141414;
           margin-bottom: 8px;
         }
 
         .upload-hint {
           font-size: 14px;
-          color: #64748b;
+          color: #6c757d;
         }
 
         .file-info {
@@ -2045,7 +2044,7 @@ const LiveCallsCampaignsManagement = () => {
         .file-icon {
           width: 48px;
           height: 48px;
-          background: linear-gradient(135deg, #667eea 0%, #667eea 100%);
+          background: linear-gradient(135deg, #0066CC 0%, #0066CC 100%);
           border-radius: 12px;
           display: flex;
           align-items: center;
@@ -2059,13 +2058,13 @@ const LiveCallsCampaignsManagement = () => {
 
         .file-name {
           font-weight: 600;
-          color: #1e293b;
+          color: #141414;
           margin-bottom: 4px;
         }
 
         .file-size {
           font-size: 13px;
-          color: #64748b;
+          color: #6c757d;
         }
 
         .column-list {
@@ -2087,7 +2086,7 @@ const LiveCallsCampaignsManagement = () => {
         .column-order {
           width: 32px;
           height: 32px;
-          background: linear-gradient(135deg, #667eea 0%, #667eea 100%);
+          background: linear-gradient(135deg, #0066CC 0%, #0066CC 100%);
           color: white;
           border-radius: 8px;
           display: flex;
@@ -2108,8 +2107,8 @@ const LiveCallsCampaignsManagement = () => {
 
         .column-input:focus {
           outline: none;
-          border-color: #667eea;
-          box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+          border-color: #0066CC;
+          box-shadow: 0 0 0 3px rgba(0, 102, 204, 0.1);
         }
 
         .column-controls {
@@ -2128,14 +2127,14 @@ const LiveCallsCampaignsManagement = () => {
           align-items: center;
           justify-content: center;
           transition: all 0.2s;
-          color: #64748b;
+          color: #6c757d;
           border: 1px solid #e5e7eb;
         }
 
         .column-btn:hover {
-          background: #667eea;
+          background: #0066CC;
           color: white;
-          border-color: #667eea;
+          border-color: #0066CC;
         }
 
         .column-btn:disabled {
@@ -2145,7 +2144,7 @@ const LiveCallsCampaignsManagement = () => {
 
         .column-btn:disabled:hover {
           background: white;
-          color: #64748b;
+          color: #6c757d;
           border-color: #e5e7eb;
         }
 
@@ -2166,12 +2165,12 @@ const LiveCallsCampaignsManagement = () => {
           justify-content: center;
           gap: 8px;
           font-weight: 600;
-          color: #667eea;
+          color: #0066CC;
           transition: all 0.2s;
         }
 
         .add-column-btn:hover {
-          border-color: #667eea;
+          border-color: #0066CC;
           background: #f8fafc;
         }
 
@@ -2185,7 +2184,7 @@ const LiveCallsCampaignsManagement = () => {
 
         .btn-cancel {
           background: #f1f5f9;
-          color: #64748b;
+          color: #6c757d;
           border: none;
           padding: 12px 24px;
           border-radius: 10px;
@@ -2199,7 +2198,7 @@ const LiveCallsCampaignsManagement = () => {
         }
 
         .btn-upload {
-          background: linear-gradient(135deg, #667eea 0%, #667eea 100%);
+          background: linear-gradient(135deg, #0066CC 0%, #0066CC 100%);
           color: white;
           border: none;
           padding: 12px 24px;
@@ -2214,7 +2213,7 @@ const LiveCallsCampaignsManagement = () => {
 
         .btn-upload:hover {
           transform: translateY(-2px);
-          box-shadow: 0 8px 20px rgba(102, 126, 234, 0.4);
+          box-shadow: 0 8px 20px rgba(0, 102, 204, 0.4);
         }
 
         @media (max-width: 1024px) {
@@ -2322,7 +2321,7 @@ const LiveCallsCampaignsManagement = () => {
                         style={{
                           textAlign: "center",
                           padding: "48px 24px",
-                          color: "#64748b",
+                          color: "#6c757d",
                         }}
                       >
                         <Loader
@@ -2344,7 +2343,7 @@ const LiveCallsCampaignsManagement = () => {
                         style={{
                           textAlign: "center",
                           padding: "48px 24px",
-                          color: "#64748b",
+                          color: "#6c757d",
                         }}
                       >
                         No campaigns found.
@@ -2370,11 +2369,11 @@ const LiveCallsCampaignsManagement = () => {
                             <input
                               type="checkbox"
                               checked={selectedCampaigns.includes(campaign.id)}
-                              onChange={() =>
-                                handleSelectCampaign(campaign.id)
-                              }
+                              onChange={() => handleSelectCampaign(campaign.id)}
                               aria-label={`Select campaign ${campaign.name}`}
-                              style={CAMPAIGN_MANAGER_VISUALLY_HIDDEN_INPUT_STYLE}
+                              style={
+                                CAMPAIGN_MANAGER_VISUALLY_HIDDEN_INPUT_STYLE
+                              }
                             />
                             {selectedCampaigns.includes(campaign.id) && (
                               <CheckCircle size={14} color="white" />
@@ -2383,7 +2382,7 @@ const LiveCallsCampaignsManagement = () => {
                         </td>
                         <td>
                           <div className="campaign-name">
-                            <Target size={18} color="#667eea" />
+                            <Target size={18} color="#0066CC" />
                             {campaign.name}
                           </div>
                         </td>
@@ -2459,13 +2458,17 @@ const LiveCallsCampaignsManagement = () => {
                             }
                             onClick={() => {
                               if (!canChangeCampaignStatus) return;
-                              handleToggleCampaign(campaign.id).catch(() => undefined);
+                              handleToggleCampaign(campaign.id).catch(
+                                () => undefined,
+                              );
                             }}
                             onKeyDown={(e) => {
                               if (!canChangeCampaignStatus) return;
                               if (e.key === "Enter" || e.key === " ") {
                                 e.preventDefault();
-                                handleToggleCampaign(campaign.id).catch(() => undefined);
+                                handleToggleCampaign(campaign.id).catch(
+                                  () => undefined,
+                                );
                               }
                             }}
                             role="switch"
@@ -2498,7 +2501,7 @@ const LiveCallsCampaignsManagement = () => {
             </div>
           </div>
 
-          {/* Outgoing Call Widget – dynamic from preview event */}
+          {/* Outgoing Call Widget â€“ dynamic from preview event */}
           <CallWidget {...callWidgetProps} />
 
           <WrapUpModal {...wrapUpModalProps} />
@@ -2546,7 +2549,7 @@ const LiveCallsCampaignsManagement = () => {
                           fontWeight: 600,
                         }}
                       >
-                        <Target size={18} color="#667eea" />
+                        <Target size={18} color="#0066CC" />
                         <span>
                           {uploadModalCampaignRow?.name ??
                             `Campaign #${selectedCampaignId}`}
@@ -2565,7 +2568,7 @@ const LiveCallsCampaignsManagement = () => {
                             display: "flex",
                             alignItems: "center",
                             gap: "8px",
-                            color: "#64748b",
+                            color: "#6c757d",
                           }}
                         >
                           <span style={{ fontWeight: 600 }}>
@@ -2583,10 +2586,10 @@ const LiveCallsCampaignsManagement = () => {
                               style={{
                                 fontWeight: 700,
                                 fontSize: "18px",
-                                color: "#1e293b",
+                                color: "#141414",
                               }}
                             >
-                              {uploadModalDisplayRemaining ?? "—"}
+                              {uploadModalDisplayRemaining ?? "â€”"}
                             </span>
                           )}
                         </div>
@@ -2596,7 +2599,9 @@ const LiveCallsCampaignsManagement = () => {
                           title="Refresh remaining contacts"
                           aria-label="Refresh remaining contacts"
                           onClick={() => {
-                            handleRefreshUploadModalContacts().catch(() => undefined);
+                            handleRefreshUploadModalContacts().catch(
+                              () => undefined,
+                            );
                           }}
                           disabled={
                             uploadModalRemainingLoading ||
@@ -2611,7 +2616,9 @@ const LiveCallsCampaignsManagement = () => {
                           title="Remove all remaining contacts"
                           aria-label="Remove all remaining contacts"
                           onClick={() => {
-                            handleClearUploadModalContacts().catch(() => undefined);
+                            handleClearUploadModalContacts().catch(
+                              () => undefined,
+                            );
                           }}
                           disabled={
                             uploadModalRemainingLoading ||
@@ -2711,7 +2718,7 @@ const LiveCallsCampaignsManagement = () => {
                         <div
                           style={{
                             fontSize: "13px",
-                            color: "#64748b",
+                            color: "#6c757d",
                             maxWidth: "420px",
                           }}
                         >
@@ -2777,7 +2784,7 @@ const LiveCallsCampaignsManagement = () => {
                       <div
                         style={{
                           marginTop: "8px",
-                          color: "#64748b",
+                          color: "#6c757d",
                           display: "flex",
                           alignItems: "center",
                           gap: "8px",
@@ -2810,7 +2817,9 @@ const LiveCallsCampaignsManagement = () => {
                               isSearchable={false}
                               isClearable={false}
                               isDisabled={columnsLoading}
-                              options={CAMPAIGN_MANAGER_CONTACT_HEADER_VALUE_OPTIONS}
+                              options={
+                                CAMPAIGN_MANAGER_CONTACT_HEADER_VALUE_OPTIONS
+                              }
                               value={
                                 CAMPAIGN_MANAGER_CONTACT_HEADER_VALUE_OPTIONS.find(
                                   (o) => o.value === column.value,

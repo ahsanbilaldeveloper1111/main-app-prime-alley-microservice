@@ -83,6 +83,7 @@ import {
   persistVisibleTabIds,
   persistVisibleTaskColumnKeys,
   POSSIBLE_TABS,
+  resolvePlannerTaskTabCount,
   PRIORITY_OPTIONS,
   PROJECT_DETAILS_STATUS_WITH,
   readVisibleTaskColumnKeysFromStorage,
@@ -97,6 +98,7 @@ import {
   buildTaskListingPageStyleTag,
   TaskListingSearchRow,
 } from "@utils/taskListing/taskListUiPrimitives";
+import "@components/planner/plannerTasksListing/plannerTasksListing.scss";
 
 function plannerTaskConvertDeniedTitle(
   canConvertRow: boolean,
@@ -565,8 +567,7 @@ const TasksListingPage = ({
           }
 
           const res = await listTasks(params);
-          const summary =
-            isProjectScopedEmbed && res?.summary != null ? res.summary : undefined;
+          const summary = res?.summary ?? undefined;
           let mapped: Task[] = [];
           let totalRows = 0;
           if (res?.data) {
@@ -1153,6 +1154,8 @@ const TasksListingPage = ({
             {allTabs.map((tab, index) => (
               <button
                 key={tab.id}
+                type="button"
+                data-active={activeTab === tab.id}
                 onClick={() => switchTab(tab.id)}
                 style={{
                   flex: 1,
@@ -1176,7 +1179,9 @@ const TasksListingPage = ({
                 }}
               >
                 {tab.label}
-                {tab.id === "all"}
+                <span className="ptl-tab-count">
+                  {resolvePlannerTaskTabCount(tab.id, tasksQueryData?.summary)}
+                </span>
               </button>
             ))}
 
@@ -1529,8 +1534,8 @@ const TasksListingPage = ({
                             padding: "8px 10px",
                             fontSize: 13,
                             fontFamily: "Lexend Deca, Helvetica, Arial, sans-serif",
-                            color: !fForm.task_type ? "#0066CC" : "#141414",
-                            fontWeight: !fForm.task_type ? 500 : 400,
+                            color: fForm.task_type ? "#141414" : "#0066CC",
+                            fontWeight: fForm.task_type ? 400 : 500,
                             cursor: "pointer",
                           }}
                           onMouseEnter={e => { if (fForm.task_type) e.currentTarget.style.background = "#f5f8fa"; }}
@@ -1650,8 +1655,8 @@ const TasksListingPage = ({
                             padding: "8px 10px",
                             fontSize: 13,
                             fontFamily: "Lexend Deca, Helvetica, Arial, sans-serif",
-                            color: !fForm.priority ? "#0066CC" : "#141414",
-                            fontWeight: !fForm.priority ? 500 : 400,
+                            color: fForm.priority ? "#141414" : "#0066CC",
+                            fontWeight: fForm.priority ? 400 : 500,
                             cursor: "pointer",
                           }}
                           onMouseEnter={e => { if (fForm.priority) e.currentTarget.style.background = "#f5f8fa"; }}

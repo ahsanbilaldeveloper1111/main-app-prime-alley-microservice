@@ -10,7 +10,12 @@ import type { WorkloadBoardDropIntent } from "./WorkloadBoardPanel";
 import type { WorkloadSelectedCellState } from "./workloadPlannerPageHelpers";
 
 type AssignMutation = Readonly<{
-  mutate: (vars: { task: WorkloadTaskCard; toExtension: string }) => void;
+  mutate: (vars: {
+    task: WorkloadTaskCard;
+    toExtension: string;
+    dueDate?: string | null;
+    estimateMinutes?: number | null;
+  }) => void;
 }>;
 
 type RescheduleMutation = Readonly<{
@@ -64,14 +69,10 @@ export function useWorkloadPlannerTaskActions({
   setBoardDropOverload,
   formatError,
 }: UseWorkloadPlannerTaskActionsParams) {
-  const submitReassign = useCallback(async (dueDate?: string | null, estimateMinutes?: number | null) => {
-    if (!reassignTask || !reassignTarget) return;
-    if (!selectedCell) {
-      assignMutation.mutate({ task: reassignTask, toExtension: reassignTarget, dueDate, estimateMinutes });
-      return;
-    }
+  const submitReassign = useCallback(async () => {
+    if (!reassignTask || !reassignTarget || !selectedCell) return;
     if (reassignOverloadConfirm) {
-      assignMutation.mutate({ task: reassignTask, toExtension: reassignTarget, dueDate, estimateMinutes });
+      assignMutation.mutate({ task: reassignTask, toExtension: reassignTarget });
       return;
     }
     const minutes = resolveWorkloadTaskEstimateMinutes(reassignTask);
@@ -87,7 +88,7 @@ export function useWorkloadPlannerTaskActions({
         setReassignOverloadConfirm(true);
         return;
       }
-      assignMutation.mutate({ task: reassignTask, toExtension: reassignTarget, dueDate, estimateMinutes });
+      assignMutation.mutate({ task: reassignTask, toExtension: reassignTarget });
     } catch (err) {
       toast.error(formatError(err));
     }

@@ -9,6 +9,7 @@ import {
   updateStage,
 } from "@utils/crm";
 import { normalizeSearchQuery } from "@utils/Helper";
+import { resolveStageThemeColor } from "@utils/crmThemeColors";
 import { reportApiErrorFromCatch } from "@utils/sentryLogger";
 import {
   DEFAULT_STAGES_SELECTED_COLUMNS,
@@ -120,8 +121,21 @@ export function useStagesManagement() {
     },
   });
 
+  const archivedStagesQuery = useQuery({
+    queryKey: [...crmAppKeys.crmStages.all(), "archivedForCounts", refreshKey] as const,
+    queryFn: async () => {
+      try {
+        return await getStages(undefined, { include_archived: true });
+      } catch (error: unknown) {
+        consumeHandledApiError(error, "StagesManagement.fetchArchivedStagesForCounts");
+        throw error;
+      }
+    },
+  });
+
   const stagesData = filteredStagesQuery.data ?? [];
   const allStagesData = allStagesQuery.data ?? [];
+  const archivedStagesData = archivedStagesQuery.data ?? [];
   const loadingStages = filteredStagesQuery.isFetching;
 
   const [showRestoreModal, setShowRestoreModal] = useState(false);
@@ -271,8 +285,14 @@ export function useStagesManagement() {
     value: StageFormState[K],
   ) => {
     setFormData((prev) => {
-      if (field === "type" && value === "lost_reason") {
-        return { ...prev, type: "lost_reason", probability: 0 };
+      if (field === "type") {
+        const nextType = value as StageType;
+        return {
+          ...prev,
+          type: nextType,
+          color: resolveStageThemeColor(nextType),
+          ...(nextType === "lost_reason" ? { probability: 0 } : {}),
+        };
       }
       return { ...prev, [field]: value };
     });
@@ -322,10 +342,14 @@ export function useStagesManagement() {
     };
 
     const stagesByType = [
-      { type: "Lead", count: byType.lead, fill: "#0d6efd" },
-      { type: "Deal", count: byType.deal, fill: "#ffc107" },
-      { type: "Order", count: byType.order, fill: "#20c997" },
-      { type: "Lost Reason", count: byType.lost_reason, fill: "#dc3545" },
+      { type: "Lead", count: byType.lead, fill: resolveStageThemeColor("lead") },
+      { type: "Deal", count: byType.deal, fill: resolveStageThemeColor("deal") },
+      { type: "Order", count: byType.order, fill: resolveStageThemeColor("order") },
+      {
+        type: "Lost Reason",
+        count: byType.lost_reason,
+        fill: resolveStageThemeColor("lost_reason"),
+      },
     ].filter((item) => item.count > 0);
 
     return { total, byType, stagesByType };
@@ -338,10 +362,10 @@ export function useStagesManagement() {
       deal: allStagesData.filter((s) => s.type === "deal").length,
       order: allStagesData.filter((s) => s.type === "order").length,
       lost_reason: allStagesData.filter((s) => s.type === "lost_reason").length,
-      deleted: 0,
+      deleted: archivedStagesData.length,
     };
     return counts;
-  }, [allStagesData]);
+  }, [allStagesData, archivedStagesData]);
 
   const handleToolbarTabChange = useCallback(
     (tabId: string) => {

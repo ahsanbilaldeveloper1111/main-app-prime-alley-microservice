@@ -1,0 +1,41 @@
+// Compact layout for Control Hub user view (/controlhub/users/[id])
+.user-view-page {
+  .user-view-page__back {
+    margin-bottom: 0.75rem;
+  }
+
+  #system-tabs.nav-tabs {
+    margin-bottom: 0.75rem !important;
+  }
+
+  .overview-card {
+    padding: 14px;
+  }
+
+  .user-view-profile-card {
+    .card-header {
+      min-height: auto;
+    }
+
+    .card-body {
+      padding: 0.75rem 1rem;
+    }
+  }
+
+  .profile-field-item {
+    margin-bottom: 0.5rem;
+  }
+
+  .theme-hr {
+    margin: 6px 0;
+  }
+
+  .card.no-shadow .card-body {
+    padding: 0.75rem 1rem;
+  }
+
+  > .row > [class*='col'] > .card + .row,
+  > .row > [class*='col'] .user-view-profile-section {
+    margin-top: 0.5rem;
+  }
+}

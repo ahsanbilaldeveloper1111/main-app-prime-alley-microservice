@@ -29,7 +29,13 @@ export const SmartCrmPage: React.FC<ControlledTabsProps> = ({
   )
 
   return (
-    <SettingsSectionTabShell title="Smart CRM" allowedTabs={allowedTabs} activeTab={activeTab} onSelectTab={selectTab}>
+    <SettingsSectionTabShell
+      title="Smart CRM"
+      allowedTabs={allowedTabs}
+      activeTab={activeTab}
+      onSelectTab={selectTab}
+      dense
+    >
       <SmartCrmTabPanel activeTab={activeTab} />
     </SettingsSectionTabShell>
   )

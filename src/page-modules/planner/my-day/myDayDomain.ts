@@ -170,6 +170,90 @@ export function formatMyDayHeaderMetaLine(taskCount: number, usedMinutes: number
   return `${taskPart} · ${toMinutesDisplay(usedMinutes)} capacity used`;
 }
 
+/** Spec: header date includes weekday (e.g. "Tuesday, 3 June 2026"). */
+export function formatMyDayHeaderDateLabel(isoDate: string): string {
+  const parsed = moment(isoDate);
+  if (!parsed.isValid()) return "";
+  return parsed.format("dddd, D MMMM, YYYY");
+}
+
+export function resolvePlannerCreatedTaskId(data: unknown): number | null {
+  if (data == null || typeof data !== "object") return null;
+  const record = data as Record<string, unknown>;
+  const nestedTask = record.task;
+  const candidates: unknown[] = [record.id, record.task_id];
+  if (nestedTask != null && typeof nestedTask === "object") {
+    const nested = nestedTask as Record<string, unknown>;
+    candidates.push(nested.id, nested.task_id);
+  }
+  for (const value of candidates) {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed) && parsed > 0) return Math.floor(parsed);
+  }
+  return null;
+}
+
+export type MyDaySuggestionFilterState = Readonly<{
+  priority: string;
+  overdueOnly: boolean;
+  category: MyDaySuggestionCategory | "all";
+}>;
+
+function normalizeSuggestionPriorityKey(priority: string): string {
+  return priority.trim().toLowerCase().replace(/\s+/g, "-");
+}
+
+function isOverdueSuggestionCategory(category: MyDaySuggestionCategory): boolean {
+  return category === "overdue";
+}
+
+function isOverdueSuggestionRow(
+  category: MyDaySuggestionCategory,
+  dueDate: string | null,
+  todayStart: moment.Moment,
+): boolean {
+  if (isOverdueSuggestionCategory(category)) return true;
+  if (!dueDate) return false;
+  const due = moment(dueDate).startOf("day");
+  return due.isValid() && due.isBefore(todayStart, "day");
+}
+
+/** Client-side filters for the suggestions panel (priority, overdue, category). */
+export function filterMyDaySuggestionTasks<
+  T extends {
+    category: MyDaySuggestionCategory;
+    priority: string;
+    dueDate: string | null;
+    alreadyInMyDay?: boolean;
+  },
+>(
+  tasks: ReadonlyArray<T>,
+  filters: MyDaySuggestionFilterState,
+  todayStart: moment.Moment,
+  options?: Readonly<{ hideAlreadyInMyDay?: boolean }>,
+): T[] {
+  const priorityFilter = normalizeSuggestionPriorityKey(filters.priority);
+  const hideInMyDay = options?.hideAlreadyInMyDay === true;
+
+  return tasks.filter((task) => {
+    if (hideInMyDay && task.alreadyInMyDay === true) return false;
+    if (filters.category !== "all" && task.category !== filters.category) return false;
+    if (
+      priorityFilter.length > 0 &&
+      normalizeSuggestionPriorityKey(task.priority) !== priorityFilter
+    ) {
+      return false;
+    }
+    if (
+      filters.overdueOnly &&
+      !isOverdueSuggestionRow(task.category, task.dueDate, todayStart)
+    ) {
+      return false;
+    }
+    return true;
+  });
+}
+
 export function resolveMyDayTaskCount(tasksLength: number, meta: MyDayTasksMeta): number {
   if (meta.tasks_planned != null && Number.isFinite(meta.tasks_planned)) {
     return Math.max(0, Math.floor(meta.tasks_planned));
@@ -209,6 +293,14 @@ export function readTaskPriorityLabel(priority: unknown): string {
 }
 
 /** Postman: `has_estimate` is true when minutes > 0 — prefer this over parsing alone. */
+/** Plan-day completion (My Day) vs legacy project `is_completed` on the row. */
+export function readMyDayTaskCompletedFromRow(row: Record<string, unknown>): boolean {
+  if (row.is_completed_for_my_day === true) return true;
+  const completedAt = row.my_day_completed_at;
+  if (typeof completedAt === "string" && completedAt.trim() !== "") return true;
+  return row.is_completed === true || row.completed === true;
+}
+
 export function readHasEstimateFromRow(row: Record<string, unknown>): boolean {
   if (row.has_estimate === true) return true;
   return resolveEstimateMinutesFromRow(row) > 0;

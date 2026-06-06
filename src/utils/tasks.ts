@@ -1523,6 +1523,20 @@ export interface MyDayDailyLogsListPayload {
   logs?: MyDayDailyLogPayload[];
 }
 
+/** `GET /my-day/monthly-report?month=YYYY-MM` (Reports → My Day Monthly tab). */
+export interface MyDayMonthlyReportApiPayload {
+  month?: string;
+  from?: string;
+  to?: string;
+  working_days?: number;
+  balanced_days?: number;
+  overloaded_days?: number;
+  light_days?: number;
+  average_planned_per_day_minutes?: number;
+  average_completion_rate_percent?: number;
+  logs?: MyDayDailyLogPayload[];
+}
+
 function parseMyDayResponseData<T>(response: { data?: unknown }): T {
   const responseData = response?.data;
   if (responseData == null || typeof responseData !== "object") {
@@ -1689,13 +1703,32 @@ export const removeTaskFromMyDay = async (
   return parseMyDayResponseData(response);
 };
 
+export type MyDayCompleteScope = "my_day" | "task";
+
+export type ToggleMyDayTaskCompleteOptions = Readonly<{
+  extensionNumber?: string;
+  /** Default `my_day` — plan-day only; does not complete the project task on the board. */
+  completeScope?: MyDayCompleteScope;
+  /** Which My Day row to update (`Y-m-d`). Defaults to today on the server. */
+  planDate?: string;
+}>;
+
 export const toggleMyDayTaskComplete = async (
   taskId: number,
-  extensionNumber?: string,
+  options: ToggleMyDayTaskCompleteOptions = {},
 ): Promise<unknown> => {
+  const { extensionNumber, completeScope = "my_day", planDate } = options;
   const query = buildMyDayQuery({ extension_number: extensionNumber });
+  const body: { complete_scope: MyDayCompleteScope; plan_date?: string } = {
+    complete_scope: completeScope,
+  };
+  const planDateTrimmed = planDate?.trim();
+  if (planDateTrimmed) {
+    body.plan_date = planDateTrimmed;
+  }
   const response = await axiosInstance.patch(
     buildMyDayUrl(`work-planner/my-day/complete/${taskId}`, query),
+    body,
   );
   return parseMyDayResponseData(response);
 };
@@ -1810,6 +1843,23 @@ export const getMyDayDailyLogByDate = async (
     buildMyDayUrl(`work-planner/my-day/daily-logs/${date}`, query),
   );
   return parseMyDayResponseData<MyDayDailyLogPayload>(response);
+};
+
+export const getMyDayMonthlyReport = async (
+  params: { month: string; extension_number?: string } ,
+): Promise<MyDayMonthlyReportApiPayload> => {
+  const month = params.month.trim();
+  if (!/^\d{4}-\d{2}$/.test(month)) {
+    throw new Error("month must be YYYY-MM");
+  }
+  const query = buildMyDayQuery({
+    extension_number: params.extension_number,
+    month,
+  });
+  const response = await axiosInstance.get(
+    buildMyDayUrl("work-planner/my-day/monthly-report", query),
+  );
+  return parseMyDayResponseData<MyDayMonthlyReportApiPayload>(response);
 };
 
 // ==================== Workload (team capacity / planner) ====================

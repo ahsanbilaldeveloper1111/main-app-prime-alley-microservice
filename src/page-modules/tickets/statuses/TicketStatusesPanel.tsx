@@ -8,12 +8,12 @@ import { useTicketStatusesPage } from "@page-modules/tickets/statuses/useTicketS
 import { useTicketsPanelChrome } from "@page-modules/tickets/shared/useTicketsPanelChrome";
 
 const TicketStatusesPanel = () => {
-  const { showBreadcrumb, breadcrumbMainLink } = useTicketsPanelChrome("statuses");
+  const { showBreadcrumb, breadcrumbMainLink, embeddedInMainSettings } =
+    useTicketsPanelChrome("statuses");
   const {
     data,
     loading,
     columns,
-    actions,
     currentPage,
     rowsPerPage,
     totalRows,
@@ -45,7 +45,7 @@ const TicketStatusesPanel = () => {
   } = useTicketStatusesPage();
 
   return (
-    <React.Fragment>
+    <div className={embeddedInMainSettings ? "tickets-settings-panel" : undefined}>
       {showBreadcrumb ? (
         <BreadcrumbItem
           mainTitle="Tickets"
@@ -54,10 +54,10 @@ const TicketStatusesPanel = () => {
         />
       ) : null}
       <TicketStatusesPageView
+        embeddedInMainSettings={embeddedInMainSettings}
         data={data}
         loading={loading}
         columns={columns}
-        actions={actions}
         currentPage={currentPage}
         rowsPerPage={rowsPerPage}
         totalRows={totalRows}
@@ -87,7 +87,7 @@ const TicketStatusesPanel = () => {
         onCloseDeleteStatusModal={closeDeleteStatusModal}
         onSubmitDeleteStatus={handleSubmitDeleteStatus}
       />
-    </React.Fragment>
+    </div>
   );
 };
 

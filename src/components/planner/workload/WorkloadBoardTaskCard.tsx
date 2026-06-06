@@ -131,7 +131,7 @@ export function WorkloadBoardTaskCard({
         {unestimated ? (
           <WorkloadBdg tone="orange">
             <i className="ti ti-clock" style={{ fontSize: "10px" }} aria-hidden />
-            No est.
+            {" No est."}
           </WorkloadBdg>
         ) : (
           <WorkloadBdg tone="gray">

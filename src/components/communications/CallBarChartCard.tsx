@@ -1,4 +1,5 @@
 import React from 'react';
+import { Maximize2 } from 'lucide-react';
 import { Col } from 'react-bootstrap';
 import type { ApexOptions } from 'apexcharts';
 import EmptyState from '@components/EmptyState';
@@ -33,7 +34,7 @@ const CallBarChartCard: React.FC<CallBarChartCardProps> = ({
   if (!show) return null;
 
   return (
-    <Col md={4}>
+    <Col xs={12} lg={4}>
       <div className="card">
         <div className="card-body">
           {dataLength === 0 ? (
@@ -46,8 +47,8 @@ const CallBarChartCard: React.FC<CallBarChartCardProps> = ({
             <>
               <div className="d-flex justify-content-between align-items-center mb-3">
                 <h5 className="mb-0 app-title-heading">{title}</h5>
-                <button type="button" className="btn btn-sm btn-light" onClick={onExpand}>
-                  <i className="material-icons-two-tone">open_in_full</i>
+                <button type="button" className="btn btn-sm btn-light" onClick={onExpand} aria-label="Expand chart">
+                  <Maximize2 size={16} aria-hidden />
                 </button>
               </div>
               <CallDashboardApexChart

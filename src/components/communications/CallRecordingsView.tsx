@@ -21,11 +21,14 @@ import ChartBar from "@components/ChartBar";
 import AudioPlayer, { type AudioPlayerRef } from "@components/AudioPlayer";
 import EmptyState from "@components/EmptyState";
 import {
+  AlertCircle,
+  BarChart3,
+  Download,
   Hash,
   Phone,
   PhoneIncoming,
   PhoneOutgoing,
-  Calendar,
+  Play,
 } from "lucide-react";
 import CircularProgressCircle from "@components/CircularProgressCircle";
 
@@ -37,11 +40,10 @@ import {
   formatDuration,
   GlobalDateFormat,
   GlobalTimeFormat,
-  GlobalDateTimeFormat,
   encodeAnalysisData,
   convertDateTimeWithOffsetToLocal,
-  formatDateTimeToLocal,
 } from "@utils/Helper";
+import { COMMUNICATIONS_STAT_COLORS } from "@utils/communications/communicationsThemeTokens";
 import { formatFilterDateTimeLabel } from "@utils/communicationsDateUtils";
 import {
   buildDateTimeFilterPill,
@@ -55,7 +57,7 @@ import {
   createTextFilterDropdownContent,
 } from "@utils/communicationsFilterDropdowns";
 import {
-  renderApplyResetFilterActions,
+  renderApplyFilterActions,
   useStagedFiltersActions,
 } from "@utils/communicationsStagedFilters";
 import { HEADER_CONSTANTS } from "@constants/headerConstants";
@@ -77,6 +79,10 @@ import {
   exportCallRecordingsExcelThunk,
   resetCallRecordingsFiltersThunk,
 } from "@toolkit/callRecordingsList/thunks";
+import {
+  CALL_RECORDINGS_TOOLBAR,
+  COMMUNICATIONS_TABS_DROPDOWN_ITEMS,
+} from "@components/communications/callLogsListPageConfig";
 
 const ReactApexChart = dynamic(() => import("react-apexcharts"), {
   ssr: false,
@@ -242,7 +248,9 @@ const CallRecordingsView: React.FC = () => {
   const audioPlayerRef = useRef<AudioPlayerRef>(null);
 
   const refreshKey = useAppSelector((s) => s.callRecordingsList.refreshKey);
-  const currentFilters = useAppSelector((s) => s.callRecordingsList.currentFilters);
+  const currentFilters = useAppSelector(
+    (s) => s.callRecordingsList.currentFilters,
+  );
   const appliedFilters = useAppSelector(
     (s) => s.callRecordingsList.appliedFilters,
   );
@@ -253,7 +261,9 @@ const CallRecordingsView: React.FC = () => {
   const tableData = useAppSelector((s) => s.callRecordingsList.tableData);
   const pagination = useAppSelector((s) => s.callRecordingsList.pagination);
   const summary = useAppSelector((s) => s.callRecordingsList.summary);
-  const durationChart = useAppSelector((s) => s.callRecordingsList.durationChart);
+  const durationChart = useAppSelector(
+    (s) => s.callRecordingsList.durationChart,
+  );
   const directionChart = useAppSelector(
     (s) => s.callRecordingsList.directionChart,
   );
@@ -264,8 +274,6 @@ const CallRecordingsView: React.FC = () => {
   const currentChartTitle = useAppSelector(
     (s) => s.callRecordingsList.currentChartTitle,
   );
-  const startDateTime = useAppSelector((s) => s.callRecordingsList.startDateTime);
-  const endDateTime = useAppSelector((s) => s.callRecordingsList.endDateTime);
 
   const filtersKey = useMemo(
     () => JSON.stringify(appliedFilters),
@@ -330,7 +338,6 @@ const CallRecordingsView: React.FC = () => {
   const tableLoading = listPending || listFetching;
 
   const showAnalytics = false;
-  const [showDateRange] = useState(true);
 
   const {
     hierarchyDataExtensions,
@@ -414,32 +421,32 @@ const CallRecordingsView: React.FC = () => {
         title: "Extensions",
         value: summary?.extensions || 0,
         icon: Hash,
-        iconColor: "#8B5CF6",
-        iconBgColor: "#EDE9FE",
+        iconColor: COMMUNICATIONS_STAT_COLORS.primary.iconColor,
+        iconBgColor: COMMUNICATIONS_STAT_COLORS.primary.iconBgColor,
         subtitle: "Extensions in the system",
       },
       {
         title: "Remote Numbers",
         value: summary?.numbers || 0,
         icon: Phone,
-        iconColor: "#3B82F6",
-        iconBgColor: "#DBEAFE",
+        iconColor: COMMUNICATIONS_STAT_COLORS.primary.iconColor,
+        iconBgColor: COMMUNICATIONS_STAT_COLORS.primary.iconBgColor,
         subtitle: "Remote numbers in the system",
       },
       {
         title: "Inbound",
         value: summary?.inbound || 0,
         icon: PhoneIncoming,
-        iconColor: "#10B981",
-        iconBgColor: "#D1FAE5",
+        iconColor: COMMUNICATIONS_STAT_COLORS.inbound.iconColor,
+        iconBgColor: COMMUNICATIONS_STAT_COLORS.inbound.iconBgColor,
         subtitle: "Inbound calls in the system",
       },
       {
         title: "Outbound",
         value: summary?.outbound || 0,
         icon: PhoneOutgoing,
-        iconColor: "#0EA5E9",
-        iconBgColor: "#E0F2FE",
+        iconColor: COMMUNICATIONS_STAT_COLORS.outbound.iconColor,
+        iconBgColor: COMMUNICATIONS_STAT_COLORS.outbound.iconBgColor,
         subtitle: "Outbound calls in the system",
       },
     ],
@@ -451,7 +458,11 @@ const CallRecordingsView: React.FC = () => {
       return {
         series: [] as { name: string; data: number[] }[],
         options: {
-          chart: { type: "bar" as const, height: 300, toolbar: { show: false } },
+          chart: {
+            type: "bar" as const,
+            height: 300,
+            toolbar: { show: false },
+          },
           plotOptions: {
             bar: {
               horizontal: false,
@@ -522,7 +533,6 @@ const CallRecordingsView: React.FC = () => {
   const {
     handleApplyFiltersClick,
     hasUnappliedFilterChanges,
-    hasNonDefaultFilters,
   } = useStagedFiltersActions(
     currentFilters as Record<string, unknown>,
     appliedFilters as Record<string, unknown>,
@@ -616,13 +626,6 @@ const CallRecordingsView: React.FC = () => {
     ],
   );
 
-  const selectedStartDateTime = String(
-    appliedFilters.start_date ?? startDateTime ?? "",
-  );
-  const selectedEndDateTime = String(
-    appliedFilters.end_date ?? endDateTime ?? "",
-  );
-
   const handleOpenChartModal = useCallback(
     (title: string) => {
       dispatch(setCurrentChartTitle(title));
@@ -641,19 +644,23 @@ const CallRecordingsView: React.FC = () => {
 
   const tableToolbar = useMemo(() => {
     return {
+      clearAllFilters: handleResetFiltersClick,
       showTabs: true,
+      tabsDropdownLabel: CALL_RECORDINGS_TOOLBAR.tabsDropdownLabel,
+      tabsDropdownItems: COMMUNICATIONS_TABS_DROPDOWN_ITEMS,
       tabs: [
         {
-          id: "call-recordings-title",
-          label: "Call Recordings",
+          id: "all",
+          label: CALL_RECORDINGS_TOOLBAR.allTabLabel,
+          count: pagination.totalRows,
           removable: false,
         },
       ],
-      activeTab: "call-recordings-title",
+      activeTab: "all",
       onTabChange: () => {},
       showSearch: true,
       searchValue,
-      searchPlaceholder: "Search by username, extension, phone...",
+      searchPlaceholder: CALL_RECORDINGS_TOOLBAR.searchPlaceholder,
       onSearchChange: (value: string) => dispatch(setSearchValue(value)),
       onSearch: () => {
         const st = store.getState().callRecordingsList;
@@ -667,7 +674,7 @@ const CallRecordingsView: React.FC = () => {
       showFiltersButton: canViewCallRecordings,
       showExportButton: canExportCallRecordings,
       onExportClick: handleExportExcel,
-      showFilterPills: true,
+      showFilterPills: false,
       showMoreFiltersButton: false,
       filterPills: [
         buildCallDirectionFilterPill(
@@ -713,63 +720,10 @@ const CallRecordingsView: React.FC = () => {
           createDateTimeDropdownContent,
         ),
       ],
-      filterPillsRightActions: renderApplyResetFilterActions(
-        hasNonDefaultFilters,
+      filterPillsRightActions: renderApplyFilterActions(
         hasUnappliedFilterChanges,
-        handleResetFiltersClick,
         handleApplyFiltersClick,
         "call-recordings",
-      ),
-      rightActions: (
-        <div className="d-flex align-items-center gap-2 call-recordings-date-range-wrap">
-          {showDateRange &&
-            selectedStartDateTime &&
-            selectedEndDateTime &&
-            moment.utc(selectedStartDateTime).isValid() &&
-            moment.utc(selectedEndDateTime).isValid() && (
-              <div
-                className="d-flex align-items-center gap-2 call-recordings-date-chip"
-                style={{
-                  background: "#f8fafc",
-                  border: "1px solid #e2e8f0",
-                  borderRadius: "10px",
-                  padding: "6px 10px",
-                }}
-              >
-                <span
-                  className="d-inline-flex align-items-center justify-content-center"
-                  style={{
-                    width: "24px",
-                    height: "24px",
-                    borderRadius: "6px",
-                    background: "#eef2ff",
-                    color: "#4f46e5",
-                  }}
-                >
-                  <Calendar size={14} />
-                </span>
-                <span
-                  className="call-recordings-date-text"
-                  style={{
-                    fontSize: "12px",
-                    fontWeight: 600,
-                    color: "#0f172a",
-                    whiteSpace: "nowrap",
-                  }}
-                >
-                  {formatDateTimeToLocal(
-                    selectedStartDateTime,
-                    GlobalDateTimeFormat,
-                  )}{" "}
-                  -{" "}
-                  {formatDateTimeToLocal(
-                    selectedEndDateTime,
-                    GlobalDateTimeFormat,
-                  )}
-                </span>
-              </div>
-            )}
-        </div>
       ),
     };
   }, [
@@ -788,10 +742,7 @@ const CallRecordingsView: React.FC = () => {
     handleResetFiltersClick,
     handleApplyFiltersClick,
     hasUnappliedFilterChanges,
-    hasNonDefaultFilters,
-    showDateRange,
-    selectedStartDateTime,
-    selectedEndDateTime,
+    pagination.totalRows,
   ]);
 
   const handleDownload = async (props: RecordingRow) => {
@@ -986,11 +937,8 @@ const CallRecordingsView: React.FC = () => {
     if (audioError) {
       return (
         <div className="p-4">
-          <div className="alert alert-warning">
-            <i
-              className="ph-duotone ph-warning-circle me-2"
-              aria-hidden="true"
-            ></i>{" "}
+          <div className="alert alert-warning d-flex align-items-center gap-2">
+            <AlertCircle size={16} className="me-1" aria-hidden />
             <span>File not found</span>
           </div>
         </div>
@@ -1097,12 +1045,11 @@ const CallRecordingsView: React.FC = () => {
               aria-label="Download"
               title="Download"
             >
-              <i
+              <Download
+                size={16}
                 data-tooltip-id="my-tooltip"
                 data-tooltip-content="Download"
-                className="ph-duotone ph-arrow-line-down"
-                style={{ fontSize: "1rem" }}
-                aria-hidden="true"
+                aria-hidden
               />
             </button>
           );
@@ -1117,12 +1064,11 @@ const CallRecordingsView: React.FC = () => {
                 aria-label="Play"
                 title="Play"
               >
-                <i
+                <Play
+                  size={16}
                   data-tooltip-id="my-tooltip"
                   data-tooltip-content="Play"
-                  className="ph-duotone ph-play"
-                  style={{ fontSize: "1rem" }}
-                  aria-hidden="true"
+                  aria-hidden
                 />
               </button>
             )}
@@ -1141,12 +1087,11 @@ const CallRecordingsView: React.FC = () => {
                 aria-label="Call Analysis"
                 title="Call Analysis"
               >
-                <i
+                <BarChart3
+                  size={16}
                   data-tooltip-id="my-tooltip"
                   data-tooltip-content="Call Analysis"
-                  className="ph-duotone ph-chart-bar"
-                  style={{ fontSize: "1rem" }}
-                  aria-hidden="true"
+                  aria-hidden
                 />
               </button>
             )}
@@ -1232,7 +1177,9 @@ const CallRecordingsView: React.FC = () => {
                       showViewAllButton={true}
                       viewAllButtonText="View All"
                       showFullScreenButton={true}
-                      onFullScreenClick={() => handleOpenChartModal("Call Duration")}
+                      onFullScreenClick={() =>
+                        handleOpenChartModal("Call Duration")
+                      }
                       useLogScale={true}
                     />
                   </>

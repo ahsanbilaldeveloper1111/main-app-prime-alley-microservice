@@ -1,6 +1,10 @@
 // /communications/text-messages — wrapper: .text-messages-page
 .text-messages-page {
-  &,
+  font-family: "Lexend Deca", Helvetica, Arial, sans-serif;
+  font-size: 0.875rem;
+  font-weight: 400;
+  color: #141414;
+
   .generic-table-th,
   .generic-table-td,
   .page-header-title h2,
@@ -9,8 +13,9 @@
   small,
   .small,
   .badge {
-    color: #141414 !important;
-    font-weight: 100 !important;
+    font-family: inherit;
+    color: #141414;
+    font-weight: inherit;
   }
 
   div.pagination-buttons .btn.btn-primary {
@@ -63,7 +68,18 @@
     }
 
     .gsm-message-cell {
-      min-width: 320px;
+      min-width: 280px;
+      max-width: none;
+    }
+  }
+
+  @media (max-width: 768px) {
+    .generic-table {
+      min-width: 720px;
+    }
+
+    .gsm-message-cell {
+      min-width: 240px;
     }
   }
 }

@@ -21,6 +21,7 @@ import { IndustryFormModal } from "@page-modules/crm/industries/IndustryFormModa
 import { IndustryProductFormModal } from "@page-modules/crm/industries/IndustryProductFormModal";
 import { IndustryProductViewModal } from "@page-modules/crm/industries/IndustryProductViewModal";
 import { buildIndustriesTableColumns } from "@page-modules/crm/industries/industriesTableColumns";
+import { CrmSettingsTableWrap } from "@page-modules/crm/shared/CrmSettingsTableWrap";
 
 const IndustriesPage = ({ hideBreadcrumb, breadcrumbMainLink }: CrmPageDisplayProps = {}) => {
   const {
@@ -165,6 +166,7 @@ const IndustriesPage = ({ hideBreadcrumb, breadcrumbMainLink }: CrmPageDisplayPr
         />
       )}
       <div>
+        <CrmSettingsTableWrap hideBreadcrumb={hideBreadcrumb}>
         <GenericTable<IndustryData>
           data={industries}
           columns={industriesTableColumns}
@@ -187,7 +189,10 @@ const IndustriesPage = ({ hideBreadcrumb, breadcrumbMainLink }: CrmPageDisplayPr
           emptyMessage="No product groups found"
           uniqueKey="id"
           showToolbarActions={false}
+          hover
+          size="md"
         />
+        </CrmSettingsTableWrap>
 
         <IndustryFormModal
           show={showModal}

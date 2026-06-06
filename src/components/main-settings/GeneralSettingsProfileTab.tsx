@@ -1,5 +1,22 @@
 import React, { useRef, useState } from 'react'
 import { generalSettingsStyles as s } from './generalSettingsPanelStyles'
+import { MAIN_SETTINGS_FONT_SIZE, MAIN_SETTINGS_RADIUS } from './mainSettingsTokens'
+
+const PHONE_COUNTRY_OPTIONS = [
+  { value: 'GB', flag: '🇬🇧', dialCode: '+44' },
+  { value: 'US', flag: '🇺🇸', dialCode: '+1' },
+  { value: 'PK', flag: '🇵🇰', dialCode: '+92' },
+  { value: 'AU', flag: '🇦🇺', dialCode: '+61' },
+] as const
+
+const DEFAULT_PHONE_COUNTRY = PHONE_COUNTRY_OPTIONS[0].value
+
+function resolvePhoneCountryOption(countryCode: string) {
+  return (
+    PHONE_COUNTRY_OPTIONS.find((option) => option.value === countryCode) ??
+    PHONE_COUNTRY_OPTIONS[0]
+  )
+}
 
 export type GeneralSettingsProfileTabProps = {
   userName: string
@@ -28,6 +45,7 @@ export const GeneralSettingsProfileTab: React.FC<GeneralSettingsProfileTabProps>
 }) => {
   const [profileImage, setProfileImage] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const selectedPhoneCountry = resolvePhoneCountryOption(phoneCountry || DEFAULT_PHONE_COUNTRY)
 
   const getInitials = () => `${userName.charAt(0)}`.toUpperCase()
 
@@ -81,10 +99,10 @@ export const GeneralSettingsProfileTab: React.FC<GeneralSettingsProfileTabProps>
           value={userName}
           onChange={(e) => setUserName(e.target.value)}
           onFocus={(e) => {
-            e.currentTarget.style.borderColor = '#006162'
+            e.currentTarget.style.borderColor = '#86b7fe'
           }}
           onBlur={(e) => {
-            e.currentTarget.style.borderColor = '#d0d0d0'
+            e.currentTarget.style.borderColor = '#b8b8b8'
           }}
         />
       </div>
@@ -108,7 +126,7 @@ export const GeneralSettingsProfileTab: React.FC<GeneralSettingsProfileTabProps>
           Date, time, and number format{' '}
           <span style={s.helpIcon} title="Sets date/time/number format based on locale">?</span>
         </label>
-        <div style={{ fontSize: '13px', color: '#555', fontWeight: 300, marginBottom: '8px' }}>
+        <div style={{ fontSize: MAIN_SETTINGS_FONT_SIZE.sm, color: '#6c757d', fontWeight: 400, marginBottom: '8px' }}>
           Format: 2 March 2026, 02/03/2026, 19:41 GMT, and 1,234.56
         </div>
         <select
@@ -139,36 +157,74 @@ export const GeneralSettingsProfileTab: React.FC<GeneralSettingsProfileTabProps>
             more information ↗
           </button>
         </div>
-        <div style={{ display: 'flex', gap: '0px', marginTop: '10px' }}>
+        <div style={{ display: 'flex', gap: 0, marginTop: '10px', alignItems: 'stretch' }}>
           <select
             aria-label="Phone country"
-            value={phoneCountry}
+            value={phoneCountry || DEFAULT_PHONE_COUNTRY}
             onChange={(e) => setPhoneCountry(e.target.value)}
             style={{
-              padding: '8px',
-              fontSize: '14px',
-              border: '1px solid #d0d0d0',
-              borderRadius: '0px',
+              padding: '8px 10px',
+              minWidth: '56px',
+              fontSize: MAIN_SETTINGS_FONT_SIZE.base,
+              border: '1px solid #b8b8b8',
+              borderRight: 'none',
+              borderTopLeftRadius: MAIN_SETTINGS_RADIUS.md,
+              borderBottomLeftRadius: MAIN_SETTINGS_RADIUS.md,
+              borderTopRightRadius: 0,
+              borderBottomRightRadius: 0,
               background: '#fff',
               fontFamily: "'Lexend Deca', Helvetica, Arial, sans-serif",
               outline: 'none',
-              borderRight: 'none',
+            }}
+            onFocus={(e) => {
+              e.currentTarget.style.borderColor = '#86b7fe'
+            }}
+            onBlur={(e) => {
+              e.currentTarget.style.borderColor = '#b8b8b8'
             }}
           >
-            <option value="GB">🇬🇧</option>
-            <option value="US">🇺🇸</option>
-            <option value="PK">🇵🇰</option>
-            <option value="AU">🇦🇺</option>
+            {PHONE_COUNTRY_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.flag}
+              </option>
+            ))}
           </select>
+          <span
+            aria-hidden
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              padding: '8px 10px',
+              fontSize: MAIN_SETTINGS_FONT_SIZE.base,
+              color: '#141414',
+              borderTop: '1px solid #b8b8b8',
+              borderBottom: '1px solid #b8b8b8',
+              background: '#f9fafb',
+              fontFamily: "'Lexend Deca', Helvetica, Arial, sans-serif",
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {selectedPhoneCountry.dialCode}
+          </span>
           <input
             id="general-phone-number"
+            type="tel"
+            inputMode="tel"
+            autoComplete="tel-national"
+            placeholder="Phone number"
             style={{
-              width: '260px',
+              flex: 1,
+              minWidth: '160px',
+              maxWidth: '260px',
               padding: '8px 12px',
-              fontSize: '14px',
+              fontSize: MAIN_SETTINGS_FONT_SIZE.base,
               color: '#141414',
-              border: '1px solid #d0d0d0',
-              borderRadius: '4px',
+              border: '1px solid #b8b8b8',
+              borderLeft: 'none',
+              borderTopLeftRadius: 0,
+              borderBottomLeftRadius: 0,
+              borderTopRightRadius: MAIN_SETTINGS_RADIUS.md,
+              borderBottomRightRadius: MAIN_SETTINGS_RADIUS.md,
               background: '#fff',
               fontFamily: "'Lexend Deca', Helvetica, Arial, sans-serif",
               outline: 'none',
@@ -176,10 +232,10 @@ export const GeneralSettingsProfileTab: React.FC<GeneralSettingsProfileTabProps>
             value={phoneNumber}
             onChange={(e) => setPhoneNumber(e.target.value)}
             onFocus={(e) => {
-              e.currentTarget.style.borderColor = '#006162'
+              e.currentTarget.style.borderColor = '#86b7fe'
             }}
             onBlur={(e) => {
-              e.currentTarget.style.borderColor = '#d0d0d0'
+              e.currentTarget.style.borderColor = '#b8b8b8'
             }}
           />
         </div>
@@ -194,8 +250,8 @@ export const GeneralSettingsProfileTab: React.FC<GeneralSettingsProfileTabProps>
           onClick={() => null}
           style={{
             ...s.link,
-            fontSize: '14px',
-            fontWeight: 300,
+            fontSize: MAIN_SETTINGS_FONT_SIZE.base,
+            fontWeight: 400,
             background: 'transparent',
             border: 'none',
             padding: 0,

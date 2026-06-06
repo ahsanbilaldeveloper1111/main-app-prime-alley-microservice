@@ -37,6 +37,13 @@ export function ReportsViewTabs({ activeView, onChange }: ReportsViewTabsProps) 
           {tab.label}
         </button>
       ))}
+      <button
+        type="button"
+        className={`reports-tabs-row__tab${activeView === "my_day_monthly" ? " reports-tabs-row__tab--active" : ""}`}
+        onClick={() => onChange("my_day_monthly")}
+      >
+        My Day Monthly
+      </button>
       <button type="button" className="reports-tabs-row__action">
         <i className="ti ti-plus" style={{ fontSize: "13px" }} aria-hidden="true" />
         Add view

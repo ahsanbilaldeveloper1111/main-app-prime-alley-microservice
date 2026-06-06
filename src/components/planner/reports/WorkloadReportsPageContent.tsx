@@ -13,6 +13,7 @@ import {
   ReportsTasksByProject,
   ReportsTeamSubTabs,
 } from "./WorkloadReportsProjectViews";
+import { MyDayMonthlyReportPanel } from "./MyDayMonthlyReportPanel";
 import { reportsErrorMessage } from "./useWorkloadReportsPage";
 import type { useWorkloadReportsPage } from "./useWorkloadReportsPage";
 
@@ -27,6 +28,10 @@ export function WorkloadReportsPageContent({
   vm,
   overviewQuery,
 }: WorkloadReportsPageContentProps) {
+  if (vm.mainView === "my_day_monthly") {
+    return <MyDayMonthlyReportPanel />;
+  }
+
   const showEmptyState =
     !vm.loadingOverview && vm.enabled && !vm.data && !overviewQuery.isError;
 

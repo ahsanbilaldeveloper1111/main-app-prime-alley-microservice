@@ -1,3 +1,4 @@
+import { MAIN_SETTINGS_FONT_SIZE } from './mainSettingsTokens'
 import React from 'react'
 import {
   ACCOUNT_DEFAULTS_FONT,
@@ -25,7 +26,7 @@ export const NotificationProfilesTabContent: React.FC = () => {
 
   return (
     <div>
-      <p style={{ fontFamily: baseFont, fontSize: '14px', color: '#555', marginBottom: '8px', fontWeight: 300 }}>
+      <p style={{ fontFamily: baseFont, fontSize: MAIN_SETTINGS_FONT_SIZE.base, color: '#6c757d', marginBottom: '8px', fontWeight: 400 }}>
         These defaults will be used for user defaults and presets.
       </p>
 
@@ -34,7 +35,7 @@ export const NotificationProfilesTabContent: React.FC = () => {
       <h2
         style={{
           fontFamily: baseFont,
-          fontSize: '16px',
+          fontSize: MAIN_SETTINGS_FONT_SIZE.md,
           fontWeight: 600,
           color: '#141414',
           marginBottom: '6px',
@@ -42,12 +43,12 @@ export const NotificationProfilesTabContent: React.FC = () => {
       >
         Notification Profiles
       </h2>
-      <p style={{ fontFamily: baseFont, fontSize: '14px', color: '#555', fontWeight: 300, marginBottom: '20px' }}>
+      <p style={{ fontFamily: baseFont, fontSize: MAIN_SETTINGS_FONT_SIZE.base, color: '#6c757d', fontWeight: 400, marginBottom: '20px' }}>
         Set notification defaults for a group of users within a preset. To add or edit Presets go to{' '}
         <a
           href={NOTIFICATION_PROFILES_PRESETS_HREF}
           style={{
-            color: '#0091ae',
+            color: '#0066CC',
             textDecoration: 'none',
             fontWeight: 600,
             display: 'inline-flex',
@@ -65,24 +66,16 @@ export const NotificationProfilesTabContent: React.FC = () => {
 
       <button
         type="button"
+        className="main-settings-btn-outline"
         onClick={openModal}
         style={{
           padding: '9px 18px',
-          fontSize: '14px',
+          fontSize: MAIN_SETTINGS_FONT_SIZE.base,
           fontFamily: baseFont,
-          fontWeight: 500,
-          color: '#141414',
-          background: '#fff',
-          border: '1px solid #d0d0d0',
-          borderRadius: '4px',
-          cursor: 'pointer',
           display: 'inline-flex',
           alignItems: 'center',
           gap: '8px',
-          transition: 'border-color 0.15s',
         }}
-        onMouseEnter={(e) => (e.currentTarget.style.borderColor = '#141414')}
-        onMouseLeave={(e) => (e.currentTarget.style.borderColor = '#d0d0d0')}
       >
         Create notification profile
       </button>

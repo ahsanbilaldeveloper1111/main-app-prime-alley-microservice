@@ -7,9 +7,11 @@ import { useFaqsPanelChrome } from "@page-modules/faqs/shared/useFaqsPanelChrome
 
 const FAQTypesPanel = () => {
   const ctx = useFAQTypesPage();
-  const { showBreadcrumb, breadcrumbMainLink } = useFaqsPanelChrome("types");
+  const { showBreadcrumb, breadcrumbMainLink, embeddedInMainSettings } =
+    useFaqsPanelChrome("types");
 
   return (
+    <div className={embeddedInMainSettings ? "faqs-settings-panel" : undefined}>
     <FAQTypesPageView
       showBreadcrumb={showBreadcrumb}
       breadcrumbMainLink={breadcrumbMainLink}
@@ -20,6 +22,7 @@ const FAQTypesPanel = () => {
       types={ctx.types}
       loading={ctx.loading}
     />
+    </div>
   );
 };
 

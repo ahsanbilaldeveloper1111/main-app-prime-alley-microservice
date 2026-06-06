@@ -100,8 +100,8 @@ export function useCrmActivityModals({
       setShowSmsModal(false);
       setShowWhatsAppModal(false);
     };
-    window.addEventListener("close-all-activity-modals", handleCloseAll);
-    return () => window.removeEventListener("close-all-activity-modals", handleCloseAll);
+    globalThis.addEventListener("close-all-activity-modals", handleCloseAll);
+    return () => globalThis.removeEventListener("close-all-activity-modals", handleCloseAll);
   }, []);
 
   const handleNoteSave = useCallback(

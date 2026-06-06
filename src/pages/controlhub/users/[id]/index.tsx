@@ -1,12 +1,15 @@
 import React, { ReactElement, useEffect, useState, useCallback, useMemo } from 'react';
 import Layout from '@layout/index';
 import BreadcrumbItem from '@common/BreadcrumbItem';
-import { Col, Row, Tab, Tabs, Modal, Button } from 'react-bootstrap';
+import { Col, Row, Tab, Tabs, Button } from 'react-bootstrap';
+import FormModal from '@components/page-partials/FormModal';
+import { MainSettingsFormProvider } from '@components/main-settings/mainSettingsFormContext';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/router';
 import { ArrowLeft } from 'lucide-react';
 import '@assets/scss/tabs.scss';
 import '@assets/scss/common.scss';
+import '@page-modules/controlhub/users/userViewPage.scss';
 
 import { getUserById, updateUserStatus } from '@utils/users';
 import { getAllRoles } from '@utils/roles';
@@ -123,8 +126,9 @@ const UserView = () => {
         return (
             <React.Fragment>
                 <BreadcrumbItem mainTitle="Controlhub" mainLink={usersListPath} subTitle="Users" />
+                <div className="user-view-page">
                 <Row>
-                    <Col md={12} className="text-center py-5">
+                    <Col md={12} className="text-center py-4">
                         <output aria-live="polite" className="d-block border-0 bg-transparent p-0">
                             <span className="d-inline-flex flex-column align-items-center gap-3">
                                 <span className="spinner-border" aria-hidden />
@@ -133,15 +137,18 @@ const UserView = () => {
                         </output>
                     </Col>
                 </Row>
+                </div>
             </React.Fragment>
         );
     }
 
     return (
+        <MainSettingsFormProvider preferSidebarForms>
         <React.Fragment>
             <BreadcrumbItem mainTitle="Controlhub" mainLink={usersListPath} subTitle="Users" />
 
-            <Row className="mb-3">
+            <div className="user-view-page">
+            <Row className="user-view-page__back">
                 <Col md={12}>
                     <Button
                         variant="outline-secondary"
@@ -154,42 +161,38 @@ const UserView = () => {
                 </Col>
             </Row>
 
-            {showChangeStatusModal && (
-                <Modal show={showChangeStatusModal} onHide={handleCloseChangeStatusModal}>
-                    <Modal.Header closeButton>
-                        <Modal.Title>Change Status</Modal.Title>
-                    </Modal.Header>
-                    <Modal.Body>
-                        <div className="form-group">
-                            <label htmlFor="status">Status</label>
-                            <select className="form-control" id="status"
-                                onChange={(e) => {
-                                    setUpdatedStatus(e.target.value);
-                                }}>
-                                <option value="">Select Status</option>
-                                <option value="Active" selected={currentUser?.status === "Active"}>Active</option>
-                                <option value="Inactive" selected={currentUser?.status === "Inactive"}>Inactive</option>
-                            </select>
-                            <p className="text-muted mt-2 small">Update the status of a user to reflect their current active or inactive status within the system</p>
-                        </div>
-                    </Modal.Body>
-                    <Modal.Footer>
-                        <Button variant="secondary" onClick={handleCloseChangeStatusModal}>
-                            Close
-                        </Button>
-                        <Button variant="primary" onClick={handleSubmitChangeStatus}>
-                            Change Status
-                        </Button>
-                    </Modal.Footer>
-                </Modal>
-            )}
+            <FormModal
+                show={showChangeStatusModal}
+                onHide={handleCloseChangeStatusModal}
+                title="Change Status"
+                desc="Update the status of a user to reflect their current active or inactive status within the system"
+                formHtml={
+                    <div className="form-group mb-0">
+                        <label htmlFor="user-status">Status</label>
+                        <select
+                            className="form-control"
+                            id="user-status"
+                            value={updatedStatus}
+                            onChange={(e) => setUpdatedStatus(e.target.value)}
+                        >
+                            <option value="">Select Status</option>
+                            <option value="Active">Active</option>
+                            <option value="Inactive">Inactive</option>
+                        </select>
+                    </div>
+                }
+                submitButtonText="Change Status"
+                cancelButtonText="Cancel"
+                onSubmit={handleSubmitChangeStatus}
+                onCancel={handleCloseChangeStatusModal}
+            />
 
             <Row>
                 <Col md={12}>
                     <Tabs
                         defaultActiveKey="overview"
                         id="system-tabs"
-                        className="mb-3"
+                        className="mb-2"
                     >
                         <Tab eventKey="overview" title="Overview">
                             <OverviewTab
@@ -217,7 +220,9 @@ const UserView = () => {
                 title={successModalTitle}
                 description={successModalDescription}
             />
+            </div>
         </React.Fragment>
+        </MainSettingsFormProvider>
     );
 };
 

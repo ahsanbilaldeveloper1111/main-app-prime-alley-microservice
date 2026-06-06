@@ -12,10 +12,12 @@ import {
   createDateTimeDropdownContent,
   createTextFilterDropdownContent,
 } from "@utils/communicationsFilterDropdowns";
-import {
-  renderApplyResetFilterActions,
-} from "@utils/communicationsStagedFilters";
+import { renderApplyFilterActions } from "@utils/communicationsStagedFilters";
 import { formatFilterDateTimeLabel } from "@utils/communicationsDateUtils";
+import {
+  CALL_LOGS_TOOLBAR,
+  COMMUNICATIONS_TABS_DROPDOWN_ITEMS,
+} from "@components/communications/callLogsListPageConfig";
 
 export interface CallLogsTablePaginationState {
   currentPage: number;
@@ -44,7 +46,8 @@ export interface BuildCallLogsTableToolbarParams {
   handleApplyFiltersClick: () => void;
   handleResetFiltersClick: () => void;
   hasUnappliedFilterChanges: boolean;
-  hasNonDefaultFilters: boolean;
+  /** Total records for the active tab badge (prospects `All prospects` count). */
+  allTabCount?: number;
 }
 
 export function buildCallLogsTableToolbar({
@@ -63,33 +66,38 @@ export function buildCallLogsTableToolbar({
   handleApplyFiltersClick,
   handleResetFiltersClick,
   hasUnappliedFilterChanges,
-  hasNonDefaultFilters,
+  allTabCount,
 }: BuildCallLogsTableToolbarParams): ToolbarConfig {
   return {
+    clearAllFilters: handleResetFiltersClick,
     showTabs: true,
+    tabsDropdownLabel: CALL_LOGS_TOOLBAR.tabsDropdownLabel,
+    tabsDropdownItems: COMMUNICATIONS_TABS_DROPDOWN_ITEMS,
     tabs: [
       {
-        id: "call-logs-title",
-        label: "Call Logs",
+        id: "all",
+        label: CALL_LOGS_TOOLBAR.allTabLabel,
+        count: allTabCount,
         removable: false,
       },
     ],
-    activeTab: "call-logs-title",
+    activeTab: "all",
     onTabChange: () => {},
     showSearch: true,
     searchValue,
-    searchPlaceholder: "Search by username, extension, phone...",
+    searchPlaceholder: CALL_LOGS_TOOLBAR.searchPlaceholder,
     onSearchChange: (value: string) => setSearchValue(value),
     onSearch: () => {
       setTablePagination((prev) => ({ ...prev, currentPage: 1 }));
       fetchCallLogs(1, tablePaginationRowsPerPage, searchValue.trim());
     },
     showFiltersButton: true,
+    showSortButton: true,
+    showAdvancedFilters: true,
     showExportButton: canExportCallLogs,
     onExportClick: () => {
       void handleExport();
     },
-    showFilterPills: true,
     showMoreFiltersButton: false,
     filterPills: [
       buildCallDirectionFilterPill(currentFilters as any, stageFilters as any),
@@ -202,10 +210,8 @@ export function buildCallLogsTableToolbar({
         createDateTimeDropdownContent,
       ),
     ],
-    filterPillsRightActions: renderApplyResetFilterActions(
-      hasNonDefaultFilters,
+    filterPillsRightActions: renderApplyFilterActions(
       hasUnappliedFilterChanges,
-      handleResetFiltersClick,
       handleApplyFiltersClick,
       "call-logs",
     ),

@@ -1,0 +1,46 @@
+// Embedded Users & Teams panels inside Main Settings (Teams, Groups, Ranks).
+@import './settingsEmbeddedToolbar.scss';
+@import './settingsEmbeddedPageShell.scss';
+
+.users-teams-settings-panel {
+  min-width: 0;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  overflow-x: visible;
+
+  .users-teams-settings-page {
+    @include settings-embedded-page-shell;
+    overflow-x: visible;
+  }
+
+  .users-teams-settings-page__toolbar {
+    @extend .settings-embedded-page__toolbar;
+  }
+
+  .users-teams-settings-page__toolbar-search {
+    @extend .settings-embedded-page__toolbar-search;
+  }
+
+  .users-teams-settings-page__toolbar-actions {
+    @extend .settings-embedded-page__toolbar-actions;
+  }
+
+  .users-teams-table-page .generic-table-responsive {
+    width: 100%;
+    max-width: 100%;
+    margin: 0;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px 8px 0 0;
+  }
+
+  .users-teams-table-page .generic-table-card {
+    border: 1px solid #e5e7eb !important;
+    border-radius: 8px;
+    box-shadow: none !important;
+  }
+
+  .users-teams-table-page .generic-table-td[data-col-key='actions'] .btn-action-style-2 {
+    color: inherit;
+  }
+}

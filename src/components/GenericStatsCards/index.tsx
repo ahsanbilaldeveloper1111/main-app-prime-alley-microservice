@@ -40,6 +40,10 @@ const StatsCards: React.FC<StatsCardsProps> = ({
   columns,
   valueFontSize = '36px'
 }) => {
+  const gridTemplateColumns = columns
+    ? `repeat(${columns}, minmax(0, 1fr))`
+    : `repeat(auto-fit, minmax(${gridMinWidth}, 1fr))`;
+
   return (
     <div style={{
       display: 'grid',

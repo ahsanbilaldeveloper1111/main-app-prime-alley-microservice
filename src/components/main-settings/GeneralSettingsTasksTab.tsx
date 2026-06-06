@@ -1,3 +1,4 @@
+import { MAIN_SETTINGS_FONT_SIZE } from './mainSettingsTokens'
 import React from 'react'
 import { Clock } from 'lucide-react'
 import { generalSettingsStyles as s } from './generalSettingsPanelStyles'
@@ -53,7 +54,7 @@ export const GeneralSettingsTasksTab: React.FC<GeneralSettingsTasksTabProps> = (
         </label>
         <select
           id="general-due-date"
-          style={{ ...s.select, width: '240px', height: '40px', fontWeight: 300 }}
+          style={{ ...s.select, width: '240px', height: '40px' }}
           value={dueDate}
           onChange={(e) => setDueDate(e.target.value)}
         >
@@ -77,8 +78,8 @@ export const GeneralSettingsTasksTab: React.FC<GeneralSettingsTasksTabProps> = (
               left: '10px',
               top: '50%',
               transform: 'translateY(-50%)',
-              color: '#888',
-              fontSize: '14px',
+              color: '#6c757d',
+              fontSize: MAIN_SETTINGS_FONT_SIZE.base,
               pointerEvents: 'none',
               zIndex: 1,
             }}
@@ -91,12 +92,12 @@ export const GeneralSettingsTasksTab: React.FC<GeneralSettingsTasksTabProps> = (
               {
                 width: '240px',
                 padding: '8px 12px 8px 34px',
-                fontSize: '16px',
+                fontSize: MAIN_SETTINGS_FONT_SIZE.md,
                 height: '40px',
-                fontWeight: 300,
+                fontWeight: 400,
                 color: '#141414',
-                border: '1px solid #d0d0d0',
-                borderRadius: '4px',
+                border: '1px solid #b8b8b8',
+                borderRadius: '8px',
                 background: '#fff',
                 fontFamily: "'Lexend Deca', Helvetica, Arial, sans-serif",
                 outline: 'none',

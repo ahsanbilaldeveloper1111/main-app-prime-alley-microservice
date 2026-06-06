@@ -2,6 +2,11 @@ import React from "react";
 import moment from "moment";
 import { Calendar } from "lucide-react";
 import { formatDateTimeToLocal, GlobalDateTimeFormat } from "@utils/Helper";
+import {
+  COMMUNICATIONS_COLOR,
+  COMMUNICATIONS_SELECTED_BG,
+  COMMUNICATIONS_STAT_COLORS,
+} from "@utils/communications/communicationsThemeTokens";
 
 export interface CallLogsDateRangeBannerProps {
   startDateTime: string;
@@ -20,7 +25,7 @@ const CallLogsDateRangeBanner: React.FC<
 
   return (
     <div
-      className="mb-3 d-flex align-items-center justify-content-between flex-wrap gap-2"
+      className="call-logs-date-range-banner communications-date-range-banner mb-3 d-flex align-items-center justify-content-between flex-wrap gap-2"
       style={{
         background: "#f8fafc",
         border: "1px solid #e2e8f0",
@@ -35,13 +40,13 @@ const CallLogsDateRangeBanner: React.FC<
             width: "30px",
             height: "30px",
             borderRadius: "8px",
-            background: "#eef2ff",
-            color: "#4f46e5",
+            background: COMMUNICATIONS_SELECTED_BG,
+            color: COMMUNICATIONS_STAT_COLORS.primary.iconColor,
           }}
         >
           <Calendar size={16} />
         </span>
-        <div className="d-flex align-items-center gap-2">
+        <div className="d-flex align-items-center gap-2 communications-date-range-banner__label-row">
           <span
             className="text-muted"
             style={{
@@ -53,10 +58,11 @@ const CallLogsDateRangeBanner: React.FC<
             Selected Date Range
           </span>
           <span
+            className="communications-date-range-banner__dates"
             style={{
               fontSize: "13px",
               fontWeight: 600,
-              color: "#0f172a",
+              color: COMMUNICATIONS_COLOR.text,
             }}
           >
             {formatDateTimeToLocal(startDateTime, GlobalDateTimeFormat)} —{" "}

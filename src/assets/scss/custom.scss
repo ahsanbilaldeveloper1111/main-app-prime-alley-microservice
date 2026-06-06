@@ -14,6 +14,7 @@ $googleFontsUrl: "https://fonts.googleapis.com/css2?family=Lexend+Deca:wght@300;
 @import "../fonts/fontawesome.css";
 @import "../fonts/material.css";
 @import "./create-planner-task-sidebar.scss";
+@import "./add-form-sidebar.scss";
 
 
 
@@ -25,8 +26,20 @@ $googleFontsUrl: "https://fonts.googleapis.com/css2?family=Lexend+Deca:wght@300;
 [data-nextjs-portal] {
   display: none !important;
 }
-.contact-sidebar-container,.create-lead-sidebar-container{
-   width: min(600px, 100vw) !important;
+.contact-sidebar-container,
+.create-lead-sidebar-container {
+  width: 600px !important;
+  max-width: 600px !important;
+
+  @media (max-width: 1199.98px) {
+    width: 70vw !important;
+    max-width: 70vw !important;
+  }
+
+  @media (max-width: 767.98px) {
+    width: 100vw !important;
+    max-width: 100vw !important;
+  }
 }
 .pc-sidebar{
     background-color:#ffffff !important;
@@ -205,8 +218,10 @@ button.nav-tab-link {
   box-shadow: 0 0 10px #2585f8, 0 0 5px #2585f8 !important;
 }
 .Toastify {
-    position: absolute;
-    z-index: 9999999;
+  position: absolute;
+  z-index: 9999999;
+  height: 0 !important;
+  overflow: hidden;
 }
 body .nextjs-toast{
     display: none !important;
@@ -563,6 +578,19 @@ body:has(.prospects-scrollable-content) {
     height: 100% !important;
   }
 
+  .generic-table-responsive {
+    width: 97% !important;
+    margin: 14px 25px !important;
+    border: 1px solid #ccc !important;
+    border-radius: 15px 15px 0 0 !important;
+    box-shadow: none !important;
+  }
+
+  .gt-toolbar-container + .generic-table-card .generic-table-responsive {
+    border-radius: 0 !important;
+    border-top: none !important;
+  }
+
   .prospects-table-wrapper {
     flex: 1 !important;
     display: flex !important;
@@ -577,6 +605,53 @@ body:has(.prospects-scrollable-content) {
 
   .gt-toolbar-tabs-section {
     flex-shrink: 0 !important;
+  }
+
+  .gt-toolbar-actions .btn.gt-toolbar-btn {
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 6px !important;
+    padding: 6px 15px !important;
+    font-size: 12px !important;
+    font-weight: 300 !important;
+    color: #000 !important;
+    background: #fff !important;
+    border: 1px solid #8a8a8a !important;
+    border-radius: 4px !important;
+    box-shadow: none !important;
+  }
+
+  .gt-toolbar-actions .btn.gt-toolbar-btn--primary {
+    background: #141414 !important;
+    color: #ffffff !important;
+    border-color: #141414 !important;
+    font-weight: 500 !important;
+  }
+
+  .gt-toolbar-actions .btn.gt-toolbar-btn--primary:hover:not(:disabled) {
+    background: #2d2d2d !important;
+    border-color: #2d2d2d !important;
+    color: #ffffff !important;
+  }
+
+  .gt-filter-pills .gt-filter-pill-add.gt-apply-filters-btn,
+  .gt-filter-pills .gt-filter-pill-add[class$='-apply-filters-btn'] {
+    color: #0066CC !important;
+    background: transparent !important;
+    border: none !important;
+    font-weight: 500 !important;
+  }
+
+  .gt-filter-pills .gt-filter-pill-add.gt-apply-filters-btn:hover:not(:disabled),
+  .gt-filter-pills .gt-filter-pill-add[class$='-apply-filters-btn']:hover:not(:disabled) {
+    color: #0052A3 !important;
+    background: #f5f8fa !important;
+  }
+
+  .gt-filter-pills .gt-filter-pill-add.gt-apply-filters-btn:disabled,
+  .gt-filter-pills .gt-filter-pill-add[class$='-apply-filters-btn']:disabled {
+    color: #9ca3af !important;
+    background: transparent !important;
   }
 
   .prospects-scrollable-content {
@@ -792,29 +867,33 @@ body:has(.crm-activities-layout) {
   }
 }
 
-.Toastify {
-  height: 0 !important;
-  overflow: hidden;
-}
-
 body:has(.workload-page) .main-content-wrapper {
   padding-bottom: 0 !important;
-  overflow-y: hidden !important;
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
 }
-
 body:has(.workload-page).modal-open {
   padding-right: 0 !important;
   overflow: auto !important;
 }
 
 body:has(.workload-page) .min-vh-100 {
-  min-height: unset !important;
+  min-height: 100vh !important;
+  height: auto !important;
+  overflow: visible !important;
 }
 
 @media (min-height: 800px) {
-  body:has(.workload-page) .min-vh-100 {
-    height: 100vh !important;
-    overflow: hidden !important;
+  body:has(.workload-page) .app-content-area {
+    flex: 1 1 auto;
+    min-height: 0;
+  }
+
+  body:has(.workload-page) .main-content-wrapper {
+    flex: 1 1 auto;
+    min-height: 0;
+    max-height: calc(100vh - 48px);
+    overflow-y: auto !important;
   }
 }
 

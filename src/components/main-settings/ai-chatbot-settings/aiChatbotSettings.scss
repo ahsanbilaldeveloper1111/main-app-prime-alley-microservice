@@ -36,38 +36,55 @@
   &__company-active {
     flex: 1 1 100%;
     margin: 0;
-    font-size: 12px;
-    color: #6b7280;
+    font-size: var(--ms-font-sm);
+    color: #6c757d;
     line-height: 1.35;
+  }
+
+  &__inner-tab-bar {
+    display: flex;
+    width: 100%;
+    align-items: flex-end;
+    border-bottom: 1px solid #8a8a8a;
+    overflow: hidden;
+    --ms-tab-btn-padding-y: 8px;
   }
 
   &__inner-tab-row {
     display: flex;
+    flex: 0 0 auto;
     flex-wrap: nowrap;
     gap: 0;
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: thin;
+    align-items: flex-end;
   }
 
   &__inner-tab-btn {
     flex: 0 0 auto;
-    padding: 8px 20px;
-    background: whitesmoke;
-    border: 1px solid #e0e0e0;
-    border-right: none;
-    border-bottom: 2px solid #e0e0e0;
+    padding: var(--ms-tab-btn-padding-y, 8px) 20px;
+    background: #ffffff;
+    border-top: 1px solid #8a8a8a;
+    border-left: none;
+    border-right: 1px solid #8a8a8a;
+    border-bottom: 1px solid #8a8a8a;
     cursor: pointer;
-    font-size: 13px;
+    font-size: var(--ms-font-sm);
     font-weight: 400;
     color: #141414;
     white-space: nowrap;
     position: relative;
-    top: 1px;
+    box-sizing: border-box;
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
+
+    &:first-child {
+      border-left: 1px solid #8a8a8a;
+    }
 
     &--active {
-      background: #fff;
-      border-bottom-color: #fff;
+      background: #f5f8fa;
+      color: #0066cc;
+      border-bottom: 2px solid #0066cc;
+      margin-bottom: -1px;
+      z-index: 1;
       font-weight: 600;
     }
   }
@@ -104,19 +121,19 @@
   &__history-table-wrap {
     overflow-x: auto;
     border: 1px solid #e5e7eb;
-    border-radius: 4px;
+    border-radius: 8px;
   }
 
   &__history-table {
-    font-size: 13px;
+    font-size: var(--ms-font-sm);
     margin: 0;
 
     th {
       white-space: nowrap;
-      font-size: 12px;
+      font-size: var(--ms-font-sm);
       text-transform: uppercase;
       letter-spacing: 0.02em;
-      color: #6b7280;
+      color: #6c757d;
     }
   }
 
@@ -150,15 +167,15 @@
 
   &__per-user-budget-title {
     margin: 0;
-    font-size: 15px;
+    font-size: var(--ms-font-md);
     font-weight: 600;
-    color: #111827;
+    color: #141414;
     line-height: 1.3;
   }
 
   &__per-user-budget-count {
-    font-size: 12px;
-    color: #6b7280;
+    font-size: var(--ms-font-sm);
+    color: #6c757d;
     display: inline-flex;
     align-items: center;
     gap: 6px;
@@ -166,7 +183,7 @@
 
   &__per-user-budget-lead {
     margin: 0;
-    font-size: 13px;
+    font-size: var(--ms-font-sm);
     color: #4b5563;
     line-height: 1.45;
   }
@@ -175,14 +192,14 @@
     margin: 0;
     padding: 10px 12px;
     background: #f3f4f6;
-    border-radius: 4px;
-    font-size: 12px;
+    border-radius: 8px;
+    font-size: var(--ms-font-sm);
     color: #4b5563;
     line-height: 1.45;
   }
 
   &__per-user-budget-code {
-    font-size: 11px;
+    font-size: var(--ms-font-xs);
     color: #1f2937;
     word-break: break-all;
   }
@@ -211,9 +228,9 @@
   }
 
   &__row-label {
-    font-size: 12px;
+    font-size: var(--ms-font-sm);
     font-weight: 600;
-    color: #6b7280;
+    color: #6c757d;
     margin: 0;
     line-height: 1.2;
   }
@@ -221,7 +238,7 @@
   &__field-label {
     display: block;
     margin-bottom: 2px;
-    font-size: 12px;
+    font-size: var(--ms-font-sm);
     font-weight: 500;
     color: #374151;
     line-height: 1.2;
@@ -233,8 +250,8 @@
     box-sizing: border-box;
     padding: 6px 10px;
     border: 1px solid #d1d5db;
-    border-radius: 4px;
-    font-size: 13px;
+    border-radius: 8px;
+    font-size: var(--ms-font-sm);
     outline: none;
     line-height: 1.35;
     min-height: 36px;
@@ -310,12 +327,12 @@
   &__hint,
   &__status {
     margin: 0;
-    font-size: 12px;
+    font-size: var(--ms-font-sm);
     line-height: 1.35;
   }
 
   &__hint {
-    color: #6b7280;
+    color: #6c757d;
   }
 
   &__status {
@@ -333,7 +350,7 @@
   }
 
   &__subsection-label {
-    font-size: 11px;
+    font-size: var(--ms-font-xs);
     font-weight: 600;
     color: #9ca3af;
     margin: 0 0 4px;
@@ -348,11 +365,11 @@
     min-height: 36px;
     box-sizing: border-box;
     border: 1px solid #e5e7eb;
-    border-radius: 4px;
+    border-radius: 8px;
     background: #f9fafb;
-    font-size: 13px;
+    font-size: var(--ms-font-sm);
     font-weight: 500;
-    color: #111827;
+    color: #141414;
     line-height: 1.35;
     display: flex;
     align-items: center;
@@ -368,8 +385,8 @@
     flex-wrap: wrap;
     gap: 6px 12px;
     align-items: center;
-    font-size: 12px;
-    color: #6b7280;
+    font-size: var(--ms-font-sm);
+    color: #6c757d;
     margin: 0;
     line-height: 1.35;
   }
@@ -381,7 +398,7 @@
 
   &__progress-track {
     height: 4px;
-    border-radius: 2px;
+    border-radius: 6px;
     background: #e5e7eb;
     overflow: hidden;
     width: 100%;
@@ -391,7 +408,7 @@
     width: 100%;
     overflow-x: auto;
     border: 1px solid #e5e7eb;
-    border-radius: 4px;
+    border-radius: 8px;
     background: #fff;
   }
 
@@ -400,7 +417,7 @@
     min-width: 36rem;
     table-layout: fixed;
     border-collapse: collapse;
-    font-size: 13px;
+    font-size: var(--ms-font-sm);
     line-height: 1.35;
 
     col.ai-chatbot-settings__pricing-ref-col-num {
@@ -444,7 +461,7 @@
 
     tbody td {
       border-bottom: 1px solid #e5e7eb;
-      color: #111827;
+      color: #141414;
     }
 
     tbody tr:last-child td {
@@ -455,8 +472,8 @@
   &__pricing-ref-model {
     font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
       "Liberation Mono", "Courier New", monospace;
-    font-size: 12px;
-    color: #111827;
+    font-size: var(--ms-font-sm);
+    color: #141414;
     background: transparent;
     padding: 0;
   }
@@ -469,7 +486,7 @@
   }
 
   &__skeleton {
-    border-radius: 4px;
+    border-radius: 8px;
     background: linear-gradient(90deg, #f3f4f6 25%, #e9ecef 50%, #f3f4f6 75%);
     background-size: 200% 100%;
     animation: ai-chatbot-settings-shimmer 1.2s ease-in-out infinite;
@@ -505,7 +522,7 @@
   &__skeleton--progress {
     height: 4px;
     width: 100%;
-    border-radius: 2px;
+    border-radius: 6px;
   }
 
   &__skeleton--table {
@@ -524,13 +541,20 @@
   }
 
   &__save {
-    border: 1px solid #111827;
-    background: #111827;
+    border: 1px solid #0066cc;
+    background: #0066cc;
     color: #ffffff;
-    border-radius: 4px;
+    border-radius: 8px;
     padding: 8px 16px;
-    font-size: 13px;
+    font-family: Lexend Deca, Helvetica, Arial, sans-serif;
+    font-size: var(--ms-font-base);
+    font-weight: 400;
     cursor: pointer;
+
+    &:hover:not(:disabled) {
+      background: #0052a3;
+      border-color: #0052a3;
+    }
     align-self: flex-start;
     min-height: 40px;
 

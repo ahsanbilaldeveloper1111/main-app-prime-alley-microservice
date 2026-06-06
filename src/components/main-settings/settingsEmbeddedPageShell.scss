@@ -1,0 +1,28 @@
+// Shared layout shell for embedded Main Settings table tabs (Workforce, Tickets, Help Center).
+
+@mixin settings-embedded-page-shell {
+  min-width: 0;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  overflow-x: visible;
+
+  > .smart-crm-table-page,
+  .smart-crm-table-page {
+    min-width: 0;
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .generic-table-card,
+  .generic-table-responsive {
+    min-width: 0;
+    max-width: 100%;
+  }
+}
+
+.tickets-settings-page,
+.faqs-settings-page,
+.request-categories-page {
+  @include settings-embedded-page-shell;
+}

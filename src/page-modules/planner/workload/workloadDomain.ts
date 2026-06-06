@@ -4,6 +4,8 @@ import {
 } from "@components/planner/plannerTasksListing/plannerTasksListingDomain";
 import type {
   AssigneeMatch,
+  WorkloadBoardColumn,
+  WorkloadBoardData,
   WorkloadGridData,
   WorkloadGridMember,
   WorkloadRangePreset,
@@ -69,7 +71,7 @@ export function workloadGridCellVisualVariant(
 }
 
 export function workloadGridCellPercentLabel(loadPercent: number, variant: WorkloadGridCellVisualVariant): string {
-  if (variant === "zero") return "0%";
+  if (variant === "zero") return "0% Planned";
   const rounded = Math.round(loadPercent * 10) / 10;
   const base = `${rounded}%`;
   if (loadPercent > 100) return `${base} (over)`;
@@ -497,10 +499,11 @@ export const WORKLOAD_PRIORITY_LEGEND_ITEMS = (
 
 /** Grid legend (reference design + Postman `load_band`). */
 export const WORKLOAD_GRID_LEGEND_ITEMS = [
-  { id: "comfortable", swatch: "#22c55e", label: "0–74% Comfortable" },
-  { id: "near_full", swatch: "#f97316", label: "75–99% Near Full" },
-  { id: "overloaded", swatch: "#ef4444", label: "100%+ Overloaded" },
-  { id: "unestimated", swatch: "#ea580c", label: "Has unestimated tasks" },
+  { id: "available", swatch: "#22c55e", label: "Available (0–70%)" },
+  { id: "comfortable", swatch: "#eab308", label: "Comfortable (70–90%)" },
+  { id: "near_full", swatch: "#f97316", label: "Near full (90–100%)" },
+  { id: "overloaded", swatch: "#ef4444", label: "Overloaded (>100%)" },
+  { id: "incomplete_data", swatch: "#9ca3af", label: "Incomplete data" },
 ] as const;
 
 /** BEM-style modifier for cell backgrounds (see `workload-view.scss`). */
@@ -513,22 +516,22 @@ export function workloadCellKey(extensionNumber: string, isoDate: string): strin
   return `${extensionNumber}|${isoDate}`;
 }
 
-/** Collect assignee extensions from grid API payload (members, root list, or cells). */
+/** Collect assignee extensions from grid API payload (members, root list, and cells). */
 export function collectWorkloadMemberExtensionsFromGrid(grid: WorkloadGridData): string[] {
-  const fromMembers = (grid.members ?? [])
-    .map((m) => m.extension_number?.trim())
-    .filter((ext): ext is string => Boolean(ext));
-  if (fromMembers.length > 0) return [...new Set(fromMembers)];
-
-  const fromRoot = (grid.extension_numbers ?? [])
-    .map((ext) => String(ext).trim())
-    .filter(Boolean);
-  if (fromRoot.length > 0) return [...new Set(fromRoot)];
-
-  const fromCells = (grid.cells ?? [])
-    .map((c) => c.extension_number?.trim())
-    .filter((ext): ext is string => Boolean(ext));
-  return [...new Set(fromCells)];
+  const extensions = new Set<string>();
+  for (const member of grid.members ?? []) {
+    const ext = member.extension_number?.trim();
+    if (ext) extensions.add(ext);
+  }
+  for (const ext of grid.extension_numbers ?? []) {
+    const normalized = String(ext).trim();
+    if (normalized) extensions.add(normalized);
+  }
+  for (const cell of grid.cells ?? []) {
+    const ext = cell.extension_number?.trim();
+    if (ext) extensions.add(ext);
+  }
+  return [...extensions];
 }
 
 function buildWorkloadGridMemberRow(
@@ -544,12 +547,32 @@ function buildWorkloadGridMemberRow(
   };
 }
 
+/** When set, only extensions in this set are shown in grid/board member lists. */
+export function filterWorkloadMemberExtensions(
+  extensions: readonly string[],
+  companyExtensionAllowlist?: ReadonlySet<string> | null,
+): string[] {
+  if (!companyExtensionAllowlist || companyExtensionAllowlist.size === 0) {
+    return [...extensions];
+  }
+  return extensions.filter((ext) => companyExtensionAllowlist.has(ext.trim()));
+}
+
 type WorkloadGridDisplayOptions = Readonly<{
   viewerExtension: string;
   memberFilter?: string;
   rangeFallback?: WorkloadIsoDateRange;
   /** When the viewer is a team owner, use full roster if the API omits `members`. */
   teamExtensionNumbers?: string[];
+  companyExtensionAllowlist?: ReadonlySet<string>;
+}>;
+
+type WorkloadBoardDisplayOptions = Readonly<{
+  viewerExtension: string;
+  memberFilter?: string;
+  /** When the viewer is a root/company admin, pad columns using the team roster. */
+  teamExtensionNumbers?: string[];
+  companyExtensionAllowlist?: ReadonlySet<string>;
 }>;
 
 function buildExistingMembersByExtension(
@@ -569,23 +592,42 @@ function resolveWorkloadGridExtensionList(
 ): string[] {
   const memberFilter = options.memberFilter?.trim();
   if (memberFilter && memberFilter !== "all") {
-    return [memberFilter];
+    return filterWorkloadMemberExtensions([memberFilter], options.companyExtensionAllowlist);
   }
 
-  const fromGrid = collectWorkloadMemberExtensionsFromGrid(grid);
+  const fromGrid = filterWorkloadMemberExtensions(
+    collectWorkloadMemberExtensionsFromGrid(grid),
+    options.companyExtensionAllowlist,
+  );
+  const teamRoster = (options.teamExtensionNumbers ?? [])
+    .map((ext) => ext.trim())
+    .filter(Boolean);
+  const scopedTeamRoster = filterWorkloadMemberExtensions(
+    teamRoster,
+    options.companyExtensionAllowlist,
+  );
+
+  if (scopedTeamRoster.length > 0) {
+    const merged: string[] = [];
+    const seen = new Set<string>();
+    const add = (ext: string) => {
+      const normalized = ext.trim();
+      if (!normalized || seen.has(normalized)) return;
+      seen.add(normalized);
+      merged.push(normalized);
+    };
+    for (const ext of scopedTeamRoster) add(ext);
+    for (const ext of fromGrid) add(ext);
+    return merged;
+  }
+
   if (fromGrid.length > 0) {
     return fromGrid;
   }
 
-  const teamRoster = (options.teamExtensionNumbers ?? [])
-    .map((ext) => ext.trim())
-    .filter(Boolean);
-  if (teamRoster.length > 0) {
-    return [...new Set(teamRoster)];
-  }
-
   const viewer = options.viewerExtension.trim();
-  return viewer ? [viewer] : [];
+  const fallback = viewer ? [viewer] : [];
+  return filterWorkloadMemberExtensions(fallback, options.companyExtensionAllowlist);
 }
 
 function resolveWorkloadGridDays(
@@ -633,16 +675,168 @@ export function resolveWorkloadGridDisplayData(
   };
 }
 
+function buildExistingBoardColumnsByExtension(
+  board: WorkloadBoardData,
+): Map<string, WorkloadBoardColumn> {
+  const existingByExt = new Map<string, WorkloadBoardColumn>();
+  for (const col of board.columns ?? []) {
+    const ext = col.extension_number?.trim();
+    if (ext) existingByExt.set(ext, col);
+  }
+  return existingByExt;
+}
+
+function resolveWorkloadBoardExtensionList(
+  board: WorkloadBoardData,
+  options: WorkloadBoardDisplayOptions,
+): string[] {
+  const memberFilter = options.memberFilter?.trim();
+  if (memberFilter && memberFilter !== "all") {
+    return filterWorkloadMemberExtensions([memberFilter], options.companyExtensionAllowlist);
+  }
+
+  const roster = (options.teamExtensionNumbers ?? []).map((ext) => ext.trim()).filter(Boolean);
+  if (roster.length > 0) {
+    return filterWorkloadMemberExtensions([...new Set(roster)], options.companyExtensionAllowlist);
+  }
+
+  const fromColumns = (board.columns ?? [])
+    .map((c) => c.extension_number?.trim())
+    .filter((ext): ext is string => Boolean(ext));
+  if (fromColumns.length > 0) {
+    return filterWorkloadMemberExtensions(
+      [...new Set(fromColumns)],
+      options.companyExtensionAllowlist,
+    );
+  }
+
+  const fromRoot = (board.extension_numbers ?? [])
+    .map((ext) => String(ext).trim())
+    .filter(Boolean);
+  if (fromRoot.length > 0) {
+    return filterWorkloadMemberExtensions(
+      [...new Set(fromRoot)],
+      options.companyExtensionAllowlist,
+    );
+  }
+
+  const viewer = options.viewerExtension.trim();
+  const fallback = viewer ? [viewer] : [];
+  return filterWorkloadMemberExtensions(fallback, options.companyExtensionAllowlist);
+}
+
+/** Extensions from work-planner hierarchy (`GET users/hierarchyData`). */
+export function collectWorkloadExtensionsFromHierarchy(
+  hierarchyExtensions: unknown[] | null | undefined,
+  companyExtensionAllowlist?: ReadonlySet<string> | null,
+): string[] {
+  if (!Array.isArray(hierarchyExtensions)) return [];
+  const extensions = new Set<string>();
+  for (const row of hierarchyExtensions) {
+    if (row == null || typeof row !== "object") continue;
+    const record = row as {
+      id?: string | number;
+      extension_number?: string | number;
+      extension?: string | number;
+      phone?: string | number;
+    };
+    const candidates = [
+      record.extension_number,
+      record.extension,
+      record.phone,
+      record.id,
+    ];
+    for (const value of candidates) {
+      if (typeof value === "string" && value.trim()) {
+        extensions.add(value.trim());
+        break;
+      }
+      if (typeof value === "number" && Number.isFinite(value)) {
+        extensions.add(String(value));
+        break;
+      }
+    }
+  }
+  return filterWorkloadMemberExtensions([...extensions], companyExtensionAllowlist);
+}
+
+function workloadRangeDayCount(range: WorkloadBoardData["range"] | undefined): number {
+  if (!range?.start || !range?.end) return 0;
+  return listWorkloadDaysInRange(range.start, range.end).length;
+}
+
+function buildEmptyWorkloadBoardColumn(
+  extensionNumber: string,
+  rangeDayCount: number,
+  existing?: WorkloadBoardColumn,
+): WorkloadBoardColumn {
+  const perDayCapacity = 8 * MINUTES_PER_HOUR;
+  return {
+    extension_number: extensionNumber,
+    name: existing?.name ?? null,
+    display_name: existing?.display_name ?? null,
+    is_owner: existing?.is_owner,
+    role: existing?.role ?? null,
+    estimated_minutes: 0,
+    unestimated_count: 0,
+    task_count: 0,
+    effective_capacity_minutes_per_day: perDayCapacity,
+    effective_capacity_minutes_period: perDayCapacity * Math.max(0, rangeDayCount),
+    range_day_count: Math.max(0, rangeDayCount),
+    load_percent: 0,
+    load_band: "available",
+    tasks: [],
+  };
+}
+
+/**
+ * When the board API omits team members with 0 tasks, pad columns using the team roster so the
+ * UI shows everyone in the list (same behavior as the workload grid).
+ */
+export function resolveWorkloadBoardDisplayData(
+  board: WorkloadBoardData | undefined,
+  options: WorkloadBoardDisplayOptions,
+): WorkloadBoardData | undefined {
+  if (!board) return undefined;
+
+  const existingByExt = buildExistingBoardColumnsByExtension(board);
+  const extensionList = resolveWorkloadBoardExtensionList(board, options);
+  const dayCount = workloadRangeDayCount(board.range);
+  const columns = extensionList.map((ext) => {
+    const existing = existingByExt.get(ext);
+    return existing ?? buildEmptyWorkloadBoardColumn(ext, dayCount);
+  });
+
+  const hasDisplayMembers = columns.length > 0;
+  const effectiveEmptyTeam = board.empty_team === true && !hasDisplayMembers;
+
+  return {
+    ...board,
+    columns,
+    empty_team: effectiveEmptyTeam,
+    empty_team_message: effectiveEmptyTeam ? board.empty_team_message : null,
+  };
+}
+
 /** Summary period panel: use API members or current viewer when empty. */
 export function resolveWorkloadPeriodDisplayMembers(
   apiMembers: WorkloadSummaryMember[] | undefined,
   viewerExtension: string,
   teamExtensionNumbers?: string[],
+  companyExtensionAllowlist?: ReadonlySet<string>,
 ): WorkloadSummaryMember[] {
   if (Array.isArray(apiMembers) && apiMembers.length > 0) {
-    return apiMembers;
+    if (!companyExtensionAllowlist || companyExtensionAllowlist.size === 0) {
+      return apiMembers;
+    }
+    return apiMembers.filter((member) =>
+      companyExtensionAllowlist.has(member.extension_number?.trim() ?? ""),
+    );
   }
-  const roster = (teamExtensionNumbers ?? []).map((ext) => ext.trim()).filter(Boolean);
+  const roster = filterWorkloadMemberExtensions(
+    (teamExtensionNumbers ?? []).map((ext) => ext.trim()).filter(Boolean),
+    companyExtensionAllowlist,
+  );
   if (roster.length > 0) {
     return roster.map((extension_number) => ({ extension_number }));
   }

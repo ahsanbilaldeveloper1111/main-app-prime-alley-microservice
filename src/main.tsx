@@ -1,4 +1,5 @@
 import "@assets/scss/custom.scss";
+import "@assets/scss/communications-pages.scss";
 import "@assets/fonts/phosphor/duotone/style.css";
 import "nprogress/nprogress.css";
 import "./utils/i18n";
@@ -72,11 +73,7 @@ class SentryErrorBoundary extends Component<
   }
 }
 
-function GlobalRejectionGuard({
-  children,
-}: {
-  readonly children: ReactNode;
-}) {
+function GlobalRejectionGuard({ children }: { readonly children: ReactNode }) {
   useEffect(() => {
     if (typeof globalThis === "undefined") return;
     const target = globalThis as typeof globalThis & {

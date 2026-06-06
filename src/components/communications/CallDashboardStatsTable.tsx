@@ -52,7 +52,7 @@ function CallDashboardStatsTable<T>({
   if (!show) return null;
 
   return (
-    <Col md={6}>
+    <Col xs={12} lg={6}>
       <div className="card">
         <div className="card-body">
           {data.length === 0 ? (

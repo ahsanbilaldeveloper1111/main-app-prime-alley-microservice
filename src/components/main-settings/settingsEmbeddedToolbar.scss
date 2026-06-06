@@ -1,0 +1,249 @@
+// Shared embedded toolbar (search left, actions right) for Main Settings table tabs.
+
+
+
+.settings-embedded-page__toolbar {
+
+  display: flex;
+
+  flex-direction: column;
+
+  align-items: stretch;
+
+  gap: 10px;
+
+  margin-bottom: 12px;
+
+  min-width: 0;
+
+  width: 100%;
+
+  max-width: 100%;
+
+  box-sizing: border-box;
+
+
+
+  @media (min-width: 576px) {
+
+    gap: 12px;
+
+  }
+
+
+
+  @media (min-width: 768px) {
+
+    flex-direction: row;
+
+    align-items: center;
+
+    justify-content: flex-end;
+
+  }
+
+}
+
+
+
+.settings-embedded-page__toolbar-search {
+
+  flex: 1 1 auto;
+
+  min-width: 0;
+
+  width: 100%;
+
+
+
+  .search-container {
+
+    position: relative;
+
+    display: flex;
+
+    align-items: center;
+
+    width: 100%;
+
+    min-width: 0;
+
+  }
+
+
+
+  .search-icon {
+
+    position: absolute;
+
+    left: 12px;
+
+    color: #64748b;
+
+    pointer-events: none;
+
+    flex-shrink: 0;
+
+  }
+
+
+
+  .search-bar {
+
+    width: 100%;
+
+    max-width: 100%;
+
+    box-sizing: border-box;
+
+    padding: 8px 12px 8px 36px;
+
+    border-radius: 8px;
+
+    border: 1px solid #b8b8b8;
+
+    font-size: var(--ms-font-input, 0.875rem);
+
+    font-family: Lexend Deca, Helvetica, Arial, sans-serif;
+
+    font-weight: 400;
+
+    color: #141414;
+
+    background: #fff;
+
+    min-width: 0;
+
+
+
+    &:focus {
+
+      outline: none;
+
+      border-color: #141414;
+
+      box-shadow: none;
+
+    }
+
+
+
+    @media (max-width: 575.98px) {
+
+      padding-top: 10px;
+
+      padding-bottom: 10px;
+
+      font-size: max(16px, var(--ms-font-input, 0.875rem));
+
+    }
+
+  }
+
+}
+
+
+
+.settings-embedded-page__toolbar-actions {
+
+  flex: 0 0 auto;
+
+  display: flex;
+
+  flex-wrap: wrap;
+
+  gap: 8px;
+
+  width: 100%;
+
+  justify-content: stretch;
+
+  margin-left: auto;
+
+  min-width: 0;
+
+
+
+  @media (min-width: 576px) {
+
+    justify-content: flex-end;
+
+  }
+
+
+
+  @media (min-width: 768px) {
+
+    width: auto;
+
+    flex-wrap: nowrap;
+
+  }
+
+
+
+  .btn {
+
+    width: 100%;
+
+    min-width: 0;
+
+    white-space: nowrap;
+
+
+
+    @media (min-width: 576px) {
+
+      width: auto;
+
+      flex: 0 1 auto;
+
+    }
+
+  }
+
+
+
+  .btn-group {
+
+    width: 100%;
+
+
+
+    @media (min-width: 576px) {
+
+      width: auto;
+
+    }
+
+  }
+
+}
+
+
+
+// Workforce request categories uses parallel BEM names — keep in sync.
+
+.request-categories-page__toolbar {
+
+  @extend .settings-embedded-page__toolbar;
+
+}
+
+
+
+.request-categories-page__toolbar-search {
+
+  @extend .settings-embedded-page__toolbar-search;
+
+}
+
+
+
+.request-categories-page__toolbar-actions {
+
+  @extend .settings-embedded-page__toolbar-actions;
+
+}
+
+

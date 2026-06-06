@@ -1,0 +1,264 @@
+// Communications section — shared responsive layout for list pages, dashboard, and wallboard.
+
+$communications-page-top-offset: 74px;
+$communications-breakpoint-lg: 992px;
+$communications-breakpoint-md: 768px;
+$communications-breakpoint-sm: 576px;
+
+// Theme — aligned with Main Settings / Prospects (Lexend Deca + #0066CC primary)
+$communications-color-primary: #0066cc;
+$communications-color-primary-hover: #0052a3;
+$communications-color-text: #141414;
+$communications-color-text-muted: #6c757d;
+$communications-color-selected-bg: #eef2ff;
+$communications-font-family: "Lexend Deca", Helvetica, Arial, sans-serif;
+$communications-font-size-base: 0.875rem;
+
+@mixin communications-theme-typography {
+  font-family: $communications-font-family;
+  font-size: $communications-font-size-base;
+  font-weight: 400;
+  color: $communications-color-text;
+  -webkit-font-smoothing: antialiased;
+}
+
+@mixin communications-theme-controls {
+  .page-header-title h2,
+  .page-header-title h5,
+  .generic-table-th,
+  .generic-table-td,
+  .gt-toolbar-container,
+  .gt-tab-button,
+  .gt-tab-label,
+  .gt-search-input,
+  .btn,
+  .form-control,
+  .form-select,
+  .modal-title,
+  .breadcrumb,
+  small,
+  .small {
+    font-family: $communications-font-family;
+  }
+
+  .page-header-title h2 {
+    color: $communications-color-text;
+    font-weight: 600;
+  }
+
+  a:not(.btn) {
+    color: $communications-color-primary;
+
+    &:hover {
+      color: $communications-color-primary-hover;
+    }
+  }
+
+  .btn-primary {
+    background-color: $communications-color-primary;
+    border-color: $communications-color-primary;
+
+    &:hover,
+    &:focus {
+      background-color: $communications-color-primary-hover;
+      border-color: $communications-color-primary-hover;
+    }
+  }
+}
+
+@mixin communications-list-page-containers {
+  .call-logs-page-container,
+  .call-recordings-page-container,
+  .call-analysis-page-container,
+  .text-messages-page-container,
+  .wallboards-live-page-container {
+    @content;
+  }
+}
+
+@include communications-list-page-containers {
+  @include communications-theme-typography;
+  @include communications-theme-controls;
+
+  display: flex;
+  gap: 0;
+  height: calc(100vh - #{$communications-page-top-offset});
+  overflow: hidden;
+
+  .prospects-scrollable-content {
+    flex: 1;
+    height: 100%;
+    overflow-x: hidden;
+    overflow-y: hidden;
+  }
+
+  .prospects-content-area {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .prospects-table-wrapper {
+    flex: 1;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+  }
+}
+
+.wallboards-live-page-container .prospects-scrollable-content {
+  overflow-y: auto;
+}
+
+// Date range banner above list tables
+.communications-date-range-banner {
+  flex-shrink: 0;
+
+  .communications-date-range-banner__label-row {
+    flex-wrap: wrap;
+    row-gap: 4px;
+  }
+
+  .communications-date-range-banner__dates {
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+
+  @media (max-width: $communications-breakpoint-md) {
+    padding: 10px !important;
+
+    .communications-date-range-banner__label-row {
+      flex-direction: column;
+      align-items: flex-start !important;
+    }
+  }
+}
+
+// Call dashboard
+.communications-dashboard-page {
+  @include communications-theme-typography;
+  @include communications-theme-controls;
+
+  .page-header-title .row {
+    row-gap: 12px;
+  }
+
+  .communications-dashboard-date-controls {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  @media (max-width: $communications-breakpoint-md) {
+    .action-buttons {
+      width: 100%;
+      justify-content: flex-start !important;
+    }
+
+    .communications-dashboard-date-controls {
+      width: 100%;
+    }
+  }
+}
+
+// Live wallboard header + filter bar
+.wallboards-live-page-container {
+  @include communications-theme-controls;
+
+  .page-header-title .row {
+    row-gap: 12px;
+  }
+
+  .wallboards-live-header-actions {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  @media (max-width: $communications-breakpoint-md) {
+    .wallboards-live-header-actions {
+      width: 100%;
+      justify-content: flex-start !important;
+    }
+  }
+}
+
+.wallboards-live-filter-bar {
+  @media (max-width: $communications-breakpoint-md) {
+    top: 0 !important;
+    position: relative !important;
+  }
+}
+
+// Tablet and below — allow natural page scroll instead of trapping content
+@media (max-width: $communications-breakpoint-lg) {
+  body:has(.call-logs-page-container),
+  body:has(.call-recordings-page-container),
+  body:has(.call-analysis-page-container),
+  body:has(.text-messages-page-container),
+  body:has(.wallboards-live-page-container) {
+    overflow: auto !important;
+
+    .main-content-wrapper {
+      overflow: auto !important;
+    }
+
+    .min-vh-100 {
+      height: auto !important;
+      min-height: 100vh !important;
+      overflow: visible !important;
+    }
+  }
+
+  @include communications-list-page-containers {
+    height: auto;
+    min-height: calc(100vh - #{$communications-page-top-offset});
+    overflow: visible;
+
+    .prospects-scrollable-content {
+      height: auto;
+      overflow-y: visible;
+    }
+
+    .prospects-content-area {
+      height: auto;
+      min-height: 0;
+      padding-left: 12px;
+      padding-right: 12px;
+    }
+
+    .prospects-table-wrapper {
+      height: auto;
+      min-height: 360px;
+    }
+  }
+}
+
+@media (max-width: $communications-breakpoint-sm) {
+  @include communications-list-page-containers {
+    .prospects-content-area {
+      padding-left: 8px;
+      padding-right: 8px;
+    }
+  }
+}
+
+// Campaign console, manager, and agent pages
+.communications-campaign-root,
+.campaign-agent-page {
+  @include communications-theme-typography;
+  @include communications-theme-controls;
+
+  .dropdown-item.active {
+    background: $communications-color-selected-bg !important;
+    color: $communications-color-primary !important;
+  }
+
+  .page-title,
+  .card-title,
+  h1,
+  h2,
+  h3 {
+    font-family: $communications-font-family;
+    color: $communications-color-text;
+  }
+}
