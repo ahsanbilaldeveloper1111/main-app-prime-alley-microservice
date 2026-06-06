@@ -266,7 +266,7 @@ export function ReportsTeamBoardPanel({
     <>
       <ReportsBoardDashboardKpiRow summary={summary} statusRows={statusRows} />
 
-      <Row className="g-3 mb-3">
+      <Row className="g-3 mb-3 align-items-stretch">
         <Col lg={6}>
           <div className="reports-panel">
             <h2 className="reports-panel__title">Member Performance</h2>
