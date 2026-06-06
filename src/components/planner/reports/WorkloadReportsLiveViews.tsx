@@ -63,7 +63,21 @@ export function ReportsLiveTaskByMember({
               </div>
             ) : null}
             <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", marginTop: "6px" }}>
-              <span className="reports-list-badge reports-list-badge--default">
+              <span
+                className="reports-list-badge reports-list-badge--default"
+                style={{ cursor: "pointer" }}
+                onClick={() => setModal({
+                  type: "all",
+                  member: row.memberLabel,
+                  tasks: [
+                    { id: 1, title: "Fix login bug", project: "Auth Service", due: "Jun 1, 2026", status: "In Progress" },
+                    { id: 2, title: "Update API docs", project: "Dev Portal", due: "Jun 3, 2026", status: "Pending" },
+                    { id: 3, title: "Q2 Report submission", project: "Finance", due: "May 28, 2026", status: "Overdue" },
+                  ],
+                })}
+                onMouseEnter={(e) => { e.currentTarget.style.textDecoration = "underline"; }}
+                onMouseLeave={(e) => { e.currentTarget.style.textDecoration = "none"; }}
+              >
                 {row.totalTasks} tasks
               </span>
               {row.inProgressTasks > 0 ? (
@@ -141,7 +155,7 @@ export function ReportsLiveTaskByMember({
           }}>
             <div>
               <div style={{ fontSize: "13px", fontWeight: 700, color: "#141414", fontFamily: "Lexend Deca, sans-serif" }}>
-                {modal.type === "overdue" ? "Overdue Tasks" : "In Progress Tasks"}
+                {modal.type === "overdue" ? "Overdue Tasks" : modal.type === "in_progress" ? "In Progress Tasks" : "All Tasks"}
               </div>
               <div style={{ fontSize: "11px", color: "#718096", marginTop: "2px", fontFamily: "Lexend Deca, sans-serif" }}>
                 {modal.member}
@@ -172,6 +186,18 @@ export function ReportsLiveTaskByMember({
                   <div style={{ fontSize: "11px", color: "#718096", marginTop: "2px", fontFamily: "Lexend Deca, sans-serif" }}>
                     {task.project}
                   </div>
+                  <span style={{
+                    fontSize: "10px",
+                    fontWeight: 600,
+                    padding: "2px 8px",
+                    borderRadius: "999px",
+                    background: task.status === "Overdue" ? "#fef2f2" : task.status === "In Progress" ? "#eff6ff" : "#f3f4f6",
+                    color: task.status === "Overdue" ? "#991b1b" : task.status === "In Progress" ? "#0066CC" : "#374151",
+                    marginTop: "4px",
+                    display: "inline-block",
+                  }}>
+                    {task.status}
+                  </span>
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: "10px", flexShrink: 0 }}>
                   <span style={{ fontSize: "11px", color: modal.type === "overdue" ? "#991b1b" : "#718096", fontFamily: "Lexend Deca, sans-serif" }}>
