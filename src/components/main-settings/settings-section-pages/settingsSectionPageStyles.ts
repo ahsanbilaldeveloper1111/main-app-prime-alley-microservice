@@ -1,12 +1,11 @@
 import type { CSSProperties } from 'react'
 import {
   getMainSettingsTabButtonStyle,
+  MAIN_SETTINGS_FONT,
   mainSettingsPageTitleStyle,
   mainSettingsTabBarStyle,
   mainSettingsTabRowStyle,
 } from '../mainSettingsTokens'
-
-export const SETTINGS_SECTION_FONT = 'Lexend Deca, Helvetica, Arial, sans-serif'
 
 export const settingsSectionShellStyle: CSSProperties = {
   padding: 'clamp(16px, 3vw, 20px) clamp(12px, 4vw, 24px)',
@@ -15,7 +14,7 @@ export const settingsSectionShellStyle: CSSProperties = {
 
 export const settingsSectionTitleStyle: CSSProperties = {
   ...mainSettingsPageTitleStyle,
-  fontFamily: SETTINGS_SECTION_FONT,
+  fontFamily: MAIN_SETTINGS_FONT,
 }
 
 export const settingsSectionTabBarStyle: CSSProperties = {
@@ -35,10 +34,10 @@ export function settingsSectionTabButtonStyle(
     isActive,
     isFirst,
     isLast,
-    fontFamily: SETTINGS_SECTION_FONT,
+    fontFamily: MAIN_SETTINGS_FONT,
   })
 }
 
 export const settingsSectionNoPermissionStyle: CSSProperties = {
-  color: '#6b7280',
+  color: '#6c757d',
 }

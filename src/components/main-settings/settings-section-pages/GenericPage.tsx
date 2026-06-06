@@ -1,7 +1,7 @@
-import { MAIN_SETTINGS_FONT_SIZE } from '../mainSettingsTokens'
+import { MAIN_SETTINGS_FONT, MAIN_SETTINGS_FONT_SIZE } from '../mainSettingsTokens'
 import React from 'react'
 import { Divider } from '../accountDefaultsTabPrimitives'
-import { SETTINGS_SECTION_FONT, settingsSectionShellStyle, settingsSectionTitleStyle } from './settingsSectionPageStyles'
+import { settingsSectionShellStyle, settingsSectionTitleStyle } from './settingsSectionPageStyles'
 
 export const GenericPage: React.FC<Readonly<{ title: string }>> = ({ title }) => (
   <div style={settingsSectionShellStyle} className="settings-section-shell">
@@ -18,12 +18,12 @@ export const GenericPage: React.FC<Readonly<{ title: string }>> = ({ title }) =>
           padding: '64px 32px',
           textAlign: 'center',
           color: '#999',
-          fontFamily: SETTINGS_SECTION_FONT,
+          fontFamily: MAIN_SETTINGS_FONT,
           fontSize: MAIN_SETTINGS_FONT_SIZE.base,
         }}
       >
         <div style={{ fontSize: MAIN_SETTINGS_FONT_SIZE.display, marginBottom: '12px' }}>🗂️</div>
-        <div style={{ fontWeight: 500, color: '#555', marginBottom: '6px' }}>{title}</div>
+        <div style={{ fontWeight: 500, color: '#6c757d', marginBottom: '6px' }}>{title}</div>
         <div>Content for this section goes here.</div>
       </div>
     </div>

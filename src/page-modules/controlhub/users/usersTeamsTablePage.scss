@@ -17,6 +17,15 @@
     overflow: hidden;
   }
 
+  .generic-table-container--column-resize-active .generic-table-card {
+    overflow: visible !important;
+  }
+
+  .generic-table-responsive--column-resize-active {
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch;
+  }
+
   .generic-table-responsive {
     width: 100%;
     max-width: 100%;
@@ -31,6 +40,10 @@
   .generic-table-th {
     overflow: hidden;
     max-width: 100%;
+  }
+
+  .generic-table--column-resize .generic-table-th {
+    max-width: none !important;
   }
 
   .generic-table-th.sortable {
@@ -82,86 +95,7 @@
     color: var(--light-text, #767676) !important;
   }
 
-  .generic-table-td[data-col-key='actions'] .dropdown,
-  .generic-table-td[data-col-key='actions'] .gt-row-actions--desktop {
-    display: inline-flex;
-    justify-content: center;
-    width: 100%;
-  }
-
-  // Action buttons: override btn-sm + Settings.css so icons fit (default btn-action-style-2 is 32px)
-  --users-teams-action-btn-size: var(--ms-action-btn-size, 40px);
-  --users-teams-action-icon-size: var(--ms-action-icon-size, 22px);
-
-  // Desktop row actions only — do NOT match .gt-mobile-actions-more-btn (see media queries below)
-  .generic-table-td[data-col-key='actions'] .btn.btn-action-style-2:not(.gt-mobile-actions-more-btn),
-  .generic-table-td[data-col-key='actions'] .btn.btn-sm.btn-action-style-2:not(.gt-mobile-actions-more-btn) {
-    width: var(--users-teams-action-btn-size) !important;
-    height: var(--users-teams-action-btn-size) !important;
-    min-width: var(--users-teams-action-btn-size) !important;
-    min-height: var(--users-teams-action-btn-size) !important;
-    padding: 0 !important;
-    align-items: center !important;
-    justify-content: center !important;
-    flex-shrink: 0;
-    border: 1px solid #dee2e6 !important;
-    border-radius: 3px !important;
-    line-height: 1 !important;
-    color: inherit;
-
-    svg {
-      width: var(--users-teams-action-icon-size) !important;
-      height: var(--users-teams-action-icon-size) !important;
-      min-width: var(--users-teams-action-icon-size);
-      min-height: var(--users-teams-action-icon-size);
-      display: block !important;
-      flex-shrink: 0;
-      visibility: visible !important;
-      opacity: 1 !important;
-      font-size: var(--users-teams-action-icon-size) !important;
-      background: transparent !important;
-      border: none !important;
-      box-shadow: none !important;
-    }
-  }
-
-  .generic-table-td[data-col-key='actions'] .gt-row-actions--desktop {
-    gap: 6px;
-  }
-
-  @media (min-width: 768px) {
-    .generic-table-td[data-col-key='actions'] .gt-row-actions--desktop {
-      display: inline-flex !important;
-    }
-
-    .generic-table-td[data-col-key='actions'] .gt-mobile-actions-more-btn,
-    .gt-mobile-actions-popup {
-      display: none !important;
-    }
-  }
-
-  @media (max-width: 767.98px) {
-    .generic-table-td[data-col-key='actions'] .gt-row-actions--desktop {
-      display: none !important;
-    }
-
-    .generic-table-td[data-col-key='actions'] .gt-mobile-actions-more-btn.btn-action-style-2 {
-      display: inline-flex !important;
-      align-items: center !important;
-      justify-content: center !important;
-      width: var(--users-teams-action-btn-size) !important;
-      height: var(--users-teams-action-btn-size) !important;
-      min-width: var(--users-teams-action-btn-size) !important;
-      min-height: var(--users-teams-action-btn-size) !important;
-      padding: 0 !important;
-      border: 1px solid #dee2e6 !important;
-
-      svg {
-        width: var(--users-teams-action-icon-size) !important;
-        height: var(--users-teams-action-icon-size) !important;
-      }
-    }
-  }
+  // Row action button sizing: main-settings-layout.scss (@include main-settings-table-row-action-buttons)
 
   .generic-table-td[data-col-key='actions'] .btn.text-primary svg {
     color: var(--primary-accent, #2583f2) !important;
@@ -796,8 +730,8 @@
 
       .users-directory-more-btn,
       .users-directory-row-actions--desktop .btn-action-style-2 {
-        min-width: var(--users-teams-action-btn-size);
-        min-height: var(--users-teams-action-btn-size);
+        min-width: var(--users-teams-action-btn-size, var(--ms-action-btn-size, 32px));
+        min-height: var(--users-teams-action-btn-size, var(--ms-action-btn-size, 32px));
       }
 
       .users-directory-more-btn {

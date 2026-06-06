@@ -12,9 +12,9 @@ const HelpIcon: React.FC<{ title?: string }> = ({ title = 'Help' }) => (
       width: '16px',
       height: '16px',
       borderRadius: '50%',
-      border: '1.5px solid #888',
+      border: '1.5px solid #6c757d',
       fontSize: MAIN_SETTINGS_FONT_SIZE.xs,
-      color: '#888',
+      color: '#6c757d',
       cursor: 'default',
       lineHeight: 1,
       flexShrink: 0,
@@ -47,7 +47,7 @@ const FieldLabel: React.FC<{ children: React.ReactNode; helpIcon?: boolean; help
     </div>
     {sub ? (
       <div
-        style={{ fontFamily: ACCOUNT_DEFAULTS_FONT, fontSize: MAIN_SETTINGS_FONT_SIZE.sm, fontWeight: 300, color: '#888', marginTop: '2px' }}
+        style={{ fontFamily: ACCOUNT_DEFAULTS_FONT, fontSize: MAIN_SETTINGS_FONT_SIZE.sm, fontWeight: 400, color: '#6c757d', marginTop: '2px' }}
       >
         {sub}
       </div>
@@ -105,7 +105,7 @@ export const UserDefaultsSelectField: React.FC<{
           top: '50%',
           transform: 'translateY(-50%)',
           pointerEvents: 'none',
-          color: '#555',
+          color: '#6c757d',
           fontSize: MAIN_SETTINGS_FONT_SIZE.sm,
         }}
       >
@@ -146,7 +146,7 @@ export const UserDefaultsSectionHeading: React.FC<{ title: string; subtitle?: st
       {title}
     </h2>
     {subtitle ? (
-      <p style={{ fontFamily: ACCOUNT_DEFAULTS_FONT, fontSize: MAIN_SETTINGS_FONT_SIZE.base, color: '#555', marginBottom: '20px', fontWeight: 300 }}>
+      <p style={{ fontFamily: ACCOUNT_DEFAULTS_FONT, fontSize: MAIN_SETTINGS_FONT_SIZE.base, color: '#6c757d', marginBottom: '20px', fontWeight: 400 }}>
         {subtitle}
       </p>
     ) : null}

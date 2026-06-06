@@ -6,6 +6,7 @@ import {
   mainSettingsTabRowStyle,
 } from './mainSettingsTokens'
 
+/** @deprecated Use MAIN_SETTINGS_FONT from mainSettingsTokens */
 export const ACCOUNT_DEFAULTS_PAGE_FONT = 'Lexend Deca, Helvetica, Arial, sans-serif'
 
 export const accountDefaultsPageShellStyle: CSSProperties = {

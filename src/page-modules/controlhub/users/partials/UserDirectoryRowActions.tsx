@@ -3,6 +3,7 @@ import { Eye, Key, MoreVertical } from "lucide-react";
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Button, Dropdown } from "react-bootstrap";
+import { DROPDOWN_MENU_POPPER_CONFIG } from "@components/GenericTable/dropdownMenuPopperConfig";
 
 const STATUS_OPTIONS = ["processing", "completed", "deleted"] as const;
 const MOBILE_MENU_WIDTH_PX = 176;
@@ -57,7 +58,8 @@ function useUserDirectoryActionFlags(
   );
 
   const hasMobileMenu = canResetPassword || canView || (canChangeStatus && statusOptions.length > 0);
-  const hasDesktopActions = canResetPassword || canView || canChangeStatus;
+  const hasDesktopActions =
+    canResetPassword || canView || (canChangeStatus && statusOptions.length > 0);
 
   return {
     canResetPassword,
@@ -117,27 +119,27 @@ function UserDirectoryDesktopActions({
         </Button>
       ) : null}
 
-      {canChangeStatus ? (
-        <Dropdown
-          align="end"
-          onSelect={(status) => {
-            if (!status) return;
-            onStatusOptionSelect?.(row, status);
-          }}
-        >
+      {canChangeStatus && statusOptions.length > 0 ? (
+        <Dropdown align="end">
           <Dropdown.Toggle
             type="button"
             variant="outline-primary"
             size="sm"
             title="Status"
             id={`status-dropdown-${row.encId}`}
-            onClick={stopRowClick}
           >
             Change Status
           </Dropdown.Toggle>
-          <Dropdown.Menu>
+          <Dropdown.Menu renderOnMount popperConfig={DROPDOWN_MENU_POPPER_CONFIG}>
             {statusOptions.map((status) => (
-              <Dropdown.Item key={status} eventKey={status}>
+              <Dropdown.Item
+                key={status}
+                eventKey={status}
+                onClick={(e) => {
+                  stopRowClick(e);
+                  onStatusOptionSelect?.(row, status);
+                }}
+              >
                 {status}
               </Dropdown.Item>
             ))}

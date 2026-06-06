@@ -1,4 +1,9 @@
-import { MAIN_SETTINGS_FONT_SIZE } from '../mainSettingsTokens'
+import {
+  MAIN_SETTINGS_COLOR,
+  MAIN_SETTINGS_FONT_SIZE,
+  MAIN_SETTINGS_FONT_WEIGHT,
+  mainSettingsPrimaryButtonStyle,
+} from '../mainSettingsTokens'
 import React from 'react'
 import { PLANNER_SETTINGS_SUCCESS_MESSAGE } from './constants'
 
@@ -30,16 +35,6 @@ const inputStyle: React.CSSProperties = {
   outline: 'none',
 }
 
-const saveButtonStyle: React.CSSProperties = {
-  border: '1px solid #111827',
-  background: '#111827',
-  color: '#ffffff',
-  borderRadius: '8px',
-  padding: '8px 14px',
-  fontSize: MAIN_SETTINGS_FONT_SIZE.sm,
-  cursor: 'pointer',
-}
-
 export const PlannerGeneralSettingsView: React.FC<Props> = ({
   capacityInput,
   showMyDay,
@@ -56,17 +51,17 @@ export const PlannerGeneralSettingsView: React.FC<Props> = ({
 
   return (
     <div style={shellStyle}>
-      <div style={{ marginBottom: '8px', fontSize: MAIN_SETTINGS_FONT_SIZE.md, fontWeight: 600, color: '#111827' }}>
+      <div style={{ marginBottom: '8px', fontSize: MAIN_SETTINGS_FONT_SIZE.md, fontWeight: MAIN_SETTINGS_FONT_WEIGHT.semibold, color: MAIN_SETTINGS_COLOR.text }}>
         General
       </div>
-      <div style={{ marginBottom: '14px', fontSize: MAIN_SETTINGS_FONT_SIZE.sm, color: '#6b7280' }}>
+      <div style={{ marginBottom: '14px', fontSize: MAIN_SETTINGS_FONT_SIZE.sm, color: '#6c757d' }}>
         Configure planner defaults for My Day and task estimation behavior.
       </div>
       <div style={{ marginBottom: '18px' }}>
-        <div style={{ marginBottom: '6px', fontSize: MAIN_SETTINGS_FONT_SIZE.base, fontWeight: 500, color: '#111827' }}>
+        <div style={{ marginBottom: '6px', fontSize: MAIN_SETTINGS_FONT_SIZE.base, fontWeight: MAIN_SETTINGS_FONT_WEIGHT.medium, color: MAIN_SETTINGS_COLOR.text }}>
           Default daily capacity (minutes)
         </div>
-        <div style={{ marginBottom: '10px', fontSize: MAIN_SETTINGS_FONT_SIZE.sm, color: '#6b7280' }}>
+        <div style={{ marginBottom: '10px', fontSize: MAIN_SETTINGS_FONT_SIZE.sm, color: '#6c757d' }}>
           Syncs with My Day capacity. Used as the default when planning your day.
         </div>
         <input
@@ -85,7 +80,7 @@ export const PlannerGeneralSettingsView: React.FC<Props> = ({
             alignItems: 'center',
             gap: '8px',
             cursor: 'pointer',
-            color: '#111827',
+            color: '#141414',
           }}
         >
           <input
@@ -103,7 +98,7 @@ export const PlannerGeneralSettingsView: React.FC<Props> = ({
             alignItems: 'center',
             gap: '8px',
             cursor: 'pointer',
-            color: '#111827',
+            color: '#141414',
           }}
         >
           <input
@@ -115,7 +110,13 @@ export const PlannerGeneralSettingsView: React.FC<Props> = ({
         </label>
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
-        <button type="button" onClick={onSave} disabled={isSaving} style={saveButtonStyle}>
+        <button
+          type="button"
+          className="main-settings-btn-primary"
+          onClick={onSave}
+          disabled={isSaving}
+          style={mainSettingsPrimaryButtonStyle}
+        >
           {isSaving ? 'Saving…' : 'Save'}
         </button>
       </div>

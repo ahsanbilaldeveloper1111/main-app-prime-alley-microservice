@@ -38,16 +38,10 @@
 }
 
 .products-toolbar-add-btn {
-  background-color: #4f46e5;
-  border: none;
-  border-radius: 8px;
-  color: #ffffff;
   height: 33px;
   font-size: 0.875rem;
   padding: 0 12px;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
+  border-radius: 8px;
 }
 
 .products-filter-form {
@@ -334,8 +328,13 @@
 
 .products-detail-card-price {
   font-size: 20px;
-  color: #10b981;
-  font-weight: 700;
+  color: #141414;
+  font-weight: 400;
+}
+
+.products-table-price {
+  color: #141414;
+  font-weight: 400;
 }
 
 .products-view-badge {

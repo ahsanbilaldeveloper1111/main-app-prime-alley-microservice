@@ -36,7 +36,7 @@ import {
   type FormEvent,
   type SetStateAction,
 } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient, useQueries } from "@tanstack/react-query";
 import { toast } from "react-toastify";
 import type { Session } from "next-auth";
 import type { FilterPill } from "@components/GenericTable";
@@ -96,6 +96,7 @@ export interface UseCrmProductsPageResult {
   handleDeleteProduct: () => Promise<void>;
   requestDeleteProduct: (product: ProductDisplayData) => void;
   openProductView: (product: ProductDisplayData) => void;
+  productFilterCounts: { all: number; active: number; inactive: number };
 }
 
 function getErrorMessageFromUnknown(error: unknown, fallback: string): string {
@@ -110,6 +111,54 @@ function getErrorMessageFromUnknown(error: unknown, fallback: string): string {
   }
   if (error instanceof Error && error.message) return error.message;
   return fallback;
+}
+
+function buildProductsTabCountParams(
+  search: string,
+  filters: ProductsPageFilters,
+  active?: boolean,
+): {
+  page: number;
+  per_page: number;
+  search?: string;
+  active?: boolean;
+  industry_id?: number;
+  category?: string;
+  brand?: string[];
+} {
+  const params: {
+    page: number;
+    per_page: number;
+    search?: string;
+    active?: boolean;
+    industry_id?: number;
+    category?: string;
+    brand?: string[];
+  } = { page: 1, per_page: 1 };
+
+  if (search) {
+    params.search = search;
+  }
+
+  if (active === true) {
+    params.active = true;
+  } else if (active === false) {
+    params.active = false;
+  }
+
+  if (filters.industry_id) {
+    params.industry_id = filters.industry_id;
+  }
+
+  if (filters.category) {
+    params.category = filters.category;
+  }
+
+  if (filters.brand.length > 0) {
+    params.brand = filters.brand;
+  }
+
+  return params;
 }
 
 export function useCrmProductsPage(): UseCrmProductsPageResult {
@@ -317,6 +366,75 @@ export function useCrmProductsPage(): UseCrmProductsPageResult {
   const products = productsListQuery.data?.data ?? [];
   const totalProducts = productsListQuery.data?.total ?? 0;
   const loading = productsListQuery.isPending;
+
+  const productTabCountQueries = useQueries({
+    queries: [
+      {
+        queryKey: [
+          ...crmAppKeys.crmProductsPage.all(),
+          "tabCount",
+          "all",
+          listSearch,
+          productsFilters.industry_id,
+          productsFilters.category,
+          brandKey,
+        ] as const,
+        queryFn: async () => {
+          const response = await getCrmProducts(
+            buildProductsTabCountParams(listSearch, productsFilters),
+          );
+          return response.total ?? 0;
+        },
+      },
+      {
+        queryKey: [
+          ...crmAppKeys.crmProductsPage.all(),
+          "tabCount",
+          "active",
+          listSearch,
+          productsFilters.industry_id,
+          productsFilters.category,
+          brandKey,
+        ] as const,
+        queryFn: async () => {
+          const response = await getCrmProducts(
+            buildProductsTabCountParams(listSearch, productsFilters, true),
+          );
+          return response.total ?? 0;
+        },
+      },
+      {
+        queryKey: [
+          ...crmAppKeys.crmProductsPage.all(),
+          "tabCount",
+          "inactive",
+          listSearch,
+          productsFilters.industry_id,
+          productsFilters.category,
+          brandKey,
+        ] as const,
+        queryFn: async () => {
+          const response = await getCrmProducts(
+            buildProductsTabCountParams(listSearch, productsFilters, false),
+          );
+          return response.total ?? 0;
+        },
+      },
+    ],
+  });
+
+  const productFilterCounts = useMemo(
+    () => ({
+      all: productTabCountQueries[0]?.data ?? 0,
+      active: productTabCountQueries[1]?.data ?? 0,
+      inactive: productTabCountQueries[2]?.data ?? 0,
+    }),
+    [
+      productTabCountQueries[0]?.data,
+      productTabCountQueries[1]?.data,
+      productTabCountQueries[2]?.data,
+    ],
+  );
 
   useEffect(() => {
     if (productsListQuery.isError) {
@@ -701,5 +819,6 @@ export function useCrmProductsPage(): UseCrmProductsPageResult {
     handleDeleteProduct,
     requestDeleteProduct,
     openProductView,
+    productFilterCounts,
   } satisfies UseCrmProductsPageResult;
 }

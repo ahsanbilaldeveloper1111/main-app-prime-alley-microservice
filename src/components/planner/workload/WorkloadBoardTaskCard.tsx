@@ -7,6 +7,7 @@ import {
   formatWorkloadRangeLabel,
   formatWorkloadShortDueDate,
   formatWorkloadTaskEstimate,
+  isWorkloadOrganizationTask,
   isWorkloadTaskUnestimated,
   workloadBoardStatusBdgTone,
   workloadTaskProjectLabel,
@@ -54,6 +55,7 @@ export function WorkloadBoardTaskCard({
   onMove,
 }: WorkloadBoardTaskCardProps) {
   const unestimated = isWorkloadTaskUnestimated(task);
+  const isOrg = isWorkloadOrganizationTask(task);
   const statusLabel = task.status_name?.trim();
   const projectLabel = workloadTaskProjectLabel(task);
   const scheduleLabel = task.due_date
@@ -103,19 +105,17 @@ export function WorkloadBoardTaskCard({
         </span>
         <div className="workload-board-task-card__title-wrap">
           <div className="workload-board-task-card__title">{task.title}</div>
-          {unestimated ? (
-            <span
-              className="workload-unestimated-dot"
-              title="No estimate"
-              aria-label="No estimate"
-            />
-          ) : null}
         </div>
       </div>
 
       <div className="workload-board-task-card__meta">
+        {isOrg ? (
+          <WorkloadBdg tone="green">
+            Org task
+          </WorkloadBdg>
+        ) : null}
         <WorkloadPriorityBadge priority={task.priority} />
-        {projectLabel && projectLabel !== "—" ? (
+        {projectLabel && projectLabel !== "—" && projectLabel !== "Personal" ? (
           <WorkloadBdg tone="gray">{projectLabel}</WorkloadBdg>
         ) : null}
         {statusLabel ? (
@@ -124,20 +124,20 @@ export function WorkloadBoardTaskCard({
       </div>
 
       <div className="workload-board-task-card__meta workload-board-task-card__meta--secondary">
-        <span
-          className={[
-            "workload-board-task-card__due",
-            task.is_overdue && !task.is_completed ? "workload-board-task-card__due--overdue" : "",
-          ]
-            .filter(Boolean)
-            .join(" ")}
-        >
-          <span aria-hidden>📅</span> {scheduleLabel}
-        </span>
+        <WorkloadBdg tone={task.is_overdue && !task.is_completed ? "red" : "gray"}>
+          <i className="ti ti-calendar" style={{ fontSize: "10px" }} aria-hidden />
+          {scheduleLabel}
+        </WorkloadBdg>
         {unestimated ? (
-          <span className="workload-est-pill workload-est-pill--add">⏱ Unestimated</span>
+          <WorkloadBdg tone="orange">
+            <i className="ti ti-clock" style={{ fontSize: "10px" }} aria-hidden />
+            {" No est."}
+          </WorkloadBdg>
         ) : (
-          <span className="workload-est-pill">⏱ {formatWorkloadTaskEstimate(task)}</span>
+          <WorkloadBdg tone="gray">
+            <i className="ti ti-clock" style={{ fontSize: "10px" }} aria-hidden />
+            {formatWorkloadTaskEstimate(task)}
+          </WorkloadBdg>
         )}
       </div>
 

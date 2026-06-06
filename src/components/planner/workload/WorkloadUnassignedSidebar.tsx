@@ -1,15 +1,16 @@
 import React from "react";
 import { Alert, Button, Form, Offcanvas, Spinner } from "react-bootstrap";
-import { AlertTriangle, Calendar, Clock, Inbox } from "lucide-react";
+import { AlertTriangle, Calendar, Clock } from "lucide-react";
 import type { WorkloadTaskCard, WorkloadUnassignedData } from "@utils/tasks";
 import {
   formatWorkloadMemberAssignOption,
   formatWorkloadShortDueDate,
   formatWorkloadTaskEstimate,
+  isWorkloadOrganizationTask,
   isWorkloadTaskUnestimated,
   workloadTaskProjectLabel,
 } from "@page-modules/planner/workload/workloadDomain";
-import { WorkloadPriorityBadge } from "./WorkloadPlannerSubviews";
+import { WorkloadBdg, WorkloadPriorityBadge } from "./WorkloadPlannerSubviews";
 
 type UnassignedQuerySlice = Readonly<{
   isPending: boolean;
@@ -38,11 +39,19 @@ function WorkloadUnassignedTaskRow({
   isAssigning,
 }: WorkloadUnassignedTaskRowProps) {
   const unestimated = isWorkloadTaskUnestimated(task);
+  const isOrg = isWorkloadOrganizationTask(task);
+  const projectLabel = workloadTaskProjectLabel(task);
 
   return (
     <div className="workload-unassigned-task">
       <p className="workload-unassigned-task__title">
         {task.title}
+        {isOrg ? (
+          <WorkloadBdg tone="green" className="ms-2">
+            <i className="ti ti-building" style={{ fontSize: "10px" }} aria-hidden />
+            {" Org"}
+          </WorkloadBdg>
+        ) : null}
         {unestimated ? (
           <span
             className="workload-unestimated-dot ms-1"
@@ -53,22 +62,31 @@ function WorkloadUnassignedTaskRow({
       </p>
       <div className="workload-unassigned-task__tags">
         <WorkloadPriorityBadge priority={task.priority} />
-        <span className="workload-unassigned-task__tag">{workloadTaskProjectLabel(task)}</span>
+        {!isOrg && projectLabel && projectLabel !== "—" && projectLabel !== "Personal" ? (
+          <WorkloadBdg tone="gray">{projectLabel}</WorkloadBdg>
+        ) : null}
         {unestimated ? (
-          <span className="workload-unassigned-task__tag workload-unassigned-task__tag--warn">
-            <AlertTriangle size={12} aria-hidden />
+          <WorkloadBdg tone="orange">
+            <AlertTriangle size={10} aria-hidden />
             No est.
-          </span>
+          </WorkloadBdg>
         ) : (
-          <span className="workload-unassigned-task__tag">
-            <Clock size={12} aria-hidden />
+          <WorkloadBdg tone="gray">
+            <Clock size={10} aria-hidden />
             {formatWorkloadTaskEstimate(task)}
-          </span>
+          </WorkloadBdg>
         )}
-        <span className="workload-unassigned-task__tag">
-          <Calendar size={12} aria-hidden />
-          {formatWorkloadShortDueDate(task.due_date)}
-        </span>
+        {task.due_date ? (
+          <WorkloadBdg tone="gray">
+            <Calendar size={10} aria-hidden />
+            {formatWorkloadShortDueDate(task.due_date)}
+          </WorkloadBdg>
+        ) : (
+          <WorkloadBdg tone="gray">
+            <Calendar size={10} aria-hidden />
+            No due date
+          </WorkloadBdg>
+        )}
       </div>
       <div className="workload-unassigned-task__assign">
         <Form.Select
@@ -106,10 +124,8 @@ export type WorkloadUnassignedSidebarProps = Readonly<{
   hierarchyExtensions?: unknown[] | null;
   assignTargets: Record<number, string>;
   setAssignTargets: React.Dispatch<React.SetStateAction<Record<number, string>>>;
-  assignMutation: Readonly<{
-    isPending: boolean;
-    mutate: (vars: { task: WorkloadTaskCard; toExtension: string }) => void;
-  }>;
+  onRequestAssign: (task: WorkloadTaskCard, toExtension: string) => void;
+  assignPending?: boolean;
   formatError: (err: unknown) => string;
 }>;
 
@@ -121,7 +137,8 @@ export function WorkloadUnassignedSidebar({
   hierarchyExtensions,
   assignTargets,
   setAssignTargets,
-  assignMutation,
+  onRequestAssign,
+  assignPending = false,
   formatError,
 }: WorkloadUnassignedSidebarProps) {
   const count = unassignedQuery.data?.count ?? unassignedQuery.data?.tasks.length ?? 0;
@@ -135,13 +152,13 @@ export function WorkloadUnassignedSidebar({
       placement="end"
       className="workload-unassigned-offcanvas"
     >
-      <Offcanvas.Header closeButton className="workload-unassigned-offcanvas__header border-0 pb-0">
+      <Offcanvas.Header closeButton className="workload-unassigned-offcanvas__header">
         <div className="workload-unassigned-offcanvas__title-block">
           <div className="workload-unassigned-offcanvas__title-row">
-            <Inbox size={20} className="text-primary" aria-hidden />
-            <Offcanvas.Title className="mb-0">Unassigned Tasks</Offcanvas.Title>
+            <i className="ti ti-inbox workload-unassigned-offcanvas__title-icon" aria-hidden />
+            <span className="workload-unassigned-offcanvas__title-text">Unassigned Tasks</span>
           </div>
-          <p className="workload-unassigned-offcanvas__subtitle text-muted small mb-0">
+          <p className="workload-unassigned-offcanvas__subtitle">
             {unassignedQuery.isPending ? "Loading…" : subtitle}
           </p>
         </div>
@@ -171,9 +188,9 @@ export function WorkloadUnassignedSidebar({
             onAssign={() => {
               const toExtension = assignTargets[task.id] ?? "";
               if (!toExtension) return;
-              assignMutation.mutate({ task, toExtension });
+              onRequestAssign(task, toExtension);
             }}
-            isAssigning={assignMutation.isPending}
+            isAssigning={assignPending}
           />
         ))}
       </Offcanvas.Body>

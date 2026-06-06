@@ -12,7 +12,7 @@ const MIGRATION_BULLETS: Array<{ id: string; content: React.ReactNode }> = [
     id: 'unavailable',
     content: (
       <>
-        Your account will be <span style={{ color: '#0091ae' }}>unavailable during the migration</span>. Most finish within 24
+        Your account will be <span style={{ color: '#0066CC' }}>unavailable during the migration</span>. Most finish within 24
         hours; some can take up to 36. Your public content will remain online.
       </>
     ),
@@ -26,7 +26,7 @@ const MIGRATION_BULLETS: Array<{ id: string; content: React.ReactNode }> = [
           type="button"
           onClick={() => null}
           style={{
-            color: '#0091ae',
+            color: '#0066CC',
             fontWeight: 500,
             textDecoration: 'none',
             display: 'inline-flex',
@@ -49,7 +49,7 @@ const MIGRATION_BULLETS: Array<{ id: string; content: React.ReactNode }> = [
     content: (
       <>
         If you have active Sandboxes,{' '}
-        <span style={{ color: '#0091ae' }}>they&apos;ll be selected too, but only eligible ones will be migrated</span>{' '}
+        <span style={{ color: '#0066CC' }}>they&apos;ll be selected too, but only eligible ones will be migrated</span>{' '}
         —you may need to take action.
       </>
     ),
@@ -63,7 +63,7 @@ const MIGRATION_BULLETS: Array<{ id: string; content: React.ReactNode }> = [
           type="button"
           onClick={() => null}
           style={{
-            color: '#0091ae',
+            color: '#0066CC',
             fontWeight: 500,
             textDecoration: 'none',
             display: 'inline-flex',
@@ -82,7 +82,7 @@ const MIGRATION_BULLETS: Array<{ id: string; content: React.ReactNode }> = [
           type="button"
           onClick={() => null}
           style={{
-            color: '#0091ae',
+            color: '#0066CC',
             fontWeight: 500,
             textDecoration: 'none',
             display: 'inline-flex',
@@ -113,7 +113,7 @@ export const DataHostingTabContent: React.FC = () => {
   return (
     <>
       <div>
-        <p style={{ fontFamily: baseFont, fontSize: MAIN_SETTINGS_FONT_SIZE.base, color: '#555', fontWeight: 300, marginBottom: '8px' }}>
+        <p style={{ fontFamily: baseFont, fontSize: MAIN_SETTINGS_FONT_SIZE.base, color: '#6c757d', fontWeight: 400, marginBottom: '8px' }}>
           View or change the data hosting location for your account.
         </p>
 
@@ -146,9 +146,9 @@ export const DataHostingTabContent: React.FC = () => {
                 width: '16px',
                 height: '16px',
                 borderRadius: '50%',
-                border: '1.5px solid #888',
+                border: '1.5px solid #6c757d',
                 fontSize: MAIN_SETTINGS_FONT_SIZE.xs,
-                color: '#888',
+                color: '#6c757d',
                 cursor: 'default',
                 lineHeight: 1,
                 flexShrink: 0,
@@ -166,7 +166,7 @@ export const DataHostingTabContent: React.FC = () => {
                 borderRadius: '8px',
                 fontFamily: baseFont,
                 fontSize: MAIN_SETTINGS_FONT_SIZE.base,
-                fontWeight: 300,
+                fontWeight: 400,
                 color: '#141414',
                 background: '#fff',
                 whiteSpace: 'nowrap',
@@ -185,7 +185,7 @@ export const DataHostingTabContent: React.FC = () => {
                 fontFamily: baseFont,
                 fontSize: MAIN_SETTINGS_FONT_SIZE.base,
                 fontWeight: 500,
-                color: '#0091ae',
+                color: '#0066CC',
                 padding: 0,
                 textDecoration: 'none',
               }}
@@ -244,7 +244,7 @@ export const DataHostingTabContent: React.FC = () => {
             flexShrink: 0,
           }}
         >
-          <h2 style={{ fontFamily: baseFont, fontSize: MAIN_SETTINGS_FONT_SIZE.lg, fontWeight: 700, color: '#141414', margin: 0 }}>
+          <h2 style={{ fontFamily: baseFont, fontSize: MAIN_SETTINGS_FONT_SIZE.lg, fontWeight: 600, color: '#141414', margin: 0 }}>
             Schedule a data migration
           </h2>
           <button
@@ -254,7 +254,7 @@ export const DataHostingTabContent: React.FC = () => {
               background: 'none',
               border: 'none',
               cursor: 'pointer',
-              color: '#555',
+              color: '#6c757d',
               fontSize: MAIN_SETTINGS_FONT_SIZE.icon,
               lineHeight: 1,
               padding: '0 4px',
@@ -279,7 +279,7 @@ export const DataHostingTabContent: React.FC = () => {
             style={{
               fontFamily: baseFont,
               fontSize: MAIN_SETTINGS_FONT_SIZE.base,
-              fontWeight: 300,
+              fontWeight: 400,
               color: '#141414',
               marginBottom: '20px',
               lineHeight: '1.6',
@@ -304,7 +304,7 @@ export const DataHostingTabContent: React.FC = () => {
                 style={{
                   fontFamily: baseFont,
                   fontSize: MAIN_SETTINGS_FONT_SIZE.base,
-                  fontWeight: 300,
+                  fontWeight: 400,
                   color: '#141414',
                   lineHeight: '1.6',
                   listStyleType: 'disc',
@@ -342,7 +342,7 @@ export const DataHostingTabContent: React.FC = () => {
                     fontSize: MAIN_SETTINGS_FONT_SIZE.base,
                     fontFamily: baseFont,
                     fontWeight: selectedLocation ? 400 : 300,
-                    color: selectedLocation ? '#141414' : '#888',
+                    color: selectedLocation ? '#141414' : '#6c757d',
                     border: '1px solid #b8b8b8',
                     borderRadius: '8px',
                     outline: 'none',
@@ -354,7 +354,7 @@ export const DataHostingTabContent: React.FC = () => {
                     height: '42px',
                   } as React.CSSProperties
                 }
-                onFocus={(e) => (e.currentTarget.style.borderColor = '#0091ae')}
+                onFocus={(e) => (e.currentTarget.style.borderColor = '#86b7fe')}
                 onBlur={(e) => (e.currentTarget.style.borderColor = '#b8b8b8')}
               >
                 <option value="" disabled>
@@ -373,7 +373,7 @@ export const DataHostingTabContent: React.FC = () => {
                   top: '50%',
                   transform: 'translateY(-50%)',
                   pointerEvents: 'none',
-                  color: '#555',
+                  color: '#6c757d',
                   fontSize: MAIN_SETTINGS_FONT_SIZE.sm,
                 }}
               >
@@ -397,24 +397,14 @@ export const DataHostingTabContent: React.FC = () => {
         >
           <button
             type="button"
+            className="main-settings-btn-primary"
             disabled={!canSchedule}
             style={{
               padding: '9px 20px',
               fontSize: MAIN_SETTINGS_FONT_SIZE.base,
               fontFamily: baseFont,
-              fontWeight: 400,
-              color: canSchedule ? '#141414' : '#aaa',
-              background: '#fff',
-              border: `1px solid ${canSchedule ? '#d0d0d0' : '#e0e0e0'}`,
-              borderRadius: '8px',
+              opacity: canSchedule ? 1 : 0.65,
               cursor: canSchedule ? 'pointer' : 'not-allowed',
-              transition: 'border-color 0.15s, color 0.15s',
-            }}
-            onMouseEnter={(e) => {
-              if (canSchedule) e.currentTarget.style.borderColor = '#141414'
-            }}
-            onMouseLeave={(e) => {
-              if (canSchedule) e.currentTarget.style.borderColor = '#b8b8b8'
             }}
           >
             Schedule data migration
@@ -422,6 +412,7 @@ export const DataHostingTabContent: React.FC = () => {
 
           <button
             type="button"
+            className="main-settings-btn-outline"
             onClick={() => {
               setSidebarOpen(false)
               setSelectedLocation('')
@@ -430,12 +421,6 @@ export const DataHostingTabContent: React.FC = () => {
               padding: '9px 20px',
               fontSize: MAIN_SETTINGS_FONT_SIZE.base,
               fontFamily: baseFont,
-              fontWeight: 500,
-              color: '#141414',
-              background: '#fff',
-              border: '1px solid #141414',
-              borderRadius: '8px',
-              cursor: 'pointer',
             }}
           >
             Cancel

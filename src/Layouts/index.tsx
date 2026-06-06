@@ -45,7 +45,6 @@ interface LayoutProps {
 const Layout = ({ children }: LayoutProps) => {
   const dispatch = useAppDispatch();
   const router = useRouter();
-  const isWorkloadPage = router.pathname.includes("workload");
   const { data: session, status } = useSession();
 	const { isOpen: isDialerOpen, closeDialer } = useDialerModal();
 
@@ -252,11 +251,11 @@ const Layout = ({ children }: LayoutProps) => {
   }, [showBreezeAssistant, breezeMaximized]);
 
   const mainContentOverflow = useMemo(() => {
-    if (breezeMaximized || isWorkloadPage) {
+    if (breezeMaximized) {
       return "hidden";
     }
     return "auto";
-  }, [breezeMaximized, isWorkloadPage]);
+  }, [breezeMaximized]);
 
   return (
     <>
@@ -318,7 +317,7 @@ const Layout = ({ children }: LayoutProps) => {
           <div
             className="flex-grow-1 p-3 main-content-wrapper"
             style={{
-              overflowY: isWorkloadPage ? "visible" : "auto",
+              overflowY: "auto",
               width: mainContentWidth,
               overflow: mainContentOverflow,
               transition: "width 0.3s ease-in-out",
