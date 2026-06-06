@@ -10,56 +10,19 @@ import React, {
 import { createPortal } from "react-dom";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
-import GenericListPage from "@components/GenericListPage";
 import { Row, Col } from "react-bootstrap";
 import { useSession } from "next-auth/react";
 import {
-  Users,
-  Settings,
-  Search,
-  Plus,
-  Filter,
-  Download,
-  Upload,
+  AlertCircle,
+  CheckCircle,
+  Clock,
+  LogOut,
   MoreVertical,
   Phone,
-  Mail,
-  Edit,
-  Trash2,
-  Clock,
-  PhoneCall,
-  PhoneOff,
-  CheckCircle,
-  XCircle,
-  AlertCircle,
-  Menu,
-  X,
-  ChevronDown,
-  UserPlus,
-  BarChart3,
-  Bell,
-  Grid,
-  List,
   RefreshCw,
-  TrendingUp,
-  TrendingDown,
-  ArrowUpRight,
-  ArrowDownRight,
-  Activity,
-  Zap,
-  User,
-  Mic,
-  MicOff,
-  LogOut,
+  X,
+  XCircle,
 } from "lucide-react";
-import {
-  LineChart,
-  Line,
-  ResponsiveContainer,
-  AreaChart,
-  Area,
-} from "recharts";
-
 import CallWidget from "../campaign-partials/CallWidget";
 import WrapUpModal from "../campaign-partials/WrapUp";
 import TopBar, { type TeamOption } from "../campaign-partials/TopBarAgent";
@@ -133,9 +96,6 @@ const LiveCallsAgentsManagement = () => {
   /** Bumps when cluster id is persisted from API so EventSource reconnects with roster params. */
   const [streamConfigBump, setStreamConfigBump] = useState(0);
   const [, setLiveTimeTick] = useState(0);
-  const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [viewMode, setViewMode] = useState("table");
-  const [filterStatus, setFilterStatus] = useState("all");
   const [agentStatus, setAgentStatus] = useState("READY");
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [bulkActionLoading, setBulkActionLoading] = useState(false);
@@ -181,20 +141,19 @@ const LiveCallsAgentsManagement = () => {
   // Close dropdowns when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      const t = event.target as HTMLElement | null;
-      if (!t) return;
-      if (t.closest("[data-campaign-console-action-menu]")) return;
-      if (t.closest("[data-campaign-console-action-trigger]")) return;
+      const target = event.target;
+      if (!(target instanceof Node)) return;
+      if (target instanceof HTMLElement) {
+        if (target.closest("[data-campaign-console-action-menu]")) return;
+        if (target.closest("[data-campaign-console-action-trigger]")) return;
+      }
       if (
         statusDropdownRef.current &&
-        !statusDropdownRef.current.contains(event.target as Node)
+        !statusDropdownRef.current.contains(target)
       ) {
         setShowStatusDropdown(false);
       }
-      if (
-        userMenuRef.current &&
-        !userMenuRef.current.contains(event.target as Node)
-      ) {
+      if (userMenuRef.current && !userMenuRef.current.contains(target)) {
         setShowUserMenu(false);
       }
       setActionMenuPortal(null);
@@ -546,16 +505,10 @@ const LiveCallsAgentsManagement = () => {
 
   const filteredAgents = agents.filter((agent) => {
     const q = searchQuery.toLowerCase();
-    const matchesSearch =
+    return (
       agent.name.toLowerCase().includes(q) ||
-      agent.loginId.toLowerCase().includes(q);
-    const matchesStatus =
-      filterStatus === "all" ||
-      (filterStatus === "ready" && agent.state === "READY") ||
-      (filterStatus === "notready" && agent.state === "NOT_READY") ||
-      (filterStatus === "offline" &&
-        isFinesseAgentOfflineLikeState(agent.state));
-    return matchesSearch && matchesStatus;
+      agent.loginId.toLowerCase().includes(q)
+    );
   });
 
   const teamDataAvailable = !teamDataLoading && teamData != null;
@@ -1866,43 +1819,19 @@ const LiveCallsAgentsManagement = () => {
             </div>
 
             <div className="filters">
-              {/* <div className="view-toggle">
-                  <button
-                    className={viewMode === 'table' ? 'active' : ''}
-                    onClick={() => setViewMode('table')}
-                  >
-                    <List size={18} />
-                  </button>
-                  <button
-                    className={viewMode === 'grid' ? 'active' : ''}
-                    onClick={() => setViewMode('grid')}
-                  >
-                    <Grid size={18} />
-                  </button>
-                </div> */}
-
-              {/* <div className="dropdown">
-                  <select
-                    className="dropdown-toggle"
-                    value={filterStatus}
-                    onChange={(e) => setFilterStatus(e.target.value)}
-                    style={{ border: '2px solid #e5e7eb', background: 'white' }}
-                  >
-                    <option value="all">All Status</option>
-                    <option value="ready">Ready</option>
-                    <option value="oncall">On Call</option>
-                    <option value="break">Break</option>
-                    <option value="offline">Offline</option>
-                  </select>
-                </div> */}
-
               <label className="checkbox-label">
-                <div
+                <input
+                  type="checkbox"
+                  className="visually-hidden"
+                  checked={includeLoggedOut}
+                  onChange={(e) => setIncludeLoggedOut(e.target.checked)}
+                />
+                <span
                   className={`checkbox ${includeLoggedOut ? "checked" : ""}`}
-                  onClick={() => setIncludeLoggedOut(!includeLoggedOut)}
+                  aria-hidden
                 >
                   {includeLoggedOut && <CheckCircle size={14} color="white" />}
-                </div>
+                </span>
                 <span>Show Offline Agents</span>
               </label>
 
@@ -2107,20 +2036,6 @@ const LiveCallsAgentsManagement = () => {
             </div>
           )}
 
-          {/* Info Card when showing few agents (only when team data is loaded) */}
-          {/* {teamDataAvailable && filteredAgents.length < 3 && (
-              <div className="info-card">
-                <div className="info-card-title">
-                  <AlertCircle size={20} color="#0066CC" />
-                  Limited Agent List
-                </div>
-                <p className="info-card-text">
-                  {selectedTeam
-                    ? `Team ${selectedTeam.replace(/-/g, ' ')} currently has ${filteredAgents.length} agent(s). Other agents may be assigned to different teams.`
-                    : `Currently ${filteredAgents.length} agent(s). Log in to Finesse to load teams and see team-specific agents.`}
-                </p>
-              </div>
-            )} */}
         </div>
 
         {typeof document !== "undefined" &&
