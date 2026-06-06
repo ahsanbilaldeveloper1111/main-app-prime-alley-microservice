@@ -49,6 +49,7 @@ import {
   buildWorkloadSummaryQuery,
   buildWorkloadCompanyExtensionAllowlist,
   fetchCompanyWorkloadRoster,
+  mergeViewerWorkloadExtension,
   readWorkloadCompanyScopeFromSession,
 } from "@page-modules/planner/workload/workloadTeamScope";
 import { WorkloadPlannerAlertStack } from "./workload/WorkloadPlannerSubviews";
@@ -139,8 +140,8 @@ const WorkloadPlannerPage: React.FC = () => {
     sessionStatus,
     canViewCompanyWideRoster || isCompanyAdmin,
   );
-  const isWorkloadRoot =
-    teamScope.isTeamOwner || canViewCompanyWideRoster || isCompanyAdmin;
+  /** Company-wide only — team managers still send `extension_numbers[]` (incl. their own ext). */
+  const isWorkloadRoot = canViewCompanyWideRoster || isCompanyAdmin;
   const effectiveTeamScope = useMemo(
     () => ({ ...teamScope, isTeamOwner: isWorkloadRoot }),
     [teamScope, isWorkloadRoot],
@@ -189,7 +190,7 @@ const WorkloadPlannerPage: React.FC = () => {
   const rosterExtensions = useMemo(() => {
     let raw: string[];
     if (!isWorkloadRoot) {
-      raw = teamScope.teamExtensions;
+      raw = mergeViewerWorkloadExtension(teamScope.teamExtensions, extension);
     } else {
       const fromCompany = companyRosterQuery.data ?? [];
       if (fromCompany.length > 0) {
@@ -206,6 +207,7 @@ const WorkloadPlannerPage: React.FC = () => {
   }, [
     isWorkloadRoot,
     teamScope.teamExtensions,
+    extension,
     companyRosterQuery.data,
     hierarchyDataExtensions,
     companyExtensionAllowlist,
@@ -320,14 +322,17 @@ const WorkloadPlannerPage: React.FC = () => {
   const teamMemberBlocked = teamScope.isTeamMemberOnly;
   const companyRosterLoading =
     (canViewCompanyWideRoster || isCompanyAdmin) && companyRosterQuery.isLoading;
+  const hasWorkloadScope =
+    isWorkloadRoot ||
+    teamScope.teamExtensions.length > 0 ||
+    extension.trim().length > 0;
   const queriesEnabled =
     appliedRangeValid &&
-    extension.length > 0 &&
+    hasWorkloadScope &&
     !teamScope.loading &&
     !companyRosterLoading &&
-    !teamMemberBlocked &&
-    (isWorkloadRoot || teamScope.teamExtensions.length > 0);
-  const filtersEnabled = extension.length > 0;
+    !teamMemberBlocked;
+  const filtersEnabled = extension.length > 0 || teamScope.teamExtensions.length > 0;
 
   useEffect(() => {
     writeWorkloadMainViewPreference(mainView);
@@ -462,7 +467,11 @@ const WorkloadPlannerPage: React.FC = () => {
         memberFilter: appliedFilters.memberFilter,
         rangeFallback: gridRangeFallback,
         teamExtensionNumbers:
-          rosterExtensions.length > 0 ? rosterExtensions : undefined,
+          rosterExtensions.length > 0
+            ? rosterExtensions
+            : extension.trim()
+              ? [extension.trim()]
+              : undefined,
         companyExtensionAllowlist,
       }),
     [
@@ -481,7 +490,11 @@ const WorkloadPlannerPage: React.FC = () => {
         viewerExtension: extension,
         memberFilter: appliedFilters.memberFilter,
         teamExtensionNumbers:
-          rosterExtensions.length > 0 ? rosterExtensions : undefined,
+          rosterExtensions.length > 0
+            ? rosterExtensions
+            : extension.trim()
+              ? [extension.trim()]
+              : undefined,
         companyExtensionAllowlist,
       }),
     [
@@ -792,6 +805,7 @@ const WorkloadPlannerPage: React.FC = () => {
         <WorkloadPlannerAlertStack
           sessionStatus={sessionStatus}
           enabled={queriesEnabled}
+          teamMemberOnly={teamMemberBlocked}
           accessForbidden={accessForbidden}
           summaryError={summaryQuery.error}
           summaryHasError={summaryQuery.isError}
