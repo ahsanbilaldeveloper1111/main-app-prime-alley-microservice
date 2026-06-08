@@ -14,24 +14,29 @@ export function ReportsModalOverlay({
   dialogClassName,
   children,
 }: ReportsModalOverlayProps) {
+  const dialogRef = useRef<HTMLDialogElement>(null);
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
 
   useEffect(() => {
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
+    const dialog = dialogRef.current;
+    if (!dialog) return undefined;
 
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        onCloseRef.current();
-      }
+    if (!dialog.open) {
+      dialog.showModal();
+    }
+
+    const handleClose = () => {
+      onCloseRef.current();
     };
 
-    document.addEventListener("keydown", handleKeyDown);
+    dialog.addEventListener("close", handleClose);
 
     return () => {
-      document.body.style.overflow = previousOverflow;
-      document.removeEventListener("keydown", handleKeyDown);
+      dialog.removeEventListener("close", handleClose);
+      if (dialog.open) {
+        dialog.close();
+      }
     };
   }, []);
 
@@ -40,21 +45,9 @@ export function ReportsModalOverlay({
   }
 
   return ReactDOM.createPortal(
-    <div
-      className="reports-modal-overlay"
-      role="presentation"
-      onClick={() => onCloseRef.current()}
-    >
-      <div
-        className={`reports-modal-dialog ${dialogClassName}`}
-        role="dialog"
-        aria-modal="true"
-        aria-label={ariaLabel}
-        onClick={(event) => event.stopPropagation()}
-      >
-        {children}
-      </div>
-    </div>,
+    <dialog ref={dialogRef} aria-label={ariaLabel} className="reports-modal-overlay">
+      <div className={`reports-modal-dialog ${dialogClassName}`}>{children}</div>
+    </dialog>,
     document.body,
   );
 }
