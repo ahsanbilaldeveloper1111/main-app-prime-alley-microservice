@@ -9,13 +9,6 @@
   @include main-settings-table-row-action-buttons;
 }
 
-.workforce-page-container {
-  font-family: "Lexend Deca", Helvetica, Arial, sans-serif;
-  -webkit-font-smoothing: antialiased;
-  color: #141414;
-
-}
-
 // —— Page primary CTAs (top-right in document flow, not sticky/fixed) ——
 .workforce-page-actions,
 .workforce-prospects-fixed-action {
@@ -150,6 +143,10 @@
 }
 
 .workforce-page-container {
+  font-family: "Lexend Deca", Helvetica, Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  color: #141414;
+
   .gt-search-icon {
     color: #64748b;
   }
