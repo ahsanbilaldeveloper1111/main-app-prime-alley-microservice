@@ -1,5 +1,4 @@
 import React, { useState } from "react";
-import ReactDOM from "react-dom";
 import { ChevronRight, Folder, Settings } from "lucide-react";
 import { Col, Row } from "react-bootstrap";
 import type {
@@ -65,7 +64,7 @@ export function ReportsLiveDashboardKpiRow({
       {cards.map((card) => (
         <div
           key={card.label}
-          className={`reports-kpi-card reports-kpi-card--${card.accent === "in_progress" ? "in-progress" : card.accent}`}
+          className="reports-kpi-card"
         >
           <div className="reports-kpi-card__label">{card.label}</div>
           <div className="reports-kpi-card__value">{card.value}</div>
@@ -174,8 +173,7 @@ export function ReportsLiveTaskByMember({
           View All ({rows.length} members)
         </button>
       </div>
-      {showAllMembers
-        ? ReactDOM.createPortal(
+      {showAllMembers ? (
             <ReportsModalOverlay
               ariaLabel="Team Members"
               onClose={() => setShowAllMembers(false)}
@@ -236,12 +234,9 @@ export function ReportsLiveTaskByMember({
                     </div>
                   ))}
               </div>
-            </ReportsModalOverlay>,
-            document.body,
-          )
-        : null}
-      {modal
-        ? ReactDOM.createPortal(
+            </ReportsModalOverlay>
+      ) : null}
+      {modal ? (
             <ReportsModalOverlay
               ariaLabel={resolveMemberTaskModalTitle(modal.type)}
               onClose={() => setModal(null)}
@@ -313,10 +308,8 @@ export function ReportsLiveTaskByMember({
                   );
                 })}
               </div>
-            </ReportsModalOverlay>,
-            document.body,
-          )
-        : null}
+            </ReportsModalOverlay>
+      ) : null}
     </>
   );
 }
@@ -366,8 +359,7 @@ export function ReportsLiveTaskDetailList({
           View All ({rows.length} tasks)
         </button>
       </div>
-      {showAll
-        ? ReactDOM.createPortal(
+      {showAll ? (
             <ReportsModalOverlay
               ariaLabel="All Tasks"
               onClose={() => setShowAll(false)}
@@ -429,10 +421,8 @@ export function ReportsLiveTaskDetailList({
                     </div>
                   ))}
               </div>
-            </ReportsModalOverlay>,
-            document.body,
-          )
-        : null}
+            </ReportsModalOverlay>
+      ) : null}
     </>
   );
 }

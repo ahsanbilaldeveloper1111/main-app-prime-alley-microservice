@@ -431,9 +431,11 @@
   .reports-kpi-grid {
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));
-    margin: 0 0 4px;
+    margin: 0 0 16px;
     background: #ffffff;
-    border-bottom: 1px solid #eaf0f6;
+    border: 1px solid #cccccc;
+    border-radius: 10px;
+    overflow: hidden;
     gap: 0;
   }
 
@@ -443,8 +445,8 @@
     }
 
     .reports-kpi-card {
-      border-right: 1px solid #eaf0f6;
-      border-bottom: 1px solid #eaf0f6;
+      border-right: 1px solid #cccccc;
+      border-bottom: 1px solid #cccccc;
 
       &:nth-child(2n) {
         border-right: none;
@@ -463,7 +465,7 @@
 
     .reports-kpi-card {
       border-right: none;
-      border-bottom: 1px solid #eaf0f6;
+      border-bottom: 1px solid #cccccc;
 
       &:last-child {
         border-bottom: none;
@@ -473,9 +475,10 @@
 
   .reports-kpi-card {
     --reports-kpi-accent: #0066CC;
+    --reports-kpi-bg: #eef2ff;
     padding: 14px 20px;
-    border-right: 1px solid #eaf0f6;
-    background: #ffffff;
+    border-right: 1px solid #cccccc;
+    background: var(--reports-kpi-bg);
     border-top: none;
     border-bottom: none;
     border-left: none;
@@ -485,22 +488,66 @@
     &:last-child {
       border-right: none;
     }
+
+    &--shade-indigo {
+      --reports-kpi-bg: #eef2ff;
+      --reports-kpi-accent: #0066CC;
+    }
+
+    &--shade-light {
+      --reports-kpi-bg: #dbeafe;
+      --reports-kpi-accent: #0052A3;
+    }
+
+    &--shade-sky {
+      --reports-kpi-bg: #e0f2fe;
+      --reports-kpi-accent: #0066CC;
+    }
+
+    &--shade-medium {
+      --reports-kpi-bg: #bfdbfe;
+      --reports-kpi-accent: #1d4ed8;
+    }
   }
 
   .reports-kpi-card--completed {
-    --reports-kpi-accent: #22c55e;
+    --reports-kpi-bg: #d1fae5;
+    --reports-kpi-accent: #059669;
   }
 
   .reports-kpi-card--overdue {
-    --reports-kpi-accent: #ef4444;
+    --reports-kpi-bg: #ffedd5;
+    --reports-kpi-accent: #dc2626;
   }
 
   .reports-kpi-card--pending {
-    --reports-kpi-accent: #f59e0b;
+    --reports-kpi-bg: #fef3c7;
+    --reports-kpi-accent: #d97706;
   }
 
   .reports-kpi-card--in-progress {
-    --reports-kpi-accent: #f59e0b;
+    --reports-kpi-bg: #e0f2fe;
+    --reports-kpi-accent: #0066CC;
+  }
+
+  .reports-kpi-grid--live .reports-kpi-card {
+    --reports-kpi-bg: #ffffff;
+    --reports-kpi-accent: #0066CC;
+    background: #ffffff;
+  }
+
+  .reports-kpi-grid--live .reports-kpi-card__value {
+    color: #0066CC;
+    font-weight: 500;
+  }
+
+  .reports-kpi-grid--live .reports-kpi-card__label {
+    color: #141414;
+    font-weight: 500;
+  }
+
+  .reports-kpi-grid--live .reports-kpi-card__sub {
+    color: #374151;
   }
 
   .reports-kpi-grid--live .reports-kpi-card--sparkline {
@@ -545,7 +592,7 @@
     align-items: center;
     gap: 5px;
     font-size: clamp(10px, 0.75vw, 11px);
-    color: #718096;
+    color: #374151;
     font-family: "Lexend Deca", Helvetica, Arial, sans-serif;
   }
 
@@ -984,19 +1031,23 @@
   }
 
   .reports-kpi-card--project-total {
+    --reports-kpi-bg: #eef2ff;
     --reports-kpi-accent: #0066CC;
   }
 
   .reports-kpi-card--project-on-track {
-    --reports-kpi-accent: #22c55e;
+    --reports-kpi-bg: #d1fae5;
+    --reports-kpi-accent: #059669;
   }
 
   .reports-kpi-card--project-at-risk {
-    --reports-kpi-accent: #ef4444;
+    --reports-kpi-bg: #ffedd5;
+    --reports-kpi-accent: #dc2626;
   }
 
   .reports-kpi-card--project-overdue {
-    --reports-kpi-accent: #f59e0b;
+    --reports-kpi-bg: #fef3c7;
+    --reports-kpi-accent: #d97706;
   }
 
   .reports-kpi-grid--project-summary .reports-kpi-card__label {
@@ -1351,55 +1402,6 @@
 
     &:hover {
       text-decoration: underline;
-    }
-  }
-
-  .reports-modal-overlay {
-    position: fixed;
-    inset: 0;
-    z-index: 9999;
-    width: 100%;
-    max-width: none;
-    height: 100%;
-    max-height: none;
-    margin: 0;
-    padding: 0;
-    border: none;
-    background: transparent;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-
-    &::backdrop {
-      background: rgba(0, 0, 0, 0.5);
-    }
-  }
-
-  .reports-modal-dialog {
-    background: #fff;
-    border-radius: 8px;
-    max-height: 80vh;
-    display: flex;
-    flex-direction: column;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.18);
-  }
-
-  .reports-modal-dialog--members {
-    width: min(640px, 90vw);
-  }
-
-  .reports-modal-dialog--tasks {
-    width: min(600px, 90vw);
-    overflow: hidden;
-  }
-
-  .reports-modal-dialog--all-tasks {
-    width: min(680px, 90vw);
-  }
-
-  .reports-modal-list-row {
-    &:hover {
-      background: #f5f7fa;
     }
   }
 
@@ -2201,5 +2203,55 @@
       font-size: 11px;
       color: #9ca3af;
     }
+  }
+}
+
+// Portaled to document.body — must live outside .workload-reports-page scope.
+.reports-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  width: 100%;
+  max-width: none;
+  height: 100%;
+  max-height: none;
+  margin: 0;
+  padding: 16px;
+  border: none;
+  background: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  &::backdrop {
+    background: rgba(0, 0, 0, 0.5);
+  }
+}
+
+.reports-modal-dialog {
+  background: #fff;
+  border-radius: 8px;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.18);
+}
+
+.reports-modal-dialog--members {
+  width: min(640px, 90vw);
+}
+
+.reports-modal-dialog--tasks {
+  width: min(600px, 90vw);
+  overflow: hidden;
+}
+
+.reports-modal-dialog--all-tasks {
+  width: min(680px, 90vw);
+}
+
+.reports-modal-list-row {
+  &:hover {
+    background: #f5f7fa;
   }
 }

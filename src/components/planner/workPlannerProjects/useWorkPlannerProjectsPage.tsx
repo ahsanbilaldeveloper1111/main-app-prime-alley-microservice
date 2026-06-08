@@ -629,10 +629,38 @@ export function useWorkPlannerProjectsPage(): WorkPlannerProjectsPageViewModel {
 
   const statsCardsData: StatsCardData[] = useMemo(
     () => [
-      { title: "Active Projects", value: stats.activeProjects, icon: FolderOpen, iconColor: "#0ea5e9", iconBgColor: "#e0f2fe" },
-      { title: "Total Projects", value: stats.totalProjects, icon: Folder, iconColor: "#3b82f6", iconBgColor: "#dbeafe" },
-      { title: "Tasks Due This Week", value: stats.tasksDueThisWeek, icon: CalendarDays, iconColor: "#3b82f6", iconBgColor: "#eff6ff" },
-      { title: "Overdue Across Projects", value: stats.overdueAcrossProjects, icon: AlertCircle, iconColor: "#ef4444", iconBgColor: "#fef2f2" },
+      {
+        title: "Active Projects",
+        value: stats.activeProjects,
+        icon: FolderOpen,
+        iconColor: "#0066CC",
+        iconBgColor: "#EEF2FF",
+        metric: { text: "Currently in progress", dotColor: "#0066CC" },
+      },
+      {
+        title: "Total Projects",
+        value: stats.totalProjects,
+        icon: Folder,
+        iconColor: "#0066CC",
+        iconBgColor: "#E0F2FE",
+        metric: { text: "All projects in the system", dotColor: "#0066CC" },
+      },
+      {
+        title: "Tasks Due This Week",
+        value: stats.tasksDueThisWeek,
+        icon: CalendarDays,
+        iconColor: "#D97706",
+        iconBgColor: "#D1FAE5",
+        metric: { text: "Due in the next 7 days", dotColor: "#D97706" },
+      },
+      {
+        title: "Overdue Across Projects",
+        value: stats.overdueAcrossProjects,
+        icon: AlertCircle,
+        iconColor: "#DC2626",
+        iconBgColor: "#FFEDD5",
+        metric: { text: "Needs attention", dotColor: "#DC2626" },
+      },
     ],
     [stats],
   );

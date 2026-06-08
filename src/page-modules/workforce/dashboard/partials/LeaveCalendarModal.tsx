@@ -1,5 +1,12 @@
 import React from "react";
+import {
+  WORKFORCE_AVATAR_PALETTE,
+  workforcePaletteSoftBg,
+} from "@page-modules/workforce/shared/workforceChartColors";
 import type { LeaveCalendarDay } from "../dashboardDomain";
+
+const CALENDAR_ACCENT = WORKFORCE_AVATAR_PALETTE[0];
+const CALENDAR_LEAVE_TINT = WORKFORCE_AVATAR_PALETTE[5];
 
 export interface LeaveCalendarModalProps {
   open: boolean;
@@ -61,16 +68,19 @@ const LeaveCalendarModal: React.FC<LeaveCalendarModalProps> = ({
             const isToday = dateStr === todayStr;
             let dayBackground = "#F9FAFB";
             if (hasLeave) {
-              dayBackground = "#FEF3C7";
+              dayBackground = workforcePaletteSoftBg(CALENDAR_LEAVE_TINT);
             }
             if (isToday) {
-              dayBackground = "#E0E7FF";
+              dayBackground = workforcePaletteSoftBg(CALENDAR_ACCENT);
             }
             if (isSelected) {
-              dayBackground = "#EEF2FF";
+              dayBackground = workforcePaletteSoftBg(WORKFORCE_AVATAR_PALETTE[3]);
             }
-            const dayBorder = isSelected || isToday ? "2px solid #0066CC" : "1px solid #E5E7EB";
-            const dayColor = isSelected || isToday ? "#0066CC" : "#374151";
+            const dayBorder =
+              isSelected || isToday
+                ? `2px solid ${CALENDAR_ACCENT}`
+                : `1px solid ${workforcePaletteSoftBg(CALENDAR_ACCENT)}`;
+            const dayColor = isSelected || isToday ? CALENDAR_ACCENT : "#374151";
             const dayWeight = isSelected || isToday ? "600" : "400";
             const leaveCountText = dayData?.on_leave_count ? `(${dayData.on_leave_count})` : "";
             return (

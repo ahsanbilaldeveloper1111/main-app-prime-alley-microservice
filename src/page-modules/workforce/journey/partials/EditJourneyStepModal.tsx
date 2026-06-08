@@ -120,7 +120,7 @@ const EditJourneyStepModal: React.FC<EditJourneyStepModalProps> = ({
       <Modal.Footer>
         <button
           type="button"
-          className="journey-page__modal-footer-btn journey-page__modal-footer-btn--cancel"
+          className="workforce-sidebar-btn-cancel"
           onClick={onHide}
           disabled={submitting}
         >
@@ -128,7 +128,7 @@ const EditJourneyStepModal: React.FC<EditJourneyStepModalProps> = ({
         </button>
         <button
           type="button"
-          className="journey-page__modal-footer-btn journey-page__modal-footer-btn--submit"
+          className="workforce-sidebar-btn-create"
           onClick={handleSubmit}
           disabled={submitting}
         >

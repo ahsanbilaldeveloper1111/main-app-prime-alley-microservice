@@ -1,5 +1,4 @@
 import React, { useState } from "react";
-import ReactDOM from "react-dom";
 import { Plus } from "lucide-react";
 import {
   formatProjectHealthStatsLine,
@@ -221,8 +220,7 @@ export function ReportsProjectDetailList({
           View All ({rows.length} projects)
         </button>
       </div>
-      {showAll
-        ? ReactDOM.createPortal(
+      {showAll ? (
             <ReportsModalOverlay
               ariaLabel="Project Health"
               onClose={() => setShowAll(false)}
@@ -272,10 +270,8 @@ export function ReportsProjectDetailList({
                     );
                   })}
               </div>
-            </ReportsModalOverlay>,
-            document.body,
-          )
-        : null}
+            </ReportsModalOverlay>
+      ) : null}
     </>
   );
 }
@@ -333,8 +329,7 @@ export function ReportsTasksByProject({
           View All ({segments.length} projects)
         </button>
       </div>
-      {showAll
-        ? ReactDOM.createPortal(
+      {showAll ? (
             <ReportsModalOverlay
               ariaLabel="Tasks by Project"
               onClose={() => setShowAll(false)}
@@ -376,10 +371,8 @@ export function ReportsTasksByProject({
                     ))}
                 </div>
               </div>
-            </ReportsModalOverlay>,
-            document.body,
-          )
-        : null}
+            </ReportsModalOverlay>
+      ) : null}
     </>
   );
 }

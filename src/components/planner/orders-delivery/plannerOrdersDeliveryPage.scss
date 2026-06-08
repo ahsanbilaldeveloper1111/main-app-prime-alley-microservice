@@ -1,0 +1,24 @@
+// Planner — Order Delivery table shell (metrics live in GenericTable toolbar)
+
+.planner-orders-delivery__table {
+  .gt-toolbar-container,
+  .gt-metrics-panel,
+  .gt-metrics-panel .generic-stats-cards {
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .generic-table-card {
+    border-radius: 0 0 8px 8px !important;
+    border-top: none !important;
+  }
+
+  .generic-table-actions-cell {
+    text-align: right;
+  }
+
+  .generic-table-actions,
+  .gt-row-actions--desktop {
+    justify-content: flex-end;
+  }
+}

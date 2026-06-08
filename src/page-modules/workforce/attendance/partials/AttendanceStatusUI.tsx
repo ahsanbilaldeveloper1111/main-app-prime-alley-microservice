@@ -136,7 +136,7 @@ export function AttendanceToolbarStatusStrip({
   const checkInOutButtonLabel = checkInOutLoading ? "…" : undefined;
 
   return (
-    <div className="att-toolbar-strip">
+    <div className="att-toolbar-strip att-toolbar-card">
       <div className={pillClassName} role="status" aria-live="polite">
         <AttendanceStatusPillBody
           isCheckedIn={isCheckedIn}

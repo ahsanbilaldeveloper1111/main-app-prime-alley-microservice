@@ -131,23 +131,8 @@ export const CALL_ANALYTICS_REPORT_COLUMNS: TableColumn<CallAnalyticsReportRow>[
     key: "description",
     label: "Description",
     sortable: false,
-    width: "560px",
     render: (row) => (
-      <span
-        style={{
-          color: "#374151",
-          display: "block",
-          minWidth: "560px",
-          width: "560px",
-          maxWidth: "560px",
-          whiteSpace: "normal",
-          overflowWrap: "anywhere",
-          wordBreak: "break-word",
-          lineHeight: 1.4,
-        }}
-      >
-        {row.description}
-      </span>
+      <span className="call-analytics-reports-list__description-cell">{row.description}</span>
     ),
   },
   {

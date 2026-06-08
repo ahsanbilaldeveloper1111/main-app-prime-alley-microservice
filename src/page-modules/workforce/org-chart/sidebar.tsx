@@ -294,7 +294,7 @@ const OrganizationEmployeeSidebar: React.FC<OrganizationEmployeeSidebarProps> = 
           <div className="org-chart-sidebar__info-row">
             <div
               className="org-chart-sidebar__info-icon-wrap"
-              style={{ backgroundColor: "#e0e7ff" }}
+              style={{ backgroundColor: "#bfdbfe" }}
             >
               <Briefcase size={18} color="#0066CC" />
             </div>

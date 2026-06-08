@@ -48,19 +48,20 @@ const DepartmentHeadcountPanel: React.FC<DepartmentHeadcountPanelProps> = ({ dep
       {departmentData.length > 0 ? (
         <ResponsiveContainer width="100%" height="100%">
           <BarChart data={departmentData} margin={{ top: 10, right: 10, left: 10, bottom: 5 }}>
-            <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: "#9CA3AF", fontSize: 11 }} />
+            <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: "#475569", fontSize: 11 }} />
             <YAxis
               axisLine={false}
               tickLine={false}
-              tick={{ fill: "#9CA3AF", fontSize: 11 }}
+              tick={{ fill: "#475569", fontSize: 11 }}
               domain={[0, departmentData.length ? Math.max(...departmentData.map((d) => d.value), 0) + 1 : 5]}
             />
             <Tooltip
               contentStyle={{
                 background: "#FFFFFF",
-                border: "1px solid #E5E7EB",
+                border: "1px solid #BFDBFE",
                 borderRadius: "8px",
                 fontSize: "12px",
+                color: "#141414",
               }}
               formatter={(value: number, _name: unknown, props: { payload?: { percentage?: number } }) => {
                 const percentage = props.payload?.percentage;

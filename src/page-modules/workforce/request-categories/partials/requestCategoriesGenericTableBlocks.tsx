@@ -110,18 +110,20 @@ export const CHILD_REQUEST_CATEGORY_COLUMNS: TableColumn<UserRequestCategory>[] 
 function pencilOutlineAction<T>(onClick: (row: T) => void): TableAction<T> {
   return {
     label: "Edit",
-    icon: <Pencil size={14} />,
+    icon: <Pencil size={16} />,
     onClick,
-    variant: "outline-secondary",
+    variant: "light",
+    className: "btn-action-style-2 p-1 text-primary",
   };
 }
 
 function trashOutlineDangerAction<T>(onClick: (row: T) => void): TableAction<T> {
   return {
     label: "Delete",
-    icon: <Trash2 size={14} />,
+    icon: <Trash2 size={16} />,
     onClick,
-    variant: "outline-danger",
+    variant: "light",
+    className: "btn-action-style-2 p-1 text-danger",
   };
 }
 
@@ -140,19 +142,19 @@ function renderMainRequestCategoryRowActions(
       actions={[
         {
           label: `Edit ${row.name}`,
-          icon: <Pencil size={22} aria-hidden />,
+          icon: <Pencil size={16} aria-hidden />,
           tone: "primary",
           onClick: () => handlers.openEditCategory(row),
         },
         {
           label: `Sub-categories for ${row.name}`,
-          icon: <FolderTree size={22} aria-hidden />,
+          icon: <FolderTree size={16} aria-hidden />,
           tone: "info",
           onClick: () => handlers.openChildrenModal(row),
         },
         {
           label: `Delete ${row.name}`,
-          icon: <Trash2 size={22} aria-hidden />,
+          icon: <Trash2 size={16} aria-hidden />,
           tone: "danger",
           onClick: () => handlers.openDeleteCategory(row),
         },
@@ -196,12 +198,13 @@ export function buildChildrenRequestCategoryActions(handlers: Readonly<{
     }),
     {
       label: "Manage fields",
-      icon: <List size={14} />,
+      icon: <List size={16} />,
       onClick: (child) => {
         handlers.closeChildrenModal();
         handlers.openFieldsModal(child);
       },
-      variant: "outline-secondary",
+      variant: "light",
+      className: "btn-action-style-2 p-1 text-info",
     },
     trashOutlineDangerAction(handlers.openDeleteCategory),
   ];

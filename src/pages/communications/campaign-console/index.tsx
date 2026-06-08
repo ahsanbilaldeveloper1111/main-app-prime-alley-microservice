@@ -1,4 +1,4 @@
-﻿import "@assets/scss/datatable-style.scss";
+import "@assets/scss/datatable-style.scss";
 import React, {
   ReactElement,
   useState,

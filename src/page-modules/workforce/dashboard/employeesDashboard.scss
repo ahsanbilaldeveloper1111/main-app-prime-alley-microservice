@@ -112,7 +112,7 @@
   &--active {
     color: #0066CC;
     font-weight: 600;
-    background: #eef2ff;
+    background: #eff6ff;
   }
 }
 
@@ -172,9 +172,32 @@
 
 .employees-dashboard__charts-row {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
   gap: 16px;
   margin-bottom: 16px;
+}
+
+@media (max-width: 767.98px) {
+  .employees-dashboard {
+    padding: 16px;
+  }
+
+  .employees-dashboard__title {
+    font-size: 22px;
+  }
+
+  .employees-dashboard__page-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .employees-dashboard__charts-row {
+    grid-template-columns: 1fr;
+  }
+
+  .employees-dashboard__card {
+    padding: 16px;
+  }
 }
 
 .employees-dashboard__card {
@@ -286,7 +309,7 @@
 .employees-dashboard__insight-callout-label {
   font-size: 13px;
   font-weight: 600;
-  color: #1e40af;
+  color: #0052A3;
 }
 
 .employees-dashboard__insight-callout-value {
@@ -297,7 +320,7 @@
 
 .employees-dashboard__insight-callout-detail {
   font-size: 12px;
-  color: #1e40af;
+  color: #0052A3;
   line-height: 1.4;
 }
 
@@ -310,8 +333,14 @@
 .employees-dashboard__aging-total {
   font-size: 42px;
   font-weight: 700;
-  color: #111827;
+  color: #0066CC;
   line-height: 1;
+}
+
+.employees-dashboard__aging-label {
+  font-size: 14px;
+  font-weight: 500;
+  color: #6b7280;
 }
 
 .employees-dashboard__aging-summary {
@@ -400,7 +429,8 @@
 .employees-dashboard__calendar-detail {
   margin-top: 24px;
   padding: 16px;
-  background: #f9fafb;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
   border-radius: 8px;
 }
 
@@ -423,7 +453,7 @@
 
 .employees-dashboard__calendar-leave-pill {
   font-size: 10px;
-  color: #92400e;
+  color: #0052A3;
   margin-top: 4px;
 }
 
@@ -482,32 +512,11 @@
   display: flex;
   align-items: center;
   justify-content: center;
-
-  &--indigo {
-    background: #eef2ff;
-  }
-
-  &--green {
-    background: #d1fae5;
-  }
-
-  &--amber {
-    background: #fef3c7;
-  }
-
-  &--violet {
-    background: #e0f2fe;
-  }
-
-  &--red {
-    background: #fee2e2;
-  }
 }
 
 .employees-dashboard-stats__big-number {
-  font-size: 36px;
-  font-weight: 700;
-  color: #111827;
+  font-size: 28px;
+  font-weight: 500;
   line-height: 1;
 }
 
@@ -543,13 +552,10 @@
   border-radius: 6px;
   font-size: 12px;
   font-weight: 600;
-  background: #fef3c7;
-  color: #92400e;
 }
 
 .employees-dashboard-stats__link {
   font-size: 13px;
-  color: #0066CC;
   text-decoration: none;
   font-weight: 500;
   cursor: pointer;
@@ -577,19 +583,4 @@
   border-radius: 6px;
   font-size: 11px;
   font-weight: 600;
-
-  &--high {
-    background: #fee2e2;
-    color: #991b1b;
-  }
-
-  &--med {
-    background: #fef3c7;
-    color: #92400e;
-  }
-
-  &--low {
-    background: #f3f4f6;
-    color: #374151;
-  }
 }

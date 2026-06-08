@@ -1,15 +1,15 @@
 import "@crm/orders/orderListPageOrderScss";
+import "./plannerOrdersDeliveryPage.scss";
 import { useRouter } from "next/router";
 import React, { useState, useCallback, useMemo } from "react";
 import {
   BreadcrumbItem,
   GenericTable,
   GenericFilterSidebar,
-  StatsCards,
   OrderEditModal,
+  type StatsCardData,
   type TableAction,
 } from "@crm/orders/orderListOrderPageFrame";
-import { FiFilter } from "@crm/orders/orderListFiIcons";
 import {
   Button,
   Row,
@@ -422,6 +422,89 @@ export const CrmOrdersPageContentImpl = () => {
     [ordersData, extensions, stages, summaryTiles, totalOrders],
   );
 
+  const ordersDeliveryToolbarConfig = useMemo(
+    () => ({
+      showSearch: true,
+      searchValue: ordersSearch,
+      searchPlaceholder: "Search orders by number, customer, deal...",
+      onSearchChange: setOrdersSearch,
+      onSearch: () => {
+        applyOrdersUiFilters();
+      },
+      showFiltersButton: true,
+      onFiltersClick: () => setShowFiltersSidebar((prev) => !prev),
+      showSortButton: true,
+      rightActions: (
+        <Button
+          variant={showFilterBar ? "secondary" : "outline-secondary"}
+          size="sm"
+          className="gt-toolbar-btn"
+          onClick={() => setShowFilterBar((prev) => !prev)}
+        >
+          <Layers size={16} className="me-1" />
+          {showFilterBar ? "Hide Tabs" : "Show Tabs"}
+        </Button>
+      ),
+    }),
+    [ordersSearch, applyOrdersUiFilters, showFilterBar],
+  );
+
+  const ordersDeliveryStatsCards: StatsCardData[] = useMemo(
+    () => [
+      {
+        title: "All Orders",
+        value: summaryTiles?.total_orders ?? totalOrders ?? 0,
+        iconColor: "#0066CC",
+        iconBgColor: "#EEF2FF",
+        metric: { text: "Total in the system", dotColor: "#0066CC" },
+        onClick: () => handleFilterChange("all"),
+      },
+      {
+        title: "New",
+        value: summaryTiles?.new_orders ?? analyticsData.stageCounts.New ?? 0,
+        iconColor: "#0066CC",
+        iconBgColor: "#E0F2FE",
+        metric: { text: "New stage orders", dotColor: "#0066CC" },
+      },
+      {
+        title: "Qualified",
+        value: summaryTiles?.qualified_orders ?? analyticsData.stageCounts.Qualified ?? 0,
+        iconColor: "#059669",
+        iconBgColor: "#D1FAE5",
+        metric: { text: "Qualified stage orders", dotColor: "#059669" },
+      },
+      {
+        title: "Proposal",
+        value: analyticsData.stageCounts.Proposal ?? 0,
+        iconColor: "#D97706",
+        iconBgColor: "#FFEDD5",
+        metric: { text: "Proposal stage orders", dotColor: "#D97706" },
+      },
+      {
+        title: "Negotiation",
+        value: analyticsData.stageCounts.Negotiation ?? 0,
+        iconColor: "#0066CC",
+        iconBgColor: "#EDE9FE",
+        metric: { text: "Negotiation stage orders", dotColor: "#0066CC" },
+      },
+      {
+        title: "Lost",
+        value: summaryTiles?.lost_orders ?? filterCounts.lost ?? 0,
+        iconColor: "#DC2626",
+        iconBgColor: "#FFEDD5",
+        metric: { text: "Marked as lost", dotColor: "#DC2626" },
+        onClick: () => handleFilterChange("lost"),
+      },
+    ],
+    [
+      analyticsData.stageCounts,
+      filterCounts.lost,
+      handleFilterChange,
+      summaryTiles,
+      totalOrders,
+    ],
+  );
+
   // Define columns for GenericTable
   const ordersColumns = PLANNER_CRM_ORDERS_TABLE_COLUMNS;
 
@@ -493,88 +576,22 @@ export const CrmOrdersPageContentImpl = () => {
         mainLink="/work-planner/dashboard"
         subTitle="Orders"
       />
-      <div>
+      <div className="planner-orders-delivery">
         {/* Page Header */}
-        <div className="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-4">
-        <div className="mb-3 mb-md-0">
-  <nav aria-label="breadcrumb">
-    <ol className="breadcrumb mb-0">
-      <li className="breadcrumb-item">
-        <a href="/dashboard" className="text-decoration-none">
-          Work Planner
-        </a>
-      </li>
-      <li className="breadcrumb-item active fw-bold" aria-current="page">
-        Order Management
-      </li>
-    </ol>
-  </nav>
-</div>
-          <div className="d-flex flex-wrap gap-2">
-            <Button
-              variant={showFilterBar ? "secondary" : "outline-secondary"}
-              onClick={() => setShowFilterBar(!showFilterBar)}
-            >
-              <Layers size={16} className="me-2" />
-              {showFilterBar ? "Hide Tabs" : "Show Tabs"}
-            </Button>
-            <Button
-            variant={showFiltersSidebar ? "secondary" : "outline-secondary"}
-            onClick={() => setShowFiltersSidebar(!showFiltersSidebar)}
-          >
-            <FiFilter size={16} className="me-2" />
-            {showFiltersSidebar ? "Hide Filters" : "Show Filters"}
-          </Button>
-          </div>
+        <div className="mb-4">
+          <nav aria-label="breadcrumb">
+            <ol className="breadcrumb mb-0">
+              <li className="breadcrumb-item">
+                <a href="/dashboard" className="text-decoration-none">
+                  Work Planner
+                </a>
+              </li>
+              <li className="breadcrumb-item active fw-bold" aria-current="page">
+                Order Management
+              </li>
+            </ol>
+          </nav>
         </div>
-
-        {/* Stats Cards */}
-        <StatsCards 
-          data={[
-            {
-              title: 'All Orders',
-              value: summaryTiles?.total_orders || totalOrders || 0,
-              
-            },
-            {
-              title: 'New',
-              value: summaryTiles?.new_orders || analyticsData.stageCounts['New'] || 0,
-              
-            },
-            {
-              title: 'Qualified',
-              value: summaryTiles?.qualified_orders || analyticsData.stageCounts['Qualified'] || 0,
-             
-            },
-            {
-              title: 'Proposal',
-              value: analyticsData.stageCounts['Proposal'] || 0,
-             
-            },
-            {
-              title: 'Negotiation',
-              value: analyticsData.stageCounts['Negotiation'] || 0,
-              
-            },
-            {
-              title: 'Lost',
-              value: summaryTiles?.lost_orders || filterCounts.lost || 0,
-             
-            }
-            // {
-            //   title: 'Deleted',
-            //   value: summaryTiles?.deleted_orders || filterCounts.deleted || 0,
-            //   icon: Trash2,
-            //   iconColor: '#6B7280',
-            //   iconBgColor: '#F3F4F6',
-            //   metric: {
-            //     text: 'Archived',
-            //     dotColor: '#9CA3AF'
-            //   }
-            // }
-          ]}
-          gridMinWidth="150px"
-        />
 
         {/* Analytics Section - Collapsible */}
         {showOrdersAnalytics && (
@@ -715,10 +732,17 @@ export const CrmOrdersPageContentImpl = () => {
         )}
 
         {/* Orders Table with GenericTable */}
+        <div className="orders-table-wrapper planner-orders-delivery__table">
         <GenericTable
           data={filteredOrders}
           columns={ordersColumns}
           actions={ordersActions}
+          showToolbar={true}
+          toolbar={ordersDeliveryToolbarConfig}
+          statsCards={ordersDeliveryStatsCards}
+          metricsGridMinWidth="120px"
+          metricsColumns={6}
+          defaultShowMetrics={true}
           customizableColumns={true}
           defaultSelectedColumns={['orderNumber', 'customer', 'deal', 'stage', 'value', 'approvalStatus', 'fulfillmentStatus', 'assignedUser', 'orderDate', 'owner']}
           columnStorageKey="ordersSelectedColumns"
@@ -755,6 +779,7 @@ export const CrmOrdersPageContentImpl = () => {
           hover={true}
           uniqueKey="id"
         />
+        </div>
       </div>
 
       {/* Delete Order Modal */}

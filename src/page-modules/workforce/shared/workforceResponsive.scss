@@ -1,0 +1,103 @@
+// Shared responsive rules for workforce list pages (table + sidebar layouts).
+
+.approval-page-shell {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  min-width: 0;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.approval-table-pane {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+@media (max-width: 991.98px) {
+  .workforce-page-container {
+    .gt-filter-pills {
+      padding: 8px 16px 12px;
+    }
+
+    .employees-page__layout-row,
+    .journey-page__layout-row,
+    .approval-page-shell {
+      flex-direction: column !important;
+      height: auto !important;
+      overflow: visible !important;
+      gap: 12px;
+      align-items: stretch;
+    }
+
+    .employees-page__main,
+    .journey-page__table-main,
+    .approval-table-pane {
+      width: 100%;
+      min-width: 0;
+      overflow: visible !important;
+    }
+
+    .employees-page__layout-row > .generic-sidebar-new-container,
+    .journey-page__layout-row > .generic-sidebar-new-container,
+    .approval-page-shell > .generic-sidebar-new-container {
+      width: 100% !important;
+      min-width: 0 !important;
+      max-width: 100% !important;
+      flex: 0 0 auto !important;
+      margin-top: 0 !important;
+      height: auto !important;
+      max-height: none !important;
+    }
+  }
+}
+
+@media (max-width: 767.98px) {
+  .workforce-page-container {
+    .workforce-page-actions,
+    .workforce-prospects-fixed-action {
+      width: 100%;
+      padding: 0 16px 12px;
+      justify-content: flex-start;
+    }
+
+    .workforce-prospects-primary-btn {
+      width: 100%;
+      justify-content: center;
+    }
+
+    .employees-page__charts-grid {
+      grid-template-columns: 1fr;
+      padding: 0 16px 24px;
+      gap: 16px;
+    }
+  }
+
+  .workforce-static-page {
+    padding: 16px;
+  }
+}
+
+@media (max-width: 575.98px) {
+  .workforce-page-container {
+    .gt-filter-pills {
+      padding: 8px 12px 10px;
+    }
+
+    .gt-filter-pill.dropdown-toggle,
+    .gt-filter-pill {
+      max-width: 100%;
+    }
+
+    .generic-table-responsive {
+      margin-left: 12px !important;
+      margin-right: 12px !important;
+      width: calc(100% - 24px) !important;
+    }
+  }
+}

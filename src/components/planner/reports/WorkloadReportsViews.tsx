@@ -1,5 +1,4 @@
 import React, { useState } from "react";
-import ReactDOM from "react-dom";
 import type { LucideIcon } from "lucide-react";
 import {
   BarChart3,
@@ -94,7 +93,7 @@ function resolveKpiAccentClass(accent: KpiCardProps["accent"]): string {
   if (accent === "overdue") return "reports-kpi-card--overdue";
   if (accent === "pending") return "reports-kpi-card--pending";
   if (accent === "in_progress") return "reports-kpi-card--in-progress";
-  return "";
+  return "reports-kpi-card--shade-indigo";
 }
 
 function resolveKpiDeltaClass(delta: string | null | undefined): string {
@@ -621,8 +620,7 @@ export function ReportsMemberPerformanceBars({
         View All ({sortedRows.length} members)
       </button>
     </div>
-    {showAll
-      ? ReactDOM.createPortal(
+    {showAll ? (
           <ReportsModalOverlay
             ariaLabel="Member Performance"
             onClose={() => setShowAll(false)}
@@ -695,10 +693,8 @@ export function ReportsMemberPerformanceBars({
                 );
               })}
             </div>
-          </ReportsModalOverlay>,
-          document.body,
-        )
-      : null}
+          </ReportsModalOverlay>
+    ) : null}
     </>
   );
 }
