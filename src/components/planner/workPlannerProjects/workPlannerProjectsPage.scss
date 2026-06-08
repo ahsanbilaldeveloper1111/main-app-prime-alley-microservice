@@ -149,6 +149,10 @@
 .wp-planner-projects__main {
   flex: 1;
   min-width: 0;
+
+  .gt-metrics-panel {
+    flex-shrink: 0;
+  }
 }
 
 // Task tree (inside expandable table)

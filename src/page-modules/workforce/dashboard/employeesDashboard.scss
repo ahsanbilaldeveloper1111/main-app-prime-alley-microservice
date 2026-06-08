@@ -512,32 +512,11 @@
   display: flex;
   align-items: center;
   justify-content: center;
-
-  &--indigo {
-    background: #eff6ff;
-  }
-
-  &--green {
-    background: #dbeafe;
-  }
-
-  &--amber {
-    background: #e0f2fe;
-  }
-
-  &--violet {
-    background: #bfdbfe;
-  }
-
-  &--alert {
-    background: #dbeafe;
-  }
 }
 
 .employees-dashboard-stats__big-number {
   font-size: 28px;
   font-weight: 500;
-  color: #0066CC;
   line-height: 1;
 }
 
@@ -573,13 +552,10 @@
   border-radius: 6px;
   font-size: 12px;
   font-weight: 600;
-  background: #dbeafe;
-  color: #0052A3;
 }
 
 .employees-dashboard-stats__link {
   font-size: 13px;
-  color: #0066CC;
   text-decoration: none;
   font-weight: 500;
   cursor: pointer;
@@ -607,19 +583,4 @@
   border-radius: 6px;
   font-size: 11px;
   font-weight: 600;
-
-  &--high {
-    background: #bfdbfe;
-    color: #0052A3;
-  }
-
-  &--med {
-    background: #dbeafe;
-    color: #0066CC;
-  }
-
-  &--low {
-    background: #eff6ff;
-    color: #0052A3;
-  }
 }

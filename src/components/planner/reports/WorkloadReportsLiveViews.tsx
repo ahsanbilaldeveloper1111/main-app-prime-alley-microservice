@@ -1,5 +1,4 @@
 import React, { useState } from "react";
-import ReactDOM from "react-dom";
 import { ChevronRight, Folder, Settings } from "lucide-react";
 import { Col, Row } from "react-bootstrap";
 import type {
@@ -57,30 +56,15 @@ function TaskBadgeButton({ badgeClassName, label, onClick }: TaskBadgeButtonProp
   );
 }
 
-const LIVE_KPI_BLUE_SHADES = [
-  "reports-kpi-card--shade-indigo",
-  "reports-kpi-card--shade-light",
-  "reports-kpi-card--shade-sky",
-  "reports-kpi-card--shade-medium",
-] as const;
-
-function resolveLiveKpiCardClass(accent: string, index: number): string {
-  if (accent === "in_progress") return "reports-kpi-card--in-progress";
-  if (accent === "overdue") return "reports-kpi-card--overdue";
-  if (accent === "completed") return "reports-kpi-card--completed";
-  if (accent === "pending") return "reports-kpi-card--pending";
-  return LIVE_KPI_BLUE_SHADES[index % LIVE_KPI_BLUE_SHADES.length];
-}
-
 export function ReportsLiveDashboardKpiRow({
   cards,
 }: Readonly<{ cards: LiveDashboardKpi[] }>) {
   return (
     <div className="reports-kpi-grid reports-kpi-grid--live">
-      {cards.map((card, index) => (
+      {cards.map((card) => (
         <div
           key={card.label}
-          className={`reports-kpi-card ${resolveLiveKpiCardClass(card.accent, index)}`}
+          className="reports-kpi-card"
         >
           <div className="reports-kpi-card__label">{card.label}</div>
           <div className="reports-kpi-card__value">{card.value}</div>
@@ -189,8 +173,7 @@ export function ReportsLiveTaskByMember({
           View All ({rows.length} members)
         </button>
       </div>
-      {showAllMembers
-        ? ReactDOM.createPortal(
+      {showAllMembers ? (
             <ReportsModalOverlay
               ariaLabel="Team Members"
               onClose={() => setShowAllMembers(false)}
@@ -251,12 +234,9 @@ export function ReportsLiveTaskByMember({
                     </div>
                   ))}
               </div>
-            </ReportsModalOverlay>,
-            document.body,
-          )
-        : null}
-      {modal
-        ? ReactDOM.createPortal(
+            </ReportsModalOverlay>
+      ) : null}
+      {modal ? (
             <ReportsModalOverlay
               ariaLabel={resolveMemberTaskModalTitle(modal.type)}
               onClose={() => setModal(null)}
@@ -328,10 +308,8 @@ export function ReportsLiveTaskByMember({
                   );
                 })}
               </div>
-            </ReportsModalOverlay>,
-            document.body,
-          )
-        : null}
+            </ReportsModalOverlay>
+      ) : null}
     </>
   );
 }
@@ -381,8 +359,7 @@ export function ReportsLiveTaskDetailList({
           View All ({rows.length} tasks)
         </button>
       </div>
-      {showAll
-        ? ReactDOM.createPortal(
+      {showAll ? (
             <ReportsModalOverlay
               ariaLabel="All Tasks"
               onClose={() => setShowAll(false)}
@@ -444,10 +421,8 @@ export function ReportsLiveTaskDetailList({
                     </div>
                   ))}
               </div>
-            </ReportsModalOverlay>,
-            document.body,
-          )
-        : null}
+            </ReportsModalOverlay>
+      ) : null}
     </>
   );
 }

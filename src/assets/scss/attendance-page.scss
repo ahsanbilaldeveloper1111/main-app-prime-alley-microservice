@@ -108,13 +108,25 @@
   font-family: ui-monospace, "SFMono-Regular", "Consolas", monospace;
 }
 
-/* Toolbar: pill (status) + date + check in/out button */
+/* Toolbar: unified card — live counter + date + check in/out */
+.att-toolbar-card {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px;
+  min-height: 2.5rem;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+
 .att-toolbar-strip {
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: flex-end;
-  flex-wrap: wrap;
-  gap: 0.5rem 1.125rem;
+  flex-wrap: nowrap;
+  gap: 8px;
   min-width: 0;
 }
 
@@ -125,7 +137,7 @@
   align-items: stretch;
   gap: 0.5rem;
   padding: 0.5rem 1.05rem;
-  min-height: 2.5rem;
+  min-height: 2rem;
   max-width: 100%;
   font-size: 0.875rem;
   font-weight: 600;
@@ -236,8 +248,10 @@
 .att-toolbar-strip__date {
   display: inline-flex;
   align-items: center;
+  align-self: stretch;
   gap: 0.4rem;
-  padding: 0.35rem 0.6rem 0.35rem 0.5rem;
+  padding: 0 0.6rem 0 0.5rem;
+  min-height: 2rem;
   font-size: 0.8125rem;
   line-height: 1.35;
   color: #475569;
@@ -256,17 +270,13 @@
   opacity: 0.9;
 }
 
-.attendance-fixed-status {
-  display: flex;
-  align-items: center;
-}
-
 .btn.att-action-btn,
 .btn.att-action-btn.btn-success,
 .btn.att-action-btn.btn-warning {
   font-weight: 500;
   border-radius: 4px;
-  padding: 9px 13px;
+  padding: 0 13px;
+  min-height: 2rem;
   font-size: 12px;
   display: inline-flex;
   align-items: center;
@@ -277,6 +287,7 @@
   color: #ffffff;
   box-shadow: none;
   transition: background-color 0.15s ease;
+  flex-shrink: 0;
 }
 
 .btn.att-action-btn:hover:not(:disabled),
@@ -302,9 +313,17 @@
   color: #141414;
 }
 
-@media (max-width: 576.98px) {
+@media (max-width: 767.98px) {
+  .att-toolbar-card {
+    flex-wrap: wrap;
+    width: 100%;
+    justify-content: flex-end;
+  }
+
   .att-toolbar-strip {
-    justify-content: flex-start;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    width: 100%;
   }
 
   .att-toolbar-strip__date {
@@ -340,32 +359,82 @@
 
 /* Shell / layout */
 .attendance-page-shell .gt-toolbar-tabs-section {
-  padding-bottom: 0.75rem;
+  padding: 2px 24px 0;
+  margin-bottom: -1px;
+}
+
+.attendance-page-shell .gt-toolbar-tabs-row {
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: 12px;
+  width: 100%;
+}
+
+.attendance-page-shell .gt-toolbar-tabs-list {
+  flex: 0 1 auto;
+}
+
+.attendance-page-shell .gt-tab-button {
+  align-items: center;
+}
+
+.attendance-page-shell .gt-tab-count {
+  margin-left: 0;
+}
+
+.attendance-page-shell .gt-toolbar-tabs-actions {
+  display: flex;
+  align-items: center;
+  margin-left: auto;
+  flex: 0 0 auto;
 }
 
 .attendance-page-shell .attendance-toolbar-right {
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  gap: 60px;
-  flex-wrap: wrap;
   min-width: 0;
 }
 
 .attendance-page-shell .attendance-status-content {
   display: flex;
   align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.attendance-page-shell .attendance-status-content .att-status-panel {
+  flex-direction: row;
+  align-items: center;
+  align-self: stretch;
+  max-width: none;
+  padding: 4px 8px;
+  gap: 8px;
+}
+
+.attendance-page-shell .attendance-status-content .att-status-panel__meta {
+  width: auto;
+  justify-content: flex-start;
+  text-align: left;
+  margin-bottom: 0;
+}
+
+.attendance-page-shell .attendance-status-content .att-session-timer {
+  width: auto;
+  min-width: 10rem;
 }
 
 .att-status-loading,
 .att-status-unavailable {
-  display: flex;
+  display: inline-flex;
   align-items: center;
   gap: 10px;
+  min-height: 2rem;
+  padding: 0 12px;
   font-size: 14px;
   color: #6b7280;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
 }
 
 .att-status-loading svg {
@@ -378,34 +447,19 @@
 }
 
 @media (max-width: 991.98px) {
-  .attendance-page-shell .gt-toolbar-tabs-section .d-flex.align-items-center.gap-3 {
-    flex-direction: column-reverse;
-    align-items: stretch;
-    gap: 0 !important;
+  .attendance-page-shell .gt-toolbar-tabs-row {
+    flex-wrap: wrap;
+    row-gap: 10px;
   }
 
-  .attendance-page-shell .gt-toolbar-tabs-section .d-flex.align-items-center.gap-3 > div:last-child {
-    margin-left: 0 !important;
+  .attendance-page-shell .gt-toolbar-tabs-actions {
     width: 100%;
-    padding-bottom: 10px;
+    justify-content: flex-end;
   }
 
   .attendance-page-shell .attendance-toolbar-right {
     width: 100%;
-    justify-content: space-between !important;
-    gap: 12px !important;
-  }
-
-  .attendance-page-shell .attendance-status-content {
-    min-width: 0;
-  }
-}
-
-@media (max-width: 767.98px) {
-  .attendance-page-shell .attendance-toolbar-right {
-    flex-direction: column;
-    align-items: flex-end !important;
-    gap: 10px !important;
+    justify-content: flex-end;
   }
 }
 

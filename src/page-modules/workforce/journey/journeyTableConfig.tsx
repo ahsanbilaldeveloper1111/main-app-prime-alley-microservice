@@ -1,6 +1,5 @@
-import React, { type Dispatch, type SetStateAction } from "react";
-import { ChevronRight } from "lucide-react";
-import type { TableAction, TableColumn } from "@components/GenericTable";
+import React from "react";
+import type { TableColumn } from "@components/GenericTable";
 import { getAvatarColor, getInitials } from "@utils/workforceUserAvatar";
 import { getStatusColor, type OnboardingEmployee } from "./journeyDomain";
 
@@ -99,24 +98,6 @@ export function buildOnboardingColumns(): TableColumn<OnboardingEmployee>[] {
           </div>
         );
       },
-    },
-  ];
-}
-
-export function buildOnboardingActions(params: {
-  setSelectedEmployee: Dispatch<SetStateAction<OnboardingEmployee | null>>;
-  setIsSidebarOpen: Dispatch<SetStateAction<boolean>>;
-}): TableAction<OnboardingEmployee>[] {
-  return [
-    {
-      label: "View",
-      icon: <ChevronRight size={16} />,
-      onClick: (row) => {
-        params.setSelectedEmployee(row);
-        params.setIsSidebarOpen(true);
-      },
-      variant: "light",
-      className: "btn-action-style-2 p-1 text-secondary",
     },
   ];
 }

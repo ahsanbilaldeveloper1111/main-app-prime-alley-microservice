@@ -38,7 +38,6 @@ import { useAttendanceLiveSessionElapsed } from "@page-modules/workforce/attenda
 import { useAttendanceListQuery, useAttendanceStatusQuery } from "@page-modules/workforce/attendance/useAttendanceQueries";
 import { AttendanceStatusDisplay } from "@page-modules/workforce/attendance/partials/AttendanceStatusUI";
 import { WorkforceListPageShell } from "@page-modules/workforce/shared/WorkforceListPageShell";
-import { WorkforceFixedActionBar } from "@page-modules/workforce/shared/WorkforceProspectsTheme";
 import {
   WORKFORCE_TOOLBAR_LABELS,
   workforceModuleToolbarDropdown,
@@ -531,6 +530,35 @@ const AttendancePage = () => {
 
   const checkInOutLoading = checkInMutation.isPending || checkOutMutation.isPending;
 
+  const attendanceToolbarRightActions = useMemo(
+    () => (
+      <div className="attendance-toolbar-right">
+        <div className="attendance-status-content">
+          <AttendanceStatusDisplay
+            statusLoading={attendanceStatusQuery.isFetching}
+            status={status}
+            isCheckedIn={isCheckedIn}
+            canCheckInOut={canCheckInOut}
+            liveSessionElapsed={liveSessionElapsed}
+            checkInOutLoading={checkInOutLoading}
+            onCheckIn={handleCheckIn}
+            onCheckOut={handleCheckOut}
+          />
+        </div>
+      </div>
+    ),
+    [
+      attendanceStatusQuery.isFetching,
+      status,
+      isCheckedIn,
+      canCheckInOut,
+      liveSessionElapsed,
+      checkInOutLoading,
+      handleCheckIn,
+      handleCheckOut,
+    ],
+  );
+
   const attendanceToolbar = useMemo<ToolbarConfig>(
     () => ({
       showTabs: true,
@@ -538,11 +566,12 @@ const AttendancePage = () => {
         {
           id: "attendance-records",
           label: "Attendance records",
-          count: pagination?.total,
+          count: pagination?.total ?? 0,
         },
       ],
       activeTab: "attendance-records",
       ...workforceModuleToolbarDropdown(WORKFORCE_TOOLBAR_LABELS.attendance),
+      rightActions: attendanceToolbarRightActions,
       showFiltersButton: true,
       showFilterPills: true,
       filterPills: attendanceFilterPills,
@@ -556,6 +585,7 @@ const AttendancePage = () => {
     }),
     [
       attendanceFilterPills,
+      attendanceToolbarRightActions,
       pagination?.total,
       hasActiveFilters,
       hasUnappliedFilterChanges,
@@ -568,24 +598,6 @@ const AttendancePage = () => {
     <WorkforceListPageShell
       breadcrumbSubTitle="Attendance"
       tableWrapperClass="workforce-attendance-table-wrapper"
-      fixedActions={
-        canCheckInOut ? (
-          <WorkforceFixedActionBar>
-            <div className="attendance-fixed-status">
-              <AttendanceStatusDisplay
-                statusLoading={attendanceStatusQuery.isFetching}
-                status={status}
-                isCheckedIn={isCheckedIn}
-                canCheckInOut={canCheckInOut}
-                liveSessionElapsed={liveSessionElapsed}
-                checkInOutLoading={checkInOutLoading}
-                onCheckIn={handleCheckIn}
-                onCheckOut={handleCheckOut}
-              />
-            </div>
-          </WorkforceFixedActionBar>
-        ) : undefined
-      }
     >
       <div className="attendance-page-shell">
       <GenericTable<AttendanceRecord>

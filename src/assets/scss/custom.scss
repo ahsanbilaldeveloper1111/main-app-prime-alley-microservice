@@ -803,6 +803,16 @@ body:has(.leads-scrollable-content) {
   }
 }
 
+// CRM list metrics — prospects, leads, orders, approvals (shared toolbar metrics panel)
+body:has(.prospects-scrollable-content),
+body:has(.leads-scrollable-content),
+body:has(.orders-scrollable-content),
+body:has(.deals-scrollable-content) {
+  .gt-metrics-panel {
+    flex-shrink: 0 !important;
+  }
+}
+
 body:has(.deals-scrollable-content) {
   overflow: hidden !important;
   .main-content-wrapper {

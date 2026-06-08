@@ -1,4 +1,5 @@
 import React, { useEffect, useRef } from "react";
+import ReactDOM from "react-dom";
 
 type ReportsModalOverlayProps = Readonly<{
   ariaLabel: string;
@@ -7,25 +8,53 @@ type ReportsModalOverlayProps = Readonly<{
   children: React.ReactNode;
 }>;
 
-export function ReportsModalOverlay({ ariaLabel, onClose, dialogClassName, children }: ReportsModalOverlayProps) {
-  const dialogRef = useRef<HTMLDialogElement>(null);
+export function ReportsModalOverlay({
+  ariaLabel,
+  onClose,
+  dialogClassName,
+  children,
+}: ReportsModalOverlayProps) {
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
 
   useEffect(() => {
-    const dialog = dialogRef.current;
-    if (!dialog) return undefined;
-    dialog.showModal();
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
 
-    const handleClose = () => onClose();
-    dialog.addEventListener("close", handleClose);
-    return () => {
-      dialog.removeEventListener("close", handleClose);
-      if (dialog.open) dialog.close();
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        onCloseRef.current();
+      }
     };
-  }, [onClose]);
 
-  return (
-    <dialog ref={dialogRef} aria-label={ariaLabel} className="reports-modal-overlay">
-      <div className={`reports-modal-dialog ${dialogClassName}`}>{children}</div>
-    </dialog>
+    document.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, []);
+
+  if (globalThis.document === undefined) {
+    return null;
+  }
+
+  return ReactDOM.createPortal(
+    <div
+      className="reports-modal-overlay"
+      role="presentation"
+      onClick={() => onCloseRef.current()}
+    >
+      <div
+        className={`reports-modal-dialog ${dialogClassName}`}
+        role="dialog"
+        aria-modal="true"
+        aria-label={ariaLabel}
+        onClick={(event) => event.stopPropagation()}
+      >
+        {children}
+      </div>
+    </div>,
+    document.body,
   );
 }

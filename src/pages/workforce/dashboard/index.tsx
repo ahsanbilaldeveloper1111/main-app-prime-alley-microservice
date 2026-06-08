@@ -34,6 +34,7 @@ import { Plus, Calendar, type LucideIcon } from "lucide-react";
 
 import "@page-modules/workforce/dashboard/employeesDashboard.scss";
 import { workforceKeys } from "@query/keys";
+import { WORKFORCE_AVATAR_PALETTE } from "@page-modules/workforce/shared/workforceChartColors";
 
 const { PERMISSIONS } = HEADER_CONSTANTS;
 
@@ -208,10 +209,20 @@ const EmployeesDashboard = () => {
   const quickActions = useMemo(() => {
     const items: { icon: LucideIcon; color: string; text: string; onClick: () => void }[] = [];
     if (canQuickAddEmployee) {
-      items.push({ icon: Plus, color: "#0066CC", text: "Add Employee", onClick: handleAddEmployee });
+      items.push({
+        icon: Plus,
+        color: WORKFORCE_AVATAR_PALETTE[0],
+        text: "Add Employee",
+        onClick: handleAddEmployee,
+      });
     }
     if (canQuickNewRequest) {
-      items.push({ icon: Calendar, color: "#0066CC", text: "New Request", onClick: handleNewRequest });
+      items.push({
+        icon: Calendar,
+        color: WORKFORCE_AVATAR_PALETTE[1],
+        text: "New Request",
+        onClick: handleNewRequest,
+      });
     }
     return items;
   }, [canQuickAddEmployee, canQuickNewRequest, handleAddEmployee, handleNewRequest]);

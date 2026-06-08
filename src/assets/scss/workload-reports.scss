@@ -530,6 +530,26 @@
     --reports-kpi-accent: #0066CC;
   }
 
+  .reports-kpi-grid--live .reports-kpi-card {
+    --reports-kpi-bg: #ffffff;
+    --reports-kpi-accent: #0066CC;
+    background: #ffffff;
+  }
+
+  .reports-kpi-grid--live .reports-kpi-card__value {
+    color: #0066CC;
+    font-weight: 500;
+  }
+
+  .reports-kpi-grid--live .reports-kpi-card__label {
+    color: #141414;
+    font-weight: 500;
+  }
+
+  .reports-kpi-grid--live .reports-kpi-card__sub {
+    color: #374151;
+  }
+
   .reports-kpi-grid--live .reports-kpi-card--sparkline {
     padding-bottom: 0.5rem;
   }
@@ -1385,55 +1405,6 @@
     }
   }
 
-  .reports-modal-overlay {
-    position: fixed;
-    inset: 0;
-    z-index: 9999;
-    width: 100%;
-    max-width: none;
-    height: 100%;
-    max-height: none;
-    margin: 0;
-    padding: 0;
-    border: none;
-    background: transparent;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-
-    &::backdrop {
-      background: rgba(0, 0, 0, 0.5);
-    }
-  }
-
-  .reports-modal-dialog {
-    background: #fff;
-    border-radius: 8px;
-    max-height: 80vh;
-    display: flex;
-    flex-direction: column;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.18);
-  }
-
-  .reports-modal-dialog--members {
-    width: min(640px, 90vw);
-  }
-
-  .reports-modal-dialog--tasks {
-    width: min(600px, 90vw);
-    overflow: hidden;
-  }
-
-  .reports-modal-dialog--all-tasks {
-    width: min(680px, 90vw);
-  }
-
-  .reports-modal-list-row {
-    &:hover {
-      background: #f5f7fa;
-    }
-  }
-
   .reports-pending-table {
     font-size: 0.82rem;
 
@@ -2232,5 +2203,47 @@
       font-size: 11px;
       color: #9ca3af;
     }
+  }
+}
+
+// Portaled to document.body — must live outside .workload-reports-page scope.
+.reports-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  margin: 0;
+  border: none;
+  background: rgba(0, 0, 0, 0.5);
+}
+
+.reports-modal-dialog {
+  background: #fff;
+  border-radius: 8px;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.18);
+}
+
+.reports-modal-dialog--members {
+  width: min(640px, 90vw);
+}
+
+.reports-modal-dialog--tasks {
+  width: min(600px, 90vw);
+  overflow: hidden;
+}
+
+.reports-modal-dialog--all-tasks {
+  width: min(680px, 90vw);
+}
+
+.reports-modal-list-row {
+  &:hover {
+    background: #f5f7fa;
   }
 }

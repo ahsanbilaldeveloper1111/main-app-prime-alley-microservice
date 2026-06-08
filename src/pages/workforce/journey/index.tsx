@@ -64,7 +64,7 @@ import {
 } from "@page-modules/workforce/journey/journeyDomain";
 import { buildJourneySidebarSections } from "@page-modules/workforce/journey/buildJourneySidebarSections";
 import { buildJourneyFilterPills } from "@page-modules/workforce/journey/journeyFilterPills";
-import { buildOnboardingActions, buildOnboardingColumns } from "@page-modules/workforce/journey/journeyTableConfig";
+import { buildOnboardingColumns } from "@page-modules/workforce/journey/journeyTableConfig";
 import { useJourneysListQuery } from "@page-modules/workforce/journey/useJourneysListQuery";
 import { useJourneyDetailQuery } from "@page-modules/workforce/journey/useJourneyDetailQuery";
 import AddJourneyStepModal from "@page-modules/workforce/journey/partials/AddJourneyStepModal";
@@ -517,15 +517,6 @@ const EmployeesOnboarding = () => {
 
   const onboardingColumns = useMemo(() => buildOnboardingColumns(), []);
 
-  const onboardingActions = useMemo(
-    () =>
-      buildOnboardingActions({
-        setSelectedEmployee,
-        setIsSidebarOpen,
-      }),
-    [],
-  );
-
   const deletingStepIdForUi = deletingStepIdFromMutationState(
     deleteStepMutation.isPending,
     deleteStepMutation.variables,
@@ -831,9 +822,6 @@ const EmployeesOnboarding = () => {
               <GenericTable<OnboardingEmployee>
                 data={employees}
                 columns={onboardingColumns}
-                actions={onboardingActions}
-                showActions={true}
-                actionsLabel="View"
                 loading={Boolean(companyIdentifier) && journeysFetching}
                 loadingMessage="Loading onboarding data..."
                 emptyMessage="No onboarding journeys found"

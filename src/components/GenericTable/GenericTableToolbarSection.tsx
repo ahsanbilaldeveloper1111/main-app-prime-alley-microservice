@@ -104,6 +104,29 @@ function handleClearAllFilterPills(toolbar: ToolbarConfig) {
     .forEach((pill) => pill.onClear?.());
 }
 
+function shouldRenderToolbarMain(
+  toolbar: ToolbarConfig,
+  showToolbarActions: boolean,
+  statsCards?: StatsCardData[],
+): boolean {
+  return Boolean(
+    toolbar.showSearch ||
+      toolbar.showTableViewDropdown ||
+      toolbar.showEditColumns ||
+      toolbar.showPipelineDropdown ||
+      toolbar.showFiltersButton ||
+      toolbar.showSortButton ||
+      toolbar.showExportButton ||
+      toolbar.showSaveButton ||
+      toolbar.customActions ||
+      showToolbarActions ||
+      toolbar.showImport ||
+      (statsCards && statsCards.length > 0) ||
+      ((!toolbar.showTabs || !toolbar.tabs || toolbar.tabs.length === 0) &&
+        toolbar.rightActions),
+  );
+}
+
 type SortableToolbarColumn = {
   key: string;
   label: string;
@@ -180,6 +203,12 @@ export function GenericTableToolbarSection({
     }
     toolbar.onSearchChange?.(sanitized);
   };
+
+  const renderToolbarMain = shouldRenderToolbarMain(
+    toolbar,
+    showToolbarActions,
+    statsCards,
+  );
 
   return (
     <div className="gt-toolbar-container">
@@ -275,6 +304,7 @@ export function GenericTableToolbarSection({
         </div>
       )}
 
+      {renderToolbarMain && (
       <div className="gt-toolbar-main">
         {toolbar.showSearch && (
           <div className="gt-toolbar-search">
@@ -512,6 +542,7 @@ export function GenericTableToolbarSection({
             toolbar.rightActions}
         </div>
       </div>
+      )}
 
       {showFilterPills &&
         toolbar.filterPills &&
@@ -574,7 +605,10 @@ export function GenericTableToolbarSection({
 
       {showMetrics && statsCards && statsCards.length > 0 && (
         <div
+          className="gt-metrics-panel"
           style={{
+            width: "100%",
+            boxSizing: "border-box",
             paddingTop: "16px",
             paddingLeft: "25px",
             paddingRight: "25px",
@@ -588,6 +622,7 @@ export function GenericTableToolbarSection({
             data={statsCards}
             gridMinWidth={metricsGridMinWidth}
             columns={metricsColumns}
+            embedded
           />
         </div>
       )}

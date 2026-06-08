@@ -1008,6 +1008,8 @@ button.preview-button:hover, button.preview-button:focus {
 
 /* Toolbar Styles */
 .gt-toolbar-container {
+  width: 100%;
+  box-sizing: border-box;
   background: transparent;
   border: none;
   border-bottom: none;
@@ -1138,6 +1140,8 @@ button.preview-button:hover, button.preview-button:focus {
 }
 
 .gt-toolbar-main {
+  width: 100%;
+  box-sizing: border-box;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -1202,6 +1206,7 @@ button.preview-button:hover, button.preview-button:focus {
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
+  margin-left: auto;
 }
 
 .gt-toolbar-btn {
@@ -1433,6 +1438,48 @@ background: #fff !important;
 .gt-toolbar-container + .generic-table-card .generic-table-responsive {
   border-radius: 0;
   border-top: none;
+}
+
+/* Metrics panel — aligned with CRM Prospects list pages */
+.gt-metrics-panel {
+  width: 100%;
+  box-sizing: border-box;
+  flex-shrink: 0;
+  border-bottom: 1px solid #ccc;
+}
+
+.gt-toolbar-container:not(:has(.gt-toolbar-main)) > .gt-metrics-panel,
+.gt-toolbar-container > .gt-toolbar-tabs-section + .gt-metrics-panel,
+.gt-toolbar-container > .gt-filter-pills + .gt-metrics-panel {
+  border-top: 1px solid #cccccc;
+  border-radius: 10px 10px 0 0;
+}
+
+.gt-metrics-panel .generic-stats-cards {
+  width: 100%;
+  max-width: 100%;
+  margin-bottom: 0 !important;
+  border: none !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+
+.gt-metrics-panel .generic-stats-cards > button,
+.gt-metrics-panel .generic-stats-cards > div {
+  min-height: 108px;
+}
+
+@media (max-width: 575.98px) {
+  .gt-metrics-panel .generic-stats-cards > button,
+  .gt-metrics-panel .generic-stats-cards > div {
+    border-left: none !important;
+    border-top: 1px solid #e5e7eb !important;
+  }
+
+  .gt-metrics-panel .generic-stats-cards > button:first-child,
+  .gt-metrics-panel .generic-stats-cards > div:first-child {
+    border-top: none !important;
+  }
 }
 
 /* Responsive Adjustments */

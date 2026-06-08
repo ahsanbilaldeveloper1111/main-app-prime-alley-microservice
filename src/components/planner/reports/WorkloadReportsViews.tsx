@@ -1,5 +1,4 @@
 import React, { useState } from "react";
-import ReactDOM from "react-dom";
 import type { LucideIcon } from "lucide-react";
 import {
   BarChart3,
@@ -621,8 +620,7 @@ export function ReportsMemberPerformanceBars({
         View All ({sortedRows.length} members)
       </button>
     </div>
-    {showAll
-      ? ReactDOM.createPortal(
+    {showAll ? (
           <ReportsModalOverlay
             ariaLabel="Member Performance"
             onClose={() => setShowAll(false)}
@@ -695,10 +693,8 @@ export function ReportsMemberPerformanceBars({
                 );
               })}
             </div>
-          </ReportsModalOverlay>,
-          document.body,
-        )
-      : null}
+          </ReportsModalOverlay>
+    ) : null}
     </>
   );
 }
