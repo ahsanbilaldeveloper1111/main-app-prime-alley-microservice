@@ -50,6 +50,15 @@ import EmployeesDepartmentHeadcountPanel from "@page-modules/workforce/employees
 import EmployeesDashboardOverviewPanel from "@page-modules/workforce/employees/partials/EmployeesDashboardOverviewPanel";
 import CreateJourneyModal from "@page-modules/workforce/employees/partials/CreateJourneyModal";
 import { WorkforceListPageShell } from "@page-modules/workforce/shared/WorkforceListPageShell";
+import {
+  WorkforceFixedActionBar,
+  WorkforceProspectsPrimaryButton,
+} from "@page-modules/workforce/shared/WorkforceProspectsTheme";
+import {
+  EMPLOYEES_LIST_SCOPED_LAYOUT,
+  WORKFORCE_TOOLBAR_LABELS,
+  workforceModuleToolbarDropdown,
+} from "@page-modules/workforce/shared/workforceListPageConfig";
 import { renderApplyFilterActions } from "@utils/communicationsStagedFilters";
 
 import { useSession } from "next-auth/react";
@@ -599,6 +608,7 @@ const Employees = () => {
       tabs: employeeTabs,
       activeTab: "employees",
       onTabChange: () => {},
+      ...workforceModuleToolbarDropdown(WORKFORCE_TOOLBAR_LABELS.employees),
       showFiltersButton: true,
       showFilterPills: true,
       filterPills: employeeFilterPills,
@@ -609,12 +619,6 @@ const Employees = () => {
         handleApply,
         "employees",
       ),
-      rightActions: session?.user?.permissions?.includes(PERMISSIONS.ADD_EMPLOYEE_STAFF_MANAGEMENT) ? (
-        <button type="button" className="btn btn-dark btn-sm d-flex align-items-center gap-1" onClick={openCreateModal}>
-          <Plus size={14} />
-          Add Employee
-        </button>
-      ) : undefined,
     }),
     [
       employeeFilterPills,
@@ -622,12 +626,12 @@ const Employees = () => {
       handleApply,
       hasActiveFilters,
       hasUnappliedFilterChanges,
-      openCreateModal,
       resetFilters,
       searchTerm,
-      session?.user?.permissions,
     ],
   );
+
+  const canAddEmployee = session?.user?.permissions?.includes(PERMISSIONS.ADD_EMPLOYEE_STAFF_MANAGEMENT);
 
   const employeeSidebarSections = useMemo<SidebarSection[]>(() => {
     if (!selectedProfile) return [];
@@ -699,6 +703,17 @@ const Employees = () => {
       <WorkforceListPageShell
         breadcrumbSubTitle="Employees"
         tableWrapperClass="workforce-employees-table-wrapper"
+        scopedLayout={EMPLOYEES_LIST_SCOPED_LAYOUT}
+        fixedActions={
+          canAddEmployee ? (
+            <WorkforceFixedActionBar>
+              <WorkforceProspectsPrimaryButton onClick={openCreateModal}>
+                <Plus size={16} />
+                Add Employee
+              </WorkforceProspectsPrimaryButton>
+            </WorkforceFixedActionBar>
+          ) : undefined
+        }
         footer={
           <div className="employees-page__charts-grid">
             <EmployeesDepartmentHeadcountPanel chartRows={departmentHeadcountData} />

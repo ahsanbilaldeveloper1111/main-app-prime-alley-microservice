@@ -76,6 +76,7 @@ const SidebarDateInputField: React.FC<SidebarDateInputFieldProps> = ({
     <Form.Label className="new-request-label">{label}</Form.Label>
     <Form.Control
       type="date"
+      className="new-request-fieldControl"
       value={value}
       min={min}
       onChange={(e) => onChange(e.target.value)}
@@ -349,6 +350,7 @@ const NewRequestModal: React.FC<NewRequestModalProps> = ({
                 Category <span className="text-danger">*</span>
               </Form.Label>
               <Form.Select
+                className="new-request-fieldControl"
                 value={selectedParentId === "" ? "" : String(selectedParentId)}
                 onChange={(e) => {
                   const val = e.target.value;
@@ -377,6 +379,7 @@ const NewRequestModal: React.FC<NewRequestModalProps> = ({
                   Sub-category <span className="text-danger">*</span>
                 </Form.Label>
                 <Form.Select
+                  className="new-request-fieldControl"
                   value={form.user_request_category_id === "" ? "" : String(form.user_request_category_id)}
                   onChange={(e) => {
                     const val = e.target.value;
@@ -400,6 +403,7 @@ const NewRequestModal: React.FC<NewRequestModalProps> = ({
               </Form.Label>
               <Form.Control
                 type="text"
+                className="new-request-fieldControl"
                 value={form.subject}
                 onChange={(e) => setForm((f) => ({ ...f, subject: e.target.value }))}
                 placeholder="Request subject"
@@ -413,6 +417,7 @@ const NewRequestModal: React.FC<NewRequestModalProps> = ({
               </Form.Label>
               <Form.Control
                 as="textarea"
+                className="new-request-fieldControl"
                 rows={3}
                 value={form.reason}
                 onChange={(e) => setForm((f) => ({ ...f, reason: e.target.value }))}

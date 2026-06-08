@@ -94,7 +94,7 @@ function resolveKpiAccentClass(accent: KpiCardProps["accent"]): string {
   if (accent === "overdue") return "reports-kpi-card--overdue";
   if (accent === "pending") return "reports-kpi-card--pending";
   if (accent === "in_progress") return "reports-kpi-card--in-progress";
-  return "";
+  return "reports-kpi-card--shade-indigo";
 }
 
 function resolveKpiDeltaClass(delta: string | null | undefined): string {

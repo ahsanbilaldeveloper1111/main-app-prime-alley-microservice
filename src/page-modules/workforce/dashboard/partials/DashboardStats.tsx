@@ -67,7 +67,7 @@ const DashboardStats: React.FC<DashboardStatsProps> = ({ onViewCalendar, params 
       <div className="employees-dashboard-stats__card">
         <div className="employees-dashboard-stats__top-row">
           <div className="employees-dashboard-stats__icon-wrap employees-dashboard-stats__icon-wrap--green">
-            <CheckCircle size={24} color="#10B981" strokeWidth={2} />
+            <CheckCircle size={24} color="#0052A3" strokeWidth={2} />
           </div>
           <div className="employees-dashboard-stats__big-number">{counters?.approvals?.pending ?? 0}</div>
         </div>
@@ -76,7 +76,7 @@ const DashboardStats: React.FC<DashboardStatsProps> = ({ onViewCalendar, params 
           ⏰ {counters?.approvals?.aging?.["8_plus_days"] ?? 0} overdue
         </span>
         <div className="employees-dashboard-stats__sub-row employees-dashboard-stats__sub-row--spaced">
-          <Circle size={8} fill="#F59E0B" color="#F59E0B" />
+          <Circle size={8} fill="#0066CC" color="#0066CC" />
           <span>
             0–3d: {counters?.approvals?.aging?.["0_3_days"] ?? 0} · 4–7d:{" "}
             {counters?.approvals?.aging?.["4_7_days"] ?? 0} · 8+d:{" "}
@@ -88,7 +88,7 @@ const DashboardStats: React.FC<DashboardStatsProps> = ({ onViewCalendar, params 
       <div className="employees-dashboard-stats__card">
         <div className="employees-dashboard-stats__top-row">
           <div className="employees-dashboard-stats__icon-wrap employees-dashboard-stats__icon-wrap--amber">
-            <MessageSquare size={24} color="#F59E0B" strokeWidth={2} />
+            <MessageSquare size={24} color="#0066CC" strokeWidth={2} />
           </div>
           <div className="employees-dashboard-stats__big-number">{counters?.leave?.on_leave_today ?? 0}</div>
         </div>
@@ -105,21 +105,21 @@ const DashboardStats: React.FC<DashboardStatsProps> = ({ onViewCalendar, params 
       <div className="employees-dashboard-stats__card">
         <div className="employees-dashboard-stats__top-row">
           <div className="employees-dashboard-stats__icon-wrap employees-dashboard-stats__icon-wrap--violet">
-            <Send size={24} color="#0EA5E9" strokeWidth={2} />
+            <Send size={24} color="#0066CC" strokeWidth={2} />
           </div>
           <div className="employees-dashboard-stats__big-number">{counters?.journey?.in_progress ?? 0}</div>
         </div>
         <div className="employees-dashboard-stats__label">Journey Overdue</div>
         <div className="employees-dashboard-stats__sub-row employees-dashboard-stats__sub-row--spaced">
-          <Circle size={8} fill="#F59E0B" color="#F59E0B" />
+          <Circle size={8} fill="#0052A3" color="#0052A3" />
           <span>{counters?.journey?.overdue ?? 0} Due Soon</span>
         </div>
       </div>
 
       <div className="employees-dashboard-stats__card">
         <div className="employees-dashboard-stats__top-row">
-          <div className="employees-dashboard-stats__icon-wrap employees-dashboard-stats__icon-wrap--red">
-            <AlertTriangle size={24} color="#EF4444" strokeWidth={2} />
+          <div className="employees-dashboard-stats__icon-wrap employees-dashboard-stats__icon-wrap--alert">
+            <AlertTriangle size={24} color="#0052A3" strokeWidth={2} />
           </div>
           <div className="employees-dashboard-stats__big-number">{counters?.compliance_alerts?.total ?? 0}</div>
         </div>

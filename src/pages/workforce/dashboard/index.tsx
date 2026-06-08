@@ -13,6 +13,7 @@ import { type EmployeeDashboardParams } from "@utils/staffManagement";
 import { useMainAppLookups } from "@hooks/useMainAppLookups";
 import { HEADER_CONSTANTS } from "@constants/headerConstants";
 import {
+  AGING_CHART_COLORS,
   DEPARTMENT_CHART_COLORS,
   departmentNameFromLookup,
   type LeaveCalendarDay,
@@ -180,9 +181,9 @@ const EmployeesDashboard = () => {
   const approvalsAgingChartData = useMemo(() => {
     const d = approvalsAgingData;
     return [
-      { name: "0-3 days", value: d["0_3_days"] ?? 0, fill: "#10B981" },
-      { name: "4-7 days", value: d["4_7_days"] ?? 0, fill: "#F59E0B" },
-      { name: "8+ days", value: d["8_plus_days"] ?? 0, fill: "#EF4444" },
+      { name: "0-3 days", value: d["0_3_days"] ?? 0, fill: AGING_CHART_COLORS[0] },
+      { name: "4-7 days", value: d["4_7_days"] ?? 0, fill: AGING_CHART_COLORS[1] },
+      { name: "8+ days", value: d["8_plus_days"] ?? 0, fill: AGING_CHART_COLORS[2] },
     ];
   }, [approvalsAgingData]);
 
@@ -210,7 +211,7 @@ const EmployeesDashboard = () => {
       items.push({ icon: Plus, color: "#0066CC", text: "Add Employee", onClick: handleAddEmployee });
     }
     if (canQuickNewRequest) {
-      items.push({ icon: Calendar, color: "#10B981", text: "New Request", onClick: handleNewRequest });
+      items.push({ icon: Calendar, color: "#0066CC", text: "New Request", onClick: handleNewRequest });
     }
     return items;
   }, [canQuickAddEmployee, canQuickNewRequest, handleAddEmployee, handleNewRequest]);

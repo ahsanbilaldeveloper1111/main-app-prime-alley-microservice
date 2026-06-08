@@ -793,8 +793,8 @@ const ApprovalDetailSidebar: React.FC<ApprovalDetailSidebarProps> = ({
                     style={{
                       padding: "5px 10px",
                       borderRadius: "999px",
-                      backgroundColor: "#eef2ff",
-                      border: "1px solid #e0e7ff",
+                      backgroundColor: "#eff6ff",
+                      border: "1px solid #bfdbfe",
                       color: "#0066CC",
                       fontSize: "12px",
                       fontWeight: 600,

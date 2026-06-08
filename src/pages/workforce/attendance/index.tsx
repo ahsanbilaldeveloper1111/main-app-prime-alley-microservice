@@ -38,6 +38,11 @@ import { useAttendanceLiveSessionElapsed } from "@page-modules/workforce/attenda
 import { useAttendanceListQuery, useAttendanceStatusQuery } from "@page-modules/workforce/attendance/useAttendanceQueries";
 import { AttendanceStatusDisplay } from "@page-modules/workforce/attendance/partials/AttendanceStatusUI";
 import { WorkforceListPageShell } from "@page-modules/workforce/shared/WorkforceListPageShell";
+import { WorkforceFixedActionBar } from "@page-modules/workforce/shared/WorkforceProspectsTheme";
+import {
+  WORKFORCE_TOOLBAR_LABELS,
+  workforceModuleToolbarDropdown,
+} from "@page-modules/workforce/shared/workforceListPageConfig";
 import { renderApplyFilterActions } from "@utils/communicationsStagedFilters";
 
 import "@assets/scss/common.scss";
@@ -502,7 +507,8 @@ const AttendancePage = () => {
         show: () => canDeleteAttendance,
         disabled: (record: AttendanceRecord) => !canDeleteAttendanceRow(record),
         disabledTitle: "You can only delete attendance for yourself or your team (with permission).",
-        variant: "link",
+        variant: "light",
+        className: "btn-action-style-2 p-1 text-danger",
       },
     ],
     [canDeleteAttendance, canDeleteAttendanceRow, handleDeleteAttendanceClick],
@@ -536,6 +542,7 @@ const AttendancePage = () => {
         },
       ],
       activeTab: "attendance-records",
+      ...workforceModuleToolbarDropdown(WORKFORCE_TOOLBAR_LABELS.attendance),
       showFiltersButton: true,
       showFilterPills: true,
       filterPills: attendanceFilterPills,
@@ -546,34 +553,10 @@ const AttendancePage = () => {
         handleApplyFilters,
         "attendance",
       ),
-      rightActions: (
-        <div className="attendance-toolbar-right">
-          <div className="attendance-status-content">
-            <AttendanceStatusDisplay
-              statusLoading={attendanceStatusQuery.isFetching}
-              status={status}
-              isCheckedIn={isCheckedIn}
-              canCheckInOut={canCheckInOut}
-              liveSessionElapsed={liveSessionElapsed}
-              checkInOutLoading={checkInOutLoading}
-              onCheckIn={handleCheckIn}
-              onCheckOut={handleCheckOut}
-            />
-          </div>
-        </div>
-      ),
     }),
     [
       attendanceFilterPills,
       pagination?.total,
-      attendanceStatusQuery.isFetching,
-      status,
-      isCheckedIn,
-      canCheckInOut,
-      liveSessionElapsed,
-      checkInOutLoading,
-      handleCheckIn,
-      handleCheckOut,
       hasActiveFilters,
       hasUnappliedFilterChanges,
       handleApplyFilters,
@@ -582,7 +565,28 @@ const AttendancePage = () => {
   );
 
   return (
-    <WorkforceListPageShell breadcrumbSubTitle="Attendance" tableWrapperClass="workforce-attendance-table-wrapper">
+    <WorkforceListPageShell
+      breadcrumbSubTitle="Attendance"
+      tableWrapperClass="workforce-attendance-table-wrapper"
+      fixedActions={
+        canCheckInOut ? (
+          <WorkforceFixedActionBar>
+            <div className="attendance-fixed-status">
+              <AttendanceStatusDisplay
+                statusLoading={attendanceStatusQuery.isFetching}
+                status={status}
+                isCheckedIn={isCheckedIn}
+                canCheckInOut={canCheckInOut}
+                liveSessionElapsed={liveSessionElapsed}
+                checkInOutLoading={checkInOutLoading}
+                onCheckIn={handleCheckIn}
+                onCheckOut={handleCheckOut}
+              />
+            </div>
+          </WorkforceFixedActionBar>
+        ) : undefined
+      }
+    >
       <div className="attendance-page-shell">
       <GenericTable<AttendanceRecord>
         data={records}

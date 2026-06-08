@@ -115,7 +115,8 @@ export function buildOnboardingActions(params: {
         params.setSelectedEmployee(row);
         params.setIsSidebarOpen(true);
       },
-      variant: "link",
+      variant: "light",
+      className: "btn-action-style-2 p-1 text-secondary",
     },
   ];
 }

@@ -119,7 +119,7 @@ const AddJourneyStepModal: React.FC<AddJourneyStepModalProps> = ({
       <Modal.Footer>
         <button
           type="button"
-          className="journey-page__modal-footer-btn journey-page__modal-footer-btn--cancel"
+          className="workforce-sidebar-btn-cancel"
           onClick={onHide}
           disabled={submitting}
         >
@@ -127,7 +127,7 @@ const AddJourneyStepModal: React.FC<AddJourneyStepModalProps> = ({
         </button>
         <button
           type="button"
-          className="journey-page__modal-footer-btn journey-page__modal-footer-btn--submit"
+          className="workforce-sidebar-btn-create"
           onClick={handleSubmit}
           disabled={submitting || form.title.trim() === ""}
         >

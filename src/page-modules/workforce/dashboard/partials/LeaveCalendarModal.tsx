@@ -61,15 +61,15 @@ const LeaveCalendarModal: React.FC<LeaveCalendarModalProps> = ({
             const isToday = dateStr === todayStr;
             let dayBackground = "#F9FAFB";
             if (hasLeave) {
-              dayBackground = "#FEF3C7";
+              dayBackground = "#E0F2FE";
             }
             if (isToday) {
-              dayBackground = "#E0E7FF";
+              dayBackground = "#DBEAFE";
             }
             if (isSelected) {
-              dayBackground = "#EEF2FF";
+              dayBackground = "#EFF6FF";
             }
-            const dayBorder = isSelected || isToday ? "2px solid #0066CC" : "1px solid #E5E7EB";
+            const dayBorder = isSelected || isToday ? "2px solid #0066CC" : "1px solid #BFDBFE";
             const dayColor = isSelected || isToday ? "#0066CC" : "#374151";
             const dayWeight = isSelected || isToday ? "600" : "400";
             const leaveCountText = dayData?.on_leave_count ? `(${dayData.on_leave_count})` : "";

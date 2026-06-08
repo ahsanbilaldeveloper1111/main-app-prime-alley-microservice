@@ -2,11 +2,18 @@ import React from "react";
 import { Col, Row } from "react-bootstrap";
 import type { HighLevelKpiCard, HighLevelListItem } from "@page-modules/planner/reports/teamOverviewReportsDomain";
 
-function resolveKpiAccentClass(accent: HighLevelKpiCard["accent"]): string {
+const HIGH_LEVEL_KPI_BLUE_SHADES = [
+  "reports-kpi-card--shade-indigo",
+  "reports-kpi-card--shade-light",
+  "reports-kpi-card--shade-sky",
+  "reports-kpi-card--shade-medium",
+] as const;
+
+function resolveKpiAccentClass(accent: HighLevelKpiCard["accent"], index = 0): string {
   if (accent === "completed") return "reports-kpi-card--completed";
   if (accent === "overdue") return "reports-kpi-card--overdue";
   if (accent === "pending") return "reports-kpi-card--pending";
-  return "";
+  return HIGH_LEVEL_KPI_BLUE_SHADES[index % HIGH_LEVEL_KPI_BLUE_SHADES.length];
 }
 
 function resolveListBadgeClass(tone: HighLevelListItem["badgeTone"]): string {
@@ -20,8 +27,8 @@ function resolveListBadgeClass(tone: HighLevelListItem["badgeTone"]): string {
 export function ReportsHighLevelKpiRow({ cards }: Readonly<{ cards: HighLevelKpiCard[] }>) {
   return (
     <div className="reports-kpi-grid">
-      {cards.map((card) => (
-        <div key={card.label} className={`reports-kpi-card ${resolveKpiAccentClass(card.accent)}`.trim()}>
+      {cards.map((card, index) => (
+        <div key={card.label} className={`reports-kpi-card ${resolveKpiAccentClass(card.accent, index)}`.trim()}>
           <div className="reports-kpi-card__label">
             <span className="reports-kpi-card__dot" aria-hidden="true" />
             {card.label}

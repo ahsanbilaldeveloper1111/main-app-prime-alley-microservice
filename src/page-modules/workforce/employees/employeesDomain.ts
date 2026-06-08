@@ -1,5 +1,6 @@
 import moment from "moment";
 import type { MainAppDepartmentLookup } from "@hooks/useMainAppLookups";
+import { WORKFORCE_DEPARTMENT_CHART_COLORS } from "@page-modules/workforce/shared/workforceChartColors";
 import type { UserProfile } from "@utils/staffManagement";
 
 /** Dashboard counters on employees page (includes optional fields returned by API). */
@@ -48,16 +49,7 @@ export function serializeEmployeesListScopeKey(scope: EmployeesListQueryScope): 
   });
 }
 
-export const DEPARTMENT_HEADCOUNT_CHART_COLORS = [
-  "#0066CC",
-  "#10b981",
-  "#f59e0b",
-  "#ec4899",
-  "#0EA5E9",
-  "#06b6d4",
-  "#84cc16",
-  "#f97316",
-];
+export const DEPARTMENT_HEADCOUNT_CHART_COLORS = WORKFORCE_DEPARTMENT_CHART_COLORS;
 
 /** Value sent as `user_ids` in getUserProfiles — matches profile `user_id` (phone / extension). */
 export function userIdForProfilePayload(u: { phone?: string | null }): string {

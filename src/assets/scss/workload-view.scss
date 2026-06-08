@@ -341,26 +341,51 @@
     line-height: 1.4;
   }
 
+  // Prospects-aligned blue palette (see CrmProspectsContactsListPage stats cards).
   .workload-summary-row {
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));
-    margin: 4px 0;
+    margin: 4px 0 16px;
     background: #ffffff;
-    border-left: none;
-    border-right: none;
-    border-top: none;
-    border-radius: 0;
-    border-bottom: 1px solid #eaf0f6;
+    border: 1px solid #cccccc;
+    border-radius: 10px;
+    overflow: hidden;
   }
 
   .workload-summary-card {
+    --workload-summary-accent: #0066CC;
+    --workload-summary-bg: #eef2ff;
     padding: 16px 20px;
-    border-right: 1px solid #eaf0f6;
-    background: #ffffff;
+    border-right: 1px solid #cccccc;
+    background: var(--workload-summary-bg);
     transition: background 0.15s ease;
 
     &:last-child {
       border-right: none;
+    }
+
+    // #EEF2FF + #0066CC — matches prospects "All" card
+    &--shade-indigo {
+      --workload-summary-bg: #eef2ff;
+      --workload-summary-accent: #0066CC;
+    }
+
+    // #DBEAFE + #0052A3
+    &--shade-light {
+      --workload-summary-bg: #dbeafe;
+      --workload-summary-accent: #0052A3;
+    }
+
+    // #E0F2FE + #0066CC — matches prospects "Recently Contacted"
+    &--shade-sky {
+      --workload-summary-bg: #e0f2fe;
+      --workload-summary-accent: #0066CC;
+    }
+
+    // #BFDBFE + deeper blue
+    &--shade-medium {
+      --workload-summary-bg: #bfdbfe;
+      --workload-summary-accent: #1d4ed8;
     }
   }
 
@@ -368,7 +393,8 @@
     cursor: pointer;
 
     &:hover:not(:disabled) {
-      background: #f9fafb;
+      filter: brightness(0.98);
+      background: var(--workload-summary-bg);
     }
   }
 
@@ -384,7 +410,7 @@
     font-size: clamp(20px, 1.8vw, 28px);
     font-weight: 700;
     line-height: 1;
-    color: #141414;
+    color: var(--workload-summary-accent, #0066CC);
     margin-bottom: 6px;
     font-family: "Lexend Deca", Helvetica, Arial, sans-serif;
   }
@@ -394,7 +420,7 @@
     align-items: center;
     gap: 5px;
     font-size: clamp(10px, 0.75vw, 11px);
-    color: #718096;
+    color: #374151;
     font-family: "Lexend Deca", Helvetica, Arial, sans-serif;
   }
 
@@ -403,6 +429,7 @@
     height: 7px;
     border-radius: 50%;
     flex-shrink: 0;
+    background: var(--workload-summary-accent, #0066CC);
   }
 
   // Planner dashboard board tokens (BoardView.tsx)
@@ -1604,17 +1631,39 @@
   }
 
   .workload-day-stat {
-    border: 1px solid #b0bec5;
+    --workload-day-stat-accent: #0066CC;
+    --workload-day-stat-bg: #eef2ff;
+    border: 1px solid #cccccc;
     border-radius: 8px;
     padding: 10px 12px;
     text-align: center;
-    background: #ffffff;
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+    background: var(--workload-day-stat-bg);
+    box-shadow: none;
+
+    &:nth-child(1) {
+      --workload-day-stat-bg: #eef2ff;
+      --workload-day-stat-accent: #0066CC;
+    }
+
+    &:nth-child(2) {
+      --workload-day-stat-bg: #dbeafe;
+      --workload-day-stat-accent: #0052A3;
+    }
+
+    &:nth-child(3) {
+      --workload-day-stat-bg: #e0f2fe;
+      --workload-day-stat-accent: #0066CC;
+    }
+
+    &:nth-child(4) {
+      --workload-day-stat-bg: #bfdbfe;
+      --workload-day-stat-accent: #1d4ed8;
+    }
   }
 
   .workload-day-stat__label {
     font-size: clamp(9px, 0.7vw, 11px);
-    color: #718096;
+    color: #475569;
     text-transform: uppercase;
     letter-spacing: 0.04em;
     margin-top: 2px;
@@ -1626,16 +1675,16 @@
     font-weight: 700;
     font-size: clamp(16px, 1.2vw, 20px);
     line-height: 1.2;
-    color: #141414;
+    color: var(--workload-day-stat-accent, #0066CC);
     font-family: "Lexend Deca", Helvetica, Arial, sans-serif;
   }
 
   .workload-day-stat__value--accent {
-    color: #0066CC;
+    color: var(--workload-day-stat-accent, #0066CC);
   }
 
   .workload-day-stat__value--warn {
-    color: #ea580c;
+    color: #d97706;
   }
 
   .workload-day-action-btn {

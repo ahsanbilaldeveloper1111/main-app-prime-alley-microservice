@@ -18,6 +18,10 @@ import {
 } from "@page-modules/workforce/request-categories/partials/requestCategoriesGenericTableBlocks";
 import { WorkforceSettingsTableWrap } from "@page-modules/workforce/shared/WorkforceSettingsTableWrap";
 import { WorkforceListPageShell } from "@page-modules/workforce/shared/WorkforceListPageShell";
+import {
+  WorkforceFixedActionBar,
+  WorkforceProspectsPrimaryButton,
+} from "@page-modules/workforce/shared/WorkforceProspectsTheme";
 import "@page-modules/workforce/shared/workforcePages.scss";
 import {
   categoryModalTitle,
@@ -142,10 +146,10 @@ function RequestCategoriesAddButton({
   }
 
   return (
-    <Button variant="primary" onClick={onClick}>
-      <Plus size={18} className="me-1" />
+    <WorkforceProspectsPrimaryButton onClick={onClick}>
+      <Plus size={16} />
       Add Category
-    </Button>
+    </WorkforceProspectsPrimaryButton>
   );
 }
 
@@ -333,16 +337,23 @@ export function RequestCategoriesPageView({
           </WorkforceSettingsTableWrap>
         </>
       ) : (
-        <WorkforceListPageShell breadcrumbSubTitle="Request Categories" tableWrapperClass="workforce-request-categories-table-wrapper">
+        <WorkforceListPageShell
+          breadcrumbSubTitle="Request Categories"
+          tableWrapperClass="workforce-request-categories-table-wrapper"
+          fixedActions={
+            canManage ? (
+              <WorkforceFixedActionBar>
+                <RequestCategoriesAddButton canManage={canManage} onClick={openCreateCategory} />
+              </WorkforceFixedActionBar>
+            ) : undefined
+          }
+        >
           <PageHeader
             title=""
             showSearch={true}
             searchPlaceholder="Search categories..."
             searchValue={searchValue}
             onSearchChange={(value) => setSearchValue(value)}
-            buttons={
-              <RequestCategoriesAddButton canManage={canManage} onClick={openCreateCategory} />
-            }
           />
 
           <GenericTable<UserRequestCategory>

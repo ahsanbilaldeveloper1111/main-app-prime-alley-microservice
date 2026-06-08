@@ -1,9 +1,223 @@
+@import "../../../components/main-settings/mainSettingsTableActions.scss";
+@import "./workforceResponsive.scss";
+
 // Shared workforce page chrome — aligned with CRM Prospects / Main Settings.
+
+.workforce-page-container,
+.sub-categories-page,
+.request-categories-page {
+  @include main-settings-table-row-action-buttons;
+}
 
 .workforce-page-container {
   font-family: "Lexend Deca", Helvetica, Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
   color: #141414;
+
+}
+
+// —— Page primary CTAs (top-right in document flow, not sticky/fixed) ——
+.workforce-page-actions,
+.workforce-prospects-fixed-action {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 0 24px 12px;
+  box-sizing: border-box;
+  position: static;
+  width: auto;
+  z-index: auto;
+}
+
+.workforce-prospects-primary-btn,
+.workforce-toolbar-primary-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 13px;
+  background-color: #0066CC;
+  color: #ffffff;
+  border: none;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  font-family: "Lexend Deca", Helvetica, Arial, sans-serif;
+  line-height: 1.2;
+  cursor: pointer;
+  white-space: nowrap;
+
+  &:hover:not(:disabled) {
+    background-color: #0052A3;
+    color: #ffffff;
+  }
+
+  &:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+  }
+
+  svg {
+    color: currentColor;
+    stroke: currentColor;
+    flex-shrink: 0;
+  }
+}
+
+// —— Prospects-aligned sidebar / form footer buttons ——
+.workforce-sidebar-btn-create,
+.contact-sidebar-footer .contact-form-btn-create {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 8px 14px;
+  background-color: #0066CC;
+  color: #ffffff;
+  border: none;
+  border-radius: 4px;
+  font-size: 13px;
+  font-weight: 500;
+  font-family: "Lexend Deca", Helvetica, Arial, sans-serif;
+  line-height: 1.2;
+  cursor: pointer;
+
+  &:hover:not(:disabled) {
+    background-color: #0052A3;
+    color: #ffffff;
+  }
+
+  &:disabled {
+    background-color: #cbd5e0;
+    color: #334155;
+    cursor: not-allowed;
+  }
+}
+
+.workforce-sidebar-btn-cancel,
+.contact-sidebar-footer .contact-form-btn-cancel {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 8px 14px;
+  background-color: transparent;
+  color: #141414;
+  border: 1px solid #8a8a8a;
+  border-radius: 4px;
+  font-size: 13px;
+  font-weight: 500;
+  font-family: "Lexend Deca", Helvetica, Arial, sans-serif;
+  line-height: 1.2;
+  cursor: pointer;
+
+  &:hover:not(:disabled) {
+    background-color: #f7fafc;
+  }
+
+  &:disabled {
+    color: #a0aec0;
+    cursor: not-allowed;
+  }
+}
+
+.workforce-sidebar-btn-danger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 8px 14px;
+  background-color: #dc3545;
+  color: #ffffff;
+  border: none;
+  border-radius: 4px;
+  font-size: 13px;
+  font-weight: 500;
+  font-family: "Lexend Deca", Helvetica, Arial, sans-serif;
+  line-height: 1.2;
+  cursor: pointer;
+
+  &:hover:not(:disabled) {
+    background-color: #c82333;
+    color: #ffffff;
+  }
+
+  &:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+  }
+}
+
+.workforce-page-container {
+  .gt-search-icon {
+    color: #64748b;
+  }
+
+  .generic-table-container {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    overflow: visible;
+  }
+
+  .gt-toolbar-container {
+    flex-shrink: 0;
+    margin-bottom: 0;
+    padding-bottom: 0;
+    overflow: visible;
+  }
+
+  .gt-toolbar-tabs-section,
+  .gt-toolbar-main {
+    flex-shrink: 0;
+  }
+
+  .gt-filter-pills {
+    flex-shrink: 0;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    align-content: flex-start;
+    justify-content: flex-start;
+    row-gap: 8px;
+    padding: 8px 24px 12px;
+    margin: 0;
+    overflow: visible;
+    max-width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+    background: #fff;
+    border-left: 1px solid #ccc;
+    border-right: 1px solid #ccc;
+    border-bottom: 1px solid #ccc;
+
+    > .d-flex.align-items-center.gap-2.flex-wrap {
+      flex-wrap: wrap !important;
+      align-items: center !important;
+      gap: 8px !important;
+      width: 100%;
+      min-width: 0;
+    }
+  }
+
+  .gt-filter-pill.dropdown-toggle,
+  .gt-filter-pill {
+    max-width: min(240px, calc(100vw - 48px));
+    min-width: 0;
+  }
+
+  .gt-filter-pill-value {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 180px;
+    display: inline-block;
+    vertical-align: bottom;
+  }
+
+  .gt-filter-pills .dropdown-menu {
+    z-index: 1060;
+  }
 }
 
 .workforce-page-container .gt-filter-pills .gt-filter-pill-add.gt-apply-filters-btn,

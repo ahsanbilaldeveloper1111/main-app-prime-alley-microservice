@@ -256,45 +256,50 @@
   opacity: 0.9;
 }
 
-.att-action-btn {
-  font-weight: 600;
-  border-radius: 0.625rem;
-  padding: 0.5rem 1.1rem 0.5rem 0.95rem;
+.attendance-fixed-status {
+  display: flex;
+  align-items: center;
+}
+
+.btn.att-action-btn,
+.btn.att-action-btn.btn-success,
+.btn.att-action-btn.btn-warning {
+  font-weight: 500;
+  border-radius: 4px;
+  padding: 9px 13px;
+  font-size: 12px;
   display: inline-flex;
   align-items: center;
-  gap: 0.45rem;
+  gap: 8px;
   white-space: nowrap;
   border: none;
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06), 0 4px 12px rgba(16, 185, 129, 0.2);
-  transition: transform 0.15s ease, box-shadow 0.15s ease, filter 0.15s ease;
+  background-color: #0066CC;
+  color: #ffffff;
+  box-shadow: none;
+  transition: background-color 0.15s ease;
 }
 
-.att-action-btn:hover:not(:disabled) {
-  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.08), 0 8px 20px rgba(16, 185, 129, 0.28);
-  filter: brightness(1.02);
-  transform: translateY(-1px);
+.btn.att-action-btn:hover:not(:disabled),
+.btn.att-action-btn.btn-success:hover:not(:disabled),
+.btn.att-action-btn.btn-warning:hover:not(:disabled) {
+  background-color: #0052A3;
+  color: #ffffff;
 }
 
-.att-action-btn:active:not(:disabled) {
-  transform: translateY(0);
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08);
-}
-
-.att-action-btn:disabled {
-  opacity: 0.65;
+.btn.att-action-btn:disabled {
+  opacity: 0.55;
   box-shadow: none;
 }
 
-/* Check out — warm gold; dark text for WCAG contrast (icons use currentColor) */
 .btn.att-action-btn.att-action-btn--out {
-  background: linear-gradient(180deg, #fde68a 0%, #f59e0b 100%);
-  color: #1e293b;
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08), 0 4px 14px rgba(245, 158, 11, 0.35);
+  background-color: transparent;
+  color: #141414;
+  border: 1px solid #8a8a8a;
 }
 
 .btn.att-action-btn.att-action-btn--out:hover:not(:disabled) {
-  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.1), 0 8px 22px rgba(245, 158, 11, 0.45);
-  filter: brightness(1.02);
+  background-color: #f7fafc;
+  color: #141414;
 }
 
 @media (max-width: 576.98px) {
@@ -334,11 +339,6 @@
 }
 
 /* Shell / layout */
-.attendance-page-shell .gt-toolbar-container {
-  margin-bottom: 1.5rem;
-  padding-bottom: 0.25rem;
-}
-
 .attendance-page-shell .gt-toolbar-tabs-section {
   padding-bottom: 0.75rem;
 }
