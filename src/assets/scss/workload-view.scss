@@ -2434,14 +2434,22 @@
 .workload-onboarding-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.5);
   z-index: 9999;
+  width: 100%;
+  max-width: none;
+  height: 100%;
+  max-height: none;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 16px;
   margin: 0;
   border: none;
+  background: transparent;
+
+  &::backdrop {
+    background: rgba(0, 0, 0, 0.5);
+  }
 }
 
 .workload-onboarding-modal {
