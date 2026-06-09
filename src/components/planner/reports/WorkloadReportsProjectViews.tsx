@@ -35,19 +35,10 @@ export function ReportsViewTabs({ activeView, onChange }: ReportsViewTabsProps) 
           className={`reports-tabs-row__tab${activeView === tab.id ? " reports-tabs-row__tab--active" : ""}`}
           onClick={() => onChange(tab.id)}
         >
-          Project View
-        </Nav.Link>
-      </Nav.Item>
-      <Nav.Item>
-        <Nav.Link
-          active={activeView === "historical"}
-          onClick={() => onChange("historical")}
-          className={activeView === "historical" ? "active" : ""}
-        >
-          Historical Trends
-        </Nav.Link>
-      </Nav.Item>
-    </Nav>
+          {tab.label}
+        </button>
+      ))}
+    </div>
   );
 }
 
