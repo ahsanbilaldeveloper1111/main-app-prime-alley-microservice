@@ -134,6 +134,7 @@ export function pricingFormSkeletonFields(): AnalysisFormSkeletonField[] {
 
 const TENANT_FORM_FIELD_IDS = [
   "tenant-id",
+  "tenant-name",
   "tenant-industry",
   "tenant-language",
   "tenant-monthly-limit",

@@ -79,7 +79,9 @@ function unwrapPricingBody(data: unknown): AnalysisCostPricingResponse | null {
 const PRICING_PATH = "/ai-analytics/cost/pricing";
 
 export interface AnalysisTenantRecord {
+  /** Normalized from API `company_id`. */
   tenant_id: string;
+  name: string | null;
   industry_type: string | null;
   primary_language: string | null;
   monthly_call_limit: number | null;
@@ -92,8 +94,9 @@ export interface AnalysisTenantRecord {
   updated_at: string | null;
 }
 
-/** PUT `/api/v2/tenants/{tenant_id}` — nullable fields clear overrides. */
+/** PUT `/ai-analytics/companies/{companyId}` — nullable fields clear overrides. */
 export interface AnalysisTenantUpdateRequest {
+  name?: string;
   industry_type?: string;
   primary_language?: string;
   monthly_call_limit?: number | null;
@@ -108,7 +111,9 @@ function isAnalysisTenantRecord(value: unknown): value is AnalysisTenantRecord {
   if (!isRecord(value)) {
     return false;
   }
-  return typeof value.tenant_id === "string";
+  return (
+    typeof value.tenant_id === "string" || typeof value.company_id === "string"
+  );
 }
 
 function coerceFiniteNumber(value: unknown, fallback = 0): number {
@@ -145,8 +150,13 @@ function normalizeTenantRecord(
     value.alert_threshold_pct ??
     ("alert_threshold" in value ? value.alert_threshold : undefined);
 
+  const companyOrTenantId = coerceStringId(
+    "company_id" in value ? value.company_id : value.tenant_id,
+  );
+
   return {
-    tenant_id: coerceStringId(value.tenant_id),
+    tenant_id: companyOrTenantId,
+    name: typeof value.name === "string" ? value.name : null,
     industry_type:
       typeof value.industry_type === "string" ? value.industry_type : null,
     primary_language:
@@ -180,7 +190,7 @@ function unwrapTenantRecord(data: unknown): AnalysisTenantRecord | null {
     return normalizeTenantRecord(data);
   }
   if (isRecord(data)) {
-    for (const key of ["data", "result", "tenant"] as const) {
+    for (const key of ["data", "result", "tenant", "company"] as const) {
       const found = unwrapTenantRecord(data[key]);
       if (found) {
         return found;
@@ -190,9 +200,9 @@ function unwrapTenantRecord(data: unknown): AnalysisTenantRecord | null {
   return null;
 }
 
-function tenantPath(tenantId: string): string {
-  const id = encodeURIComponent(tenantId.trim());
-  return `/ai-analytics/tenants/${id}`;
+function companyPath(companyId: string): string {
+  const id = encodeURIComponent(companyId.trim());
+  return `/ai-analytics/companies/${id}`;
 }
 
 /** GET `/api/ai-analytics/cost/pricing` */
@@ -237,16 +247,16 @@ export async function updateAnalysisCostPricing(
   }
 }
 
-/** GET `/api/ai-analytics/tenants/{tenantId}` */
+/** GET `/ai-analytics/companies/{companyId}` */
 export async function getAnalysisTenant(
   tenantId: string,
 ): Promise<AnalysisTenantRecord | null> {
   const id = tenantId.trim();
   if (!id) {
-    throw new Error("tenant_id is required");
+    throw new Error("company_id is required");
   }
   try {
-    const response = await axiosInstance.get<unknown>(tenantPath(id), {
+    const response = await axiosInstance.get<unknown>(companyPath(id), {
       validateStatus: (status) =>
         (status >= 200 && status < 300) || status === 404,
     });
@@ -264,17 +274,17 @@ export async function getAnalysisTenant(
   }
 }
 
-/** PUT `/api/ai-analytics/tenants/{tenantId}` */
+/** PUT `/ai-analytics/companies/{companyId}` */
 export async function updateAnalysisTenant(
   tenantId: string,
   payload: AnalysisTenantUpdateRequest,
 ): Promise<AnalysisTenantRecord> {
   const id = tenantId.trim();
   if (!id) {
-    throw new Error("tenant_id is required");
+    throw new Error("company_id is required");
   }
   try {
-    await axiosInstance.put<unknown>(tenantPath(id), payload);
+    await axiosInstance.put<unknown>(companyPath(id), payload);
     const refreshed = await getAnalysisTenant(id);
     if (!refreshed) {
       throw new Error("Failed to load tenant settings after save");
@@ -583,6 +593,386 @@ export async function listAnalysisPerCallCosts(
         error,
         "Failed to load per-call cost data. Please try again.",
       ),
+    );
+  }
+}
+
+function companyConfigPath(companyId: string): string {
+  return `${companyPath(companyId)}/config`;
+}
+
+function httpErrorResponseData(error: unknown): unknown {
+  if (!isRecord(error)) {
+    return undefined;
+  }
+  const response = error.response;
+  if (isRecord(response)) {
+    return response.data;
+  }
+  return undefined;
+}
+
+export interface AnalysisConfigTag {
+  tag_key: string;
+  label: string;
+  when_to_apply: string;
+  example: string | null;
+  color: string;
+  enabled: boolean;
+  sort_order: number | null;
+}
+
+export interface AnalysisConfigCriterion {
+  criterion_key: string;
+  text: string;
+  weight: number;
+  example: string | null;
+  sort_order: number | null;
+}
+
+export interface AnalysisConfigBand {
+  min_score: number;
+  max_score: number;
+  label: string;
+  color: string;
+  sort_order: number | null;
+}
+
+export interface AnalysisConfigAssessment {
+  assess_key: string;
+  label: string;
+  enabled: boolean;
+  sort_order: number | null;
+  criteria: AnalysisConfigCriterion[];
+  bands: AnalysisConfigBand[];
+}
+
+export type AnalysisConfigInfoFieldType = "text" | "yes_no" | "number";
+
+export interface AnalysisConfigInfoField {
+  field_key: string;
+  label: string;
+  field_type: AnalysisConfigInfoFieldType;
+  description: string;
+  example: string | null;
+  enabled: boolean;
+  sort_order: number | null;
+}
+
+export interface AnalysisConfigValidationIssue {
+  id: string;
+  code: string;
+  severity: string;
+  layer: string;
+  target: string;
+  message: string;
+  model_backed: boolean;
+}
+
+export interface AnalysisCompanyConfigRecord {
+  id: number | null;
+  company_id: string;
+  stated_industry: string;
+  inferred_industry: string | null;
+  industry_key: string | null;
+  template_id: string | null;
+  template_version: string | null;
+  config_sha256: string | null;
+  registry_version: string | null;
+  authored_by: string | null;
+  created_at: string | null;
+  updated_at: string | null;
+  tags: AnalysisConfigTag[];
+  assessments: AnalysisConfigAssessment[];
+  info_fields: AnalysisConfigInfoField[];
+}
+
+export interface AnalysisCompanyConfigUpdateRequest {
+  stated_industry: string;
+  industry_key?: string;
+  authored_by?: string;
+  tags?: AnalysisConfigTag[];
+  assessments?: AnalysisConfigAssessment[];
+  info_fields?: AnalysisConfigInfoField[];
+}
+
+export interface AnalysisCompanyConfigSaveResult {
+  config: AnalysisCompanyConfigRecord;
+  warnings: AnalysisConfigValidationIssue[];
+}
+
+export class AnalysisCompanyConfigValidationError extends Error {
+  readonly issues: AnalysisConfigValidationIssue[];
+
+  constructor(message: string, issues: AnalysisConfigValidationIssue[]) {
+    super(message);
+    this.name = "AnalysisCompanyConfigValidationError";
+    this.issues = issues;
+  }
+}
+
+function normalizeOptionalString(value: unknown): string | null {
+  if (typeof value === "string" && value.trim()) {
+    return value.trim();
+  }
+  return null;
+}
+
+function normalizeConfigTag(value: Record<string, unknown>): AnalysisConfigTag {
+  return {
+    tag_key: coerceStringId(value.tag_key),
+    label: coerceStringId(value.label),
+    when_to_apply:
+      typeof value.when_to_apply === "string" ? value.when_to_apply : "",
+    example: normalizeOptionalString(value.example),
+    color: typeof value.color === "string" ? value.color : "green",
+    enabled: value.enabled !== false,
+    sort_order: coerceNullableFiniteNumber(value.sort_order),
+  };
+}
+
+function normalizeConfigCriterion(
+  value: Record<string, unknown>,
+): AnalysisConfigCriterion {
+  return {
+    criterion_key: coerceStringId(value.criterion_key),
+    text: typeof value.text === "string" ? value.text : "",
+    weight: coerceFiniteNumber(value.weight),
+    example: normalizeOptionalString(value.example),
+    sort_order: coerceNullableFiniteNumber(value.sort_order),
+  };
+}
+
+function normalizeConfigBand(value: Record<string, unknown>): AnalysisConfigBand {
+  return {
+    min_score: coerceFiniteNumber(value.min_score),
+    max_score: coerceFiniteNumber(value.max_score),
+    label: coerceStringId(value.label),
+    color: typeof value.color === "string" ? value.color : "neutral",
+    sort_order: coerceNullableFiniteNumber(value.sort_order),
+  };
+}
+
+function normalizeConfigAssessment(
+  value: Record<string, unknown>,
+): AnalysisConfigAssessment {
+  const criteriaRaw = value.criteria;
+  const bandsRaw = value.bands;
+  return {
+    assess_key: coerceStringId(value.assess_key),
+    label: coerceStringId(value.label),
+    enabled: value.enabled !== false,
+    sort_order: coerceNullableFiniteNumber(value.sort_order),
+    criteria: Array.isArray(criteriaRaw)
+      ? criteriaRaw
+          .filter(isRecord)
+          .map((row) => normalizeConfigCriterion(row))
+      : [],
+    bands: Array.isArray(bandsRaw)
+      ? bandsRaw.filter(isRecord).map((row) => normalizeConfigBand(row))
+      : [],
+  };
+}
+
+function normalizeInfoFieldType(value: unknown): AnalysisConfigInfoFieldType {
+  if (value === "yes_no" || value === "number" || value === "text") {
+    return value;
+  }
+  return "text";
+}
+
+function normalizeConfigInfoField(
+  value: Record<string, unknown>,
+): AnalysisConfigInfoField {
+  return {
+    field_key: coerceStringId(value.field_key),
+    label: coerceStringId(value.label),
+    field_type: normalizeInfoFieldType(value.field_type),
+    description: typeof value.description === "string" ? value.description : "",
+    example: normalizeOptionalString(value.example),
+    enabled: value.enabled !== false,
+    sort_order: coerceNullableFiniteNumber(value.sort_order),
+  };
+}
+
+function isAnalysisCompanyConfigRecord(value: unknown): boolean {
+  if (!isRecord(value)) {
+    return false;
+  }
+  return (
+    typeof value.company_id === "string" ||
+    typeof value.stated_industry === "string"
+  );
+}
+
+function normalizeCompanyConfigRecord(
+  value: Record<string, unknown>,
+): AnalysisCompanyConfigRecord {
+  const tagsRaw = value.tags;
+  const assessmentsRaw = value.assessments;
+  const infoFieldsRaw = value.info_fields;
+
+  const idRaw = value.id;
+  const id =
+    typeof idRaw === "number" && Number.isFinite(idRaw)
+      ? idRaw
+      : typeof idRaw === "string" && idRaw.trim()
+        ? Number.parseInt(idRaw, 10)
+        : null;
+
+  return {
+    id: id != null && Number.isFinite(id) ? id : null,
+    company_id: coerceStringId(value.company_id),
+    stated_industry:
+      typeof value.stated_industry === "string" ? value.stated_industry : "",
+    inferred_industry: normalizeOptionalString(value.inferred_industry),
+    industry_key: normalizeOptionalString(value.industry_key),
+    template_id: normalizeOptionalString(value.template_id),
+    template_version: normalizeOptionalString(value.template_version),
+    config_sha256: normalizeOptionalString(value.config_sha256),
+    registry_version: normalizeOptionalString(value.registry_version),
+    authored_by: normalizeOptionalString(value.authored_by),
+    created_at: typeof value.created_at === "string" ? value.created_at : null,
+    updated_at: typeof value.updated_at === "string" ? value.updated_at : null,
+    tags: Array.isArray(tagsRaw)
+      ? tagsRaw.filter(isRecord).map((row) => normalizeConfigTag(row))
+      : [],
+    assessments: Array.isArray(assessmentsRaw)
+      ? assessmentsRaw.filter(isRecord).map((row) => normalizeConfigAssessment(row))
+      : [],
+    info_fields: Array.isArray(infoFieldsRaw)
+      ? infoFieldsRaw.filter(isRecord).map((row) => normalizeConfigInfoField(row))
+      : [],
+  };
+}
+
+function parseValidationIssues(value: unknown): AnalysisConfigValidationIssue[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return value
+    .filter(isRecord)
+    .map((issue) => ({
+      id: coerceStringId(issue.id ?? issue.code),
+      code: coerceStringId(issue.code ?? issue.id),
+      severity: typeof issue.severity === "string" ? issue.severity : "error",
+      layer: typeof issue.layer === "string" ? issue.layer : "",
+      target: typeof issue.target === "string" ? issue.target : "",
+      message: typeof issue.message === "string" ? issue.message : "",
+      model_backed: issue.model_backed === true,
+    }))
+    .filter((issue) => issue.message || issue.code);
+}
+
+function unwrapCompanyConfigRecord(data: unknown): AnalysisCompanyConfigRecord | null {
+  if (data == null) {
+    return null;
+  }
+  if (isRecord(data) && isAnalysisCompanyConfigRecord(data)) {
+    return normalizeCompanyConfigRecord(data);
+  }
+  if (isRecord(data)) {
+    if ("config" in data) {
+      return unwrapCompanyConfigRecord(data.config);
+    }
+    for (const key of ["data", "result"] as const) {
+      const found = unwrapCompanyConfigRecord(data[key]);
+      if (found) {
+        return found;
+      }
+    }
+  }
+  return null;
+}
+
+function unwrapCompanyConfigSaveResult(
+  data: unknown,
+): AnalysisCompanyConfigSaveResult | null {
+  if (data == null) {
+    return null;
+  }
+  if (isRecord(data)) {
+    const config = unwrapCompanyConfigRecord(data.config ?? data);
+    if (!config) {
+      return null;
+    }
+    const warnings = parseValidationIssues(data.warnings);
+    return { config, warnings };
+  }
+  return null;
+}
+
+function parseValidationBlockedError(
+  error: unknown,
+): AnalysisCompanyConfigValidationError | null {
+  const raw = httpErrorResponseData(error);
+  if (!isRecord(raw)) {
+    return null;
+  }
+  const payload = isRecord(raw.data) ? raw.data : raw;
+  if (payload.error_code !== "VALIDATION_BLOCKED") {
+    return null;
+  }
+  const issues = parseValidationIssues(payload.issues);
+  const message =
+    issues[0]?.message ??
+    (typeof payload.message === "string" ? payload.message : "Validation blocked.");
+  return new AnalysisCompanyConfigValidationError(message, issues);
+}
+
+/** GET `/ai-analytics/companies/{companyId}/config` */
+export async function getAnalysisCompanyConfig(
+  companyId: string,
+): Promise<AnalysisCompanyConfigRecord | null> {
+  const id = companyId.trim();
+  if (!id) {
+    throw new Error("company_id is required");
+  }
+  try {
+    const response = await axiosInstance.get<unknown>(companyConfigPath(id), {
+      validateStatus: (status) =>
+        (status >= 200 && status < 300) || status === 404,
+    });
+    if (response.status === 404 || response.data == null) {
+      return null;
+    }
+    return unwrapCompanyConfigRecord(response.data);
+  } catch (error: unknown) {
+    throw new Error(
+      apiErrorMessage(
+        error,
+        "Failed to load company config. Please try again.",
+      ),
+    );
+  }
+}
+
+/** PUT `/ai-analytics/companies/{companyId}/config` */
+export async function updateAnalysisCompanyConfig(
+  companyId: string,
+  payload: AnalysisCompanyConfigUpdateRequest,
+): Promise<AnalysisCompanyConfigSaveResult> {
+  const id = companyId.trim();
+  if (!id) {
+    throw new Error("company_id is required");
+  }
+  try {
+    const response = await axiosInstance.put<unknown>(
+      companyConfigPath(id),
+      payload,
+    );
+    const result = unwrapCompanyConfigSaveResult(response.data);
+    if (!result) {
+      throw new Error("Failed to save company config");
+    }
+    return result;
+  } catch (error: unknown) {
+    const blocked = parseValidationBlockedError(error);
+    if (blocked) {
+      throw blocked;
+    }
+    throw new Error(
+      apiErrorMessage(error, "Failed to save company config. Please try again."),
     );
   }
 }

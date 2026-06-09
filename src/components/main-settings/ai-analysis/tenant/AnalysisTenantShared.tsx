@@ -45,11 +45,11 @@ export function TenantField(props: Readonly<{
   } = props;
 
   return (
-    <label className="ai-analysis-tenant__field">
-      <span className="ai-analysis-tenant__field-label">{label}</span>
+    <label className="ai-analysis-tenant-config__field">
+      <span className="ai-analysis-tenant-config__field-label">{label}</span>
       <input
         type={type}
-        className="ai-analysis-tenant__input"
+        className="ai-analysis-tenant-config__input"
         value={value}
         readOnly={readOnly}
         disabled={disabled || readOnly}
@@ -64,7 +64,7 @@ export function TenantField(props: Readonly<{
         }
       />
       {hint ? (
-        <span className="ai-analysis-tenant__field-hint">{hint}</span>
+        <span className="ai-analysis-tenant-config__field-hint">{hint}</span>
       ) : null}
     </label>
   );
