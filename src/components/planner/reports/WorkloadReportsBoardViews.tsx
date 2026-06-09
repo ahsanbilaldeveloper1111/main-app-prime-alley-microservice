@@ -28,7 +28,7 @@ import {
   workloadMemberAvatarColor,
   workloadMemberInitials,
 } from "@page-modules/planner/workload/workloadDomain";
-import { ReportsKpiCard } from "./WorkloadReportsViews";
+import { ReportsEmptyState, ReportsKpiCard, ReportsMemberPerformanceBars } from "./WorkloadReportsViews";
 
 function resolveCompletionRate(summary: TaskReportsSummary): number {
   if (summary.completion_rate != null && Number.isFinite(summary.completion_rate)) {
@@ -54,23 +54,28 @@ export function ReportsBoardDashboardKpiRow({
 
   return (
     <div className="reports-kpi-grid">
-      <ReportsKpiCard label="Total Tasks" value={total} sub="All tasks in range" accent="default" />
       <ReportsKpiCard
-        label="Completed"
-        value={`${rate}%`}
-        sub="Tasks Completed"
+        label="Total Active Tasks"
+        value={total}
+        sub="Incomplete tasks in system"
+        accent="default"
+      />
+      <ReportsKpiCard
+        label="Completion Rate"
+        value={rate > 0 ? `${rate}%` : "—"}
+        sub="Tasks completed on time"
         accent="completed"
       />
       <ReportsKpiCard
-        label="In Progress"
-        value={inProgress}
-        sub="Tasks in Progress"
-        accent="in_progress"
+        label="Overdue Tasks"
+        value={resolveSummaryMetric(summary, "overdue_tasks")}
+        sub="Past due and not completed"
+        accent="overdue"
       />
       <ReportsKpiCard
-        label="Pending"
-        value={pending}
-        sub="Pending Tasks"
+        label="Stuck Tasks"
+        value={inProgress}
+        sub="In progress beyond threshold"
         accent="pending"
       />
     </div>
@@ -80,8 +85,8 @@ export function ReportsBoardDashboardKpiRow({
 function resolveDonutStatusColor(statusName: string): string {
   const status = statusName.toLowerCase();
   if (status.includes("complete") || status.includes("done")) return "#22c55e";
-  if (status.includes("progress")) return "#3b82f6";
-  if (status.includes("pending")) return "#ef4444";
+  if (status.includes("progress")) return "#0066CC";
+  if (status.includes("pending")) return "#94a3b8";
   if (status.includes("todo") || status.includes("to_do")) return "#94a3b8";
   return "#94a3b8";
 }
@@ -106,7 +111,13 @@ export function ReportsTaskDistributionDonut({
 }>) {
   const total = rows.reduce((sum, row) => sum + row.count, 0);
   if (rows.length === 0 || total <= 0) {
-    return <p className="small text-muted mb-0">No status data for this period.</p>;
+    return (
+      <ReportsEmptyState
+        icon="ti-chart-donut"
+        title="No status data"
+        subtitle="No task status data available for this period"
+      />
+    );
   }
   const data = rows.map((row) => ({
     name: normalizeDonutLabel(row.status_name),
@@ -116,9 +127,9 @@ export function ReportsTaskDistributionDonut({
   const centerDisplay = centerValue ?? total;
 
   return (
-    <div className="reports-status-donut">
+    <div className="reports-status-donut" style={{ flexDirection: "column", alignItems: "center" }}>
       <div className="reports-status-donut__chart">
-        <ResponsiveContainer width="100%" height={220}>
+        <ResponsiveContainer width="100%" height={280}>
           <PieChart>
             <Pie
               data={data}
@@ -140,7 +151,7 @@ export function ReportsTaskDistributionDonut({
           <div className="reports-status-donut__center-label">{centerLabel}</div>
         </div>
       </div>
-      <ul className="reports-status-donut__legend">
+      <ul className="reports-status-donut__legend" style={{ display: "flex", flexDirection: "row", justifyContent: "center", gap: "1rem" }}>
         {data.map((entry) => (
           <li key={entry.name}>
             <span className="reports-status-donut__dot" style={{ backgroundColor: entry.color }} />
@@ -161,7 +172,13 @@ export function ReportsBoardMemberActivity({
   hierarchyExtensions?: unknown[] | null;
 }>) {
   if (rows.length === 0) {
-    return <p className="small text-muted mb-0">No member activity for this period.</p>;
+    return (
+      <ReportsEmptyState
+        icon="ti-users"
+        title="No member activity"
+        subtitle="No tasks assigned in this period"
+      />
+    );
   }
   const maxTotal = Math.max(
     ...rows.map((row) => row.total_tasks ?? row.task_count ?? 0),
@@ -204,7 +221,13 @@ export function ReportsWeeklyTrendChart({
   points,
 }: Readonly<{ points: TaskReportsTrendPoint[] }>) {
   if (points.length === 0) {
-    return <p className="small text-muted mb-0">No trend data for this period.</p>;
+    return (
+      <ReportsEmptyState
+        icon="ti-chart-bar"
+        title="No trend data"
+        subtitle="Try adjusting the date range to see delivery trends"
+      />
+    );
   }
   const data = points.map((point) => ({
     label: formatReportsDateLabel(point.date),
@@ -219,7 +242,7 @@ export function ReportsWeeklyTrendChart({
           <XAxis dataKey="label" tick={{ fontSize: 11 }} interval="preserveStartEnd" />
           <YAxis allowDecimals={false} tick={{ fontSize: 11 }} width={32} />
           <Tooltip />
-          <Bar dataKey="tasks" fill="#3b82f6" radius={[4, 4, 0, 0]} maxBarSize={48} />
+          <Bar dataKey="tasks" fill="#0066CC" radius={[4, 4, 0, 0]} maxBarSize={48} />
         </BarChart>
       </ResponsiveContainer>
     </div>
@@ -243,12 +266,12 @@ export function ReportsTeamBoardPanel({
     <>
       <ReportsBoardDashboardKpiRow summary={summary} statusRows={statusRows} />
 
-      <Row className="g-3 mb-3">
+      <Row className="g-3 mb-3 align-items-stretch">
         <Col lg={6}>
           <div className="reports-panel">
-            <h2 className="reports-panel__title">Recent Activity</h2>
-            <p className="reports-panel__subtitle">Team member workload in selected range</p>
-            <ReportsBoardMemberActivity
+            <h2 className="reports-panel__title">Member Performance</h2>
+            <p className="reports-panel__subtitle">Completion rate per member this period</p>
+            <ReportsMemberPerformanceBars
               rows={memberRows}
               hierarchyExtensions={hierarchyExtensions}
             />
@@ -264,8 +287,8 @@ export function ReportsTeamBoardPanel({
       </Row>
 
       <div className="reports-panel">
-        <h2 className="reports-panel__title">Weekly Trends</h2>
-        <p className="reports-panel__subtitle">Task volume over the selected period</p>
+        <h2 className="reports-panel__title">Weekly Delivery</h2>
+        <p className="reports-panel__subtitle">Tasks completed per day this week</p>
         <ReportsWeeklyTrendChart points={trends} />
       </div>
     </>

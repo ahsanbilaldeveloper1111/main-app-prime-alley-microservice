@@ -1,4 +1,5 @@
 import "@assets/scss/datatable-style.scss";
+import "@assets/scss/common.scss";
 import React, { ReactElement, useCallback, useState } from "react";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
@@ -44,6 +45,11 @@ import {
 import SubCategoriesCategoryModal from "@page-modules/workforce/sub-categories/partials/SubCategoriesCategoryModal";
 import SubCategoriesFieldModal from "@page-modules/workforce/sub-categories/partials/SubCategoriesFieldModal";
 
+import "@page-modules/workforce/shared/workforcePages.scss";
+import {
+  WorkforceFixedActionBar,
+  WorkforceProspectsPrimaryButton,
+} from "@page-modules/workforce/shared/WorkforceProspectsTheme";
 import "@page-modules/workforce/sub-categories/subCategoriesPage.scss";
 
 function RequestSubCategories() {
@@ -391,15 +397,17 @@ function RequestSubCategories() {
         actions={[
           {
             label: "Edit",
-            icon: <Pencil size={14} />,
+            icon: <Pencil size={16} />,
             onClick: openEditField,
-            variant: "outline-secondary",
+            variant: "light",
+            className: "btn-action-style-2 p-1 text-primary",
           },
           {
             label: "Delete",
-            icon: <Trash2 size={14} />,
+            icon: <Trash2 size={16} />,
             onClick: openDeleteFieldModal,
-            variant: "outline-danger",
+            variant: "light",
+            className: "btn-action-style-2 p-1 text-danger",
           },
         ]}
         showActions
@@ -411,22 +419,17 @@ function RequestSubCategories() {
   }
 
   return (
-    <div className="sub-categories-page">
+    <div className="sub-categories-page prospects-scrollable-content">
       <BreadcrumbItem mainTitle="" mainLink="" subTitle="Request Sub-Categories" />
-      <PageHeader
-        title="Request Sub-Categories"
-        showSearch={false}
-        buttons={
-          <>
-            {canManage && (
-              <Button variant="primary" onClick={openCreateCategory}>
-                <Plus size={18} className="me-1" />
-                Add Category
-              </Button>
-            )}
-          </>
-        }
-      />
+      {canManage ? (
+        <WorkforceFixedActionBar>
+          <WorkforceProspectsPrimaryButton onClick={openCreateCategory}>
+            <Plus size={16} />
+            Add Category
+          </WorkforceProspectsPrimaryButton>
+        </WorkforceFixedActionBar>
+      ) : null}
+      <PageHeader title="Request Sub-Categories" showSearch={false} />
 
       <div className="sub-categories-page__shell">
         <GenericTable<UserRequestCategory>
@@ -464,23 +467,26 @@ function RequestSubCategories() {
           actions={[
             {
               label: "Edit",
-              icon: <Pencil size={14} />,
+              icon: <Pencil size={16} />,
               onClick: openEditCategory,
-              variant: "outline-secondary",
+              variant: "light",
+              className: "btn-action-style-2 p-1 text-primary",
               show: () => canManage,
             },
             {
               label: "Manage fields",
-              icon: <List size={14} />,
+              icon: <List size={16} />,
               onClick: openFieldsModal,
-              variant: "outline-secondary",
+              variant: "light",
+              className: "btn-action-style-2 p-1 text-info",
               show: () => canManage,
             },
             {
               label: "Delete",
-              icon: <Trash2 size={14} />,
+              icon: <Trash2 size={16} />,
               onClick: openDeleteCategory,
-              variant: "outline-danger",
+              variant: "light",
+              className: "btn-action-style-2 p-1 text-danger",
               show: () => canManage,
             },
           ]}

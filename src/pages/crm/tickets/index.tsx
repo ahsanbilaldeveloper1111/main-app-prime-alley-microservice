@@ -256,7 +256,6 @@ const CrmTicketsPage = () => {
     handleApplyFiltersClick,
     handleResetFiltersClick,
     hasUnappliedFilterChanges,
-    hasNonDefaultFilters,
   } = useStagedFiltersActions(
     currentFilters,
     appliedFilters,
@@ -589,7 +588,6 @@ const CrmTicketsPage = () => {
         handleApplyFiltersClick,
         handleResetFiltersClick,
         hasUnappliedFilterChanges,
-        hasNonDefaultFilters,
         rightActions: renderAddTicketsButton(),
       }),
     [
@@ -601,7 +599,6 @@ const CrmTicketsPage = () => {
       handleApplyFiltersClick,
       handleResetFiltersClick,
       hasUnappliedFilterChanges,
-      hasNonDefaultFilters,
       renderAddTicketsButton,
       handleSearchChange,
     ],

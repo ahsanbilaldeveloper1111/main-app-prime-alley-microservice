@@ -1,5 +1,5 @@
 import React from "react";
-import { Button, Form, Modal } from "react-bootstrap";
+import { Form, Modal } from "react-bootstrap";
 import { toast } from "react-toastify";
 import type { UserProfile } from "@utils/staffManagement";
 import { journeyStartDateMinIso } from "../employeesDomain";
@@ -70,12 +70,12 @@ const CreateJourneyModal: React.FC<CreateJourneyModalProps> = ({
       )}
     </Modal.Body>
     <Modal.Footer>
-      <Button variant="secondary" onClick={onHide} type="button">
+      <button type="button" className="workforce-sidebar-btn-cancel" onClick={onHide}>
         Cancel
-      </Button>
-      <Button variant="primary" type="button" onClick={onSubmit} disabled={submitting}>
+      </button>
+      <button type="button" className="workforce-sidebar-btn-create" onClick={onSubmit} disabled={submitting}>
         {submitting ? "Creating…" : "Create"}
-      </Button>
+      </button>
     </Modal.Footer>
   </Modal>
 );

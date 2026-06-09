@@ -31,7 +31,7 @@ export function buildEmployeeTableColumns({
         return (
           <div className="employees-page__cell-employee">
             <div className="employees-page__cell-avatar">
-              <User size={20} color="#6366f1" />
+              <User size={20} aria-hidden />
             </div>
             <div>
               <div className="employees-page__cell-name">{getDisplayName(profile)}</div>
@@ -154,7 +154,8 @@ export function buildEmployeeTableActions({
       icon: <Pencil size={16} />,
       onClick: (profile: UserProfile) => openEditModal(profile),
       show: () => Boolean(permissions?.includes(PERMISSIONS.UPDATE_EMPLOYEE_STAFF_MANAGEMENT)),
-      variant: "link",
+      variant: "light",
+      className: "btn-action-style-2 p-1 text-primary",
     },
     {
       label: "Create Journey",
@@ -163,14 +164,16 @@ export function buildEmployeeTableActions({
       show: () => Boolean(permissions?.includes(PERMISSIONS.CREATE_JOURNEY_STAFF_MANAGEMENT)),
       disabled: (profile: UserProfile) => (profile as UserProfile & { journey?: { id?: number } }).journey?.id != null,
       disabledTitle: "Journey already started",
-      variant: "link",
+      variant: "light",
+      className: "btn-action-style-2 p-1 text-primary",
     },
     {
       label: "Delete",
       icon: <Trash2 size={16} />,
       onClick: (profile: UserProfile) => handleDeleteClick(profile),
       show: () => Boolean(permissions?.includes(PERMISSIONS.DELETE_EMPLOYEE_STAFF_MANAGEMENT)),
-      variant: "link",
+      variant: "light",
+      className: "btn-action-style-2 p-1 text-danger",
     },
   ];
 }

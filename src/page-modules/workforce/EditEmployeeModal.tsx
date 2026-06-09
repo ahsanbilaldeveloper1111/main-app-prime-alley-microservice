@@ -523,28 +523,11 @@ const EditEmployeeModal: React.FC<EditEmployeeModalProps> = ({
             />
           </div>
 
-          <div
-            style={{
-              padding: "16px 24px",
-              borderTop: "1px solid #eaf0f6",
-              display: "flex",
-              gap: "12px",
-              justifyContent: "flex-start",
-            }}
-          >
+          <div className="contact-sidebar-footer workforce-employee-modal-sidebar__footer">
             <button
               type="submit"
               disabled={submitting || !editSubmitReady}
-              style={{
-                padding: "10px 20px",
-                backgroundColor: submitting || !editSubmitReady ? "#cbd5e0" : "#0091ae",
-                color: "#ffffff",
-                border: "none",
-                borderRadius: "4px",
-                fontSize: "14px",
-                fontWeight: 500,
-                cursor: submitting || !editSubmitReady ? "not-allowed" : "pointer",
-              }}
+              className="contact-form-btn-create workforce-sidebar-btn-create"
             >
               {submitting ? "Saving…" : "Save"}
             </button>
@@ -552,16 +535,7 @@ const EditEmployeeModal: React.FC<EditEmployeeModalProps> = ({
               type="button"
               disabled={submitting}
               onClick={handleCancelClick}
-              style={{
-                padding: "10px 20px",
-                backgroundColor: "transparent",
-                color: "#141414",
-                border: "1px solid #8a8a8a",
-                borderRadius: "4px",
-                fontSize: "14px",
-                fontWeight: 500,
-                cursor: submitting ? "not-allowed" : "pointer",
-              }}
+              className="contact-form-btn-cancel workforce-sidebar-btn-cancel"
             >
               Cancel
             </button>

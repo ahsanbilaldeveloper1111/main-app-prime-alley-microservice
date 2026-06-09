@@ -1,21 +1,10 @@
 ﻿import React, { useMemo, useCallback } from "react";
-import {
-  Table,
-  Form,
-  Button,
-  Dropdown,
-  Card,
-} from "react-bootstrap";
-import {
-  ChevronRight,
-  RotateCcw,
-} from "lucide-react";
+import { Table, Form, Button, Dropdown, Card } from "react-bootstrap";
+import { ChevronRight, RotateCcw } from "lucide-react";
 import "@assets/css/GenericTable.css";
 import { DROPDOWN_MENU_POPPER_CONFIG } from "./dropdownMenuPopperConfig";
 import { GenericTableMobileActionsMenu } from "./GenericTableMobileActionsMenu";
-import {
-  GENERIC_TABLE_ACTION_COLUMN_KEY,
-} from "./genericTableColumnResize";
+import { GENERIC_TABLE_ACTION_COLUMN_KEY } from "./genericTableColumnResize";
 import { GenericTableToolbarSection } from "./GenericTableToolbarSection";
 import { GenericTablePaginationControls } from "./GenericTablePagination";
 import { GenericTableHeader } from "./GenericTableHeader";
@@ -46,7 +35,9 @@ export type { GenericTableProps, PaginationConfig } from "./genericTableProps";
 
 const ACTION_COLUMN_KEY = GENERIC_TABLE_ACTION_COLUMN_KEY;
 
-function isGenericTableInteractiveClickTarget(target: EventTarget | null): boolean {
+function isGenericTableInteractiveClickTarget(
+  target: EventTarget | null,
+): boolean {
   if (!(target instanceof Element)) {
     return false;
   }
@@ -654,8 +645,16 @@ function GenericTableBodyDataCell<T extends Record<string, any>>({
     <td
       className="generic-table-td"
       data-col-key={col.key}
-      onClick={isGenericTableActionColumnKey(col.key) ? (e) => e.stopPropagation() : undefined}
-      onMouseDown={isGenericTableActionColumnKey(col.key) ? (e) => e.stopPropagation() : undefined}
+      onClick={
+        isGenericTableActionColumnKey(col.key)
+          ? (e) => e.stopPropagation()
+          : undefined
+      }
+      onMouseDown={
+        isGenericTableActionColumnKey(col.key)
+          ? (e) => e.stopPropagation()
+          : undefined
+      }
       style={{
         verticalAlign: "top",
         textAlign: col.align || "left",
@@ -704,7 +703,9 @@ function GenericTableRowActionsCell<T extends Record<string, any>>({
     if (action.show && !action.show(row)) return false;
     if (action.render) return true;
     if (action.dropdown) {
-      return action.dropdown.options.some((option) => !option.show || option.show(row));
+      return action.dropdown.options.some(
+        (option) => !option.show || option.show(row),
+      );
     }
     return true;
   });
@@ -713,116 +714,120 @@ function GenericTableRowActionsCell<T extends Record<string, any>>({
     <>
       {hasDesktopActions ? (
         <div className="gt-row-actions gt-row-actions--desktop d-none d-md-flex align-items-center flex-nowrap">
-      {actions.map((action, actionIndex) => {
-        if (action.show && !action.show(row)) return null;
-        const actionStableKey = `gt-act-${rowStableKey}-${action.label}`;
+          {actions.map((action, actionIndex) => {
+            if (action.show && !action.show(row)) return null;
+            const actionStableKey = `gt-act-${rowStableKey}-${action.label}`;
 
-        if (action.render) {
-          return (
-            <React.Fragment key={actionStableKey}>
-              {action.render(row)}
-            </React.Fragment>
-          );
-        }
+            if (action.render) {
+              return (
+                <React.Fragment key={actionStableKey}>
+                  {action.render(row)}
+                </React.Fragment>
+              );
+            }
 
-        if (action.dropdown) {
-          const visibleOptions = action.dropdown.options.filter(
-            (option) => !option.show || option.show(row),
-          );
+            if (action.dropdown) {
+              const visibleOptions = action.dropdown.options.filter(
+                (option) => !option.show || option.show(row),
+              );
 
-          if (visibleOptions.length === 0) return null;
+              if (visibleOptions.length === 0) return null;
 
-          return (
-            <Dropdown key={actionStableKey} drop="down" align="end">
-              <Dropdown.Toggle
+              return (
+                <Dropdown key={actionStableKey} drop="down" align="end">
+                  <Dropdown.Toggle
+                    variant={action.variant || "link"}
+                    size="sm"
+                    className={action.className || ""}
+                    id={`dropdown-${rowStableKey}-${action.label}`}
+                  >
+                    {action.icon}
+                  </Dropdown.Toggle>
+                  <Dropdown.Menu
+                    renderOnMount
+                    popperConfig={DROPDOWN_MENU_POPPER_CONFIG}
+                    onMouseDown={(e) => {
+                      e.stopPropagation();
+                    }}
+                  >
+                    {visibleOptions.map((option, optionIndex) => {
+                      const optKey = `${actionStableKey}-opt-${option.label}`;
+                      const menuItem = (
+                        <Dropdown.Item
+                          key={optKey}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            option.onClick(row);
+                          }}
+                          className={option.className}
+                        >
+                          {option.icon && (
+                            <span className="me-2">{option.icon}</span>
+                          )}
+                          {option.label}
+                        </Dropdown.Item>
+                      );
+
+                      if (option.divider) {
+                        return (
+                          <React.Fragment key={`${optKey}-div`}>
+                            {menuItem}
+                            <Dropdown.Divider />
+                          </React.Fragment>
+                        );
+                      }
+
+                      return menuItem;
+                    })}
+                  </Dropdown.Menu>
+                </Dropdown>
+              );
+            }
+
+            const isDisabled = action.disabled?.(row);
+            const buttonEl = (
+              <Button
+                key={actionStableKey}
                 variant={action.variant || "link"}
                 size="sm"
-                className={action.className || ""}
-                id={`dropdown-${rowStableKey}-${action.label}`}
-              >
-                {action.icon}
-              </Dropdown.Toggle>
-              <Dropdown.Menu
-                renderOnMount
-                popperConfig={DROPDOWN_MENU_POPPER_CONFIG}
-                onMouseDown={(e) => {
+                disabled={isDisabled}
+                onClick={(e) => {
                   e.stopPropagation();
-                }}
-              >
-                {visibleOptions.map((option, optionIndex) => {
-                  const optKey = `${actionStableKey}-opt-${option.label}`;
-                  const menuItem = (
-                    <Dropdown.Item
-                      key={optKey}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        option.onClick(row);
-                      }}
-                      className={option.className}
-                    >
-                      {option.icon && (
-                        <span className="me-2">{option.icon}</span>
-                      )}
-                      {option.label}
-                    </Dropdown.Item>
-                  );
-
-                  if (option.divider) {
-                    return (
-                      <React.Fragment key={`${optKey}-div`}>
-                        {menuItem}
-                        <Dropdown.Divider />
-                      </React.Fragment>
-                    );
+                  if (isDisabled) {
+                    return;
                   }
-
-                  return menuItem;
-                })}
-              </Dropdown.Menu>
-            </Dropdown>
-          );
-        }
-
-        const isDisabled = action.disabled?.(row);
-        const buttonEl = (
-          <Button
-            key={actionStableKey}
-            variant={action.variant || "link"}
-            size="sm"
-            disabled={isDisabled}
-            onClick={(e) => {
-              e.stopPropagation();
-              if (isDisabled) {
-                return;
-              }
-              action.onClick?.(row);
-            }}
-            className={`p-1 ${
-              isDisabled
-                ? `gt-action-disabled ${action.disabledClassName ?? ""}`
-                : action.className || ""
-            }`}
-            title={isDisabled ? undefined : action.label}
-          >
-            {action.icon || action.label}
-          </Button>
-        );
-        if (isDisabled && action.disabledTitle) {
-          return (
-            <span
-              key={actionStableKey}
-              className="gt-action-disabled-wrapper"
-              title={action.disabledTitle}
-            >
-              {buttonEl}
-            </span>
-          );
-        }
-        return buttonEl;
-      })}
+                  action.onClick?.(row);
+                }}
+                className={`p-1 ${
+                  isDisabled
+                    ? `gt-action-disabled ${action.disabledClassName ?? ""}`
+                    : action.className || ""
+                }`}
+                title={isDisabled ? undefined : action.label}
+              >
+                {action.icon || action.label}
+              </Button>
+            );
+            if (isDisabled && action.disabledTitle) {
+              return (
+                <span
+                  key={actionStableKey}
+                  className="gt-action-disabled-wrapper"
+                  title={action.disabledTitle}
+                >
+                  {buttonEl}
+                </span>
+              );
+            }
+            return buttonEl;
+          })}
         </div>
       ) : null}
-      <GenericTableMobileActionsMenu row={row} rowStableKey={rowStableKey} actions={actions} />
+      <GenericTableMobileActionsMenu
+        row={row}
+        rowStableKey={rowStableKey}
+        actions={actions}
+      />
     </>
   );
 }
@@ -841,9 +846,9 @@ type GenericTableBodyRowsProps<T extends Record<string, any>> = Readonly<{
   onRowDoubleClick?: (row: T, index: number) => void;
   rowClassName?: (row: T, index: number) => string;
   actions: TableAction<T>[];
-  getBoundContextMenuItems: (row: T) => ReturnType<
-    typeof buildBoundTableContextMenuItems<T>
-  >;
+  getBoundContextMenuItems: (
+    row: T,
+  ) => ReturnType<typeof buildBoundTableContextMenuItems<T>>;
   setContextMenu: React.Dispatch<
     React.SetStateAction<{ x: number; y: number; row: T } | null>
   >;
@@ -1156,7 +1161,11 @@ function GenericTableView<T extends Record<string, any>>({
           </Button>
         </div>
       )}
-      <div ref={tableScrollRef} className={responsiveClassName} style={scrollStyle}>
+      <div
+        ref={tableScrollRef}
+        className={responsiveClassName}
+        style={scrollStyle}
+      >
         <Table
           hover={hover}
           striped={striped}
@@ -1290,7 +1299,9 @@ function GenericTableView<T extends Record<string, any>>({
   );
 }
 
-const GenericTable = <T extends Record<string, any>>(props: GenericTableProps<T>) => {
+const GenericTable = <T extends Record<string, any>>(
+  props: GenericTableProps<T>,
+) => {
   const vm = useGenericTableViewModel(props);
   return <GenericTableView vm={vm} />;
 };

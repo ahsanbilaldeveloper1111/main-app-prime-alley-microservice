@@ -24,9 +24,9 @@
 }
 
 .new-request-additionalFieldsPanel {
-  border: 1px solid #e5e7eb;
+  border: 1px solid #bfdbfe;
   border-radius: 12px;
-  background-color: #f8fafc;
+  background-color: #eff6ff;
   padding: 14px;
 }
 
@@ -48,8 +48,8 @@
 }
 
 .new-request-additionalFieldCard:focus-within {
-  border-color: #93c5fd;
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.14);
+  border-color: #0066CC;
+  box-shadow: 0 0 0 3px rgba(0, 102, 204, 0.14);
 }
 
 .new-request-additionalFieldLabel {
@@ -62,7 +62,7 @@
 .new-request-additionalFieldInput :is(.form-control, .form-select, input[type="date"], input[type="number"]) {
   min-height: 44px;
   border-radius: 10px;
-  border-color: #dbe3ee;
+  border-color: #bfdbfe;
   font-size: 14px;
   color: #0f172a;
   background-color: #f8fafc;
@@ -75,23 +75,23 @@
 }
 
 .new-request-additionalFieldInput :is(.form-control, .form-select):focus {
-  border-color: #93c5fd;
+  border-color: #0066CC;
   background-color: #ffffff;
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+  box-shadow: 0 0 0 3px rgba(0, 102, 204, 0.15);
 }
 
 .new-request-selectbox .new-request-selectbox__control {
   min-height: 44px;
   border-radius: 10px;
-  border: 1px solid #dbe3ee;
+  border: 1px solid #bfdbfe;
   background-color: #f8fafc;
   box-shadow: none;
 }
 
 .new-request-selectbox .new-request-selectbox__control--is-focused {
-  border-color: #93c5fd;
+  border-color: #0066CC;
   background-color: #ffffff;
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+  box-shadow: 0 0 0 3px rgba(0, 102, 204, 0.15);
 }
 
 .new-request-selectbox .new-request-selectbox__placeholder {
@@ -104,23 +104,35 @@
 }
 
 .new-request-selectbox .new-request-selectbox__multi-value__label {
-  color: #1e3a8a;
+  color: #0052A3;
   font-size: 12px;
   font-weight: 600;
 }
 
 .new-request-selectbox .new-request-selectbox__multi-value__remove {
-  color: #1e40af;
+  color: #0066CC;
 }
 
 .new-request-selectbox .new-request-selectbox__multi-value__remove:hover {
   background-color: #bfdbfe;
-  color: #1e3a8a;
+  color: #0052A3;
 }
 
 .new-request-booleanControl .form-check-input,
 .new-request-switchControl .form-check-input {
   cursor: pointer;
+}
+
+.new-request-booleanControl .form-check-input:checked,
+.new-request-switchControl .form-check-input:checked {
+  background-color: #0066CC;
+  border-color: #0066CC;
+}
+
+.new-request-booleanControl .form-check-input:focus,
+.new-request-switchControl .form-check-input:focus {
+  border-color: #0066CC;
+  box-shadow: 0 0 0 0.25rem rgba(0, 102, 204, 0.25);
 }
 
 .new-request-booleanControl .form-check-label,
@@ -154,9 +166,9 @@
 }
 
 .urdf-radioOption--selected {
-  border-color: #6366f1;
-  background-color: #eef2ff;
-  color: #3730a3;
+  border-color: #0066CC;
+  background-color: #eff6ff;
+  color: #0052A3;
 }
 
 .urdf-radioInput {
@@ -180,14 +192,14 @@
 }
 
 .urdf-radioMark--selected {
-  border-color: #4f46e5;
+  border-color: #0066CC;
 }
 
 .urdf-radioDot {
   width: 10px;
   height: 10px;
   border-radius: 50%;
-  background-color: #4f46e5;
+  background-color: #0066CC;
   display: inline-block;
 }
 
@@ -215,9 +227,9 @@
 }
 
 .urdf-checkboxOption--selected {
-  border-color: #0ea5e9;
-  background-color: #f0f9ff;
-  color: #0f172a;
+  border-color: #0066CC;
+  background-color: #eff6ff;
+  color: #0052A3;
 }
 
 .urdf-checkboxInput {
@@ -242,8 +254,8 @@
 }
 
 .urdf-checkboxMark--selected {
-  border-color: #0ea5e9;
-  background-color: #0ea5e9;
+  border-color: #0066CC;
+  background-color: #0066CC;
 }
 
 .urdf-checkboxTick {
@@ -256,9 +268,21 @@
 /* Main form controls (Create / Edit request — outside “additional fields” cards) */
 .new-request-sidebar .new-request-fieldControl {
   border-radius: 10px;
-  border-color: #dbe3ee;
+  border-color: #bfdbfe;
   background-color: #f8fafc;
   transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+}
+
+.new-request-sidebar :is(.form-control, .form-select):not(.new-request-fieldControl) {
+  border-radius: 10px;
+  border-color: #bfdbfe;
+  background-color: #f8fafc;
+}
+
+.new-request-sidebar :is(.form-control, .form-select):not(.new-request-fieldControl):focus {
+  border-color: #0066CC;
+  background-color: #ffffff;
+  box-shadow: 0 0 0 3px rgba(0, 102, 204, 0.15);
 }
 
 .new-request-sidebar textarea.new-request-fieldControl {
@@ -267,9 +291,9 @@
 }
 
 .new-request-sidebar .new-request-fieldControl:focus {
-  border-color: #93c5fd;
+  border-color: #0066CC;
   background-color: #ffffff;
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+  box-shadow: 0 0 0 3px rgba(0, 102, 204, 0.15);
 }
 
 .new-request-sidebar :is(.form-select, .form-control):disabled {
@@ -292,9 +316,9 @@
 .new-request-attachmentList {
   margin-bottom: 8px;
   padding: 10px 12px;
-  border: 1px solid #e2e8f0;
+  border: 1px solid #bfdbfe;
   border-radius: 10px;
-  background-color: #f8fafc;
+  background-color: #eff6ff;
 }
 
 .new-request-attachmentListHeading {
@@ -313,7 +337,7 @@
   background-color: #ffffff;
   border-radius: 8px;
   margin-bottom: 6px;
-  border: 1px solid #e5e7eb;
+  border: 1px solid #bfdbfe;
 }
 
 .new-request-attachmentRow:last-child {
@@ -343,14 +367,47 @@
   padding: 6px 10px;
   border: none;
   border-radius: 8px;
-  background-color: #f1f5f9;
+  background-color: #eff6ff;
   cursor: pointer;
   display: flex;
   align-items: center;
   flex-shrink: 0;
   transition: background-color 0.2s ease;
+  color: #0066CC;
 }
 
 .new-request-attachmentDownloadBtn:hover {
-  background-color: #e2e8f0;
+  background-color: #dbeafe;
+}
+
+.approval-actions-row {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+
+  .workforce-sidebar-btn-create,
+  .workforce-sidebar-btn-cancel,
+  .workforce-sidebar-btn-danger {
+    flex: 1 1 auto;
+    min-width: 110px;
+  }
+}
+
+.approval-result-dialog__footer {
+  display: flex;
+  justify-content: flex-end;
+}
+
+/* Footer CTAs — Prospects blue (#0066CC), scoped to request sidebars */
+.new-request-sidebar .contact-sidebar-footer {
+  .workforce-sidebar-btn-create,
+  .contact-form-btn-create {
+    background-color: #0066CC;
+    color: #ffffff;
+
+    &:hover:not(:disabled) {
+      background-color: #0052A3;
+      color: #ffffff;
+    }
+  }
 }

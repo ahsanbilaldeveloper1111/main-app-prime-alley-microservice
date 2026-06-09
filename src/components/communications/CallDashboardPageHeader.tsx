@@ -1,4 +1,5 @@
 import React from 'react';
+import { RefreshCw } from 'lucide-react';
 import { Button, Col, Form, Row } from 'react-bootstrap';
 import moment from 'moment';
 import { useAppDispatch, useAppSelector } from '../../toolkit/hooks';
@@ -93,7 +94,7 @@ const CallDashboardPageHeader: React.FC = () => {
                         title="Refresh"
                         aria-label="Refresh"
                       >
-                        <i className="material-icons-two-tone">refresh</i>
+                        <RefreshCw size={16} aria-hidden />
                       </button>
                     </>
                   )}

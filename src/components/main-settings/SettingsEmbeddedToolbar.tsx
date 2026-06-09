@@ -1,3 +1,4 @@
+import { Search } from "lucide-react";
 import { sanitizeSearchInputLive } from "@utils/Helper";
 import React from "react";
 import "./settingsEmbeddedToolbar.scss";
@@ -17,7 +18,7 @@ export function SettingsEmbeddedToolbar({
     <div className="settings-embedded-page__toolbar">
       <div className="settings-embedded-page__toolbar-search">
         <div className="search-container">
-          <i className="fas fa-search search-icon" aria-hidden />
+          <Search size={16} className="search-icon" aria-hidden />
           <input
             type="text"
             className="search-bar"

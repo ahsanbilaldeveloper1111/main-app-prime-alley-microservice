@@ -1,9 +1,16 @@
-import React, { useMemo } from 'react';
-import { Phone, PhoneIncoming, PhoneOutgoing, PhoneMissed, PhoneOff } from 'lucide-react';
-import StatsCards from '@components/GenericStatsCards';
-import { useAppSelector } from '../../toolkit/hooks';
+import React, { useMemo } from "react";
+import {
+  Phone,
+  PhoneIncoming,
+  PhoneOutgoing,
+  PhoneMissed,
+  PhoneOff,
+} from "lucide-react";
+import StatsCards from "@components/GenericStatsCards";
+import { COMMUNICATIONS_STAT_COLORS } from "@utils/communications/communicationsThemeTokens";
+import { useAppSelector } from "../../toolkit/hooks";
 
-const GRID_MIN_WIDTH = '180px';
+const GRID_MIN_WIDTH = "180px";
 
 const CallStatsSummaryCards: React.FC = () => {
   const stats = useAppSelector((s) => s.callDashboard.generalStats);
@@ -11,44 +18,44 @@ const CallStatsSummaryCards: React.FC = () => {
   const data = useMemo(
     () => [
       {
-        title: 'Total Calls',
+        title: "Total Calls",
         value: stats.totalCalls,
         icon: Phone,
-        iconColor: '#3B82F6',
-        iconBgColor: '#DBEAFE',
-        subtitle: 'Total calls in the system',
+        iconColor: COMMUNICATIONS_STAT_COLORS.primary.iconColor,
+        iconBgColor: COMMUNICATIONS_STAT_COLORS.primary.iconBgColor,
+        subtitle: "Total calls in the system",
       },
       {
-        title: 'Inbound',
+        title: "Inbound",
         value: stats.totalInbound,
         icon: PhoneIncoming,
-        iconColor: '#10B981',
-        iconBgColor: '#D1FAE5',
-        subtitle: 'Inbound calls in the system',
+        iconColor: COMMUNICATIONS_STAT_COLORS.inbound.iconColor,
+        iconBgColor: COMMUNICATIONS_STAT_COLORS.inbound.iconBgColor,
+        subtitle: "Inbound calls in the system",
       },
       {
-        title: 'Outbound',
+        title: "Outbound",
         value: stats.totalOutbound,
         icon: PhoneOutgoing,
-        iconColor: '#0EA5E9',
-        iconBgColor: '#E0F2FE',
-        subtitle: 'Outbound calls in the system',
+        iconColor: COMMUNICATIONS_STAT_COLORS.outbound.iconColor,
+        iconBgColor: COMMUNICATIONS_STAT_COLORS.outbound.iconBgColor,
+        subtitle: "Outbound calls in the system",
       },
       {
-        title: 'Missed Incoming',
+        title: "Missed Incoming",
         value: stats.totalMissedIncoming,
         icon: PhoneMissed,
-        iconColor: '#F59E0B',
-        iconBgColor: '#FEF3C7',
-        subtitle: 'Missed incoming calls in the system',
+        iconColor: COMMUNICATIONS_STAT_COLORS.warning.iconColor,
+        iconBgColor: COMMUNICATIONS_STAT_COLORS.warning.iconBgColor,
+        subtitle: "Missed incoming calls in the system",
       },
       {
-        title: 'Missed Outgoing',
+        title: "Missed Outgoing",
         value: stats.totalMissedOutgoing,
         icon: PhoneOff,
-        iconColor: '#EF4444',
-        iconBgColor: '#FEE2E2',
-        subtitle: 'Missed outgoing calls in the system',
+        iconColor: COMMUNICATIONS_STAT_COLORS.danger.iconColor,
+        iconBgColor: COMMUNICATIONS_STAT_COLORS.danger.iconBgColor,
+        subtitle: "Missed outgoing calls in the system",
       },
     ],
     [stats],

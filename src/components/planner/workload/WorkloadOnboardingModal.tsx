@@ -1,4 +1,15 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
+import ReactDOM from "react-dom";
+import type { LucideIcon } from "lucide-react";
+import {
+  AlertTriangle,
+  ArrowLeftRight,
+  Calendar,
+  Database,
+  LayoutGrid,
+  Plus,
+  X,
+} from "lucide-react";
 import { setOnboardingComplete } from "./workloadOnboarding";
 
 type OnboardingChoice = "sample" | "fresh" | null;
@@ -8,35 +19,48 @@ type Props = Readonly<{
   onComplete: (choice: OnboardingChoice) => void;
 }>;
 
-const FEATURES = [
+const FEATURES: ReadonlyArray<{
+  icon: LucideIcon;
+  title: string;
+  desc: string;
+}> = [
   {
-    icon: "ti-layout-columns",
+    icon: LayoutGrid,
     title: "Two views",
     desc: "Spreadsheet for capacity overview, Board for task-level management.",
   },
   {
-    icon: "ti-switch-horizontal",
+    icon: ArrowLeftRight,
     title: "Drag to reassign",
     desc: "In Board view, drag a task card to another member column to reassign it.",
   },
   {
-    icon: "ti-calendar",
+    icon: Calendar,
     title: "Reschedule easily",
     desc: 'Use "Move to" on any card to change the due date without opening the task.',
   },
   {
-    icon: "ti-alert-triangle",
+    icon: AlertTriangle,
     title: "Overload warnings",
     desc: "Red cells and alerts appear when a member exceeds 100% capacity.",
   },
 ];
 
+function resolveOnboardingDialogLabel(step: 1 | 2): string {
+  return step === 1 ? "Welcome to Workload" : "How would you like to start?";
+}
+
 export function WorkloadOnboardingModal({ show, onComplete }: Props) {
   const [step, setStep] = useState<1 | 2>(1);
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  const onCompleteRef = useRef(onComplete);
+  const finishedRef = useRef(false);
+  onCompleteRef.current = onComplete;
 
   useEffect(() => {
     if (show) {
       setStep(1);
+      finishedRef.current = false;
     }
   }, [show]);
 
@@ -53,13 +77,43 @@ export function WorkloadOnboardingModal({ show, onComplete }: Props) {
     };
   }, [show]);
 
-  if (!show) return null;
-
-  function handleSkip() {
+  function finish(choice: OnboardingChoice) {
+    if (finishedRef.current) return;
+    finishedRef.current = true;
     setOnboardingComplete();
     document.body.style.overflow = "";
     document.body.style.paddingRight = "";
-    onComplete(null);
+    onCompleteRef.current(choice);
+  }
+
+  useEffect(() => {
+    if (!show) return undefined;
+
+    const dialog = dialogRef.current;
+    if (!dialog) return undefined;
+
+    if (!dialog.open) {
+      dialog.showModal();
+    }
+
+    const handleClose = () => {
+      finish(null);
+    };
+
+    dialog.addEventListener("close", handleClose);
+
+    return () => {
+      dialog.removeEventListener("close", handleClose);
+      if (dialog.open) {
+        dialog.close();
+      }
+    };
+  }, [show]);
+
+  if (!show) return null;
+
+  function handleSkip() {
+    finish(null);
   }
 
   function handleNext() {
@@ -67,26 +121,23 @@ export function WorkloadOnboardingModal({ show, onComplete }: Props) {
   }
 
   function handleChoice(choice: "sample" | "fresh") {
-    setOnboardingComplete();
-    document.body.style.overflow = "";
-    document.body.style.paddingRight = "";
-    onComplete(choice);
+    finish(choice);
   }
 
-  return (
-    <div className="workload-onboarding-overlay">
+  const dialogLabel = resolveOnboardingDialogLabel(step);
+
+  const modal = (
+    <dialog ref={dialogRef} aria-label={dialogLabel} className="workload-onboarding-overlay">
       <div className="workload-onboarding-modal">
         <div className="workload-onboarding-modal__header">
-          <div className="workload-onboarding-modal__title">
-            {step === 1 ? "Welcome to Workload" : "How would you like to start?"}
-          </div>
+          <div className="workload-onboarding-modal__title">{dialogLabel}</div>
           <button
             type="button"
             className="workload-onboarding-modal__close"
             onClick={handleSkip}
             aria-label="Close"
           >
-            <i className="ti ti-x" aria-hidden="true" />
+            <X size={18} aria-hidden />
           </button>
         </div>
 
@@ -96,7 +147,7 @@ export function WorkloadOnboardingModal({ show, onComplete }: Props) {
               {FEATURES.map((f) => (
                 <div key={f.title} className="workload-onboarding-modal__feature-item">
                   <div className="workload-onboarding-modal__feature-icon">
-                    <i className={`ti ${f.icon}`} aria-hidden="true" />
+                    <f.icon size={20} aria-hidden />
                   </div>
                   <div className="workload-onboarding-modal__feature-text">
                     <div className="workload-onboarding-modal__feature-title">{f.title}</div>
@@ -112,7 +163,7 @@ export function WorkloadOnboardingModal({ show, onComplete }: Props) {
                 className="workload-onboarding-modal__choice-card"
                 onClick={() => handleChoice("sample")}
               >
-                <i className="ti ti-database" aria-hidden="true" />
+                <Database size={24} aria-hidden />
                 <div className="workload-onboarding-modal__choice-title">Load sample data</div>
                 <div className="workload-onboarding-modal__choice-desc">
                   See the page with realistic tasks and members — great for exploring features.
@@ -123,7 +174,7 @@ export function WorkloadOnboardingModal({ show, onComplete }: Props) {
                 className="workload-onboarding-modal__choice-card"
                 onClick={() => handleChoice("fresh")}
               >
-                <i className="ti ti-plus" aria-hidden="true" />
+                <Plus size={24} aria-hidden />
                 <div className="workload-onboarding-modal__choice-title">Fresh start</div>
                 <div className="workload-onboarding-modal__choice-desc">
                   Start with your real team data. You can always explore sample data later.
@@ -169,6 +220,12 @@ export function WorkloadOnboardingModal({ show, onComplete }: Props) {
           </div>
         </div>
       </div>
-    </div>
+    </dialog>
   );
+
+  if (globalThis.document === undefined) {
+    return null;
+  }
+
+  return ReactDOM.createPortal(modal, document.body);
 }

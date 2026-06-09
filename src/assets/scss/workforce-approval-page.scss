@@ -1,0 +1,190 @@
+// Approval Requests page sections — Prospects blue theme (#0066CC)
+
+.approval-page-shell {
+  .approval-summary-card {
+    padding: 12px;
+    border-radius: 8px;
+    background-color: #eff6ff;
+    border: 1px solid #bfdbfe;
+  }
+
+  .approval-summary-title {
+    font-size: 15px;
+    font-weight: 600;
+    color: #141414;
+    margin-bottom: 6px;
+  }
+
+  .approval-summary-reason {
+    font-size: 14px;
+    color: #4b5563;
+    line-height: 1.5;
+  }
+
+  .approval-meta-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    color: #6b7280;
+  }
+
+  .approval-section-label {
+    margin-bottom: 8px;
+    font-size: 13px;
+    font-weight: 500;
+    color: #6b7280;
+  }
+
+  .approval-approver-chip {
+    padding: 5px 10px;
+    border-radius: 999px;
+    background-color: #eff6ff;
+    border: 1px solid #bfdbfe;
+    color: #0066CC;
+    font-size: 12px;
+    font-weight: 600;
+  }
+
+  .approval-detail-panel {
+    padding: 10px 12px;
+    background-color: #eff6ff;
+    border: 1px solid #bfdbfe;
+    border-radius: 10px;
+  }
+
+  .approval-detail-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 8px 0;
+    border-bottom: 1px solid #bfdbfe;
+
+    &:last-child {
+      border-bottom: none;
+    }
+  }
+
+  .approval-detail-key {
+    color: #6b7280;
+    font-weight: 600;
+  }
+
+  .approval-detail-value {
+    color: #141414;
+    text-align: right;
+    font-weight: 500;
+  }
+
+  .approval-type-filter {
+    min-width: 220px;
+  }
+
+  .approval-type-filter__list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .approval-type-filter__btn {
+    text-align: left;
+    border: 1px solid #e5e7eb;
+    background-color: #ffffff;
+    color: #141414;
+    border-radius: 6px;
+    padding: 8px 10px;
+    font-size: 13px;
+    cursor: pointer;
+
+    &--selected {
+      border-color: #bfdbfe;
+      background-color: #eff6ff;
+      color: #0052A3;
+    }
+
+    &--all {
+      border-width: 0;
+    }
+  }
+
+  .approval-comment-field-wrap {
+    position: relative;
+  }
+
+  .approval-comment-field {
+    width: 100%;
+    min-height: 100px;
+    padding: 12px;
+    border: 1px solid #bfdbfe;
+    border-radius: 8px;
+    font-size: 14px;
+    color: #141414;
+    resize: vertical;
+    background-color: #f8fafc;
+    box-sizing: border-box;
+
+    &:focus {
+      outline: none;
+      border-color: #0066CC;
+      background-color: #ffffff;
+      box-shadow: 0 0 0 3px rgba(0, 102, 204, 0.15);
+    }
+  }
+
+  .approval-comment-count {
+    position: absolute;
+    bottom: 10px;
+    right: 12px;
+    font-size: 12px;
+    color: #9ca3af;
+  }
+
+  .approval-attachment-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 12px;
+    border: 1px solid #bfdbfe;
+    border-radius: 8px;
+    background-color: #ffffff;
+    gap: 10px;
+  }
+
+  .approval-attachment-download-btn {
+    padding: 8px;
+    background-color: #eff6ff;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    color: #0066CC;
+
+    &:hover {
+      background-color: #dbeafe;
+    }
+  }
+
+  .approval-aging-badge {
+    display: inline-block;
+    padding: 4px 12px;
+    background-color: #dbeafe;
+    color: #0052A3;
+    border-radius: 16px;
+    font-size: 13px;
+    font-weight: 500;
+  }
+
+  .approval-type-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    border-radius: 6px;
+  }
+}
+
+.approval-result-dialog__footer .workforce-prospects-primary-btn {
+  padding: 8px 16px;
+}

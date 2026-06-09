@@ -2,7 +2,6 @@ import "@assets/scss/datatable-style.scss";
 import React, { ReactElement, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import Layout from "@layout/index";
-import BreadcrumbItem from "@common/BreadcrumbItem";
 import GenericTable, {
   FilterPill,
   TableAction,
@@ -38,9 +37,16 @@ import {
 import { useAttendanceLiveSessionElapsed } from "@page-modules/workforce/attendance/useAttendanceLiveSessionElapsed";
 import { useAttendanceListQuery, useAttendanceStatusQuery } from "@page-modules/workforce/attendance/useAttendanceQueries";
 import { AttendanceStatusDisplay } from "@page-modules/workforce/attendance/partials/AttendanceStatusUI";
+import { WorkforceListPageShell } from "@page-modules/workforce/shared/WorkforceListPageShell";
+import {
+  WORKFORCE_TOOLBAR_LABELS,
+  workforceModuleToolbarDropdown,
+} from "@page-modules/workforce/shared/workforceListPageConfig";
+import { renderApplyFilterActions } from "@utils/communicationsStagedFilters";
 
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
+import "@page-modules/workforce/shared/workforcePages.scss";
 import "@assets/scss/attendance-page.scss";
 
 const { PERMISSIONS } = HEADER_CONSTANTS;
@@ -131,6 +137,7 @@ const AttendancePage = () => {
   const [appliedUserIds, setAppliedUserIds] = useState<string[]>([]);
   const [userSearchTerm, setUserSearchTerm] = useState("");
   const [selectedDate, setSelectedDate] = useState("");
+  const [appliedDate, setAppliedDate] = useState("");
 
   const [currentPage, setCurrentPage] = useState(1);
   const [rowsPerPage, setRowsPerPage] = useState(ATTENDANCE_ITEMS_PER_PAGE);
@@ -197,7 +204,7 @@ const AttendancePage = () => {
       page: currentPage,
       limit: rowsPerPage,
       appliedUserIds,
-      selectedDatePreset: selectedDate,
+      selectedDatePreset: appliedDate,
       canViewAllEmployees,
       teamScopeLoading,
       teamScopeUserIds,
@@ -278,7 +285,34 @@ const AttendancePage = () => {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [appliedUserIds, selectedDate]);
+  }, [appliedUserIds, appliedDate]);
+
+  const handleApplyFilters = useCallback(() => {
+    setAppliedUserIds(selectedUserIds);
+    setAppliedDate(selectedDate);
+    setCurrentPage(1);
+  }, [selectedUserIds, selectedDate]);
+
+  const resetFilters = useCallback(() => {
+    setSelectedUserIds([]);
+    setAppliedUserIds([]);
+    setSelectedDate("");
+    setAppliedDate("");
+    setUserSearchTerm("");
+    setCurrentPage(1);
+  }, []);
+
+  const hasUnappliedFilterChanges = useMemo(
+    () =>
+      JSON.stringify(selectedUserIds) !== JSON.stringify(appliedUserIds) ||
+      selectedDate !== appliedDate,
+    [selectedUserIds, appliedUserIds, selectedDate, appliedDate],
+  );
+
+  const hasActiveFilters = useMemo(
+    () => appliedUserIds.length > 0 || Boolean(appliedDate),
+    [appliedUserIds, appliedDate],
+  );
 
   const handleCheckIn = useCallback(() => {
     checkInMutation.mutate();
@@ -340,16 +374,8 @@ const AttendancePage = () => {
         rows={attendanceUserDropdownRows}
         selectedIds={selectedUserIds}
         onToggle={toggleSelectedUserId}
-        onApply={() => {
-          setAppliedUserIds(selectedUserIds);
-          setCurrentPage(1);
-        }}
-        onClear={() => {
-          setSelectedUserIds([]);
-          setAppliedUserIds([]);
-          setUserSearchTerm("");
-          setCurrentPage(1);
-        }}
+        onApply={() => undefined}
+        onClear={() => undefined}
         listMaxHeightPx={220}
       />
     ),
@@ -372,10 +398,12 @@ const AttendancePage = () => {
     [],
   );
 
-  const activeAttendanceUserId = selectedUserIds[0] || appliedUserIds[0] || "";
+  const activeAttendanceUserId =
+    selectedUserIds[0] || appliedUserIds[0] || "";
   const activeAttendanceUserLabel = activeAttendanceUserId
     ? getDisplayName(activeAttendanceUserId)
     : undefined;
+  const dateFilterKey = selectedDate || appliedDate;
 
   const attendanceFilterPills = useMemo<FilterPill[]>(() => {
     const userPill: FilterPill = {
@@ -401,9 +429,15 @@ const AttendancePage = () => {
       label: "Date",
       showDropdown: true,
       searchable: true,
-      active: Boolean(selectedDate),
-      activeLabel: selectedDate || undefined,
-      onClear: selectedDate ? () => setSelectedDate("") : undefined,
+      active: Boolean(dateFilterKey),
+      activeLabel: dateFilterKey || undefined,
+      onClear: dateFilterKey
+        ? () => {
+            setSelectedDate("");
+            setAppliedDate("");
+            setCurrentPage(1);
+          }
+        : undefined,
       dropdownOptions: dateFilterOptions,
     };
     const showUserFilter =
@@ -414,7 +448,7 @@ const AttendancePage = () => {
     appliedUserIds,
     activeAttendanceUserLabel,
     usersDropdownContent,
-    selectedDate,
+    dateFilterKey,
     dateFilterOptions,
     canViewAllEmployees,
     teamScopeUserIds.length,
@@ -472,7 +506,8 @@ const AttendancePage = () => {
         show: () => canDeleteAttendance,
         disabled: (record: AttendanceRecord) => !canDeleteAttendanceRow(record),
         disabledTitle: "You can only delete attendance for yourself or your team (with permission).",
-        variant: "link",
+        variant: "light",
+        className: "btn-action-style-2 p-1 text-danger",
       },
     ],
     [canDeleteAttendance, canDeleteAttendanceRow, handleDeleteAttendanceClick],
@@ -495,41 +530,24 @@ const AttendancePage = () => {
 
   const checkInOutLoading = checkInMutation.isPending || checkOutMutation.isPending;
 
-  const attendanceToolbar = useMemo<ToolbarConfig>(
-    () => ({
-      showTabs: true,
-      tabs: [
-        {
-          id: "attendance-records",
-          label: "Attendance records",
-          count: pagination?.total,
-        },
-      ],
-      activeTab: "attendance-records",
-      showFiltersButton: true,
-      showFilterPills: false,
-      filterPills: attendanceFilterPills,
-      showMoreFiltersButton: false,
-      rightActions: (
-        <div className="attendance-toolbar-right">
-          <div className="attendance-status-content">
-            <AttendanceStatusDisplay
-              statusLoading={attendanceStatusQuery.isFetching}
-              status={status}
-              isCheckedIn={isCheckedIn}
-              canCheckInOut={canCheckInOut}
-              liveSessionElapsed={liveSessionElapsed}
-              checkInOutLoading={checkInOutLoading}
-              onCheckIn={handleCheckIn}
-              onCheckOut={handleCheckOut}
-            />
-          </div>
+  const attendanceToolbarRightActions = useMemo(
+    () => (
+      <div className="attendance-toolbar-right">
+        <div className="attendance-status-content">
+          <AttendanceStatusDisplay
+            statusLoading={attendanceStatusQuery.isFetching}
+            status={status}
+            isCheckedIn={isCheckedIn}
+            canCheckInOut={canCheckInOut}
+            liveSessionElapsed={liveSessionElapsed}
+            checkInOutLoading={checkInOutLoading}
+            onCheckIn={handleCheckIn}
+            onCheckOut={handleCheckOut}
+          />
         </div>
-      ),
-    }),
+      </div>
+    ),
     [
-      attendanceFilterPills,
-      pagination?.total,
       attendanceStatusQuery.isFetching,
       status,
       isCheckedIn,
@@ -541,10 +559,47 @@ const AttendancePage = () => {
     ],
   );
 
-  return (
-    <div className="attendance-page-shell">
-      <BreadcrumbItem mainTitle="" mainLink="" subTitle="Attendance" />
+  const attendanceToolbar = useMemo<ToolbarConfig>(
+    () => ({
+      showTabs: true,
+      tabs: [
+        {
+          id: "attendance-records",
+          label: "Attendance records",
+          count: pagination?.total ?? 0,
+        },
+      ],
+      activeTab: "attendance-records",
+      ...workforceModuleToolbarDropdown(WORKFORCE_TOOLBAR_LABELS.attendance),
+      rightActions: attendanceToolbarRightActions,
+      showFiltersButton: true,
+      showFilterPills: true,
+      filterPills: attendanceFilterPills,
+      showMoreFiltersButton: false,
+      clearAllFilters: hasActiveFilters ? resetFilters : undefined,
+      filterPillsRightActions: renderApplyFilterActions(
+        hasUnappliedFilterChanges,
+        handleApplyFilters,
+        "attendance",
+      ),
+    }),
+    [
+      attendanceFilterPills,
+      attendanceToolbarRightActions,
+      pagination?.total,
+      hasActiveFilters,
+      hasUnappliedFilterChanges,
+      handleApplyFilters,
+      resetFilters,
+    ],
+  );
 
+  return (
+    <WorkforceListPageShell
+      breadcrumbSubTitle="Attendance"
+      tableWrapperClass="workforce-attendance-table-wrapper"
+    >
+      <div className="attendance-page-shell">
       <GenericTable<AttendanceRecord>
         data={records}
         columns={attendanceColumns}
@@ -587,7 +642,8 @@ const AttendancePage = () => {
         itemType="attendance record"
         loading={deleteAttendanceMutation.isPending}
       />
-    </div>
+      </div>
+    </WorkforceListPageShell>
   );
 };
 

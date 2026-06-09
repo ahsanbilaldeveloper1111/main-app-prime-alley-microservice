@@ -1,5 +1,5 @@
-import React from "react";
-import { Nav } from "react-bootstrap";
+import React, { useState } from "react";
+import { Plus } from "lucide-react";
 import {
   formatProjectHealthStatsLine,
   type OverdueByProjectEntry,
@@ -11,6 +11,8 @@ import {
   type ReportsMainView,
   type ReportsTeamSubView,
 } from "@page-modules/planner/reports/projectReportsDomain";
+import { ReportsEmptyState } from "./WorkloadReportsViews";
+import { ReportsModalOverlay } from "./ReportsModalOverlay";
 
 type ReportsViewTabsProps = Readonly<{
   activeView: ReportsMainView;
@@ -18,22 +20,20 @@ type ReportsViewTabsProps = Readonly<{
 }>;
 
 export function ReportsViewTabs({ activeView, onChange }: ReportsViewTabsProps) {
+  const tabs: { id: ReportsMainView; label: string }[] = [
+    { id: "team", label: "Team Overview" },
+    { id: "project", label: "Project View" },
+    { id: "historical", label: "Historical Trends" },
+  ];
+
   return (
-    <Nav variant="tabs" className="reports-view-tabs mb-3">
-      <Nav.Item>
-        <Nav.Link
-          active={activeView === "team"}
-          onClick={() => onChange("team")}
-          className={activeView === "team" ? "active" : ""}
-        >
-          Team Overview
-        </Nav.Link>
-      </Nav.Item>
-      <Nav.Item>
-        <Nav.Link
-          active={activeView === "project"}
-          onClick={() => onChange("project")}
-          className={activeView === "project" ? "active" : ""}
+    <div className="reports-tabs-row">
+      {tabs.map((tab) => (
+        <button
+          key={tab.id}
+          type="button"
+          className={`reports-tabs-row__tab${activeView === tab.id ? " reports-tabs-row__tab--active" : ""}`}
+          onClick={() => onChange(tab.id)}
         >
           Project View
         </Nav.Link>
@@ -58,27 +58,21 @@ type ReportsTeamSubTabsProps = Readonly<{
 
 export function ReportsTeamSubTabs({ activeSubView, onChange }: ReportsTeamSubTabsProps) {
   return (
-    <div className="reports-team-sub-tabs-wrap mb-3">
-      <Nav variant="pills" className="reports-team-sub-tabs gap-1">
-        <Nav.Item>
-          <Nav.Link
-            active={activeSubView === "live"}
-            onClick={() => onChange("live")}
-            className="reports-team-sub-tabs__link"
-          >
-            Live View
-          </Nav.Link>
-        </Nav.Item>
-        <Nav.Item>
-          <Nav.Link
-            active={activeSubView === "board"}
-            onClick={() => onChange("board")}
-            className="reports-team-sub-tabs__link"
-          >
-            Board
-          </Nav.Link>
-        </Nav.Item>
-      </Nav>
+    <div className="reports-team-sub-tabs-wrap">
+      <button
+        type="button"
+        className={`reports-sub-tab-btn${activeSubView === "live" ? " reports-sub-tab-btn--active" : ""}`}
+        onClick={() => onChange("live")}
+      >
+        Live View
+      </button>
+      <button
+        type="button"
+        className={`reports-sub-tab-btn${activeSubView === "board" ? " reports-sub-tab-btn--active" : ""}`}
+        onClick={() => onChange("board")}
+      >
+        Report View
+      </button>
     </div>
   );
 }
@@ -140,95 +134,240 @@ export function ReportsProjectKpiRow({
 }
 
 function projectProgressTone(progress: number): string {
-  if (progress >= 100) return "success";
-  if (progress >= 70) return "primary";
-  return "warning";
+  if (progress >= 75) return "success";
+  if (progress >= 50) return "warning";
+  return "delay";
+}
+
+function projectProgressBarColor(tone: string): string {
+  if (tone === "success") return "#16a34a";
+  if (tone === "warning") return "#f59e0b";
+  return "#ef4444";
+}
+
+function resolveProjectHealthClass(health: ProjectReportRow["health"]): string {
+  return health === "at_risk" ? "reports-project-row__health--risk" : "reports-project-row__health--ok";
 }
 
 export function ReportsProjectDetailList({
   rows,
 }: Readonly<{ rows: ProjectReportRow[] }>) {
+  const [showAll, setShowAll] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+
   if (rows.length === 0) {
-    return <p className="small text-muted mb-0">No projects in this period.</p>;
+    return (
+      <ReportsEmptyState
+        icon="ti-topology-star"
+        title="No projects found"
+        subtitle="No project activity in this period"
+      />
+    );
   }
+
+  const displayedRows = rows.slice(0, 10);
+
   return (
-    <div className="reports-project-list">
-      {rows.map((row) => {
-        const tone = projectProgressTone(row.progressPercent);
-        const healthClass =
-          row.health === "at_risk" ? "reports-project-row__health--risk" : "reports-project-row__health--ok";
-        return (
-          <div key={row.id} className="reports-project-row">
-            <div className="reports-project-row__head">
-              <span
-                className="reports-project-row__dot"
-                style={{ backgroundColor: row.color }}
-                aria-hidden
-              />
-              <div className="reports-project-row__title-block">
-                <span className="reports-project-row__name">{row.name}</span>
-                <span className="reports-project-row__stats">
-                  {formatProjectHealthStatsLine(row)}
-                </span>
+    <>
+      <div className="reports-project-list">
+        {displayedRows.map((row) => {
+          const tone = projectProgressTone(row.progressPercent);
+          const healthClass = resolveProjectHealthClass(row.health);
+          return (
+            <div key={row.id} className="reports-project-row">
+              <div className="reports-project-row__head">
+                <span
+                  className="reports-project-row__dot"
+                  style={{ backgroundColor: row.color }}
+                  aria-hidden
+                />
+                <div className="reports-project-row__title-block">
+                  <span className="reports-project-row__name">{row.name}</span>
+                  <span className="reports-project-row__stats">
+                    {formatProjectHealthStatsLine(row)}
+                  </span>
+                </div>
+                <span className={`reports-project-row__health ${healthClass}`}>{row.healthLabel}</span>
+                <span className="reports-project-row__pct">{row.progressPercent}%</span>
               </div>
-              <span className={`reports-project-row__health ${healthClass}`}>{row.healthLabel}</span>
-              <span className="reports-project-row__pct">{row.progressPercent}%</span>
+              <div className="reports-project-row__bar reports-project-row__bar--dual">
+                <div
+                  className={`reports-project-row__bar-fill reports-project-row__bar-fill--${tone}`}
+                  style={{ width: `${Math.min(100, Math.max(0, row.progressPercent))}%` }}
+                />
+                <div
+                  className="reports-project-row__bar-fill reports-project-row__bar-fill--delay"
+                  style={{
+                    width: `${Math.min(100, Math.max(0, row.delayPercent))}%`,
+                  }}
+                />
+              </div>
             </div>
-            <div className="reports-project-row__bar reports-project-row__bar--dual">
-              <div
-                className={`reports-project-row__bar-fill reports-project-row__bar-fill--${tone}`}
-                style={{ width: `${Math.min(100, Math.max(0, row.progressPercent))}%` }}
-              />
-              <div
-                className="reports-project-row__bar-fill reports-project-row__bar-fill--delay"
-                style={{
-                  width: `${Math.min(100, Math.max(0, row.delayPercent))}%`,
-                }}
-              />
-            </div>
-          </div>
-        );
-      })}
-    </div>
+          );
+        })}
+      </div>
+      <div style={{ padding: "10px 16px", borderTop: "1px solid #eaf0f6", textAlign: "center" }}>
+        <button
+          type="button"
+          onClick={() => setShowAll(true)}
+          style={{ background: "none", border: "none", color: "#0066CC", fontSize: "12px", fontWeight: 500, cursor: "pointer", fontFamily: "Lexend Deca, sans-serif" }}
+        >
+          View All ({rows.length} projects)
+        </button>
+      </div>
+      {showAll ? (
+            <ReportsModalOverlay
+              ariaLabel="Project Health"
+              onClose={() => setShowAll(false)}
+              dialogClassName="reports-modal-dialog--all-tasks"
+            >
+              <div style={{ padding: "16px 20px", borderBottom: "1px solid #eaf0f6", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                <div>
+                  <div style={{ fontSize: "13px", fontWeight: 700, color: "#141414", fontFamily: "Lexend Deca, sans-serif" }}>Project Health</div>
+                  <div style={{ fontSize: "11px", color: "#718096", marginTop: "2px", fontFamily: "Lexend Deca, sans-serif" }}>{rows.length} projects</div>
+                </div>
+                <button type="button" onClick={() => setShowAll(false)} style={{ background: "none", border: "none", cursor: "pointer", color: "#718096", fontSize: "18px" }}>×</button>
+              </div>
+              <div style={{ padding: "8px 20px", borderBottom: "1px solid #eaf0f6" }}>
+                <input
+                  type="text"
+                  placeholder="Search project..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  style={{ width: "100%", padding: "6px 10px", fontSize: "12px", border: "1px solid #eaf0f6", borderRadius: "4px", fontFamily: "Lexend Deca, sans-serif", outline: "none", color: "#141414", background: "#f5f8fa" }}
+                />
+              </div>
+              <div style={{ overflowY: "auto", flex: 1 }}>
+                {rows
+                  .filter((row) => row.name.toLowerCase().includes(searchQuery.toLowerCase()))
+                  .map((row, idx) => {
+                    const tone = projectProgressTone(row.progressPercent);
+                    const healthClass = resolveProjectHealthClass(row.health);
+                    const progressBarColor = projectProgressBarColor(tone);
+
+                    return (
+                      <div
+                        key={row.id}
+                        className="reports-modal-list-row"
+                        style={{ padding: "10px 20px", borderBottom: "1px solid #f3f4f6" }}
+                      >
+                        <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "6px" }}>
+                          <span style={{ fontSize: "11px", color: "#9ca3af", minWidth: "20px", fontFamily: "Lexend Deca, sans-serif" }}>{idx + 1}</span>
+                          <span style={{ width: "8px", height: "8px", borderRadius: "50%", backgroundColor: row.color, flexShrink: 0, display: "inline-block" }} />
+                          <span style={{ fontSize: "13px", fontWeight: 500, color: "#141414", fontFamily: "Lexend Deca, sans-serif", flex: 1 }}>{row.name}</span>
+                          <span className={`reports-project-row__health ${healthClass}`}>{row.healthLabel}</span>
+                          <span style={{ fontSize: "13px", fontWeight: 600, color: "#374151", minWidth: "2.5rem", textAlign: "right", fontFamily: "Lexend Deca, sans-serif" }}>{row.progressPercent}%</span>
+                        </div>
+                        <div style={{ height: "5px", background: "#e2e8f0", borderRadius: "999px", overflow: "hidden", marginLeft: "28px" }}>
+                          <div style={{ height: "100%", width: `${Math.min(100, Math.max(0, row.progressPercent))}%`, background: progressBarColor, borderRadius: "999px" }} />
+                        </div>
+                      </div>
+                    );
+                  })}
+              </div>
+            </ReportsModalOverlay>
+      ) : null}
+    </>
   );
 }
 
 export function ReportsTasksByProject({
   segments,
 }: Readonly<{ segments: ProjectTaskCountSegment[] }>) {
+  const [showAll, setShowAll] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+
   const total = segments.reduce((sum, segment) => sum + segment.value, 0);
   if (segments.length === 0 || total <= 0) {
-    return <p className="small text-muted mb-0">No task counts by project for this period.</p>;
+    return (
+      <ReportsEmptyState
+        icon="ti-chart-bar"
+        title="No project data"
+        subtitle="No tasks found across projects for this period"
+      />
+    );
   }
+
+  const sorted = [...segments].sort((a, b) => b.value - a.value);
+  const maxValue = sorted[0]?.value ?? 1;
+  const displayed = sorted.slice(0, 8);
+
   return (
     <>
-      <div className="reports-project-breakdown-bar" aria-hidden>
-        {segments.map((segment) => (
-          <span
-            key={segment.name}
-            className="reports-project-breakdown-bar__segment"
-            style={{
-              width: `${(segment.value / total) * 100}%`,
-              backgroundColor: segment.color,
-            }}
-            title={`${segment.name}: ${segment.value} tasks`}
-          />
+      <div style={{ display: "flex", flexDirection: "column", gap: "10px", padding: "4px 16px" }}>
+        {displayed.map((segment) => (
+          <div key={segment.name} style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+            <div style={{ fontSize: "12px", fontWeight: 500, color: "#141414", fontFamily: "Lexend Deca, sans-serif", width: "35%", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              {segment.name}
+            </div>
+            <div style={{ flex: 1, height: "5px", background: "#e2e8f0", borderRadius: "999px", overflow: "hidden" }}>
+              <div style={{
+                height: "100%",
+                width: `${Math.round((segment.value / maxValue) * 100)}%`,
+                backgroundColor: segment.color,
+                borderRadius: "999px",
+                minWidth: "4px",
+              }} />
+            </div>
+            <div style={{ fontSize: "12px", fontWeight: 600, color: "#374151", fontFamily: "Lexend Deca, sans-serif", minWidth: "2rem", textAlign: "right" }}>
+              {segment.value}
+            </div>
+          </div>
         ))}
       </div>
-      <ul className="reports-project-breakdown-bar__legend">
-        {segments.map((segment) => (
-          <li key={segment.name}>
-            <span
-              className="reports-project-breakdown-bar__dot"
-              style={{ backgroundColor: segment.color }}
-            />
-            <span>{segment.name}</span>
-            <span className="reports-project-breakdown-bar__count">
-              {segment.value} {segment.value === 1 ? "task" : "tasks"}
-            </span>
-          </li>
-        ))}
-      </ul>
+      <div style={{ padding: "10px 0 0", borderTop: "1px solid #eaf0f6", marginTop: "8px", textAlign: "center" }}>
+        <button
+          type="button"
+          onClick={() => setShowAll(true)}
+          style={{ background: "none", border: "none", color: "#0066CC", fontSize: "12px", fontWeight: 500, cursor: "pointer", fontFamily: "Lexend Deca, sans-serif" }}
+        >
+          View All ({segments.length} projects)
+        </button>
+      </div>
+      {showAll ? (
+            <ReportsModalOverlay
+              ariaLabel="Tasks by Project"
+              onClose={() => setShowAll(false)}
+              dialogClassName="reports-modal-dialog--members"
+            >
+              <div style={{ padding: "16px 20px", borderBottom: "1px solid #eaf0f6", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                <div>
+                  <div style={{ fontSize: "13px", fontWeight: 700, color: "#141414", fontFamily: "Lexend Deca, sans-serif" }}>Tasks by Project</div>
+                  <div style={{ fontSize: "11px", color: "#718096", marginTop: "2px", fontFamily: "Lexend Deca, sans-serif" }}>{segments.length} projects</div>
+                </div>
+                <button type="button" onClick={() => setShowAll(false)} style={{ background: "none", border: "none", cursor: "pointer", color: "#718096", fontSize: "18px" }}>×</button>
+              </div>
+              <div style={{ padding: "8px 20px", borderBottom: "1px solid #eaf0f6" }}>
+                <input
+                  type="text"
+                  placeholder="Search project..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  style={{ width: "100%", padding: "6px 10px", fontSize: "12px", border: "1px solid #eaf0f6", borderRadius: "4px", fontFamily: "Lexend Deca, sans-serif", outline: "none", color: "#141414", background: "#f5f8fa" }}
+                />
+              </div>
+              <div style={{ overflowY: "auto", flex: 1, padding: "12px 20px" }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                  {sorted
+                    .filter((s) => s.name.toLowerCase().includes(searchQuery.toLowerCase()))
+                    .map((segment, idx) => (
+                      <div key={segment.name} style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                        <span style={{ fontSize: "11px", color: "#9ca3af", minWidth: "20px", fontFamily: "Lexend Deca, sans-serif" }}>{idx + 1}</span>
+                        <div style={{ fontSize: "12px", fontWeight: 500, color: "#141414", fontFamily: "Lexend Deca, sans-serif", width: "40%", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                          {segment.name}
+                        </div>
+                        <div style={{ flex: 1, height: "5px", background: "#e2e8f0", borderRadius: "999px", overflow: "hidden" }}>
+                          <div style={{ height: "100%", width: `${Math.round((segment.value / maxValue) * 100)}%`, backgroundColor: segment.color, borderRadius: "999px", minWidth: "4px" }} />
+                        </div>
+                        <div style={{ fontSize: "12px", fontWeight: 600, color: "#374151", fontFamily: "Lexend Deca, sans-serif", minWidth: "2rem", textAlign: "right" }}>
+                          {segment.value}
+                        </div>
+                      </div>
+                    ))}
+                </div>
+              </div>
+            </ReportsModalOverlay>
+      ) : null}
     </>
   );
 }
@@ -249,7 +388,10 @@ export function ReportsOverdueByProject({
       <div>
         {entries.map((entry) => (
           <div key={entry.projectName} className="reports-overdue-project-row">
-            <div className="reports-overdue-project-row__project">{entry.projectName}</div>
+            <div>
+              <div className="reports-overdue-project-row__project">{entry.projectName}</div>
+              <div className="reports-overdue-project-row__task">{entry.count} {entry.count === 1 ? "task" : "tasks"} overdue</div>
+            </div>
             <span
               className={`reports-overdue-project-row__badge reports-overdue-project-row__badge--${entry.tone}`}
             >

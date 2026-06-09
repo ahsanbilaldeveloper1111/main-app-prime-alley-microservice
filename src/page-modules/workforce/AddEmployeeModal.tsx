@@ -383,15 +383,19 @@ const AddEmployeeModal: React.FC<AddEmployeeModalProps> = ({
             />
           </div>
 
-          <div className="workforce-employee-modal-sidebar__footer">
-            <button type="submit" disabled={isPrimaryDisabled} className="workforce-employee-modal-sidebar__btn-primary">
+          <div className="contact-sidebar-footer workforce-employee-modal-sidebar__footer">
+            <button
+              type="submit"
+              disabled={isPrimaryDisabled}
+              className="contact-form-btn-create workforce-sidebar-btn-create"
+            >
               {submitting ? "Creating..." : "Create"}
             </button>
             <button
               type="button"
               disabled={submitting}
               onClick={handleCancelClick}
-              className="workforce-employee-modal-sidebar__btn-secondary"
+              className="contact-form-btn-cancel workforce-sidebar-btn-cancel"
             >
               Cancel
             </button>

@@ -3,7 +3,6 @@ import React, { ReactElement, useCallback, useEffect, useMemo, useState } from "
 import { useRouter } from "next/router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Layout from "@layout/index";
-import BreadcrumbItem from "@common/BreadcrumbItem";
 import GenericSidebar, { SidebarSection } from "@components/GenericSidebarNew";
 import DeleteConfirmationModal from "@components/page-partials/DeleteConfirmationModal";
 import AddEmployeeModal from "@page-modules/workforce/AddEmployeeModal";
@@ -50,9 +49,21 @@ import UsersPillDropdownContent from "@page-modules/workforce/employees/partials
 import EmployeesDepartmentHeadcountPanel from "@page-modules/workforce/employees/partials/EmployeesDepartmentHeadcountPanel";
 import EmployeesDashboardOverviewPanel from "@page-modules/workforce/employees/partials/EmployeesDashboardOverviewPanel";
 import CreateJourneyModal from "@page-modules/workforce/employees/partials/CreateJourneyModal";
+import { WorkforceListPageShell } from "@page-modules/workforce/shared/WorkforceListPageShell";
+import {
+  WorkforceFixedActionBar,
+  WorkforceProspectsPrimaryButton,
+} from "@page-modules/workforce/shared/WorkforceProspectsTheme";
+import {
+  EMPLOYEES_LIST_SCOPED_LAYOUT,
+  WORKFORCE_TOOLBAR_LABELS,
+  workforceModuleToolbarDropdown,
+} from "@page-modules/workforce/shared/workforceListPageConfig";
+import { renderApplyFilterActions } from "@utils/communicationsStagedFilters";
 
 import { useSession } from "next-auth/react";
 
+import "@page-modules/workforce/shared/workforcePages.scss";
 import "@page-modules/workforce/employees/employeesPage.scss";
 
 const { PERMISSIONS } = HEADER_CONSTANTS;
@@ -376,6 +387,55 @@ const Employees = () => {
     setCurrentPage(1);
   }, []);
 
+  const hasUnappliedFilterChanges = useMemo(
+    () =>
+      searchTerm !== appliedSearch ||
+      selectedDepartment !== appliedDepartment ||
+      selectedLocationId !== appliedLocationId ||
+      selectedStatus !== appliedStatus ||
+      selectedEmploymentType !== appliedEmploymentType ||
+      selectedContract !== appliedContract ||
+      JSON.stringify(selectedManagerIds) !== JSON.stringify(appliedManagerIds),
+    [
+      searchTerm,
+      appliedSearch,
+      selectedDepartment,
+      appliedDepartment,
+      selectedLocationId,
+      appliedLocationId,
+      selectedStatus,
+      appliedStatus,
+      selectedEmploymentType,
+      appliedEmploymentType,
+      selectedContract,
+      appliedContract,
+      selectedManagerIds,
+      appliedManagerIds,
+    ],
+  );
+
+  const hasActiveFilters = useMemo(
+    () =>
+      Boolean(
+        appliedSearch ||
+          appliedDepartment ||
+          appliedLocationId != null ||
+          appliedStatus ||
+          appliedEmploymentType ||
+          appliedContract ||
+          appliedManagerIds.length > 0,
+      ),
+    [
+      appliedSearch,
+      appliedDepartment,
+      appliedLocationId,
+      appliedStatus,
+      appliedEmploymentType,
+      appliedContract,
+      appliedManagerIds,
+    ],
+  );
+
   const employeeTabs = useMemo<TabConfig[]>(
     () => [{ id: "employees", label: "Employees", count: pagination?.total ?? 0, removable: false }],
     [pagination?.total],
@@ -548,29 +608,30 @@ const Employees = () => {
       tabs: employeeTabs,
       activeTab: "employees",
       onTabChange: () => {},
+      ...workforceModuleToolbarDropdown(WORKFORCE_TOOLBAR_LABELS.employees),
       showFiltersButton: true,
-      showFilterPills: false,
+      showFilterPills: true,
       filterPills: employeeFilterPills,
       showMoreFiltersButton: false,
-      customActions: (
-        <div className="d-flex align-items-center gap-2 flex-wrap">
-          <button type="button" className="gt-toolbar-btn btn btn-outline-dark btn-sm" onClick={resetFilters}>
-            Reset
-          </button>
-          <button type="button" className="gt-toolbar-btn btn btn-dark btn-sm" onClick={handleApply}>
-            Apply
-          </button>
-        </div>
+      clearAllFilters: hasActiveFilters ? resetFilters : undefined,
+      filterPillsRightActions: renderApplyFilterActions(
+        hasUnappliedFilterChanges,
+        handleApply,
+        "employees",
       ),
-      rightActions: session?.user?.permissions?.includes(PERMISSIONS.ADD_EMPLOYEE_STAFF_MANAGEMENT) ? (
-        <button type="button" className="btn btn-dark btn-sm d-flex align-items-center gap-1" onClick={openCreateModal}>
-          <Plus size={14} />
-          Add Employee
-        </button>
-      ) : undefined,
     }),
-    [employeeFilterPills, employeeTabs, handleApply, openCreateModal, resetFilters, searchTerm, session?.user?.permissions],
+    [
+      employeeFilterPills,
+      employeeTabs,
+      handleApply,
+      hasActiveFilters,
+      hasUnappliedFilterChanges,
+      resetFilters,
+      searchTerm,
+    ],
   );
+
+  const canAddEmployee = session?.user?.permissions?.includes(PERMISSIONS.ADD_EMPLOYEE_STAFF_MANAGEMENT);
 
   const employeeSidebarSections = useMemo<SidebarSection[]>(() => {
     if (!selectedProfile) return [];
@@ -639,8 +700,27 @@ const Employees = () => {
 
   return (
     <React.Fragment>
-      <BreadcrumbItem mainTitle="" mainLink="" subTitle="Employees" />
-      <div>
+      <WorkforceListPageShell
+        breadcrumbSubTitle="Employees"
+        tableWrapperClass="workforce-employees-table-wrapper"
+        scopedLayout={EMPLOYEES_LIST_SCOPED_LAYOUT}
+        fixedActions={
+          canAddEmployee ? (
+            <WorkforceFixedActionBar>
+              <WorkforceProspectsPrimaryButton onClick={openCreateModal}>
+                <Plus size={16} />
+                Add Employee
+              </WorkforceProspectsPrimaryButton>
+            </WorkforceFixedActionBar>
+          ) : undefined
+        }
+        footer={
+          <div className="employees-page__charts-grid">
+            <EmployeesDepartmentHeadcountPanel chartRows={departmentHeadcountData} />
+            <EmployeesDashboardOverviewPanel counters={dashboardCounters} loading={countersPending} />
+          </div>
+        }
+      >
         <div className="employees-page__layout-row">
           <div className="employees-page__main">
             <GenericTable<UserProfile>
@@ -679,18 +759,13 @@ const Employees = () => {
               avatar={{
                 initials: getDisplayName(selectedProfile).slice(0, 2).toUpperCase(),
                 name: getDisplayName(selectedProfile),
-                gradient: "#6366f1",
+                gradient: "#0066CC",
               }}
               sections={employeeSidebarSections}
             />
           )}
         </div>
-
-        <div className="employees-page__charts-grid">
-          <EmployeesDepartmentHeadcountPanel chartRows={departmentHeadcountData} />
-          <EmployeesDashboardOverviewPanel counters={dashboardCounters} loading={countersPending} />
-        </div>
-      </div>
+      </WorkforceListPageShell>
 
       <AddEmployeeModal
         show={showCreateModal}

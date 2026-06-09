@@ -607,8 +607,67 @@ body:has(.prospects-scrollable-content) {
     flex-shrink: 0 !important;
   }
 
-  .gt-toolbar-actions .btn.gt-toolbar-btn,
-  .gt-filter-pills-right-actions .gt-toolbar-btn {
+  .gt-filter-pills {
+    flex-wrap: wrap;
+    align-items: flex-start;
+    align-content: flex-start;
+    row-gap: 8px;
+    padding: 8px 24px 12px !important;
+    border-left: 1px solid #ccc !important;
+    border-right: 1px solid #ccc !important;
+    border-bottom: 1px solid #ccc !important;
+    overflow: visible;
+  }
+
+  .gt-filter-pills > .d-flex.align-items-center.gap-2.flex-wrap {
+    flex-wrap: wrap !important;
+    align-items: center !important;
+    gap: 8px !important;
+    width: 100%;
+    min-width: 0;
+  }
+
+  .gt-filter-pill,
+  .gt-filter-pill.dropdown-toggle {
+    border: 1px solid #8a8a8a !important;
+    box-shadow: none !important;
+    max-width: min(240px, calc(100vw - 48px));
+    min-width: 0;
+  }
+
+  .gt-filter-pill:hover {
+    border-color: #0066CC !important;
+  }
+
+  .gt-filter-pill-active,
+  .gt-filter-pill.gt-filter-pill-active {
+    border-color: #bfdbfe !important;
+  }
+
+  .gt-filter-pill-active:hover,
+  .gt-filter-pill.gt-filter-pill-active:hover {
+    border-color: #93c5fd !important;
+  }
+
+  .gt-filter-pill-value {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 180px;
+    display: inline-block;
+    vertical-align: bottom;
+  }
+
+  .gt-filter-pill-add:not(.gt-apply-filters-btn):not([class$='-apply-filters-btn']) {
+    border: 1px solid #8a8a8a !important;
+    background: #fff !important;
+  }
+
+  .gt-filter-pills .dropdown-menu {
+    z-index: 1060;
+  }
+
+  .gt-toolbar-actions .btn.gt-toolbar-btn {
     display: inline-flex !important;
     align-items: center !important;
     gap: 6px !important;
@@ -635,19 +694,24 @@ body:has(.prospects-scrollable-content) {
     color: #ffffff !important;
   }
 
-  .gt-filter-pills-right-actions .gt-apply-filters-btn,
-  .gt-filter-pills-right-actions [class$='-apply-filters-btn'] {
-    background: #0066CC !important;
-    color: #ffffff !important;
-    border-color: #0066CC !important;
+  .gt-filter-pills .gt-filter-pill-add.gt-apply-filters-btn,
+  .gt-filter-pills .gt-filter-pill-add[class$='-apply-filters-btn'] {
+    color: #0066CC !important;
+    background: transparent !important;
+    border: none !important;
     font-weight: 500 !important;
   }
 
-  .gt-filter-pills-right-actions .gt-apply-filters-btn:hover:not(:disabled),
-  .gt-filter-pills-right-actions [class$='-apply-filters-btn']:hover:not(:disabled) {
-    background: #0052A3 !important;
-    border-color: #0052A3 !important;
-    color: #ffffff !important;
+  .gt-filter-pills .gt-filter-pill-add.gt-apply-filters-btn:hover:not(:disabled),
+  .gt-filter-pills .gt-filter-pill-add[class$='-apply-filters-btn']:hover:not(:disabled) {
+    color: #0052A3 !important;
+    background: #f5f8fa !important;
+  }
+
+  .gt-filter-pills .gt-filter-pill-add.gt-apply-filters-btn:disabled,
+  .gt-filter-pills .gt-filter-pill-add[class$='-apply-filters-btn']:disabled {
+    color: #9ca3af !important;
+    background: transparent !important;
   }
 
   .prospects-scrollable-content {
@@ -735,6 +799,16 @@ body:has(.leads-scrollable-content) {
     flex-shrink: 0 !important;
   }
   .gt-toolbar-tabs-section {
+    flex-shrink: 0 !important;
+  }
+}
+
+// CRM list metrics — prospects, leads, orders, approvals (shared toolbar metrics panel)
+body:has(.prospects-scrollable-content),
+body:has(.leads-scrollable-content),
+body:has(.orders-scrollable-content),
+body:has(.deals-scrollable-content) {
+  .gt-metrics-panel {
     flex-shrink: 0 !important;
   }
 }
@@ -868,6 +942,10 @@ body:has(.workload-page) .main-content-wrapper {
   overflow-x: hidden !important;
   overflow-y: auto !important;
 }
+body:has(.workload-page).modal-open {
+  padding-right: 0 !important;
+  overflow: auto !important;
+}
 
 body:has(.workload-page) .min-vh-100 {
   min-height: 100vh !important;
@@ -887,4 +965,8 @@ body:has(.workload-page) .min-vh-100 {
     max-height: calc(100vh - 48px);
     overflow-y: auto !important;
   }
+}
+
+body:has(.workload-page) {
+  padding-right: 0 !important;
 }

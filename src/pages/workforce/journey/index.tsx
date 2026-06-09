@@ -7,7 +7,6 @@ import React, {
   useState,
 } from "react";
 import Layout from "@layout/index";
-import BreadcrumbItem from "@common/BreadcrumbItem";
 import GenericTable, { FilterPill, ToolbarConfig } from "@components/GenericTable";
 
 import "@assets/scss/common.scss";
@@ -36,6 +35,12 @@ import { toast } from "react-toastify";
 import { workforceKeys } from "@query/keys";
 
 import { hierarchyLabel } from "@page-modules/workforce/employees/employeesDomain";
+import { WorkforceListPageShell } from "@page-modules/workforce/shared/WorkforceListPageShell";
+import {
+  WORKFORCE_TOOLBAR_LABELS,
+  workforceModuleToolbarDropdown,
+} from "@page-modules/workforce/shared/workforceListPageConfig";
+import { renderApplyFilterActions } from "@utils/communicationsStagedFilters";
 import {
   CONTRACT_TYPES,
   EMPLOYMENT_TYPES,
@@ -59,12 +64,13 @@ import {
 } from "@page-modules/workforce/journey/journeyDomain";
 import { buildJourneySidebarSections } from "@page-modules/workforce/journey/buildJourneySidebarSections";
 import { buildJourneyFilterPills } from "@page-modules/workforce/journey/journeyFilterPills";
-import { buildOnboardingActions, buildOnboardingColumns } from "@page-modules/workforce/journey/journeyTableConfig";
+import { buildOnboardingColumns } from "@page-modules/workforce/journey/journeyTableConfig";
 import { useJourneysListQuery } from "@page-modules/workforce/journey/useJourneysListQuery";
 import { useJourneyDetailQuery } from "@page-modules/workforce/journey/useJourneyDetailQuery";
 import AddJourneyStepModal from "@page-modules/workforce/journey/partials/AddJourneyStepModal";
 import EditJourneyStepModal from "@page-modules/workforce/journey/partials/EditJourneyStepModal";
 
+import "@page-modules/workforce/shared/workforcePages.scss";
 import "@page-modules/workforce/journey/journeyPage.scss";
 
 const { PERMISSIONS } = HEADER_CONSTANTS;
@@ -215,6 +221,10 @@ const EmployeesOnboarding = () => {
   const [showDeleteJourneyModal, setShowDeleteJourneyModal] = useState(false);
   const [showDeleteStepModal, setShowDeleteStepModal] = useState(false);
   const [stepPendingDelete, setStepPendingDelete] = useState<JourneyStepRecord | null>(null);
+  const [tableMaxHeight, setTableMaxHeight] = useState("calc(100vh - 295px)");
+  const [sidebarMarginTop, setSidebarMarginTop] = useState(0);
+  const [layoutRowMinHeight, setLayoutRowMinHeight] = useState<number | undefined>(undefined);
+  const [sidebarWidth, setSidebarWidth] = useState("470px");
 
   const users = mainAppUsers;
   const managers = users;
@@ -321,6 +331,53 @@ const EmployeesOnboarding = () => {
   const toggleSelectedUserId = useCallback((idStr: string, isSelected: boolean) => {
     setSelectedUserIds((prev) => toggleSelectedJourneyUserIds(prev, idStr, isSelected));
   }, []);
+
+  useEffect(() => {
+    const root = document.querySelector(".workforce-journey-table-wrapper-container");
+    if (!root) return;
+
+    const updateJourneyTableLayout = () => {
+      const toolbarEl = root.querySelector<HTMLElement>(".gt-toolbar-container");
+      const tabsEl = root.querySelector<HTMLElement>(".gt-toolbar-tabs-section");
+      const tableContainerEl = root.querySelector<HTMLElement>(".generic-table-container");
+      if (toolbarEl) {
+        const headerHeight = 74;
+        const breadcrumbHeight = 48;
+        const paginationHeight = 72;
+        const toolbarHeight = Math.round(toolbarEl.getBoundingClientRect().height);
+        setTableMaxHeight(
+          `calc(100vh - ${headerHeight + breadcrumbHeight + toolbarHeight + paginationHeight}px)`,
+        );
+      }
+      if (tabsEl) {
+        setSidebarMarginTop(Math.round(tabsEl.getBoundingClientRect().height));
+      }
+      if (tableContainerEl) {
+        setLayoutRowMinHeight(Math.round(tableContainerEl.getBoundingClientRect().height));
+      }
+      const viewportWidth = window.innerWidth;
+      if (viewportWidth < 768) {
+        setSidebarWidth("320px");
+      } else if (viewportWidth < 1280) {
+        setSidebarWidth("360px");
+      } else {
+        setSidebarWidth("470px");
+      }
+    };
+
+    const timer = globalThis.setTimeout(updateJourneyTableLayout, 100);
+    const observer = new ResizeObserver(updateJourneyTableLayout);
+    const toolbarEl = root.querySelector(".gt-toolbar-container");
+    const tableContainerEl = root.querySelector(".generic-table-container");
+    if (toolbarEl) observer.observe(toolbarEl);
+    if (tableContainerEl) observer.observe(tableContainerEl);
+    window.addEventListener("resize", updateJourneyTableLayout);
+    return () => {
+      globalThis.clearTimeout(timer);
+      observer.disconnect();
+      window.removeEventListener("resize", updateJourneyTableLayout);
+    };
+  }, [isSidebarOpen]);
 
   const filteredManagers = useMemo(
     () => filterJourneyManagers(managers, userSearchTerm),
@@ -459,15 +516,6 @@ const EmployeesOnboarding = () => {
   );
 
   const onboardingColumns = useMemo(() => buildOnboardingColumns(), []);
-
-  const onboardingActions = useMemo(
-    () =>
-      buildOnboardingActions({
-        setSelectedEmployee,
-        setIsSidebarOpen,
-      }),
-    [],
-  );
 
   const deletingStepIdForUi = deletingStepIdFromMutationState(
     deleteStepMutation.isPending,
@@ -609,15 +657,8 @@ const EmployeesOnboarding = () => {
         rows={journeyUserDropdownRows}
         selectedIds={selectedUserIds}
         onToggle={toggleSelectedUserId}
-        onApply={() => {
-          setAppliedUserIds(selectedUserIds);
-          setCurrentPage(1);
-        }}
-        onClear={() => {
-          setSelectedUserIds([]);
-          setAppliedUserIds([]);
-          setCurrentPage(1);
-        }}
+        onApply={() => undefined}
+        onClear={() => undefined}
       />
     ),
     [journeyUserDropdownRows, selectedUserIds, toggleSelectedUserId, userSearchTerm],
@@ -676,48 +717,6 @@ const EmployeesOnboarding = () => {
     ],
   );
 
-  const onboardingToolbar = useMemo<ToolbarConfig>(
-    () => ({
-      showTabs: true,
-      tabs: [
-        {
-          id: "employees-journey",
-          label: "Employees Journey",
-          count: journeysPagination?.total,
-        },
-      ],
-      activeTab: "employees-journey",
-      showSearch: true,
-      searchValue: searchTerm,
-      searchPlaceholder: "Search by extension or designation",
-      onSearchChange: setSearchTerm,
-      onSearch: handleApply,
-      showFiltersButton: true,
-      showFilterPills: false,
-      filterPills,
-      showMoreFiltersButton: false,
-      customActions: (
-        <div className="journey-page__toolbar-actions">
-          <button
-            type="button"
-            className="journey-page__toolbar-btn journey-page__toolbar-btn--primary"
-            onClick={handleApply}
-          >
-            Apply
-          </button>
-          <button
-            type="button"
-            className="journey-page__toolbar-btn journey-page__toolbar-btn--outline"
-            onClick={resetFilters}
-          >
-            Clear
-          </button>
-        </div>
-      ),
-    }),
-    [searchTerm, filterPills, journeysPagination?.total, handleApply, resetFilters],
-  );
-
   const hasAppliedFilters = useMemo(
     () =>
       hasAppliedJourneyFilters({
@@ -738,6 +737,69 @@ const EmployeesOnboarding = () => {
     ],
   );
 
+  const hasUnappliedFilterChanges = useMemo(
+    () =>
+      searchTerm !== appliedSearch ||
+      selectedDepartment !== appliedDepartment ||
+      selectedEmploymentType !== appliedEmploymentType ||
+      selectedContract !== appliedContract ||
+      JSON.stringify(selectedUserIds) !== JSON.stringify(appliedUserIds) ||
+      selectedStatus !== appliedStatus,
+    [
+      searchTerm,
+      appliedSearch,
+      selectedDepartment,
+      appliedDepartment,
+      selectedEmploymentType,
+      appliedEmploymentType,
+      selectedContract,
+      appliedContract,
+      selectedUserIds,
+      appliedUserIds,
+      selectedStatus,
+      appliedStatus,
+    ],
+  );
+
+  const onboardingToolbar = useMemo<ToolbarConfig>(
+    () => ({
+      showTabs: true,
+      tabs: [
+        {
+          id: "employees-journey",
+          label: "Employees Journey",
+          count: journeysPagination?.total,
+        },
+      ],
+      activeTab: "employees-journey",
+      ...workforceModuleToolbarDropdown(WORKFORCE_TOOLBAR_LABELS.journey),
+      showSearch: true,
+      searchValue: searchTerm,
+      searchPlaceholder: "Search by extension or designation",
+      onSearchChange: setSearchTerm,
+      onSearch: handleApply,
+      showFiltersButton: true,
+      showFilterPills: true,
+      filterPills,
+      showMoreFiltersButton: false,
+      clearAllFilters: hasAppliedFilters ? resetFilters : undefined,
+      filterPillsRightActions: renderApplyFilterActions(
+        hasUnappliedFilterChanges,
+        handleApply,
+        "journey",
+      ),
+    }),
+    [
+      searchTerm,
+      filterPills,
+      journeysPagination?.total,
+      handleApply,
+      resetFilters,
+      hasAppliedFilters,
+      hasUnappliedFilterChanges,
+    ],
+  );
+
   const sidebarQuickActions = useMemo(
     () =>
       getJourneySidebarQuickActions({
@@ -750,40 +812,65 @@ const EmployeesOnboarding = () => {
 
   return (
     <React.Fragment>
-      <BreadcrumbItem mainTitle="" mainLink="" subTitle="Employees Journey" />
-      <div className="journey-page__shell">
-        <div className="journey-page__table-pane">
-          <GenericTable<OnboardingEmployee>
-            data={employees}
-            columns={onboardingColumns}
-            actions={onboardingActions}
-            showActions={true}
-            actionsLabel="View"
-            loading={Boolean(companyIdentifier) && journeysFetching}
-            loadingMessage="Loading onboarding data..."
-            emptyMessage="No onboarding journeys found"
-            hover={true}
-            uniqueKey="id"
-            pagination={genericTablePaginationFromJourneys(
-              journeysPagination,
-              currentPage,
-              rowsPerPage,
+      <WorkforceListPageShell breadcrumbSubTitle="Employees Journey" tableWrapperClass="workforce-journey-table-wrapper">
+        <div className="journey-page__shell">
+          <div
+            className="journey-page__layout-row"
+            style={layoutRowMinHeight == null ? undefined : { minHeight: layoutRowMinHeight }}
+          >
+            <div className="journey-page__table-main">
+              <GenericTable<OnboardingEmployee>
+                data={employees}
+                columns={onboardingColumns}
+                loading={Boolean(companyIdentifier) && journeysFetching}
+                loadingMessage="Loading onboarding data..."
+                emptyMessage="No onboarding journeys found"
+                hover={true}
+                uniqueKey="id"
+                pagination={genericTablePaginationFromJourneys(
+                  journeysPagination,
+                  currentPage,
+                  rowsPerPage,
+                )}
+                onPaginationChange={handlePaginationChange}
+                onRowClick={(row) => {
+                  setSelectedEmployee(row);
+                  setIsSidebarOpen(true);
+                }}
+                onPreviewClick={(row) => {
+                  setSelectedEmployee(row);
+                  setIsSidebarOpen(true);
+                }}
+                showToolbar={true}
+                toolbar={onboardingToolbar}
+                showToolbarActions={false}
+                fixedHeight={true}
+                maxHeight={tableMaxHeight}
+              />
+            </div>
+
+            {isSidebarOpen && selectedEmployee && (
+              <GenericSidebar
+                isOpen={isSidebarOpen}
+                width={sidebarWidth}
+                sidebarMarginTop={sidebarMarginTop}
+                onClose={() => {
+                  setIsSidebarOpen(false);
+                  setSelectedEmployee(null);
+                }}
+                title={selectedEmployee.name}
+                subtitle={selectedEmployee.role ?? selectedEmployee.designation ?? ""}
+                company={selectedEmployee.department_name}
+                avatar={{
+                  initials: getInitials(selectedEmployee.name),
+                  name: selectedEmployee.name,
+                  gradient: getAvatarColor(selectedEmployee.name),
+                }}
+                quickActions={sidebarQuickActions}
+                sections={journeySidebarSections}
+              />
             )}
-            onPaginationChange={handlePaginationChange}
-            onRowClick={(row) => {
-              setSelectedEmployee(row);
-              setIsSidebarOpen(true);
-            }}
-            onPreviewClick={(row) => {
-              setSelectedEmployee(row);
-              setIsSidebarOpen(true);
-            }}
-            showToolbar={true}
-            toolbar={onboardingToolbar}
-            showToolbarActions={false}
-            fixedHeight={true}
-            maxHeight="calc(100vh - 295px)"
-          />
+          </div>
 
           {hasAppliedFilters && (
             <JourneyAppliedFiltersSummary
@@ -799,28 +886,9 @@ const EmployeesOnboarding = () => {
             />
           )}
         </div>
+      </WorkforceListPageShell>
 
-        {isSidebarOpen && selectedEmployee && (
-          <GenericSidebar
-            isOpen={isSidebarOpen}
-            onClose={() => {
-              setIsSidebarOpen(false);
-              setSelectedEmployee(null);
-            }}
-            title={selectedEmployee.name}
-            subtitle={selectedEmployee.role ?? selectedEmployee.designation ?? ""}
-            company={selectedEmployee.department_name}
-            avatar={{
-              initials: getInitials(selectedEmployee.name),
-              name: selectedEmployee.name,
-              gradient: getAvatarColor(selectedEmployee.name),
-            }}
-            quickActions={sidebarQuickActions}
-            sections={journeySidebarSections}
-          />
-        )}
-
-        <AddJourneyStepModal
+      <AddJourneyStepModal
           show={showAddStepForm}
           journeyId={journeyId}
           stepCount={journeySteps.length}
@@ -851,7 +919,6 @@ const EmployeesOnboarding = () => {
           itemType="journey"
           loading={deleteJourneyMutation.isPending}
         />
-      </div>
     </React.Fragment>
   );
 };

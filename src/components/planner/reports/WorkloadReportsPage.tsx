@@ -1,7 +1,6 @@
-import React from "react";
+import React, { useState } from "react";
 import { Alert, Button, Container } from "react-bootstrap";
-import { Download, RefreshCw } from "lucide-react";
-import BreadcrumbItem from "@common/BreadcrumbItem";
+import { ChevronDown, Download } from "lucide-react";
 import { TASK_REPORTS_MAX_DATE_RANGE_DAYS } from "@utils/reportsApiConstants";
 import { ReportsViewTabs } from "./WorkloadReportsProjectViews";
 import { WorkloadReportsFiltersCard } from "./WorkloadReportsFiltersCard";
@@ -10,12 +9,11 @@ import { useWorkloadReportsPage } from "./useWorkloadReportsPage";
 
 const WorkloadReportsPage: React.FC = () => {
   const vm = useWorkloadReportsPage();
+  const [exportOpen, setExportOpen] = useState(false);
 
   return (
     <div className="workload-reports-page">
-      <Container fluid className="px-3 px-md-4 py-3">
-        <BreadcrumbItem mainTitle="Planner" mainLink="/planner/dashboard" subTitle="Reports" />
-
+      <Container fluid className="px-0 py-0">
         <div className="workload-reports-page__header">
           <div>
             <h1 className="workload-reports-page__title">Reports</h1>
@@ -24,33 +22,53 @@ const WorkloadReportsPage: React.FC = () => {
             </p>
           </div>
           <div className="d-flex flex-wrap gap-2">
-            <Button
-              variant="outline-secondary"
-              size="sm"
-              disabled={!vm.enabled || vm.exporting != null}
-              onClick={() => vm.handleExport("csv")}
-            >
-              <Download size={16} className="me-1" />
-              {vm.exporting === "csv" ? "Exporting…" : "Export CSV"}
-            </Button>
-            <Button
-              variant="outline-secondary"
-              size="sm"
-              disabled={!vm.enabled || vm.exporting != null}
-              onClick={() => vm.handleExport("xlsx")}
-            >
-              <Download size={16} className="me-1" />
-              {vm.exporting === "xlsx" ? "Exporting…" : "Export PDF"}
-            </Button>
-            <Button
-              variant="outline-primary"
-              size="sm"
-              disabled={!vm.enabled || vm.overviewQuery.isFetching}
-              onClick={vm.handleRefetchOverview}
-            >
-              <RefreshCw size={16} className="me-1" />
-              Refresh
-            </Button>
+            <div style={{ position: "relative" }}>
+              <Button
+                variant="outline-primary"
+                size="sm"
+                disabled={!vm.enabled || vm.exporting != null}
+                onClick={() => setExportOpen((prev) => !prev)}
+              >
+                <Download size={16} className="me-1" />
+                Export
+                <ChevronDown size={11} style={{ marginLeft: "4px" }} aria-hidden />
+              </Button>
+              {exportOpen ? (
+                <div style={{
+                  position: "absolute",
+                  top: "calc(100% + 4px)",
+                  right: 0,
+                  background: "#fff",
+                  border: "1px solid #eaf0f6",
+                  borderRadius: "6px",
+                  boxShadow: "0 4px 16px rgba(0,0,0,0.10)",
+                  zIndex: 500,
+                  minWidth: "140px",
+                  padding: "4px",
+                }}>
+                  <button
+                    type="button"
+                    style={{ display: "flex", alignItems: "center", gap: "8px", width: "100%", padding: "8px 12px", border: "none", background: "none", cursor: "pointer", fontSize: "13px", fontFamily: "Lexend Deca, sans-serif", color: "#141414", borderRadius: "4px" }}
+                    onMouseEnter={(e) => { e.currentTarget.style.background = "#f5f7fa"; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.background = "none"; }}
+                    onClick={() => { vm.handleExport("csv"); setExportOpen(false); }}
+                  >
+                    <Download size={13} />
+                    Export CSV
+                  </button>
+                  <button
+                    type="button"
+                    style={{ display: "flex", alignItems: "center", gap: "8px", width: "100%", padding: "8px 12px", border: "none", background: "none", cursor: "pointer", fontSize: "13px", fontFamily: "Lexend Deca, sans-serif", color: "#141414", borderRadius: "4px" }}
+                    onMouseEnter={(e) => { e.currentTarget.style.background = "#f5f7fa"; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.background = "none"; }}
+                    onClick={() => { vm.handleExport("xlsx"); setExportOpen(false); }}
+                  >
+                    <Download size={13} />
+                    Export PDF
+                  </button>
+                </div>
+              ) : null}
+            </div>
           </div>
         </div>
 
@@ -94,9 +112,9 @@ const WorkloadReportsPage: React.FC = () => {
             onApply={vm.handleRefetchOverview}
           />
 
-        <ReportsViewTabs activeView={vm.mainView} onChange={vm.setMainView} />
-
-        <WorkloadReportsPageContent vm={vm} overviewQuery={vm.overviewQuery} />
+        <div className="workload-reports-page__content">
+          <WorkloadReportsPageContent vm={vm} overviewQuery={vm.overviewQuery} />
+        </div>
       </Container>
     </div>
   );

@@ -11,6 +11,7 @@ import BreadcrumbItem from "@common/BreadcrumbItem";
 
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
+import "@page-modules/workforce/shared/workforcePages.scss";
 
 import dynamic from "next/dynamic";
 import { useSession } from "next-auth/react";
@@ -362,7 +363,7 @@ const OrganizationalChart = () => {
     <>
       <BreadcrumbItem mainTitle="" mainLink="" subTitle="Organizational Chart" />
 
-      <div className="org-chart-page">
+      <div className="workforce-static-page org-chart-page">
         <div className="org-chart-page__title-row">
           <h1 className="org-chart-page__page-title">Organizational Chart</h1>
         </div>

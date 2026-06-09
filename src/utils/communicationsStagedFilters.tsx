@@ -36,32 +36,35 @@ export function useStagedFiltersActions(
   };
 }
 
-export function renderApplyResetFilterActions(
-  hasNonDefaultFilters: boolean,
+/** Apply button for staged filter toolbars. Use `toolbar.clearAllFilters` for reset (Clear all). */
+export function renderApplyFilterActions(
   hasUnappliedFilterChanges: boolean,
-  onReset: () => void,
   onApply: () => void,
   classPrefix: string,
 ) {
   return (
-    <>
-      {hasNonDefaultFilters && (
-        <button
-          type="button"
-          onClick={onReset}
-          className={`gt-toolbar-btn ${classPrefix}-reset-filters-btn`}
-        >
-          Reset
-        </button>
-      )}
-      <button
-        type="button"
-        onClick={onApply}
-        disabled={!hasUnappliedFilterChanges}
-        className={`gt-toolbar-btn gt-apply-filters-btn ${classPrefix}-apply-filters-btn`}
-      >
-        Apply Filters
-      </button>
-    </>
+    <button
+      type="button"
+      onClick={onApply}
+      disabled={!hasUnappliedFilterChanges}
+      className={`gt-filter-pill-add gt-apply-filters-btn ${classPrefix}-apply-filters-btn`}
+    >
+      Apply filters
+    </button>
+  );
+}
+
+/** @deprecated Use {@link renderApplyFilterActions} — Reset is handled by Clear all. */
+export function renderApplyResetFilterActions(
+  _hasNonDefaultFilters: boolean,
+  hasUnappliedFilterChanges: boolean,
+  _onReset: () => void,
+  onApply: () => void,
+  classPrefix: string,
+) {
+  return renderApplyFilterActions(
+    hasUnappliedFilterChanges,
+    onApply,
+    classPrefix,
   );
 }

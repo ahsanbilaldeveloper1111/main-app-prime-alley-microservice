@@ -529,9 +529,9 @@ const ApprovalDetailSidebar: React.FC<ApprovalDetailSidebarProps> = ({
   const getTypeIcon = (iconType: string) => {
     const t = (iconType || "").toLowerCase();
     if (t.includes("leave")) return <Calendar size={20} color="#3b82f6" />;
-    if (t.includes("document")) return <FileText size={20} color="#8b5cf6" />;
+    if (t.includes("document")) return <FileText size={20} color="#0EA5E9" />;
     if (t.includes("onboarding")) return <UserPlus size={20} color="#10b981" />;
-    if (t.includes("profile")) return <User size={20} color="#6366f1" />;
+    if (t.includes("profile")) return <User size={20} color="#0066CC" />;
     return <File size={20} color="#6b7280" />;
   };
 
@@ -598,7 +598,7 @@ const ApprovalDetailSidebar: React.FC<ApprovalDetailSidebarProps> = ({
             title="Edit"
             onMouseEnter={(e) => {
               e.currentTarget.style.backgroundColor = '#f3f4f6';
-              e.currentTarget.style.color = '#6366f1';
+              e.currentTarget.style.color = '#0066CC';
             }}
             onMouseLeave={(e) => {
               e.currentTarget.style.backgroundColor = 'transparent';
@@ -793,9 +793,9 @@ const ApprovalDetailSidebar: React.FC<ApprovalDetailSidebarProps> = ({
                     style={{
                       padding: "5px 10px",
                       borderRadius: "999px",
-                      backgroundColor: "#eef2ff",
-                      border: "1px solid #e0e7ff",
-                      color: "#3730a3",
+                      backgroundColor: "#eff6ff",
+                      border: "1px solid #bfdbfe",
+                      color: "#0066CC",
                       fontSize: "12px",
                       fontWeight: 600,
                       lineHeight: 1.2,
@@ -1067,7 +1067,7 @@ const ApprovalDetailSidebar: React.FC<ApprovalDetailSidebarProps> = ({
                   outline: 'none',
                   fontFamily: 'inherit'
                 }}
-                onFocus={(e) => e.currentTarget.style.borderColor = '#6366f1'}
+                onFocus={(e) => e.currentTarget.style.borderColor = '#0066CC'}
                 onBlur={(e) => e.currentTarget.style.borderColor = '#e5e7eb'}
               />
               <div style={{
@@ -1332,7 +1332,7 @@ const ApprovalDetailSidebar: React.FC<ApprovalDetailSidebarProps> = ({
                 onClick={closeDialog}
                 style={{
                   padding: "10px 24px",
-                  backgroundColor: "#6366f1",
+                  backgroundColor: "#0066CC",
                   color: "white",
                   border: "none",
                   borderRadius: "8px",
@@ -1341,8 +1341,8 @@ const ApprovalDetailSidebar: React.FC<ApprovalDetailSidebarProps> = ({
                   cursor: "pointer",
                   transition: "all 0.2s",
                 }}
-                onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "#4f46e5")}
-                onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "#6366f1")}
+                onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "#0052A3")}
+                onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "#0066CC")}
               >
                 OK
               </button>

@@ -1437,11 +1437,11 @@ const CrmOrders = () => { // NOSONAR
           title: "All Orders",
           value: m.total_orders ?? 0,
           icon: Users,
-          iconColor: "#6366F1",
+          iconColor: "#0066CC",
           iconBgColor: "#EEF2FF",
           metric: {
             text: `${m.total_orders_last_7_days ?? 0} in last 7 days`,
-            dotColor: "#6366F1",
+            dotColor: "#0066CC",
           },
           onClick: () =>
             applyOrdersWidgetFiltersPatch({ ...clearOrdersWidgetFiltersPatch }),
@@ -1450,9 +1450,12 @@ const CrmOrders = () => { // NOSONAR
           title: "High-Value Orders",
           value: m.high_value_orders ?? 0,
           icon: Calendar,
-          iconColor: "#10B981",
+          iconColor: "#059669",
           iconBgColor: "#D1FAE5",
-          additionalText: "≥ 5000 AED",
+          metric: {
+            text: "≥ 5000 AED",
+            dotColor: "#059669",
+          },
           onClick: () =>
             applyOrdersWidgetFiltersPatch({
               ...clearOrdersWidgetFiltersPatch,
@@ -1463,9 +1466,12 @@ const CrmOrders = () => { // NOSONAR
           title: "Active Orders",
           value: m.active_orders ?? 0,
           icon: Target,
-          iconColor: "#8B5CF6",
-          iconBgColor: "#EDE9FE",
-          additionalText: "In progress",
+          iconColor: "#0066CC",
+          iconBgColor: "#E0F2FE",
+          metric: {
+            text: "In progress",
+            dotColor: "#0066CC",
+          },
           onClick: () =>
             applyOrdersWidgetFiltersPatch({
               ...clearOrdersWidgetFiltersPatch,
@@ -1476,9 +1482,12 @@ const CrmOrders = () => { // NOSONAR
           title: "Orders under Review",
           value: m.orders_under_review ?? 0,
           icon: Users,
-          iconColor: "#6366F1",
-          iconBgColor: "#EEF2FF",
-          additionalText: "Orders paused for review",
+          iconColor: "#D97706",
+          iconBgColor: "#FFEDD5",
+          metric: {
+            text: "Orders paused for review",
+            dotColor: "#D97706",
+          },
           onClick: () =>
             applyOrdersWidgetFiltersPatch({
               ...clearOrdersWidgetFiltersPatch,
@@ -1489,11 +1498,11 @@ const CrmOrders = () => { // NOSONAR
           title: "Completed Orders",
           value: m.completed_orders ?? 0,
           icon: Calendar,
-          iconColor: "#10B981",
+          iconColor: "#059669",
           iconBgColor: "#D1FAE5",
           metric: {
             text: `${m.completed_orders_last_7_days ?? 0} in last 7 days`,
-            dotColor: "#10B981",
+            dotColor: "#059669",
           },
           onClick: () =>
             applyOrdersWidgetFiltersPatch({
@@ -1505,11 +1514,11 @@ const CrmOrders = () => { // NOSONAR
           title: "Canceled Orders",
           value: m.canceled_orders ?? 0,
           icon: Target,
-          iconColor: "#8B5CF6",
-          iconBgColor: "#EDE9FE",
+          iconColor: "#DC2626",
+          iconBgColor: "#FFEDD5",
           metric: {
             text: `${m.canceled_orders_last_7_days ?? 0} in last 7 days`,
-            dotColor: "#8B5CF6",
+            dotColor: "#DC2626",
           },
           onClick: () =>
             applyOrdersWidgetFiltersPatch({
@@ -2567,7 +2576,9 @@ const CrmOrders = () => { // NOSONAR
                 toolbar={ordersToolbarConfig}
                 // Stats cards for metrics
                 statsCards={ordersStatsCards}
-                metricsGridMinWidth="150px"
+                metricsGridMinWidth="120px"
+                metricsColumns={6}
+                defaultShowMetrics={true}
                 customBody={
                   ordersViewMode === "board" ? (
                     <KanbanBoard

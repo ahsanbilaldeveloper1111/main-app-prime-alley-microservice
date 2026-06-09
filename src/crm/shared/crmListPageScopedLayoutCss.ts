@@ -4,6 +4,8 @@ export type CrmListPageScopedLayoutStylesConfig = {
   pageContainerClass: string;
   contentAreaClass: string;
   includePhoneInputStyles?: boolean;
+  /** When true, page grows with content (e.g. table + charts) instead of locking to viewport height. */
+  autoHeight?: boolean;
 };
 
 const SHARED_TIMELINE_AND_ROW_CSS = `
@@ -45,19 +47,95 @@ const PHONE_INPUT_CSS = `
         }
 `;
 
+function buildTableWrapperOverflowCss(tableWrapperClass: string, autoHeight: boolean): string {
+  return (
+    "\n        ." +
+    tableWrapperClass +
+    ` {
+          width: 100%;
+          overflow: ${autoHeight ? "visible" : "hidden"};
+        }`
+  );
+}
+
+function buildPageShellLayoutCss(config: CrmListPageScopedLayoutStylesConfig): string {
+  if (config.autoHeight) {
+    return (
+      `
+        .` +
+      config.pageContainerClass +
+      ` {
+          display: flex;
+          flex-direction: column;
+          min-height: calc(100vh - 74px);
+          height: auto;
+          overflow: visible;
+        }
+        
+        .` +
+      config.contentAreaClass +
+      ` {
+          flex: 1 1 auto;
+          overflow: visible;
+          display: flex;
+          flex-direction: column;
+        }
+        
+        .` +
+      config.scrollableContentClass +
+      ` {
+          flex: 1 1 auto;
+          height: auto;
+          overflow-y: auto;
+          overflow-x: hidden;
+        }
+        `
+    );
+  }
+
+  return (
+    `
+        /* Page layout for full height */
+        .` +
+    config.pageContainerClass +
+    ` {
+          display: flex;
+          flex-direction: column;
+          height: calc(100vh - 74px);
+          overflow: hidden;
+        }
+        
+        .` +
+    config.contentAreaClass +
+    ` {
+          flex: 1;
+          overflow: hidden;
+          display: flex;
+          flex-direction: column;
+        }
+        
+        .` +
+    config.scrollableContentClass +
+    ` {
+          flex: 1;
+          height: 100%;
+          overflow-y: auto;
+          overflow-x: hidden;
+        }
+        `
+  );
+}
+
 export function buildCrmListPageScopedLayoutCss(
   config: CrmListPageScopedLayoutStylesConfig,
 ): string {
   const tw = config.tableWrapperClass;
   const phone = config.includePhoneInputStyles ? PHONE_INPUT_CSS : "";
+  const autoHeight = Boolean(config.autoHeight);
 
   return (
-    "\n        ." +
-    tw +
-    ` {
-          width: 100%;
-          overflow: hidden;
-        }
+    buildTableWrapperOverflowCss(tw, autoHeight) +
+    `
         .` +
     tw +
     ` .table-responsive {
@@ -100,36 +178,7 @@ export function buildCrmListPageScopedLayoutCss(
         }
         ` +
     SHARED_TIMELINE_AND_ROW_CSS +
-    `
-        
-        /* Page layout for full height */
-        .` +
-    config.pageContainerClass +
-    ` {
-          display: flex;
-          flex-direction: column;
-          height: calc(100vh - 74px);
-          overflow: hidden;
-        }
-        
-        .` +
-    config.contentAreaClass +
-    ` {
-          flex: 1;
-          overflow: hidden;
-          display: flex;
-          flex-direction: column;
-        }
-        
-        .` +
-    config.scrollableContentClass +
-    ` {
-          flex: 1;
-          height: 100%;
-          overflow-y: auto;
-          overflow-x: hidden;
-        }
-        ` +
+    buildPageShellLayoutCss(config) +
     phone
   );
 }

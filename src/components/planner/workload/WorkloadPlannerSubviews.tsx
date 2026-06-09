@@ -1,4 +1,5 @@
 import React from "react";
+import { Building2 } from "lucide-react";
 import { Alert, Badge, Spinner, Table } from "react-bootstrap";
 import type {
   WorkloadBoardColumn,
@@ -145,67 +146,35 @@ type WorkloadSummaryCardsProps = Readonly<{
 export function WorkloadSummaryCardsRow({ data }: WorkloadSummaryCardsProps) {
   return (
     <div className="workload-summary-row">
-      <div className="workload-summary-card">
+      <div className="workload-summary-card workload-summary-card--shade-indigo">
         <div className="workload-summary-card__label">Tasks this week</div>
-        <div
-          className="workload-summary-card__value"
-          style={{ color: "#0066CC" }}
-        >
-          {data.total_tasks_this_week}
-        </div>
+        <div className="workload-summary-card__value">{data.total_tasks_this_week}</div>
         <div className="workload-summary-card__sub">
-          <span
-            className="workload-summary-card__dot"
-            style={{ background: "#0066CC" }}
-          />
+          <span className="workload-summary-card__dot" />
           {" Assigned to team"}
         </div>
       </div>
-      <div className="workload-summary-card">
+      <div className="workload-summary-card workload-summary-card--shade-light">
         <div className="workload-summary-card__label">Overloaded members</div>
-        <div
-          className="workload-summary-card__value"
-          style={{ color: "#dc2626" }}
-        >
-          {data.overloaded_members}
-        </div>
+        <div className="workload-summary-card__value">{data.overloaded_members}</div>
         <div className="workload-summary-card__sub">
-          <span
-            className="workload-summary-card__dot"
-            style={{ background: "#dc2626" }}
-          />
+          <span className="workload-summary-card__dot" />
           {" Above 100% capacity"}
         </div>
       </div>
-      <div className="workload-summary-card">
+      <div className="workload-summary-card workload-summary-card--shade-sky">
         <div className="workload-summary-card__label">Unestimated tasks</div>
-        <div
-          className="workload-summary-card__value"
-          style={{ color: "#ea580c" }}
-        >
-          {data.unestimated_tasks}
-        </div>
+        <div className="workload-summary-card__value">{data.unestimated_tasks}</div>
         <div className="workload-summary-card__sub">
-          <span
-            className="workload-summary-card__dot"
-            style={{ background: "#ea580c" }}
-          />
+          <span className="workload-summary-card__dot" />
           {" No time estimate set"}
         </div>
       </div>
-      <div className="workload-summary-card">
+      <div className="workload-summary-card workload-summary-card--shade-medium">
         <div className="workload-summary-card__label">Critical priority</div>
-        <div
-          className="workload-summary-card__value"
-          style={{ color: "#dc2626" }}
-        >
-          {data.critical_priority_tasks}
-        </div>
+        <div className="workload-summary-card__value">{data.critical_priority_tasks}</div>
         <div className="workload-summary-card__sub">
-          <span
-            className="workload-summary-card__dot"
-            style={{ background: "#dc2626" }}
-          />
+          <span className="workload-summary-card__dot" />
           {" Needs immediate attention"}
         </div>
       </div>
@@ -249,9 +218,10 @@ export function WorkloadBoardLegendBar() {
             className="workload-board-toolbar__legend-item"
             style={{ color: "#718096" }}
           >
-            <i
-              className="ti ti-building"
-              style={{ fontSize: "11px", color: "#0f766e", marginRight: "4px" }}
+            <Building2
+              size={11}
+              style={{ color: "#0f766e", marginRight: "4px" }}
+              aria-hidden
             />
             <span>Org Tasks included</span>
           </span>
@@ -309,10 +279,7 @@ export function WorkloadLegendRow({
         ))}
         <span className="workload-legend__item">
           <span className="workload-legend__org-icon" aria-hidden>
-            <i
-              className="ti ti-building"
-              style={{ fontSize: "12px", color: "#0f766e" }}
-            />
+            <Building2 size={12} style={{ color: "#0f766e" }} />
           </span>
           {" Org Tasks included"}
         </span>

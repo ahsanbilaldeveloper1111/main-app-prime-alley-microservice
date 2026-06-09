@@ -294,9 +294,9 @@ const OrganizationEmployeeSidebar: React.FC<OrganizationEmployeeSidebarProps> = 
           <div className="org-chart-sidebar__info-row">
             <div
               className="org-chart-sidebar__info-icon-wrap"
-              style={{ backgroundColor: "#e0e7ff" }}
+              style={{ backgroundColor: "#bfdbfe" }}
             >
-              <Briefcase size={18} color="#6366f1" />
+              <Briefcase size={18} color="#0066CC" />
             </div>
             <div style={{ flex: 1 }}>
               <div className="org-chart-sidebar__info-label">Employee ID</div>
@@ -479,7 +479,7 @@ const OrganizationEmployeeSidebar: React.FC<OrganizationEmployeeSidebarProps> = 
                   padding: "8px",
                   textAlign: "center",
                   fontSize: "13px",
-                  color: "#6366f1",
+                  color: "#0066CC",
                   fontWeight: 500,
                   cursor: "pointer",
                 }}

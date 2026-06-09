@@ -1,21 +1,87 @@
 // Workforce employees page (`src/pages/workforce/employees`)
+// Overrides prospects full-height rules from custom.scss — this page scrolls with charts below the table.
+
+body:has(.workforce-employees-table-wrapper-container) {
+  overflow: auto !important;
+
+  .main-content-wrapper,
+  .min-vh-100 {
+    overflow: visible !important;
+    height: auto !important;
+    min-height: 100vh !important;
+  }
+
+  .generic-table-card {
+    flex: 0 1 auto !important;
+    height: auto !important;
+    overflow: visible !important;
+  }
+
+  .prospects-table-wrapper {
+    flex: 0 1 auto !important;
+    height: auto !important;
+    overflow: visible !important;
+  }
+
+  .workforce-employees-table-wrapper-container {
+    .prospects-table-wrapper.workforce-employees-table-wrapper {
+      flex: 0 1 auto;
+      min-height: 0;
+      height: auto !important;
+      max-height: none;
+      overflow: visible;
+    }
+
+    .employees-page__main {
+      width: 100%;
+      min-width: 0;
+    }
+
+    .generic-table-container {
+      display: flex;
+      flex-direction: column;
+      flex: 0 1 auto;
+      min-width: 0;
+      overflow: visible;
+    }
+
+    .generic-table-card {
+      flex: 0 1 auto !important;
+      height: auto !important;
+      overflow: visible !important;
+    }
+
+    .employees-page__charts-grid {
+      flex-shrink: 0;
+    }
+  }
+}
 
 .employees-page__layout-row {
   display: flex;
   gap: 0;
   align-items: stretch;
+  flex: 1 1 auto;
+  min-height: 0;
+  min-width: 0;
 }
 
 .employees-page__main {
   flex: 1;
   min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: visible;
 }
 
 .employees-page__charts-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
   gap: 24px;
   margin-top: 24px;
+  padding: 0 0 24px;
+  font-family: "Lexend Deca", Helvetica, Arial, sans-serif;
 }
 
 .employees-page__chart-card {
@@ -67,7 +133,7 @@
 .employees-page__overview-title {
   font-size: 18px;
   font-weight: 600;
-  color: #1f2937;
+  color: #141414;
   margin-bottom: 20px;
 }
 
@@ -85,18 +151,18 @@
 .employees-page__overview-block {
   padding: 12px;
   border-radius: 8px;
-  border: 1px solid #e5e7eb;
+  border: 1px solid #bfdbfe;
 
   &--muted {
-    background-color: #f9fafb;
+    background-color: #eff6ff;
   }
 
   &--amber {
-    background-color: #fffbeb;
+    background-color: #dbeafe;
   }
 
   &--green {
-    background-color: #f0fdf4;
+    background-color: #e0f2fe;
   }
 
   &--blue {
@@ -104,18 +170,18 @@
   }
 
   &--purple {
-    background-color: #faf5ff;
+    background-color: #dbeafe;
   }
 
   &--rose {
-    background-color: #fef2f2;
+    background-color: #e0f2fe;
   }
 }
 
 .employees-page__overview-block-title {
   font-size: 13px;
   font-weight: 600;
-  color: #374151;
+  color: #0052A3;
   margin-bottom: 8px;
 }
 
@@ -145,22 +211,20 @@
 }
 
 .employees-page__overview-strong {
-  color: #1f2937;
+  font-weight: 600;
+  color: #0066CC;
 
-  &--green {
-    color: #059669;
+  &--green,
+  &--blue {
+    color: #0066CC;
   }
 
   &--red {
-    color: #dc2626;
-  }
-
-  &--blue {
-    color: #2563eb;
+    color: #0052A3;
   }
 
   &--amber {
-    color: #d97706;
+    color: #2563EB;
   }
 }
 
@@ -175,10 +239,15 @@
   width: 40px;
   height: 40px;
   border-radius: 50%;
-  background-color: #e0e7ff;
+  background-color: #eff6ff;
   display: flex;
   align-items: center;
   justify-content: center;
+
+  svg {
+    color: #0066CC;
+    stroke: #0066CC;
+  }
 }
 
 .employees-page__cell-name {
@@ -273,7 +342,7 @@
 }
 
 .employees-page__mgr-filter-item--selected {
-  background-color: #eef2ff;
+  background-color: #eff6ff;
 }
 
 .employees-page__mgr-filter-check {

@@ -2,11 +2,22 @@ import "@assets/scss/datatable-style.scss";
 import React, { ReactElement, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/router";
 import Layout from "@layout/index";
-import BreadcrumbItem from "@common/BreadcrumbItem";
 
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
 import "@assets/scss/workforce-user-request.scss";
+import "@assets/scss/workforce-approval-page.scss";
+import "@page-modules/workforce/shared/workforcePages.scss";
+import { WorkforceListPageShell } from "@page-modules/workforce/shared/WorkforceListPageShell";
+import {
+  WorkforceFixedActionBar,
+  WorkforceProspectsPrimaryButton,
+} from "@page-modules/workforce/shared/WorkforceProspectsTheme";
+import {
+  WORKFORCE_TOOLBAR_LABELS,
+  workforceModuleToolbarDropdown,
+} from "@page-modules/workforce/shared/workforceListPageConfig";
+import { renderApplyFilterActions } from "@utils/communicationsStagedFilters";
 import { useSession } from "next-auth/react";
 import {
   getUserRequestCategories,
@@ -28,7 +39,7 @@ import { getWorkforceTableDatePresetRange } from "@utils/workforceTableDatePrese
 import { useMainAppLookups, type MainAppUserLookup } from "@hooks/useMainAppLookups";
 import { toast } from "react-toastify";
 import { Badge, Modal, Form } from "react-bootstrap";
-import GenericTable, { FilterPill, TableColumn, ToolbarConfig } from "@components/GenericTable";
+import GenericTable, { FilterPill, TabConfig, TableColumn, ToolbarConfig } from "@components/GenericTable";
 import GenericSidebar, { SidebarSection } from "@components/GenericSidebarNew";
 
 import {
@@ -95,6 +106,60 @@ function parseOpenIdFromQuery(openId: string | string[] | undefined): string | u
   if (typeof openId === "string") return openId;
   if (Array.isArray(openId)) return openId[0];
   return undefined;
+}
+
+function resolveApprovalTypeOptions(typeOptionsFromCategories: string[]): string[] {
+  if (typeOptionsFromCategories.length > 0) return typeOptionsFromCategories;
+  return ["Leave", "Document", "Onboarding", "Profile"];
+}
+
+function resolveSelectedRequestedByName(
+  requestedByUsers: MainAppUserLookup[],
+  selectedRequestedByUserId: string | null,
+  appliedRequestedByUserId: string | null,
+): string {
+  if (selectedRequestedByUserId == null && appliedRequestedByUserId == null) {
+    return "";
+  }
+
+  return String(
+    findMainAppUserByRequestUserId(
+      requestedByUsers,
+      selectedRequestedByUserId ?? appliedRequestedByUserId,
+    )?.name ??
+      selectedRequestedByUserId ??
+      appliedRequestedByUserId ??
+      "",
+  );
+}
+
+function formatApprovalRequestsSummary(
+  totalRequests: number,
+  currentPage: number,
+  pageLimit: number,
+): string {
+  if (totalRequests === 0) return "Showing 0 of 0 requests";
+  const start = ((currentPage - 1) * pageLimit) + 1;
+  const end = Math.min(currentPage * pageLimit, totalRequests);
+  return `Showing ${start}-${end} of ${totalRequests} requests`;
+}
+
+function getCategoryNameFromList(
+  categoryId: number | string | null | undefined,
+  categories: UserRequestCategory[],
+): string {
+  if (categoryId == null || categoryId === "") return "—";
+  const id = Number(categoryId);
+  const cat = categories.find((c) => Number(c.id) === id);
+  return cat?.name ?? cat?.code ?? String(categoryId);
+}
+
+function resolveSelectedCategoryName(
+  selectedRequest: UserRequest | null,
+  categories: UserRequestCategory[],
+): string {
+  if (!selectedRequest) return "—";
+  return getCategoryNameFromList(selectedRequest.user_request_category_id, categories);
 }
 
 function requestStatusBadgeVariant(status: string | null | undefined): "success" | "danger" | "info" {
@@ -367,15 +432,15 @@ function getApprovalRequestTypeIconName(
 function getApprovalRequestTypeIcon(iconType: string): React.ReactNode {
   switch (iconType) {
     case "leave":
-      return <Calendar size={16} color="#6366f1" />;
+      return <Calendar size={16} color="#0066CC" />;
     case "document":
-      return <FileText size={16} color="#8b5cf6" />;
+      return <FileText size={16} color="#0052A3" />;
     case "onboarding":
-      return <UserPlus size={16} color="#10b981" />;
+      return <UserPlus size={16} color="#0066CC" />;
     case "profile":
-      return <User size={16} color="#6366f1" />;
+      return <User size={16} color="#0066CC" />;
     default:
-      return <File size={16} color="#6b7280" />;
+      return <File size={16} color="#64748b" />;
   }
 }
 
@@ -384,13 +449,13 @@ function getApprovalRequestTypeColor(iconType: string): string {
     case "leave":
       return "#dbeafe";
     case "document":
-      return "#f3e8ff";
+      return "#e0f2fe";
     case "onboarding":
-      return "#d1fae5";
+      return "#bfdbfe";
     case "profile":
-      return "#dbeafe";
+      return "#eff6ff";
     default:
-      return "#f3f4f6";
+      return "#f1f5f9";
   }
 }
 
@@ -426,17 +491,11 @@ function createApprovalRequestColumns({
           (request as UserRequest & { category?: { name?: string | null } }).category?.name ?? "—";
         return (
           <div
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: "6px",
-              padding: "4px 10px",
-              backgroundColor: getApprovalRequestTypeColor(iconType),
-              borderRadius: "6px",
-            }}
+            className="approval-type-badge"
+            style={{ backgroundColor: getApprovalRequestTypeColor(iconType) }}
           >
             {getApprovalRequestTypeIcon(iconType)}
-            <span style={{ fontSize: "13px", fontWeight: 500, color: "#1f2937" }}>
+            <span style={{ fontSize: "13px", fontWeight: 500, color: "#141414" }}>
               {categoryName}
             </span>
           </div>
@@ -469,16 +528,7 @@ function createApprovalRequestColumns({
       type: "custom",
       sortable: false,
       render: (request) => (
-        <span
-          style={{
-            padding: "4px 12px",
-            backgroundColor: "#fef3c7",
-            color: "#92400e",
-            borderRadius: "16px",
-            fontSize: "13px",
-            fontWeight: 500,
-          }}
-        >
+        <span className="approval-aging-badge">
           {getAgingLabel((request as UserRequest & { created_at?: string }).created_at)}
         </span>
       ),
@@ -603,43 +653,6 @@ function RequestedByDropdownContent({
           );
         })}
       </div>
-      <div style={{ display: "flex", gap: "8px" }}>
-        <button
-          type="button"
-          onClick={() => {
-            setCurrentPage(1);
-            setRequestedBySearchTerm("");
-          }}
-          style={{
-            border: "none",
-            backgroundColor: "#6366f1",
-            color: "white",
-            borderRadius: "6px",
-            padding: "6px 10px",
-            fontSize: "12px",
-          }}
-        >
-          Apply
-        </button>
-        <button
-          type="button"
-          onClick={() => {
-            setSelectedRequestedByUserId(null);
-            setRequestedBySearchTerm("");
-            setCurrentPage(1);
-          }}
-          style={{
-            border: "1px solid #d1d5db",
-            backgroundColor: "white",
-            color: "#374151",
-            borderRadius: "6px",
-            padding: "6px 10px",
-            fontSize: "12px",
-          }}
-        >
-          Clear
-        </button>
-      </div>
     </div>
   );
 }
@@ -658,23 +671,20 @@ function TypeDropdownContent({
   types,
 }: Readonly<TypeDropdownProps>) {
   return (
-    <div style={{ minWidth: "220px" }}>
-      <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+    <div className="approval-type-filter">
+      <div className="approval-type-filter__list">
         <button
           type="button"
           onClick={() => {
             setSelectedType("");
-            setCurrentPage(1);
           }}
-          style={{
-            textAlign: "left",
-            border: "0px solid #e5e7eb",
-            backgroundColor: selectedType === "" ? "#eef2ff" : "white",
-            color: "#111827",
-            borderRadius: "6px",
-            padding: "8px 10px",
-            fontSize: "13px",
-          }}
+          className={[
+            "approval-type-filter__btn",
+            "approval-type-filter__btn--all",
+            selectedType === "" ? "approval-type-filter__btn--selected" : "",
+          ]
+            .filter(Boolean)
+            .join(" ")}
         >
           All Types
         </button>
@@ -684,17 +694,13 @@ function TypeDropdownContent({
             type="button"
             onClick={() => {
               setSelectedType(type);
-              setCurrentPage(1);
             }}
-            style={{
-              textAlign: "left",
-              border: "1px solid #e5e7eb",
-              backgroundColor: selectedType === type ? "#eef2ff" : "white",
-              color: "#111827",
-              borderRadius: "6px",
-              padding: "8px 10px",
-              fontSize: "13px",
-            }}
+            className={[
+              "approval-type-filter__btn",
+              selectedType === type ? "approval-type-filter__btn--selected" : "",
+            ]
+              .filter(Boolean)
+              .join(" ")}
           >
             {type}
           </button>
@@ -706,43 +712,60 @@ function TypeDropdownContent({
 
 type ApprovalFilterPillsArgs = {
   selectedType: string;
+  appliedType: string;
   setSelectedType: (value: string) => void;
+  setAppliedType: (value: string) => void;
   setCurrentPage: (page: number) => void;
   typeDropdownContent: React.ReactNode;
   selectedRequestedByUserId: string | null;
+  appliedRequestedByUserId: string | null;
   setSelectedRequestedByUserId: (value: string | null) => void;
+  setAppliedRequestedByUserId: (value: string | null) => void;
   setRequestedBySearchTerm: (value: string) => void;
   selectedRequestedByName: string;
   requestedByDropdownContent: React.ReactNode;
   selectedDate: string;
+  appliedDate: string;
   setSelectedDate: (value: string) => void;
+  setAppliedDate: (value: string) => void;
   dateOptions: string[];
 };
 
 function createApprovalFilterPills({
   selectedType,
+  appliedType,
   setSelectedType,
+  setAppliedType,
   setCurrentPage,
   typeDropdownContent,
   selectedRequestedByUserId,
+  appliedRequestedByUserId,
   setSelectedRequestedByUserId,
+  setAppliedRequestedByUserId,
   setRequestedBySearchTerm,
   selectedRequestedByName,
   requestedByDropdownContent,
   selectedDate,
+  appliedDate,
   setSelectedDate,
+  setAppliedDate,
   dateOptions,
 }: Readonly<ApprovalFilterPillsArgs>): FilterPill[] {
+  const typeKey = selectedType || appliedType;
+  const requestedByKey = selectedRequestedByUserId ?? appliedRequestedByUserId;
+  const dateKey = selectedDate || appliedDate;
+
   return [
     {
       id: "approval-type",
       label: "Type",
       showDropdown: true,
-      active: Boolean(selectedType),
-      activeLabel: selectedType || undefined,
-      onClear: selectedType
+      active: Boolean(typeKey),
+      activeLabel: typeKey || undefined,
+      onClear: typeKey
         ? () => {
             setSelectedType("");
+            setAppliedType("");
             setCurrentPage(1);
           }
         : undefined,
@@ -752,11 +775,12 @@ function createApprovalFilterPills({
       id: "approval-requested-by",
       label: "Requested by",
       showDropdown: true,
-      active: Boolean(selectedRequestedByUserId),
+      active: Boolean(requestedByKey),
       activeLabel: selectedRequestedByName || undefined,
-      onClear: selectedRequestedByUserId
+      onClear: requestedByKey
         ? () => {
             setSelectedRequestedByUserId(null);
+            setAppliedRequestedByUserId(null);
             setRequestedBySearchTerm("");
             setCurrentPage(1);
           }
@@ -768,11 +792,12 @@ function createApprovalFilterPills({
       label: "Dates",
       showDropdown: true,
       searchable: false,
-      active: Boolean(selectedDate),
-      activeLabel: selectedDate || undefined,
-      onClear: selectedDate
+      active: Boolean(dateKey),
+      activeLabel: dateKey || undefined,
+      onClear: dateKey
         ? () => {
             setSelectedDate("");
+            setAppliedDate("");
             setCurrentPage(1);
           }
         : undefined,
@@ -782,7 +807,6 @@ function createApprovalFilterPills({
           value: "__all__",
           onClick: () => {
             setSelectedDate("");
-            setCurrentPage(1);
           },
         },
         ...dateOptions.map((option) => ({
@@ -790,7 +814,6 @@ function createApprovalFilterPills({
           value: option,
           onClick: () => {
             setSelectedDate(option);
-            setCurrentPage(1);
           },
         })),
       ],
@@ -802,15 +825,15 @@ type ApprovalToolbarArgs = {
   searchTerm: string;
   setSearchTerm: (value: string) => void;
   onSearch: () => void;
-  requestTabs: Array<{ id: string; label: string; removable: boolean }>;
+  requestTabs: TabConfig[];
   activeTab: "All" | "Pending" | "Approved" | "Rejected";
   setActiveTab: (tab: "All" | "Pending" | "Approved" | "Rejected") => void;
   setCurrentPage: (page: number) => void;
   filterPills: FilterPill[];
-  canCreateRequest: boolean;
-  openCreateModal: () => void;
-  disableCreateRequest: boolean;
   onClearFilters: () => void;
+  hasUnappliedFilterChanges: boolean;
+  onApplyFilters: () => void;
+  hasActiveFilters: boolean;
 };
 
 function createApprovalToolbar({
@@ -822,10 +845,10 @@ function createApprovalToolbar({
   setActiveTab,
   setCurrentPage,
   filterPills,
-  canCreateRequest,
-  openCreateModal,
-  disableCreateRequest,
   onClearFilters,
+  hasUnappliedFilterChanges,
+  onApplyFilters,
+  hasActiveFilters,
 }: Readonly<ApprovalToolbarArgs>): ToolbarConfig {
   return {
     showSearch: true,
@@ -836,6 +859,7 @@ function createApprovalToolbar({
     showTabs: true,
     tabs: requestTabs,
     activeTab,
+    ...workforceModuleToolbarDropdown(WORKFORCE_TOOLBAR_LABELS.approvalRequests),
     onTabChange: (tabId: string) => {
       if (tabId === "All" || tabId === "Pending" || tabId === "Approved" || tabId === "Rejected") {
         setActiveTab(tabId);
@@ -845,62 +869,11 @@ function createApprovalToolbar({
     showFilterPills: true,
     filterPills,
     showMoreFiltersButton: false,
-    rightActions: canCreateRequest ? (
-      <button
-        type="button"
-        onClick={openCreateModal}
-        disabled={disableCreateRequest}
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: "8px",
-          padding: "8px 14px",
-          backgroundColor: disableCreateRequest ? "#000000" : "#141414",
-          color: disableCreateRequest ? "#9ca3af" : "white",
-          border: "none",
-          borderRadius: "8px",
-          fontSize: "13px",
-          fontWeight: 600,
-          cursor: disableCreateRequest ? "not-allowed" : "pointer",
-        }}
-      >
-        <Plus size={16} />
-        New Request
-      </button>
-    ) : undefined,
-    customActions: (
-      <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-        <button
-          type="button"
-          onClick={onSearch}
-          style={{
-            border: "none",
-            backgroundColor: "#141414",
-            color: "white",
-            borderRadius: "6px",
-            padding: "7px 12px",
-            fontSize: "13px",
-            fontWeight: 500,
-          }}
-        >
-          Search
-        </button>
-        <button
-          type="button"
-          onClick={onClearFilters}
-          style={{
-            border: "1px solid #d1d5db",
-            backgroundColor: "white",
-            color: "#374151",
-            borderRadius: "6px",
-            padding: "7px 12px",
-            fontSize: "13px",
-            fontWeight: 500,
-          }}
-        >
-          Clear
-        </button>
-      </div>
+    clearAllFilters: hasActiveFilters ? onClearFilters : undefined,
+    filterPillsRightActions: renderApplyFilterActions(
+      hasUnappliedFilterChanges,
+      onApplyFilters,
+      "approval-requests",
     ),
   };
 }
@@ -978,37 +951,26 @@ function ApprovalSummarySection({
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-      <div style={{ padding: "12px", borderRadius: "8px", backgroundColor: "#f9fafb" }}>
-        <div style={{ fontSize: "15px", fontWeight: 600, color: "#1f2937", marginBottom: "6px" }}>
+      <div className="approval-summary-card">
+        <div className="approval-summary-title">
           {selectedRequest.subject ?? "—"}
         </div>
         {selectedRequest.reason ? (
-          <div style={{ fontSize: "14px", color: "#4b5563", lineHeight: 1.5 }}>{selectedRequest.reason}</div>
+          <div className="approval-summary-reason">{selectedRequest.reason}</div>
         ) : null}
       </div>
-      <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "13px", color: "#6b7280" }}>
+      <div className="approval-meta-row">
         <Calendar size={14} />
         <span>Submitted: {formatEventDate(createdAt)}</span>
       </div>
       {approverNames.length > 0 ? (
         <div>
-          <div style={{ marginBottom: "8px", fontSize: "13px", fontWeight: 500, color: "#6b7280" }}>
+          <div className="approval-section-label">
             Who can approve{currentLevelLabel}:
           </div>
           <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
             {approverNames.map((name) => (
-              <span
-                key={name}
-                style={{
-                  padding: "5px 10px",
-                  borderRadius: "999px",
-                  backgroundColor: "#eef2ff",
-                  border: "1px solid #e0e7ff",
-                  color: "#3730a3",
-                  fontSize: "12px",
-                  fontWeight: 600,
-                }}
-              >
+              <span key={name} className="approval-approver-chip">
                 {name}
               </span>
             ))}
@@ -1017,10 +979,10 @@ function ApprovalSummarySection({
       ) : null}
       {dynamicApprovals.length > 0 ? (
         <div>
-          <div style={{ marginBottom: "8px", fontSize: "13px", fontWeight: 500, color: "#6b7280" }}>
+          <div className="approval-section-label">
             Who has approved
           </div>
-          <div style={{ padding: "10px 12px", backgroundColor: "#f8fafc", border: "1px solid #e5e7eb", borderRadius: "10px" }}>
+          <div className="approval-detail-panel">
             {dynamicApprovals.map((approval: RequestApprovalItem, idx: number) => (
               <ApprovalLevelRow
                 key={approval.id}
@@ -1047,21 +1009,11 @@ function ApprovalDetailsSection({
     <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
       <div style={{ fontSize: "13px", color: "#6b7280" }}>Type: {selectedCategoryName}</div>
       {Object.keys(dynamicFields).length > 0 ? (
-        <div style={{ padding: "10px 12px", backgroundColor: "#f8fafc", border: "1px solid #e5e7eb", borderRadius: "10px" }}>
-          {Object.entries(dynamicFields).map(([key, value], idx, arr) => (
-            <div
-              key={key}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                gap: "16px",
-                padding: "8px 0",
-                borderBottom: idx < arr.length - 1 ? "1px solid #e5e7eb" : "none",
-              }}
-            >
-              <span style={{ color: "#6b7280", fontWeight: 600 }}>{formatDynamicFieldKey(key)}</span>
-              <span style={{ color: "#111827", textAlign: "right", fontWeight: 500 }}>
+        <div className="approval-detail-panel">
+          {Object.entries(dynamicFields).map(([key, value]) => (
+            <div key={key} className="approval-detail-row">
+              <span className="approval-detail-key">{formatDynamicFieldKey(key)}</span>
+              <span className="approval-detail-value">
                 {formatDynamicFieldValue(value)}
               </span>
             </div>
@@ -1087,21 +1039,9 @@ function ApprovalAttachmentsSection({
         <div style={{ fontSize: "13px", color: "#9ca3af" }}>No attachments</div>
       ) : (
         attachments.map((attachment) => (
-          <div
-            key={attachment.id}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              padding: "10px 12px",
-              border: "1px solid #e5e7eb",
-              borderRadius: "8px",
-              backgroundColor: "white",
-              gap: "10px",
-            }}
-          >
+          <div key={attachment.id} className="approval-attachment-row">
             <div style={{ minWidth: 0, flex: 1 }}>
-              <div style={{ fontSize: "14px", fontWeight: 500, color: "#1f2937" }}>
+              <div style={{ fontSize: "14px", fontWeight: 500, color: "#141414" }}>
                 {attachment.original_name || "Attachment"}
               </div>
               <div style={{ fontSize: "12px", color: "#9ca3af" }}>
@@ -1112,18 +1052,10 @@ function ApprovalAttachmentsSection({
             <button
               type="button"
               onClick={() => handleDownloadAttachmentFromSidebar(attachment)}
-              style={{
-                padding: "8px",
-                backgroundColor: "#f3f4f6",
-                border: "none",
-                borderRadius: "6px",
-                cursor: "pointer",
-                display: "flex",
-                alignItems: "center",
-              }}
+              className="approval-attachment-download-btn"
               title="Download"
             >
-              <Download size={16} color="#6b7280" />
+              <Download size={16} color="#0066CC" />
             </button>
           </div>
         ))
@@ -1140,23 +1072,14 @@ function ApprovalCommentField({
   setSidebarComment: (value: string) => void;
 }>) {
   return (
-    <div style={{ position: "relative" }}>
+    <div className="approval-comment-field-wrap">
       <textarea
         value={sidebarComment}
         onChange={(e) => setSidebarComment(e.target.value.slice(0, 500))}
         placeholder="Add a comment *"
-        style={{
-          width: "100%",
-          minHeight: "100px",
-          padding: "12px",
-          border: "1px solid #e5e7eb",
-          borderRadius: "8px",
-          fontSize: "14px",
-          color: "#1f2937",
-          resize: "vertical",
-        }}
+        className="approval-comment-field"
       />
-      <div style={{ position: "absolute", bottom: "10px", right: "12px", fontSize: "12px", color: "#9ca3af" }}>
+      <div className="approval-comment-count">
         {sidebarComment.length}/500
       </div>
     </div>
@@ -1183,24 +1106,13 @@ function PendingApprovalActionButtons({
   handleRequestChanges: () => Promise<void>;
 }>) {
   return (
-    <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
+    <div className="approval-actions-row">
       {canApprove ? (
         <button
           type="button"
+          className="workforce-sidebar-btn-create"
           onClick={handleApproveRequest}
           disabled={sidebarSubmitting}
-          style={{
-            flex: 1,
-            minWidth: "110px",
-            padding: "10px 14px",
-            backgroundColor: "#10b981",
-            color: "white",
-            border: "none",
-            borderRadius: "8px",
-            fontSize: "13px",
-            fontWeight: 600,
-            cursor: "pointer",
-          }}
         >
           {sidebarSubmittingAction === "approve" ? "Approving..." : "Approve"}
         </button>
@@ -1208,20 +1120,9 @@ function PendingApprovalActionButtons({
       {canReject ? (
         <button
           type="button"
+          className="workforce-sidebar-btn-danger"
           onClick={handleRejectRequest}
           disabled={sidebarSubmitting}
-          style={{
-            flex: 1,
-            minWidth: "110px",
-            padding: "10px 14px",
-            backgroundColor: "#ef4444",
-            color: "white",
-            border: "none",
-            borderRadius: "8px",
-            fontSize: "13px",
-            fontWeight: 600,
-            cursor: "pointer",
-          }}
         >
           {sidebarSubmittingAction === "reject" ? "Rejecting..." : "Reject"}
         </button>
@@ -1229,20 +1130,9 @@ function PendingApprovalActionButtons({
       {canRequestChanges ? (
         <button
           type="button"
+          className="workforce-sidebar-btn-cancel"
           onClick={handleRequestChanges}
           disabled={sidebarSubmitting}
-          style={{
-            flex: 1,
-            minWidth: "140px",
-            padding: "10px 14px",
-            backgroundColor: "white",
-            color: "#6b7280",
-            border: "1px solid #e5e7eb",
-            borderRadius: "8px",
-            fontSize: "13px",
-            fontWeight: 500,
-            cursor: "pointer",
-          }}
         >
           {sidebarSubmittingAction === "changes" ? "Submitting..." : "Request Changes"}
         </button>
@@ -1502,7 +1392,7 @@ function ApprovalRequestsTableSection({
   requestsSummary: string;
 }>) {
   return (
-    <div className="approval-table-pane" style={{ flex: 1, overflow: "hidden", display: "flex", flexDirection: "column" }}>
+    <div className="approval-table-pane">
       <GenericTable<UserRequest>
         data={requests}
         columns={requestColumns}
@@ -1727,6 +1617,7 @@ function EditApprovalRequestModal({
         </Form.Label>
         <Form.Control
           type="text"
+          className="new-request-fieldControl"
           value={editForm.subject}
           onChange={(e) => setEditForm((f) => ({ ...f, subject: e.target.value }))}
           placeholder="Request subject"
@@ -1737,6 +1628,7 @@ function EditApprovalRequestModal({
         <Form.Label className="new-request-label">Reason</Form.Label>
         <Form.Control
           as="textarea"
+          className="new-request-fieldControl"
           rows={3}
           value={editForm.reason}
           onChange={(e) => setEditForm((f) => ({ ...f, reason: e.target.value }))}
@@ -1768,7 +1660,7 @@ function EditApprovalRequestModal({
                   onClick={() => handleDownloadAttachment(att)}
                   title="Download"
                 >
-                  <Download size={14} color="#6b7280" />
+                  <Download size={14} color="#0066CC" />
                 </button>
               </div>
             ))}
@@ -1798,6 +1690,58 @@ function EditApprovalRequestModal({
   );
 }
 
+type ApprovalSidebarResultDialogProps = Readonly<{
+  show: boolean;
+  config: {
+    type: DialogVariant;
+    title: string;
+    message: string;
+  } | null;
+  onClose: () => void;
+}>;
+
+function ApprovalSidebarResultDialog({ show, config, onClose }: ApprovalSidebarResultDialogProps) {
+  if (!show || !config) return null;
+
+  return (
+    <Modal show onHide={onClose} centered style={{ zIndex: 999999 }}>
+      <Modal.Body style={{ padding: "24px" }}>
+        <div style={{ display: "flex", alignItems: "flex-start", gap: "16px", marginBottom: "20px" }}>
+          <div
+            style={{
+              width: "48px",
+              height: "48px",
+              borderRadius: "50%",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              flexShrink: 0,
+              backgroundColor: getDialogTypeBgColor(config.type),
+            }}
+          >
+            {config.type === "success" ? <CheckCircle size={28} color="#10b981" /> : null}
+            {config.type === "error" ? <XCircle size={28} color="#ef4444" /> : null}
+            {config.type === "warning" ? <Edit3 size={28} color="#f59e0b" /> : null}
+          </div>
+          <div style={{ flex: 1 }}>
+            <h3 style={{ fontSize: "18px", fontWeight: "600", color: "#1f2937", margin: "0 0 8px 0" }}>
+              {config.title}
+            </h3>
+            <p style={{ fontSize: "14px", color: "#6b7280", lineHeight: "1.5", margin: 0 }}>
+              {config.message}
+            </p>
+          </div>
+        </div>
+        <div className="approval-result-dialog__footer">
+          <button type="button" className="workforce-prospects-primary-btn" onClick={onClose}>
+            OK
+          </button>
+        </div>
+      </Modal.Body>
+    </Modal>
+  );
+}
+
 const ApprovalRequest = () => {
   const router = useRouter();
   const { data: session } = useSession();
@@ -1810,10 +1754,14 @@ const ApprovalRequest = () => {
 
   const [activeTab, setActiveTab] = useState<"All" | "Pending" | "Approved" | "Rejected">("All");
   const [searchTerm, setSearchTerm] = useState("");
+  const [appliedSearch, setAppliedSearch] = useState("");
   const [selectedType, setSelectedType] = useState("");
+  const [appliedType, setAppliedType] = useState("");
   const [selectedRequestedByUserId, setSelectedRequestedByUserId] = useState<string | null>(null);
+  const [appliedRequestedByUserId, setAppliedRequestedByUserId] = useState<string | null>(null);
   const [requestedBySearchTerm, setRequestedBySearchTerm] = useState("");
   const [selectedDate, setSelectedDate] = useState("");
+  const [appliedDate, setAppliedDate] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [rowsPerPage, setRowsPerPage] = useState(15);
   const rowsPerPageRef = useRef(rowsPerPage);
@@ -1939,12 +1887,12 @@ const ApprovalRequest = () => {
           limit: rowsPerPage,
           status,
         };
-        if (searchTerm?.trim()) params.search = searchTerm.trim();
-        const category = selectedType ? categories.find((c) => (c.name ?? c.code ?? String(c.id)) === selectedType) : undefined;
+        if (appliedSearch?.trim()) params.search = appliedSearch.trim();
+        const category = appliedType ? categories.find((c) => (c.name ?? c.code ?? String(c.id)) === appliedType) : undefined;
         if (category?.id != null) params.user_request_category_id = category.id;
-        const requestedByTrimmed = selectedRequestedByUserId?.trim();
+        const requestedByTrimmed = appliedRequestedByUserId?.trim();
         if (requestedByTrimmed) params.user_ids = [requestedByTrimmed];
-        const dateRange = getWorkforceTableDatePresetRange(selectedDate ?? "");
+        const dateRange = getWorkforceTableDatePresetRange(appliedDate ?? "");
         if (dateRange) {
           params.created_at_from = dateRange.from;
           params.created_at_to = dateRange.to;
@@ -1961,7 +1909,7 @@ const ApprovalRequest = () => {
         setLoadingRequests(false);
       }
     },
-    [activeTab, searchTerm, selectedType, selectedRequestedByUserId, selectedDate, categories, rowsPerPage]
+    [activeTab, appliedSearch, appliedType, appliedRequestedByUserId, appliedDate, categories, rowsPerPage]
   );
 
   const handlePaginationChange = useCallback((page: number, limit: number) => {
@@ -1977,9 +1925,42 @@ const ApprovalRequest = () => {
     loadRequests(currentPage);
   }, [currentPage, loadRequests]);
 
-  useEffect(() => {
+  const handleApplyFilters = useCallback(() => {
+    setAppliedSearch(searchTerm);
+    setAppliedType(selectedType);
+    setAppliedRequestedByUserId(selectedRequestedByUserId);
+    setAppliedDate(selectedDate);
     setCurrentPage(1);
-  }, [selectedRequestedByUserId, selectedDate]);
+  }, [searchTerm, selectedType, selectedRequestedByUserId, selectedDate]);
+
+  const hasUnappliedFilterChanges = useMemo(
+    () =>
+      searchTerm !== appliedSearch ||
+      selectedType !== appliedType ||
+      selectedRequestedByUserId !== appliedRequestedByUserId ||
+      selectedDate !== appliedDate,
+    [
+      searchTerm,
+      appliedSearch,
+      selectedType,
+      appliedType,
+      selectedRequestedByUserId,
+      appliedRequestedByUserId,
+      selectedDate,
+      appliedDate,
+    ],
+  );
+
+  const hasActiveFilters = useMemo(
+    () =>
+      Boolean(
+        appliedSearch.trim() ||
+          appliedType ||
+          appliedRequestedByUserId ||
+          appliedDate,
+      ),
+    [appliedSearch, appliedType, appliedRequestedByUserId, appliedDate],
+  );
 
   // Open sidebar when navigating from notification with ?openId= (target_id)
   useEffect(() => {
@@ -2166,29 +2147,32 @@ const ApprovalRequest = () => {
 
   const typeOptionsFromCategories = useMemo(() => categories.map((c) => c.name ?? c.code ?? String(c.id)), [categories]);
 
-  const types = typeOptionsFromCategories.length > 0 ? typeOptionsFromCategories : ["Leave", "Document", "Onboarding", "Profile"];
+  const types = resolveApprovalTypeOptions(typeOptionsFromCategories);
   const requestedByUsers = Array.isArray(mainAppUsers) ? mainAppUsers : [];
-  const selectedRequestedByName =
-    selectedRequestedByUserId == null
-      ? ""
-      : (findMainAppUserByRequestUserId(requestedByUsers, selectedRequestedByUserId)?.name ??
-        selectedRequestedByUserId);
+  const selectedRequestedByName = resolveSelectedRequestedByName(
+    requestedByUsers,
+    selectedRequestedByUserId,
+    appliedRequestedByUserId,
+  );
   const dateOptions = ["Today", "Last 7 days", "Last 30 days", "All time"];
   const totalRequests = requestsPagination?.total ?? 0;
   const canCreateRequest =
     session?.user?.permissions?.includes(PERMISSIONS.ADD_APPROVAL_REQUEST_STAFF_MANAGEMENT) ?? false;
 
   const handleRunSearch = useCallback(() => {
-    setCurrentPage(1);
-    loadRequests(1);
-  }, [loadRequests]);
+    handleApplyFilters();
+  }, [handleApplyFilters]);
 
   const handleClearFilters = useCallback(() => {
     setSearchTerm("");
+    setAppliedSearch("");
     setSelectedType("");
+    setAppliedType("");
     setSelectedRequestedByUserId(null);
+    setAppliedRequestedByUserId(null);
     setRequestedBySearchTerm("");
     setSelectedDate("");
+    setAppliedDate("");
     setCurrentPage(1);
   }, []);
 
@@ -2208,21 +2192,15 @@ const ApprovalRequest = () => {
     }
   }, [requestToDelete, refreshRequests]);
 
-  const getCategoryName = (categoryId: number | string | null): string => {
-    if (categoryId == null || categoryId === "") return "—";
-    const id = Number(categoryId);
-    const cat = categories.find((c) => Number(c.id) === id);
-    return cat?.name ?? cat?.code ?? String(categoryId);
-  };
-
-  const requestTabs = useMemo(
-    () => [
-      { id: "All", label: "All", removable: false },
-      { id: "Pending", label: "Pending", removable: false },
-      { id: "Approved", label: "Approved", removable: false },
-      { id: "Rejected", label: "Rejected", removable: false },
-    ],
-    []
+  const requestTabs = useMemo<TabConfig[]>(
+    () =>
+      (["All", "Pending", "Approved", "Rejected"] as const).map((id) => ({
+        id,
+        label: id,
+        count: activeTab === id ? totalRequests : undefined,
+        removable: false,
+      })),
+    [activeTab, totalRequests],
   );
 
   const requestColumns = useMemo<TableColumn<UserRequest>[]>(
@@ -2260,25 +2238,34 @@ const ApprovalRequest = () => {
     () =>
       createApprovalFilterPills({
         selectedType,
+        appliedType,
         setSelectedType,
+        setAppliedType,
         setCurrentPage,
         typeDropdownContent,
         selectedRequestedByUserId,
+        appliedRequestedByUserId,
         setSelectedRequestedByUserId,
+        setAppliedRequestedByUserId,
         setRequestedBySearchTerm,
         selectedRequestedByName,
         requestedByDropdownContent,
         selectedDate,
+        appliedDate,
         setSelectedDate,
+        setAppliedDate,
         dateOptions,
       }),
     [
       selectedType,
+      appliedType,
       typeDropdownContent,
       selectedRequestedByUserId,
+      appliedRequestedByUserId,
       selectedRequestedByName,
       requestedByDropdownContent,
       selectedDate,
+      appliedDate,
       dateOptions,
     ]
   );
@@ -2294,10 +2281,10 @@ const ApprovalRequest = () => {
         setActiveTab,
         setCurrentPage,
         filterPills,
-        canCreateRequest,
-        openCreateModal,
-        disableCreateRequest: categories.length === 0 || loadingCategories,
         onClearFilters: handleClearFilters,
+        hasUnappliedFilterChanges,
+        onApplyFilters: handleApplyFilters,
+        hasActiveFilters,
       }),
     [
       searchTerm,
@@ -2305,20 +2292,22 @@ const ApprovalRequest = () => {
       requestTabs,
       activeTab,
       filterPills,
-      canCreateRequest,
-      openCreateModal,
-      categories.length,
-      loadingCategories,
       handleClearFilters,
+      hasUnappliedFilterChanges,
+      handleApplyFilters,
+      hasActiveFilters,
     ]
   );
 
-  const requestsSummary =
-    totalRequests === 0
-      ? "Showing 0 of 0 requests"
-      : `Showing ${((currentPage - 1) * (requestsPagination?.limit ?? rowsPerPage)) + 1}-${Math.min(currentPage * (requestsPagination?.limit ?? rowsPerPage), totalRequests)} of ${totalRequests} requests`;
+  const disableCreateRequest = categories.length === 0 || loadingCategories;
 
-  const selectedCategoryName = selectedRequest ? getCategoryName(selectedRequest.user_request_category_id) : "—";
+  const requestsSummary = formatApprovalRequestsSummary(
+    totalRequests,
+    currentPage,
+    requestsPagination?.limit ?? rowsPerPage,
+  );
+
+  const selectedCategoryName = resolveSelectedCategoryName(selectedRequest, categories);
 
   const handleSelectRequest = useCallback((request: UserRequest) => {
     setSelectedRequest(request);
@@ -2368,9 +2357,22 @@ const ApprovalRequest = () => {
 
   return (
     <React.Fragment>
-      <BreadcrumbItem mainTitle="" mainLink="" subTitle="Customer Dashboard" />
-      <div className="approval-page-shell" style={{ display: "flex", gap: 0, height: "calc(100vh)", overflow: "hidden" }}>
-        <ApprovalRequestsTableSection
+      <WorkforceListPageShell
+        breadcrumbSubTitle="Approval Requests"
+        tableWrapperClass="workforce-approval-table-wrapper"
+        fixedActions={
+          canCreateRequest ? (
+            <WorkforceFixedActionBar>
+              <WorkforceProspectsPrimaryButton onClick={openCreateModal} disabled={disableCreateRequest}>
+                <Plus size={16} />
+                New Request
+              </WorkforceProspectsPrimaryButton>
+            </WorkforceFixedActionBar>
+          ) : undefined
+        }
+      >
+        <div className="approval-page-shell">
+          <ApprovalRequestsTableSection
           requests={requests}
           requestColumns={requestColumns}
           loadingRequests={loadingRequests}
@@ -2394,7 +2396,7 @@ const ApprovalRequest = () => {
             avatar={{
               initials: getDisplayName(selectedRequest.user_id).slice(0, 2).toUpperCase(),
               name: getDisplayName(selectedRequest.user_id),
-              gradient: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+              gradient: "#0066CC",
             }}
             quickActions={[
               {
@@ -2425,7 +2427,8 @@ const ApprovalRequest = () => {
             sections={approvalSidebarSections}
           />
         ) : null}
-      </div>
+        </div>
+      </WorkforceListPageShell>
 
       <NewRequestModal
         show={showCreateModal}
@@ -2444,56 +2447,11 @@ const ApprovalRequest = () => {
         onSuccess={refreshRequests}
       />
 
-      {showSidebarDialog && sidebarDialogConfig ? (
-        <Modal show onHide={closeSidebarDialog} centered style={{ zIndex: 999999 }}>
-          <Modal.Body style={{ padding: "24px" }}>
-            <div style={{ display: "flex", alignItems: "flex-start", gap: "16px", marginBottom: "20px" }}>
-              <div
-                style={{
-                  width: "48px",
-                  height: "48px",
-                  borderRadius: "50%",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  flexShrink: 0,
-                  backgroundColor: getDialogTypeBgColor(sidebarDialogConfig.type),
-                }}
-              >
-                {sidebarDialogConfig.type === "success" ? <CheckCircle size={28} color="#10b981" /> : null}
-                {sidebarDialogConfig.type === "error" ? <XCircle size={28} color="#ef4444" /> : null}
-                {sidebarDialogConfig.type === "warning" ? <Edit3 size={28} color="#f59e0b" /> : null}
-              </div>
-              <div style={{ flex: 1 }}>
-                <h3 style={{ fontSize: "18px", fontWeight: "600", color: "#1f2937", margin: "0 0 8px 0" }}>
-                  {sidebarDialogConfig.title}
-                </h3>
-                <p style={{ fontSize: "14px", color: "#6b7280", lineHeight: "1.5", margin: 0 }}>
-                  {sidebarDialogConfig.message}
-                </p>
-              </div>
-            </div>
-            <div style={{ display: "flex", justifyContent: "flex-end" }}>
-              <button
-                type="button"
-                onClick={closeSidebarDialog}
-                style={{
-                  padding: "10px 24px",
-                  backgroundColor: "#6366f1",
-                  color: "white",
-                  border: "none",
-                  borderRadius: "8px",
-                  fontSize: "14px",
-                  fontWeight: "500",
-                  cursor: "pointer",
-                }}
-              >
-                OK
-              </button>
-            </div>
-          </Modal.Body>
-        </Modal>
-      ) : null}
+      <ApprovalSidebarResultDialog
+        show={showSidebarDialog}
+        config={sidebarDialogConfig}
+        onClose={closeSidebarDialog}
+      />
 
       {/* Delete request confirmation modal */}
       <DeleteConfirmationModal

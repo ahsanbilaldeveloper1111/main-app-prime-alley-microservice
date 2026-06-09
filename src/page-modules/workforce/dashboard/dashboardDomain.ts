@@ -1,6 +1,11 @@
 import type { MainAppDepartmentLookup } from "@hooks/useMainAppLookups";
 import type { EmployeeDashboardParams } from "@utils/staffManagement";
 
+export {
+  WORKFORCE_DEPARTMENT_CHART_COLORS as DEPARTMENT_CHART_COLORS,
+  WORKFORCE_AGING_CHART_COLORS as AGING_CHART_COLORS,
+} from "@page-modules/workforce/shared/workforceChartColors";
+
 export interface LeaveCalendarEmployee {
   user_id: string;
   employee_name: string;
@@ -37,17 +42,6 @@ export type ApprovalsAgingBuckets = {
 };
 
 export type DepartmentHeadcountRow = { department_id: number; count: number };
-
-export const DEPARTMENT_CHART_COLORS = [
-  "#6366F1",
-  "#10B981",
-  "#8B5CF6",
-  "#F59E0B",
-  "#EC4899",
-  "#06B6D4",
-  "#84CC16",
-  "#F97316",
-];
 
 export function serializeEmployeeDashboardParamsKey(params?: EmployeeDashboardParams): string {
   if (!params) return "{}";

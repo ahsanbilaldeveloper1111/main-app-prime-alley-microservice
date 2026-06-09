@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { GripVertical } from "lucide-react";
+import { Calendar, Clock, GripVertical } from "lucide-react";
 import type { WorkloadTaskCard } from "@utils/tasks";
 import {
   formatWorkloadBoardMoveLabel,
@@ -125,17 +125,17 @@ export function WorkloadBoardTaskCard({
 
       <div className="workload-board-task-card__meta workload-board-task-card__meta--secondary">
         <WorkloadBdg tone={task.is_overdue && !task.is_completed ? "red" : "gray"}>
-          <i className="ti ti-calendar" style={{ fontSize: "10px" }} aria-hidden />
+          <Calendar size={10} aria-hidden />
           {scheduleLabel}
         </WorkloadBdg>
         {unestimated ? (
           <WorkloadBdg tone="orange">
-            <i className="ti ti-clock" style={{ fontSize: "10px" }} aria-hidden />
+            <Clock size={10} aria-hidden />
             {" No est."}
           </WorkloadBdg>
         ) : (
           <WorkloadBdg tone="gray">
-            <i className="ti ti-clock" style={{ fontSize: "10px" }} aria-hidden />
+            <Clock size={10} aria-hidden />
             {formatWorkloadTaskEstimate(task)}
           </WorkloadBdg>
         )}

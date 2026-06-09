@@ -823,6 +823,12 @@ function normalizeAssigneeRow(raw: unknown): TaskReportsAssigneeRow | null {
     overdue_count: readNumber(row.overdue_count),
     completion_percent:
       readNumber(row.completion_percent) ?? readNumber(row.completion_rate_percent),
+    project_name:
+      readString(row.project_name) ??
+      readString(row.primary_project_name) ??
+      readString(row.top_project_name) ??
+      (readNestedRecord(row.project) ? readString(readNestedRecord(row.project)!.name) : undefined),
+    primary_project_name: readString(row.primary_project_name),
   };
 }
 

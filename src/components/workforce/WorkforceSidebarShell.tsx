@@ -1,6 +1,8 @@
 import React, { type CSSProperties } from "react";
 import { Form } from "react-bootstrap";
 import { X } from "lucide-react";
+import "@assets/scss/add-form-sidebar.scss";
+import "@page-modules/workforce/shared/workforcePages.scss";
 
 type WorkforceSidebarShellProps = {
   isOpen: boolean;
@@ -71,29 +73,6 @@ const sidebarFooterStyle: CSSProperties = {
   justifyContent: "flex-start",
 };
 
-const sidebarSecondaryButtonStyle: CSSProperties = {
-  padding: "10px 20px",
-  backgroundColor: "transparent",
-  color: "#141414",
-  border: "1px solid #8a8a8a",
-  borderRadius: "4px",
-  fontSize: "14px",
-  fontWeight: 500,
-};
-
-function getPrimaryButtonStyle(isDisabled: boolean): CSSProperties {
-  return {
-    padding: "10px 20px",
-    backgroundColor: isDisabled ? "#cbd5e0" : "#0091ae",
-    color: "#ffffff",
-    border: "none",
-    borderRadius: "4px",
-    fontSize: "14px",
-    fontWeight: 500,
-    cursor: isDisabled ? "not-allowed" : "pointer",
-  };
-}
-
 const WorkforceSidebarShell: React.FC<WorkforceSidebarShellProps> = ({
   isOpen,
   className,
@@ -135,17 +114,18 @@ const WorkforceSidebarShell: React.FC<WorkforceSidebarShellProps> = ({
           <div className="contact-sidebar-content" style={sidebarContentStyle}>{children}</div>
 
           <div className="contact-sidebar-footer" style={sidebarFooterStyle}>
-            <button type="submit" disabled={primaryDisabled} style={getPrimaryButtonStyle(primaryDisabled)}>
+            <button
+              type="submit"
+              disabled={primaryDisabled}
+              className="contact-form-btn-create workforce-sidebar-btn-create"
+            >
               {submitting ? submittingLabel : submitLabel}
             </button>
             <button
               type="button"
               disabled={submitting}
               onClick={onClose}
-              style={{
-                ...sidebarSecondaryButtonStyle,
-                cursor: submitting ? "not-allowed" : "pointer",
-              }}
+              className="contact-form-btn-cancel workforce-sidebar-btn-cancel"
             >
               Cancel
             </button>

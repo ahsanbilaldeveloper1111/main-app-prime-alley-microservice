@@ -17,6 +17,12 @@ import {
   REQUEST_CATEGORIES_NESTED_TABLE_LAYOUT,
 } from "@page-modules/workforce/request-categories/partials/requestCategoriesGenericTableBlocks";
 import { WorkforceSettingsTableWrap } from "@page-modules/workforce/shared/WorkforceSettingsTableWrap";
+import { WorkforceListPageShell } from "@page-modules/workforce/shared/WorkforceListPageShell";
+import {
+  WorkforceFixedActionBar,
+  WorkforceProspectsPrimaryButton,
+} from "@page-modules/workforce/shared/WorkforceProspectsTheme";
+import "@page-modules/workforce/shared/workforcePages.scss";
 import {
   categoryModalTitle,
   categorySaveButtonLabel,
@@ -140,10 +146,10 @@ function RequestCategoriesAddButton({
   }
 
   return (
-    <Button variant="primary" onClick={onClick}>
-      <Plus size={18} className="me-1" />
+    <WorkforceProspectsPrimaryButton onClick={onClick}>
+      <Plus size={16} />
       Add Category
-    </Button>
+    </WorkforceProspectsPrimaryButton>
   );
 }
 
@@ -284,38 +290,72 @@ export function RequestCategoriesPageView({
 
   return (
     <div className="request-categories-page">
-      {hideBreadcrumb ? null : (
-        <BreadcrumbItem mainTitle="" mainLink="" subTitle="Request Categories" />
-      )}
-
       {embeddedInMainSettings ? (
-        <div className="request-categories-page__toolbar">
-          <div className="request-categories-page__toolbar-search">
-            <RequestCategoriesSearchInput
-              searchValue={searchValue}
-              onSearchChange={setSearchValue}
-              placeholder="Search categories..."
+        <>
+          {hideBreadcrumb ? null : (
+            <BreadcrumbItem mainTitle="" mainLink="" subTitle="Request Categories" />
+          )}
+
+          <div className="request-categories-page__toolbar">
+            <div className="request-categories-page__toolbar-search">
+              <RequestCategoriesSearchInput
+                searchValue={searchValue}
+                onSearchChange={setSearchValue}
+                placeholder="Search categories..."
+              />
+            </div>
+            <div className="request-categories-page__toolbar-actions">
+              <RequestCategoriesAddButton canManage={canManage} onClick={openCreateCategory} />
+            </div>
+          </div>
+
+          <WorkforceSettingsTableWrap>
+            <GenericTable<UserRequestCategory>
+              data={categories}
+              columns={mainTableColumns}
+              showActions={false}
+              loading={loading}
+              emptyMessage="No request categories yet. Create one to get started."
+              pagination={
+                pagination
+                  ? {
+                      currentPage: pagination.page,
+                      rowsPerPage: pagination.limit,
+                      totalRows: pagination.total,
+                    }
+                  : undefined
+              }
+              onPaginationChange={(p, rowsPerPage) => {
+                setPage(p);
+                setLimit(rowsPerPage);
+              }}
+              uniqueKey="id"
+              showToolbarActions={false}
+              hover
+              size="md"
             />
-          </div>
-          <div className="request-categories-page__toolbar-actions">
-            <RequestCategoriesAddButton canManage={canManage} onClick={openCreateCategory} />
-          </div>
-        </div>
+          </WorkforceSettingsTableWrap>
+        </>
       ) : (
-        <PageHeader
-          title=""
-          showSearch={true}
-          searchPlaceholder="Search categories..."
-          searchValue={searchValue}
-          onSearchChange={(value) => setSearchValue(value)}
-          buttons={
-            <RequestCategoriesAddButton canManage={canManage} onClick={openCreateCategory} />
+        <WorkforceListPageShell
+          breadcrumbSubTitle="Request Categories"
+          tableWrapperClass="workforce-request-categories-table-wrapper"
+          fixedActions={
+            canManage ? (
+              <WorkforceFixedActionBar>
+                <RequestCategoriesAddButton canManage={canManage} onClick={openCreateCategory} />
+              </WorkforceFixedActionBar>
+            ) : undefined
           }
-        />
-      )}
+        >
+          <PageHeader
+            title=""
+            showSearch={true}
+            searchPlaceholder="Search categories..."
+            searchValue={searchValue}
+            onSearchChange={(value) => setSearchValue(value)}
+          />
 
-      {embeddedInMainSettings ? (
-        <WorkforceSettingsTableWrap>
           <GenericTable<UserRequestCategory>
             data={categories}
             columns={mainTableColumns}
@@ -340,30 +380,7 @@ export function RequestCategoriesPageView({
             hover
             size="md"
           />
-        </WorkforceSettingsTableWrap>
-      ) : (
-        <GenericTable<UserRequestCategory>
-          data={categories}
-          columns={mainTableColumns}
-          showActions={false}
-          loading={loading}
-          emptyMessage="No request categories yet. Create one to get started."
-          pagination={
-            pagination
-              ? {
-                  currentPage: pagination.page,
-                  rowsPerPage: pagination.limit,
-                  totalRows: pagination.total,
-                }
-              : undefined
-          }
-          onPaginationChange={(p, rowsPerPage) => {
-            setPage(p);
-            setLimit(rowsPerPage);
-          }}
-          uniqueKey="id"
-          showToolbarActions={false}
-        />
+        </WorkforceListPageShell>
       )}
 
       <CategoryEditSidebar

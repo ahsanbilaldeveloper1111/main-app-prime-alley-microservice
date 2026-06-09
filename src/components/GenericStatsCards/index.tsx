@@ -32,47 +32,66 @@ interface StatsCardsProps {
   columns?: number;
   /** Font size for the stat value (e.g. '24px', '36px'). Defaults to '36px'. */
   valueFontSize?: string;
+  /** When true, omits outer card chrome for use inside `.gt-metrics-panel`. */
+  embedded?: boolean;
 }
 
 const StatsCards: React.FC<StatsCardsProps> = ({ 
   data, 
   gridMinWidth = 'clamp(120px, 12vw, 200px)',
   columns,
-  valueFontSize = '36px'
+  valueFontSize = '28px',
+  embedded = false,
 }) => {
   const gridTemplateColumns = columns
     ? `repeat(${columns}, minmax(0, 1fr))`
     : `repeat(auto-fit, minmax(${gridMinWidth}, 1fr))`;
 
   return (
-    <div style={{
-      display: 'grid',
-      gridTemplateColumns: columns ? `repeat(${columns}, 1fr)` : `repeat(auto-fit, minmax(${gridMinWidth}, 1fr))`,
-      gap: '16px',
-      marginBottom: '16px',
-      background: '#FFFFFF',
-      borderRadius: '10px',
-      border: '1px solid #cccccc',
-      overflow: 'hidden',
-    }}>
-      {data.map((card) => {
+    <div
+      className="generic-stats-cards"
+      style={{
+        display: 'grid',
+        gridTemplateColumns,
+        alignItems: 'stretch',
+        gap: columns ? 0 : '16px',
+        width: embedded ? '100%' : undefined,
+        maxWidth: embedded ? '100%' : undefined,
+        boxSizing: 'border-box',
+        marginBottom: embedded ? 0 : '16px',
+        background: '#FFFFFF',
+        borderRadius: embedded ? 0 : '10px',
+        border: embedded ? 'none' : '1px solid #cccccc',
+        overflow: 'hidden',
+      }}
+    >
+      {data.map((card, index) => {
         const cardKey = card.title + '|' + String(card.value) + '|' + (card.subtitle || '') + '|' + (card.additionalText || '');
         const interactive = typeof card.onClick === 'function';
+        const showColumnDivider = Boolean(columns) && index > 0;
         const shellStyle: React.CSSProperties = {
           padding: '16px 12px',
           borderRadius: interactive ? '8px' : undefined,
           transition: interactive ? 'background-color 0.15s ease' : undefined,
           overflow: 'hidden',
           minWidth: 0,
+          height: '100%',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'flex-start',
+          boxSizing: 'border-box',
+          borderLeft: showColumnDivider ? '1px solid #e5e7eb' : undefined,
           ...(interactive
             ? {
                 cursor: 'pointer' as const,
-                border: 'none',
+                borderTop: 'none',
+                borderRight: 'none',
+                borderBottom: 'none',
                 background: 'transparent',
                 width: '100%',
                 font: 'inherit',
-                textAlign: 'inherit' as const,
-                display: 'block',
+                textAlign: 'center' as const,
               }
             : {}),
         };
@@ -98,11 +117,12 @@ const StatsCards: React.FC<StatsCardsProps> = ({
 
             {/* Value */}
             <div style={{
-              fontSize: '28px',
+              fontSize: valueFontSize,
               fontWeight: '500',
               color: '#0066CC',
               lineHeight: '1',
-              textAlign: 'center'
+              textAlign: 'center',
+              marginBottom: card.metric || card.subtitle || card.additionalText || card.badge ? '8px' : 0,
             }}>
               {card.value}
             </div>
@@ -131,23 +151,36 @@ const StatsCards: React.FC<StatsCardsProps> = ({
                 alignItems: 'center',
                 justifyContent: 'center',
                 width: '100%',
+                minWidth: 0,
                 gap: '6px',
                 fontSize: '13px',
                 color: '#374151',
                 textAlign: 'center',
-                marginTop: card.badge ? '8px' : '0'
+                marginTop: card.badge ? '8px' : '0',
               }}>
                 <Circle size={8} fill={card.metric.dotColor} color={card.metric.dotColor} style={{ flexShrink: 0 }} />
-                <span>{card.metric.text}</span>
+                <span
+                  style={{
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                    minWidth: 0,
+                  }}
+                  title={card.metric.text}
+                >
+                  {card.metric.text}
+                </span>
               </div>
             )}
 
             {/* Additional Text */}
             {card.additionalText && (
-              <div style={{ 
-                fontSize: '12px', 
-                color: '#9CA3AF', 
-                marginTop: '8px' 
+              <div style={{
+                fontSize: '12px',
+                color: '#9CA3AF',
+                marginTop: '8px',
+                textAlign: 'center',
+                width: '100%',
               }}>
                 {card.additionalText}
               </div>

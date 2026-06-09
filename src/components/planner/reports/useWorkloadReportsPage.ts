@@ -55,6 +55,7 @@ import {
   buildLiveInProgressTaskRows,
   buildLiveMemberRows,
   buildLiveOverdueTaskRows,
+  buildLiveStaleTaskRows,
   resolveLiveTopAssigneeSource,
 } from "@page-modules/planner/reports/teamLiveViewDomain";
 
@@ -99,7 +100,7 @@ export function useWorkloadReportsPage() {
     ModuleSlug.WORK_PLANNER,
   );
 
-  const [datePreset, setDatePreset] = useState<ReportsDatePreset>("last_30");
+  const [datePreset, setDatePreset] = useState<ReportsDatePreset>("last_7");
   const [customStart, setCustomStart] = useState("");
   const [customEnd, setCustomEnd] = useState("");
   const [projectFilter, setProjectFilter] = useState<ReportsProjectFilter>("all");
@@ -312,8 +313,9 @@ export function useWorkloadReportsPage() {
         liveMemberSource,
         hierarchyDataExtensions,
         hierarchyDataUsers,
+        data ?? null,
       ),
-    [liveMemberSource, hierarchyDataExtensions, hierarchyDataUsers],
+    [liveMemberSource, hierarchyDataExtensions, hierarchyDataUsers, data],
   );
 
   const liveOverdueTasks = useMemo(
@@ -338,6 +340,17 @@ export function useWorkloadReportsPage() {
           )
         : [],
     [data, hierarchyDataExtensions, hierarchyDataUsers],
+  );
+
+  const liveStaleTaskRows = useMemo(
+    () =>
+      data
+        ? buildLiveStaleTaskRows(
+            data.stale_in_progress_tasks ?? [],
+            staleDays,
+          )
+        : [],
+    [data, staleDays],
   );
 
   const liveKpiCards = useMemo(() => {
@@ -471,6 +484,7 @@ export function useWorkloadReportsPage() {
     liveMembers,
     liveOverdueTasks,
     liveInProgressTasks,
+    liveStaleTaskRows,
     completionRateChartPoints,
     overdueTrendChartPoints,
     completionChartSubtitle,

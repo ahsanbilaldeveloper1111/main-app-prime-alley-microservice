@@ -25,15 +25,16 @@ const EmployeesDepartmentHeadcountPanel: React.FC<EmployeesDepartmentHeadcountPa
 
     <ResponsiveContainer width="100%" height={250}>
       <BarChart data={chartRows}>
-        <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
-        <XAxis dataKey="name" tick={{ fontSize: 12, fill: "#6b7280" }} axisLine={{ stroke: "#e5e7eb" }} />
-        <YAxis tick={{ fontSize: 12, fill: "#6b7280" }} axisLine={{ stroke: "#e5e7eb" }} />
+        <CartesianGrid strokeDasharray="3 3" stroke="#dbeafe" />
+        <XAxis dataKey="name" tick={{ fontSize: 12, fill: "#475569" }} axisLine={{ stroke: "#bfdbfe" }} />
+        <YAxis tick={{ fontSize: 12, fill: "#475569" }} axisLine={{ stroke: "#bfdbfe" }} />
         <Tooltip
           contentStyle={{
-            backgroundColor: "white",
-            border: "1px solid #e5e7eb",
+            backgroundColor: "#ffffff",
+            border: "1px solid #bfdbfe",
             borderRadius: "8px",
             fontSize: "12px",
+            color: "#141414",
           }}
         />
         <Bar dataKey="count" radius={[8, 8, 0, 0]}>

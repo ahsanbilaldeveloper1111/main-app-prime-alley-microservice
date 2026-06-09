@@ -1,4 +1,4 @@
-import React, {
+﻿import React, {
   useState,
   useEffect,
   useLayoutEffect,
@@ -194,7 +194,7 @@ export default function FinesseAuthGate({
           style={{
             padding: '32px',
             textAlign: 'center',
-            color: '#64748b',
+            color: '#6c757d',
           }}
         >
           Please sign in to access {pageLabel}.
@@ -206,12 +206,12 @@ export default function FinesseAuthGate({
   if (!isFinesseAuthenticated) {
     const manualCard = manualConnectMode ? (
       <>
-        <h2 style={{ margin: 0, fontSize: '22px', fontWeight: 700, color: '#1e293b' }}>
+        <h2 style={{ margin: 0, fontSize: '22px', fontWeight: 700, color: '#141414' }}>
           Connect to Finesse
         </h2>
         <p
           style={{
-            color: '#64748b',
+            color: '#6c757d',
             fontSize: '14px',
             marginBottom: '24px',
             marginTop: '10px',
@@ -239,7 +239,7 @@ export default function FinesseAuthGate({
           {isFinesseLoading ? (
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
               <Loader size={18} style={{ animation: 'spin 1s linear infinite' }} />
-              Connecting…
+              Connectingâ€¦
             </span>
           ) : (
             'Connect to Finesse'
@@ -248,12 +248,12 @@ export default function FinesseAuthGate({
       </>
     ) : (
       <>
-        <h2 style={{ margin: 0, fontSize: '22px', fontWeight: 700, color: '#1e293b' }}>
+        <h2 style={{ margin: 0, fontSize: '22px', fontWeight: 700, color: '#141414' }}>
           Connecting to Finesse
         </h2>
         <p
           style={{
-            color: '#64748b',
+            color: '#6c757d',
             fontSize: '14px',
             marginBottom: '24px',
             marginTop: '10px',
@@ -261,7 +261,7 @@ export default function FinesseAuthGate({
         >
           {authMessage ?? `Preparing access to ${pageLabel}...`}
         </p>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', color: '#64748b' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', color: '#6c757d' }}>
           <Loader size={20} style={{ animation: 'spin 1s linear infinite' }} />
           <span>{isFinesseLoading ? 'Connecting...' : 'Waiting for connection...'}</span>
         </div>
@@ -306,5 +306,5 @@ export default function FinesseAuthGate({
     );
   }
 
-  return <>{children}</>;
+  return <div className="communications-campaign-root">{children}</div>;
 }
