@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import ReactDOM from "react-dom";
 import type { LucideIcon } from "lucide-react";
 import {
   AlertTriangle,
@@ -87,9 +88,14 @@ export function WorkloadOnboardingModal({ show, onComplete }: Props) {
     onComplete(choice);
   }
 
-  return (
-    <div className="workload-onboarding-overlay">
-      <div className="workload-onboarding-modal">
+  const modal = (
+    <div className="workload-onboarding-overlay" role="presentation">
+      <div
+        className="workload-onboarding-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-label={step === 1 ? "Welcome to Workload" : "How would you like to start?"}
+      >
         <div className="workload-onboarding-modal__header">
           <div className="workload-onboarding-modal__title">
             {step === 1 ? "Welcome to Workload" : "How would you like to start?"}
@@ -185,4 +191,10 @@ export function WorkloadOnboardingModal({ show, onComplete }: Props) {
       </div>
     </div>
   );
+
+  if (globalThis.document === undefined) {
+    return null;
+  }
+
+  return ReactDOM.createPortal(modal, document.body);
 }
