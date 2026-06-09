@@ -1215,3 +1215,240 @@
     }
   }
 }
+
+// History modal (portaled to document body — mirrors Reports page styling)
+.myday-history-modal {
+  .myday-history-modal__content {
+    border: none;
+    border-radius: 0.65rem;
+    overflow: hidden;
+  }
+
+  .myday-history-modal__body {
+    background: #f4f6f9;
+    padding: 1rem 1.25rem 1.25rem;
+  }
+
+  .reports-view-tabs {
+    border-bottom: 1px solid #e5e7eb;
+    background: #fff;
+    border-radius: 0.65rem 0.65rem 0 0;
+    padding: 0 0.5rem;
+    margin: -1rem -1.25rem 1rem;
+    padding-left: 1rem;
+    padding-right: 1rem;
+
+    .nav-link {
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: #6b7280;
+      border: none;
+      padding: 0.55rem 1rem;
+      cursor: pointer;
+
+      &.active {
+        color: #2563eb;
+        border-bottom: 2px solid #2563eb;
+        background: transparent;
+      }
+    }
+  }
+
+  .reports-panel {
+    background: #fff;
+    border: 1px solid var(--bs-border-color, #e5e7eb);
+    border-radius: 0.65rem;
+    padding: 1rem 1.1rem;
+    margin-bottom: 0;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+  }
+
+  .reports-panel__title {
+    font-size: 0.95rem;
+    font-weight: 700;
+    margin: 0 0 0.2rem;
+    color: #111827;
+  }
+
+  .reports-panel__subtitle {
+    font-size: 0.78rem;
+    color: #6b7280;
+    margin-bottom: 0.85rem;
+  }
+
+  .myday-history-past-day {
+    .reports-panel__subtitle {
+      margin-bottom: 1rem;
+    }
+  }
+
+  .myday-history-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    max-height: 360px;
+    overflow-y: auto;
+  }
+
+  .myday-history-item {
+    border: 1px solid #eaf0f6;
+    border-radius: 8px;
+    padding: 10px 12px;
+    background: #f9fafb;
+  }
+
+  .myday-history-item__title {
+    font-size: 13px;
+    font-weight: 500;
+    color: #141414;
+    margin-bottom: 4px;
+  }
+
+  .myday-history-item__meta {
+    font-size: 11px;
+    color: #718096;
+  }
+
+  .myday-daily-summary {
+    margin-top: 0;
+
+    &__title {
+      margin: 0 0 8px;
+      font-size: 14px;
+      font-weight: 700;
+      color: #141414;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    &__card {
+      margin-bottom: 0;
+    }
+
+    &__grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+
+      @media (min-width: 768px) {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+    }
+  }
+
+  .myday-past-stats {
+    border: 1px solid #eaf0f6;
+    border-radius: 10px;
+    padding: 12px 14px;
+    margin-bottom: 12px;
+    background: #f9fafb;
+  }
+
+  .myday-past-stats__grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px 16px;
+    margin-bottom: 12px;
+  }
+
+  .myday-past-stats__item {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+
+    strong {
+      font-size: 15px;
+      color: #141414;
+    }
+  }
+
+  .myday-past-stats__label {
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: #718096;
+  }
+
+  .myday-past-stats__capacity-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 8px;
+    font-size: 12px;
+    color: #374151;
+    margin-bottom: 6px;
+
+    strong {
+      color: #141414;
+    }
+  }
+
+  .myday-progress-track {
+    height: 6px;
+    border-radius: 999px;
+    background: #e5e7eb;
+    overflow: hidden;
+  }
+
+  .myday-progress-fill {
+    height: 100%;
+    border-radius: 999px;
+    background: #3b82f6;
+
+    &--medium {
+      background: #f59e0b;
+    }
+  }
+
+  .myday-monthly-report {
+    &__header {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 1rem;
+      margin-bottom: 1rem;
+    }
+
+    &__month-picker {
+      min-width: 11rem;
+    }
+
+    &__grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px 16px;
+
+      @media (min-width: 992px) {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+    }
+
+    &__item {
+      border: 1px solid #e5e7eb;
+      border-radius: 10px;
+      padding: 12px 14px;
+      background: #fafafa;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+
+      strong {
+        font-size: 1.1rem;
+        color: #111827;
+      }
+    }
+
+    &__label {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: #6b7280;
+    }
+
+    &__hint {
+      font-size: 11px;
+      color: #9ca3af;
+    }
+  }
+}

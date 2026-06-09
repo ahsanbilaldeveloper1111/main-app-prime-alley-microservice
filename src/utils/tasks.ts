@@ -1523,7 +1523,7 @@ export interface MyDayDailyLogsListPayload {
   logs?: MyDayDailyLogPayload[];
 }
 
-/** `GET /my-day/monthly-report?month=YYYY-MM` (Reports → My Day Monthly tab). */
+/** `GET /my-day/monthly-report?month=YYYY-MM` (My Day history modal → Monthly summary). */
 export interface MyDayMonthlyReportApiPayload {
   month?: string;
   from?: string;

@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import moment from "moment";
 import { useSession } from "next-auth/react";
 import { Button, Form, Modal } from "react-bootstrap";
-import { CircleCheckBig, History, Pencil, Plus, Search, X } from "lucide-react";
+import { CircleCheckBig, ClipboardList, History, Pencil, Plus, Search, X } from "lucide-react";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 import CreateTaskSidebar from "@components/CreatePlannerTaskSidebar";
 import { MyDayTeamSection } from "@components/planner/my-day/MyDayTeamSection";
@@ -777,6 +777,7 @@ function useMyDayTasksPageController() {
   );
   const [rolloverShowPrompt, setRolloverShowPrompt] = useState(false);
   const [showHistoryModal, setShowHistoryModal] = useState(false);
+  const [showDailySummary, setShowDailySummary] = useState(false);
   const [planDate, setPlanDate] = useState("");
   const [tasksMeta, setTasksMeta] = useState<MyDayTasksMeta>({});
   const [isEditingCapacity, setIsEditingCapacity] = useState(false);
@@ -1470,6 +1471,8 @@ function useMyDayTasksPageController() {
     rolloverShowPrompt,
     showHistoryModal,
     setShowHistoryModal,
+    showDailySummary,
+    setShowDailySummary,
     planDate,
     isEditingCapacity,
     setIsEditingCapacity,
@@ -1556,6 +1559,15 @@ function MyDayPageHeader({ vm }: MyDayTasksPageViewProps) {
         <p className="myday-header__meta">{vm.headerMetaLine}</p>
       </div>
       <div className="myday-header__actions">
+        <Button
+          variant={vm.showDailySummary ? "secondary" : "outline-secondary"}
+          size="sm"
+          onClick={() => vm.setShowDailySummary((prev) => !prev)}
+          aria-pressed={vm.showDailySummary}
+        >
+          <ClipboardList size={14} className="me-1" />
+          Daily Summary
+        </Button>
         <Button variant="outline-secondary" size="sm" onClick={() => vm.setShowHistoryModal(true)}>
           <History size={14} className="me-1" />
           History
@@ -2203,9 +2215,9 @@ function MyDayTasksPageView({ vm }: MyDayTasksPageViewProps) {
           ) : null}
           <MyDayTodayTasksSection vm={vm} />
           <MyDayCompletedSection vm={vm} />
-          {vm.loading ? null : (
+          {!vm.loading && vm.showDailySummary ? (
             <MyDayDailySummaryPanel stats={vm.dailySummaryStats} showCapacityBar />
-          )}
+          ) : null}
         </div>
         <MyDaySuggestionsPanel vm={vm} />
       </div>

@@ -73,8 +73,7 @@ const WorkloadReportsPage: React.FC = () => {
           </Alert>
         ) : null}
 
-        {vm.mainView === "my_day_monthly" ? null : (
-          <WorkloadReportsFiltersCard
+        <WorkloadReportsFiltersCard
             datePreset={vm.datePreset}
             onDatePresetChange={vm.setDatePreset}
             customStart={vm.customStart}
@@ -94,7 +93,6 @@ const WorkloadReportsPage: React.FC = () => {
             loadingOverview={vm.loadingOverview}
             onApply={vm.handleRefetchOverview}
           />
-        )}
 
         <ReportsViewTabs activeView={vm.mainView} onChange={vm.setMainView} />
 
