@@ -143,6 +143,13 @@
     line-height: 1.3;
   }
 
+  &__config-section-hint {
+    margin: 0 0 0.35rem;
+    font-size: var(--ms-font-sm);
+    color: #9ca3af;
+    line-height: 1.4;
+  }
+
   &__config-item {
     border: 1px solid #e5e7eb;
     border-radius: 6px;

@@ -27,8 +27,15 @@ const INFO_FIELD_TYPE_OPTIONS = [
   { value: "number" as const, label: "Number" },
 ];
 
+function SectionHint(props: Readonly<{ children: React.ReactNode }>) {
+  return (
+    <p className="ai-analysis-tenant-config__config-section-hint">{props.children}</p>
+  );
+}
+
 function SectionCard(props: Readonly<{
   title: string;
+  hint?: string;
   onAdd?: () => void;
   addLabel?: string;
   children: React.ReactNode;
@@ -43,6 +50,7 @@ function SectionCard(props: Readonly<{
           </Button>
         ) : null}
       </div>
+      {props.hint ? <SectionHint>{props.hint}</SectionHint> : null}
       {props.children}
     </section>
   );
@@ -63,24 +71,6 @@ function ItemCard(props: Readonly<{
       </div>
       <div className="ai-analysis-tenant-config__grid">{props.children}</div>
     </div>
-  );
-}
-
-function EnabledCheckbox(props: Readonly<{
-  checked: boolean;
-  disabled: boolean;
-  onChange: (checked: boolean) => void;
-}>) {
-  return (
-    <label className="ai-analysis-tenant-config__config-checkbox">
-      <input
-        type="checkbox"
-        checked={props.checked}
-        disabled={props.disabled}
-        onChange={(e) => props.onChange(e.target.checked)}
-      />
-      <span>Enabled</span>
-    </label>
   );
 }
 
@@ -122,6 +112,7 @@ function TagsSection(props: Readonly<{
   return (
     <SectionCard
       title="Tags"
+      hint="Labels must start with a letter."
       addLabel="Add tag"
       onAdd={() => props.onChange([...props.tags, defaultConfigTagForm()])}
     >
@@ -182,15 +173,13 @@ function CriteriaSection(props: Readonly<{
           size="sm"
           disabled={props.disabled}
           onClick={() =>
-            props.onChange([
-              ...props.criteria,
-              defaultConfigCriterionForm(props.criteria.length + 1),
-            ])
+            props.onChange([...props.criteria, defaultConfigCriterionForm()])
           }
         >
           Add criterion
         </Button>
       </div>
+      <SectionHint>Criteria weights must total 100.</SectionHint>
       {props.criteria.length === 0 ? (
         <p className="ai-analysis-tenant-config__config-empty">No criteria.</p>
       ) : (
@@ -227,20 +216,6 @@ function CriteriaSection(props: Readonly<{
                 disabled={props.disabled}
                 onChange={(v) => updateCriterion(index, { weight: v })}
               />
-              <TenantField
-                label="Example"
-                value={criterion.example}
-                disabled={props.disabled}
-                onChange={(v) => updateCriterion(index, { example: v })}
-              />
-              <TenantField
-                label="Sort order"
-                value={criterion.sortOrder}
-                type="number"
-                step="1"
-                disabled={props.disabled}
-                onChange={(v) => updateCriterion(index, { sortOrder: v })}
-              />
             </div>
           </div>
         ))
@@ -270,15 +245,16 @@ function BandsSection(props: Readonly<{
           size="sm"
           disabled={props.disabled}
           onClick={() =>
-            props.onChange([
-              ...props.bands,
-              defaultConfigBandForm(props.bands.length + 1),
-            ])
+            props.onChange([...props.bands, defaultConfigBandForm()])
           }
         >
           Add band
         </Button>
       </div>
+      <SectionHint>
+        Score bands must not overlap (e.g. 0–49, then 50–100). Band labels must start
+        with a letter.
+      </SectionHint>
       {props.bands.length === 0 ? (
         <p className="ai-analysis-tenant-config__config-empty">No bands.</p>
       ) : (
@@ -324,14 +300,6 @@ function BandsSection(props: Readonly<{
                 disabled={props.disabled}
                 onChange={(v) => updateBand(index, { color: v })}
               />
-              <TenantField
-                label="Sort order"
-                value={band.sortOrder}
-                type="number"
-                step="1"
-                disabled={props.disabled}
-                onChange={(v) => updateBand(index, { sortOrder: v })}
-              />
             </div>
           </div>
         ))
@@ -357,12 +325,10 @@ function AssessmentsSection(props: Readonly<{
   return (
     <SectionCard
       title="Assessments"
+      hint="Assessment labels must start with a letter."
       addLabel="Add assessment"
       onAdd={() =>
-        props.onChange([
-          ...props.assessments,
-          defaultConfigAssessmentForm(props.assessments.length + 1),
-        ])
+        props.onChange([...props.assessments, defaultConfigAssessmentForm()])
       }
     >
       {props.assessments.length === 0 ? (
@@ -381,19 +347,6 @@ function AssessmentsSection(props: Readonly<{
               value={assessment.label}
               disabled={props.disabled}
               onChange={(v) => updateAssessment(index, { label: v })}
-            />
-            <TenantField
-              label="Sort order"
-              value={assessment.sortOrder}
-              type="number"
-              step="1"
-              disabled={props.disabled}
-              onChange={(v) => updateAssessment(index, { sortOrder: v })}
-            />
-            <EnabledCheckbox
-              checked={assessment.enabled}
-              disabled={props.disabled}
-              onChange={(v) => updateAssessment(index, { enabled: v })}
             />
             <CriteriaSection
               criteria={assessment.criteria}
@@ -426,12 +379,10 @@ function InfoFieldsSection(props: Readonly<{
   return (
     <SectionCard
       title="Info fields"
+      hint="Labels must start with a letter."
       addLabel="Add info field"
       onAdd={() =>
-        props.onChange([
-          ...props.infoFields,
-          defaultConfigInfoFieldForm(props.infoFields.length + 1),
-        ])
+        props.onChange([...props.infoFields, defaultConfigInfoFieldForm()])
       }
     >
       {props.infoFields.length === 0 ? (
@@ -473,25 +424,6 @@ function InfoFieldsSection(props: Readonly<{
               value={field.description}
               disabled={props.disabled}
               onChange={(v) => updateField(index, { description: v })}
-            />
-            <TenantField
-              label="Example"
-              value={field.example}
-              disabled={props.disabled}
-              onChange={(v) => updateField(index, { example: v })}
-            />
-            <TenantField
-              label="Sort order"
-              value={field.sortOrder}
-              type="number"
-              step="1"
-              disabled={props.disabled}
-              onChange={(v) => updateField(index, { sortOrder: v })}
-            />
-            <EnabledCheckbox
-              checked={field.enabled}
-              disabled={props.disabled}
-              onChange={(v) => updateField(index, { enabled: v })}
             />
           </ItemCard>
         ))

@@ -7,8 +7,6 @@ export type ConfigTagFormValues = {
 export type ConfigCriterionFormValues = {
   text: string;
   weight: string;
-  example: string;
-  sortOrder: string;
 };
 
 export type ConfigBandFormValues = {
@@ -16,13 +14,10 @@ export type ConfigBandFormValues = {
   maxScore: string;
   label: string;
   color: string;
-  sortOrder: string;
 };
 
 export type ConfigAssessmentFormValues = {
   label: string;
-  enabled: boolean;
-  sortOrder: string;
   criteria: ConfigCriterionFormValues[];
   bands: ConfigBandFormValues[];
 };
@@ -31,9 +26,6 @@ export type ConfigInfoFieldFormValues = {
   label: string;
   fieldType: "text" | "yes_no" | "number";
   description: string;
-  example: string;
-  enabled: boolean;
-  sortOrder: string;
 };
 
 export type ConfigAuthoringFormValues = {
@@ -52,43 +44,35 @@ export function defaultConfigTagForm(): ConfigTagFormValues {
   };
 }
 
-export function defaultConfigCriterionForm(sortOrder = 1): ConfigCriterionFormValues {
+export function defaultConfigCriterionForm(): ConfigCriterionFormValues {
   return {
     text: "",
     weight: "0",
-    example: "",
-    sortOrder: String(sortOrder),
   };
 }
 
-export function defaultConfigBandForm(sortOrder = 1): ConfigBandFormValues {
+export function defaultConfigBandForm(): ConfigBandFormValues {
   return {
     minScore: "0",
     maxScore: "100",
     label: "",
     color: "neutral",
-    sortOrder: String(sortOrder),
   };
 }
 
-export function defaultConfigAssessmentForm(sortOrder = 1): ConfigAssessmentFormValues {
+export function defaultConfigAssessmentForm(): ConfigAssessmentFormValues {
   return {
     label: "",
-    enabled: true,
-    sortOrder: String(sortOrder),
     criteria: [],
     bands: [],
   };
 }
 
-export function defaultConfigInfoFieldForm(sortOrder = 1): ConfigInfoFieldFormValues {
+export function defaultConfigInfoFieldForm(): ConfigInfoFieldFormValues {
   return {
     label: "",
     fieldType: "text",
     description: "",
-    example: "",
-    enabled: true,
-    sortOrder: String(sortOrder),
   };
 }
 
