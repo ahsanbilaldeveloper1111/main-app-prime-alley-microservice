@@ -1450,11 +1450,11 @@ const CrmOrders = () => { // NOSONAR
           title: "High-Value Orders",
           value: m.high_value_orders ?? 0,
           icon: Calendar,
-          iconColor: "#059669",
+          iconColor: "#D97706",
           iconBgColor: "#D1FAE5",
           metric: {
             text: "≥ 5000 AED",
-            dotColor: "#059669",
+            dotColor: "#D97706",
           },
           onClick: () =>
             applyOrdersWidgetFiltersPatch({
@@ -1932,13 +1932,19 @@ const CrmOrders = () => { // NOSONAR
         style={{
           display: "flex",
           gap: "0",
-          height: "calc(100vh)",
+          height: "calc(100vh - 74px)",
           overflow: "hidden",
         }}
       >
         {/* Main content area */}
-        <div className="orders-scrollable-content" style={{ flex: 1 }}>
-          <div className="container-fluid">
+        <div
+          className="orders-scrollable-content"
+          style={{ flex: 1, height: "100%", overflowY: "hidden" }}
+        >
+          <div
+            className="container-fluid"
+            style={{ height: "100%", display: "flex", flexDirection: "column" }}
+          >
             {/* Analytics Section - Collapsible */}
             {showOrdersAnalytics && (
               <>
@@ -2505,6 +2511,7 @@ const CrmOrders = () => { // NOSONAR
                 overflow: "hidden",
                 display: "flex",
                 flexDirection: "column",
+                height: "100%",
               }}
             >
               <GenericTable
@@ -2578,6 +2585,7 @@ const CrmOrders = () => { // NOSONAR
                 statsCards={ordersStatsCards}
                 metricsGridMinWidth="120px"
                 metricsColumns={6}
+                metricsEmbedded={false}
                 defaultShowMetrics={true}
                 customBody={
                   ordersViewMode === "board" ? (

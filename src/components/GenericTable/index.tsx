@@ -1033,6 +1033,7 @@ function GenericTableView<T extends Record<string, any>>({
     statsCards,
     metricsGridMinWidth,
     metricsColumns,
+    metricsEmbedded,
     showToolbarActions,
     noBorder,
     customBody,
@@ -1283,6 +1284,7 @@ function GenericTableView<T extends Record<string, any>>({
           setShowMetrics={setShowMetrics}
           metricsGridMinWidth={metricsGridMinWidth}
           metricsColumns={metricsColumns}
+          metricsEmbedded={metricsEmbedded}
         />
       )}
 

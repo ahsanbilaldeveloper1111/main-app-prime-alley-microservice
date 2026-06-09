@@ -146,12 +146,14 @@
   gap: 12px;
 }
 
-.wp-planner-projects__main {
+.wp-planner-projects__main,
+.wp-planner-projects__table {
   flex: 1;
   min-width: 0;
 
-  .gt-metrics-panel {
-    flex-shrink: 0;
+  .generic-table-card {
+    border-radius: 0 0 8px 8px !important;
+    border-top: none !important;
   }
 }
 

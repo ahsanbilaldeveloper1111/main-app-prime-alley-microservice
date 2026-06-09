@@ -157,6 +157,7 @@ export type GenericTableToolbarSectionProps = Readonly<{
   setShowMetrics: React.Dispatch<React.SetStateAction<boolean>>;
   metricsGridMinWidth: string;
   metricsColumns?: number;
+  metricsEmbedded?: boolean;
 }>;
 
 export function GenericTableToolbarSection({
@@ -182,6 +183,7 @@ export function GenericTableToolbarSection({
   setShowMetrics,
   metricsGridMinWidth,
   metricsColumns,
+  metricsEmbedded = true,
 }: GenericTableToolbarSectionProps) {
   const router = useRouter();
   const tableViewToggleLabel = getTableViewToggleLabel(toolbar);
@@ -586,8 +588,7 @@ export function GenericTableToolbarSection({
               {toolbar.filterPillsRightActions}
               {toolbar.filterPills.some((pill) => pill.active) && (
                 <button
-                  className="gt-filter-pill-add"
-                  style={{ color: "#DC2626" }}
+                  className="gt-filter-pill-add gt-clear-all-filters-btn"
                   onClick={() => handleClearAllFilterPills(toolbar)}
                 >
                   <span>Clear all</span>
@@ -605,10 +606,11 @@ export function GenericTableToolbarSection({
 
       {showMetrics && statsCards && statsCards.length > 0 && (
         <div
-          className="gt-metrics-panel"
+          className={metricsEmbedded ? "gt-metrics-panel" : undefined}
           style={{
-            width: "100%",
-            boxSizing: "border-box",
+            ...(metricsEmbedded
+              ? { width: "100%", boxSizing: "border-box" as const }
+              : {}),
             paddingTop: "16px",
             paddingLeft: "25px",
             paddingRight: "25px",
@@ -622,7 +624,7 @@ export function GenericTableToolbarSection({
             data={statsCards}
             gridMinWidth={metricsGridMinWidth}
             columns={metricsColumns}
-            embedded
+            embedded={metricsEmbedded}
           />
         </div>
       )}

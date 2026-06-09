@@ -340,6 +340,11 @@
   color: #6b7280;
 }
 
+// Row actions menu — above GenericTable .dropdown-menu (z-index: 99) and scroll containers
+.tasks-page .ptl-actions-dropdown-menu {
+  z-index: 1060 !important;
+}
+
 .ptl-dropdown-item {
   cursor: pointer;
 }
