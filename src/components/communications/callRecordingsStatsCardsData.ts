@@ -1,23 +1,11 @@
 import type { StatsCardData } from "@components/GenericStatsCards";
 import { Hash, Phone, PhoneIncoming, PhoneOutgoing } from "lucide-react";
-import type { CallLogsSummary } from "./callLogTypes";
+import type { CallRecordingsSummary } from "@toolkit/callRecordingsList/slice";
 
-export function buildCallLogsStatsCardsData(
-  totalCalls: number,
-  summary: CallLogsSummary,
+export function buildCallRecordingsStatsCardsData(
+  summary: CallRecordingsSummary | undefined,
 ): StatsCardData[] {
   return [
-    {
-      title: "Total Calls",
-      value: totalCalls || 0,
-      icon: Phone,
-      iconColor: "#0066CC",
-      iconBgColor: "#EEF2FF",
-      metric: {
-        text: "Currently in the system",
-        dotColor: "#0066CC",
-      },
-    },
     {
       title: "Extensions",
       value: summary?.extensions || 0,
@@ -25,7 +13,18 @@ export function buildCallLogsStatsCardsData(
       iconColor: "#0066CC",
       iconBgColor: "#EEF2FF",
       metric: {
-        text: "Extensions engaged or making calls",
+        text: "Extensions in the system",
+        dotColor: "#0066CC",
+      },
+    },
+    {
+      title: "Remote Numbers",
+      value: summary?.numbers || 0,
+      icon: Phone,
+      iconColor: "#0066CC",
+      iconBgColor: "#EEF2FF",
+      metric: {
+        text: "Remote numbers in the system",
         dotColor: "#0066CC",
       },
     },
@@ -36,7 +35,7 @@ export function buildCallLogsStatsCardsData(
       iconColor: "#059669",
       iconBgColor: "#D1FAE5",
       metric: {
-        text: "Total received call count",
+        text: "Inbound calls in the system",
         dotColor: "#059669",
       },
     },
@@ -47,7 +46,7 @@ export function buildCallLogsStatsCardsData(
       iconColor: "#0066CC",
       iconBgColor: "#E0F2FE",
       metric: {
-        text: "Total placed call count",
+        text: "Outbound calls in the system",
         dotColor: "#0066CC",
       },
     },

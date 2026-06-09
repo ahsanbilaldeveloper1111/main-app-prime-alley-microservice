@@ -44,20 +44,22 @@ const StatsCards: React.FC<StatsCardsProps> = ({
   embedded = false,
 }) => {
   const gridTemplateColumns = columns
-    ? `repeat(${columns}, minmax(0, 1fr))`
+    ? embedded
+      ? `repeat(${columns}, minmax(0, 1fr))`
+      : `repeat(${columns}, 1fr)`
     : `repeat(auto-fit, minmax(${gridMinWidth}, 1fr))`;
 
   return (
     <div
-      className="generic-stats-cards"
+      className={embedded ? 'generic-stats-cards' : undefined}
       style={{
         display: 'grid',
         gridTemplateColumns,
-        alignItems: 'stretch',
-        gap: columns ? 0 : '16px',
+        alignItems: embedded ? 'stretch' : undefined,
+        gap: embedded && columns ? 0 : '16px',
         width: embedded ? '100%' : undefined,
         maxWidth: embedded ? '100%' : undefined,
-        boxSizing: 'border-box',
+        boxSizing: embedded ? 'border-box' : undefined,
         marginBottom: embedded ? 0 : '16px',
         background: '#FFFFFF',
         borderRadius: embedded ? 0 : '10px',
@@ -68,33 +70,52 @@ const StatsCards: React.FC<StatsCardsProps> = ({
       {data.map((card, index) => {
         const cardKey = card.title + '|' + String(card.value) + '|' + (card.subtitle || '') + '|' + (card.additionalText || '');
         const interactive = typeof card.onClick === 'function';
-        const showColumnDivider = Boolean(columns) && index > 0;
-        const shellStyle: React.CSSProperties = {
-          padding: '16px 12px',
-          borderRadius: interactive ? '8px' : undefined,
-          transition: interactive ? 'background-color 0.15s ease' : undefined,
-          overflow: 'hidden',
-          minWidth: 0,
-          height: '100%',
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'flex-start',
-          boxSizing: 'border-box',
-          borderLeft: showColumnDivider ? '1px solid #e5e7eb' : undefined,
-          ...(interactive
-            ? {
-                cursor: 'pointer' as const,
-                borderTop: 'none',
-                borderRight: 'none',
-                borderBottom: 'none',
-                background: 'transparent',
-                width: '100%',
-                font: 'inherit',
-                textAlign: 'center' as const,
-              }
-            : {}),
-        };
+        const showColumnDivider = embedded && Boolean(columns) && index > 0;
+        const shellStyle: React.CSSProperties = embedded
+          ? {
+              padding: '16px 12px',
+              borderRadius: interactive ? '8px' : undefined,
+              transition: interactive ? 'background-color 0.15s ease' : undefined,
+              overflow: 'hidden',
+              minWidth: 0,
+              height: '100%',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'flex-start',
+              boxSizing: 'border-box',
+              borderLeft: showColumnDivider ? '1px solid #e5e7eb' : undefined,
+              ...(interactive
+                ? {
+                    cursor: 'pointer' as const,
+                    borderTop: 'none',
+                    borderRight: 'none',
+                    borderBottom: 'none',
+                    background: 'transparent',
+                    width: '100%',
+                    font: 'inherit',
+                    textAlign: 'center' as const,
+                  }
+                : {}),
+            }
+          : {
+              padding: '16px 12px',
+              borderRadius: interactive ? '8px' : undefined,
+              transition: interactive ? 'background-color 0.15s ease' : undefined,
+              overflow: 'hidden',
+              minWidth: 0,
+              ...(interactive
+                ? {
+                    cursor: 'pointer' as const,
+                    border: 'none',
+                    background: 'transparent',
+                    width: '100%',
+                    font: 'inherit',
+                    textAlign: 'inherit' as const,
+                    display: 'block',
+                  }
+                : {}),
+            };
 
         const cardBody = (
           <React.Fragment>
@@ -117,12 +138,12 @@ const StatsCards: React.FC<StatsCardsProps> = ({
 
             {/* Value */}
             <div style={{
-              fontSize: valueFontSize,
+              fontSize: embedded ? valueFontSize : '28px',
               fontWeight: '500',
               color: '#0066CC',
               lineHeight: '1',
               textAlign: 'center',
-              marginBottom: card.metric || card.subtitle || card.additionalText || card.badge ? '8px' : 0,
+              marginBottom: embedded && (card.metric || card.subtitle || card.additionalText || card.badge) ? '8px' : 0,
             }}>
               {card.value}
             </div>
@@ -160,13 +181,17 @@ const StatsCards: React.FC<StatsCardsProps> = ({
               }}>
                 <Circle size={8} fill={card.metric.dotColor} color={card.metric.dotColor} style={{ flexShrink: 0 }} />
                 <span
-                  style={{
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap',
-                    minWidth: 0,
-                  }}
-                  title={card.metric.text}
+                  {...(embedded
+                    ? {
+                        style: {
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                          minWidth: 0,
+                        },
+                        title: card.metric.text,
+                      }
+                    : {})}
                 >
                   {card.metric.text}
                 </span>
@@ -179,8 +204,7 @@ const StatsCards: React.FC<StatsCardsProps> = ({
                 fontSize: '12px',
                 color: '#9CA3AF',
                 marginTop: '8px',
-                textAlign: 'center',
-                width: '100%',
+                ...(embedded ? { textAlign: 'center' as const, width: '100%' } : {}),
               }}>
                 {card.additionalText}
               </div>

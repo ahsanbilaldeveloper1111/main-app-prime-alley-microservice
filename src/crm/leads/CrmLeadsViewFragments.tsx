@@ -2229,7 +2229,10 @@ export function CrmLeadsViewFragment02() {
         }}
       >
         {/* Main content area */}
-        <div className="leads-scrollable-content" style={{ flex: 1 }}>
+        <div
+          className="leads-scrollable-content"
+          style={{ flex: 1, height: "100%", overflowY: "hidden" }}
+        >
           {/* Analytics Section - Collapsible */}
           {showLeadsAnalytics && (
             <CrmLeadsAnalyticsSection
@@ -2238,7 +2241,10 @@ export function CrmLeadsViewFragment02() {
             />
           )}
 
-          <div className="container-fluid">
+          <div
+            className="container-fluid"
+            style={{ height: "100%", display: "flex", flexDirection: "column" }}
+          >
             {/* Filter Bar */}
             {showFilterBar && (
               <FilterBar
@@ -2660,6 +2666,7 @@ export function CrmLeadsViewFragment02() {
                 overflow: "hidden",
                 display: "flex",
                 flexDirection: "column",
+                height: "100%",
               }}
             >
               <GenericTable
@@ -2732,6 +2739,7 @@ export function CrmLeadsViewFragment02() {
                 statsCards={leadsStatsCards}
                 metricsGridMinWidth="120px"
                 metricsColumns={6}
+                metricsEmbedded={false}
                 defaultShowMetrics={true}
                 customBody={
                   leadsViewMode === "board" ? (

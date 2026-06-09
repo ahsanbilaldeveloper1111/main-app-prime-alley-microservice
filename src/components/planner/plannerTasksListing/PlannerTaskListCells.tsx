@@ -1,6 +1,7 @@
 import React from "react";
 import { Dropdown } from "react-bootstrap";
 import { MoreVertical, Settings, Sun, Trash2 } from "lucide-react";
+import { DROPDOWN_MENU_POPPER_CONFIG } from "@components/GenericTable/dropdownMenuPopperConfig";
 import {
   TaskCompleteCircleButton,
   TaskListingAssigneeCell,
@@ -162,7 +163,12 @@ export function PlannerTaskRowActionsMenu({
       >
         <MoreVertical size={16} />
       </Dropdown.Toggle>
-      <Dropdown.Menu align="end">
+      <Dropdown.Menu
+        align="end"
+        className="ptl-actions-dropdown-menu"
+        renderOnMount
+        popperConfig={DROPDOWN_MENU_POPPER_CONFIG}
+      >
         {showAddToMyDay ? (
           <>
             <Dropdown.Item
