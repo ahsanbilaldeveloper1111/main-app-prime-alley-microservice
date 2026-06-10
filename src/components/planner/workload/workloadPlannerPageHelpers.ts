@@ -115,3 +115,49 @@ export type WorkloadSelectedCellState = Readonly<{
   member?: Pick<WorkloadGridMember, "name" | "display_name">;
   cell?: WorkloadGridCell;
 }> | null;
+
+export function readWorkloadSessionUserId(
+  user: { id?: string | number } | null | undefined,
+): string {
+  const id = user?.id;
+  return id == null ? "" : String(id).trim();
+}
+
+export function readIsCompanyAdminFromSession(
+  user: { is_company_admin?: unknown } | null | undefined,
+): boolean {
+  const value = user?.is_company_admin;
+  return value === true || value === "1" || value === 1;
+}
+
+export function mergeWorkloadFilterMemberExtensions(
+  isWorkloadRoot: boolean,
+  rosterExtensions: readonly string[],
+  memberExtensions: readonly string[],
+): string[] {
+  if (!isWorkloadRoot || rosterExtensions.length === 0) {
+    return [...memberExtensions];
+  }
+  const merged = new Set<string>();
+  for (const ext of rosterExtensions) {
+    const normalized = ext.trim();
+    if (normalized) merged.add(normalized);
+  }
+  for (const ext of memberExtensions) {
+    const normalized = ext.trim();
+    if (normalized) merged.add(normalized);
+  }
+  return [...merged];
+}
+
+export function buildWorkloadCellMap(
+  cells: WorkloadGridCell[] | undefined,
+  cellKeyFn: (extension: string, date: string) => string,
+): Map<string, WorkloadGridCell> {
+  const map = new Map<string, WorkloadGridCell>();
+  if (!Array.isArray(cells)) return map;
+  for (const cell of cells) {
+    map.set(cellKeyFn(cell.extension_number, cell.date), cell);
+  }
+  return map;
+}
