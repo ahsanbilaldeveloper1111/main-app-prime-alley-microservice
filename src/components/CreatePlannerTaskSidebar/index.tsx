@@ -183,6 +183,8 @@ interface PlannerEditTask {
   watcher_numbers?: string[];
   due_date?: string;
   start_date?: string;
+  estimated_duration_minutes?: number | null;
+  estimated_minutes?: number | null;
   label_ids?: number[];
   labels?: Array<{ id: number }>;
   frequency?: string;
@@ -854,12 +856,10 @@ function readRecurringReminderStateFromEdit(
   };
 }
 
-function readEstimatedDurationFormStringFromEdit(
-  editTask: PlannerEditTask,
-  isRecurringTemplate: boolean,
-): string {
-  if (!isRecurringTemplate) return "";
-  const estRaw = pickRecurringScalar(editTask, "estimated_duration_minutes");
+function readEstimatedDurationFormStringFromEdit(editTask: PlannerEditTask): string {
+  const estRaw =
+    pickRecurringScalar(editTask, "estimated_duration_minutes") ??
+    pickRecurringScalar(editTask, "estimated_minutes");
   const estNum = coalesceFiniteNumberFromUnknown(estRaw);
   if (estNum == null || !Number.isFinite(estNum) || estNum <= 0) return "";
   return String(Math.floor(estNum));
@@ -935,10 +935,7 @@ function readRecurringTemplateFormSlice(
     editTask,
     isRecurringTemplate,
   );
-  const estimatedDurationMinutes = readEstimatedDurationFormStringFromEdit(
-    editTask,
-    isRecurringTemplate,
-  );
+  const estimatedDurationMinutes = readEstimatedDurationFormStringFromEdit(editTask);
   const recurringAutoCreateNextOnComplete =
     isRecurringTemplate &&
     readRecurringBooleanFlag(

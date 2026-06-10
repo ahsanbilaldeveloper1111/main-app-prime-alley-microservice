@@ -154,6 +154,7 @@ interface CreateTaskData {
   due_time?: string | null;
   start_date?: string;
   estimated_hours?: string;
+  estimated_duration_minutes?: number | null;
   progress?: number;
   extension_numbers?: string[];
   watchers?: string[];
@@ -1523,7 +1524,7 @@ export interface MyDayDailyLogsListPayload {
   logs?: MyDayDailyLogPayload[];
 }
 
-/** `GET /my-day/monthly-report?month=YYYY-MM` (Reports → My Day Monthly tab). */
+/** `GET /my-day/monthly-report?month=YYYY-MM` (My Day history modal → Monthly summary). */
 export interface MyDayMonthlyReportApiPayload {
   month?: string;
   from?: string;
@@ -1733,6 +1734,23 @@ export const toggleMyDayTaskComplete = async (
   return parseMyDayResponseData(response);
 };
 
+function normalizeMyDayRolloverPayload(payload: MyDayRolloverPayload): MyDayRolloverPayload {
+  const tasksList = Array.isArray(payload.tasks) ? payload.tasks : [];
+  const previewList = Array.isArray(payload.tasks_preview) ? payload.tasks_preview : [];
+  const mergedTasks = tasksList.length > 0 ? tasksList : previewList;
+  return {
+    ...payload,
+    tasks: mergedTasks,
+    tasks_preview: previewList.length > 0 ? previewList : undefined,
+    show_rollover_prompt: payload.show_rollover_prompt === true,
+    prompt_acknowledged_today: payload.prompt_acknowledged_today === true,
+    previous_date: payload.previous_date ?? null,
+    days_since_last_seen:
+      payload.days_since_last_seen == null ? null : Number(payload.days_since_last_seen),
+    last_my_day_seen_date: payload.last_my_day_seen_date ?? null,
+  };
+}
+
 export const getMyDayRollover = async (
   extensionNumber?: string,
 ): Promise<MyDayRolloverPayload> => {
@@ -1741,17 +1759,7 @@ export const getMyDayRollover = async (
     buildMyDayUrl("work-planner/my-day/rollover", query),
   );
   const payload = parseMyDayResponseData<MyDayRolloverPayload>(response);
-  const tasksList = Array.isArray(payload.tasks) ? payload.tasks : [];
-  return {
-    tasks: tasksList,
-    tasks_preview: Array.isArray(payload.tasks_preview) ? payload.tasks_preview : undefined,
-    show_rollover_prompt: payload.show_rollover_prompt === true,
-    prompt_acknowledged_today: payload.prompt_acknowledged_today === true,
-    previous_date: payload.previous_date ?? null,
-    days_since_last_seen:
-      payload.days_since_last_seen == null ? null : Number(payload.days_since_last_seen),
-    last_my_day_seen_date: payload.last_my_day_seen_date ?? null,
-  };
+  return normalizeMyDayRolloverPayload(payload);
 };
 
 export const ackMyDayRolloverPrompt = async (
