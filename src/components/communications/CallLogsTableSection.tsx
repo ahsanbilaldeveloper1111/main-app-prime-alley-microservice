@@ -303,6 +303,7 @@ const CallLogsTableSection: React.FC = () => {
       statsCards={statsCardsData}
       metricsGridMinWidth="120px"
       metricsColumns={4}
+      metricsEmbedded={false}
       fixedHeight
       maxHeight={tableMaxHeight}
       size="md"

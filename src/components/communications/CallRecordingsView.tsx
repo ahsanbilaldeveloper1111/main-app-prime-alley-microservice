@@ -20,16 +20,7 @@ import { useHierarchyData } from "@components/filters/useHierarchyData";
 import ChartBar from "@components/ChartBar";
 import AudioPlayer, { type AudioPlayerRef } from "@components/AudioPlayer";
 import EmptyState from "@components/EmptyState";
-import {
-  AlertCircle,
-  BarChart3,
-  Download,
-  Hash,
-  Phone,
-  PhoneIncoming,
-  PhoneOutgoing,
-  Play,
-} from "lucide-react";
+import { AlertCircle, BarChart3, Download, Play } from "lucide-react";
 import CircularProgressCircle from "@components/CircularProgressCircle";
 
 import { DownloadCallRecording } from "@utils/calls";
@@ -43,7 +34,6 @@ import {
   encodeAnalysisData,
   convertDateTimeWithOffsetToLocal,
 } from "@utils/Helper";
-import { COMMUNICATIONS_STAT_COLORS } from "@utils/communications/communicationsThemeTokens";
 import { formatFilterDateTimeLabel } from "@utils/communicationsDateUtils";
 import {
   buildDateTimeFilterPill,
@@ -83,6 +73,7 @@ import {
   CALL_RECORDINGS_TOOLBAR,
   COMMUNICATIONS_TABS_DROPDOWN_ITEMS,
 } from "@components/communications/callLogsListPageConfig";
+import { buildCallRecordingsStatsCardsData } from "@components/communications/callRecordingsStatsCardsData";
 
 const ReactApexChart = dynamic(() => import("react-apexcharts"), {
   ssr: false,
@@ -416,40 +407,7 @@ const CallRecordingsView: React.FC = () => {
   );
 
   const statsCardsData = useMemo(
-    () => [
-      {
-        title: "Extensions",
-        value: summary?.extensions || 0,
-        icon: Hash,
-        iconColor: COMMUNICATIONS_STAT_COLORS.primary.iconColor,
-        iconBgColor: COMMUNICATIONS_STAT_COLORS.primary.iconBgColor,
-        subtitle: "Extensions in the system",
-      },
-      {
-        title: "Remote Numbers",
-        value: summary?.numbers || 0,
-        icon: Phone,
-        iconColor: COMMUNICATIONS_STAT_COLORS.primary.iconColor,
-        iconBgColor: COMMUNICATIONS_STAT_COLORS.primary.iconBgColor,
-        subtitle: "Remote numbers in the system",
-      },
-      {
-        title: "Inbound",
-        value: summary?.inbound || 0,
-        icon: PhoneIncoming,
-        iconColor: COMMUNICATIONS_STAT_COLORS.inbound.iconColor,
-        iconBgColor: COMMUNICATIONS_STAT_COLORS.inbound.iconBgColor,
-        subtitle: "Inbound calls in the system",
-      },
-      {
-        title: "Outbound",
-        value: summary?.outbound || 0,
-        icon: PhoneOutgoing,
-        iconColor: COMMUNICATIONS_STAT_COLORS.outbound.iconColor,
-        iconBgColor: COMMUNICATIONS_STAT_COLORS.outbound.iconBgColor,
-        subtitle: "Outbound calls in the system",
-      },
-    ],
+    () => buildCallRecordingsStatsCardsData(summary),
     [summary],
   );
 
@@ -1230,7 +1188,9 @@ const CallRecordingsView: React.FC = () => {
           toolbar={tableToolbar}
           showToolbarActions={false}
           statsCards={statsCardsData}
-          metricsGridMinWidth="180px"
+          metricsGridMinWidth="120px"
+          metricsColumns={4}
+          metricsEmbedded={false}
           pagination={{
             currentPage: pagination.currentPage,
             rowsPerPage: pagination.perPage,

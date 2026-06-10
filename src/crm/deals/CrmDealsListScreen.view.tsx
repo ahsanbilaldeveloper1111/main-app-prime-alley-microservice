@@ -4031,13 +4031,19 @@ export function CrmDealsListScreenView({
         style={{
           display: "flex",
           gap: "0",
-          height: "calc(100vh)",
+          height: "calc(100vh - 74px)",
           overflow: "hidden",
         }}
       >
         {/* Main content area */}
-        <div className="deals-scrollable-content" style={{ flex: 1 }}>
-          <div className="container-fluid">
+        <div
+          className="deals-scrollable-content"
+          style={{ flex: 1, height: "100%", overflowY: "hidden" }}
+        >
+          <div
+            className="container-fluid"
+            style={{ height: "100%", display: "flex", flexDirection: "column" }}
+          >
             {/* Analytics Section - Collapsible */}
             {showDealsAnalytics && (
               <>
@@ -4159,6 +4165,7 @@ export function CrmDealsListScreenView({
                 overflow: "hidden",
                 display: "flex",
                 flexDirection: "column",
+                height: "100%",
               }}
             >
               <GenericTable
@@ -4228,6 +4235,7 @@ export function CrmDealsListScreenView({
                 statsCards={dealsStatsCards}
                 metricsGridMinWidth="120px"
                 metricsColumns={6}
+                metricsEmbedded={false}
                 defaultShowMetrics={true}
                 customBody={
                   dealsViewMode === "board" ? (

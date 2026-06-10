@@ -503,56 +503,71 @@ export const ExpandableProjectTable: React.FC<ExpandableProjectTableProps> = ({
         isEdit={!!fetchedEditTask}
       />
 
-      <GenericTable<Project>
-        data={projects}
-        columns={columns}
-        actions={actions}
-        showActions={true}
-        showToolbarActions={false}
-        actionsLabel="Actions"
-        pagination={{
-          currentPage: pagination.page,
-          rowsPerPage: pagination.limit,
-          totalRows: pagination.total,
-          pageSizeOptions: [10, 15, 25, 50],
+      <div
+        className="wp-planner-projects__table"
+        style={{
+          flex: 1,
+          display: "flex",
+          flexDirection: "column",
+          minHeight: 0,
+          height: "100%",
+          overflow: "hidden",
         }}
-        onPaginationChange={onPaginationChange}
-        sortable={true}
-        loading={loading}
-        emptyMessage={
-          <div className="wp-generic-table-empty">
-            <FolderOpen size={48} className="wp-generic-table-empty-icon" />
-            <p className="wp-generic-table-empty-title">No projects found</p>
-          </div>
-        }
-        hover={true}
-        uniqueKey="id"
-        customizableColumns={true}
-        columnStorageKey="planner-projects-columns"
-        showToolbar={true}
-        toolbar={toolbarConfig}
-        statsCards={statsCards}
-        metricsGridMinWidth="120px"
-        metricsColumns={4}
-        defaultShowMetrics={true}
-        customBody={
-          <div className="generic-table-responsive wp-task-tree">
-            <table className="table generic-table mb-0 wp-task-tree__table">
-              <thead className="generic-table-header">
-                <tr>
-                  <th className="generic-table-th">Project Name</th>
-                  <th className="generic-table-th">Members</th>
-                  <th className="generic-table-th">Open Tasks</th>
-                  <th className="generic-table-th">Overdue Tasks</th>
-                  <th className="generic-table-th">Last Update</th>
-                  <th className="generic-table-th generic-table-actions-header">Actions</th>
-                </tr>
-              </thead>
-              {renderTableBody()}
-            </table>
-          </div>
-        }
-      />
+      >
+        <GenericTable<Project>
+          data={projects}
+          columns={columns}
+          actions={actions}
+          showActions={true}
+          showToolbarActions={false}
+          actionsLabel="Actions"
+          pagination={{
+            currentPage: pagination.page,
+            rowsPerPage: pagination.limit,
+            totalRows: pagination.total,
+            pageSizeOptions: [10, 15, 25, 50],
+          }}
+          onPaginationChange={onPaginationChange}
+          sortable={true}
+          loading={loading}
+          emptyMessage={
+            <div className="wp-generic-table-empty">
+              <FolderOpen size={48} className="wp-generic-table-empty-icon" />
+              <p className="wp-generic-table-empty-title">No projects found</p>
+            </div>
+          }
+          hover={true}
+          uniqueKey="id"
+          customizableColumns={true}
+          columnStorageKey="planner-projects-columns"
+          fixedHeight={true}
+          maxHeight="calc(100vh - 380px)"
+          showToolbar={true}
+          toolbar={toolbarConfig}
+          statsCards={statsCards}
+          metricsGridMinWidth="120px"
+          metricsColumns={4}
+          metricsEmbedded={false}
+          defaultShowMetrics={true}
+          customBody={
+            <div className="generic-table-responsive wp-task-tree">
+              <table className="table generic-table mb-0 wp-task-tree__table">
+                <thead className="generic-table-header">
+                  <tr>
+                    <th className="generic-table-th">Project Name</th>
+                    <th className="generic-table-th">Members</th>
+                    <th className="generic-table-th">Open Tasks</th>
+                    <th className="generic-table-th">Overdue Tasks</th>
+                    <th className="generic-table-th">Last Update</th>
+                    <th className="generic-table-th generic-table-actions-header">Actions</th>
+                  </tr>
+                </thead>
+                {renderTableBody()}
+              </table>
+            </div>
+          }
+        />
+      </div>
     </>
   );
 };

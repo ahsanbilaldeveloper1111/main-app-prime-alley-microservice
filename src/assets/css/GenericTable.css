@@ -1285,6 +1285,23 @@ button.preview-button:hover, button.preview-button:focus {
   opacity: 0.7;
 }
 
+/* Clear all — text action in filter pill row (no border) */
+.gt-filter-pill-add.gt-clear-all-filters-btn {
+  color: #DC2626;
+  border: none;
+  background: transparent;
+}
+
+.gt-filter-pill-add.gt-clear-all-filters-btn:hover:not(:disabled) {
+  color: #B91C1C;
+  background: #f5f8fa;
+}
+
+.gt-filter-pill-add.gt-clear-all-filters-btn:focus-visible:not(:disabled) {
+  outline: none;
+  background: #f5f8fa;
+}
+
 .gt-toolbar-dropdown{
 background: #fff !important;
   padding: 7px 14px;
