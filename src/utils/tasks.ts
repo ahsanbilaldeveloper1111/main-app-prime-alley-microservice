@@ -154,6 +154,7 @@ interface CreateTaskData {
   due_time?: string | null;
   start_date?: string;
   estimated_hours?: string;
+  estimated_duration_minutes?: number | null;
   progress?: number;
   extension_numbers?: string[];
   watchers?: string[];

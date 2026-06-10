@@ -80,7 +80,7 @@ export type WorkloadTeamScopeResult = Readonly<{
   loading: boolean;
   /** Listed in Control Hub `team_owners` (manager / team owner) for the user's team */
   isTeamOwner: boolean;
-  /** In `team_member` but not an owner — Workload is manager-only per product spec */
+  /** In `team_member` but not an owner — Workload shows only the viewer's row. */
   isTeamMemberOnly: boolean;
   /** Phone/extension values for everyone on the team roster (owners + members) */
   teamExtensions: string[];
@@ -179,6 +179,14 @@ export function parseWorkloadTeamScope(
     return IDLE_SCOPE;
   }
   if (teamMembers.length === 0 && teamOwners.length === 0) {
+    if (viewerExt) {
+      return {
+        loading: false,
+        isTeamOwner: false,
+        isTeamMemberOnly: false,
+        teamExtensions: [],
+      };
+    }
     return IDLE_SCOPE;
   }
 
@@ -202,7 +210,10 @@ export function parseWorkloadTeamScope(
 
 type BuildWorkloadQueryInput = Readonly<{
   viewerExtension: string;
-  teamScope: Pick<WorkloadTeamScopeResult, "isTeamOwner" | "teamExtensions">;
+  teamScope: Pick<
+    WorkloadTeamScopeResult,
+    "isTeamOwner" | "teamExtensions" | "isTeamMemberOnly"
+  >;
   memberFilter: string;
   assigneeMatch: AssigneeMatch;
   range: WorkloadRangePreset;
@@ -242,6 +253,10 @@ export function mergeViewerWorkloadExtension(
 function resolveTeamMemberExtensionNumbers(
   input: BuildWorkloadQueryInput,
 ): string[] | undefined {
+  const viewer = input.viewerExtension.trim();
+  if (input.teamScope.isTeamMemberOnly) {
+    return viewer ? [viewer] : undefined;
+  }
   if (input.memberFilter !== "all") {
     const single = input.memberFilter.trim();
     return single ? [single] : undefined;
@@ -251,6 +266,19 @@ function resolveTeamMemberExtensionNumbers(
     input.viewerExtension,
   );
   return merged.length > 0 ? merged : undefined;
+}
+
+/** Roster rows for grid/board when the viewer is not company-wide. */
+export function resolveWorkloadTeamRosterExtensions(input: Readonly<{
+  isTeamMemberOnly: boolean;
+  teamExtensions: readonly string[];
+  viewerExtension: string;
+}>): string[] {
+  if (input.isTeamMemberOnly) {
+    const viewer = input.viewerExtension.trim();
+    return viewer ? [viewer] : [];
+  }
+  return mergeViewerWorkloadExtension(input.teamExtensions, input.viewerExtension);
 }
 
 /** Team roster for grid/board display filters; falls back to viewer-only when roster is empty. */
@@ -268,28 +296,10 @@ export function resolveWorkloadDisplayTeamExtensions(
   return undefined;
 }
 
-/**
- * Root / company admin (`isTeamOwner` on scope): no `extension_number` / `extension_numbers`.
- * Server loads all assignees with tasks in range from JWT.
- */
-export function buildWorkloadSummaryQuery(input: BuildWorkloadQueryInput): WorkloadQueryBase {
-  const base = buildWorkloadQueryBase(input);
-  if (input.teamScope.isTeamOwner) {
-    return base;
-  }
-  const viewer = input.viewerExtension.trim();
-  if (viewer) {
-    base.extension_number = viewer;
-  }
-  return base;
-}
-
-/**
- * Root / company admin: no extension params on grid/board/summary.
- * Non-root: `extension_numbers[]` (team roster + viewer's own extension).
- */
-export function buildWorkloadGridBoardQuery(input: BuildWorkloadQueryInput): WorkloadQueryBase {
-  const base = buildWorkloadQueryBase(input);
+function applyWorkloadExtensionScopeToQuery(
+  base: WorkloadQueryBase,
+  input: BuildWorkloadQueryInput,
+): WorkloadQueryBase {
   if (input.teamScope.isTeamOwner) {
     return base;
   }
@@ -298,6 +308,22 @@ export function buildWorkloadGridBoardQuery(input: BuildWorkloadQueryInput): Wor
     base.extension_numbers = extensions;
   }
   return base;
+}
+
+/**
+ * Root / company admin: no extension params — server scopes from JWT.
+ * Everyone else: `extension_numbers[]` (team roster, member filter, or viewer only).
+ */
+export function buildWorkloadSummaryQuery(input: BuildWorkloadQueryInput): WorkloadQueryBase {
+  return applyWorkloadExtensionScopeToQuery(buildWorkloadQueryBase(input), input);
+}
+
+/**
+ * Root / company admin: no extension params — server scopes from JWT.
+ * Everyone else: `extension_numbers[]` (team roster, member filter, or viewer only).
+ */
+export function buildWorkloadGridBoardQuery(input: BuildWorkloadQueryInput): WorkloadQueryBase {
+  return applyWorkloadExtensionScopeToQuery(buildWorkloadQueryBase(input), input);
 }
 
 type DirectoryUserRow = Readonly<{
@@ -325,7 +351,9 @@ function readDirectoryUserExtension(row: unknown): string {
   return "";
 }
 
-function collectExtensionsFromUserRows(rows: readonly unknown[]): string[] {
+export function collectWorkloadExtensionsFromUserRows(
+  rows: readonly unknown[],
+): string[] {
   const extensions = new Set<string>();
   for (const row of rows) {
     const ext = readDirectoryUserExtension(row);
@@ -346,7 +374,7 @@ export async function fetchCompanyWorkloadRoster(
         Array.isArray(staffUsers) ? staffUsers : [],
         companyScope,
       );
-      const fromStaff = collectExtensionsFromUserRows(scopedStaff);
+      const fromStaff = collectWorkloadExtensionsFromUserRows(scopedStaff);
       if (fromStaff.length > 0) return fromStaff;
     } catch {
       // Fall through to filtered directory sources.
@@ -357,7 +385,7 @@ export async function fetchCompanyWorkloadRoster(
     const parentUsers = await getParentUsers();
     if (Array.isArray(parentUsers) && parentUsers.length > 0) {
       const scoped = filterUserRowsForCompanyScope(parentUsers, companyScope);
-      const fromParent = collectExtensionsFromUserRows(scoped);
+      const fromParent = collectWorkloadExtensionsFromUserRows(scoped);
       if (fromParent.length > 0) return fromParent;
     }
   } catch {
@@ -367,7 +395,7 @@ export async function fetchCompanyWorkloadRoster(
   try {
     const directory = await fetchUsersDirectoryList();
     const scoped = filterUserRowsForCompanyScope(directory, companyScope);
-    const fromDirectory = collectExtensionsFromUserRows(scoped);
+    const fromDirectory = collectWorkloadExtensionsFromUserRows(scoped);
     if (fromDirectory.length > 0) return fromDirectory;
   } catch {
     return [];
@@ -415,6 +443,47 @@ function collectCompanyScopedHierarchyExtensions(
     if (ext) extensions.push(ext);
   }
   return extensions;
+}
+
+/** Merge company roster, hierarchy extensions, and hierarchy users for root / company admin. */
+export function resolveWorkloadPrivilegedRosterExtensions(input: Readonly<{
+  companyRoster: readonly string[];
+  hierarchyExtensions: unknown[] | null | undefined;
+  hierarchyUsers: unknown[] | null | undefined;
+  viewerExtension: string;
+}>): string[] {
+  if (input.companyRoster.length > 0) {
+    return [...input.companyRoster];
+  }
+
+  const merged = new Set<string>();
+  for (const ext of collectWorkloadExtensionsFromUserRows(input.hierarchyUsers ?? [])) {
+    merged.add(ext);
+  }
+  for (const row of input.hierarchyExtensions ?? []) {
+    if (row == null || typeof row !== "object") continue;
+    const record = row as Record<string, unknown>;
+    const candidates = [
+      record.extension_number,
+      record.extension,
+      record.phone,
+      record.id,
+    ];
+    for (const value of candidates) {
+      const normalized = readStringCandidate(value);
+      if (normalized) {
+        merged.add(normalized);
+        break;
+      }
+    }
+  }
+
+  if (merged.size > 0) {
+    return [...merged];
+  }
+
+  const viewer = input.viewerExtension.trim();
+  return viewer ? [viewer] : [];
 }
 
 /** Extensions that may appear in workload member lists for the logged-in user's company. */

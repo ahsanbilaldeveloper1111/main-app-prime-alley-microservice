@@ -28,7 +28,6 @@ import {
   formatWorkloadDayDetailDate,
   formatWorkloadMemberLabel,
   getWorkloadWeekRange,
-  collectWorkloadExtensionsFromHierarchy,
   filterWorkloadMemberExtensions,
   resolveWorkloadBoardDisplayData,
   resolveWorkloadGridDisplayData,
@@ -50,9 +49,10 @@ import {
   buildWorkloadSummaryQuery,
   buildWorkloadCompanyExtensionAllowlist,
   fetchCompanyWorkloadRoster,
-  mergeViewerWorkloadExtension,
   readWorkloadCompanyScopeFromSession,
   resolveWorkloadDisplayTeamExtensions,
+  resolveWorkloadPrivilegedRosterExtensions,
+  resolveWorkloadTeamRosterExtensions,
 } from "@page-modules/planner/workload/workloadTeamScope";
 import { WorkloadPlannerAlertStack } from "./workload/WorkloadPlannerSubviews";
 import { WorkloadPlannerDataViews } from "./workload/WorkloadPlannerDataViews";
@@ -148,7 +148,9 @@ const WorkloadPlannerPage: React.FC = () => {
     () => ({ ...teamScope, isTeamOwner: isWorkloadRoot }),
     [teamScope, isWorkloadRoot],
   );
-  const { hierarchyDataExtensions } = useHierarchyData(ModuleSlug.WORK_PLANNER);
+  const { hierarchyDataExtensions, hierarchyDataUsers } = useHierarchyData(
+    ModuleSlug.WORK_PLANNER,
+  );
 
   const companyScope = useMemo(
     () => readWorkloadCompanyScopeFromSession(session?.user),
@@ -165,53 +167,56 @@ const WorkloadPlannerPage: React.FC = () => {
     queryFn: () => fetchCompanyWorkloadRoster(companyScope),
     enabled:
       (canViewCompanyWideRoster || isCompanyAdmin) &&
-      sessionStatus === "authenticated" &&
-      companyScope != null,
+      sessionStatus === "authenticated",
     staleTime: 60_000,
     refetchOnWindowFocus: false,
   });
 
-  const companyExtensionAllowlist = useMemo(
-    () =>
-      buildWorkloadCompanyExtensionAllowlist({
-        companyScope,
-        companyRoster: companyRosterQuery.data,
-        hierarchyExtensions: hierarchyDataExtensions,
-        teamExtensions: teamScope.teamExtensions,
-        viewerExtension: extension,
-      }),
-    [
+  const companyExtensionAllowlist = useMemo(() => {
+    // Root / company admin: never shrink API or roster lists via a partial allowlist.
+    if (isWorkloadRoot) return undefined;
+    return buildWorkloadCompanyExtensionAllowlist({
       companyScope,
-      companyRosterQuery.data,
-      hierarchyDataExtensions,
-      teamScope.teamExtensions,
-      extension,
-    ],
-  );
+      companyRoster: companyRosterQuery.data,
+      hierarchyExtensions: hierarchyDataExtensions,
+      teamExtensions: teamScope.teamExtensions,
+      viewerExtension: extension,
+    });
+  }, [
+    isWorkloadRoot,
+    companyScope,
+    companyRosterQuery.data,
+    hierarchyDataExtensions,
+    teamScope.teamExtensions,
+    extension,
+  ]);
+
+  const workloadSelfScoped = teamScope.isTeamMemberOnly;
 
   const rosterExtensions = useMemo(() => {
-    let raw: string[];
     if (!isWorkloadRoot) {
-      raw = mergeViewerWorkloadExtension(teamScope.teamExtensions, extension);
-    } else {
-      const fromCompany = companyRosterQuery.data ?? [];
-      if (fromCompany.length > 0) {
-        raw = fromCompany;
-      } else {
-        const fromHierarchy = collectWorkloadExtensionsFromHierarchy(
-          hierarchyDataExtensions,
-          companyExtensionAllowlist,
-        );
-        raw = fromHierarchy.length > 0 ? fromHierarchy : teamScope.teamExtensions;
-      }
+      const raw = resolveWorkloadTeamRosterExtensions({
+        isTeamMemberOnly: teamScope.isTeamMemberOnly,
+        teamExtensions: teamScope.teamExtensions,
+        viewerExtension: extension,
+      });
+      return filterWorkloadMemberExtensions(raw, companyExtensionAllowlist);
     }
+    const raw = resolveWorkloadPrivilegedRosterExtensions({
+      companyRoster: companyRosterQuery.data ?? [],
+      hierarchyExtensions: hierarchyDataExtensions,
+      hierarchyUsers: hierarchyDataUsers,
+      viewerExtension: extension,
+    });
     return filterWorkloadMemberExtensions(raw, companyExtensionAllowlist);
   }, [
     isWorkloadRoot,
+    teamScope.isTeamMemberOnly,
     teamScope.teamExtensions,
     extension,
     companyRosterQuery.data,
     hierarchyDataExtensions,
+    hierarchyDataUsers,
     companyExtensionAllowlist,
   ]);
 
@@ -321,7 +326,6 @@ const WorkloadPlannerPage: React.FC = () => {
     [extension, isWorkloadRoot, appliedFilters, appliedProjectFilterKey],
   );
 
-  const teamMemberBlocked = teamScope.isTeamMemberOnly;
   const companyRosterLoading =
     (canViewCompanyWideRoster || isCompanyAdmin) && companyRosterQuery.isLoading;
   const hasWorkloadScope =
@@ -332,9 +336,11 @@ const WorkloadPlannerPage: React.FC = () => {
     appliedRangeValid &&
     hasWorkloadScope &&
     !teamScope.loading &&
-    !companyRosterLoading &&
-    !teamMemberBlocked;
-  const filtersEnabled = extension.length > 0 || teamScope.teamExtensions.length > 0;
+    !companyRosterLoading;
+  const filtersEnabled =
+    extension.length > 0 ||
+    teamScope.teamExtensions.length > 0 ||
+    (isWorkloadRoot && rosterExtensions.length > 0);
 
   useEffect(() => {
     writeWorkloadMainViewPreference(mainView);
@@ -517,6 +523,22 @@ const WorkloadPlannerPage: React.FC = () => {
       ),
     [displayGridData, extension, displayBoardData?.columns],
   );
+
+  const filterMemberExtensions = useMemo(() => {
+    if (!isWorkloadRoot || rosterExtensions.length === 0) {
+      return memberExtensions;
+    }
+    const merged = new Set<string>();
+    for (const ext of rosterExtensions) {
+      const normalized = ext.trim();
+      if (normalized) merged.add(normalized);
+    }
+    for (const ext of memberExtensions) {
+      const normalized = ext.trim();
+      if (normalized) merged.add(normalized);
+    }
+    return [...merged];
+  }, [isWorkloadRoot, rosterExtensions, memberExtensions]);
 
   const displayPeriodMembers = useMemo(
     () =>
@@ -783,7 +805,7 @@ const WorkloadPlannerPage: React.FC = () => {
           onMemberFilterChange={(value) =>
             setDraftFilters((prev) => ({ ...prev, memberFilter: value }))
           }
-          memberExtensions={memberExtensions}
+          memberExtensions={filterMemberExtensions}
           hierarchyExtensions={hierarchyDataExtensions}
           priorityFilter={draftFilters.priorityFilter}
           onPriorityFilterChange={(value) =>
@@ -802,7 +824,7 @@ const WorkloadPlannerPage: React.FC = () => {
         <WorkloadPlannerAlertStack
           sessionStatus={sessionStatus}
           enabled={queriesEnabled}
-          teamMemberOnly={teamMemberBlocked}
+          workloadSelfScoped={workloadSelfScoped}
           accessForbidden={accessForbidden}
           summaryError={summaryQuery.error}
           summaryHasError={summaryQuery.isError}
@@ -886,7 +908,7 @@ const WorkloadPlannerPage: React.FC = () => {
 
       <WorkloadReassignModal
         task={reassignTask}
-        memberExtensions={memberExtensions}
+        memberExtensions={filterMemberExtensions}
         hierarchyExtensions={hierarchyDataExtensions}
         targetExtension={reassignTarget}
         onTargetChange={setReassignTarget}
@@ -910,7 +932,7 @@ const WorkloadPlannerPage: React.FC = () => {
         show={showUnassigned}
         onClose={() => setShowUnassigned(false)}
         unassignedQuery={unassignedQuery}
-        memberExtensions={memberExtensions}
+        memberExtensions={filterMemberExtensions}
         hierarchyExtensions={hierarchyDataExtensions}
         assignTargets={assignTargets}
         setAssignTargets={setAssignTargets}
