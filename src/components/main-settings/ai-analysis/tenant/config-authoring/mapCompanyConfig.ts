@@ -16,7 +16,7 @@ import type {
   ConfigInfoFieldFormValues,
   ConfigTagFormValues,
 } from "./types";
-import { defaultConfigAuthoringFormValues } from "./types";
+import { defaultConfigAuthoringFormValues, createConfigFormClientId } from "./types";
 
 /** Derive a stable snake_case key from a human-readable label. */
 export function labelToSnakeCase(label: string): string {
@@ -208,6 +208,7 @@ function validateConfigAuthoringFields(
 
 function mapTagToForm(tag: AnalysisConfigTag): ConfigTagFormValues {
   return {
+    clientId: createConfigFormClientId(),
     label: tag.label,
     whenToApply: tag.when_to_apply,
     color: tag.color,
@@ -218,6 +219,7 @@ function mapCriterionToForm(
   criterion: AnalysisConfigCriterion,
 ): ConfigCriterionFormValues {
   return {
+    clientId: createConfigFormClientId(),
     text: criterion.text,
     weight: numberToInput(criterion.weight),
   };
@@ -225,6 +227,7 @@ function mapCriterionToForm(
 
 function mapBandToForm(band: AnalysisConfigBand): ConfigBandFormValues {
   return {
+    clientId: createConfigFormClientId(),
     minScore: numberToInput(band.min_score),
     maxScore: numberToInput(band.max_score),
     label: band.label,
@@ -236,6 +239,7 @@ function mapAssessmentToForm(
   assessment: AnalysisConfigAssessment,
 ): ConfigAssessmentFormValues {
   return {
+    clientId: createConfigFormClientId(),
     label: assessment.label,
     criteria: assessment.criteria.map(mapCriterionToForm),
     bands: assessment.bands.map(mapBandToForm),
@@ -246,6 +250,7 @@ function mapInfoFieldToForm(
   field: AnalysisConfigInfoField,
 ): ConfigInfoFieldFormValues {
   return {
+    clientId: createConfigFormClientId(),
     label: field.label,
     fieldType: field.field_type,
     description: field.description,

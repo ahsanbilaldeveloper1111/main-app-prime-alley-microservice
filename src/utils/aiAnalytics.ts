@@ -133,6 +133,17 @@ function coerceNullableFiniteNumber(value: unknown): number | null {
   return null;
 }
 
+function coerceOptionalIntId(value: unknown): number | null {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
+  }
+  if (typeof value === "string" && value.trim()) {
+    const parsed = Number.parseInt(value.trim(), 10);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+  return null;
+}
+
 function coerceStringId(value: unknown): string {
   if (typeof value === "string") {
     return value;
@@ -711,20 +722,13 @@ export class AnalysisCompanyConfigValidationError extends Error {
   }
 }
 
-function normalizeOptionalString(value: unknown): string | null {
-  if (typeof value === "string" && value.trim()) {
-    return value.trim();
-  }
-  return null;
-}
-
 function normalizeConfigTag(value: Record<string, unknown>): AnalysisConfigTag {
   return {
     tag_key: coerceStringId(value.tag_key),
     label: coerceStringId(value.label),
     when_to_apply:
       typeof value.when_to_apply === "string" ? value.when_to_apply : "",
-    example: normalizeOptionalString(value.example),
+    example: coerceOptionalString(value.example),
     color: typeof value.color === "string" ? value.color : "green",
     enabled: value.enabled !== false,
     sort_order: coerceNullableFiniteNumber(value.sort_order),
@@ -738,7 +742,7 @@ function normalizeConfigCriterion(
     criterion_key: coerceStringId(value.criterion_key),
     text: typeof value.text === "string" ? value.text : "",
     weight: coerceFiniteNumber(value.weight),
-    example: normalizeOptionalString(value.example),
+    example: coerceOptionalString(value.example),
     sort_order: coerceNullableFiniteNumber(value.sort_order),
   };
 }
@@ -789,7 +793,7 @@ function normalizeConfigInfoField(
     label: coerceStringId(value.label),
     field_type: normalizeInfoFieldType(value.field_type),
     description: typeof value.description === "string" ? value.description : "",
-    example: normalizeOptionalString(value.example),
+    example: coerceOptionalString(value.example),
     enabled: value.enabled !== false,
     sort_order: coerceNullableFiniteNumber(value.sort_order),
   };
@@ -812,26 +816,18 @@ function normalizeCompanyConfigRecord(
   const assessmentsRaw = value.assessments;
   const infoFieldsRaw = value.info_fields;
 
-  const idRaw = value.id;
-  const id =
-    typeof idRaw === "number" && Number.isFinite(idRaw)
-      ? idRaw
-      : typeof idRaw === "string" && idRaw.trim()
-        ? Number.parseInt(idRaw, 10)
-        : null;
-
   return {
-    id: id != null && Number.isFinite(id) ? id : null,
+    id: coerceOptionalIntId(value.id),
     company_id: coerceStringId(value.company_id),
     stated_industry:
       typeof value.stated_industry === "string" ? value.stated_industry : "",
-    inferred_industry: normalizeOptionalString(value.inferred_industry),
-    industry_key: normalizeOptionalString(value.industry_key),
-    template_id: normalizeOptionalString(value.template_id),
-    template_version: normalizeOptionalString(value.template_version),
-    config_sha256: normalizeOptionalString(value.config_sha256),
-    registry_version: normalizeOptionalString(value.registry_version),
-    authored_by: normalizeOptionalString(value.authored_by),
+    inferred_industry: coerceOptionalString(value.inferred_industry),
+    industry_key: coerceOptionalString(value.industry_key),
+    template_id: coerceOptionalString(value.template_id),
+    template_version: coerceOptionalString(value.template_version),
+    config_sha256: coerceOptionalString(value.config_sha256),
+    registry_version: coerceOptionalString(value.registry_version),
+    authored_by: coerceOptionalString(value.authored_by),
     created_at: typeof value.created_at === "string" ? value.created_at : null,
     updated_at: typeof value.updated_at === "string" ? value.updated_at : null,
     tags: Array.isArray(tagsRaw)

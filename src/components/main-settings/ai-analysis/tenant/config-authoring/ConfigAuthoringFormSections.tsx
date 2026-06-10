@@ -121,7 +121,7 @@ function TagsSection(props: Readonly<{
       ) : (
         props.tags.map((tag, index) => (
           <ItemCard
-            key={`tag-${index}`}
+            key={tag.clientId}
             title={tag.label.trim() || `Tag ${index + 1}`}
             onRemove={() => props.onChange(props.tags.filter((_, i) => i !== index))}
           >
@@ -184,7 +184,7 @@ function CriteriaSection(props: Readonly<{
         <p className="ai-analysis-tenant-config__config-empty">No criteria.</p>
       ) : (
         props.criteria.map((criterion, index) => (
-          <div key={`criterion-${index}`} className="ai-analysis-tenant-config__config-nested-item">
+          <div key={criterion.clientId} className="ai-analysis-tenant-config__config-nested-item">
             <div className="ai-analysis-tenant-config__config-nested-item-header">
               <span>
                 {criterion.text.trim() || `Criterion ${index + 1}`}
@@ -259,7 +259,7 @@ function BandsSection(props: Readonly<{
         <p className="ai-analysis-tenant-config__config-empty">No bands.</p>
       ) : (
         props.bands.map((band, index) => (
-          <div key={`band-${index}`} className="ai-analysis-tenant-config__config-nested-item">
+          <div key={band.clientId} className="ai-analysis-tenant-config__config-nested-item">
             <div className="ai-analysis-tenant-config__config-nested-item-header">
               <span>{band.label.trim() || `Band ${index + 1}`}</span>
               <Button
@@ -336,7 +336,7 @@ function AssessmentsSection(props: Readonly<{
       ) : (
         props.assessments.map((assessment, index) => (
           <ItemCard
-            key={`assessment-${index}`}
+            key={assessment.clientId}
             title={assessment.label.trim() || `Assessment ${index + 1}`}
             onRemove={() =>
               props.onChange(props.assessments.filter((_, i) => i !== index))
@@ -390,7 +390,7 @@ function InfoFieldsSection(props: Readonly<{
       ) : (
         props.infoFields.map((field, index) => (
           <ItemCard
-            key={`info-field-${index}`}
+            key={field.clientId}
             title={field.label.trim() || `Field ${index + 1}`}
             onRemove={() => props.onChange(props.infoFields.filter((_, i) => i !== index))}
           >
