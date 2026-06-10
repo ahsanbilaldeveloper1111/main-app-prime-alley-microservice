@@ -57,7 +57,7 @@
     margin: 0 0 20px;
     font-size: 14px;
     line-height: 1.5;
-    color: #94a3b8;
+    color: #cbd5e1;
   }
 
   &__tasks {
@@ -138,36 +138,64 @@
     font-size: 11px;
     font-weight: 600;
     line-height: 1.4;
-    border: 1px solid transparent;
-    background: rgba(148, 163, 184, 0.12);
-    color: #cbd5e1;
+    border: 1px solid #475569;
+    background: #334155;
+    color: #f1f5f9;
   }
 
   &__tag--project {
-    color: #cbd5e1;
-    background: rgba(148, 163, 184, 0.14);
+    color: #f1f5f9;
+    background: #334155;
+    border-color: #475569;
   }
 
   &__tag--priority {
-    background: rgba(15, 23, 42, 0.35);
+    background: #1e293b;
+    border-color: #475569;
+
+    &.priority-urgent,
+    &.priority-critical {
+      color: #fecaca;
+      background: #7f1d1d;
+      border-color: #991b1b;
+    }
+
+    &.priority-high {
+      color: #ffedd5;
+      background: #7c2d12;
+      border-color: #9a3412;
+    }
+
+    &.priority-medium,
+    &.priority-normal {
+      color: #fef08a;
+      background: #713f12;
+      border-color: #854d0e;
+    }
+
+    &.priority-low {
+      color: #bfdbfe;
+      background: #1e3a8a;
+      border-color: #1d4ed8;
+    }
   }
 
   &__tag--postponed {
-    color: #fdba74;
-    border-color: rgba(251, 146, 60, 0.35);
-    background: rgba(251, 146, 60, 0.12);
+    color: #ffedd5;
+    border-color: #9a3412;
+    background: #7c2d12;
   }
 
   &__tag--ignored {
-    color: #f87171;
-    border-color: rgba(248, 113, 113, 0.35);
-    background: rgba(248, 113, 113, 0.12);
+    color: #fee2e2;
+    border-color: #991b1b;
+    background: #7f1d1d;
   }
 
   &__task-duration {
     font-size: 13px;
     font-weight: 600;
-    color: #cbd5e1;
+    color: #e2e8f0;
     white-space: nowrap;
   }
 
@@ -226,14 +254,14 @@
     margin: 0 auto;
     border: 0;
     background: transparent;
-    color: #94a3b8;
+    color: #cbd5e1;
     font-size: 13px;
     font-family: inherit;
     cursor: pointer;
     padding: 4px 8px;
 
     &:hover {
-      color: #cbd5e1;
+      color: #f1f5f9;
       text-decoration: underline;
     }
   }

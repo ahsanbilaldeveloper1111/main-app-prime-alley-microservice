@@ -30,15 +30,6 @@ type MyDayRolloverPromptProps = Readonly<{
   onDismiss: () => void;
 }>;
 
-const PRIORITY_COLORS: Record<string, string> = {
-  urgent: "#ef4444",
-  critical: "#ef4444",
-  high: "#ef4444",
-  medium: "#eab308",
-  normal: "#eab308",
-  low: "#3b82f6",
-};
-
 function resolvePriorityKey(priority: string): string {
   return priority.toLowerCase().replace(/\s+/g, "-");
 }
@@ -53,7 +44,6 @@ function MyDayRolloverTaskRow({
   onToggle: () => void;
 }>) {
   const priorityKey = resolvePriorityKey(task.priority);
-  const priorityColor = PRIORITY_COLORS[priorityKey] ?? "#94a3b8";
   const showPostponed = readRolloverTaskIsPostponed(task.raw);
   const durationLabel =
     task.estimateMinutes > 0 ? toMinutesDisplay(task.estimateMinutes) : "--";
@@ -76,7 +66,6 @@ function MyDayRolloverTaskRow({
           </span>
           <span
             className={`myday-rollover-modal__tag myday-rollover-modal__tag--priority priority-${priorityKey}`}
-            style={{ color: priorityColor, borderColor: `${priorityColor}55` }}
           >
             {task.priority}
           </span>
