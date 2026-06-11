@@ -2183,29 +2183,8 @@
   display: flex;
   flex-direction: column;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.18);
-}
 
-.reports-modal-dialog--members {
-  width: min(640px, 90vw);
-}
-
-.reports-modal-dialog--tasks {
-  width: min(600px, 90vw);
-  overflow: hidden;
-}
-
-.reports-modal-dialog--all-tasks {
-  width: min(680px, 90vw);
-}
-
-.reports-modal-list-row {
-  &:hover {
-    background: #f5f7fa;
-  }
-}
-
-// Project Health badges in portaled modals (outside .workload-reports-page scope).
-.reports-modal-dialog {
+  // Project Health badges in portaled modals (outside .workload-reports-page scope).
   .reports-project-row__name {
     display: block;
     flex: 1;
@@ -2247,3 +2226,23 @@
     font-family: "Lexend Deca", Helvetica, Arial, sans-serif;
   }
 }
+
+.reports-modal-dialog--members {
+  width: min(640px, 90vw);
+}
+
+.reports-modal-dialog--tasks {
+  width: min(600px, 90vw);
+  overflow: hidden;
+}
+
+.reports-modal-dialog--all-tasks {
+  width: min(680px, 90vw);
+}
+
+.reports-modal-list-row {
+  &:hover {
+    background: #f5f7fa;
+  }
+}
+
