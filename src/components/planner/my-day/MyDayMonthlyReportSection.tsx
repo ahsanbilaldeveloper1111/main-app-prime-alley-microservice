@@ -65,7 +65,13 @@ function MyDayMonthlyReportGrid({ report }: Readonly<{ report: MyDayMonthlyRepor
   );
 }
 
-export function MyDayMonthlyReportPanel() {
+export type MyDayMonthlyReportSectionProps = Readonly<{
+  /** When false, skip fetching until the parent view is visible. */
+  active?: boolean;
+}>;
+
+/** Monthly My Day performance — same layout as former Reports → My Day Monthly tab. */
+export function MyDayMonthlyReportSection({ active = true }: MyDayMonthlyReportSectionProps) {
   const [monthIso, setMonthIso] = useState(() => moment().format("YYYY-MM"));
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -88,8 +94,12 @@ export function MyDayMonthlyReportPanel() {
   }, [monthIso]);
 
   useEffect(() => {
+    if (!active) return;
     loadMonth().catch(() => undefined);
-  }, [loadMonth]);
+  }, [active, loadMonth]);
+
+  const showEmptyMonth =
+    !loading && !loadError && report.workingDays === 0;
 
   return (
     <div className="reports-panel myday-monthly-report">
@@ -97,7 +107,7 @@ export function MyDayMonthlyReportPanel() {
         <div>
           <h2 className="reports-panel__title">My Day monthly report</h2>
           <p className="reports-panel__subtitle mb-0">
-            Performance across {report.monthLabel} from end-of-day My Day logs.
+            An overview of your My Day tasks and performance for the month.
           </p>
         </div>
         <Form.Group className="myday-monthly-report__month-picker mb-0">
@@ -114,6 +124,12 @@ export function MyDayMonthlyReportPanel() {
 
       {loadError ? <Alert variant="warning">{loadError}</Alert> : null}
 
+      {showEmptyMonth ? (
+        <Alert variant="warning" className="mb-3">
+          No data found for My Day history for this month.
+        </Alert>
+      ) : null}
+
       {loading ? (
         <div className="text-center py-4">
           <Spinner animation="border" size="sm" role="status" />
@@ -121,13 +137,6 @@ export function MyDayMonthlyReportPanel() {
       ) : (
         <MyDayMonthlyReportGrid report={report} />
       )}
-
-      {!loading && !loadError && report.workingDays === 0 ? (
-        <p className="text-muted small mb-0 mt-3">
-          No My Day activity recorded for this month yet. Use My Day during the month to build
-          your monthly report.
-        </p>
-      ) : null}
     </div>
   );
 }

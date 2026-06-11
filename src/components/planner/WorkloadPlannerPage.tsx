@@ -1,65 +1,16 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { useSession } from "next-auth/react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { isAxiosError } from "axios";
+import React from "react";
 import { Info, X } from "lucide-react";
-import BreadcrumbItem from "@common/BreadcrumbItem";
-import { toast } from "react-toastify";
 import "@assets/scss/common.scss";
-import { useHierarchyData } from "@components/filters/useHierarchyData";
-import { getSessionPhoneOrExtension } from "@planner/projectMemberRole";
-import { ModuleSlug } from "@utils/Helper";
-import { plannerKeys } from "../../query/keys";
-import { canViewAllEmployeesAttendance } from "@utils/workforce/canViewAllEmployeesAttendance";
-import {
-  getWorkloadBoard,
-  getWorkloadDay,
-  getWorkloadGrid,
-  getWorkloadSummary,
-  getWorkloadUnassigned,
-  listProjects,
-  patchWorkloadTask,
-  updateTask,
-  type WorkloadGridCell,
-  type WorkloadRangePreset,
-  type WorkloadTaskCard,
-} from "@utils/tasks";
 import {
   formatWorkloadDayDetailDate,
   formatWorkloadMemberLabel,
-  getWorkloadWeekRange,
-  collectWorkloadExtensionsFromHierarchy,
-  filterWorkloadMemberExtensions,
-  resolveWorkloadBoardDisplayData,
-  resolveWorkloadGridDisplayData,
-  resolveWorkloadPeriodDisplayMembers,
-  createDefaultWorkloadPlannerFilters,
-  isDefaultWorkloadPlannerFilters,
-  isWorkloadPlannerDraftRangeValid,
-  readWorkloadMainViewPreference,
-  workloadPlannerFiltersEqual,
-  writeWorkloadMainViewPreference,
-  buildWorkloadTaskPatchBody,
   workloadCellKey,
-  workloadPriorityToApiString,
-  type WorkloadPlannerFilterState,
 } from "@page-modules/planner/workload/workloadDomain";
-import type { WorkloadBoardDropIntent } from "./workload/WorkloadBoardPanel";
-import {
-  buildWorkloadGridBoardQuery,
-  buildWorkloadSummaryQuery,
-  buildWorkloadCompanyExtensionAllowlist,
-  fetchCompanyWorkloadRoster,
-  mergeViewerWorkloadExtension,
-  readWorkloadCompanyScopeFromSession,
-  resolveWorkloadDisplayTeamExtensions,
-} from "@page-modules/planner/workload/workloadTeamScope";
 import { WorkloadPlannerAlertStack } from "./workload/WorkloadPlannerSubviews";
 import { WorkloadPlannerDataViews } from "./workload/WorkloadPlannerDataViews";
 import {
   WorkloadPlannerFilterBar,
   WorkloadPlannerPageHeader,
-  type WorkloadProjectOption,
 } from "./workload/WorkloadPlannerChrome";
 import {
   WorkloadBoardDragConfirmModal,
@@ -69,15 +20,10 @@ import {
 } from "./workload/WorkloadPlannerDialogs";
 import { WorkloadUnassignedSidebar } from "./workload/WorkloadUnassignedSidebar";
 import { useWorkloadPlannerTaskActions } from "./workload/useWorkloadPlannerTaskActions";
-import { useWorkloadTeamScope } from "./workload/useWorkloadTeamScope";
-import {
-  computeWorkloadIsApplyingFilters,
-  computeWorkloadLoadingMain,
-  resolveAppliedProjectFilterKey,
-  resolveWorkloadGridRangeFallback,
-  resolveWorkloadMemberExtensions,
-  type WorkloadSelectedCellState,
-} from "./workload/workloadPlannerPageHelpers";
+import { useWorkloadPlannerPageScope } from "./workload/useWorkloadPlannerPageScope";
+import { useWorkloadPlannerPageUiState } from "./workload/useWorkloadPlannerPageUiState";
+import { useWorkloadPlannerPageData } from "./workload/useWorkloadPlannerPageData";
+import { useWorkloadPlannerPageMutations } from "./workload/useWorkloadPlannerPageMutations";
 import { WorkloadOnboardingModal } from "./workload/WorkloadOnboardingModal";
 import {
   getOnboardingStatus,
@@ -118,344 +64,13 @@ function buildCellMap(
 }
 
 const WorkloadPlannerPage: React.FC = () => {
-  const { data: session, status: sessionStatus } = useSession();
-  const queryClient = useQueryClient();
-  const extension = useMemo(
-    () => getSessionPhoneOrExtension(session),
-    [session],
-  );
-  const isCompanyAdmin = useMemo(() => {
-    const value =
-      (session?.user as { is_company_admin?: unknown } | undefined)?.is_company_admin;
-    return value === true || value === "1" || value === 1;
-  }, [session?.user]);
-  const canViewCompanyWideRoster = useMemo(
-    () => canViewAllEmployeesAttendance(session?.user as any),
-    [session?.user],
-  );
-  const sessionUserId = useMemo(() => {
-    const id = (session?.user as { id?: string | number } | undefined)?.id;
-    return id == null ? "" : String(id).trim();
-  }, [session?.user]);
-  const teamScope = useWorkloadTeamScope(
-    sessionUserId,
-    extension,
-    sessionStatus,
-    canViewCompanyWideRoster || isCompanyAdmin,
-  );
-  /** Company-wide only — team managers still send `extension_numbers[]` (incl. their own ext). */
-  const isWorkloadRoot = canViewCompanyWideRoster || isCompanyAdmin;
-  const effectiveTeamScope = useMemo(
-    () => ({ ...teamScope, isTeamOwner: isWorkloadRoot }),
-    [teamScope, isWorkloadRoot],
-  );
-  const { hierarchyDataExtensions } = useHierarchyData(ModuleSlug.WORK_PLANNER);
-
-  const companyScope = useMemo(
-    () => readWorkloadCompanyScopeFromSession(session?.user),
-    [session?.user],
-  );
-
-  const companyRosterQuery = useQuery({
-    queryKey: [
-      ...plannerKeys.workload.all(),
-      "company-roster",
-      companyScope?.companyId ?? "",
-      companyScope?.companyIdentifier ?? "",
-    ],
-    queryFn: () => fetchCompanyWorkloadRoster(companyScope),
-    enabled:
-      (canViewCompanyWideRoster || isCompanyAdmin) &&
-      sessionStatus === "authenticated" &&
-      companyScope != null,
-    staleTime: 60_000,
-    refetchOnWindowFocus: false,
-  });
-
-  const companyExtensionAllowlist = useMemo(
-    () =>
-      buildWorkloadCompanyExtensionAllowlist({
-        companyScope,
-        companyRoster: companyRosterQuery.data,
-        hierarchyExtensions: hierarchyDataExtensions,
-        teamExtensions: teamScope.teamExtensions,
-        viewerExtension: extension,
-      }),
-    [
-      companyScope,
-      companyRosterQuery.data,
-      hierarchyDataExtensions,
-      teamScope.teamExtensions,
-      extension,
-    ],
-  );
-
-  const rosterExtensions = useMemo(() => {
-    let raw: string[];
-    if (!isWorkloadRoot) {
-      raw = mergeViewerWorkloadExtension(teamScope.teamExtensions, extension);
-    } else {
-      const fromCompany = companyRosterQuery.data ?? [];
-      if (fromCompany.length > 0) {
-        raw = fromCompany;
-      } else {
-        const fromHierarchy = collectWorkloadExtensionsFromHierarchy(
-          hierarchyDataExtensions,
-          companyExtensionAllowlist,
-        );
-        raw = fromHierarchy.length > 0 ? fromHierarchy : teamScope.teamExtensions;
-      }
-    }
-    return filterWorkloadMemberExtensions(raw, companyExtensionAllowlist);
-  }, [
-    isWorkloadRoot,
-    teamScope.teamExtensions,
-    extension,
-    companyRosterQuery.data,
-    hierarchyDataExtensions,
-    companyExtensionAllowlist,
-  ]);
-
-  const [draftFilters, setDraftFilters] = useState<WorkloadPlannerFilterState>(
-    createDefaultWorkloadPlannerFilters,
-  );
-  const [appliedFilters, setAppliedFilters] =
-    useState<WorkloadPlannerFilterState>(createDefaultWorkloadPlannerFilters);
-  const [mainView, setMainView] = useState<MainView>(() =>
-    readWorkloadMainViewPreference(),
-  );
-  const [reassignOverloadConfirm, setReassignOverloadConfirm] = useState(false);
-  const [selectedCell, setSelectedCell] =
-    useState<WorkloadSelectedCellState>(null);
-  const [showUnassigned, setShowUnassigned] = useState(false);
-  const [assignTargets, setAssignTargets] = useState<Record<number, string>>(
-    {},
-  );
-  const [reassignTask, setReassignTask] = useState<WorkloadTaskCard | null>(
-    null,
-  );
-  const [reassignTarget, setReassignTarget] = useState("");
-  const [rescheduleTask, setRescheduleTask] = useState<WorkloadTaskCard | null>(
-    null,
-  );
-  const [rescheduleDate, setRescheduleDate] = useState("");
-  const [overloadSecondStep, setOverloadSecondStep] = useState(false);
-  const [boardDropIntent, setBoardDropIntent] =
-    useState<WorkloadBoardDropIntent | null>(null);
-  const [boardDropOverload, setBoardDropOverload] = useState(false);
-  const [showWorkloadPerDay, setShowWorkloadPerDay] = useState(true);
-  const [showOnboarding, setShowOnboarding] = useState<boolean>(
-    () => !getOnboardingStatus(),
-  );
-  const [useMockData, setUseMockData] = useState(false);
-  const [showBoardHint, setShowBoardHint] = useState(true);
-
-  function handleOnboardingComplete(choice: "sample" | "fresh" | null) {
-    if (choice === "sample") {
-      setUseMockData(true);
-      setTimeout(() => startWorkloadTour("grid", () => {}), 600);
-    }
-    setShowOnboarding(false);
-  }
-
-  function handleMainViewChange(view: MainView) {
-    setMainView(view);
-    writeWorkloadMainViewPreference(view);
-    if (view === "board" && !getBoardTourSeen()) {
-      setTimeout(() => startWorkloadTour("board", () => {}), 600);
-    }
-    if (view === "grid" && !getGridTourSeen()) {
-      setTimeout(() => startWorkloadTour("grid", () => {}), 600);
-    }
-  }
-
-  const appliedRangeValid = useMemo(
-    () => isWorkloadPlannerDraftRangeValid(appliedFilters),
-    [appliedFilters],
-  );
-
-  const draftRangeInvalid = useMemo(
-    () => !isWorkloadPlannerDraftRangeValid(draftFilters),
-    [draftFilters],
-  );
-
-  const appliedProjectFilterKey = useMemo(
-    () => resolveAppliedProjectFilterKey(appliedFilters.projectFilter),
-    [appliedFilters.projectFilter],
-  );
-
-  const workloadQueryInput = useMemo(
-    () => ({
-      viewerExtension: extension,
-      teamScope: effectiveTeamScope,
-      memberFilter: appliedFilters.memberFilter,
-      assigneeMatch: appliedFilters.assigneeMatch,
-      range: appliedFilters.range,
-      customStart: appliedFilters.customStart,
-      customEnd: appliedFilters.customEnd,
-      customRangeValid: appliedRangeValid,
-      projectFilter: appliedFilters.projectFilter,
-    }),
-    [extension, effectiveTeamScope, appliedFilters, appliedRangeValid],
-  );
-
-  const summaryQueryBase = useMemo(
-    () => buildWorkloadSummaryQuery(workloadQueryInput),
-    [workloadQueryInput],
-  );
-
-  const gridBoardQueryBase = useMemo(
-    () => buildWorkloadGridBoardQuery(workloadQueryInput),
-    [workloadQueryInput],
-  );
-
-  const workloadQueryKeyParams = useMemo(
-    () => ({
-      ext: isWorkloadRoot ? "root" : extension,
-      range: appliedFilters.range,
-      match: appliedFilters.assigneeMatch,
-      start: appliedFilters.range === "custom" ? appliedFilters.customStart : undefined,
-      end: appliedFilters.range === "custom" ? appliedFilters.customEnd : undefined,
-      member: appliedFilters.memberFilter,
-      project: appliedProjectFilterKey,
-    }),
-    [extension, isWorkloadRoot, appliedFilters, appliedProjectFilterKey],
-  );
-
-  const teamMemberBlocked = teamScope.isTeamMemberOnly;
-  const companyRosterLoading =
-    (canViewCompanyWideRoster || isCompanyAdmin) && companyRosterQuery.isLoading;
-  const hasWorkloadScope =
-    isWorkloadRoot ||
-    teamScope.teamExtensions.length > 0 ||
-    extension.trim().length > 0;
-  const queriesEnabled =
-    appliedRangeValid &&
-    hasWorkloadScope &&
-    !teamScope.loading &&
-    !companyRosterLoading &&
-    !teamMemberBlocked;
-  const filtersEnabled = extension.length > 0 || teamScope.teamExtensions.length > 0;
-
-  useEffect(() => {
-    writeWorkloadMainViewPreference(mainView);
-  }, [mainView]);
-
-  useEffect(() => {
-    const originalScrollbar = document.body.style.paddingRight;
-    const observer = new MutationObserver(() => {
-      if (document.body.classList.contains('modal-open')) {
-        document.body.style.paddingRight = "0px";
-      }
-    });
-    observer.observe(document.body, {
-      attributes: true,
-      attributeFilter: ["class", "style"],
-    });
-    return () => {
-      observer.disconnect();
-      document.body.style.paddingRight = originalScrollbar;
-    };
-  }, []);
-
-  const handleDraftRangeChange = useCallback((value: WorkloadRangePreset) => {
-    setDraftFilters((prev) => {
-      if (value === "custom") {
-        const week = getWorkloadWeekRange("this_week");
-        return {
-          ...prev,
-          range: value,
-          customStart: week.start,
-          customEnd: week.end,
-        };
-      }
-      return { ...prev, range: value };
-    });
-  }, []);
-
-  const handleApplyFilters = useCallback(() => {
-    if (!isWorkloadPlannerDraftRangeValid(draftFilters)) {
-      toast.error("Choose a valid custom date range.");
-      return;
-    }
-    setAppliedFilters({ ...draftFilters });
-  }, [draftFilters]);
-
-  const summaryQuery = useQuery({
-    queryKey: plannerKeys.workload.summary(workloadQueryKeyParams),
-    queryFn: () => getWorkloadSummary(summaryQueryBase),
-    enabled: queriesEnabled,
-  });
-
-  const gridQuery = useQuery({
-    queryKey: plannerKeys.workload.grid(workloadQueryKeyParams),
-    queryFn: () => getWorkloadGrid(gridBoardQueryBase),
-    enabled: queriesEnabled,
-  });
-
-  const boardQuery = useQuery({
-    queryKey: plannerKeys.workload.board(workloadQueryKeyParams),
-    queryFn: () => getWorkloadBoard(gridBoardQueryBase),
-    enabled: queriesEnabled && mainView === "board",
-  });
-
-  const effectiveGridData = useMockData ? WORKLOAD_MOCK_GRID_DATA : gridQuery.data;
-  const effectiveBoardData = useMockData ? WORKLOAD_MOCK_BOARD_DATA : boardQuery.data;
-
-  const dayQuery = useQuery({
-    queryKey: plannerKeys.workload.day({
-      ext: selectedCell?.extension ?? "",
-      date: selectedCell?.date ?? "",
-      match: appliedFilters.assigneeMatch,
-    }),
-    queryFn: async () => {
-      const cell = selectedCell;
-      if (!cell) {
-        throw new Error("No day selected");
-      }
-      return getWorkloadDay({
-        extension_number: cell.extension,
-        date: cell.date,
-        assignee_match: appliedFilters.assigneeMatch,
-      });
-    },
-    enabled: Boolean(selectedCell && queriesEnabled),
-  });
-
-  const projectsQuery = useQuery({
-    queryKey: [...plannerKeys.workload.all(), "project-options"],
-    queryFn: async () => {
-      const res = await listProjects({ page: 1, limit: 200 });
-      const rows =
-        (res as { data?: { id?: number; name?: string }[] } | null)?.data ?? [];
-      return rows
-        .filter((p) => typeof p.id === "number" && p.name)
-        .map((p) => ({ id: p.id as number, name: String(p.name) }));
-    },
-    enabled: filtersEnabled,
-    staleTime: 120_000,
-  });
-
-  const projectOptions: WorkloadProjectOption[] = projectsQuery.data ?? [];
-
-  const unassignedProjectId =
-    typeof appliedFilters.projectFilter === "number"
-      ? appliedFilters.projectFilter
-      : undefined;
-
-  const unassignedQuery = useQuery({
-    queryKey: plannerKeys.workload.unassigned(
-      extension,
-      appliedProjectFilterKey,
-    ),
-    queryFn: () =>
-      getWorkloadUnassigned({
-        extension_number: extension,
-        limit: 100,
-        project_id: unassignedProjectId,
-      }),
-    enabled: queriesEnabled,
-    staleTime: 30_000,
+  const scope = useWorkloadPlannerPageScope();
+  const ui = useWorkloadPlannerPageUiState();
+  const data = useWorkloadPlannerPageData({
+    scope,
+    mainView: ui.mainView,
+    useMockData: ui.useMockData,
+    selectedCell: ui.selectedCell,
   });
 
   const gridRangeFallback = useMemo(
@@ -563,116 +178,13 @@ const WorkloadPlannerPage: React.FC = () => {
         buildWorkloadTaskPatchBody(task, { extension_numbers: [toExtension] }),
       );
     },
-    onSuccess: () => {
-      toast.success("Task assigned");
-      setReassignTask(null);
-      setReassignOverloadConfirm(false);
-      invalidateWorkload();
-      unassignedQuery.refetch().catch(() => undefined);
-      dayQuery.refetch().catch(() => undefined);
+    onRescheduleSuccess: () => {
+      ui.setRescheduleTask(null);
+      ui.setOverloadSecondStep(false);
     },
-    onError: (err: unknown) => {
-      toast.error(workloadErrorMessage(err));
-    },
-  });
-
-  const estimateMutation = useMutation({
-    mutationFn: async ({
-      task,
-      minutes,
-    }: {
-      task: WorkloadTaskCard;
-      minutes: number;
-    }) => {
-      if (!Number.isFinite(minutes) || minutes <= 0) {
-        throw new Error("Enter a valid estimate in minutes.");
-      }
-      await updateTask(task.id, {
-        estimated_duration_minutes: minutes,
-        priority: workloadPriorityToApiString(task.priority),
-      });
-    },
-    onSuccess: () => {
-      invalidateWorkload();
-      dayQuery.refetch().catch(() => undefined);
-    },
-    onError: (err: unknown) => {
-      toast.error(workloadErrorMessage(err));
-    },
-  });
-
-  const markDoneMutation = useMutation({
-    mutationFn: async (task: WorkloadTaskCard) => {
-      await patchWorkloadTask(
-        task.id,
-        extension,
-        buildWorkloadTaskPatchBody(task, { is_completed: true }),
-      );
-    },
-    onSuccess: () => {
-      toast.success("Task marked done");
-      invalidateWorkload();
-      dayQuery.refetch().catch(() => undefined);
-    },
-    onError: (err: unknown) => {
-      toast.error(workloadErrorMessage(err));
-    },
-  });
-
-  const rescheduleMutation = useMutation({
-    mutationFn: async (payload: {
-      task: WorkloadTaskCard;
-      dueDate: string;
-    }) => {
-      await patchWorkloadTask(
-        payload.task.id,
-        extension,
-        buildWorkloadTaskPatchBody(payload.task, { due_date: payload.dueDate }),
-      );
-    },
-    onSuccess: () => {
-      toast.success("Task rescheduled");
-      setRescheduleTask(null);
-      setOverloadSecondStep(false);
-      invalidateWorkload();
-      dayQuery.refetch().catch(() => undefined);
-    },
-    onError: (err: unknown) => {
-      toast.error(workloadErrorMessage(err));
-    },
-  });
-
-  const openReschedule = useCallback(
-    (task: WorkloadTaskCard) => {
-      setRescheduleTask(task);
-      const d = task.due_date?.slice(0, 10) ?? selectedCell?.date ?? "";
-      setRescheduleDate(d);
-      setOverloadSecondStep(false);
-    },
-    [selectedCell?.date],
-  );
-
-  const boardDragMutation = useMutation({
-    mutationFn: async (intent: WorkloadBoardDropIntent) => {
-      await patchWorkloadTask(
-        intent.task.id,
-        extension,
-        buildWorkloadTaskPatchBody(intent.task, {
-          ...(intent.toExtension
-            ? { extension_numbers: [intent.toExtension] }
-            : {}),
-          ...(intent.toDate ? { due_date: intent.toDate } : {}),
-        }),
-      );
-    },
-    onSuccess: () => {
-      toast.success("Task updated");
-      setBoardDropIntent(null);
-      setBoardDropOverload(false);
-      invalidateWorkload();
-    },
-    onError: (err: unknown) => {
-      toast.error(workloadErrorMessage(err));
+    onBoardDropSuccess: () => {
+      ui.setBoardDropIntent(null);
+      ui.setBoardDropOverload(false);
     },
   });
 
@@ -682,25 +194,25 @@ const WorkloadPlannerPage: React.FC = () => {
     handleBoardDropIntent,
     confirmBoardDrop,
   } = useWorkloadPlannerTaskActions({
-    extension,
-    assigneeMatch: appliedFilters.assigneeMatch,
-    boardRangeStart: effectiveBoardData?.range.start,
-    reassignTask,
-    reassignTarget,
-    reassignOverloadConfirm,
-    selectedCell,
-    rescheduleTask,
-    rescheduleDate,
-    overloadSecondStep,
-    boardDropIntent,
-    assignMutation,
-    rescheduleMutation,
-    boardDragMutation,
-    setReassignOverloadConfirm,
-    setOverloadSecondStep,
-    setBoardDropIntent,
-    setBoardDropOverload,
-    formatError: workloadErrorMessage,
+    extension: scope.extension,
+    assigneeMatch: data.appliedFilters.assigneeMatch,
+    boardRangeStart: data.effectiveBoardData?.range.start,
+    reassignTask: ui.reassignTask,
+    reassignTarget: ui.reassignTarget,
+    reassignOverloadConfirm: ui.reassignOverloadConfirm,
+    selectedCell: ui.selectedCell,
+    rescheduleTask: ui.rescheduleTask,
+    rescheduleDate: ui.rescheduleDate,
+    overloadSecondStep: ui.overloadSecondStep,
+    boardDropIntent: ui.boardDropIntent,
+    assignMutation: mutations.assignMutation,
+    rescheduleMutation: mutations.rescheduleMutation,
+    boardDragMutation: mutations.boardDragMutation,
+    setReassignOverloadConfirm: ui.setReassignOverloadConfirm,
+    setOverloadSecondStep: ui.setOverloadSecondStep,
+    setBoardDropIntent: ui.setBoardDropIntent,
+    setBoardDropOverload: ui.setBoardDropOverload,
+    formatError: mutations.formatError,
   });
 
   const summaryForbidden =
@@ -752,93 +264,99 @@ const WorkloadPlannerPage: React.FC = () => {
 
   return (
     <div className="workload-page">
-      {useMockData ? (
+      {ui.useMockData ? (
         <div className="workload-demo-banner">
           <Info size={18} aria-hidden />
           You are viewing sample data.
           <button
             type="button"
             className="workload-demo-banner__exit"
-            onClick={() => { setUseMockData(false); window.scrollTo(0, 0); }}
+            onClick={() => {
+              ui.setUseMockData(false);
+              window.scrollTo(0, 0);
+            }}
           >
             Exit demo → view real data
           </button>
         </div>
       ) : null}
       <div className="workload-page__inner">
-
         <WorkloadPlannerPageHeader
-          mainView={mainView}
-          onMainViewChange={handleMainViewChange}
-          enabled={queriesEnabled}
+          mainView={ui.mainView}
+          onMainViewChange={ui.handleMainViewChange}
+          enabled={data.queriesEnabled}
         />
 
         <WorkloadPlannerFilterBar
-          range={draftFilters.range}
-          onRangeChange={handleDraftRangeChange}
-          customStart={draftFilters.customStart}
-          customEnd={draftFilters.customEnd}
+          range={data.draftFilters.range}
+          onRangeChange={data.handleDraftRangeChange}
+          customStart={data.draftFilters.customStart}
+          customEnd={data.draftFilters.customEnd}
           onCustomStartChange={(value) =>
-            setDraftFilters((prev) => ({ ...prev, customStart: value }))
+            data.setDraftFilters((prev) => ({ ...prev, customStart: value }))
           }
           onCustomEndChange={(value) =>
-            setDraftFilters((prev) => ({ ...prev, customEnd: value }))
+            data.setDraftFilters((prev) => ({ ...prev, customEnd: value }))
           }
           customRangeInvalid={
-            draftFilters.range === "custom" && draftRangeInvalid
+            data.draftFilters.range === "custom" && data.draftRangeInvalid
           }
-          assigneeMatch={draftFilters.assigneeMatch}
+          assigneeMatch={data.draftFilters.assigneeMatch}
           onAssigneeMatchChange={(value) =>
-            setDraftFilters((prev) => ({ ...prev, assigneeMatch: value }))
+            data.setDraftFilters((prev) => ({ ...prev, assigneeMatch: value }))
           }
-          projectFilter={draftFilters.projectFilter}
+          projectFilter={data.draftFilters.projectFilter}
           onProjectFilterChange={(value) =>
-            setDraftFilters((prev) => ({ ...prev, projectFilter: value }))
+            data.setDraftFilters((prev) => ({ ...prev, projectFilter: value }))
           }
-          projectOptions={projectOptions}
-          memberFilter={draftFilters.memberFilter}
+          projectOptions={data.projectOptions}
+          memberFilter={data.draftFilters.memberFilter}
           onMemberFilterChange={(value) =>
-            setDraftFilters((prev) => ({ ...prev, memberFilter: value }))
+            data.setDraftFilters((prev) => ({ ...prev, memberFilter: value }))
           }
-          memberExtensions={memberExtensions}
-          hierarchyExtensions={hierarchyDataExtensions}
-          priorityFilter={draftFilters.priorityFilter}
+          memberExtensions={data.filterMemberExtensions}
+          hierarchyExtensions={scope.hierarchyDataExtensions}
+          priorityFilter={data.draftFilters.priorityFilter}
           onPriorityFilterChange={(value) =>
-            setDraftFilters((prev) => ({ ...prev, priorityFilter: value }))
+            data.setDraftFilters((prev) => ({ ...prev, priorityFilter: value }))
           }
-          enabled={filtersEnabled}
-          unassignedCount={unassignedQuery.data?.count}
-          onOpenUnassigned={() => setShowUnassigned(true)}
-          onClearFilters={handleClearFilters}
-          hasActiveFilters={hasActiveFilters}
-          onApply={handleApplyFilters}
-          applyDisabled={applyDisabled}
-          isApplying={isApplyingFilters}
+          enabled={data.filtersEnabled}
+          unassignedCount={data.unassignedQuery.data?.count}
+          onOpenUnassigned={() => ui.setShowUnassigned(true)}
+          onClearFilters={data.handleClearFilters}
+          hasActiveFilters={data.hasActiveFilters}
+          onApply={data.handleApplyFilters}
+          applyDisabled={data.applyDisabled}
+          isApplying={data.isApplyingFilters}
         />
 
         <WorkloadPlannerAlertStack
-          sessionStatus={sessionStatus}
-          enabled={queriesEnabled}
-          teamMemberOnly={teamMemberBlocked}
-          accessForbidden={accessForbidden}
-          summaryError={summaryQuery.error}
-          summaryHasError={summaryQuery.isError}
-          gridError={gridQuery.error}
-          gridHasError={gridQuery.isError}
-          boardError={boardQuery.error}
-          boardHasError={boardQuery.isError && !boardForbidden}
-          mainView={mainView}
-          workloadErrorMessage={workloadErrorMessage}
+          sessionStatus={scope.sessionStatus}
+          enabled={data.queriesEnabled}
+          workloadSelfScoped={scope.workloadSelfScoped}
+          accessForbidden={data.accessForbidden}
+          summaryError={data.summaryQuery.error}
+          summaryHasError={data.summaryQuery.isError}
+          gridError={data.gridQuery.error}
+          gridHasError={data.gridQuery.isError}
+          boardError={data.boardQuery.error}
+          boardHasError={data.boardQuery.isError && !data.boardForbidden}
+          mainView={ui.mainView}
+          workloadErrorMessage={mutations.formatError}
         />
 
-        {mainView === "board" && useMockData && showBoardHint ? (
+        {ui.mainView === "board" && ui.useMockData && ui.showBoardHint ? (
           <div className="workload-board-hint">
             <Info size={18} aria-hidden />
-            <span><strong>Drag</strong> cards between columns to reassign &nbsp;·&nbsp; <strong>Move to</strong> changes due date &nbsp;·&nbsp; <strong>View</strong> opens the full task</span>
+            <span>
+              <strong>Drag</strong> cards between columns to reassign &nbsp;·&nbsp;{" "}
+              <strong>Move to</strong> changes due date &nbsp;·&nbsp; <strong>View</strong>{" "}
+              opens the full task
+            </span>
             <button
               type="button"
               className="workload-board-hint__close"
-              onClick={() => setShowBoardHint(false)}
+              onClick={() => ui.setShowBoardHint(false)}
               aria-label="Dismiss"
             >
               <X size={16} aria-hidden />
@@ -859,64 +377,67 @@ const WorkloadPlannerPage: React.FC = () => {
           priorityFilter={appliedFilters.priorityFilter}
           boardDragSaving={boardDragMutation.isPending}
           onBoardDropIntent={handleBoardDropIntent}
-          showWorkloadPerDay={showWorkloadPerDay}
-          onToggleWorkloadPerDay={() => setShowWorkloadPerDay((prev) => !prev)}
+          showWorkloadPerDay={ui.showWorkloadPerDay}
+          onToggleWorkloadPerDay={() => ui.setShowWorkloadPerDay((prev) => !prev)}
           onSelectCell={(extension, date) => {
-            const member = displayGridData?.members?.find(
+            const member = data.displayGridData?.members?.find(
               (m) => m.extension_number === extension,
             );
-            const cell = cellMap.get(workloadCellKey(extension, date));
-            setSelectedCell({ extension, date, member, cell });
+            const cell = data.cellMap.get(workloadCellKey(extension, date));
+            ui.setSelectedCell({ extension, date, member, cell });
           }}
         />
       </div>
 
       <WorkloadDayOffcanvas
-        selected={selectedCell}
-        onClose={() => setSelectedCell(null)}
-        dayQuery={dayQuery}
+        selected={ui.selectedCell}
+        onClose={() => ui.setSelectedCell(null)}
+        dayQuery={data.dayQuery}
         onReassign={(task) => {
-          setReassignTask(task);
-          setReassignTarget(memberExtensions[0] ?? "");
-          setReassignOverloadConfirm(false);
+          ui.setReassignTask(task);
+          ui.setReassignTarget(data.memberExtensions[0] ?? "");
+          ui.setReassignOverloadConfirm(false);
         }}
-        onReschedule={openReschedule}
+        onReschedule={ui.openReschedule}
         onMarkDone={(task) => {
-          markDoneMutation.mutate(task);
+          mutations.markDoneMutation.mutate(task);
         }}
         markDoneTaskId={
-          markDoneMutation.isPending
-            ? (markDoneMutation.variables?.id ?? null)
+          mutations.markDoneMutation.isPending
+            ? (mutations.markDoneMutation.variables?.id ?? null)
             : null
         }
         onSaveEstimate={(task, minutes) => {
-          estimateMutation.mutate({ task, minutes });
+          mutations.estimateMutation.mutate({ task, minutes });
         }}
         estimateSavingTaskId={
-          estimateMutation.isPending
-            ? (estimateMutation.variables?.task.id ?? null)
+          mutations.estimateMutation.isPending
+            ? (mutations.estimateMutation.variables?.task.id ?? null)
             : null
         }
-        formatError={workloadErrorMessage}
-        hierarchyExtensions={hierarchyDataExtensions}
+        formatError={mutations.formatError}
+        hierarchyExtensions={scope.hierarchyDataExtensions}
       />
 
       <WorkloadReassignModal
-        task={reassignTask}
-        memberExtensions={memberExtensions}
-        hierarchyExtensions={hierarchyDataExtensions}
-        targetExtension={reassignTarget}
-        onTargetChange={setReassignTarget}
-        isSaving={assignMutation.isPending}
-        overloadConfirm={reassignOverloadConfirm}
+        task={ui.reassignTask}
+        memberExtensions={data.filterMemberExtensions}
+        hierarchyExtensions={scope.hierarchyDataExtensions}
+        targetExtension={ui.reassignTarget}
+        onTargetChange={ui.setReassignTarget}
+        isSaving={mutations.assignMutation.isPending}
+        overloadConfirm={ui.reassignOverloadConfirm}
         memberName={
-          reassignTarget
-            ? formatWorkloadMemberLabel(reassignTarget, hierarchyDataExtensions)
+          ui.reassignTarget
+            ? formatWorkloadMemberLabel(
+                ui.reassignTarget,
+                scope.hierarchyDataExtensions,
+              )
             : ""
         }
         onClose={() => {
-          setReassignTask(null);
-          setReassignOverloadConfirm(false);
+          ui.setReassignTask(null);
+          ui.setReassignOverloadConfirm(false);
         }}
         onConfirm={() => {
           submitReassign().catch(() => undefined);
@@ -924,34 +445,34 @@ const WorkloadPlannerPage: React.FC = () => {
       />
 
       <WorkloadUnassignedSidebar
-        show={showUnassigned}
-        onClose={() => setShowUnassigned(false)}
-        unassignedQuery={unassignedQuery}
-        memberExtensions={memberExtensions}
-        hierarchyExtensions={hierarchyDataExtensions}
-        assignTargets={assignTargets}
-        setAssignTargets={setAssignTargets}
+        show={ui.showUnassigned}
+        onClose={() => ui.setShowUnassigned(false)}
+        unassignedQuery={data.unassignedQuery}
+        memberExtensions={data.filterMemberExtensions}
+        hierarchyExtensions={scope.hierarchyDataExtensions}
+        assignTargets={ui.assignTargets}
+        setAssignTargets={ui.setAssignTargets}
         onRequestAssign={(task, toExtension) => {
-          assignMutation.mutate({ task, toExtension });
+          mutations.assignMutation.mutate({ task, toExtension });
         }}
-        assignPending={assignMutation.isPending}
-        formatError={workloadErrorMessage}
+        assignPending={mutations.assignMutation.isPending}
+        formatError={mutations.formatError}
       />
 
       <WorkloadRescheduleModal
-        task={rescheduleTask}
-        currentDate={selectedCell?.date}
+        task={ui.rescheduleTask}
+        currentDate={ui.selectedCell?.date}
         onClose={() => {
-          setRescheduleTask(null);
-          setOverloadSecondStep(false);
+          ui.setRescheduleTask(null);
+          ui.setOverloadSecondStep(false);
         }}
-        rescheduleDate={rescheduleDate}
+        rescheduleDate={ui.rescheduleDate}
         onDateChange={(value: string) => {
-          setRescheduleDate(value);
-          setOverloadSecondStep(false);
+          ui.setRescheduleDate(value);
+          ui.setOverloadSecondStep(false);
         }}
-        overloadSecondStep={overloadSecondStep}
-        isSaving={rescheduleMutation.isPending}
+        overloadSecondStep={ui.overloadSecondStep}
+        isSaving={mutations.rescheduleMutation.isPending}
         onSubmit={() => {
           submitReschedule().catch(() => undefined);
         }}
@@ -959,31 +480,31 @@ const WorkloadPlannerPage: React.FC = () => {
 
       <WorkloadBoardDragConfirmModal
         payload={
-          boardDropIntent
+          ui.boardDropIntent
             ? {
-                taskTitle: boardDropIntent.task.title,
+                taskTitle: ui.boardDropIntent.task.title,
                 memberName: formatWorkloadMemberLabel(
-                  boardDropIntent.toExtension,
-                  hierarchyDataExtensions,
+                  ui.boardDropIntent.toExtension,
+                  scope.hierarchyDataExtensions,
                 ),
-                dateLabel: boardDropIntent.toDate
-                  ? formatWorkloadDayDetailDate(boardDropIntent.toDate)
+                dateLabel: ui.boardDropIntent.toDate
+                  ? formatWorkloadDayDetailDate(ui.boardDropIntent.toDate)
                   : "",
-                overloadWarning: boardDropOverload,
+                overloadWarning: ui.boardDropOverload,
               }
             : null
         }
-        isSaving={boardDragMutation.isPending}
+        isSaving={mutations.boardDragMutation.isPending}
         onClose={() => {
-          setBoardDropIntent(null);
-          setBoardDropOverload(false);
+          ui.setBoardDropIntent(null);
+          ui.setBoardDropOverload(false);
         }}
         onConfirm={confirmBoardDrop}
       />
 
       <WorkloadOnboardingModal
-        show={showOnboarding}
-        onComplete={handleOnboardingComplete}
+        show={ui.showOnboarding}
+        onComplete={ui.handleOnboardingComplete}
       />
     </div>
   );

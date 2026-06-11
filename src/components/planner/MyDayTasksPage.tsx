@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import moment from "moment";
 import { useSession } from "next-auth/react";
 import { Button, Form, Modal } from "react-bootstrap";
-import { CircleCheckBig, History, Pencil, Plus, Search, X } from "lucide-react";
+import { CircleCheckBig, ClipboardList, History, Pencil, Plus, Search, X } from "lucide-react";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 import CreateTaskSidebar from "@components/CreatePlannerTaskSidebar";
 import { MyDayTeamSection } from "@components/planner/my-day/MyDayTeamSection";
@@ -29,6 +29,10 @@ import {
 } from "@utils/tasks";
 import { MyDayDailySummaryPanel } from "@components/planner/my-day/MyDayDailySummaryPanel";
 import { MyDayHistoryModal } from "@components/planner/MyDayHistoryModal";
+import {
+  MyDayRolloverPrompt,
+  openMyDayRolloverScheduleModal,
+} from "@components/planner/my-day/MyDayRolloverPrompt";
 import { buildLiveMyDayStats } from "@page-modules/planner/my-day/myDayHistoryDomain";
 import { useHierarchyData } from "@components/filters/useHierarchyData";
 import { formatDateGlobal, ModuleSlug } from "@utils/Helper";
@@ -42,7 +46,6 @@ import {
   formatMyDayHeaderMetaLine,
   filterMyDaySuggestionTasks,
   resolveCapacityStatsFromPayload,
-  formatRolloverPromptCopy,
   formatSuggestionDueDate,
   getCapacityFillTone,
   isFlexibleTaskRow,
@@ -52,10 +55,12 @@ import {
   readTaskPriorityLabel,
   readHasEstimateFromRow,
   readMyDayTaskCompletedFromRow,
+  readRolloverTaskCompletedFromRow,
   resolveEstimateMinutesFromRow,
   normalizeMyDaySuggestionsPayload,
   resolveMyDayReporteeExtensions,
   resolveMyDayTaskCount,
+  resolveRolloverTaskRows,
   shouldShowMyDayTeamSection,
   resolveMyDayUnestimatedCount,
   resolveProjectFromRow,
@@ -233,8 +238,6 @@ type MyDayTaskListsSnapshot = Readonly<{
   planDate: string;
   meta: MyDayTasksMeta;
   isEmptyByDesign: boolean;
-  hasIncompleteToday: boolean;
-  todayTaskCount: number;
 }>;
 
 function isDeletedRolloverRow(row: unknown): boolean {
@@ -247,23 +250,23 @@ function isDeletedRolloverRow(row: unknown): boolean {
   );
 }
 
+function isIncompleteRolloverRow(row: unknown): boolean {
+  if (isDeletedRolloverRow(row)) return false;
+  if (row == null || typeof row !== "object") return false;
+  return !readRolloverTaskCompletedFromRow(row as Record<string, unknown>);
+}
+
 function syncRolloverFromPayload(
   rolloverPayload: MyDayRolloverPayload,
   todayStart: moment.Moment,
-  lists: MyDayTaskListsSnapshot,
 ): Readonly<{
   rolloverTasks: MyDayTask[];
-  previousDate: string | null;
   showPrompt: boolean;
 }> {
-  const rolloverRows = (rolloverPayload.tasks ?? []).filter((row) => !isDeletedRolloverRow(row));
+  const rolloverRows = resolveRolloverTaskRows(rolloverPayload).filter(isIncompleteRolloverRow);
   return {
     rolloverTasks: rolloverRows.map((row) => mapMyDayTaskRow(row, todayStart)),
-    previousDate: rolloverPayload.previous_date ?? null,
-    showPrompt: resolveShowRolloverPrompt(rolloverPayload, {
-      hasIncompleteTodayTasks: lists.hasIncompleteToday,
-      todayTaskCount: lists.todayTaskCount,
-    }),
+    showPrompt: resolveShowRolloverPrompt(rolloverPayload),
   };
 }
 
@@ -322,8 +325,6 @@ function buildMyDayTaskListsSnapshot(
     planDate: taskPayload.plan_date ?? today,
     meta: taskPayload.meta ?? {},
     isEmptyByDesign: taskPayload.is_empty_by_design === true,
-    hasIncompleteToday: tasks.some((task) => !task.isCompleted),
-    todayTaskCount: tasks.length,
   };
 }
 
@@ -736,10 +737,12 @@ function useMyDayCarryOverSelection(
 ): void {
   useEffect(() => {
     if (carryOverTasks.length === 0) {
-      setCarryOverMode("added");
       setSelectedCarryOverIds([]);
       return;
     }
+    setCarryOverMode((prev) =>
+      prev === "added" || prev === "skipped" ? prev : "pending",
+    );
     setSelectedCarryOverIds((prev) => {
       const keep = carryOverTasks.map((t) => t.id).filter((id) => prev.includes(id));
       return keep.length > 0 ? keep : carryOverTasks.map((t) => t.id);
@@ -777,6 +780,7 @@ function useMyDayTasksPageController() {
   );
   const [rolloverShowPrompt, setRolloverShowPrompt] = useState(false);
   const [showHistoryModal, setShowHistoryModal] = useState(false);
+  const [showDailySummary, setShowDailySummary] = useState(false);
   const [planDate, setPlanDate] = useState("");
   const [tasksMeta, setTasksMeta] = useState<MyDayTasksMeta>({});
   const [isEditingCapacity, setIsEditingCapacity] = useState(false);
@@ -789,7 +793,6 @@ function useMyDayTasksPageController() {
   const [showScheduleLaterModal, setShowScheduleLaterModal] = useState(false);
   const [scheduleLaterDate, setScheduleLaterDate] = useState("");
   const [isEmptyByDesign, setIsEmptyByDesign] = useState(false);
-  const [rolloverPreviousDate, setRolloverPreviousDate] = useState<string | null>(null);
   const [suggestionPriorityFilter, setSuggestionPriorityFilter] = useState("");
   const [suggestionOverdueOnly, setSuggestionOverdueOnly] = useState(false);
   const [suggestionCategoryFilter, setSuggestionCategoryFilter] = useState<
@@ -889,14 +892,23 @@ function useMyDayTasksPageController() {
     [],
   );
 
+  const applyRolloverPayload = useCallback(
+    (rolloverPayload: MyDayRolloverPayload) => {
+      const rollover = syncRolloverFromPayload(rolloverPayload, todayStart);
+      setRolloverTasks(rollover.rolloverTasks);
+      setRolloverShowPrompt(rollover.showPrompt);
+    },
+    [todayStart],
+  );
+
   const fetchCoreMyDayData = useCallback(async () => {
     try {
       setLoading(true);
-      const [preferences, taskPayload, capacityPayload, rolloverPayload] = await Promise.all([
-        getMyDayPreferences(),
-        listMyDayTasks(),
-        getMyDayCapacity({ date: today }),
-        getMyDayRollover(),
+      const extensionNumber = managerExtension || undefined;
+      const [preferences, taskPayload, capacityPayload] = await Promise.all([
+        getMyDayPreferences(extensionNumber),
+        listMyDayTasks({ extension_number: extensionNumber }),
+        getMyDayCapacity({ date: today, extension_number: extensionNumber }),
       ]);
 
       const lists = buildMyDayTaskListsSnapshot(taskPayload, todayStart, today);
@@ -917,10 +929,13 @@ function useMyDayTasksPageController() {
         resolvedDefault,
       );
 
-      const rollover = syncRolloverFromPayload(rolloverPayload, todayStart, lists);
-      setRolloverTasks(rollover.rolloverTasks);
-      setRolloverPreviousDate(rollover.previousDate);
-      setRolloverShowPrompt(rollover.showPrompt);
+      try {
+        const rolloverPayload = await getMyDayRollover(extensionNumber);
+        applyRolloverPayload(rolloverPayload);
+      } catch {
+        setRolloverTasks([]);
+        setRolloverShowPrompt(false);
+      }
     } catch {
       toast.error("Failed to load My Day tasks");
       setTasks([]);
@@ -929,28 +944,29 @@ function useMyDayTasksPageController() {
     } finally {
       setLoading(false);
     }
-  }, [applyCapacityFromApi, today, todayStart]);
+  }, [applyCapacityFromApi, applyRolloverPayload, managerExtension, today, todayStart]);
 
   const refreshTasksAndRollover = useCallback(async () => {
     try {
-      const [taskPayload, rolloverPayload] = await Promise.all([
-        listMyDayTasks(),
-        getMyDayRollover(),
-      ]);
+      const extensionNumber = managerExtension || undefined;
+      const taskPayload = await listMyDayTasks({ extension_number: extensionNumber });
       const lists = buildMyDayTaskListsSnapshot(taskPayload, todayStart, today);
       setTasks(lists.tasks);
       setPlanDate(lists.planDate);
       setTasksMeta(lists.meta);
       setIsEmptyByDesign(lists.isEmptyByDesign);
 
-      const rollover = syncRolloverFromPayload(rolloverPayload, todayStart, lists);
-      setRolloverTasks(rollover.rolloverTasks);
-      setRolloverPreviousDate(rollover.previousDate);
-      setRolloverShowPrompt(rollover.showPrompt);
+      try {
+        const rolloverPayload = await getMyDayRollover(extensionNumber);
+        applyRolloverPayload(rolloverPayload);
+      } catch {
+        setRolloverTasks([]);
+        setRolloverShowPrompt(false);
+      }
     } catch {
       toast.error("Failed to refresh My Day tasks");
     }
-  }, [today, todayStart]);
+  }, [applyRolloverPayload, managerExtension, today, todayStart]);
 
   const refreshMyDayPage = useCallback(async () => {
     await fetchCoreMyDayData();
@@ -965,27 +981,42 @@ function useMyDayTasksPageController() {
     fetchSuggestions(debouncedSuggestedSearch).catch(() => undefined);
   }, [debouncedSuggestedSearch, fetchSuggestions]);
 
-  const carryOverTasks = useMemo(
-    () => rolloverTasks.filter((t) => !t.isCompleted),
-    [rolloverTasks],
-  );
+  const carryOverTasks = rolloverTasks;
 
   useMyDayCarryOverSelection(carryOverTasks, setCarryOverMode, setSelectedCarryOverIds);
 
+  const rolloverAckSentRef = useRef(false);
+
   const persistRolloverAck = useCallback(async () => {
     try {
-      await ackMyDayRolloverPrompt();
+      await ackMyDayRolloverPrompt(managerExtension || undefined);
     } catch {
       /* prompt may still show on next load if ack fails */
     }
-  }, []);
+  }, [managerExtension]);
+
+  useEffect(() => {
+    rolloverAckSentRef.current = false;
+  }, [today]);
+
+  useEffect(() => {
+    if (
+      !rolloverShowPrompt ||
+      carryOverTasks.length === 0 ||
+      carryOverMode !== "pending" ||
+      rolloverAckSentRef.current
+    ) {
+      return;
+    }
+    rolloverAckSentRef.current = true;
+    persistRolloverAck();
+  }, [carryOverMode, carryOverTasks.length, rolloverShowPrompt, persistRolloverAck]);
 
   const visibleTasks = useMemo(() => {
     if (carryOverMode === "added") return tasks;
-    if (carryOverMode === "skipped") return tasks.filter((t) => !t.isCarryOver);
-    const allowed = new Set(selectedCarryOverIds);
-    return tasks.filter((t) => !t.isCarryOver || allowed.has(t.id));
-  }, [carryOverMode, selectedCarryOverIds, tasks]);
+    // §7.2 CRITICAL: never surface yesterday's tasks in My Day until the user chooses "Add to Today".
+    return tasks.filter((task) => !task.isCarryOver);
+  }, [carryOverMode, tasks]);
 
   const activeTasks = useMemo(
     () => visibleTasks.filter((task) => !task.isCompleted),
@@ -1060,11 +1091,6 @@ function useMyDayTasksPageController() {
     const usedMinutes = resolveMyDayCapacityUsedMinutes(tasks, plannedMinutes);
     return formatMyDayHeaderMetaLine(taskCount, usedMinutes);
   }, [plannedMinutes, tasks, tasksMeta]);
-
-  const rolloverPromptCopy = useMemo(
-    () => formatRolloverPromptCopy(rolloverPreviousDate),
-    [rolloverPreviousDate],
-  );
 
   const applyOptimisticMyDayAdd = useCallback((task: MyDayTask, estimatedMinutes?: number) => {
     const minutes = Math.max(0, estimatedMinutes ?? task.estimateMinutes ?? 0);
@@ -1287,31 +1313,47 @@ function useMyDayTasksPageController() {
     [handleAddSuggestedTask],
   );
 
+  const rolloverExtension = managerExtension || undefined;
+
   const handleCarryOverSkip = useCallback(() => {
+    if (selectedCarryOverIds.length === 0) {
+      toast.error("Select at least one task to dismiss");
+      return;
+    }
     swallowAsyncError(
-      submitMyDayRolloverAction({
-        task_ids: selectedCarryOverIds,
-        action: "dismiss",
-      }).then(async () => {
+      submitMyDayRolloverAction(
+        {
+          task_ids: selectedCarryOverIds,
+          action: "dismiss",
+        },
+        rolloverExtension,
+      ).then(async () => {
         setCarryOverMode("skipped");
         setRolloverShowPrompt(false);
         await persistRolloverAck();
         return refreshMyDayPage();
       }),
     );
-  }, [persistRolloverAck, refreshMyDayPage, selectedCarryOverIds]);
+  }, [persistRolloverAck, refreshMyDayPage, rolloverExtension, selectedCarryOverIds]);
 
   const handleCarryOverScheduleLater = useCallback(() => {
+    if (selectedCarryOverIds.length === 0) {
+      toast.error("Select at least one task to schedule");
+      return;
+    }
     if (!scheduleLaterDate) {
       toast.error("Choose a date to schedule missed tasks");
       return;
     }
     swallowAsyncError(
-      submitMyDayRolloverAction({
-        task_ids: selectedCarryOverIds,
-        action: "schedule",
-        schedule_date: scheduleLaterDate,
-      }).then(async () => {
+      submitMyDayRolloverAction(
+        {
+          task_ids: selectedCarryOverIds,
+          action: "schedule",
+          schedule_date: scheduleLaterDate,
+        },
+        rolloverExtension,
+      ).then(async () => {
         setShowScheduleLaterModal(false);
         setCarryOverMode("skipped");
         setRolloverShowPrompt(false);
@@ -1319,21 +1361,28 @@ function useMyDayTasksPageController() {
         return refreshMyDayPage();
       }),
     );
-  }, [persistRolloverAck, refreshMyDayPage, scheduleLaterDate, selectedCarryOverIds]);
+  }, [persistRolloverAck, refreshMyDayPage, rolloverExtension, scheduleLaterDate, selectedCarryOverIds]);
 
   const handleCarryOverApply = useCallback(() => {
+    if (selectedCarryOverIds.length === 0) {
+      toast.error("Select at least one task to add to today");
+      return;
+    }
     swallowAsyncError(
-      submitMyDayRolloverAction({
-        task_ids: selectedCarryOverIds,
-        action: "today",
-      }).then(async () => {
+      submitMyDayRolloverAction(
+        {
+          task_ids: selectedCarryOverIds,
+          action: "today",
+        },
+        rolloverExtension,
+      ).then(async () => {
         setCarryOverMode("added");
         setRolloverShowPrompt(false);
         await persistRolloverAck();
         return refreshMyDayPage();
       }),
     );
-  }, [persistRolloverAck, refreshMyDayPage, selectedCarryOverIds]);
+  }, [persistRolloverAck, refreshMyDayPage, rolloverExtension, selectedCarryOverIds]);
 
   const handleSaveDefaultCapacity = useCallback(async () => {
     const parsed = parseCapacityDurationInput(defaultCapacityDraft);
@@ -1470,6 +1519,8 @@ function useMyDayTasksPageController() {
     rolloverShowPrompt,
     showHistoryModal,
     setShowHistoryModal,
+    showDailySummary,
+    setShowDailySummary,
     planDate,
     isEditingCapacity,
     setIsEditingCapacity,
@@ -1499,7 +1550,6 @@ function useMyDayTasksPageController() {
     groupedSuggestions,
     headerDateLabel,
     headerMetaLine,
-    rolloverPromptCopy,
     refreshMyDayPage,
     toggleCarryOverSelection,
     handleOpenEstimateModal,
@@ -1556,6 +1606,15 @@ function MyDayPageHeader({ vm }: MyDayTasksPageViewProps) {
         <p className="myday-header__meta">{vm.headerMetaLine}</p>
       </div>
       <div className="myday-header__actions">
+        <Button
+          variant={vm.showDailySummary ? "secondary" : "outline-secondary"}
+          size="sm"
+          onClick={() => vm.setShowDailySummary((prev) => !prev)}
+          aria-pressed={vm.showDailySummary}
+        >
+          <ClipboardList size={14} className="me-1" />
+          Daily Summary
+        </Button>
         <Button variant="outline-secondary" size="sm" onClick={() => vm.setShowHistoryModal(true)}>
           <History size={14} className="me-1" />
           History
@@ -1647,48 +1706,6 @@ function MyDayCapacitySection({ vm }: MyDayTasksPageViewProps) {
           {formatUnestimatedActiveLabel(vm.unestimatedActiveCount)}
         </p>
       ) : null}
-    </div>
-  );
-}
-
-function MyDayRolloverSection({ vm }: MyDayTasksPageViewProps) {
-  const showCard =
-    vm.carryOverTasks.length > 0 && vm.carryOverMode === "pending" && vm.rolloverShowPrompt;
-  if (!showCard) return null;
-  return (
-    <div className="myday-carry-card">
-      <h4>Missed yesterday</h4>
-      <p className="myday-carry-copy">{vm.rolloverPromptCopy}</p>
-      <div className="myday-carry-list">
-        {vm.carryOverTasks.slice(0, 5).map((task) => (
-          <button
-            key={task.id}
-            type="button"
-            className={`myday-carry-item ${vm.selectedCarryOverIds.includes(task.id) ? "selected" : ""}`}
-            onClick={() => vm.toggleCarryOverSelection(task.id)}
-          >
-            <span>{task.title}</span>
-            <span>{task.estimateMinutes > 0 ? `${task.estimateMinutes}m` : "--"}</span>
-          </button>
-        ))}
-      </div>
-      <div className="myday-carry-actions">
-        <button type="button" onClick={vm.handleCarryOverApply}>
-          Add to today
-        </button>
-        <button
-          type="button"
-          onClick={() => {
-            vm.setScheduleLaterDate(moment().add(1, "day").format("YYYY-MM-DD"));
-            vm.setShowScheduleLaterModal(true);
-          }}
-        >
-          Schedule later
-        </button>
-        <button type="button" onClick={vm.handleCarryOverSkip}>
-          Handle them later
-        </button>
-      </div>
     </div>
   );
 }
@@ -2019,8 +2036,22 @@ function MyDaySuggestionsPanel({ vm }: MyDayTasksPageViewProps) {
 }
 
 function MyDayTasksPageModals({ vm }: MyDayTasksPageViewProps) {
+  const showRolloverPrompt =
+    vm.carryOverTasks.length > 0 && vm.carryOverMode === "pending" && vm.rolloverShowPrompt;
+
   return (
     <>
+      <MyDayRolloverPrompt
+        show={showRolloverPrompt}
+        tasks={vm.carryOverTasks}
+        selectedTaskIds={vm.selectedCarryOverIds}
+        onToggleTask={vm.toggleCarryOverSelection}
+        onAddToday={vm.handleCarryOverApply}
+        onScheduleLater={() => {
+          openMyDayRolloverScheduleModal(vm.setScheduleLaterDate, vm.setShowScheduleLaterModal);
+        }}
+        onDismiss={vm.handleCarryOverSkip}
+      />
       <CreateTaskSidebar
         isOpen={vm.showCreateSidebar}
         onClose={() => vm.setShowCreateSidebar(false)}
@@ -2192,7 +2223,6 @@ function MyDayTasksPageView({ vm }: MyDayTasksPageViewProps) {
       </div>
       <div className="myday-layout">
         <div className="myday-main">
-          <MyDayRolloverSection vm={vm} />
           {showTeam && vm.reporteeExtensions.length > 0 ? (
             <MyDayTeamSection
               planDate={vm.planDate || vm.today}
@@ -2203,9 +2233,9 @@ function MyDayTasksPageView({ vm }: MyDayTasksPageViewProps) {
           ) : null}
           <MyDayTodayTasksSection vm={vm} />
           <MyDayCompletedSection vm={vm} />
-          {vm.loading ? null : (
+          {!vm.loading && vm.showDailySummary ? (
             <MyDayDailySummaryPanel stats={vm.dailySummaryStats} showCapacityBar />
-          )}
+          ) : null}
         </div>
         <MyDaySuggestionsPanel vm={vm} />
       </div>

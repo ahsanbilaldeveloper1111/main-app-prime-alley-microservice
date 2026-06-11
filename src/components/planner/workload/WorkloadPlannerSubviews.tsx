@@ -525,7 +525,8 @@ export function WorkloadGridPanel({
 type WorkloadPlannerAlertStackProps = Readonly<{
   sessionStatus: string;
   enabled: boolean;
-  teamMemberOnly?: boolean;
+  /** Team members (non-owners) only see their own workload row. */
+  workloadSelfScoped?: boolean;
   accessForbidden: boolean;
   summaryError: unknown;
   summaryHasError: boolean;
@@ -540,7 +541,7 @@ type WorkloadPlannerAlertStackProps = Readonly<{
 export function WorkloadPlannerAlertStack({
   sessionStatus,
   enabled,
-  teamMemberOnly = false,
+  workloadSelfScoped = false,
   accessForbidden,
   summaryError,
   summaryHasError,
@@ -559,17 +560,17 @@ export function WorkloadPlannerAlertStack({
         </div>
       ) : null}
 
-      {!enabled && sessionStatus === "authenticated" && !teamMemberOnly ? (
+      {!enabled && sessionStatus === "authenticated" ? (
         <Alert variant="warning">
           Your session does not include a phone or extension; workload APIs
           cannot be called.
         </Alert>
       ) : null}
 
-      {teamMemberOnly ? (
+      {workloadSelfScoped && enabled ? (
         <Alert variant="info">
-          Workload is a manager-only view (team owners). Use{" "}
-          <a href="/planner/my-tasks">My Day</a> for your personal task plan.
+          Showing your workload only. Team owners can view and manage the full
+          team roster.
         </Alert>
       ) : null}
 
