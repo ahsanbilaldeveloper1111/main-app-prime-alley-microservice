@@ -259,9 +259,9 @@ export function ReportsProjectDetailList({
                         <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "6px" }}>
                           <span style={{ fontSize: "11px", color: "#9ca3af", minWidth: "20px", fontFamily: "Lexend Deca, sans-serif" }}>{idx + 1}</span>
                           <span style={{ width: "8px", height: "8px", borderRadius: "50%", backgroundColor: row.color, flexShrink: 0, display: "inline-block" }} />
-                          <span style={{ fontSize: "13px", fontWeight: 500, color: "#141414", fontFamily: "Lexend Deca, sans-serif", flex: 1 }}>{row.name}</span>
+                          <span className="reports-project-row__name">{row.name}</span>
                           <span className={`reports-project-row__health ${healthClass}`}>{row.healthLabel}</span>
-                          <span style={{ fontSize: "13px", fontWeight: 600, color: "#374151", minWidth: "2.5rem", textAlign: "right", fontFamily: "Lexend Deca, sans-serif" }}>{row.progressPercent}%</span>
+                          <span className="reports-project-row__pct">{row.progressPercent}%</span>
                         </div>
                         <div style={{ height: "5px", background: "#e2e8f0", borderRadius: "999px", overflow: "hidden", marginLeft: "28px" }}>
                           <div style={{ height: "100%", width: `${Math.min(100, Math.max(0, row.progressPercent))}%`, background: progressBarColor, borderRadius: "999px" }} />

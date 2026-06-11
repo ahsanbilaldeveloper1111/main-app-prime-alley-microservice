@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useLayoutEffect, useRef } from "react";
 import ReactDOM from "react-dom";
 import type { LucideIcon } from "lucide-react";
 import {
@@ -83,10 +83,14 @@ export function WorkloadOnboardingModal({ show, onComplete }: Props) {
     setOnboardingComplete();
     document.body.style.overflow = "";
     document.body.style.paddingRight = "";
+    const dialog = dialogRef.current;
+    if (dialog?.open) {
+      dialog.close();
+    }
     onCompleteRef.current(choice);
   }
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!show) return undefined;
 
     const dialog = dialogRef.current;
@@ -96,14 +100,16 @@ export function WorkloadOnboardingModal({ show, onComplete }: Props) {
       dialog.showModal();
     }
 
-    const handleClose = () => {
-      finish(null);
+    // Backdrop click and Escape dismiss the native dialog and were completing
+    // onboarding before the user could finish the wizard.
+    const preventLightDismiss = (event: Event) => {
+      event.preventDefault();
     };
 
-    dialog.addEventListener("close", handleClose);
+    dialog.addEventListener("cancel", preventLightDismiss);
 
     return () => {
-      dialog.removeEventListener("close", handleClose);
+      dialog.removeEventListener("cancel", preventLightDismiss);
       if (dialog.open) {
         dialog.close();
       }

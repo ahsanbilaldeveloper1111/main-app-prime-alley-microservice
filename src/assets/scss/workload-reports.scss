@@ -532,12 +532,11 @@
 
   .reports-kpi-grid--live .reports-kpi-card {
     --reports-kpi-bg: #ffffff;
-    --reports-kpi-accent: #0066CC;
     background: #ffffff;
   }
 
   .reports-kpi-grid--live .reports-kpi-card__value {
-    color: #0066CC;
+    color: var(--reports-kpi-accent, #0066CC);
     font-weight: 500;
   }
 
@@ -1092,7 +1091,7 @@
   }
 
   .reports-project-row__name {
-    flex: 1;
+    display: block;
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -1103,6 +1102,7 @@
   }
 
   .reports-project-row__health {
+    flex-shrink: 0;
     font-size: clamp(10px, 0.75vw, 12px);
     font-weight: 600;
     padding: 3px 9px;
@@ -1111,7 +1111,7 @@
 
   .reports-project-row__health--ok {
     background: #ecfdf5;
-    color: #15803d;
+    color: #16a34a;
   }
 
   .reports-project-row__health--risk {
@@ -1120,6 +1120,7 @@
   }
 
   .reports-project-row__pct {
+    flex-shrink: 0;
     font-size: clamp(11px, 0.8vw, 13px);
     font-weight: 600;
     color: #374151;
@@ -2253,5 +2254,49 @@
 .reports-modal-list-row {
   &:hover {
     background: #f5f7fa;
+  }
+}
+
+// Project Health badges in portaled modals (outside .workload-reports-page scope).
+.reports-modal-dialog {
+  .reports-project-row__name {
+    display: block;
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: clamp(11px, 0.85vw, 13px);
+    font-weight: 500;
+    color: #141414;
+    font-family: "Lexend Deca", Helvetica, Arial, sans-serif;
+  }
+
+  .reports-project-row__health {
+    flex-shrink: 0;
+    font-size: clamp(10px, 0.75vw, 12px);
+    font-weight: 600;
+    padding: 3px 9px;
+    border-radius: 999px;
+  }
+
+  .reports-project-row__health--ok {
+    background: #ecfdf5;
+    color: #16a34a;
+  }
+
+  .reports-project-row__health--risk {
+    background: #fef2f2;
+    color: #991b1b;
+  }
+
+  .reports-project-row__pct {
+    flex-shrink: 0;
+    font-size: clamp(11px, 0.8vw, 13px);
+    font-weight: 600;
+    color: #374151;
+    min-width: 2.5rem;
+    text-align: right;
+    font-family: "Lexend Deca", Helvetica, Arial, sans-serif;
   }
 }

@@ -146,36 +146,44 @@ type WorkloadSummaryCardsProps = Readonly<{
 export function WorkloadSummaryCardsRow({ data }: WorkloadSummaryCardsProps) {
   return (
     <div className="workload-summary-row">
-      <div className="workload-summary-card workload-summary-card--shade-indigo">
+      <div className="workload-summary-card">
         <div className="workload-summary-card__label">Tasks this week</div>
-        <div className="workload-summary-card__value">{data.total_tasks_this_week}</div>
+        <div className="workload-summary-card__value" style={{ color: "#0066CC" }}>
+          {data.total_tasks_this_week}
+        </div>
         <div className="workload-summary-card__sub">
-          <span className="workload-summary-card__dot" />
-          {" Assigned to team"}
+          <span className="workload-summary-card__dot" style={{ background: "#0066CC" }} />
+          Assigned to team
         </div>
       </div>
-      <div className="workload-summary-card workload-summary-card--shade-light">
+      <div className="workload-summary-card">
         <div className="workload-summary-card__label">Overloaded members</div>
-        <div className="workload-summary-card__value">{data.overloaded_members}</div>
+        <div className="workload-summary-card__value" style={{ color: "#dc2626" }}>
+          {data.overloaded_members}
+        </div>
         <div className="workload-summary-card__sub">
-          <span className="workload-summary-card__dot" />
-          {" Above 100% capacity"}
+          <span className="workload-summary-card__dot" style={{ background: "#dc2626" }} />
+          Above 100% capacity
         </div>
       </div>
-      <div className="workload-summary-card workload-summary-card--shade-sky">
+      <div className="workload-summary-card">
         <div className="workload-summary-card__label">Unestimated tasks</div>
-        <div className="workload-summary-card__value">{data.unestimated_tasks}</div>
+        <div className="workload-summary-card__value" style={{ color: "#ea580c" }}>
+          {data.unestimated_tasks}
+        </div>
         <div className="workload-summary-card__sub">
-          <span className="workload-summary-card__dot" />
-          {" No time estimate set"}
+          <span className="workload-summary-card__dot" style={{ background: "#ea580c" }} />
+          No time estimate set
         </div>
       </div>
-      <div className="workload-summary-card workload-summary-card--shade-medium">
+      <div className="workload-summary-card">
         <div className="workload-summary-card__label">Critical priority</div>
-        <div className="workload-summary-card__value">{data.critical_priority_tasks}</div>
+        <div className="workload-summary-card__value" style={{ color: "#dc2626" }}>
+          {data.critical_priority_tasks}
+        </div>
         <div className="workload-summary-card__sub">
-          <span className="workload-summary-card__dot" />
-          {" Needs immediate attention"}
+          <span className="workload-summary-card__dot" style={{ background: "#dc2626" }} />
+          Needs immediate attention
         </div>
       </div>
     </div>

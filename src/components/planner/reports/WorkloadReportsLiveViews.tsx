@@ -56,15 +56,30 @@ function TaskBadgeButton({ badgeClassName, label, onClick }: TaskBadgeButtonProp
   );
 }
 
+const LIVE_KPI_BLUE_SHADES = [
+  "reports-kpi-card--shade-indigo",
+  "reports-kpi-card--shade-light",
+  "reports-kpi-card--shade-sky",
+  "reports-kpi-card--shade-medium",
+] as const;
+
+function resolveLiveKpiCardClass(accent: string, index: number): string {
+  if (accent === "in_progress") return "reports-kpi-card--in-progress";
+  if (accent === "overdue") return "reports-kpi-card--overdue";
+  if (accent === "completed") return "reports-kpi-card--completed";
+  if (accent === "pending") return "reports-kpi-card--pending";
+  return LIVE_KPI_BLUE_SHADES[index % LIVE_KPI_BLUE_SHADES.length];
+}
+
 export function ReportsLiveDashboardKpiRow({
   cards,
 }: Readonly<{ cards: LiveDashboardKpi[] }>) {
   return (
     <div className="reports-kpi-grid reports-kpi-grid--live">
-      {cards.map((card) => (
+      {cards.map((card, index) => (
         <div
           key={card.label}
-          className="reports-kpi-card"
+          className={`reports-kpi-card ${resolveLiveKpiCardClass(card.accent, index)}`}
         >
           <div className="reports-kpi-card__label">{card.label}</div>
           <div className="reports-kpi-card__value">{card.value}</div>

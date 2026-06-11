@@ -1,4 +1,17 @@
-import type { WorkloadBoardData, WorkloadGridData } from "@utils/tasks";
+import type {
+  WorkloadBoardData,
+  WorkloadGridData,
+  WorkloadSummaryMember,
+} from "@utils/tasks";
+
+/** Demo mode must bypass company roster filtering so mock extensions render. */
+export function mapMockGridMembersToPeriodMembers(
+  grid: WorkloadGridData,
+): WorkloadSummaryMember[] {
+  return (grid.members ?? []).map((member) => ({
+    extension_number: member.extension_number,
+  }));
+}
 
 // ─── Onboarding status ───────────────────────────────────────────
 // Replace these two functions with API calls when backend is ready.

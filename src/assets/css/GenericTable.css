@@ -1035,8 +1035,66 @@ button.preview-button:hover, button.preview-button:focus {
   flex: 0 0 auto;
 }
 
-.members-table-wrapper .gt-toolbar-tabs-section {
- margin-left: 15px;
+/* Planner project settings tabs — keep GenericTable inside the page shell */
+.members-table-wrapper,
+.labels-table-wrapper,
+.statuses-table-wrapper {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  position: relative;
+}
+
+.members-table-wrapper .generic-table-container,
+.labels-table-wrapper .generic-table-container,
+.statuses-table-wrapper .generic-table-container {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.members-table-wrapper .generic-table-card,
+.labels-table-wrapper .generic-table-card,
+.statuses-table-wrapper .generic-table-card {
+  max-width: 100%;
+  min-width: 0;
+}
+
+.members-table-wrapper .generic-table-responsive,
+.labels-table-wrapper .generic-table-responsive,
+.statuses-table-wrapper .generic-table-responsive {
+  width: calc(100% - 48px);
+  max-width: calc(100% - 48px);
+  margin: 14px 24px;
+  box-sizing: border-box;
+}
+
+.members-table-wrapper .gt-toolbar-container,
+.labels-table-wrapper .gt-toolbar-container,
+.statuses-table-wrapper .gt-toolbar-container {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  overflow-x: hidden;
+}
+
+.members-table-wrapper .gt-metrics-panel,
+.labels-table-wrapper .gt-metrics-panel,
+.statuses-table-wrapper .gt-metrics-panel {
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+.members-table-wrapper .gt-toolbar-tabs-actions,
+.labels-table-wrapper .gt-toolbar-tabs-actions,
+.statuses-table-wrapper .gt-toolbar-tabs-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
 }
 
 .gt-tab-button {

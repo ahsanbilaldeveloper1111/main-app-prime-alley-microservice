@@ -83,6 +83,7 @@ import {
   getOnboardingStatus,
   WORKLOAD_MOCK_BOARD_DATA,
   WORKLOAD_MOCK_GRID_DATA,
+  mapMockGridMembersToPeriodMembers,
 } from "./workload/workloadOnboarding";
 import { startWorkloadTour, getGridTourSeen, getBoardTourSeen } from "./workload/useWorkloadTour";
 
@@ -467,41 +468,45 @@ const WorkloadPlannerPage: React.FC = () => {
     [rosterExtensions, extension],
   );
 
-  const displayGridData = useMemo(
-    () =>
-      resolveWorkloadGridDisplayData(effectiveGridData, {
-        viewerExtension: extension,
-        memberFilter: appliedFilters.memberFilter,
-        rangeFallback: gridRangeFallback,
-        teamExtensionNumbers: gridTeamExtensionNumbers,
-        companyExtensionAllowlist,
-      }),
-    [
-      effectiveGridData,
-      extension,
-      appliedFilters.memberFilter,
-      gridRangeFallback,
-      gridTeamExtensionNumbers,
+  const displayGridData = useMemo(() => {
+    if (useMockData) {
+      return effectiveGridData;
+    }
+    return resolveWorkloadGridDisplayData(effectiveGridData, {
+      viewerExtension: extension,
+      memberFilter: appliedFilters.memberFilter,
+      rangeFallback: gridRangeFallback,
+      teamExtensionNumbers: gridTeamExtensionNumbers,
       companyExtensionAllowlist,
-    ],
-  );
+    });
+  }, [
+    useMockData,
+    effectiveGridData,
+    extension,
+    appliedFilters.memberFilter,
+    gridRangeFallback,
+    gridTeamExtensionNumbers,
+    companyExtensionAllowlist,
+  ]);
 
-  const displayBoardData = useMemo(
-    () =>
-      resolveWorkloadBoardDisplayData(effectiveBoardData, {
-        viewerExtension: extension,
-        memberFilter: appliedFilters.memberFilter,
-        teamExtensionNumbers: gridTeamExtensionNumbers,
-        companyExtensionAllowlist,
-      }),
-    [
-      effectiveBoardData,
-      extension,
-      appliedFilters.memberFilter,
-      gridTeamExtensionNumbers,
+  const displayBoardData = useMemo(() => {
+    if (useMockData) {
+      return effectiveBoardData;
+    }
+    return resolveWorkloadBoardDisplayData(effectiveBoardData, {
+      viewerExtension: extension,
+      memberFilter: appliedFilters.memberFilter,
+      teamExtensionNumbers: gridTeamExtensionNumbers,
       companyExtensionAllowlist,
-    ],
-  );
+    });
+  }, [
+    useMockData,
+    effectiveBoardData,
+    extension,
+    appliedFilters.memberFilter,
+    gridTeamExtensionNumbers,
+    companyExtensionAllowlist,
+  ]);
 
   const cellMap = useMemo(
     () => buildCellMap(displayGridData?.cells ?? effectiveGridData?.cells),
@@ -518,16 +523,24 @@ const WorkloadPlannerPage: React.FC = () => {
     [displayGridData, extension, displayBoardData?.columns],
   );
 
-  const displayPeriodMembers = useMemo(
-    () =>
-      resolveWorkloadPeriodDisplayMembers(
-        summaryQuery.data?.members,
-        extension,
-        rosterExtensions.length > 0 ? rosterExtensions : undefined,
-        companyExtensionAllowlist,
-      ),
-    [summaryQuery.data?.members, extension, rosterExtensions, companyExtensionAllowlist],
-  );
+  const displayPeriodMembers = useMemo(() => {
+    if (useMockData && effectiveGridData) {
+      return mapMockGridMembersToPeriodMembers(effectiveGridData);
+    }
+    return resolveWorkloadPeriodDisplayMembers(
+      summaryQuery.data?.members,
+      extension,
+      rosterExtensions.length > 0 ? rosterExtensions : undefined,
+      companyExtensionAllowlist,
+    );
+  }, [
+    useMockData,
+    effectiveGridData,
+    summaryQuery.data?.members,
+    extension,
+    rosterExtensions,
+    companyExtensionAllowlist,
+  ]);
 
   const invalidateWorkload = useCallback(() => {
     queryClient
@@ -713,13 +726,17 @@ const WorkloadPlannerPage: React.FC = () => {
     setAppliedFilters(defaults);
   }, []);
 
-  const loadingMain = computeWorkloadLoadingMain(
-    queriesEnabled,
-    mainView,
-    summaryQuery.isPending,
-    gridQuery.isPending,
-    boardQuery.isPending,
-  );
+  const dataViewsEnabled = queriesEnabled || useMockData;
+
+  const loadingMain = useMockData
+    ? false
+    : computeWorkloadLoadingMain(
+        queriesEnabled,
+        mainView,
+        summaryQuery.isPending,
+        gridQuery.isPending,
+        boardQuery.isPending,
+      );
 
   const applyDisabled =
     !filtersEnabled || draftRangeInvalid || !hasPendingFilters || loadingMain;
@@ -831,7 +848,7 @@ const WorkloadPlannerPage: React.FC = () => {
 
         <WorkloadPlannerDataViews
           loadingMain={loadingMain}
-          enabled={queriesEnabled}
+          enabled={dataViewsEnabled}
           mainView={mainView}
           summaryData={summaryQuery.data}
           gridData={displayGridData}
