@@ -2246,3 +2246,364 @@
   }
 }
 
+.reports-view-all-footer {
+  padding: 10px 16px;
+  border-top: 1px solid #eaf0f6;
+  text-align: center;
+
+  &--inset {
+    padding: 10px 0 0;
+    margin-top: 8px;
+  }
+
+  &__btn {
+    background: none;
+    border: none;
+    color: #0066CC;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    font-family: "Lexend Deca", Helvetica, Arial, sans-serif;
+  }
+}
+
+.reports-modal-header {
+  padding: 16px 20px;
+  border-bottom: 1px solid #eaf0f6;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  &__title {
+    font-size: 13px;
+    font-weight: 700;
+    color: #141414;
+    font-family: "Lexend Deca", Helvetica, Arial, sans-serif;
+  }
+
+  &__subtitle {
+    font-size: 11px;
+    color: #718096;
+    margin-top: 2px;
+    font-family: "Lexend Deca", Helvetica, Arial, sans-serif;
+  }
+
+  &__actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  &__close {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: #718096;
+    font-size: 18px;
+    line-height: 1;
+  }
+}
+
+.reports-modal-search-wrap {
+  padding: 8px 20px;
+  border-bottom: 1px solid #eaf0f6;
+}
+
+.reports-modal-search-input {
+  width: 100%;
+  padding: 6px 10px;
+  font-size: 12px;
+  border: 1px solid #eaf0f6;
+  border-radius: 4px;
+  font-family: "Lexend Deca", Helvetica, Arial, sans-serif;
+  outline: none;
+  color: #141414;
+  background: #f5f8fa;
+}
+
+.reports-modal-body {
+  overflow-y: auto;
+  flex: 1;
+
+  &--padded {
+    padding: 12px 20px;
+  }
+
+  &--list-padded {
+    padding: 8px 0;
+  }
+}
+
+.reports-modal-list-row--indexed {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 20px;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.reports-modal-list-row--split {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 20px;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.reports-modal-list-row--project {
+  padding: 10px 20px;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.reports-modal-index {
+  font-size: 11px;
+  color: #9ca3af;
+  min-width: 20px;
+  font-family: "Lexend Deca", Helvetica, Arial, sans-serif;
+}
+
+.reports-modal-avatar {
+  border-radius: 50%;
+  color: #fff;
+  width: 2rem;
+  height: 2rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.65rem;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.reports-sort-toggle {
+  display: flex;
+  border: 1px solid #eaf0f6;
+  border-radius: 4px;
+  overflow: hidden;
+
+  &__btn {
+    padding: 4px 10px;
+    font-size: 11px;
+    border: none;
+    cursor: pointer;
+    font-family: "Lexend Deca", Helvetica, Arial, sans-serif;
+    font-weight: 500;
+    background: #fff;
+    color: #374151;
+
+    & + & {
+      border-left: 1px solid #eaf0f6;
+    }
+
+    &--active {
+      background: #0066CC;
+      color: #fff;
+    }
+  }
+}
+
+.reports-sort-toggle-wrap {
+  display: flex;
+  justify-content: flex-end;
+  padding: 8px 16px 0;
+}
+
+.reports-modal-task-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 20px;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.reports-modal-task-row__title {
+  font-size: 13px;
+  font-weight: 500;
+  color: #141414;
+  font-family: "Lexend Deca", Helvetica, Arial, sans-serif;
+}
+
+.reports-modal-task-row__meta {
+  font-size: 11px;
+  color: #718096;
+  margin-top: 2px;
+  font-family: "Lexend Deca", Helvetica, Arial, sans-serif;
+}
+
+.reports-modal-task-row__status {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 999px;
+  margin-top: 4px;
+  display: inline-block;
+}
+
+.reports-modal-task-row__due-wrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.reports-modal-task-row__due {
+  font-size: 11px;
+  font-family: "Lexend Deca", Helvetica, Arial, sans-serif;
+}
+
+.reports-modal-member-row__name {
+  font-size: 13px;
+  font-weight: 500;
+  color: #141414;
+  font-family: "Lexend Deca", Helvetica, Arial, sans-serif;
+}
+
+.reports-modal-member-row__badges {
+  display: flex;
+  gap: 6px;
+  margin-top: 4px;
+  flex-wrap: wrap;
+}
+
+.reports-modal-member-row__content {
+  flex: 1;
+  min-width: 0;
+}
+
+.reports-modal-project-row__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.reports-modal-project-row__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  display: inline-block;
+}
+
+.reports-modal-project-row__bar {
+  height: 5px;
+  background: #e2e8f0;
+  border-radius: 999px;
+  overflow: hidden;
+  margin-left: 28px;
+}
+
+.reports-modal-project-row__bar-fill {
+  height: 100%;
+  border-radius: 999px;
+}
+
+.reports-modal-segment-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.reports-modal-segment-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.reports-modal-segment-row__name {
+  font-size: 12px;
+  font-weight: 500;
+  color: #141414;
+  font-family: "Lexend Deca", Helvetica, Arial, sans-serif;
+  width: 40%;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.reports-modal-segment-row__track {
+  flex: 1;
+  height: 5px;
+  background: #e2e8f0;
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.reports-modal-segment-row__fill {
+  height: 100%;
+  border-radius: 999px;
+  min-width: 4px;
+}
+
+.reports-modal-segment-row__value {
+  font-size: 12px;
+  font-weight: 600;
+  color: #374151;
+  font-family: "Lexend Deca", Helvetica, Arial, sans-serif;
+  min-width: 2rem;
+  text-align: right;
+}
+
+.reports-modal-perf-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 20px;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.reports-modal-perf-row__name {
+  font-size: 13px;
+  font-weight: 500;
+  color: #141414;
+  font-family: "Lexend Deca", Helvetica, Arial, sans-serif;
+  margin-bottom: 4px;
+}
+
+.reports-modal-perf-row__bar {
+  height: 5px;
+  background: #eaf0f6;
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.reports-modal-perf-row__bar-fill {
+  height: 100%;
+  border-radius: 3px;
+}
+
+.reports-modal-perf-row__pct {
+  font-size: 13px;
+  font-weight: 700;
+  min-width: 2.5rem;
+  text-align: right;
+  font-family: "Lexend Deca", Helvetica, Arial, sans-serif;
+}
+
+.reports-modal-perf-row__meta {
+  flex: 1;
+  min-width: 0;
+}
+
+.reports-modal-task-detail-row__main {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  min-width: 0;
+}
+
+.reports-modal-task-detail-row__assignee {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.reports-modal-task-detail-row__assignee-label {
+  font-size: 11px;
+  color: #374151;
+  font-family: "Lexend Deca", Helvetica, Arial, sans-serif;
+}
+

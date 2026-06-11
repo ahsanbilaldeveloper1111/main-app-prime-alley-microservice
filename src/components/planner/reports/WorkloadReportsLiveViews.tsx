@@ -8,7 +8,12 @@ import type {
   LiveTaskDetailRow,
 } from "@page-modules/planner/reports/teamLiveViewDomain";
 import { ReportsEmptyState } from "./WorkloadReportsViews";
-import { ReportsModalOverlay } from "./ReportsModalOverlay";
+import {
+  ReportsModalAvatar,
+  ReportsModalIndex,
+  ReportsModalShell,
+  ReportsViewAllFooter,
+} from "./ReportsListModal";
 
 type MemberTaskModalState = Readonly<{
   type: string;
@@ -179,151 +184,90 @@ export function ReportsLiveTaskByMember({
           </div>
         ))}
       </div>
-      <div style={{ padding: "10px 16px", borderTop: "1px solid #eaf0f6", textAlign: "center" }}>
-        <button
-          type="button"
-          onClick={() => setShowAllMembers(true)}
-          style={{ background: "none", border: "none", color: "#0066CC", fontSize: "12px", fontWeight: 500, cursor: "pointer", fontFamily: "Lexend Deca, sans-serif" }}
-        >
-          View All ({rows.length} members)
-        </button>
-      </div>
+      <ReportsViewAllFooter
+        count={rows.length}
+        label="members"
+        onClick={() => setShowAllMembers(true)}
+      />
       {showAllMembers ? (
-            <ReportsModalOverlay
-              ariaLabel="Team Members"
-              onClose={() => setShowAllMembers(false)}
-              dialogClassName="reports-modal-dialog--members"
-            >
-              <div style={{ padding: "16px 20px", borderBottom: "1px solid #eaf0f6", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                <div>
-                  <div style={{ fontSize: "13px", fontWeight: 700, color: "#141414", fontFamily: "Lexend Deca, sans-serif" }}>Team Members</div>
-                  <div style={{ fontSize: "11px", color: "#718096", marginTop: "2px", fontFamily: "Lexend Deca, sans-serif" }}>{rows.length} members</div>
-                </div>
-                <button type="button" onClick={() => setShowAllMembers(false)} style={{ background: "none", border: "none", cursor: "pointer", color: "#718096", fontSize: "18px" }}>×</button>
-              </div>
-              <div style={{ padding: "8px 20px", borderBottom: "1px solid #eaf0f6" }}>
-                <input
-                  type="text"
-                  placeholder="Search member..."
-                  value={memberSearch}
-                  onChange={(e) => setMemberSearch(e.target.value)}
-                  style={{ width: "100%", padding: "6px 10px", fontSize: "12px", border: "1px solid #eaf0f6", borderRadius: "4px", fontFamily: "Lexend Deca, sans-serif", outline: "none", color: "#141414", background: "#f5f8fa" }}
+        <ReportsModalShell
+          ariaLabel="Team Members"
+          onClose={() => setShowAllMembers(false)}
+          dialogClassName="reports-modal-dialog--members"
+          title="Team Members"
+          subtitle={`${rows.length} members`}
+          searchPlaceholder="Search member..."
+          searchQuery={memberSearch}
+          onSearchChange={setMemberSearch}
+        >
+          {rows
+            .filter((row) => row.memberLabel.toLowerCase().includes(memberSearch.toLowerCase()))
+            .map((row, idx) => (
+              <div key={row.key} className="reports-modal-list-row reports-modal-list-row--indexed">
+                <ReportsModalIndex index={idx} />
+                <ReportsModalAvatar
+                  backgroundColor={row.avatarColor}
+                  initials={row.initials}
                 />
-              </div>
-              <div style={{ overflowY: "auto", flex: 1 }}>
-                {rows
-                  .filter((row) => row.memberLabel.toLowerCase().includes(memberSearch.toLowerCase()))
-                  .map((row, idx) => (
-                    <div
-                      key={row.key}
-                      className="reports-modal-list-row"
-                      style={{ display: "flex", alignItems: "center", gap: "10px", padding: "10px 20px", borderBottom: "1px solid #f3f4f6" }}
-                    >
-                      <span style={{ fontSize: "11px", color: "#9ca3af", minWidth: "20px", fontFamily: "Lexend Deca, sans-serif" }}>{idx + 1}</span>
-                      <span
-                        style={{
-                          backgroundColor: row.avatarColor,
-                          borderRadius: "50%",
-                          color: "#fff",
-                          width: "2rem",
-                          height: "2rem",
-                          display: "inline-flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          fontSize: "0.65rem",
-                          fontWeight: 700,
-                          flexShrink: 0,
-                        }}
-                        aria-hidden
-                      >
-                        {row.initials}
+                <div className="reports-modal-member-row__content">
+                  <div className="reports-modal-member-row__name">{row.memberLabel}</div>
+                  <div className="reports-modal-member-row__badges">
+                    <span className="reports-list-badge reports-list-badge--default">{row.totalTasks} tasks</span>
+                    {row.inProgressTasks > 0 ? (
+                      <span className="reports-list-badge reports-list-badge--info">
+                        {row.inProgressTasks} in progress
                       </span>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: "13px", fontWeight: 500, color: "#141414", fontFamily: "Lexend Deca, sans-serif" }}>{row.memberLabel}</div>
-                        <div style={{ display: "flex", gap: "6px", marginTop: "4px", flexWrap: "wrap" }}>
-                          <span className="reports-list-badge reports-list-badge--default">{row.totalTasks} tasks</span>
-                          {row.inProgressTasks > 0 ? <span className="reports-list-badge reports-list-badge--info">{row.inProgressTasks} in progress</span> : null}
-                          {row.overdueTasks > 0 ? <span className="reports-list-badge reports-list-badge--critical">{row.overdueTasks} overdue</span> : null}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
+                    ) : null}
+                    {row.overdueTasks > 0 ? (
+                      <span className="reports-list-badge reports-list-badge--critical">
+                        {row.overdueTasks} overdue
+                      </span>
+                    ) : null}
+                  </div>
+                </div>
               </div>
-            </ReportsModalOverlay>
+            ))}
+        </ReportsModalShell>
       ) : null}
       {modal ? (
-            <ReportsModalOverlay
-              ariaLabel={resolveMemberTaskModalTitle(modal.type)}
-              onClose={() => setModal(null)}
-              dialogClassName="reports-modal-dialog--tasks"
-            >
-              <div style={{
-                padding: "16px 20px", borderBottom: "1px solid #eaf0f6",
-                display: "flex", alignItems: "center", justifyContent: "space-between",
-              }}>
-                <div>
-                  <div style={{ fontSize: "13px", fontWeight: 700, color: "#141414", fontFamily: "Lexend Deca, sans-serif" }}>
-                    {resolveMemberTaskModalTitle(modal.type)}
-                  </div>
-                  <div style={{ fontSize: "11px", color: "#718096", marginTop: "2px", fontFamily: "Lexend Deca, sans-serif" }}>
-                    {modal.member}
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setModal(null)}
-                  style={{ background: "none", border: "none", cursor: "pointer", color: "#718096", fontSize: "18px", lineHeight: 1 }}
-                >
-                  ×
-                </button>
-              </div>
-              <div style={{ overflowY: "auto", flex: 1 }}>
-                {modal.tasks.map((task) => {
-                  const statusStyle = resolveTaskStatusStyle(task.status);
-                  const dueColor = resolveModalTaskDueColor(modal.type);
+        <ReportsModalShell
+          ariaLabel={resolveMemberTaskModalTitle(modal.type)}
+          onClose={() => setModal(null)}
+          dialogClassName="reports-modal-dialog--tasks"
+          title={resolveMemberTaskModalTitle(modal.type)}
+          subtitle={modal.member}
+        >
+          {modal.tasks.map((task) => {
+            const statusStyle = resolveTaskStatusStyle(task.status);
+            const dueColor = resolveModalTaskDueColor(modal.type);
 
-                  return (
-                    <div
-                      key={task.id}
-                      className="reports-modal-list-row"
+            return (
+              <div key={task.id} className="reports-modal-list-row reports-modal-task-row">
+                <div>
+                  <div className="reports-modal-task-row__title">{task.title}</div>
+                  <div className="reports-modal-task-row__meta">{task.project}</div>
+                  {task.status ? (
+                    <span
+                      className="reports-modal-task-row__status"
                       style={{
-                        display: "flex", alignItems: "center", justifyContent: "space-between",
-                        padding: "12px 20px", borderBottom: "1px solid #f3f4f6",
+                        background: statusStyle.background,
+                        color: statusStyle.color,
                       }}
                     >
-                      <div>
-                        <div style={{ fontSize: "13px", fontWeight: 500, color: "#141414", fontFamily: "Lexend Deca, sans-serif" }}>
-                          {task.title}
-                        </div>
-                        <div style={{ fontSize: "11px", color: "#718096", marginTop: "2px", fontFamily: "Lexend Deca, sans-serif" }}>
-                          {task.project}
-                        </div>
-                        {task.status ? (
-                          <span style={{
-                            fontSize: "10px",
-                            fontWeight: 600,
-                            padding: "2px 8px",
-                            borderRadius: "999px",
-                            background: statusStyle.background,
-                            color: statusStyle.color,
-                            marginTop: "4px",
-                            display: "inline-block",
-                          }}>
-                            {task.status}
-                          </span>
-                        ) : null}
-                      </div>
-                      <div style={{ display: "flex", alignItems: "center", gap: "10px", flexShrink: 0 }}>
-                        <span style={{ fontSize: "11px", color: dueColor, fontFamily: "Lexend Deca, sans-serif" }}>
-                          {task.due}
-                        </span>
-                        <ChevronRight size={14} style={{ color: "#9ca3af" }} aria-hidden />
-                      </div>
-                    </div>
-                  );
-                })}
+                      {task.status}
+                    </span>
+                  ) : null}
+                </div>
+                <div className="reports-modal-task-row__due-wrap">
+                  <span className="reports-modal-task-row__due" style={{ color: dueColor }}>
+                    {task.due}
+                  </span>
+                  <ChevronRight size={14} style={{ color: "#9ca3af" }} aria-hidden />
+                </div>
               </div>
-            </ReportsModalOverlay>
+            );
+          })}
+        </ReportsModalShell>
       ) : null}
     </>
   );
@@ -365,78 +309,52 @@ export function ReportsLiveTaskDetailList({
           </div>
         ))}
       </div>
-      <div style={{ padding: "10px 16px", borderTop: "1px solid #eaf0f6", textAlign: "center" }}>
-        <button
-          type="button"
-          onClick={() => setShowAll(true)}
-          style={{ background: "none", border: "none", color: "#0066CC", fontSize: "12px", fontWeight: 500, cursor: "pointer", fontFamily: "Lexend Deca, sans-serif" }}
-        >
-          View All ({rows.length} tasks)
-        </button>
-      </div>
+      <ReportsViewAllFooter
+        count={rows.length}
+        label="tasks"
+        onClick={() => setShowAll(true)}
+      />
       {showAll ? (
-            <ReportsModalOverlay
-              ariaLabel="All Tasks"
-              onClose={() => setShowAll(false)}
-              dialogClassName="reports-modal-dialog--all-tasks"
-            >
-              <div style={{ padding: "16px 20px", borderBottom: "1px solid #eaf0f6", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                <div>
-                  <div style={{ fontSize: "13px", fontWeight: 700, color: "#141414", fontFamily: "Lexend Deca, sans-serif" }}>All Tasks</div>
-                  <div style={{ fontSize: "11px", color: "#718096", marginTop: "2px", fontFamily: "Lexend Deca, sans-serif" }}>{rows.length} tasks</div>
+        <ReportsModalShell
+          ariaLabel="All Tasks"
+          onClose={() => setShowAll(false)}
+          dialogClassName="reports-modal-dialog--all-tasks"
+          title="All Tasks"
+          subtitle={`${rows.length} tasks`}
+          searchPlaceholder="Search task..."
+          searchQuery={searchQuery}
+          onSearchChange={setSearchQuery}
+        >
+          {rows
+            .filter(
+              (row) =>
+                row.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                row.assigneeLabel.toLowerCase().includes(searchQuery.toLowerCase()),
+            )
+            .map((row, idx) => (
+              <div
+                key={row.id}
+                className="reports-modal-list-row reports-modal-list-row--split"
+              >
+                <div className="reports-modal-task-detail-row__main">
+                  <ReportsModalIndex index={idx} />
+                  <div style={{ minWidth: 0 }}>
+                    <div className="reports-modal-member-row__name">{row.title}</div>
+                    <div className="reports-modal-task-row__meta">{row.projectLabel}</div>
+                  </div>
                 </div>
-                <button type="button" onClick={() => setShowAll(false)} style={{ background: "none", border: "none", cursor: "pointer", color: "#718096", fontSize: "18px" }}>×</button>
+                <div className="reports-modal-task-detail-row__assignee">
+                  <span className="reports-modal-task-detail-row__assignee-label">
+                    {row.assigneeLabel}
+                  </span>
+                  <ReportsModalAvatar
+                    backgroundColor={row.assigneeAvatarColor}
+                    initials={row.assigneeInitials}
+                  />
+                </div>
               </div>
-              <div style={{ padding: "8px 20px", borderBottom: "1px solid #eaf0f6" }}>
-                <input
-                  type="text"
-                  placeholder="Search task..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  style={{ width: "100%", padding: "6px 10px", fontSize: "12px", border: "1px solid #eaf0f6", borderRadius: "4px", fontFamily: "Lexend Deca, sans-serif", outline: "none", color: "#141414", background: "#f5f8fa" }}
-                />
-              </div>
-              <div style={{ overflowY: "auto", flex: 1 }}>
-                {rows
-                  .filter((row) => row.title.toLowerCase().includes(searchQuery.toLowerCase()) || row.assigneeLabel.toLowerCase().includes(searchQuery.toLowerCase()))
-                  .map((row, idx) => (
-                    <div
-                      key={row.id}
-                      className="reports-modal-list-row"
-                      style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 20px", borderBottom: "1px solid #f3f4f6" }}
-                    >
-                      <div style={{ display: "flex", alignItems: "center", gap: "10px", flex: 1, minWidth: 0 }}>
-                        <span style={{ fontSize: "11px", color: "#9ca3af", minWidth: "20px", fontFamily: "Lexend Deca, sans-serif" }}>{idx + 1}</span>
-                        <div style={{ minWidth: 0 }}>
-                          <div style={{ fontSize: "13px", fontWeight: 500, color: "#141414", fontFamily: "Lexend Deca, sans-serif" }}>{row.title}</div>
-                          <div style={{ fontSize: "11px", color: "#718096", marginTop: "2px", fontFamily: "Lexend Deca, sans-serif" }}>{row.projectLabel}</div>
-                        </div>
-                      </div>
-                      <div style={{ display: "flex", alignItems: "center", gap: "8px", flexShrink: 0 }}>
-                        <span style={{ fontSize: "11px", color: "#374151", fontFamily: "Lexend Deca, sans-serif" }}>{row.assigneeLabel}</span>
-                        <span
-                          style={{
-                            backgroundColor: row.assigneeAvatarColor,
-                            borderRadius: "50%",
-                            color: "#fff",
-                            width: "2rem",
-                            height: "2rem",
-                            display: "inline-flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            fontSize: "0.65rem",
-                            fontWeight: 700,
-                            flexShrink: 0,
-                          }}
-                          aria-hidden
-                        >
-                          {row.assigneeInitials}
-                        </span>
-                      </div>
-                    </div>
-                  ))}
-              </div>
-            </ReportsModalOverlay>
+            ))}
+        </ReportsModalShell>
       ) : null}
     </>
   );
