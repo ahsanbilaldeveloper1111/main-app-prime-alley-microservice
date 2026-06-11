@@ -25,43 +25,6 @@ import { useWorkloadPlannerPageUiState } from "./workload/useWorkloadPlannerPage
 import { useWorkloadPlannerPageData } from "./workload/useWorkloadPlannerPageData";
 import { useWorkloadPlannerPageMutations } from "./workload/useWorkloadPlannerPageMutations";
 import { WorkloadOnboardingModal } from "./workload/WorkloadOnboardingModal";
-import {
-  getOnboardingStatus,
-  WORKLOAD_MOCK_BOARD_DATA,
-  WORKLOAD_MOCK_GRID_DATA,
-  mapMockGridMembersToPeriodMembers,
-} from "./workload/workloadOnboarding";
-import { startWorkloadTour, getGridTourSeen, getBoardTourSeen } from "./workload/useWorkloadTour";
-
-type MainView = "grid" | "board";
-
-function isForbiddenError(err: unknown): boolean {
-  return isAxiosError(err) && err.response?.status === 403;
-}
-
-function workloadErrorMessage(err: unknown): string {
-  if (
-    isAxiosError(err) &&
-    typeof err.response?.data === "object" &&
-    err.response.data !== null
-  ) {
-    const msg = (err.response.data as { message?: string }).message;
-    if (typeof msg === "string" && msg.trim()) return msg;
-  }
-  if (err instanceof Error) return err.message;
-  return "Something went wrong.";
-}
-
-function buildCellMap(
-  cells: WorkloadGridCell[] | undefined,
-): Map<string, WorkloadGridCell> {
-  const m = new Map<string, WorkloadGridCell>();
-  if (!Array.isArray(cells)) return m;
-  for (const c of cells) {
-    m.set(workloadCellKey(c.extension_number, c.date), c);
-  }
-  return m;
-}
 
 const WorkloadPlannerPage: React.FC = () => {
   const scope = useWorkloadPlannerPageScope();
@@ -72,111 +35,12 @@ const WorkloadPlannerPage: React.FC = () => {
     useMockData: ui.useMockData,
     selectedCell: ui.selectedCell,
   });
-
-  const gridRangeFallback = useMemo(
-    () => resolveWorkloadGridRangeFallback(appliedFilters, appliedRangeValid),
-    [appliedFilters, appliedRangeValid],
-  );
-
-  const gridTeamExtensionNumbers = useMemo(
-    () => resolveWorkloadDisplayTeamExtensions(rosterExtensions, extension),
-    [rosterExtensions, extension],
-  );
-
-  const displayGridData = useMemo(() => {
-    if (useMockData) {
-      return effectiveGridData;
-    }
-    return resolveWorkloadGridDisplayData(effectiveGridData, {
-      viewerExtension: extension,
-      memberFilter: appliedFilters.memberFilter,
-      rangeFallback: gridRangeFallback,
-      teamExtensionNumbers: gridTeamExtensionNumbers,
-      companyExtensionAllowlist,
-    });
-  }, [
-    useMockData,
-    effectiveGridData,
-    extension,
-    appliedFilters.memberFilter,
-    gridRangeFallback,
-    gridTeamExtensionNumbers,
-    companyExtensionAllowlist,
-  ]);
-
-  const displayBoardData = useMemo(() => {
-    if (useMockData) {
-      return effectiveBoardData;
-    }
-    return resolveWorkloadBoardDisplayData(effectiveBoardData, {
-      viewerExtension: extension,
-      memberFilter: appliedFilters.memberFilter,
-      teamExtensionNumbers: gridTeamExtensionNumbers,
-      companyExtensionAllowlist,
-    });
-  }, [
-    useMockData,
-    effectiveBoardData,
-    extension,
-    appliedFilters.memberFilter,
-    gridTeamExtensionNumbers,
-    companyExtensionAllowlist,
-  ]);
-
-  const cellMap = useMemo(
-    () => buildCellMap(displayGridData?.cells ?? effectiveGridData?.cells),
-    [displayGridData?.cells, effectiveGridData?.cells],
-  );
-
-  const memberExtensions = useMemo(
-    () =>
-      resolveWorkloadMemberExtensions(
-        displayGridData,
-        extension,
-        displayBoardData?.columns,
-      ),
-    [displayGridData, extension, displayBoardData?.columns],
-  );
-
-  const displayPeriodMembers = useMemo(() => {
-    if (useMockData && effectiveGridData) {
-      return mapMockGridMembersToPeriodMembers(effectiveGridData);
-    }
-    return resolveWorkloadPeriodDisplayMembers(
-      summaryQuery.data?.members,
-      extension,
-      rosterExtensions.length > 0 ? rosterExtensions : undefined,
-      companyExtensionAllowlist,
-    );
-  }, [
-    useMockData,
-    effectiveGridData,
-    summaryQuery.data?.members,
-    extension,
-    rosterExtensions,
-    companyExtensionAllowlist,
-  ]);
-
-  const invalidateWorkload = useCallback(() => {
-    queryClient
-      .invalidateQueries({ queryKey: plannerKeys.workload.all() })
-      .catch(() => undefined);
-  }, [queryClient]);
-
-  const assignMutation = useMutation({
-    mutationFn: async ({
-      task,
-      toExtension,
-    }: {
-      task: WorkloadTaskCard;
-      toExtension: string;
-    }) => {
-      if (!toExtension) throw new Error("Choose a team member.");
-      await patchWorkloadTask(
-        task.id,
-        extension,
-        buildWorkloadTaskPatchBody(task, { extension_numbers: [toExtension] }),
-      );
+  const mutations = useWorkloadPlannerPageMutations({
+    extension: scope.extension,
+    data,
+    onAssignSuccess: () => {
+      ui.setReassignTask(null);
+      ui.setReassignOverloadConfirm(false);
     },
     onRescheduleSuccess: () => {
       ui.setRescheduleTask(null);
@@ -215,52 +79,8 @@ const WorkloadPlannerPage: React.FC = () => {
     formatError: mutations.formatError,
   });
 
-  const summaryForbidden =
-    summaryQuery.isError && isForbiddenError(summaryQuery.error);
-  const gridForbidden = gridQuery.isError && isForbiddenError(gridQuery.error);
-  const boardForbidden =
-    boardQuery.isError && isForbiddenError(boardQuery.error);
-  const accessForbidden = summaryForbidden || gridForbidden || boardForbidden;
-
-  const hasActiveFilters = useMemo(
-    () => !isDefaultWorkloadPlannerFilters(draftFilters),
-    [draftFilters],
-  );
-
-  const hasPendingFilters = useMemo(
-    () => !workloadPlannerFiltersEqual(draftFilters, appliedFilters),
-    [draftFilters, appliedFilters],
-  );
-
-  const handleClearFilters = useCallback(() => {
-    const defaults = createDefaultWorkloadPlannerFilters();
-    setDraftFilters(defaults);
-    setAppliedFilters(defaults);
-  }, []);
-
-  const dataViewsEnabled = queriesEnabled || useMockData;
-
-  const loadingMain = useMockData
-    ? false
-    : computeWorkloadLoadingMain(
-        queriesEnabled,
-        mainView,
-        summaryQuery.isPending,
-        gridQuery.isPending,
-        boardQuery.isPending,
-      );
-
-  const applyDisabled =
-    !filtersEnabled || draftRangeInvalid || !hasPendingFilters || loadingMain;
-
-  const isApplyingFilters = computeWorkloadIsApplyingFilters(
-    hasPendingFilters,
-    queriesEnabled,
-    mainView,
-    summaryQuery.isFetching,
-    gridQuery.isFetching,
-    boardQuery.isFetching,
-  );
+  const dataViewsEnabled = data.queriesEnabled || ui.useMockData;
+  const loadingMain = ui.useMockData ? false : data.loadingMain;
 
   return (
     <div className="workload-page">
@@ -356,7 +176,7 @@ const WorkloadPlannerPage: React.FC = () => {
             <button
               type="button"
               className="workload-board-hint__close"
-              onClick={() => ui.setShowBoardHint(false)}
+              onClick={ui.dismissBoardHint}
               aria-label="Dismiss"
             >
               <X size={16} aria-hidden />
@@ -367,15 +187,15 @@ const WorkloadPlannerPage: React.FC = () => {
         <WorkloadPlannerDataViews
           loadingMain={loadingMain}
           enabled={dataViewsEnabled}
-          mainView={mainView}
-          summaryData={summaryQuery.data}
-          gridData={displayGridData}
-          periodMembers={displayPeriodMembers}
-          boardData={displayBoardData}
-          cellMap={cellMap}
-          hierarchyExtensions={hierarchyDataExtensions}
-          priorityFilter={appliedFilters.priorityFilter}
-          boardDragSaving={boardDragMutation.isPending}
+          mainView={ui.mainView}
+          summaryData={data.summaryQuery.data}
+          gridData={data.displayGridData}
+          periodMembers={data.displayPeriodMembers}
+          boardData={data.displayBoardData}
+          cellMap={data.cellMap}
+          hierarchyExtensions={scope.hierarchyDataExtensions}
+          priorityFilter={data.appliedFilters.priorityFilter}
+          boardDragSaving={mutations.boardDragMutation.isPending}
           onBoardDropIntent={handleBoardDropIntent}
           showWorkloadPerDay={ui.showWorkloadPerDay}
           onToggleWorkloadPerDay={() => ui.setShowWorkloadPerDay((prev) => !prev)}

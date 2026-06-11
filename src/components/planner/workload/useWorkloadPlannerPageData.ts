@@ -30,6 +30,7 @@ import {
 } from "@page-modules/planner/workload/workloadTeamScope";
 import type { WorkloadProjectOption } from "./WorkloadPlannerChrome";
 import {
+  mapMockGridMembersToPeriodMembers,
   WORKLOAD_MOCK_BOARD_DATA,
   WORKLOAD_MOCK_GRID_DATA,
 } from "./workloadOnboarding";
@@ -241,40 +242,44 @@ export function useWorkloadPlannerPageData({
     () => resolveWorkloadDisplayTeamExtensions(rosterExtensions, extension),
     [rosterExtensions, extension],
   );
-  const displayGridData = useMemo(
-    () =>
-      resolveWorkloadGridDisplayData(effectiveGridData, {
-        viewerExtension: extension,
-        memberFilter: appliedFilters.memberFilter,
-        rangeFallback: gridRangeFallback,
-        teamExtensionNumbers: gridTeamExtensionNumbers,
-        companyExtensionAllowlist,
-      }),
-    [
-      effectiveGridData,
-      extension,
-      appliedFilters.memberFilter,
-      gridRangeFallback,
-      gridTeamExtensionNumbers,
+  const displayGridData = useMemo(() => {
+    if (useMockData) {
+      return effectiveGridData;
+    }
+    return resolveWorkloadGridDisplayData(effectiveGridData, {
+      viewerExtension: extension,
+      memberFilter: appliedFilters.memberFilter,
+      rangeFallback: gridRangeFallback,
+      teamExtensionNumbers: gridTeamExtensionNumbers,
       companyExtensionAllowlist,
-    ],
-  );
-  const displayBoardData = useMemo(
-    () =>
-      resolveWorkloadBoardDisplayData(effectiveBoardData, {
-        viewerExtension: extension,
-        memberFilter: appliedFilters.memberFilter,
-        teamExtensionNumbers: gridTeamExtensionNumbers,
-        companyExtensionAllowlist,
-      }),
-    [
-      effectiveBoardData,
-      extension,
-      appliedFilters.memberFilter,
-      gridTeamExtensionNumbers,
+    });
+  }, [
+    useMockData,
+    effectiveGridData,
+    extension,
+    appliedFilters.memberFilter,
+    gridRangeFallback,
+    gridTeamExtensionNumbers,
+    companyExtensionAllowlist,
+  ]);
+  const displayBoardData = useMemo(() => {
+    if (useMockData) {
+      return effectiveBoardData;
+    }
+    return resolveWorkloadBoardDisplayData(effectiveBoardData, {
+      viewerExtension: extension,
+      memberFilter: appliedFilters.memberFilter,
+      teamExtensionNumbers: gridTeamExtensionNumbers,
       companyExtensionAllowlist,
-    ],
-  );
+    });
+  }, [
+    useMockData,
+    effectiveBoardData,
+    extension,
+    appliedFilters.memberFilter,
+    gridTeamExtensionNumbers,
+    companyExtensionAllowlist,
+  ]);
   const cellMap = useMemo(
     () =>
       buildWorkloadCellMap(
@@ -301,16 +306,24 @@ export function useWorkloadPlannerPageData({
       ),
     [isWorkloadRoot, rosterExtensions, memberExtensions],
   );
-  const displayPeriodMembers = useMemo(
-    () =>
-      resolveWorkloadPeriodDisplayMembers(
-        summaryQuery.data?.members,
-        extension,
-        rosterExtensions.length > 0 ? rosterExtensions : undefined,
-        companyExtensionAllowlist,
-      ),
-    [summaryQuery.data?.members, extension, rosterExtensions, companyExtensionAllowlist],
-  );
+  const displayPeriodMembers = useMemo(() => {
+    if (useMockData && effectiveGridData) {
+      return mapMockGridMembersToPeriodMembers(effectiveGridData);
+    }
+    return resolveWorkloadPeriodDisplayMembers(
+      summaryQuery.data?.members,
+      extension,
+      rosterExtensions.length > 0 ? rosterExtensions : undefined,
+      companyExtensionAllowlist,
+    );
+  }, [
+    useMockData,
+    effectiveGridData,
+    summaryQuery.data?.members,
+    extension,
+    rosterExtensions,
+    companyExtensionAllowlist,
+  ]);
 
   const summaryForbidden =
     summaryQuery.isError && isWorkloadForbiddenError(summaryQuery.error);
@@ -327,13 +340,15 @@ export function useWorkloadPlannerPageData({
     () => !workloadPlannerFiltersEqual(draftFilters, appliedFilters),
     [draftFilters, appliedFilters],
   );
-  const loadingMain = computeWorkloadLoadingMain(
-    queriesEnabled,
-    mainView,
-    summaryQuery.isPending,
-    gridQuery.isPending,
-    boardQuery.isPending,
-  );
+  const loadingMain = useMockData
+    ? false
+    : computeWorkloadLoadingMain(
+        queriesEnabled,
+        mainView,
+        summaryQuery.isPending,
+        gridQuery.isPending,
+        boardQuery.isPending,
+      );
   const applyDisabled =
     !filtersEnabled || draftRangeInvalid || !hasPendingFilters || loadingMain;
   const isApplyingFilters = computeWorkloadIsApplyingFilters(

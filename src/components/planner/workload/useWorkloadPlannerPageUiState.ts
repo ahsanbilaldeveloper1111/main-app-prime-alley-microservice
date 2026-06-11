@@ -7,7 +7,12 @@ import {
 import type { WorkloadBoardDropIntent } from "./WorkloadBoardPanel";
 import type { WorkloadSelectedCellState } from "./workloadPlannerPageHelpers";
 import { getOnboardingStatus } from "./workloadOnboarding";
-import { startWorkloadTour, getGridTourSeen, getBoardTourSeen } from "./useWorkloadTour";
+import {
+  startWorkloadTour,
+  getGridTourSeen,
+  getBoardTourSeen,
+  setBoardTourSeen,
+} from "./useWorkloadTour";
 
 type MainView = "grid" | "board";
 
@@ -56,23 +61,38 @@ export function useWorkloadPlannerPageUiState() {
     };
   }, []);
 
-  const handleOnboardingComplete = useCallback((choice: "sample" | "fresh" | null) => {
-    if (choice === "sample") {
-      setUseMockData(true);
-      setTimeout(() => startWorkloadTour("grid", () => {}), 600);
-    }
-    setShowOnboarding(false);
-  }, []);
+  const handleOnboardingComplete = useCallback(
+    (choice: "sample" | "fresh" | null) => {
+      if (choice === "sample") {
+        setUseMockData(true);
+        // Board view uses the inline hint; only run the grid tour when grid is active.
+        if (mainView === "grid") {
+          setTimeout(() => startWorkloadTour("grid", () => {}), 600);
+        }
+      }
+      setShowOnboarding(false);
+    },
+    [mainView],
+  );
 
-  const handleMainViewChange = useCallback((view: MainView) => {
-    setMainView(view);
-    writeWorkloadMainViewPreference(view);
-    if (view === "board" && !getBoardTourSeen()) {
-      setTimeout(() => startWorkloadTour("board", () => {}), 600);
-    }
-    if (view === "grid" && !getGridTourSeen()) {
-      setTimeout(() => startWorkloadTour("grid", () => {}), 600);
-    }
+  const handleMainViewChange = useCallback(
+    (view: MainView) => {
+      setMainView(view);
+      writeWorkloadMainViewPreference(view);
+      // Demo mode uses the inline board hint instead of the driver.js board tour.
+      if (view === "board" && !getBoardTourSeen() && !useMockData) {
+        setTimeout(() => startWorkloadTour("board", () => {}), 600);
+      }
+      if (view === "grid" && !getGridTourSeen()) {
+        setTimeout(() => startWorkloadTour("grid", () => {}), 600);
+      }
+    },
+    [useMockData],
+  );
+
+  const dismissBoardHint = useCallback(() => {
+    setShowBoardHint(false);
+    setBoardTourSeen();
   }, []);
 
   const openReschedule = useCallback(
@@ -115,7 +135,7 @@ export function useWorkloadPlannerPageUiState() {
     useMockData,
     setUseMockData,
     showBoardHint,
-    setShowBoardHint,
+    dismissBoardHint,
     handleOnboardingComplete,
     handleMainViewChange,
     openReschedule,

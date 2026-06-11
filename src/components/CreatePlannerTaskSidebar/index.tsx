@@ -383,8 +383,8 @@ function recurringScheduleField(
   const direct = fromRecord(task as unknown as Record<string, unknown>);
   if (direct) return direct;
   const raw = task.rawData;
-  if (raw && typeof raw === "object") {
-    const got = fromRecord(raw as Record<string, unknown>);
+  if (raw !== null && typeof raw === "object") {
+    const got = fromRecord(raw);
     if (got) return got;
   }
   return fromRecord(readNestedRecurring(task));
@@ -3053,15 +3053,19 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
 
   useEffect(() => {
     const handleOutsideClick = (e: MouseEvent) => {
+      const target = e.target;
+      if (!(target instanceof Node)) {
+        return;
+      }
       if (
         assigneeDropdownRef.current &&
-        !assigneeDropdownRef.current.contains(e.target as Node)
+        !assigneeDropdownRef.current.contains(target)
       ) {
         setShowAssigneeDropdown(false);
       }
       if (
         watcherDropdownRef.current &&
-        !watcherDropdownRef.current.contains(e.target as Node)
+        !watcherDropdownRef.current.contains(target)
       ) {
         setShowWatcherDropdown(false);
       }
@@ -3717,7 +3721,16 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
                                   display: "inline-block",
                                 }}
                               >
-                                <div
+                                <button
+                                  type="button"
+                                  title={user.name}
+                                  aria-label={
+                                    isLimitedTaskEdit
+                                      ? user.name
+                                      : `Remove assignee ${user.name}`
+                                  }
+                                  disabled={isLimitedTaskEdit}
+                                  onClick={() => toggleAssignee(user.id)}
                                   style={{
                                     width: 36,
                                     height: 36,
@@ -3734,16 +3747,17 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
                                       : "pointer",
                                     border: "2px solid #fff",
                                     boxShadow: "0 1px 3px rgba(0,0,0,0.15)",
+                                    padding: 0,
                                   }}
-                                  onClick={() =>
-                                    !isLimitedTaskEdit &&
-                                    toggleAssignee(user.id)
-                                  }
                                 >
                                   {user.name.charAt(0).toUpperCase()}
-                                </div>
+                                </button>
                                 {!isLimitedTaskEdit && (
-                                  <div
+                                  <button
+                                    type="button"
+                                    title={`Remove ${user.name}`}
+                                    aria-label={`Remove assignee ${user.name}`}
+                                    onClick={() => toggleAssignee(user.id)}
                                     style={{
                                       position: "absolute",
                                       top: -4,
@@ -3757,11 +3771,11 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
                                       justifyContent: "center",
                                       cursor: "pointer",
                                       border: "1px solid #fff",
+                                      padding: 0,
                                     }}
-                                    onClick={() => toggleAssignee(user.id)}
                                   >
                                     <X size={9} color="#fff" />
-                                  </div>
+                                  </button>
                                 )}
                               </div>
                             ))}
@@ -3948,7 +3962,16 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
                                   display: "inline-block",
                                 }}
                               >
-                                <div
+                                <button
+                                  type="button"
+                                  title={user.name}
+                                  aria-label={
+                                    isLimitedTaskEdit
+                                      ? user.name
+                                      : `Remove watcher ${user.name}`
+                                  }
+                                  disabled={isLimitedTaskEdit}
+                                  onClick={() => toggleWatcher(user.id)}
                                   style={{
                                     width: 36,
                                     height: 36,
@@ -3965,16 +3988,17 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
                                       : "pointer",
                                     border: "2px solid #fff",
                                     boxShadow: "0 1px 3px rgba(0,0,0,0.15)",
+                                    padding: 0,
                                   }}
-                                  onClick={() =>
-                                    !isLimitedTaskEdit &&
-                                    toggleWatcher(user.id)
-                                  }
                                 >
                                   {user.name.charAt(0).toUpperCase()}
-                                </div>
+                                </button>
                                 {!isLimitedTaskEdit && (
-                                  <div
+                                  <button
+                                    type="button"
+                                    title={`Remove ${user.name}`}
+                                    aria-label={`Remove watcher ${user.name}`}
+                                    onClick={() => toggleWatcher(user.id)}
                                     style={{
                                       position: "absolute",
                                       top: -4,
@@ -3988,11 +4012,11 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
                                       justifyContent: "center",
                                       cursor: "pointer",
                                       border: "1px solid #fff",
+                                      padding: 0,
                                     }}
-                                    onClick={() => toggleWatcher(user.id)}
                                   >
                                     <X size={9} color="#fff" />
-                                  </div>
+                                  </button>
                                 )}
                               </div>
                             ))}

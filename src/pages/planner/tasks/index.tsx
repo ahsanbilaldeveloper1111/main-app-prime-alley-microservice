@@ -1407,8 +1407,8 @@ const TasksListingPage = ({
                             padding: "8px 10px",
                             fontSize: 13,
                             fontFamily: "Lexend Deca, Helvetica, Arial, sans-serif",
-                            color: !fForm.task_type ? "#0066CC" : "#141414",
-                            fontWeight: !fForm.task_type ? 500 : 400,
+                            color: fForm.task_type ? "#141414" : "#0066CC",
+                            fontWeight: fForm.task_type ? 400 : 500,
                             cursor: "pointer",
                           }}
                           onMouseEnter={e => { if (fForm.task_type) e.currentTarget.style.background = "#f5f8fa"; }}
@@ -1528,8 +1528,8 @@ const TasksListingPage = ({
                             padding: "8px 10px",
                             fontSize: 13,
                             fontFamily: "Lexend Deca, Helvetica, Arial, sans-serif",
-                            color: !fForm.priority ? "#0066CC" : "#141414",
-                            fontWeight: !fForm.priority ? 500 : 400,
+                            color: fForm.priority ? "#141414" : "#0066CC",
+                            fontWeight: fForm.priority ? 400 : 500,
                             cursor: "pointer",
                           }}
                           onMouseEnter={e => { if (fForm.priority) e.currentTarget.style.background = "#f5f8fa"; }}

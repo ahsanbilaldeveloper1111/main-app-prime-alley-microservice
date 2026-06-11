@@ -2690,3 +2690,42 @@
     }
   }
 }
+
+.workload-board-hint {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 16px;
+  background: #eff6ff;
+  border-bottom: 1px solid #bfdbfe;
+  font-size: 12px;
+  color: #1e40af;
+  font-family: "Lexend Deca", Helvetica, Arial, sans-serif;
+  flex-shrink: 0;
+
+  svg {
+    color: #2563eb;
+    flex-shrink: 0;
+  }
+
+  span {
+    flex: 1;
+    min-width: 0;
+    line-height: 1.45;
+  }
+
+  &__close {
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    color: #1e40af;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
+
+    &:hover {
+      color: #1e3a8a;
+    }
+  }
+}
