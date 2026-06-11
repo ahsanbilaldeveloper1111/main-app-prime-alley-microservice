@@ -12,8 +12,7 @@ import BreadcrumbItem from "@common/BreadcrumbItem";
 import { toast } from "react-toastify";
 import { useRouter } from "next/router";
 import moment from "moment";
-import { ChevronDown, Plus, X } from "lucide-react";
-import { Button, Form, Modal } from "react-bootstrap";
+import { ChevronDown, X } from "lucide-react";
 import GenericTable, { TableColumn, TableAction } from "@components/GenericTable";
 import DeleteConfirmationModal from "@components/page-partials/DeleteConfirmationModal";
 import CreateTaskSidebar from "@components/CreatePlannerTaskSidebar";
@@ -67,6 +66,7 @@ import { PlannerAddToMyDayEstimateModal } from "@components/planner/plannerTasks
 import { usePlannerAddToMyDay } from "@components/planner/plannerTasksListing/usePlannerAddToMyDay";
 import { listingTaskToAddToMyDayTarget } from "@components/planner/plannerTasksListing/plannerTasksListingMyDay";
 import { PlannerTasksEditColumnsDropdown } from "@components/planner/plannerTasksListing/PlannerTasksEditColumnsDropdown";
+import { PlannerTasksTabsBar } from "@components/planner/plannerTasksListing/PlannerTasksTabsBar";
 import {
   type ApiTask,
   type HierarchyExtension,
@@ -83,7 +83,6 @@ import {
   persistVisibleTabIds,
   persistVisibleTaskColumnKeys,
   POSSIBLE_TABS,
-  resolvePlannerTaskTabCount,
   PRIORITY_OPTIONS,
   PROJECT_DETAILS_STATUS_WITH,
   readVisibleTaskColumnKeysFromStorage,
@@ -91,7 +90,6 @@ import {
   stripHtmlTags,
   TASK_TYPE_OPTIONS,
   TASK_VIEW_TAB_IDS,
-  TOTAL_VIEWS,
 } from "@components/planner/plannerTasksListing/plannerTasksListingDomain";
 import {
   TASK_LIST_BTN_OUTLINE,
@@ -1138,143 +1136,18 @@ const TasksListingPage = ({
                       ────────── spacer ──────────  [+ Add view (4/50)]  [All Views]
           ══════════════════════════════════════════════════════ */}
           {!isTabLocked && (
-          <div className="ptl-tabs-row" style={{
-            display: "flex",
-            alignItems: "stretch",
-            backgroundColor: "#fff",
-            flexShrink: 0,
-            height: 44,
-          }}>
-            {(() => {
-              const currentViewCount = allTabs.length;
-              const hasAllViews = visibleTabIds.length === POSSIBLE_TABS.length;
-              return (
-                <>
-            {/* Tabs with equal width */}
-            {allTabs.map((tab, index) => (
-              <button
-                key={tab.id}
-                type="button"
-                data-active={activeTab === tab.id}
-                onClick={() => switchTab(tab.id)}
-                style={{
-                  flex: 1,
-                  display: "inline-flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  padding: "0 20px",
-                  borderLeft: index === 0 ? "1px solid #8A8A8A" : "none",
-                  borderRight: "1px solid #8A8A8A",
-                  borderTop: "1px solid #8A8A8A",
-                  backgroundColor: activeTab === tab.id ? "#f5f8fa" : "#fff",
-                  borderBottom: activeTab === tab.id ? "2px solid #0066CC" : "1px solid #8A8A8A",
-                  color: activeTab === tab.id ? "#0066CC" : "#141414",
-                  fontSize: 13,
-                  fontWeight: activeTab === tab.id ? 600 : 400,
-                  fontFamily: "Lexend Deca, Helvetica, Arial, sans-serif",
-                  cursor: "pointer",
-                  height: 44,
-                  whiteSpace: "nowrap",
-                  gap: 6,
-                }}
-              >
-                {tab.label}
-                <span className="ptl-tab-count">
-                  {resolvePlannerTaskTabCount(tab.id, tasksQueryData?.summary)}
-                </span>
-              </button>
-            ))}
-
-            {/* + Add view — opens popup to toggle which tabs are visible */}
-            <button
-              onClick={() => setShowAddViewModal(true)}
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 4,
-                padding: "0 16px",
-                border: "none",
-                borderBottom: "1px solid #e5e7eb",
-                backgroundColor: "#fff",
-                color: "#374151",
-                fontSize: 13,
-                fontFamily: "Lexend Deca, Helvetica, Arial, sans-serif",
-                fontWeight: 400,
-                cursor: "pointer",
-                flexShrink: 0,
-                height: 44,
-                whiteSpace: "nowrap",
-              }}
-            >
-              <Plus size={14} />
-              Add view ({currentViewCount}/{TOTAL_VIEWS})
-            </button>
-
-            {/* All Views — enable all tabs, then hide this button */}
-            {!hasAllViews && (
-              <button
-                onClick={() => {
-                  const all = POSSIBLE_TABS.map((t) => t.id);
-                  setVisibleTabIds(all);
-                  persistVisibleTabIds(all);
-                }}
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  padding: "10px 16px",
-                  border: "none",
-                  borderBottom: "2px solid transparent",
-                  backgroundColor: "#fff",
-                  color: "#0066CC",
-                  fontSize: 13,
-                  fontWeight: 600,
-                  fontFamily: "Lexend Deca, Helvetica, Arial, sans-serif",
-                  cursor: "pointer",
-                  flexShrink: 0,
-                  whiteSpace: "nowrap",
-                }}
-              >All Views</button>
-            )}
-                </>
-              );
-            })()}
-          </div>
+            <PlannerTasksTabsBar
+              allTabs={allTabs}
+              activeTab={activeTab}
+              switchTab={switchTab}
+              visibleTabIds={visibleTabIds}
+              setVisibleTabIds={setVisibleTabIds}
+              showAddViewModal={showAddViewModal}
+              setShowAddViewModal={setShowAddViewModal}
+              toggleVisibleTab={toggleVisibleTab}
+              listSummary={tasksQueryData?.summary}
+            />
           )}
-
-          {/* Add view / Manage tabs modal */}
-          <Modal show={showAddViewModal} onHide={() => setShowAddViewModal(false)} centered>
-            <Modal.Header closeButton>
-              <Modal.Title>Manage views</Modal.Title>
-            </Modal.Header>
-            <Modal.Body>
-              <p className="text-muted small mb-3">
-                Toggle which views appear in the tab bar. At least one must be visible.
-              </p>
-              {POSSIBLE_TABS.map((tab) => {
-                const isVisible = visibleTabIds.includes(tab.id);
-                const isOnlyOne = visibleTabIds.length === 1;
-                return (
-                  <Form.Check
-                    key={tab.id}
-                    type="switch"
-                    id={`view-${tab.id}`}
-                    label={tab.label}
-                    checked={isVisible}
-                    disabled={isVisible && isOnlyOne}
-                    onChange={() => {
-                      toggleVisibleTab(tab.id, isVisible, isOnlyOne);
-                    }}
-                    className="mb-2"
-                  />
-                );
-              })}
-            </Modal.Body>
-            <Modal.Footer>
-              <Button variant="secondary" onClick={() => setShowAddViewModal(false)}>
-                Close
-              </Button>
-            </Modal.Footer>
-          </Modal>
 
           {/* ══════════════════════════════════════════════════════
               ROW 3 — Filter controls row

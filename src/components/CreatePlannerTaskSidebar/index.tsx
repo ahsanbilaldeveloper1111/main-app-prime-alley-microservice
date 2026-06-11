@@ -4,10 +4,7 @@ import {
   X,
   Calendar,
   Clock,
-  FileText,
   Tag,
-  Users,
-  Eye,
   ListTodo,
   Plus,
   FolderOpen,
@@ -34,6 +31,7 @@ import TaskSecondaryTabs from "@components/planner/workPlannerPagePartials/TaskS
 import { PlannerAddToMyDayHeaderButton } from "@components/planner/plannerTasksListing/PlannerAddToMyDayHeaderButton";
 import type { PlannerTaskEditScope } from "@planner/taskRowPermissions";
 import { resolvePlannerCreatedTaskId } from "@page-modules/planner/my-day/myDayDomain";
+import { getTaskAvatarColor } from "@utils/taskListing/taskListUiPrimitives";
 
 // ─── Types (from createtask-modal) ─────────────────────────────────────────────
 
@@ -385,8 +383,8 @@ function recurringScheduleField(
   const direct = fromRecord(task as unknown as Record<string, unknown>);
   if (direct) return direct;
   const raw = task.rawData;
-  if (raw && typeof raw === "object") {
-    const got = fromRecord(raw as Record<string, unknown>);
+  if (raw !== null && typeof raw === "object") {
+    const got = fromRecord(raw);
     if (got) return got;
   }
   return fromRecord(readNestedRecurring(task));
@@ -2969,6 +2967,8 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
   const [showAssigneeDropdown, setShowAssigneeDropdown] = useState(false);
   const [watcherSearchQuery, setWatcherSearchQuery] = useState("");
   const [showWatcherDropdown, setShowWatcherDropdown] = useState(false);
+  const assigneeDropdownRef = React.useRef<HTMLDivElement>(null);
+  const watcherDropdownRef = React.useRef<HTMLDivElement>(null);
   const {
     fetchedProjects,
     loadingProjects,
@@ -3050,6 +3050,29 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
       () => undefined,
     );
   }, [isOpen, fetchLinkRecordsForSearch]);
+
+  useEffect(() => {
+    const handleOutsideClick = (e: MouseEvent) => {
+      const target = e.target;
+      if (!(target instanceof Node)) {
+        return;
+      }
+      if (
+        assigneeDropdownRef.current &&
+        !assigneeDropdownRef.current.contains(target)
+      ) {
+        setShowAssigneeDropdown(false);
+      }
+      if (
+        watcherDropdownRef.current &&
+        !watcherDropdownRef.current.contains(target)
+      ) {
+        setShowWatcherDropdown(false);
+      }
+    };
+    document.addEventListener("mousedown", handleOutsideClick);
+    return () => document.removeEventListener("mousedown", handleOutsideClick);
+  }, []);
 
   usePlannerSidebarFormOpenLifecycle({
     isOpen,
@@ -3366,7 +3389,17 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
   const groupClass = "mb-3 planner-sidebar-field";
   const dueDateMin = minDueDateFromTodayAndStart(formData.startDate);
   const conversionHeaderTone = PLANNER_TASK_SIDEBAR.surface;
-  const conversionBodyTone = PLANNER_TASK_SIDEBAR.surface;
+  const sectionDividerStyle: React.CSSProperties = {
+    fontSize: "13px",
+    fontWeight: 600,
+    letterSpacing: "0.04em",
+    textTransform: "uppercase",
+    color: "#4a5568",
+    borderBottom: "1px solid #e2e8f0",
+    paddingBottom: "8px",
+    marginBottom: "14px",
+    marginTop: "8px",
+  };
 
   return (
     <>
@@ -3487,7 +3520,7 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
               minHeight: 0,
               overflowY: "auto",
               padding: "14px 18px 22px",
-              backgroundColor: conversionBodyTone,
+              backgroundColor: "#f5f7fa",
             }}
           >
           <Form onSubmit={(e) => { e.preventDefault(); handleCreate(); }}>
@@ -3497,13 +3530,9 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
 
               <Row>
                 <Col xs={12}>
+                  <div style={sectionDividerStyle}>Task Details</div>
                   <Form.Group className={groupClass}>
                     <Form.Label style={labelStyle}>
-                      <FileText
-                        size={16}
-                        className="me-2"
-                        style={{ verticalAlign: "middle" }}
-                      />
                       Title <span style={{ color: "#ef4444" }}>*</span>
                     </Form.Label>
                     <div style={helperTextStyle}>Give your task a clear, descriptive name.</div>
@@ -3644,6 +3673,7 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
                 )}
 
                 <Col xs={12}>
+                  <div style={sectionDividerStyle}>People</div>
                   {!isRecurringConversionMode &&
                     formData.taskType !== "todo" && (
                       <fieldset
@@ -3667,62 +3697,11 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
                             <Form.Label
                               style={{ ...labelStyle, marginBottom: 0 }}
                             >
-                              <Users
-                                size={16}
-                                className="me-2"
-                                style={{ verticalAlign: "middle" }}
-                              />
                               Assigned To
                             </Form.Label>
                           </div>
-                          <div style={helperTextStyle}>Who is responsible for completing this task?</div>
-                          <div
-                            style={{
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "space-between",
-                              marginBottom: 8,
-                            }}
-                          >
-                            {!isLimitedTaskEdit && (
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setShowAssigneeDropdown(
-                                    !showAssigneeDropdown,
-                                  );
-                                  if (!showAssigneeDropdown)
-                                    setAssigneeSearchQuery("");
-                                }}
-                                style={{
-                                  backgroundColor: "rgb(255, 255, 255)",
-                                  borderColor: "rgb(138, 138, 138)",
-                                  color: "rgb(20, 20, 20)",
-                                  textDecoration: "none",
-                                  borderRadius: 4,
-                                  borderWidth: 1,
-                                  borderStyle: "solid",
-                                  verticalAlign: "middle",
-                                  paddingBlock: "8px",
-                                  paddingInline: "16px",
-                                  maxWidth: "100%",
-                                  fontFamily:
-                                    '"Lexend Deca", Helvetica, Arial, sans-serif',
-                                  fontSize: "12px",
-                                  fontWeight: 300,
-                                  letterSpacing: "0px",
-                                  lineHeight: "14px",
-                                  textUnderlineOffset: "24%",
-                                  display: "inline-flex",
-                                  alignItems: "center",
-                                  gap: 6,
-                                  cursor: "pointer",
-                                }}
-                              >
-                                <Plus size={14} />
-                                Add Assignee
-                              </button>
-                            )}
+                          <div style={helperTextStyle}>
+                            Who is responsible for completing this task?
                           </div>
                           <div
                             style={{
@@ -3733,58 +3712,111 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
                               marginBottom: 8,
                             }}
                           >
-                            {selectedAssignees.map((user) =>
-                              isLimitedTaskEdit ? (
-                                <span
-                                  key={user.id}
-                                  style={{
-                                    display: "inline-flex",
-                                    alignItems: "center",
-                                    gap: 8,
-                                    padding: "6px 12px",
-                                    borderRadius: 6,
-                                    backgroundColor: "#edf6ff",
-                                    border: "1px solid #bfdbfe",
-                                    fontSize: "0.875rem",
-                                    color: "#141414",
-                                    fontWeight: 500,
-                                  }}
-                                >
-                                  {user.name}
-                                </span>
-                              ) : (
+                            {selectedAssignees.map((user) => (
+                              <div
+                                key={`pre-${user.id}`}
+                                title={user.name}
+                                style={{
+                                  position: "relative",
+                                  display: "inline-block",
+                                }}
+                              >
                                 <button
-                                  key={user.id}
                                   type="button"
+                                  title={user.name}
+                                  aria-label={
+                                    isLimitedTaskEdit
+                                      ? user.name
+                                      : `Remove assignee ${user.name}`
+                                  }
+                                  disabled={isLimitedTaskEdit}
                                   onClick={() => toggleAssignee(user.id)}
                                   style={{
-                                    display: "inline-flex",
+                                    width: 36,
+                                    height: 36,
+                                    borderRadius: "50%",
+                                    background: getTaskAvatarColor(user.name),
+                                    display: "flex",
                                     alignItems: "center",
-                                    gap: 8,
-                                    padding: "6px 12px",
-                                    borderRadius: 6,
-                                    backgroundColor: "#edf6ff",
-                                    border: "1px solid #bfdbfe",
-                                    fontSize: "0.875rem",
-                                    cursor: "pointer",
-                                    font: "inherit",
+                                    justifyContent: "center",
+                                    fontSize: 13,
+                                    fontWeight: 600,
+                                    color: "#fff",
+                                    cursor: isLimitedTaskEdit
+                                      ? "default"
+                                      : "pointer",
+                                    border: "2px solid #fff",
+                                    boxShadow: "0 1px 3px rgba(0,0,0,0.15)",
+                                    padding: 0,
                                   }}
                                 >
-                                  <span
+                                  {user.name.charAt(0).toUpperCase()}
+                                </button>
+                                {!isLimitedTaskEdit && (
+                                  <button
+                                    type="button"
+                                    title={`Remove ${user.name}`}
+                                    aria-label={`Remove assignee ${user.name}`}
+                                    onClick={() => toggleAssignee(user.id)}
                                     style={{
-                                      color: "#141414",
-                                      fontWeight: 500,
+                                      position: "absolute",
+                                      top: -4,
+                                      right: -4,
+                                      width: 16,
+                                      height: 16,
+                                      borderRadius: "50%",
+                                      backgroundColor: "#ef4444",
+                                      display: "flex",
+                                      alignItems: "center",
+                                      justifyContent: "center",
+                                      cursor: "pointer",
+                                      border: "1px solid #fff",
+                                      padding: 0,
                                     }}
                                   >
-                                    {user.name}
-                                  </span>
-                                  <X size={14} style={{ color: "#64748b" }} />
-                                </button>
-                              ),
+                                    <X size={9} color="#fff" />
+                                  </button>
+                                )}
+                              </div>
+                            ))}
+                            {!isLimitedTaskEdit && (
+                              <button
+                                type="button"
+                                title="Add Assignee"
+                                onClick={() => {
+                                  setShowAssigneeDropdown(!showAssigneeDropdown);
+                                  if (!showAssigneeDropdown)
+                                    setAssigneeSearchQuery("");
+                                }}
+                                style={{
+                                  width: 36,
+                                  height: 36,
+                                  borderRadius: "50%",
+                                  border: "2px dashed #cbd5e0",
+                                  backgroundColor: "transparent",
+                                  display: "flex",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                  cursor: "pointer",
+                                  color: "#718096",
+                                  transition: "all 0.15s ease",
+                                }}
+                                onMouseEnter={(e) => {
+                                  e.currentTarget.style.borderColor = "#0066CC";
+                                  e.currentTarget.style.color = "#0066CC";
+                                }}
+                                onMouseLeave={(e) => {
+                                  e.currentTarget.style.borderColor = "#cbd5e0";
+                                  e.currentTarget.style.color = "#718096";
+                                }}
+                              >
+                                <Plus size={16} />
+                              </button>
                             )}
                           </div>
                           {showAssigneeDropdown && !isLimitedTaskEdit && (
                             <div
+                              ref={assigneeDropdownRef}
                               style={{
                                 border: "1px solid #e2e8f0",
                                 borderRadius: 4,
@@ -3829,12 +3861,32 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
                                           ? "#edf6ff"
                                           : "white",
                                       border: "none",
-                                      borderBottom: "1px solid #d5d5d5",
+                                      borderBottom: "1px solid #f0f0f0",
                                       width: "100%",
+                                      display: "flex",
+                                      alignItems: "center",
+                                      gap: 10,
                                       textAlign: "left",
                                       font: "inherit",
                                     }}
                                   >
+                                    <div
+                                      style={{
+                                        width: 28,
+                                        height: 28,
+                                        borderRadius: "50%",
+                                        background: getTaskAvatarColor(user.name),
+                                        display: "flex",
+                                        alignItems: "center",
+                                        justifyContent: "center",
+                                        fontSize: 11,
+                                        fontWeight: 600,
+                                        color: "#fff",
+                                        flexShrink: 0,
+                                      }}
+                                    >
+                                      {user.name.charAt(0).toUpperCase()}
+                                    </div>
                                     <span
                                       style={{
                                         fontSize: "13px",
@@ -3844,33 +3896,17 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
                                       {user.name}
                                     </span>
                                     {formData.assigneeIds.includes(user.id) && (
-                                      <Check
-                                        size={18}
-                                        className="text-primary ms-2"
+                                      <span
                                         style={{
-                                          flexShrink: 0,
-                                          display: "inline",
-                                          verticalAlign: "middle",
+                                          marginLeft: "auto",
+                                          color: "#0066CC",
                                         }}
-                                      />
+                                      >
+                                        ✓
+                                      </span>
                                     )}
                                   </button>
                                 ))}
-                              <div
-                                className="p-2 border-top"
-                                style={{ backgroundColor: "white" }}
-                              >
-                                <button
-                                  type="button"
-                                  className="btn btn-primary btn-sm w-100"
-                                  onClick={() => {
-                                    setShowAssigneeDropdown(false);
-                                    setAssigneeSearchQuery("");
-                                  }}
-                                >
-                                  Done
-                                </button>
-                              </div>
                             </div>
                           )}
                         </Form.Group>
@@ -3902,60 +3938,11 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
                             <Form.Label
                               style={{ ...labelStyle, marginBottom: 0 }}
                             >
-                              <Eye
-                                size={16}
-                                className="me-2"
-                                style={{ verticalAlign: "middle" }}
-                              />
                               Watchers
                             </Form.Label>
                           </div>
-                          <div style={helperTextStyle}>Who should be notified of updates on this task?</div>
-                          <div
-                            style={{
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "space-between",
-                              marginBottom: 8,
-                            }}
-                          >
-                            {!isLimitedTaskEdit && (
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setShowWatcherDropdown(!showWatcherDropdown);
-                                  if (!showWatcherDropdown)
-                                    setWatcherSearchQuery("");
-                                }}
-                                style={{
-                                  backgroundColor: "rgb(255, 255, 255)",
-                                  borderColor: "rgb(138, 138, 138)",
-                                  color: "rgb(20, 20, 20)",
-                                  textDecoration: "none",
-                                  borderRadius: 4,
-                                  borderWidth: 1,
-                                  borderStyle: "solid",
-                                  verticalAlign: "middle",
-                                  paddingBlock: "8px",
-                                  paddingInline: "16px",
-                                  maxWidth: "100%",
-                                  fontFamily:
-                                    '"Lexend Deca", Helvetica, Arial, sans-serif',
-                                  fontSize: "12px",
-                                  fontWeight: 300,
-                                  letterSpacing: "0px",
-                                  lineHeight: "14px",
-                                  textUnderlineOffset: "24%",
-                                  display: "inline-flex",
-                                  alignItems: "center",
-                                  gap: 6,
-                                  cursor: "pointer",
-                                }}
-                              >
-                                <Plus size={14} />
-                                Add Watcher
-                              </button>
-                            )}
+                          <div style={helperTextStyle}>
+                            Who should be notified of updates on this task?
                           </div>
                           <div
                             style={{
@@ -3966,58 +3953,111 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
                               marginBottom: 8,
                             }}
                           >
-                            {selectedWatchers.map((user) =>
-                              isLimitedTaskEdit ? (
-                                <span
-                                  key={user.id}
-                                  style={{
-                                    display: "inline-flex",
-                                    alignItems: "center",
-                                    gap: 8,
-                                    padding: "6px 12px",
-                                    borderRadius: 6,
-                                    backgroundColor: "#eef4ff",
-                                    border: "1px solid #bfdbfe",
-                                    fontSize: "0.875rem",
-                                    color: "#141414",
-                                    fontWeight: 500,
-                                  }}
-                                >
-                                  {user.name}
-                                </span>
-                              ) : (
+                            {selectedWatchers.map((user) => (
+                              <div
+                                key={`pre-${user.id}`}
+                                title={user.name}
+                                style={{
+                                  position: "relative",
+                                  display: "inline-block",
+                                }}
+                              >
                                 <button
-                                  key={user.id}
                                   type="button"
+                                  title={user.name}
+                                  aria-label={
+                                    isLimitedTaskEdit
+                                      ? user.name
+                                      : `Remove watcher ${user.name}`
+                                  }
+                                  disabled={isLimitedTaskEdit}
                                   onClick={() => toggleWatcher(user.id)}
                                   style={{
-                                    display: "inline-flex",
+                                    width: 36,
+                                    height: 36,
+                                    borderRadius: "50%",
+                                    background: getTaskAvatarColor(user.name),
+                                    display: "flex",
                                     alignItems: "center",
-                                    gap: 8,
-                                    padding: "6px 12px",
-                                    borderRadius: 6,
-                                    backgroundColor: "#eef4ff",
-                                    border: "1px solid #bfdbfe",
-                                    fontSize: "0.875rem",
-                                    cursor: "pointer",
-                                    font: "inherit",
+                                    justifyContent: "center",
+                                    fontSize: 13,
+                                    fontWeight: 600,
+                                    color: "#fff",
+                                    cursor: isLimitedTaskEdit
+                                      ? "default"
+                                      : "pointer",
+                                    border: "2px solid #fff",
+                                    boxShadow: "0 1px 3px rgba(0,0,0,0.15)",
+                                    padding: 0,
                                   }}
                                 >
-                                  <span
+                                  {user.name.charAt(0).toUpperCase()}
+                                </button>
+                                {!isLimitedTaskEdit && (
+                                  <button
+                                    type="button"
+                                    title={`Remove ${user.name}`}
+                                    aria-label={`Remove watcher ${user.name}`}
+                                    onClick={() => toggleWatcher(user.id)}
                                     style={{
-                                      color: "#141414",
-                                      fontWeight: 500,
+                                      position: "absolute",
+                                      top: -4,
+                                      right: -4,
+                                      width: 16,
+                                      height: 16,
+                                      borderRadius: "50%",
+                                      backgroundColor: "#ef4444",
+                                      display: "flex",
+                                      alignItems: "center",
+                                      justifyContent: "center",
+                                      cursor: "pointer",
+                                      border: "1px solid #fff",
+                                      padding: 0,
                                     }}
                                   >
-                                    {user.name}
-                                  </span>
-                                  <X size={14} style={{ color: "#64748b" }} />
-                                </button>
-                              ),
+                                    <X size={9} color="#fff" />
+                                  </button>
+                                )}
+                              </div>
+                            ))}
+                            {!isLimitedTaskEdit && (
+                              <button
+                                type="button"
+                                title="Add Watcher"
+                                onClick={() => {
+                                  setShowWatcherDropdown(!showWatcherDropdown);
+                                  if (!showWatcherDropdown)
+                                    setWatcherSearchQuery("");
+                                }}
+                                style={{
+                                  width: 36,
+                                  height: 36,
+                                  borderRadius: "50%",
+                                  border: "2px dashed #cbd5e0",
+                                  backgroundColor: "transparent",
+                                  display: "flex",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                  cursor: "pointer",
+                                  color: "#718096",
+                                  transition: "all 0.15s ease",
+                                }}
+                                onMouseEnter={(e) => {
+                                  e.currentTarget.style.borderColor = "#0066CC";
+                                  e.currentTarget.style.color = "#0066CC";
+                                }}
+                                onMouseLeave={(e) => {
+                                  e.currentTarget.style.borderColor = "#cbd5e0";
+                                  e.currentTarget.style.color = "#718096";
+                                }}
+                              >
+                                <Plus size={16} />
+                              </button>
                             )}
                           </div>
                           {showWatcherDropdown && !isLimitedTaskEdit && (
                             <div
+                              ref={watcherDropdownRef}
                               style={{
                                 border: "1px solid #e2e8f0",
                                 borderRadius: 4,
@@ -4060,12 +4100,32 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
                                           ? "#f0fdf4"
                                           : "white",
                                       border: "none",
-                                      borderBottom: "1px solid #d5d5d5",
+                                      borderBottom: "1px solid #f0f0f0",
                                       width: "100%",
+                                      display: "flex",
+                                      alignItems: "center",
+                                      gap: 10,
                                       textAlign: "left",
                                       font: "inherit",
                                     }}
                                   >
+                                    <div
+                                      style={{
+                                        width: 28,
+                                        height: 28,
+                                        borderRadius: "50%",
+                                        background: getTaskAvatarColor(user.name),
+                                        display: "flex",
+                                        alignItems: "center",
+                                        justifyContent: "center",
+                                        fontSize: 11,
+                                        fontWeight: 600,
+                                        color: "#fff",
+                                        flexShrink: 0,
+                                      }}
+                                    >
+                                      {user.name.charAt(0).toUpperCase()}
+                                    </div>
                                     <span
                                       style={{
                                         fontSize: "13px",
@@ -4075,15 +4135,14 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
                                       {user.name}
                                     </span>
                                     {formData.watcherIds.includes(user.id) && (
-                                      <Check
-                                        size={18}
+                                      <span
                                         style={{
-                                          flexShrink: 0,
-                                          display: "inline",
-                                          verticalAlign: "middle",
-                                          color: "#22c55e",
+                                          marginLeft: "auto",
+                                          color: "#0066CC",
                                         }}
-                                      />
+                                      >
+                                        ✓
+                                      </span>
                                     )}
                                   </button>
                                 ))}
@@ -4095,10 +4154,13 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
                 </Col>
 
               {!isRecurringConversionMode && (
+                <>
+                <Col xs={12}>
+                  <div style={sectionDividerStyle}>Schedule</div>
+                </Col>
                 <Col xs={12} md={6}>
                   <Form.Group className={groupClass}>
                     <Form.Label style={labelStyle}>
-                      <Calendar size={16} className="me-2" style={{ verticalAlign: "middle" }} />
                       Start Date
                       {formData.taskType === "recurring" && (
                         <span style={{ color: "#ef4444" }}> *</span>
@@ -4120,12 +4182,12 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
                     />
                   </Form.Group>
                 </Col>
+                </>
               )}
               {formData.taskType !== "recurring" && (
               <Col xs={12} md={6}>
                 <Form.Group className={groupClass}>
                   <Form.Label style={labelStyle}>
-                    <Calendar size={16} className="me-2" style={{ verticalAlign: "middle" }} />
                     Due Date
                   </Form.Label>
                     <div style={helperTextStyle}>When must this be completed?</div>
@@ -4567,12 +4629,8 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
 
               {!isRecurringConversionMode && (
                 <Form.Group className={groupClass}>
+                  <div style={sectionDividerStyle}>More Details</div>
                   <Form.Label style={labelStyle}>
-                    <FileText
-                      size={16}
-                      className="me-2"
-                      style={{ verticalAlign: "middle" }}
-                    />
                     Description
                   </Form.Label>
                   <div style={helperTextStyle}>Add details, context, or instructions for this task.</div>
@@ -4596,11 +4654,6 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
                     <Col xs={12} className="mb-3">
                       <Form.Group className={groupClass}>
                         <Form.Label style={labelStyle}>
-                          <FolderOpen
-                            size={16}
-                            className="me-2"
-                            style={{ verticalAlign: "middle" }}
-                          />
                           Project
                           {formData.taskType === "recurring" && (
                             <span style={{ fontWeight: 400, color: "#6b7280" }}>
@@ -4633,11 +4686,6 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
                   <Col xs={6} className="mb-3">
                     <Form.Group className={groupClass}>
                       <Form.Label style={labelStyle}>
-                        <ListTodo
-                          size={16}
-                          className="me-2"
-                          style={{ verticalAlign: "middle" }}
-                        />
                         Status
                       </Form.Label>
                       <div style={helperTextStyle}>Current state of this task.</div>

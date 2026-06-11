@@ -700,12 +700,10 @@ const StatusesTab: React.FC<StatusesTabProps> = ({
   const renderAddStatusButton = () => (
     <div
       style={{
-        position: "absolute",
-        right: "19px",
-        top: "170px",
         display: "flex",
         alignItems: "center",
         gap: "8px",
+        flexShrink: 0,
       }}
     >
       {canDeleteStatus && selectedItems.length > 0 && (
@@ -1047,6 +1045,8 @@ const StatusesTab: React.FC<StatusesTabProps> = ({
           showToolbar={true}
           toolbar={toolbarConfig}
           statsCards={statsCardsData}
+          metricsGridMinWidth="150px"
+          metricsEmbedded={false}
         />
       </div>
 

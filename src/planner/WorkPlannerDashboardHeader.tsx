@@ -8,6 +8,8 @@ import {
 import type { DashboardProjectRow } from "./workPlannerDashboardTypes";
 
 const LEXEND = '"Lexend Deca", Helvetica, Arial, sans-serif';
+const PLANNER_PRIMARY = "#0066CC";
+const PLANNER_PRIMARY_HOVER = "#0052A3";
 
 const projectDropdownButtonBase: React.CSSProperties = {
   display: "inline-flex",
@@ -219,12 +221,22 @@ export function WorkPlannerDashboardHeader({
                   ...headerActionButtonBase,
                   cursor:
                     selectedProject && !hierarchyLoading ? "pointer" : "not-allowed",
-                  backgroundColor: "rgb(20, 20, 20)",
-                  borderColor: "rgba(20, 20, 20, 0)",
-                  color: "rgb(255, 255, 255)",
+                  backgroundColor: PLANNER_PRIMARY,
+                  borderColor: PLANNER_PRIMARY,
+                  color: "#ffffff",
+                  fontWeight: 500,
                 }}
                 onClick={openCreateTask}
                 disabled={!selectedProject || hierarchyLoading || !canViewProjects}
+                onMouseEnter={(e) => {
+                  if (!selectedProject || hierarchyLoading || !canViewProjects) return;
+                  e.currentTarget.style.backgroundColor = PLANNER_PRIMARY_HOVER;
+                  e.currentTarget.style.borderColor = PLANNER_PRIMARY_HOVER;
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = PLANNER_PRIMARY;
+                  e.currentTarget.style.borderColor = PLANNER_PRIMARY;
+                }}
               >
                 <Plus size={18} />
                 <span>Create Task</span>

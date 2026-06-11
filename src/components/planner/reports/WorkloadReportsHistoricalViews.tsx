@@ -34,73 +34,60 @@ function resolveOverdueBarColor(value: number): string {
   return "#ef4444";
 }
 
-export function ReportsOverdueTrendChart({
-  title,
-  subtitle,
-  points,
-}: Readonly<{
+function formatBarTrendTooltip(
+  value: number,
+  barColorMode: "overdue" | "metric",
+  percentAxis: boolean,
+  valueSuffix: string,
+): string {
+  if (barColorMode === "overdue") return `${value} overdue`;
+  if (percentAxis) return `${value}%`;
+  return `${value}${valueSuffix}`;
+}
+
+function resolveBarTrendFill(
+  barColorMode: "overdue" | "metric",
+  value: number,
+  index: number,
+  pointCount: number,
+): string {
+  if (barColorMode === "overdue") return resolveOverdueBarColor(value);
+  return index === pointCount - 1 ? "#0066CC" : "#bfdbfe";
+}
+
+type ReportsBarTrendChartProps = Readonly<{
   title: string;
   subtitle: string;
   points: HistoricalChartPoint[];
-}>) {
-  const hasValues = points.some((p) => p.value > 0);
-  return (
-    <div className="reports-panel reports-panel--chart">
-      <h2 className="reports-panel__title">{title}</h2>
-      <p className="reports-panel__subtitle">{subtitle}</p>
-      {points.length === 0 ? (
-        <ReportsEmptyState
-          icon="ti-calendar-check"
-          title="No overdue data"
-          subtitle="No overdue tasks recorded in this period"
-        />
-      ) : (
-        <div className="reports-trend-chart">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={points} margin={{ top: 8, right: 12, left: 0, bottom: 4 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" vertical={false} />
-              <XAxis dataKey="label" tick={{ fontSize: 11 }} interval="preserveStartEnd" />
-              <YAxis allowDecimals={false} tick={{ fontSize: 11 }} width={32} domain={[0, "auto"]} />
-              <Tooltip formatter={(value: number) => `${value} overdue`} />
-              <Bar dataKey="value" radius={[4, 4, 0, 0]} maxBarSize={48}>
-                {points.map((point, index) => (
-                  <Cell
-                    key={point.label}
-                    fill={resolveOverdueBarColor(point.value)}
-                  />
-                ))}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-      )}
-      {!hasValues && points.length > 0 ? (
-        <p className="small text-muted mt-2 mb-0">
-          No overdue tasks recorded in these weeks.
-        </p>
-      ) : null}
-    </div>
-  );
-}
+  emptyIcon: string;
+  emptyTitle: string;
+  emptySubtitle: string;
+  zeroHint?: string;
+  valueSuffix?: string;
+  percentAxis?: boolean;
+  barColorMode: "overdue" | "metric";
+}>;
 
-export function ReportsMetricTrendChart({
+function ReportsBarTrendChart({
   title,
   subtitle,
   points,
+  emptyIcon,
+  emptyTitle,
+  emptySubtitle,
+  zeroHint,
   valueSuffix = "",
   percentAxis = false,
-}: ReportsMetricTrendChartProps) {
+  barColorMode,
+}: ReportsBarTrendChartProps) {
   const hasValues = points.some((p) => p.value > 0);
+
   return (
     <div className="reports-panel reports-panel--chart">
       <h2 className="reports-panel__title">{title}</h2>
       <p className="reports-panel__subtitle">{subtitle}</p>
       {points.length === 0 ? (
-        <ReportsEmptyState
-          icon="ti-trending-up"
-          title="No trend data"
-          subtitle="Try adjusting the date range to see completion trends"
-        />
+        <ReportsEmptyState icon={emptyIcon} title={emptyTitle} subtitle={emptySubtitle} />
       ) : (
         <div className="reports-trend-chart">
           <ResponsiveContainer width="100%" height="100%">
@@ -114,16 +101,12 @@ export function ReportsMetricTrendChart({
                 domain={percentAxis ? [0, 100] : [0, "auto"]}
                 tickFormatter={percentAxis ? (v) => `${v}%` : undefined}
               />
-              <Tooltip
-                formatter={(value: number) =>
-                  percentAxis ? `${value}%` : `${value}${valueSuffix}`
-                }
-              />
+              <Tooltip formatter={(value: number) => formatBarTrendTooltip(value, barColorMode, percentAxis, valueSuffix)} />
               <Bar dataKey="value" radius={[4, 4, 0, 0]} maxBarSize={48}>
                 {points.map((point, index) => (
                   <Cell
                     key={point.label}
-                    fill={index === points.length - 1 ? "#0066CC" : "#bfdbfe"}
+                    fill={resolveBarTrendFill(barColorMode, point.value, index, points.length)}
                   />
                 ))}
               </Bar>
@@ -131,12 +114,56 @@ export function ReportsMetricTrendChart({
           </ResponsiveContainer>
         </div>
       )}
-      {!hasValues && points.length > 0 ? (
-        <p className="small text-muted mt-2 mb-0">
-          Showing baseline for the selected range. Task activity may be zero in this period.
-        </p>
+      {!hasValues && points.length > 0 && zeroHint ? (
+        <p className="small text-muted mt-2 mb-0">{zeroHint}</p>
       ) : null}
     </div>
+  );
+}
+
+export function ReportsOverdueTrendChart({
+  title,
+  subtitle,
+  points,
+}: Readonly<{
+  title: string;
+  subtitle: string;
+  points: HistoricalChartPoint[];
+}>) {
+  return (
+    <ReportsBarTrendChart
+      title={title}
+      subtitle={subtitle}
+      points={points}
+      emptyIcon="ti-calendar-check"
+      emptyTitle="No overdue data"
+      emptySubtitle="No overdue tasks recorded in this period"
+      zeroHint="No overdue tasks recorded in these weeks."
+      barColorMode="overdue"
+    />
+  );
+}
+
+export function ReportsMetricTrendChart({
+  title,
+  subtitle,
+  points,
+  valueSuffix = "",
+  percentAxis = false,
+}: ReportsMetricTrendChartProps) {
+  return (
+    <ReportsBarTrendChart
+      title={title}
+      subtitle={subtitle}
+      points={points}
+      valueSuffix={valueSuffix}
+      percentAxis={percentAxis}
+      emptyIcon="ti-trending-up"
+      emptyTitle="No trend data"
+      emptySubtitle="Try adjusting the date range to see completion trends"
+      zeroHint="Showing baseline for the selected range. Task activity may be zero in this period."
+      barColorMode="metric"
+    />
   );
 }
 

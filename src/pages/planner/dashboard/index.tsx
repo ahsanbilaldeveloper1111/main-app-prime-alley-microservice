@@ -62,7 +62,7 @@ const WorkPlannerProjectsDashboard = () => {
 
       <style>{WORK_PLANNER_STAT_CARDS_GLOBAL_CSS}</style>
 
-      <div style={layout.container}>
+      <div style={layout.container} className="wp-planner-dashboard">
         <WorkPlannerDashboardHeader
           canViewProjects={canViewProjects}
           canViewTasks={canViewTasks}

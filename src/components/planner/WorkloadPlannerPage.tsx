@@ -79,6 +79,9 @@ const WorkloadPlannerPage: React.FC = () => {
     formatError: mutations.formatError,
   });
 
+  const dataViewsEnabled = data.queriesEnabled || ui.useMockData;
+  const loadingMain = ui.useMockData ? false : data.loadingMain;
+
   return (
     <div className="workload-page">
       {ui.useMockData ? (
@@ -173,7 +176,7 @@ const WorkloadPlannerPage: React.FC = () => {
             <button
               type="button"
               className="workload-board-hint__close"
-              onClick={() => ui.setShowBoardHint(false)}
+              onClick={ui.dismissBoardHint}
               aria-label="Dismiss"
             >
               <X size={16} aria-hidden />
@@ -182,8 +185,8 @@ const WorkloadPlannerPage: React.FC = () => {
         ) : null}
 
         <WorkloadPlannerDataViews
-          loadingMain={data.loadingMain}
-          enabled={data.queriesEnabled}
+          loadingMain={loadingMain}
+          enabled={dataViewsEnabled}
           mainView={ui.mainView}
           summaryData={data.summaryQuery.data}
           gridData={data.displayGridData}
