@@ -181,7 +181,8 @@
 
   @media (max-width: 767.98px) {
     .settings-section-shell__tab-btn,
-    .ai-chatbot-settings__inner-tab-btn {
+    .ai-chatbot-settings__inner-tab-btn,
+    .ai-analysis-tenant-config__inner-tab-btn {
       font-size: var(--ms-font-sm);
       --ms-tab-btn-padding-x: clamp(8px, 2vw, 14px);
       --ms-tab-btn-padding-y: clamp(8px, 1.5vw, 10px);

@@ -971,6 +971,11 @@ export const aiAnalyticsKeys = {
     detail: (tenantId: string) =>
       [...aiAnalyticsKeys.tenants.all(), tenantId || "__none__"] as const,
   },
+  companyConfig: {
+    all: () => [...aiAnalyticsKeys.root, "companyConfig"] as const,
+    detail: (companyId: string) =>
+      [...aiAnalyticsKeys.companyConfig.all(), companyId || "__none__"] as const,
+  },
   costMonthly: {
     all: () => [...aiAnalyticsKeys.root, "costMonthly"] as const,
     list: (filters: {

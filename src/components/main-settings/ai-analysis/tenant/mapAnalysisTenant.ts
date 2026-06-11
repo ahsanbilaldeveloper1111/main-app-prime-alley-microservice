@@ -164,12 +164,14 @@ function assignIfChanged<K extends keyof AnalysisTenantUpdateRequest>(
 export function mapAnalysisTenantToFormValues(
   data: AnalysisTenantRecord | null | undefined,
   fallbackTenantId: string,
+  fallbackName = "",
 ): AnalysisTenantFormValues {
   if (!data) {
-    return defaultAnalysisTenantFormValues(fallbackTenantId);
+    return defaultAnalysisTenantFormValues(fallbackTenantId, fallbackName);
   }
   return {
-    tenantId: data.tenant_id,
+    tenantId: data.tenant_id || fallbackTenantId,
+    name: data.name?.trim() || fallbackName,
     industryType: data.industry_type?.trim() ?? "",
     primaryLanguage: data.primary_language?.trim() ?? "",
     monthlyCallLimit: numberToInputString(data.monthly_call_limit),
@@ -189,6 +191,11 @@ export function mapFormValuesToAnalysisTenantUpdate(
 ): AnalysisTenantUpdateRequest {
   const payload: AnalysisTenantUpdateRequest = {};
 
+  assignIfChanged(
+    payload,
+    "name",
+    resolveOptionalString(values.name, original?.name ?? null),
+  );
   assignIfChanged(
     payload,
     "industry_type",

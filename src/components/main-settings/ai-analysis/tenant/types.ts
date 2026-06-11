@@ -1,5 +1,6 @@
 export type AnalysisTenantFormValues = {
   tenantId: string;
+  name: string;
   industryType: string;
   primaryLanguage: string;
   monthlyCallLimit: string;
@@ -12,9 +13,11 @@ export type AnalysisTenantFormValues = {
 
 export function defaultAnalysisTenantFormValues(
   tenantId = "",
+  name = "",
 ): AnalysisTenantFormValues {
   return {
     tenantId,
+    name,
     industryType: "",
     primaryLanguage: "",
     monthlyCallLimit: "",

@@ -1,5 +1,7 @@
 import moment from "moment";
 
+import { formatDateTimeFilterForApi } from "@utils/communicationsDateUtils";
+
 export function getDatesFromFilters(filters: Record<string, unknown>): {
   startDate: string;
   endDate: string;
@@ -15,20 +17,13 @@ export function getDatesFromFilters(filters: Record<string, unknown>): {
 
   const startRaw = filters.start_datetime;
   if (typeof startRaw === "string" && startRaw.trim()) {
-    if (startRaw.endsWith("Z") || startRaw.includes("T")) {
-      startDate = startRaw;
-    } else {
-      startDate = moment(startRaw).utc().format("YYYY-MM-DDTHH:mm:ss") + "Z";
-    }
+    startDate =
+      formatDateTimeFilterForApi(startRaw, false) ?? defaultStartDate;
   }
 
   const endRaw = filters.end_datetime;
   if (typeof endRaw === "string" && endRaw.trim()) {
-    if (endRaw.endsWith("Z") || endRaw.includes("T")) {
-      endDate = endRaw;
-    } else {
-      endDate = moment(endRaw).utc().format("YYYY-MM-DDTHH:mm:ss") + "Z";
-    }
+    endDate = formatDateTimeFilterForApi(endRaw, true) ?? defaultEndDate;
   }
 
   return { startDate, endDate };

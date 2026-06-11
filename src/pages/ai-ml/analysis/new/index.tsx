@@ -1,10 +1,12 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useRouter } from 'next/router';
+import { useSession } from 'next-auth/react';
 import { Row, Col, Card, Button, Spinner, Alert, Form } from 'react-bootstrap';
 import { toast } from 'react-toastify';
 import Tab from 'react-bootstrap/Tab';
 import Tabs from 'react-bootstrap/Tabs';
 import { useAnalysisSSE } from '@hooks/useAnalysisSSE';
+import { resolveChatTenantIdFromSession } from '@components/main-settings/ai-chatbot-settings/resolveChatTenantId';
 
 // Components
 import Layout from '@layout/index';
@@ -63,6 +65,11 @@ interface Transcription {
 
 const CallAnalysis = () => {
   const router = useRouter();
+  const { data: session } = useSession();
+  const tenantId = useMemo(
+    () => resolveChatTenantIdFromSession(session?.user),
+    [session?.user],
+  );
   
   // Analysis state
   const [chunksAnalysisData, setChunksAnalysisData] = useState<any>({
@@ -513,6 +520,7 @@ const CallAnalysis = () => {
     callType: callType?.toString(),
     remotePartyNumber: remotePartyNumber,
     dateTime: dateTime,
+    tenantId,
 
     preventAutoConnect: analysisComplete,
     onMessage: (data) => {

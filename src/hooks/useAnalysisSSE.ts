@@ -15,8 +15,24 @@ interface SSEConfig {
   callType?: string;
   remotePartyNumber?: string;
   dateTime?: string;
+  tenantId?: string;
 
   preventAutoConnect?: boolean;
+}
+
+function buildAnalysisStreamSearchParams(config: SSEConfig): URLSearchParams {
+  const params = new URLSearchParams();
+  if (config.uuid) params.append('uuid', config.uuid);
+  if (config.date) params.append('date', config.date);
+  if (config.localPartyNumber) params.append('localPartyNumber', config.localPartyNumber);
+  if (config.ownerUsername) params.append('ownerUsername', config.ownerUsername);
+  if (config.imagicle) params.append('imagicle', config.imagicle);
+  if (config.callDuration) params.append('callDuration', config.callDuration);
+  if (config.callType) params.append('callType', config.callType);
+  if (config.remotePartyNumber) params.append('remotePartyNumber', config.remotePartyNumber);
+  if (config.dateTime) params.append('dateTime', config.dateTime);
+  if (config.tenantId) params.append('tenantId', config.tenantId);
+  return params;
 }
 
 interface SSEState {
@@ -68,7 +84,7 @@ export const useAnalysisSSE = (config: SSEConfig) => {
 
   const connect = useCallback(() => {
     // Create a unique key from connection parameters
-    const connectionKey = `${configRef.current.uuid}-${configRef.current.date}-${configRef.current.localPartyNumber}-${configRef.current.ownerUsername}-${configRef.current.imagicle}`;
+    const connectionKey = `${configRef.current.uuid}-${configRef.current.date}-${configRef.current.localPartyNumber}-${configRef.current.ownerUsername}-${configRef.current.imagicle}-${configRef.current.tenantId ?? ''}`;
     
     // Prevent multiple simultaneous connections using ref
     if (isConnectingRef.current) {
@@ -126,20 +142,7 @@ export const useAnalysisSSE = (config: SSEConfig) => {
     }));
 
     try {
-      // Build query parameters
-      const params = new URLSearchParams();
-      if (configRef.current.uuid) params.append('uuid', configRef.current.uuid);
-      if (configRef.current.date) params.append('date', configRef.current.date);
-      if (configRef.current.localPartyNumber) params.append('localPartyNumber', configRef.current.localPartyNumber);
-      if (configRef.current.ownerUsername) params.append('ownerUsername', configRef.current.ownerUsername);
-      if (configRef.current.imagicle) params.append('imagicle', configRef.current.imagicle);
-
-      if (configRef.current.callDuration) params.append('callDuration', configRef.current.callDuration);
-      if (configRef.current.callType) params.append('callType', configRef.current.callType);
-      if (configRef.current.remotePartyNumber) params.append('remotePartyNumber', configRef.current.remotePartyNumber);
-      if (configRef.current.dateTime) params.append('dateTime', configRef.current.dateTime);
-      
-      const sseUrl = `/streaming/analysis-stream?${params.toString()}`;
+      const sseUrl = `/streaming/analysis-stream?${buildAnalysisStreamSearchParams(configRef.current).toString()}`;
       
       // CRITICAL: Check if we're already connecting to this exact URL
       // This prevents duplicate HTTP requests from being made
@@ -317,19 +320,7 @@ export const useAnalysisSSE = (config: SSEConfig) => {
     }
     
     // Build the URL to check if we're already connecting to it
-    const params = new URLSearchParams();
-    if (configRef.current.uuid) params.append('uuid', configRef.current.uuid);
-    if (configRef.current.date) params.append('date', configRef.current.date);
-    if (configRef.current.localPartyNumber) params.append('localPartyNumber', configRef.current.localPartyNumber);
-    if (configRef.current.ownerUsername) params.append('ownerUsername', configRef.current.ownerUsername);
-    if (configRef.current.imagicle) params.append('imagicle', configRef.current.imagicle);
-
-    if (configRef.current.callDuration) params.append('callDuration', configRef.current.callDuration);
-    if (configRef.current.callType) params.append('callType', configRef.current.callType);
-    if (configRef.current.remotePartyNumber) params.append('remotePartyNumber', configRef.current.remotePartyNumber);
-    if (configRef.current.dateTime) params.append('dateTime', configRef.current.dateTime);
-
-    const sseUrl = `/streaming/analysis-stream?${params.toString()}`;
+    const sseUrl = `/streaming/analysis-stream?${buildAnalysisStreamSearchParams(configRef.current).toString()}`;
     
     // CRITICAL: Check if we're already connecting to this exact URL
     if (currentConnectionUrlRef.current === sseUrl) {
