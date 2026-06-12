@@ -2,6 +2,7 @@ import "@assets/scss/datatable-style.scss";
 import React, {
   ReactElement,
   useState,
+  useReducer,
   useEffect,
   useRef,
   useCallback,
@@ -51,8 +52,15 @@ import {
   mergeTeamUsersFromRoster,
   mergeRosterPayloads,
 } from "@utils/finesseRosterMerge";
-import { useFinesseStomp } from "@hooks/live-calls/useFinesseStomp";
+import {
+  useFinesseStomp,
+  type FinessePreviewEvent,
+} from "@hooks/live-calls/useFinesseStomp";
 import { useFinesseCampaignPreview } from "@hooks/live-calls/useFinesseCampaignPreview";
+import {
+  useFinesseMonitoring,
+  type FinesseAgentMonitoringState,
+} from "@hooks/live-calls/useFinesseMonitoring";
 import { HEADER_CONSTANTS } from "@constants/headerConstants";
 import { usePermissions } from "@utils/permissionUtils";
 
@@ -75,6 +83,142 @@ type ActionMenuPortalState = CampaignConsoleActionMenuPortalState;
 
 const { PERMISSIONS } = HEADER_CONSTANTS;
 
+type MonitoringActionMenuStatus = {
+  monitoringState: FinesseAgentMonitoringState | null;
+  isOwnFinesseRow: boolean;
+  canStartMonitor: boolean;
+  monitorDisabledReason?: string;
+};
+
+function getMonitorDisabledReason(
+  isFinesseSupervisor: boolean,
+  isOwnFinesseRow: boolean,
+  monitoringState: FinesseAgentMonitoringState | null,
+): string | undefined {
+  if (!isFinesseSupervisor) {
+    return "Finesse Supervisor role is required for call monitoring";
+  }
+  if (isOwnFinesseRow) {
+    return "You cannot monitor your own Finesse session";
+  }
+  if (monitoringState?.agentOnCall !== true) {
+    return "Agent has no active call";
+  }
+  return undefined;
+}
+
+function getMonitoringActionMenuStatus(
+  actionMenuPortal: ActionMenuPortalState | null,
+  getAgentMonitoringState: (
+    agent: DisplayAgent,
+  ) => FinesseAgentMonitoringState,
+  isOwnFinesseRow: (agentLoginId: string) => boolean,
+  isFinesseSupervisor: boolean,
+): MonitoringActionMenuStatus {
+  const monitoringState = actionMenuPortal
+    ? getAgentMonitoringState(actionMenuPortal.agent)
+    : null;
+  const ownRow = actionMenuPortal
+    ? isOwnFinesseRow(actionMenuPortal.agent.loginId)
+    : false;
+  const canStartMonitor =
+    monitoringState != null &&
+    isFinesseSupervisor &&
+    !ownRow &&
+    monitoringState.agentOnCall &&
+    !monitoringState.monitoringActive;
+  return {
+    monitoringState,
+    isOwnFinesseRow: ownRow,
+    canStartMonitor,
+    monitorDisabledReason: getMonitorDisabledReason(
+      isFinesseSupervisor,
+      ownRow,
+      monitoringState,
+    ),
+  };
+}
+
+type CampaignConsoleMonitoringMenuItemsProps = Readonly<{
+  agent: DisplayAgent;
+  status: MonitoringActionMenuStatus;
+  onStartSilentMonitor: (agent: DisplayAgent) => Promise<void>;
+  onBargeAgentCall: (agent: DisplayAgent) => Promise<void>;
+  onStopMonitoring: (agent: DisplayAgent) => Promise<void>;
+}>;
+
+function CampaignConsoleMonitoringMenuItems({
+  agent,
+  status,
+  onStartSilentMonitor,
+  onBargeAgentCall,
+  onStopMonitoring,
+}: CampaignConsoleMonitoringMenuItemsProps) {
+  const { monitoringState } = status;
+  if (!monitoringState) return null;
+
+  return (
+    <React.Fragment>
+      {!monitoringState.monitoringActive && (
+        <button
+          type="button"
+          className="action-menu-item"
+          disabled={!status.canStartMonitor || monitoringState.actionLoading != null}
+          title={
+            status.canStartMonitor ? undefined : status.monitorDisabledReason
+          }
+          onClick={(e) => {
+            e.stopPropagation();
+            if (!status.canStartMonitor) return;
+            onStartSilentMonitor(agent).catch(() => undefined);
+          }}
+        >
+          <Phone size={16} color="#0066CC" />
+          <span>
+            {monitoringState.actionLoading === "monitor"
+              ? "Starting monitor..."
+              : "Monitor Call"}
+          </span>
+        </button>
+      )}
+      {monitoringState.silentMonitorActive && !monitoringState.bargedIn && (
+        <button
+          type="button"
+          className="action-menu-item"
+          disabled={monitoringState.actionLoading != null}
+          onClick={(e) => {
+            e.stopPropagation();
+            onBargeAgentCall(agent).catch(() => undefined);
+          }}
+        >
+          <Phone size={16} color="#8b5cf6" />
+          <span>
+            {monitoringState.actionLoading === "barge" ? "Barging..." : "Barge"}
+          </span>
+        </button>
+      )}
+      {monitoringState.monitoringActive && (
+        <button
+          type="button"
+          className="action-menu-item danger"
+          disabled={monitoringState.actionLoading != null}
+          onClick={(e) => {
+            e.stopPropagation();
+            onStopMonitoring(agent).catch(() => undefined);
+          }}
+        >
+          <X size={16} />
+          <span>
+            {monitoringState.actionLoading === "end"
+              ? "Stopping..."
+              : "Stop Monitoring"}
+          </span>
+        </button>
+      )}
+    </React.Fragment>
+  );
+}
+
 const LiveCallsAgentsManagement = () => {
   const { data: session } = useSession();
   const { hasPermission } = usePermissions();
@@ -95,7 +239,7 @@ const LiveCallsAgentsManagement = () => {
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   /** Bumps when cluster id is persisted from API so EventSource reconnects with roster params. */
   const [streamConfigBump, setStreamConfigBump] = useState(0);
-  const [, setLiveTimeTick] = useState(0);
+  const [, rerenderLiveTime] = useReducer((tick: number) => tick + 1, 0);
   const [agentStatus, setAgentStatus] = useState("READY");
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [bulkActionLoading, setBulkActionLoading] = useState(false);
@@ -177,7 +321,7 @@ const LiveCallsAgentsManagement = () => {
   // Tick every second so "time in state" increases for each agent
   useEffect(() => {
     const interval = setInterval(() => {
-      setLiveTimeTick((t) => t + 1);
+      rerenderLiveTime();
     }, 1000);
     return () => clearInterval(interval);
   }, []);
@@ -220,6 +364,15 @@ const LiveCallsAgentsManagement = () => {
     const d = getFinesseUserData();
     return d?.loginId ?? d?.loginName ?? null;
   }, [refreshTrigger, selectedTeam, streamConfigBump]);
+  const supervisorExtension = useMemo(() => {
+    const d = getFinesseUserData();
+    const user = session?.user as { phone?: string } | undefined;
+    return d?.extension ?? user?.phone ?? null;
+  }, [refreshTrigger, selectedTeam, session?.user, streamConfigBump]);
+  const isFinesseSupervisor = useMemo(() => {
+    const roles = getFinesseUserData()?.roles ?? [];
+    return roles.some((role) => role.toUpperCase().includes("SUPERVISOR"));
+  }, [refreshTrigger, selectedTeam, streamConfigBump]);
 
   /** Offline / logged-out rows only when â€œInclude logged outâ€ is checked (stream may still carry them in teamData). */
   const teamUsersForDisplay = useMemo(() => {
@@ -234,6 +387,14 @@ const LiveCallsAgentsManagement = () => {
       );
     });
   }, [teamData?.users, includeLoggedOut]);
+  const monitoringAgents = useMemo(
+    () =>
+      teamUsersForDisplay.map((user) => ({
+        loginId: user.loginId,
+        extension: user.extension,
+      })),
+    [teamUsersForDisplay],
+  );
 
   const rosterSyncDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(
     null,
@@ -310,17 +471,42 @@ const LiveCallsAgentsManagement = () => {
     [scheduleTeamSyncFromRoster],
   );
 
+  const {
+    monitoredAgentIds,
+    handleMonitoringDialogEvent,
+    handleSupervisorPreviewEvent,
+    getAgentMonitoringState,
+    startSilentMonitor,
+    barge,
+    endMonitoring,
+  } = useFinesseMonitoring({
+    teamId: streamTeamId,
+    supervisorFinesseUserId: sseFinesseUserId,
+    supervisorExtension,
+    agents: monitoringAgents,
+  });
+
+  const handleFinessePreviewEvent = useCallback(
+    (payload: FinessePreviewEvent) => {
+      handlePreviewEvent(payload);
+      handleSupervisorPreviewEvent(payload);
+    },
+    [handlePreviewEvent, handleSupervisorPreviewEvent],
+  );
+
   useFinesseStomp({
     token: finesseSseToken,
     finesseUserId: sseFinesseUserId,
     clusterId: rosterClusterId,
     teamId: streamTeamId,
+    monitoredAgentIds,
     onStateEvent: (p) => {
       const raw = typeof p?.state === "string" ? p.state.trim() : "";
       if (!raw) return;
       setAgentStatus(mapEffectiveFinesseStateToTopBarReadyToggle(raw));
     },
-    onPreviewEvent: handlePreviewEvent,
+    onPreviewEvent: handleFinessePreviewEvent,
+    onMonitoringDialogEvent: handleMonitoringDialogEvent,
     onErrorEvent: (p) =>
       toast.error((p as { message?: string })?.message ?? "Finesse error"),
     onAuthError: (msg) => toast.error(msg),
@@ -660,6 +846,80 @@ const LiveCallsAgentsManagement = () => {
       }
     },
     [canForceSignOut],
+  );
+
+  const isOwnFinesseRow = useCallback(
+    (agentLoginId: string) => agentLoginId === sseFinesseUserId,
+    [sseFinesseUserId],
+  );
+
+  const handleStartSilentMonitor = useCallback(
+    async (agent: DisplayAgent) => {
+      const state = getAgentMonitoringState(agent);
+      if (!isFinesseSupervisor) {
+        toast.error("Finesse Supervisor role is required for call monitoring.");
+        return;
+      }
+      if (isOwnFinesseRow(agent.loginId)) {
+        toast.warn("You cannot monitor your own Finesse session.");
+        return;
+      }
+      if (!state.agentOnCall) {
+        toast.warn("The agent does not have an active call to monitor.");
+        return;
+      }
+      try {
+        await startSilentMonitor(agent);
+        toast.success("Silent monitoring started.");
+      } catch (err: unknown) {
+        toast.error(
+          getFinesseApiErrorMessage(err, "Failed to start silent monitoring."),
+        );
+      } finally {
+        setActionMenuPortal(null);
+      }
+    },
+    [
+      getAgentMonitoringState,
+      isFinesseSupervisor,
+      isOwnFinesseRow,
+      startSilentMonitor,
+    ],
+  );
+
+  const handleBargeAgentCall = useCallback(
+    async (agent: DisplayAgent) => {
+      try {
+        await barge(agent);
+        toast.success("Barge request sent.");
+      } catch (err: unknown) {
+        toast.error(getFinesseApiErrorMessage(err, "Barge failed."));
+      } finally {
+        setActionMenuPortal(null);
+      }
+    },
+    [barge],
+  );
+
+  const handleStopMonitoring = useCallback(
+    async (agent: DisplayAgent) => {
+      try {
+        await endMonitoring(agent);
+        toast.success("Monitoring stopped.");
+      } catch (err: unknown) {
+        toast.error(getFinesseApiErrorMessage(err, "Stop monitoring failed."));
+      } finally {
+        setActionMenuPortal(null);
+      }
+    },
+    [endMonitoring],
+  );
+
+  const actionMenuMonitoringStatus = getMonitoringActionMenuStatus(
+    actionMenuPortal,
+    getAgentMonitoringState,
+    isOwnFinesseRow,
+    isFinesseSupervisor,
   );
 
   return (
@@ -2107,6 +2367,13 @@ const LiveCallsAgentsManagement = () => {
                 <XCircle size={16} color="#ef4444" />
                 <span>Not Ready</span>
               </button>
+              <CampaignConsoleMonitoringMenuItems
+                agent={actionMenuPortal.agent}
+                status={actionMenuMonitoringStatus}
+                onStartSilentMonitor={handleStartSilentMonitor}
+                onBargeAgentCall={handleBargeAgentCall}
+                onStopMonitoring={handleStopMonitoring}
+              />
               <button
                 type="button"
                 className="action-menu-item danger"

@@ -16,6 +16,9 @@ const NEXT_PUBLIC_FINESSED_DEFAULT_TEAM_ID =
   process.env.VITE_PUBLIC_FINESSED_DEFAULT_TEAM_ID || "2";
 const DEFAULT_TEAM_ID = Number(NEXT_PUBLIC_FINESSED_DEFAULT_TEAM_ID);
 
+export type FinesseId = number | string;
+export type FinesseNullableId = FinesseId | null;
+
 export const getStoredTeamId = (): number => {
   if (globalThis.window === undefined) return DEFAULT_TEAM_ID;
   try {
@@ -318,7 +321,7 @@ export function applyFinesseRemoteForcedLogout(): void {
  */
 export const getEffectiveTeamId = (
   data: FinesseUserData | null,
-): number | string | null => {
+): FinesseNullableId => {
   if (!data) return null;
   return getStoredTeamId();
 };
@@ -417,7 +420,7 @@ export const normalizeFinesseUserData = (
 // ==================== Types/Interfaces ====================
 
 export interface FinesseLinkPayload {
-  teamId: number | string;
+  teamId: FinesseId;
 }
 
 /**
@@ -433,7 +436,7 @@ export const finesseLink = async (payload: FinesseLinkPayload) => {
  */
 export const finesseUnlink = async (
   finesseUserId: string,
-  teamId: number | string,
+  teamId: FinesseId,
 ) => {
   const response = await axiosInstance.post(`${prefix}/unlink`, {
     finesseUserId: finesseUserId,
@@ -443,7 +446,7 @@ export const finesseUnlink = async (
 };
 
 export interface FinesseForceSignOutPayload {
-  teamId: number | string;
+  teamId: FinesseId;
   finesseUserId: string;
   supervisorFinesseUserId: string;
 }
@@ -460,11 +463,91 @@ export const finesseForceSignOut = async (payload: FinesseForceSignOutPayload) =
   return response.data;
 };
 
+export interface FinesseMonitoringSilentMonitorPayload {
+  targetAgentId: string;
+  supervisorExtension: string;
+  agentExtension?: string;
+}
+
+export interface FinesseMonitoringBargePayload {
+  supervisorExtension: string;
+  targetAgentId?: string;
+  agentExtension?: string;
+  supervisorMonitorDialogId?: FinesseNullableId;
+  agentDialogId?: FinesseNullableId;
+}
+
+export interface FinesseMonitoringEndPayload {
+  supervisorExtension: string;
+  supervisorMonitorDialogId?: FinesseNullableId;
+  targetAgentId?: string;
+  agentExtension?: string;
+}
+
+const finesseMonitoringBasePath = (
+  teamId: FinesseId,
+  supervisorFinesseUserId: string,
+): string =>
+  `${prefix}/teams/${teamId}/users/${encodeURIComponent(supervisorFinesseUserId)}/monitoring`;
+
+export const getFinesseMonitoringAgentDialogs = async (
+  teamId: FinesseId,
+  supervisorFinesseUserId: string,
+  targetAgentId: string,
+) => {
+  const response = await axiosInstance.get(
+    `${finesseMonitoringBasePath(
+      teamId,
+      supervisorFinesseUserId,
+    )}/agents/${encodeURIComponent(targetAgentId)}/dialogs`,
+  );
+  return response.data;
+};
+
+export const finesseStartSilentMonitor = async (
+  teamId: FinesseId,
+  supervisorFinesseUserId: string,
+  payload: FinesseMonitoringSilentMonitorPayload,
+) => {
+  const response = await axiosInstance.post(
+    `${finesseMonitoringBasePath(
+      teamId,
+      supervisorFinesseUserId,
+    )}/silent-monitor`,
+    payload,
+  );
+  return response.data;
+};
+
+export const finesseBarge = async (
+  teamId: FinesseId,
+  supervisorFinesseUserId: string,
+  payload: FinesseMonitoringBargePayload,
+) => {
+  const response = await axiosInstance.post(
+    `${finesseMonitoringBasePath(teamId, supervisorFinesseUserId)}/barge`,
+    payload,
+  );
+  return response.data;
+};
+
+export const finesseEndMonitoring = async (
+  teamId: FinesseId,
+  supervisorFinesseUserId: string,
+  payload: FinesseMonitoringEndPayload,
+) => {
+  const response = await axiosInstance.post(
+    `${finesseMonitoringBasePath(teamId, supervisorFinesseUserId)}/end`,
+    payload,
+  );
+  return response.data;
+};
+
 /**
  * GET /finesse/teams/{teamId}/users/{finesseUserId} - Fetch Finesse user data
  */
 export const getFinesseUser = async (
-  teamId: number | string,
+  teamId: FinesseId,
   finesseUserId: string,
 ) => {
   const response = await axiosInstance.get(
@@ -669,7 +752,7 @@ export async function assertFinesseTeamSwitchable(
  * POST /api/v1/finesse/teams/{teamId}/users/{finesseUserId}/state — body `{"newState":"READY"|"NOT_READY"}`.
  */
 export const finesseSetState = async (
-  teamId: number | string,
+  teamId: FinesseId,
   finesseUserId: string,
   newState: "READY" | "NOT_READY",
 ) => {
@@ -686,7 +769,7 @@ export const finesseSetState = async (
  * GET finesse/admins/capabilities/teams/{teamId}/users/{finesseUserId} - Get User Capabilities
  */
 export const getFinesseUserCapabilities = async (
-  teamId: number | string,
+  teamId: FinesseId,
   finesseUserId: string,
 ) => {
   const response = await axiosInstance.get(
@@ -701,7 +784,7 @@ export const getFinesseUserCapabilities = async (
  * GET finesse/admins/teams/{teamId}/users/{finesseUserId}/campaigns - Get Campaigns
  */
 export const getFinesseCampaigns = async (
-  teamId: number | string,
+  teamId: FinesseId,
   finesseUserId: string,
 ) => {
   const response = await axiosInstance.get(
@@ -714,9 +797,9 @@ export const getFinesseCampaigns = async (
  * POST finesse/admins/teams/{teamId}/users/{finesseUserId}/campaigns/{campaignId}/enabled - Enable/disable campaign
  */
 export const setFinesseCampaignEnabled = async (
-  teamId: number | string,
+  teamId: FinesseId,
   finesseUserId: string,
-  campaignId: number | string,
+  campaignId: FinesseId,
   enable: boolean,
 ) => {
   const response = await axiosInstance.post(
@@ -730,7 +813,7 @@ export const setFinesseCampaignEnabled = async (
  * GET finesse/admins/teams/{teamId}/users/{finesseUserId}/campaigns/contacts/status - Contacts Status
  */
 export const getFinesseCampaignsContactsStatus = async (
-  teamId: number | string,
+  teamId: FinesseId,
   finesseUserId: string,
 ) => {
   const response = await axiosInstance.get(
@@ -802,7 +885,7 @@ function applyUpdateCallDataPayloadToBody(
  * POST finesse/teams/{teamId}/user/{finesseUserId}/dialog/{dialogId}/action - Send dialog action (ACCEPT, REJECT, CLOSE, DROP, UPDATE_CALL_DATA, RECLASSIFY)
  */
 export const sendFinesseDialogAction = async (
-  teamId: number | string,
+  teamId: FinesseId,
   finesseUserId: string,
   dialogId: string,
   payload: FinesseDialogActionPayload,
@@ -835,9 +918,9 @@ export interface FinesseCampaignContactsImportPayload {
  * POST finesse/admins/teams/{teamId}/users/{finesseUserId}/campaigns/{campaignId}/contacts/import - Upload + Import Contacts
  */
 export const importFinesseCampaignContacts = async (
-  teamId: number | string,
+  teamId: FinesseId,
   finesseUserId: string,
-  campaignId: number | string,
+  campaignId: FinesseId,
   file: File,
   payload?: FinesseCampaignContactsImportPayload,
 ) => {
@@ -871,7 +954,7 @@ export const importFinesseCampaignContacts = async (
  */
 export const getFinesseUserTeam = async (
   username: string,
-  teamId: number | string,
+  teamId: FinesseId,
   includeLoggedOutAgents: boolean = false,
 ) => {
   const baseUrl = `${prefix}/teams/${teamId}/users/${encodeURIComponent(username)}/teamUsers`;
@@ -888,9 +971,9 @@ export const getFinesseUserTeam = async (
  * GET admins/teams/{teamId}/users/{finesseUserId}/campaigns/{campaignId} - Get single campaign
  */
 export const getFinesseCampaign = async (
-  teamId: number | string,
+  teamId: FinesseId,
   finesseUserId: string,
-  campaignId: number | string,
+  campaignId: FinesseId,
 ) => {
   const response = await axiosInstance.get(
     `${prefix}/admins/teams/${teamId}/users/${encodeURIComponent(finesseUserId)}/campaigns/${campaignId}`,
@@ -902,9 +985,9 @@ export const getFinesseCampaign = async (
  * POST admins/teams/{teamId}/users/{finesseUserId}/campaigns/{campaignId}/schedule - Schedule campaign
  */
 export const scheduleFinesseCampaign = async (
-  teamId: number | string,
+  teamId: FinesseId,
   finesseUserId: string,
-  campaignId: number | string,
+  campaignId: FinesseId,
   payload: Record<string, unknown>,
 ) => {
   const response = await axiosInstance.post(
@@ -918,9 +1001,9 @@ export const scheduleFinesseCampaign = async (
  * GET admins/teams/{teamId}/users/{finesseUserId}/campaigns/{campaignId}/contacts/config - Get contacts config
  */
 export const getFinesseCampaignContactsConfig = async (
-  teamId: number | string,
+  teamId: FinesseId,
   finesseUserId: string,
-  campaignId: number | string,
+  campaignId: FinesseId,
 ) => {
   const response = await axiosInstance.get(
     `${prefix}/admins/teams/${teamId}/users/${encodeURIComponent(finesseUserId)}/campaigns/${campaignId}/contacts/config`,
@@ -932,9 +1015,9 @@ export const getFinesseCampaignContactsConfig = async (
  * GET admins/teams/{teamId}/users/{finesseUserId}/campaigns/{campaignId}/contacts - Get campaign contacts (used for remaining contacts count)
  */
 export const getFinesseCampaignContacts = async (
-  teamId: number | string,
+  teamId: FinesseId,
   finesseUserId: string,
-  campaignId: number | string,
+  campaignId: FinesseId,
 ) => {
   const response = await axiosInstance.get(
     `${prefix}/admins/teams/${teamId}/users/${encodeURIComponent(finesseUserId)}/campaigns/${campaignId}/contacts`,
@@ -946,9 +1029,9 @@ export const getFinesseCampaignContacts = async (
  * DELETE admins/teams/{teamId}/users/{finesseUserId}/campaigns/{campaignId}/contacts - Remove campaign contacts (remaining queue)
  */
 export const deleteFinesseCampaignContacts = async (
-  teamId: number | string,
+  teamId: FinesseId,
   finesseUserId: string,
-  campaignId: number | string,
+  campaignId: FinesseId,
 ) => {
   const response = await axiosInstance.delete(
     `${prefix}/admins/teams/${teamId}/users/${encodeURIComponent(finesseUserId)}/campaigns/${campaignId}/contacts`,
@@ -960,7 +1043,7 @@ export const deleteFinesseCampaignContacts = async (
  * GET teams/{teamId}/users/{finesseUserId}/wrapUpReasons - Get wrap-up reasons for user
  */
 export const getFinesseWrapUpReasons = async (
-  teamId: number | string,
+  teamId: FinesseId,
   finesseUserId: string,
 ) => {
   const response = await axiosInstance.get(
@@ -973,7 +1056,7 @@ export const getFinesseWrapUpReasons = async (
  * GET teams/{teamId}/users/{finesseUserId}/teamUsers - Get team users
  */
 export const getFinesseTeamUsers = async (
-  teamId: number | string,
+  teamId: FinesseId,
   finesseUserId: string,
 ) => {
   const response = await axiosInstance.get(
