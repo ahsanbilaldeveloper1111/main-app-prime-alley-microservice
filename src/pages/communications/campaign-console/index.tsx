@@ -2,6 +2,7 @@ import "@assets/scss/datatable-style.scss";
 import React, {
   ReactElement,
   useState,
+  useReducer,
   useEffect,
   useRef,
   useCallback,
@@ -56,7 +57,10 @@ import {
   type FinessePreviewEvent,
 } from "@hooks/live-calls/useFinesseStomp";
 import { useFinesseCampaignPreview } from "@hooks/live-calls/useFinesseCampaignPreview";
-import { useFinesseMonitoring } from "@hooks/live-calls/useFinesseMonitoring";
+import {
+  useFinesseMonitoring,
+  type FinesseAgentMonitoringState,
+} from "@hooks/live-calls/useFinesseMonitoring";
 import { HEADER_CONSTANTS } from "@constants/headerConstants";
 import { usePermissions } from "@utils/permissionUtils";
 
@@ -79,6 +83,142 @@ type ActionMenuPortalState = CampaignConsoleActionMenuPortalState;
 
 const { PERMISSIONS } = HEADER_CONSTANTS;
 
+type MonitoringActionMenuStatus = {
+  monitoringState: FinesseAgentMonitoringState | null;
+  isOwnFinesseRow: boolean;
+  canStartMonitor: boolean;
+  monitorDisabledReason?: string;
+};
+
+function getMonitorDisabledReason(
+  isFinesseSupervisor: boolean,
+  isOwnFinesseRow: boolean,
+  monitoringState: FinesseAgentMonitoringState | null,
+): string | undefined {
+  if (!isFinesseSupervisor) {
+    return "Finesse Supervisor role is required for call monitoring";
+  }
+  if (isOwnFinesseRow) {
+    return "You cannot monitor your own Finesse session";
+  }
+  if (monitoringState?.agentOnCall !== true) {
+    return "Agent has no active call";
+  }
+  return undefined;
+}
+
+function getMonitoringActionMenuStatus(
+  actionMenuPortal: ActionMenuPortalState | null,
+  getAgentMonitoringState: (
+    agent: DisplayAgent,
+  ) => FinesseAgentMonitoringState,
+  isOwnFinesseRow: (agentLoginId: string) => boolean,
+  isFinesseSupervisor: boolean,
+): MonitoringActionMenuStatus {
+  const monitoringState = actionMenuPortal
+    ? getAgentMonitoringState(actionMenuPortal.agent)
+    : null;
+  const ownRow = actionMenuPortal
+    ? isOwnFinesseRow(actionMenuPortal.agent.loginId)
+    : false;
+  const canStartMonitor =
+    monitoringState != null &&
+    isFinesseSupervisor &&
+    !ownRow &&
+    monitoringState.agentOnCall &&
+    !monitoringState.monitoringActive;
+  return {
+    monitoringState,
+    isOwnFinesseRow: ownRow,
+    canStartMonitor,
+    monitorDisabledReason: getMonitorDisabledReason(
+      isFinesseSupervisor,
+      ownRow,
+      monitoringState,
+    ),
+  };
+}
+
+type CampaignConsoleMonitoringMenuItemsProps = Readonly<{
+  agent: DisplayAgent;
+  status: MonitoringActionMenuStatus;
+  onStartSilentMonitor: (agent: DisplayAgent) => Promise<void>;
+  onBargeAgentCall: (agent: DisplayAgent) => Promise<void>;
+  onStopMonitoring: (agent: DisplayAgent) => Promise<void>;
+}>;
+
+function CampaignConsoleMonitoringMenuItems({
+  agent,
+  status,
+  onStartSilentMonitor,
+  onBargeAgentCall,
+  onStopMonitoring,
+}: CampaignConsoleMonitoringMenuItemsProps) {
+  const { monitoringState } = status;
+  if (!monitoringState) return null;
+
+  return (
+    <React.Fragment>
+      {!monitoringState.monitoringActive && (
+        <button
+          type="button"
+          className="action-menu-item"
+          disabled={!status.canStartMonitor || monitoringState.actionLoading != null}
+          title={
+            status.canStartMonitor ? undefined : status.monitorDisabledReason
+          }
+          onClick={(e) => {
+            e.stopPropagation();
+            if (!status.canStartMonitor) return;
+            onStartSilentMonitor(agent).catch(() => undefined);
+          }}
+        >
+          <Phone size={16} color="#0066CC" />
+          <span>
+            {monitoringState.actionLoading === "monitor"
+              ? "Starting monitor..."
+              : "Monitor Call"}
+          </span>
+        </button>
+      )}
+      {monitoringState.silentMonitorActive && !monitoringState.bargedIn && (
+        <button
+          type="button"
+          className="action-menu-item"
+          disabled={monitoringState.actionLoading != null}
+          onClick={(e) => {
+            e.stopPropagation();
+            onBargeAgentCall(agent).catch(() => undefined);
+          }}
+        >
+          <Phone size={16} color="#8b5cf6" />
+          <span>
+            {monitoringState.actionLoading === "barge" ? "Barging..." : "Barge"}
+          </span>
+        </button>
+      )}
+      {monitoringState.monitoringActive && (
+        <button
+          type="button"
+          className="action-menu-item danger"
+          disabled={monitoringState.actionLoading != null}
+          onClick={(e) => {
+            e.stopPropagation();
+            onStopMonitoring(agent).catch(() => undefined);
+          }}
+        >
+          <X size={16} />
+          <span>
+            {monitoringState.actionLoading === "end"
+              ? "Stopping..."
+              : "Stop Monitoring"}
+          </span>
+        </button>
+      )}
+    </React.Fragment>
+  );
+}
+
 const LiveCallsAgentsManagement = () => {
   const { data: session } = useSession();
   const { hasPermission } = usePermissions();
@@ -99,7 +239,7 @@ const LiveCallsAgentsManagement = () => {
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   /** Bumps when cluster id is persisted from API so EventSource reconnects with roster params. */
   const [streamConfigBump, setStreamConfigBump] = useState(0);
-  const [, setLiveTimeTick] = useState(0);
+  const [, rerenderLiveTime] = useReducer((tick: number) => tick + 1, 0);
   const [agentStatus, setAgentStatus] = useState("READY");
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [bulkActionLoading, setBulkActionLoading] = useState(false);
@@ -181,7 +321,7 @@ const LiveCallsAgentsManagement = () => {
   // Tick every second so "time in state" increases for each agent
   useEffect(() => {
     const interval = setInterval(() => {
-      setLiveTimeTick((t) => t + 1);
+      rerenderLiveTime();
     }, 1000);
     return () => clearInterval(interval);
   }, []);
@@ -775,28 +915,12 @@ const LiveCallsAgentsManagement = () => {
     [endMonitoring],
   );
 
-  const actionMenuMonitoringState = actionMenuPortal
-    ? getAgentMonitoringState(actionMenuPortal.agent)
-    : null;
-  const actionMenuIsOwnFinesseRow = actionMenuPortal
-    ? isOwnFinesseRow(actionMenuPortal.agent.loginId)
-    : false;
-  const actionMenuCanStartMonitor =
-    actionMenuMonitoringState != null &&
-    isFinesseSupervisor &&
-    !actionMenuIsOwnFinesseRow &&
-    actionMenuMonitoringState.agentOnCall &&
-    !actionMenuMonitoringState.monitoringActive;
-  let actionMenuMonitorDisabledReason: string | undefined;
-  if (!isFinesseSupervisor) {
-    actionMenuMonitorDisabledReason =
-      "Finesse Supervisor role is required for call monitoring";
-  } else if (actionMenuIsOwnFinesseRow) {
-    actionMenuMonitorDisabledReason =
-      "You cannot monitor your own Finesse session";
-  } else if (actionMenuMonitoringState?.agentOnCall !== true) {
-    actionMenuMonitorDisabledReason = "Agent has no active call";
-  }
+  const actionMenuMonitoringStatus = getMonitoringActionMenuStatus(
+    actionMenuPortal,
+    getAgentMonitoringState,
+    isOwnFinesseRow,
+    isFinesseSupervisor,
+  );
 
   return (
     <FinesseAuthGate
@@ -2243,77 +2367,13 @@ const LiveCallsAgentsManagement = () => {
                 <XCircle size={16} color="#ef4444" />
                 <span>Not Ready</span>
               </button>
-              {actionMenuMonitoringState &&
-                !actionMenuMonitoringState.monitoringActive && (
-                  <button
-                    type="button"
-                    className="action-menu-item"
-                    disabled={
-                      !actionMenuCanStartMonitor ||
-                      actionMenuMonitoringState.actionLoading != null
-                    }
-                    title={
-                      actionMenuCanStartMonitor
-                        ? undefined
-                        : actionMenuMonitorDisabledReason
-                    }
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      if (!actionMenuCanStartMonitor) return;
-                      handleStartSilentMonitor(actionMenuPortal.agent).catch(
-                        () => undefined,
-                      );
-                    }}
-                  >
-                    <Phone size={16} color="#0066CC" />
-                    <span>
-                      {actionMenuMonitoringState.actionLoading === "monitor"
-                        ? "Starting monitor..."
-                        : "Monitor Call"}
-                    </span>
-                  </button>
-                )}
-              {actionMenuMonitoringState?.silentMonitorActive &&
-                !actionMenuMonitoringState.bargedIn && (
-                  <button
-                    type="button"
-                    className="action-menu-item"
-                    disabled={actionMenuMonitoringState.actionLoading != null}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleBargeAgentCall(actionMenuPortal.agent).catch(
-                        () => undefined,
-                      );
-                    }}
-                  >
-                    <Phone size={16} color="#8b5cf6" />
-                    <span>
-                      {actionMenuMonitoringState.actionLoading === "barge"
-                        ? "Barging..."
-                        : "Barge"}
-                    </span>
-                  </button>
-                )}
-              {actionMenuMonitoringState?.monitoringActive && (
-                <button
-                  type="button"
-                  className="action-menu-item danger"
-                  disabled={actionMenuMonitoringState.actionLoading != null}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleStopMonitoring(actionMenuPortal.agent).catch(
-                      () => undefined,
-                    );
-                  }}
-                >
-                  <X size={16} />
-                  <span>
-                    {actionMenuMonitoringState.actionLoading === "end"
-                      ? "Stopping..."
-                      : "Stop Monitoring"}
-                  </span>
-                </button>
-              )}
+              <CampaignConsoleMonitoringMenuItems
+                agent={actionMenuPortal.agent}
+                status={actionMenuMonitoringStatus}
+                onStartSilentMonitor={handleStartSilentMonitor}
+                onBargeAgentCall={handleBargeAgentCall}
+                onStopMonitoring={handleStopMonitoring}
+              />
               <button
                 type="button"
                 className="action-menu-item danger"
