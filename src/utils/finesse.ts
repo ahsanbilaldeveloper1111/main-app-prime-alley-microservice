@@ -460,6 +460,86 @@ export const finesseForceSignOut = async (payload: FinesseForceSignOutPayload) =
   return response.data;
 };
 
+export interface FinesseMonitoringSilentMonitorPayload {
+  targetAgentId: string;
+  supervisorExtension: string;
+  agentExtension?: string;
+}
+
+export interface FinesseMonitoringBargePayload {
+  supervisorExtension: string;
+  targetAgentId?: string;
+  agentExtension?: string;
+  supervisorMonitorDialogId?: string | number | null;
+  agentDialogId?: string | number | null;
+}
+
+export interface FinesseMonitoringEndPayload {
+  supervisorExtension: string;
+  supervisorMonitorDialogId?: string | number | null;
+  targetAgentId?: string;
+  agentExtension?: string;
+}
+
+const finesseMonitoringBasePath = (
+  teamId: number | string,
+  supervisorFinesseUserId: string,
+): string =>
+  `${prefix}/teams/${teamId}/users/${encodeURIComponent(supervisorFinesseUserId)}/monitoring`;
+
+export const getFinesseMonitoringAgentDialogs = async (
+  teamId: number | string,
+  supervisorFinesseUserId: string,
+  targetAgentId: string,
+) => {
+  const response = await axiosInstance.get(
+    `${finesseMonitoringBasePath(
+      teamId,
+      supervisorFinesseUserId,
+    )}/agents/${encodeURIComponent(targetAgentId)}/dialogs`,
+  );
+  return response.data;
+};
+
+export const finesseStartSilentMonitor = async (
+  teamId: number | string,
+  supervisorFinesseUserId: string,
+  payload: FinesseMonitoringSilentMonitorPayload,
+) => {
+  const response = await axiosInstance.post(
+    `${finesseMonitoringBasePath(
+      teamId,
+      supervisorFinesseUserId,
+    )}/silent-monitor`,
+    payload,
+  );
+  return response.data;
+};
+
+export const finesseBarge = async (
+  teamId: number | string,
+  supervisorFinesseUserId: string,
+  payload: FinesseMonitoringBargePayload,
+) => {
+  const response = await axiosInstance.post(
+    `${finesseMonitoringBasePath(teamId, supervisorFinesseUserId)}/barge`,
+    payload,
+  );
+  return response.data;
+};
+
+export const finesseEndMonitoring = async (
+  teamId: number | string,
+  supervisorFinesseUserId: string,
+  payload: FinesseMonitoringEndPayload,
+) => {
+  const response = await axiosInstance.post(
+    `${finesseMonitoringBasePath(teamId, supervisorFinesseUserId)}/end`,
+    payload,
+  );
+  return response.data;
+};
+
 /**
  * GET /finesse/teams/{teamId}/users/{finesseUserId} - Fetch Finesse user data
  */

@@ -56,6 +56,7 @@ const SSE_TYPE = {
   STATE: 'state',
   ERROR: 'error',
   PREVIEW: 'preview',
+  MONITORING_DIALOG: 'monitoring_dialog',
   ROSTER_STATE: 'roster_state',
   STOMP_CONNECTED: 'stomp_connected',
   STOMP_CLOSED: 'stomp_closed',
@@ -175,10 +176,14 @@ function looksLikeAuthError(message = '', body = '') {
   );
 }
 
-function parseAndForward(connectionKey, msg, eventType) {
+function parseAndForward(connectionKey, msg, eventType, extraData = null) {
   try {
     const payload = JSON.parse(msg.body);
-    writeToStreams(connectionKey, { type: eventType, data: payload });
+    const data =
+      extraData != null && payload && typeof payload === 'object' && !Array.isArray(payload)
+        ? { ...extraData, ...payload }
+        : payload;
+    writeToStreams(connectionKey, { type: eventType, data });
   } catch (e) {
     if (eventType === SSE_TYPE.ROSTER_STATE) {
       writeToStreams(connectionKey, {
@@ -200,7 +205,46 @@ function rosterTopicPath(clusterId, teamId) {
   return `/topic/finesse/cluster/${c}/team/${t}/roster/state`;
 }
 
-function setupSubscriptions(client, connectionKey, finesseUserId, hasPreview, clusterId, teamId) {
+function monitoringTopicPath(clusterId, teamId, agentId) {
+  const c = encodeURIComponent(String(clusterId));
+  const t = encodeURIComponent(String(teamId));
+  const a = encodeURIComponent(String(agentId));
+  return `/topic/finesse/cluster/${c}/team/${t}/monitoring/agent/${a}/dialogs`;
+}
+
+function legacyMonitoringTopicPath(agentId) {
+  return `/topic/finesse/monitoring/agent/${encodeURIComponent(String(agentId))}/dialogs`;
+}
+
+function clusterPreviewTopicPath(clusterId, teamId, userId) {
+  const c = encodeURIComponent(String(clusterId));
+  const t = encodeURIComponent(String(teamId));
+  const u = encodeURIComponent(String(userId));
+  return `/topic/finesse/cluster/${c}/team/${t}/user/${u}/preview`;
+}
+
+function normalizeQueryList(value) {
+  const raw = Array.isArray(value) ? value.join(',') : value;
+  if (typeof raw !== 'string') return [];
+  return Array.from(
+    new Set(
+      raw
+        .split(',')
+        .map((item) => item.trim())
+        .filter(Boolean),
+    ),
+  );
+}
+
+function setupSubscriptions(
+  client,
+  connectionKey,
+  finesseUserId,
+  hasPreview,
+  clusterId,
+  teamId,
+  monitoringAgentIds = [],
+) {
   cleanupSubscriptions(connectionKey);
 
   const stateTopic = topicPath(finesseUserId, 'state');
@@ -224,6 +268,7 @@ function setupSubscriptions(client, connectionKey, finesseUserId, hasPreview, cl
     errorTopic,
     hasPreview ? previewTopic : '(no preview)',
     hasRoster ? rosterTopicPath(clusterId, teamId) : '(no roster)',
+    monitoringAgentIds.length ? `monitoring agents: ${monitoringAgentIds.join(',')}` : '(no monitoring)',
   );
 
   const subs = [
@@ -234,9 +279,25 @@ function setupSubscriptions(client, connectionKey, finesseUserId, hasPreview, cl
   ];
 
   if (hasPreview) {
+    if (hasRoster) {
+      const clusterPreviewTopic = clusterPreviewTopicPath(
+        clusterId,
+        teamId,
+        finesseUserId,
+      );
+      subs.push(
+        client.subscribe(clusterPreviewTopic, (msg) => {
+          parseAndForward(connectionKey, msg, SSE_TYPE.PREVIEW);
+        }),
+      );
+    }
     subs.push(
-      client.subscribe(previewTopic, (msg) => parseAndForward(connectionKey, msg, SSE_TYPE.PREVIEW)),
-      client.subscribe(userQueuePreview, (msg) => parseAndForward(connectionKey, msg, SSE_TYPE.PREVIEW)),
+      client.subscribe(previewTopic, (msg) => {
+        parseAndForward(connectionKey, msg, SSE_TYPE.PREVIEW);
+      }),
+      client.subscribe(userQueuePreview, (msg) => {
+        parseAndForward(connectionKey, msg, SSE_TYPE.PREVIEW);
+      }),
     );
   }
 
@@ -246,6 +307,22 @@ function setupSubscriptions(client, connectionKey, finesseUserId, hasPreview, cl
       client.subscribe(rt, (msg) => parseAndForward(connectionKey, msg, SSE_TYPE.ROSTER_STATE)),
     );
   }
+
+  monitoringAgentIds.forEach((agentId) => {
+    const extraData = { agentId };
+    if (hasRoster) {
+      subs.push(
+        client.subscribe(monitoringTopicPath(clusterId, teamId, agentId), (msg) =>
+          parseAndForward(connectionKey, msg, SSE_TYPE.MONITORING_DIALOG, extraData),
+        ),
+      );
+    }
+    subs.push(
+      client.subscribe(legacyMonitoringTopicPath(agentId), (msg) =>
+        parseAndForward(connectionKey, msg, SSE_TYPE.MONITORING_DIALOG, extraData),
+      ),
+    );
+  });
 
   connectionSubscriptions.set(connectionKey, subs);
   subscriptionsSetup.add(connectionKey);
@@ -289,11 +366,25 @@ export default async function handler(req, res) {
     return res.status(405).json({ message: 'Method not allowed' });
   }
 
-  const { token, finesseUserId, preview = 'true', clusterId, teamId } = req.query;
+  const { token, finesseUserId, preview = 'true', clusterId, teamId, monitoredAgentIds } = req.query;
   const hasPreview = preview === 'true' || preview === '1';
-  const connectionKey = finesseUserId;
+  const monitoringAgentIds = normalizeQueryList(monitoredAgentIds);
+  const connectionKey = [
+    String(finesseUserId ?? ''),
+    hasPreview ? 'preview:1' : 'preview:0',
+    clusterId ? `cluster:${clusterId}` : 'cluster:',
+    teamId ? `team:${teamId}` : 'team:',
+    monitoringAgentIds.length ? `monitor:${monitoringAgentIds.join(',')}` : 'monitor:',
+  ].join('|');
 
-  log('SSE request — finesseUserId:', finesseUserId, 'preview:', hasPreview);
+  log(
+    'SSE request — finesseUserId:',
+    finesseUserId,
+    'preview:',
+    hasPreview,
+    'monitoring:',
+    monitoringAgentIds.join(',') || '(none)',
+  );
 
   if (!token || !finesseUserId) {
     res.writeHead(200, SSE_HEADERS);
@@ -361,7 +452,15 @@ export default async function handler(req, res) {
   const existing = connectionPool.get(connectionKey);
   if (existing?.client?.connected) {
     existing.lastUsed = Date.now();
-    setupSubscriptions(existing.client, connectionKey, finesseUserId, hasPreview, clusterId, teamId);
+    setupSubscriptions(
+      existing.client,
+      connectionKey,
+      finesseUserId,
+      hasPreview,
+      clusterId,
+      teamId,
+      monitoringAgentIds,
+    );
     writeToStreams(connectionKey, { type: SSE_TYPE.STOMP_CONNECTED });
     return;
   }
@@ -393,7 +492,15 @@ export default async function handler(req, res) {
           token,
           finesseUserId,
         });
-        setupSubscriptions(client, connectionKey, finesseUserId, hasPreview, clusterId, teamId);
+        setupSubscriptions(
+          client,
+          connectionKey,
+          finesseUserId,
+          hasPreview,
+          clusterId,
+          teamId,
+          monitoringAgentIds,
+        );
         writeToStreams(connectionKey, { type: SSE_TYPE.STOMP_CONNECTED });
       },
       onStompError: (frame) => {
