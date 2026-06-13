@@ -1,13 +1,6 @@
-// Planner — Order Delivery table shell (metrics live in GenericTable toolbar)
+// Planner — Order Delivery table shell (metrics use legacy bordered cards like CRM Prospects)
 
 .planner-orders-delivery__table {
-  .gt-toolbar-container,
-  .gt-metrics-panel,
-  .gt-metrics-panel .generic-stats-cards {
-    width: 100%;
-    max-width: 100%;
-  }
-
   .generic-table-card {
     border-radius: 0 0 8px 8px !important;
     border-top: none !important;

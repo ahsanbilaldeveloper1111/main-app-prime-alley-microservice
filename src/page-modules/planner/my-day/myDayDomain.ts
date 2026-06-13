@@ -301,6 +301,19 @@ export function readMyDayTaskCompletedFromRow(row: Record<string, unknown>): boo
   return row.is_completed === true || row.completed === true;
 }
 
+/** Rollover rows: only My Day plan completion counts — not project-level `is_completed`. */
+export function readRolloverTaskCompletedFromRow(row: Record<string, unknown>): boolean {
+  if (row.is_completed_for_my_day === true) return true;
+  const completedAt = row.my_day_completed_at;
+  return typeof completedAt === "string" && completedAt.trim() !== "";
+}
+
+export function resolveRolloverTaskRows(payload: MyDayRolloverPayload): unknown[] {
+  const primary = Array.isArray(payload.tasks) ? payload.tasks : [];
+  if (primary.length > 0) return primary;
+  return Array.isArray(payload.tasks_preview) ? payload.tasks_preview : [];
+}
+
 export function readHasEstimateFromRow(row: Record<string, unknown>): boolean {
   if (row.has_estimate === true) return true;
   return resolveEstimateMinutesFromRow(row) > 0;
@@ -480,23 +493,29 @@ export function getCapacityFillTone(usagePct: number): CapacityFillTone {
 }
 
 /** Trust server `show_rollover_prompt` (yesterday only, days_since_last_seen === 1). */
-export function resolveShowRolloverPrompt(
-  payload: MyDayRolloverPayload,
-  options: {
-    todayTaskCount: number;
-    hasIncompleteTodayTasks: boolean;
-  },
-): boolean {
+export function resolveShowRolloverPrompt(payload: MyDayRolloverPayload): boolean {
   if (payload.show_rollover_prompt !== true) return false;
   if (payload.prompt_acknowledged_today === true) return false;
-  const tasks = Array.isArray(payload.tasks) ? payload.tasks : [];
-  if (tasks.length === 0) return false;
-  if (options.todayTaskCount > 0 && !options.hasIncompleteTodayTasks) return false;
-  return true;
+  return resolveRolloverTaskRows(payload).length > 0;
 }
 
+export function formatRolloverPromptHeading(taskCount: number): string {
+  const count = Math.max(0, Math.floor(taskCount));
+  const label = count === 1 ? "task" : "tasks";
+  return `${count} ${label} from yesterday are incomplete`;
+}
+
+export function formatRolloverPromptSubtext(): string {
+  return "Add them to today's My Day, schedule them for later, or dismiss.";
+}
+
+/** @deprecated Use formatRolloverPromptHeading + formatRolloverPromptSubtext */
 export function formatRolloverPromptCopy(_previousDate?: string | null): string {
-  return "These tasks were missed yesterday. Would you like to add them to today's tasks or handle them later?";
+  return formatRolloverPromptSubtext();
+}
+
+export function readRolloverTaskIsPostponed(row: Record<string, unknown>): boolean {
+  return row.scheduling_type === "postponed" || row.was_postponed === true;
 }
 
 export function resolveMyDayTeamReporteeExtensions(
@@ -568,5 +587,5 @@ export const MY_DAY_CATEGORY_LABELS: Record<MyDaySuggestionCategory, string> = {
   personal_tasks: "Personal Tasks",
   flexible_upcoming: "Flexible Tasks",
   backlog: "Backlog",
-  repeatedly_ignored: "Repeatedly Ignored",
+  repeatedly_ignored: "Repeatedly Postponed",
 };

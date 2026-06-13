@@ -58,6 +58,8 @@ export interface GenericTableProps<T = any> {
   statsCards?: StatsCardData[];
   metricsGridMinWidth?: string;
   metricsColumns?: number;
+  /** When false, metrics use the legacy bordered card layout (e.g. CRM Prospects). Default true. */
+  metricsEmbedded?: boolean;
   /** When true, stats cards show on load; default is visible only at viewport >= 1920px. */
   defaultShowMetrics?: boolean;
   showToolbarActions?: boolean;

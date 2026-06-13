@@ -576,7 +576,22 @@ export const CrmOrdersPageContentImpl = () => {
         mainLink="/work-planner/dashboard"
         subTitle="Orders"
       />
-      <div className="planner-orders-delivery">
+      <div
+        style={{
+          display: "flex",
+          gap: "0",
+          height: "calc(100vh - 74px)",
+          overflow: "hidden",
+        }}
+      >
+        <div
+          className="orders-scrollable-content"
+          style={{ flex: 1, height: "100%", overflowY: "hidden" }}
+        >
+      <div
+        className="planner-orders-delivery container-fluid"
+        style={{ height: "100%", display: "flex", flexDirection: "column" }}
+      >
         {/* Page Header */}
         <div className="mb-4">
           <nav aria-label="breadcrumb">
@@ -732,7 +747,16 @@ export const CrmOrdersPageContentImpl = () => {
         )}
 
         {/* Orders Table with GenericTable */}
-        <div className="orders-table-wrapper planner-orders-delivery__table">
+        <div
+          className="orders-table-wrapper planner-orders-delivery__table"
+          style={{
+            flex: 1,
+            overflow: "hidden",
+            display: "flex",
+            flexDirection: "column",
+            height: "100%",
+          }}
+        >
         <GenericTable
           data={filteredOrders}
           columns={ordersColumns}
@@ -742,6 +766,7 @@ export const CrmOrdersPageContentImpl = () => {
           statsCards={ordersDeliveryStatsCards}
           metricsGridMinWidth="120px"
           metricsColumns={6}
+          metricsEmbedded={false}
           defaultShowMetrics={true}
           customizableColumns={true}
           defaultSelectedColumns={['orderNumber', 'customer', 'deal', 'stage', 'value', 'approvalStatus', 'fulfillmentStatus', 'assignedUser', 'orderDate', 'owner']}
@@ -779,6 +804,8 @@ export const CrmOrdersPageContentImpl = () => {
           hover={true}
           uniqueKey="id"
         />
+        </div>
+      </div>
         </div>
       </div>
 

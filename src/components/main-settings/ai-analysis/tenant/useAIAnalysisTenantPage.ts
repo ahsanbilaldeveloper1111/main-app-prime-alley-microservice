@@ -32,7 +32,17 @@ export function useAIAnalysisTenantPage() {
     setAppliedTenantId((prev) => prev || sessionTenantId);
   }, [sessionTenantId]);
 
-  const tenantQuery = useAnalysisTenantQuery(appliedTenantId);
+  const appliedCompanyLabel = useMemo(() => {
+    if (appliedTenantId) {
+      const match = companies.find(
+        (c) => resolveTenantIdFromCompany(c) === appliedTenantId,
+      );
+      return match?.name ?? appliedTenantId;
+    }
+    return "";
+  }, [appliedTenantId, companies]);
+
+  const tenantQuery = useAnalysisTenantQuery(appliedTenantId, appliedCompanyLabel);
   const saveMutation = useUpdateAnalysisTenantMutation(appliedTenantId);
 
   const companyOptions = useMemo(
@@ -46,16 +56,6 @@ export function useAIAnalysisTenantPage() {
     }
     return null;
   }, [companies, selectedCompanyId]);
-
-  const appliedCompanyLabel = useMemo(() => {
-    if (appliedTenantId) {
-      const match = companies.find(
-        (c) => resolveTenantIdFromCompany(c) === appliedTenantId,
-      );
-      return match?.name ?? appliedTenantId;
-    }
-    return "";
-  }, [appliedTenantId, companies]);
 
   const handleCompanySelect = useCallback((companyId: string) => {
     const id = companyId.trim();

@@ -59,7 +59,7 @@
   flex: 1;
   display: inline-flex;
   align-items: center;
-  justify-content: flex-start;
+  justify-content: center;
   gap: 6px;
   padding: 0 clamp(12px, 1.2vw, 20px);
   border: none;
@@ -70,6 +70,10 @@
   font-family: "Lexend Deca", Helvetica, Arial, sans-serif;
   cursor: pointer;
   height: clamp(36px, 3.5vw, 44px);
+
+  &:first-child {
+    border-left: 1px solid #8a8a8a;
+  }
 }
 
 .ptl-tab-btn--active {
@@ -134,7 +138,7 @@
   border-top: none;
   border-right: none;
   background-color: #fff;
-  color: #2563eb;
+  color: #0066CC;
   font-size: 13px;
   font-weight: 600;
   font-family: "Lexend Deca", Helvetica, Arial, sans-serif;
@@ -338,6 +342,11 @@
 
 .dropdown-toggle.ptl-actions-toggle {
   color: #6b7280;
+}
+
+// Row actions menu — above GenericTable .dropdown-menu (z-index: 99) and scroll containers
+.tasks-page .ptl-actions-dropdown-menu {
+  z-index: 1060 !important;
 }
 
 .ptl-dropdown-item {

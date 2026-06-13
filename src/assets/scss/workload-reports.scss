@@ -532,12 +532,11 @@
 
   .reports-kpi-grid--live .reports-kpi-card {
     --reports-kpi-bg: #ffffff;
-    --reports-kpi-accent: #0066CC;
     background: #ffffff;
   }
 
   .reports-kpi-grid--live .reports-kpi-card__value {
-    color: #0066CC;
+    color: var(--reports-kpi-accent, #0066CC);
     font-weight: 500;
   }
 
@@ -1092,7 +1091,7 @@
   }
 
   .reports-project-row__name {
-    flex: 1;
+    display: block;
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -1103,6 +1102,7 @@
   }
 
   .reports-project-row__health {
+    flex-shrink: 0;
     font-size: clamp(10px, 0.75vw, 12px);
     font-weight: 600;
     padding: 3px 9px;
@@ -1111,7 +1111,7 @@
 
   .reports-project-row__health--ok {
     background: #ecfdf5;
-    color: #15803d;
+    color: #16a34a;
   }
 
   .reports-project-row__health--risk {
@@ -1120,6 +1120,7 @@
   }
 
   .reports-project-row__pct {
+    flex-shrink: 0;
     font-size: clamp(11px, 0.8vw, 13px);
     font-weight: 600;
     color: #374151;
@@ -2151,59 +2152,6 @@
     height: 1.75rem;
     margin: 0 auto;
   }
-
-  .myday-monthly-report {
-    &__header {
-      display: flex;
-      flex-wrap: wrap;
-      align-items: flex-end;
-      justify-content: space-between;
-      gap: 1rem;
-      margin-bottom: 1rem;
-    }
-
-    &__month-picker {
-      min-width: 11rem;
-    }
-
-    &__grid {
-      display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 12px 16px;
-
-      @media (min-width: 992px) {
-        grid-template-columns: repeat(3, minmax(0, 1fr));
-      }
-    }
-
-    &__item {
-      border: 1px solid #e5e7eb;
-      border-radius: 10px;
-      padding: 12px 14px;
-      background: #fafafa;
-      display: flex;
-      flex-direction: column;
-      gap: 4px;
-
-      strong {
-        font-size: 1.1rem;
-        color: #111827;
-      }
-    }
-
-    &__label {
-      font-size: 11px;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.04em;
-      color: #6b7280;
-    }
-
-    &__hint {
-      font-size: 11px;
-      color: #9ca3af;
-    }
-  }
 }
 
 // Portaled to document.body — must live outside .workload-reports-page scope.
@@ -2235,6 +2183,48 @@
   display: flex;
   flex-direction: column;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.18);
+
+  // Project Health badges in portaled modals (outside .workload-reports-page scope).
+  .reports-project-row__name {
+    display: block;
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: clamp(11px, 0.85vw, 13px);
+    font-weight: 500;
+    color: #141414;
+    font-family: "Lexend Deca", Helvetica, Arial, sans-serif;
+  }
+
+  .reports-project-row__health {
+    flex-shrink: 0;
+    font-size: clamp(10px, 0.75vw, 12px);
+    font-weight: 600;
+    padding: 3px 9px;
+    border-radius: 999px;
+  }
+
+  .reports-project-row__health--ok {
+    background: #ecfdf5;
+    color: #16a34a;
+  }
+
+  .reports-project-row__health--risk {
+    background: #fef2f2;
+    color: #991b1b;
+  }
+
+  .reports-project-row__pct {
+    flex-shrink: 0;
+    font-size: clamp(11px, 0.8vw, 13px);
+    font-weight: 600;
+    color: #374151;
+    min-width: 2.5rem;
+    text-align: right;
+    font-family: "Lexend Deca", Helvetica, Arial, sans-serif;
+  }
 }
 
 .reports-modal-dialog--members {
@@ -2255,3 +2245,365 @@
     background: #f5f7fa;
   }
 }
+
+.reports-view-all-footer {
+  padding: 10px 16px;
+  border-top: 1px solid #eaf0f6;
+  text-align: center;
+
+  &--inset {
+    padding: 10px 0 0;
+    margin-top: 8px;
+  }
+
+  &__btn {
+    background: none;
+    border: none;
+    color: #0066CC;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    font-family: "Lexend Deca", Helvetica, Arial, sans-serif;
+  }
+}
+
+.reports-modal-header {
+  padding: 16px 20px;
+  border-bottom: 1px solid #eaf0f6;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  &__title {
+    font-size: 13px;
+    font-weight: 700;
+    color: #141414;
+    font-family: "Lexend Deca", Helvetica, Arial, sans-serif;
+  }
+
+  &__subtitle {
+    font-size: 11px;
+    color: #718096;
+    margin-top: 2px;
+    font-family: "Lexend Deca", Helvetica, Arial, sans-serif;
+  }
+
+  &__actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  &__close {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: #718096;
+    font-size: 18px;
+    line-height: 1;
+  }
+}
+
+.reports-modal-search-wrap {
+  padding: 8px 20px;
+  border-bottom: 1px solid #eaf0f6;
+}
+
+.reports-modal-search-input {
+  width: 100%;
+  padding: 6px 10px;
+  font-size: 12px;
+  border: 1px solid #eaf0f6;
+  border-radius: 4px;
+  font-family: "Lexend Deca", Helvetica, Arial, sans-serif;
+  outline: none;
+  color: #141414;
+  background: #f5f8fa;
+}
+
+.reports-modal-body {
+  overflow-y: auto;
+  flex: 1;
+
+  &--padded {
+    padding: 12px 20px;
+  }
+
+  &--list-padded {
+    padding: 8px 0;
+  }
+}
+
+.reports-modal-list-row--indexed {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 20px;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.reports-modal-list-row--split {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 20px;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.reports-modal-list-row--project {
+  padding: 10px 20px;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.reports-modal-index {
+  font-size: 11px;
+  color: #9ca3af;
+  min-width: 20px;
+  font-family: "Lexend Deca", Helvetica, Arial, sans-serif;
+}
+
+.reports-modal-avatar {
+  border-radius: 50%;
+  color: #fff;
+  width: 2rem;
+  height: 2rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.65rem;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.reports-sort-toggle {
+  display: flex;
+  border: 1px solid #eaf0f6;
+  border-radius: 4px;
+  overflow: hidden;
+
+  &__btn {
+    padding: 4px 10px;
+    font-size: 11px;
+    border: none;
+    cursor: pointer;
+    font-family: "Lexend Deca", Helvetica, Arial, sans-serif;
+    font-weight: 500;
+    background: #fff;
+    color: #374151;
+
+    & + & {
+      border-left: 1px solid #eaf0f6;
+    }
+
+    &--active {
+      background: #0066CC;
+      color: #fff;
+    }
+  }
+}
+
+.reports-sort-toggle-wrap {
+  display: flex;
+  justify-content: flex-end;
+  padding: 8px 16px 0;
+}
+
+.reports-modal-task-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 20px;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.reports-modal-task-row__title {
+  font-size: 13px;
+  font-weight: 500;
+  color: #141414;
+  font-family: "Lexend Deca", Helvetica, Arial, sans-serif;
+}
+
+.reports-modal-task-row__meta {
+  font-size: 11px;
+  color: #718096;
+  margin-top: 2px;
+  font-family: "Lexend Deca", Helvetica, Arial, sans-serif;
+}
+
+.reports-modal-task-row__status {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 999px;
+  margin-top: 4px;
+  display: inline-block;
+}
+
+.reports-modal-task-row__due-wrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.reports-modal-task-row__due {
+  font-size: 11px;
+  font-family: "Lexend Deca", Helvetica, Arial, sans-serif;
+}
+
+.reports-modal-member-row__name {
+  font-size: 13px;
+  font-weight: 500;
+  color: #141414;
+  font-family: "Lexend Deca", Helvetica, Arial, sans-serif;
+}
+
+.reports-modal-member-row__badges {
+  display: flex;
+  gap: 6px;
+  margin-top: 4px;
+  flex-wrap: wrap;
+}
+
+.reports-modal-member-row__content {
+  flex: 1;
+  min-width: 0;
+}
+
+.reports-modal-project-row__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.reports-modal-project-row__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  display: inline-block;
+}
+
+.reports-modal-project-row__bar {
+  height: 5px;
+  background: #e2e8f0;
+  border-radius: 999px;
+  overflow: hidden;
+  margin-left: 28px;
+}
+
+.reports-modal-project-row__bar-fill {
+  height: 100%;
+  border-radius: 999px;
+}
+
+.reports-modal-segment-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.reports-modal-segment-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.reports-modal-segment-row__name {
+  font-size: 12px;
+  font-weight: 500;
+  color: #141414;
+  font-family: "Lexend Deca", Helvetica, Arial, sans-serif;
+  width: 40%;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.reports-modal-segment-row__track {
+  flex: 1;
+  height: 5px;
+  background: #e2e8f0;
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.reports-modal-segment-row__fill {
+  height: 100%;
+  border-radius: 999px;
+  min-width: 4px;
+}
+
+.reports-modal-segment-row__value {
+  font-size: 12px;
+  font-weight: 600;
+  color: #374151;
+  font-family: "Lexend Deca", Helvetica, Arial, sans-serif;
+  min-width: 2rem;
+  text-align: right;
+}
+
+.reports-modal-perf-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 20px;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.reports-modal-perf-row__name {
+  font-size: 13px;
+  font-weight: 500;
+  color: #141414;
+  font-family: "Lexend Deca", Helvetica, Arial, sans-serif;
+  margin-bottom: 4px;
+}
+
+.reports-modal-perf-row__bar {
+  height: 5px;
+  background: #eaf0f6;
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.reports-modal-perf-row__bar-fill {
+  height: 100%;
+  border-radius: 3px;
+}
+
+.reports-modal-perf-row__pct {
+  font-size: 13px;
+  font-weight: 700;
+  min-width: 2.5rem;
+  text-align: right;
+  font-family: "Lexend Deca", Helvetica, Arial, sans-serif;
+}
+
+.reports-modal-perf-row__meta {
+  flex: 1;
+  min-width: 0;
+}
+
+.reports-modal-task-detail-row__main {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  min-width: 0;
+}
+
+.reports-modal-task-detail-row__assignee {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.reports-modal-task-detail-row__assignee-label {
+  font-size: 11px;
+  color: #374151;
+  font-family: "Lexend Deca", Helvetica, Arial, sans-serif;
+}
+

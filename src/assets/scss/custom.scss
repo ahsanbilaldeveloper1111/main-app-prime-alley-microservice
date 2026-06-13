@@ -547,8 +547,13 @@ button[style*="background-color: #000000"],
   }
 }
 
-// Prospects page scroll fix
-body:has(.prospects-scrollable-content) {
+// CRM / planner list pages — shared toolbar/metrics shell
+body:has(.prospects-scrollable-content),
+body:has(.leads-scrollable-content),
+body:has(.deals-scrollable-content),
+body:has(.orders-scrollable-content),
+body:has(.planner-projects-scrollable-content),
+body:has(.wp-planner-projects) {
   overflow: hidden !important;
 
   .main-content-wrapper {
@@ -591,7 +596,12 @@ body:has(.prospects-scrollable-content) {
     border-top: none !important;
   }
 
-  .prospects-table-wrapper {
+  .prospects-table-wrapper,
+  .leads-table-wrapper,
+  .deals-table-wrapper,
+  .orders-table-wrapper,
+  .wp-planner-projects__main,
+  .wp-planner-projects__table {
     flex: 1 !important;
     display: flex !important;
     flex-direction: column !important;
@@ -658,7 +668,7 @@ body:has(.prospects-scrollable-content) {
     vertical-align: bottom;
   }
 
-  .gt-filter-pill-add:not(.gt-apply-filters-btn):not([class$='-apply-filters-btn']) {
+  .gt-filter-pill-add:not(.gt-apply-filters-btn):not([class$='-apply-filters-btn']):not(.gt-clear-all-filters-btn) {
     border: 1px solid #8a8a8a !important;
     background: #fff !important;
   }
@@ -714,7 +724,23 @@ body:has(.prospects-scrollable-content) {
     background: transparent !important;
   }
 
-  .prospects-scrollable-content {
+  .gt-filter-pills .gt-filter-pill-add.gt-clear-all-filters-btn {
+    color: #DC2626 !important;
+    background: transparent !important;
+    border: none !important;
+    font-weight: 500 !important;
+  }
+
+  .gt-filter-pills .gt-filter-pill-add.gt-clear-all-filters-btn:hover:not(:disabled) {
+    color: #B91C1C !important;
+    background: #f5f8fa !important;
+  }
+
+  .prospects-scrollable-content,
+  .leads-scrollable-content,
+  .deals-scrollable-content,
+  .orders-scrollable-content,
+  .planner-projects-scrollable-content {
     scrollbar-width: thin;
     scrollbar-color: transparent transparent;
 
@@ -765,121 +791,6 @@ body:has(.prospects-scrollable-content) {
     &:hover::-webkit-scrollbar-thumb {
       background-color: #CBD5E1;
     }
-  }
-}
-
-body:has(.leads-scrollable-content) {
-  overflow: hidden !important;
-  .main-content-wrapper {
-    overflow: hidden !important;
-  }
-  .pc-content {
-    padding-top: 0 !important;
-  }
-  .generic-table-card {
-    border-radius: 0 0 8px 8px !important;
-    border: 1px solid #ccc !important;
-    border-top: none !important;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12) !important;
-    flex: 1 !important;
-    display: flex !important;
-    flex-direction: column !important;
-    min-height: 0 !important;
-    overflow: hidden !important;
-    height: 100% !important;
-  }
-  .leads-table-wrapper {
-    flex: 1 !important;
-    display: flex !important;
-    flex-direction: column !important;
-    min-height: 0 !important;
-    height: 100% !important;
-  }
-  .gt-toolbar-main {
-    flex-shrink: 0 !important;
-  }
-  .gt-toolbar-tabs-section {
-    flex-shrink: 0 !important;
-  }
-}
-
-// CRM list metrics — prospects, leads, orders, approvals (shared toolbar metrics panel)
-body:has(.prospects-scrollable-content),
-body:has(.leads-scrollable-content),
-body:has(.orders-scrollable-content),
-body:has(.deals-scrollable-content) {
-  .gt-metrics-panel {
-    flex-shrink: 0 !important;
-  }
-}
-
-body:has(.deals-scrollable-content) {
-  overflow: hidden !important;
-  .main-content-wrapper {
-    overflow: hidden !important;
-  }
-  .pc-content {
-    padding-top: 0 !important;
-  }
-  .generic-table-card {
-    border-radius: 0 0 8px 8px !important;
-    border: 1px solid #ccc !important;
-    border-top: none !important;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12) !important;
-    flex: 1 !important;
-    display: flex !important;
-    flex-direction: column !important;
-    min-height: 0 !important;
-    overflow: hidden !important;
-    height: 100% !important;
-  }
-  .deals-table-wrapper {
-    flex: 1 !important;
-    display: flex !important;
-    flex-direction: column !important;
-    min-height: 0 !important;
-    height: 100% !important;
-  }
-  .gt-toolbar-main {
-    flex-shrink: 0 !important;
-  }
-  .gt-toolbar-tabs-section {
-    flex-shrink: 0 !important;
-  }
-}
-
-body:has(.orders-scrollable-content) {
-  overflow: hidden !important;
-  .main-content-wrapper {
-    overflow: hidden !important;
-  }
-  .pc-content {
-    padding-top: 0 !important;
-  }
-  .generic-table-card {
-    border-radius: 0 0 8px 8px !important;
-    border: 1px solid #ccc !important;
-    border-top: none !important;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12) !important;
-    flex: 1 !important;
-    display: flex !important;
-    flex-direction: column !important;
-    min-height: 0 !important;
-    overflow: hidden !important;
-    height: 100% !important;
-  }
-  .orders-table-wrapper {
-    flex: 1 !important;
-    display: flex !important;
-    flex-direction: column !important;
-    min-height: 0 !important;
-    height: 100% !important;
-  }
-  .gt-toolbar-main {
-    flex-shrink: 0 !important;
-  }
-  .gt-toolbar-tabs-section {
-    flex-shrink: 0 !important;
   }
 }
 

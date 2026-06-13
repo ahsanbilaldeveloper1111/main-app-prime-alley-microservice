@@ -20,6 +20,7 @@ export type { CallDashboardStatsTableColumn } from './CallDashboardStatsTable';
 export type { CallLogRow, CallLogsSummary } from './callLogTypes';
 export { extractCallLogRows, normalizeCallLogRow } from './callLogRowUtils';
 export { buildCallLogsStatsCardsData } from './callLogsStatsCardsData';
+export { buildCallRecordingsStatsCardsData } from './callRecordingsStatsCardsData';
 export { getCallLogsTableColumns } from './callLogsTableColumns';
 export {
   buildCallLogsTableToolbar,

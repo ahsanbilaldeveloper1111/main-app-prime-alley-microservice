@@ -47,6 +47,13 @@ import {
   CALL_ANALYSIS_TOOLBAR,
   COMMUNICATIONS_TABS_DROPDOWN_ITEMS,
 } from "@components/communications/callLogsListPageConfig";
+import { toDateTimeLocalInputValue } from "@utils/communications/communicationsDateExtensionFilters";
+import {
+  formatDateTimeFilterForApi,
+  formatFilterDateTimeLabel,
+} from "@utils/communicationsDateUtils";
+import { buildDateTimeFilterPill } from "@utils/communicationsFilterPills";
+import { createDateTimeDropdownContent } from "@utils/communicationsFilterDropdowns";
 
 type AnalysisRow = Record<string, unknown> & {
   uuid?: string;
@@ -268,6 +275,45 @@ const CallAnalysisView: React.FC = () => {
     [dispatch],
   );
 
+  const stageDateFilters = useCallback(
+    (nextFilters: Record<string, unknown>) => {
+      const normalized = { ...nextFilters };
+      if (
+        typeof normalized.start_datetime === "string" &&
+        normalized.start_datetime
+      ) {
+        normalized.start_datetime =
+          formatDateTimeFilterForApi(normalized.start_datetime, false) ??
+          normalized.start_datetime;
+      }
+      if (
+        typeof normalized.end_datetime === "string" &&
+        normalized.end_datetime
+      ) {
+        normalized.end_datetime =
+          formatDateTimeFilterForApi(normalized.end_datetime, true) ??
+          normalized.end_datetime;
+      }
+      applyFilters(normalized);
+    },
+    [applyFilters],
+  );
+
+  const filtersForPills = useMemo(
+    () => ({
+      ...filters,
+      start_datetime: toDateTimeLocalInputValue(
+        String(filters.start_datetime ?? ""),
+        "start",
+      ),
+      end_datetime: toDateTimeLocalInputValue(
+        String(filters.end_datetime ?? ""),
+        "end",
+      ),
+    }),
+    [filters],
+  );
+
   useEffect(() => {
     dispatch(runCallAnalysisFetchForRefreshKeyThunk());
   }, [refreshKey, dispatch]);
@@ -331,9 +377,27 @@ const CallAnalysisView: React.FC = () => {
         );
       },
       showFiltersButton: true,
-      showFilterPills: false,
+      showFilterPills: true,
       showMoreFiltersButton: false,
       filterPills: [
+        buildDateTimeFilterPill(
+          "start_datetime",
+          "Start Date & Time",
+          filtersForPills,
+          () => {},
+          stageDateFilters,
+          formatFilterDateTimeLabel,
+          createDateTimeDropdownContent,
+        ),
+        buildDateTimeFilterPill(
+          "end_datetime",
+          "End Date & Time",
+          filtersForPills,
+          () => {},
+          stageDateFilters,
+          formatFilterDateTimeLabel,
+          createDateTimeDropdownContent,
+        ),
         {
           id: "direction",
           label: "Direction",
@@ -562,10 +626,12 @@ const CallAnalysisView: React.FC = () => {
     [
       searchValue,
       filters,
+      filtersForPills,
       hierarchyDataExtensions,
       dispatch,
       store,
       applyFilters,
+      stageDateFilters,
       pagination.totalRows,
     ],
   );

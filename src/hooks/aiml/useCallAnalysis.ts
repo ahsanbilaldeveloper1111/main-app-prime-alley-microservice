@@ -1,9 +1,11 @@
 import type { AudioPlayerRef } from "@components/AudioPlayer";
+import { resolveChatTenantIdFromSession } from "@components/main-settings/ai-chatbot-settings/resolveChatTenantId";
 import { useAnalysisSSE } from "@hooks/useAnalysisSSE";
 import axiosInstance from "@utils/axios";
 import { decodeAnalysisData, formatDuration } from "@utils/Helper";
+import { useSession } from "next-auth/react";
 import { useRouter } from "next/router";
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "react-toastify";
 import {
   INITIAL_CHUNKS_ANALYSIS_DATA,
@@ -359,6 +361,11 @@ function persistDecodedSnapToCallAnalysisState(
 
 export function useCallAnalysis() {
   const router = useRouter();
+  const { data: session } = useSession();
+  const tenantId = useMemo(
+    () => resolveChatTenantIdFromSession(session?.user),
+    [session?.user],
+  );
   const [chunksAnalysisData, setChunksAnalysisData] = useState<any>({
     ...INITIAL_CHUNKS_ANALYSIS_DATA,
   });
@@ -496,6 +503,7 @@ export function useCallAnalysis() {
     callType: callType?.toString(),
     remotePartyNumber: remotePartyNumber,
     dateTime: dateTime,
+    tenantId,
 
     preventAutoConnect: analysisComplete,
     onMessage: (data) => {

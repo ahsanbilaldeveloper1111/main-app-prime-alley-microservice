@@ -341,12 +341,10 @@ const LabelsTab: React.FC<LabelsTabProps> = ({
   const renderAddLabelButton = () => (
     <div
       style={{
-        position: "absolute",
-        right: "19px",
-        top: "170px",
         display: "flex",
         alignItems: "center",
         gap: "8px",
+        flexShrink: 0,
       }}
     >
       {canDeleteLabel && selectedItems.length > 0 && (
@@ -554,8 +552,10 @@ const LabelsTab: React.FC<LabelsTabProps> = ({
           showToolbar={true}
           toolbar={toolbarConfig}
           
-          // Stats cards for metrics
+          // Stats cards for metrics (legacy bordered row — matches commit / CRM layout)
           statsCards={statsCardsData}
+          metricsGridMinWidth="150px"
+          metricsEmbedded={false}
         />
       </div>
 

@@ -9,9 +9,13 @@ import { useMemo } from "react";
 
 import { mapAnalysisTenantToFormValues } from "./mapAnalysisTenant";
 
-export function useAnalysisTenantQuery(appliedTenantId: string) {
+export function useAnalysisTenantQuery(
+  appliedTenantId: string,
+  fallbackCompanyName = "",
+) {
   const { status: sessionStatus } = useSession();
   const tenantId = appliedTenantId.trim();
+  const fallbackName = fallbackCompanyName.trim();
 
   const query = useQuery<AnalysisTenantRecord | null>({
     queryKey: aiAnalyticsKeys.tenants.detail(tenantId),
@@ -21,8 +25,8 @@ export function useAnalysisTenantQuery(appliedTenantId: string) {
   });
 
   const formValues = useMemo(
-    () => mapAnalysisTenantToFormValues(query.data, tenantId),
-    [query.data, query.dataUpdatedAt, tenantId],
+    () => mapAnalysisTenantToFormValues(query.data, tenantId, fallbackName),
+    [query.data, query.dataUpdatedAt, tenantId, fallbackName],
   );
 
   return {

@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { toast } from "react-toastify";
 import {
   applyFinesseRemoteForcedLogout,
@@ -16,6 +16,7 @@ const SSE_TYPE = {
   STATE: "state",
   ERROR: "error",
   PREVIEW: "preview",
+  MONITORING_DIALOG: "monitoring_dialog",
   ROSTER_STATE: "roster_state",
   PING: "ping",
   STOMP_ERROR: "stomp_error",
@@ -66,10 +67,12 @@ export interface UseFinesseStompOptions {
   onConnectionChange?: (connected: boolean) => void;
   onAuthError?: (message: string) => void;
   onPreviewEvent?: (payload: FinessePreviewEvent) => void;
+  onMonitoringDialogEvent?: (payload: FinessePreviewEvent) => void;
   /** Roster topic payload (array or wrapped); use to refresh agent rows / self state. */
   onRosterEvent?: (payload: unknown) => void;
   /** After STOMP connects (or pooled connection re-subscribes); use to sync team list from API. */
   onStompConnected?: () => void;
+  monitoredAgentIds?: string[];
 }
 
 interface SSEPayload {
@@ -89,6 +92,7 @@ type SseCallbackBundle = {
   onConnectionChange?: (connected: boolean) => void;
   onAuthError?: (message: string) => void;
   onPreviewEvent?: (payload: FinessePreviewEvent) => void;
+  onMonitoringDialogEvent?: (payload: FinessePreviewEvent) => void;
   onRosterEvent?: (payload: unknown) => void;
   onStompConnected?: () => void;
 };
@@ -155,6 +159,9 @@ function dispatchSsePayload(
     case SSE_TYPE.PREVIEW:
       if (data) cb.onPreviewEvent?.(data as FinessePreviewEvent);
       return;
+    case SSE_TYPE.MONITORING_DIALOG:
+      if (data) cb.onMonitoringDialogEvent?.(data as FinessePreviewEvent);
+      return;
     case SSE_TYPE.ROSTER_STATE:
       if (data !== undefined) cb.onRosterEvent?.(data);
       return;
@@ -183,11 +190,24 @@ export function useFinesseStomp({
   onConnectionChange,
   onAuthError,
   onPreviewEvent,
+  onMonitoringDialogEvent,
   onRosterEvent,
   onStompConnected,
+  monitoredAgentIds,
 }: UseFinesseStompOptions): void {
   const eventSourceRef = useRef<EventSource | null>(null);
   const wantsPreviewRef = useRef(Boolean(onPreviewEvent));
+  const monitoredAgentIdsKey = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          (monitoredAgentIds ?? [])
+            .map((id) => String(id).trim())
+            .filter(Boolean),
+        ),
+      ).join(","),
+    [monitoredAgentIds],
+  );
 
   const callbacksRef = useRef({
     onStateEvent,
@@ -195,6 +215,7 @@ export function useFinesseStomp({
     onConnectionChange,
     onAuthError,
     onPreviewEvent,
+    onMonitoringDialogEvent,
     onRosterEvent,
     onStompConnected,
   });
@@ -206,6 +227,7 @@ export function useFinesseStomp({
       onConnectionChange,
       onAuthError,
       onPreviewEvent,
+      onMonitoringDialogEvent,
       onRosterEvent,
       onStompConnected,
     };
@@ -216,6 +238,7 @@ export function useFinesseStomp({
     onConnectionChange,
     onAuthError,
     onPreviewEvent,
+    onMonitoringDialogEvent,
     onRosterEvent,
     onStompConnected,
   ]);
@@ -239,7 +262,6 @@ export function useFinesseStomp({
       clusterId != null && String(clusterId).trim() !== ""
         ? String(clusterId).trim()
         : "";
-    console.log("clusterId", c);
     const t =
       teamId != null && String(teamId).trim() !== ""
         ? String(teamId).trim()
@@ -247,6 +269,9 @@ export function useFinesseStomp({
     if (c && t) {
       params.set("clusterId", c);
       params.set("teamId", t);
+    }
+    if (monitoredAgentIdsKey) {
+      params.set("monitoredAgentIds", monitoredAgentIdsKey);
     }
     const es = new EventSource(`${FINESSE_SSE_PATH}?${params}`);
 
@@ -273,5 +298,5 @@ export function useFinesseStomp({
       eventSourceRef.current = null;
       callbacksRef.current.onConnectionChange?.(false);
     };
-  }, [token, finesseUserId, clusterId, teamId]);
+  }, [token, finesseUserId, clusterId, teamId, monitoredAgentIdsKey]);
 }

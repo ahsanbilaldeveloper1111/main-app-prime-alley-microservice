@@ -146,36 +146,44 @@ type WorkloadSummaryCardsProps = Readonly<{
 export function WorkloadSummaryCardsRow({ data }: WorkloadSummaryCardsProps) {
   return (
     <div className="workload-summary-row">
-      <div className="workload-summary-card workload-summary-card--shade-indigo">
+      <div className="workload-summary-card">
         <div className="workload-summary-card__label">Tasks this week</div>
-        <div className="workload-summary-card__value">{data.total_tasks_this_week}</div>
+        <div className="workload-summary-card__value" style={{ color: "#0066CC" }}>
+          {data.total_tasks_this_week}
+        </div>
         <div className="workload-summary-card__sub">
-          <span className="workload-summary-card__dot" />
-          {" Assigned to team"}
+          <span className="workload-summary-card__dot" style={{ background: "#0066CC" }} />
+          <span>Assigned to team</span>
         </div>
       </div>
-      <div className="workload-summary-card workload-summary-card--shade-light">
+      <div className="workload-summary-card">
         <div className="workload-summary-card__label">Overloaded members</div>
-        <div className="workload-summary-card__value">{data.overloaded_members}</div>
+        <div className="workload-summary-card__value" style={{ color: "#dc2626" }}>
+          {data.overloaded_members}
+        </div>
         <div className="workload-summary-card__sub">
-          <span className="workload-summary-card__dot" />
-          {" Above 100% capacity"}
+          <span className="workload-summary-card__dot" style={{ background: "#dc2626" }} />
+          <span>Above 100% capacity</span>
         </div>
       </div>
-      <div className="workload-summary-card workload-summary-card--shade-sky">
+      <div className="workload-summary-card">
         <div className="workload-summary-card__label">Unestimated tasks</div>
-        <div className="workload-summary-card__value">{data.unestimated_tasks}</div>
+        <div className="workload-summary-card__value" style={{ color: "#ea580c" }}>
+          {data.unestimated_tasks}
+        </div>
         <div className="workload-summary-card__sub">
-          <span className="workload-summary-card__dot" />
-          {" No time estimate set"}
+          <span className="workload-summary-card__dot" style={{ background: "#ea580c" }} />
+          <span>No time estimate set</span>
         </div>
       </div>
-      <div className="workload-summary-card workload-summary-card--shade-medium">
+      <div className="workload-summary-card">
         <div className="workload-summary-card__label">Critical priority</div>
-        <div className="workload-summary-card__value">{data.critical_priority_tasks}</div>
+        <div className="workload-summary-card__value" style={{ color: "#dc2626" }}>
+          {data.critical_priority_tasks}
+        </div>
         <div className="workload-summary-card__sub">
-          <span className="workload-summary-card__dot" />
-          {" Needs immediate attention"}
+          <span className="workload-summary-card__dot" style={{ background: "#dc2626" }} />
+          <span>Needs immediate attention</span>
         </div>
       </div>
     </div>
@@ -517,7 +525,8 @@ export function WorkloadGridPanel({
 type WorkloadPlannerAlertStackProps = Readonly<{
   sessionStatus: string;
   enabled: boolean;
-  teamMemberOnly?: boolean;
+  /** Team members (non-owners) only see their own workload row. */
+  workloadSelfScoped?: boolean;
   accessForbidden: boolean;
   summaryError: unknown;
   summaryHasError: boolean;
@@ -532,7 +541,7 @@ type WorkloadPlannerAlertStackProps = Readonly<{
 export function WorkloadPlannerAlertStack({
   sessionStatus,
   enabled,
-  teamMemberOnly = false,
+  workloadSelfScoped = false,
   accessForbidden,
   summaryError,
   summaryHasError,
@@ -551,17 +560,17 @@ export function WorkloadPlannerAlertStack({
         </div>
       ) : null}
 
-      {!enabled && sessionStatus === "authenticated" && !teamMemberOnly ? (
+      {!enabled && sessionStatus === "authenticated" ? (
         <Alert variant="warning">
           Your session does not include a phone or extension; workload APIs
           cannot be called.
         </Alert>
       ) : null}
 
-      {teamMemberOnly ? (
+      {workloadSelfScoped && enabled ? (
         <Alert variant="info">
-          Workload is a manager-only view (team owners). Use{" "}
-          <a href="/planner/my-tasks">My Day</a> for your personal task plan.
+          Showing your workload only. Team owners can view and manage the full
+          team roster.
         </Alert>
       ) : null}
 
