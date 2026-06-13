@@ -423,6 +423,113 @@ export interface FinesseLinkPayload {
   teamId: FinesseId;
 }
 
+function trimmedNonEmptyString(value: unknown): string | undefined {
+  if (typeof value !== "string") return undefined;
+  const trimmed = value.trim();
+  return trimmed === "" ? undefined : trimmed;
+}
+
+/** True when sessionStorage has a Finesse token and linked user identity. */
+export function isFinesseSessionReady(): boolean {
+  const token = getFinesseToken();
+  const userData = getFinesseUserData();
+  if (!trimmedNonEmptyString(token) || !userData) return false;
+  return Boolean(
+    trimmedNonEmptyString(userData.loginId) ??
+      trimmedNonEmptyString(userData.loginName),
+  );
+}
+
+function extractFinesseLinkToken(response: Record<string, unknown>): string | undefined {
+  const nestedData = isPlainRecord(response.data) ? response.data : null;
+  const nestedResponseData = isPlainRecord(response.responseData)
+    ? response.responseData
+    : null;
+  return (
+    trimmedNonEmptyString(response.token) ??
+    (nestedData ? trimmedNonEmptyString(nestedData.token) : undefined) ??
+    (nestedResponseData
+      ? trimmedNonEmptyString(nestedResponseData.token)
+      : undefined)
+  );
+}
+
+function extractFinesseLinkUserPayload(
+  response: Record<string, unknown>,
+): FinesseUserData | null {
+  const candidates: unknown[] = [
+    response.responseData,
+    isPlainRecord(response.data) ? response.data : null,
+    response,
+  ];
+  for (const candidate of candidates) {
+    if (!isPlainRecord(candidate)) continue;
+    const nestedUser = candidate.User ?? candidate.user;
+    const payload = isPlainRecord(nestedUser) ? nestedUser : candidate;
+    const loginId = trimmedNonEmptyString(payload.loginId);
+    const loginName = trimmedNonEmptyString(payload.loginName);
+    if (loginId ?? loginName) {
+      return payload;
+    }
+  }
+  return null;
+}
+
+function isFinesseLinkSuccessResponse(response: Record<string, unknown>): boolean {
+  const status = response.status;
+  if (
+    status === "success" ||
+    status === "SUCCESS" ||
+    status === true ||
+    response.code === 200 ||
+    response.statusCode === 200
+  ) {
+    return true;
+  }
+  return extractFinesseLinkUserPayload(response) != null;
+}
+
+export type ApplyFinesseLinkResponseResult =
+  | { ok: true }
+  | { ok: false; error: string };
+
+/**
+ * Persist link/login payload into sessionStorage. Accepts common API envelope shapes.
+ */
+export function applyFinesseLinkResponse(
+  response: unknown,
+): ApplyFinesseLinkResponseResult {
+  if (!isPlainRecord(response)) {
+    return { ok: false, error: "Authentication failed." };
+  }
+
+  const userPayload = extractFinesseLinkUserPayload(response);
+  if (!isFinesseLinkSuccessResponse(response) || !userPayload) {
+    const message =
+      trimmedNonEmptyString(response.message) ??
+      trimmedNonEmptyString(response.statusCode) ??
+      "Authentication failed.";
+    return { ok: false, error: message };
+  }
+
+  const normalized = normalizeFinesseUserData(userPayload);
+  setFinesseUserData(normalized);
+
+  const token = extractFinesseLinkToken(response);
+  if (token) {
+    setFinesseToken(token);
+  }
+
+  if (!isFinesseSessionReady()) {
+    return {
+      ok: false,
+      error: "Authentication failed: missing Finesse session token.",
+    };
+  }
+
+  return { ok: true };
+}
+
 /**
  * POST link - Link Finesse user with credentials, teamId and extension
  */
@@ -749,16 +856,27 @@ export async function assertFinesseTeamSwitchable(
 }
 
 /**
- * POST /api/v1/finesse/teams/{teamId}/users/{finesseUserId}/state — body `{"newState":"READY"|"NOT_READY"}`.
+ * POST finesse/teams/{teamId}/users/{finesseUserId}/state — body `{ newState, actingFinesseUserId? }`.
+ * When `actingFinesseUserId` is set and differs from the target user, the backend uses the
+ * supervisor's linked Finesse credentials to change the agent's state.
  */
 export const finesseSetState = async (
   teamId: FinesseId,
   finesseUserId: string,
   newState: "READY" | "NOT_READY",
+  actingFinesseUserId?: string | null,
 ) => {
+  const payload: {
+    newState: "READY" | "NOT_READY";
+    actingFinesseUserId?: string;
+  } = { newState };
+  const acting = actingFinesseUserId?.trim();
+  if (acting && acting !== finesseUserId.trim()) {
+    payload.actingFinesseUserId = acting;
+  }
   const response = await axiosInstance.post(
     `${prefix}/teams/${teamId}/users/${encodeURIComponent(finesseUserId)}/state`,
-    { newState },
+    payload,
   );
   return response.data;
 };
