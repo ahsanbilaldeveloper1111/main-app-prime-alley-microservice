@@ -205,6 +205,7 @@ export function useCrmActivityModals({
       followUpTaskDueDate: string | null;
       followUpTaskDueTime: string | null;
       attachments?: File[];
+      emailSenderId?: number;
     }) => {
       if (!emailData.to?.length) return;
       try {
@@ -334,6 +335,7 @@ export function useCrmActivityModals({
     async (whatsappData: {
       content_sid: string;
       content_variables: Record<string, string>;
+      whatsappSenderId: number;
     }) => {
       const number = (recordPhone ?? "").replace(/\s/g, "").trim();
       if (!number) {
