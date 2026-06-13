@@ -11,37 +11,14 @@ import { Loader } from 'lucide-react';
 import BreadcrumbItem from '@common/BreadcrumbItem';
 import {
   finesseLink,
-  setFinesseUserData,
-  getFinesseUserData,
-  getFinesseToken,
-  setFinesseToken,
-  normalizeFinesseUserData,
   getStoredTeamId,
   setStoredTeamId,
   clearFinesseManualReconnectRequired,
   getFinesseManualReconnectRequired,
-  type FinesseUserData,
+  applyFinesseLinkResponse,
+  isFinesseSessionReady,
+  getFinesseApiErrorMessage,
 } from '@utils/finesse';
-
-function getFinesseLinkErrorMessage(err: unknown): string {
-  if (
-    err &&
-    typeof err === 'object' &&
-    'response' in err &&
-    err.response &&
-    typeof err.response === 'object' &&
-    'data' in err.response &&
-    err.response.data &&
-    typeof err.response.data === 'object' &&
-    'message' in err.response.data
-  ) {
-    return String((err.response.data as { message?: string }).message);
-  }
-  if (err instanceof Error) {
-    return err.message;
-  }
-  return 'Authentication failed.';
-}
 
 export interface FinesseAuthGateProps {
   children: ReactNode;
@@ -71,66 +48,77 @@ export default function FinesseAuthGate({
   const [manualConnectMode, setManualConnectMode] = useState(false);
   const linkInFlightRef = useRef(false);
 
+  const syncAuthFromStorage = useCallback((): boolean => {
+    if (!isFinesseSessionReady()) return false;
+    clearFinesseManualReconnectRequired();
+    setManualConnectMode(false);
+    setFinesseError(null);
+    setIsFinesseAuthenticated(true);
+    return true;
+  }, []);
+
   useLayoutEffect(() => {
     if (globalThis.window === undefined) return;
+    syncAuthFromStorage();
     if (getFinesseManualReconnectRequired()) {
       setManualConnectMode(true);
     }
-  }, []);
+  }, [syncAuthFromStorage]);
 
   useEffect(() => {
     if (globalThis.window === undefined) return;
-    const token = getFinesseToken();
-    const userData = getFinesseUserData();
-    if (token && userData) {
-      setIsFinesseAuthenticated(true);
-    }
-  }, []);
+    const onAuthenticated = () => {
+      syncAuthFromStorage();
+    };
+    globalThis.window.addEventListener('finesse-authenticated', onAuthenticated);
+    return () =>
+      globalThis.window.removeEventListener('finesse-authenticated', onAuthenticated);
+  }, [syncAuthFromStorage]);
 
   const attemptAutoLink = useCallback(async () => {
     if (globalThis.window === undefined) return;
+    if (syncAuthFromStorage()) return;
     if (linkInFlightRef.current) return;
+
     linkInFlightRef.current = true;
     setFinesseError(null);
     setIsFinesseLoading(true);
     const teamIdToUse = getStoredTeamId();
     try {
       const response = await finesseLink({ teamId: teamIdToUse as number | string });
-      if (response?.status === 'success' && response?.responseData) {
-        const data = normalizeFinesseUserData(response.responseData as FinesseUserData);
-        setFinesseUserData(data);
+      const result = applyFinesseLinkResponse(response);
+      if (result.ok) {
         setStoredTeamId(Number(teamIdToUse));
-        if (response?.token) {
-          setFinesseToken(response.token);
-        }
         clearFinesseManualReconnectRequired();
         setManualConnectMode(false);
         setIsFinesseAuthenticated(true);
-        if (globalThis.window !== undefined) {
-          globalThis.window.dispatchEvent(new CustomEvent('finesse-authenticated'));
-        }
+        globalThis.window.dispatchEvent(new CustomEvent('finesse-authenticated'));
       } else {
-        setFinesseError(
-          response?.message || response?.statusCode || 'Authentication failed.',
-        );
+        setFinesseError(result.error);
+        syncAuthFromStorage();
       }
     } catch (err: unknown) {
-      setFinesseError(getFinesseLinkErrorMessage(err));
+      setFinesseError(getFinesseApiErrorMessage(err, 'Authentication failed.'));
+      syncAuthFromStorage();
     } finally {
       setIsFinesseLoading(false);
       linkInFlightRef.current = false;
+      syncAuthFromStorage();
     }
-  }, []);
+  }, [syncAuthFromStorage]);
 
   const onRequireReauth = useCallback(
     (e: Event) => {
-      const manual = (e as CustomEvent<{ manualConnect?: boolean }>).detail?.manualConnect === true;
+      const manual =
+        (e as CustomEvent<{ manualConnect?: boolean }>).detail?.manualConnect ===
+        true;
       setIsFinesseAuthenticated(false);
       setFinesseError(null);
       if (manual) {
         setManualConnectMode(true);
         return;
       }
+      setManualConnectMode(false);
       attemptAutoLink().catch(() => undefined);
     },
     [attemptAutoLink],
@@ -147,22 +135,13 @@ export default function FinesseAuthGate({
     if (globalThis.window === undefined) return;
     if (sessionStatus === 'loading') return;
     if (!session?.user) return;
-    const token = getFinesseToken();
-    const userData = getFinesseUserData();
-    if (token && userData) {
-      setIsFinesseAuthenticated(true);
-      clearFinesseManualReconnectRequired();
-      setManualConnectMode(false);
-      return;
-    }
+    if (syncAuthFromStorage()) return;
     if (getFinesseManualReconnectRequired()) {
       setManualConnectMode(true);
       return;
     }
-    if (!isFinesseAuthenticated) {
-      attemptAutoLink().catch(() => undefined);
-    }
-  }, [session?.user, sessionStatus, isFinesseAuthenticated, attemptAutoLink]);
+    attemptAutoLink().catch(() => undefined);
+  }, [session?.user, sessionStatus, syncAuthFromStorage, attemptAutoLink]);
 
   if (sessionStatus === 'loading') {
     return (
@@ -204,6 +183,7 @@ export default function FinesseAuthGate({
   }
 
   if (!isFinesseAuthenticated) {
+    const showRetry = Boolean(finesseError) && !isFinesseLoading;
     const manualCard = manualConnectMode ? (
       <>
         <h2 style={{ margin: 0, fontSize: '22px', fontWeight: 700, color: '#141414' }}>
@@ -239,7 +219,7 @@ export default function FinesseAuthGate({
           {isFinesseLoading ? (
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
               <Loader size={18} style={{ animation: 'spin 1s linear infinite' }} />
-              Connectingâ€¦
+              Connecting…
             </span>
           ) : (
             'Connect to Finesse'
@@ -265,6 +245,26 @@ export default function FinesseAuthGate({
           <Loader size={20} style={{ animation: 'spin 1s linear infinite' }} />
           <span>{isFinesseLoading ? 'Connecting...' : 'Waiting for connection...'}</span>
         </div>
+        {showRetry && (
+          <button
+            type="button"
+            className="btn btn-outline-primary"
+            disabled={isFinesseLoading}
+            onClick={() => {
+              attemptAutoLink().catch(() => undefined);
+            }}
+            style={{
+              width: '100%',
+              marginTop: '16px',
+              padding: '10px 20px',
+              borderRadius: '10px',
+              fontWeight: 600,
+              cursor: isFinesseLoading ? 'wait' : 'pointer',
+            }}
+          >
+            Retry connection
+          </button>
+        )}
       </>
     );
 
@@ -307,4 +307,4 @@ export default function FinesseAuthGate({
   }
 
   return <div className="communications-campaign-root">{children}</div>;
-}
+};

@@ -62,6 +62,8 @@ import {
   assertFinesseTeamSwitchable,
   getFinesseApiErrorMessage,
   getFinesseClusterId,
+  getFinesseUserTeam,
+  mergeClusterIntoStoredUserFromTeamPayload,
   normalizeFinesseUserData,
   scheduleFinesseCampaign,
   type FinesseUserData,
@@ -161,6 +163,8 @@ const LiveCallsCampaignsManagement = () => {
   // Hydrate from storage on mount so teams/APIs run when landing after link (storage is set but first render may miss it).
   // useLayoutEffect so dropdown is filled before first paint and dependent APIs run.
   const [finesseHydrated, setFinesseHydrated] = useState(false);
+  /** Bumped when cluster id is persisted so the Finesse SSE stream reconnects with preview topics. */
+  const [streamConfigBump, setStreamConfigBump] = useState(0);
   const hydrateFromStorage = useCallback(() => {
     const stored = getFinesseUserData();
     if (stored) {
@@ -207,6 +211,22 @@ const LiveCallsCampaignsManagement = () => {
       );
   }, [hydrateFromStorage]);
 
+  const syncStreamClusterFromTeam = useCallback(async () => {
+    const d = getFinesseUserData();
+    const username = d?.loginId ?? d?.loginName;
+    const teamId = getEffectiveTeamId(d);
+    if (!username || teamId == null || getFinesseClusterId()) return;
+    try {
+      const res = await getFinesseUserTeam(username, teamId, false);
+      const payload = res?.responseData ?? res;
+      if (mergeClusterIntoStoredUserFromTeamPayload(payload)) {
+        setStreamConfigBump((b) => b + 1);
+      }
+    } catch {
+      // ignore
+    }
+  }, []);
+
   // Fetch Finesse user and map to TopBar (teams, selectedTeam, agentStatus) â€“ runs when past FinesseAuthGate / after hydrate
   useEffect(() => {
     if (!finesseHydrated) return;
@@ -235,7 +255,11 @@ const LiveCallsCampaignsManagement = () => {
         setTeamsWithIds(withIds);
         setTeams(teamNames);
         const normalized = normalizeFinesseUserData(resData as FinesseUserData);
+        const clusterBefore = getFinesseClusterId();
         setFinesseUserData(normalized);
+        if (!clusterBefore && getFinesseClusterId()) {
+          setStreamConfigBump((b) => b + 1);
+        }
         setStoredTeamId(teamId);
         const match = withIds.find((t) => t.id === teamId);
         setSelectedTeam(
@@ -245,6 +269,9 @@ const LiveCallsCampaignsManagement = () => {
             "",
         );
         setAgentStatus((resData as { state?: string }).state ?? "READY");
+        if (!getFinesseClusterId()) {
+          await syncStreamClusterFromTeam();
+        }
       } catch {
         const stored = getFinesseUserData();
         if (stored) {
@@ -264,7 +291,7 @@ const LiveCallsCampaignsManagement = () => {
       }
     };
     loadUser();
-  }, [finesseHydrated, finesseUsername, session?.user]);
+  }, [finesseHydrated, finesseUsername, session?.user, syncStreamClusterFromTeam]);
 
   // Load import statuses in background â€“ runs when past FinesseAuthGate / after hydrate
   useEffect(() => {
@@ -454,7 +481,12 @@ const LiveCallsCampaignsManagement = () => {
 
   const rosterClusterId = useMemo(
     () => getFinesseClusterId(),
-    [finesseHydrated, finesseDataForCap?.loginId, finesseDataForCap?.settings],
+    [
+      finesseHydrated,
+      finesseDataForCap?.loginId,
+      finesseDataForCap?.settings,
+      streamConfigBump,
+    ],
   );
 
   const handleRosterEvent = useCallback(
@@ -493,7 +525,8 @@ const LiveCallsCampaignsManagement = () => {
     queryClient.invalidateQueries({
       queryKey: communicationsKeys.finesse.all(),
     });
-  }, [queryClient]);
+    syncStreamClusterFromTeam().catch(() => undefined);
+  }, [queryClient, syncStreamClusterFromTeam]);
 
   useFinesseStomp({
     token,

@@ -724,7 +724,7 @@ const LiveCallsAgentsManagement = () => {
     await handleAgentStatusChange(status);
   };
 
-  /** POST /api/v1/finesse/teams/{teamId}/users/{loginId}/state â€” body `{ newState: "READY" | "NOT_READY" }` */
+  /** POST finesse/teams/{teamId}/users/{loginId}/state — body `{ newState, actingFinesseUserId? }` */
   const handleBulkStatusChange = async (newStatus: string) => {
     if (!canChangeUserStatus) {
       toast.error("You do not have permission to change agent status.");
@@ -738,6 +738,7 @@ const LiveCallsAgentsManagement = () => {
       newStatus === "READY" ? "READY" : "NOT_READY";
     const data = getFinesseUserData();
     const teamId = getEffectiveTeamId(data);
+    const actingFinesseUserId = data?.loginId ?? data?.loginName ?? "";
     if (teamId == null) {
       toast.error("Team not available.");
       return;
@@ -748,7 +749,7 @@ const LiveCallsAgentsManagement = () => {
     try {
       const results = await Promise.allSettled(
         selectedAgents.map((loginId) =>
-          finesseSetState(teamId, loginId, newState),
+          finesseSetState(teamId, loginId, newState, actingFinesseUserId),
         ),
       );
       const rejected = results.filter(
@@ -784,13 +785,19 @@ const LiveCallsAgentsManagement = () => {
       newStatus === "READY" ? "READY" : "NOT_READY";
     const data = getFinesseUserData();
     const teamId = getEffectiveTeamId(data);
+    const actingFinesseUserId = data?.loginId ?? data?.loginName ?? "";
     if (teamId == null) {
       toast.error("Team not available.");
       setActionMenuPortal(null);
       return;
     }
     try {
-      await finesseSetState(teamId, agentLoginId, newState);
+      await finesseSetState(
+        teamId,
+        agentLoginId,
+        newState,
+        actingFinesseUserId,
+      );
       const label = newState === "READY" ? "Ready" : "Not Ready";
       toast.success(`Status updated to ${label}.`);
       setRefreshTrigger((t) => t + 1);

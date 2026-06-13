@@ -25,6 +25,8 @@ import {
   getFinesseUser,
   getFinesseToken,
   getFinesseClusterId,
+  getFinesseUserTeam,
+  mergeClusterIntoStoredUserFromTeamPayload,
   clearFinesseUserData,
   setFinesseUserData,
   setFinesseManualReconnectRequired,
@@ -65,6 +67,8 @@ const CampaignAgentPage = () => {
   const [profileLoading, setProfileLoading] = useState(false);
   const [timeRerender, setTimeRerender] = useState(0);
   const [finesseSseToken, setFinesseSseToken] = useState<string | null>(null);
+  /** Bumped when cluster/team stream context is persisted so SSE reconnects with preview topics. */
+  const [streamConfigBump, setStreamConfigBump] = useState(0);
 
   const statusOptions = [
     { value: "READY", label: "Ready", color: "#10b981", icon: CheckCircle },
@@ -128,12 +132,28 @@ const CampaignAgentPage = () => {
 
   const rosterClusterId = useMemo(
     () => getFinesseClusterId(),
-    [finesseHydrated, agentProfile?.loginId, agentProfile?.settings],
+    [finesseHydrated, agentProfile?.loginId, agentProfile?.settings, streamConfigBump],
   );
   const streamTeamId = useMemo(
     () => getEffectiveTeamId(getFinesseUserData()),
-    [finesseHydrated, selectedTeam],
+    [finesseHydrated, selectedTeam, streamConfigBump],
   );
+
+  const syncStreamClusterFromTeam = useCallback(async () => {
+    const d = getFinesseUserData();
+    const username = d?.loginId ?? d?.loginName;
+    const teamId = getEffectiveTeamId(d);
+    if (!username || teamId == null || getFinesseClusterId()) return;
+    try {
+      const res = await getFinesseUserTeam(username, teamId, false);
+      const payload = res?.responseData ?? res;
+      if (mergeClusterIntoStoredUserFromTeamPayload(payload)) {
+        setStreamConfigBump((b) => b + 1);
+      }
+    } catch {
+      // ignore — preview may still work via legacy topics when cluster is unavailable
+    }
+  }, []);
 
   const {
     handlePreviewEvent,
@@ -186,6 +206,9 @@ const CampaignAgentPage = () => {
       toast.error((p as { message?: string })?.message ?? "Finesse error"),
     onAuthError: (msg) => toast.error(msg),
     onRosterEvent: handleRosterEvent,
+    onStompConnected: () => {
+      syncStreamClusterFromTeam().catch(() => undefined);
+    },
   });
 
   const loadSelfProfile = useCallback(async () => {
@@ -205,7 +228,12 @@ const CampaignAgentPage = () => {
       const resData = response?.responseData ?? response;
       if (!resData) return;
       const normalized = normalizeFinesseUserData(resData as FinesseUserData);
+      const clusterBefore = getFinesseClusterId();
+      setFinesseUserData(normalized);
       setAgentProfile(normalized);
+      if (!clusterBefore && getFinesseClusterId()) {
+        setStreamConfigBump((b) => b + 1);
+      }
       const withIds: TeamOption[] = (normalized.teams ?? []).map((t) => ({
         id: t.id,
         name: t.name,
@@ -218,6 +246,9 @@ const CampaignAgentPage = () => {
         );
       }
       if (normalized.state) setAgentStatus(normalized.state);
+      if (!getFinesseClusterId()) {
+        await syncStreamClusterFromTeam();
+      }
     } catch (err: unknown) {
       toast.error(getFinesseApiErrorMessage(err, "Failed to load your agent profile"));
       const stored = getFinesseUserData();
@@ -225,7 +256,7 @@ const CampaignAgentPage = () => {
     } finally {
       setProfileLoading(false);
     }
-  }, [finesseHydrated, session?.user]);
+  }, [finesseHydrated, session?.user, syncStreamClusterFromTeam]);
 
   useEffect(() => {
     loadSelfProfile().catch(() => undefined);

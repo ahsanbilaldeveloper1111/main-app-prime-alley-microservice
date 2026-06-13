@@ -26,6 +26,52 @@ function formatPreviewTime(seconds: number): string {
   return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
 }
 
+type PreviewParticipant = NonNullable<FinessePreviewEvent["participants"]>[number];
+
+function resolveAgentExtension(session: Session | null): string | undefined {
+  const d = getFinesseUserData();
+  const u = session?.user as { phone?: string } | undefined;
+  return d?.extension ?? u?.phone;
+}
+
+function resolvePreviewAgentParticipant(
+  dialog: FinessePreviewEvent,
+  extension: string | undefined,
+): PreviewParticipant | null {
+  const participants = dialog.participants ?? [];
+  if (!extension) return participants[0] ?? null;
+  return (
+    participants.find((p) => p.mediaAddress === extension) ??
+    participants[0] ??
+    null
+  );
+}
+
+function previewDialogActions(
+  dialog: FinessePreviewEvent,
+  agentParticipant: PreviewParticipant | null,
+): string[] {
+  const dialogActions = (dialog as { actions?: string[] }).actions;
+  if (Array.isArray(dialogActions) && dialogActions.length > 0) {
+    return dialogActions;
+  }
+  return Array.isArray(agentParticipant?.actions) ? agentParticipant.actions : [];
+}
+
+function isWrapUpPreviewState(
+  dialog: FinessePreviewEvent,
+  agentParticipant: PreviewParticipant | null,
+): boolean {
+  return (
+    agentParticipant?.state === "WRAP_UP" || dialog.dialogState === "WRAP_UP"
+  );
+}
+
+function participantSortTime(dialog: FinessePreviewEvent): string {
+  const agent = dialog.participants?.[0];
+  return agent?.stateChangeTime ?? agent?.startTime ?? "";
+}
+
 /**
  * Finesse outbound preview (campaign) dialog: SSE PREVIEW events → CallWidget + WrapUpModal + dialog actions.
  */
@@ -57,8 +103,40 @@ export function useFinesseCampaignPreview(
   >([]);
 
   const wrapUpEventDialogIdRef = useRef<string | null>(null);
+  /** Dialog kept in state so wrap-up submit still works after preview ENDED. */
+  const wrapUpPendingDialogIdRef = useRef<string | null>(null);
   const wrapUpAutoCloseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
     null,
+  );
+  const handleWrapUpClickRef = useRef<
+    (openedFromEndCall?: boolean, openedFromWrapUpEvent?: boolean) => Promise<void>
+  >(async () => undefined);
+  /** After a Finesse REST error, keep the call popup hidden until the next CREATED preview. */
+  const suppressCallWidgetUntilCreatedRef = useRef(false);
+
+  const resetCallWidgetState = useCallback(() => {
+    setShowCallWidget(false);
+    setPreviewElapsedSeconds(0);
+    setCallStatus("Ringing");
+    setIsMuted(false);
+    setIsHold(false);
+  }, []);
+
+  const dismissCallWidgetAfterFinesseError = useCallback(
+    (dialogId?: string | number | null) => {
+      suppressCallWidgetUntilCreatedRef.current = true;
+      if (dialogId != null) {
+        const id = String(dialogId);
+        setPreviewDialogs((prev) => {
+          if (!(id in prev)) return prev;
+          const next = { ...prev };
+          delete next[id];
+          return next;
+        });
+      }
+      resetCallWidgetState();
+    },
+    [resetCallWidgetState],
   );
 
   const getFinesseContext = useCallback(() => {
@@ -71,41 +149,48 @@ export function useFinesseCampaignPreview(
     };
   }, [session?.user]);
 
+  const agentExtension = useMemo(
+    () => resolveAgentExtension(session),
+    [session?.user],
+  );
+
+  const clearWrapUpSession = useCallback((dialogId?: string | number | null) => {
+    wrapUpEventDialogIdRef.current = null;
+    wrapUpPendingDialogIdRef.current = null;
+    if (dialogId == null) return;
+    const id = String(dialogId);
+    setPreviewDialogs((prev) => {
+      if (!(id in prev)) return prev;
+      const next = { ...prev };
+      delete next[id];
+      return next;
+    });
+  }, []);
+
   const activePreviewDialog = useMemo(() => {
     const dialogs = Object.values(previewDialogs);
     if (dialogs.length === 0) return null;
     const active = dialogs
       .filter((d) => {
+        const id = d.dialogId == null ? "" : String(d.dialogId);
+        if (wrapUpPendingDialogIdRef.current === id) return true;
         if ((d as { eventType?: string }).eventType === "ENDED") return false;
-        const p = d.participants?.[0];
-        if (p?.state === "DROPPED") return false;
+        const agent = resolvePreviewAgentParticipant(d, agentExtension);
+        if (agent?.state === "DROPPED") return false;
         return true;
       })
-      .sort((a, b) => {
-        const timeA =
-          a.participants?.[0]?.stateChangeTime ??
-          a.participants?.[0]?.startTime ??
-          "";
-        const timeB =
-          b.participants?.[0]?.stateChangeTime ??
-          b.participants?.[0]?.startTime ??
-          "";
-        return new Date(timeB).getTime() - new Date(timeA).getTime();
-      });
+      .sort(
+        (a, b) =>
+          new Date(participantSortTime(b)).getTime() -
+          new Date(participantSortTime(a)).getTime(),
+      );
     return active[0] ?? null;
-  }, [previewDialogs]);
+  }, [previewDialogs, agentExtension]);
 
   const activePreviewAgentParticipant = useMemo(() => {
     if (!activePreviewDialog?.dialogId) return null;
-    const d = getFinesseUserData();
-    const u = session?.user as { phone?: string } | undefined;
-    const extension = d?.extension ?? u?.phone;
-    const participants = activePreviewDialog.participants ?? [];
-    const match = participants.find(
-      (p) => (p as { mediaAddress?: string }).mediaAddress === extension,
-    );
-    return match ?? participants[0] ?? null;
-  }, [activePreviewDialog, session?.user]);
+    return resolvePreviewAgentParticipant(activePreviewDialog, agentExtension);
+  }, [activePreviewDialog, agentExtension]);
 
   const previewCallVariables = useMemo(() => {
     const p = activePreviewAgentParticipant as {
@@ -145,6 +230,7 @@ export function useFinesseCampaignPreview(
     const eventType = (payload as { eventType?: string }).eventType;
     const dialogId = String(payload.dialogId);
     if (eventType === "CREATED") {
+      suppressCallWidgetUntilCreatedRef.current = false;
       setPreviewDialogs((prev) => ({ ...prev, [dialogId]: payload }));
       setLastSubmittedWrapUpIds([]);
     } else if (eventType === "UPDATED") {
@@ -164,8 +250,23 @@ export function useFinesseCampaignPreview(
         return { ...prev, [dialogId]: payload };
       });
     } else if (eventType === "ENDED") {
-      if (wrapUpEventDialogIdRef.current === dialogId)
+      if (wrapUpPendingDialogIdRef.current === dialogId) {
+        setPreviewDialogs((prev) => {
+          const existing = prev[dialogId];
+          return {
+            ...prev,
+            [dialogId]: {
+              ...(existing ?? payload),
+              ...payload,
+              eventType: "ENDED",
+            },
+          };
+        });
+        return;
+      }
+      if (wrapUpEventDialogIdRef.current === dialogId) {
         wrapUpEventDialogIdRef.current = null;
+      }
       setLastSubmittedWrapUpIds([]);
       setPreviewDialogs((prev) => {
         const next = { ...prev };
@@ -176,6 +277,10 @@ export function useFinesseCampaignPreview(
   }, []);
 
   useEffect(() => {
+    if (suppressCallWidgetUntilCreatedRef.current) {
+      setShowCallWidget(false);
+      return;
+    }
     if (!activePreviewDialog?.dialogId) {
       setShowCallWidget(false);
       return;
@@ -187,12 +292,10 @@ export function useFinesseCampaignPreview(
     const isActive =
       dialogState === "ACTIVE" || participant?.state === "ACTIVE";
     const isHeld = participant?.state === "HELD";
-    const hasUpdateCallData =
-      Array.isArray(participant?.actions) &&
-      (participant as { actions?: string[] }).actions?.includes(
-        "UPDATE_CALL_DATA",
-      );
-    const isWrapUpState = participant?.state === "WRAP_UP" && hasUpdateCallData;
+    const isWrapUpState =
+      isWrapUpPreviewState(activePreviewDialog, participant) ||
+      wrapUpPendingDialogIdRef.current ===
+        String(activePreviewDialog.dialogId);
     setShowCallWidget(true);
     if (isAlerting) {
       setCallStatus("Ringing");
@@ -233,17 +336,9 @@ export function useFinesseCampaignPreview(
           action: "ACCEPT",
         });
         setCallStatus("Connected");
-      } catch (err: unknown) {
-        toast.error(
-          (
-            err as {
-              response?: { data?: { message?: string } };
-              message?: string;
-            }
-          )?.response?.data?.message ??
-            (err as Error)?.message ??
-            "Failed to accept call",
-        );
+      } catch {
+        toast.error("Issue establishing the call. Skipping...");
+        dismissCallWidgetAfterFinesseError(dialogId);
       }
     } else {
       setCallStatus("Connected");
@@ -260,16 +355,8 @@ export function useFinesseCampaignPreview(
           action: "REJECT",
         });
       } catch (err: unknown) {
-        toast.error(
-          (
-            err as {
-              response?: { data?: { message?: string } };
-              message?: string;
-            }
-          )?.response?.data?.message ??
-            (err as Error)?.message ??
-            "Failed to reject call",
-        );
+        toast.error(getFinesseApiErrorMessage(err, "Failed to reject call"));
+        dismissCallWidgetAfterFinesseError(dialogId);
       }
     }
     setShowCallWidget(false);
@@ -288,15 +375,9 @@ export function useFinesseCampaignPreview(
         });
       } catch (err: unknown) {
         toast.error(
-          (
-            err as {
-              response?: { data?: { message?: string } };
-              message?: string;
-            }
-          )?.response?.data?.message ??
-            (err as Error)?.message ??
-            `Failed to ${action.toLowerCase()} call`,
+          getFinesseApiErrorMessage(err, `Failed to ${action.toLowerCase()} call`),
         );
+        dismissCallWidgetAfterFinesseError(dialogId);
       }
     }
     setShowCallWidget(false);
@@ -329,16 +410,25 @@ export function useFinesseCampaignPreview(
       toast.success("Reclassify sent.");
     } catch (err: unknown) {
       toast.error(getFinesseApiErrorMessage(err, "Failed to reclassify."));
+      dismissCallWidgetAfterFinesseError(dialogId);
     }
-  }, [getFinesseContext, activePreviewDialog?.dialogId]);
+  }, [
+    getFinesseContext,
+    activePreviewDialog?.dialogId,
+    dismissCallWidgetAfterFinesseError,
+  ]);
 
-  const resetCallWidgetState = useCallback(() => {
-    setShowCallWidget(false);
-    setPreviewElapsedSeconds(0);
-    setCallStatus("Ringing");
-    setIsMuted(false);
-    setIsHold(false);
-  }, []);
+  const requestWrapUpModal = useCallback(
+    (dialogId: string | number, openedFromWrapUpEvent = true) => {
+      const dialogKey = String(dialogId);
+      if (wrapUpEventDialogIdRef.current === dialogKey) return;
+      wrapUpEventDialogIdRef.current = dialogKey;
+      wrapUpPendingDialogIdRef.current = dialogKey;
+      setCallStatus("Wrap up");
+      void handleWrapUpClickRef.current(false, openedFromWrapUpEvent);
+    },
+    [],
+  );
 
   const handleEndCall = async () => {
     const { username, extension, teamId } = getFinesseContext();
@@ -349,17 +439,10 @@ export function useFinesseCampaignPreview(
           extension: String(extension),
           action: "DROP",
         });
+        requestWrapUpModal(dialogId, true);
       } catch (err: unknown) {
-        toast.error(
-          (
-            err as {
-              response?: { data?: { message?: string } };
-              message?: string;
-            }
-          )?.response?.data?.message ??
-            (err as Error)?.message ??
-            "Failed to end call",
-        );
+        toast.error(getFinesseApiErrorMessage(err, "Failed to end call"));
+        dismissCallWidgetAfterFinesseError(dialogId);
       }
     }
   };
@@ -378,15 +461,12 @@ export function useFinesseCampaignPreview(
         toast.success(hold ? "Call on hold" : "Call resumed");
       } catch (err: unknown) {
         toast.error(
-          (
-            err as {
-              response?: { data?: { message?: string } };
-              message?: string;
-            }
-          )?.response?.data?.message ??
-            (err as Error)?.message ??
-            (hold ? "Failed to hold" : "Failed to resume"),
+          getFinesseApiErrorMessage(
+            err,
+            hold ? "Failed to hold" : "Failed to resume",
+          ),
         );
+        dismissCallWidgetAfterFinesseError(dialogId);
       } finally {
         setHoldLoading(false);
       }
@@ -398,7 +478,8 @@ export function useFinesseCampaignPreview(
     variables: Record<string, string>;
   }) => {
     const { username, extension, teamId } = getFinesseContext();
-    const dialogId = activePreviewDialog?.dialogId;
+    const dialogId =
+      wrapUpPendingDialogIdRef.current ?? activePreviewDialog?.dialogId;
     if (username && extension && dialogId && teamId != null) {
       const reasons = Array.isArray(data.wrapUp) ? data.wrapUp : [data.wrapUp];
       setLastSubmittedWrapUpIds(reasons.map(String));
@@ -414,16 +495,8 @@ export function useFinesseCampaignPreview(
         });
         toast.success("Wrap up submitted.");
       } catch (err: unknown) {
-        toast.error(
-          (
-            err as {
-              response?: { data?: { message?: string } };
-              message?: string;
-            }
-          )?.response?.data?.message ??
-            (err as Error)?.message ??
-            "Failed to submit wrap up",
-        );
+        toast.error(getFinesseApiErrorMessage(err, "Failed to submit wrap up"));
+        dismissCallWidgetAfterFinesseError(dialogId);
       }
     }
     if (wrapUpAutoCloseTimerRef.current) {
@@ -431,6 +504,7 @@ export function useFinesseCampaignPreview(
       wrapUpAutoCloseTimerRef.current = null;
     }
     setIsWrapUpOpen(false);
+    clearWrapUpSession(dialogId);
   };
 
   const handleWrapUpMinimize = () => setIsWrapUpOpen(false);
@@ -449,6 +523,13 @@ export function useFinesseCampaignPreview(
     _openedFromEndCall?: boolean,
     openedFromWrapUpEvent?: boolean,
   ) => {
+    const dialogId =
+      wrapUpPendingDialogIdRef.current ?? activePreviewDialog?.dialogId;
+    if (dialogId != null) {
+      const dialogKey = String(dialogId);
+      wrapUpPendingDialogIdRef.current = dialogKey;
+      wrapUpEventDialogIdRef.current = dialogKey;
+    }
     const { username, teamId } = getFinesseContext();
     if (!username || teamId == null) {
       toast.error("User not found.");
@@ -525,16 +606,7 @@ export function useFinesseCampaignPreview(
         if (openedFromWrapUpEvent) startWrapUpAutoCloseTimer();
       }, 0);
     } catch (err) {
-      toast.error(
-        (
-          err as {
-            response?: { data?: { message?: string } };
-            message?: string;
-          }
-        )?.response?.data?.message ??
-          (err as Error)?.message ??
-          "Failed to load wrap-up reasons.",
-      );
+      toast.error(getFinesseApiErrorMessage(err, "Failed to load wrap-up reasons."));
       setWrapUpReasons([{ value: "other", label: "Other" }]);
       setCallVariablesConfig([]);
       setTimeout(() => {
@@ -546,14 +618,36 @@ export function useFinesseCampaignPreview(
     }
   };
 
+  useEffect(() => {
+    handleWrapUpClickRef.current = handleWrapUpClick;
+  });
+
+  useEffect(() => {
+    if (suppressCallWidgetUntilCreatedRef.current) return;
+    if (!activePreviewDialog?.dialogId) return;
+
+    const participant = activePreviewAgentParticipant;
+    if (!isWrapUpPreviewState(activePreviewDialog, participant)) return;
+
+    requestWrapUpModal(activePreviewDialog.dialogId, true);
+  }, [
+    activePreviewDialog,
+    activePreviewAgentParticipant?.state,
+    activePreviewDialog?.dialogState,
+    requestWrapUpModal,
+  ]);
+
   const wrapUpOnClose = useCallback(() => {
     if (wrapUpAutoCloseTimerRef.current) {
       clearTimeout(wrapUpAutoCloseTimerRef.current);
       wrapUpAutoCloseTimerRef.current = null;
     }
+    const dialogId =
+      wrapUpPendingDialogIdRef.current ?? activePreviewDialog?.dialogId;
     setIsWrapUpOpen(false);
+    clearWrapUpSession(dialogId);
     resetCallWidgetState();
-  }, [resetCallWidgetState]);
+  }, [activePreviewDialog?.dialogId, clearWrapUpSession, resetCallWidgetState]);
 
   return {
     handlePreviewEvent,
@@ -583,9 +677,12 @@ export function useFinesseCampaignPreview(
         activePreviewDialog?.dialedNumber ?? activePreviewDialog?.fromAddress,
       previewStateLabel: previewCallStateLabel,
       previewContactRows,
-      previewActions:
-        activePreviewAgentParticipant?.actions ??
-        activePreviewDialog?.participants?.[0]?.actions,
+      previewActions: activePreviewDialog
+        ? previewDialogActions(
+            activePreviewDialog,
+            activePreviewAgentParticipant,
+          )
+        : [],
       onRejectWithAction: handleRejectOrClose,
       onReclassify: handlePreviewReclassify,
       onWrapUpClick: handleWrapUpClick,
