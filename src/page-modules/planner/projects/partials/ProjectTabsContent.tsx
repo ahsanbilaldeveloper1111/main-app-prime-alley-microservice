@@ -311,7 +311,7 @@ const ProjectTabsContent = forwardRef<ProjectTabsContentRef, ProjectTabsContentP
       backgroundColor: '#ffffff',
       maxWidth: '100%',
       minWidth: 0,
-      overflowX: 'hidden',
+      overflowX: 'hidden' as const,
       boxSizing: 'border-box' as const,
     },
     grid: { display: 'grid', gap: '1rem', marginBottom: '1.5rem' },
