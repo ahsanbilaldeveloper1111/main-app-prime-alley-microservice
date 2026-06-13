@@ -1,0 +1,60 @@
+.messaging-senders {
+  min-width: 0;
+  width: 100%;
+
+  &__loading,
+  &__empty,
+  &__hint,
+  &__footer-note {
+    font-family: Lexend Deca, Helvetica, Arial, sans-serif;
+    font-size: 14px;
+    font-weight: 300;
+    color: #555;
+    margin: 0 0 12px;
+    line-height: 1.5;
+  }
+
+  &__table-wrap {
+    overflow-x: auto;
+  }
+
+  &__table {
+    width: 100%;
+    border-collapse: collapse;
+    font-family: Lexend Deca, Helvetica, Arial, sans-serif;
+    font-size: 14px;
+
+    th,
+    td {
+      padding: 10px 12px;
+      text-align: left;
+      border-bottom: 1px solid #e8e8e8;
+      vertical-align: middle;
+    }
+
+    th {
+      font-weight: 600;
+      color: #141414;
+      background: #fafafa;
+    }
+
+    td {
+      font-weight: 300;
+      color: #141414;
+    }
+  }
+
+  &__form-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 0 24px;
+  }
+
+  &__actions,
+  &__mode-toggle {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 8px;
+  }
+}

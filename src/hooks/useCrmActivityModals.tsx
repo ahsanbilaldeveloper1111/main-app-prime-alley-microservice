@@ -214,6 +214,9 @@ export function useCrmActivityModals({
           bcc: emailData.bcc?.length ? emailData.bcc : undefined,
           subject: emailData.subject ?? "",
           content: emailData.body ?? "",
+          ...(emailData.emailSenderId == null
+            ? {}
+            : { email_sender_id: emailData.emailSenderId }),
           ...(recordId != null && { record_id: Number(recordId) }),
           ...(recordType && { record_type: recordType }),
           ...(emailData.attachments?.length
@@ -340,6 +343,7 @@ export function useCrmActivityModals({
       try {
         await sendWhatsApp({
           number,
+          whatsapp_sender_id: whatsappData.whatsappSenderId,
           content_sid: whatsappData.content_sid,
           content_variables:
             Object.keys(whatsappData.content_variables || {}).length > 0

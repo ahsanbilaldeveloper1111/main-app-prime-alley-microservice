@@ -9,6 +9,11 @@ import {
   Sparkles,
 } from "lucide-react";
 import { toast } from "react-toastify";
+import { SenderSelectField } from "@components/messaging/SenderSelectField";
+import {
+  formatEmailSenderLabel,
+  useSendableEmailSenders,
+} from "@hooks/messaging/useSendableMessagingSenders";
 import { generateEmail } from "@utils/communication";
 import {
   buildFollowUpTaskFields,
@@ -45,7 +50,10 @@ interface EmailModalProps {
     followUpTaskDueDate: string | null;
     followUpTaskDueTime: string | null;
     attachments?: File[];
+    emailSenderId?: number;
   }) => void | Promise<void>;
+  /** When true (default), user must pick a verified tenant sender before sending. */
+  requireTenantSender?: boolean;
 }
 
 /** Extract HTML from content (strip markdown code fence if present). */
@@ -58,6 +66,86 @@ function getEmailPreviewHtml(content: string | undefined): string {
   return htmlMatch ? htmlMatch[1].trim() : raw;
 }
 
+function getMissingTenantSenderMessage(
+  requireTenantSender: boolean,
+  selectedId: number | null,
+): string | null {
+  if (!requireTenantSender || selectedId != null) {
+    return null;
+  }
+  return "No verified email sender is available. Register one in Settings → Communications → Email.";
+}
+
+function optionalEmailSenderId(
+  requireTenantSender: boolean,
+  selectedId: number | null,
+): { emailSenderId?: number } {
+  if (!requireTenantSender || selectedId == null) {
+    return {};
+  }
+  return { emailSenderId: selectedId };
+}
+
+function useEmailModalSenders(isOpen: boolean, requireTenantSender: boolean) {
+  const emailSendersState = useSendableEmailSenders(isOpen && requireTenantSender);
+  const emailSenderOptions = useMemo(
+    () =>
+      emailSendersState.senders.map((sender) => ({
+        id: sender.id,
+        label: formatEmailSenderLabel(sender),
+      })),
+    [emailSendersState.senders],
+  );
+
+  return { emailSendersState, emailSenderOptions };
+}
+
+type EmailModalFromFieldProps = Readonly<{
+  requireTenantSender: boolean;
+  senderName: string;
+  senderEmail: string;
+  emailSenderOptions: Array<{ id: number; label: string }>;
+  selectedId: number | null;
+  onSelectedIdChange: (id: number) => void;
+  isLoading: boolean;
+  isEmpty: boolean;
+}>;
+
+function EmailModalFromField({
+  requireTenantSender,
+  senderName,
+  senderEmail,
+  emailSenderOptions,
+  selectedId,
+  onSelectedIdChange,
+  isLoading,
+  isEmpty,
+}: EmailModalFromFieldProps) {
+  if (requireTenantSender) {
+    return (
+      <SenderSelectField
+        label="From"
+        options={emailSenderOptions}
+        value={selectedId}
+        onChange={onSelectedIdChange}
+        isLoading={isLoading}
+        isEmpty={isEmpty}
+        emptyMessage="No verified email senders. Add one in Settings → Communications → Email."
+        settingsHref="/main-settings/communications/email"
+      />
+    );
+  }
+
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+      <span style={{ fontSize: "14px", fontWeight: 600, color: "#141414" }}>From</span>
+      <span style={{ fontSize: "14px", color: "#141414" }}>
+        {senderName} ({senderEmail})
+      </span>
+    </div>
+  );
+}
+
 const EmailModal: React.FC<EmailModalProps> = ({
   isOpen,
   onClose,
@@ -67,7 +155,13 @@ const EmailModal: React.FC<EmailModalProps> = ({
   senderName = "Your Name",
   contextPayload,
   onSend,
+  requireTenantSender = true,
 }) => {
+  const { emailSendersState, emailSenderOptions } = useEmailModalSenders(
+    isOpen,
+    requireTenantSender,
+  );
+
   const initialTo = useMemo(
     () => normalizeRecipientEmails(recipientEmail),
     [recipientEmail],
@@ -578,6 +672,15 @@ const EmailModal: React.FC<EmailModalProps> = ({
       return;
     }
 
+    const missingSenderMessage = getMissingTenantSenderMessage(
+      requireTenantSender,
+      emailSendersState.selectedId,
+    );
+    if (missingSenderMessage) {
+      setSendValidationMessage(missingSenderMessage);
+      return;
+    }
+
     if (!subject.trim() && !confirmSendWithoutSubject) {
       setConfirmSendWithoutSubject(true);
       setSendValidationMessage(
@@ -605,6 +708,7 @@ const EmailModal: React.FC<EmailModalProps> = ({
         body: bodyToSend,
         ...followUp,
         attachments: attachments.length > 0 ? attachments : undefined,
+        ...optionalEmailSenderId(requireTenantSender, emailSendersState.selectedId),
       });
       setToEmails([]);
       setCcEmails([]);
@@ -823,23 +927,21 @@ const EmailModal: React.FC<EmailModalProps> = ({
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
+            gap: "12px",
+            flexWrap: "wrap",
           }}
         >
-          <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-            {/* <label style={{ fontSize: '14px', fontWeight: '600', color: '#141414', minWidth: '60px' }}>
-              From
-            </label>
-            <div>
-              <span style={{ fontSize: '14px', color: '#141414', fontWeight: '500' }}>
-                {senderName}
-              </span>
-              {' '}
-              <span style={{ fontSize: '13px', color: '#718096' }}>
-                ({senderEmail})
-              </span>
-            </div> */}
-          </div>
-          <div style={{ display: "flex", gap: "12px" }}>
+          <EmailModalFromField
+            requireTenantSender={requireTenantSender}
+            senderName={senderName}
+            senderEmail={senderEmail}
+            emailSenderOptions={emailSenderOptions}
+            selectedId={emailSendersState.selectedId}
+            onSelectedIdChange={emailSendersState.setSelectedId}
+            isLoading={emailSendersState.isLoading}
+            isEmpty={emailSendersState.isEmpty}
+          />
+          <div style={{ display: "flex", gap: "12px", marginLeft: "auto" }}>
             {!showCc && (
               <button
                 onClick={() => setShowCc(true)}

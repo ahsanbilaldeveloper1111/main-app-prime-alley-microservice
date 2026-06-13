@@ -28,6 +28,8 @@ export interface SendEmailPayload {
   bcc?: string[];
   /** Reply-to email. */
   reply_to?: string;
+  /** Tenant-registered sender id (`verification_status` must be `verified`). */
+  email_sender_id?: number;
   /** Array of file path strings (JSON body; server-side paths). */
   attachments?: string[];
   /** Browser files from the email modal; sent as multipart `attachments[]`. */
@@ -80,6 +82,8 @@ export interface SendWhatsAppPayload {
   content_sid?: string;
   /** Key-value variables for the template (e.g. `{"1":"John","2":"Doe"}`). */
   content_variables?: Record<string, string>;
+  /** Tenant-registered sender id (`twilio_status` must be `ONLINE`). */
+  whatsapp_sender_id?: number;
 }
 
 /** Success response (200) for send-whatsapp. */
@@ -328,6 +332,9 @@ function appendSendEmailFormData(
   payload.bcc?.forEach((email) => formData.append("bcc[]", email));
   if (payload.reply_to) {
     formData.append("reply_to", payload.reply_to);
+  }
+  if (payload.email_sender_id != null) {
+    formData.append("email_sender_id", String(payload.email_sender_id));
   }
   payload.attachments?.forEach((path) => formData.append("attachments[]", path));
   if (payload.create_follow_up_task !== undefined) {

@@ -79,6 +79,11 @@ import {
 } from "@utils/crmFollowUpTaskDue";
 import RichNoteEditor from "@components/RichNoteEditor";
 import EmailModal from "@components/EmailModal";
+import { SenderSelectField } from "@components/messaging/SenderSelectField";
+import {
+  formatWhatsAppSenderLabel,
+  useSendableWhatsAppSenders,
+} from "@hooks/messaging/useSendableMessagingSenders";
 import TaskModal, { type TaskModalSaveTaskData } from "@components/TaskModal";
 import MeetingModal from "@components/MeetingModal";
 import LogSmsModal from "@components/LogSms";
@@ -451,6 +456,15 @@ const CrmActivitiesPanelInnerRender: React.ForwardRefRenderFunction<
   const [whatsappReplyMessage, setWhatsappReplyMessage] = useState("");
   const [whatsappReplySendLoading, setWhatsappReplySendLoading] =
     useState(false);
+  const whatsAppSendersForReply = useSendableWhatsAppSenders(showWhatsAppModal);
+  const whatsAppReplySenderOptions = useMemo(
+    () =>
+      whatsAppSendersForReply.senders.map((sender) => ({
+        id: sender.id,
+        label: formatWhatsAppSenderLabel(sender),
+      })),
+    [whatsAppSendersForReply.senders],
+  );
   const [emailsList, setEmailsList] = useState<EmailListItem[]>([]);
   const [emailsLoading, setEmailsLoading] = useState(false);
   const [emailsError, setEmailsError] = useState<string | null>(null);
@@ -1182,9 +1196,14 @@ const CrmActivitiesPanelInnerRender: React.ForwardRefRenderFunction<
       return;
     setWhatsappReplySendLoading(true);
     try {
+      if (!whatsAppSendersForReply.selectedId) {
+        toast.error("Select an ONLINE WhatsApp sender before replying.");
+        return;
+      }
       await sendWhatsApp({
         number: (selectedWhatsAppChat?.phone_number ?? "").replaceAll(/\s/g, ""),
         message: whatsappReplyMessage.trim(),
+        whatsapp_sender_id: whatsAppSendersForReply.selectedId,
       });
       setWhatsappReplyMessage("");
       const res = await getWhatsAppChatMessages({
@@ -1210,6 +1229,7 @@ const CrmActivitiesPanelInnerRender: React.ForwardRefRenderFunction<
     selectedWhatsAppChat?.phone_number,
     whatsappReplyMessage,
     canSendWhatsApp,
+    whatsAppSendersForReply.selectedId,
   ]);
 
   const toggleActivity = useCallback((activityId: string) => {
@@ -3424,6 +3444,9 @@ const CrmActivitiesPanelInnerRender: React.ForwardRefRenderFunction<
                   bcc: emailData.bcc?.length ? emailData.bcc : undefined,
                   subject: emailData.subject ?? "",
                   content: emailData.body ?? "",
+                  ...(emailData.emailSenderId == null
+                    ? {}
+                    : { email_sender_id: emailData.emailSenderId }),
                   ...(recordId != null && { record_id: Number(recordId) }),
                   ...(recordType && { record_type: recordType }),
                   ...(emailData.attachments?.length
@@ -3435,7 +3458,7 @@ const CrmActivitiesPanelInnerRender: React.ForwardRefRenderFunction<
                     followUpTaskDueTime: emailData.followUpTaskDueTime,
                   }),
                 });
-                await fetchEmails();
+                fetchEmails();
                 setShowEmailModal(false);
               } catch {
                 // sendEmail shows toast on error
@@ -4030,6 +4053,18 @@ const CrmActivitiesPanelInnerRender: React.ForwardRefRenderFunction<
               <div
                 style={{ padding: "12px 16px", borderTop: "1px solid #e2e8f0" }}
               >
+                <div style={{ marginBottom: "10px" }}>
+                  <SenderSelectField
+                    label="From"
+                    options={whatsAppReplySenderOptions}
+                    value={whatsAppSendersForReply.selectedId}
+                    onChange={whatsAppSendersForReply.setSelectedId}
+                    isLoading={whatsAppSendersForReply.isLoading}
+                    isEmpty={whatsAppSendersForReply.isEmpty}
+                    emptyMessage="No ONLINE WhatsApp senders. Add one in Settings → Communications → WhatsApp."
+                    settingsHref="/main-settings/communications/whatsapp"
+                  />
+                </div>
                 <textarea
                   value={whatsappReplyMessage}
                   onChange={(e) => setWhatsappReplyMessage(e.target.value)}
@@ -4077,7 +4112,8 @@ const CrmActivitiesPanelInnerRender: React.ForwardRefRenderFunction<
                     disabled={
                       !canSend ||
                       whatsappReplySendLoading ||
-                      !whatsappReplyMessage.trim()
+                      !whatsappReplyMessage.trim() ||
+                      !whatsAppSendersForReply.selectedId
                     }
                     style={{
                       padding: "8px 16px",

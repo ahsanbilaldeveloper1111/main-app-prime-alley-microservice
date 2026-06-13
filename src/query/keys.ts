@@ -236,6 +236,18 @@ export const communicationsKeys = {
     campaigns: (teamId: string | number, username: string) =>
       [...communicationsKeys.finesse.all(), "campaigns", teamId, username] as const,
   },
+
+  messagingSenders: {
+    all: () => [...communicationsKeys.root, "messagingSenders"] as const,
+    emailSenders: () =>
+      [...communicationsKeys.messagingSenders.all(), "emailSenders"] as const,
+    sendGridConfig: () =>
+      [...communicationsKeys.messagingSenders.all(), "sendGridConfig"] as const,
+    whatsAppSenders: () =>
+      [...communicationsKeys.messagingSenders.all(), "whatsAppSenders"] as const,
+    twilioConfig: () =>
+      [...communicationsKeys.messagingSenders.all(), "twilioConfig"] as const,
+  },
 };
 
 export const plannerKeys = {

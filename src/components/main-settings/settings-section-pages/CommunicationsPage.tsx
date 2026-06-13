@@ -1,43 +1,34 @@
 import { AnalysisPricingTab } from '@components/main-settings/ai-analysis/pricing/AnalysisPricingTab'
-
 import { AnalysisMonthlyRollupTab } from '@components/main-settings/ai-analysis/monthly-rollup/AnalysisMonthlyRollupTab'
-
 import { AnalysisPerCallCostTab } from '@components/main-settings/ai-analysis/per-call-cost/AnalysisPerCallCostTab'
-
 import { AnalysisTenantTab } from '@components/main-settings/ai-analysis/tenant/AnalysisTenantTab'
-
 import { AnalysisTenantConfigTab } from '@components/main-settings/ai-analysis/tenant/AnalysisTenantConfigTab'
-
+import { EmailSendersTab } from '@components/main-settings/messaging-senders/EmailSendersTab'
+import { WhatsAppSendersTab } from '@components/main-settings/messaging-senders/WhatsAppSendersTab'
 import { HEADER_CONSTANTS } from '@constants/headerConstants'
-
 import ManageExtensions from '@pages/ai-ml/manage-extensions'
-
 import ManualAnalysis from '@pages/ai-ml/analysis'
-
 import React from 'react'
-
 import type { ControlledTabsProps, Tab } from '../types'
-
 import { SettingsSectionTabShell } from './SettingsSectionTabShell'
-
 import { useSettingsSectionTabs } from './useSettingsSectionTabs'
-
-
-
 import './communicationsEmbedded.scss'
-
-
 
 const { PERMISSIONS } = HEADER_CONSTANTS
 
-
-
 const communicationsTabs: Tab[] = [
-
   {
-
+    id: 'email',
+    label: 'Email',
+    permission: PERMISSIONS.COMMUNICATIONS_SERVICES,
+  },
+  {
+    id: 'whatsapp',
+    label: 'WhatsApp',
+    permission: PERMISSIONS.COMMUNICATIONS_SERVICES,
+  },
+  {
     id: 'manage-extensions',
-
     label: 'Manage Analysis',
 
     permission: PERMISSIONS.MANAGE_EXTENSIONS_AIML,
@@ -89,9 +80,11 @@ const communicationsTabs: Tab[] = [
 
 
 function CommunicationsTabPanel({ activeTab }: Readonly<{ activeTab: string }>) {
-
   switch (activeTab) {
-
+    case 'email':
+      return <EmailSendersTab />
+    case 'whatsapp':
+      return <WhatsAppSendersTab />
     case 'manage-extensions':
 
       return (
@@ -161,9 +154,7 @@ export const CommunicationsPage: React.FC<ControlledTabsProps> = ({
     onTabChange,
 
     communicationsTabs,
-
-    'manage-extensions',
-
+    'email',
   )
 
 
