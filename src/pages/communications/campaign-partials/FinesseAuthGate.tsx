@@ -30,6 +30,265 @@ export interface FinesseAuthGateProps {
   authMessage?: string;
 }
 
+type GateShellProps = Readonly<{
+  subTitle: string;
+  children: ReactNode;
+}>;
+
+function GateShell({ subTitle, children }: GateShellProps) {
+  return (
+    <>
+      <BreadcrumbItem mainTitle="" mainLink="" subTitle={subTitle} />
+      {children}
+    </>
+  );
+}
+
+function SessionLoadingView({ subTitle }: Readonly<{ subTitle: string }>) {
+  return (
+    <GateShell subTitle={subTitle}>
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          minHeight: '50vh',
+        }}
+      >
+        <Loader
+          size={40}
+          className="text-primary"
+          style={{ animation: 'spin 1s linear infinite' }}
+        />
+      </div>
+    </GateShell>
+  );
+}
+
+function SignInRequiredView({
+  subTitle,
+  pageLabel,
+}: Readonly<{ subTitle: string; pageLabel: string }>) {
+  return (
+    <GateShell subTitle={subTitle}>
+      <div
+        style={{
+          padding: '32px',
+          textAlign: 'center',
+          color: '#6c757d',
+        }}
+      >
+        Please sign in to access {pageLabel}.
+      </div>
+    </GateShell>
+  );
+}
+
+type FinesseAuthCardProps = Readonly<{
+  subTitle: string;
+  pageLabel: string;
+  authMessage?: string;
+  manualConnectMode: boolean;
+  isFinesseLoading: boolean;
+  finesseError: string | null;
+  onConnect: () => void;
+}>;
+
+function FinesseConnectButton({
+  isFinesseLoading,
+  onConnect,
+  label,
+}: Readonly<{
+  isFinesseLoading: boolean;
+  onConnect: () => void;
+  label: string;
+}>) {
+  return (
+    <button
+      type="button"
+      className="btn btn-primary"
+      disabled={isFinesseLoading}
+      onClick={onConnect}
+      style={{
+        width: '100%',
+        padding: '12px 20px',
+        borderRadius: '10px',
+        fontWeight: 600,
+        border: 'none',
+        cursor: isFinesseLoading ? 'wait' : 'pointer',
+      }}
+    >
+      {isFinesseLoading ? (
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+          <Loader size={18} style={{ animation: 'spin 1s linear infinite' }} />
+          Connecting…
+        </span>
+      ) : (
+        label
+      )}
+    </button>
+  );
+}
+
+function ManualConnectPanel({
+  authMessage,
+  isFinesseLoading,
+  onConnect,
+}: Readonly<{
+  authMessage?: string;
+  isFinesseLoading: boolean;
+  onConnect: () => void;
+}>) {
+  return (
+    <>
+      <h2 style={{ margin: 0, fontSize: '22px', fontWeight: 700, color: '#141414' }}>
+        Connect to Finesse
+      </h2>
+      <p
+        style={{
+          color: '#6c757d',
+          fontSize: '14px',
+          marginBottom: '24px',
+          marginTop: '10px',
+        }}
+      >
+        {authMessage ??
+          'You signed out from Finesse. Click below to sign in again and continue.'}
+      </p>
+      <FinesseConnectButton
+        isFinesseLoading={isFinesseLoading}
+        onConnect={onConnect}
+        label="Connect to Finesse"
+      />
+    </>
+  );
+}
+
+function AutoConnectPanel({
+  authMessage,
+  pageLabel,
+  isFinesseLoading,
+  showRetry,
+  onConnect,
+}: Readonly<{
+  authMessage?: string;
+  pageLabel: string;
+  isFinesseLoading: boolean;
+  showRetry: boolean;
+  onConnect: () => void;
+}>) {
+  return (
+    <>
+      <h2 style={{ margin: 0, fontSize: '22px', fontWeight: 700, color: '#141414' }}>
+        Connecting to Finesse
+      </h2>
+      <p
+        style={{
+          color: '#6c757d',
+          fontSize: '14px',
+          marginBottom: '24px',
+          marginTop: '10px',
+        }}
+      >
+        {authMessage ?? `Preparing access to ${pageLabel}...`}
+      </p>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', color: '#6c757d' }}>
+        <Loader size={20} style={{ animation: 'spin 1s linear infinite' }} />
+        <span>{isFinesseLoading ? 'Connecting...' : 'Waiting for connection...'}</span>
+      </div>
+      {showRetry && (
+        <button
+          type="button"
+          className="btn btn-outline-primary"
+          disabled={isFinesseLoading}
+          onClick={onConnect}
+          style={{
+            width: '100%',
+            marginTop: '16px',
+            padding: '10px 20px',
+            borderRadius: '10px',
+            fontWeight: 600,
+            cursor: isFinesseLoading ? 'wait' : 'pointer',
+          }}
+        >
+          Retry connection
+        </button>
+      )}
+    </>
+  );
+}
+
+function FinesseAuthCard({
+  subTitle,
+  pageLabel,
+  authMessage,
+  manualConnectMode,
+  isFinesseLoading,
+  finesseError,
+  onConnect,
+}: FinesseAuthCardProps) {
+  const showRetry = Boolean(finesseError) && !isFinesseLoading;
+  const panel = manualConnectMode ? (
+    <ManualConnectPanel
+      authMessage={authMessage}
+      isFinesseLoading={isFinesseLoading}
+      onConnect={onConnect}
+    />
+  ) : (
+    <AutoConnectPanel
+      authMessage={authMessage}
+      pageLabel={pageLabel}
+      isFinesseLoading={isFinesseLoading}
+      showRetry={showRetry}
+      onConnect={onConnect}
+    />
+  );
+
+  return (
+    <GateShell subTitle={subTitle}>
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          minHeight: '70vh',
+          padding: '24px',
+        }}
+      >
+        <div
+          className="card"
+          style={{ maxWidth: '420px', width: '100%', padding: '32px' }}
+        >
+          {panel}
+          {finesseError && (
+            <div
+              style={{
+                marginTop: '16px',
+                padding: '10px 14px',
+                background: '#fef2f2',
+                border: '1px solid #fecaca',
+                borderRadius: '8px',
+                color: '#b91c1c',
+                fontSize: '14px',
+              }}
+            >
+              {finesseError}
+            </div>
+          )}
+        </div>
+      </div>
+    </GateShell>
+  );
+}
+
+function applySuccessfulFinesseLink(teamIdToUse: number | string | null): void {
+  if (teamIdToUse != null) {
+    setStoredTeamId(Number(teamIdToUse));
+  }
+  clearFinesseManualReconnectRequired();
+  globalThis.window?.dispatchEvent(new CustomEvent('finesse-authenticated'));
+}
+
 /**
  * Requires NextAuth session and Finesse token + user data.
  * On first visit without a Finesse session, auto-links with finesseLink({ teamId }).
@@ -88,11 +347,9 @@ export default function FinesseAuthGate({
       const response = await finesseLink({ teamId: teamIdToUse as number | string });
       const result = applyFinesseLinkResponse(response);
       if (result.ok) {
-        setStoredTeamId(Number(teamIdToUse));
-        clearFinesseManualReconnectRequired();
+        applySuccessfulFinesseLink(teamIdToUse);
         setManualConnectMode(false);
         setIsFinesseAuthenticated(true);
-        globalThis.window.dispatchEvent(new CustomEvent('finesse-authenticated'));
       } else {
         setFinesseError(result.error);
         syncAuthFromStorage();
@@ -107,6 +364,10 @@ export default function FinesseAuthGate({
     }
   }, [syncAuthFromStorage]);
 
+  const handleConnect = useCallback(() => {
+    attemptAutoLink().catch(() => undefined);
+  }, [attemptAutoLink]);
+
   const onRequireReauth = useCallback(
     (e: Event) => {
       const manual =
@@ -119,9 +380,9 @@ export default function FinesseAuthGate({
         return;
       }
       setManualConnectMode(false);
-      attemptAutoLink().catch(() => undefined);
+      handleConnect();
     },
-    [attemptAutoLink],
+    [handleConnect],
   );
 
   useEffect(() => {
@@ -144,167 +405,26 @@ export default function FinesseAuthGate({
   }, [session?.user, sessionStatus, syncAuthFromStorage, attemptAutoLink]);
 
   if (sessionStatus === 'loading') {
-    return (
-      <>
-        <BreadcrumbItem mainTitle="" mainLink="" subTitle={subTitle} />
-        <div
-          style={{
-            display: 'flex',
-            justifyContent: 'center',
-            alignItems: 'center',
-            minHeight: '50vh',
-          }}
-        >
-          <Loader
-            size={40}
-            className="text-primary"
-            style={{ animation: 'spin 1s linear infinite' }}
-          />
-        </div>
-      </>
-    );
+    return <SessionLoadingView subTitle={subTitle} />;
   }
 
   if (!session?.user) {
-    return (
-      <>
-        <BreadcrumbItem mainTitle="" mainLink="" subTitle={subTitle} />
-        <div
-          style={{
-            padding: '32px',
-            textAlign: 'center',
-            color: '#6c757d',
-          }}
-        >
-          Please sign in to access {pageLabel}.
-        </div>
-      </>
-    );
+    return <SignInRequiredView subTitle={subTitle} pageLabel={pageLabel} />;
   }
 
   if (!isFinesseAuthenticated) {
-    const showRetry = Boolean(finesseError) && !isFinesseLoading;
-    const manualCard = manualConnectMode ? (
-      <>
-        <h2 style={{ margin: 0, fontSize: '22px', fontWeight: 700, color: '#141414' }}>
-          Connect to Finesse
-        </h2>
-        <p
-          style={{
-            color: '#6c757d',
-            fontSize: '14px',
-            marginBottom: '24px',
-            marginTop: '10px',
-          }}
-        >
-          {authMessage ??
-            'You signed out from Finesse. Click below to sign in again and continue.'}
-        </p>
-        <button
-          type="button"
-          className="btn btn-primary"
-          disabled={isFinesseLoading}
-          onClick={() => {
-            attemptAutoLink().catch(() => undefined);
-          }}
-          style={{
-            width: '100%',
-            padding: '12px 20px',
-            borderRadius: '10px',
-            fontWeight: 600,
-            border: 'none',
-            cursor: isFinesseLoading ? 'wait' : 'pointer',
-          }}
-        >
-          {isFinesseLoading ? (
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
-              <Loader size={18} style={{ animation: 'spin 1s linear infinite' }} />
-              Connecting…
-            </span>
-          ) : (
-            'Connect to Finesse'
-          )}
-        </button>
-      </>
-    ) : (
-      <>
-        <h2 style={{ margin: 0, fontSize: '22px', fontWeight: 700, color: '#141414' }}>
-          Connecting to Finesse
-        </h2>
-        <p
-          style={{
-            color: '#6c757d',
-            fontSize: '14px',
-            marginBottom: '24px',
-            marginTop: '10px',
-          }}
-        >
-          {authMessage ?? `Preparing access to ${pageLabel}...`}
-        </p>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', color: '#6c757d' }}>
-          <Loader size={20} style={{ animation: 'spin 1s linear infinite' }} />
-          <span>{isFinesseLoading ? 'Connecting...' : 'Waiting for connection...'}</span>
-        </div>
-        {showRetry && (
-          <button
-            type="button"
-            className="btn btn-outline-primary"
-            disabled={isFinesseLoading}
-            onClick={() => {
-              attemptAutoLink().catch(() => undefined);
-            }}
-            style={{
-              width: '100%',
-              marginTop: '16px',
-              padding: '10px 20px',
-              borderRadius: '10px',
-              fontWeight: 600,
-              cursor: isFinesseLoading ? 'wait' : 'pointer',
-            }}
-          >
-            Retry connection
-          </button>
-        )}
-      </>
-    );
-
     return (
-      <>
-        <BreadcrumbItem mainTitle="" mainLink="" subTitle={subTitle} />
-        <div
-          style={{
-            display: 'flex',
-            justifyContent: 'center',
-            alignItems: 'center',
-            minHeight: '70vh',
-            padding: '24px',
-          }}
-        >
-          <div
-            className="card"
-            style={{ maxWidth: '420px', width: '100%', padding: '32px' }}
-          >
-            {manualCard}
-            {finesseError && (
-              <div
-                style={{
-                  marginTop: '16px',
-                  padding: '10px 14px',
-                  background: '#fef2f2',
-                  border: '1px solid #fecaca',
-                  borderRadius: '8px',
-                  color: '#b91c1c',
-                  fontSize: '14px',
-                }}
-              >
-                {finesseError}
-              </div>
-            )}
-          </div>
-        </div>
-      </>
+      <FinesseAuthCard
+        subTitle={subTitle}
+        pageLabel={pageLabel}
+        authMessage={authMessage}
+        manualConnectMode={manualConnectMode}
+        isFinesseLoading={isFinesseLoading}
+        finesseError={finesseError}
+        onConnect={handleConnect}
+      />
     );
   }
 
   return <div className="communications-campaign-root">{children}</div>;
-};
+}

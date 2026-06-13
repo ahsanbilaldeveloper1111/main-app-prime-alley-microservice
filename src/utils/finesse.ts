@@ -469,7 +469,7 @@ function extractFinesseLinkUserPayload(
     const loginId = trimmedNonEmptyString(payload.loginId);
     const loginName = trimmedNonEmptyString(payload.loginName);
     if (loginId ?? loginName) {
-      return payload as FinesseUserData;
+      return payload;
     }
   }
   return null;

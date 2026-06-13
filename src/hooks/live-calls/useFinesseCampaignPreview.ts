@@ -419,13 +419,13 @@ export function useFinesseCampaignPreview(
   ]);
 
   const requestWrapUpModal = useCallback(
-    (dialogId: string | number, openedFromWrapUpEvent = true) => {
+    async (dialogId: string | number, openedFromWrapUpEvent = true) => {
       const dialogKey = String(dialogId);
       if (wrapUpEventDialogIdRef.current === dialogKey) return;
       wrapUpEventDialogIdRef.current = dialogKey;
       wrapUpPendingDialogIdRef.current = dialogKey;
       setCallStatus("Wrap up");
-      void handleWrapUpClickRef.current(false, openedFromWrapUpEvent);
+      await handleWrapUpClickRef.current(false, openedFromWrapUpEvent);
     },
     [],
   );
@@ -439,7 +439,7 @@ export function useFinesseCampaignPreview(
           extension: String(extension),
           action: "DROP",
         });
-        requestWrapUpModal(dialogId, true);
+        await requestWrapUpModal(dialogId, true);
       } catch (err: unknown) {
         toast.error(getFinesseApiErrorMessage(err, "Failed to end call"));
         dismissCallWidgetAfterFinesseError(dialogId);
