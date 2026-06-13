@@ -14,8 +14,13 @@
 // Parent is responsible for calling sendWhatsApp with number + data.content_sid + data.content_variables.
 // ============================================================================
 
-import React, { useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { ChevronDown, Maximize2, X } from 'lucide-react';
+import { SenderSelectField } from '@components/messaging/SenderSelectField';
+import {
+  formatWhatsAppSenderLabel,
+  useSendableWhatsAppSenders,
+} from '@hooks/messaging/useSendableMessagingSenders';
 import { getWhatsAppTemplates } from '@utils/communication';
 import type { WhatsAppTemplateItem } from '@utils/communication';
 
@@ -125,7 +130,9 @@ interface WhatsAppMessageModalProps {
   onSave: (data: {
     content_sid: string;
     content_variables: Record<string, string>;
+    whatsappSenderId: number;
   }) => void;
+  requireTenantSender?: boolean;
 }
 
 const WhatsAppMessageModal: React.FC<WhatsAppMessageModalProps> = ({
@@ -133,7 +140,18 @@ const WhatsAppMessageModal: React.FC<WhatsAppMessageModalProps> = ({
   onClose,
   associatedRecords = [],
   onSave,
+  requireTenantSender = true,
 }) => {
+  const whatsAppSendersState = useSendableWhatsAppSenders(isOpen && requireTenantSender);
+  const whatsAppSenderOptions = useMemo(
+    () =>
+      whatsAppSendersState.senders.map((sender) => ({
+        id: sender.id,
+        label: formatWhatsAppSenderLabel(sender),
+      })),
+    [whatsAppSendersState.senders],
+  );
+
   const [templates, setTemplates] = useState<WhatsAppTemplateItem[]>([]);
   const [templatesLoading, setTemplatesLoading] = useState(false);
   const [selectedTemplate, setSelectedTemplate] = useState<WhatsAppTemplateItem | null>(null);
@@ -172,8 +190,12 @@ const WhatsAppMessageModal: React.FC<WhatsAppMessageModalProps> = ({
     (_, i) => (paramValues[String(i + 1)] ?? '').trim() !== ''
   );
   const hasTemplateSid = Boolean(selectedTemplate?.content_sid);
+  const hasSender = !requireTenantSender || whatsAppSendersState.selectedId != null;
   const canSend =
-    hasTemplateSid && (params.length === 0 || allParamsFilled);
+    hasTemplateSid &&
+    hasSender &&
+    (params.length === 0 || allParamsFilled) &&
+    !whatsAppSendersState.isLoading;
 
   const templateContent = (selectedTemplate as { content?: string } | null)?.content;
   const previewContent =
@@ -199,6 +221,7 @@ const WhatsAppMessageModal: React.FC<WhatsAppMessageModalProps> = ({
 
   const handleSave = () => {
     if (!selectedTemplate?.content_sid) return;
+    if (requireTenantSender && !whatsAppSendersState.selectedId) return;
     const content_variables: Record<string, string> = {};
     (selectedTemplate.params ?? []).forEach((_, index) => {
       const key = String(index + 1);
@@ -207,6 +230,7 @@ const WhatsAppMessageModal: React.FC<WhatsAppMessageModalProps> = ({
     onSave({
       content_sid: selectedTemplate.content_sid,
       content_variables: Object.keys(content_variables).length > 0 ? content_variables : {},
+      whatsappSenderId: whatsAppSendersState.selectedId!,
     });
     setSelectedTemplate(null);
     setParamValues({});
@@ -277,6 +301,21 @@ const WhatsAppMessageModal: React.FC<WhatsAppMessageModalProps> = ({
       </div>
 
       <div style={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>
+        {requireTenantSender ? (
+          <div style={{ padding: '20px', borderBottom: '1px solid #e2e8f0' }}>
+            <SenderSelectField
+              label="From"
+              options={whatsAppSenderOptions}
+              value={whatsAppSendersState.selectedId}
+              onChange={whatsAppSendersState.setSelectedId}
+              isLoading={whatsAppSendersState.isLoading}
+              isEmpty={whatsAppSendersState.isEmpty}
+              emptyMessage="No ONLINE WhatsApp senders. Add one in Settings → Communications → WhatsApp."
+              settingsHref="/main-settings/communications/whatsapp"
+            />
+          </div>
+        ) : null}
+
         {/* ── Template dropdown ── */}
         <div style={{ padding: '20px', borderBottom: '1px solid #e2e8f0' }}>
           <div style={sectionLabelStyle}>

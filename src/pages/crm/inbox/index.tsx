@@ -4,6 +4,11 @@ import React, { useState, useRef, useEffect, useCallback, useMemo, ReactElement 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import Layout from "@layout/index";
 import '../../../app/generic-style.css';
+import { SenderSelectField } from "@components/messaging/SenderSelectField";
+import {
+  formatWhatsAppSenderLabel,
+  useSendableWhatsAppSenders,
+} from "@hooks/messaging/useSendableMessagingSenders";
 import { getChats, getWhatsAppChatMessages, sendWhatsApp, getWhatsAppTemplates, type WhatsAppTemplateItem } from "@utils/communication";
 import { crmAppKeys } from "@query/keys";
 import { useWhatsAppSocket, type WhatsAppSocketPayload } from "@hooks/useWhatsAppSocket";
@@ -684,6 +689,15 @@ const MessageThread = ({
   const bottomRef = useRef<HTMLDivElement>(null);
   const insertRef = useRef<HTMLDivElement>(null);
   const waRef = useRef<HTMLDivElement>(null);
+  const whatsAppSendersState = useSendableWhatsAppSenders(Boolean(selectedChat));
+  const whatsAppSenderOptions = useMemo(
+    () =>
+      whatsAppSendersState.senders.map((sender) => ({
+        id: sender.id,
+        label: formatWhatsAppSenderLabel(sender),
+      })),
+    [whatsAppSendersState.senders],
+  );
 
   const contactName = selectedChat?.phone_number ?? "Contact";
 
@@ -777,9 +791,14 @@ const MessageThread = ({
   const sendMessage = async () => {
     const text = message.trim();
     if (!text || !selectedChat?.phone_number) return;
+    if (!whatsAppSendersState.selectedId) return;
     setSendLoading(true);
     try {
-      await sendWhatsApp({ number: selectedChat.phone_number, message: text });
+      await sendWhatsApp({
+        number: selectedChat.phone_number,
+        message: text,
+        whatsapp_sender_id: whatsAppSendersState.selectedId,
+      });
       setMessage("");
       // Optimistic append only after successful API call (socket may deliver the real message later; we dedupe in onMessageReceived)
       setMessages((prev) => [
@@ -976,8 +995,22 @@ const MessageThread = ({
             <Icon name="expand" size={14} color="#141414" />
           </button>
         </div>
-        {/* Text area */}
+        {/* Sender + text area */}
         <div style={{ padding: "10px 16px" }}>
+          {selectedChat ? (
+            <div style={{ marginBottom: 10 }}>
+              <SenderSelectField
+                label="From"
+                options={whatsAppSenderOptions}
+                value={whatsAppSendersState.selectedId}
+                onChange={whatsAppSendersState.setSelectedId}
+                isLoading={whatsAppSendersState.isLoading}
+                isEmpty={whatsAppSendersState.isEmpty}
+                emptyMessage="No ONLINE WhatsApp senders. Add one in Settings → Communications → WhatsApp."
+                settingsHref="/main-settings/communications/whatsapp"
+              />
+            </div>
+          ) : null}
           <textarea
             value={message}
             onChange={e => setMessage(e.target.value)}
@@ -1059,7 +1092,12 @@ const MessageThread = ({
             <button 
               onClick={sendMessage} 
               className={message.trim() && selectedChat ? "btn btn-primary" : "btn"}
-              disabled={!message.trim() || !selectedChat || sendLoading}
+              disabled={
+                !message.trim() ||
+                !selectedChat ||
+                sendLoading ||
+                !whatsAppSendersState.selectedId
+              }
               style={{
                 borderRadius: "4px 0 0 4px",
                 ...(!message.trim() && { background: "#e6e6e6", color: "#aaa" })
@@ -1500,8 +1538,18 @@ const NewChatModal = ({
     number: string;
     content_sid: string;
     content_variables: Record<string, string>;
+    whatsappSenderId: number;
   }) => void;
 }) => {
+  const whatsAppSendersState = useSendableWhatsAppSenders(isOpen);
+  const whatsAppSenderOptions = useMemo(
+    () =>
+      whatsAppSendersState.senders.map((sender) => ({
+        id: sender.id,
+        label: formatWhatsAppSenderLabel(sender),
+      })),
+    [whatsAppSendersState.senders],
+  );
   const [phone, setPhone] = useState("");
   const [templates, setTemplates] = useState<WhatsAppTemplateItem[]>([]);
   const [templatesLoading, setTemplatesLoading] = useState(false);
@@ -1567,11 +1615,17 @@ const NewChatModal = ({
       : templateContent;
 
   const trimmed = phone.trim();
-  const canStart = trimmed.length > 0 && canTemplateSend && isPhoneE164(trimmed);
+  const canStart =
+    trimmed.length > 0 &&
+    canTemplateSend &&
+    isPhoneE164(trimmed) &&
+    whatsAppSendersState.selectedId != null &&
+    !whatsAppSendersState.isLoading;
 
   const handleStart = () => {
     if (!canStart) return;
     if (!selectedTemplate?.content_sid) return;
+    if (!whatsAppSendersState.selectedId) return;
 
     const content_variables: Record<string, string> = {};
     (selectedTemplate.params ?? []).forEach((_, index) => {
@@ -1584,6 +1638,7 @@ const NewChatModal = ({
       content_sid: selectedTemplate.content_sid,
       content_variables:
         Object.keys(content_variables).length > 0 ? content_variables : {},
+      whatsappSenderId: whatsAppSendersState.selectedId,
     });
   };
 
@@ -1640,6 +1695,18 @@ const NewChatModal = ({
         </div>
 
         <div style={{ padding: "16px 18px 4px" }}>
+          <div style={{ marginBottom: 14 }}>
+            <SenderSelectField
+              label="From"
+              options={whatsAppSenderOptions}
+              value={whatsAppSendersState.selectedId}
+              onChange={whatsAppSendersState.setSelectedId}
+              isLoading={whatsAppSendersState.isLoading}
+              isEmpty={whatsAppSendersState.isEmpty}
+              emptyMessage="No ONLINE WhatsApp senders. Add one in Settings → Communications → WhatsApp."
+              settingsHref="/main-settings/communications/whatsapp"
+            />
+          </div>
           <label
             htmlFor="customer-phone-input"
             style={{
@@ -1893,12 +1960,14 @@ function CRMInbox() {
     number: string;
     content_sid: string;
     content_variables: Record<string, string>;
+    whatsappSenderId: number;
   }) => {
     const number = data.number.trim();
     if (!number || !data.content_sid) return;
     try {
       await sendWhatsApp({
         number,
+        whatsapp_sender_id: data.whatsappSenderId,
         content_sid: data.content_sid,
         content_variables:
           Object.keys(data.content_variables || {}).length > 0

@@ -6552,6 +6552,7 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
       followUpTaskDueDate: string | null;
       followUpTaskDueTime: string | null;
       attachments?: File[];
+      emailSenderId?: number;
     },
     record?: {
       id: number;
@@ -6566,6 +6567,9 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
         bcc: emailData.bcc?.length ? emailData.bcc : undefined,
         subject: emailData.subject,
         content: emailData.body,
+        ...(emailData.emailSenderId == null
+          ? {}
+          : { email_sender_id: emailData.emailSenderId }),
         record_id: record?.id,
         record_type: record?.type,
         ...(emailData.attachments?.length
@@ -6790,6 +6794,7 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
   const handleWhatsAppLog = async (whatsappData: {
     content_sid: string;
     content_variables: Record<string, string>;
+    whatsappSenderId: number;
   }) => {
     const rawNumber =
       phoneList?.[0] ||
@@ -6803,6 +6808,7 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
     try {
       await sendWhatsApp({
         number,
+        whatsapp_sender_id: whatsappData.whatsappSenderId,
         content_sid: whatsappData.content_sid,
         content_variables:
           Object.keys(whatsappData.content_variables ?? {}).length > 0

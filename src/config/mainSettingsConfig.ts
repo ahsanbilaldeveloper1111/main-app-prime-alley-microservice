@@ -103,6 +103,18 @@ export const settingsSubTabSearchItems: SettingsSubTabSearchItem[] = [
     permission: PERMISSIONS.VIEW_TICKETS_TYPES,
   },
   {
+    sectionId: "communications",
+    subTabId: "email",
+    label: "Email Senders",
+    permission: PERMISSIONS.COMMUNICATIONS_SERVICES,
+  },
+  {
+    sectionId: "communications",
+    subTabId: "whatsapp",
+    label: "WhatsApp Senders",
+    permission: PERMISSIONS.COMMUNICATIONS_SERVICES,
+  },
+  {
     sectionId: "smart-crm",
     subTabId: "stages",
     label: "CRM Stages",
@@ -225,7 +237,7 @@ export const defaultSubTabBySection: Record<string, string | undefined> = {
   'account-defaults': 'general',
   'users-teams': 'user-directory',
   'smart-crm': 'stages',
-  communications: 'manage-extensions',
+  communications: 'email',
   planner: 'general',
   workforce: 'request-categories',
   billing: 'payment-methods',
