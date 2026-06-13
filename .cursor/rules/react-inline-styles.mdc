@@ -1,0 +1,58 @@
+---
+description: Type-safe React inline styles—avoid CSSProperties assignment errors
+globs: src/**/*.{ts,tsx}
+alwaysApply: false
+---
+
+# React inline style typing
+
+TypeScript widens string literals in untyped object literals to `string`. React's `style` prop expects `CSSProperties`, where many values are **union literals** (e.g. `OverflowX`, `Display`, `Position`)—not plain `string`.
+
+## Required patterns
+
+When passing an object to `style={...}`, use **one** of these:
+
+1. **Annotate the whole object** (preferred for named/reused styles):
+
+```tsx
+const tableWrapperStyle: React.CSSProperties = {
+  overflowX: 'auto',
+  boxSizing: 'border-box',
+};
+```
+
+2. **Use `satisfies` on the style object** (keeps literal inference while validating):
+
+```tsx
+contentContainer: {
+  overflowX: 'hidden',
+  boxSizing: 'border-box',
+} satisfies React.CSSProperties,
+```
+
+3. **`as const` on narrowed literals** when the parent object cannot be fully typed:
+
+```tsx
+overflowX: 'auto' as const,
+position: 'relative' as const,
+textAlign: 'left' as const,
+```
+
+## Common properties that need narrowing
+
+Apply `React.CSSProperties`, `satisfies React.CSSProperties`, or `as const` for:
+
+- `overflow`, `overflowX`, `overflowY`
+- `display`, `position`, `flexDirection`, `alignItems`, `justifyContent`
+- `textAlign`, `textTransform`, `boxSizing`, `pointerEvents`
+- `borderCollapse`, `objectFit`, `whiteSpace`
+
+## Do not
+
+- Leave inline style objects untyped when they use the properties above—`overflowX: 'hidden'` alone becomes `string` and fails `style={...}`.
+- Cast the entire style object with `as any` or `as CSSProperties` to silence errors without fixing literals.
+- Use `Record<string, string>` or loose index signatures for style maps passed to DOM `style`.
+
+## Verification
+
+After adding or editing inline `style` objects in TSX, run `npm run typecheck` (or ensure the file is covered by the project's typecheck) before finishing.
