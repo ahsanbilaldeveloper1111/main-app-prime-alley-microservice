@@ -5,6 +5,7 @@ import {
   finesseStartSilentMonitor,
   getFinesseMonitoringAgentDialogs,
   isFinesseAgentOnCallFromRosterState,
+  resolveFinesseCallDisplayState,
 } from "@utils/finesse";
 import type { FinessePreviewEvent } from "@hooks/live-calls/useFinesseStomp";
 
@@ -386,6 +387,21 @@ export function useFinesseMonitoring({
     [mergeSupervisorDialogs],
   );
 
+  const getAgentCallDisplayState = useCallback(
+    (agent: FinesseMonitoringAgent): string | null => {
+      const dialogs = agentDialogs[agent.loginId] ?? {};
+      const connected = Object.values(dialogs).find(isConnectedDialog);
+      if (!connected) return null;
+      const resolved = resolveFinesseCallDisplayState(
+        connected,
+        cleanValue(agent.extension),
+        agent.state,
+      );
+      return resolved || null;
+    },
+    [agentDialogs],
+  );
+
   const getAgentMonitoringState = useCallback(
     (agent: FinesseMonitoringAgent): FinesseAgentMonitoringState => {
       const dialogs = agentDialogs[agent.loginId] ?? {};
@@ -574,6 +590,7 @@ export function useFinesseMonitoring({
     handleMonitoringDialogEvent,
     handleSupervisorPreviewEvent,
     getAgentMonitoringState,
+    getAgentCallDisplayState,
     startSilentMonitor,
     barge,
     endMonitoring,

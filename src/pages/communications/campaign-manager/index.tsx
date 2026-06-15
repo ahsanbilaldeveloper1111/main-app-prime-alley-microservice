@@ -404,6 +404,7 @@ const LiveCallsCampaignsManagement = () => {
 
   const {
     handlePreviewEvent,
+    handleAgentStateEvent,
     getFinesseContext,
     callWidgetProps,
     wrapUpModalProps,
@@ -516,8 +517,9 @@ const LiveCallsCampaignsManagement = () => {
 
   const handleFinesseStateEvent = useCallback((p: { state?: string }) => {
     if (!p?.state) return;
+    handleAgentStateEvent(p);
     setAgentStatus(p.state);
-  }, []);
+  }, [handleAgentStateEvent]);
 
   const handleFinesseErrorEvent = useCallback((p: unknown) => {
     toast.error((p as { message?: string })?.message ?? "Finesse error");

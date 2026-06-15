@@ -2,6 +2,18 @@
  * Shared Finesse/agent UI helpers for campaign communications pages.
  */
 
+/** Human-readable Finesse state for badges and call popup (e.g. TALKING → Talking). */
+export function formatFinesseStateLabel(raw: string | undefined): string {
+  const trimmed = (raw ?? "").trim();
+  if (!trimmed) return "";
+  if (trimmed !== trimmed.toUpperCase()) return trimmed;
+  return trimmed
+    .split("_")
+    .filter(Boolean)
+    .map((part) => part.charAt(0) + part.slice(1).toLowerCase())
+    .join(" ");
+}
+
 /** When `treatLoginAsReady`, LOGIN uses the same color as READY (supervisor console). */
 export function getCampaignAgentStateColor(
   state: string,

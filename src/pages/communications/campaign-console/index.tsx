@@ -67,6 +67,8 @@ import { usePermissions } from "@utils/permissionUtils";
 
 import {
   formatFinesseStateDuration,
+  formatFinesseStateLabel,
+  formatFinesseReasonLabel,
   getCampaignAgentStateColor,
   mapEffectiveFinesseStateToTopBarReadyToggle,
   isFinesseConsoleReadyLikeState,
@@ -327,6 +329,7 @@ const LiveCallsAgentsManagement = () => {
 
   const {
     handlePreviewEvent,
+    handleAgentStateEvent,
     getFinesseContext,
     callWidgetProps,
     wrapUpModalProps,
@@ -559,6 +562,7 @@ const LiveCallsAgentsManagement = () => {
     handleMonitoringDialogEvent,
     handleSupervisorPreviewEvent,
     getAgentMonitoringState,
+    getAgentCallDisplayState,
     startSilentMonitor,
     barge,
     endMonitoring,
@@ -580,8 +584,9 @@ const LiveCallsAgentsManagement = () => {
   const handleFinesseStateEvent = useCallback((p: { state?: string }) => {
     const raw = typeof p?.state === "string" ? p.state.trim() : "";
     if (!raw) return;
+    handleAgentStateEvent(p);
     setAgentStatus(mapEffectiveFinesseStateToTopBarReadyToggle(raw));
-  }, []);
+  }, [handleAgentStateEvent]);
 
   const handleFinesseErrorEvent = useCallback((p: unknown) => {
     toast.error((p as { message?: string })?.message ?? "Finesse error");
@@ -775,18 +780,31 @@ const LiveCallsAgentsManagement = () => {
   ];
 
   // Derive agents from API team response (no dummy data)
-  const agents: DisplayAgent[] = teamUsersForDisplay.map((u) => ({
-    id: u.loginId,
-    loginId: u.loginId,
-    name:
-      [u.firstName, u.lastName].filter(Boolean).join(" ").trim() || u.loginId,
-    state: u.state ?? "UNKNOWN",
-    stateColor: getCampaignAgentStateColor(u.state ?? "", {
-      treatLoginAsReady: true,
-    }),
-    timeInState: formatFinesseStateDuration(u.stateChangeTime),
-    extension: u.extension ?? "â€”",
-  }));
+  const agents: DisplayAgent[] = teamUsersForDisplay.map((u) => {
+    const rosterState = u.state ?? "UNKNOWN";
+    const monitoringAgent = {
+      loginId: u.loginId,
+      extension: u.extension,
+      state: rosterState,
+    };
+    const callState = getAgentCallDisplayState(monitoringAgent);
+    const effectiveState = callState ?? rosterState;
+    const reasonLabel = formatFinesseReasonLabel(u.reasonCode);
+    return {
+      id: u.loginId,
+      loginId: u.loginId,
+      name:
+        [u.firstName, u.lastName].filter(Boolean).join(" ").trim() || u.loginId,
+      state: effectiveState,
+      stateLabel: formatFinesseStateLabel(effectiveState),
+      stateColor: getCampaignAgentStateColor(effectiveState, {
+        treatLoginAsReady: true,
+      }),
+      timeInState: formatFinesseStateDuration(u.stateChangeTime),
+      extension: u.extension ?? "â€”",
+      label: reasonLabel ?? undefined,
+    };
+  });
 
   const filteredAgents = agents.filter((agent) => {
     const q = searchQuery.toLowerCase();
@@ -2479,7 +2497,7 @@ const LiveCallsAgentsManagement = () => {
                               background: agent.stateColor,
                             }}
                           />
-                          {agent.state}
+                          {agent.stateLabel}
                           {agent.label ? ` (${agent.label})` : ""}
                         </span>
                       </td>

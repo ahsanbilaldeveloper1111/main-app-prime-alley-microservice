@@ -228,6 +228,58 @@ export function isFinesseAgentOnCallFromRosterState(
   );
 }
 
+export type FinesseDialogStateSource = {
+  dialogState?: string;
+  participants?: Array<{ state?: string; mediaAddress?: string }>;
+};
+
+/** Agent leg state from a Finesse dialog — participant state before generic dialogState. */
+export function resolveFinesseDialogParticipantState(
+  dialog: FinesseDialogStateSource | null | undefined,
+  agentExtension?: string,
+): string {
+  if (!dialog) return "";
+  const participants = dialog.participants ?? [];
+  const ext =
+    typeof agentExtension === "string" ? agentExtension.trim() : "";
+  const agentParticipant = ext
+    ? participants.find((p) => (p.mediaAddress ?? "").trim() === ext) ??
+      participants[0]
+    : participants[0];
+  const participantState = trimmedStringFromUnknownState(
+    agentParticipant?.state,
+  );
+  const dialogState = trimmedStringFromUnknownState(dialog.dialogState);
+  if (participantState) return participantState;
+  return dialogState;
+}
+
+/**
+ * Best-effort in-call display state for UI.
+ * Participant leg state wins; roster TALKING/HELD can refine generic dialog ACTIVE.
+ */
+export function resolveFinesseCallDisplayState(
+  dialog: FinesseDialogStateSource | null | undefined,
+  agentExtension?: string,
+  rosterState?: string,
+): string {
+  const fromDialog = resolveFinesseDialogParticipantState(dialog, agentExtension);
+  const dialogUpper = fromDialog.toUpperCase();
+  const rosterUpper = trimmedStringFromUnknownState(rosterState).toUpperCase();
+
+  if (
+    rosterUpper &&
+    isFinesseAgentOnCallFromRosterState(rosterUpper) &&
+    dialogUpper === "ACTIVE" &&
+    rosterUpper !== "ACTIVE"
+  ) {
+    return rosterUpper;
+  }
+  if (fromDialog) return fromDialog;
+  if (rosterUpper) return rosterUpper;
+  return "";
+}
+
 /**
  * Effective agent `state` for UI (TopBar) from STOMP / API user rows.
  * - LOGOUT/OFFLINE pending while state lags → prefer pending.

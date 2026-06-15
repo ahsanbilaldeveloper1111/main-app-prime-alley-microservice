@@ -7,7 +7,9 @@ import {
   sendFinesseDialogAction,
   getFinesseWrapUpReasons,
   getFinesseApiErrorMessage,
+  resolveFinesseCallDisplayState,
 } from "@utils/finesse";
+import { formatFinesseStateLabel } from "@utils/communications/campaign-shared/finesseAgentDisplay";
 import { buildPreviewContactGridRows } from "@utils/finessePreviewContactGrid";
 import type { FinessePreviewEvent } from "@hooks/live-calls/useFinesseStomp";
 import type { CallVariableConfig } from "@pages/communications/campaign-partials/WrapUp";
@@ -141,6 +143,10 @@ export function useFinesseCampaignPreview(
   const [lastSubmittedWrapUpIds, setLastSubmittedWrapUpIds] = useState<
     string[]
   >([]);
+  const [finesseAgentRosterState, setFinesseAgentRosterState] = useState(() => {
+    const stored = getFinesseUserData()?.state;
+    return typeof stored === "string" ? stored.trim() : "";
+  });
 
   const wrapUpEventDialogIdRef = useRef<string | null>(null);
   /** Dialog kept in state so wrap-up submit still works after preview ENDED. */
@@ -250,12 +256,18 @@ export function useFinesseCampaignPreview(
 
   const previewCallStateLabel = useMemo(() => {
     if (!activePreviewDialog) return "";
-    return (
-      activePreviewDialog.dialogState ??
-      activePreviewAgentParticipant?.state ??
-      ""
+    return formatFinesseStateLabel(
+      resolveFinesseCallDisplayState(
+        activePreviewDialog,
+        agentExtension,
+        finesseAgentRosterState,
+      ),
     );
-  }, [activePreviewDialog, activePreviewAgentParticipant]);
+  }, [
+    activePreviewDialog,
+    agentExtension,
+    finesseAgentRosterState,
+  ]);
 
   const previewTimeAnchorMs = useMemo(() => {
     if (!activePreviewAgentParticipant) return null;
@@ -322,6 +334,11 @@ export function useFinesseCampaignPreview(
     }
   }, [agentExtension]);
 
+  const handleAgentStateEvent = useCallback((payload: { state?: string }) => {
+    const raw = typeof payload?.state === "string" ? payload.state.trim() : "";
+    if (raw) setFinesseAgentRosterState(raw);
+  }, []);
+
   useEffect(() => {
     if (suppressCallWidgetUntilCreatedRef.current) {
       setShowCallWidget(false);
@@ -337,23 +354,29 @@ export function useFinesseCampaignPreview(
       return;
     }
 
-    const dialogState = activePreviewDialog.dialogState ?? participant?.state;
-    const isAlerting =
-      dialogState === "ALERTING" || participant?.state === "ALERTING";
-    const isActive =
-      dialogState === "ACTIVE" || participant?.state === "ACTIVE";
-    const isHeld = participant?.state === "HELD";
+    const displayState = resolveFinesseCallDisplayState(
+      activePreviewDialog,
+      agentExtension,
+      finesseAgentRosterState,
+    );
+    const displayUpper = displayState.toUpperCase();
+    const isAlerting = displayUpper === "ALERTING";
+    const isHeld = displayUpper === "HELD";
     setShowCallWidget(true);
     if (isAlerting) {
       setCallStatus("Ringing");
-    } else if (isActive || isHeld) {
-      setCallStatus("Connected");
-      setIsHold(isHeld);
+    } else if (isHeld) {
+      setCallStatus(formatFinesseStateLabel(displayState) || "Held");
+      setIsHold(true);
+    } else if (displayState) {
+      setCallStatus(formatFinesseStateLabel(displayState) || "Connected");
+      setIsHold(false);
     }
   }, [
-    activePreviewDialog?.dialogId,
-    activePreviewDialog?.dialogState,
+    activePreviewDialog,
     activePreviewAgentParticipant,
+    agentExtension,
+    finesseAgentRosterState,
   ]);
 
   useEffect(() => {
@@ -714,6 +737,7 @@ export function useFinesseCampaignPreview(
 
   return {
     handlePreviewEvent,
+    handleAgentStateEvent,
     /** Same shape as previous inline helpers: username, extension, teamId */
     getFinesseContext,
     formatPreviewTime,

@@ -142,6 +142,7 @@ const CampaignAgentPage = () => {
 
   const {
     handlePreviewEvent,
+    handleAgentStateEvent,
     getFinesseContext,
     callWidgetProps,
     wrapUpModalProps,
@@ -157,7 +158,10 @@ const CampaignAgentPage = () => {
     if (!self) return;
     const patch = findRosterEntryForLogin(raw, self);
     const rosterDisplay = patch ? resolveRosterAgentDisplayState(patch) : undefined;
-    if (rosterDisplay) setAgentStatus(rosterDisplay);
+    if (rosterDisplay) {
+      setAgentStatus(rosterDisplay);
+      handleAgentStateEvent({ state: rosterDisplay });
+    }
     setAgentProfile((prev) => {
       if (!prev) return prev;
       const next = mergeAgentProfileFromRoster(prev, raw, self);
@@ -170,17 +174,18 @@ const CampaignAgentPage = () => {
       }
       return next;
     });
-  }, [finesseUsername]);
+  }, [finesseUsername, handleAgentStateEvent]);
 
   const handleFinesseStateEvent = useCallback((p: { state?: string }) => {
     if (!p?.state) return;
+    handleAgentStateEvent(p);
     setAgentStatus(p.state);
     setAgentProfile((prev) => (prev ? { ...prev, state: p.state } : prev));
     const stored = getFinesseUserData();
     if (stored) {
       setFinesseUserData({ ...stored, state: p.state });
     }
-  }, []);
+  }, [handleAgentStateEvent]);
 
   const handleFinesseErrorEvent = useCallback((p: unknown) => {
     toast.error((p as { message?: string })?.message ?? "Finesse error");

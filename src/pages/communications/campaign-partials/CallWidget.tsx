@@ -57,6 +57,11 @@ function hasTrimmedText(value: string | undefined | null): boolean {
   return value != null && value.trim() !== '';
 }
 
+function isCallWidgetOnCall(callStatus: string): boolean {
+  const normalized = callStatus.trim().toLowerCase();
+  return normalized !== '' && normalized !== 'ringing' && normalized !== 'wrap up';
+}
+
 function runReclassify(handler: () => void | Promise<void>): void {
   Promise.resolve(handler()).catch(() => undefined);
 }
@@ -116,19 +121,20 @@ function CallWidgetHeaderBar({ setShowCallWidget }: CallWidgetHeaderBarProps) {
 type CallWidgetStatusLabelProps = Readonly<{ callStatus: string }>;
 
 function CallWidgetStatusLabel({ callStatus }: CallWidgetStatusLabelProps) {
+  const onCall = isCallWidgetOnCall(callStatus);
   return (
     <div className="call-status">
-      <span className={`call-status-badge ${callStatus === 'Connected' ? 'connected' : ''}`}>
+      <span className={`call-status-badge ${onCall ? 'connected' : ''}`}>
         {callStatus === 'Ringing' && (
           <>
             <PhoneCall size={12} />
             Ringing...
           </>
         )}
-        {callStatus === 'Connected' && (
+        {onCall && (
           <>
             <CheckCircle size={12} />
-            Connected
+            {callStatus}
           </>
         )}
         {callStatus === 'Wrap up' && (
@@ -198,10 +204,10 @@ function CallWidgetMetaRows({
         <span
           className="call-info-value"
           style={{
-            color: callStatus === 'Connected' ? '#10b981' : '#f59e0b',
+            color: isCallWidgetOnCall(callStatus) ? '#10b981' : '#f59e0b',
           }}
         >
-          {previewStateLabel || callStatus || 'â€”'}
+          {previewStateLabel || callStatus || '—'}
         </span>
       </div>
       <div className="call-info-item">
@@ -892,7 +898,7 @@ const CallWidget: React.FC<CallWidgetProps> = ({
 
           <CallWidgetContactPreview rows={previewContactRows} />
 
-          {callStatus === 'Connected' && (
+          {isCallWidgetOnCall(callStatus) && (
             <ConnectedCallPanel
               previewActions={previewActions}
               isHold={isHold}
