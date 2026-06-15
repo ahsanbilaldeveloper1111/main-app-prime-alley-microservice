@@ -48,7 +48,6 @@ import { useFinesseStomp } from "@hooks/live-calls/useFinesseStomp";
 import { useFinesseStreamClusterSync } from "@hooks/live-calls/useFinesseStreamClusterSync";
 import { useFinesseCampaignPreview } from "@hooks/live-calls/useFinesseCampaignPreview";
 import {
-  formatFinesseReasonLabel,
   formatFinesseStateDuration,
   getCampaignAgentStateColor,
 } from "@utils/communications/campaign-shared/finesseAgentDisplay";
@@ -143,6 +142,7 @@ const CampaignAgentPage = () => {
   const {
     handlePreviewEvent,
     handleAgentStateEvent,
+    derivedTopBarStatus,
     getFinesseContext,
     callWidgetProps,
     wrapUpModalProps,
@@ -338,6 +338,8 @@ const CampaignAgentPage = () => {
     }
   };
 
+  const displayAgentStatus = derivedTopBarStatus ?? agentStatus;
+
   const displayName = [agentProfile?.firstName, agentProfile?.lastName]
     .filter(Boolean)
     .join(" ")
@@ -345,7 +347,6 @@ const CampaignAgentPage = () => {
   const loginLabel =
     agentProfile?.loginId ?? agentProfile?.loginName ?? finesseUsername ?? "â€”";
   const teamLabel = agentProfile?.teamName ?? selectedTeam ?? "â€”";
-  const reasonLabel = formatFinesseReasonLabel(agentProfile?.reasonCode);
 
   const topBarTeams = useMemo((): TeamOption[] => {
     if (teams.length > 0) return teams;
@@ -378,7 +379,7 @@ const CampaignAgentPage = () => {
               selectedTeam={selectedTeam}
               setSelectedTeam={setSelectedTeam}
               teams={topBarTeams}
-              agentStatus={agentStatus}
+              agentStatus={displayAgentStatus}
               setAgentStatus={setAgentStatus}
               showStatusDropdown={showStatusDropdown}
               setShowStatusDropdown={setShowStatusDropdown}
@@ -500,10 +501,6 @@ const CampaignAgentPage = () => {
                   <div className="detail-value" style={{ fontVariantNumeric: "tabular-nums" }}>
                     {formatFinesseStateDuration(agentProfile?.stateChangeTime, timeRerender)}
                   </div>
-                </div>
-                <div className="detail-tile">
-                  <div className="detail-label">Reason / not-ready</div>
-                  <div className="detail-value">{reasonLabel ?? "â€”"}</div>
                 </div>
                 <div className="detail-tile">
                   <div className="detail-label">Roles</div>

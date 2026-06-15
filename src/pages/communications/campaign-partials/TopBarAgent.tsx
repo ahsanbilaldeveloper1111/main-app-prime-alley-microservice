@@ -1,5 +1,6 @@
-﻿import React, { useRef, useEffect } from "react";
+﻿import React, { useRef, useEffect, useMemo } from "react";
 import { Search, ChevronDown, CheckCircle, User, LogOut } from "lucide-react";
+import { getCampaignTopBarStatusPresentation } from "@utils/communications/campaign-shared/finesseAgentDisplay";
 
 interface StatusOption {
   value: string;
@@ -83,10 +84,13 @@ const TopBar: React.FC<TopBarProps> = ({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [setShowStatusDropdown, setShowUserMenu]);
 
-  const currentStatus =
-    statusOptions.find((s) => s.value === agentStatus) || statusOptions[0];
+  const statusPresentation = useMemo(
+    () => getCampaignTopBarStatusPresentation(agentStatus, statusOptions),
+    [agentStatus, statusOptions],
+  );
 
   const handleStatusChange = async (status: string) => {
+    if (statusPresentation.statusChangeDisabled) return;
     setShowStatusDropdown(false);
     if (onStatusChange) {
       await onStatusChange(status);
@@ -343,19 +347,32 @@ const TopBar: React.FC<TopBarProps> = ({
               className="status-selector"
               aria-expanded={showStatusDropdown}
               aria-haspopup="menu"
+              disabled={statusPresentation.statusChangeDisabled}
+              title={
+                statusPresentation.statusChangeDisabled
+                  ? `${statusPresentation.label} — status cannot be changed during a call`
+                  : undefined
+              }
               onClick={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
+                if (statusPresentation.statusChangeDisabled) return;
                 setShowStatusDropdown(!showStatusDropdown);
               }}
-              style={{ cursor: "pointer", userSelect: "none" }}
+              style={{
+                cursor: statusPresentation.statusChangeDisabled
+                  ? "not-allowed"
+                  : "pointer",
+                userSelect: "none",
+                opacity: statusPresentation.statusChangeDisabled ? 0.85 : 1,
+              }}
             >
               <span
                 className="status-indicator"
                 aria-hidden
-                style={{ backgroundColor: currentStatus.color }}
+                style={{ backgroundColor: statusPresentation.color }}
               />
-              <span>{currentStatus.label}</span>
+              <span>{statusPresentation.label}</span>
               <ChevronDown
                 size={16}
                 style={{
@@ -372,7 +389,12 @@ const TopBar: React.FC<TopBarProps> = ({
               <div className="dropdown-menu" style={{ display: "block" }}>
                 {statusOptions.map((option) => {
                   const IconComponent = option.icon;
-                  const isCurrentStatus = agentStatus === option.value;
+                  const isCurrentStatus =
+                    option.value === "READY"
+                      ? statusPresentation.readyOptionActive
+                      : option.value === "NOT_READY"
+                        ? statusPresentation.notReadyOptionActive
+                        : agentStatus === option.value;
                   return (
                     <button
                       key={option.value}
