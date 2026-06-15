@@ -74,6 +74,7 @@ import {
   isFinesseConsoleReadyLikeState,
   isFinesseConsoleNotReadyState,
   isFinesseConsoleStatusActionDisabled,
+  isFinesseCampaignTopBarStatusLockedState,
 } from "@utils/communications/campaign-shared/finesseAgentDisplay";
 import type {
   CampaignConsoleActionMenuPortalState,
@@ -94,20 +95,28 @@ type ForceSignOutConfirmTarget = {
 
 const { PERMISSIONS } = HEADER_CONSTANTS;
 
+const SUPERVISOR_READY_MONITORING_DISABLED_REASON =
+  "Set your status to Not Ready before monitoring calls";
+
 type MonitoringActionMenuStatus = {
   monitoringState: FinesseAgentMonitoringState | null;
   isOwnFinesseRow: boolean;
   canStartMonitor: boolean;
+  canBarge: boolean;
   monitorDisabledReason?: string;
 };
 
 function getMonitorDisabledReason(
   isFinesseSupervisor: boolean,
+  supervisorIsReady: boolean,
   isOwnFinesseRow: boolean,
   monitoringState: FinesseAgentMonitoringState | null,
 ): string | undefined {
   if (!isFinesseSupervisor) {
     return "Finesse Supervisor role is required for call monitoring";
+  }
+  if (supervisorIsReady) {
+    return SUPERVISOR_READY_MONITORING_DISABLED_REASON;
   }
   if (isOwnFinesseRow) {
     return "You cannot monitor your own Finesse session";
@@ -125,6 +134,7 @@ function getMonitoringActionMenuStatus(
   ) => FinesseAgentMonitoringState,
   isOwnFinesseRow: (agentLoginId: string) => boolean,
   isFinesseSupervisor: boolean,
+  supervisorIsReady: boolean,
 ): MonitoringActionMenuStatus {
   const monitoringState = actionMenuPortal
     ? getAgentMonitoringState(actionMenuPortal.agent)
@@ -132,21 +142,30 @@ function getMonitoringActionMenuStatus(
   const ownRow = actionMenuPortal
     ? isOwnFinesseRow(actionMenuPortal.agent.loginId)
     : false;
+  const monitorDisabledReason = getMonitorDisabledReason(
+    isFinesseSupervisor,
+    supervisorIsReady,
+    ownRow,
+    monitoringState,
+  );
   const canStartMonitor =
     monitoringState != null &&
     isFinesseSupervisor &&
+    !supervisorIsReady &&
     !ownRow &&
     monitoringState.agentOnCall &&
     !monitoringState.monitoringActive;
+  const canBarge =
+    monitoringState != null &&
+    monitoringState.silentMonitorActive &&
+    !monitoringState.bargedIn &&
+    !supervisorIsReady;
   return {
     monitoringState,
     isOwnFinesseRow: ownRow,
     canStartMonitor,
-    monitorDisabledReason: getMonitorDisabledReason(
-      isFinesseSupervisor,
-      ownRow,
-      monitoringState,
-    ),
+    canBarge,
+    monitorDisabledReason,
   };
 }
 
@@ -260,9 +279,13 @@ function CampaignConsoleMonitoringMenuItems({
         <button
           type="button"
           className="action-menu-item"
-          disabled={monitoringState.actionLoading != null}
+          disabled={
+            !status.canBarge || monitoringState.actionLoading != null
+          }
+          title={status.canBarge ? undefined : status.monitorDisabledReason}
           onClick={(e) => {
             e.stopPropagation();
+            if (!status.canBarge) return;
             onBargeAgentCall(agent).catch(() => undefined);
           }}
         >
@@ -330,6 +353,7 @@ const LiveCallsAgentsManagement = () => {
   const {
     handlePreviewEvent,
     handleAgentStateEvent,
+    derivedTopBarStatus,
     getFinesseContext,
     callWidgetProps,
     wrapUpModalProps,
@@ -585,7 +609,7 @@ const LiveCallsAgentsManagement = () => {
     const raw = typeof p?.state === "string" ? p.state.trim() : "";
     if (!raw) return;
     handleAgentStateEvent(p);
-    setAgentStatus(mapEffectiveFinesseStateToTopBarReadyToggle(raw));
+    setAgentStatus(raw);
   }, [handleAgentStateEvent]);
 
   const handleFinesseErrorEvent = useCallback((p: unknown) => {
@@ -681,8 +705,10 @@ const LiveCallsAgentsManagement = () => {
       getFinesseEffectiveAgentStateFromStatePayload(getFinesseUserData());
     const eff = effFromRow ?? effFromStore;
     if (eff == null || eff === "") return;
-    setAgentStatus(mapEffectiveFinesseStateToTopBarReadyToggle(eff));
+    setAgentStatus(eff);
   }, [teamData]);
+
+  const displayAgentStatus = derivedTopBarStatus ?? agentStatus;
 
   const handleTeamChange = async (newTeamName: string, newTeamId: number) => {
     if (Number(getStoredTeamId()) === newTeamId) return;
@@ -1074,11 +1100,20 @@ const LiveCallsAgentsManagement = () => {
     [sseFinesseUserId],
   );
 
+  const supervisorIsReady =
+    isFinesseConsoleReadyLikeState(
+      mapEffectiveFinesseStateToTopBarReadyToggle(displayAgentStatus),
+    ) && !isFinesseCampaignTopBarStatusLockedState(displayAgentStatus);
+
   const handleStartSilentMonitor = useCallback(
     async (agent: DisplayAgent) => {
       const state = getAgentMonitoringState(agent);
       if (!isFinesseSupervisor) {
         toast.error("Finesse Supervisor role is required for call monitoring.");
+        return;
+      }
+      if (supervisorIsReady) {
+        toast.warn(SUPERVISOR_READY_MONITORING_DISABLED_REASON);
         return;
       }
       if (isOwnFinesseRow(agent.loginId)) {
@@ -1105,11 +1140,16 @@ const LiveCallsAgentsManagement = () => {
       isFinesseSupervisor,
       isOwnFinesseRow,
       startSilentMonitor,
+      supervisorIsReady,
     ],
   );
 
   const handleBargeAgentCall = useCallback(
     async (agent: DisplayAgent) => {
+      if (supervisorIsReady) {
+        toast.warn(SUPERVISOR_READY_MONITORING_DISABLED_REASON);
+        return;
+      }
       try {
         await barge(agent);
         toast.success("Barge request sent.");
@@ -1119,7 +1159,7 @@ const LiveCallsAgentsManagement = () => {
         setActionMenuPortal(null);
       }
     },
-    [barge],
+    [barge, supervisorIsReady],
   );
 
   const handleStopMonitoring = useCallback(
@@ -1141,6 +1181,7 @@ const LiveCallsAgentsManagement = () => {
     getAgentMonitoringState,
     isOwnFinesseRow,
     isFinesseSupervisor,
+    supervisorIsReady,
   );
   const actionMenuAgentOnCall =
     actionMenuMonitoringStatus.monitoringState?.agentOnCall === true;
@@ -2239,7 +2280,7 @@ const LiveCallsAgentsManagement = () => {
               selectedTeam={selectedTeam}
               setSelectedTeam={setSelectedTeam}
               teams={teams}
-              agentStatus={agentStatus}
+              agentStatus={displayAgentStatus}
               setAgentStatus={setAgentStatus}
               showStatusDropdown={showStatusDropdown}
               setShowStatusDropdown={setShowStatusDropdown}

@@ -405,6 +405,7 @@ const LiveCallsCampaignsManagement = () => {
   const {
     handlePreviewEvent,
     handleAgentStateEvent,
+    derivedTopBarStatus,
     getFinesseContext,
     callWidgetProps,
     wrapUpModalProps,
@@ -1004,6 +1005,8 @@ const LiveCallsCampaignsManagement = () => {
       );
     }
   };
+
+  const displayAgentStatus = derivedTopBarStatus ?? agentStatus;
 
   const renderCapabilityLoadingBlock = (): ReactElement | null => {
     if (!capabilityUsername) return null;
@@ -2282,7 +2285,7 @@ const LiveCallsCampaignsManagement = () => {
                     ? teamsWithIds
                     : teams.map((name, i) => ({ id: i, name }))
                 }
-                agentStatus={agentStatus}
+                agentStatus={displayAgentStatus}
                 setAgentStatus={setAgentStatus}
                 showStatusDropdown={showStatusDropdown}
                 setShowStatusDropdown={setShowStatusDropdown}

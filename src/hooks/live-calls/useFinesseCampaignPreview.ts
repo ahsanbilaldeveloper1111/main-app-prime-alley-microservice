@@ -114,6 +114,48 @@ function participantSortTime(dialog: FinessePreviewEvent): string {
   return agent?.stateChangeTime ?? agent?.startTime ?? "";
 }
 
+function upperPreviewString(value: unknown): string {
+  return typeof value === "string" ? value.trim().toUpperCase() : "";
+}
+
+function callTypeFromPreviewDialog(dialog: FinessePreviewEvent): string {
+  const mediaProperties = (dialog as { mediaProperties?: unknown }).mediaProperties;
+  const mediaCallType =
+    typeof mediaProperties === "object" &&
+    mediaProperties !== null &&
+    "callType" in mediaProperties
+      ? (mediaProperties as { callType?: unknown }).callType
+      : undefined;
+  return upperPreviewString(
+    (dialog as { callType?: unknown }).callType ?? mediaCallType,
+  );
+}
+
+function dialogIncludesOwnAgentLeg(
+  dialog: FinessePreviewEvent,
+  extension: string | undefined,
+): boolean {
+  const ext = extension?.trim();
+  if (!ext) return true;
+  return (dialog.participants ?? []).some(
+    (participant) => (participant.mediaAddress ?? "").trim() === ext,
+  );
+}
+
+/**
+ * Call popup and wrap-up belong only on the signed-in user's own campaign leg —
+ * not on monitored agent dialogs or supervisor monitor/barge legs.
+ */
+function shouldProcessOwnCampaignPreviewDialog(
+  dialog: FinessePreviewEvent,
+  extension: string | undefined,
+): boolean {
+  if (!dialogIncludesOwnAgentLeg(dialog, extension)) return false;
+  const callType = callTypeFromPreviewDialog(dialog);
+  if (callType.includes("MONITOR") || callType.includes("BARGE")) return false;
+  return true;
+}
+
 /**
  * Finesse outbound preview (campaign) dialog: SSE PREVIEW events → CallWidget + WrapUpModal + dialog actions.
  */
@@ -269,6 +311,32 @@ export function useFinesseCampaignPreview(
     finesseAgentRosterState,
   ]);
 
+  /** Live Finesse state for the TopBar (call leg wins over roster when on a dialog). */
+  const derivedTopBarStatus = useMemo(() => {
+    if (isWrapUpOpen) return "WRAP_UP";
+    if (activePreviewDialog?.dialogId) {
+      if (
+        isWrapUpPreviewState(activePreviewDialog, activePreviewAgentParticipant)
+      ) {
+        return "WRAP_UP";
+      }
+      const callDisplay = resolveFinesseCallDisplayState(
+        activePreviewDialog,
+        agentExtension,
+        finesseAgentRosterState,
+      );
+      if (callDisplay.trim()) return callDisplay;
+    }
+    const roster = finesseAgentRosterState.trim();
+    return roster || undefined;
+  }, [
+    activePreviewAgentParticipant,
+    activePreviewDialog,
+    agentExtension,
+    finesseAgentRosterState,
+    isWrapUpOpen,
+  ]);
+
   const previewTimeAnchorMs = useMemo(() => {
     if (!activePreviewAgentParticipant) return null;
     const iso =
@@ -281,6 +349,7 @@ export function useFinesseCampaignPreview(
 
   const handlePreviewEvent = useCallback((payload: FinessePreviewEvent) => {
     if (payload?.dialogId == null) return;
+    if (!shouldProcessOwnCampaignPreviewDialog(payload, agentExtension)) return;
     const eventType = (payload as { eventType?: string }).eventType;
     const dialogId = String(payload.dialogId);
     if (eventType === "CREATED") {
@@ -711,15 +780,20 @@ export function useFinesseCampaignPreview(
   useEffect(() => {
     if (suppressCallWidgetUntilCreatedRef.current) return;
     if (!activePreviewDialog?.dialogId) return;
+    if (
+      !shouldProcessOwnCampaignPreviewDialog(activePreviewDialog, agentExtension)
+    ) {
+      return;
+    }
 
     const participant = activePreviewAgentParticipant;
     if (!isWrapUpPreviewState(activePreviewDialog, participant)) return;
 
     requestWrapUpModal(activePreviewDialog.dialogId, true);
   }, [
-    activePreviewDialog?.dialogId,
-    activePreviewDialog?.dialogState,
-    activePreviewAgentParticipant?.state,
+    activePreviewDialog,
+    activePreviewAgentParticipant,
+    agentExtension,
     requestWrapUpModal,
   ]);
 
@@ -735,9 +809,14 @@ export function useFinesseCampaignPreview(
     resetCallWidgetState();
   }, [activePreviewDialog?.dialogId, clearWrapUpSession, resetCallWidgetState]);
 
+  const ownsActivePreviewDialog =
+    activePreviewDialog != null &&
+    shouldProcessOwnCampaignPreviewDialog(activePreviewDialog, agentExtension);
+
   return {
     handlePreviewEvent,
     handleAgentStateEvent,
+    derivedTopBarStatus,
     /** Same shape as previous inline helpers: username, extension, teamId */
     getFinesseContext,
     formatPreviewTime,
@@ -779,7 +858,7 @@ export function useFinesseCampaignPreview(
       holdLoading,
     },
     wrapUpModalProps: {
-      isOpen: isWrapUpOpen,
+      isOpen: isWrapUpOpen && ownsActivePreviewDialog,
       onClose: wrapUpOnClose,
       onSubmit: handleWrapUpSubmit,
       onMinimize: handleWrapUpMinimize,
