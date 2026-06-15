@@ -1,6 +1,9 @@
 ﻿import React, { useRef, useEffect, useMemo } from "react";
 import { Search, ChevronDown, CheckCircle, User, LogOut } from "lucide-react";
-import { getCampaignTopBarStatusPresentation } from "@utils/communications/campaign-shared/finesseAgentDisplay";
+import {
+  getCampaignTopBarStatusPresentation,
+  type CampaignTopBarStatusPresentation,
+} from "@utils/communications/campaign-shared/finesseAgentDisplay";
 
 interface StatusOption {
   value: string;
@@ -33,6 +36,20 @@ interface TopBarProps {
   onStatusChange?: (newState: string) => void | Promise<void>;
   /** When provided and teams are TeamOption[], called when user selects a different team (unlink â†’ storage â†’ link flow). */
   onTeamChange?: (teamName: string, teamId: number) => void | Promise<void>;
+}
+
+function isTopBarStatusOptionActive(
+  optionValue: string,
+  agentStatus: string,
+  presentation: CampaignTopBarStatusPresentation,
+): boolean {
+  if (optionValue === "READY") {
+    return presentation.readyOptionActive;
+  }
+  if (optionValue === "NOT_READY") {
+    return presentation.notReadyOptionActive;
+  }
+  return agentStatus === optionValue;
 }
 
 const TopBar: React.FC<TopBarProps> = ({
@@ -389,12 +406,11 @@ const TopBar: React.FC<TopBarProps> = ({
               <div className="dropdown-menu" style={{ display: "block" }}>
                 {statusOptions.map((option) => {
                   const IconComponent = option.icon;
-                  const isCurrentStatus =
-                    option.value === "READY"
-                      ? statusPresentation.readyOptionActive
-                      : option.value === "NOT_READY"
-                        ? statusPresentation.notReadyOptionActive
-                        : agentStatus === option.value;
+                  const isCurrentStatus = isTopBarStatusOptionActive(
+                    option.value,
+                    agentStatus,
+                    statusPresentation,
+                  );
                   return (
                     <button
                       key={option.value}
