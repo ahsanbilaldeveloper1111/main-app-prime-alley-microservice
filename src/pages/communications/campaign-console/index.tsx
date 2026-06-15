@@ -28,6 +28,7 @@ import CallWidget from "../campaign-partials/CallWidget";
 import WrapUpModal from "../campaign-partials/WrapUp";
 import TopBar, { type TeamOption } from "../campaign-partials/TopBarAgent";
 import FinesseAuthGate from "../campaign-partials/FinesseAuthGate";
+import ConfirmModal from "@components/page-partials/ConfirmModal";
 import { toast } from "react-toastify";
 import {
   getFinesseUserTeam,
@@ -66,8 +67,13 @@ import { usePermissions } from "@utils/permissionUtils";
 
 import {
   formatFinesseStateDuration,
+  formatFinesseStateLabel,
+  formatFinesseReasonLabel,
   getCampaignAgentStateColor,
   mapEffectiveFinesseStateToTopBarReadyToggle,
+  isFinesseConsoleReadyLikeState,
+  isFinesseConsoleNotReadyState,
+  isFinesseConsoleStatusActionDisabled,
 } from "@utils/communications/campaign-shared/finesseAgentDisplay";
 import type {
   CampaignConsoleActionMenuPortalState,
@@ -80,6 +86,11 @@ type TeamUser = CampaignConsoleTeamUser;
 type TeamApiResponse = CampaignConsoleTeamApiResponse;
 type DisplayAgent = CampaignConsoleDisplayAgent;
 type ActionMenuPortalState = CampaignConsoleActionMenuPortalState;
+
+type ForceSignOutConfirmTarget = {
+  loginId: string;
+  name: string;
+};
 
 const { PERMISSIONS } = HEADER_CONSTANTS;
 
@@ -102,7 +113,7 @@ function getMonitorDisabledReason(
     return "You cannot monitor your own Finesse session";
   }
   if (monitoringState?.agentOnCall !== true) {
-    return "Agent has no active call";
+    return "Agent is not on a call";
   }
   return undefined;
 }
@@ -137,6 +148,70 @@ function getMonitoringActionMenuStatus(
       monitoringState,
     ),
   };
+}
+
+function getSupervisorStatusActionDisabledReason(
+  canChangeUserStatus: boolean,
+  agent: DisplayAgent | undefined,
+  agentOnCall: boolean,
+  targetState: "READY" | "NOT_READY",
+): string | undefined {
+  if (!canChangeUserStatus) {
+    return "You do not have permission to change agent status";
+  }
+  if (!agent || isFinesseAgentOfflineLikeState(agent.state)) {
+    return "Cannot change status of offline agents";
+  }
+  if (agentOnCall) {
+    return "Cannot change status while agent is on a call";
+  }
+  if (
+    targetState === "READY" &&
+    isFinesseConsoleReadyLikeState(agent.state)
+  ) {
+    return "Agent is already Ready";
+  }
+  if (
+    targetState === "NOT_READY" &&
+    isFinesseConsoleNotReadyState(agent.state)
+  ) {
+    return "Agent is already Not Ready";
+  }
+  return undefined;
+}
+
+function isSupervisorStatusActionDisabled(
+  canChangeUserStatus: boolean,
+  agent: DisplayAgent | undefined,
+  agentOnCall: boolean,
+  targetState: "READY" | "NOT_READY",
+): boolean {
+  return (
+    getSupervisorStatusActionDisabledReason(
+      canChangeUserStatus,
+      agent,
+      agentOnCall,
+      targetState,
+    ) != null
+  );
+}
+
+function getBulkStatusActionDisabledReason(
+  canChangeUserStatus: boolean,
+  selectedAgentsAllOnCall: boolean,
+  canPerformAction: boolean,
+  alreadyInTargetStateMessage: string,
+): string | undefined {
+  if (!canChangeUserStatus) {
+    return "You do not have permission to change agent status";
+  }
+  if (selectedAgentsAllOnCall) {
+    return "Cannot change status while selected agent(s) are on a call";
+  }
+  if (!canPerformAction) {
+    return alreadyInTargetStateMessage;
+  }
+  return undefined;
 }
 
 type CampaignConsoleMonitoringMenuItemsProps = Readonly<{
@@ -247,10 +322,14 @@ const LiveCallsAgentsManagement = () => {
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [actionMenuPortal, setActionMenuPortal] =
     useState<ActionMenuPortalState | null>(null);
+  const [forceSignOutConfirmTarget, setForceSignOutConfirmTarget] =
+    useState<ForceSignOutConfirmTarget | null>(null);
+  const [forceSignOutLoading, setForceSignOutLoading] = useState(false);
   const [finesseSseToken, setFinesseSseToken] = useState<string | null>(null);
 
   const {
     handlePreviewEvent,
+    handleAgentStateEvent,
     getFinesseContext,
     callWidgetProps,
     wrapUpModalProps,
@@ -392,6 +471,7 @@ const LiveCallsAgentsManagement = () => {
       teamUsersForDisplay.map((user) => ({
         loginId: user.loginId,
         extension: user.extension,
+        state: user.state,
       })),
     [teamUsersForDisplay],
   );
@@ -399,6 +479,7 @@ const LiveCallsAgentsManagement = () => {
   const rosterSyncDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(
     null,
   );
+  const teamFetchInFlightRef = useRef(false);
   /** Latest roster STOMP payload; reapplied after REST refetch so API lag cannot revert LOGOUT/offline. */
   const lastRosterPayloadRef = useRef<unknown>(null);
 
@@ -411,6 +492,8 @@ const LiveCallsAgentsManagement = () => {
     const username = d?.loginId ?? d?.loginName;
     const teamId = getEffectiveTeamId(d);
     if (!username || teamId == null) return;
+    if (teamFetchInFlightRef.current) return;
+    teamFetchInFlightRef.current = true;
     /** Always include logged-out agents so logout matches roster and is not overwritten. */
     getFinesseUserTeam(username, teamId, true)
       .then((res: TeamApiResponse) => {
@@ -428,7 +511,10 @@ const LiveCallsAgentsManagement = () => {
           }
         }
       })
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => {
+        teamFetchInFlightRef.current = false;
+      });
   }, []);
 
   const scheduleTeamSyncFromRoster = useCallback(() => {
@@ -476,6 +562,7 @@ const LiveCallsAgentsManagement = () => {
     handleMonitoringDialogEvent,
     handleSupervisorPreviewEvent,
     getAgentMonitoringState,
+    getAgentCallDisplayState,
     startSilentMonitor,
     barge,
     endMonitoring,
@@ -494,24 +581,38 @@ const LiveCallsAgentsManagement = () => {
     [handlePreviewEvent, handleSupervisorPreviewEvent],
   );
 
+  const handleFinesseStateEvent = useCallback((p: { state?: string }) => {
+    const raw = typeof p?.state === "string" ? p.state.trim() : "";
+    if (!raw) return;
+    handleAgentStateEvent(p);
+    setAgentStatus(mapEffectiveFinesseStateToTopBarReadyToggle(raw));
+  }, [handleAgentStateEvent]);
+
+  const handleFinesseErrorEvent = useCallback((p: unknown) => {
+    toast.error((p as { message?: string })?.message ?? "Finesse error");
+  }, []);
+
+  const handleFinesseAuthError = useCallback((msg: string) => {
+    toast.error(msg);
+  }, []);
+
+  const handleStompConnected = useCallback(() => {
+    scheduleTeamSyncFromRoster();
+  }, [scheduleTeamSyncFromRoster]);
+
   useFinesseStomp({
     token: finesseSseToken,
     finesseUserId: sseFinesseUserId,
     clusterId: rosterClusterId,
     teamId: streamTeamId,
     monitoredAgentIds,
-    onStateEvent: (p) => {
-      const raw = typeof p?.state === "string" ? p.state.trim() : "";
-      if (!raw) return;
-      setAgentStatus(mapEffectiveFinesseStateToTopBarReadyToggle(raw));
-    },
+    onStateEvent: handleFinesseStateEvent,
     onPreviewEvent: handleFinessePreviewEvent,
     onMonitoringDialogEvent: handleMonitoringDialogEvent,
-    onErrorEvent: (p) =>
-      toast.error((p as { message?: string })?.message ?? "Finesse error"),
-    onAuthError: (msg) => toast.error(msg),
+    onErrorEvent: handleFinesseErrorEvent,
+    onAuthError: handleFinesseAuthError,
     onRosterEvent: handleTeamRosterEvent,
-    onStompConnected: refetchTeamFromStream,
+    onStompConnected: handleStompConnected,
   });
   // When gate authenticates on same page (no reload), re-hydrate teams and refetch
   useEffect(() => {
@@ -660,6 +761,9 @@ const LiveCallsAgentsManagement = () => {
     }
     const state =
       newState === "READY" || newState === "NOT_READY" ? newState : "READY";
+    if (isFinesseConsoleStatusActionDisabled(agentStatus, state)) {
+      return;
+    }
     try {
       await finesseSetState(teamId, username, state);
       setAgentStatus(state);
@@ -676,18 +780,31 @@ const LiveCallsAgentsManagement = () => {
   ];
 
   // Derive agents from API team response (no dummy data)
-  const agents: DisplayAgent[] = teamUsersForDisplay.map((u) => ({
-    id: u.loginId,
-    loginId: u.loginId,
-    name:
-      [u.firstName, u.lastName].filter(Boolean).join(" ").trim() || u.loginId,
-    state: u.state ?? "UNKNOWN",
-    stateColor: getCampaignAgentStateColor(u.state ?? "", {
-      treatLoginAsReady: true,
-    }),
-    timeInState: formatFinesseStateDuration(u.stateChangeTime),
-    extension: u.extension ?? "â€”",
-  }));
+  const agents: DisplayAgent[] = teamUsersForDisplay.map((u) => {
+    const rosterState = u.state ?? "UNKNOWN";
+    const monitoringAgent = {
+      loginId: u.loginId,
+      extension: u.extension,
+      state: rosterState,
+    };
+    const callState = getAgentCallDisplayState(monitoringAgent);
+    const effectiveState = callState ?? rosterState;
+    const reasonLabel = formatFinesseReasonLabel(u.reasonCode);
+    return {
+      id: u.loginId,
+      loginId: u.loginId,
+      name:
+        [u.firstName, u.lastName].filter(Boolean).join(" ").trim() || u.loginId,
+      state: effectiveState,
+      stateLabel: formatFinesseStateLabel(effectiveState),
+      stateColor: getCampaignAgentStateColor(effectiveState, {
+        treatLoginAsReady: true,
+      }),
+      timeInState: formatFinesseStateDuration(u.stateChangeTime),
+      extension: u.extension ?? "â€”",
+      label: reasonLabel ?? undefined,
+    };
+  });
 
   const filteredAgents = agents.filter((agent) => {
     const q = searchQuery.toLowerCase();
@@ -696,6 +813,33 @@ const LiveCallsAgentsManagement = () => {
       agent.loginId.toLowerCase().includes(q)
     );
   });
+
+  const selectedAgentRows = useMemo(
+    () => agents.filter((agent) => selectedAgents.includes(agent.id)),
+    [agents, selectedAgents],
+  );
+
+  const canBulkSetReady = useMemo(
+    () =>
+      selectedAgentRows.some(
+        (agent) =>
+          !isFinesseAgentOfflineLikeState(agent.state) &&
+          !isFinesseConsoleReadyLikeState(agent.state) &&
+          !getAgentMonitoringState(agent).agentOnCall,
+      ),
+    [selectedAgentRows, getAgentMonitoringState],
+  );
+
+  const canBulkSetNotReady = useMemo(
+    () =>
+      selectedAgentRows.some(
+        (agent) =>
+          !isFinesseAgentOfflineLikeState(agent.state) &&
+          !isFinesseConsoleNotReadyState(agent.state) &&
+          !getAgentMonitoringState(agent).agentOnCall,
+      ),
+    [selectedAgentRows, getAgentMonitoringState],
+  );
 
   const teamDataAvailable = !teamDataLoading && teamData != null;
 
@@ -736,6 +880,28 @@ const LiveCallsAgentsManagement = () => {
     }
     const newState: "READY" | "NOT_READY" =
       newStatus === "READY" ? "READY" : "NOT_READY";
+    const agentsToUpdate = selectedAgents.filter((loginId) => {
+      const agent = agents.find((a) => a.loginId === loginId);
+      if (!agent || isFinesseAgentOfflineLikeState(agent.state)) return false;
+      if (getAgentMonitoringState(agent).agentOnCall) return false;
+      return !isFinesseConsoleStatusActionDisabled(agent.state, newState);
+    });
+    if (agentsToUpdate.length === 0) {
+      const hasOnCallSelection = selectedAgents.some((loginId) => {
+        const agent = agents.find((a) => a.loginId === loginId);
+        return agent != null && getAgentMonitoringState(agent).agentOnCall;
+      });
+      if (hasOnCallSelection) {
+        toast.warn("Cannot change status while selected agent(s) are on a call.");
+        return;
+      }
+      toast.warn(
+        newState === "READY"
+          ? "Selected agent(s) are already Ready."
+          : "Selected agent(s) are already Not Ready.",
+      );
+      return;
+    }
     const data = getFinesseUserData();
     const teamId = getEffectiveTeamId(data);
     const actingFinesseUserId = data?.loginId ?? data?.loginName ?? "";
@@ -743,12 +909,12 @@ const LiveCallsAgentsManagement = () => {
       toast.error("Team not available.");
       return;
     }
-    const count = selectedAgents.length;
+    const count = agentsToUpdate.length;
     const label = newState === "READY" ? "Ready" : "Not Ready";
     setBulkActionLoading(true);
     try {
       const results = await Promise.allSettled(
-        selectedAgents.map((loginId) =>
+        agentsToUpdate.map((loginId) =>
           finesseSetState(teamId, loginId, newState, actingFinesseUserId),
         ),
       );
@@ -783,6 +949,26 @@ const LiveCallsAgentsManagement = () => {
     }
     const newState: "READY" | "NOT_READY" =
       newStatus === "READY" ? "READY" : "NOT_READY";
+    const agent = agents.find((a) => a.loginId === agentLoginId);
+    if (!agent || isFinesseAgentOfflineLikeState(agent.state)) {
+      toast.warn("Cannot change status of offline agents");
+      setActionMenuPortal(null);
+      return;
+    }
+    if (isFinesseConsoleStatusActionDisabled(agent.state, newState)) {
+      toast.warn(
+        newState === "READY"
+          ? "Agent is already Ready."
+          : "Agent is already Not Ready.",
+      );
+      setActionMenuPortal(null);
+      return;
+    }
+    if (getAgentMonitoringState(agent).agentOnCall) {
+      toast.warn("Cannot change status while agent is on a call.");
+      setActionMenuPortal(null);
+      return;
+    }
     const data = getFinesseUserData();
     const teamId = getEffectiveTeamId(data);
     const actingFinesseUserId = data?.loginId ?? data?.loginName ?? "";
@@ -810,12 +996,11 @@ const LiveCallsAgentsManagement = () => {
     }
   };
 
-  const handleForceSignOutAgent = useCallback(
+  const executeForceSignOutAgent = useCallback(
     async (agentLoginId: string) => {
       if (!canForceSignOut) {
         toast.error("You do not have permission to force sign-out.");
-        setActionMenuPortal(null);
-        return;
+        return false;
       }
       const stored = getFinesseUserData();
       const supervisorFinesseUserId =
@@ -823,20 +1008,17 @@ const LiveCallsAgentsManagement = () => {
       const teamId = getEffectiveTeamId(stored);
       if (!supervisorFinesseUserId.trim()) {
         toast.error("Supervisor user not found.");
-        setActionMenuPortal(null);
-        return;
+        return false;
       }
       if (teamId == null) {
         toast.error("Team not available.");
-        setActionMenuPortal(null);
-        return;
+        return false;
       }
       if (agentLoginId === supervisorFinesseUserId) {
         toast.warn(
           "You cannot force sign-out your own session from another agent row.",
         );
-        setActionMenuPortal(null);
-        return;
+        return false;
       }
       try {
         await finesseForceSignOut({
@@ -846,14 +1028,46 @@ const LiveCallsAgentsManagement = () => {
         });
         toast.success("Agent signed out of Finesse.");
         setRefreshTrigger((t) => t + 1);
+        return true;
       } catch (err: unknown) {
         toast.error(getFinesseApiErrorMessage(err, "Force sign-out failed."));
-      } finally {
-        setActionMenuPortal(null);
+        return false;
       }
     },
     [canForceSignOut],
   );
+
+  const openForceSignOutConfirm = useCallback((agent: DisplayAgent) => {
+    setActionMenuPortal(null);
+    setForceSignOutConfirmTarget({
+      loginId: agent.loginId,
+      name: agent.name,
+    });
+  }, []);
+
+  const handleCloseForceSignOutConfirm = useCallback(() => {
+    if (forceSignOutLoading) return;
+    setForceSignOutConfirmTarget(null);
+  }, [forceSignOutLoading]);
+
+  const handleConfirmForceSignOut = useCallback(async () => {
+    if (!forceSignOutConfirmTarget || forceSignOutLoading) return;
+    setForceSignOutLoading(true);
+    try {
+      const success = await executeForceSignOutAgent(
+        forceSignOutConfirmTarget.loginId,
+      );
+      if (success) {
+        setForceSignOutConfirmTarget(null);
+      }
+    } finally {
+      setForceSignOutLoading(false);
+    }
+  }, [
+    executeForceSignOutAgent,
+    forceSignOutConfirmTarget,
+    forceSignOutLoading,
+  ]);
 
   const isOwnFinesseRow = useCallback(
     (agentLoginId: string) => agentLoginId === sseFinesseUserId,
@@ -927,6 +1141,16 @@ const LiveCallsAgentsManagement = () => {
     getAgentMonitoringState,
     isOwnFinesseRow,
     isFinesseSupervisor,
+  );
+  const actionMenuAgentOnCall =
+    actionMenuMonitoringStatus.monitoringState?.agentOnCall === true;
+  const selectedAgentsAllOnCall = useMemo(
+    () =>
+      selectedAgentRows.length > 0 &&
+      selectedAgentRows.every(
+        (agent) => getAgentMonitoringState(agent).agentOnCall,
+      ),
+    [selectedAgentRows, getAgentMonitoringState],
   );
 
   return (
@@ -1664,8 +1888,13 @@ const LiveCallsAgentsManagement = () => {
           font-family: inherit;
         }
 
-        .action-menu-item:hover {
+        .action-menu-item:hover:not(:disabled) {
           background: #f8fafc;
+        }
+
+        .action-menu-item:disabled {
+          cursor: not-allowed;
+          opacity: 0.5;
         }
 
         .action-menu-item.danger {
@@ -1737,9 +1966,14 @@ const LiveCallsAgentsManagement = () => {
           gap: 6px;
         }
 
-        .bulk-action-btn:hover {
+        .bulk-action-btn:hover:not(:disabled) {
           background: white;
           color: #0066CC;
+        }
+
+        .bulk-action-btn:disabled {
+          cursor: not-allowed;
+          opacity: 0.5;
         }
 
         .call-widget {
@@ -2039,12 +2273,15 @@ const LiveCallsAgentsManagement = () => {
                 <button
                   className="bulk-action-btn"
                   type="button"
-                  disabled={bulkActionLoading || !canChangeUserStatus}
-                  title={
-                    canChangeUserStatus
-                      ? undefined
-                      : "You do not have permission to change agent status"
+                  disabled={
+                    bulkActionLoading || !canChangeUserStatus || !canBulkSetReady
                   }
+                  title={getBulkStatusActionDisabledReason(
+                    canChangeUserStatus,
+                    selectedAgentsAllOnCall,
+                    canBulkSetReady,
+                    "Selected agent(s) are already Ready",
+                  )}
                   onClick={() => {
                     handleBulkStatusChange("READY").catch(() => undefined);
                   }}
@@ -2055,12 +2292,17 @@ const LiveCallsAgentsManagement = () => {
                 <button
                   className="bulk-action-btn"
                   type="button"
-                  disabled={bulkActionLoading || !canChangeUserStatus}
-                  title={
-                    canChangeUserStatus
-                      ? undefined
-                      : "You do not have permission to change agent status"
+                  disabled={
+                    bulkActionLoading ||
+                    !canChangeUserStatus ||
+                    !canBulkSetNotReady
                   }
+                  title={getBulkStatusActionDisabledReason(
+                    canChangeUserStatus,
+                    selectedAgentsAllOnCall,
+                    canBulkSetNotReady,
+                    "Selected agent(s) are already Not Ready",
+                  )}
                   onClick={() => {
                     handleBulkStatusChange("NOT_READY").catch(() => undefined);
                   }}
@@ -2255,7 +2497,7 @@ const LiveCallsAgentsManagement = () => {
                               background: agent.stateColor,
                             }}
                           />
-                          {agent.state}
+                          {agent.stateLabel}
                           {agent.label ? ` (${agent.label})` : ""}
                         </span>
                       </td>
@@ -2325,24 +2567,25 @@ const LiveCallsAgentsManagement = () => {
               <button
                 type="button"
                 className="action-menu-item"
-                disabled={!canChangeUserStatus}
-                title={
-                  canChangeUserStatus
-                    ? undefined
-                    : "You do not have permission to change agent status"
-                }
+                disabled={isSupervisorStatusActionDisabled(
+                  canChangeUserStatus,
+                  actionMenuPortal.agent,
+                  actionMenuAgentOnCall,
+                  "READY",
+                )}
+                title={getSupervisorStatusActionDisabledReason(
+                  canChangeUserStatus,
+                  actionMenuPortal.agent,
+                  actionMenuAgentOnCall,
+                  "READY",
+                )}
                 onClick={(e) => {
                   e.stopPropagation();
                   if (!canChangeUserStatus) return;
-                  const a = actionMenuPortal.agent;
-                  if (a.state === "OFFLINE") {
-                    toast.warn("Cannot change status of offline agents");
-                    setActionMenuPortal(null);
-                  } else {
-                    handleSingleAgentStatusChange(a.loginId, "READY").catch(
-                      () => undefined,
-                    );
-                  }
+                  handleSingleAgentStatusChange(
+                    actionMenuPortal.agent.loginId,
+                    "READY",
+                  ).catch(() => undefined);
                 }}
               >
                 <CheckCircle size={16} color="#10b981" />
@@ -2351,24 +2594,25 @@ const LiveCallsAgentsManagement = () => {
               <button
                 type="button"
                 className="action-menu-item"
-                disabled={!canChangeUserStatus}
-                title={
-                  canChangeUserStatus
-                    ? undefined
-                    : "You do not have permission to change agent status"
-                }
+                disabled={isSupervisorStatusActionDisabled(
+                  canChangeUserStatus,
+                  actionMenuPortal.agent,
+                  actionMenuAgentOnCall,
+                  "NOT_READY",
+                )}
+                title={getSupervisorStatusActionDisabledReason(
+                  canChangeUserStatus,
+                  actionMenuPortal.agent,
+                  actionMenuAgentOnCall,
+                  "NOT_READY",
+                )}
                 onClick={(e) => {
                   e.stopPropagation();
                   if (!canChangeUserStatus) return;
-                  const a = actionMenuPortal.agent;
-                  if (a.state === "OFFLINE") {
-                    toast.warn("Cannot change status of offline agents");
-                    setActionMenuPortal(null);
-                  } else {
-                    handleSingleAgentStatusChange(a.loginId, "NOT_READY").catch(
-                      () => undefined,
-                    );
-                  }
+                  handleSingleAgentStatusChange(
+                    actionMenuPortal.agent.loginId,
+                    "NOT_READY",
+                  ).catch(() => undefined);
                 }}
               >
                 <XCircle size={16} color="#ef4444" />
@@ -2393,9 +2637,7 @@ const LiveCallsAgentsManagement = () => {
                 onClick={(e) => {
                   e.stopPropagation();
                   if (!canForceSignOut) return;
-                  handleForceSignOutAgent(actionMenuPortal.agent.loginId).catch(
-                    () => undefined,
-                  );
+                  openForceSignOutConfirm(actionMenuPortal.agent);
                 }}
               >
                 <LogOut size={16} />
@@ -2409,6 +2651,23 @@ const LiveCallsAgentsManagement = () => {
         <CallWidget {...callWidgetProps} />
 
         <WrapUpModal {...wrapUpModalProps} />
+
+        <ConfirmModal
+          show={forceSignOutConfirmTarget != null}
+          onHide={handleCloseForceSignOutConfirm}
+          onCancel={handleCloseForceSignOutConfirm}
+          title="Force sign out"
+          description="Agent might be in an active session. Still want to continue?"
+          targetName={forceSignOutConfirmTarget?.name ?? "this agent"}
+          confirmButtonText="Continue"
+          cancelButtonText="Cancel"
+          confirmButtonVariant="danger"
+          requireTextConfirmation={false}
+          loading={forceSignOutLoading}
+          onConfirm={() => {
+            handleConfirmForceSignOut().catch(() => undefined);
+          }}
+        />
       </React.Fragment>
     </FinesseAuthGate>
   );

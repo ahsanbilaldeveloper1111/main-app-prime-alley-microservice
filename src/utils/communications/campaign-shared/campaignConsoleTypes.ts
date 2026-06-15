@@ -30,7 +30,10 @@ export type CampaignConsoleDisplayAgent = {
   id: string;
   loginId: string;
   name: string;
+  /** Raw Finesse state for logic (READY, TALKING, ACTIVE, …). */
   state: string;
+  /** Formatted label for the roster table. */
+  stateLabel: string;
   stateColor: string;
   timeInState: string;
   extension: string;

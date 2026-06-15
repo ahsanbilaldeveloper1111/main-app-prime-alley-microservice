@@ -7,7 +7,9 @@ import {
   sendFinesseDialogAction,
   getFinesseWrapUpReasons,
   getFinesseApiErrorMessage,
+  resolveFinesseCallDisplayState,
 } from "@utils/finesse";
+import { formatFinesseStateLabel } from "@utils/communications/campaign-shared/finesseAgentDisplay";
 import { buildPreviewContactGridRows } from "@utils/finessePreviewContactGrid";
 import type { FinessePreviewEvent } from "@hooks/live-calls/useFinesseStomp";
 import type { CallVariableConfig } from "@pages/communications/campaign-partials/WrapUp";
@@ -67,6 +69,46 @@ function isWrapUpPreviewState(
   );
 }
 
+/** Dedicated call popup — only while the agent leg is ringing or connected. */
+function isPreviewCallWidgetVisibleState(
+  dialog: FinessePreviewEvent,
+  agentParticipant: PreviewParticipant | null,
+): boolean {
+  if ((dialog as { eventType?: string }).eventType === "ENDED") return false;
+
+  const participantState = agentParticipant?.state;
+  const dialogState = dialog.dialogState;
+
+  if (
+    participantState === "DROPPED" ||
+    participantState === "WRAP_UP" ||
+    dialogState === "WRAP_UP" ||
+    dialogState === "ENDED"
+  ) {
+    return false;
+  }
+
+  if (participantState === "ALERTING" || dialogState === "ALERTING") return true;
+  if (participantState === "ACTIVE" || dialogState === "ACTIVE") return true;
+  if (participantState === "HELD") return true;
+
+  return false;
+}
+
+/** Preview/ringing before the agent leg is connected — wrap-up must not be offered yet. */
+function isPreviewBeforeConnectedCall(
+  dialog: FinessePreviewEvent | null | undefined,
+  agentParticipant: PreviewParticipant | null,
+): boolean {
+  if (!dialog) return true;
+  if (isWrapUpPreviewState(dialog, agentParticipant)) return false;
+  const participantState = agentParticipant?.state;
+  const dialogState = dialog.dialogState;
+  if (participantState === "ACTIVE" || participantState === "HELD") return false;
+  if (dialogState === "ACTIVE") return false;
+  return true;
+}
+
 function participantSortTime(dialog: FinessePreviewEvent): string {
   const agent = dialog.participants?.[0];
   return agent?.stateChangeTime ?? agent?.startTime ?? "";
@@ -101,6 +143,10 @@ export function useFinesseCampaignPreview(
   const [lastSubmittedWrapUpIds, setLastSubmittedWrapUpIds] = useState<
     string[]
   >([]);
+  const [finesseAgentRosterState, setFinesseAgentRosterState] = useState(() => {
+    const stored = getFinesseUserData()?.state;
+    return typeof stored === "string" ? stored.trim() : "";
+  });
 
   const wrapUpEventDialogIdRef = useRef<string | null>(null);
   /** Dialog kept in state so wrap-up submit still works after preview ENDED. */
@@ -173,10 +219,12 @@ export function useFinesseCampaignPreview(
     const active = dialogs
       .filter((d) => {
         const id = d.dialogId == null ? "" : String(d.dialogId);
-        if (wrapUpPendingDialogIdRef.current === id) return true;
-        if ((d as { eventType?: string }).eventType === "ENDED") return false;
         const agent = resolvePreviewAgentParticipant(d, agentExtension);
         if (agent?.state === "DROPPED") return false;
+        if ((d as { eventType?: string }).eventType === "ENDED") {
+          return wrapUpPendingDialogIdRef.current === id;
+        }
+        if (wrapUpPendingDialogIdRef.current === id) return true;
         return true;
       })
       .sort(
@@ -208,12 +256,18 @@ export function useFinesseCampaignPreview(
 
   const previewCallStateLabel = useMemo(() => {
     if (!activePreviewDialog) return "";
-    return (
-      activePreviewDialog.dialogState ??
-      activePreviewAgentParticipant?.state ??
-      ""
+    return formatFinesseStateLabel(
+      resolveFinesseCallDisplayState(
+        activePreviewDialog,
+        agentExtension,
+        finesseAgentRosterState,
+      ),
     );
-  }, [activePreviewDialog, activePreviewAgentParticipant]);
+  }, [
+    activePreviewDialog,
+    agentExtension,
+    finesseAgentRosterState,
+  ]);
 
   const previewTimeAnchorMs = useMemo(() => {
     if (!activePreviewAgentParticipant) return null;
@@ -234,23 +288,27 @@ export function useFinesseCampaignPreview(
       setPreviewDialogs((prev) => ({ ...prev, [dialogId]: payload }));
       setLastSubmittedWrapUpIds([]);
     } else if (eventType === "UPDATED") {
+      let mergedDialog: FinessePreviewEvent = payload;
       setPreviewDialogs((prev) => {
         const existing = prev[dialogId];
         if (existing) {
-          return {
-            ...prev,
-            [dialogId]: {
-              ...existing,
-              ...payload,
-              callVariables: payload.callVariables ?? existing.callVariables,
-              participants: payload.participants ?? existing.participants,
-            },
+          mergedDialog = {
+            ...existing,
+            ...payload,
+            callVariables: payload.callVariables ?? existing.callVariables,
+            participants: payload.participants ?? existing.participants,
           };
+          return { ...prev, [dialogId]: mergedDialog };
         }
         return { ...prev, [dialogId]: payload };
       });
+      const agent = resolvePreviewAgentParticipant(mergedDialog, agentExtension);
+      if (!isPreviewCallWidgetVisibleState(mergedDialog, agent)) {
+        setShowCallWidget(false);
+      }
     } else if (eventType === "ENDED") {
       if (wrapUpPendingDialogIdRef.current === dialogId) {
+        setShowCallWidget(false);
         setPreviewDialogs((prev) => {
           const existing = prev[dialogId];
           return {
@@ -274,6 +332,11 @@ export function useFinesseCampaignPreview(
         return next;
       });
     }
+  }, [agentExtension]);
+
+  const handleAgentStateEvent = useCallback((payload: { state?: string }) => {
+    const raw = typeof payload?.state === "string" ? payload.state.trim() : "";
+    if (raw) setFinesseAgentRosterState(raw);
   }, []);
 
   useEffect(() => {
@@ -286,29 +349,34 @@ export function useFinesseCampaignPreview(
       return;
     }
     const participant = activePreviewAgentParticipant;
-    const dialogState = activePreviewDialog.dialogState ?? participant?.state;
-    const isAlerting =
-      dialogState === "ALERTING" || participant?.state === "ALERTING";
-    const isActive =
-      dialogState === "ACTIVE" || participant?.state === "ACTIVE";
-    const isHeld = participant?.state === "HELD";
-    const isWrapUpState =
-      isWrapUpPreviewState(activePreviewDialog, participant) ||
-      wrapUpPendingDialogIdRef.current ===
-        String(activePreviewDialog.dialogId);
+    if (!isPreviewCallWidgetVisibleState(activePreviewDialog, participant)) {
+      setShowCallWidget(false);
+      return;
+    }
+
+    const displayState = resolveFinesseCallDisplayState(
+      activePreviewDialog,
+      agentExtension,
+      finesseAgentRosterState,
+    );
+    const displayUpper = displayState.toUpperCase();
+    const isAlerting = displayUpper === "ALERTING";
+    const isHeld = displayUpper === "HELD";
     setShowCallWidget(true);
     if (isAlerting) {
       setCallStatus("Ringing");
-    } else if (isWrapUpState) {
-      setCallStatus("Wrap up");
-    } else if (isActive || isHeld) {
-      setCallStatus("Connected");
-      setIsHold(isHeld);
+    } else if (isHeld) {
+      setCallStatus(formatFinesseStateLabel(displayState) || "Held");
+      setIsHold(true);
+    } else if (displayState) {
+      setCallStatus(formatFinesseStateLabel(displayState) || "Connected");
+      setIsHold(false);
     }
   }, [
-    activePreviewDialog?.dialogId,
-    activePreviewDialog?.dialogState,
+    activePreviewDialog,
     activePreviewAgentParticipant,
+    agentExtension,
+    finesseAgentRosterState,
   ]);
 
   useEffect(() => {
@@ -424,7 +492,7 @@ export function useFinesseCampaignPreview(
       if (wrapUpEventDialogIdRef.current === dialogKey) return;
       wrapUpEventDialogIdRef.current = dialogKey;
       wrapUpPendingDialogIdRef.current = dialogKey;
-      setCallStatus("Wrap up");
+      setShowCallWidget(false);
       await handleWrapUpClickRef.current(false, openedFromWrapUpEvent);
     },
     [],
@@ -480,6 +548,16 @@ export function useFinesseCampaignPreview(
     const { username, extension, teamId } = getFinesseContext();
     const dialogId =
       wrapUpPendingDialogIdRef.current ?? activePreviewDialog?.dialogId;
+    if (
+      isPreviewBeforeConnectedCall(
+        activePreviewDialog,
+        activePreviewAgentParticipant,
+      ) &&
+      wrapUpPendingDialogIdRef.current == null
+    ) {
+      toast.warn("Wrap-up reasons can only be added while on a call.");
+      return;
+    }
     if (username && extension && dialogId && teamId != null) {
       const reasons = Array.isArray(data.wrapUp) ? data.wrapUp : [data.wrapUp];
       setLastSubmittedWrapUpIds(reasons.map(String));
@@ -523,6 +601,16 @@ export function useFinesseCampaignPreview(
     _openedFromEndCall?: boolean,
     openedFromWrapUpEvent?: boolean,
   ) => {
+    if (
+      !openedFromWrapUpEvent &&
+      isPreviewBeforeConnectedCall(
+        activePreviewDialog,
+        activePreviewAgentParticipant,
+      )
+    ) {
+      toast.warn("Wrap-up reasons can only be added while on a call.");
+      return;
+    }
     const dialogId =
       wrapUpPendingDialogIdRef.current ?? activePreviewDialog?.dialogId;
     if (dialogId != null) {
@@ -618,9 +706,7 @@ export function useFinesseCampaignPreview(
     }
   };
 
-  useEffect(() => {
-    handleWrapUpClickRef.current = handleWrapUpClick;
-  });
+  handleWrapUpClickRef.current = handleWrapUpClick;
 
   useEffect(() => {
     if (suppressCallWidgetUntilCreatedRef.current) return;
@@ -631,9 +717,9 @@ export function useFinesseCampaignPreview(
 
     requestWrapUpModal(activePreviewDialog.dialogId, true);
   }, [
-    activePreviewDialog,
-    activePreviewAgentParticipant?.state,
+    activePreviewDialog?.dialogId,
     activePreviewDialog?.dialogState,
+    activePreviewAgentParticipant?.state,
     requestWrapUpModal,
   ]);
 
@@ -651,6 +737,7 @@ export function useFinesseCampaignPreview(
 
   return {
     handlePreviewEvent,
+    handleAgentStateEvent,
     /** Same shape as previous inline helpers: username, extension, teamId */
     getFinesseContext,
     formatPreviewTime,
@@ -685,7 +772,8 @@ export function useFinesseCampaignPreview(
         : [],
       onRejectWithAction: handleRejectOrClose,
       onReclassify: handlePreviewReclassify,
-      onWrapUpClick: handleWrapUpClick,
+      onWrapUpClick:
+        callStatus === "Ringing" ? undefined : handleWrapUpClick,
       wrapUpLoading: wrapUpReasonsLoading,
       onHoldToggle: handleHoldToggle,
       holdLoading,

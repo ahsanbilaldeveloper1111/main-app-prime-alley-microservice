@@ -2,6 +2,18 @@
  * Shared Finesse/agent UI helpers for campaign communications pages.
  */
 
+/** Human-readable Finesse state for badges and call popup (e.g. TALKING → Talking). */
+export function formatFinesseStateLabel(raw: string | undefined): string {
+  const trimmed = (raw ?? "").trim();
+  if (!trimmed) return "";
+  if (trimmed !== trimmed.toUpperCase()) return trimmed;
+  return trimmed
+    .split("_")
+    .filter(Boolean)
+    .map((part) => part.charAt(0) + part.slice(1).toLowerCase())
+    .join(" ");
+}
+
 /** When `treatLoginAsReady`, LOGIN uses the same color as READY (supervisor console). */
 export function getCampaignAgentStateColor(
   state: string,
@@ -62,4 +74,25 @@ export function mapEffectiveFinesseStateToTopBarReadyToggle(
   const u = (raw ?? "").trim().toUpperCase();
   if (u === "READY") return "READY";
   return "NOT_READY";
+}
+
+/** Console treats LOGIN like READY for availability actions and badges. */
+export function isFinesseConsoleReadyLikeState(state: string | undefined): boolean {
+  const u = (state ?? "").trim().toUpperCase();
+  return u === "READY" || u === "LOGIN";
+}
+
+export function isFinesseConsoleNotReadyState(state: string | undefined): boolean {
+  return (state ?? "").trim().toUpperCase() === "NOT_READY";
+}
+
+/** True when the target Ready/Not Ready action would not change the agent. */
+export function isFinesseConsoleStatusActionDisabled(
+  currentState: string | undefined,
+  targetState: "READY" | "NOT_READY",
+): boolean {
+  if (targetState === "READY") {
+    return isFinesseConsoleReadyLikeState(currentState);
+  }
+  return isFinesseConsoleNotReadyState(currentState);
 }

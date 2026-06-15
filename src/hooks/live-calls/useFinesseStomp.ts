@@ -220,19 +220,7 @@ export function useFinesseStomp({
     onStompConnected,
   });
 
-  useEffect(() => {
-    callbacksRef.current = {
-      onStateEvent,
-      onErrorEvent,
-      onConnectionChange,
-      onAuthError,
-      onPreviewEvent,
-      onMonitoringDialogEvent,
-      onRosterEvent,
-      onStompConnected,
-    };
-    wantsPreviewRef.current = Boolean(onPreviewEvent);
-  }, [
+  callbacksRef.current = {
     onStateEvent,
     onErrorEvent,
     onConnectionChange,
@@ -241,7 +229,8 @@ export function useFinesseStomp({
     onMonitoringDialogEvent,
     onRosterEvent,
     onStompConnected,
-  ]);
+  };
+  wantsPreviewRef.current = Boolean(onPreviewEvent);
 
   useEffect(() => {
     if (!token || !finesseUserId) {

@@ -4,16 +4,22 @@ import {
   finesseEndMonitoring,
   finesseStartSilentMonitor,
   getFinesseMonitoringAgentDialogs,
+  isFinesseAgentOnCallFromRosterState,
+  resolveFinesseCallDisplayState,
 } from "@utils/finesse";
 import type { FinessePreviewEvent } from "@hooks/live-calls/useFinesseStomp";
 
 const MONITOR_START_GRACE_MS = 15_000;
 const MONITORING_POLL_MS = 20_000;
 const ACTIVE_DIALOG_STATES = new Set(["ACTIVE", "ALERTING", "HELD", "TALKING"]);
+/** Connected call legs only — excludes ALERTING (ringing/preview) for monitor eligibility. */
+const CONNECTED_DIALOG_STATES = new Set(["ACTIVE", "HELD", "TALKING"]);
 
 export type FinesseMonitoringAgent = {
   loginId: string;
   extension?: string;
+  /** Team roster state; combined with dialogs to detect on-call for monitoring. */
+  state?: string;
 };
 
 export type FinesseMonitorAction = "monitor" | "barge" | "end";
@@ -123,6 +129,21 @@ function isActiveDialog(dialog: FinessePreviewEvent): boolean {
   );
 }
 
+function isConnectedDialog(dialog: FinessePreviewEvent): boolean {
+  if (upperString(dialog.eventType) === "ENDED") return false;
+  const dialogState = upperString(
+    dialog.dialogState ?? (dialog as { state?: unknown }).state,
+  );
+  if (CONNECTED_DIALOG_STATES.has(dialogState)) return true;
+  return (dialog.participants ?? []).some((participant) =>
+    CONNECTED_DIALOG_STATES.has(upperString(participant.state)),
+  );
+}
+
+function isAgentOnCallFromRosterState(state: string | undefined): boolean {
+  return isFinesseAgentOnCallFromRosterState(state);
+}
+
 function participantAddresses(dialog: FinessePreviewEvent): string[] {
   return (dialog.participants ?? [])
     .map((participant) => cleanValue(participant.mediaAddress))
@@ -168,6 +189,11 @@ function dialogsById(dialogs: FinessePreviewEvent[]) {
 function getActiveDialogId(dialogs: Record<string, FinessePreviewEvent>) {
   const active = Object.values(dialogs).find(isActiveDialog);
   return active ? dialogIdFromEvent(active) : null;
+}
+
+function getConnectedDialogId(dialogs: Record<string, FinessePreviewEvent>) {
+  const connected = Object.values(dialogs).find(isConnectedDialog);
+  return connected ? dialogIdFromEvent(connected) : null;
 }
 
 function findSupervisorDialogIdForSession(
@@ -361,10 +387,26 @@ export function useFinesseMonitoring({
     [mergeSupervisorDialogs],
   );
 
+  const getAgentCallDisplayState = useCallback(
+    (agent: FinesseMonitoringAgent): string | null => {
+      const dialogs = agentDialogs[agent.loginId] ?? {};
+      const connected = Object.values(dialogs).find(isConnectedDialog);
+      if (!connected) return null;
+      const resolved = resolveFinesseCallDisplayState(
+        connected,
+        cleanValue(agent.extension),
+        agent.state,
+      );
+      return resolved || null;
+    },
+    [agentDialogs],
+  );
+
   const getAgentMonitoringState = useCallback(
     (agent: FinesseMonitoringAgent): FinesseAgentMonitoringState => {
       const dialogs = agentDialogs[agent.loginId] ?? {};
-      const activeAgentDialogId = getActiveDialogId(dialogs);
+      const connectedDialogId = getConnectedDialogId(dialogs);
+      const rosterOnCall = isAgentOnCallFromRosterState(agent.state);
       const session = sessions[agent.loginId];
       const withinGrace =
         session != null && now - session.monitorStartedAt <= MONITOR_START_GRACE_MS;
@@ -374,11 +416,11 @@ export function useFinesseMonitoring({
         (session.supervisorMonitorDialogId != null || withinGrace);
       const bargedIn = session?.bargedIn === true;
       return {
-        agentOnCall: activeAgentDialogId != null,
+        agentOnCall: connectedDialogId != null || rosterOnCall,
         monitoringActive: silentMonitorActive || bargedIn,
         silentMonitorActive,
         bargedIn,
-        activeAgentDialogId,
+        activeAgentDialogId: connectedDialogId,
         supervisorMonitorDialogId: session?.supervisorMonitorDialogId ?? null,
         actionLoading: actionLoading[agent.loginId] ?? null,
       };
@@ -403,6 +445,9 @@ export function useFinesseMonitoring({
       }
       if (!agentExtension) {
         throw new Error("Agent extension is not available.");
+      }
+      if (!getAgentMonitoringState(agent).agentOnCall) {
+        throw new Error("The agent does not have an active call to monitor.");
       }
       setAgentActionLoading(agent.loginId, "monitor");
       try {
@@ -431,6 +476,7 @@ export function useFinesseMonitoring({
       canUseMonitoringApi,
       fetchAgentDialogs,
       fetchSupervisorDialogs,
+      getAgentMonitoringState,
       normalizedSupervisorExtension,
       setAgentActionLoading,
       supervisorFinesseUserId,
@@ -544,6 +590,7 @@ export function useFinesseMonitoring({
     handleMonitoringDialogEvent,
     handleSupervisorPreviewEvent,
     getAgentMonitoringState,
+    getAgentCallDisplayState,
     startSilentMonitor,
     barge,
     endMonitoring,
