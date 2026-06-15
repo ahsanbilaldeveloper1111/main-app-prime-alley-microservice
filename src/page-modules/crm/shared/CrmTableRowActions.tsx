@@ -15,6 +15,8 @@ export type CrmTableRowAction = Readonly<{
   icon: React.ReactNode;
   onClick: () => void;
   tone?: CrmTableRowActionTone;
+  disabled?: boolean;
+  disabledTitle?: string;
 }>;
 
 const TONE_CLASS: Record<CrmTableRowActionTone, string> = {
@@ -39,23 +41,45 @@ export function CrmTableRowActions({ actions }: CrmTableRowActionsProps) {
   return (
     <>
       <div className="d-flex flex-nowrap align-items-center justify-content-center gap-1 gt-row-actions--desktop d-none d-md-flex">
-        {actions.map((action) => (
-          <Button
-            key={action.label}
-            type="button"
-            variant="light"
-            size="sm"
-            className={`btn-action-style-2 p-1 ${TONE_CLASS[action.tone ?? "primary"]}`}
-            title={action.label}
-            aria-label={action.label}
-            onClick={(event) => {
-              event.stopPropagation();
-              action.onClick();
-            }}
-          >
-            {action.icon}
-          </Button>
-        ))}
+        {actions.map((action) => {
+          const isDisabled = action.disabled === true;
+          const button = (
+            <Button
+              type="button"
+              variant="light"
+              size="sm"
+              disabled={isDisabled}
+              className={`btn-action-style-2 p-1 ${
+                isDisabled ? "gt-action-disabled" : TONE_CLASS[action.tone ?? "primary"]
+              }`}
+              title={isDisabled ? undefined : action.label}
+              aria-label={action.label}
+              onClick={(event) => {
+                event.stopPropagation();
+                if (isDisabled) return;
+                action.onClick();
+              }}
+            >
+              {action.icon}
+            </Button>
+          );
+
+          if (isDisabled && action.disabledTitle) {
+            return (
+              <span
+                key={action.label}
+                className="gt-action-disabled-wrapper"
+                title={action.disabledTitle}
+              >
+                {button}
+              </span>
+            );
+          }
+
+          return (
+            <React.Fragment key={action.label}>{button}</React.Fragment>
+          );
+        })}
       </div>
       <CrmTableRowActionsMobileMenu actions={actions} />
     </>

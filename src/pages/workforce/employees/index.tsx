@@ -33,6 +33,7 @@ import {
   EMPLOYMENT_TYPES,
   CONTRACT_TYPES,
   EMPLOYEES_ITEMS_PER_PAGE,
+  EMPLOYEE_JOURNEY_CREATE_PERMISSIONS,
   hierarchyLabel,
   userIdForProfilePayload,
   buildDepartmentHeadcountChartRows,
@@ -44,7 +45,7 @@ import {
   useEmployeesDepartmentHeadcountQuery,
   useEmployeesDashboardCountersQuery,
 } from "@page-modules/workforce/employees/useEmployeesAnalyticsQueries";
-import { buildEmployeeTableActions, buildEmployeeTableColumns } from "@page-modules/workforce/employees/employeesTableConfig";
+import { buildEmployeeTableColumns } from "@page-modules/workforce/employees/employeesTableConfig";
 import UsersPillDropdownContent from "@page-modules/workforce/employees/partials/UsersPillDropdownContent";
 import EmployeesDepartmentHeadcountPanel from "@page-modules/workforce/employees/partials/EmployeesDepartmentHeadcountPanel";
 import EmployeesDashboardOverviewPanel from "@page-modules/workforce/employees/partials/EmployeesDashboardOverviewPanel";
@@ -61,7 +62,7 @@ import {
 } from "@page-modules/workforce/shared/workforceListPageConfig";
 import { renderApplyFilterActions } from "@utils/communicationsStagedFilters";
 
-import { useSession } from "next-auth/react";
+import { usePermissions } from "@utils/permissionUtils";
 
 import "@page-modules/workforce/shared/workforcePages.scss";
 import "@page-modules/workforce/employees/employeesPage.scss";
@@ -71,15 +72,12 @@ const { PERMISSIONS } = HEADER_CONSTANTS;
 const Employees = () => {
   const router = useRouter();
   const queryClient = useQueryClient();
-  const { data: session } = useSession();
+  const { hasPermission, hasAnyPermission, isAdmin } = usePermissions();
   const { mainAppDepartments, mainAppUsers, companyIdentifier, loadingUsers } = useMainAppLookups();
 
   const canViewAllCompanyEmployees = useMemo(
-    () =>
-      Boolean(
-        session?.user?.permissions?.includes(PERMISSIONS.VIEW_ALL_COMPANY_EMPLOYEES_STAFF_MANAGEMENT),
-      ),
-    [session?.user?.permissions],
+    () => hasPermission(PERMISSIONS.VIEW_ALL_COMPANY_EMPLOYEES_STAFF_MANAGEMENT),
+    [hasPermission],
   );
 
   const mainAppUserPhones = useMemo(
@@ -631,7 +629,35 @@ const Employees = () => {
     ],
   );
 
-  const canAddEmployee = session?.user?.permissions?.includes(PERMISSIONS.ADD_EMPLOYEE_STAFF_MANAGEMENT);
+  const isWorkforceAdmin = isAdmin();
+  const canAddEmployee =
+    isWorkforceAdmin || hasPermission(PERMISSIONS.ADD_EMPLOYEE_STAFF_MANAGEMENT);
+  const canEditEmployee =
+    isWorkforceAdmin || hasPermission(PERMISSIONS.UPDATE_EMPLOYEE_STAFF_MANAGEMENT);
+  const canCreateEmployeeJourney =
+    isWorkforceAdmin ||
+    hasAnyPermission([...EMPLOYEE_JOURNEY_CREATE_PERMISSIONS]);
+  const canDeleteEmployee =
+    isWorkforceAdmin || hasPermission(PERMISSIONS.DELETE_EMPLOYEE_STAFF_MANAGEMENT);
+
+  const employeeTableActions = useMemo(
+    () => ({
+      canEdit: canEditEmployee,
+      canCreateJourney: canCreateEmployeeJourney,
+      canDelete: canDeleteEmployee,
+      openEditModal,
+      openJourneyModal,
+      handleDeleteClick,
+    }),
+    [
+      canCreateEmployeeJourney,
+      canDeleteEmployee,
+      canEditEmployee,
+      handleDeleteClick,
+      openEditModal,
+      openJourneyModal,
+    ],
+  );
 
   const employeeSidebarSections = useMemo<SidebarSection[]>(() => {
     if (!selectedProfile) return [];
@@ -683,19 +709,9 @@ const Employees = () => {
       buildEmployeeTableColumns({
         getDisplayName,
         departments,
+        tableActions: employeeTableActions,
       }),
-    [getDisplayName, departments],
-  );
-
-  const employeeActions = useMemo(
-    () =>
-      buildEmployeeTableActions({
-        permissions: session?.user?.permissions,
-        openEditModal,
-        openJourneyModal,
-        handleDeleteClick,
-      }),
-    [handleDeleteClick, openEditModal, openJourneyModal, session?.user?.permissions],
+    [departments, employeeTableActions, getDisplayName],
   );
 
   return (
@@ -726,9 +742,7 @@ const Employees = () => {
             <GenericTable<UserProfile>
               data={profiles}
               columns={employeeColumns}
-              actions={employeeActions}
-              showActions={true}
-              actionsLabel="Actions"
+              showActions={false}
               loading={listFetching}
               loadingMessage="Loading employees..."
               emptyMessage="No employees found"

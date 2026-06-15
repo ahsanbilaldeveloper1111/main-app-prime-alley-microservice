@@ -372,8 +372,6 @@ type RingingCallPanelProps = Readonly<{
   onRejectWithAction?: (action: 'REJECT' | 'CLOSE') => void;
   handleAcceptCall: () => void;
   handleRejectCall: () => void;
-  onWrapUpClick?: () => void;
-  wrapUpLoading: boolean;
   onReclassify?: () => void | Promise<void>;
 }>;
 
@@ -388,15 +386,10 @@ function RingingCallPanel({
   onRejectWithAction,
   handleAcceptCall,
   handleRejectCall,
-  onWrapUpClick,
-  wrapUpLoading,
   onReclassify,
 }: RingingCallPanelProps) {
   return (
     <>
-      {onWrapUpClick && previewActions.includes('UPDATE_CALL_DATA') && (
-        <WrapUpButton onClick={onWrapUpClick} loading={wrapUpLoading} />
-      )}
 
       <div className="call-action-buttons">
         {previewActions.length ? (
@@ -931,8 +924,6 @@ const CallWidget: React.FC<CallWidgetProps> = ({
               onRejectWithAction={onRejectWithAction}
               handleAcceptCall={handleAcceptCall}
               handleRejectCall={handleRejectCall}
-              onWrapUpClick={onWrapUpClick}
-              wrapUpLoading={wrapUpLoading}
               onReclassify={onReclassify}
             />
           )}

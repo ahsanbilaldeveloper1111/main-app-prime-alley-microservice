@@ -126,8 +126,11 @@ export function CrmTableRowActionsMobileMenu({ actions }: CrmTableRowActionsMobi
                 key={action.label}
                 type="button"
                 className="dropdown-item"
+                disabled={action.disabled === true}
+                title={action.disabled ? action.disabledTitle : undefined}
                 onClick={(e) => {
                   stopRowClick(e);
+                  if (action.disabled === true) return;
                   closeMenu();
                   action.onClick();
                 }}

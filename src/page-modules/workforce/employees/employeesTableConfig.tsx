@@ -1,25 +1,29 @@
 import React from "react";
 import moment from "moment";
 import { Calendar, Pencil, Trash2, User } from "lucide-react";
-import type { TableAction, TableColumn } from "@components/GenericTable";
+import type { TableColumn } from "@components/GenericTable";
 import type { MainAppDepartmentLookup } from "@hooks/useMainAppLookups";
 import type { UserProfile } from "@utils/staffManagement";
 import { GlobalDateTimeFormat } from "@utils/Helper";
 import { formatPhoneForDisplay } from "@utils/phoneDisplay";
-import { HEADER_CONSTANTS } from "@constants/headerConstants";
-
-const { PERMISSIONS } = HEADER_CONSTANTS;
+import {
+  CrmTableRowActions,
+  type CrmTableRowAction,
+} from "@page-modules/crm/shared/CrmTableRowActions";
+import { employeeProfileHasJourneyStarted } from "./employeesDomain";
 
 export interface EmployeeTableColumnsParams {
   getDisplayName: (p: UserProfile) => string;
   departments: MainAppDepartmentLookup[];
+  tableActions?: EmployeeTableActionsParams;
 }
 
 export function buildEmployeeTableColumns({
   getDisplayName,
   departments,
+  tableActions,
 }: EmployeeTableColumnsParams): TableColumn<UserProfile>[] {
-  return [
+  const columns: TableColumn<UserProfile>[] = [
     {
       key: "name",
       label: "Employee",
@@ -133,47 +137,78 @@ export function buildEmployeeTableColumns({
       ),
     },
   ];
+
+  if (
+    tableActions &&
+    (tableActions.canEdit || tableActions.canCreateJourney || tableActions.canDelete)
+  ) {
+    columns.push({
+      key: "actions",
+      label: "Actions",
+      type: "custom",
+      sortable: false,
+      align: "center",
+      width: "140px",
+      render: (profile: UserProfile) => (
+        <CrmTableRowActions actions={buildEmployeeRowActions(profile, tableActions)} />
+      ),
+    });
+  }
+
+  return columns;
 }
 
 export interface EmployeeTableActionsParams {
-  permissions: string[] | undefined;
+  canEdit: boolean;
+  canCreateJourney: boolean;
+  canDelete: boolean;
   openEditModal: (profile: UserProfile, e?: React.MouseEvent) => void;
   openJourneyModal: (profile: UserProfile, e?: React.MouseEvent) => void;
   handleDeleteClick: (profile: UserProfile, e?: React.MouseEvent) => void;
 }
 
-export function buildEmployeeTableActions({
-  permissions,
-  openEditModal,
-  openJourneyModal,
-  handleDeleteClick,
-}: EmployeeTableActionsParams): TableAction<UserProfile>[] {
-  return [
-    {
+function buildEmployeeRowActions(
+  profile: UserProfile,
+  {
+    canEdit,
+    canCreateJourney,
+    canDelete,
+    openEditModal,
+    openJourneyModal,
+    handleDeleteClick,
+  }: EmployeeTableActionsParams,
+): CrmTableRowAction[] {
+  const actions: CrmTableRowAction[] = [];
+
+  if (canEdit) {
+    actions.push({
       label: "Edit",
-      icon: <Pencil size={16} />,
-      onClick: (profile: UserProfile) => openEditModal(profile),
-      show: () => Boolean(permissions?.includes(PERMISSIONS.UPDATE_EMPLOYEE_STAFF_MANAGEMENT)),
-      variant: "light",
-      className: "btn-action-style-2 p-1 text-primary",
-    },
-    {
+      icon: <Pencil size={16} aria-hidden />,
+      tone: "primary",
+      onClick: () => openEditModal(profile),
+    });
+  }
+
+  if (canCreateJourney) {
+    const journeyStarted = employeeProfileHasJourneyStarted(profile);
+    actions.push({
       label: "Create Journey",
-      icon: <Calendar size={16} />,
-      onClick: (profile: UserProfile) => openJourneyModal(profile),
-      show: () => Boolean(permissions?.includes(PERMISSIONS.CREATE_JOURNEY_STAFF_MANAGEMENT)),
-      disabled: (profile: UserProfile) => (profile as UserProfile & { journey?: { id?: number } }).journey?.id != null,
+      icon: <Calendar size={16} aria-hidden />,
+      tone: "primary",
+      disabled: journeyStarted,
       disabledTitle: "Journey already started",
-      variant: "light",
-      className: "btn-action-style-2 p-1 text-primary",
-    },
-    {
+      onClick: () => openJourneyModal(profile),
+    });
+  }
+
+  if (canDelete) {
+    actions.push({
       label: "Delete",
-      icon: <Trash2 size={16} />,
-      onClick: (profile: UserProfile) => handleDeleteClick(profile),
-      show: () => Boolean(permissions?.includes(PERMISSIONS.DELETE_EMPLOYEE_STAFF_MANAGEMENT)),
-      variant: "light",
-      className: "btn-action-style-2 p-1 text-danger",
-    },
-  ];
+      icon: <Trash2 size={16} aria-hidden />,
+      tone: "danger",
+      onClick: () => handleDeleteClick(profile),
+    });
+  }
+
+  return actions;
 }

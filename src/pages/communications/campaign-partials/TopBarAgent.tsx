@@ -266,8 +266,13 @@ const TopBar: React.FC<TopBarProps> = ({
           font-family: inherit;
         }
 
-        .dropdown-item:hover {
+        .dropdown-item:hover:not(:disabled) {
           background: #f8fafc;
+        }
+
+        .dropdown-item:disabled {
+          cursor: not-allowed;
+          opacity: 0.65;
         }
 
         .dropdown-item.active {
@@ -367,20 +372,28 @@ const TopBar: React.FC<TopBarProps> = ({
               <div className="dropdown-menu" style={{ display: "block" }}>
                 {statusOptions.map((option) => {
                   const IconComponent = option.icon;
+                  const isCurrentStatus = agentStatus === option.value;
                   return (
                     <button
                       key={option.value}
                       type="button"
-                      className={`dropdown-item ${agentStatus === option.value ? "active" : ""}`}
+                      className={`dropdown-item ${isCurrentStatus ? "active" : ""}`}
+                      disabled={isCurrentStatus}
+                      title={
+                        isCurrentStatus
+                          ? `Already ${option.label}`
+                          : undefined
+                      }
                       onClick={(e) => {
                         e.preventDefault();
                         e.stopPropagation();
+                        if (isCurrentStatus) return;
                         handleStatusChange(option.value);
                       }}
                     >
                       <IconComponent size={18} color={option.color} />
                       <span>{option.label}</span>
-                      {agentStatus === option.value && (
+                      {isCurrentStatus && (
                         <CheckCircle size={16} style={{ marginLeft: "auto" }} />
                       )}
                     </button>

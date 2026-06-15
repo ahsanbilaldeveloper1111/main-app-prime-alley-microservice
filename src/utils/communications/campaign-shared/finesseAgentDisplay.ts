@@ -63,3 +63,24 @@ export function mapEffectiveFinesseStateToTopBarReadyToggle(
   if (u === "READY") return "READY";
   return "NOT_READY";
 }
+
+/** Console treats LOGIN like READY for availability actions and badges. */
+export function isFinesseConsoleReadyLikeState(state: string | undefined): boolean {
+  const u = (state ?? "").trim().toUpperCase();
+  return u === "READY" || u === "LOGIN";
+}
+
+export function isFinesseConsoleNotReadyState(state: string | undefined): boolean {
+  return (state ?? "").trim().toUpperCase() === "NOT_READY";
+}
+
+/** True when the target Ready/Not Ready action would not change the agent. */
+export function isFinesseConsoleStatusActionDisabled(
+  currentState: string | undefined,
+  targetState: "READY" | "NOT_READY",
+): boolean {
+  if (targetState === "READY") {
+    return isFinesseConsoleReadyLikeState(currentState);
+  }
+  return isFinesseConsoleNotReadyState(currentState);
+}

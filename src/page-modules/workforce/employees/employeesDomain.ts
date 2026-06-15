@@ -1,7 +1,32 @@
 import moment from "moment";
+import { HEADER_CONSTANTS } from "@constants/headerConstants";
 import type { MainAppDepartmentLookup } from "@hooks/useMainAppLookups";
 import { WORKFORCE_DEPARTMENT_CHART_COLORS } from "@page-modules/workforce/shared/workforceChartColors";
 import type { UserProfile } from "@utils/staffManagement";
+
+const { PERMISSIONS } = HEADER_CONSTANTS;
+
+/** Permissions that allow starting an employee journey from the Employees list. */
+export const EMPLOYEE_JOURNEY_CREATE_PERMISSIONS = [
+  PERMISSIONS.CREATE_JOURNEY_STAFF_MANAGEMENT,
+  PERMISSIONS.VIEW_EMPLOYEES_ONBOARDING_STAFF_MANAGEMENT,
+  PERMISSIONS.UPDATE_JOURNEY_STAFF_MANAGEMENT,
+] as const;
+
+/** True when the profile already has an onboarding journey (supports multiple API shapes). */
+export function employeeProfileHasJourneyStarted(
+  profile: UserProfile | null | undefined,
+): boolean {
+  if (profile == null) return false;
+  const row = profile as UserProfile & {
+    journey?: { id?: number | string | null } | null;
+    journey_id?: number | string | null;
+  };
+  const nestedId = row.journey?.id;
+  if (nestedId != null && String(nestedId).trim() !== "") return true;
+  const journeyId = row.journey_id;
+  return journeyId != null && String(journeyId).trim() !== "";
+}
 
 /** Dashboard counters on employees page (includes optional fields returned by API). */
 export interface EmployeesDashboardOverviewCounters {

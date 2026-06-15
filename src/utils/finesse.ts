@@ -2,14 +2,11 @@ import axiosInstance from "./axios";
 
 const prefix = "finesse";
 
-/** State updates use `/api/v1/finesse/...` per API spec; other Finesse routes remain `/api/finesse/...`. */
 const FINESSE_V1_PREFIX = "v1/finesse";
-
-// ==================== Storage ====================
 
 export const FINESSE_USER_DATA_KEY = "finesseResponseData";
 export const FINESSE_TOKEN_KEY = "finesseToken";
-/** Stored selected team id; use this for all APIs (payloads/query params). Default 15 when not set. */
+
 export const FINESSE_SELECTED_TEAM_ID_KEY = "finesseSelectedTeamId";
 
 const NEXT_PUBLIC_FINESSED_DEFAULT_TEAM_ID =
@@ -162,6 +159,13 @@ const FINESSE_LOGGED_OUT_AGENT_STATES = new Set([
   "LOGGED_OUT",
 ]);
 
+/** Roster states that indicate an agent is on an active call. */
+const FINESSE_AGENT_ON_CALL_ROSTER_STATES = new Set([
+  "TALKING",
+  "ACTIVE",
+  "HELD",
+]);
+
 /**
  * Avoid `String(object)` → "[object Object]". Supports primitives and Finesse-style `{ label: string }`.
  */
@@ -212,6 +216,16 @@ export function isFinesseAgentOfflineLikeState(value: unknown): boolean {
   if (isFinesseAgentLoggedOutStateField(value)) return true;
   if (value == null) return false;
   return trimmedStringFromUnknownState(value).toUpperCase() === "OFFLINE";
+}
+
+/** True when roster state indicates the agent is on an active call. */
+export function isFinesseAgentOnCallFromRosterState(
+  value: unknown,
+): boolean {
+  if (value == null) return false;
+  return FINESSE_AGENT_ON_CALL_ROSTER_STATES.has(
+    trimmedStringFromUnknownState(value).toUpperCase(),
+  );
 }
 
 /**
@@ -269,7 +283,9 @@ export function getFinesseStateEventLoginId(payload: unknown): string | null {
   return null;
 }
 
-export function finesseStatePayloadIndicatesLoggedOut(payload: unknown): boolean {
+export function finesseStatePayloadIndicatesLoggedOut(
+  payload: unknown,
+): boolean {
   if (payload == null || typeof payload !== "object") return false;
   const p = payload as Record<string, unknown>;
   return (
@@ -295,7 +311,10 @@ export function shouldApplyFinesseRemoteLogoutFromStateEvent(
   payload: unknown,
   streamFinesseUserId: string | null | undefined,
 ): boolean {
-  if (streamFinesseUserId == null || String(streamFinesseUserId).trim() === "") {
+  if (
+    streamFinesseUserId == null ||
+    String(streamFinesseUserId).trim() === ""
+  ) {
     return false;
   }
   if (!finesseStatePayloadIndicatesLoggedOut(payload)) return false;
@@ -310,7 +329,9 @@ export function applyFinesseRemoteForcedLogout(): void {
   clearFinesseUserData();
   setFinesseManualReconnectRequired();
   globalThis.dispatchEvent(
-    new CustomEvent("finesse-require-reauth", { detail: { manualConnect: true } }),
+    new CustomEvent("finesse-require-reauth", {
+      detail: { manualConnect: true },
+    }),
   );
 }
 
@@ -338,9 +359,7 @@ export const getFinesseClusterId = (): string | null => {
   try {
     const data = getFinesseUserData();
     const s =
-      data?.settings?.finesseClusterId ??
-      data?.settings?.clusterId ??
-      null;
+      data?.settings?.finesseClusterId ?? data?.settings?.clusterId ?? null;
     if (s != null && String(s).trim() !== "") return String(s).trim();
   } catch {
     // ignore
@@ -353,7 +372,9 @@ export const getFinesseClusterId = (): string | null => {
  * SSE stream can subscribe to `/topic/finesse/cluster/{clusterId}/team/{teamId}/roster/state`.
  * Returns true when storage was updated (caller may want to reconnect the Finesse EventSource).
  */
-export function mergeClusterIntoStoredUserFromTeamPayload(teamPayload: unknown): boolean {
+export function mergeClusterIntoStoredUserFromTeamPayload(
+  teamPayload: unknown,
+): boolean {
   if (teamPayload == null || typeof teamPayload !== "object") return false;
   const p = teamPayload as Record<string, unknown>;
   const fromSettings =
@@ -369,8 +390,7 @@ export function mergeClusterIntoStoredUserFromTeamPayload(teamPayload: unknown):
   if (nextId == null) return false;
   const ud = getFinesseUserData();
   if (!ud) return false;
-  const cur =
-    ud.settings?.finesseClusterId ?? ud.settings?.clusterId ?? "";
+  const cur = ud.settings?.finesseClusterId ?? ud.settings?.clusterId ?? "";
   if (String(cur).trim() === nextId) return false;
   setFinesseUserData({
     ...ud,
@@ -436,11 +456,13 @@ export function isFinesseSessionReady(): boolean {
   if (!trimmedNonEmptyString(token) || !userData) return false;
   return Boolean(
     trimmedNonEmptyString(userData.loginId) ??
-      trimmedNonEmptyString(userData.loginName),
+    trimmedNonEmptyString(userData.loginName),
   );
 }
 
-function extractFinesseLinkToken(response: Record<string, unknown>): string | undefined {
+function extractFinesseLinkToken(
+  response: Record<string, unknown>,
+): string | undefined {
   const nestedData = isPlainRecord(response.data) ? response.data : null;
   const nestedResponseData = isPlainRecord(response.responseData)
     ? response.responseData
@@ -475,7 +497,9 @@ function extractFinesseLinkUserPayload(
   return null;
 }
 
-function isFinesseLinkSuccessResponse(response: Record<string, unknown>): boolean {
+function isFinesseLinkSuccessResponse(
+  response: Record<string, unknown>,
+): boolean {
   const status = response.status;
   if (
     status === "success" ||
@@ -562,7 +586,9 @@ export interface FinesseForceSignOutPayload {
  * POST /finesse/force-sign-out — supervisor forces an agent session to end in Finesse.
  * Body: `{ teamId, finesseUserId, supervisorFinesseUserId }`.
  */
-export const finesseForceSignOut = async (payload: FinesseForceSignOutPayload) => {
+export const finesseForceSignOut = async (
+  payload: FinesseForceSignOutPayload,
+) => {
   const response = await axiosInstance.post(
     `${prefix}/force-sign-out`,
     payload,

@@ -54,6 +54,28 @@ body:has(.workforce-employees-table-wrapper-container) {
     .employees-page__charts-grid {
       flex-shrink: 0;
     }
+
+    .generic-table-actions-cell,
+    .generic-table-td[data-col-key='actions'] {
+      width: 140px;
+      min-width: 140px;
+      max-width: 140px;
+      overflow: visible;
+      white-space: nowrap;
+    }
+
+    .generic-table-td[data-col-key='actions'] .btn-action-style-2.btn-light.gt-action-disabled,
+    .generic-table-td[data-col-key='actions'] .btn-action-style-2.btn-light:disabled {
+      opacity: 0.65;
+      cursor: not-allowed;
+    }
+
+    .generic-table-actions,
+    .generic-table-td[data-col-key='actions'] .gt-row-actions--desktop {
+      max-width: none;
+      overflow: visible;
+      flex-wrap: nowrap;
+    }
   }
 }
 
