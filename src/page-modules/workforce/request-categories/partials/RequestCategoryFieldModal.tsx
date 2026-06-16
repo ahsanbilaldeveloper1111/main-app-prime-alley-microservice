@@ -33,6 +33,8 @@ export type RequestCategoryFieldModalProps = Readonly<{
   setShowAdvanced: React.Dispatch<React.SetStateAction<boolean>>;
   autoGenerateKey: boolean;
   onSubmit: (e: React.FormEvent) => void;
+  /** Use centered modal when opened over another modal (default follows Main Settings sidebar). */
+  presentation?: "modal" | "sidebar";
 }>;
 
 export default function RequestCategoryFieldModal(props: RequestCategoryFieldModalProps) {
@@ -48,9 +50,11 @@ export default function RequestCategoryFieldModal(props: RequestCategoryFieldMod
     setShowAdvanced,
     autoGenerateKey,
     onSubmit,
+    presentation,
   } = props;
 
   const preferSidebar = useMainSettingsFormSidebar();
+  const useSidebar = (presentation ?? (preferSidebar ? "sidebar" : "modal")) === "sidebar";
   const panelTitle = fieldModalTitle(editingField);
   const formId = "request-category-field-form";
   const submitDisabled = savingField || !isFieldFormReadyForSubmit(fieldForm);
@@ -464,13 +468,13 @@ export default function RequestCategoryFieldModal(props: RequestCategoryFieldMod
       <Button variant="secondary" type="button" onClick={onHide} disabled={savingField}>
         Cancel
       </Button>
-      <Button variant="primary" type="submit" form={preferSidebar ? formId : undefined} disabled={submitDisabled}>
+      <Button variant="primary" type="submit" form={useSidebar ? formId : undefined} disabled={submitDisabled}>
         {fieldModalPrimaryButtonLabel(savingField, editingField)}
       </Button>
     </>
   );
 
-  if (preferSidebar) {
+  if (useSidebar) {
     return (
       <MainSettingsFormSidebar
         show={show}
