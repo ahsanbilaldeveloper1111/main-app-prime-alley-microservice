@@ -76,6 +76,7 @@ function RequestCategoriesLargeModal({
   toolbarHint,
   toolbarAction,
   bodyContent,
+  enforceFocus = true,
 }: Readonly<{
   show: boolean;
   onHide: () => void;
@@ -83,18 +84,19 @@ function RequestCategoriesLargeModal({
   toolbarHint: ReactNode;
   toolbarAction?: ReactNode;
   bodyContent: ReactNode;
+  enforceFocus?: boolean;
 }>) {
   return (
-    <Modal show={show} onHide={onHide} size="lg" centered>
+    <Modal show={show} onHide={onHide} size="lg" centered enforceFocus={enforceFocus}>
       <Modal.Header closeButton>
         <Modal.Title>{title}</Modal.Title>
       </Modal.Header>
-      <Modal.Body>
+      <Modal.Body className="request-categories-page__modal-body">
         <div className="d-flex justify-content-between align-items-center mb-3">
           <span className="text-muted">{toolbarHint}</span>
           {toolbarAction}
         </div>
-        {bodyContent}
+        <div className="request-categories-page__modal-table-wrap">{bodyContent}</div>
       </Modal.Body>
       <Modal.Footer>
         <Button variant="secondary" onClick={onHide}>
@@ -539,6 +541,7 @@ export function RequestCategoriesPageView({
       <RequestCategoriesLargeModal
         show={showFieldsModal}
         onHide={closeFieldsModal}
+        enforceFocus={!showFieldModal}
         title={<>Fields: {fieldsCategoryName}</>}
         toolbarHint="Define form fields for this request category."
         toolbarAction={
