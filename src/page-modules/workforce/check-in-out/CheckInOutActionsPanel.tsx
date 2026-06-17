@@ -1,5 +1,4 @@
 import React, { type ReactElement } from "react";
-import moment from "moment";
 import {
   Calendar,
   Clock,
@@ -16,10 +15,13 @@ import {
 } from "@page-modules/workforce/attendance/partials/AttendanceStatusUI";
 import {
   getMyAttendanceActionAvailability,
+  buildMyAttendanceStatusData,
   isMyAttendanceOnBreak,
   isMyAttendanceOnOvertime,
+  readMyAttendanceSessionActive,
   resolveMyAttendanceState,
 } from "./checkInOutDomain";
+import { formatAttendanceToolbarDateLine } from "@page-modules/workforce/attendance/attendanceDomain";
 
 type CheckInOutActionsPanelProps = Readonly<{
   statusLoading: boolean;
@@ -34,14 +36,19 @@ type CheckInOutActionsPanelProps = Readonly<{
   onStartOvertime: () => void;
 }>;
 
-function renderStatusDateLine(myAttendance: MyAttendanceData): ReactElement | null {
-  if (!myAttendance.work_date) {
+function renderStatusDateLine(
+  myAttendance: MyAttendanceData,
+  isCheckedIn: boolean,
+): ReactElement | null {
+  const status = buildMyAttendanceStatusData(myAttendance, isCheckedIn);
+  const dateLine = status ? formatAttendanceToolbarDateLine(status, isCheckedIn) : null;
+  if (!dateLine) {
     return null;
   }
   return (
     <div className="check-in-out-page__status-meta">
       <Calendar size={16} aria-hidden />
-      <span>{moment(myAttendance.work_date).format("dddd, DD MMM YYYY")}</span>
+      <span>{dateLine}</span>
     </div>
   );
 }
@@ -59,6 +66,7 @@ function renderStatusIcon(state: string): ReactElement {
 function renderStatusSection(
   statusLoading: boolean,
   myAttendance: MyAttendanceData | null,
+  canPerformActions: boolean,
   liveSessionElapsed: string,
 ): ReactElement {
   if (statusLoading) {
@@ -68,15 +76,18 @@ function renderStatusSection(
     return <AttendanceStatusUnavailable />;
   }
 
+  const availability = getMyAttendanceActionAvailability(myAttendance, canPerformActions);
+  const isCheckedIn = readMyAttendanceSessionActive(myAttendance, availability);
+  const status = buildMyAttendanceStatusData(myAttendance, isCheckedIn);
   const { label: statusLabel, chipModifier } = resolveMyAttendanceState(myAttendance.state);
   const chipClass = `check-in-out-page__status-chip check-in-out-page__status-chip--${chipModifier}`;
   const showLiveTimer =
-    myAttendance.is_checked_in && Boolean(myAttendance.attendance?.check_in_at) && liveSessionElapsed;
+    isCheckedIn && Boolean(status?.attendance?.check_in_at) && liveSessionElapsed;
 
   return (
     <>
-      {renderStatusDateLine(myAttendance)}
-      {myAttendance.banner ? (
+      {renderStatusDateLine(myAttendance, isCheckedIn)}
+      {!isCheckedIn && myAttendance.banner ? (
         <p className="check-in-out-page__banner">{myAttendance.banner}</p>
       ) : null}
       <div className={chipClass}>
@@ -167,7 +178,7 @@ export function CheckInOutActionsPanel({
       </div>
 
       <div className="check-in-out-page__status">
-        {renderStatusSection(statusLoading, myAttendance, liveSessionElapsed)}
+        {renderStatusSection(statusLoading, myAttendance, canPerformActions, liveSessionElapsed)}
       </div>
 
       {canPerformActions ? (

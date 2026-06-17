@@ -49,12 +49,11 @@ import {
 } from "@page-modules/workforce/check-in-out/buildCheckInOutActionPayload";
 import {
   getMyAttendanceActionAvailability,
-  isMyAttendanceOnBreak,
-  isMyAttendanceOnOvertime,
   readMyAttendanceCheckInAt,
+  readMyAttendanceSessionActive,
+  buildMyAttendanceStatusData,
 } from "@page-modules/workforce/check-in-out/checkInOutDomain";
 import { useMyAttendanceQuery } from "@page-modules/workforce/check-in-out/useMyAttendanceQuery";
-import type { AttendanceStatusData, MyAttendanceData } from "@utils/staffManagement";
 import { AttendanceCorrectionModal } from "@page-modules/workforce/attendance-reports/AttendanceCorrectionModal";
 import {
   buildAttendanceCorrectionTargetFromRecord,
@@ -75,63 +74,6 @@ import "@assets/scss/attendance-page.scss";
 import "@page-modules/workforce/attendance-reports/attendanceCorrectionModal.scss";
 
 const { PERMISSIONS } = HEADER_CONSTANTS;
-
-function readMyAttendanceSessionActive(
-  data: MyAttendanceData | null,
-  availability: ReturnType<typeof getMyAttendanceActionAvailability>,
-): boolean {
-  if (!data) {
-    return false;
-  }
-
-  if (data.is_checked_in === true) {
-    return true;
-  }
-
-  const state = data.state.trim().toLowerCase();
-  if (state === "checked_in" || state === "on_break" || state === "on_overtime") {
-    return true;
-  }
-
-  return (
-    availability.canCheckOut ||
-    availability.canStartBreak ||
-    availability.canEndBreak ||
-    availability.canStartOvertime
-  );
-}
-
-function buildAttendanceToolbarStatus(
-  data: MyAttendanceData | null,
-  isCheckedIn: boolean,
-): AttendanceStatusData | null {
-  if (!data) {
-    return null;
-  }
-
-  const attendance = data.attendance;
-  const checkInAt = attendance?.check_in_at?.trim() ?? "";
-
-  return {
-    user_id: data.user_id,
-    tenant_id: data.tenant_id,
-    work_date: data.work_date,
-    is_checked_in: isCheckedIn,
-    is_on_break: isMyAttendanceOnBreak(data.state),
-    is_on_overtime: isMyAttendanceOnOvertime(data.state),
-    attendance:
-      attendance && checkInAt
-        ? {
-            id: attendance.id,
-            tenant_id: data.tenant_id,
-            user_id: data.user_id,
-            work_date: data.work_date,
-            check_in_at: checkInAt,
-            check_out_at: attendance.check_out_at ?? null,
-          }
-        : null,
-  };
-}
 
 type MainAppUser = {
   id: string | number;
@@ -712,7 +654,7 @@ const AttendancePage = () => {
   const actionAvailability = getMyAttendanceActionAvailability(myAttendance, canCheckInOut);
   const isCheckedIn = readMyAttendanceSessionActive(myAttendance, actionAvailability);
   const status = useMemo(
-    () => buildAttendanceToolbarStatus(myAttendance, isCheckedIn),
+    () => buildMyAttendanceStatusData(myAttendance, isCheckedIn),
     [myAttendance, isCheckedIn],
   );
 

@@ -1,4 +1,4 @@
-import type { AttendanceBreakType, MyAttendanceData } from "@utils/staffManagement";
+import type { AttendanceBreakType, AttendanceStatusData, MyAttendanceData } from "@utils/staffManagement";
 import { formatBreakTypeLabel } from "@page-modules/workforce/company-config/breakTypesDomain";
 
 export type MyAttendanceActionAvailability = Readonly<{
@@ -69,6 +69,63 @@ export function readMyAttendanceCheckInAt(data: MyAttendanceData | null): string
   }
   const trimmed = raw.trim();
   return trimmed === "" ? null : trimmed;
+}
+
+export function readMyAttendanceSessionActive(
+  data: MyAttendanceData | null,
+  availability: MyAttendanceActionAvailability,
+): boolean {
+  if (!data) {
+    return false;
+  }
+
+  if (data.is_checked_in === true) {
+    return true;
+  }
+
+  const state = data.state.trim().toLowerCase();
+  if (state === "checked_in" || state === "on_break" || state === "on_overtime") {
+    return true;
+  }
+
+  return (
+    availability.canCheckOut ||
+    availability.canStartBreak ||
+    availability.canEndBreak ||
+    availability.canStartOvertime
+  );
+}
+
+export function buildMyAttendanceStatusData(
+  data: MyAttendanceData | null,
+  isCheckedIn: boolean,
+): AttendanceStatusData | null {
+  if (!data) {
+    return null;
+  }
+
+  const attendance = data.attendance;
+  const checkInAt = attendance?.check_in_at?.trim() ?? "";
+
+  return {
+    user_id: data.user_id,
+    tenant_id: data.tenant_id,
+    work_date: data.work_date,
+    is_checked_in: isCheckedIn,
+    is_on_break: isMyAttendanceOnBreak(data.state),
+    is_on_overtime: isMyAttendanceOnOvertime(data.state),
+    attendance:
+      attendance && checkInAt
+        ? {
+            id: attendance.id,
+            tenant_id: data.tenant_id,
+            user_id: data.user_id,
+            work_date: data.work_date,
+            check_in_at: checkInAt,
+            check_out_at: attendance.check_out_at ?? null,
+          }
+        : null,
+  };
 }
 
 export function isMyAttendanceOnBreak(state: string): boolean {

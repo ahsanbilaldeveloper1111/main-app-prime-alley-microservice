@@ -1,7 +1,7 @@
-import { formatDateForTable } from "@utils/Helper";
+import { formatDateForTable, GlobalDateTimeFormat } from "@utils/Helper";
 import { normalizeShiftDateForInput } from "@page-modules/workforce/shifts/shiftManagementDomain";
-import { formatWorkforceAttendanceDateTime } from "@page-modules/workforce/attendance/workforceAttendanceDateTime";
 import type { DailyAttendanceReportRow } from "@utils/staffManagement";
+import moment from "moment";
 
 export const DAILY_ATTENDANCE_REPORT_LIST_DEFAULT_LIMIT = 25;
 
@@ -26,7 +26,11 @@ export function formatDailyReportDate(value: string | null | undefined): string 
 }
 
 export function formatDailyReportDateTime(value: string | null | undefined): string {
-  return formatWorkforceAttendanceDateTime(value);
+  const trimmed = value?.trim();
+  if (!trimmed) return "—";
+  const parsed = moment(trimmed);
+  if (!parsed.isValid()) return trimmed;
+  return parsed.format(GlobalDateTimeFormat);
 }
 
 export function formatDailyReportLabel(value: string | null | undefined): string {

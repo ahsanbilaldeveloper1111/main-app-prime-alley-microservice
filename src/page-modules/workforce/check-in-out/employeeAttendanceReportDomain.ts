@@ -1,5 +1,6 @@
 import { formatDailyReportLabel, formatDailyReportStatus } from "@page-modules/workforce/attendance-reports/dailyAttendanceReportDomain";
-import { formatWorkforceAttendanceTime } from "@page-modules/workforce/attendance/workforceAttendanceDateTime";
+import { GlobalDateTimeFormat } from "@utils/Helper";
+import moment from "moment";
 import type {
   EmployeeAttendanceReportDay,
   EmployeeAttendanceReportSummary,
@@ -68,7 +69,11 @@ export function formatEmployeeReportDayStatus(day: EmployeeAttendanceReportDay):
 }
 
 export function formatEmployeeReportDayTime(value: string | null | undefined): string {
-  return formatWorkforceAttendanceTime(value);
+  if (!value?.trim()) {
+    return "—";
+  }
+  const parsed = moment(value);
+  return parsed.isValid() ? parsed.format(GlobalDateTimeFormat) : value.trim();
 }
 
 export function formatEmployeeReportDayHours(day: EmployeeAttendanceReportDay): string {
