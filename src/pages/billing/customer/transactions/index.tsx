@@ -18,6 +18,7 @@ import { useEnsureCustomerForCrmCompany } from "@hooks/billing/useEnsureCustomer
 import { useMinifiedCompaniesForSelect } from "@hooks/billing/useMinifiedCompaniesForSelect";
 import { BillingCustomerCompanySelect } from "@components/billings/customer/BillingCustomerCompanySelect";
 import ColumnEditorModal from "@components/ColumnEditorModal";
+import { resolvePaymentDisplayStatus } from "@components/billings/shared/paymentStatus";
 
 const BILLING_TRANSACTIONS_COLUMN_STORAGE_KEY = "billing-transactions-table-columns";
 
@@ -253,21 +254,11 @@ const ProductDetails = () => {
         sortable: true,
         type: "badge",
         accessor: (payment) => {
-          const status = payment?.status;
-          if (typeof status !== "string") return "-";
-          const normalized = status.trim().toLowerCase();
-          if (normalized === "completed") return "Processed";
-          if (normalized === "failed") return "Failed";
-          return status.trim() || "-";
+          return resolvePaymentDisplayStatus(payment).label;
         },
         badge: {
           getVariant: (payment) => {
-            const status = payment?.status;
-            if (typeof status !== "string") return "secondary";
-            const normalized = status.trim().toLowerCase();
-            if (normalized === "completed") return "success";
-            if (normalized === "failed") return "danger";
-            return "secondary";
+            return resolvePaymentDisplayStatus(payment).variant;
           },
         },
       },

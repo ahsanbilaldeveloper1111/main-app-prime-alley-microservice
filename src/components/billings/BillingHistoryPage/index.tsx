@@ -19,6 +19,7 @@ import { useMinifiedCompaniesSendAll } from "@hooks/billing/useMinifiedCompanies
 import { useQueryClient } from "@tanstack/react-query";
 import { accountBillingKeys } from "@query/keys";
 import { useAccountBillingInvoiceHistoryQuery } from "@page-modules/billing/account-billing/useAccountBillingInvoiceHistoryQuery";
+import { getPaymentMethodLabel } from "../TransactionPage/transactionPageHelpers";
 
 const font = BILLING_FONT;
 const { PERMISSIONS } = HEADER_CONSTANTS;
@@ -851,6 +852,8 @@ function PaymentCard({
   id,
   product,
   invoiceRef,
+  paymentMethod,
+  cardBrand,
   cardLast4,
   cardHolder,
   amount,
@@ -858,10 +861,31 @@ function PaymentCard({
   id: string;
   product: string;
   invoiceRef: string;
+  paymentMethod?: string;
+  cardBrand?: string;
   cardLast4: string;
   cardHolder: string;
   amount: string;
 }>) {
+  const normalizedPaymentMethod = String(paymentMethod ?? "")
+    .trim()
+    .toLowerCase();
+  const isCardPayment =
+    normalizedPaymentMethod === "stripe" ||
+    String(cardLast4 || "").trim().length > 0;
+
+  const chipLabel = (
+    isCardPayment
+      ? (cardBrand || "CARD").toString().toUpperCase()
+      : getPaymentMethodLabel(paymentMethod).toUpperCase()
+  ).trim();
+
+  const primaryLine = isCardPayment
+    ? `${(cardBrand || "Card").toString()} ending in ${String(cardLast4 || "****")}`
+    : getPaymentMethodLabel(paymentMethod);
+
+  const secondaryLine = String(cardHolder || "").trim();
+
   return (
     <div style={s.card}>
       <div style={s.cardHeader}>
@@ -888,12 +912,23 @@ function PaymentCard({
           <div>
             <div style={s.colLabel}>Payment method</div>
             <div style={{ display: "flex", alignItems: "center", marginTop: 2 }}>
-              <span style={s.visaChip}>VISA</span>
+              <span style={s.visaChip}>{chipLabel || "PAYMENT"}</span>
               <div>
                 <div style={{ fontSize: 14, color: "#141414", fontFamily: font }}>
-                  Visa <em>ending in</em> {cardLast4}
+                  {primaryLine}
                 </div>
-                <div style={{ fontSize: 13, fontWeight: 700, fontFamily: font, color: "#141414" }}>{cardHolder}</div>
+                {secondaryLine.length > 0 && (
+                  <div
+                    style={{
+                      fontSize: 13,
+                      fontWeight: 700,
+                      fontFamily: font,
+                      color: "#141414",
+                    }}
+                  >
+                    {secondaryLine}
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -1304,6 +1339,8 @@ export default function BillingHistoryPage({
                     id={String(payment.id)}
                     product={payment.notes}
                     invoiceRef={String(invoice.invoice_number ?? "")}
+                    paymentMethod={payment?.payment_method ?? payment?.method ?? ""}
+                    cardBrand={payment?.card_brand ?? payment?.brand ?? ""}
                     cardLast4={payment?.card_last4 ?? ""}
                     cardHolder={payment?.card_holder ?? ""}
                     amount={`${payment?.currency_code || "AED"} ${formatNumber(payment?.amount ?? 0)}`}
