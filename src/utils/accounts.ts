@@ -266,6 +266,10 @@ export interface InvoiceData {
   invoice_date: string;
   due_date: string;
   amount_due: string;
+  /** 3% card fee on current `amount_due` (from API when partially paid). */
+  card_processing_fee?: string | number | null;
+  /** Outstanding + card fee — total charged for card checkout. */
+  card_charge_total?: string | number | null;
   tenant_id?: string;
   subtotal: string;
   tax_amount: string;
