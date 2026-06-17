@@ -30,6 +30,8 @@ export function useSettingsSectionTabs(
   const [activeTab, setActiveTab] = useState(initialTabId)
 
   useEffect(() => {
+    if (allowedTabs.length === 0) return
+
     const next = resolveAllowedActiveTabId(routeActiveTab, activeTab, allowedTabs)
     const allowedIds = new Set(allowedTabs.map((t) => t.id))
     const routeTabDisallowed =

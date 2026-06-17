@@ -1,3 +1,4 @@
+import { readWorkforceAttendanceEpochMs } from "@page-modules/workforce/attendance/workforceAttendanceDateTime";
 import { useEffect, useMemo, useState } from "react";
 
 /** Elapsed time since check-in, updates every second while `checkInAtIso` is set (HH:MM:SS). */
@@ -13,9 +14,8 @@ export function useAttendanceLiveSessionElapsed(checkInAtIso: string | null | un
   }, [checkInAtIso]);
 
   return useMemo(() => {
-    if (!checkInAtIso) return "";
-    const start = Date.parse(checkInAtIso);
-    if (Number.isNaN(start)) return "";
+    const start = readWorkforceAttendanceEpochMs(checkInAtIso);
+    if (start == null) return "";
     const totalSec = Math.max(0, Math.floor((Date.now() - start) / 1000));
     const h = Math.floor(totalSec / 3600);
     const m = Math.floor((totalSec % 3600) / 60);

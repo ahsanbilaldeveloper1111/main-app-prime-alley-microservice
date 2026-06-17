@@ -13,14 +13,20 @@ import {
   attendanceCheckIn,
   attendanceCheckOut,
   deleteAttendance,
+  normalizeMyAttendanceData,
+  type AttendanceCorrectionPayload,
   type AttendanceRecord,
 } from "@utils/staffManagement";
+import {
+  readWorkforceTenantId,
+  validateAttendanceSessionPayload,
+} from "@utils/workforce/attendanceActionPayload";
 import { toast } from "react-toastify";
 import moment from "moment";
 import { GlobalDateTimeFormat } from "@utils/Helper";
 import { useMainAppLookups } from "@hooks/useMainAppLookups";
 import { useSession } from "next-auth/react";
-import { Trash2 } from "lucide-react";
+import { Trash2, ClipboardEdit } from "lucide-react";
 import { HEADER_CONSTANTS } from "@constants/headerConstants";
 import { usePermissions } from "@utils/permissionUtils";
 import { getAvatarColor, getInitials } from "@utils/workforceUserAvatar";
@@ -35,8 +41,26 @@ import {
   consumeHandledAttendanceError,
 } from "@page-modules/workforce/attendance/attendanceDomain";
 import { useAttendanceLiveSessionElapsed } from "@page-modules/workforce/attendance/useAttendanceLiveSessionElapsed";
-import { useAttendanceListQuery, useAttendanceStatusQuery } from "@page-modules/workforce/attendance/useAttendanceQueries";
+import { useAttendanceListQuery } from "@page-modules/workforce/attendance/useAttendanceQueries";
 import { AttendanceStatusDisplay } from "@page-modules/workforce/attendance/partials/AttendanceStatusUI";
+import {
+  buildCheckInOutSessionPayload,
+  buildCheckInPayload,
+} from "@page-modules/workforce/check-in-out/buildCheckInOutActionPayload";
+import {
+  getMyAttendanceActionAvailability,
+  isMyAttendanceOnBreak,
+  isMyAttendanceOnOvertime,
+  readMyAttendanceCheckInAt,
+} from "@page-modules/workforce/check-in-out/checkInOutDomain";
+import { useMyAttendanceQuery } from "@page-modules/workforce/check-in-out/useMyAttendanceQuery";
+import type { AttendanceStatusData, MyAttendanceData } from "@utils/staffManagement";
+import { AttendanceCorrectionModal } from "@page-modules/workforce/attendance-reports/AttendanceCorrectionModal";
+import {
+  buildAttendanceCorrectionTargetFromRecord,
+  type AttendanceCorrectionTarget,
+} from "@page-modules/workforce/attendance-reports/attendanceCorrectionDomain";
+import { useCreateAttendanceCorrectionMutation } from "@page-modules/workforce/attendance-reports/useCreateAttendanceCorrectionMutation";
 import { WorkforceListPageShell } from "@page-modules/workforce/shared/WorkforceListPageShell";
 import {
   WORKFORCE_TOOLBAR_LABELS,
@@ -48,8 +72,66 @@ import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
 import "@page-modules/workforce/shared/workforcePages.scss";
 import "@assets/scss/attendance-page.scss";
+import "@page-modules/workforce/attendance-reports/attendanceCorrectionModal.scss";
 
 const { PERMISSIONS } = HEADER_CONSTANTS;
+
+function readMyAttendanceSessionActive(
+  data: MyAttendanceData | null,
+  availability: ReturnType<typeof getMyAttendanceActionAvailability>,
+): boolean {
+  if (!data) {
+    return false;
+  }
+
+  if (data.is_checked_in === true) {
+    return true;
+  }
+
+  const state = data.state.trim().toLowerCase();
+  if (state === "checked_in" || state === "on_break" || state === "on_overtime") {
+    return true;
+  }
+
+  return (
+    availability.canCheckOut ||
+    availability.canStartBreak ||
+    availability.canEndBreak ||
+    availability.canStartOvertime
+  );
+}
+
+function buildAttendanceToolbarStatus(
+  data: MyAttendanceData | null,
+  isCheckedIn: boolean,
+): AttendanceStatusData | null {
+  if (!data) {
+    return null;
+  }
+
+  const attendance = data.attendance;
+  const checkInAt = attendance?.check_in_at?.trim() ?? "";
+
+  return {
+    user_id: data.user_id,
+    tenant_id: data.tenant_id,
+    work_date: data.work_date,
+    is_checked_in: isCheckedIn,
+    is_on_break: isMyAttendanceOnBreak(data.state),
+    is_on_overtime: isMyAttendanceOnOvertime(data.state),
+    attendance:
+      attendance && checkInAt
+        ? {
+            id: attendance.id,
+            tenant_id: data.tenant_id,
+            user_id: data.user_id,
+            work_date: data.work_date,
+            check_in_at: checkInAt,
+            check_out_at: attendance.check_out_at ?? null,
+          }
+        : null,
+  };
+}
 
 type MainAppUser = {
   id: string | number;
@@ -66,7 +148,7 @@ const AttendancePage = () => {
     PERMISSIONS.DELETE_ATTENDANCE_STAFF_MANAGEMENT,
     "delete-attendance-staff-management",
   ]);
-  const { mainAppUsers } = useMainAppLookups();
+  const { mainAppUsers, companyIdentifier } = useMainAppLookups();
 
   // True → list/dropdown use full company scope. False → only Control Hub team (+ self); see canViewAllEmployeesAttendance (admin/root/permission).
   const canViewAllEmployees = useMemo(
@@ -146,6 +228,9 @@ const AttendancePage = () => {
 
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [recordToDelete, setRecordToDelete] = useState<AttendanceRecord | null>(null);
+  const [correctionTarget, setCorrectionTarget] = useState<AttendanceCorrectionTarget | null>(null);
+
+  const correctionMutation = useCreateAttendanceCorrectionMutation();
 
   const managers = useMemo(() => {
     if (canViewAllEmployees) {
@@ -224,37 +309,90 @@ const AttendancePage = () => {
     [teamScopeUserIds],
   );
 
-  const attendanceStatusQuery = useAttendanceStatusQuery();
+  const myAttendanceQuery = useMyAttendanceQuery();
+  const myAttendance = myAttendanceQuery.data ?? null;
 
-  const invalidateAttendanceReads = useCallback(() => {
-    queryClient.invalidateQueries({ queryKey: workforceKeys.attendance.all() }).catch((err: unknown) => {
-      consumeHandledAttendanceError(err, "Attendance.invalidateReads");
-    });
+  const invalidateAttendanceReads = useCallback(async () => {
+    await queryClient.invalidateQueries({ queryKey: workforceKeys.attendance.all() });
   }, [queryClient]);
 
-  const sessionUserId = session?.user?.id;
+  const sessionUser = session?.user;
+
+  const buildSessionPayload = useCallback(
+    () =>
+      buildCheckInOutSessionPayload({
+        sessionUser,
+        tenantId: companyIdentifier,
+        myAttendance,
+      }),
+    [companyIdentifier, myAttendance, sessionUser],
+  );
+
+  const validateToolbarPayloadOrToast = useCallback(
+    (payload: ReturnType<typeof buildCheckInOutSessionPayload>): boolean => {
+      const error = validateAttendanceSessionPayload(payload);
+      if (!error) {
+        return true;
+      }
+      toast.error(error);
+      return false;
+    },
+    [],
+  );
 
   const checkInMutation = useMutation({
-    mutationFn: () =>
-      attendanceCheckIn(sessionUserId == null ? {} : { user_id: String(sessionUserId) }),
-    onSuccess: () => {
+    mutationFn: async () => {
+      const payload = await buildCheckInPayload({
+        sessionUser,
+        tenantId: companyIdentifier,
+        myAttendance,
+      });
+      if (!validateToolbarPayloadOrToast(payload)) {
+        throw new Error("Invalid check-in payload");
+      }
+      return attendanceCheckIn(payload);
+    },
+    onSuccess: async (data) => {
+      if (data != null && typeof data === "object") {
+        queryClient.setQueryData(
+          workforceKeys.attendance.my(),
+          normalizeMyAttendanceData(data),
+        );
+      }
       toast.success("Checked in successfully");
-      invalidateAttendanceReads();
+      await invalidateAttendanceReads();
     },
     onError: (err: unknown) => {
+      if (err instanceof Error && err.message === "Invalid check-in payload") {
+        return;
+      }
       consumeHandledAttendanceError(err, "Attendance.checkIn");
       toast.error("Check-in failed");
     },
   });
 
   const checkOutMutation = useMutation({
-    mutationFn: () =>
-      attendanceCheckOut(sessionUserId == null ? {} : { user_id: String(sessionUserId) }),
-    onSuccess: () => {
+    mutationFn: () => {
+      const payload = buildSessionPayload();
+      if (!validateToolbarPayloadOrToast(payload)) {
+        throw new Error("Invalid check-out payload");
+      }
+      return attendanceCheckOut(payload);
+    },
+    onSuccess: async (data) => {
+      if (data != null && typeof data === "object") {
+        queryClient.setQueryData(
+          workforceKeys.attendance.my(),
+          normalizeMyAttendanceData(data),
+        );
+      }
       toast.success("Checked out successfully");
-      invalidateAttendanceReads();
+      await invalidateAttendanceReads();
     },
     onError: (err: unknown) => {
+      if (err instanceof Error && err.message === "Invalid check-out payload") {
+        return;
+      }
       consumeHandledAttendanceError(err, "Attendance.checkOut");
       toast.error("Check-out failed");
     },
@@ -354,6 +492,49 @@ const AttendancePage = () => {
       setShowDeleteModal(true);
     },
     [canDeleteAttendance, canDeleteAttendanceRow],
+  );
+
+  const handleOpenCorrection = useCallback(
+    (record: AttendanceRecord) => {
+      const target = buildAttendanceCorrectionTargetFromRecord(
+        record,
+        getDisplayName(record.user_id),
+      );
+      if (!target) {
+        toast.error("This attendance record cannot be corrected.");
+        return;
+      }
+      setCorrectionTarget(target);
+    },
+    [getDisplayName],
+  );
+
+  const handleCloseCorrection = useCallback(() => {
+    if (correctionMutation.isPending) {
+      return;
+    }
+    setCorrectionTarget(null);
+  }, [correctionMutation.isPending]);
+
+  const handleSubmitCorrection = useCallback(
+    (payload: AttendanceCorrectionPayload) => {
+      correctionMutation.mutate(payload, {
+        onSuccess: () => {
+          toast.success("Attendance correction submitted.");
+          setCorrectionTarget(null);
+        },
+        onError: (error: unknown) => {
+          consumeHandledAttendanceError(error, "Attendance.attendanceCorrection");
+          toast.error("Failed to submit attendance correction.");
+        },
+      });
+    },
+    [correctionMutation],
+  );
+
+  const resolvedCorrectionTenantId = readWorkforceTenantId(
+    companyIdentifier,
+    sessionUser?.company_identifier,
   );
 
   const attendanceUserDropdownRows = useMemo(
@@ -498,6 +679,15 @@ const AttendancePage = () => {
   const attendanceActions = useMemo<TableAction<AttendanceRecord>[]>(
     () => [
       {
+        label: "Correct",
+        icon: <ClipboardEdit size={16} />,
+        onClick: (record: AttendanceRecord) => {
+          handleOpenCorrection(record);
+        },
+        variant: "light",
+        className: "btn-action-style-2 p-1",
+      },
+      {
         label: "Delete",
         icon: <Trash2 size={16} />,
         onClick: (record: AttendanceRecord) => {
@@ -510,22 +700,23 @@ const AttendancePage = () => {
         className: "btn-action-style-2 p-1 text-danger",
       },
     ],
-    [canDeleteAttendance, canDeleteAttendanceRow, handleDeleteAttendanceClick],
+    [canDeleteAttendance, canDeleteAttendanceRow, handleDeleteAttendanceClick, handleOpenCorrection],
   );
 
   const records = attendanceListQuery.data?.records ?? [];
   const pagination = attendanceListQuery.data?.pagination ?? null;
-  const status = attendanceStatusQuery.data ?? null;
 
-  const isCheckedIn = status?.is_checked_in === true;
   const canCheckInOut = Boolean(
     session?.user?.permissions?.includes(PERMISSIONS.CHECK_IN_OUT_ATTENDENCE_STAFF_MANAGEMENT),
   );
+  const actionAvailability = getMyAttendanceActionAvailability(myAttendance, canCheckInOut);
+  const isCheckedIn = readMyAttendanceSessionActive(myAttendance, actionAvailability);
+  const status = useMemo(
+    () => buildAttendanceToolbarStatus(myAttendance, isCheckedIn),
+    [myAttendance, isCheckedIn],
+  );
 
-  const sessionCheckInAt =
-    status?.is_checked_in === true && status?.attendance?.check_in_at
-      ? String(status.attendance.check_in_at)
-      : null;
+  const sessionCheckInAt = readMyAttendanceCheckInAt(myAttendance);
   const liveSessionElapsed = useAttendanceLiveSessionElapsed(sessionCheckInAt);
 
   const checkInOutLoading = checkInMutation.isPending || checkOutMutation.isPending;
@@ -535,7 +726,7 @@ const AttendancePage = () => {
       <div className="attendance-toolbar-right">
         <div className="attendance-status-content">
           <AttendanceStatusDisplay
-            statusLoading={attendanceStatusQuery.isFetching}
+            statusLoading={myAttendanceQuery.isFetching && !myAttendance}
             status={status}
             isCheckedIn={isCheckedIn}
             canCheckInOut={canCheckInOut}
@@ -548,7 +739,8 @@ const AttendancePage = () => {
       </div>
     ),
     [
-      attendanceStatusQuery.isFetching,
+      myAttendanceQuery.isFetching,
+      myAttendance,
       status,
       isCheckedIn,
       canCheckInOut,
@@ -641,6 +833,15 @@ const AttendancePage = () => {
         }
         itemType="attendance record"
         loading={deleteAttendanceMutation.isPending}
+      />
+
+      <AttendanceCorrectionModal
+        show={correctionTarget != null}
+        tenantId={resolvedCorrectionTenantId || null}
+        target={correctionTarget}
+        isSubmitting={correctionMutation.isPending}
+        onClose={handleCloseCorrection}
+        onSubmit={handleSubmitCorrection}
       />
       </div>
     </WorkforceListPageShell>

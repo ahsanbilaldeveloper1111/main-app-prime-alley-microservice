@@ -49,7 +49,7 @@ export function CrmTableRowActions({ actions }: CrmTableRowActionsProps) {
               variant="light"
               size="sm"
               disabled={isDisabled}
-              className={`btn-action-style-2 p-1 ${
+              className={`btn-action-style-2 d-inline-flex align-items-center justify-content-center p-0 ${
                 isDisabled ? "gt-action-disabled" : TONE_CLASS[action.tone ?? "primary"]
               }`}
               title={isDisabled ? undefined : action.label}

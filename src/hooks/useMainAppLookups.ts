@@ -13,6 +13,7 @@ export interface MainAppUserLookup {
   id: number;
   name: string;
   phone: string;
+  department_id?: number | null;
 }
 
 /** Raw row from `users/users` (GetMinifiedUsers) — field names vary by API. */
@@ -21,13 +22,23 @@ type MinifiedUserApiRow = {
   name?: string;
   phone?: string | number | null;
   phone_no?: string | number | null;
+  extension?: string | number | null;
+  extension_number?: string | number | null;
+  department_id?: number | null;
 };
 
 function phoneFromMinifiedUserRow(u: MinifiedUserApiRow): string {
-  const raw = u.phone ?? u.phone_no;
+  const raw = u.phone ?? u.phone_no ?? u.extension ?? u.extension_number;
   if (raw == null) return "";
-  const s = String(raw).trim();
-  return s;
+  return String(raw).trim();
+}
+
+function departmentIdFromMinifiedUserRow(u: MinifiedUserApiRow): number | null {
+  const raw = u.department_id;
+  if (typeof raw === "number" && Number.isFinite(raw)) {
+    return raw;
+  }
+  return null;
 }
 
 export function useMainAppLookups() {
@@ -60,6 +71,7 @@ export function useMainAppLookups() {
                 id: typeof u.id === "number" ? u.id : Number(u.id),
                 name: u.name != null && String(u.name).trim() !== "" ? String(u.name) : "—",
                 phone: phoneFromMinifiedUserRow(u),
+                department_id: departmentIdFromMinifiedUserRow(u),
               }))
             : []
         );

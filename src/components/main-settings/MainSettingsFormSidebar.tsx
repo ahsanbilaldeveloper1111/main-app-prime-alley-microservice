@@ -11,6 +11,8 @@ export type MainSettingsFormSidebarProps = Readonly<{
   children: React.ReactNode;
   footer?: React.ReactNode;
   disableClose?: boolean;
+  /** Extra class on the dialog root — use section-specific modifiers (e.g. Policies & Attendance). */
+  sidebarClassName?: string;
 }>;
 
 const SIDEBAR_Z_INDEX = 99999;
@@ -25,6 +27,7 @@ export function MainSettingsFormSidebar({
   children,
   footer,
   disableClose = false,
+  sidebarClassName,
 }: MainSettingsFormSidebarProps) {
   useEffect(() => {
     if (!show || globalThis.document === undefined) return undefined;
@@ -64,7 +67,14 @@ export function MainSettingsFormSidebar({
       />
       <dialog
         open
-        className="main-settings-form-sidebar main-settings-form-sidebar--open contact-sidebar-container"
+        className={[
+          "main-settings-form-sidebar",
+          "main-settings-form-sidebar--open",
+          "contact-sidebar-container",
+          sidebarClassName,
+        ]
+          .filter(Boolean)
+          .join(" ")}
         aria-modal="true"
         aria-label={typeof title === "string" ? title : "Form panel"}
         style={{

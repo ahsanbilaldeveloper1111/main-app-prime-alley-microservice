@@ -70,6 +70,14 @@ const PulsePage = dynamic(
   { loading: () => <SettingsSectionFallback /> }
 )
 
+const PoliciesAttendancePage = dynamic(
+  () =>
+    import('@components/main-settings/settings-section-pages/PoliciesAttendancePage').then(
+      (m) => m.PoliciesAttendancePage,
+    ),
+  { loading: () => <SettingsSectionFallback /> }
+)
+
 const GenericPage = dynamic(
   () => import('@components/main-settings/settings-section-pages/GenericPage').then((m) => m.GenericPage),
   { loading: () => <SettingsSectionFallback /> }
@@ -104,6 +112,9 @@ export const sectionPageMap: Record<string, SectionRenderer> = {
   ),
   workforce: ({ subTab, onSubTabChange }) => (
     <WorkforcePage activeTab={subTab} onTabChange={onSubTabChange} />
+  ),
+  'policies-attendance': ({ subTab, onSubTabChange }) => (
+    <PoliciesAttendancePage activeTab={subTab} onTabChange={onSubTabChange} />
   ),
   billing: ({ subTab, onSubTabChange }) => (
     <BillingPage activeTab={subTab} onTabChange={onSubTabChange} />

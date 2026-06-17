@@ -455,6 +455,8 @@ export const routePermissions: RoutePermission[] = [
 
             
             {path:'/attendance',permissions: [PERMISSIONS.VIEW_ATTENDENCE_STAFF_MANAGEMENT]},
+            {path:'/attendance-analytics',permissions: [PERMISSIONS.VIEW_ATTENDENCE_STAFF_MANAGEMENT]},
+            {path:'/check-in-out',permissions: [PERMISSIONS.CHECK_IN_OUT_ATTENDENCE_STAFF_MANAGEMENT]},
         ]
     },
     //workforce services ends

@@ -1,6 +1,7 @@
 @import '../../../components/main-settings/mainSettingsTableActions.scss';
 @import '../../../components/main-settings/settings-section-pages/settingsSectionTabShell.scss';
 @import '../../../components/main-settings/smartCrmSettingsPanel.scss';
+@import '../../../components/main-settings/policiesAttendanceSettingsPanel.scss';
 @import '../../../components/main-settings/workforceSettingsPanel.scss';
 @import '../../../components/main-settings/ticketsSettingsPanel.scss';
 @import '../../../components/main-settings/faqsSettingsPanel.scss';
@@ -606,6 +607,7 @@ $main-settings-select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.
   .users-teams-table-page,
   .smart-crm-table-page,
   .workforce-settings-panel .smart-crm-table-page,
+  .policies-attendance-settings-panel .smart-crm-table-page,
   .tickets-settings-panel .smart-crm-table-page,
   .faqs-settings-panel .smart-crm-table-page {
     @include main-settings-table-row-action-buttons;

@@ -1,5 +1,6 @@
 @import './smartCrmTablePage.scss';
 @import './settingsEmbeddedToolbar.scss';
+@import './settingsEmbeddedFilters.scss';
 @import './settingsEmbeddedPageShell.scss';
 
 // Workforce tabs inside Main Settings — tight layout + shared table chrome.
@@ -11,6 +12,10 @@
   padding: 0;
   box-sizing: border-box;
   overflow-x: clip;
+
+  .settings-embedded-page {
+    @include settings-embedded-page-shell;
+  }
 
   > .smart-crm-table-page,
   > div > .smart-crm-table-page {
@@ -52,5 +57,276 @@
       width: 100%;
       flex-wrap: wrap;
     }
+  }
+
+  .company-config-panel {
+    @include settings-embedded-page-shell;
+    padding-top: 4px;
+  }
+
+  .company-config-panel__header {
+    margin-bottom: 16px;
+  }
+
+  .company-config-panel__inner-tab-bar {
+    margin-bottom: 16px;
+  }
+
+  .company-config-panel__inner-tab-row {
+    gap: 8px;
+  }
+
+  .company-config-panel__inner-tab-btn {
+    font-size: 14px;
+    padding: 6px 12px;
+    border-radius: 6px;
+    border: 1px solid transparent;
+    background: transparent;
+    color: #6b7280;
+  }
+
+  .company-config-panel__inner-tab-btn--active {
+    background: #fff;
+    border-color: #e5e7eb;
+    color: #141414;
+    font-weight: 600;
+  }
+
+  .company-config-panel__section-header {
+    margin-bottom: 12px;
+  }
+
+  .company-config-panel__hint,
+  .company-config-panel__meta {
+    font-size: 14px;
+    color: #6b7280;
+    margin: 0 0 16px;
+  }
+
+  .company-config-panel__status {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: #6b7280;
+    font-size: 14px;
+    margin: 16px 0;
+  }
+
+  .company-config-panel__status--error {
+    flex-direction: column;
+    align-items: flex-start;
+    color: #b42318;
+  }
+
+  .company-config-panel__card {
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    padding: 20px 24px;
+    max-width: 760px;
+  }
+
+  .company-config-panel__actions {
+    margin-top: 8px;
+  }
+
+  .shift-management-panel {
+    @include settings-embedded-page-shell;
+    padding-top: 4px;
+  }
+
+  .shift-management-panel__header {
+    margin-bottom: 16px;
+  }
+
+  .shift-management-panel__inner-tab-bar {
+    margin-bottom: 16px;
+  }
+
+  .shift-management-panel__inner-tab-row {
+    gap: 8px;
+  }
+
+  .shift-management-panel__inner-tab-btn {
+    font-size: 14px;
+    padding: 6px 12px;
+    border-radius: 6px;
+    border: 1px solid transparent;
+    background: transparent;
+    color: #6b7280;
+  }
+
+  .shift-management-panel__inner-tab-btn--active {
+    background: #fff;
+    border-color: #e5e7eb;
+    color: #141414;
+    font-weight: 600;
+  }
+
+  .shift-management-panel__section-header {
+    margin-bottom: 12px;
+  }
+
+  .shift-management-panel__hint,
+  .shift-management-panel__meta {
+    font-size: 14px;
+    color: #6b7280;
+    margin: 0 0 16px;
+  }
+
+  .shift-management-panel__status {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: #6b7280;
+    font-size: 14px;
+    margin: 16px 0;
+  }
+
+  .shift-management-panel__status--error {
+    flex-direction: column;
+    align-items: flex-start;
+    color: #b42318;
+  }
+
+  .attendance-report-panel {
+    @include settings-embedded-page-shell;
+    padding-top: 4px;
+  }
+
+  .attendance-report-panel__header {
+    margin-bottom: 16px;
+  }
+
+  .attendance-report-panel__inner-tab-bar {
+    margin-bottom: 16px;
+  }
+
+  .attendance-report-panel__inner-tab-row {
+    gap: 8px;
+  }
+
+  .attendance-report-panel__inner-tab-btn {
+    font-size: 14px;
+    padding: 6px 12px;
+    border-radius: 6px;
+    border: 1px solid transparent;
+    background: transparent;
+    color: #6b7280;
+  }
+
+  .attendance-report-panel__inner-tab-btn--active {
+    background: #fff;
+    border-color: #e5e7eb;
+    color: #141414;
+    font-weight: 600;
+  }
+
+  .attendance-report-panel__section-header {
+    margin-bottom: 12px;
+  }
+
+  .attendance-report-panel__hint {
+    font-size: 14px;
+    color: #6b7280;
+    margin: 0 0 16px;
+  }
+
+  .attendance-report-panel__filters {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    max-width: 240px;
+    margin-bottom: 16px;
+  }
+
+  .attendance-report-panel__filter-label {
+    font-size: 13px;
+    font-weight: 500;
+    color: #374151;
+    margin: 0;
+  }
+
+  .attendance-report-panel__month-input {
+    max-width: 240px;
+  }
+
+  .attendance-report-panel__placeholder {
+    border: 1px dashed #d1d5db;
+    border-radius: 8px;
+    padding: 32px 24px;
+    text-align: center;
+    color: #6b7280;
+    font-size: 14px;
+    background: #fafafa;
+
+    p {
+      margin: 0;
+    }
+  }
+
+  .attendance-report-panel__status {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: #6b7280;
+    font-size: 14px;
+    margin: 16px 0;
+  }
+
+  .attendance-report-panel__status--error {
+    flex-direction: column;
+    align-items: flex-start;
+    color: #b42318;
+  }
+
+  .daily-attendance-report-extensions-select {
+    width: 100%;
+    min-width: 0;
+    font-size: var(--ms-font-input, 0.875rem);
+  }
+
+  .attendance-report-panel__summary {
+    margin-bottom: 20px;
+  }
+
+  .attendance-report-panel__summary-title,
+  .attendance-report-panel__section-heading {
+    margin: 0 0 12px;
+    font-size: 14px;
+    font-weight: 600;
+    color: #111827;
+  }
+
+  .attendance-report-panel__summary-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 12px;
+  }
+
+  .attendance-report-panel__summary-card {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 14px 16px;
+    border: 1px solid #e5e7eb;
+    border-radius: 10px;
+    background: #fff;
+  }
+
+  .attendance-report-panel__summary-label {
+    font-size: 13px;
+    color: #6b7280;
+  }
+
+  .attendance-report-panel__summary-value {
+    font-size: 20px;
+    font-weight: 600;
+    color: #111827;
+    line-height: 1.2;
+  }
+
+  .attendance-report-panel__section {
+    margin-bottom: 20px;
   }
 }

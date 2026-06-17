@@ -46,6 +46,7 @@ import {
   House,
   Book,
   Bot,
+  LogIn,
   Building2,
 } from "lucide-react";
 import Link from "next/link";
@@ -866,6 +867,20 @@ const ApplicationCustomerSidebar: React.FC = () => {
           icon: <Clock size={16} />,
           url: "/workforce/attendance",
           permission: PERMISSIONS.VIEW_ATTENDENCE_STAFF_MANAGEMENT,
+        },
+        {
+          id: "workforce-attendance-analytics",
+          title: "Attendance Analytics",
+          icon: <BarChart3 size={16} />,
+          url: "/workforce/attendance-analytics",
+          permission: PERMISSIONS.VIEW_ATTENDENCE_STAFF_MANAGEMENT,
+        },
+        {
+          id: "workforce-check-in-out",
+          title: "Check in / Check out",
+          icon: <LogIn size={16} />,
+          url: "/workforce/check-in-out",
+          permission: PERMISSIONS.CHECK_IN_OUT_ATTENDENCE_STAFF_MANAGEMENT,
         },
         {
           id: "workforce-journey",
