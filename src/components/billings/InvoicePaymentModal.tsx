@@ -5,10 +5,17 @@ import moment from "moment";
 import { loadStripe, type PaymentMethod as StripePaymentMethod, type Stripe } from "@stripe/stripe-js";
 import { Elements, CardElement, useElements, useStripe } from "@stripe/react-stripe-js";
 
-import { GetPaymentMethods, CompletePayment } from "@utils/accounting";
+import { GetPaymentMethods, CompletePayment, recordManualInvoicePayment } from "@utils/accounting";
+import type { ManualInvoicePaymentMethod } from "@utils/accounting";
 import type { InvoiceData, CreateDirectPaymentData, PaymentIntentResponse } from "@utils/accounts";
-import { createDirectPayment, getCustomerPaymentMethods } from "@utils/accounts";
+import { createDirectPayment, getCustomerPaymentMethods, getInvoice } from "@utils/accounts";
 import { formatNumber, getCompanyByCrmId } from "@utils/Helper";
+import {
+  buildManualPaymentAmounts,
+  getInvoiceOutstandingAmount,
+  isInvoicePartiallyPaid,
+  resolveCardPaymentTotals,
+} from "./shared/invoicePaymentTotals";
 
 /** Intent states where the payment has been accepted by Stripe (incl. async capture / 3DS done). */
 const STRIPE_INTENT_COMPLETE_ENOUGH_STATUSES = new Set([
@@ -48,41 +55,12 @@ function extractPaymentId(paymentResult: any): string | number | undefined {
   );
 }
 
-/** Processing fee applied when charging by card (matches product copy: 3%). */
-const CARD_PAYMENT_PROCESSING_FEE_RATE = 0.03;
-
-function roundCurrency2(value: number): number {
-  return Math.round((Number(value) + Number.EPSILON) * 100) / 100;
-}
-
-function getOutstandingInvoiceBaseAmount(invoice: InvoiceData): number {
-  const due = Number.parseFloat(String(invoice.amount_due ?? ""));
-  if (Number.isFinite(due) && due > 0) {
-    return roundCurrency2(due);
-  }
-  return roundCurrency2(Number.parseFloat(String(invoice.total_amount ?? "0")));
-}
-
-function computeCardPaymentTotals(invoice: InvoiceData | null): {
-  base_amount: number;
-  processing_fee: number;
-  amount: number;
-} {
-  if (invoice == null) {
-    return { base_amount: 0, processing_fee: 0, amount: 0 };
-  }
-  const base_amount = getOutstandingInvoiceBaseAmount(invoice);
-  const processing_fee = roundCurrency2(base_amount * CARD_PAYMENT_PROCESSING_FEE_RATE);
-  const amount = roundCurrency2(base_amount + processing_fee);
-  return { base_amount, processing_fee, amount };
-}
-
 function resolveInvoicePaymentCustomerId(invoice: InvoiceData): number {
   const companyRecordId = invoice.crm_company_id;
-  if (companyRecordId!=null) {
+  if (companyRecordId != null) {
     return Number(companyRecordId);
   }
-  if (invoice.tenant_id!=null) {
+  if (invoice.tenant_id != null) {
     return Number(invoice.tenant_id);
   }
   throw new Error("No customer ID found");
@@ -92,7 +70,7 @@ function buildStripeCreatePaymentIntentPayload(
   invoice: InvoiceData,
   paymentMethodId: string,
 ): CreateDirectPaymentData {
-  const { base_amount, processing_fee, amount } = computeCardPaymentTotals(invoice);
+  const { base_amount, processing_fee, amount } = resolveCardPaymentTotals(invoice);
   const currency_code = (String(invoice.currency_code || "USD").trim() || "USD").toUpperCase();
   return {
     invoice_id: Number(invoice.id),
@@ -126,23 +104,25 @@ function PaymentChargeBreakdown({
     <div className="card border mb-3 small">
       <div className="card-body py-3">
         <div className="text-success fw-semibold mb-2">
-          Full payment: invoice will be marked paid when this succeeds.
+          {baseAmount > 0
+            ? "Card payment applies a 3% processing fee on the outstanding balance only."
+            : "No outstanding balance on this invoice."}
         </div>
         <div className="d-flex justify-content-between py-1">
-          <span className="text-muted">Payment amount</span>
+          <span className="text-muted">Outstanding</span>
           <span className="fw-medium">
             {currencyCode} {formatNumber(baseAmount)}
           </span>
         </div>
         <div className="d-flex justify-content-between py-1">
-          <span className="text-muted">Processing fee (3%)</span>
+          <span className="text-muted">Card processing fee (3%)</span>
           <span className="text-danger fw-medium">
             + {currencyCode} {formatNumber(processingFee)}
           </span>
         </div>
         <hr className="my-2" />
         <div className="d-flex justify-content-between fw-bold">
-          <span>Total charged</span>
+          <span>Total to pay by card</span>
           <span className="text-primary">
             {currencyCode} {formatNumber(totalCharged)}
           </span>
@@ -312,9 +292,11 @@ const useCreateInvoicePayment = (): UseCreateInvoicePaymentReturn => {
 
 const DirectCardPaymentForm: React.FC<{
   invoice: InvoiceData;
+  currencyCode: string;
+  chargeTotals: ReturnType<typeof resolveCardPaymentTotals>;
   onPaymentSuccess: () => void;
   onPaymentError: (error: string) => void;
-}> = ({ invoice, onPaymentSuccess, onPaymentError }) => {
+}> = ({ invoice, currencyCode, chargeTotals, onPaymentSuccess, onPaymentError }) => {
   const stripe = useStripe();
   const elements = useElements();
   const [isProcessing, setIsProcessing] = useState(false);
@@ -407,6 +389,12 @@ const DirectCardPaymentForm: React.FC<{
 
   return (
     <form onSubmit={handleSubmit}>
+      <PaymentChargeBreakdown
+        currencyCode={currencyCode}
+        baseAmount={chargeTotals.base_amount}
+        processingFee={chargeTotals.processing_fee}
+        totalCharged={chargeTotals.amount}
+      />
       <div className="mb-3">
         <div className="form-label fw-bold">Card Details</div>
         <div className="border rounded p-3">
@@ -434,7 +422,7 @@ const DirectCardPaymentForm: React.FC<{
               Processing Payment...
             </>
           ) : (
-            <>Pay Now</>
+            <>Pay {currencyCode} {formatNumber(chargeTotals.amount)}</>
           )}
         </Button>
       </div>
@@ -471,28 +459,99 @@ export function InvoicePaymentModal({
   onClose,
   onPaymentSuccess,
 }: InvoicePaymentModalProps) {
-  const [activePaymentTab, setActivePaymentTab] = useState<"saved-cards" | "direct-payment">("saved-cards");
+  const [activePaymentTab, setActivePaymentTab] = useState<
+    "saved-cards" | "direct-payment" | "manual-payment"
+  >("saved-cards");
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
   const [isLoadingPaymentMethods, setIsLoadingPaymentMethods] = useState(false);
   const [paymentMethodsError, setPaymentMethodsError] = useState<string>("");
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
   const [stripePublishableKey, setStripePublishableKey] = useState<string>("");
+  const [invoiceSnapshot, setInvoiceSnapshot] = useState<InvoiceData | null>(null);
+  const [isRefreshingInvoice, setIsRefreshingInvoice] = useState(false);
+  const [manualPaymentMethod, setManualPaymentMethod] =
+    useState<ManualInvoicePaymentMethod>("bank_transfer");
+  const [manualPaymentAmount, setManualPaymentAmount] = useState<string>("");
+  const [manualPaymentNotes, setManualPaymentNotes] = useState<string>("");
+  const [isRecordingManualPayment, setIsRecordingManualPayment] = useState(false);
 
   const { createInvoicePayment, isCreateInvoicePaymentPending } = useCreateInvoicePayment();
 
-  const currencyCode = (String(invoice?.currency_code ?? "USD").trim() || "USD").toUpperCase();
-  const chargeTotals = useMemo(() => computeCardPaymentTotals(invoice), [invoice]);
+  const activeInvoice = invoiceSnapshot ?? invoice;
+  const currencyCode = (
+    String(activeInvoice?.currency_code ?? "USD").trim() || "USD"
+  ).toUpperCase();
+  const chargeTotals = useMemo(
+    () => resolveCardPaymentTotals(activeInvoice),
+    [activeInvoice],
+  );
+  const outstandingAmount = useMemo(
+    () => getInvoiceOutstandingAmount(activeInvoice),
+    [activeInvoice],
+  );
+  const partiallyPaid = useMemo(
+    () => isInvoicePartiallyPaid(activeInvoice),
+    [activeInvoice],
+  );
+
+  const refreshInvoiceSnapshot = useCallback(async (invoiceId: number) => {
+    const fresh = await getInvoice(invoiceId);
+    setInvoiceSnapshot(fresh);
+    return fresh;
+  }, []);
+
+  useEffect(() => {
+    if (!show || !invoice?.id) {
+      return;
+    }
+
+    let cancelled = false;
+    setIsRefreshingInvoice(true);
+    refreshInvoiceSnapshot(invoice.id)
+      .catch((err: unknown) => {
+        console.error("InvoicePaymentModal refresh invoice failed:", err);
+        if (!cancelled) {
+          setInvoiceSnapshot(invoice);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setIsRefreshingInvoice(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [show, invoice, refreshInvoiceSnapshot]);
+
+  useEffect(() => {
+    if (!show) {
+      setInvoiceSnapshot(null);
+      setManualPaymentAmount("");
+      setManualPaymentNotes("");
+      setManualPaymentMethod("bank_transfer");
+    }
+  }, [show]);
+
+  useEffect(() => {
+    if (!show || outstandingAmount <= 0) {
+      return;
+    }
+    setManualPaymentAmount(String(outstandingAmount));
+  }, [show, outstandingAmount, activeInvoice?.id]);
 
   const resolvedCompanyName =
-    getCompanyByCrmId(invoice?.company?.crm_company_id, companyOptions) ??
-    (invoice as any)?.company?.name ??
+    getCompanyByCrmId(activeInvoice?.company?.crm_company_id, companyOptions) ??
+    (activeInvoice as any)?.company?.name ??
     "";
 
   const closeAndReset = useCallback(() => {
     setActivePaymentTab("saved-cards");
     setSelectedCardId(null);
     setIsProcessingPayment(false);
+    setIsRecordingManualPayment(false);
     onClose();
   }, [onClose]);
 
@@ -509,15 +568,15 @@ export function InvoicePaymentModal({
     setIsLoadingPaymentMethods(true);
     setPaymentMethodsError("");
     try {
-      if (!invoice) {
+      if (!activeInvoice) {
         setPaymentMethods([]);
         return;
       }
-      const tenantSelfPay = invoice.is_tenant_invoice === true;
-      const profileId = resolveInvoicePaymentCustomerId(invoice);
+      const tenantSelfPay = activeInvoice.is_tenant_invoice === true;
+      const profileId = resolveInvoicePaymentCustomerId(activeInvoice);
       if (!tenantSelfPay && profileId > 0) {
         const methods = await getCustomerPaymentMethods(profileId);
-        setPaymentMethods(methods as PaymentMethod[]);
+        setPaymentMethods(Array.isArray(methods) ? (methods as PaymentMethod[]) : []);
         return;
       }
       const response = (await GetPaymentMethods()) as any;
@@ -530,7 +589,7 @@ export function InvoicePaymentModal({
     } finally {
       setIsLoadingPaymentMethods(false);
     }
-  }, [invoice]);
+  }, [activeInvoice]);
 
   useEffect(() => {
     if (!show) return;
@@ -640,14 +699,14 @@ export function InvoicePaymentModal({
   );
 
   const handlePaymentWithSavedCard = useCallback(async () => {
-    if (!selectedCardId || !invoice) {
+    if (!selectedCardId || !activeInvoice) {
       toast.error("Please select a payment method");
       return;
     }
 
     setIsProcessingPayment(true);
     await createInvoicePayment(
-      buildStripeCreatePaymentIntentPayload(invoice, selectedCardId),
+      buildStripeCreatePaymentIntentPayload(activeInvoice, selectedCardId),
       {
         onSuccess: (paymentResult: any) => {
           handleSavedCardPaymentSuccess(paymentResult).catch((err) => {
@@ -662,9 +721,73 @@ export function InvoicePaymentModal({
         },
       }
     );
-  }, [selectedCardId, invoice, createInvoicePayment, handleSavedCardPaymentSuccess, handleDirectPaymentError]);
+  }, [
+    selectedCardId,
+    activeInvoice,
+    createInvoicePayment,
+    handleSavedCardPaymentSuccess,
+    handleDirectPaymentError,
+  ]);
 
-  if (!show || !invoice) return null;
+  const handleManualPaymentSubmit = useCallback(async () => {
+    if (!activeInvoice?.id) {
+      return;
+    }
+
+    const parsedAmount = Number.parseFloat(manualPaymentAmount);
+    if (!Number.isFinite(parsedAmount) || parsedAmount <= 0) {
+      toast.error("Enter a valid payment amount");
+      return;
+    }
+    if (parsedAmount > outstandingAmount + 0.009) {
+      toast.error(
+        `Amount cannot exceed outstanding balance (${currencyCode} ${formatNumber(outstandingAmount)})`,
+      );
+      return;
+    }
+
+    const { amount, base_amount } = buildManualPaymentAmounts(parsedAmount);
+    setIsRecordingManualPayment(true);
+    try {
+      await recordManualInvoicePayment({
+        invoice_id: Number(activeInvoice.id),
+        tenant_id: activeInvoice.tenant_id,
+        payment_method: manualPaymentMethod,
+        amount,
+        base_amount,
+        notes: manualPaymentNotes.trim() || undefined,
+      });
+
+      const fresh = await refreshInvoiceSnapshot(activeInvoice.id);
+      const remaining = getInvoiceOutstandingAmount(fresh);
+      toast.success("Manual payment recorded");
+
+      if (remaining <= 0) {
+        onPaymentSuccess?.();
+        closeAndReset();
+        return;
+      }
+
+      setManualPaymentAmount(String(remaining));
+      setActivePaymentTab("saved-cards");
+    } catch (err: unknown) {
+      console.error("InvoicePaymentModal manual payment failed:", err);
+    } finally {
+      setIsRecordingManualPayment(false);
+    }
+  }, [
+    activeInvoice,
+    manualPaymentAmount,
+    manualPaymentMethod,
+    manualPaymentNotes,
+    outstandingAmount,
+    currencyCode,
+    refreshInvoiceSnapshot,
+    onPaymentSuccess,
+    closeAndReset,
+  ]);
+
+  if (!show || !activeInvoice) return null;
 
   const hasSavedCards = paymentMethods.some((m) => m.type === "card");
   const renderSavedCardsTab = () => {
@@ -749,19 +872,105 @@ export function InvoicePaymentModal({
               Processing Payment...
             </>
           ) : (
-            <>Pay Now</>
+            <>Pay {currencyCode} {formatNumber(chargeTotals.amount)}</>
           )}
         </Button>
       </div>
     );
   };
 
+  const renderManualPaymentTab = () => (
+    <div>
+      <Alert variant="info" className="small">
+        Manual payments (bank transfer, cash, cheque) have <strong>no processing fee</strong>. Record a
+        partial payment here, then pay the remainder by card — the 3% fee applies only to the outstanding
+        balance.
+      </Alert>
+      <div className="mb-3">
+        <label className="form-label fw-semibold" htmlFor="manual-payment-method">
+          Payment method
+        </label>
+        <select
+          id="manual-payment-method"
+          className="form-select"
+          value={manualPaymentMethod}
+          onChange={(e) =>
+            setManualPaymentMethod(e.target.value as ManualInvoicePaymentMethod)
+          }
+        >
+          <option value="bank_transfer">Bank transfer</option>
+          <option value="cash">Cash</option>
+          <option value="check">Cheque</option>
+        </select>
+      </div>
+      <div className="mb-3">
+        <label className="form-label fw-semibold" htmlFor="manual-payment-amount">
+          Amount ({currencyCode})
+        </label>
+        <input
+          id="manual-payment-amount"
+          type="number"
+          min={0}
+          step="0.01"
+          max={outstandingAmount}
+          className="form-control"
+          value={manualPaymentAmount}
+          onChange={(e) => setManualPaymentAmount(e.target.value)}
+        />
+        <div className="form-text">
+          Outstanding: {currencyCode} {formatNumber(outstandingAmount)}
+        </div>
+      </div>
+      <div className="mb-3">
+        <label className="form-label fw-semibold" htmlFor="manual-payment-notes">
+          Notes (optional)
+        </label>
+        <textarea
+          id="manual-payment-notes"
+          className="form-control"
+          rows={2}
+          value={manualPaymentNotes}
+          onChange={(e) => setManualPaymentNotes(e.target.value)}
+        />
+      </div>
+      <Button
+        variant="primary"
+        className="w-100"
+        disabled={isRecordingManualPayment || outstandingAmount <= 0}
+        onClick={() => {
+          handleManualPaymentSubmit().catch(() => undefined);
+        }}
+      >
+        {isRecordingManualPayment ? (
+          <>
+            <Spinner animation="border" size="sm" className="me-2" />
+            Recording payment...
+          </>
+        ) : (
+          <>Record manual payment</>
+        )}
+      </Button>
+    </div>
+  );
+
   return (
     <Modal show={show} onHide={closeAndReset} size="lg">
       <Modal.Header closeButton>
-        <Modal.Title>Process Payment - Invoice #{invoice.invoice_number}</Modal.Title>
+        <Modal.Title>Process Payment - Invoice #{activeInvoice.invoice_number}</Modal.Title>
       </Modal.Header>
       <Modal.Body>
+        {isRefreshingInvoice && (
+          <div className="text-muted small mb-3">
+            <Spinner animation="border" size="sm" className="me-2" />
+            Refreshing invoice balance...
+          </div>
+        )}
+        {partiallyPaid && (
+          <Alert variant="warning" className="small">
+            This invoice is partially paid. Card checkout will charge the{" "}
+            <strong>remaining balance</strong> plus a 3% fee — not the original invoice total.
+          </Alert>
+        )}
         <div className="card mb-4">
           <div className="card-header">
             <h6 className="mb-0">Invoice Summary</h6>
@@ -774,25 +983,33 @@ export function InvoicePaymentModal({
                 </p>
                 <p>
                   <strong>Invoice Date:</strong>{" "}
-                  {invoice.invoice_date ? moment(invoice.invoice_date).format("DD-MMM-YYYY") : "N/A"}
+                  {activeInvoice.invoice_date
+                    ? moment(activeInvoice.invoice_date).format("DD-MMM-YYYY")
+                    : "N/A"}
                 </p>
                 <p>
                   <strong>Due Date:</strong>{" "}
-                  {invoice.due_date ? moment(invoice.due_date).format("DD-MMM-YYYY") : "N/A"}
+                  {activeInvoice.due_date
+                    ? moment(activeInvoice.due_date).format("DD-MMM-YYYY")
+                    : "N/A"}
                 </p>
               </div>
               <div className="col-md-6">
                 <p>
                   <strong>Subtotal:</strong> {currencyCode}{" "}
-                  {formatNumber(Number.parseFloat(String(invoice.subtotal || "0")))}
+                  {formatNumber(Number.parseFloat(String(activeInvoice.subtotal || "0")))}
                 </p>
                 <p>
                   <strong>TAX Amount:</strong> {currencyCode}{" "}
-                  {formatNumber(Number.parseFloat(String(invoice.tax_amount || "0")))}
+                  {formatNumber(Number.parseFloat(String(activeInvoice.tax_amount || "0")))}
                 </p>
                 <p>
-                  <strong className="text-primary">Total Amount:</strong> {currencyCode}{" "}
-                  {formatNumber(Number.parseFloat(String(invoice.total_amount || "0")))}
+                  <strong>Invoice total:</strong> {currencyCode}{" "}
+                  {formatNumber(Number.parseFloat(String(activeInvoice.total_amount || "0")))}
+                </p>
+                <p>
+                  <strong className="text-primary">Outstanding:</strong> {currencyCode}{" "}
+                  {formatNumber(outstandingAmount)}
                 </p>
               </div>
             </div>
@@ -800,19 +1017,32 @@ export function InvoicePaymentModal({
         </div>
 
         <div className="mb-4">
-          <h6 className="mb-2">Card charge (saved or direct)</h6>
-          <p className="text-muted small mb-2">
-            Card payments include a 3% processing fee on the outstanding invoice amount (saved cards and new
-            card details use the same charge).
-          </p>
-          <PaymentChargeBreakdown
-            currencyCode={currencyCode}
-            baseAmount={chargeTotals.base_amount}
-            processingFee={chargeTotals.processing_fee}
-            totalCharged={chargeTotals.amount}
-          />
+          {(activePaymentTab === "saved-cards" || activePaymentTab === "direct-payment") && (
+            <>
+              <h6 className="mb-2">Card charge (saved or direct)</h6>
+              <p className="text-muted small mb-2">
+                The 3% processing fee is calculated on the outstanding balance only — not on amounts already
+                paid manually.
+              </p>
+              <PaymentChargeBreakdown
+                currencyCode={currencyCode}
+                baseAmount={chargeTotals.base_amount}
+                processingFee={chargeTotals.processing_fee}
+                totalCharged={chargeTotals.amount}
+              />
+            </>
+          )}
           <h6 className="mb-3">Payment Method</h6>
           <ul className="nav nav-tabs mb-3">
+            <li className="nav-item">
+              <button
+                className={`nav-link ${activePaymentTab === "manual-payment" ? "active" : ""}`}
+                onClick={() => setActivePaymentTab("manual-payment")}
+                type="button"
+              >
+                Manual payment
+              </button>
+            </li>
             <li className="nav-item">
               <button
                 className={`nav-link ${activePaymentTab === "saved-cards" ? "active" : ""}`}
@@ -834,10 +1064,11 @@ export function InvoicePaymentModal({
           </ul>
 
           <div className="tab-content">
+            {activePaymentTab === "manual-payment" && (
+              <div className="tab-pane active">{renderManualPaymentTab()}</div>
+            )}
             {activePaymentTab === "saved-cards" && (
-              <div className="tab-pane active">
-                {renderSavedCardsTab()}
-              </div>
+              <div className="tab-pane active">{renderSavedCardsTab()}</div>
             )}
 
             {activePaymentTab === "direct-payment" && (
@@ -845,7 +1076,9 @@ export function InvoicePaymentModal({
                 {stripePublishableKey ? (
                   <Elements stripe={loadStripe(stripePublishableKey)}>
                     <DirectCardPaymentForm
-                      invoice={invoice}
+                      invoice={activeInvoice}
+                      currencyCode={currencyCode}
+                      chargeTotals={chargeTotals}
                       onPaymentSuccess={handleDirectPaymentSuccess}
                       onPaymentError={handleDirectPaymentError}
                     />

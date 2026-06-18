@@ -180,6 +180,31 @@ export const addPaymentMethod = async (
   }
 };
 
+export type ManualInvoicePaymentMethod = "bank_transfer" | "cash" | "check" | "cheque";
+
+export interface RecordManualInvoicePaymentPayload {
+  invoice_id: number;
+  tenant_id?: string | number;
+  payment_method: ManualInvoicePaymentMethod;
+  /** Manual payments have no processing fee — same as base_amount. */
+  amount: number;
+  base_amount?: number;
+  notes?: string;
+}
+
+/** POST accounting/payments — record bank transfer / cash / cheque (no card fee). */
+export const recordManualInvoicePayment = async (
+  payload: RecordManualInvoicePaymentPayload,
+) => {
+  try {
+    const response = await axiosInstance.post("accounting/payments", payload);
+    return extractAccountingApiData(response.data);
+  } catch (error: any) {
+    toast.error(error?.message || "Failed to record manual payment");
+    throw error;
+  }
+};
+
 export const GetPayments = async (params: PaginationParams = {}) => {
   try {
     const response = await axiosInstance.get('accounting/get-payments', { params });
@@ -432,6 +457,22 @@ export const PostInvoiceStripePaymentLink = async (
     throw error;
   }
 };
+
+/** Public invoice pay page payload (GET public/invoice-pay/{token}). */
+export interface PublicInvoicePayData {
+  invoice?: {
+    id?: number;
+    invoice_number?: string;
+    amount_due?: string | number;
+    total_amount?: string | number;
+    currency_code?: string;
+    status?: string;
+    card_processing_fee?: string | number;
+    card_charge_total?: string | number;
+  };
+  publishable_key?: string;
+  payment_methods?: unknown[];
+}
 
 /** Public - Payment Link & Session (token-scoped)
  * GET public/invoice-pay/{payment_link_token}

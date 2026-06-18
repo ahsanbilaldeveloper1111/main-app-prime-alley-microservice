@@ -46,7 +46,7 @@ const ChatbotWidget = lazy(() => import("./components/chatbot"));
 
 NProgress.configure({ showSpinner: false });
 
-const PUBLIC_PREFIXES = ["/auth/", "/public/payment", "/access-denied", "/404"];
+const PUBLIC_PREFIXES = ["/auth/", "/public/payment", "/public/invoice-pay", "/access-denied", "/404"];
 const PUBLIC_PATHS = new Set([
   "/",
   "/auth/signin",
