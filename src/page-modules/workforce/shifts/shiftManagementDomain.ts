@@ -190,8 +190,24 @@ export function normalizeShiftTimeForInput(value: unknown): string {
   return loose.isValid() ? loose.format("HH:mm") : "";
 }
 
+function coerceShiftDateString(value: unknown): string {
+  if (value == null) {
+    return "";
+  }
+  if (typeof value === "string") {
+    return value.trim();
+  }
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return String(value);
+  }
+  if (value instanceof Date) {
+    return moment(value).format("YYYY-MM-DD");
+  }
+  return "";
+}
+
 export function normalizeShiftDateForInput(value: unknown): string {
-  const raw = value == null ? "" : String(value).trim();
+  const raw = coerceShiftDateString(value);
   if (!raw) return "";
 
   const datePart = raw.slice(0, 10);
