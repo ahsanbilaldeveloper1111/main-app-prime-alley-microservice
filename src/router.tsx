@@ -86,6 +86,10 @@ const pageGlob = import.meta.glob<PageModule>([
 const supplementalPageGlob: Record<string, () => Promise<PageModule>> = {
   "./pages/chat/audit-logs/index.tsx": () =>
     import("./pages/chat/audit-logs/index"),
+  "./pages/workforce/check-in-out/index.tsx": () =>
+    import("./pages/workforce/check-in-out/index"),
+  "./pages/workforce/attendance-analytics/index.tsx": () =>
+    import("./pages/workforce/attendance-analytics/index"),
 };
 
 function normalizeGlobFilePath(filePath: string): string {

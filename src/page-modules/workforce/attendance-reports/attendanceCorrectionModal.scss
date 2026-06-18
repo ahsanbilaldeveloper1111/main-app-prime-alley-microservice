@@ -1,0 +1,54 @@
+.attendance-correction-modal__title {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.attendance-correction-modal__intro {
+  margin: 0 0 16px;
+  color: #475569;
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.attendance-correction-modal__form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px 16px;
+}
+
+.attendance-correction-modal__field {
+  margin: 0;
+  min-width: 0;
+}
+
+.attendance-correction-modal__field:has(textarea) {
+  grid-column: 1 / -1;
+}
+
+.attendance-correction-modal__inline-fields {
+  display: contents;
+}
+
+.attendance-correction-modal__label {
+  margin-bottom: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #475569;
+}
+
+.attendance-correction-modal__error {
+  margin: 14px 0 0;
+  color: #b42318;
+  font-size: 13px;
+}
+
+.attendance-correction-modal__submit-btn {
+  min-width: 150px;
+}
+
+@media (max-width: 767.98px) {
+  .attendance-correction-modal__form {
+    grid-template-columns: 1fr;
+  }
+}

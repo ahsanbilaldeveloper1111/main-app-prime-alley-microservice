@@ -150,6 +150,24 @@ export const settingsSubTabSearchItems: SettingsSubTabSearchItem[] = [
     label: "CRM Campaigns",
     permission: PERMISSIONS.VIEW_CRM_CAMPAIGNS,
   },
+  {
+    sectionId: "policies-attendance",
+    subTabId: "company-config",
+    label: "Company Config",
+    permission: PERMISSIONS.STAFF_MANAGEMENT_SERVICES,
+  },
+  {
+    sectionId: "policies-attendance",
+    subTabId: "shift-management",
+    label: "Shift Management",
+    permission: PERMISSIONS.STAFF_MANAGEMENT_SERVICES,
+  },
+  {
+    sectionId: "policies-attendance",
+    subTabId: "holiday-management",
+    label: "Holiday Management",
+    permission: PERMISSIONS.STAFF_MANAGEMENT_SERVICES,
+  },
 ];
 
 export const sidebarGroups: SidebarGroup[] = [
@@ -209,6 +227,11 @@ export const sidebarGroups: SidebarGroup[] = [
         permission: PERMISSIONS.STAFF_MANAGEMENT_SERVICES,
       },
       {
+        id: "policies-attendance",
+        label: "Policies & Attendance",
+        permission: PERMISSIONS.STAFF_MANAGEMENT_SERVICES,
+      },
+      {
         id: "billing",
         label: "Billing",
         permission: PERMISSIONS.ACCOUNTS_SERVICES,
@@ -240,6 +263,7 @@ export const defaultSubTabBySection: Record<string, string | undefined> = {
   communications: 'email',
   planner: 'general',
   workforce: 'request-categories',
+  'policies-attendance': 'company-config',
   billing: 'payment-methods',
   tickets: 'statuses',
   'help-center': 'modules',

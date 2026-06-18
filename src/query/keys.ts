@@ -545,6 +545,160 @@ export const workforceKeys = {
         params.filtersKey,
       ] as const,
     status: () => [...workforceKeys.attendance.all(), "status"] as const,
+    my: () => [...workforceKeys.attendance.all(), "my"] as const,
+    dailyReport: (params: {
+      tenantId: string;
+      date: string;
+      departmentId: string;
+      extensionsKey: string;
+    }) =>
+      [
+        ...workforceKeys.attendance.all(),
+        "reports",
+        "daily",
+        params.tenantId,
+        params.date,
+        params.departmentId,
+        params.extensionsKey,
+      ] as const,
+    dailyReportExtensions: (params: {
+      companyIdentifier: string;
+      departmentId: string;
+    }) =>
+      [
+        ...workforceKeys.attendance.all(),
+        "reports",
+        "daily",
+        "extensions",
+        params.companyIdentifier,
+        params.departmentId,
+      ] as const,
+    monthlyReport: (params: {
+      tenantId: string;
+      month: string;
+      departmentId: string;
+    }) =>
+      [
+        ...workforceKeys.attendance.all(),
+        "reports",
+        "monthly",
+        params.tenantId,
+        params.month,
+        params.departmentId,
+      ] as const,
+    employeeReport: (params: { tenantId: string; userId: string; month: string }) =>
+      [
+        ...workforceKeys.attendance.all(),
+        "reports",
+        "employee",
+        params.tenantId,
+        params.userId,
+        params.month,
+      ] as const,
+    teamSnapshot: (params: {
+      tenantId: string;
+      date: string;
+      departmentId: string;
+      extensionsKey: string;
+      status: string;
+      search: string;
+      managerId: string;
+    }) =>
+      [
+        ...workforceKeys.attendance.all(),
+        "team",
+        "snapshot",
+        params.tenantId,
+        params.date,
+        params.departmentId,
+        params.extensionsKey,
+        params.status,
+        params.search,
+        params.managerId,
+      ] as const,
+  },
+
+  /** Shift definitions (`main-settings/policies-attendance/shift-management`). */
+  shifts: {
+    all: () => [...workforceKeys.root, "shifts"] as const,
+    list: (params: {
+      tenantId: string;
+      status: string;
+      type: string;
+      page: number;
+      limit: number;
+    }) =>
+      [
+        ...workforceKeys.shifts.all(),
+        "list",
+        params.tenantId,
+        params.status,
+        params.type,
+        params.page,
+        params.limit,
+      ] as const,
+    assignments: (params: { tenantId: string; page: number; limit: number }) =>
+      [
+        ...workforceKeys.shifts.all(),
+        "assignments",
+        params.tenantId,
+        params.page,
+        params.limit,
+      ] as const,
+  },
+
+  /** Company work-hours policy (`main-settings/policies-attendance/company-config`). */
+  attendancePolicies: {
+    all: () => [...workforceKeys.root, "attendancePolicies"] as const,
+    workHours: (params: { tenantId: string; page: number; limit: number }) =>
+      [
+        ...workforceKeys.attendancePolicies.all(),
+        "workHours",
+        params.tenantId,
+        params.page,
+        params.limit,
+      ] as const,
+    gracePeriod: (tenantId: string) =>
+      [...workforceKeys.attendancePolicies.all(), "gracePeriod", tenantId] as const,
+    breakTypes: (tenantId: string) =>
+      [...workforceKeys.attendancePolicies.all(), "breakTypes", tenantId] as const,
+    breaks: (params: { tenantId: string; page: number; limit: number }) =>
+      [
+        ...workforceKeys.attendancePolicies.all(),
+        "breaks",
+        params.tenantId,
+        params.page,
+        params.limit,
+      ] as const,
+    overtime: (params: { tenantId: string; page: number; limit: number }) =>
+      [
+        ...workforceKeys.attendancePolicies.all(),
+        "overtime",
+        params.tenantId,
+        params.page,
+        params.limit,
+      ] as const,
+  },
+
+  /** Holiday calendars (`main-settings/policies-attendance/holiday-management`). */
+  holidayCalendars: {
+    all: () => [...workforceKeys.root, "holidayCalendars"] as const,
+    list: (params: {
+      tenantId: string;
+      year: string;
+      status: string;
+      limit: number;
+    }) =>
+      [
+        ...workforceKeys.holidayCalendars.all(),
+        "list",
+        params.tenantId,
+        params.year,
+        params.status,
+        params.limit,
+      ] as const,
+    holidays: (calendarId: number) =>
+      [...workforceKeys.holidayCalendars.all(), "holidays", calendarId] as const,
   },
 
   /** Approval requests inbox (`src/pages/workforce/approval-requests/*`). */

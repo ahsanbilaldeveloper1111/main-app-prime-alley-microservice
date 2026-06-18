@@ -2,7 +2,6 @@ import { reportApiErrorFromCatch } from "@utils/sentryLogger";
 import type { AttendanceStatusData } from "@utils/staffManagement";
 import { getWorkforceTableDatePresetRange } from "@utils/workforceTableDatePresetRange";
 import moment from "moment";
-
 export const ATTENDANCE_ITEMS_PER_PAGE = 15;
 
 export const ATTENDANCE_DATE_PRESETS = [

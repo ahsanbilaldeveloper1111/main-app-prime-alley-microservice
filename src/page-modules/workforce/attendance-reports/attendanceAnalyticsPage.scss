@@ -1,0 +1,389 @@
+// Attendance Analytics — overrides prospects full-height rules from custom.scss on hard reload.
+
+body:has(.workforce-attendance-analytics-wrapper-container) {
+  overflow: auto !important;
+
+  .main-content-wrapper,
+  .min-vh-100 {
+    overflow: visible !important;
+    height: auto !important;
+    min-height: 100vh !important;
+  }
+
+  .generic-table-card {
+    flex: 0 1 auto !important;
+    height: auto !important;
+    overflow: visible !important;
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075) !important;
+  }
+
+  .prospects-table-wrapper {
+    flex: 0 1 auto !important;
+    height: auto !important;
+    overflow: visible !important;
+  }
+
+  .workforce-attendance-analytics-wrapper-container {
+    .prospects-scrollable-content {
+      height: auto !important;
+      overflow: visible !important;
+    }
+
+    .prospects-content-area.container-fluid {
+      padding: 20px 24px 24px;
+      box-sizing: border-box;
+    }
+
+    .prospects-table-wrapper.workforce-attendance-analytics-wrapper {
+      flex: 0 1 auto !important;
+      height: auto !important;
+      min-height: 0;
+      max-height: none;
+      overflow: visible;
+      padding-top: 0;
+    }
+
+    .generic-table-container {
+      display: flex;
+      flex-direction: column;
+      flex: 0 1 auto;
+      min-width: 0;
+      overflow: visible;
+    }
+  }
+}
+
+.workforce-attendance-analytics-wrapper {
+  width: 100%;
+  min-width: 0;
+  font-family: "Lexend Deca", Helvetica, Arial, sans-serif;
+  color: #141414;
+
+  .workforce-inner-tab-layout {
+    width: 100%;
+    min-width: 0;
+    overflow: visible;
+  }
+
+  .workforce-inner-tab-layout .gt-toolbar-container {
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    background: #ffffff;
+    border: 1px solid #cccccc;
+    border-bottom: none;
+    border-radius: 8px 8px 0 0;
+  }
+
+  .workforce-inner-tab-layout .gt-toolbar-tabs-section {
+    padding: 2px 24px 0;
+    margin-bottom: -1px;
+    background: #ffffff;
+    border: none;
+    border-radius: 8px 8px 0 0;
+  }
+
+  .workforce-inner-tab-layout .gt-toolbar-tabs-row {
+    align-items: center;
+    flex-wrap: nowrap;
+    width: 100%;
+    min-width: 0;
+  }
+
+  .workforce-inner-tab-layout .gt-toolbar-tabs-list {
+    flex: 0 1 auto;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 2px;
+    gap: 8px;
+  }
+
+  .workforce-inner-tab-layout .gt-tab-button {
+    font-family: "Lexend Deca", Helvetica, Arial, sans-serif;
+    font-size: 14px;
+    font-weight: 500;
+    color: #141414 !important;
+    max-width: min(100%, 240px);
+    border: none;
+    border-radius: 6px;
+    background: transparent;
+
+    &:hover {
+      color: #0066cc !important;
+      background: #f5f8fa;
+    }
+
+    &.active {
+      color: #141414 !important;
+      font-weight: 600 !important;
+      background: #ffffff;
+      border-radius: 5px 5px 0 0 !important;
+      border-top: 1px solid #cccccc;
+      border-left: 1px solid #cccccc;
+      border-right: 1px solid #cccccc;
+      border-bottom: 1px solid #ffffff;
+      margin-bottom: -1px;
+    }
+  }
+
+  .workforce-inner-tab-layout__body {
+    border-radius: 0 0 8px 8px !important;
+    border-top: none !important;
+    overflow: visible;
+    background: #ffffff;
+    box-shadow: none !important;
+  }
+}
+
+.attendance-analytics-page__empty {
+  margin: 0;
+  padding: 16px 20px;
+  font-size: 14px;
+  color: #64748b;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  line-height: 1.45;
+}
+
+.attendance-analytics-panel {
+  min-width: 0;
+  width: 100%;
+}
+
+.attendance-analytics-panel__message {
+  margin: 0;
+  padding: 20px 24px;
+  font-size: 14px;
+  color: #6b7280;
+}
+
+.attendance-analytics-panel__message--error {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  color: #b42318;
+}
+
+.attendance-analytics-filters {
+  padding: 12px 24px;
+  border-bottom: 1px solid #cccccc;
+  background: #ffffff;
+  box-sizing: border-box;
+
+  .settings-embedded-page__filters {
+    margin-bottom: 0;
+    align-items: flex-end;
+  }
+
+  .settings-embedded-page__filter-field {
+    margin: 0;
+  }
+
+  #daily-report-extensions,
+  .daily-attendance-report-extensions-select {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .settings-embedded-page__filter-field:has(.daily-attendance-report-extensions-select),
+  .settings-embedded-page__filter-field:has(.team-attendance-snapshot-extensions-select) {
+    flex: 1 1 220px;
+    max-width: 320px;
+  }
+}
+
+.attendance-analytics-dashboard {
+  min-width: 0;
+  width: 100%;
+  padding: 20px 24px 24px;
+  box-sizing: border-box;
+}
+
+.attendance-analytics-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(1, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 20px;
+
+  @media (min-width: 576px) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  @media (min-width: 992px) {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+.attendance-analytics-stats-grid--monthly {
+  @media (min-width: 1200px) {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+.attendance-analytics-stats-grid--snapshot {
+  @media (min-width: 1200px) {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+.team-attendance-snapshot-table-wrap {
+  width: 100%;
+  min-width: 0;
+  max-height: min(360px, 52vh);
+  overflow: auto;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+}
+
+.team-attendance-snapshot-table {
+  width: 100%;
+  table-layout: fixed;
+  font-size: 12px;
+  margin-bottom: 0;
+
+  th,
+  td {
+    padding: 6px 10px;
+    vertical-align: middle;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background: #f8fafc;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: #64748b;
+    border-bottom-width: 1px;
+  }
+
+  td {
+    color: #0f172a;
+  }
+}
+
+.team-attendance-snapshot-roster-card {
+  .attendance-analytics-chart-card__body {
+    padding: 14px 16px 16px;
+  }
+
+  h5 {
+    margin-bottom: 4px !important;
+    font-size: 1rem;
+  }
+
+  .text-muted.small {
+    margin-bottom: 10px !important;
+  }
+}
+
+.team-attendance-snapshot-status {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  border: 1px solid transparent;
+  white-space: nowrap;
+
+  &--present {
+    color: #047857;
+    background: #ecfdf5;
+    border-color: #a7f3d0;
+  }
+
+  &--absent {
+    color: #b91c1c;
+    background: #fef2f2;
+    border-color: #fecaca;
+  }
+
+  &--late {
+    color: #c2410c;
+    background: #fff7ed;
+    border-color: #fed7aa;
+  }
+
+  &--on-break {
+    color: #6d28d9;
+    background: #f5f3ff;
+    border-color: #ddd6fe;
+  }
+
+  &--overtime {
+    color: #b45309;
+    background: #fff7ed;
+    border-color: #fdba74;
+  }
+
+  &--on-leave {
+    color: #1d4ed8;
+    background: #eff6ff;
+    border-color: #bfdbfe;
+  }
+
+  &--no-show {
+    color: #475569;
+    background: #f8fafc;
+    border-color: #e2e8f0;
+  }
+
+  &--unknown {
+    color: #475569;
+    background: #f8fafc;
+    border-color: #e2e8f0;
+  }
+}
+
+.team-attendance-snapshot-table__action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+}
+
+.attendance-analytics-charts-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 16px;
+  margin-bottom: 16px;
+
+  &--split {
+    @media (min-width: 992px) {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+
+  &--snapshot-chart {
+    @media (min-width: 992px) {
+      grid-template-columns: minmax(0, 420px);
+    }
+  }
+
+  &--roster {
+    margin-bottom: 0;
+  }
+}
+
+.attendance-analytics-chart-card__body {
+  min-width: 0;
+  overflow: hidden;
+}
+
+.attendance-analytics-chart-empty {
+  min-height: 220px;
+}
+
+.attendance-analytics-stat-card {
+  min-width: 0;
+}

@@ -1,0 +1,515 @@
+@import './smartCrmTablePage.scss';
+
+@import './settingsEmbeddedToolbar.scss';
+
+
+
+$pa-form-accent: #0066cc;
+
+$pa-form-accent-soft: rgba(0, 102, 204, 0.12);
+
+$pa-form-surface: #ffffff;
+
+$pa-form-surface-muted: #f5f8fa;
+
+$pa-form-border: #eaf0f6;
+
+$pa-form-text: #141414;
+
+$pa-form-text-muted: #718096;
+
+$pa-form-placeholder: #a0aec0;
+
+
+
+// Policies & Attendance tabs inside Main Settings — aligned with Smart CRM section chrome.
+
+.policies-attendance-settings-panel {
+
+  min-width: 0;
+
+  width: 100%;
+
+  max-width: 100%;
+
+  margin: 0;
+
+  padding: 0;
+
+  overflow-x: clip;
+
+  box-sizing: border-box;
+
+
+
+  > .smart-crm-table-page,
+
+  > div > .smart-crm-table-page {
+
+    margin-top: 0;
+
+  }
+
+
+
+  .gt-toolbar-tabs-section {
+
+    overflow-x: auto;
+
+    overflow-y: hidden;
+
+    -webkit-overflow-scrolling: touch;
+
+    max-width: 100%;
+
+  }
+
+
+
+  .gt-toolbar-tabs-row {
+
+    flex-wrap: wrap;
+
+    row-gap: 8px;
+
+    min-width: 0;
+
+  }
+
+
+
+  @media (max-width: 767.98px) {
+
+    .gt-toolbar-tabs-actions,
+
+    .gt-toolbar-actions {
+
+      width: 100%;
+
+      margin-left: 0;
+
+    }
+
+
+
+    .gt-toolbar-tabs-actions > .d-flex,
+
+    .gt-toolbar-actions > .d-flex {
+
+      width: 100%;
+
+      flex-wrap: wrap;
+
+    }
+
+  }
+
+
+
+  // Inline forms (grace period panel, report filters).
+
+  @include policies-attendance-add-task-form-controls;
+
+  @include policies-attendance-add-task-datepicker-styles;
+
+}
+
+
+
+.policies-attendance-inner-tab-layout {
+
+  &__content {
+
+    min-width: 0;
+
+    width: 100%;
+
+  }
+
+}
+
+
+
+@mixin policies-attendance-add-task-form-controls {
+
+  .form-control,
+
+  .form-select {
+
+    border-color: #cbd5e0 !important;
+
+    border-radius: 4px !important;
+
+    min-height: 36px !important;
+
+    font-size: 13px !important;
+
+    font-weight: 400 !important;
+
+    background-color: #f9fafb !important;
+
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+
+    font-family: 'Lexend Deca', Helvetica, Arial, sans-serif !important;
+
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04) !important;
+
+    color: $pa-form-text !important;
+
+  }
+
+
+
+  .form-control:focus,
+
+  .form-select:focus {
+
+    border-color: $pa-form-accent !important;
+
+    box-shadow: 0 0 0 2px $pa-form-accent-soft !important;
+
+    background-color: #f9fafb !important;
+
+  }
+
+
+
+  .form-control::placeholder,
+
+  textarea::placeholder,
+
+  input::placeholder {
+
+    font-size: 13px !important;
+
+    color: $pa-form-placeholder !important;
+
+  }
+
+
+
+  .form-check-input:checked {
+
+    background-color: $pa-form-accent;
+
+    border-color: $pa-form-accent;
+
+  }
+
+
+
+  .form-check-input:focus {
+
+    box-shadow: 0 0 0 2px $pa-form-accent-soft;
+
+  }
+
+
+
+  .form-check-label {
+
+    font-size: 13px;
+
+    color: $pa-form-text;
+
+    line-height: 1.45;
+
+    font-family: 'Lexend Deca', Helvetica, Arial, sans-serif;
+
+  }
+
+
+
+  .planner-sidebar-field .form-text {
+
+    font-size: 11px !important;
+
+    color: $pa-form-text-muted !important;
+
+    margin-top: 4px !important;
+
+  }
+
+}
+
+
+
+@mixin policies-attendance-add-task-sidebar-footer-buttons {
+
+  .contact-form-btn-create,
+
+  .contact-form-btn-cancel {
+
+    display: inline-flex;
+
+    align-items: center;
+
+    justify-content: center;
+
+    gap: 8px;
+
+    padding: 8px 14px;
+
+    border-radius: 4px;
+
+    font-size: 13px;
+
+    font-weight: 500;
+
+    font-family: 'Lexend Deca', Helvetica, Arial, sans-serif;
+
+    line-height: 1.2;
+
+    cursor: pointer;
+
+    max-width: 100%;
+
+    box-sizing: border-box;
+
+  }
+
+
+
+  .contact-form-btn-create {
+
+    background-color: $pa-form-accent;
+
+    color: #ffffff;
+
+    border: none;
+
+
+
+    &:hover:not(:disabled) {
+
+      background-color: #0052a3;
+
+      color: #ffffff;
+
+    }
+
+
+
+    &:disabled {
+
+      background-color: #cbd5e0;
+
+      color: #334155;
+
+      cursor: not-allowed;
+
+    }
+
+  }
+
+
+
+  .contact-form-btn-cancel {
+
+    background-color: transparent;
+
+    color: $pa-form-text;
+
+    border: 1px solid #8a8a8a;
+
+
+
+    &:hover:not(:disabled) {
+
+      background-color: #f7fafc;
+
+    }
+
+
+
+    &:disabled {
+
+      color: #a0aec0;
+
+      cursor: not-allowed;
+
+    }
+
+  }
+
+}
+
+
+
+@mixin policies-attendance-add-task-datepicker-styles {
+
+  .react-datepicker-wrapper {
+
+    display: block;
+
+    width: 100%;
+
+  }
+
+
+
+  .main-settings-datepicker-popper {
+
+    z-index: 100000 !important;
+
+    font-family: 'Lexend Deca', Helvetica, Arial, sans-serif;
+
+  }
+
+
+
+  .main-settings-datepicker {
+
+    font-family: 'Lexend Deca', Helvetica, Arial, sans-serif;
+
+    border: 1px solid #cbd5e0;
+
+    border-radius: 4px;
+
+    overflow: hidden;
+
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+
+  }
+
+
+
+  .main-settings-datepicker .react-datepicker__header {
+
+    background: $pa-form-surface-muted;
+
+    border-bottom: 1px solid $pa-form-border;
+
+  }
+
+
+
+  .main-settings-datepicker .react-datepicker__current-month,
+
+  .main-settings-datepicker .react-datepicker__day-name {
+
+    font-family: 'Lexend Deca', Helvetica, Arial, sans-serif;
+
+    color: $pa-form-text;
+
+  }
+
+
+
+  .main-settings-datepicker .react-datepicker__day--selected,
+
+  .main-settings-datepicker .react-datepicker__day--keyboard-selected {
+
+    background-color: $pa-form-accent;
+
+    color: #fff;
+
+  }
+
+
+
+  .main-settings-datepicker .react-datepicker__day:hover {
+
+    background-color: #e8f2ff;
+
+  }
+
+
+
+  .main-settings-datepicker .react-datepicker__day--disabled {
+
+    color: #c4c4c4;
+
+  }
+
+}
+
+
+
+// Sidebars portal to document.body — match CreatePlannerTaskSidebar chrome.
+
+body:has(.main-settings-form-sidebar--policies-attendance) {
+
+  .main-settings-form-sidebar-backdrop {
+
+    background: rgba(15, 23, 42, 0.25) !important;
+
+  }
+
+
+
+  .policies-attendance-form-sidebar-panel {
+
+    background-color: #f5f7fa !important;
+
+    box-shadow: -4px 0 20px rgba(0, 0, 0, 0.12) !important;
+
+
+
+    .main-settings-form-sidebar__header {
+
+      background-color: $pa-form-surface;
+
+      border-bottom: 1px solid $pa-form-border !important;
+
+    }
+
+
+
+    .contact-sidebar-title {
+
+      font-family: 'Lexend Deca', Helvetica, Arial, sans-serif;
+
+      font-size: 20px;
+
+      font-weight: 600;
+
+      color: $pa-form-text;
+
+      letter-spacing: 0;
+
+    }
+
+
+
+    .main-settings-form-sidebar__body {
+
+      background-color: #f5f7fa;
+
+      padding: 14px 18px 22px !important;
+
+    }
+
+
+
+    .main-settings-form-sidebar__footer,
+
+    .policies-attendance-form-sidebar-footer {
+
+      background: $pa-form-surface;
+
+      border-top: 1px solid $pa-form-border;
+
+      box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.04);
+
+    }
+
+
+
+    @include policies-attendance-add-task-form-controls;
+
+    @include policies-attendance-add-task-datepicker-styles;
+
+  }
+
+
+
+  .policies-attendance-form-sidebar-footer {
+
+    @include policies-attendance-add-task-sidebar-footer-buttons;
+
+  }
+
+}
+
+
