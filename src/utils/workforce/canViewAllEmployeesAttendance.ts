@@ -4,8 +4,8 @@ const VIEW_ALL_COMPANY_EMPLOYEES =
   HEADER_CONSTANTS.PERMISSIONS.VIEW_ALL_COMPANY_EMPLOYEES_STAFF_MANAGEMENT;
 
 /**
- * Workforce attendance / org-chart: who may load **company-wide** data vs **team-only**
- * (`getTeamUsers` scope).
+ * Workforce attendance / org-chart: who may load **company-wide** data vs **hierarchy-scoped**
+ * (`GetHierarchyData` staff-management module).
  *
  * - **Team members** see only their team (plus self).
  * - **Company-wide** when any of: `is_admin` from auth, portal `user_type` root/admin/administrator,

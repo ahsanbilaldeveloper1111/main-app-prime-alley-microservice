@@ -18,9 +18,49 @@ function collectAttendanceScopeIdFromRow(row: unknown, sink: Set<string>): void 
   }
 }
 
+function collectAttendanceScopeIdsFromRows(
+  rows: readonly unknown[],
+  sink: Set<string>,
+): void {
+  for (const item of rows) {
+    collectAttendanceScopeIdFromRow(item, sink);
+  }
+}
+
+/**
+ * Normalizes hierarchy `users` (or full hierarchy payload) into identifiers accepted
+ * by attendance APIs (main-app user id and/or phone, depending on tenant).
+ */
+export function parseHierarchyUsersForAttendanceScope(
+  raw: unknown,
+  fallbackSelfId: string,
+): string[] {
+  const sink = new Set<string>();
+  const self = String(fallbackSelfId ?? "").trim();
+  if (self) {
+    sink.add(self);
+  }
+  if (raw == null) {
+    return [...sink];
+  }
+  if (Array.isArray(raw)) {
+    collectAttendanceScopeIdsFromRows(raw, sink);
+    return [...sink];
+  }
+  if (typeof raw !== "object") {
+    return [...sink];
+  }
+  const users = (raw as Record<string, unknown>).users;
+  if (Array.isArray(users)) {
+    collectAttendanceScopeIdsFromRows(users, sink);
+  }
+  return [...sink];
+}
+
 /**
  * Normalizes `getTeamUsers` payloads into identifiers accepted by attendance APIs
  * (main-app user id and/or phone, depending on tenant).
+ * @deprecated Prefer `parseHierarchyUsersForAttendanceScope` with `GetHierarchyData`.
  */
 export function parseTeamUsersResponseForAttendanceScope(
   raw: unknown,

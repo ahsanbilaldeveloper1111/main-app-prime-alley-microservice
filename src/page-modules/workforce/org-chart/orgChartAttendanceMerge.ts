@@ -100,7 +100,7 @@ export async function fetchTodayAttendanceForOrgChartUserIds(
   return out;
 }
 
-/** Non-privileged users: only enrich attendance for Control Hub team (or self while team loads). */
+/** Non-privileged users: only enrich attendance for hierarchy-visible users (or self while hierarchy loads). */
 export function filterOrgChartUserIdsForAttendanceFetch(input: Readonly<{
   chartUserIds: readonly string[];
   canViewAllAttendance: boolean;

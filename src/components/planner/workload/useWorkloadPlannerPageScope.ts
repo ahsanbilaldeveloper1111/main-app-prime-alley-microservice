@@ -37,18 +37,23 @@ export function useWorkloadPlannerPageScope() {
     [session?.user],
   );
   const isWorkloadRoot = canViewCompanyWideRoster || isCompanyAdmin;
+  const {
+    hierarchyDataExtensions,
+    hierarchyDataUsers,
+    loading: hierarchyLoading,
+  } = useHierarchyData(ModuleSlug.WORK_PLANNER);
   const teamScope = useWorkloadTeamScope(
     sessionUserId,
     extension,
     sessionStatus,
     isWorkloadRoot,
+    hierarchyDataExtensions,
+    hierarchyDataUsers,
+    hierarchyLoading,
   );
   const effectiveTeamScope = useMemo(
     () => ({ ...teamScope, isTeamOwner: isWorkloadRoot }),
     [teamScope, isWorkloadRoot],
-  );
-  const { hierarchyDataExtensions, hierarchyDataUsers } = useHierarchyData(
-    ModuleSlug.WORK_PLANNER,
   );
   const companyScope = useMemo(
     () => readWorkloadCompanyScopeFromSession(session?.user),

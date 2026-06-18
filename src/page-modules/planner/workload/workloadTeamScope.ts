@@ -1,9 +1,16 @@
-import axiosInstance from "@utils/axios";
-import { fetchUsersDirectoryList, getParentUsers } from "@utils/users";
+import {
+  fetchUsersDirectoryList,
+  GetHierarchyData,
+  getParentUsers,
+} from "@utils/users";
+import { ModuleSlug } from "@utils/Helper";
 import { getMainAppUsers, setStaffManagementCompanyIdentifier } from "@utils/staffManagement";
 import type { AssigneeMatch, WorkloadQueryBase, WorkloadRangePreset } from "@utils/tasks";
-import { workloadProjectFilterQuery } from "@page-modules/planner/workload/workloadDomain";
-import type { WorkloadProjectFilterValue } from "@page-modules/planner/workload/workloadDomain";
+import {
+  collectWorkloadExtensionsFromHierarchy,
+  workloadProjectFilterQuery,
+  type WorkloadProjectFilterValue,
+} from "@page-modules/planner/workload/workloadDomain";
 
 export type WorkloadCompanyScope = Readonly<{
   companyId: string;
@@ -516,27 +523,41 @@ export function buildWorkloadCompanyExtensionAllowlist(input: Readonly<{
   return allowlist.size > 0 ? allowlist : undefined;
 }
 
-export async function fetchWorkloadTeamScope(
+function mergeHierarchyWorkloadExtensions(
+  hierarchyExtensions: unknown[] | null | undefined,
+  hierarchyUsers: unknown[] | null | undefined,
+): string[] {
+  const merged = new Set<string>();
+  for (const ext of collectWorkloadExtensionsFromHierarchy(hierarchyExtensions)) {
+    merged.add(ext);
+  }
+  for (const ext of collectWorkloadExtensionsFromUserRows(hierarchyUsers ?? [])) {
+    merged.add(ext);
+  }
+  return [...merged];
+}
+
+/**
+ * Derives workload team roster / owner flags from work-planner hierarchy data
+ * (`GET users/hierarchyData`) instead of Control Hub `teams/users`.
+ */
+export function parseWorkloadHierarchyScope(
+  hierarchyExtensions: unknown[] | null | undefined,
+  hierarchyUsers: unknown[] | null | undefined,
   sessionUserId: string,
   sessionExtension = "",
-): Promise<WorkloadTeamScopeResult> {
+): WorkloadTeamScopeResult {
   const selfId = sessionUserId.trim();
   const viewerExt = sessionExtension.trim();
-  if (!selfId && !viewerExt) return IDLE_SCOPE;
-
-  const numericId = Number(selfId);
-  const id = Number.isFinite(numericId) ? numericId : undefined;
-  if (!id) {
-    return parseWorkloadTeamScope(null, selfId, viewerExt);
+  if (!selfId && !viewerExt) {
+    return IDLE_SCOPE;
   }
-  try {
-    // Use a workload-specific fetch so team-scope failures don't toast
-    // (e.g. backend "Group Not Found" for users without a team).
-    const response = await axiosInstance.post("teams/users", { id });
-    const payload = (response?.data as { data?: unknown } | undefined)?.data;
-    return parseWorkloadTeamScope(payload, selfId, viewerExt);
-  } catch {
-    // Fall back to viewer-only scope; UI will still render with padding logic.
+
+  const allExtensions = mergeHierarchyWorkloadExtensions(
+    hierarchyExtensions,
+    hierarchyUsers,
+  );
+  if (allExtensions.length === 0) {
     return {
       loading: false,
       isTeamOwner: false,
@@ -544,4 +565,57 @@ export async function fetchWorkloadTeamScope(
       teamExtensions: viewerExt ? [viewerExt] : [],
     };
   }
+
+  const reportees =
+    viewerExt.length > 0
+      ? allExtensions.filter((ext) => ext !== viewerExt)
+      : allExtensions;
+  const isTeamOwner = reportees.length > 0;
+  const isTeamMemberOnly = !isTeamOwner;
+
+  return {
+    loading: false,
+    isTeamOwner,
+    isTeamMemberOnly,
+    teamExtensions: allExtensions,
+  };
+}
+
+export async function fetchWorkloadHierarchyScope(
+  sessionUserId: string,
+  sessionExtension = "",
+  moduleSlug: string = ModuleSlug.WORK_PLANNER,
+): Promise<WorkloadTeamScopeResult> {
+  const selfId = sessionUserId.trim();
+  const viewerExt = sessionExtension.trim();
+  if (!selfId && !viewerExt) return IDLE_SCOPE;
+
+  try {
+    const hierarchyData = await GetHierarchyData(moduleSlug);
+    if (!hierarchyData || typeof hierarchyData !== "object") {
+      throw new Error("Hierarchy data unavailable");
+    }
+    const record = hierarchyData as Record<string, unknown>;
+    return parseWorkloadHierarchyScope(
+      Array.isArray(record.extensions) ? record.extensions : [],
+      Array.isArray(record.users) ? record.users : [],
+      selfId,
+      viewerExt,
+    );
+  } catch {
+    return {
+      loading: false,
+      isTeamOwner: false,
+      isTeamMemberOnly: false,
+      teamExtensions: viewerExt ? [viewerExt] : [],
+    };
+  }
+}
+
+/** @deprecated Use `fetchWorkloadHierarchyScope` / `parseWorkloadHierarchyScope`. */
+export async function fetchWorkloadTeamScope(
+  sessionUserId: string,
+  sessionExtension = "",
+): Promise<WorkloadTeamScopeResult> {
+  return fetchWorkloadHierarchyScope(sessionUserId, sessionExtension);
 }
