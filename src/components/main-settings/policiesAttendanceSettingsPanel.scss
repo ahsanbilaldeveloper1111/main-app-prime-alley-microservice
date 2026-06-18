@@ -22,114 +22,6 @@ $pa-form-placeholder: #a0aec0;
 
 
 
-// Policies & Attendance tabs inside Main Settings — aligned with Smart CRM section chrome.
-
-.policies-attendance-settings-panel {
-
-  min-width: 0;
-
-  width: 100%;
-
-  max-width: 100%;
-
-  margin: 0;
-
-  padding: 0;
-
-  overflow-x: clip;
-
-  box-sizing: border-box;
-
-
-
-  > .smart-crm-table-page,
-
-  > div > .smart-crm-table-page {
-
-    margin-top: 0;
-
-  }
-
-
-
-  .gt-toolbar-tabs-section {
-
-    overflow-x: auto;
-
-    overflow-y: hidden;
-
-    -webkit-overflow-scrolling: touch;
-
-    max-width: 100%;
-
-  }
-
-
-
-  .gt-toolbar-tabs-row {
-
-    flex-wrap: wrap;
-
-    row-gap: 8px;
-
-    min-width: 0;
-
-  }
-
-
-
-  @media (max-width: 767.98px) {
-
-    .gt-toolbar-tabs-actions,
-
-    .gt-toolbar-actions {
-
-      width: 100%;
-
-      margin-left: 0;
-
-    }
-
-
-
-    .gt-toolbar-tabs-actions > .d-flex,
-
-    .gt-toolbar-actions > .d-flex {
-
-      width: 100%;
-
-      flex-wrap: wrap;
-
-    }
-
-  }
-
-
-
-  // Inline forms (grace period panel, report filters).
-
-  @include policies-attendance-add-task-form-controls;
-
-  @include policies-attendance-add-task-datepicker-styles;
-
-}
-
-
-
-.policies-attendance-inner-tab-layout {
-
-  &__content {
-
-    min-width: 0;
-
-    width: 100%;
-
-  }
-
-}
-
-
-
 @mixin policies-attendance-add-task-form-controls {
 
   .form-control,
@@ -419,6 +311,114 @@ $pa-form-placeholder: #a0aec0;
   .main-settings-datepicker .react-datepicker__day--disabled {
 
     color: #c4c4c4;
+
+  }
+
+}
+
+
+
+// Policies & Attendance tabs inside Main Settings — aligned with Smart CRM section chrome.
+
+.policies-attendance-settings-panel {
+
+  min-width: 0;
+
+  width: 100%;
+
+  max-width: 100%;
+
+  margin: 0;
+
+  padding: 0;
+
+  overflow-x: clip;
+
+  box-sizing: border-box;
+
+
+
+  > .smart-crm-table-page,
+
+  > div > .smart-crm-table-page {
+
+    margin-top: 0;
+
+  }
+
+
+
+  .gt-toolbar-tabs-section {
+
+    overflow-x: auto;
+
+    overflow-y: hidden;
+
+    -webkit-overflow-scrolling: touch;
+
+    max-width: 100%;
+
+  }
+
+
+
+  .gt-toolbar-tabs-row {
+
+    flex-wrap: wrap;
+
+    row-gap: 8px;
+
+    min-width: 0;
+
+  }
+
+
+
+  @media (max-width: 767.98px) {
+
+    .gt-toolbar-tabs-actions,
+
+    .gt-toolbar-actions {
+
+      width: 100%;
+
+      margin-left: 0;
+
+    }
+
+
+
+    .gt-toolbar-tabs-actions > .d-flex,
+
+    .gt-toolbar-actions > .d-flex {
+
+      width: 100%;
+
+      flex-wrap: wrap;
+
+    }
+
+  }
+
+
+
+  // Inline forms (grace period panel, report filters).
+
+  @include policies-attendance-add-task-form-controls;
+
+  @include policies-attendance-add-task-datepicker-styles;
+
+}
+
+
+
+.policies-attendance-inner-tab-layout {
+
+  &__content {
+
+    min-width: 0;
+
+    width: 100%;
 
   }
 
