@@ -1,65 +1,15 @@
-import { useEffect, useState } from "react";
+import { useMemo } from "react";
 import {
-  fetchWorkloadTeamScope,
+  parseWorkloadHierarchyScope,
   type WorkloadTeamScopeResult,
 } from "@page-modules/planner/workload/workloadTeamScope";
 
-const INITIAL: WorkloadTeamScopeResult = {
+const LOADING_SCOPE: WorkloadTeamScopeResult = {
   loading: true,
   isTeamOwner: false,
   isTeamMemberOnly: false,
   teamExtensions: [],
 };
-
-export function useWorkloadTeamScope(
-  sessionUserId: string | null | undefined,
-  sessionExtension: string,
-  sessionStatus: string,
-  skipFetch = false,
-): WorkloadTeamScopeResult {
-  const [scope, setScope] = useState<WorkloadTeamScopeResult>(INITIAL);
-
-  useEffect(() => {
-    if (sessionStatus !== "authenticated") {
-      setScope(IDLE_UNAUTHENTICATED);
-      return;
-    }
-    if (skipFetch) {
-      setScope(IDLE_UNAUTHENTICATED);
-      return;
-    }
-    const selfId = sessionUserId == null ? "" : String(sessionUserId).trim();
-    const viewerExt = sessionExtension.trim();
-    if (!selfId && !viewerExt) {
-      setScope(IDLE_UNAUTHENTICATED);
-      return;
-    }
-
-    let cancelled = false;
-    setScope((prev) => ({ ...prev, loading: true }));
-
-    fetchWorkloadTeamScope(selfId, viewerExt)
-      .then((result) => {
-        if (!cancelled) setScope(result);
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setScope({
-            loading: false,
-            isTeamOwner: false,
-            isTeamMemberOnly: false,
-            teamExtensions: [],
-          });
-        }
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [sessionUserId, sessionExtension, sessionStatus, skipFetch]);
-
-  return scope;
-}
 
 const IDLE_UNAUTHENTICATED: WorkloadTeamScopeResult = {
   loading: false,
@@ -67,3 +17,44 @@ const IDLE_UNAUTHENTICATED: WorkloadTeamScopeResult = {
   isTeamMemberOnly: false,
   teamExtensions: [],
 };
+
+/**
+ * Workload roster scope from work-planner hierarchy (`useHierarchyData`), not teams API.
+ */
+export function useWorkloadTeamScope(
+  sessionUserId: string | null | undefined,
+  sessionExtension: string,
+  sessionStatus: string,
+  skipFetch: boolean,
+  hierarchyExtensions: unknown[],
+  hierarchyUsers: unknown[],
+  hierarchyLoading: boolean,
+): WorkloadTeamScopeResult {
+  return useMemo(() => {
+    if (sessionStatus !== "authenticated" || skipFetch) {
+      return IDLE_UNAUTHENTICATED;
+    }
+    const selfId = sessionUserId == null ? "" : String(sessionUserId).trim();
+    const viewerExt = sessionExtension.trim();
+    if (!selfId && !viewerExt) {
+      return IDLE_UNAUTHENTICATED;
+    }
+    if (hierarchyLoading) {
+      return LOADING_SCOPE;
+    }
+    return parseWorkloadHierarchyScope(
+      hierarchyExtensions,
+      hierarchyUsers,
+      selfId,
+      viewerExt,
+    );
+  }, [
+    sessionUserId,
+    sessionExtension,
+    sessionStatus,
+    skipFetch,
+    hierarchyExtensions,
+    hierarchyUsers,
+    hierarchyLoading,
+  ]);
+}

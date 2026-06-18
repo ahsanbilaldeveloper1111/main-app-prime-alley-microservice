@@ -26,8 +26,7 @@ import { usePermissions } from "@utils/permissionUtils";
 import { getAvatarColor, getInitials } from "@utils/workforceUserAvatar";
 import { WorkforceUserMultiSelectDropdown } from "@components/workforce/WorkforceUserMultiSelectDropdown";
 import { canViewAllEmployeesAttendance } from "@utils/workforce/canViewAllEmployeesAttendance";
-import { parseTeamUsersResponseForAttendanceScope } from "@utils/workforce/attendanceTeamScope";
-import { getTeamUsers } from "@utils/teams";
+import { useAttendanceHierarchyScope } from "@page-modules/workforce/attendance/useAttendanceHierarchyScope";
 import { workforceKeys } from "@query/keys";
 import {
   ATTENDANCE_DATE_PRESETS,
@@ -68,56 +67,17 @@ const AttendancePage = () => {
   ]);
   const { mainAppUsers } = useMainAppLookups();
 
-  // True → list/dropdown use full company scope. False → only Control Hub team (+ self); see canViewAllEmployeesAttendance (admin/root/permission).
+  // True → list/dropdown use full company scope. False → hierarchy-visible users (+ self); see canViewAllEmployeesAttendance.
   const canViewAllEmployees = useMemo(
     () => canViewAllEmployeesAttendance(session?.user),
     [session?.user],
   );
 
-  const [teamScopeUserIds, setTeamScopeUserIds] = useState<string[]>([]);
-  const [teamScopeLoading, setTeamScopeLoading] = useState(false);
-
-  useEffect(() => {
-    // Privileged users skip team fetch entirely so attendance API is not limited to getTeamUsers.
-    if (canViewAllEmployees || sessionStatus !== "authenticated") {
-      setTeamScopeUserIds([]);
-      setTeamScopeLoading(false);
-      return;
-    }
-    const selfRaw = session?.user?.id;
-    const selfStr = selfRaw == null ? "" : String(selfRaw).trim();
-    if (selfStr === "") {
-      setTeamScopeUserIds([]);
-      setTeamScopeLoading(false);
-      return;
-    }
-    let cancelled = false;
-    setTeamScopeLoading(true);
-    void (async () => {
-      try {
-        const numericId = Number(selfStr);
-        const raw = await getTeamUsers(
-          undefined,
-          Number.isFinite(numericId) ? numericId : undefined,
-        );
-        if (cancelled) return;
-        const ids = parseTeamUsersResponseForAttendanceScope(raw, selfStr);
-        setTeamScopeUserIds(ids);
-      } catch (e) {
-        console.error("[AttendancePage] getTeamUsers failed", e);
-        if (!cancelled) {
-          setTeamScopeUserIds([selfStr]);
-        }
-      } finally {
-        if (!cancelled) {
-          setTeamScopeLoading(false);
-        }
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [canViewAllEmployees, sessionStatus, session?.user?.id]);
+  const { teamScopeUserIds, teamScopeLoading } = useAttendanceHierarchyScope(
+    session,
+    sessionStatus,
+    canViewAllEmployees,
+  );
 
   const users = useMemo(() => (mainAppUsers ?? []) as MainAppUser[], [mainAppUsers]);
 

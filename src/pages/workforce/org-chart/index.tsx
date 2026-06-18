@@ -37,8 +37,7 @@ import {
   mainAppUserRowKeyForSelection,
 } from "@utils/workforce/orgChartMainAppUserMatch";
 import { canViewAllEmployeesAttendance } from "@utils/workforce/canViewAllEmployeesAttendance";
-import { parseTeamUsersResponseForAttendanceScope } from "@utils/workforce/attendanceTeamScope";
-import { getTeamUsers } from "@utils/teams";
+import { useAttendanceHierarchyScope } from "@page-modules/workforce/attendance/useAttendanceHierarchyScope";
 
 import {
   buildOrgChartDisplayTree,
@@ -78,54 +77,13 @@ const OrganizationalChart = () => {
   const [selectedEmployee, setSelectedEmployee] = useState<OrgChartEmployee | null>(null);
   const [showEmployeeSidebar, setShowEmployeeSidebar] = useState(false);
 
-  // Same privilege gate as attendance: admin/root/elevated user_type or view-all permission → company-wide enrichment; else team only.
+  // Same privilege gate as attendance: admin/root/elevated user_type or view-all permission → company-wide enrichment; else hierarchy scope.
   const canViewAllAttendance = useMemo(
     () => canViewAllEmployeesAttendance(session?.user),
     [session?.user],
   );
-  const [attendanceTeamScopeIds, setAttendanceTeamScopeIds] = useState<string[]>([]);
-  const [attendanceTeamScopeLoading, setAttendanceTeamScopeLoading] = useState(false);
-
-  useEffect(() => {
-    if (canViewAllAttendance || sessionStatus !== "authenticated") {
-      setAttendanceTeamScopeIds([]);
-      setAttendanceTeamScopeLoading(false);
-      return;
-    }
-    const selfRaw = session?.user?.id;
-    const selfStr = selfRaw == null ? "" : String(selfRaw).trim();
-    if (selfStr === "") {
-      setAttendanceTeamScopeIds([]);
-      setAttendanceTeamScopeLoading(false);
-      return;
-    }
-    let cancelled = false;
-    setAttendanceTeamScopeLoading(true);
-    void (async () => {
-      try {
-        const numericId = Number(selfStr);
-        const raw = await getTeamUsers(
-          undefined,
-          Number.isFinite(numericId) ? numericId : undefined,
-        );
-        if (cancelled) return;
-        const ids = parseTeamUsersResponseForAttendanceScope(raw, selfStr);
-        setAttendanceTeamScopeIds(ids);
-      } catch (e) {
-        console.error("[OrganizationalChart] getTeamUsers failed", e);
-        if (!cancelled) {
-          setAttendanceTeamScopeIds([selfStr]);
-        }
-      } finally {
-        if (!cancelled) {
-          setAttendanceTeamScopeLoading(false);
-        }
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [canViewAllAttendance, sessionStatus, session?.user?.id]);
+  const { teamScopeUserIds: attendanceTeamScopeIds, teamScopeLoading: attendanceTeamScopeLoading } =
+    useAttendanceHierarchyScope(session, sessionStatus, canViewAllAttendance);
 
   useEffect(() => {
     setShowEmployeeSidebar(false);
