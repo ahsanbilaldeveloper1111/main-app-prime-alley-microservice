@@ -183,26 +183,56 @@ export function readCalendarHolidayId(holiday: HolidayCalendarHoliday): number |
   return null;
 }
 
+function readHolidayStringField(value: unknown): string {
+  if (typeof value === "string") {
+    return value.trim();
+  }
+  return "";
+}
+
+function readHolidayScopeFromRecord(
+  holiday: HolidayCalendarHoliday,
+  record: Record<string, unknown>,
+): HolidayScopeValue {
+  const raw = holiday.scope ?? record.scope;
+  if (raw === "department") {
+    return "department";
+  }
+  if (typeof raw === "string" && raw.trim().toLowerCase() === "department") {
+    return "department";
+  }
+  return "company";
+}
+
+function readHolidayDepartmentIdString(
+  holiday: HolidayCalendarHoliday,
+  record: Record<string, unknown>,
+): string {
+  const raw = holiday.department_id ?? record.department_id;
+  if (typeof raw === "number" && Number.isFinite(raw)) {
+    return String(raw);
+  }
+  if (typeof raw === "string") {
+    return raw.trim();
+  }
+  return "";
+}
+
 export function calendarHolidayToFormState(
   holiday: HolidayCalendarHoliday,
 ): CreateCalendarHolidayFormState {
   const record = holiday as Record<string, unknown>;
-  const scopeRaw = String(holiday.scope ?? record.scope ?? "company").trim().toLowerCase();
   const halfDayRaw = holiday.half_day ?? record.half_day;
   let half_day: HolidayHalfDayFormValue = "";
   if (halfDayRaw === "am" || halfDayRaw === "pm") {
     half_day = halfDayRaw;
   }
 
-  const departmentId = holiday.department_id ?? record.department_id;
   return {
-    name: String(holiday.name ?? "").trim(),
+    name: readHolidayStringField(holiday.name),
     date: normalizeHolidayDateKey(holiday.date) ?? "",
-    scope: scopeRaw === "department" ? "department" : "company",
-    department_id:
-      departmentId != null && String(departmentId).trim() !== ""
-        ? String(departmentId)
-        : "",
+    scope: readHolidayScopeFromRecord(holiday, record),
+    department_id: readHolidayDepartmentIdString(holiday, record),
     half_day,
   };
 }
@@ -236,11 +266,12 @@ export function formatHolidayScopeLabel(
   departmentOptions: readonly HolidayDepartmentOption[],
 ): string {
   const record = holiday as Record<string, unknown>;
-  const scope = String(holiday.scope ?? record.scope ?? "company").trim().toLowerCase();
+  const scope = readHolidayScopeFromRecord(holiday, record);
   if (scope !== "department") return "Company-wide";
-  const departmentId = holiday.department_id ?? record.department_id;
+
+  const departmentId = readHolidayDepartmentIdString(holiday, record);
   const departmentLabel = departmentOptions.find(
-    (option) => option.value === String(departmentId ?? ""),
+    (option) => option.value === departmentId,
   )?.label;
   return departmentLabel ? `Department: ${departmentLabel}` : "Department";
 }

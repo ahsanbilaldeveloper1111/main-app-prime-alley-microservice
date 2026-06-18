@@ -7,6 +7,10 @@ import {
   readPolicyEffectiveTo,
   validatePolicyEffectiveDates,
 } from "@page-modules/workforce/company-config/companyConfigShared";
+import {
+  formatWorkforceUnknownNumber,
+  toWorkforceSearchToken,
+} from "@page-modules/workforce/shared/workforceSearchText";
 import type {
   AttendanceBreakPolicy,
   CreateAttendanceBreakPolicyPayload,
@@ -102,8 +106,7 @@ export function formatBreaksPolicyNumber(
 ): string {
   const camelKey = key === "max_breaks_per_day" ? "maxBreaksPerDay" : "minGapMinutes";
   const value = row[key] ?? row[camelKey];
-  if (value == null || !Number.isFinite(Number(value))) return "—";
-  return String(value);
+  return formatWorkforceUnknownNumber(value);
 }
 
 export function formatBreaksPolicyMinutes(value: number | null | undefined): string {
@@ -146,7 +149,7 @@ export function filterBreaksPoliciesBySearch(
       row.target_type ?? record.targetType,
       row.updated_at ?? record.updatedAt,
     ]
-      .map((part) => String(part ?? "").toLowerCase())
+      .map((part) => toWorkforceSearchToken(part))
       .join(" ");
     return haystack.includes(query);
   });

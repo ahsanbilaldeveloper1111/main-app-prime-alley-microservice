@@ -104,6 +104,14 @@ $pa-form-placeholder: #a0aec0;
 
   }
 
+
+
+  // Inline forms (grace period panel, report filters).
+
+  @include policies-attendance-add-task-form-controls;
+
+  @include policies-attendance-add-task-datepicker-styles;
+
 }
 
 
@@ -501,18 +509,6 @@ body:has(.main-settings-form-sidebar--policies-attendance) {
     @include policies-attendance-add-task-sidebar-footer-buttons;
 
   }
-
-}
-
-
-
-// Inline forms (grace period panel, report filters).
-
-.policies-attendance-settings-panel {
-
-  @include policies-attendance-add-task-form-controls;
-
-  @include policies-attendance-add-task-datepicker-styles;
 
 }
 

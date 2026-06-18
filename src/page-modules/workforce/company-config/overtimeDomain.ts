@@ -7,6 +7,7 @@ import {
   readPolicyEffectiveTo,
   validatePolicyEffectiveDates,
 } from "@page-modules/workforce/company-config/companyConfigShared";
+import { toWorkforceSearchToken } from "@page-modules/workforce/shared/workforceSearchText";
 import type {
   AttendanceOvertimePolicy,
   CreateAttendanceOvertimePolicyPayload,
@@ -87,12 +88,12 @@ export function overtimePolicyToFormState(
     policy.weekly_cap_hours ?? record.weeklyCapHours ?? record.weekly_cap ?? record.weeklyCap;
   const bufferMinutes = Number(bufferRaw);
   const weeklyCap = Number(capRaw);
-  const enabled =
-    typeof policy.enabled === "boolean"
-      ? policy.enabled
-      : typeof record.isEnabled === "boolean"
-        ? record.isEnabled
-        : defaults.enabled;
+  let enabled = defaults.enabled;
+  if (typeof policy.enabled === "boolean") {
+    enabled = policy.enabled;
+  } else if (typeof record.isEnabled === "boolean") {
+    enabled = record.isEnabled;
+  }
 
   return {
     ...defaults,
@@ -159,7 +160,7 @@ export function filterOvertimePoliciesBySearch(
       row.target_type ?? record.targetType,
       row.updated_at ?? record.updatedAt,
     ]
-      .map((part) => String(part ?? "").toLowerCase())
+      .map((part) => toWorkforceSearchToken(part))
       .join(" ");
     return haystack.includes(query);
   });

@@ -7,6 +7,10 @@ import {
   readPolicyEffectiveTo,
   validatePolicyEffectiveDates,
 } from "@page-modules/workforce/company-config/companyConfigShared";
+import {
+  formatWorkforceUnknownNumber,
+  toWorkforceSearchToken,
+} from "@page-modules/workforce/shared/workforceSearchText";
 import type {
   AttendanceWorkHoursPolicy,
   CreateAttendanceWorkHoursPolicyPayload,
@@ -78,10 +82,11 @@ export function formatWorkHoursPolicyHours(
   row: Pick<AttendanceWorkHoursPolicy, "min_hours_per_day" | "max_hours_per_day"> & Record<string, unknown>,
   key: "min_hours_per_day" | "max_hours_per_day",
 ): string {
-  const camelKey = key === "min_hours_per_day" ? "minHoursPerDay" : "maxHoursPerDay";
-  const value = row[key] ?? row[camelKey];
-  if (value == null || !Number.isFinite(Number(value))) return "—";
-  return String(value);
+  if (key === "min_hours_per_day") {
+    return formatWorkforceUnknownNumber(row.min_hours_per_day ?? row.minHoursPerDay);
+  }
+
+  return formatWorkforceUnknownNumber(row.max_hours_per_day ?? row.maxHoursPerDay);
 }
 
 export function formatWorkHoursEffectiveFrom(
@@ -119,7 +124,7 @@ export function filterWorkHoursPoliciesBySearch(
       row.target_type ?? record.targetType,
       row.updated_at ?? record.updatedAt,
     ]
-      .map((part) => String(part ?? "").toLowerCase())
+      .map((part) => toWorkforceSearchToken(part))
       .join(" ");
     return haystack.includes(query);
   });

@@ -48,6 +48,25 @@ const listMetaStyle: React.CSSProperties = {
   color: "#6b7280",
 };
 
+function readHolidayListItemKey(holiday: HolidayCalendarHoliday): string {
+  const holidayId = readCalendarHolidayId(holiday);
+  if (holidayId === null) {
+    return `${holiday.name ?? "holiday"}-${holiday.date ?? "date"}`;
+  }
+  return String(holidayId);
+}
+
+function canManageCalendarHoliday(
+  calendar: HolidayCalendar | null,
+  holidayId: number | null,
+): calendar is HolidayCalendar {
+  return calendar !== null && holidayId !== null;
+}
+
+function hasHolidayCalendarYear(year: number | null): year is number {
+  return year !== null && Number.isFinite(year);
+}
+
 export function ViewCalendarHolidaysSidebar({
   show,
   calendar,
@@ -70,10 +89,10 @@ export function ViewCalendarHolidaysSidebar({
       return;
     }
     const today = new Date();
-    const defaultMonth =
-      calendarYear != null && today.getFullYear() === calendarYear
-        ? today.getMonth()
-        : 0;
+    let defaultMonth = 0;
+    if (calendarYear !== null && today.getFullYear() === calendarYear) {
+      defaultMonth = today.getMonth();
+    }
     setVisibleMonth(defaultMonth);
     setSelectedDate(null);
   }, [calendar?.id, calendarYear, show]);
@@ -109,12 +128,6 @@ export function ViewCalendarHolidaysSidebar({
       }
     >
       <div style={{ fontFamily: ACCOUNT_DEFAULTS_FONT }}>
-        {calendarYear == null ? (
-          <p className="text-muted mb-0" style={listMetaStyle}>
-            Calendar year is not available.
-          </p>
-        ) : null}
-
         {holidaysQuery.isFetching && holidays.length === 0 ? (
           <div className="d-flex justify-content-center py-4">
             <Spinner animation="border" size="sm" role="status">
@@ -123,7 +136,7 @@ export function ViewCalendarHolidaysSidebar({
           </div>
         ) : null}
 
-        {calendarYear != null ? (
+        {hasHolidayCalendarYear(calendarYear) ? (
           <HolidayCalendarMonthGrid
             year={calendarYear}
             month={visibleMonth}
@@ -134,7 +147,11 @@ export function ViewCalendarHolidaysSidebar({
             }}
             onMonthChange={setVisibleMonth}
           />
-        ) : null}
+        ) : (
+          <p className="text-muted mb-0" style={listMetaStyle}>
+            Calendar year is not available.
+          </p>
+        )}
 
         <div className="mt-4">
           <div className="d-flex align-items-center justify-content-between gap-2 mb-2">
@@ -164,10 +181,8 @@ export function ViewCalendarHolidaysSidebar({
             <div className="d-flex flex-column gap-2">
               {visibleHolidays.map((holiday) => {
                 const holidayId = readCalendarHolidayId(holiday);
-                const holidayKey =
-                  holidayId != null
-                    ? String(holidayId)
-                    : `${holiday.name ?? "holiday"}-${holiday.date ?? "date"}`;
+                const holidayKey = readHolidayListItemKey(holiday);
+                const showHolidayActions = canManageCalendarHoliday(calendar, holidayId);
 
                 return (
                   <div
@@ -194,7 +209,7 @@ export function ViewCalendarHolidaysSidebar({
                         {formatHolidayHalfDayLabel(holiday)}
                       </div>
                     </div>
-                    {calendar && holidayId != null ? (
+                    {showHolidayActions ? (
                       <div className="d-flex flex-shrink-0 gap-1">
                         <Button
                           variant="light"

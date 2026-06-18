@@ -1004,12 +1004,42 @@ function parseMyAttendanceActions(raw: unknown): MyAttendanceAction[] {
   return actions;
 }
 
-function readMyAttendanceString(value: unknown): string | null {
+function readStaffManagementString(value: unknown): string | null {
   if (value == null) {
     return null;
   }
-  const text = String(value).trim();
-  return text === "" ? null : text;
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    return trimmed || null;
+  }
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return String(value);
+  }
+  if (typeof value === "boolean") {
+    return String(value);
+  }
+  return null;
+}
+
+function buildOptionalNumericIdField(id: number | null): { id: number } | Record<string, never> {
+  if (typeof id === "number" && Number.isFinite(id)) {
+    return { id };
+  }
+  return {};
+}
+
+function readAttendancePolicyBooleanField(primary: unknown, alternate: unknown): boolean | null {
+  if (typeof primary === "boolean") {
+    return primary;
+  }
+  if (typeof alternate === "boolean") {
+    return alternate;
+  }
+  return null;
+}
+
+function readMyAttendanceString(value: unknown): string | null {
+  return readStaffManagementString(value);
 }
 
 function normalizeMyAttendanceRecord(raw: unknown): MyAttendanceRecord | null {
@@ -1378,7 +1408,7 @@ function normalizeDailyAttendanceReportRow(raw: unknown): DailyAttendanceReportR
   const id = readAttendancePolicyNumber(row.id);
 
   return {
-    ...(id != null ? { id } : {}),
+    ...(buildOptionalNumericIdField(id)),
     tenant_id: readAttendancePolicyString(row.tenant_id ?? row.tenantId),
     user_id: readAttendancePolicyString(
       row.user_id ?? row.userId ?? row.extension ?? row.extension_number ?? row.extensionNumber,
@@ -1539,7 +1569,7 @@ function normalizeTeamAttendanceSnapshotAttendance(
   }
 
   return {
-    ...(id != null ? { id } : {}),
+    ...(buildOptionalNumericIdField(id)),
     status,
   };
 }
@@ -1817,7 +1847,7 @@ function normalizeMonthlyAttendanceReportRow(raw: unknown): MonthlyAttendanceRep
   const id = readAttendancePolicyNumber(row.id);
 
   return {
-    ...(id != null ? { id } : {}),
+    ...(buildOptionalNumericIdField(id)),
     tenant_id: readAttendancePolicyString(row.tenant_id ?? row.tenantId),
     user_id: readAttendancePolicyString(
       row.user_id ?? row.userId ?? row.extension ?? row.extension_number ?? row.extensionNumber,
@@ -2367,7 +2397,7 @@ function normalizeShiftAssignmentRow(raw: unknown): StaffShiftAssignment {
   const shift = isShiftAssignmentRecord(row.shift) ? row.shift : null;
 
   return {
-    ...(id != null ? { id } : {}),
+    ...(buildOptionalNumericIdField(id)),
     tenant_id: readAttendancePolicyString(row.tenant_id ?? row.tenantId),
     shift_id: readAttendancePolicyNumber(
       row.shift_id ?? row.shiftId ?? shift?.id,
@@ -2470,9 +2500,9 @@ export interface HolidayCalendarHoliday {
   name?: string | null;
   date?: string | null;
   type?: string | null;
-  scope?: "company" | "department" | string | null;
+  scope?: string | null;
   department_id?: number | null;
-  half_day?: "am" | "pm" | string | null;
+  half_day?: string | null;
   [key: string]: unknown;
 }
 
@@ -2685,9 +2715,7 @@ function readAttendancePolicyNumber(value: unknown): number | null {
 }
 
 function readAttendancePolicyString(value: unknown): string | null {
-  if (value == null) return null;
-  const trimmed = String(value).trim();
-  return trimmed || null;
+  return readStaffManagementString(value);
 }
 
 function isAttendancePolicyRow(record: Record<string, unknown>): boolean {
@@ -2876,7 +2904,7 @@ function normalizeWorkHoursPolicyRow(raw: unknown): AttendanceWorkHoursPolicy {
   const id = readAttendancePolicyNumber(row.id);
 
   return {
-    ...(id != null ? { id } : {}),
+    ...(buildOptionalNumericIdField(id)),
     tenant_id: readAttendancePolicyString(row.tenant_id ?? row.tenantId),
     target_type: readAttendancePolicyString(row.target_type ?? row.targetType),
     target_id: readAttendancePolicyString(row.target_id ?? row.targetId),
@@ -2919,18 +2947,8 @@ function normalizeBreakTypeRow(raw: unknown): AttendanceBreakType {
     duration_minutes: readAttendancePolicyNumber(
       row.duration_minutes ?? row.durationMinutes,
     ),
-    is_paid:
-      typeof row.is_paid === "boolean"
-        ? row.is_paid
-        : typeof row.isPaid === "boolean"
-          ? row.isPaid
-          : null,
-    is_active:
-      typeof row.is_active === "boolean"
-        ? row.is_active
-        : typeof row.isActive === "boolean"
-          ? row.isActive
-          : null,
+    is_paid: readAttendancePolicyBooleanField(row.is_paid, row.isPaid),
+    is_active: readAttendancePolicyBooleanField(row.is_active, row.isActive),
     created_at: readAttendancePolicyString(row.created_at ?? row.createdAt),
     updated_at: readAttendancePolicyString(row.updated_at ?? row.updatedAt),
   };
@@ -3151,7 +3169,7 @@ function normalizeBreakPolicyRow(raw: unknown): AttendanceBreakPolicy {
   const id = readAttendancePolicyNumber(row.id);
 
   return {
-    ...(id != null ? { id } : {}),
+    ...(buildOptionalNumericIdField(id)),
     tenant_id: readAttendancePolicyString(row.tenant_id ?? row.tenantId),
     target_type: readAttendancePolicyString(row.target_type ?? row.targetType),
     target_id: readAttendancePolicyString(row.target_id ?? row.targetId),
@@ -3274,7 +3292,7 @@ function normalizeOvertimePolicyRow(raw: unknown): AttendanceOvertimePolicy {
   const id = readAttendancePolicyNumber(row.id);
 
   return {
-    ...(id != null ? { id } : {}),
+    ...(buildOptionalNumericIdField(id)),
     tenant_id: readAttendancePolicyString(row.tenant_id ?? row.tenantId),
     target_type: readAttendancePolicyString(row.target_type ?? row.targetType),
     target_id: readAttendancePolicyString(row.target_id ?? row.targetId),

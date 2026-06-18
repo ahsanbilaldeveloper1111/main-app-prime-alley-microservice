@@ -2,6 +2,7 @@ import {
   buildDailyReportUserOptions,
   resolveDailyReportUserLabel,
 } from "@page-modules/workforce/attendance-reports/dailyAttendanceReportDomain";
+import { toWorkforceSearchToken } from "@page-modules/workforce/shared/workforceSearchText";
 import type {
   MonthlyAttendanceReportRow,
   MonthlyAttendanceReportSummary,
@@ -103,7 +104,7 @@ export function filterMonthlyAttendanceReportBySearch(
       row.late_arrivals,
       row.attendance_rate,
     ]
-      .map((part) => String(part ?? "").toLowerCase())
+      .map((part) => toWorkforceSearchToken(part))
       .join(" ");
     return haystack.includes(query);
   });

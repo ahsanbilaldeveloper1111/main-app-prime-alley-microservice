@@ -1,10 +1,11 @@
 import { formatDailyReportLabel, formatDailyReportStatus } from "@page-modules/workforce/attendance-reports/dailyAttendanceReportDomain";
-import { GlobalDateTimeFormat } from "@utils/Helper";
-import moment from "moment";
+import { formatDateTimeToLocal } from "@utils/Helper";
 import type {
   EmployeeAttendanceReportDay,
   EmployeeAttendanceReportSummary,
 } from "@utils/staffManagement";
+
+const EMPLOYEE_REPORT_TIME_FORMAT = "hh:mm A";
 
 export type EmployeeReportSummaryCard = Readonly<{
   key: string;
@@ -65,15 +66,31 @@ export function formatEmployeeReportDayLabel(day: EmployeeAttendanceReportDay): 
 }
 
 export function formatEmployeeReportDayStatus(day: EmployeeAttendanceReportDay): string {
-  return formatDailyReportStatus(day.status);
+  const label = formatDailyReportStatus(day.status);
+  if (resolveEmployeeReportStatusModifier(day.status) !== "late") {
+    return label;
+  }
+
+  const lateMinutes = day.late_minutes;
+  if (lateMinutes == null || !Number.isFinite(lateMinutes) || lateMinutes <= 0) {
+    return label;
+  }
+
+  const rawStatus = day.status?.trim() ?? "";
+  if (/\d/.test(rawStatus)) {
+    return label;
+  }
+
+  return `${label} · ${Math.round(lateMinutes)} min`;
 }
 
 export function formatEmployeeReportDayTime(value: string | null | undefined): string {
-  if (!value?.trim()) {
+  const trimmed = value?.trim();
+  if (!trimmed) {
     return "—";
   }
-  const parsed = moment(value);
-  return parsed.isValid() ? parsed.format(GlobalDateTimeFormat) : value.trim();
+  const formatted = formatDateTimeToLocal(trimmed, EMPLOYEE_REPORT_TIME_FORMAT);
+  return formatted === "Invalid Date" ? trimmed : formatted;
 }
 
 export function formatEmployeeReportDayHours(day: EmployeeAttendanceReportDay): string {

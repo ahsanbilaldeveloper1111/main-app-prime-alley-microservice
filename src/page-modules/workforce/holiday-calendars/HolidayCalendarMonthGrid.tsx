@@ -91,6 +91,26 @@ function dayButtonStyle(options: {
   };
 }
 
+function readHolidayCalendarWeekRowKey(
+  week: ReadonlyArray<Date | null>,
+  year: number,
+  month: number,
+): string {
+  for (const date of week) {
+    if (date) {
+      return `week-${formatIsoDateFromLocalDate(date)}`;
+    }
+  }
+  return `week-empty-${year}-${month}-${week.length}`;
+}
+
+function buildHolidayDayAriaLabel(isoDate: string, holidayCount: number): string {
+  if (holidayCount <= 0) {
+    return isoDate;
+  }
+  return `${isoDate}, ${holidayCount} holiday(s)`;
+}
+
 export function HolidayCalendarMonthGrid({
   year,
   month,
@@ -146,13 +166,16 @@ export function HolidayCalendarMonthGrid({
       </div>
 
       <div style={weeksStyle}>
-        {weeks.map((week, weekIndex) => (
-          <div key={`week-${weekIndex}`} style={weekRowStyle}>
+        {weeks.map((week) => {
+          const weekKey = readHolidayCalendarWeekRowKey(week, year, month);
+
+          return (
+            <div key={weekKey} style={weekRowStyle}>
             {week.map((date, dayIndex) => {
               if (!date) {
                 return (
                   <div
-                    key={`empty-${weekIndex}-${dayIndex}`}
+                    key={`${weekKey}-empty-${HOLIDAY_WEEKDAY_LABELS[dayIndex]}`}
                     style={dayButtonStyle({
                       isSelected: false,
                       hasHoliday: false,
@@ -177,7 +200,7 @@ export function HolidayCalendarMonthGrid({
                     isOutsideMonth: false,
                   })}
                   onClick={() => onSelectDate(isoDate)}
-                  aria-label={`${isoDate}${holidays.length > 0 ? `, ${holidays.length} holiday(s)` : ""}`}
+                  aria-label={buildHolidayDayAriaLabel(isoDate, holidays.length)}
                   aria-pressed={isSelected}
                 >
                   <span>{date.getDate()}</span>
@@ -195,8 +218,9 @@ export function HolidayCalendarMonthGrid({
                 </button>
               );
             })}
-          </div>
-        ))}
+            </div>
+          );
+        })}
       </div>
     </div>
   );

@@ -1,5 +1,6 @@
 import { formatDateForTable, GlobalDateTimeFormat } from "@utils/Helper";
 import { normalizeShiftDateForInput } from "@page-modules/workforce/shifts/shiftManagementDomain";
+import { toWorkforceSearchToken } from "@page-modules/workforce/shared/workforceSearchText";
 import type { DailyAttendanceReportRow } from "@utils/staffManagement";
 import moment from "moment";
 
@@ -93,7 +94,7 @@ export function filterDailyAttendanceReportBySearch(
       row.check_in_at,
       row.check_out_at,
     ]
-      .map((part) => String(part ?? "").toLowerCase())
+      .map((part) => toWorkforceSearchToken(part))
       .join(" ");
     return haystack.includes(query);
   });

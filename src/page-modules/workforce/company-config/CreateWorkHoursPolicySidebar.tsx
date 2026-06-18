@@ -74,20 +74,17 @@ export function CreateWorkHoursPolicySidebar({
     setSelectedTenantId(lockedTenantId);
   }, [editTenantId, initialPolicy, isAdmin, isEditMode, lockedTenantId, show, tenantOptions]);
 
-  const resolvedTenantId = isEditMode
-    ? editTenantId ?? lockedTenantId
-    : isAdmin
-      ? selectedTenantId
-      : lockedTenantId;
+  let resolvedTenantId = lockedTenantId;
+  if (isEditMode) {
+    resolvedTenantId = editTenantId ?? lockedTenantId;
+  } else if (isAdmin) {
+    resolvedTenantId = selectedTenantId;
+  }
+
   const validationMessage =
     validationError ?? validateWorkHoursPolicyForm(form, resolvedTenantId);
   const canSubmit = !validationMessage && !isSubmitting;
   const tenantFieldReadOnly = isEditMode || !isAdmin;
-  const displayTenantId = isEditMode
-    ? editTenantId ?? lockedTenantId
-    : isAdmin
-      ? selectedTenantId
-      : lockedTenantId;
 
   const handleSubmit = () => {
     const error = validateWorkHoursPolicyForm(form, resolvedTenantId);
@@ -122,8 +119,8 @@ export function CreateWorkHoursPolicySidebar({
         {tenantFieldReadOnly ? (
           <MainSettingsFormField id="work-hours-policy-tenant" label="Tenant *">
             <div className={MAIN_SETTINGS_FORM_READONLY_VALUE_CLASS} aria-readonly="true">
-              {tenantOptions.find((option) => option.value === displayTenantId)?.label ??
-                displayTenantId}
+              {tenantOptions.find((option) => option.value === resolvedTenantId)?.label ??
+                resolvedTenantId}
             </div>
           </MainSettingsFormField>
         ) : (

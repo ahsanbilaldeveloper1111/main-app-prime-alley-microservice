@@ -30,14 +30,14 @@ function buildWorkHoursPolicyBaseColumns(): TableColumn<AttendanceWorkHoursPolic
       label: "Effective from",
       sortable: true,
       render: (row) =>
-        formatWorkHoursEffectiveFrom(row.effective_from, row as Record<string, unknown>),
+        formatWorkHoursEffectiveFrom(row.effective_from, row),
     },
     {
       key: "effective_to",
       label: "Effective to",
       sortable: true,
       render: (row) =>
-        formatWorkHoursEffectiveTo(row.effective_to, row as Record<string, unknown>),
+        formatWorkHoursEffectiveTo(row.effective_to, row),
     },
     {
       key: "updated_at",

@@ -127,7 +127,7 @@ export function buildAttendanceCorrectionFormState(
     checkOutAtLocal,
     status: resolveCorrectionStatusFromEmployee(target.initialStatus),
     lateMinutes: "0",
-    totalMinutes: totalMinutes != null ? String(totalMinutes) : "",
+    totalMinutes: Number.isFinite(totalMinutes) ? String(totalMinutes) : "",
   };
 }
 
@@ -245,7 +245,7 @@ export function buildAttendanceCorrectionPayload(args: Readonly<{
     status: args.form.status,
     ...(checkInAt ? { check_in_at: checkInAt } : {}),
     ...(checkOutAt ? { check_out_at: checkOutAt } : {}),
-    ...(lateMinutes != null ? { late_minutes: lateMinutes } : {}),
-    ...(totalMinutes != null ? { total_minutes: totalMinutes } : {}),
+    ...(Number.isFinite(lateMinutes) ? { late_minutes: lateMinutes } : {}),
+    ...(Number.isFinite(totalMinutes) ? { total_minutes: totalMinutes } : {}),
   };
 }

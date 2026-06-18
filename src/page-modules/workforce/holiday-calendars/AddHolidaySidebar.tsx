@@ -45,10 +45,12 @@ export function AddHolidaySidebar({
   }, [calendar?.id, show]);
 
   const calendarYear = calendar ? readHolidayCalendarYear(calendar) : null;
-  const dateBounds = useMemo(
-    () => (calendarYear != null ? getCalendarHolidayDateBounds(calendarYear) : null),
-    [calendarYear],
-  );
+  const dateBounds = useMemo(() => {
+    if (calendarYear === null) {
+      return null;
+    }
+    return getCalendarHolidayDateBounds(calendarYear);
+  }, [calendarYear]);
   const minDate = dateBounds ? new Date(`${dateBounds.min}T00:00:00`) : undefined;
   const maxDate = dateBounds ? new Date(`${dateBounds.max}T00:00:00`) : undefined;
 

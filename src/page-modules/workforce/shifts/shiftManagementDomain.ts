@@ -277,7 +277,7 @@ function coerceShiftTimeString(value: unknown): string {
   if (value instanceof Date) {
     return moment(value).format("HH:mm:ss");
   }
-  return String(value).trim();
+  return "";
 }
 
 function extractShiftClockParts(

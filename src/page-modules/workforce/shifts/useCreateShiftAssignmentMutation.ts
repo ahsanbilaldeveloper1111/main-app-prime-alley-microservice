@@ -23,7 +23,7 @@ export function useCreateShiftAssignmentMutation() {
     mutationFn: async (input: { tenantId: string; form: ShiftAssignmentFormState }) =>
       createStaffShiftAssignment(buildShiftAssignmentPayload(input.tenantId, input.form)),
     onSuccess: (_data, variables) => {
-      void invalidateShiftAssignments(queryClient, variables.tenantId);
+      invalidateShiftAssignments(queryClient, variables.tenantId);
       toast.success("Shift assignment created.");
     },
     onError: (error: unknown) => {

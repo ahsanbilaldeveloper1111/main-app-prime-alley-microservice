@@ -31,14 +31,14 @@ export function buildBreaksPoliciesTableColumns(): TableColumn<AttendanceBreakPo
       label: "Effective from",
       sortable: true,
       render: (row) =>
-        formatBreaksEffectiveFrom(row.effective_from, row as Record<string, unknown>),
+        formatBreaksEffectiveFrom(row.effective_from, row),
     },
     {
       key: "effective_to",
       label: "Effective to",
       sortable: true,
       render: (row) =>
-        formatBreaksEffectiveTo(row.effective_to, row as Record<string, unknown>),
+        formatBreaksEffectiveTo(row.effective_to, row),
     },
     {
       key: "updated_at",

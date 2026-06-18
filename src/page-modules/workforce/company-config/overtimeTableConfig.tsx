@@ -71,14 +71,14 @@ export function buildOvertimePoliciesTableColumns(): TableColumn<AttendanceOvert
       label: "Effective from",
       sortable: true,
       render: (row) =>
-        formatOvertimeEffectiveFrom(row.effective_from, row as Record<string, unknown>),
+        formatOvertimeEffectiveFrom(row.effective_from, row),
     },
     {
       key: "effective_to",
       label: "Effective to",
       sortable: true,
       render: (row) =>
-        formatOvertimeEffectiveTo(row.effective_to, row as Record<string, unknown>),
+        formatOvertimeEffectiveTo(row.effective_to, row),
     },
     {
       key: "updated_at",

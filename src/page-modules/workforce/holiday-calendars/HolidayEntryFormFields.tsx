@@ -28,6 +28,26 @@ export type HolidayEntryFormFieldsProps = Readonly<{
   idPrefix?: string;
 }>;
 
+function readHolidayDateFieldHint(calendarYear: number | null): string | undefined {
+  if (calendarYear === null) {
+    return undefined;
+  }
+  return `Only dates in ${calendarYear} are allowed.`;
+}
+
+function readDepartmentSelectPlaceholder(
+  departmentsLoading: boolean,
+  departmentOptionCount: number,
+): string {
+  if (departmentsLoading) {
+    return "Loading departments...";
+  }
+  if (departmentOptionCount === 0) {
+    return "No departments available";
+  }
+  return "Select department";
+}
+
 export function HolidayEntryFormFields({
   form,
   calendarYear,
@@ -40,6 +60,11 @@ export function HolidayEntryFormFields({
   idPrefix = "holiday-entry",
 }: HolidayEntryFormFieldsProps) {
   const isDepartmentScope = form.scope === "department";
+  const dateFieldHint = readHolidayDateFieldHint(calendarYear);
+  const departmentPlaceholder = readDepartmentSelectPlaceholder(
+    departmentsLoading,
+    departmentOptions.length,
+  );
 
   return (
     <>
@@ -56,9 +81,7 @@ export function HolidayEntryFormFields({
       <MainSettingsFormField
         id={`${idPrefix}-date`}
         label="Date *"
-        hint={
-          calendarYear != null ? `Only dates in ${calendarYear} are allowed.` : undefined
-        }
+        hint={dateFieldHint}
       >
         <MainSettingsDatePicker
           id={`${idPrefix}-date`}
@@ -95,13 +118,7 @@ export function HolidayEntryFormFields({
             disabled={departmentsLoading || departmentOptions.length === 0}
             onChange={(event) => onChange("department_id", event.target.value)}
           >
-            <option value="">
-              {departmentsLoading
-                ? "Loading departments..."
-                : departmentOptions.length === 0
-                  ? "No departments available"
-                  : "Select department"}
-            </option>
+            <option value="">{departmentPlaceholder}</option>
             {departmentOptions.map((option) => (
               <option key={option.value} value={option.value}>
                 {option.label}

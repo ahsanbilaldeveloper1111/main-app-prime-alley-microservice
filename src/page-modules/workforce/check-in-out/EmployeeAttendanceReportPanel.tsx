@@ -216,9 +216,6 @@ export function EmployeeAttendanceReportPanel({
                             className={`check-in-out-page__day-status check-in-out-page__day-status--${statusModifier}`}
                           >
                             {formatEmployeeReportDayStatus(day)}
-                            {day.late_minutes != null && day.late_minutes > 0
-                              ? ` (${day.late_minutes}m)`
-                              : ""}
                           </span>
                         </td>
                       </tr>

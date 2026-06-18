@@ -5,11 +5,12 @@ import type {
 import {
   buildPolicyEffectiveDatesPayload,
   defaultCompanyPolicyEffectiveFrom,
-  formatCompanyPolicyUpdatedAt,
   readPolicyEffectiveFrom,
   readPolicyEffectiveTo,
   validatePolicyEffectiveDates,
 } from "@page-modules/workforce/company-config/companyConfigShared";
+
+export { formatCompanyPolicyUpdatedAt as formatGracePeriodPolicyUpdatedAt } from "@page-modules/workforce/company-config/companyConfigShared";
 
 export type GracePeriodPolicyFormState = Readonly<{
   grace_minutes: number;
@@ -100,5 +101,3 @@ export function buildGracePeriodPolicyPayload(
     ...effectiveDates,
   };
 }
-
-export { formatCompanyPolicyUpdatedAt as formatGracePeriodPolicyUpdatedAt };
