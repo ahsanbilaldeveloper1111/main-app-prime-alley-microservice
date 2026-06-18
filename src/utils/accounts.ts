@@ -258,6 +258,9 @@ export interface InvoicePaymentData {
   updated_at: string;
 }
 
+/** Money fields from invoice APIs (string or number depending on serializer). */
+export type InvoiceApiMoney = string | number | null;
+
 export interface InvoiceData {
   id: number;
   company_id: string;
@@ -267,9 +270,9 @@ export interface InvoiceData {
   due_date: string;
   amount_due: string;
   /** 3% card fee on current `amount_due` (from API when partially paid). */
-  card_processing_fee?: string | number | null;
+  card_processing_fee?: InvoiceApiMoney;
   /** Outstanding + card fee — total charged for card checkout. */
-  card_charge_total?: string | number | null;
+  card_charge_total?: InvoiceApiMoney;
   tenant_id?: string;
   subtotal: string;
   tax_amount: string;
