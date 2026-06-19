@@ -44,7 +44,10 @@ import OverdueTasksModal from './OverdueTasksModal';
 import type { ActivityLogExtension } from '@planner/activityLogExtension';
 const { PERMISSIONS } = HEADER_CONSTANTS;
 
-function readProjectTabFromQuery(tab: string | string[] | undefined): string {
+type NextRouterQueryValue = string | string[] | undefined;
+type NextRouterQuery = Record<string, NextRouterQueryValue>;
+
+function readProjectTabFromQuery(tab: NextRouterQueryValue): string {
   if (typeof tab === 'string' && tab.trim()) {
     return tab.toLowerCase();
   }
@@ -53,7 +56,7 @@ function readProjectTabFromQuery(tab: string | string[] | undefined): string {
 
 function resolveProjectRouteId(
   projectId: string | number | null | undefined,
-  routeId: string | string[] | undefined,
+  routeId: NextRouterQueryValue,
 ): string | undefined {
   if (projectId != null && String(projectId).trim() !== '') {
     return String(projectId);
@@ -65,11 +68,11 @@ function resolveProjectRouteId(
 }
 
 function buildProjectTabsRouteQuery(
-  routerQuery: Record<string, string | string[] | undefined>,
+  routerQuery: NextRouterQuery,
   tab: string,
   projectId?: string | number | null,
-): Record<string, string | string[] | undefined> {
-  const nextQuery = { ...routerQuery, tab };
+): NextRouterQuery {
+  const nextQuery: NextRouterQuery = { ...routerQuery, tab };
   const idValue = resolveProjectRouteId(projectId, routerQuery.id);
   if (idValue) {
     nextQuery.id = idValue;

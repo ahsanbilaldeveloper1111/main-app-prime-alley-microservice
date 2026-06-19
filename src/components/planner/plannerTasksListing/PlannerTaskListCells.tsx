@@ -282,15 +282,22 @@ export type PlannerTaskCommentsCountCellProps = Readonly<{
   onViewComments: (row: Task) => void;
 }>;
 
+function plannerTaskCommentsButtonTitle(count: number): string {
+  if (count === 0) {
+    return "View comments";
+  }
+  if (count === 1) {
+    return "View 1 comment";
+  }
+  return `View ${count} comments`;
+}
+
 export function PlannerTaskCommentsCountCell({
   row,
   onViewComments,
 }: PlannerTaskCommentsCountCellProps) {
   const count = row.comments_count;
-  const title =
-    count === 0
-      ? "View comments"
-      : `View ${count} comment${count === 1 ? "" : "s"}`;
+  const title = plannerTaskCommentsButtonTitle(count);
   return (
     <button
       type="button"

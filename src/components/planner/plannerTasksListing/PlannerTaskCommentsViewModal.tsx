@@ -58,7 +58,9 @@ export function PlannerTaskCommentsViewModal({
       setEditingCommentText("");
       return;
     }
-    void loadComments();
+    loadComments().catch(() => {
+      // Errors are handled inside loadComments.
+    });
   }, [show, task?.id, loadComments]);
 
   const handleHide = () => {
