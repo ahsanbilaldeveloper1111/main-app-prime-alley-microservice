@@ -7,6 +7,7 @@ import { loadStripe } from "@stripe/stripe-js";
 import { Elements, CardNumberElement, CardExpiryElement, CardCvcElement, useStripe, useElements } from "@stripe/react-stripe-js";
 import { usePermissions } from "@utils/permissionUtils";
 import { HEADER_CONSTANTS } from "@constants/headerConstants";
+import { getStripePublishableKey } from "@config/env";
 import { paymentMethodsFont as font, paymentMethodsStyles as s } from "./paymentMethodsStyles";
 import { getBillingAddressLines, getBillingAddressForStripe } from "./paymentMethodsStripeHelpers";
 import type { PaymentMethodsPageViewModel } from "./usePaymentMethodsPage";
@@ -307,7 +308,7 @@ function AddPaymentSidebar({ onClose }: Readonly<{ onClose: () => void }>) {
   const companyDetails = companyDetailsQuery.data ?? null;
 
   useEffect(() => {
-    const key = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || "";
+    const key = getStripePublishableKey();
     setStripePublishableKey(key || null);
   }, []);
 

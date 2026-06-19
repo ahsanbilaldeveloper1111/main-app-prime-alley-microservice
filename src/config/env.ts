@@ -25,6 +25,13 @@ export const config = {
     url: value("VITE_STREAMING_URL"),
   },
 
+  stripe: {
+    publishableKey: value(
+      "VITE_STRIPE_PUBLISHABLE_KEY",
+      "NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY",
+    ),
+  },
+
   firebase: {
     apiKey: value("VITE_FIREBASE_API_KEY", "NEXT_PUBLIC_FIREBASE_API_KEY"),
     authDomain: value(
@@ -50,6 +57,11 @@ export const config = {
     ),
   },
 };
+
+/** Stripe.js publishable key (`VITE_STRIPE_PUBLISHABLE_KEY` or legacy `NEXT_PUBLIC_*`). */
+export function getStripePublishableKey(): string {
+  return config.stripe.publishableKey;
+}
 
 export const validateEnv = () => {
   if (!config.backend.url) {

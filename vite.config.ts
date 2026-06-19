@@ -66,6 +66,11 @@ export default defineConfig(({ mode }) => {
     }
   }
 
+  const stripePublishableKey =
+    env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || env.VITE_STRIPE_PUBLISHABLE_KEY || "";
+  exposedEnv["process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY"] =
+    JSON.stringify(stripePublishableKey);
+
   const streamingProxy: ProxyOptions = {
     target: env.VITE_STREAMING_URL || "http://localhost:3100",
     changeOrigin: true,
