@@ -52,33 +52,56 @@ export type PlannerTaskDetailWatchersBlockProps = Readonly<{
   hierarchyDataExtensions: unknown;
 }>;
 
+function resolvePlannerWatcherDisplayName(
+  watcher: unknown,
+  extStr: string,
+  hierarchyName: string,
+): string {
+  if (typeof watcher === "object" && watcher != null) {
+    const row = watcher as { user?: { name?: string }; name?: string };
+    const userName = row.user?.name?.trim();
+    if (userName) return userName;
+    const rowName = typeof row.name === "string" ? row.name.trim() : "";
+    if (rowName) return rowName;
+  }
+  if (hierarchyName) return hierarchyName;
+  if (extStr) return extStr;
+  return "Unknown";
+}
+
 export function PlannerTaskDetailWatchersBlock({
   watchers,
   hierarchyDataExtensions,
 }: PlannerTaskDetailWatchersBlockProps) {
-  if (watchers.length === 0) return null;
-
   return (
     <div className="p-3 bg-light rounded border mb-3">
       <div className="small text-muted text-uppercase fw-semibold mb-2">Watchers</div>
       <div className="d-flex flex-column gap-2">
-        {watchers.map((watcher: unknown, idx: number) => {
-          const extStr =
-            typeof watcher === "string" || typeof watcher === "number"
-              ? String(watcher)
-              : String((watcher as { extension_number?: string }).extension_number ?? "");
-          const { name } = getExtensionDisplay(extStr, hierarchyDataExtensions);
-          const w = watcher as { id?: number | null };
-          const watcherKey =
-            w.id === undefined || w.id === null
-              ? `watcher-${extStr || "idx"}-${idx}`
-              : `watcher-${w.id}`;
-          return (
-            <span key={watcherKey} className="ptd-entity-line">
-              {name}
-            </span>
-          );
-        })}
+        {watchers.length === 0 ? (
+          <span className="text-muted ptd-muted-value">—</span>
+        ) : (
+          watchers.map((watcher: unknown, idx: number) => {
+            const extStr =
+              typeof watcher === "string" || typeof watcher === "number"
+                ? String(watcher)
+                : String((watcher as { extension_number?: string }).extension_number ?? "");
+            const { name } = getExtensionDisplay(extStr, hierarchyDataExtensions);
+            const w = watcher as { id?: number | null };
+            const displayName = resolvePlannerWatcherDisplayName(watcher, extStr, name);
+            const watcherKey =
+              w.id === undefined || w.id === null
+                ? `watcher-${extStr || "idx"}-${idx}`
+                : `watcher-${w.id}`;
+            return (
+              <span key={watcherKey} className="ptd-entity-line">
+                {displayName}
+                {extStr && displayName !== extStr ? (
+                  <span className="text-muted ms-1">({extStr})</span>
+                ) : null}
+              </span>
+            );
+          })
+        )}
       </div>
     </div>
   );

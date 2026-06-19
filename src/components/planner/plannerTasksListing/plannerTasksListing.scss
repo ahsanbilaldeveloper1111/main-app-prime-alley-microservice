@@ -423,6 +423,38 @@
   min-width: 240px;
 }
 
+.ptl-comments-count-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2rem;
+  padding: 0.125rem 0.5rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 999px;
+  background: #f9fafb;
+  color: #2563eb;
+  font-size: 13px;
+  font-weight: 500;
+  font-family: "Lexend Deca", Helvetica, Arial, sans-serif;
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+
+  &:hover {
+    background: #eff6ff;
+    border-color: #bfdbfe;
+  }
+
+  &__value {
+    line-height: 1.2;
+  }
+}
+
+.ptl-comments-modal-body {
+  min-height: 200px;
+  max-height: min(70vh, 520px);
+  overflow-y: auto;
+}
+
 /* Priority badges */
 .ptl-priority-badge {
   display: inline-flex;

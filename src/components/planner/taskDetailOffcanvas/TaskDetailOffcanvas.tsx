@@ -17,6 +17,7 @@ import {
 } from "@utils/tasks";
 import { usePermissions } from "@utils/permissionUtils";
 import { HEADER_CONSTANTS } from "@constants/headerConstants";
+import { resolvePlannerTaskRowPermissionsWithSession } from "@planner/taskRowPermissions";
 import { normalizeTaskCommentsResponse } from "@components/planner/plannerTaskDetail/plannerTaskDetailDomain";
 import { PlannerTaskActivityTabPanel } from "@components/planner/plannerTaskDetail/PlannerTaskActivityTabPanel";
 import { PlannerTaskCommentsTabPanel } from "@components/planner/plannerTaskDetail/PlannerTaskCommentsTabPanel";
@@ -54,6 +55,7 @@ const TaskDetailOffcanvas: React.FC<TaskDetailOffcanvasProps> = ({
   hierarchyDataExtensions,
   getStatusVariant,
   getPriorityVariant,
+  projectContext,
 }) => {
   const { data: session } = useSession();
   const { hasPermission } = usePermissions();
@@ -61,6 +63,29 @@ const TaskDetailOffcanvas: React.FC<TaskDetailOffcanvasProps> = ({
   const canEditPlannerTask = hasPermission(PERMISSIONS.EDIT_TASKS_WORK_PLANNER);
   const canDeletePlannerTask = hasPermission(PERMISSIONS.DELETE_TASKS_WORK_PLANNER);
   const canUseMyDay = hasPermission(PERMISSIONS.VIEW_MY_DAY_TASKS_WORK_PLANNER);
+
+  const taskDetailPermissions = useMemo(() => {
+    if (!selectedTask?.rawData) {
+      return resolvePlannerTaskRowPermissionsWithSession(null, null, extensionNumber, {
+        canUpdateTask: canEditPlannerTask,
+        canDeleteTask: canDeletePlannerTask,
+      });
+    }
+    const raw = selectedTask.rawData as Record<string, unknown>;
+    const project = projectContext ?? raw.project ?? null;
+    return resolvePlannerTaskRowPermissionsWithSession(raw, project, extensionNumber, {
+      canUpdateTask: canEditPlannerTask,
+      canDeleteTask: canDeletePlannerTask,
+    });
+  }, [
+    selectedTask?.rawData,
+    projectContext,
+    extensionNumber,
+    canEditPlannerTask,
+    canDeletePlannerTask,
+  ]);
+
+  const canMutateTask = taskDetailPermissions.canOpenTaskEdit;
 
   const addToMyDayTarget = useMemo(() => {
     if (!selectedTask?.rawData?.id) return null;
@@ -152,7 +177,7 @@ const TaskDetailOffcanvas: React.FC<TaskDetailOffcanvasProps> = ({
   };
 
   const handleUploadDocument = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!canEditPlannerTask) return;
+    if (!canMutateTask) return;
     const files = e.target.files;
     if (!files?.length || !selectedTask?.rawData?.id) return;
     try {
@@ -189,7 +214,7 @@ const TaskDetailOffcanvas: React.FC<TaskDetailOffcanvasProps> = ({
   };
 
   const handleDeleteDocument = async (doc: TaskDocumentItem) => {
-    if (!canEditPlannerTask || !selectedTask?.rawData?.id || doc.id === undefined || doc.id === "" || doc.id === null) {
+    if (!canMutateTask || !selectedTask?.rawData?.id || doc.id === undefined || doc.id === "" || doc.id === null) {
       return;
     }
     const docId = doc.id;
@@ -219,12 +244,12 @@ const TaskDetailOffcanvas: React.FC<TaskDetailOffcanvasProps> = ({
                 if (addToMyDayTarget) requestAddTaskToMyDay(addToMyDayTarget);
               }}
             />
-            {canEditPlannerTask ? (
+            {canMutateTask ? (
               <Button variant="link" className="text-primary p-0" onClick={onEditTask} title="Edit Task">
                 <Edit size={20} />
               </Button>
             ) : null}
-            {canDeletePlannerTask ? (
+            {taskDetailPermissions.canDeleteTask ? (
               <Button
                 variant="link"
                 className="text-danger p-0"
@@ -243,7 +268,7 @@ const TaskDetailOffcanvas: React.FC<TaskDetailOffcanvasProps> = ({
                 selectedTask={selectedTask}
                 hierarchyDataExtensions={hierarchyDataExtensions}
                 watchersList={watchersList}
-                canEditPlannerTask={canEditPlannerTask}
+                canEditPlannerTask={canMutateTask}
                 onEditTask={onEditTask}
                 getStatusVariant={getStatusVariant}
                 getPriorityVariant={getPriorityVariant}
@@ -305,7 +330,7 @@ const TaskDetailOffcanvas: React.FC<TaskDetailOffcanvasProps> = ({
                   setNewComment={setNewComment}
                   taskId={selectedTask.rawData?.id}
                   setTaskComments={setTaskComments}
-                  allowMutations={canEditPlannerTask}
+                  allowMutations={canMutateTask}
                   formatCommentDateFn={formatOffcanvasActivityDate}
                   sectionClassName="activity-section"
                 />
@@ -321,7 +346,7 @@ const TaskDetailOffcanvas: React.FC<TaskDetailOffcanvasProps> = ({
                   onUploadClick={() => documentInputRef.current?.click()}
                   onDownload={handleDownloadDocument}
                   onDelete={handleDeleteDocument}
-                  allowMutations={canEditPlannerTask}
+                  allowMutations={canMutateTask}
                   sectionClassName="activity-section"
                 />
               )}

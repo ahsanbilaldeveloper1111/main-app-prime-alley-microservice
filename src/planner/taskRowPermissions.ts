@@ -74,13 +74,17 @@ const EMPTY_PERMS: PlannerTaskRowPermissions = {
 };
 
 /**
- * Task row capabilities from project membership, task ownership, and assignee/watcher lists.
+ * Task row capabilities from project admin role, task ownership, and assignee/watcher lists.
  *
- * 1. **Project admin** (see {@link canAdministerProjectFromMembers}): full control on all tasks (delete, full edit).
- * 2. **Task owner** (extension from {@link resolveTaskExtensionNumberForTaskPermission}): full control on that task.
- * 3. **Project member** (role `member`, not owner): cannot delete; **limited** edit — can change the task except **assignees** and **watchers** (those stay fixed in UI and API payload).
- * 4. **Viewer or not listed in `project.members`**: no edit/delete unless (5).
- * 5. **Assignee or watcher**: same **limited** edit (no delete), even when (4) would otherwise deny.
+ * **Mutations** (status, comments, documents, edit sidebar) are allowed only for:
+ * - Project admin ({@link canAdministerProjectFromMembers})
+ * - Task assignee or watcher ({@link sessionMatchesTaskAssigneesOrWatchers})
+ *
+ * **Delete** is allowed for project admin and task owner
+ * ({@link resolveTaskExtensionNumberForTaskPermission}), not for assignees/watchers alone.
+ *
+ * Global session permissions (`EDIT_TASKS_WORK_PLANNER`, etc.) are applied via
+ * {@link applyPlannerTaskSessionCrud} / {@link resolvePlannerTaskRowPermissionsWithSession}.
  */
 export function computePlannerTaskRowPermissions(
   task: unknown,
@@ -95,7 +99,6 @@ export function computePlannerTaskRowPermissions(
   const isProjectAdmin = canAdministerProjectFromMembers(project, sessionUserPhoneOrExtension);
   const members = resolveMembersFromProject(project);
   const projectRole = getProjectMemberRoleForSessionUser(members, sessionUserPhoneOrExtension);
-  const inProjectRoster = projectRole !== null;
 
   const ownerExt = resolveTaskExtensionNumberForTaskPermission(task);
   const isTaskOwner = ownerExt !== "" && needle === ownerExt;
@@ -104,7 +107,7 @@ export function computePlannerTaskRowPermissions(
     task,
     sessionUserPhoneOrExtension,
   );
-  const inAssigneesOrWatchers = isAssignee || isWatcher;
+  const canMutateTask = isProjectAdmin || isAssignee || isWatcher;
 
   const base = {
     isProjectAdmin,
@@ -127,12 +130,12 @@ export function computePlannerTaskRowPermissions(
     return {
       ...base,
       canDeleteTask: true,
-      canOpenTaskEdit: true,
-      taskEditScope: "full",
+      canOpenTaskEdit: canMutateTask,
+      taskEditScope: canMutateTask ? "limited" : "none",
     };
   }
 
-  if (projectRole === "member") {
+  if (canMutateTask) {
     return {
       ...base,
       canDeleteTask: false,
@@ -141,28 +144,11 @@ export function computePlannerTaskRowPermissions(
     };
   }
 
-  if (projectRole === "viewer" || !inProjectRoster) {
-    if (inAssigneesOrWatchers) {
-      return {
-        ...base,
-        canDeleteTask: false,
-        canOpenTaskEdit: true,
-        taskEditScope: "limited",
-      };
-    }
-    return {
-      ...base,
-      canDeleteTask: false,
-      canOpenTaskEdit: false,
-      taskEditScope: "none",
-    };
-  }
-
   return {
     ...base,
     canDeleteTask: false,
-    canOpenTaskEdit: inAssigneesOrWatchers,
-    taskEditScope: inAssigneesOrWatchers ? "limited" : "none",
+    canOpenTaskEdit: false,
+    taskEditScope: "none",
   };
 }
 
@@ -181,9 +167,24 @@ export function applyPlannerTaskSessionCrud(
   };
 }
 
+/** Row-level rules plus global Work Planner task CRUD session flags. */
+export function resolvePlannerTaskRowPermissionsWithSession(
+  task: unknown,
+  project: unknown,
+  sessionUserPhoneOrExtension: string | null | undefined,
+  sessionFlags: { canUpdateTask: boolean; canDeleteTask: boolean },
+): PlannerTaskRowPermissions {
+  return applyPlannerTaskSessionCrud(
+    computePlannerTaskRowPermissions(task, project, sessionUserPhoneOrExtension),
+    sessionFlags,
+  );
+}
+
 /** Tooltip for the task row "Edit" action when opening the menu is denied. */
 export function plannerTaskRowEditDeniedTitle(canOpenTaskEdit: boolean): string | undefined {
-  return canOpenTaskEdit ? undefined : "You are not authorized to edit this task";
+  return canOpenTaskEdit
+    ? undefined
+    : "Only project admins, assignees, and watchers can update this task";
 }
 
 /** Tooltip for the task row "Delete" action when delete is denied. */

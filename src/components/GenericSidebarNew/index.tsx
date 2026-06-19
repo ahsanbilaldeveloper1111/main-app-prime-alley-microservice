@@ -6197,8 +6197,7 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
     activityEntityType,
   });
 
-  // Record summary from API crm_summary.
-  // Always show the section; when summary is missing/empty, the UI will display a fallback message.
+  // Record summary from API crm_summary (only rendered when crmSummary prop is provided).
   const recordSummary: RecordSummaryDisplay = {
     content: (crmSummary?.summary ?? "").trim(),
     timestamp: crmSummary ? `Generated ${new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit" })}` : "",
@@ -8937,7 +8936,7 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
           </div>
 
           {/* Record summary (from API crm_summary) */}
-          {recordSummary && (
+          {crmSummary !== undefined && (
             <div
               style={{
                 backgroundColor: "#ffffff",

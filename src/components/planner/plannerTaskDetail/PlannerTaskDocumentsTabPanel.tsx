@@ -33,7 +33,7 @@ export function PlannerTaskDocumentsTabPanel({
   onUploadClick,
   onDownload,
   onDelete,
-  allowMutations = true,
+  allowMutations = false,
   sectionClassName,
 }: PlannerTaskDocumentsTabPanelProps) {
   const documentCountLabel = taskDocuments.length === 1 ? "document" : "documents";

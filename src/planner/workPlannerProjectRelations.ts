@@ -20,8 +20,10 @@ export const WORK_PLANNER_PROJECT_DETAIL_RELATIONS = [
 /** `getTask` relations for CreatePlannerTaskSidebar edit mode (full form fields). */
 export const WORK_PLANNER_TASK_SIDEBAR_EDIT_RELATIONS = [
   "project",
+  "project.members",
   "status",
   "assignees",
+  "watchers",
   "labels",
 ] as const;
 

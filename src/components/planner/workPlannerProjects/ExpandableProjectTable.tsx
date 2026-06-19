@@ -18,6 +18,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { Dropdown, Spinner } from "react-bootstrap";
+import { toast } from "react-toastify";
 import { usePermissions } from "@utils/permissionUtils";
 import { HEADER_CONSTANTS } from "@constants/headerConstants";
 import {
@@ -30,7 +31,7 @@ import {
   type SubTask,
   type Task,
 } from "@planner/workPlannerProjectsDomain";
-import { getTask } from "@utils/tasks";
+import { getTask, completeTask, incompleteTask, deleteTask as deleteTaskApi } from "@utils/tasks";
 import {
   mapGetTaskResponseToSidebarEditTask,
   WORK_PLANNER_TASK_SIDEBAR_EDIT_RELATIONS,
@@ -41,16 +42,25 @@ import GenericTable, {
   type TableColumn,
   type ToolbarConfig,
 } from "@components/GenericTable";
+import DeleteConfirmationModal from "@components/page-partials/DeleteConfirmationModal";
 import { type StatsCardData } from "@components/GenericStatsCards";
 import { TaskRow } from "@components/planner/workPlannerProjects/TaskTreeRows";
 import {
   createProjectRowActionsToggleHandler,
+  expandedTaskCompleteButtonTitle,
+  expandedTaskDeleteButtonTitle,
   mapTableProjectToPlannerSidebarProject,
+  resolveExpandedPlannerTaskRowPermissions,
   type CreatePlannerSidebarTaskProp,
 } from "@components/planner/workPlannerProjects/expandableProjectTableHelpers";
 import "@components/planner/workPlannerProjects/workPlannerProjectsPage.scss";
 
 const { PERMISSIONS } = HEADER_CONSTANTS;
+
+type ExpandedTaskDeleteTarget = {
+  project: Project;
+  task: Task | SubTask;
+};
 
 /** Shape used by CreateTaskSidebar extension pickers (structurally matches its internal Extension type). */
 export type PlannerTaskSidebarExtension = Readonly<{
@@ -166,10 +176,14 @@ export const ExpandableProjectTable: React.FC<ExpandableProjectTableProps> = ({
 }) => {
   const { hasPermission } = usePermissions();
   const canPreviewEditTask = hasPermission(PERMISSIONS.EDIT_TASKS_WORK_PLANNER);
+  const canDeletePlannerTask = hasPermission(PERMISSIONS.DELETE_TASKS_WORK_PLANNER);
   const sessionCanCreatePlannerTask = hasPermission(PERMISSIONS.CREATE_TASKS_WORK_PLANNER);
 
   const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set());
   const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set());
+  const [completingTaskId, setCompletingTaskId] = useState<string | null>(null);
+  const [taskToDelete, setTaskToDelete] = useState<ExpandedTaskDeleteTarget | null>(null);
+  const [deletingTask, setDeletingTask] = useState(false);
   const [fetchedEditTask, setFetchedEditTask] = useState<CreatePlannerSidebarTaskProp | null>(null);
   const loadingSidebarEditTaskRef = useRef(false);
   const [createTaskForProject, setCreateTaskForProject] = useState<Project | null>(null);
@@ -264,6 +278,110 @@ export const ExpandableProjectTable: React.FC<ExpandableProjectTableProps> = ({
     setHoveredProjectId((prev) => (prev === projectId ? null : prev));
   }, []);
 
+  const sessionTaskCrudFlags = useCallback(
+    () => ({
+      canUpdateTask: canPreviewEditTask,
+      canDeleteTask: canDeletePlannerTask,
+    }),
+    [canPreviewEditTask, canDeletePlannerTask],
+  );
+
+  const resolveExpandedTaskPermissions = useCallback(
+    (task: Task | SubTask, project: Project) =>
+      resolveExpandedPlannerTaskRowPermissions(
+        task,
+        project,
+        sessionUserPhoneOrExtension,
+        sessionTaskCrudFlags(),
+      ),
+    [sessionUserPhoneOrExtension, sessionTaskCrudFlags],
+  );
+
+  const handleToggleTaskComplete = useCallback(
+    async (project: Project, task: Task | SubTask) => {
+      const perms = resolveExpandedTaskPermissions(task, project);
+      if (!perms.canOpenTaskEdit) {
+        toast.error("You are not authorized to update this task");
+        return;
+      }
+      if (completingTaskId === task.id) {
+        return;
+      }
+      setCompletingTaskId(task.id);
+      try {
+        if (task.status === "done") {
+          await incompleteTask(task.id);
+        } else {
+          await completeTask(task.id);
+        }
+        if (onProjectsRefresh) {
+          await onProjectsRefresh();
+        }
+      } catch {
+        toast.error("Failed to update task");
+      } finally {
+        setCompletingTaskId((prev) => (prev === task.id ? null : prev));
+      }
+    },
+    [completingTaskId, onProjectsRefresh, resolveExpandedTaskPermissions],
+  );
+
+  const openDeleteTaskConfirm = useCallback(
+    (project: Project, task: Task | SubTask) => {
+      const perms = resolveExpandedTaskPermissions(task, project);
+      if (!perms.canDeleteTask) {
+        return;
+      }
+      setTaskToDelete({ project, task });
+    },
+    [resolveExpandedTaskPermissions],
+  );
+
+  const handleConfirmDeleteTask = useCallback(async () => {
+    if (!taskToDelete) {
+      return;
+    }
+    const { project, task } = taskToDelete;
+    const perms = resolveExpandedTaskPermissions(task, project);
+    if (!perms.canDeleteTask) {
+      toast.error("You cannot delete this task");
+      return;
+    }
+    setDeletingTask(true);
+    try {
+      await deleteTaskApi(task.id);
+      setTaskToDelete(null);
+      if (onProjectsRefresh) {
+        await onProjectsRefresh();
+      }
+    } catch {
+      toast.error("Failed to delete task");
+    } finally {
+      setDeletingTask(false);
+    }
+  }, [onProjectsRefresh, resolveExpandedTaskPermissions, taskToDelete]);
+
+  const buildExpandedTaskRowProps = useCallback(
+    (project: Project, task: Task | SubTask) => {
+      const perms = resolveExpandedTaskPermissions(task, project);
+      return {
+        canToggleComplete: perms.canOpenTaskEdit,
+        canDeleteTask: perms.canDeleteTask,
+        completeBtnTitle: expandedTaskCompleteButtonTitle(task, perms.canOpenTaskEdit),
+        deleteBtnTitle: expandedTaskDeleteButtonTitle(perms),
+        isCompleting: completingTaskId === task.id,
+        onToggleComplete: () => handleToggleTaskComplete(project, task),
+        onDeleteTask: () => openDeleteTaskConfirm(project, task),
+      };
+    },
+    [
+      completingTaskId,
+      handleToggleTaskComplete,
+      openDeleteTaskConfirm,
+      resolveExpandedTaskPermissions,
+    ],
+  );
+
   const appendExpandedProjectRows = (
     rows: React.ReactNode[],
     project: Project,
@@ -289,6 +407,8 @@ export const ExpandableProjectTable: React.FC<ExpandableProjectTableProps> = ({
             onToggleTask={handleToggleTask}
             canPreviewEditTask={canPreviewEditTask}
             onPreviewSubtask={handlePreviewSubtask}
+            {...buildExpandedTaskRowProps(project, task)}
+            getSubtaskActions={(sub) => buildExpandedTaskRowProps(project, sub)}
           />,
         );
       });
@@ -492,6 +612,19 @@ export const ExpandableProjectTable: React.FC<ExpandableProjectTableProps> = ({
 
   return (
     <>
+      <DeleteConfirmationModal
+        show={taskToDelete != null}
+        onHide={() => {
+          if (!deletingTask) {
+            setTaskToDelete(null);
+          }
+        }}
+        onConfirm={handleConfirmDeleteTask}
+        itemName={taskToDelete?.task.title}
+        itemType="task"
+        loading={deletingTask}
+      />
+
       <CreateTaskSidebar
         isOpen={showCreateTaskSidebar}
         onClose={closeCreateSidebar}

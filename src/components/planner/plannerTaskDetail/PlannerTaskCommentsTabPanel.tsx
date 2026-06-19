@@ -57,7 +57,7 @@ export function PlannerTaskCommentsTabPanel({
   submittingComment,
   setSubmittingComment,
   hierarchyDataExtensions,
-  allowMutations = true,
+  allowMutations = false,
   formatCommentDateFn,
   sectionClassName,
 }: PlannerTaskCommentsTabPanelProps) {

@@ -259,6 +259,10 @@ const TaskDetailPage = () => {
   };
 
   const handleUploadDocument = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!taskDetailPermissions.canOpenTaskEdit) {
+      toast.error("You are not authorized to update this task");
+      return;
+    }
     const files = e.target.files;
     if (!files?.length || !task?.id) return;
     try {
@@ -295,6 +299,10 @@ const TaskDetailPage = () => {
 
   const handleDeleteDocument = async (doc: TaskDocumentRow) => {
     if (!task?.id || !doc?.id) return;
+    if (!taskDetailPermissions.canOpenTaskEdit) {
+      toast.error("You are not authorized to update this task");
+      return;
+    }
     try {
       await deleteTaskDocument(task.id, doc.id);
       await fetchTaskDocuments();
@@ -506,6 +514,7 @@ const TaskDetailPage = () => {
               onUploadClick={() => documentInputRef.current?.click()}
               onDownloadDocument={handleDownloadDocument}
               onDeleteDocument={handleDeleteDocument}
+              allowTaskMutations={taskDetailPermissions.canOpenTaskEdit}
             />
           </Card.Body>
         </Card>

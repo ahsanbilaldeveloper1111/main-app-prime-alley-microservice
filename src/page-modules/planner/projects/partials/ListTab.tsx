@@ -299,6 +299,7 @@ const ListTab: React.FC<ListTabProps> = ({
         hierarchyDataExtensions={hierarchyForOffcanvas}
         getStatusVariant={(status) => getStatusVariant(status)}
         getPriorityVariant={(priority) => getPriorityVariant(priority || '')}
+        projectContext={selectedProject}
       />
     </>
   );

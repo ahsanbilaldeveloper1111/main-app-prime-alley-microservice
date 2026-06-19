@@ -73,4 +73,6 @@ export interface TaskDetailOffcanvasProps {
   hierarchyDataExtensions?: HierarchyExtension[];
   getStatusVariant: (status: string) => string;
   getPriorityVariant: (priority: string) => string;
+  /** Project record used for admin/member permission checks (falls back to task.project on rawData). */
+  projectContext?: unknown;
 }

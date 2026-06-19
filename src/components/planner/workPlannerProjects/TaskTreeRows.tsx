@@ -1,6 +1,7 @@
 import React, { memo, useCallback, useState, type CSSProperties } from "react";
-import { ChevronRight, ChevronDown as ChevronDownIcon, Eye, type LucideIcon } from "lucide-react";
+import { ChevronRight, ChevronDown as ChevronDownIcon, Eye, Trash2, type LucideIcon } from "lucide-react";
 import { formatDateGlobal } from "@utils/Helper";
+import { TaskCompleteCircleButton } from "@utils/taskListing/taskListUiPrimitives";
 import { type SubTask, type Task } from "@planner/workPlannerProjectsDomain";
 import {
   getSubtaskBadgeCounts,
@@ -18,6 +19,25 @@ export interface TaskRowProps {
   onToggleTask: (taskId: string) => void;
   canPreviewEditTask: boolean;
   onPreviewSubtask: (parentTask: Task, sub: SubTask) => void | Promise<void>;
+  canToggleComplete: boolean;
+  canDeleteTask: boolean;
+  completeBtnTitle: string;
+  deleteBtnTitle: string;
+  isCompleting: boolean;
+  onToggleComplete: () => void | Promise<void>;
+  onDeleteTask: () => void;
+  getSubtaskActions: (
+    sub: SubTask,
+  ) => Pick<
+    SubtaskRowProps,
+    | "canToggleComplete"
+    | "canDeleteTask"
+    | "completeBtnTitle"
+    | "deleteBtnTitle"
+    | "isCompleting"
+    | "onToggleComplete"
+    | "onDeleteTask"
+  >;
 }
 
 function runTaskPreview(task: Task, onPreview: TaskRowProps["onPreview"]): void {
@@ -48,6 +68,10 @@ type TaskRowNameCellProps = {
   onToggleTask: (taskId: string) => void;
   onPreview: TaskRowProps["onPreview"];
   hovered: boolean;
+  canToggleComplete: boolean;
+  completeBtnTitle: string;
+  isCompleting: boolean;
+  onToggleComplete: () => void | Promise<void>;
 };
 
 function TaskRowNameCell({
@@ -62,6 +86,10 @@ function TaskRowNameCell({
   onToggleTask,
   onPreview,
   hovered,
+  canToggleComplete,
+  completeBtnTitle,
+  isCompleting,
+  onToggleComplete,
 }: Readonly<TaskRowNameCellProps>) {
   return (
     <td
@@ -87,7 +115,19 @@ function TaskRowNameCell({
           )}
         </span>
 
-        <StatusIcon size={14} className={`${statusIconClass} wp-flex-shrink-0`} />
+        {canToggleComplete ? (
+          <TaskCompleteCircleButton
+            isCompleted={task.status === "done"}
+            title={completeBtnTitle}
+            disabled={isCompleting}
+            onClick={(e) => {
+              e.stopPropagation();
+              Promise.resolve(onToggleComplete()).catch(() => undefined);
+            }}
+          />
+        ) : (
+          <StatusIcon size={14} className={`${statusIconClass} wp-flex-shrink-0`} />
+        )}
 
         <button
           type="button"
@@ -134,6 +174,36 @@ function TaskRowNameCell({
   );
 }
 
+function TaskRowActionsCell({
+  canDeleteTask,
+  deleteBtnTitle,
+  onDeleteTask,
+}: Readonly<{
+  canDeleteTask: boolean;
+  deleteBtnTitle: string;
+  onDeleteTask: () => void;
+}>) {
+  if (!canDeleteTask) {
+    return <td className="generic-table-actions-cell" />;
+  }
+  return (
+    <td className="generic-table-actions-cell" onClick={(e) => e.stopPropagation()}>
+      <button
+        type="button"
+        className="wp-icon-btn-transparent wp-task-delete-btn"
+        title={deleteBtnTitle}
+        aria-label={deleteBtnTitle}
+        onClick={(e) => {
+          e.stopPropagation();
+          onDeleteTask();
+        }}
+      >
+        <Trash2 size={14} />
+      </button>
+    </td>
+  );
+}
+
 const TaskRowInner: React.FC<TaskRowProps> = ({
   task,
   depth = 1,
@@ -142,6 +212,14 @@ const TaskRowInner: React.FC<TaskRowProps> = ({
   onToggleTask,
   canPreviewEditTask,
   onPreviewSubtask,
+  canToggleComplete,
+  canDeleteTask,
+  completeBtnTitle,
+  deleteBtnTitle,
+  isCompleting,
+  onToggleComplete,
+  onDeleteTask,
+  getSubtaskActions,
 }) => {
   const [hovered, setHovered] = useState(false);
   const isExpanded = expandedTasks.has(task.id);
@@ -182,6 +260,10 @@ const TaskRowInner: React.FC<TaskRowProps> = ({
           onToggleTask={onToggleTask}
           onPreview={onPreview}
           hovered={hovered}
+          canToggleComplete={canToggleComplete}
+          completeBtnTitle={completeBtnTitle}
+          isCompleting={isCompleting}
+          onToggleComplete={onToggleComplete}
         />
 
         <td className="wp-task-cell-muted">{formatTaskAssigneeLabel(task)}</td>
@@ -200,7 +282,11 @@ const TaskRowInner: React.FC<TaskRowProps> = ({
           {task.dueDate ? formatDateGlobal(task.dueDate) || "—" : "—"}
         </td>
 
-        <td className="generic-table-actions-cell" />
+        <TaskRowActionsCell
+          canDeleteTask={canDeleteTask}
+          deleteBtnTitle={deleteBtnTitle}
+          onDeleteTask={onDeleteTask}
+        />
       </tr>
 
       <TaskRowExpandedBranches
@@ -209,11 +295,9 @@ const TaskRowInner: React.FC<TaskRowProps> = ({
         subtasksLoaded={subtasksLoaded}
         task={task}
         depth={depth}
-        onPreview={onPreview}
-        expandedTasks={expandedTasks}
-        onToggleTask={onToggleTask}
         canPreviewEditTask={canPreviewEditTask}
         onPreviewSubtask={onPreviewSubtask}
+        getSubtaskActions={getSubtaskActions}
       />
     </>
   );
@@ -227,6 +311,13 @@ interface SubtaskRowProps {
   parentTask: Task;
   onPreviewSubtask: (parentTask: Task, sub: SubTask) => void | Promise<void>;
   canPreviewEditTask: boolean;
+  canToggleComplete: boolean;
+  canDeleteTask: boolean;
+  completeBtnTitle: string;
+  deleteBtnTitle: string;
+  isCompleting: boolean;
+  onToggleComplete: () => void | Promise<void>;
+  onDeleteTask: () => void;
 }
 
 const SubtaskRowInner: React.FC<SubtaskRowProps> = ({
@@ -235,6 +326,13 @@ const SubtaskRowInner: React.FC<SubtaskRowProps> = ({
   parentTask,
   onPreviewSubtask,
   canPreviewEditTask,
+  canToggleComplete,
+  canDeleteTask,
+  completeBtnTitle,
+  deleteBtnTitle,
+  isCompleting,
+  onToggleComplete,
+  onDeleteTask,
 }) => {
   const [hovered, setHovered] = useState(false);
   const StatusIcon = TASK_STATUS_ICONS[subtask.status];
@@ -257,7 +355,19 @@ const SubtaskRowInner: React.FC<SubtaskRowProps> = ({
       >
         <div className="wp-task-tree-row__cell-name-inner">
           <span className="wp-task-indent-spacer" />
-          <StatusIcon size={13} className={`${statusIconClass} wp-flex-shrink-0`} />
+          {canToggleComplete ? (
+            <TaskCompleteCircleButton
+              isCompleted={subtask.status === "done"}
+              title={completeBtnTitle}
+              disabled={isCompleting}
+              onClick={(e) => {
+                e.stopPropagation();
+                Promise.resolve(onToggleComplete()).catch(() => undefined);
+              }}
+            />
+          ) : (
+            <StatusIcon size={13} className={`${statusIconClass} wp-flex-shrink-0`} />
+          )}
           <button
             type="button"
             className={`wp-task-title-btn wp-task-title-btn--sub${canPreviewEditTask ? " wp-task-title-btn--clickable" : " wp-task-title-btn--default-cursor"}${subtask.status === "done" ? " wp-task-title-btn--done" : ""}`}
@@ -294,7 +404,11 @@ const SubtaskRowInner: React.FC<SubtaskRowProps> = ({
       <td className="wp-task-cell-muted wp-task-cell-muted--faint">
         {subtask.dueDate ? formatDateGlobal(subtask.dueDate) || "—" : "—"}
       </td>
-      <td className="generic-table-actions-cell" />
+      <TaskRowActionsCell
+        canDeleteTask={canDeleteTask}
+        deleteBtnTitle={deleteBtnTitle}
+        onDeleteTask={onDeleteTask}
+      />
     </tr>
   );
 };
@@ -307,10 +421,10 @@ type TaskRowExpandedBranchesProps = {
   subtasksLoaded: boolean;
   task: Task;
   depth: number;
-} & Pick<
-  TaskRowProps,
-  "onPreview" | "expandedTasks" | "onToggleTask" | "canPreviewEditTask" | "onPreviewSubtask"
->;
+  canPreviewEditTask: boolean;
+  onPreviewSubtask: TaskRowProps["onPreviewSubtask"];
+  getSubtaskActions: TaskRowProps["getSubtaskActions"];
+};
 
 function TaskRowExpandedBranches({
   isExpanded,
@@ -318,11 +432,9 @@ function TaskRowExpandedBranches({
   subtasksLoaded,
   task,
   depth,
-  onPreview,
-  expandedTasks,
-  onToggleTask,
   canPreviewEditTask,
   onPreviewSubtask,
+  getSubtaskActions,
 }: Readonly<TaskRowExpandedBranchesProps>) {
   if (!isExpanded) {
     return null;
@@ -340,6 +452,7 @@ function TaskRowExpandedBranches({
             canPreviewEditTask={canPreviewEditTask}
             parentTask={task}
             onPreviewSubtask={onPreviewSubtask}
+            {...getSubtaskActions(sub)}
           />
         ))}
       </>
@@ -358,6 +471,7 @@ function TaskRowExpandedBranches({
             canPreviewEditTask={canPreviewEditTask}
             parentTask={task}
             onPreviewSubtask={onPreviewSubtask}
+            {...getSubtaskActions(sub)}
           />
         ))}
       </>
