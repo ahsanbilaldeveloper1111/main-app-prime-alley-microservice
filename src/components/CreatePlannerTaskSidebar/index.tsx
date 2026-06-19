@@ -1010,6 +1010,14 @@ function buildInitialFormFromEdit(
   };
 }
 
+function resolvePropProjectId(propProject: Project | undefined): number | null {
+  if (propProject?.id == null) {
+    return null;
+  }
+  const id = Number(propProject.id);
+  return Number.isFinite(id) && id > 0 ? id : null;
+}
+
 function buildInitialFormForCreate(
   taskType: PlannerTaskTypeOrUnset,
   propProject: Project | undefined,
@@ -1020,7 +1028,7 @@ function buildInitialFormForCreate(
     title: "",
     description: "",
     taskType,
-    projectId: propProject?.id ?? null,
+    projectId: resolvePropProjectId(propProject),
     statusId: resolvePreferredStatusId(propStatuses, selectedStatusForTask),
     priorityId: 0,
     assigneeIds: [],
@@ -1097,7 +1105,11 @@ function resolveSidebarProjects(
     return fetchedProjects;
   }
   if (propProject) {
-    return [propProject];
+    const lockedId = resolvePropProjectId(propProject);
+    if (lockedId == null) {
+      return [propProject];
+    }
+    return [{ ...propProject, id: lockedId }];
   }
   return [];
 }
@@ -2478,7 +2490,7 @@ function emptyPlannerSidebarFormWhenClosed(
     title: "",
     description: "",
     taskType: "",
-    projectId: propProject?.id || null,
+    projectId: resolvePropProjectId(propProject),
     statusId: resolvePreferredStatusId(propStatuses, selectedStatusForTask),
     priorityId: 0,
     assigneeIds: [],
@@ -2744,6 +2756,27 @@ function usePlannerSidebarBodyScrollLock(isOpen: boolean): void {
   }, [isOpen]);
 }
 
+function usePlannerSidebarLockedProjectSync(
+  isOpen: boolean,
+  isEdit: boolean,
+  lockProjectSelection: boolean,
+  propProject: Project | undefined,
+  setFormData: React.Dispatch<React.SetStateAction<CreateTaskFormData>>,
+): void {
+  useEffect(() => {
+    if (!isOpen || isEdit || !lockProjectSelection) {
+      return;
+    }
+    const lockedId = resolvePropProjectId(propProject);
+    if (lockedId == null) {
+      return;
+    }
+    setFormData((prev) =>
+      prev.projectId === lockedId ? prev : { ...prev, projectId: lockedId },
+    );
+  }, [isOpen, isEdit, lockProjectSelection, propProject, setFormData]);
+}
+
 type PlannerSidebarFormOpenLifecycleParams = Readonly<{
   isOpen: boolean;
   isEdit: boolean;
@@ -2896,6 +2929,52 @@ function shouldShowOneWayTaskConversionHint(
 ): boolean {
   if (!isEdit || editTask == null) return false;
   return !isEditingRecurringTemplate;
+}
+
+function renderLimitedEditWatchersPreview(
+  selectedWatchers: Array<{ id: number; name: string }>,
+): React.ReactNode {
+  if (selectedWatchers.length === 0) {
+    return (
+      <span style={{ fontSize: 13, color: "#94a3b8" }}>No watchers on this task</span>
+    );
+  }
+  return selectedWatchers.map((user) => (
+    <span
+      key={`watcher-readonly-${user.id}`}
+      title={user.name}
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 6,
+        padding: "4px 10px",
+        borderRadius: 999,
+        backgroundColor: "#f1f5f9",
+        border: "1px solid #e2e8f0",
+        fontSize: 13,
+        color: "#334155",
+      }}
+    >
+      <span
+        style={{
+          width: 24,
+          height: 24,
+          borderRadius: "50%",
+          background: getTaskAvatarColor(user.name),
+          display: "inline-flex",
+          alignItems: "center",
+          justifyContent: "center",
+          fontSize: 11,
+          fontWeight: 600,
+          color: "#fff",
+          flexShrink: 0,
+        }}
+      >
+        {user.name.charAt(0).toUpperCase()}
+      </span>
+      {user.name}
+    </span>
+  ));
 }
 
 // ─── Component ───────────────────────────────────────────────────────────────
@@ -3092,6 +3171,14 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
   });
 
   usePlannerSidebarBodyScrollLock(isOpen);
+
+  usePlannerSidebarLockedProjectSync(
+    isOpen,
+    isEdit,
+    lockProjectSelection,
+    propProject,
+    setFormData,
+  );
 
   const users: UserType[] = mapExtensionsToPlannerUsers(extensions);
 
@@ -3953,6 +4040,10 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
                               marginBottom: 8,
                             }}
                           >
+                            {isLimitedTaskEdit
+                              ? renderLimitedEditWatchersPreview(selectedWatchers)
+                              : (
+                              <>
                             {selectedWatchers.map((user) => (
                               <div
                                 key={`pre-${user.id}`}
@@ -4054,8 +4145,7 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
                                 <Plus size={16} />
                               </button>
                             )}
-                          </div>
-                          {showWatcherDropdown && !isLimitedTaskEdit && (
+                          {showWatcherDropdown && (
                             <div
                               ref={watcherDropdownRef}
                               style={{
@@ -4064,6 +4154,7 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
                                 backgroundColor: "#f8fafc",
                                 maxHeight: 250,
                                 overflowY: "auto",
+                                width: "100%",
                               }}
                             >
                               <div
@@ -4148,6 +4239,9 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
                                 ))}
                             </div>
                           )}
+                          </>
+                            )}
+                          </div>
                         </Form.Group>
                       </fieldset>
                     )}

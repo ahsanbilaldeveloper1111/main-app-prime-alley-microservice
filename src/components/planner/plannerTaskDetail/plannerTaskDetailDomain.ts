@@ -7,6 +7,7 @@ export const PLANNER_TASK_DETAIL_WITH_RELATIONS = [
   "project.members",
   "status",
   "assignees",
+  "watchers",
   "labels",
   "comments",
   "parent",
@@ -15,6 +16,7 @@ export const PLANNER_TASK_DETAIL_WITH_RELATIONS = [
   "children",
   "children.status",
   "children.assignees",
+  "children.watchers",
 ] as const;
 
 export function readNestedRecurringRecord(

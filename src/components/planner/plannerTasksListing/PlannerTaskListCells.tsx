@@ -277,6 +277,42 @@ export function PlannerTaskRepeatStatusCell({ row }: Readonly<{ row: Task }>) {
   return <span className="ptl-list-cell">{label || "—"}</span>;
 }
 
+export type PlannerTaskCommentsCountCellProps = Readonly<{
+  row: Task;
+  onViewComments: (row: Task) => void;
+}>;
+
+function plannerTaskCommentsButtonTitle(count: number): string {
+  if (count === 0) {
+    return "View comments";
+  }
+  if (count === 1) {
+    return "View 1 comment";
+  }
+  return `View ${count} comments`;
+}
+
+export function PlannerTaskCommentsCountCell({
+  row,
+  onViewComments,
+}: PlannerTaskCommentsCountCellProps) {
+  const count = row.comments_count;
+  const title = plannerTaskCommentsButtonTitle(count);
+  return (
+    <button
+      type="button"
+      className="ptl-comments-count-btn"
+      title={title}
+      onClick={(e) => {
+        e.stopPropagation();
+        onViewComments(row);
+      }}
+    >
+      <span className="ptl-comments-count-btn__value">{count}</span>
+    </button>
+  );
+}
+
 export type PlannerTaskCompleteColumnRenderProps = Readonly<{
   row: Task;
   canToggleComplete: boolean;

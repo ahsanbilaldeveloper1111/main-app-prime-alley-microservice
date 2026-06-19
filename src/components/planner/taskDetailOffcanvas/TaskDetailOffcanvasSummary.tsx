@@ -86,22 +86,30 @@ export function TaskDetailOffcanvasSummary({
             watchersList.map((watcher, idx) => {
               const extNumber = watcher.extension_number ?? "";
               const { name, initials } = getExtensionDisplay(String(extNumber), hierarchyDataExtensions);
+              const displayName = name || String(extNumber) || "Unknown";
               return (
-                <div key={offcanvasWatcherKey(watcher, idx)} className="assignee-badge" title={name}>
-                  {initials || "—"}
+                <div
+                  key={offcanvasWatcherKey(watcher, idx)}
+                  className="tdo-watcher-chip"
+                  title={displayName}
+                >
+                  <div className="assignee-badge">{initials || "—"}</div>
+                  <span className="tdo-watcher-chip__name">{displayName}</span>
                 </div>
               );
             })
           )}
-          <button
-            type="button"
-            className="add-assignee border-0"
-            onClick={onEditTask}
-            aria-label="Edit watchers"
-            title="Edit watchers"
-          >
-            <Plus size={16} />
-          </button>
+          {canEditPlannerTask ? (
+            <button
+              type="button"
+              className="add-assignee border-0"
+              onClick={onEditTask}
+              aria-label="Edit watchers"
+              title="Edit watchers"
+            >
+              <Plus size={16} />
+            </button>
+          ) : null}
         </div>
       </div>
 

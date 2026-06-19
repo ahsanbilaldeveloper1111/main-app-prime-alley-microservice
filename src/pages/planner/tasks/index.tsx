@@ -52,6 +52,7 @@ import {
 } from "@utils/taskListing/plannerTasksQueryParams";
 import {
   PlannerTaskAssigneeCell,
+  PlannerTaskCommentsCountCell,
   PlannerTaskCompleteColumnRender,
   PlannerTaskDueDateCell,
   PlannerTaskNotesCell,
@@ -66,6 +67,7 @@ import { PlannerAddToMyDayEstimateModal } from "@components/planner/plannerTasks
 import { usePlannerAddToMyDay } from "@components/planner/plannerTasksListing/usePlannerAddToMyDay";
 import { listingTaskToAddToMyDayTarget } from "@components/planner/plannerTasksListing/plannerTasksListingMyDay";
 import { PlannerTasksEditColumnsDropdown } from "@components/planner/plannerTasksListing/PlannerTasksEditColumnsDropdown";
+import { PlannerTaskCommentsViewModal } from "@components/planner/plannerTasksListing/PlannerTaskCommentsViewModal";
 import { PlannerTasksTabsBar } from "@components/planner/plannerTasksListing/PlannerTasksTabsBar";
 import {
   type ApiTask,
@@ -86,6 +88,7 @@ import {
   PRIORITY_OPTIONS,
   PROJECT_DETAILS_STATUS_WITH,
   readVisibleTaskColumnKeysFromStorage,
+  resolvePlannerListTaskCommentsCount,
   resolvePlannerListTaskDueDate,
   stripHtmlTags,
   TASK_TYPE_OPTIONS,
@@ -258,6 +261,7 @@ const TasksListingPage = ({
         repeat_status: apiTask.type === "recurring" ? "repeat" : "no_repeat",
         status,
         workflowStatus,
+        comments_count: resolvePlannerListTaskCommentsCount(apiTask),
         rawData: apiTask,
       };
     }, [hierarchyDataExtensions]);
@@ -385,18 +389,32 @@ const TasksListingPage = ({
     const [showDelete, setShowDelete] = useState(false);
     const [toDelete, setToDelete] = useState<Task | null>(null);
     const [openTaskActionsId, setOpenTaskActionsId] = useState<number | null>(null);
+    const [commentsModalTask, setCommentsModalTask] = useState<Task | null>(null);
 
     const [visibleTaskColumnKeys, setVisibleTaskColumnKeys] = useState<string[]>(
       () => [...DEFAULT_TASK_TABLE_COLUMN_KEYS],
     );
 
     useLayoutEffect(() => {
-      const fromStorage = readVisibleTaskColumnKeysFromStorage();
+      let fromStorage = readVisibleTaskColumnKeysFromStorage();
+      let changed = false;
       if (!fromStorage.includes("actions")) {
-        const next = [...fromStorage, "actions"];
-        persistVisibleTaskColumnKeys(next);
-        setVisibleTaskColumnKeys(next);
-        return;
+        fromStorage = [...fromStorage, "actions"];
+        changed = true;
+      }
+      if (!fromStorage.includes("comments_count")) {
+        const withoutComments = fromStorage.filter((k) => k !== "comments_count");
+        const actionsIdx = withoutComments.indexOf("actions");
+        if (actionsIdx >= 0) {
+          withoutComments.splice(actionsIdx, 0, "comments_count");
+        } else {
+          withoutComments.push("comments_count");
+        }
+        fromStorage = orderTaskColumnKeysByDefault(withoutComments);
+        changed = true;
+      }
+      if (changed) {
+        persistVisibleTaskColumnKeys(fromStorage);
       }
       setVisibleTaskColumnKeys(fromStorage);
     }, []);
@@ -546,7 +564,7 @@ const TasksListingPage = ({
               column: pager.sortCol === "due_date" ? "due_date" : "created_at",
               dir: pager.sortDir,
             },
-            withRelations: ["project", "status", "assignees"],
+            withRelations: ["project", "status", "assignees", "watchers", "comments"],
           };
 
           applyPlannerTaskFiltersToListParams(
@@ -744,6 +762,21 @@ const TasksListingPage = ({
       [invalidateTaskLists, getTaskRowPermissions],
     );
   
+    const openCommentsModal = useCallback((row: Task) => {
+      setCommentsModalTask(row);
+    }, []);
+
+    const closeCommentsModal = useCallback(() => {
+      setCommentsModalTask(null);
+    }, []);
+
+    const commentsModalAllowMutations = useMemo(() => {
+      if (!commentsModalTask) {
+        return false;
+      }
+      return getTaskRowPermissions(commentsModalTask).canOpenTaskEdit;
+    }, [commentsModalTask, getTaskRowPermissions]);
+
     // ── Columns ───────────────────────────────────────────────────────────────────
     const columns: TableColumn<Task>[] = useMemo(() => [
       {
@@ -820,6 +853,15 @@ const TasksListingPage = ({
         render: (row) => <PlannerTaskRepeatStatusCell row={row} />,
       },
       {
+        key: "comments_count",
+        label: "Comments",
+        sortable: false,
+        type: "custom",
+        render: (row) => (
+          <PlannerTaskCommentsCountCell row={row} onViewComments={openCommentsModal} />
+        ),
+      },
+      {
         key: "actions",
         label: "Actions",
         sortable: false,
@@ -853,6 +895,7 @@ const TasksListingPage = ({
       openEdit,
       openConvertToRecurring,
       openDeleteConfirm,
+      openCommentsModal,
       getTaskRowPermissions,
       openTaskActionsId,
       hierarchyDataExtensions,
@@ -1883,7 +1926,16 @@ const TasksListingPage = ({
             }
           }}
         />
-  
+
+        <PlannerTaskCommentsViewModal
+          show={commentsModalTask != null}
+          task={commentsModalTask}
+          onHide={closeCommentsModal}
+          hierarchyDataExtensions={hierarchyDataExtensions}
+          allowMutations={commentsModalAllowMutations}
+          onCommentsChanged={invalidateTaskLists}
+        />
+
         {/* ── Delete confirmation ── */}
         <PlannerAddToMyDayEstimateModal
           show={addToMyDayPendingTask != null}

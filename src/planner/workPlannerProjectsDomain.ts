@@ -219,6 +219,84 @@ export function mapApiProjectToProject(apiProject: ApiProject): Project {
   };
 }
 
+export type ProjectTaskProgressSource = {
+  status?: string | null;
+  tasks?: Array<{ is_completed?: boolean }> | null;
+  progress_percent?: number | null;
+  total_tasks?: number | null;
+  completed_tasks?: number | null;
+  task_count?: number | null;
+};
+
+export type ProjectTaskProgress = {
+  percent: number;
+  completed: number;
+  total: number;
+};
+
+function clampProjectProgressPercent(value: number): number {
+  return Math.min(100, Math.max(0, Math.round(value)));
+}
+
+/** Task completion progress for project preview sidebars and summaries. */
+export function resolveProjectTaskProgress(
+  source: ProjectTaskProgressSource | null | undefined,
+): ProjectTaskProgress {
+  if (source == null) {
+    return { percent: 0, completed: 0, total: 0 };
+  }
+
+  const status = String(source.status ?? "").trim().toLowerCase();
+  if (status === "completed") {
+    const totalFromFields = source.total_tasks ?? source.task_count;
+    const completedFromFields = source.completed_tasks;
+    if (totalFromFields != null && totalFromFields > 0 && completedFromFields != null) {
+      return {
+        percent: 100,
+        completed: completedFromFields,
+        total: totalFromFields,
+      };
+    }
+    const tasks = source.tasks ?? [];
+    if (tasks.length > 0) {
+      return { percent: 100, completed: tasks.length, total: tasks.length };
+    }
+    return { percent: 100, completed: 0, total: 0 };
+  }
+
+  if (source.progress_percent != null && Number.isFinite(source.progress_percent)) {
+    const totalFromFields = source.total_tasks ?? source.task_count ?? 0;
+    const completedFromFields = source.completed_tasks ?? 0;
+    return {
+      percent: clampProjectProgressPercent(source.progress_percent),
+      completed: completedFromFields,
+      total: totalFromFields,
+    };
+  }
+
+  const totalFromFields = source.total_tasks ?? source.task_count;
+  const completedFromFields = source.completed_tasks;
+  if (totalFromFields != null && totalFromFields > 0 && completedFromFields != null) {
+    return {
+      percent: clampProjectProgressPercent((completedFromFields / totalFromFields) * 100),
+      completed: completedFromFields,
+      total: totalFromFields,
+    };
+  }
+
+  const tasks = source.tasks ?? [];
+  const total = tasks.length;
+  if (total === 0) {
+    return { percent: 0, completed: 0, total: 0 };
+  }
+  const completed = tasks.filter((task) => Boolean(task.is_completed)).length;
+  return {
+    percent: clampProjectProgressPercent((completed / total) * 100),
+    completed,
+    total,
+  };
+}
+
 export const getProjectStatusFromApiStatus = (apiStatus: string | undefined): Project["status"] => {
   if (apiStatus === "active") return "Active";
   if (apiStatus === "completed") return "Completed";

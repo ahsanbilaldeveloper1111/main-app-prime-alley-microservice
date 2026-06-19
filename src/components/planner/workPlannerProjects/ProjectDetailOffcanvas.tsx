@@ -7,6 +7,7 @@ import {
   getProjectStatusVariant,
   formatProjectSidebarDate,
   formatProjectSidebarDateTime,
+  resolveProjectTaskProgress,
   type ApiProject,
   type Project,
 } from "@planner/workPlannerProjectsDomain";
@@ -54,7 +55,9 @@ export const ProjectDetailOffcanvas: React.FC<ProjectDetailOffcanvasProps> = ({
   const lastUpdatedDisplay =
     formatProjectSidebarDateTime(lastUpdatedIso) ?? fallbackLastUpdated;
   const projectMembers = selectedProjectDetails?.members || selectedProject.members;
-  const progressPercent = Math.round((1 - selectedProject.open / (selectedProject.open + 50)) * 100);
+  const taskProgress = resolveProjectTaskProgress(
+    selectedProjectDetails ?? selectedProject.apiData ?? undefined,
+  );
 
   const descriptionHtml = selectedProjectDetails?.description?.trim();
 
@@ -63,6 +66,7 @@ export const ProjectDetailOffcanvas: React.FC<ProjectDetailOffcanvasProps> = ({
       isOpen={show}
       onClose={onHide}
       width="470px"
+      quickActions={[]}
       title={selectedProject.name}
       subtitle={resolvedStatus.toUpperCase()}
       avatar={{
@@ -121,10 +125,19 @@ export const ProjectDetailOffcanvas: React.FC<ProjectDetailOffcanvasProps> = ({
           icon: AlertCircle,
           collapsible: true,
           defaultExpanded: true,
+          isLoading: loadingProjectDetails,
           customContent: (
             <>
-              <ProgressBar now={progressPercent} className="wp-sidebar-progress-bar" variant="primary" />
-              <div className="wp-sidebar-progress-foot">{progressPercent}% Complete</div>
+              <ProgressBar
+                now={taskProgress.percent}
+                className="wp-sidebar-progress-bar"
+                variant="primary"
+              />
+              <div className="wp-sidebar-progress-foot">
+                {taskProgress.total > 0
+                  ? `${taskProgress.completed} of ${taskProgress.total} tasks complete (${taskProgress.percent}%)`
+                  : `${taskProgress.percent}% Complete`}
+              </div>
             </>
           ),
         },

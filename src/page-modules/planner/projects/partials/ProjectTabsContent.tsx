@@ -16,6 +16,7 @@ import {
   getSessionPhoneOrExtension,
 } from '@planner/projectMemberRole';
 import CreateTaskSidebar from '@components/CreatePlannerTaskSidebar';
+import { mapApiProjectToPlannerSidebarProject } from '@components/planner/workPlannerProjects/expandableProjectTableHelpers';
 import {
   BOARD_FILTER_STANDARD_PRIORITIES,
   extensionOrIdToTrimmedString,
@@ -42,6 +43,42 @@ import LabelsTab from './LabelsTab';
 import OverdueTasksModal from './OverdueTasksModal';
 import type { ActivityLogExtension } from '@planner/activityLogExtension';
 const { PERMISSIONS } = HEADER_CONSTANTS;
+
+type NextRouterQueryValue = string | string[] | undefined;
+type NextRouterQuery = Record<string, NextRouterQueryValue>;
+
+function readProjectTabFromQuery(tab: NextRouterQueryValue): string {
+  if (typeof tab === 'string' && tab.trim()) {
+    return tab.toLowerCase();
+  }
+  return '';
+}
+
+function resolveProjectRouteId(
+  projectId: string | number | null | undefined,
+  routeId: NextRouterQueryValue,
+): string | undefined {
+  if (projectId != null && String(projectId).trim() !== '') {
+    return String(projectId);
+  }
+  if (typeof routeId === 'string' && routeId.trim() !== '') {
+    return routeId;
+  }
+  return undefined;
+}
+
+function buildProjectTabsRouteQuery(
+  routerQuery: NextRouterQuery,
+  tab: string,
+  projectId?: string | number | null,
+): NextRouterQuery {
+  const nextQuery: NextRouterQuery = { ...routerQuery, tab };
+  const idValue = resolveProjectRouteId(projectId, routerQuery.id);
+  if (idValue) {
+    nextQuery.id = idValue;
+  }
+  return nextQuery;
+}
 
 interface ProjectTabsContentProps {
   selectedProject: any;
@@ -111,7 +148,6 @@ const ProjectTabsContent = forwardRef<ProjectTabsContentRef, ProjectTabsContentP
       canViewProjectDetails,
       canViewStatusesTab,
       canViewTaskDetails,
-      hasAnyPermission,
     ],
   );
 
@@ -128,6 +164,13 @@ const ProjectTabsContent = forwardRef<ProjectTabsContentRef, ProjectTabsContentP
   const [showCompletedTasks, setShowCompletedTasks] = useState(false);
 
   const selectedProjectId = selectedProject?.id;
+  const sidebarProject = useMemo(
+    () =>
+      selectedProject
+        ? mapApiProjectToPlannerSidebarProject(selectedProject)
+        : undefined,
+    [selectedProject],
+  );
   const projectTabsDataOptions = useMemo<UseProjectTabsContentDataOptions>(
     () => ({
       ...PROJECT_DETAIL_LIST_TAB_OPTS,
@@ -176,31 +219,43 @@ const ProjectTabsContent = forwardRef<ProjectTabsContentRef, ProjectTabsContentP
   } = useProjectTabsContentData(selectedProjectId, activeTab, projectTabsDataOptions);
 
   useEffect(() => {
-    if (router.isReady) {
-      const tabFromUrl = router.query.tab as string;
-      if (tabFromUrl) {
-        const requestedTab = tabFromUrl.toLowerCase();
-        const validTabs = visibleTabs.map((tab) => tab.toLowerCase());
-        if (validTabs.includes(requestedTab)) {
-          setActiveTab(requestedTab);
-        } else if (validTabs.length > 0) {
-          setActiveTab(validTabs[0]);
-        }
-      }
+    if (!router.isReady || visibleTabs.length === 0) {
+      return;
     }
+    const tabFromUrl = readProjectTabFromQuery(router.query.tab);
+    if (!tabFromUrl) {
+      return;
+    }
+    const validTabs = visibleTabs.map((tab) => tab.toLowerCase());
+    if (validTabs.includes(tabFromUrl)) {
+      setActiveTab(tabFromUrl);
+      return;
+    }
+    setActiveTab(validTabs[0]);
   }, [router.isReady, router.query.tab, visibleTabs]);
+
+  useEffect(() => {
+    if (visibleTabs.length === 0) {
+      return;
+    }
+    const validTabs = visibleTabs.map((tab) => tab.toLowerCase());
+    setActiveTab((current) => (validTabs.includes(current) ? current : validTabs[0]));
+  }, [visibleTabs]);
 
   const handleTabChange = useCallback((tab: string) => {
     setActiveTab(tab);
+    if (!router.isReady) {
+      return;
+    }
     router.push(
       {
         pathname: router.pathname,
-        query: { ...router.query, tab }
+        query: buildProjectTabsRouteQuery(router.query, tab, selectedProjectId),
       },
       undefined,
-      { shallow: true }
+      { shallow: true },
     );
-  }, [router]);
+  }, [router, selectedProjectId]);
 
   const getTasksByStatus = (statusId: string | number | null) => {
     const filtered = filterBoardTasksForColumns(
@@ -347,6 +402,22 @@ const ProjectTabsContent = forwardRef<ProjectTabsContentRef, ProjectTabsContentP
       <p>Please select a project to view details</p>
     </div>
   );
+
+  const tabsLoadingMessage = (
+    <div style={{ textAlign: 'center', padding: '3rem', color: '#6B7280' }}>
+      <p>Loading project tabs…</p>
+    </div>
+  );
+
+  const renderTabBody = () => {
+    if (!selectedProject) {
+      return emptyProjectMessage;
+    }
+    if (visibleTabs.length === 0) {
+      return tabsLoadingMessage;
+    }
+    return renderProjectTabPanel(selectedProject);
+  };
 
   const renderProjectTabPanel = (project: NonNullable<typeof selectedProject>) => {
     switch (activeTab) {
@@ -496,9 +567,7 @@ const ProjectTabsContent = forwardRef<ProjectTabsContentRef, ProjectTabsContentP
       />
 
       <div style={styles.contentContainer}>
-        {selectedProject && visibleTabs.length > 0
-          ? renderProjectTabPanel(selectedProject)
-          : emptyProjectMessage}
+        {renderTabBody()}
       </div>
 
       <OverdueTasksModal
@@ -518,18 +587,7 @@ const ProjectTabsContent = forwardRef<ProjectTabsContentRef, ProjectTabsContentP
         onCreateAndOpen={handleCreateTask}
         extensions={hierarchyDataExtensions as any}
         labels={labels}
-        project={
-          selectedProject
-            ? {
-                id: selectedProject.id,
-                name: selectedProject.name,
-                icon: '',
-                color: selectedProject.color || '#3b82f6',
-                statuses: selectedProject.statuses,
-                labels: selectedProject.labels,
-              }
-            : undefined
-        }
+        project={sidebarProject}
         statuses={statuses.map((status: any) => ({
           id: status.id,
           name: status.name,
@@ -540,7 +598,7 @@ const ProjectTabsContent = forwardRef<ProjectTabsContentRef, ProjectTabsContentP
         }))}
         selectedStatusForTask={selectedStatusForTask}
         taskTypeChoices={['regular', 'recurring']}
-        lockProjectSelection={Boolean(selectedProject)}
+        lockProjectSelection={Boolean(sidebarProject)}
       />
     </>
   );

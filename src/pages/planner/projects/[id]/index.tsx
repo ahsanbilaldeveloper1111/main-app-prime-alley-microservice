@@ -4,6 +4,7 @@ import React, {
   useState,
   useMemo,
   useRef,
+  useEffect,
   type ComponentProps,
 } from "react";
 import { useSession } from "next-auth/react";
@@ -32,7 +33,8 @@ import { useHierarchyData } from "@components/filters/useHierarchyData";
 import { Plus, LayoutGrid } from "lucide-react";
 import { toast } from "react-toastify";
 import CreateTaskSidebar from "@components/CreatePlannerTaskSidebar";
-import { useQuery } from "@tanstack/react-query";
+import { mapApiProjectToPlannerSidebarProject } from "@components/planner/workPlannerProjects/expandableProjectTableHelpers";
+import { useQuery, keepPreviousData } from "@tanstack/react-query";
 import { plannerKeys } from "@query/keys";
 
 const { PERMISSIONS } = HEADER_CONSTANTS;
@@ -44,7 +46,16 @@ type PlannerSidebarEditTask = NonNullable<
 const WorkPlannerProjectsDetails = () => {
   const router = useRouter();
   const { id } = router.query;
-  const projectId = typeof id === "string" ? id : "";
+  const projectIdFromRoute = typeof id === "string" ? id : "";
+  const [stableProjectId, setStableProjectId] = useState("");
+
+  useEffect(() => {
+    if (projectIdFromRoute.length > 0) {
+      setStableProjectId(projectIdFromRoute);
+    }
+  }, [projectIdFromRoute]);
+
+  const projectId = projectIdFromRoute || stableProjectId;
 
   const {
     data: project,
@@ -55,9 +66,12 @@ const WorkPlannerProjectsDetails = () => {
     queryFn: () =>
       getProject(projectId, Array.from(WORK_PLANNER_PROJECT_DETAIL_RELATIONS)),
     enabled: router.isReady && projectId.length > 0,
+    placeholderData: keepPreviousData,
   });
 
-  const loading = !router.isReady || (projectId.length > 0 && projectQueryPending);
+  const loading =
+    !router.isReady ||
+    (projectId.length > 0 && projectQueryPending && project == null);
 
   const [showCreateTaskSidebar, setShowCreateTaskSidebar] = useState(false);
   const [sidebarEditTask, setSidebarEditTask] = useState<PlannerSidebarEditTask | null>(null);
@@ -78,6 +92,23 @@ const WorkPlannerProjectsDetails = () => {
   const canCreateTaskByMemberRole = useMemo(
     () => canManageProjectFromMembers(project, sessionUserPhoneOrExtension),
     [project, sessionUserPhoneOrExtension],
+  );
+
+  const sidebarProject = useMemo(
+    () => (project ? mapApiProjectToPlannerSidebarProject(project) : undefined),
+    [project],
+  );
+
+  const sidebarStatuses = useMemo(
+    () =>
+      (project?.statuses ?? []).map((s: { id: number; name: string; color?: string; is_default?: boolean; is_deefault?: boolean }) => ({
+        id: s.id,
+        name: s.name,
+        icon: "",
+        color: s.color || "",
+        is_default: s.is_default === true || s.is_deefault === true,
+      })),
+    [project?.statuses],
   );
 
   // Handle task creation - ProjectTabsContent will handle refreshing its own data
@@ -238,30 +269,13 @@ const WorkPlannerProjectsDetails = () => {
         onClose={handleCreateTaskSidebarClose}
         onCreate={handleCreateTaskSidebarSuccess}
         extensions={hierarchyDataExtensions as any}
-        labels={project?.labels ?? []}
-        project={
-          project
-            ? {
-                id: project.id,
-                name: project.name,
-                icon: "",
-                color: project.color || "",
-                statuses: project.statuses,
-                labels: project.labels,
-              }
-            : undefined
-        }
-        statuses={(project?.statuses ?? []).map((s: any) => ({
-          id: s.id,
-          name: s.name,
-          icon: "",
-          color: s.color || "",
-          is_default: s.is_default === true || s.is_deefault === true,
-        }))}
+        labels={sidebarProject?.labels ?? project?.labels ?? []}
+        project={sidebarProject}
+        statuses={sidebarStatuses}
         isEdit={!!sidebarEditTask}
         task={sidebarEditTask ?? undefined}
         taskTypeChoices={["regular", "recurring"]}
-        lockProjectSelection
+        lockProjectSelection={Boolean(sidebarProject)}
       />
         
     </React.Fragment>

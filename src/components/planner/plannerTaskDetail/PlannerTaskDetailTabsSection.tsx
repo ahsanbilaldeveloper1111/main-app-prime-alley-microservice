@@ -42,6 +42,8 @@ export type PlannerTaskDetailTabsSectionProps = Readonly<{
   onUploadClick: () => void;
   onDownloadDocument: (doc: TaskDocumentRow) => void;
   onDeleteDocument: (doc: TaskDocumentRow) => void;
+  /** Status, comments, and document mutations (requires global + assignee/watcher/admin). */
+  allowTaskMutations: boolean;
 }>;
 
 export function PlannerTaskDetailTabsSection(props: PlannerTaskDetailTabsSectionProps) {
@@ -75,6 +77,7 @@ export function PlannerTaskDetailTabsSection(props: PlannerTaskDetailTabsSection
     onUploadClick,
     onDownloadDocument,
     onDeleteDocument,
+    allowTaskMutations,
   } = props;
 
   return (
@@ -136,6 +139,7 @@ export function PlannerTaskDetailTabsSection(props: PlannerTaskDetailTabsSection
             submittingComment={submittingComment}
             setSubmittingComment={setSubmittingComment}
             hierarchyDataExtensions={hierarchyDataExtensions}
+            allowMutations={allowTaskMutations}
           />
         </div>
       )}
@@ -151,6 +155,7 @@ export function PlannerTaskDetailTabsSection(props: PlannerTaskDetailTabsSection
             onUploadClick={onUploadClick}
             onDownload={onDownloadDocument}
             onDelete={onDeleteDocument}
+            allowMutations={allowTaskMutations}
           />
         </div>
       )}

@@ -24,6 +24,7 @@ export interface Task {
   repeat_status: string | null;
   status: "pending" | "completed" | "overdue";
   workflowStatus: { id: number; name: string; color?: string } | null;
+  comments_count: number;
   rawData?: any;
 }
 
@@ -43,6 +44,8 @@ export interface ApiTask {
   } | null;
   status?: { id: number; name: string } | null;
   assignees?: Array<{ extension_number?: string | number | null }>;
+  watchers?: Array<{ extension_number?: string | number | null; user?: { name?: string } }>;
+  watcher_numbers?: string[];
   extension_number?: string;
   owner_extension_number?: string | null;
   created_by_extension_number?: string | null;
@@ -54,6 +57,9 @@ export interface ApiTask {
   already_in_my_day?: boolean;
   is_in_my_day?: boolean;
   in_my_day?: boolean;
+  comments?: unknown[];
+  comments_count?: number;
+  comment_count?: number;
 }
 
 export interface TasksListingPageProps {
@@ -99,6 +105,22 @@ export function resolvePlannerListTaskDueDate(apiTask: ApiTask): string | null {
     return wall ? `${ymd}T${wall}:00` : raw;
   }
   return raw;
+}
+
+/** Comment total for task list rows (API count fields or embedded `comments` array). */
+export function resolvePlannerListTaskCommentsCount(apiTask: ApiTask | Record<string, unknown>): number {
+  const raw = apiTask as Record<string, unknown>;
+  const countFields = [raw.comments_count, raw.comment_count, raw.total_comments];
+  for (const value of countFields) {
+    if (typeof value === "number" && Number.isFinite(value) && value >= 0) {
+      return Math.floor(value);
+    }
+  }
+  const comments = raw.comments;
+  if (Array.isArray(comments)) {
+    return comments.length;
+  }
+  return 0;
 }
 
 export type HierarchyExtension = {
@@ -231,6 +253,7 @@ export const DEFAULT_TASK_TABLE_COLUMN_KEYS: string[] = [
   "notes",
   "workflow_status",
   "repeat_status",
+  "comments_count",
   "actions",
 ];
 
