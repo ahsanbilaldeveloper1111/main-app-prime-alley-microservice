@@ -6,14 +6,11 @@ import { loadStripe, type PaymentMethod as StripePaymentMethod, type Stripe } fr
 import { Elements, CardElement, useElements, useStripe } from "@stripe/react-stripe-js";
 
 import { GetPaymentMethods, CompletePayment } from "@utils/accounting";
-// import { recordManualInvoicePayment } from "@utils/accounting";
-// import type { ManualInvoicePaymentMethod } from "@utils/accounting";
 import type { InvoiceData, CreateDirectPaymentData, PaymentIntentResponse } from "@utils/accounts";
 import { createDirectPayment, getCustomerPaymentMethods, getInvoice } from "@utils/accounts";
 import { formatNumber, getCompanyByCrmId } from "@utils/Helper";
 import { getStripePublishableKey } from "@config/env";
 import {
-  // buildManualPaymentAmounts,
   getInvoiceOutstandingAmount,
   isInvoicePartiallyPaid,
   resolveCardPaymentTotals,
@@ -472,12 +469,6 @@ export function InvoicePaymentModal({
   const [stripePublishableKey, setStripePublishableKey] = useState<string>("");
   const [invoiceSnapshot, setInvoiceSnapshot] = useState<InvoiceData | null>(null);
   const [isRefreshingInvoice, setIsRefreshingInvoice] = useState(false);
-  // Manual payment (temporarily disabled)
-  // const [manualPaymentMethod, setManualPaymentMethod] =
-  //   useState<ManualInvoicePaymentMethod>("bank_transfer");
-  // const [manualPaymentAmount, setManualPaymentAmount] = useState<string>("");
-  // const [manualPaymentNotes, setManualPaymentNotes] = useState<string>("");
-  // const [isRecordingManualPayment, setIsRecordingManualPayment] = useState(false);
 
   const { createInvoicePayment, isCreateInvoicePaymentPending } = useCreateInvoicePayment();
 
@@ -532,18 +523,8 @@ export function InvoicePaymentModal({
   useEffect(() => {
     if (!show) {
       setInvoiceSnapshot(null);
-      // setManualPaymentAmount("");
-      // setManualPaymentNotes("");
-      // setManualPaymentMethod("bank_transfer");
     }
   }, [show]);
-
-  // useEffect(() => {
-  //   if (!show || outstandingAmount <= 0) {
-  //     return;
-  //   }
-  //   setManualPaymentAmount(String(outstandingAmount));
-  // }, [show, outstandingAmount, activeInvoice?.id]);
 
   const resolvedCompanyName =
     getCompanyByCrmId(activeInvoice?.company?.crm_company_id, companyOptions) ??
@@ -554,7 +535,6 @@ export function InvoicePaymentModal({
     setActivePaymentTab("saved-cards");
     setSelectedCardId(null);
     setIsProcessingPayment(false);
-    // setIsRecordingManualPayment(false);
     onClose();
   }, [onClose]);
 
@@ -731,64 +711,6 @@ export function InvoicePaymentModal({
     handleDirectPaymentError,
   ]);
 
-  // const handleManualPaymentSubmit = useCallback(async () => {
-  //   if (!activeInvoice?.id) {
-  //     return;
-  //   }
-  //
-  //   const parsedAmount = Number.parseFloat(manualPaymentAmount);
-  //   if (!Number.isFinite(parsedAmount) || parsedAmount <= 0) {
-  //     toast.error("Enter a valid payment amount");
-  //     return;
-  //   }
-  //   if (parsedAmount > outstandingAmount + 0.009) {
-  //     toast.error(
-  //       `Amount cannot exceed outstanding balance (${currencyCode} ${formatNumber(outstandingAmount)})`,
-  //     );
-  //     return;
-  //   }
-  //
-  //   const { amount, base_amount } = buildManualPaymentAmounts(parsedAmount);
-  //   setIsRecordingManualPayment(true);
-  //   try {
-  //     await recordManualInvoicePayment({
-  //       invoice_id: Number(activeInvoice.id),
-  //       tenant_id: activeInvoice.tenant_id,
-  //       payment_method: manualPaymentMethod,
-  //       amount,
-  //       base_amount,
-  //       notes: manualPaymentNotes.trim() || undefined,
-  //     });
-  //
-  //     const fresh = await refreshInvoiceSnapshot(activeInvoice.id);
-  //     const remaining = getInvoiceOutstandingAmount(fresh);
-  //     toast.success("Manual payment recorded");
-  //
-  //     if (remaining <= 0) {
-  //       onPaymentSuccess?.();
-  //       closeAndReset();
-  //       return;
-  //     }
-  //
-  //     setManualPaymentAmount(String(remaining));
-  //     setActivePaymentTab("saved-cards");
-  //   } catch (err: unknown) {
-  //     console.error("InvoicePaymentModal manual payment failed:", err);
-  //   } finally {
-  //     setIsRecordingManualPayment(false);
-  //   }
-  // }, [
-  //   activeInvoice,
-  //   manualPaymentAmount,
-  //   manualPaymentMethod,
-  //   manualPaymentNotes,
-  //   outstandingAmount,
-  //   currencyCode,
-  //   refreshInvoiceSnapshot,
-  //   onPaymentSuccess,
-  //   closeAndReset,
-  // ]);
-
   if (!show || !activeInvoice) return null;
 
   const hasSavedCards = paymentMethods.some((m) => m.type === "card");
@@ -881,80 +803,6 @@ export function InvoicePaymentModal({
     );
   };
 
-  // const renderManualPaymentTab = () => (
-  //   <div>
-  //     <Alert variant="info" className="small">
-  //       Manual payments (bank transfer, cash, cheque) have <strong>no processing fee</strong>. Record a
-  //       partial payment here, then pay the remainder by card — the 3% fee applies only to the outstanding
-  //       balance.
-  //     </Alert>
-  //     <div className="mb-3">
-  //       <label className="form-label fw-semibold" htmlFor="manual-payment-method">
-  //         Payment method
-  //       </label>
-  //       <select
-  //         id="manual-payment-method"
-  //         className="form-select"
-  //         value={manualPaymentMethod}
-  //         onChange={(e) =>
-  //           setManualPaymentMethod(e.target.value as ManualInvoicePaymentMethod)
-  //         }
-  //       >
-  //         <option value="bank_transfer">Bank transfer</option>
-  //         <option value="cash">Cash</option>
-  //         <option value="check">Cheque</option>
-  //       </select>
-  //     </div>
-  //     <div className="mb-3">
-  //       <label className="form-label fw-semibold" htmlFor="manual-payment-amount">
-  //         Amount ({currencyCode})
-  //       </label>
-  //       <input
-  //         id="manual-payment-amount"
-  //         type="number"
-  //         min={0}
-  //         step="0.01"
-  //         max={outstandingAmount}
-  //         className="form-control"
-  //         value={manualPaymentAmount}
-  //         onChange={(e) => setManualPaymentAmount(e.target.value)}
-  //       />
-  //       <div className="form-text">
-  //         Outstanding: {currencyCode} {formatNumber(outstandingAmount)}
-  //       </div>
-  //     </div>
-  //     <div className="mb-3">
-  //       <label className="form-label fw-semibold" htmlFor="manual-payment-notes">
-  //         Notes (optional)
-  //       </label>
-  //       <textarea
-  //         id="manual-payment-notes"
-  //         className="form-control"
-  //         rows={2}
-  //         value={manualPaymentNotes}
-  //         onChange={(e) => setManualPaymentNotes(e.target.value)}
-  //       />
-  //     </div>
-  //     <Button
-  //       variant="primary"
-  //       className="w-100"
-  //       disabled={isRecordingManualPayment || outstandingAmount <= 0}
-  //       onClick={() => {
-  //         handleManualPaymentSubmit().catch(() => undefined);
-  //       }}
-  //     >
-  //       {isRecordingManualPayment ? (
-  //         <>
-  //           <Spinner animation="border" size="sm" className="me-2" />
-  //           Recording payment...
-  //         </>
-  //       ) : (
-  //         <>Record manual payment</>
-  //       )}
-  //     </Button>
-  //   </div>
-  // );
-
   return (
     <Modal show={show} onHide={closeAndReset} size="lg">
       <Modal.Header closeButton>
@@ -1035,17 +883,6 @@ export function InvoicePaymentModal({
           )}
           <h6 className="mb-3">Payment Method</h6>
           <ul className="nav nav-tabs mb-3">
-            {/* Manual payment tab (temporarily disabled)
-            <li className="nav-item">
-              <button
-                className={`nav-link ${activePaymentTab === "manual-payment" ? "active" : ""}`}
-                onClick={() => setActivePaymentTab("manual-payment")}
-                type="button"
-              >
-                Manual payment
-              </button>
-            </li>
-            */}
             <li className="nav-item">
               <button
                 className={`nav-link ${activePaymentTab === "saved-cards" ? "active" : ""}`}
@@ -1067,9 +904,6 @@ export function InvoicePaymentModal({
           </ul>
 
           <div className="tab-content">
-            {/* {activePaymentTab === "manual-payment" && (
-              <div className="tab-pane active">{renderManualPaymentTab()}</div>
-            )} */}
             {activePaymentTab === "saved-cards" && (
               <div className="tab-pane active">{renderSavedCardsTab()}</div>
             )}
