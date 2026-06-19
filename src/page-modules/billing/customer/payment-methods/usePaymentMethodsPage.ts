@@ -8,6 +8,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useSession } from "next-auth/react";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "react-toastify";
+import { getStripePublishableKey } from "@config/env";
 import type { StripePaymentMethodRow } from "./paymentMethodsTypes";
 
 export function usePaymentMethodsPage() {
@@ -47,7 +48,7 @@ export function usePaymentMethodsPage() {
   useEffect(() => {
     const loadStripePublishableKey = () => {
       try {
-        const key = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || "";
+        const key = getStripePublishableKey();
         setStripePublishableKey(key);
       } catch (error) {
         console.error("Error loading Stripe publishable key:", error);

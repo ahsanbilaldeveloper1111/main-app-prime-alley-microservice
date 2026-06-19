@@ -6,6 +6,7 @@ import { CardElement, Elements, useElements, useStripe } from "@stripe/react-str
 import { loadStripe } from "@stripe/stripe-js";
 import { toast } from "react-toastify";
 
+import { getStripePublishableKey } from "@config/env";
 import {
   GetPublicInvoicePayByToken,
   PostPublicInvoiceCompletePaymentByToken,
@@ -201,7 +202,7 @@ export default function PublicInvoicePayPage() {
 
   const publishableKey =
     state.status === "ready"
-      ? String(state.data.publishable_key ?? process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY ?? "")
+      ? String(state.data.publishable_key ?? getStripePublishableKey() ?? "")
       : "";
   const stripePromise = useMemo(
     () => (publishableKey ? loadStripe(publishableKey) : null),
