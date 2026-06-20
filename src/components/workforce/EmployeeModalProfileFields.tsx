@@ -9,6 +9,11 @@ import {
   EMPLOYMENT_TYPES,
   WORKFORCE_PROFILE_SHORT_TEXT_MAX,
 } from "@utils/workforce/employeeModalShared";
+import {
+  formatCnicInput,
+  isValidCnic,
+  CNIC_MAX_DIGITS,
+} from "@utils/workforce/employeeProfileFieldUtils";
 
 export interface EmployeeModalProfileFieldsProps {
   form: Partial<UserProfilePayload>;
@@ -60,24 +65,30 @@ const EmployeeModalProfileFields: React.FC<EmployeeModalProfileFieldsProps> = ({
       <Form.Label>Identification Number (CNIC)</Form.Label>
       <Form.Control
         type="text"
-        maxLength={WORKFORCE_PROFILE_SHORT_TEXT_MAX}
+        inputMode="numeric"
+        maxLength={CNIC_MAX_DIGITS + 2}
         value={form.identification_number ?? ""}
         onChange={(e) =>
           setForm((f) => ({
             ...f,
-            identification_number: e.target.value.slice(0, WORKFORCE_PROFILE_SHORT_TEXT_MAX),
+            identification_number: formatCnicInput(e.target.value),
           }))
         }
-        placeholder="CNIC / ID"
+        placeholder="12345-1234567-1"
       />
       <div className="d-flex justify-content-between align-items-baseline gap-2 mt-1">
         <Form.Text className="text-muted mb-0">
-          Maximum {WORKFORCE_PROFILE_SHORT_TEXT_MAX} characters allowed.
+          Format: XXXXX-XXXXXXX-X ({CNIC_MAX_DIGITS} digits).
         </Form.Text>
         <Form.Text className="text-muted mb-0 small text-nowrap" aria-live="polite">
-          {(form.identification_number ?? "").length}/{WORKFORCE_PROFILE_SHORT_TEXT_MAX}
+          {formatCnicInput(form.identification_number ?? "").replace(/\D/g, "").length}/{CNIC_MAX_DIGITS}
         </Form.Text>
       </div>
+      {!isValidCnic(form.identification_number) && (
+        <Form.Text className="text-danger d-block">
+          Enter all {CNIC_MAX_DIGITS} digits or leave the field empty.
+        </Form.Text>
+      )}
     </Form.Group>
     <Form.Group className="mb-3">
       <Form.Label>

@@ -416,7 +416,11 @@
 
     &--fade {
       opacity: 0.35;
-      pointer-events: none;
+    }
+
+    &--muted {
+      opacity: 0.4;
+      filter: grayscale(0.15);
     }
   }
 

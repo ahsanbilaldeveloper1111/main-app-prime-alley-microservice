@@ -80,7 +80,10 @@ async function fetchEmployeesListPayload(args: {
     mainAppUserPhones: scope.mainAppUserPhones,
     maxIds: EMPLOYEES_LIST_MAX_USER_IDS_IN_QUERY,
   });
-  if (phoneIds != null && phoneIds.length > 0) {
+  if (phoneIds != null) {
+    if (phoneIds.length === 0) {
+      return { data: [], pagination: emptyListPagination(limit) };
+    }
     params.user_ids = phoneIds;
     delete params.search;
   }

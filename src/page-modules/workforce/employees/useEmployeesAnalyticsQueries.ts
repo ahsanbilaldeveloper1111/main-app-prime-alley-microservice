@@ -44,5 +44,8 @@ export function useEmployeesDashboardCountersQuery() {
   return useQuery({
     queryKey: workforceKeys.dashboard.counters(EMPLOYEES_WIDGETS_PARAMS_KEY),
     queryFn: fetchDashboardCountersForEmployeesPage,
+    staleTime: 30 * 1000,
+    refetchOnMount: true,
+    refetchOnWindowFocus: true,
   });
 }
