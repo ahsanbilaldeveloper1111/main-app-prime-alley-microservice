@@ -1,12 +1,22 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-type SortableTableColumn = {
+type SortableColumnType =
+  | "text"
+  | "badge"
+  | "avatar"
+  | "multi-field"
+  | "date"
+  | "number"
+  | "phone"
+  | "custom";
+
+type SortableTableColumn<T extends Record<string, unknown>> = {
   key: string;
   label: string;
   sortKey?: string;
   sortable?: boolean;
-  type?: string;
-  sortAccessor?: (row: Record<string, unknown>) => string | number;
+  type?: SortableColumnType;
+  sortAccessor?: (row: T) => string | number;
 };
 
 function safeStringifySortValue(val: unknown): string {
@@ -72,7 +82,7 @@ export function compareGenericTableSortValues(
   aVal: unknown,
   bVal: unknown,
   sortOrder: "asc" | "desc",
-  sortColumnType?: string,
+  sortColumnType?: SortableColumnType,
 ): number {
   const aText = safeStringifySortValue(aVal).trim();
   const bText = safeStringifySortValue(bVal).trim();
@@ -103,7 +113,7 @@ export function useGenericTableSorting<T extends Record<string, unknown>>({
   onSort,
 }: {
   data: T[];
-  visibleColumns: SortableTableColumn[];
+  visibleColumns: SortableTableColumn<T>[];
   sortable: boolean;
   defaultSortBy: string;
   defaultSortOrder: "asc" | "desc";

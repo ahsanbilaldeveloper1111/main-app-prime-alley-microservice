@@ -66,6 +66,7 @@ export interface TableColumn<T = any> {
     | "avatar"
     | "multi-field"
     | "date"
+    | "number"
     | "phone"
     | "custom";
 
