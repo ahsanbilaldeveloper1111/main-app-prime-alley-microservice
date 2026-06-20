@@ -65,6 +65,61 @@ function mainAppUserMatchesNumericNeedle(u: MainAppUserRow, needle: string, rawS
   return false;
 }
 
+function resolveMainAppUserSearchId(u: MainAppUserRow): { phone: string; idStr: string; userId: string } {
+  const phone = String(u.phone ?? "").trim();
+  const idStr = String(u.id ?? "").trim();
+  const userId = phone === "" ? idStr : phone;
+  return { phone, idStr, userId };
+}
+
+function isUserIdAllowedForPhoneSearch(
+  allowed: Set<string> | null,
+  phone: string,
+  idStr: string,
+  userId: string,
+): boolean {
+  if (allowed == null) {
+    return true;
+  }
+  return allowed.has(phone) || allowed.has(idStr) || allowed.has(userId);
+}
+
+function collectPhoneLikeSearchUserIds(input: {
+  appliedSearch: string;
+  mainAppUsers: readonly MainAppUserRow[];
+  allowed: Set<string> | null;
+  needle: string;
+  maxIds: number;
+}): string[] {
+  const hits: string[] = [];
+  const seen = new Set<string>();
+
+  for (const u of input.mainAppUsers) {
+    if (!mainAppUserMatchesNumericNeedle(u, input.needle, input.appliedSearch)) {
+      continue;
+    }
+
+    const { phone, idStr, userId } = resolveMainAppUserSearchId(u);
+    if (userId === "") {
+      continue;
+    }
+    if (!isUserIdAllowedForPhoneSearch(input.allowed, phone, idStr, userId)) {
+      continue;
+    }
+    if (seen.has(userId)) {
+      continue;
+    }
+
+    seen.add(userId);
+    hits.push(userId);
+    if (hits.length >= input.maxIds) {
+      break;
+    }
+  }
+
+  return hits;
+}
+
 /**
  * Returns `user_ids` (directory phones) to query instead of `search`, or `null` if phone-style
  * search should fall through to normal `search` behavior.
@@ -80,31 +135,18 @@ export function resolveUserProfileIdsForPhoneLikeSearch(input: {
   if (!isPhoneLikeEmployeeSearchQuery(input.appliedSearch)) {
     return null;
   }
+
   const needle = digitsOnlyForPhoneMatch(input.appliedSearch);
   if (needle.length < 2) {
     return null;
   }
 
   const allowed = buildAllowedPhonesFromScope(input.scope, input.mainAppUserPhones);
-
-  const hits: string[] = [];
-  const seen = new Set<string>();
-
-  for (const u of input.mainAppUsers) {
-    if (!mainAppUserMatchesNumericNeedle(u, needle, input.appliedSearch)) continue;
-
-    const phone = String(u.phone ?? "").trim();
-    const idStr = String(u.id ?? "").trim();
-    const userId = phone !== "" ? phone : idStr;
-    if (userId === "") continue;
-    if (allowed != null && !allowed.has(phone) && !allowed.has(idStr) && !allowed.has(userId)) {
-      continue;
-    }
-    if (seen.has(userId)) continue;
-    seen.add(userId);
-    hits.push(userId);
-    if (hits.length >= input.maxIds) break;
-  }
-
-  return hits;
+  return collectPhoneLikeSearchUserIds({
+    appliedSearch: input.appliedSearch,
+    mainAppUsers: input.mainAppUsers,
+    allowed,
+    needle,
+    maxIds: input.maxIds,
+  });
 }
