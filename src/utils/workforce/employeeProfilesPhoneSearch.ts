@@ -84,6 +84,29 @@ function isUserIdAllowedForPhoneSearch(
   return allowed.has(phone) || allowed.has(idStr) || allowed.has(userId);
 }
 
+function tryCollectPhoneLikeSearchUserId(input: {
+  user: MainAppUserRow;
+  allowed: Set<string> | null;
+  seen: Set<string>;
+  hits: string[];
+  maxIds: number;
+}): boolean {
+  const { phone, idStr, userId } = resolveMainAppUserSearchId(input.user);
+  if (userId === "") {
+    return false;
+  }
+  if (!isUserIdAllowedForPhoneSearch(input.allowed, phone, idStr, userId)) {
+    return false;
+  }
+  if (input.seen.has(userId)) {
+    return false;
+  }
+
+  input.seen.add(userId);
+  input.hits.push(userId);
+  return input.hits.length >= input.maxIds;
+}
+
 function collectPhoneLikeSearchUserIds(input: {
   appliedSearch: string;
   mainAppUsers: readonly MainAppUserRow[];
@@ -94,26 +117,18 @@ function collectPhoneLikeSearchUserIds(input: {
   const hits: string[] = [];
   const seen = new Set<string>();
 
-  for (const u of input.mainAppUsers) {
-    if (!mainAppUserMatchesNumericNeedle(u, input.needle, input.appliedSearch)) {
-      continue;
-    }
-
-    const { phone, idStr, userId } = resolveMainAppUserSearchId(u);
-    if (userId === "") {
-      continue;
-    }
-    if (!isUserIdAllowedForPhoneSearch(input.allowed, phone, idStr, userId)) {
-      continue;
-    }
-    if (seen.has(userId)) {
-      continue;
-    }
-
-    seen.add(userId);
-    hits.push(userId);
-    if (hits.length >= input.maxIds) {
-      break;
+  for (const user of input.mainAppUsers) {
+    if (mainAppUserMatchesNumericNeedle(user, input.needle, input.appliedSearch)) {
+      const reachedLimit = tryCollectPhoneLikeSearchUserId({
+        user,
+        allowed: input.allowed,
+        seen,
+        hits,
+        maxIds: input.maxIds,
+      });
+      if (reachedLimit) {
+        break;
+      }
     }
   }
 

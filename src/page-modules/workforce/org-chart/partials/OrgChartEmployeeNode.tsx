@@ -78,37 +78,40 @@ type OrgChartNodeHighlightInput = Readonly<{
   selectedUserSubtreeIds: Set<string>;
 }>;
 
-function resolveOrgChartNodeHighlightState(input: OrgChartNodeHighlightInput): OrgChartNodeHighlightState {
-  const { employeeId, uid, activeChartUserId, selectedUserIds, selectedUserSubtreeIds } = input;
+function resolveOrgChartNodeHighlightForActiveUser(input: OrgChartNodeHighlightInput): OrgChartNodeHighlightState {
+  const { employeeId, uid, activeChartUserId } = input;
   const isRootNode = employeeId === "root";
-  const hasActiveSelection = Boolean(activeChartUserId);
+  const isSelectedUser = Boolean(uid && activeChartUserId === uid);
+  const shouldFade = !isSelectedUser && !isRootNode;
 
-  if (hasActiveSelection) {
-    const isSelectedUser = Boolean(uid && activeChartUserId === uid);
-    const shouldFade = !isSelectedUser && !isRootNode;
-    return {
-      isSelectedUser,
-      isChildHighlight: false,
-      fadeClass: shouldFade ? "org-chart-page__node--muted" : "",
-    };
-  }
+  return {
+    isSelectedUser,
+    isChildHighlight: false,
+    fadeClass: shouldFade ? "org-chart-page__node--muted" : "",
+  };
+}
 
+function resolveOrgChartNodeHighlightForFilter(input: OrgChartNodeHighlightInput): OrgChartNodeHighlightState {
+  const { employeeId, uid, selectedUserIds, selectedUserSubtreeIds } = input;
+  const isRootNode = employeeId === "root";
   const hasUserFilter = selectedUserIds.length > 0;
   const isSelectedUser = Boolean(uid && selectedUserIds.includes(uid));
   const isInSelectedSubtree = Boolean(hasUserFilter && selectedUserSubtreeIds.has(employeeId));
   const highlightActive = hasUserFilter && selectedUserSubtreeIds.size > 0;
   const shouldFade = Boolean(highlightActive && !isInSelectedSubtree && !isRootNode);
 
-  let fadeClass = "";
-  if (shouldFade) {
-    fadeClass = "org-chart-page__node--fade";
-  }
-
   return {
     isSelectedUser,
     isChildHighlight: isInSelectedSubtree && !isSelectedUser,
-    fadeClass,
+    fadeClass: shouldFade ? "org-chart-page__node--fade" : "",
   };
+}
+
+function resolveOrgChartNodeHighlightState(input: OrgChartNodeHighlightInput): OrgChartNodeHighlightState {
+  if (input.activeChartUserId) {
+    return resolveOrgChartNodeHighlightForActiveUser(input);
+  }
+  return resolveOrgChartNodeHighlightForFilter(input);
 }
 
 type OrgChartNodeAttendanceInfo = Readonly<{
@@ -151,6 +154,29 @@ export type OrgChartEmployeeNodeProps = Readonly<{
   onNodeSelect: (emp: OrgChartEmployee) => void;
 }>;
 
+function buildOrgChartNodeInteractionProps(
+  isRoot: boolean,
+  openSidebar: () => void,
+): Record<string, unknown> {
+  if (isRoot) {
+    return {};
+  }
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      openSidebar();
+    }
+  };
+
+  return {
+    role: "button" as const,
+    tabIndex: 0 as const,
+    onClick: openSidebar,
+    onKeyDown: handleKeyDown,
+  };
+}
+
 export function OrgChartEmployeeNode(props: OrgChartEmployeeNodeProps): React.ReactElement {
   const {
     employee,
@@ -176,22 +202,7 @@ export function OrgChartEmployeeNode(props: OrgChartEmployeeNodeProps): React.Re
     onNodeSelect(employee);
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
-    if (isRoot) return;
-    if (e.key === "Enter" || e.key === " ") {
-      e.preventDefault();
-      openSidebar();
-    }
-  };
-
-  const interactionProps = isRoot
-    ? {}
-    : {
-        role: "button" as const,
-        tabIndex: 0 as const,
-        onClick: openSidebar,
-        onKeyDown: handleKeyDown,
-      };
+  const interactionProps = buildOrgChartNodeInteractionProps(isRoot, openSidebar);
 
   return (
     <div
