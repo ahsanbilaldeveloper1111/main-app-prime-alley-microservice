@@ -139,6 +139,96 @@ export function createTextFilterDropdownContent(
   };
 }
 
+function parseCommaSeparatedNumbers(value: string): string[] {
+  return value
+    .split(",")
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+}
+
+interface CalledNumbersFilterMenuProps {
+  value: string;
+  onChange: (values: string[]) => void;
+  onApply: (values: string[]) => void;
+  closeMenu: () => void;
+  placeholder: string;
+}
+
+const CalledNumbersFilterMenu: React.FC<CalledNumbersFilterMenuProps> = ({
+  value,
+  onChange,
+  onApply,
+  closeMenu,
+  placeholder,
+}) => {
+  const [draftValue, setDraftValue] = useState(value);
+
+  useEffect(() => {
+    setDraftValue(value);
+  }, [value]);
+
+  return (
+    <div className="d-flex flex-column gap-2" style={{ minWidth: 260 }}>
+      <Form.Control
+        size="sm"
+        type="text"
+        placeholder={placeholder}
+        value={draftValue}
+        onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+          setDraftValue(e.target.value);
+        }}
+      />
+      <div className="d-flex justify-content-end gap-2">
+        <Button
+          variant="outline-secondary"
+          size="sm"
+          onClick={() => {
+            setDraftValue(value);
+            closeMenu();
+          }}
+        >
+          Cancel
+        </Button>
+        <Button
+          variant="primary"
+          size="sm"
+          onClick={() => {
+            const values = parseCommaSeparatedNumbers(draftValue);
+            onChange(values);
+            onApply(values);
+            closeMenu();
+          }}
+        >
+          Select
+        </Button>
+      </div>
+    </div>
+  );
+};
+
+export function createCalledNumbersDropdownContent(
+  value: string,
+  onChange: (values: string[]) => void,
+  onApply: (values: string[]) => void,
+  placeholder = "Enter numbers (comma separated)",
+) {
+  return function CalledNumbersDropdownRender({
+    closeMenu,
+  }: {
+    closeMenu: () => void;
+  }) {
+    return (
+      <CalledNumbersFilterMenu
+        value={value}
+        onChange={onChange}
+        onApply={onApply}
+        closeMenu={closeMenu}
+        placeholder={placeholder}
+      />
+    );
+  };
+}
+
 export function createDateTimeDropdownContent(
   value: string,
   onChange: (value: string) => void,

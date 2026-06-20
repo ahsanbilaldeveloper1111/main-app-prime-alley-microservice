@@ -6,6 +6,7 @@ type SortableTableColumn = {
   sortKey?: string;
   sortable?: boolean;
   type?: string;
+  sortAccessor?: (row: Record<string, unknown>) => string | number;
 };
 
 function safeStringifySortValue(val: unknown): string {
@@ -25,6 +26,48 @@ function safeStringifySortValue(val: unknown): string {
   }
 }
 
+function directedCompare(diff: number, sortOrder: "asc" | "desc"): number {
+  return sortOrder === "asc" ? diff : -diff;
+}
+
+function compareDateTexts(
+  aText: string,
+  bText: string,
+  sortOrder: "asc" | "desc",
+): number | undefined {
+  const aTime = Date.parse(aText);
+  const bTime = Date.parse(bText);
+  if (Number.isNaN(aTime) || Number.isNaN(bTime)) {
+    return undefined;
+  }
+  return directedCompare(aTime - bTime, sortOrder);
+}
+
+function compareNumberTexts(
+  aText: string,
+  bText: string,
+  sortOrder: "asc" | "desc",
+): number | undefined {
+  const aNum = Number(aText);
+  const bNum = Number(bText);
+  if (Number.isNaN(aNum) || Number.isNaN(bNum)) {
+    return undefined;
+  }
+  return directedCompare(aNum - bNum, sortOrder);
+}
+
+function compareStringTexts(
+  aText: string,
+  bText: string,
+  sortOrder: "asc" | "desc",
+): number {
+  const aStr = aText.toLowerCase();
+  const bStr = bText.toLowerCase();
+  if (aStr < bStr) return directedCompare(-1, sortOrder);
+  if (aStr > bStr) return directedCompare(1, sortOrder);
+  return 0;
+}
+
 export function compareGenericTableSortValues(
   aVal: unknown,
   bVal: unknown,
@@ -35,18 +78,20 @@ export function compareGenericTableSortValues(
   const bText = safeStringifySortValue(bVal).trim();
 
   if (sortColumnType === "date") {
-    const aTime = Date.parse(aText);
-    const bTime = Date.parse(bText);
-    if (!Number.isNaN(aTime) && !Number.isNaN(bTime)) {
-      return sortOrder === "asc" ? aTime - bTime : bTime - aTime;
+    const dateCompare = compareDateTexts(aText, bText, sortOrder);
+    if (dateCompare !== undefined) {
+      return dateCompare;
     }
   }
 
-  const aStr = aText.toLowerCase();
-  const bStr = bText.toLowerCase();
-  if (aStr < bStr) return sortOrder === "asc" ? -1 : 1;
-  if (aStr > bStr) return sortOrder === "asc" ? 1 : -1;
-  return 0;
+  if (sortColumnType === "number") {
+    const numberCompare = compareNumberTexts(aText, bText, sortOrder);
+    if (numberCompare !== undefined) {
+      return numberCompare;
+    }
+  }
+
+  return compareStringTexts(aText, bText, sortOrder);
 }
 
 export function useGenericTableSorting<T extends Record<string, unknown>>({
@@ -90,10 +135,13 @@ export function useGenericTableSorting<T extends Record<string, unknown>>({
       if (!sortBy) {
         return "";
       }
+      if (sortColumnDef?.sortAccessor) {
+        return sortColumnDef.sortAccessor(row);
+      }
       const fieldKey = sortColumnDef?.sortKey ?? sortBy;
       return row[fieldKey as keyof T] ?? row[sortBy as keyof T] ?? "";
     },
-    [sortBy, sortColumnDef?.sortKey],
+    [sortBy, sortColumnDef?.sortKey, sortColumnDef?.sortAccessor],
   );
 
   const sortedData = useMemo(() => {

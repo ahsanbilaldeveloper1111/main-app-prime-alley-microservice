@@ -4,16 +4,34 @@ import {
     formatStartDateValueForApi,
 } from './communicationsDateExtensionFilters';
 
+function normalizeCalledNumbersFilter(value: unknown): string[] {
+    if (Array.isArray(value)) {
+        return value.map(normalizePhoneValue).filter(Boolean);
+    }
+
+    if (typeof value === 'string' && value) {
+        return value
+            .split(',')
+            .map((entry) => entry.trim())
+            .map(normalizePhoneValue)
+            .filter(Boolean);
+    }
+
+    return [];
+}
+
 export function formatCallLogsFiltersForApi(filters: Record<string, any>): Record<string, any> {
     const formattedFilters: Record<string, any> = { ...filters };
 
-    const normalizedPhoneNumber = normalizePhoneValue(formattedFilters.phone_number);
-    formattedFilters.phone_number = normalizedPhoneNumber;
-    if (normalizedPhoneNumber) {
-        formattedFilters.phone_number_exact = normalizedPhoneNumber;
+    const calledNumbers = normalizeCalledNumbersFilter(formattedFilters.called_numbers);
+    if (calledNumbers.length > 0) {
+        formattedFilters.called_numbers = calledNumbers;
     } else {
-        delete formattedFilters.phone_number_exact;
+        delete formattedFilters.called_numbers;
     }
+
+    delete formattedFilters.phone_number;
+    delete formattedFilters.phone_number_exact;
 
     if (formattedFilters.start_datetime) {
         formattedFilters.start_datetime = formatStartDateValueForApi(

@@ -6,7 +6,7 @@ import {
   shouldSkipCommunicationsListFetch,
 } from "@utils/communicationsDateUtils";
 import { getAutoTimezone } from "@utils/Helper";
-import { normalizePhoneValue } from "@utils/phoneMatch";
+import { formatCallLogsFiltersForApi as formatCallLogsFiltersBase } from "@utils/communications/communicationsAppliedFiltersFormat";
 import type { RootState } from "../index";
 import { fetchCallLogsListPayload } from "./fetchCallLogsListPayload";
 import {
@@ -24,17 +24,7 @@ let lastFetchTime = 0;
 function formatCallLogsFiltersForApi(
   filters: Record<string, unknown>,
 ): Record<string, unknown> {
-  const formattedFilters: Record<string, unknown> = { ...filters };
-
-  const normalizedPhoneNumber = normalizePhoneValue(
-    formattedFilters.phone_number as string | undefined,
-  );
-  formattedFilters.phone_number = normalizedPhoneNumber;
-  if (normalizedPhoneNumber) {
-    formattedFilters.phone_number_exact = normalizedPhoneNumber;
-  } else {
-    delete formattedFilters.phone_number_exact;
-  }
+  const formattedFilters = formatCallLogsFiltersBase(filters);
 
   if (formattedFilters.start_datetime != null) {
     formattedFilters.start_datetime = formatDateTimeFilterForApi(
@@ -49,8 +39,6 @@ function formatCallLogsFiltersForApi(
       true,
     );
   }
-
-  delete formattedFilters.timezone;
 
   return formattedFilters;
 }

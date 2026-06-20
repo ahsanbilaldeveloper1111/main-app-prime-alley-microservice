@@ -10,6 +10,7 @@ import {
   type CrmTicketPriority,
 } from "@components/crm/tickets/crmTicketsListDomain";
 import { buildDateTimeFilterPill } from "@utils/communicationsFilterPills";
+import type { StageFiltersFn } from "@utils/communicationsFilterStaging";
 import { createDateTimeDropdownContent } from "@utils/communicationsFilterDropdowns";
 import { formatFilterDateTimeLabel } from "@utils/communicationsDateUtils";
 
@@ -136,15 +137,13 @@ function buildCrmTicketsOwnerFilterPill(
 
 function buildCrmTicketsCreateDateFromPill(
   currentFilters: CrmTicketAppliedFilters,
-  setTicketFilters: (next: TicketFiltersRecord) => void,
-  stageTicketFilters: (next: TicketFiltersRecord) => void,
+  stageTicketFilters: StageFiltersFn,
 ): FilterPill {
   const filtersRecord = createTicketFiltersRecord(currentFilters);
   return buildDateTimeFilterPill(
     "createDateFrom",
     "Create date from",
     filtersRecord,
-    setTicketFilters,
     stageTicketFilters,
     formatFilterDateTimeLabel,
     createDateTimeDropdownContent,
@@ -153,15 +152,13 @@ function buildCrmTicketsCreateDateFromPill(
 
 function buildCrmTicketsCreateDateToPill(
   currentFilters: CrmTicketAppliedFilters,
-  setTicketFilters: (next: TicketFiltersRecord) => void,
-  stageTicketFilters: (next: TicketFiltersRecord) => void,
+  stageTicketFilters: StageFiltersFn,
 ): FilterPill {
   const filtersRecord = createTicketFiltersRecord(currentFilters);
   return buildDateTimeFilterPill(
     "createDateTo",
     "Create date to",
     filtersRecord,
-    setTicketFilters,
     stageTicketFilters,
     formatFilterDateTimeLabel,
     createDateTimeDropdownContent,
@@ -206,21 +203,12 @@ function buildCrmTicketsFilterPillList(
   currentFilters: CrmTicketAppliedFilters,
   extensions: TicketHierarchyExtensionLike[],
   onFiltersChange: (update: FiltersUpdater) => void,
-  setTicketFilters: (next: TicketFiltersRecord) => void,
-  stageTicketFilters: (next: TicketFiltersRecord) => void,
+  stageTicketFilters: StageFiltersFn,
 ): FilterPill[] {
   return [
     buildCrmTicketsOwnerFilterPill(currentFilters, extensions, onFiltersChange),
-    buildCrmTicketsCreateDateFromPill(
-      currentFilters,
-      setTicketFilters,
-      stageTicketFilters,
-    ),
-    buildCrmTicketsCreateDateToPill(
-      currentFilters,
-      setTicketFilters,
-      stageTicketFilters,
-    ),
+    buildCrmTicketsCreateDateFromPill(currentFilters, stageTicketFilters),
+    buildCrmTicketsCreateDateToPill(currentFilters, stageTicketFilters),
     buildCrmTicketsPriorityFilterPill(currentFilters, onFiltersChange),
   ];
 }
@@ -252,18 +240,18 @@ export function useCrmTicketsFilterPills({
   onFiltersChange,
   extensions,
 }: UseCrmTicketsFilterPillsOptions): FilterPill[] {
-  const setTicketFilters = useCallback(
-    (next: TicketFiltersRecord) => {
-      onFiltersChange(toCrmTicketAppliedFilters(next, currentFilters));
+  const stageTicketFilters = useCallback<StageFiltersFn>(
+    (nextOrUpdater) => {
+      onFiltersChange((prev) => {
+        const prevRecord = createTicketFiltersRecord(prev);
+        const next =
+          typeof nextOrUpdater === "function"
+            ? nextOrUpdater(prevRecord)
+            : nextOrUpdater;
+        return toCrmTicketAppliedFilters(next, prev);
+      });
     },
-    [currentFilters, onFiltersChange],
-  );
-
-  const stageTicketFilters = useCallback(
-    (next: TicketFiltersRecord) => {
-      onFiltersChange(toCrmTicketAppliedFilters(next, currentFilters));
-    },
-    [currentFilters, onFiltersChange],
+    [onFiltersChange],
   );
 
   return useMemo(
@@ -272,15 +260,8 @@ export function useCrmTicketsFilterPills({
         currentFilters,
         extensions,
         onFiltersChange,
-        setTicketFilters,
         stageTicketFilters,
       ),
-    [
-      currentFilters,
-      extensions,
-      onFiltersChange,
-      setTicketFilters,
-      stageTicketFilters,
-    ],
+    [currentFilters, extensions, onFiltersChange, stageTicketFilters],
   );
 }

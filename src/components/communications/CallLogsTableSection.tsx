@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useSession } from "next-auth/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useStore } from "react-redux";
@@ -14,6 +14,7 @@ import {
   type CallLogsTablePaginationState,
 } from "@components/communications";
 import type { CallLogRow } from "@components/communications/callLogTypes";
+import { createStageFiltersHandler } from "@utils/communicationsFilterStaging";
 import { useStagedFiltersActions } from "@utils/communicationsStagedFilters";
 import { useAppDispatch, useAppSelector } from "../../toolkit/hooks";
 import {
@@ -63,6 +64,11 @@ const CallLogsTableSection: React.FC = () => {
 
   const tablePagination = useAppSelector((s) => s.callLogsList.tablePagination);
   const searchValue = useAppSelector((s) => s.callLogsList.searchValue);
+  const [searchDraft, setSearchDraft] = useState(searchValue);
+
+  useEffect(() => {
+    setSearchDraft(searchValue);
+  }, [searchValue]);
   const currentFilters = useAppSelector((s) => s.callLogsList.currentFilters);
   const appliedFilters = useAppSelector((s) => s.callLogsList.appliedFilters);
   const defaultFiltersCurrent = useAppSelector(
@@ -203,10 +209,11 @@ const CallLogsTableSection: React.FC = () => {
   );
 
   const stageFilters = useCallback(
-    (nextFilters: Record<string, unknown>) => {
-      dispatch(setCallLogsCurrentFilters(nextFilters));
-    },
-    [dispatch],
+    createStageFiltersHandler(
+      () => store.getState().callLogsList.currentFilters,
+      (nextFilters) => dispatch(setCallLogsCurrentFilters(nextFilters)),
+    ),
+    [dispatch, store],
   );
 
   const applyCommitted = useCallback(
@@ -239,18 +246,25 @@ const CallLogsTableSection: React.FC = () => {
     exportMutation.mutate();
   }, [exportMutation]);
 
+  const applySearch = useCallback(
+    (value: string) => {
+      dispatch(setSearchValue(value));
+    },
+    [dispatch],
+  );
+
   const tableToolbar = useMemo(
     () =>
       buildCallLogsTableToolbar({
         canExportCallLogs,
-        searchValue,
-        setSearchValue: (value: string) => dispatch(setSearchValue(value)),
+        searchDraft,
+        setSearchDraft,
+        applySearch,
         tablePaginationRowsPerPage: tablePagination.rowsPerPage,
         setTablePagination: setTablePaginationState,
         fetchCallLogs,
         currentFilters,
         stageFilters,
-        setCurrentFilters: (f) => dispatch(setCallLogsCurrentFilters(f)),
         extensionOptionsSelectedFirst,
         hierarchyDataDepartments,
         handleExport,
@@ -261,8 +275,8 @@ const CallLogsTableSection: React.FC = () => {
       }),
     [
       canExportCallLogs,
-      searchValue,
-      dispatch,
+      searchDraft,
+      applySearch,
       tablePagination.rowsPerPage,
       setTablePaginationState,
       fetchCallLogs,

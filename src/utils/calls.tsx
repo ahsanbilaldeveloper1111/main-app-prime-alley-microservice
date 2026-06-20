@@ -25,12 +25,31 @@ type ExportJsonPayload = {
     | Array<Record<string, unknown>>;
 };
 
+function isCallLogsOrderValue(
+  value: unknown,
+): value is { column?: string; dir?: string } {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
 function appendFiltersToQueryParams(
   queryParams: URLSearchParams,
   filters: Record<string, unknown>,
 ) {
   Object.entries(filters).forEach(([key, value]) => {
     if (value === undefined || value === null || value === "") return;
+
+    if (key === "order" && isCallLogsOrderValue(value)) {
+      const column = value.column;
+      const dir = value.dir;
+      if (column) {
+        queryParams.append("order[column]", String(column));
+      }
+      if (dir) {
+        queryParams.append("order[dir]", String(dir));
+      }
+      return;
+    }
+
     if (Array.isArray(value) || typeof value === "object") {
       queryParams.append(key, JSON.stringify(value));
       return;
@@ -126,12 +145,70 @@ function downloadCsvRows(rows: Record<string, unknown>[]): string {
   return csvUrl;
 }
 
-type BinaryExportFormat = "xlsx" | "pdf";
+type BinaryExportFormat = "xlsx" | "pdf" | "csv";
 
 function acceptHeaderForStreamingExport(format: BinaryExportFormat): string {
-  return format === "xlsx"
-    ? "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel, application/octet-stream, */*"
-    : "application/pdf, application/octet-stream, */*";
+  if (format === "csv") {
+    return "text/csv, application/csv, application/octet-stream, */*";
+  }
+  if (format === "xlsx") {
+    return "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel, application/octet-stream, */*";
+  }
+  return "application/pdf, application/octet-stream, */*";
+}
+
+function blobMimeTypeForExportFormat(format: BinaryExportFormat): string {
+  if (format === "csv") return "text/csv;charset=utf-8;";
+  if (format === "pdf") return "application/pdf";
+  return "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+}
+
+function fileExtensionForExportFormat(format: BinaryExportFormat): string {
+  if (format === "csv") return "csv";
+  if (format === "pdf") return "pdf";
+  return "xlsx";
+}
+
+function resolveExportFormatFromContentType(
+  contentType: string,
+  requested: BinaryExportFormat,
+): BinaryExportFormat {
+  const normalized = contentType.toLowerCase();
+  if (
+    normalized.includes("text/csv") ||
+    normalized.includes("application/csv")
+  ) {
+    return "csv";
+  }
+  if (normalized.includes("application/pdf")) {
+    return "pdf";
+  }
+  if (
+    normalized.includes("spreadsheetml") ||
+    normalized.includes("ms-excel")
+  ) {
+    return "xlsx";
+  }
+  return requested;
+}
+
+function triggerBlobDownload(
+  blob: Blob,
+  downloadBaseName: string,
+  extension: string,
+): string {
+  const url = globalThis.URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.setAttribute(
+    "download",
+    `${downloadBaseName}_${buildExportTimestamp()}.${extension}`,
+  );
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  globalThis.URL.revokeObjectURL(url);
+  return url;
 }
 
 async function processBlobExportResponse(
@@ -166,25 +243,24 @@ async function processBlobExportResponse(
     return csvUrl;
   }
 
-  const blobType =
-    options.binaryFormat === "xlsx"
-      ? "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-      : "application/pdf";
-  const blob = new Blob([response.data], { type: blobType });
-  const url = globalThis.URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  const timestamp = buildExportTimestamp();
-  const ext = options.binaryFormat === "xlsx" ? "xlsx" : "pdf";
-  link.setAttribute(
-    "download",
-    `${options.downloadBaseName}_${timestamp}.${ext}`,
+  const resolvedFormat = resolveExportFormatFromContentType(
+    contentType,
+    options.binaryFormat,
   );
-
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-  globalThis.URL.revokeObjectURL(url);
+  const blobType = blobMimeTypeForExportFormat(resolvedFormat);
+  let blob: Blob;
+  if (resolvedFormat === "csv") {
+    const csvText = await response.data.text();
+    const withBom = csvText.startsWith("\uFEFF") ? csvText : `\uFEFF${csvText}`;
+    blob = new Blob([withBom], { type: blobType });
+  } else {
+    blob = new Blob([response.data], { type: blobType });
+  }
+  const url = triggerBlobDownload(
+    blob,
+    options.downloadBaseName,
+    fileExtensionForExportFormat(resolvedFormat),
+  );
 
   toast.success(options.successToast);
   return url;
@@ -240,20 +316,7 @@ export const ListCallLogs = async (
     });
 
     // Flatten filters and add each key-value pair as separate query parameters
-    Object.entries(filters).forEach(([key, value]) => {
-      if (value !== undefined && value !== null && value !== "") {
-        // Handle arrays by converting them to JSON strings for proper format
-        if (Array.isArray(value)) {
-          queryParams.append(key, JSON.stringify(value));
-        }
-        // Handle objects by converting them to JSON strings
-        else if (typeof value === "object") {
-          queryParams.append(key, JSON.stringify(value));
-        } else {
-          queryParams.append(key, value.toString());
-        }
-      }
-    });
+    appendFiltersToQueryParams(queryParams, filters);
 
     if (isExport === true) {
       const response = await axiosInstance.get(
@@ -438,15 +501,15 @@ export const ExportCallRecordings = async (
       {
         responseType: "blob",
         headers: {
-          Accept: acceptHeaderForStreamingExport("xlsx"),
+          Accept: acceptHeaderForStreamingExport("csv"),
         },
       },
     );
 
     return await processBlobExportResponse(response, {
-      binaryFormat: "xlsx",
+      binaryFormat: "csv",
       downloadBaseName: "call_recordings",
-      successToast: "XLSX file downloaded successfully",
+      successToast: "CSV file downloaded successfully",
     });
   } catch (error) {
     await toastAxiosBlobError(error, "Call recordings export failed");
@@ -482,17 +545,7 @@ export const DownloadCallsExport = async (params: any, endpoint: string) => {
     const queryParams = new URLSearchParams();
 
     // Flatten filters and add each key-value pair as separate query parameters
-    Object.entries(params).forEach(([key, value]) => {
-      if (value !== undefined && value !== null && value !== "") {
-        // Handle arrays/objects by converting them to JSON strings.
-        if (Array.isArray(value) || typeof value === "object") {
-          const jsonString = JSON.stringify(value);
-          queryParams.append(key, jsonString);
-        } else {
-          queryParams.append(key, value.toString());
-        }
-      }
-    });
+    appendFiltersToQueryParams(queryParams, params);
 
     const queryString = queryParams.toString();
     // Set appropriate headers based on export type

@@ -14,7 +14,6 @@ import { useStore } from "react-redux";
 
 import GenericTable, {
   type TableAction,
-  type TableColumn,
 } from "@components/GenericTable";
 import { useHierarchyData } from "@components/filters/useHierarchyData";
 import ChartBar from "@components/ChartBar";
@@ -28,11 +27,7 @@ import axiosInstance from "@utils/axios";
 import { toast } from "react-toastify";
 import {
   ModuleSlug,
-  formatDuration,
-  GlobalDateFormat,
-  GlobalTimeFormat,
   encodeAnalysisData,
-  convertDateTimeWithOffsetToLocal,
 } from "@utils/Helper";
 import { formatFilterDateTimeLabel } from "@utils/communicationsDateUtils";
 import {
@@ -50,6 +45,10 @@ import {
   renderApplyFilterActions,
   useStagedFiltersActions,
 } from "@utils/communicationsStagedFilters";
+import {
+  createStageFiltersHandler,
+  type StageFiltersFn,
+} from "@utils/communicationsFilterStaging";
 import { HEADER_CONSTANTS } from "@constants/headerConstants";
 import { communicationsKeys } from "@query/keys";
 import type { RootState } from "@toolkit/index";
@@ -74,26 +73,14 @@ import {
   COMMUNICATIONS_TABS_DROPDOWN_ITEMS,
 } from "@components/communications/callLogsListPageConfig";
 import { buildCallRecordingsStatsCardsData } from "@components/communications/callRecordingsStatsCardsData";
+import { getCallRecordingsTableColumns } from "@components/communications/callRecordingsTableColumns";
+import type { CallRecordingRow } from "@components/communications/callRecordingTypes";
 
 const ReactApexChart = dynamic(() => import("react-apexcharts"), {
   ssr: false,
 });
 
 const { PERMISSIONS } = HEADER_CONSTANTS;
-
-/** Row shape from call-recordings API (dataList items) */
-interface RecordingRow {
-  Id?: string;
-  DateTime?: string;
-  AgentExtension?: string;
-  Username?: string;
-  Department?: string;
-  RemotePartyNumber?: string;
-  Direction?: string;
-  Duration?: string | number;
-  imagicle?: string;
-  [key: string]: unknown;
-}
 
 /** Avoid `String(object)` → `"[object Object]"` for hierarchy/API ids. */
 function hierarchyScalarToString(value: unknown): string {
@@ -182,7 +169,7 @@ function applyAudioRecordingGetResponse(args: {
 
 function buildUsernameFilterPill(
   currentFilters: Record<string, unknown>,
-  stageFilters: (nextFilters: Record<string, unknown>) => void,
+  stageFilters: StageFiltersFn,
   selectedUsernameIds: string[],
   areAllUsernamesSelected: boolean,
   allUsernameIds: string[],
@@ -204,12 +191,12 @@ function buildUsernameFilterPill(
       selectedUsernameIds.length > 0
         ? `${selectedUsernameIds.length} selected`
         : undefined,
-    onClear: () => stageFilters({ ...currentFilters, username: [] }),
+    onClear: () => stageFilters((prev) => ({ ...prev, username: [] })),
     onSelectAll: () => {
-      stageFilters({
-        ...currentFilters,
+      stageFilters((prev) => ({
+        ...prev,
         username: areAllUsernamesSelected ? [] : allUsernameIds,
-      });
+      }));
     },
     selectAllLabel: areAllUsernamesSelected ? "Deselect all" : "Select all",
     dropdownOptions: usernameDropdownOptions,
@@ -249,6 +236,12 @@ const CallRecordingsView: React.FC = () => {
     (s) => s.callRecordingsList.defaultFiltersCurrent,
   );
   const searchValue = useAppSelector((s) => s.callRecordingsList.searchValue);
+  const [searchDraft, setSearchDraft] = useState(searchValue);
+
+  useEffect(() => {
+    setSearchDraft(searchValue);
+  }, [searchValue]);
+
   const tableData = useAppSelector((s) => s.callRecordingsList.tableData);
   const pagination = useAppSelector((s) => s.callRecordingsList.pagination);
   const summary = useAppSelector((s) => s.callRecordingsList.summary);
@@ -363,7 +356,7 @@ const CallRecordingsView: React.FC = () => {
 
   const [mediaPlayerModal, setMediaPlayerModal] = useState(false);
   const [selectedRecording, setSelectedRecording] =
-    useState<RecordingRow | null>(null);
+    useState<CallRecordingRow | null>(null);
   const [audioLoading, setAudioLoading] = useState(false);
   const [audioUrl, setAudioUrl] = useState<string>("");
   const [audioError, setAudioError] = useState<string | null>(null);
@@ -468,10 +461,11 @@ const CallRecordingsView: React.FC = () => {
   }, [directionChart]);
 
   const stageFilters = useCallback(
-    (nextFilters: Record<string, unknown>) => {
-      dispatch(setCallRecordingsCurrentFilters(nextFilters));
-    },
-    [dispatch],
+    createStageFiltersHandler(
+      () => store.getState().callRecordingsList.currentFilters,
+      (nextFilters) => dispatch(setCallRecordingsCurrentFilters(nextFilters)),
+    ),
+    [dispatch, store],
   );
 
   const setCurrentFiltersDispatch = useCallback(
@@ -531,16 +525,24 @@ const CallRecordingsView: React.FC = () => {
 
   const toggleUsernameSelection = useCallback(
     (userId: string) => {
-      const isSelected = selectedUsernameIds.includes(userId);
-      const nextUsernames = isSelected
-        ? selectedUsernameIds.filter((id) => id !== userId)
-        : [...selectedUsernameIds, userId];
-      stageFilters({
-        ...currentFilters,
-        username: nextUsernames,
+      stageFilters((prev) => {
+        const raw = prev.username;
+        const currentSelected = Array.isArray(raw)
+          ? raw
+              .map((value) => hierarchyScalarToString(value).trim())
+              .filter((value) => value.length > 0)
+          : (() => {
+              const single = hierarchyScalarToString(raw).trim();
+              return single ? [single] : [];
+            })();
+        const isSelected = currentSelected.includes(userId);
+        const nextUsernames = isSelected
+          ? currentSelected.filter((id) => id !== userId)
+          : [...currentSelected, userId];
+        return { ...prev, username: nextUsernames };
       });
     },
-    [selectedUsernameIds, stageFilters, currentFilters],
+    [stageFilters],
   );
 
   const usernameDropdownOptions = useMemo(
@@ -600,6 +602,20 @@ const CallRecordingsView: React.FC = () => {
     exportMutation.mutate();
   }, [exportMutation]);
 
+  const applySearch = useCallback(
+    (value: string) => {
+      dispatch(setSearchValue(value));
+      const st = store.getState().callRecordingsList;
+      dispatch(
+        setCallRecordingsPagination({
+          ...st.pagination,
+          currentPage: 1,
+        }),
+      );
+    },
+    [dispatch, store],
+  );
+
   const tableToolbar = useMemo(() => {
     return {
       clearAllFilters: handleResetFiltersClick,
@@ -617,17 +633,11 @@ const CallRecordingsView: React.FC = () => {
       activeTab: "all",
       onTabChange: () => {},
       showSearch: true,
-      searchValue,
+      searchValue: searchDraft,
       searchPlaceholder: CALL_RECORDINGS_TOOLBAR.searchPlaceholder,
-      onSearchChange: (value: string) => dispatch(setSearchValue(value)),
+      onSearchChange: (value: string) => setSearchDraft(value),
       onSearch: () => {
-        const st = store.getState().callRecordingsList;
-        dispatch(
-          setCallRecordingsPagination({
-            ...st.pagination,
-            currentPage: 1,
-          }),
-        );
+        applySearch(searchDraft.trim());
       },
       showFiltersButton: canViewCallRecordings,
       showExportButton: canExportCallRecordings,
@@ -640,7 +650,7 @@ const CallRecordingsView: React.FC = () => {
           stageFilters,
         ),
         buildExtensionMultiSelectFilterPill(
-          extensionOptionsSelectedFirst,
+          extensionOptionsSelectedFirst as { id?: unknown; name?: unknown }[],
           currentFilters as Record<string, unknown>,
           stageFilters,
         ),
@@ -654,7 +664,6 @@ const CallRecordingsView: React.FC = () => {
           "remote_party_number",
           "Remote Party Number",
           currentFilters as Record<string, unknown>,
-          setCurrentFiltersDispatch,
           stageFilters,
           createTextFilterDropdownContent,
           "Enter phone number",
@@ -663,19 +672,19 @@ const CallRecordingsView: React.FC = () => {
           "start_date",
           "Start Date & Time",
           currentFilters as Record<string, unknown>,
-          setCurrentFiltersDispatch,
           stageFilters,
           formatFilterDateTimeLabel,
           createDateTimeDropdownContent,
+          { clearable: false },
         ),
         buildDateTimeFilterPill(
           "end_date",
           "End Date & Time",
           currentFilters as Record<string, unknown>,
-          setCurrentFiltersDispatch,
           stageFilters,
           formatFilterDateTimeLabel,
           createDateTimeDropdownContent,
+          { clearable: false },
         ),
       ],
       filterPillsRightActions: renderApplyFilterActions(
@@ -687,15 +696,14 @@ const CallRecordingsView: React.FC = () => {
   }, [
     canExportCallRecordings,
     canViewCallRecordings,
-    searchValue,
+    searchDraft,
+    applySearch,
     dispatch,
-    store,
     currentFilters,
     stageFilters,
     extensionOptionsSelectedFirst,
     hierarchyDataDepartments,
     usernameFilterPill,
-    setCurrentFiltersDispatch,
     handleExportExcel,
     handleResetFiltersClick,
     handleApplyFiltersClick,
@@ -703,7 +711,7 @@ const CallRecordingsView: React.FC = () => {
     pagination.totalRows,
   ]);
 
-  const handleDownload = async (props: RecordingRow) => {
+  const handleDownload = async (props: CallRecordingRow) => {
     const Id = String(props.Id ?? "");
     const AgentExtension = String(props.AgentExtension ?? "");
 
@@ -768,7 +776,7 @@ const CallRecordingsView: React.FC = () => {
     }
   };
 
-  const handleAnalysis = async (props: RecordingRow) => {
+  const handleAnalysis = async (props: CallRecordingRow) => {
     try {
       const Id = props.Id;
       let dateOnly = "";
@@ -852,7 +860,7 @@ const CallRecordingsView: React.FC = () => {
     }
   };
 
-  const handlePlayRecording = (recording: RecordingRow) => {
+  const handlePlayRecording = (recording: CallRecordingRow) => {
     dispatch(setShowPageLoader(true));
     const trackId = String(recording.Id ?? "");
     const agentExtension = String(recording.AgentExtension ?? "");
@@ -916,61 +924,9 @@ const CallRecordingsView: React.FC = () => {
     );
   };
 
-  const tableColumns: TableColumn<RecordingRow>[] = useMemo(
-    () => [
-      {
-        key: "DateTime",
-        label: "Date",
-        sortable: true,
-        render: (row) => (
-          <div>
-            {convertDateTimeWithOffsetToLocal(
-              String(row.DateTime ?? ""),
-              undefined,
-              GlobalDateFormat,
-            )}
-          </div>
-        ),
-      },
-      {
-        key: "Time",
-        label: "Time",
-        sortable: true,
-        render: (row) => (
-          <div>
-            {convertDateTimeWithOffsetToLocal(
-              String(row.DateTime ?? ""),
-              undefined,
-              GlobalTimeFormat,
-            )}
-          </div>
-        ),
-      },
-      { key: "AgentExtension", label: "Extension", sortable: true },
-      { key: "Username", label: "Username", sortable: true },
-      {
-        key: "Department",
-        label: "Department",
-        sortable: true,
-        render: (row) => row.Department || "---",
-      },
-      { key: "RemotePartyNumber", label: "Remote Number", sortable: true },
-      { key: "Direction", label: "Direction", sortable: true },
-      {
-        key: "Duration",
-        label: "Duration",
-        sortable: true,
-        render: (row) => {
-          const duration =
-            Number.parseInt(String(row.Duration), 10) / 10000000 || 0;
-          return <div>{formatDuration(duration)}</div>;
-        },
-      },
-    ],
-    [],
-  );
+  const tableColumns = useMemo(() => getCallRecordingsTableColumns(), []);
 
-  const recordingActions: TableAction<RecordingRow>[] = [
+  const recordingActions: TableAction<CallRecordingRow>[] = [
     {
       label: "Actions",
       render: (row) => {
@@ -1176,8 +1132,8 @@ const CallRecordingsView: React.FC = () => {
       )}
 
       {canViewCallRecordings && (
-        <GenericTable<RecordingRow>
-          data={tableData as RecordingRow[]}
+        <GenericTable<CallRecordingRow>
+          data={tableData as CallRecordingRow[]}
           columns={tableColumns}
           actions={recordingActions}
           actionsLabel="Action"
