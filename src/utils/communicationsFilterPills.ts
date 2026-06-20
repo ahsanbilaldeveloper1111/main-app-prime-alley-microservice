@@ -22,17 +22,86 @@ type CreateCalledNumbersDropdown = (
   placeholder?: string,
 ) => ComponentType<{ closeMenu: () => void }>;
 
+function readFilterScalarAsString(value: unknown): string {
+  if (value === null || value === undefined) return "";
+  if (typeof value === "string") return value;
+  if (
+    typeof value === "number" ||
+    typeof value === "boolean" ||
+    typeof value === "bigint"
+  ) {
+    return String(value);
+  }
+  return "";
+}
+
+function readStringArrayFilter(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((item) => readFilterScalarAsString(item))
+    .filter((item) => item.length > 0);
+}
+
+function addIdToMultiSelectField(
+  field: string,
+  idVal: string,
+): (prev: Filters) => Filters {
+  return (prev) => {
+    const currentSelected = readStringArrayFilter(prev[field]);
+    if (currentSelected.includes(idVal)) {
+      return prev;
+    }
+    return { ...prev, [field]: [...currentSelected, idVal] };
+  };
+}
+
+function removeIdFromMultiSelectField(
+  field: string,
+  idVal: string,
+): (prev: Filters) => Filters {
+  return (prev) => {
+    const currentSelected = readStringArrayFilter(prev[field]);
+    return {
+      ...prev,
+      [field]: currentSelected.filter((value) => value !== idVal),
+    };
+  };
+}
+
+function createMultiSelectSelectHandler(
+  field: string,
+  idVal: string,
+  stageFilters: StageFiltersFn,
+): () => void {
+  return () => {
+    stageFilters(addIdToMultiSelectField(field, idVal));
+  };
+}
+
+function createMultiSelectDeselectHandler(
+  field: string,
+  idVal: string,
+  stageFilters: StageFiltersFn,
+): () => void {
+  return () => {
+    stageFilters(removeIdFromMultiSelectField(field, idVal));
+  };
+}
+
+function hierarchyItemIdString(item: { id?: unknown }): string {
+  return readFilterScalarAsString(item.id);
+}
+
+function hierarchyItemLabel(item: { id?: unknown; name?: unknown }): string {
+  return readFilterScalarAsString(item.name) || hierarchyItemIdString(item);
+}
+
 function getCalledNumbersFilterValue(currentFilters: Filters): string[] {
-  return Array.isArray(currentFilters.called_numbers)
-    ? (currentFilters.called_numbers as string[])
-    : [];
+  return readStringArrayFilter(currentFilters.called_numbers);
 }
 
 export function getCallDirectionActiveLabel(value: unknown): string | undefined {
-  const v =
-    typeof value === "string" || typeof value === "number"
-      ? String(value)
-      : "";
+  const v = readFilterScalarAsString(value);
   if (v === "OUTGOING") return "Outgoing";
   if (v === "INCOMING") return "Incoming";
   if (v === "Both") return "Both";
@@ -77,14 +146,14 @@ export function buildCallStatusFilterPill(
   currentFilters: Filters,
   stageFilters: StageFiltersFn,
 ): FilterPill {
+  const callStatusLabel = readFilterScalarAsString(currentFilters.call_status);
+
   return {
     id: "call_status",
     label: "Call Status",
     showDropdown: true,
-    active: Boolean(currentFilters.call_status),
-    activeLabel: currentFilters.call_status
-      ? String(currentFilters.call_status)
-      : undefined,
+    active: Boolean(callStatusLabel),
+    activeLabel: callStatusLabel || undefined,
     onClear: () => stageFilters((prev) => ({ ...prev, call_status: "" })),
     dropdownOptions: [
       {
@@ -114,10 +183,10 @@ export function buildExtensionMultiSelectFilterPill(
   currentFilters: Filters,
   stageFilters: StageFiltersFn,
 ): FilterPill {
-  const extensionAllIds = hierarchyDataExtensions.map((ext) => String(ext.id));
-  const selected = Array.isArray(currentFilters.extension_number)
-    ? (currentFilters.extension_number as string[])
-    : [];
+  const extensionAllIds = hierarchyDataExtensions.map((ext) =>
+    hierarchyItemIdString(ext),
+  );
+  const selected = readStringArrayFilter(currentFilters.extension_number);
   const allSelected =
     extensionAllIds.length > 0 && selected.length === extensionAllIds.length;
 
@@ -138,23 +207,23 @@ export function buildExtensionMultiSelectFilterPill(
     onClear: () =>
       stageFilters((prev) => ({ ...prev, extension_number: [] })),
     dropdownOptions: hierarchyDataExtensions.map((ext) => {
-      const idVal = String(ext.id);
+      const idVal = hierarchyItemIdString(ext);
       const isSelected = selected.includes(idVal);
       return {
-        label: String(ext.name ?? ext.id),
+        label: hierarchyItemLabel(ext),
         value: idVal,
         selected: isSelected,
-        onClick: () => {
-          stageFilters((prev) => {
-            const currentSelected = Array.isArray(prev.extension_number)
-              ? (prev.extension_number as string[])
-              : [];
-            const next = isSelected
-              ? currentSelected.filter((v) => v !== idVal)
-              : [...currentSelected, idVal];
-            return { ...prev, extension_number: next };
-          });
-        },
+        onClick: isSelected
+          ? createMultiSelectDeselectHandler(
+              "extension_number",
+              idVal,
+              stageFilters,
+            )
+          : createMultiSelectSelectHandler(
+              "extension_number",
+              idVal,
+              stageFilters,
+            ),
       };
     }),
   };
@@ -165,9 +234,8 @@ export function buildDepartmentFilterPill(
   currentFilters: Filters,
   stageFilters: StageFiltersFn,
 ): FilterPill {
-  const selected = Array.isArray(currentFilters.department)
-    ? (currentFilters.department as string[])
-    : [];
+  const selected = readStringArrayFilter(currentFilters.department);
+
   return {
     id: "department",
     label: "Department",
@@ -178,23 +246,15 @@ export function buildDepartmentFilterPill(
     activeLabel: selected.length > 0 ? `${selected.length} selected` : undefined,
     onClear: () => stageFilters((prev) => ({ ...prev, department: [] })),
     dropdownOptions: hierarchyDataDepartments.map((dept) => {
-      const idVal = String(dept.id);
+      const idVal = hierarchyItemIdString(dept);
       const isSelected = selected.includes(idVal);
       return {
-        label: String(dept.name ?? dept.id),
+        label: hierarchyItemLabel(dept),
         value: idVal,
         selected: isSelected,
-        onClick: () => {
-          stageFilters((prev) => {
-            const currentSelected = Array.isArray(prev.department)
-              ? (prev.department as string[])
-              : [];
-            const next = isSelected
-              ? currentSelected.filter((v) => v !== idVal)
-              : [...currentSelected, idVal];
-            return { ...prev, department: next };
-          });
-        },
+        onClick: isSelected
+          ? createMultiSelectDeselectHandler("department", idVal, stageFilters)
+          : createMultiSelectSelectHandler("department", idVal, stageFilters),
       };
     }),
   };
@@ -240,8 +300,9 @@ export function buildTextDropdownFilterPill(
   createTextDropdownContent: CreateTextDropdown,
   placeholder: string,
 ): FilterPill {
+  const filterValue = readFilterScalarAsString(currentFilters[id]);
   const DropdownContent = createTextDropdownContent(
-    String(currentFilters[id] ?? ""),
+    filterValue,
     (value: string) => stageFilters((prev) => ({ ...prev, [id]: value })),
     (value: string) => stageFilters((prev) => ({ ...prev, [id]: value })),
     placeholder,
@@ -250,8 +311,8 @@ export function buildTextDropdownFilterPill(
     id,
     label,
     showDropdown: true,
-    active: Boolean(currentFilters[id]),
-    activeLabel: currentFilters[id] ? String(currentFilters[id]) : undefined,
+    active: Boolean(filterValue),
+    activeLabel: filterValue || undefined,
     onClear: () => stageFilters((prev) => ({ ...prev, [id]: "" })),
     dropdownContent: ({ closeMenu }) =>
       createElement(DropdownContent, { closeMenu }),
@@ -268,8 +329,9 @@ export function buildDateTimeFilterPill(
   options?: { clearable?: boolean },
 ): FilterPill {
   const clearable = options?.clearable !== false;
+  const filterValue = readFilterScalarAsString(currentFilters[id]);
   const DropdownContent = createDateTimeDropdownContent(
-    String(currentFilters[id] ?? ""),
+    filterValue,
     (value: string) => stageFilters((prev) => ({ ...prev, [id]: value })),
     (value: string) => stageFilters((prev) => ({ ...prev, [id]: value })),
   );
@@ -277,7 +339,7 @@ export function buildDateTimeFilterPill(
     id,
     label,
     showDropdown: true,
-    active: Boolean(currentFilters[id]),
+    active: Boolean(filterValue),
     activeLabel: formatLabel(currentFilters[id]),
     activeLabelOnly: true,
     ...(clearable

@@ -1,13 +1,46 @@
 import type { CallLogRow } from "./callLogTypes";
 
+function readScalarAsString(value: unknown): string | undefined {
+  if (value === null || value === undefined) return undefined;
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    return trimmed || undefined;
+  }
+  if (
+    typeof value === "number" ||
+    typeof value === "boolean" ||
+    typeof value === "bigint"
+  ) {
+    return String(value);
+  }
+  return undefined;
+}
+
 function readStringField(row: CallLogRow, ...keys: string[]): string {
   for (const key of keys) {
-    const value = row[key];
-    if (value === null || value === undefined) continue;
-    const text = String(value).trim();
+    const text = readScalarAsString(row[key]);
     if (text) return text;
   }
   return "";
+}
+
+function readDurationSortNumber(row: CallLogRow): number {
+  const raw = row.duration ?? row.Duration ?? row.DurationInSeconds;
+  const text = readScalarAsString(raw);
+  if (text === undefined) return 0;
+  const parsed = Number.parseInt(text, 10);
+  return Number.isNaN(parsed) ? 0 : parsed;
+}
+
+function readDefaultColumnSortValue(
+  row: CallLogRow,
+  columnKey: string,
+): string | number {
+  const value = row[columnKey];
+  if (value === null || value === undefined) return "";
+  if (typeof value === "number") return value;
+  const text = readScalarAsString(value);
+  return text ? text.toLowerCase() : "";
 }
 
 export function getCallLogDateTimeSortValue(row: CallLogRow): number {
@@ -26,9 +59,7 @@ export function getCallLogDateTimeSortValue(row: CallLogRow): number {
 }
 
 export function getCallLogDurationSortValue(row: CallLogRow): number {
-  const raw = row.duration ?? row.Duration ?? row.DurationInSeconds;
-  const parsed = Number.parseInt(String(raw ?? ""), 10);
-  return Number.isNaN(parsed) ? 0 : parsed;
+  return readDurationSortNumber(row);
 }
 
 export function getCallLogAnsweredSortValue(row: CallLogRow): number {
@@ -55,7 +86,13 @@ export function getCallLogRowSortValue(
     case "is_answered":
       return getCallLogAnsweredSortValue(row);
     case "username":
-      return readStringField(row, "username", "Username", "user_name", "agent_name").toLowerCase();
+      return readStringField(
+        row,
+        "username",
+        "Username",
+        "user_name",
+        "agent_name",
+      ).toLowerCase();
     case "department_name":
       return readStringField(
         row,
@@ -76,11 +113,7 @@ export function getCallLogRowSortValue(
         "phone",
         "number",
       ).toLowerCase();
-    default: {
-      const value = row[columnKey];
-      if (value === null || value === undefined) return "";
-      if (typeof value === "number") return value;
-      return String(value).toLowerCase();
-    }
+    default:
+      return readDefaultColumnSortValue(row, columnKey);
   }
 }

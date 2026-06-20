@@ -2,14 +2,53 @@ import type { CallRecordingRow } from "./callRecordingTypes";
 
 const DOTNET_TICKS_PER_SECOND = 10_000_000;
 
+function readScalarAsString(value: unknown): string | undefined {
+  if (value === null || value === undefined) return undefined;
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    return trimmed || undefined;
+  }
+  if (
+    typeof value === "number" ||
+    typeof value === "boolean" ||
+    typeof value === "bigint"
+  ) {
+    return String(value);
+  }
+  return undefined;
+}
+
 function readStringField(row: CallRecordingRow, ...keys: string[]): string {
   for (const key of keys) {
-    const value = row[key];
-    if (value === null || value === undefined) continue;
-    const text = String(value).trim();
+    const text = readScalarAsString(row[key]);
     if (text) return text;
   }
   return "";
+}
+
+function readDurationSortNumber(row: CallRecordingRow): number {
+  const raw = row.Duration ?? row.duration ?? row.DurationInSeconds;
+  const text = readScalarAsString(raw);
+  if (text === undefined) return 0;
+
+  const parsed = Number.parseInt(text, 10);
+  if (Number.isNaN(parsed)) return 0;
+
+  if (parsed >= DOTNET_TICKS_PER_SECOND) {
+    return parsed / DOTNET_TICKS_PER_SECOND;
+  }
+  return parsed;
+}
+
+function readDefaultColumnSortValue(
+  row: CallRecordingRow,
+  columnKey: string,
+): string | number {
+  const value = row[columnKey];
+  if (value === null || value === undefined) return "";
+  if (typeof value === "number") return value;
+  const text = readScalarAsString(value);
+  return text ? text.toLowerCase() : "";
 }
 
 export function getCallRecordingDateTimeSortValue(row: CallRecordingRow): number {
@@ -28,14 +67,7 @@ export function getCallRecordingDateTimeSortValue(row: CallRecordingRow): number
 }
 
 export function getCallRecordingDurationSortValue(row: CallRecordingRow): number {
-  const raw = row.Duration ?? row.duration ?? row.DurationInSeconds;
-  const parsed = Number.parseInt(String(raw ?? ""), 10);
-  if (Number.isNaN(parsed)) return 0;
-
-  if (parsed >= DOTNET_TICKS_PER_SECOND) {
-    return parsed / DOTNET_TICKS_PER_SECOND;
-  }
-  return parsed;
+  return readDurationSortNumber(row);
 }
 
 export function getCallRecordingRowSortValue(
@@ -88,11 +120,7 @@ export function getCallRecordingRowSortValue(
         "call_direction",
         "CallDirection",
       ).toLowerCase();
-    default: {
-      const value = row[columnKey];
-      if (value === null || value === undefined) return "";
-      if (typeof value === "number") return value;
-      return String(value).toLowerCase();
-    }
+    default:
+      return readDefaultColumnSortValue(row, columnKey);
   }
 }
