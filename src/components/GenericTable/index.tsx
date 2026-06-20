@@ -116,6 +116,9 @@ export interface TableColumn<T = any> {
 
   /** Row field used for sorting when it differs from `key` (e.g. sort by ISO `created_at`, display `create_date`). */
   sortKey?: string;
+
+  /** Custom value extractor for client-side column sorting. */
+  sortAccessor?: (row: T) => string | number;
 }
 
 export interface DropdownOption<T = any> {

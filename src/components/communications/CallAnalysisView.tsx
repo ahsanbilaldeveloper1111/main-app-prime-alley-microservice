@@ -53,6 +53,7 @@ import {
   formatFilterDateTimeLabel,
 } from "@utils/communicationsDateUtils";
 import { buildDateTimeFilterPill } from "@utils/communicationsFilterPills";
+import type { StageFiltersFn } from "@utils/communicationsFilterStaging";
 import { createDateTimeDropdownContent } from "@utils/communicationsFilterDropdowns";
 
 type AnalysisRow = Record<string, unknown> & {
@@ -275,9 +276,14 @@ const CallAnalysisView: React.FC = () => {
     [dispatch],
   );
 
-  const stageDateFilters = useCallback(
-    (nextFilters: Record<string, unknown>) => {
-      const normalized = { ...nextFilters };
+  const stageDateFilters = useCallback<StageFiltersFn>(
+    (nextOrUpdater) => {
+      const previous = store.getState().callAnalysisList.filters;
+      const next =
+        typeof nextOrUpdater === "function"
+          ? nextOrUpdater(previous)
+          : nextOrUpdater;
+      const normalized = { ...next };
       if (
         typeof normalized.start_datetime === "string" &&
         normalized.start_datetime
@@ -296,7 +302,7 @@ const CallAnalysisView: React.FC = () => {
       }
       applyFilters(normalized);
     },
-    [applyFilters],
+    [applyFilters, store],
   );
 
   const filtersForPills = useMemo(
@@ -384,19 +390,19 @@ const CallAnalysisView: React.FC = () => {
           "start_datetime",
           "Start Date & Time",
           filtersForPills,
-          () => {},
           stageDateFilters,
           formatFilterDateTimeLabel,
           createDateTimeDropdownContent,
+          { clearable: false },
         ),
         buildDateTimeFilterPill(
           "end_datetime",
           "End Date & Time",
           filtersForPills,
-          () => {},
           stageDateFilters,
           formatFilterDateTimeLabel,
           createDateTimeDropdownContent,
+          { clearable: false },
         ),
         {
           id: "direction",

@@ -25,12 +25,31 @@ type ExportJsonPayload = {
     | Array<Record<string, unknown>>;
 };
 
+function isCallLogsOrderValue(
+  value: unknown,
+): value is { column?: string; dir?: string } {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
 function appendFiltersToQueryParams(
   queryParams: URLSearchParams,
   filters: Record<string, unknown>,
 ) {
   Object.entries(filters).forEach(([key, value]) => {
     if (value === undefined || value === null || value === "") return;
+
+    if (key === "order" && isCallLogsOrderValue(value)) {
+      const column = value.column;
+      const dir = value.dir;
+      if (column) {
+        queryParams.append("order[column]", String(column));
+      }
+      if (dir) {
+        queryParams.append("order[dir]", String(dir));
+      }
+      return;
+    }
+
     if (Array.isArray(value) || typeof value === "object") {
       queryParams.append(key, JSON.stringify(value));
       return;
@@ -240,20 +259,7 @@ export const ListCallLogs = async (
     });
 
     // Flatten filters and add each key-value pair as separate query parameters
-    Object.entries(filters).forEach(([key, value]) => {
-      if (value !== undefined && value !== null && value !== "") {
-        // Handle arrays by converting them to JSON strings for proper format
-        if (Array.isArray(value)) {
-          queryParams.append(key, JSON.stringify(value));
-        }
-        // Handle objects by converting them to JSON strings
-        else if (typeof value === "object") {
-          queryParams.append(key, JSON.stringify(value));
-        } else {
-          queryParams.append(key, value.toString());
-        }
-      }
-    });
+    appendFiltersToQueryParams(queryParams, filters);
 
     if (isExport === true) {
       const response = await axiosInstance.get(
@@ -482,17 +488,7 @@ export const DownloadCallsExport = async (params: any, endpoint: string) => {
     const queryParams = new URLSearchParams();
 
     // Flatten filters and add each key-value pair as separate query parameters
-    Object.entries(params).forEach(([key, value]) => {
-      if (value !== undefined && value !== null && value !== "") {
-        // Handle arrays/objects by converting them to JSON strings.
-        if (Array.isArray(value) || typeof value === "object") {
-          const jsonString = JSON.stringify(value);
-          queryParams.append(key, jsonString);
-        } else {
-          queryParams.append(key, value.toString());
-        }
-      }
-    });
+    appendFiltersToQueryParams(queryParams, params);
 
     const queryString = queryParams.toString();
     // Set appropriate headers based on export type

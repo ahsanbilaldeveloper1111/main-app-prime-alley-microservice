@@ -6,6 +6,7 @@ type SortableTableColumn = {
   sortKey?: string;
   sortable?: boolean;
   type?: string;
+  sortAccessor?: (row: Record<string, unknown>) => string | number;
 };
 
 function safeStringifySortValue(val: unknown): string {
@@ -39,6 +40,14 @@ export function compareGenericTableSortValues(
     const bTime = Date.parse(bText);
     if (!Number.isNaN(aTime) && !Number.isNaN(bTime)) {
       return sortOrder === "asc" ? aTime - bTime : bTime - aTime;
+    }
+  }
+
+  if (sortColumnType === "number") {
+    const aNum = Number(aText);
+    const bNum = Number(bText);
+    if (!Number.isNaN(aNum) && !Number.isNaN(bNum)) {
+      return sortOrder === "asc" ? aNum - bNum : bNum - aNum;
     }
   }
 
@@ -90,10 +99,13 @@ export function useGenericTableSorting<T extends Record<string, unknown>>({
       if (!sortBy) {
         return "";
       }
+      if (sortColumnDef?.sortAccessor) {
+        return sortColumnDef.sortAccessor(row);
+      }
       const fieldKey = sortColumnDef?.sortKey ?? sortBy;
       return row[fieldKey as keyof T] ?? row[sortBy as keyof T] ?? "";
     },
-    [sortBy, sortColumnDef?.sortKey],
+    [sortBy, sortColumnDef?.sortKey, sortColumnDef?.sortAccessor],
   );
 
   const sortedData = useMemo(() => {

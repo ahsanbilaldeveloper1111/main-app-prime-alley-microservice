@@ -6,12 +6,13 @@ import {
   buildCallStatusFilterPill,
   buildDepartmentFilterPill,
   buildExtensionMultiSelectFilterPill,
-  buildTextDropdownFilterPill,
+  buildCalledNumbersFilterPill,
 } from "@utils/communicationsFilterPills";
 import {
+  createCalledNumbersDropdownContent,
   createDateTimeDropdownContent,
-  createTextFilterDropdownContent,
 } from "@utils/communicationsFilterDropdowns";
+import type { StageFiltersFn } from "@utils/communicationsFilterStaging";
 import { renderApplyFilterActions } from "@utils/communicationsStagedFilters";
 import { formatFilterDateTimeLabel } from "@utils/communicationsDateUtils";
 import {
@@ -28,8 +29,9 @@ export interface CallLogsTablePaginationState {
 
 export interface BuildCallLogsTableToolbarParams {
   canExportCallLogs: boolean;
-  searchValue: string;
-  setSearchValue: (value: string) => void;
+  searchDraft: string;
+  setSearchDraft: (value: string) => void;
+  applySearch: (value: string) => void;
   tablePaginationRowsPerPage: number;
   setTablePagination: Dispatch<SetStateAction<CallLogsTablePaginationState>>;
   fetchCallLogs: (
@@ -38,8 +40,7 @@ export interface BuildCallLogsTableToolbarParams {
     search?: string,
   ) => Promise<unknown>;
   currentFilters: Record<string, unknown>;
-  stageFilters: (next: Record<string, unknown>) => void;
-  setCurrentFilters: (filters: Record<string, unknown>) => void;
+  stageFilters: StageFiltersFn;
   extensionOptionsSelectedFirst: unknown[];
   hierarchyDataDepartments: unknown[];
   handleExport: () => void | Promise<void>;
@@ -52,14 +53,14 @@ export interface BuildCallLogsTableToolbarParams {
 
 export function buildCallLogsTableToolbar({
   canExportCallLogs,
-  searchValue,
-  setSearchValue,
+  searchDraft,
+  setSearchDraft,
+  applySearch,
   tablePaginationRowsPerPage,
   setTablePagination,
   fetchCallLogs,
   currentFilters,
   stageFilters,
-  setCurrentFilters,
   extensionOptionsSelectedFirst,
   hierarchyDataDepartments,
   handleExport,
@@ -84,12 +85,14 @@ export function buildCallLogsTableToolbar({
     activeTab: "all",
     onTabChange: () => {},
     showSearch: true,
-    searchValue,
+    searchValue: searchDraft,
     searchPlaceholder: CALL_LOGS_TOOLBAR.searchPlaceholder,
-    onSearchChange: (value: string) => setSearchValue(value),
+    onSearchChange: (value: string) => setSearchDraft(value),
     onSearch: () => {
+      const trimmed = searchDraft.trim();
+      applySearch(trimmed);
       setTablePagination((prev) => ({ ...prev, currentPage: 1 }));
-      fetchCallLogs(1, tablePaginationRowsPerPage, searchValue.trim());
+      fetchCallLogs(1, tablePaginationRowsPerPage, trimmed);
     },
     showFiltersButton: true,
     showSortButton: true,
@@ -100,8 +103,8 @@ export function buildCallLogsTableToolbar({
     },
     showMoreFiltersButton: false,
     filterPills: [
-      buildCallDirectionFilterPill(currentFilters as any, stageFilters as any),
-      buildCallStatusFilterPill(currentFilters as any, stageFilters as any),
+      buildCallDirectionFilterPill(currentFilters, stageFilters),
+      buildCallStatusFilterPill(currentFilters, stageFilters),
       {
         id: "traffic_type",
         label: "Traffic Type",
@@ -109,25 +112,25 @@ export function buildCallLogsTableToolbar({
         active: Boolean(currentFilters.traffic_type),
         activeLabel: (currentFilters.traffic_type as string) || undefined,
         onClear: () =>
-          stageFilters({ ...currentFilters, traffic_type: "" }),
+          stageFilters((prev) => ({ ...prev, traffic_type: "" })),
         dropdownOptions: [
           {
             label: "Internal",
             value: "internal",
             onClick: () =>
-              stageFilters({ ...currentFilters, traffic_type: "internal" }),
+              stageFilters((prev) => ({ ...prev, traffic_type: "internal" })),
           },
           {
             label: "External",
             value: "external",
             onClick: () =>
-              stageFilters({ ...currentFilters, traffic_type: "external" }),
+              stageFilters((prev) => ({ ...prev, traffic_type: "external" })),
           },
           {
             label: "All",
             value: "",
             onClick: () =>
-              stageFilters({ ...currentFilters, traffic_type: "" }),
+              stageFilters((prev) => ({ ...prev, traffic_type: "" })),
           },
         ],
       },
@@ -138,76 +141,75 @@ export function buildCallLogsTableToolbar({
         active: Boolean(currentFilters.destination_type),
         activeLabel: (currentFilters.destination_type as string) || undefined,
         onClear: () =>
-          stageFilters({ ...currentFilters, destination_type: "" }),
+          stageFilters((prev) => ({ ...prev, destination_type: "" })),
         dropdownOptions: [
           {
             label: "Local",
             value: "local",
             onClick: () =>
-              stageFilters({ ...currentFilters, destination_type: "local" }),
+              stageFilters((prev) => ({
+                ...prev,
+                destination_type: "local",
+              })),
           },
           {
             label: "National",
             value: "national",
             onClick: () =>
-              stageFilters({
-                ...currentFilters,
+              stageFilters((prev) => ({
+                ...prev,
                 destination_type: "national",
-              }),
+              })),
           },
           {
             label: "International",
             value: "international",
             onClick: () =>
-              stageFilters({
-                ...currentFilters,
+              stageFilters((prev) => ({
+                ...prev,
                 destination_type: "international",
-              }),
+              })),
           },
           {
             label: "All",
             value: "",
             onClick: () =>
-              stageFilters({ ...currentFilters, destination_type: "" }),
+              stageFilters((prev) => ({ ...prev, destination_type: "" })),
           },
         ],
       },
       buildExtensionMultiSelectFilterPill(
-        extensionOptionsSelectedFirst as any[],
-        currentFilters as any,
-        stageFilters as any,
+        extensionOptionsSelectedFirst as { id?: unknown; name?: unknown }[],
+        currentFilters,
+        stageFilters,
       ),
       buildDepartmentFilterPill(
-        hierarchyDataDepartments as any[],
-        currentFilters as any,
-        stageFilters as any,
+        hierarchyDataDepartments as { id?: unknown; name?: unknown }[],
+        currentFilters,
+        stageFilters,
       ),
-      buildTextDropdownFilterPill(
-        "phone_number",
-        "Numbers",
-        currentFilters as any,
-        setCurrentFilters as any,
-        stageFilters as any,
-        createTextFilterDropdownContent,
-        "Enter number",
+      buildCalledNumbersFilterPill(
+        currentFilters,
+        stageFilters,
+        createCalledNumbersDropdownContent,
       ),
       buildDateTimeFilterPill(
         "start_datetime",
         "Start Date & Time",
-        currentFilters as any,
-        setCurrentFilters as any,
-        stageFilters as any,
+        currentFilters,
+        stageFilters,
         formatFilterDateTimeLabel,
         createDateTimeDropdownContent,
+        { clearable: false },
       ),
       buildDateTimeFilterPill(
         "end_datetime",
         "End Date & Time",
-        currentFilters as any,
-        setCurrentFilters as any,
-        stageFilters as any,
+        currentFilters,
+        stageFilters,
         formatFilterDateTimeLabel,
         createDateTimeDropdownContent,
+        { clearable: false },
       ),
     ],
     filterPillsRightActions: renderApplyFilterActions(
