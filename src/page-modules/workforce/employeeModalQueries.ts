@@ -4,6 +4,7 @@ import {
   fetchDepartmentUserRowsForModal,
   type DepartmentUserRow,
 } from "@utils/workforce/employeeModalShared";
+import { getUserProfiles, type UserProfile } from "@utils/staffManagement";
 
 function normalizeDepartmentIdForQuery(raw: number | null | undefined): number {
   if (raw == null) return 0;
@@ -39,6 +40,26 @@ export function useEmployeeModalDepartmentUsersQuery(args: Readonly<{
 
   return {
     rows: q.data ?? [],
+    isFetching: q.isFetching,
+  };
+}
+
+export function useEmployeeModalPhoneValidationQuery(enabled: boolean): Readonly<{
+  profiles: UserProfile[];
+  isFetching: boolean;
+}> {
+  const q = useQuery({
+    queryKey: [...workforceKeys.employees.all(), "phoneValidation"] as const,
+    queryFn: async () => {
+      const { data } = await getUserProfiles({ page: 1, limit: 500 });
+      return data ?? [];
+    },
+    enabled,
+    staleTime: 60 * 1000,
+  });
+
+  return {
+    profiles: q.data ?? [],
     isFetching: q.isFetching,
   };
 }

@@ -68,20 +68,39 @@ export type OrgChartEmployeeNodeProps = Readonly<{
   employee: OrgChartEmployee;
   selectedUserIds: readonly string[];
   selectedUserSubtreeIds: Set<string>;
+  activeChartUserId?: string | null;
   rawProfileById: Record<string, ApiOrgChartNode>;
   onNodeSelect: (emp: OrgChartEmployee) => void;
 }>;
 
 export function OrgChartEmployeeNode(props: OrgChartEmployeeNodeProps): React.ReactElement {
-  const { employee, selectedUserIds, selectedUserSubtreeIds, rawProfileById, onNodeSelect } = props;
+  const {
+    employee,
+    selectedUserIds,
+    selectedUserSubtreeIds,
+    activeChartUserId = null,
+    rawProfileById,
+    onNodeSelect,
+  } = props;
   const isRoot = employee.id === "root";
   const uid = employee.userId?.trim() ?? "";
-  const isSelectedUser = Boolean(uid && selectedUserIds.includes(uid));
   const hasUserFilter = selectedUserIds.length > 0;
-  const isInSelectedSubtree = Boolean(hasUserFilter && selectedUserSubtreeIds.has(employee.id));
-  const highlightActive = hasUserFilter && selectedUserSubtreeIds.size > 0;
-  const shouldFade = Boolean(highlightActive && !isInSelectedSubtree && employee.id !== "root");
-  const isChildHighlight = isInSelectedSubtree && !isSelectedUser;
+  const hasActiveSelection = Boolean(activeChartUserId);
+
+  let isSelectedUser = false;
+  let isChildHighlight = false;
+  let shouldFade = false;
+
+  if (hasActiveSelection) {
+    isSelectedUser = Boolean(uid && activeChartUserId === uid);
+    shouldFade = !isSelectedUser && employee.id !== "root";
+  } else {
+    isSelectedUser = Boolean(uid && selectedUserIds.includes(uid));
+    const isInSelectedSubtree = Boolean(hasUserFilter && selectedUserSubtreeIds.has(employee.id));
+    const highlightActive = hasUserFilter && selectedUserSubtreeIds.size > 0;
+    shouldFade = Boolean(highlightActive && !isInSelectedSubtree && employee.id !== "root");
+    isChildHighlight = isInSelectedSubtree && !isSelectedUser;
+  }
 
   const openSidebar = () => {
     onNodeSelect(employee);
@@ -115,12 +134,17 @@ export function OrgChartEmployeeNode(props: OrgChartEmployeeNodeProps): React.Re
         onKeyDown: handleKeyDown,
       };
 
+  let fadeClass = "";
+  if (shouldFade) {
+    fadeClass = hasActiveSelection ? "org-chart-page__node--muted" : "org-chart-page__node--fade";
+  }
+
   const nodeClass = [
     "org-chart-page__node",
     isRoot ? "org-chart-page__node--root" : "",
     isSelectedUser ? "org-chart-page__node--selected" : "",
     isChildHighlight ? "org-chart-page__node--subtree" : "",
-    shouldFade ? "org-chart-page__node--fade" : "",
+    fadeClass,
   ]
     .filter(Boolean)
     .join(" ");

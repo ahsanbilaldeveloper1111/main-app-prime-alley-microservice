@@ -1,9 +1,10 @@
 import "@assets/scss/datatable-style.scss";
 import React, { ReactElement, useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/router";
+import { useSession } from "next-auth/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Layout from "@layout/index";
-import GenericSidebar, { SidebarSection } from "@components/GenericSidebarNew";
+import GenericSidebar, { QuickAction, SidebarSection } from "@components/GenericSidebarNew";
 import DeleteConfirmationModal from "@components/page-partials/DeleteConfirmationModal";
 import AddEmployeeModal from "@page-modules/workforce/AddEmployeeModal";
 import EditEmployeeModal from "@page-modules/workforce/EditEmployeeModal";
@@ -21,10 +22,15 @@ import GenericTable, { FilterPill, TabConfig, ToolbarConfig } from "@components/
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
 
-import { Plus } from "lucide-react";
+import { Calendar, Pencil, Plus, Trash2 } from "lucide-react";
 import moment from "moment";
 import { GlobalDateTimeFormat } from "@utils/Helper";
 import { formatPhoneForDisplay } from "@utils/phoneDisplay";
+import {
+  formatCnicForDisplay,
+  formatEmployeeAddressBlock,
+  resolveEmployeeIdDisplay,
+} from "@utils/workforce/employeeProfileFieldUtils";
 import { HEADER_CONSTANTS } from "@constants/headerConstants";
 
 import { workforceKeys } from "@query/keys";
@@ -37,6 +43,7 @@ import {
   hierarchyLabel,
   userIdForProfilePayload,
   buildDepartmentHeadcountChartRows,
+  employeeProfileHasJourneyStarted,
   journeyStartDateMinIso,
   type EmployeesListAppliedFilters,
 } from "@page-modules/workforce/employees/employeesDomain";
@@ -51,10 +58,7 @@ import EmployeesDepartmentHeadcountPanel from "@page-modules/workforce/employees
 import EmployeesDashboardOverviewPanel from "@page-modules/workforce/employees/partials/EmployeesDashboardOverviewPanel";
 import CreateJourneyModal from "@page-modules/workforce/employees/partials/CreateJourneyModal";
 import { WorkforceListPageShell } from "@page-modules/workforce/shared/WorkforceListPageShell";
-import {
-  WorkforceFixedActionBar,
-  WorkforceProspectsPrimaryButton,
-} from "@page-modules/workforce/shared/WorkforceProspectsTheme";
+import { WorkforceProspectsPrimaryButton } from "@page-modules/workforce/shared/WorkforceProspectsTheme";
 import {
   EMPLOYEES_LIST_SCOPED_LAYOUT,
   WORKFORCE_TOOLBAR_LABELS,
@@ -63,6 +67,11 @@ import {
 import { renderApplyFilterActions } from "@utils/communicationsStagedFilters";
 
 import { usePermissions } from "@utils/permissionUtils";
+import { useAttendanceHierarchyScope } from "@page-modules/workforce/attendance/useAttendanceHierarchyScope";
+import {
+  filterMainAppUsersForEmployeeListScope,
+  resolveEmployeeDirectoryPhonesForListScope,
+} from "@utils/workforce/employeeListDirectoryScope";
 
 import "@page-modules/workforce/shared/workforcePages.scss";
 import "@page-modules/workforce/employees/employeesPage.scss";
@@ -72,6 +81,7 @@ const { PERMISSIONS } = HEADER_CONSTANTS;
 const Employees = () => {
   const router = useRouter();
   const queryClient = useQueryClient();
+  const { data: session, status: sessionStatus } = useSession();
   const { hasPermission, hasAnyPermission, isAdmin } = usePermissions();
   const { mainAppDepartments, mainAppUsers, companyIdentifier, loadingUsers } = useMainAppLookups();
 
@@ -80,22 +90,46 @@ const Employees = () => {
     [hasPermission],
   );
 
+  const { teamScopeUserIds, teamScopeLoading } = useAttendanceHierarchyScope(
+    session,
+    sessionStatus,
+    canViewAllCompanyEmployees,
+  );
+
+  const scopedMainAppUsers = useMemo(
+    () =>
+      filterMainAppUsersForEmployeeListScope({
+        canViewAllCompanyEmployees,
+        mainAppUsers: mainAppUsers ?? [],
+        teamScopeUserIds,
+      }),
+    [canViewAllCompanyEmployees, mainAppUsers, teamScopeUserIds],
+  );
+
   const mainAppUserPhones = useMemo(
     () =>
-      (mainAppUsers ?? [])
-        .map((u) => String(u.phone ?? "").trim())
-        .filter((p) => p.length > 0),
-    [mainAppUsers],
+      resolveEmployeeDirectoryPhonesForListScope({
+        canViewAllCompanyEmployees,
+        mainAppUsers: mainAppUsers ?? [],
+        teamScopeUserIds,
+      }),
+    [canViewAllCompanyEmployees, mainAppUsers, teamScopeUserIds],
   );
 
   const employeesListScope = useMemo(
     () => ({
       canViewAllCompanyEmployees,
       mainAppUserPhones,
-      mainAppUsers: mainAppUsers ?? [],
-      loadingUsers,
+      mainAppUsers: scopedMainAppUsers,
+      loadingUsers: loadingUsers || (!canViewAllCompanyEmployees && teamScopeLoading),
     }),
-    [canViewAllCompanyEmployees, mainAppUserPhones, mainAppUsers, loadingUsers],
+    [
+      canViewAllCompanyEmployees,
+      mainAppUserPhones,
+      scopedMainAppUsers,
+      loadingUsers,
+      teamScopeLoading,
+    ],
   );
 
   const refreshWorkforceQueries = useCallback(() => {
@@ -595,6 +629,28 @@ const Employees = () => {
     mainAppUsers,
   ]);
 
+  const isWorkforceAdmin = isAdmin();
+  const canAddEmployee =
+    isWorkforceAdmin || hasPermission(PERMISSIONS.ADD_EMPLOYEE_STAFF_MANAGEMENT);
+  const canEditEmployee =
+    isWorkforceAdmin || hasPermission(PERMISSIONS.UPDATE_EMPLOYEE_STAFF_MANAGEMENT);
+  const canCreateEmployeeJourney =
+    isWorkforceAdmin ||
+    hasAnyPermission([...EMPLOYEE_JOURNEY_CREATE_PERMISSIONS]);
+  const canDeleteEmployee =
+    isWorkforceAdmin || hasPermission(PERMISSIONS.DELETE_EMPLOYEE_STAFF_MANAGEMENT);
+
+  const employeeToolbarRightActions = useMemo(
+    () =>
+      canAddEmployee ? (
+        <WorkforceProspectsPrimaryButton onClick={openCreateModal}>
+          <Plus size={16} />
+          Add Employee
+        </WorkforceProspectsPrimaryButton>
+      ) : null,
+    [canAddEmployee, openCreateModal],
+  );
+
   const employeeToolbarConfig = useMemo<ToolbarConfig>(
     () => ({
       showSearch: true,
@@ -607,6 +663,7 @@ const Employees = () => {
       activeTab: "employees",
       onTabChange: () => {},
       ...workforceModuleToolbarDropdown(WORKFORCE_TOOLBAR_LABELS.employees),
+      rightActions: employeeToolbarRightActions,
       showFiltersButton: true,
       showFilterPills: true,
       filterPills: employeeFilterPills,
@@ -621,6 +678,7 @@ const Employees = () => {
     [
       employeeFilterPills,
       employeeTabs,
+      employeeToolbarRightActions,
       handleApply,
       hasActiveFilters,
       hasUnappliedFilterChanges,
@@ -628,17 +686,6 @@ const Employees = () => {
       searchTerm,
     ],
   );
-
-  const isWorkforceAdmin = isAdmin();
-  const canAddEmployee =
-    isWorkforceAdmin || hasPermission(PERMISSIONS.ADD_EMPLOYEE_STAFF_MANAGEMENT);
-  const canEditEmployee =
-    isWorkforceAdmin || hasPermission(PERMISSIONS.UPDATE_EMPLOYEE_STAFF_MANAGEMENT);
-  const canCreateEmployeeJourney =
-    isWorkforceAdmin ||
-    hasAnyPermission([...EMPLOYEE_JOURNEY_CREATE_PERMISSIONS]);
-  const canDeleteEmployee =
-    isWorkforceAdmin || hasPermission(PERMISSIONS.DELETE_EMPLOYEE_STAFF_MANAGEMENT);
 
   const employeeTableActions = useMemo(
     () => ({
@@ -674,13 +721,29 @@ const Employees = () => {
         defaultExpanded: true,
         fields: [
           { label: "Name", value: getDisplayName(selectedProfile) },
+          { label: "Employee ID", value: resolveEmployeeIdDisplay(selectedProfile) },
           { label: "Extension", value: selectedProfile.user_id ?? "—" },
+          {
+            label: "CNIC/ID",
+            value: formatCnicForDisplay(selectedProfile.identification_number),
+          },
           { label: "Phone", value: formatPhoneForDisplay(selectedProfile.phone ?? "") || "—", type: "phone" },
           {
             label: "Status",
             value: selectedProfile.status ?? "—",
             type: "badge",
             badgeVariant: String(selectedProfile.status ?? "").toLowerCase() === "active" ? "success" : "danger",
+          },
+        ],
+      },
+      {
+        id: "employee-address",
+        title: "Address",
+        defaultExpanded: true,
+        fields: [
+          {
+            label: "Address",
+            value: formatEmployeeAddressBlock(selectedProfile.addresses, selectedProfile),
           },
         ],
       },
@@ -704,6 +767,50 @@ const Employees = () => {
     ];
   }, [getDisplayName, departments, selectedProfile]);
 
+  const employeeSidebarQuickActions = useMemo<QuickAction[]>(() => {
+    if (!selectedProfile) return [];
+
+    const actions: QuickAction[] = [];
+
+    if (canEditEmployee) {
+      actions.push({
+        id: "edit-employee",
+        label: "Edit",
+        icon: Pencil,
+        onClick: () => openEditModal(selectedProfile),
+      });
+    }
+
+    if (canCreateEmployeeJourney) {
+      actions.push({
+        id: "create-journey",
+        label: "Create Journey",
+        icon: Calendar,
+        onClick: () => openJourneyModal(selectedProfile),
+        disabled: employeeProfileHasJourneyStarted(selectedProfile),
+      });
+    }
+
+    if (canDeleteEmployee) {
+      actions.push({
+        id: "delete-employee",
+        label: "Delete",
+        icon: Trash2,
+        onClick: () => handleDeleteClick(selectedProfile),
+      });
+    }
+
+    return actions;
+  }, [
+    canCreateEmployeeJourney,
+    canDeleteEmployee,
+    canEditEmployee,
+    handleDeleteClick,
+    openEditModal,
+    openJourneyModal,
+    selectedProfile,
+  ]);
+
   const employeeColumns = useMemo(
     () =>
       buildEmployeeTableColumns({
@@ -714,22 +821,26 @@ const Employees = () => {
     [departments, employeeTableActions, getDisplayName],
   );
 
+  const employeeEmptyMessage = useMemo(() => {
+    if (!hasActiveFilters && !appliedSearch.trim()) {
+      return "No employees found";
+    }
+    return (
+      <div className="employees-page__empty-search">
+        <p>No employees match your current search or filters.</p>
+        <button type="button" className="workforce-prospects-primary-btn" onClick={resetFilters}>
+          Clear search &amp; show all
+        </button>
+      </div>
+    );
+  }, [appliedSearch, hasActiveFilters, resetFilters]);
+
   return (
     <React.Fragment>
       <WorkforceListPageShell
         breadcrumbSubTitle="Employees"
         tableWrapperClass="workforce-employees-table-wrapper"
         scopedLayout={EMPLOYEES_LIST_SCOPED_LAYOUT}
-        fixedActions={
-          canAddEmployee ? (
-            <WorkforceFixedActionBar>
-              <WorkforceProspectsPrimaryButton onClick={openCreateModal}>
-                <Plus size={16} />
-                Add Employee
-              </WorkforceProspectsPrimaryButton>
-            </WorkforceFixedActionBar>
-          ) : undefined
-        }
         footer={
           <div className="employees-page__charts-grid">
             <EmployeesDepartmentHeadcountPanel chartRows={departmentHeadcountData} />
@@ -745,7 +856,7 @@ const Employees = () => {
               showActions={false}
               loading={listFetching}
               loadingMessage="Loading employees..."
-              emptyMessage="No employees found"
+              emptyMessage={employeeEmptyMessage}
               hover={true}
               uniqueKey="id"
               pagination={{
@@ -768,6 +879,7 @@ const Employees = () => {
             <GenericSidebar
               isOpen={Boolean(selectedProfile)}
               onClose={closeSidebar}
+              dockInParent
               title={getDisplayName(selectedProfile)}
               subtitle={selectedProfile.designation ?? ""}
               avatar={{
@@ -775,6 +887,7 @@ const Employees = () => {
                 name: getDisplayName(selectedProfile),
                 gradient: "#0066CC",
               }}
+              quickActions={employeeSidebarQuickActions}
               sections={employeeSidebarSections}
             />
           )}

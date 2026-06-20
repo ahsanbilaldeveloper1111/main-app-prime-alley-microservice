@@ -991,6 +991,8 @@ export interface GenericSidebarProps {
   onLogWhatsApp?: () => void;
   onLogMeeting?: () => void;
   sidebarMarginTop?: string | number;
+  /** When true, hides the icon row under the contact header (Call, WhatsApp, etc.). */
+  hideQuickActionsBar?: boolean;
 }
 
 // ============================================================================
@@ -6165,6 +6167,7 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
   onLogWhatsApp,
   onLogMeeting,
   sidebarMarginTop = 0,
+  hideQuickActionsBar = false,
 }) => {
   const router = useRouter();
   const emailContextPayload = buildEmailContextPayload(contextPayload);
@@ -7479,9 +7482,10 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
             bg={field.badgeVariant || "primary"}
             style={{
               fontSize: "12px",
-              padding: "4px 10px",
-              borderRadius: "3px",
-              fontWeight: "500",
+              padding: "4px 12px",
+              borderRadius: "999px",
+              fontWeight: "600",
+              textTransform: "capitalize",
             }}
           >
             {field.value}
@@ -8897,6 +8901,7 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
             </div>
 
             {/* Quick Actions */}
+            {!hideQuickActionsBar && processedQuickActions.length > 0 && (
             <div
               style={{
                 display: "flex",
@@ -8933,6 +8938,7 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
                 );
               })}
             </div>
+            )}
           </div>
 
           {/* Record summary (from API crm_summary) */}

@@ -41,6 +41,7 @@ import { useAttendanceHierarchyScope } from "@page-modules/workforce/attendance/
 
 import {
   buildOrgChartDisplayTree,
+  buildOrgChartTreeFromMinifiedProfiles,
   buildRawProfileByIdMap,
   collectOrgChartUserIds,
   collectSubtreeIdsForUsers,
@@ -76,6 +77,7 @@ const OrganizationalChart = () => {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState<OrgChartEmployee | null>(null);
   const [showEmployeeSidebar, setShowEmployeeSidebar] = useState(false);
+  const [activeChartUserId, setActiveChartUserId] = useState<string | null>(null);
 
   // Same privilege gate as attendance: admin/root/elevated user_type or view-all permission → company-wide enrichment; else hierarchy scope.
   const canViewAllAttendance = useMemo(
@@ -88,6 +90,7 @@ const OrganizationalChart = () => {
   useEffect(() => {
     setShowEmployeeSidebar(false);
     setSelectedEmployee(null);
+    setActiveChartUserId(null);
   }, [activeTab]);
 
   const { userProfilesMinified, loading: userProfilesMinifiedLoading } = useUserProfilesMinified();
@@ -127,7 +130,11 @@ const OrganizationalChart = () => {
     attendance: orgChartAttendanceContext,
   });
 
-  const orgChartTreeRaw = orgChartQuery.data ?? [];
+  const orgChartTreeRaw = useMemo(() => {
+    if (orgChartQuery.data?.length) return orgChartQuery.data ?? [];
+    if (userProfilesMinifiedLoading || userProfilesMinified.length === 0) return [];
+    return buildOrgChartTreeFromMinifiedProfiles(userProfilesMinified);
+  }, [orgChartQuery.data, userProfilesMinified, userProfilesMinifiedLoading]);
 
   const companyName =
     (session?.user as { company_name?: string } | undefined)?.company_name ?? "Organization";
@@ -218,6 +225,8 @@ const OrganizationalChart = () => {
   const handleOrgChartNodeSelect = useCallback((employee: OrgChartEmployee) => {
     setSelectedEmployee(employee);
     setShowEmployeeSidebar(true);
+    const uid = employee.userId?.trim();
+    setActiveChartUserId(uid && uid.length > 0 ? uid : null);
   }, []);
 
   const renderNode = useCallback(
@@ -226,11 +235,12 @@ const OrganizationalChart = () => {
         employee={employee}
         selectedUserIds={selectedUserIds}
         selectedUserSubtreeIds={selectedUserSubtreeIds}
+        activeChartUserId={activeChartUserId}
         rawProfileById={rawProfileById}
         onNodeSelect={handleOrgChartNodeSelect}
       />
     ),
-    [selectedUserIds, selectedUserSubtreeIds, rawProfileById, handleOrgChartNodeSelect],
+    [selectedUserIds, selectedUserSubtreeIds, activeChartUserId, rawProfileById, handleOrgChartNodeSelect],
   );
 
   const renderTree = useCallback(
@@ -250,6 +260,7 @@ const OrganizationalChart = () => {
   const closeEmployeeSidebar = useCallback(() => {
     setShowEmployeeSidebar(false);
     setSelectedEmployee(null);
+    setActiveChartUserId(null);
   }, []);
 
   const handleZoomIn = useCallback(() => {
@@ -288,7 +299,12 @@ const OrganizationalChart = () => {
       return <div className="org-chart-page__empty-panel">Loading chart...</div>;
     }
     if (!orgData) {
-      return <div className="org-chart-page__empty-panel">No organizational data available.</div>;
+      return (
+        <div className="org-chart-page__empty-panel">
+          No organizational data available. Create employee profiles and assign reporting lines from the
+          employee sidebar — a journey is not required.
+        </div>
+      );
     }
     return (
       <div

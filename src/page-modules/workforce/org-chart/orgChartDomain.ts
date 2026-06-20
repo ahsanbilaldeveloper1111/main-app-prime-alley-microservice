@@ -1,4 +1,5 @@
 import type { MainAppDepartmentLookup, MainAppUserLookup } from "@hooks/useMainAppLookups";
+import type { UserProfileMinified } from "@utils/staffManagement";
 import {
   findMainAppUserByOrgChartUserId,
   normalizeOrgChartUserKey,
@@ -63,6 +64,62 @@ export function parseOrgChartTreeResponse(raw: unknown): ApiOrgChartNode[] {
     return (raw as { data: ApiOrgChartNode[] }).data;
   }
   return [];
+}
+
+/**
+ * Build an org chart from minified employee profiles when the org-chart-tree API returns empty.
+ * Lets managers assign reporting lines without requiring a journey record.
+ */
+export function buildOrgChartTreeFromMinifiedProfiles(
+  profiles: readonly UserProfileMinified[],
+): ApiOrgChartNode[] {
+  if (!profiles.length) return [];
+
+  const nodesByProfileId = new Map<number, ApiOrgChartNode>();
+  for (const profile of profiles) {
+    nodesByProfileId.set(profile.id, {
+      id: profile.id,
+      user_id: profile.user_id,
+      parent_id: profile.parent_id,
+      department_id: profile.department_id,
+      children: [],
+    });
+  }
+
+  const findParentProfile = (parentRef: string | null | undefined): UserProfileMinified | undefined => {
+    if (parentRef == null) return undefined;
+    const key = String(parentRef).trim();
+    if (key === "") return undefined;
+    return profiles.find(
+      (p) =>
+        normalizeOrgChartUserKey(p.user_id) === normalizeOrgChartUserKey(key) ||
+        String(p.id) === key,
+    );
+  };
+
+  const roots: ApiOrgChartNode[] = [];
+
+  for (const profile of profiles) {
+    const node = nodesByProfileId.get(profile.id);
+    if (!node) continue;
+
+    const parentProfile = findParentProfile(profile.parent_id);
+    if (parentProfile == null) {
+      roots.push(node);
+      continue;
+    }
+
+    const parentNode = nodesByProfileId.get(parentProfile.id);
+    if (parentNode == null) {
+      roots.push(node);
+      continue;
+    }
+
+    parentNode.children = parentNode.children ?? [];
+    parentNode.children.push(node);
+  }
+
+  return roots;
 }
 
 export function employeeStatusFromApiNode(node: ApiOrgChartNode): OrgChartEmployeeStatus {

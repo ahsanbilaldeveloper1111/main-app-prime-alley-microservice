@@ -124,30 +124,34 @@ const EmployeesDashboardOverviewPanel: React.FC<EmployeesDashboardOverviewPanelP
         {counters.compliance_alerts && (
           <div className="employees-page__overview-block employees-page__overview-block--rose">
             <div className="employees-page__overview-block-title">Compliance alerts</div>
-            <div className="employees-page__overview-wrap-metrics">
-              <span>
-                High:{" "}
-                <strong className="employees-page__overview-strong employees-page__overview-strong--red">
-                  {counters.compliance_alerts.high ?? 0}
-                </strong>
-              </span>
-              <span>
-                Medium:{" "}
-                <strong className="employees-page__overview-strong employees-page__overview-strong--amber">
-                  {counters.compliance_alerts.medium ?? 0}
-                </strong>
-              </span>
-              <span>
-                Low:{" "}
-                <strong className="employees-page__overview-strong employees-page__overview-strong--green">
-                  {counters.compliance_alerts.low ?? 0}
-                </strong>
-              </span>
-              <span>
-                Total:{" "}
-                <strong className="employees-page__overview-strong">{counters.compliance_alerts.total ?? 0}</strong>
-              </span>
-            </div>
+            {(counters.compliance_alerts.total ?? 0) > 0 ? (
+              <div className="employees-page__overview-wrap-metrics">
+                <span>
+                  High:{" "}
+                  <strong className="employees-page__overview-strong employees-page__overview-strong--red">
+                    {counters.compliance_alerts.high ?? 0}
+                  </strong>
+                </span>
+                <span>
+                  Medium:{" "}
+                  <strong className="employees-page__overview-strong employees-page__overview-strong--amber">
+                    {counters.compliance_alerts.medium ?? 0}
+                  </strong>
+                </span>
+                <span>
+                  Low:{" "}
+                  <strong className="employees-page__overview-strong employees-page__overview-strong--green">
+                    {counters.compliance_alerts.low ?? 0}
+                  </strong>
+                </span>
+                <span>
+                  Total:{" "}
+                  <strong className="employees-page__overview-strong">{counters.compliance_alerts.total ?? 0}</strong>
+                </span>
+              </div>
+            ) : (
+              <div className="employees-page__overview-metric">No compliance alerts at this time.</div>
+            )}
           </div>
         )}
       </div>

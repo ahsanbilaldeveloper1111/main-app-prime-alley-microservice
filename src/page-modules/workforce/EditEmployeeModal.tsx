@@ -27,6 +27,12 @@ import {
   validateEmployeeModalCoreRequiredFields,
   type DepartmentUserRow,
 } from "@utils/workforce/employeeModalShared";
+import { useEmployeeModalPhoneValidationQuery } from "./employeeModalQueries";
+import {
+  findEmployeeWithDuplicatePhone,
+  formatCnicInput,
+  isValidCnic,
+} from "@utils/workforce/employeeProfileFieldUtils";
 
 export type AddressFormItem = EmployeeModalAddressBase;
 type AddressFieldKey = EmployeeModalAddressFieldKey;
@@ -118,6 +124,9 @@ const EditEmployeeModal: React.FC<EditEmployeeModalProps> = ({
     companyIdentifier ||
     null;
 
+  const phoneValidationQuery = useEmployeeModalPhoneValidationQuery(show);
+  const existingProfiles = phoneValidationQuery.profiles;
+
   // Initialize sidebar if profile changes
   useEffect(() => {
     try {
@@ -134,7 +143,7 @@ const EditEmployeeModal: React.FC<EditEmployeeModalProps> = ({
     setForm({
       user_id: profile.user_id ?? "",
       employee_code: profile.employee_code ?? "",
-      identification_number: profile.identification_number ?? "",
+      identification_number: formatCnicInput(profile.identification_number ?? ""),
       job_title: profile.job_title ?? "",
       designation: profile.designation ?? "",
       department_id: profile.department_id ?? null,
@@ -180,13 +189,15 @@ const EditEmployeeModal: React.FC<EditEmployeeModalProps> = ({
       }
       setLoadingDepartmentUsers(true);
       try {
-        const list = await fetchDepartmentUserRowsForModal(companyUuid, departmentId);
+        const list = await fetchDepartmentUserRowsForModal(companyUuid, departmentId, {
+          allowUserId: profile?.user_id ?? null,
+        });
         setDepartmentUsers(list);
       } finally {
         setLoadingDepartmentUsers(false);
       }
     },
-    [companyUuid],
+    [companyUuid, profile?.user_id],
   );
 
   // Fetch users when department changes
@@ -286,10 +297,18 @@ const EditEmployeeModal: React.FC<EditEmployeeModalProps> = ({
   }, []);
 
   const phoneFieldValid = useMemo(() => isOptionalWorkforcePhoneValid(form.phone), [form.phone]);
+  const cnicFieldValid = useMemo(() => isValidCnic(form.identification_number), [form.identification_number]);
+  const phoneDuplicate = useMemo(
+    () => findEmployeeWithDuplicatePhone(String(form.phone ?? ""), existingProfiles, profile?.id),
+    [existingProfiles, form.phone, profile?.id],
+  );
   const phoneShowInvalid = Boolean(form.phone?.toString().trim()) && !phoneFieldValid;
   const editSubmitReady = useMemo(
-    () => isEditEmployeeReadyToSubmit(form, addresses, phoneFieldValid),
-    [form, addresses, phoneFieldValid],
+    () =>
+      isEditEmployeeReadyToSubmit(form, addresses, phoneFieldValid) &&
+      cnicFieldValid &&
+      !phoneDuplicate,
+    [form, addresses, phoneFieldValid, cnicFieldValid, phoneDuplicate],
   );
 
   const handleCancelClick = useCallback(() => {
@@ -309,6 +328,14 @@ const EditEmployeeModal: React.FC<EditEmployeeModalProps> = ({
       toast.error("Enter a valid phone number or clear the field.");
       return;
     }
+    if (phoneDuplicate) {
+      toast.error("This mobile number is already assigned to another employee.");
+      return;
+    }
+    if (!isValidCnic(form.identification_number)) {
+      toast.error("CNIC must contain exactly 13 digits or be left empty.");
+      return;
+    }
     const addressValidation = validateEmployeeModalAddressRows(addresses);
     if (!addressValidation.ok) {
       toast.error(addressValidation.message);
@@ -322,7 +349,7 @@ const EditEmployeeModal: React.FC<EditEmployeeModalProps> = ({
         tenant_id: companyUuid?.trim() || undefined,
         user_id: form.user_id?.toString().trim() || null,
         employee_code: form.employee_code?.toString().trim() || null,
-        identification_number: form.identification_number?.toString().trim() || null,
+        identification_number: formatCnicInput(form.identification_number?.toString() ?? "") || null,
         job_title: form.job_title?.toString().trim() || null,
         designation: form.designation?.toString().trim() || null,
         department_id: form.department_id ?? null,
@@ -504,9 +531,13 @@ const EditEmployeeModal: React.FC<EditEmployeeModalProps> = ({
             <EmployeeModalProfileFields
               form={form}
               setForm={setForm}
-              phoneShowInvalid={phoneShowInvalid}
+              phoneShowInvalid={phoneShowInvalid || Boolean(phoneDuplicate)}
               phoneDefaultCountry="PK"
-              phoneHelpText="Select country then enter a complete phone number."
+              phoneHelpText={
+                phoneDuplicate
+                  ? "This mobile number is already assigned to another employee."
+                  : "Select country then enter a complete phone number."
+              }
               employmentSelectRequired={false}
             />
 

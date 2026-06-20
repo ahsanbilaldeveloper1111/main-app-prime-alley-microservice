@@ -1,4 +1,9 @@
-import { getMainAppUsers, type UserProfilePayload } from "@utils/staffManagement";
+import {
+  getMainAppUsers,
+  getUserProfilesMinified,
+  type UserProfilePayload,
+} from "@utils/staffManagement";
+import { normalizeWorkforcePhoneKey } from "@utils/workforce/employeeProfileFieldUtils";
 
 export const EMPLOYMENT_TYPES = ["Full-Time", "Part-Time", "Contract", "Internship", "Freelance", "Temporary"];
 export const CONTRACT_TYPES = ["Permanent", "Temporary", "Freelance", "Fixed-term", "Probation"];
@@ -90,22 +95,50 @@ export function mainAppUserRowPhone(user: MainAppUserApiRow): string {
 /**
  * Users in a department for the employee modal user dropdown (extension required).
  */
+export async function fetchExistingEmployeeUserIds(): Promise<Set<string>> {
+  try {
+    const rows = await getUserProfilesMinified();
+    const ids = new Set<string>();
+    for (const row of rows) {
+      const userId = normalizeWorkforcePhoneKey(row.user_id);
+      if (userId !== "") ids.add(userId);
+    }
+    return ids;
+  } catch {
+    return new Set<string>();
+  }
+}
+
 export async function fetchDepartmentUserRowsForModal(
   companyUuid: string | null | undefined,
   departmentId: number,
+  options?: Readonly<{
+    excludedUserIds?: ReadonlySet<string>;
+    /** Keep this user id visible even if an employee profile already exists (edit flow). */
+    allowUserId?: string | null;
+  }>,
 ): Promise<DepartmentUserRow[]> {
   const uuid = typeof companyUuid === "string" ? companyUuid.trim() : "";
   if (uuid === "") return [];
   try {
-    const usersRaw = await getMainAppUsers(uuid, { department_id: departmentId });
+    const [usersRaw, existingUserIds] = await Promise.all([
+      getMainAppUsers(uuid, { department_id: departmentId }),
+      options?.excludedUserIds ? Promise.resolve(options.excludedUserIds) : fetchExistingEmployeeUserIds(),
+    ]);
     if (!Array.isArray(usersRaw)) return [];
+    const allowedUserId = normalizeWorkforcePhoneKey(options?.allowUserId);
     return (usersRaw as MainAppUserApiRow[])
       .map((u) => ({
         id: u.id,
         name: u.name ?? "—",
         phone: mainAppUserRowPhone(u),
       }))
-      .filter((u) => u.phone !== "");
+      .filter((u) => {
+        const phone = normalizeWorkforcePhoneKey(u.phone);
+        if (phone === "") return false;
+        if (allowedUserId !== "" && phone === allowedUserId) return true;
+        return !existingUserIds.has(phone);
+      });
   } catch {
     return [];
   }

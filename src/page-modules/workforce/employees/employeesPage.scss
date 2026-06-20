@@ -76,16 +76,52 @@ body:has(.workforce-employees-table-wrapper-container) {
       overflow: visible;
       flex-wrap: nowrap;
     }
+
+    .gt-toolbar-tabs-actions {
+      display: flex;
+      align-items: center;
+      margin-left: auto;
+      flex: 0 0 auto;
+      gap: 8px;
+    }
+  }
+
+  .employees-page__layout-row > .generic-sidebar-new-container {
+    @media (min-width: 1280px) {
+      width: 470px !important;
+      min-width: 470px !important;
+      max-width: 470px !important;
+    }
+
+    @media (min-width: 768px) and (max-width: 1279.98px) {
+      width: 360px !important;
+      min-width: 360px !important;
+      max-width: 360px !important;
+    }
+
+    @media (max-width: 767.98px) {
+      width: 320px !important;
+      min-width: 320px !important;
+      max-width: 320px !important;
+    }
   }
 }
 
 .employees-page__layout-row {
   display: flex;
-  gap: 0;
-  align-items: stretch;
+  gap: 12px;
+  align-items: flex-start;
   flex: 1 1 auto;
   min-height: 0;
   min-width: 0;
+}
+
+.employees-page__layout-row > .generic-sidebar-new-container {
+  flex: 0 0 auto !important;
+  flex-shrink: 0 !important;
+  align-self: flex-start;
+  height: auto !important;
+  max-height: calc(100vh - 96px);
 }
 
 .employees-page__main {
@@ -95,6 +131,22 @@ body:has(.workforce-employees-table-wrapper-container) {
   display: flex;
   flex-direction: column;
   overflow: visible;
+}
+
+.employees-page__empty-search {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 24px 16px;
+  text-align: center;
+
+  p {
+    margin: 0;
+    color: #6b7280;
+    font-size: 14px;
+  }
 }
 
 .employees-page__charts-grid {
@@ -318,22 +370,25 @@ body:has(.workforce-employees-table-wrapper-container) {
 
 .employees-page__status-pill {
   padding: 4px 12px;
-  border-radius: 16px;
+  border-radius: 999px;
   font-size: 13px;
-  font-weight: 500;
+  font-weight: 600;
   display: inline-flex;
   align-items: center;
   gap: 6px;
   text-transform: capitalize;
+  border: 1px solid transparent;
 
   &--active {
     background-color: #d1fae5;
     color: #065f46;
+    border-color: #6ee7b7;
   }
 
   &--inactive {
     background-color: #fee2e2;
     color: #991b1b;
+    border-color: #fca5a5;
   }
 }
 

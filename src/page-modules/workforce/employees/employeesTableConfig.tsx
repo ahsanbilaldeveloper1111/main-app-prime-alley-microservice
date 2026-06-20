@@ -5,7 +5,8 @@ import type { TableColumn } from "@components/GenericTable";
 import type { MainAppDepartmentLookup } from "@hooks/useMainAppLookups";
 import type { UserProfile } from "@utils/staffManagement";
 import { GlobalDateTimeFormat } from "@utils/Helper";
-import { formatPhoneForDisplay } from "@utils/phoneDisplay";
+import { CrmPhoneDisplay } from "@components/crm/CrmListPageUi";
+import { formatCnicForDisplay } from "@utils/workforce/employeeProfileFieldUtils";
 import {
   CrmTableRowActions,
   type CrmTableRowAction,
@@ -29,26 +30,16 @@ export function buildEmployeeTableColumns({
       label: "Employee",
       type: "custom",
       sortable: false,
-      render: (profile: UserProfile) => {
-        const statusText = String(profile.status ?? "Active");
-        const isActive = statusText.toLowerCase() === "active";
-        return (
-          <div className="employees-page__cell-employee">
-            <div className="employees-page__cell-avatar">
-              <User size={20} aria-hidden />
-            </div>
-            <div>
-              <div className="employees-page__cell-name">{getDisplayName(profile)}</div>
-              <div className="employees-page__cell-sub employees-page__cell-sub--capitalize">
-                <span
-                  className={`employees-page__cell-dot${isActive ? " employees-page__cell-dot--active" : " employees-page__cell-dot--inactive"}`}
-                />
-                {statusText}
-              </div>
-            </div>
+      render: (profile: UserProfile) => (
+        <div className="employees-page__cell-employee">
+          <div className="employees-page__cell-avatar">
+            <User size={20} aria-hidden />
           </div>
-        );
-      },
+          <div>
+            <div className="employees-page__cell-name">{getDisplayName(profile)}</div>
+          </div>
+        </div>
+      ),
     },
     {
       key: "user_id",
@@ -59,8 +50,13 @@ export function buildEmployeeTableColumns({
     {
       key: "identification_number",
       label: "CNIC/ID",
-      type: "text",
+      type: "custom",
       sortable: false,
+      render: (profile: UserProfile) => (
+        <span className="employees-page__cell-text-primary">
+          {formatCnicForDisplay(profile.identification_number)}
+        </span>
+      ),
     },
     {
       key: "designation",
@@ -99,9 +95,13 @@ export function buildEmployeeTableColumns({
       label: "Phone",
       type: "custom",
       sortable: false,
-      render: (profile: UserProfile) => (
-        <span className="employees-page__cell-text-primary">{formatPhoneForDisplay(profile.phone)}</span>
-      ),
+      render: (profile: UserProfile) => {
+        const phone = String(profile.phone ?? "").trim();
+        if (phone === "") {
+          return <span className="employees-page__cell-muted">—</span>;
+        }
+        return <CrmPhoneDisplay phone={phone} />;
+      },
     },
     {
       key: "status",

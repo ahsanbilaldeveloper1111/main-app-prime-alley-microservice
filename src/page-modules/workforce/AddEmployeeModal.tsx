@@ -24,7 +24,13 @@ import {
 } from "@utils/workforce/employeeModalShared";
 import { workforceKeys } from "@query/keys";
 import "@assets/scss/workforceEmployeeModalSidebar.scss";
-import { useEmployeeModalDepartmentUsersQuery } from "./employeeModalQueries";
+import { useEmployeeModalDepartmentUsersQuery, useEmployeeModalPhoneValidationQuery } from "./employeeModalQueries";
+import {
+  findEmployeeWithDuplicatePhone,
+  formatCnicInput,
+  isValidCnic,
+  CNIC_MAX_DIGITS,
+} from "@utils/workforce/employeeProfileFieldUtils";
 
 export type AddressFormItem = EmployeeModalAddressBase;
 type AddressFieldKey = EmployeeModalAddressFieldKey;
@@ -180,6 +186,9 @@ const AddEmployeeModal: React.FC<AddEmployeeModalProps> = ({
   const departmentUsers = departmentUsersQuery.rows;
   const loadingDepartmentUsers = departmentUsersQuery.isFetching;
 
+  const phoneValidationQuery = useEmployeeModalPhoneValidationQuery(show);
+  const existingProfiles = phoneValidationQuery.profiles;
+
   useEffect(() => {
     try {
       setAddressCountries(Country.getAllCountries());
@@ -206,7 +215,7 @@ const AddEmployeeModal: React.FC<AddEmployeeModalProps> = ({
         tenant_id: tenantId?.trim() || undefined,
         user_id: String(form.user_id).trim(),
         employee_code: form.employee_code?.toString().trim() || null,
-        identification_number: form.identification_number?.toString().trim() || null,
+        identification_number: formatCnicInput(form.identification_number?.toString() ?? "") || null,
         job_title: form.job_title?.toString().trim() || null,
         department_id: form.department_id ?? null,
         location_id: form.location_id ?? null,
@@ -274,10 +283,20 @@ const AddEmployeeModal: React.FC<AddEmployeeModalProps> = ({
   const requiredValidation = useMemo(() => validateEmployeeModalCoreRequiredFields(form), [form]);
   const addressRowsValidation = useMemo(() => validateEmployeeModalAddressRows(addresses), [addresses]);
   const phoneFieldValid = useMemo(() => isOptionalWorkforcePhoneValid(form.phone), [form.phone]);
+  const cnicFieldValid = useMemo(() => isValidCnic(form.identification_number), [form.identification_number]);
+  const phoneDuplicate = useMemo(
+    () => findEmployeeWithDuplicatePhone(String(form.phone ?? ""), existingProfiles),
+    [existingProfiles, form.phone],
+  );
   const phoneShowInvalid = Boolean(form.phone?.toString().trim()) && !phoneFieldValid;
   const submitting = createEmployeeMutation.isPending;
   const isPrimaryDisabled =
-    submitting || !requiredValidation.ok || !addressRowsValidation.ok || !phoneFieldValid;
+    submitting ||
+    !requiredValidation.ok ||
+    !addressRowsValidation.ok ||
+    !phoneFieldValid ||
+    !cnicFieldValid ||
+    Boolean(phoneDuplicate);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -288,6 +307,14 @@ const AddEmployeeModal: React.FC<AddEmployeeModalProps> = ({
     }
     if (!phoneFieldValid) {
       toast.error("Enter a valid phone number or clear the field.");
+      return;
+    }
+    if (phoneDuplicate) {
+      toast.error("This mobile number is already assigned to another employee.");
+      return;
+    }
+    if (!isValidCnic(form.identification_number)) {
+      toast.error(`CNIC must contain exactly ${CNIC_MAX_DIGITS} digits or be left empty.`);
       return;
     }
     const addressValidation = validateEmployeeModalAddressRows(addresses);
@@ -352,7 +379,7 @@ const AddEmployeeModal: React.FC<AddEmployeeModalProps> = ({
               }
               helpText={
                 !userOptionsLoading && hasDepartmentSelected && mainAppUserOptions.length === 0
-                  ? "No users available for this department."
+                  ? "All users in this department already have employee profiles."
                   : undefined
               }
             />
@@ -360,9 +387,13 @@ const AddEmployeeModal: React.FC<AddEmployeeModalProps> = ({
             <EmployeeModalProfileFields
               form={form}
               setForm={setForm}
-              phoneShowInvalid={phoneShowInvalid}
+              phoneShowInvalid={phoneShowInvalid || Boolean(phoneDuplicate)}
               phoneDefaultCountry="US"
-              phoneHelpText="Select country (e.g. +92) then enter a complete phone number."
+              phoneHelpText={
+                phoneDuplicate
+                  ? "This mobile number is already assigned to another employee."
+                  : "Select country (e.g. +92) then enter a complete phone number."
+              }
               employmentSelectRequired
             />
 
