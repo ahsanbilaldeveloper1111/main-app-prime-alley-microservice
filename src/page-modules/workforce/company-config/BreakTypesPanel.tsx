@@ -1,8 +1,10 @@
 import { EmbeddedSettingsTable } from "@components/main-settings/EmbeddedSettingsTable";
 import { SettingsEmbeddedToolbar } from "@components/main-settings/SettingsEmbeddedToolbar";
-import { CreateBreakTypeSidebar } from "@page-modules/workforce/company-config/CreateBreakTypeSidebar";
+import DeleteConfirmationModal from "@components/page-partials/DeleteConfirmationModal";
+import { BreakTypeSidebar } from "@page-modules/workforce/company-config/BreakTypeSidebar";
 import type { CompanyConfigPolicyPanelProps } from "@page-modules/workforce/company-config/companyConfigPanelTypes";
 import {
+  BREAK_TYPE_EMPTY_LIST_MESSAGE,
   BREAK_TYPES_LIST_DEFAULT_LIMIT,
   BREAK_TYPES_LIST_PAGE_SIZE_OPTIONS,
   filterBreakTypesBySearch,
@@ -11,6 +13,9 @@ import {
 import { buildBreakTypesTableColumns } from "@page-modules/workforce/company-config/breakTypesTableConfig";
 import { useBreakTypesQuery } from "@page-modules/workforce/company-config/useBreakTypesQuery";
 import { useCreateBreakTypeMutation } from "@page-modules/workforce/company-config/useCreateBreakTypeMutation";
+import { useDeleteBreakTypeMutation } from "@page-modules/workforce/company-config/useDeleteBreakTypeMutation";
+import { useUpdateBreakTypeMutation } from "@page-modules/workforce/company-config/useUpdateBreakTypeMutation";
+import type { AttendanceBreakType } from "@utils/staffManagement";
 import { Plus } from "lucide-react";
 import React, { useMemo, useState } from "react";
 import { Button } from "react-bootstrap";
@@ -30,9 +35,13 @@ export function BreakTypesPanel({
   const [searchValue, setSearchValue] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [rowsPerPage, setRowsPerPage] = useState(BREAK_TYPES_LIST_DEFAULT_LIMIT);
-  const [showCreateSidebar, setShowCreateSidebar] = useState(false);
+  const [sidebarMode, setSidebarMode] = useState<"create" | "edit" | null>(null);
+  const [editingBreakType, setEditingBreakType] = useState<AttendanceBreakType | null>(null);
+  const [breakTypeToDelete, setBreakTypeToDelete] = useState<AttendanceBreakType | null>(null);
 
   const createBreakTypeMutation = useCreateBreakTypeMutation();
+  const updateBreakTypeMutation = useUpdateBreakTypeMutation();
+  const deleteBreakTypeMutation = useDeleteBreakTypeMutation();
 
   const breakTypesQuery = useBreakTypesQuery({
     tenantId: resolvedTenantId || null,
@@ -41,7 +50,17 @@ export function BreakTypesPanel({
 
   const breakTypeRows = breakTypesQuery.data?.data ?? [];
 
-  const columns = useMemo(() => buildBreakTypesTableColumns(), []);
+  const columns = useMemo(
+    () =>
+      buildBreakTypesTableColumns({
+        onEdit: (row) => {
+          setEditingBreakType(row);
+          setSidebarMode("edit");
+        },
+        onDelete: (row) => setBreakTypeToDelete(row),
+      }),
+    [],
+  );
 
   const filteredRows = useMemo(
     () => filterBreakTypesBySearch(breakTypeRows, searchValue),
@@ -50,6 +69,7 @@ export function BreakTypesPanel({
 
   const pagination = breakTypesQuery.data?.pagination;
   const totalRows = pagination?.total ?? filteredRows.length;
+  const sidebarSubmitting = createBreakTypeMutation.isPending || updateBreakTypeMutation.isPending;
 
   const addButton = (
     <Button
@@ -58,7 +78,10 @@ export function BreakTypesPanel({
       type="button"
       className="shadow-sm"
       disabled={!resolvedTenantId}
-      onClick={() => setShowCreateSidebar(true)}
+      onClick={() => {
+        setEditingBreakType(null);
+        setSidebarMode("create");
+      }}
     >
       <Plus size={16} className="me-1" aria-hidden />
       Add break type
@@ -102,7 +125,7 @@ export function BreakTypesPanel({
         data={filteredRows}
         columns={columns}
         loading={breakTypesQuery.isFetching}
-        emptyMessage="No break types found."
+        emptyMessage={BREAK_TYPE_EMPTY_LIST_MESSAGE}
         pagination={{
           currentPage,
           rowsPerPage,
@@ -118,26 +141,65 @@ export function BreakTypesPanel({
         hover
       />
 
-      <CreateBreakTypeSidebar
-        show={showCreateSidebar}
+      <BreakTypeSidebar
+        show={sidebarMode != null}
+        mode={sidebarMode === "edit" ? "edit" : "create"}
+        breakType={editingBreakType}
         isAdmin={isWorkforceAdmin}
         tenantOptions={tenantOptions}
         lockedTenantId={resolvedTenantId}
-        isSubmitting={createBreakTypeMutation.isPending}
+        isSubmitting={sidebarSubmitting}
         onClose={() => {
-          if (createBreakTypeMutation.isPending) return;
-          setShowCreateSidebar(false);
+          if (sidebarSubmitting) return;
+          setSidebarMode(null);
+          setEditingBreakType(null);
         }}
         onSubmit={({ tenantId, form }) => {
+          if (sidebarMode === "edit" && editingBreakType) {
+            updateBreakTypeMutation.mutate(
+              { id: editingBreakType.id, tenantId, form },
+              {
+                onSuccess: () => {
+                  setSidebarMode(null);
+                  setEditingBreakType(null);
+                },
+              },
+            );
+            return;
+          }
           createBreakTypeMutation.mutate(
             { tenantId, form },
             {
               onSuccess: () => {
-                setShowCreateSidebar(false);
+                setSidebarMode(null);
               },
             },
           );
         }}
+      />
+
+      <DeleteConfirmationModal
+        show={breakTypeToDelete != null}
+        onHide={() => {
+          if (deleteBreakTypeMutation.isPending) return;
+          setBreakTypeToDelete(null);
+        }}
+        onConfirm={() => {
+          if (!breakTypeToDelete || !resolvedTenantId) return;
+          deleteBreakTypeMutation.mutate(
+            { id: breakTypeToDelete.id, tenantId: resolvedTenantId },
+            { onSuccess: () => setBreakTypeToDelete(null) },
+          );
+        }}
+        itemName={breakTypeToDelete?.name?.trim() || undefined}
+        itemType="break type"
+        additionalInfo={
+          <p className="mb-0">
+            If this break type has existing records, deletion will be blocked — deactivate it
+            instead.
+          </p>
+        }
+        loading={deleteBreakTypeMutation.isPending}
       />
     </>
   );

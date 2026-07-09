@@ -5,15 +5,17 @@ import {
   type BreakTypeFormState,
 } from "@page-modules/workforce/company-config/breakTypesDomain";
 import { workforceKeys } from "@query/keys";
-import { createAttendanceBreakType } from "@utils/staffManagement";
+import { updateAttendanceBreakType } from "@utils/staffManagement";
 import { getHttpApiErrorDetail } from "@utils/errors";
 
-export function useCreateBreakTypeMutation() {
+export function useUpdateBreakTypeMutation() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (input: { tenantId: string; form: BreakTypeFormState }) =>
-      createAttendanceBreakType(buildCreateBreakTypePayload(input.tenantId, input.form)),
+    mutationFn: async (input: { id: number; tenantId: string; form: BreakTypeFormState }) => {
+      const { tenant_id, ...payload } = buildCreateBreakTypePayload(input.tenantId, input.form);
+      return updateAttendanceBreakType(input.id, { tenant_id, ...payload });
+    },
     onSuccess: (_data, variables) => {
       queryClient
         .invalidateQueries({
@@ -21,10 +23,10 @@ export function useCreateBreakTypeMutation() {
         })
         .catch(() => undefined);
       queryClient.invalidateQueries({ queryKey: workforceKeys.attendance.all() }).catch(() => undefined);
-      toast.success("Break type created.");
+      toast.success("Break type updated.");
     },
     onError: (error: unknown) => {
-      toast.error(getHttpApiErrorDetail(error, "Failed to create break type."));
+      toast.error(getHttpApiErrorDetail(error, "Failed to update break type."));
     },
   });
 }

@@ -1,3 +1,4 @@
+import { useMainAppLookups } from "@hooks/useMainAppLookups";
 import { BreaksPolicyForm } from "@page-modules/workforce/company-config/BreaksPolicyForm";
 
 import {
@@ -65,7 +66,7 @@ export function CreateBreaksPolicySidebar({
   onSubmit,
 
 }: CreateBreaksPolicySidebarProps) {
-
+  const { mainAppDepartments } = useMainAppLookups();
   const [form, setForm] = useState(createDefaultBreaksPolicyFormState);
 
   const [selectedTenantId, setSelectedTenantId] = useState("");
@@ -193,11 +194,9 @@ export function CreateBreaksPolicySidebar({
 
 
         <BreaksPolicyForm
-
           form={form}
-
           disabled={isSubmitting}
-
+          departmentOptions={mainAppDepartments}
           onChange={(nextForm) => {
 
             setValidationError(null);

@@ -51,6 +51,7 @@ import {
   readMyAttendanceCheckInAt,
   readMyAttendanceSessionActive,
   buildMyAttendanceStatusData,
+  buildCheckOutSuccessMessage,
 } from "@page-modules/workforce/check-in-out/checkInOutDomain";
 import { useMyAttendanceQuery } from "@page-modules/workforce/check-in-out/useMyAttendanceQuery";
 import { AttendanceCorrectionModal } from "@page-modules/workforce/attendance-reports/AttendanceCorrectionModal";
@@ -288,7 +289,9 @@ const AttendancePage = () => {
           normalizeMyAttendanceData(data),
         );
       }
-      toast.success("Checked out successfully");
+      toast.success(buildCheckOutSuccessMessage(
+        data != null && typeof data === "object" ? normalizeMyAttendanceData(data) : null,
+      ));
       await invalidateAttendanceReads();
     },
     onError: (err: unknown) => {

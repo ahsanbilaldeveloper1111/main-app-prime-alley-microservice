@@ -936,8 +936,14 @@ export interface AttendanceCheckInPayload {
   };
 }
 
+export interface AttendanceOvertimeStartPayload extends AttendanceCheckInPayload {
+  is_approved?: boolean;
+  estimated_end_at?: string;
+}
+
 export interface AttendanceBreakStartPayload extends AttendanceCheckInPayload {
   break_type_id: number;
+  break_name?: string;
 }
 
 export interface AttendanceRecord {
@@ -976,6 +982,51 @@ export interface MyAttendanceRecord {
   status?: string | null;
   check_in_at?: string | null;
   check_out_at?: string | null;
+  late_minutes?: number | null;
+  early_exit_minutes?: number | null;
+  overtime_minutes?: number | null;
+  is_auto_checkout?: boolean | null;
+}
+
+export interface MyAttendanceShiftContext {
+  id?: number;
+  name?: string | null;
+  end_time?: string | null;
+  hard_limit_hours?: string | number | null;
+  overtime_enabled?: boolean | null;
+  grace_period_minutes?: number | null;
+}
+
+export interface MyAttendanceGracePeriodPolicyContext {
+  compensate_late_by_stay?: boolean | null;
+  late_adjustment_approval_required?: boolean | null;
+}
+
+export interface MyAttendancePoliciesContext {
+  grace_period?: MyAttendanceGracePeriodPolicyContext | null;
+  break?: Readonly<{
+    max_breaks_per_day?: number | null;
+    min_gap_minutes?: number | null;
+    total_max_break_minutes?: number | null;
+    break_time_counts_toward_overtime?: boolean | null;
+  }> | null;
+  overtime?: Readonly<{
+    buffer_minutes?: number | null;
+    enabled?: boolean | null;
+    weekly_cap_enabled?: boolean | null;
+  }> | null;
+}
+
+export interface MyAttendanceContext {
+  grace_minutes?: number | null;
+  checkout_grace_minutes?: number | null;
+  shift?: MyAttendanceShiftContext | null;
+  break_types?: AttendanceBreakType[];
+  policies?: MyAttendancePoliciesContext | null;
+  tenant_settings?: Readonly<{
+    multiple_break_types_enabled?: boolean | null;
+    auto_checkout_on_hard_limit?: boolean | null;
+  }> | null;
 }
 
 export interface MyAttendanceData {
@@ -987,6 +1038,7 @@ export interface MyAttendanceData {
   is_checked_in: boolean;
   attendance: MyAttendanceRecord | null;
   actions: MyAttendanceAction[];
+  context?: MyAttendanceContext | null;
 }
 
 function parseMyAttendanceActions(raw: unknown): MyAttendanceAction[] {
@@ -1053,13 +1105,190 @@ function normalizeMyAttendanceRecord(raw: unknown): MyAttendanceRecord | null {
     status: readMyAttendanceString(row.status),
     check_in_at: readMyAttendanceString(row.check_in_at ?? row.checkInAt),
     check_out_at: readMyAttendanceString(row.check_out_at ?? row.checkOutAt),
+    late_minutes: readAttendancePolicyNumber(row.late_minutes ?? row.lateMinutes),
+    early_exit_minutes: readAttendancePolicyNumber(
+      row.early_exit_minutes ?? row.earlyExitMinutes,
+    ),
+    overtime_minutes: readAttendancePolicyNumber(
+      row.overtime_minutes ?? row.overtimeMinutes,
+    ),
+    is_auto_checkout: readAttendancePolicyBooleanField(
+      row.is_auto_checkout,
+      row.isAutoCheckout,
+    ),
   };
+}
+
+function normalizeMyAttendanceShiftContext(raw: unknown): MyAttendanceShiftContext | null {
+  if (!raw || typeof raw !== "object") {
+    return null;
+  }
+  const row = raw as Record<string, unknown>;
+  const id = Number(row.id);
+  return {
+    id: Number.isFinite(id) ? id : undefined,
+    name: readMyAttendanceString(row.name),
+    end_time: readMyAttendanceString(row.end_time ?? row.endTime),
+    hard_limit_hours:
+      readMyAttendanceString(row.hard_limit_hours ?? row.hardLimitHours) ??
+      readAttendancePolicyNumber(row.hard_limit_hours ?? row.hardLimitHours),
+    overtime_enabled: readAttendancePolicyBooleanField(
+      row.overtime_enabled,
+      row.overtimeEnabled,
+    ),
+    grace_period_minutes: readAttendancePolicyNumber(
+      row.grace_period_minutes ?? row.gracePeriodMinutes,
+    ),
+  };
+}
+
+function normalizeMyAttendanceBreakTypes(raw: unknown): AttendanceBreakType[] {
+  if (!Array.isArray(raw)) {
+    return [];
+  }
+  return raw
+    .filter((item): item is Record<string, unknown> => item != null && typeof item === "object")
+    .map((item) => {
+      const id = Number(item.id);
+      return {
+        id: Number.isFinite(id) ? id : 0,
+        tenant_id: readMyAttendanceString(item.tenant_id ?? item.tenantId) ?? "",
+        name: readMyAttendanceString(item.name) ?? "",
+        type: readMyAttendanceString(item.type) ?? "",
+        start_time: readMyAttendanceString(item.start_time ?? item.startTime),
+        end_time: readMyAttendanceString(item.end_time ?? item.endTime),
+        duration_minutes: readAttendancePolicyNumber(
+          item.duration_minutes ?? item.durationMinutes,
+        ),
+        max_per_day: readAttendancePolicyNumber(item.max_per_day ?? item.maxPerDay),
+        is_paid: readAttendancePolicyBooleanField(item.is_paid, item.isPaid),
+        is_active: readAttendancePolicyBooleanField(item.is_active, item.isActive) ?? true,
+      } satisfies AttendanceBreakType;
+    })
+    .filter((row) => row.id > 0);
+}
+
+function normalizeMyAttendancePoliciesContext(raw: unknown): MyAttendancePoliciesContext | null {
+  if (!raw || typeof raw !== "object") {
+    return null;
+  }
+  const row = raw as Record<string, unknown>;
+  const gracePeriodRaw = row.grace_period ?? row.gracePeriod;
+  const breakRaw = row.break;
+  const overtimeRaw = row.overtime;
+
+  const gracePeriod =
+    gracePeriodRaw && typeof gracePeriodRaw === "object"
+      ? (gracePeriodRaw as Record<string, unknown>)
+      : null;
+  const breakPolicy =
+    breakRaw && typeof breakRaw === "object" ? (breakRaw as Record<string, unknown>) : null;
+  const overtimePolicy =
+    overtimeRaw && typeof overtimeRaw === "object"
+      ? (overtimeRaw as Record<string, unknown>)
+      : null;
+
+  const policies: MyAttendancePoliciesContext = {
+    grace_period: gracePeriod
+      ? {
+          compensate_late_by_stay: readAttendancePolicyBooleanField(
+            gracePeriod.compensate_late_by_stay,
+            gracePeriod.compensateLateByStay,
+          ),
+          late_adjustment_approval_required: readAttendancePolicyBooleanField(
+            gracePeriod.late_adjustment_approval_required,
+            gracePeriod.lateAdjustmentApprovalRequired,
+          ),
+        }
+      : null,
+    break: breakPolicy
+      ? {
+          max_breaks_per_day: readAttendancePolicyNumber(
+            breakPolicy.max_breaks_per_day ?? breakPolicy.maxBreaksPerDay,
+          ),
+          min_gap_minutes: readAttendancePolicyNumber(
+            breakPolicy.min_gap_minutes ?? breakPolicy.minGapMinutes,
+          ),
+          total_max_break_minutes: readAttendancePolicyNumber(
+            breakPolicy.total_max_break_minutes ?? breakPolicy.totalMaxBreakMinutes,
+          ),
+          break_time_counts_toward_overtime: readAttendancePolicyBooleanField(
+            breakPolicy.break_time_counts_toward_overtime,
+            breakPolicy.breakTimeCountsTowardOvertime,
+          ),
+        }
+      : null,
+    overtime: overtimePolicy
+      ? {
+          buffer_minutes: readAttendancePolicyNumber(
+            overtimePolicy.buffer_minutes ?? overtimePolicy.bufferMinutes,
+          ),
+          enabled: readAttendancePolicyBooleanField(
+            overtimePolicy.enabled,
+            overtimePolicy.enabled,
+          ),
+          weekly_cap_enabled: readAttendancePolicyBooleanField(
+            overtimePolicy.weekly_cap_enabled,
+            overtimePolicy.weeklyCapEnabled,
+          ),
+        }
+      : null,
+  };
+
+  const hasData =
+    policies.grace_period != null || policies.break != null || policies.overtime != null;
+  return hasData ? policies : null;
+}
+
+function normalizeMyAttendanceContext(raw: unknown): MyAttendanceContext | null {
+  if (!raw || typeof raw !== "object") {
+    return null;
+  }
+  const row = raw as Record<string, unknown>;
+  const tenantSettingsRaw = row.tenant_settings ?? row.tenantSettings;
+  const tenantSettings =
+    tenantSettingsRaw && typeof tenantSettingsRaw === "object"
+      ? (tenantSettingsRaw as Record<string, unknown>)
+      : null;
+
+  const context: MyAttendanceContext = {
+    grace_minutes: readAttendancePolicyNumber(row.grace_minutes ?? row.graceMinutes),
+    checkout_grace_minutes: readAttendancePolicyNumber(
+      row.checkout_grace_minutes ?? row.checkoutGraceMinutes,
+    ),
+    shift: normalizeMyAttendanceShiftContext(row.shift),
+    break_types: normalizeMyAttendanceBreakTypes(row.break_types ?? row.breakTypes),
+    policies: normalizeMyAttendancePoliciesContext(row.policies),
+    tenant_settings: tenantSettings
+      ? {
+          multiple_break_types_enabled: readAttendancePolicyBooleanField(
+            tenantSettings.multiple_break_types_enabled,
+            tenantSettings.multipleBreakTypesEnabled,
+          ),
+          auto_checkout_on_hard_limit: readAttendancePolicyBooleanField(
+            tenantSettings.auto_checkout_on_hard_limit,
+            tenantSettings.autoCheckoutOnHardLimit,
+          ),
+        }
+      : null,
+  };
+
+  const hasData =
+    context.grace_minutes != null ||
+    context.checkout_grace_minutes != null ||
+    context.shift != null ||
+    (context.break_types?.length ?? 0) > 0 ||
+    context.policies != null ||
+    context.tenant_settings != null;
+
+  return hasData ? context : null;
 }
 
 export function normalizeMyAttendanceData(raw: unknown): MyAttendanceData {
   const row = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
   const attendanceRaw = row.attendance ?? row.attendanceRecord;
   const isCheckedIn = row.is_checked_in === true || row.isCheckedIn === true;
+  const context = normalizeMyAttendanceContext(row.context);
 
   return {
     user_id: readMyAttendanceString(row.user_id ?? row.userId) ?? "",
@@ -1070,6 +1299,7 @@ export function normalizeMyAttendanceData(raw: unknown): MyAttendanceData {
     is_checked_in: isCheckedIn,
     attendance: normalizeMyAttendanceRecord(attendanceRaw),
     actions: parseMyAttendanceActions(row.actions),
+    context,
   };
 }
 
@@ -1175,7 +1405,7 @@ export const attendanceBreakEnd = async (
 };
 
 export const attendanceOvertimeStart = async (
-  data: AttendanceCheckInPayload = {},
+  data: AttendanceOvertimeStartPayload = {},
 ): Promise<unknown> => {
   try {
     const response = await axiosInstance.post<ApiResponse<unknown>>(
@@ -1187,6 +1417,161 @@ export const attendanceOvertimeStart = async (
     handleApiError(error, "Failed to start overtime");
   }
 };
+
+export const attendanceOvertimeEnd = async (
+  data: AttendanceCheckInPayload = {},
+): Promise<unknown> => {
+  try {
+    const response = await axiosInstance.post<ApiResponse<unknown>>(
+      `${PREFIX}/attendance/overtime/end`,
+      data,
+    );
+    return extractData(response);
+  } catch (error: unknown) {
+    handleApiError(error, "Failed to end overtime");
+  }
+};
+
+/* --- Late adjustment APIs (disabled) ---
+export type LateAdjustmentRequestStatus = "pending" | "approved" | "rejected" | string;
+
+export interface LateAdjustmentRequest {
+  id: number;
+  tenant_id?: string | null;
+  user_id?: string | null;
+  work_date?: string | null;
+  status?: LateAdjustmentRequestStatus | null;
+  reason?: string | null;
+  comment?: string | null;
+  late_minutes?: number | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+}
+
+export interface SubmitLateAdjustmentPayload {
+  tenant_id: string;
+  user_id: string;
+  reason: string;
+}
+
+export interface LateAdjustmentDecisionPayload {
+  tenant_id: string;
+  comment?: string;
+}
+
+function normalizeLateAdjustmentRequest(raw: unknown): LateAdjustmentRequest | null {
+  if (!raw || typeof raw !== "object") {
+    return null;
+  }
+  const row = raw as Record<string, unknown>;
+  const id = Number(row.id);
+  if (!Number.isFinite(id)) {
+    return null;
+  }
+  return {
+    id,
+    tenant_id: readMyAttendanceString(row.tenant_id ?? row.tenantId),
+    user_id: readMyAttendanceString(row.user_id ?? row.userId),
+    work_date: readMyAttendanceString(row.work_date ?? row.workDate),
+    status: readMyAttendanceString(row.status) ?? "pending",
+    reason: readMyAttendanceString(row.reason),
+    comment: readMyAttendanceString(row.comment),
+    late_minutes: readAttendancePolicyNumber(row.late_minutes ?? row.lateMinutes),
+    created_at: readMyAttendanceString(row.created_at ?? row.createdAt),
+    updated_at: readMyAttendanceString(row.updated_at ?? row.updatedAt),
+  };
+}
+
+function normalizeLateAdjustmentRequestList(raw: unknown): LateAdjustmentRequest[] {
+  if (!Array.isArray(raw)) {
+    return [];
+  }
+  return raw
+    .map((item) => normalizeLateAdjustmentRequest(item))
+    .filter((item): item is LateAdjustmentRequest => item != null);
+}
+
+export const getLateAdjustmentRequests = async (params: Readonly<{
+  tenant_id: string;
+  status?: string;
+  user_id?: string;
+}>): Promise<LateAdjustmentRequest[]> => {
+  try {
+    const response = await axiosInstance.get<ApiResponse<unknown>>(
+      `${PREFIX}/attendance/late-adjustment`,
+      { params },
+    );
+    const data = extractData(response);
+    if (Array.isArray(data)) {
+      return normalizeLateAdjustmentRequestList(data);
+    }
+    if (data && typeof data === "object") {
+      const row = data as Record<string, unknown>;
+      const nested = row.data ?? row.requests ?? row.items;
+      return normalizeLateAdjustmentRequestList(nested);
+    }
+    return [];
+  } catch (error: unknown) {
+    handleApiError(error, "Failed to fetch late adjustment requests");
+  }
+};
+
+export const submitLateAdjustmentRequest = async (
+  payload: SubmitLateAdjustmentPayload,
+): Promise<LateAdjustmentRequest> => {
+  try {
+    const response = await axiosInstance.post<ApiResponse<unknown>>(
+      `${PREFIX}/attendance/late-adjustment`,
+      payload,
+    );
+    const normalized = normalizeLateAdjustmentRequest(extractData(response));
+    if (!normalized) {
+      throw new Error("Invalid late adjustment response");
+    }
+    return normalized;
+  } catch (error: unknown) {
+    handleApiError(error, "Failed to submit late adjustment request");
+  }
+};
+
+export const approveLateAdjustmentRequest = async (
+  id: number,
+  payload: LateAdjustmentDecisionPayload,
+): Promise<LateAdjustmentRequest> => {
+  try {
+    const response = await axiosInstance.post<ApiResponse<unknown>>(
+      `${PREFIX}/attendance/late-adjustment/${id}/approve`,
+      payload,
+    );
+    const normalized = normalizeLateAdjustmentRequest(extractData(response));
+    if (!normalized) {
+      throw new Error("Invalid late adjustment response");
+    }
+    return normalized;
+  } catch (error: unknown) {
+    handleApiError(error, "Failed to approve late adjustment request");
+  }
+};
+
+export const rejectLateAdjustmentRequest = async (
+  id: number,
+  payload: LateAdjustmentDecisionPayload,
+): Promise<LateAdjustmentRequest> => {
+  try {
+    const response = await axiosInstance.post<ApiResponse<unknown>>(
+      `${PREFIX}/attendance/late-adjustment/${id}/reject`,
+      payload,
+    );
+    const normalized = normalizeLateAdjustmentRequest(extractData(response));
+    if (!normalized) {
+      throw new Error("Invalid late adjustment response");
+    }
+    return normalized;
+  } catch (error: unknown) {
+    handleApiError(error, "Failed to reject late adjustment request");
+  }
+};
+--- End late adjustment APIs --- */
 
 export const ATTENDANCE_CORRECTION_STATUS_VALUES = [
   "present",
@@ -1947,6 +2332,7 @@ export interface EmployeeAttendanceReportDay {
   overtime_minutes?: number | null;
   status?: string | null;
   late_minutes?: number | null;
+  early_exit_minutes?: number | null;
   is_auto_checkout?: boolean | null;
 }
 
@@ -2008,6 +2394,9 @@ function normalizeEmployeeAttendanceReportDay(raw: unknown): EmployeeAttendanceR
     ),
     status: readAttendancePolicyString(day.status ?? day.attendance_status ?? day.attendanceStatus),
     late_minutes: readAttendancePolicyNumber(day.late_minutes ?? day.lateMinutes),
+    early_exit_minutes: readAttendancePolicyNumber(
+      day.early_exit_minutes ?? day.earlyExitMinutes,
+    ),
     is_auto_checkout: readAttendancePolicyBoolean(
       day.is_auto_checkout ?? day.isAutoCheckout,
     ),
@@ -2085,9 +2474,13 @@ export interface StaffShift {
   start_time?: string | null;
   end_time?: string | null;
   working_days?: number[] | null;
+  required_working_days_per_week?: number | null;
+  required_daily_hours?: number | null;
   earliest_checkin?: string | null;
+  latest_checkout?: string | null;
   grace_period_minutes?: number | null;
   hard_limit_hours?: number | null;
+  overtime_enabled?: boolean | null;
   effective_from?: string | null;
   created_at?: string | null;
   updated_at?: string | null;
@@ -2098,12 +2491,16 @@ export interface CreateStaffShiftPayload {
   tenant_id: string;
   name: string;
   type: string;
-  start_time: string;
-  end_time: string;
+  start_time?: string;
+  end_time?: string;
   working_days: number[];
+  required_working_days_per_week: number;
+  required_daily_hours?: number;
   earliest_checkin?: string;
+  latest_checkout?: string;
   grace_period_minutes?: number;
   hard_limit_hours?: number;
+  overtime_enabled?: boolean;
   effective_from: string;
   status: string;
 }
@@ -2944,11 +3341,15 @@ function normalizeBreakTypeRow(raw: unknown): AttendanceBreakType {
     tenant_id: readAttendancePolicyString(row.tenant_id ?? row.tenantId),
     name: readAttendancePolicyString(row.name),
     type: readAttendancePolicyString(row.type),
+    start_time: readAttendancePolicyString(row.start_time ?? row.startTime),
+    end_time: readAttendancePolicyString(row.end_time ?? row.endTime),
     duration_minutes: readAttendancePolicyNumber(
       row.duration_minutes ?? row.durationMinutes,
     ),
+    max_per_day: readAttendancePolicyNumber(row.max_per_day ?? row.maxPerDay),
     is_paid: readAttendancePolicyBooleanField(row.is_paid, row.isPaid),
     is_active: readAttendancePolicyBooleanField(row.is_active, row.isActive),
+    effective_from: readAttendancePolicyString(row.effective_from ?? row.effectiveFrom),
     created_at: readAttendancePolicyString(row.created_at ?? row.createdAt),
     updated_at: readAttendancePolicyString(row.updated_at ?? row.updatedAt),
   };
@@ -3081,6 +3482,8 @@ export interface AttendanceGracePeriodPolicy {
   target_id?: string | null;
   grace_minutes?: number | null;
   late_threshold_minutes?: number | null;
+  compensate_late_by_stay?: boolean | null;
+  late_adjustment_approval_required?: boolean | null;
   effective_from?: string | null;
   effective_to?: string | null;
   created_at?: string | null;
@@ -3094,6 +3497,8 @@ export interface CreateAttendanceGracePeriodPolicyPayload {
   target_id: string;
   grace_minutes: number;
   late_threshold_minutes: number;
+  compensate_late_by_stay?: boolean;
+  late_adjustment_approval_required?: boolean;
   effective_from: string;
   effective_to?: string | null;
 }
@@ -3143,6 +3548,8 @@ export interface AttendanceBreakPolicy {
   target_id?: string | null;
   max_breaks_per_day?: number | null;
   min_gap_minutes?: number | null;
+  total_max_break_minutes?: number | null;
+  break_time_counts_toward_overtime?: boolean | null;
   effective_from?: string | null;
   effective_to?: string | null;
   created_at?: string | null;
@@ -3150,12 +3557,16 @@ export interface AttendanceBreakPolicy {
   [key: string]: unknown;
 }
 
+export type AttendanceBreakPolicyTargetType = "company" | "department" | "employee";
+
 export interface CreateAttendanceBreakPolicyPayload {
   tenant_id: string;
-  target_type: "company";
+  target_type: AttendanceBreakPolicyTargetType;
   target_id: string;
   max_breaks_per_day: number;
   min_gap_minutes: number;
+  total_max_break_minutes: number;
+  break_time_counts_toward_overtime?: boolean;
   effective_from: string;
   effective_to?: string | null;
 }
@@ -3184,6 +3595,13 @@ function normalizeBreakPolicyRow(raw: unknown): AttendanceBreakPolicy {
         row.minGapMinutes ??
         row.minimum_gap_minutes ??
         row.minimumGapMinutes,
+    ),
+    total_max_break_minutes: readAttendancePolicyNumber(
+      row.total_max_break_minutes ?? row.totalMaxBreakMinutes,
+    ),
+    break_time_counts_toward_overtime: readAttendancePolicyBooleanField(
+      row.break_time_counts_toward_overtime,
+      row.breakTimeCountsTowardOvertime,
     ),
     effective_from: readAttendancePolicyString(row.effective_from ?? row.effectiveFrom),
     effective_to: readAttendancePolicyString(row.effective_to ?? row.effectiveTo),
@@ -3370,9 +3788,13 @@ export interface AttendanceBreakType {
   tenant_id?: string | null;
   name?: string | null;
   type?: string | null;
+  start_time?: string | null;
+  end_time?: string | null;
   duration_minutes?: number | null;
+  max_per_day?: number | null;
   is_paid?: boolean | null;
   is_active?: boolean | null;
+  effective_from?: string | null;
   created_at?: string | null;
   updated_at?: string | null;
   [key: string]: unknown;
@@ -3382,10 +3804,16 @@ export interface CreateAttendanceBreakTypePayload {
   tenant_id: string;
   name: string;
   type: string;
-  duration_minutes: number;
+  start_time?: string;
+  end_time?: string;
+  duration_minutes?: number;
+  max_per_day: number;
   is_paid: boolean;
   is_active: boolean;
+  effective_from: string;
 }
+
+export type UpdateAttendanceBreakTypePayload = Omit<CreateAttendanceBreakTypePayload, "tenant_id">;
 
 export const getAttendanceBreakTypes = async (
   tenantId: string,
@@ -3413,9 +3841,78 @@ export const createAttendanceBreakType = async (
       `${PREFIX}/attendance-policies/break-types`,
       payload,
     );
-    return extractData(response);
+    return normalizeBreakTypeRow(extractData(response));
   } catch (error: unknown) {
     handleApiError(error, "Failed to create break type");
+  }
+};
+
+export const updateAttendanceBreakType = async (
+  id: number,
+  payload: UpdateAttendanceBreakTypePayload & { tenant_id: string },
+): Promise<AttendanceBreakType> => {
+  try {
+    const response = await axiosInstance.put<ApiResponse<AttendanceBreakType>>(
+      `${PREFIX}/attendance-policies/break-types/${id}`,
+      payload,
+    );
+    return normalizeBreakTypeRow(extractData(response));
+  } catch (error: unknown) {
+    handleApiError(error, "Failed to update break type");
+  }
+};
+
+export const deleteAttendanceBreakType = async (
+  id: number,
+  tenantId: string,
+): Promise<void> => {
+  try {
+    await axiosInstance.delete(`${PREFIX}/attendance-policies/break-types/${id}`, {
+      params: { tenant_id: tenantId },
+    });
+  } catch (error: unknown) {
+    handleApiError(error, "Failed to delete break type");
+  }
+};
+
+export interface AttendanceTenantSettings {
+  tenant_id: string;
+  multiple_break_types_enabled?: boolean;
+  auto_checkout_on_hard_limit?: boolean;
+  timezone?: string | null;
+}
+
+export const getAttendanceSettings = async (
+  tenantId: string,
+): Promise<AttendanceTenantSettings | null> => {
+  try {
+    const response = await axiosInstance.get<ApiResponse<AttendanceTenantSettings>>(
+      `${PREFIX}/attendance/settings`,
+      {
+        params: { tenant_id: tenantId },
+        validateStatus: (status) => (status >= 200 && status < 300) || status === 404,
+      },
+    );
+    if (response.status === 404 || response.data?.data == null) {
+      return null;
+    }
+    return extractData(response);
+  } catch (error: unknown) {
+    handleApiError(error, "Failed to fetch attendance settings");
+  }
+};
+
+export const updateAttendanceSettings = async (
+  payload: AttendanceTenantSettings,
+): Promise<AttendanceTenantSettings> => {
+  try {
+    const response = await axiosInstance.put<ApiResponse<AttendanceTenantSettings>>(
+      `${PREFIX}/attendance/settings`,
+      payload,
+    );
+    return extractData(response);
+  } catch (error: unknown) {
+    handleApiError(error, "Failed to save attendance settings");
   }
 };
 

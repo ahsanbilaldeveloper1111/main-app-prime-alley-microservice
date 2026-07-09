@@ -66,22 +66,40 @@ export function formatEmployeeReportDayLabel(day: EmployeeAttendanceReportDay): 
 }
 
 export function formatEmployeeReportDayStatus(day: EmployeeAttendanceReportDay): string {
+  const statusModifier = resolveEmployeeReportStatusModifier(day.status);
   const label = formatDailyReportStatus(day.status);
-  if (resolveEmployeeReportStatusModifier(day.status) !== "late") {
+
+  if (statusModifier === "late") {
+    const lateMinutes = day.late_minutes;
+    if (lateMinutes != null && Number.isFinite(lateMinutes) && lateMinutes > 0) {
+      const rawStatus = day.status?.trim() ?? "";
+      if (!/\d/.test(rawStatus)) {
+        return `${label} · ${Math.round(lateMinutes)} min`;
+      }
+    }
     return label;
   }
 
-  const lateMinutes = day.late_minutes;
-  if (lateMinutes == null || !Number.isFinite(lateMinutes) || lateMinutes <= 0) {
+  if (statusModifier === "early_exit") {
+    const earlyExitMinutes = day.early_exit_minutes;
+    if (
+      earlyExitMinutes != null &&
+      Number.isFinite(earlyExitMinutes) &&
+      earlyExitMinutes > 0
+    ) {
+      const rawStatus = day.status?.trim() ?? "";
+      if (!/\d/.test(rawStatus)) {
+        return `${label} · ${Math.round(earlyExitMinutes)} min`;
+      }
+    }
     return label;
   }
 
-  const rawStatus = day.status?.trim() ?? "";
-  if (/\d/.test(rawStatus)) {
+  if (statusModifier === "adjusted") {
     return label;
   }
 
-  return `${label} · ${Math.round(lateMinutes)} min`;
+  return label;
 }
 
 export function formatEmployeeReportDayTime(value: string | null | undefined): string {
@@ -113,8 +131,14 @@ export function readEmployeeReportDayRowKey(day: EmployeeAttendanceReportDay, in
 
 export function resolveEmployeeReportStatusModifier(
   status: string | null | undefined,
-): "present" | "late" | "absent" | "other" {
+): "present" | "late" | "early_exit" | "adjusted" | "absent" | "other" {
   const raw = status?.trim().toLowerCase() ?? "";
+  if (raw.includes("on_time_with_adjustment") || raw.includes("on time with adjustment")) {
+    return "adjusted";
+  }
+  if (raw.includes("early_exit") || raw.includes("early exit")) {
+    return "early_exit";
+  }
   if (raw.includes("late")) {
     return "late";
   }
@@ -122,6 +146,9 @@ export function resolveEmployeeReportStatusModifier(
     return "absent";
   }
   if (raw.includes("present")) {
+    return "present";
+  }
+  if (raw.includes("on_time") || raw === "checked_in") {
     return "present";
   }
   return "other";

@@ -44,9 +44,15 @@ export function buildCheckInOutSessionPayload(args: Readonly<{
 export function buildStartBreakPayload(
   sessionPayload: ReturnType<typeof buildAttendanceSessionPayload>,
   breakTypeId: number,
+  breakName?: string | null,
 ): AttendanceBreakStartPayload {
-  return {
+  const payload: AttendanceBreakStartPayload = {
     ...sessionPayload,
     break_type_id: breakTypeId,
   };
+  const trimmedName = breakName?.trim();
+  if (trimmedName) {
+    payload.break_name = trimmedName;
+  }
+  return payload;
 }

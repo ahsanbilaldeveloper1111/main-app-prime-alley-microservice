@@ -20,7 +20,25 @@ import {
   isMyAttendanceOnOvertime,
   readMyAttendanceSessionActive,
   resolveMyAttendanceState,
+  readMyAttendanceCheckoutGraceMinutes,
+  formatCheckoutGraceHelpText,
+  readMyAttendanceLateMinutes,
+  shouldShowEarlyCheckoutBadge,
+  formatEarlyCheckoutBadgeLabel,
+  readMyAttendanceEarlyExitMinutes,
+  isMyAttendanceAutoCheckout,
+  shouldShowLateArrivalBadge,
+  // shouldShowOnTimeWithAdjustmentBadge,
+  // formatOnTimeWithAdjustmentBadgeLabel,
+  hasSelectableBreakTypes,
 } from "./checkInOutDomain";
+/* Late adjustment (disabled)
+import {
+  formatLateAdjustmentRequestStatus,
+  isLateAdjustmentPendingStatus,
+} from "./lateAdjustmentDomain";
+import type { LateAdjustmentRequest } from "@utils/staffManagement";
+*/
 import { formatAttendanceToolbarDateLine } from "@page-modules/workforce/attendance/attendanceDomain";
 
 type CheckInOutActionsPanelProps = Readonly<{
@@ -34,6 +52,12 @@ type CheckInOutActionsPanelProps = Readonly<{
   onStartBreak: () => void;
   onEndBreak: () => void;
   onStartOvertime: () => void;
+  onEndOvertime: () => void;
+  /* Late adjustment props (disabled)
+  showRequestLateAdjustment?: boolean;
+  pendingLateAdjustment?: LateAdjustmentRequest | null;
+  onRequestLateAdjustment?: () => void;
+  */
 }>;
 
 function renderStatusDateLine(
@@ -87,15 +111,91 @@ function renderStatusSection(
   return (
     <>
       {renderStatusDateLine(myAttendance, isCheckedIn)}
-      {!isCheckedIn && myAttendance.banner ? (
+      {myAttendance.banner ? (
         <p className="check-in-out-page__banner">{myAttendance.banner}</p>
+      ) : null}
+      {isMyAttendanceAutoCheckout(myAttendance) ? (
+        <p className="check-in-out-page__auto-checkout-notice">
+          You were automatically checked out.
+        </p>
       ) : null}
       <div className={chipClass}>
         {renderStatusIcon(myAttendance.state)}
         {statusLabel}
       </div>
       {showLiveTimer ? <AttendanceSessionLiveBlock elapsed={liveSessionElapsed} /> : null}
+      {renderAttendanceOutcomeBadges(myAttendance)}
     </>
+  );
+}
+
+function renderAttendanceOutcomeBadges(myAttendance: MyAttendanceData): ReactElement | null {
+  // const showAdjustmentBadge = shouldShowOnTimeWithAdjustmentBadge(myAttendance);
+  const showLateBadge = shouldShowLateArrivalBadge(myAttendance);
+  const earlyExitMinutes = readMyAttendanceEarlyExitMinutes(myAttendance);
+  const showEarlyBadge = shouldShowEarlyCheckoutBadge(myAttendance);
+  const lateMinutes = readMyAttendanceLateMinutes(myAttendance);
+
+  if (!showLateBadge && !showEarlyBadge) {
+    return null;
+  }
+
+  return (
+    <div className="check-in-out-page__outcome-badges">
+      {/* Late adjustment badge (disabled)
+      {showAdjustmentBadge ? (
+        <span className="check-in-out-page__outcome-badge check-in-out-page__outcome-badge--adjusted">
+          {formatOnTimeWithAdjustmentBadgeLabel()}
+        </span>
+      ) : null}
+      */}
+      {showLateBadge && lateMinutes != null ? (
+        <span className="check-in-out-page__outcome-badge check-in-out-page__outcome-badge--late">
+          Late arrival — {lateMinutes} min
+        </span>
+      ) : null}
+      {showEarlyBadge ? (
+        <span className="check-in-out-page__outcome-badge check-in-out-page__outcome-badge--early-exit">
+          {earlyExitMinutes != null
+            ? formatEarlyCheckoutBadgeLabel(earlyExitMinutes)
+            : "Early checkout"}
+        </span>
+      ) : null}
+    </div>
+  );
+}
+
+/* Late adjustment notice (disabled)
+function renderLateAdjustmentNotice(
+  pendingLateAdjustment: LateAdjustmentRequest | null | undefined,
+): ReactElement | null {
+  if (!pendingLateAdjustment || !isLateAdjustmentPendingStatus(pendingLateAdjustment.status)) {
+    return null;
+  }
+  return (
+    <p className="check-in-out-page__late-adjustment-notice">
+      Late adjustment request {formatLateAdjustmentRequestStatus(pendingLateAdjustment.status).toLowerCase()}
+      {pendingLateAdjustment.reason ? `: ${pendingLateAdjustment.reason}` : "."}
+    </p>
+  );
+}
+*/
+
+function renderCheckOutGraceHint(
+  myAttendance: MyAttendanceData,
+  canCheckOut: boolean,
+): ReactElement | null {
+  if (!canCheckOut) {
+    return null;
+  }
+  const graceMinutes = readMyAttendanceCheckoutGraceMinutes(myAttendance);
+  if (graceMinutes == null) {
+    return null;
+  }
+  return (
+    <p className="check-in-out-page__checkout-grace-hint">
+      {formatCheckoutGraceHelpText(graceMinutes)}
+    </p>
   );
 }
 
@@ -103,16 +203,19 @@ function renderSessionActions(
   availability: ReturnType<typeof getMyAttendanceActionAvailability>,
   buttonsDisabled: boolean,
   actionLoading: boolean,
+  hasBreakTypes: boolean,
   handlers: Readonly<{
     onStartBreak: () => void;
     onEndBreak: () => void;
     onStartOvertime: () => void;
+    onEndOvertime: () => void;
   }>,
 ): ReactElement | null {
   const hasSessionActions =
     availability.canStartBreak ||
     availability.canEndBreak ||
-    availability.canStartOvertime;
+    availability.canStartOvertime ||
+    availability.canEndOvertime;
   if (!hasSessionActions) {
     return null;
   }
@@ -120,11 +223,14 @@ function renderSessionActions(
   return (
     <div className="check-in-out-page__section">
       <p className="check-in-out-page__section-label">Session actions</p>
+      {!hasBreakTypes && availability.canStartBreak ? (
+        <p className="check-in-out-page__break-types-empty">No break types configured.</p>
+      ) : null}
       <div className="check-in-out-page__secondary-actions">
         <button
           type="button"
           className="check-in-out-page__action-btn check-in-out-page__action-btn--sub-break-start"
-          disabled={buttonsDisabled || !availability.canStartBreak}
+          disabled={buttonsDisabled || !availability.canStartBreak || !hasBreakTypes}
           onClick={handlers.onStartBreak}
         >
           <Coffee size={18} aria-hidden />
@@ -148,6 +254,15 @@ function renderSessionActions(
           <Timer size={18} aria-hidden />
           {actionLoading ? "…" : "Start Overtime"}
         </button>
+        <button
+          type="button"
+          className="check-in-out-page__action-btn check-in-out-page__action-btn--sub-overtime-end"
+          disabled={buttonsDisabled || !availability.canEndOvertime}
+          onClick={handlers.onEndOvertime}
+        >
+          <Timer size={18} aria-hidden />
+          {actionLoading ? "…" : "End Overtime"}
+        </button>
       </div>
     </div>
   );
@@ -164,9 +279,11 @@ export function CheckInOutActionsPanel({
   onStartBreak,
   onEndBreak,
   onStartOvertime,
+  onEndOvertime,
 }: CheckInOutActionsPanelProps): ReactElement {
   const availability = getMyAttendanceActionAvailability(myAttendance, canPerformActions);
   const buttonsDisabled = statusLoading || actionLoading;
+  const breakTypesAvailable = hasSelectableBreakTypes(myAttendance);
 
   return (
     <div className="check-in-out-page__card">
@@ -178,11 +295,31 @@ export function CheckInOutActionsPanel({
       </div>
 
       <div className="check-in-out-page__status">
-        {renderStatusSection(statusLoading, myAttendance, canPerformActions, liveSessionElapsed)}
+        {renderStatusSection(
+          statusLoading,
+          myAttendance,
+          canPerformActions,
+          liveSessionElapsed,
+        )}
       </div>
 
       {canPerformActions ? (
         <>
+          {/* Late adjustment request button (disabled)
+          {showRequestLateAdjustment && onRequestLateAdjustment ? (
+            <div className="check-in-out-page__section">
+              <button
+                type="button"
+                className="check-in-out-page__action-btn check-in-out-page__action-btn--sub-late-adjustment"
+                disabled={buttonsDisabled}
+                onClick={onRequestLateAdjustment}
+              >
+                <Clock size={18} aria-hidden />
+                Request late adjustment
+              </button>
+            </div>
+          ) : null}
+          */}
           <div className="check-in-out-page__section">
             <p className="check-in-out-page__section-label">Primary actions</p>
             <div className="check-in-out-page__primary-actions">
@@ -205,12 +342,16 @@ export function CheckInOutActionsPanel({
                 {actionLoading ? "…" : "Check Out"}
               </button>
             </div>
+            {myAttendance
+              ? renderCheckOutGraceHint(myAttendance, availability.canCheckOut)
+              : null}
           </div>
 
-          {renderSessionActions(availability, buttonsDisabled, actionLoading, {
+          {renderSessionActions(availability, buttonsDisabled, actionLoading, breakTypesAvailable, {
             onStartBreak,
             onEndBreak,
             onStartOvertime,
+            onEndOvertime,
           })}
         </>
       ) : (

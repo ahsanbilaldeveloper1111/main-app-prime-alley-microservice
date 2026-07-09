@@ -209,6 +209,13 @@ export function EmployeeAttendanceReportPanel({
                           {day.is_auto_checkout ? (
                             <span className="check-in-out-page__auto-checkout-badge">Auto</span>
                           ) : null}
+                          {day.early_exit_minutes != null &&
+                          Number.isFinite(day.early_exit_minutes) &&
+                          day.early_exit_minutes > 0 ? (
+                            <span className="check-in-out-page__early-exit-badge">
+                              Early — {Math.round(day.early_exit_minutes)} min
+                            </span>
+                          ) : null}
                         </td>
                         <td data-label="Hours">{formatEmployeeReportDayHours(day)}</td>
                         <td data-label="Status">

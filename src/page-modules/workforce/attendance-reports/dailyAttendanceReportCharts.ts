@@ -38,6 +38,9 @@ function normalizeAttendanceStatusKey(status: string | null | undefined): string
   const raw = status?.trim().toLowerCase() ?? "";
   if (!raw) return "unknown";
   if (raw.includes("present") || raw === "on_time" || raw === "checked_in") return "present";
+  if (raw.includes("on_time_with_adjustment") || raw.includes("on time with adjustment")) {
+    return "present";
+  }
   if (raw.includes("late")) return "late";
   if (raw.includes("absent")) return "absent";
   if (raw.includes("leave")) return "leave";

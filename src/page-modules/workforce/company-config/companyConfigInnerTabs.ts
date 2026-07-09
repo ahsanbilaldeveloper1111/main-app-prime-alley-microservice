@@ -4,6 +4,7 @@ export const COMPANY_CONFIG_INNER_TABS = [
   { id: "breaks", label: "Breaks" },
   { id: "overtime", label: "Overtime" },
   { id: "break-types", label: "Break Types" },
+  { id: "attendance-settings", label: "Attendance Settings" },
 ] as const;
 
 export type CompanyConfigInnerTabId = (typeof COMPANY_CONFIG_INNER_TABS)[number]["id"];

@@ -8,6 +8,7 @@ import {
   SHIFT_LIST_DEFAULT_LIMIT,
   SHIFT_LIST_PAGE_SIZE_OPTIONS,
   filterShiftsBySearch,
+  readShiftRequirementHours,
   resolveStaffShiftTenantId,
   staffShiftToFormState,
 } from "@page-modules/workforce/shifts/shiftManagementDomain";
@@ -16,6 +17,7 @@ import { useCreateStaffShiftMutation } from "@page-modules/workforce/shifts/useC
 import { useDeleteStaffShiftMutation } from "@page-modules/workforce/shifts/useDeleteStaffShiftMutation";
 import { useStaffShiftsQuery } from "@page-modules/workforce/shifts/useStaffShiftsQuery";
 import { useUpdateStaffShiftMutation } from "@page-modules/workforce/shifts/useUpdateStaffShiftMutation";
+import { useWorkHoursPoliciesQuery } from "@page-modules/workforce/company-config/useWorkHoursPoliciesQuery";
 import type { StaffShift } from "@utils/staffManagement";
 import { Plus } from "lucide-react";
 import React, { useCallback, useMemo, useState } from "react";
@@ -53,6 +55,17 @@ export function StaffShiftsPanel({
     limit: rowsPerPage,
     enabled: isTenantListReady,
   });
+
+  const workHoursPoliciesQuery = useWorkHoursPoliciesQuery({
+    tenantId: resolvedTenantId || null,
+    page: 1,
+    limit: 1,
+    enabled: isTenantListReady && (showCreateSidebar || Boolean(editingShift)),
+  });
+  const shiftRequirementHours = useMemo(
+    () => readShiftRequirementHours(workHoursPoliciesQuery.data?.data?.[0]),
+    [workHoursPoliciesQuery.data?.data],
+  );
 
   const handleEditShift = useCallback((shift: StaffShift) => {
     setEditingShift(shift);
@@ -167,6 +180,7 @@ export function StaffShiftsPanel({
         tenantOptions={tenantOptions}
         lockedTenantId={resolvedTenantId || companyIdentifier || ""}
         isSubmitting={createShiftMutation.isPending}
+        shiftRequirementHours={shiftRequirementHours}
         onClose={() => {
           if (createShiftMutation.isPending) return;
           setShowCreateSidebar(false);
@@ -192,6 +206,7 @@ export function StaffShiftsPanel({
         tenantOptions={tenantOptions}
         lockedTenantId={resolvedTenantId || companyIdentifier || ""}
         isSubmitting={updateShiftMutation.isPending}
+        shiftRequirementHours={shiftRequirementHours}
         onClose={() => {
           if (updateShiftMutation.isPending) return;
           setEditingShift(null);

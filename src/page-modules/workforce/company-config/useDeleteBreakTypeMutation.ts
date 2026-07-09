@@ -1,19 +1,16 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "react-toastify";
-import {
-  buildCreateBreakTypePayload,
-  type BreakTypeFormState,
-} from "@page-modules/workforce/company-config/breakTypesDomain";
+import { BREAK_TYPE_DELETE_BLOCKED_MESSAGE } from "@page-modules/workforce/company-config/breakTypesDomain";
 import { workforceKeys } from "@query/keys";
-import { createAttendanceBreakType } from "@utils/staffManagement";
+import { deleteAttendanceBreakType } from "@utils/staffManagement";
 import { getHttpApiErrorDetail } from "@utils/errors";
 
-export function useCreateBreakTypeMutation() {
+export function useDeleteBreakTypeMutation() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (input: { tenantId: string; form: BreakTypeFormState }) =>
-      createAttendanceBreakType(buildCreateBreakTypePayload(input.tenantId, input.form)),
+    mutationFn: async (input: { id: number; tenantId: string }) =>
+      deleteAttendanceBreakType(input.id, input.tenantId),
     onSuccess: (_data, variables) => {
       queryClient
         .invalidateQueries({
@@ -21,10 +18,15 @@ export function useCreateBreakTypeMutation() {
         })
         .catch(() => undefined);
       queryClient.invalidateQueries({ queryKey: workforceKeys.attendance.all() }).catch(() => undefined);
-      toast.success("Break type created.");
+      toast.success("Break type deleted.");
     },
     onError: (error: unknown) => {
-      toast.error(getHttpApiErrorDetail(error, "Failed to create break type."));
+      const detail = getHttpApiErrorDetail(error, "Failed to delete break type.");
+      toast.error(
+        detail.toLowerCase().includes("existing records")
+          ? BREAK_TYPE_DELETE_BLOCKED_MESSAGE
+          : detail,
+      );
     },
   });
 }

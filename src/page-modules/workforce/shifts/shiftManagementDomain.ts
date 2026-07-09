@@ -1,13 +1,40 @@
-import type { CreateStaffShiftPayload, StaffShift } from "@utils/staffManagement";
+import type {
+  AttendanceWorkHoursPolicy,
+  CreateStaffShiftPayload,
+  StaffShift,
+} from "@utils/staffManagement";
 import { formatDateForTable } from "@utils/Helper";
 import moment from "moment";
+
+export const SHIFT_GRACE_PERIOD_MAX_MINUTES = 60;
+export const SHIFT_REQUIRED_DAILY_HOURS_MIN = 1;
+export const SHIFT_REQUIRED_DAILY_HOURS_MAX = 24;
+export const REQUIRED_WORKING_DAYS_EXCEEDS_MESSAGE =
+  "Required days cannot exceed selected working days.";
+export const SHIFT_MIDNIGHT_SPAN_NOTE =
+  "This shift spans midnight — ends the next calendar day.";
 
 export type ShiftTenantOption = Readonly<{
   value: string;
   label: string;
 }>;
 
-export type CreateStaffShiftFormState = Omit<CreateStaffShiftPayload, "tenant_id">;
+export type CreateStaffShiftFormState = Readonly<{
+  name: string;
+  type: string;
+  start_time: string;
+  end_time: string;
+  working_days: number[];
+  required_working_days_per_week: number;
+  required_daily_hours: number;
+  earliest_checkin: string;
+  latest_checkout: string;
+  grace_period_minutes?: number;
+  hard_limit_hours?: number;
+  overtime_enabled?: boolean;
+  effective_from: string;
+  status: string;
+}>;
 
 export const SHIFT_WORKING_DAY_OPTIONS = [
   { value: 1, label: "Monday" },
@@ -31,19 +58,88 @@ export const SHIFT_STATUS_FORM_OPTIONS = [
 ] as const;
 
 export function createDefaultShiftFormState(): CreateStaffShiftFormState {
+  const workingDays = [1, 2, 3, 4, 5];
   return {
     name: "",
     type: "fixed",
     start_time: "09:00",
     end_time: "18:00",
-    working_days: [1, 2, 3, 4, 5],
+    working_days: workingDays,
+    required_working_days_per_week: workingDays.length,
+    required_daily_hours: 8,
     earliest_checkin: "08:30",
+    latest_checkout: "18:00",
     grace_period_minutes: 10,
     hard_limit_hours: 12,
+    overtime_enabled: true,
     effective_from: new Date().toISOString().slice(0, 10),
     status: "active",
   };
 }
+
+export function isFixedShiftType(type: string): boolean {
+  return type.trim().toLowerCase() === "fixed";
+}
+
+export function isFlexibleShiftType(type: string): boolean {
+  return type.trim().toLowerCase() === "flexible";
+}
+
+export function parseShiftTimeToMinutes(value: string): number | null {
+  const normalized = normalizeShiftTimeForInput(value);
+  if (!normalized) return null;
+  const parts = extractShiftClockParts(normalized);
+  if (!parts) return null;
+  return parts.hours * 60 + parts.minutes;
+}
+
+export function doesShiftSpanMidnight(startTime: string, endTime: string): boolean {
+  const start = parseShiftTimeToMinutes(startTime);
+  const end = parseShiftTimeToMinutes(endTime);
+  if (start == null || end == null) return false;
+  return end <= start;
+}
+
+export function computeShiftWindowMinutes(startTime: string, endTime: string): number | null {
+  const start = parseShiftTimeToMinutes(startTime);
+  const end = parseShiftTimeToMinutes(endTime);
+  if (start == null || end == null) return null;
+
+  let durationMinutes = end - start;
+  if (durationMinutes <= 0) {
+    durationMinutes += 24 * 60;
+  }
+  return durationMinutes;
+}
+
+export function computeFixedShiftTotalHours(startTime: string, endTime: string): number | null {
+  const durationMinutes = computeShiftWindowMinutes(startTime, endTime);
+  if (durationMinutes == null) return null;
+  return Math.round((durationMinutes / 60) * 100) / 100;
+}
+
+export function formatFixedShiftTotalHours(startTime: string, endTime: string): string {
+  const hours = computeFixedShiftTotalHours(startTime, endTime);
+  if (hours == null) return "—";
+  return `${hours} h`;
+}
+
+export function readShiftRequirementHours(
+  policy: AttendanceWorkHoursPolicy | null | undefined,
+): number | null {
+  if (!policy) return null;
+  const candidate =
+    policy.shift_requirement_hours ??
+    policy.min_hours_per_day;
+  if (typeof candidate !== "number" || !Number.isFinite(candidate) || candidate <= 0) {
+    return null;
+  }
+  return candidate;
+}
+
+export type ValidateCreateStaffShiftFormOptions = Readonly<{
+  shiftRequirementHours?: number | null;
+}>;
 
 export function toggleShiftWorkingDay(
   workingDays: number[],
@@ -114,6 +210,7 @@ export function formatShiftWorkingDays(
 export function validateCreateStaffShiftForm(
   form: CreateStaffShiftFormState,
   tenantIds: readonly string[],
+  options?: ValidateCreateStaffShiftFormOptions,
 ): string | null {
   if (tenantIds.length === 0) {
     return "Select a tenant.";
@@ -121,20 +218,78 @@ export function validateCreateStaffShiftForm(
   if (!form.name.trim()) {
     return "Shift name is required.";
   }
-  if (!form.start_time.trim() || !form.end_time.trim()) {
-    return "Start and end times are required.";
-  }
   if (!form.working_days.length) {
     return "Select at least one working day.";
+  }
+  if (
+    form.required_working_days_per_week == null ||
+    !Number.isFinite(form.required_working_days_per_week) ||
+    form.required_working_days_per_week < 1
+  ) {
+    return "Required working days per week must be at least 1.";
+  }
+  if (form.required_working_days_per_week > form.working_days.length) {
+    return REQUIRED_WORKING_DAYS_EXCEEDS_MESSAGE;
   }
   if (!form.effective_from.trim()) {
     return "Effective from date is required.";
   }
-  if (form.grace_period_minutes != null && form.grace_period_minutes < 0) {
-    return "Grace period cannot be negative.";
+  if (form.grace_period_minutes != null) {
+    if (form.grace_period_minutes < 0) {
+      return "Grace period cannot be negative.";
+    }
+    if (form.grace_period_minutes > SHIFT_GRACE_PERIOD_MAX_MINUTES) {
+      return `Grace period cannot exceed ${SHIFT_GRACE_PERIOD_MAX_MINUTES} minutes.`;
+    }
   }
   if (form.hard_limit_hours != null && form.hard_limit_hours <= 0) {
     return "Hard limit hours must be greater than zero.";
+  }
+  const shiftRequirementHours = options?.shiftRequirementHours;
+  if (
+    shiftRequirementHours != null &&
+    form.hard_limit_hours != null &&
+    form.hard_limit_hours <= shiftRequirementHours
+  ) {
+    return `Hard limit hours must be greater than shift requirement hours (${shiftRequirementHours} h).`;
+  }
+
+  if (isFixedShiftType(form.type)) {
+    if (!form.start_time.trim() || !form.end_time.trim()) {
+      return "Start and end times are required.";
+    }
+    if (computeFixedShiftTotalHours(form.start_time, form.end_time) == null) {
+      return "Enter valid start and end times.";
+    }
+    return null;
+  }
+
+  if (!isFlexibleShiftType(form.type)) {
+    return "Select a valid shift type.";
+  }
+  if (
+    form.required_daily_hours == null ||
+    !Number.isFinite(form.required_daily_hours) ||
+    form.required_daily_hours < SHIFT_REQUIRED_DAILY_HOURS_MIN ||
+    form.required_daily_hours > SHIFT_REQUIRED_DAILY_HOURS_MAX
+  ) {
+    return `Required daily hours must be between ${SHIFT_REQUIRED_DAILY_HOURS_MIN} and ${SHIFT_REQUIRED_DAILY_HOURS_MAX}.`;
+  }
+  if (!form.earliest_checkin?.trim()) {
+    return "Earliest check-in time is required.";
+  }
+  if (!form.latest_checkout?.trim()) {
+    return "Latest check-out time is required.";
+  }
+  const windowMinutes = computeShiftWindowMinutes(
+    form.earliest_checkin,
+    form.latest_checkout,
+  );
+  if (windowMinutes == null) {
+    return "Enter valid earliest check-in and latest check-out times.";
+  }
+  if (windowMinutes < form.required_daily_hours * 60) {
+    return "The check-in window must be at least as long as required daily hours.";
   }
   return null;
 }
@@ -143,18 +298,32 @@ export function buildCreateStaffShiftPayload(
   tenantId: string,
   form: CreateStaffShiftFormState,
 ): CreateStaffShiftPayload {
-  return {
+  const base: CreateStaffShiftPayload = {
     tenant_id: tenantId,
     name: form.name.trim(),
     type: form.type,
-    start_time: form.start_time.trim(),
-    end_time: form.end_time.trim(),
     working_days: [...form.working_days],
-    earliest_checkin: form.earliest_checkin?.trim() || undefined,
+    required_working_days_per_week: form.required_working_days_per_week,
     grace_period_minutes: form.grace_period_minutes,
     hard_limit_hours: form.hard_limit_hours,
+    overtime_enabled: form.overtime_enabled ?? true,
     effective_from: form.effective_from.trim(),
     status: form.status,
+  };
+
+  if (isFixedShiftType(form.type)) {
+    return {
+      ...base,
+      start_time: form.start_time.trim(),
+      end_time: form.end_time.trim(),
+    };
+  }
+
+  return {
+    ...base,
+    required_daily_hours: form.required_daily_hours,
+    earliest_checkin: form.earliest_checkin?.trim() || undefined,
+    latest_checkout: form.latest_checkout?.trim() || undefined,
   };
 }
 
@@ -221,6 +390,10 @@ export function normalizeShiftDateForInput(value: unknown): string {
 
 export function staffShiftToFormState(shift: StaffShift): CreateStaffShiftFormState {
   const workingDays = Array.isArray(shift.working_days) ? [...shift.working_days] : [];
+  const normalizedWorkingDays =
+    workingDays.length > 0 ? workingDays.toSorted((a, b) => a - b) : [1, 2, 3, 4, 5];
+  const requiredWorkingDays =
+    shift.required_working_days_per_week ?? normalizedWorkingDays.length;
 
   return {
     name: shift.name?.trim() ?? "",
@@ -228,10 +401,17 @@ export function staffShiftToFormState(shift: StaffShift): CreateStaffShiftFormSt
     start_time:
       normalizeShiftTimeForInput(readStaffShiftTime(shift, "start_time")) || "09:00",
     end_time: normalizeShiftTimeForInput(readStaffShiftTime(shift, "end_time")) || "18:00",
-    working_days: workingDays.length > 0 ? workingDays.toSorted((a, b) => a - b) : [1, 2, 3, 4, 5],
+    working_days: normalizedWorkingDays,
+    required_working_days_per_week: Math.min(
+      Math.max(1, requiredWorkingDays),
+      normalizedWorkingDays.length,
+    ),
+    required_daily_hours: shift.required_daily_hours ?? 8,
     earliest_checkin: normalizeShiftTimeForInput(shift.earliest_checkin) || "08:30",
+    latest_checkout: normalizeShiftTimeForInput(shift.latest_checkout) || "18:00",
     grace_period_minutes: shift.grace_period_minutes ?? 10,
     hard_limit_hours: shift.hard_limit_hours ?? 12,
+    overtime_enabled: shift.overtime_enabled !== false,
     effective_from:
       normalizeShiftDateForInput(shift.effective_from) ||
       new Date().toISOString().slice(0, 10),

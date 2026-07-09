@@ -546,6 +546,18 @@ export const workforceKeys = {
       ] as const,
     status: () => [...workforceKeys.attendance.all(), "status"] as const,
     my: () => [...workforceKeys.attendance.all(), "my"] as const,
+    /* Late adjustment query key (disabled)
+    lateAdjustment: (params: { tenantId: string; status: string; userId: string }) =>
+      [
+        ...workforceKeys.attendance.all(),
+        "lateAdjustment",
+        params.tenantId,
+        params.status,
+        params.userId,
+      ] as const,
+    */
+    settings: (tenantId: string) =>
+      [...workforceKeys.attendance.all(), "settings", tenantId] as const,
     dailyReport: (params: {
       tenantId: string;
       date: string;

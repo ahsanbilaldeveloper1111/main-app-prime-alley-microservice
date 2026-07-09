@@ -20,6 +20,7 @@ import { OvertimePolicyPanel } from "@page-modules/workforce/company-config/Over
 
 import { useCompanyConfigTenant } from "@page-modules/workforce/company-config/useCompanyConfigTenant";
 
+import { TenantAttendanceSettingsPanel } from "@page-modules/workforce/company-config/TenantAttendanceSettingsPanel";
 import { WorkHoursPolicyPanel } from "@page-modules/workforce/company-config/WorkHoursPolicyPanel";
 
 import { PoliciesAttendanceInnerTabLayout } from "@page-modules/workforce/shared/PoliciesAttendanceInnerTabLayout";
@@ -188,6 +189,13 @@ export function CompanyConfigTab() {
 
         />
 
+      ) : null}
+
+      {innerTab === "attendance-settings" ? (
+        <TenantAttendanceSettingsPanel
+          resolvedTenantId={resolvedTenantId}
+          isTenantListReady={isTenantListReady}
+        />
       ) : null}
 
     </PoliciesAttendanceInnerTabLayout>

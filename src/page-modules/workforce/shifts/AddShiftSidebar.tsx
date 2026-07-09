@@ -12,17 +12,26 @@ import {
   PoliciesAttendanceTenantField,
 } from "@page-modules/workforce/shared/policiesAttendanceFormSidebarUi";
 import {
+  SHIFT_GRACE_PERIOD_MAX_MINUTES,
+  SHIFT_MIDNIGHT_SPAN_NOTE,
+  SHIFT_REQUIRED_DAILY_HOURS_MAX,
+  SHIFT_REQUIRED_DAILY_HOURS_MIN,
   SHIFT_STATUS_FORM_OPTIONS,
   SHIFT_TYPE_FORM_OPTIONS,
   SHIFT_WORKING_DAY_OPTIONS,
+  doesShiftSpanMidnight,
   createDefaultShiftFormState,
+  formatFixedShiftTotalHours,
+  isFixedShiftType,
+  isFlexibleShiftType,
   toggleShiftWorkingDay,
   validateCreateStaffShiftForm,
   type CreateStaffShiftFormState,
   type ShiftTenantOption,
+  type ValidateCreateStaffShiftFormOptions,
 } from "@page-modules/workforce/shifts/shiftManagementDomain";
-import React, { useEffect, useState } from "react";
-import { Form } from "react-bootstrap";
+import React, { useEffect, useMemo, useState } from "react";
+import { Alert, Form } from "react-bootstrap";
 
 export type ShiftFormSidebarMode = "create" | "edit";
 
@@ -35,6 +44,7 @@ export type ShiftFormSidebarProps = Readonly<{
   tenantOptions: readonly ShiftTenantOption[];
   lockedTenantId: string;
   isSubmitting: boolean;
+  shiftRequirementHours?: number | null;
   onClose: () => void;
   onSubmit: (input: {
     tenantIds: readonly string[];
@@ -202,9 +212,30 @@ type ShiftSidebarFormFieldsProps = Readonly<{
 }>;
 
 function ShiftSidebarFormFields({ form, onChange }: ShiftSidebarFormFieldsProps) {
+  const isFixed = isFixedShiftType(form.type);
+  const isFlexible = isFlexibleShiftType(form.type);
+  const spansMidnight =
+    isFixed && doesShiftSpanMidnight(form.start_time, form.end_time);
+  const totalHoursLabel = useMemo(
+    () => formatFixedShiftTotalHours(form.start_time, form.end_time),
+    [form.end_time, form.start_time],
+  );
+
+  const handleWorkingDaysChange = (day: number) => {
+    const nextWorkingDays = toggleShiftWorkingDay(form.working_days, day);
+    const nextRequiredDays = Math.min(
+      form.required_working_days_per_week,
+      Math.max(1, nextWorkingDays.length),
+    );
+    onChange("working_days", nextWorkingDays);
+    if (nextRequiredDays !== form.required_working_days_per_week) {
+      onChange("required_working_days_per_week", nextRequiredDays);
+    }
+  };
+
   return (
     <>
-      <MainSettingsFormField id="shift-name" label="Shift name">
+      <MainSettingsFormField id="shift-name" label="Shift name *">
         <Form.Control
           type="text"
           placeholder="General Shift"
@@ -214,7 +245,7 @@ function ShiftSidebarFormFields({ form, onChange }: ShiftSidebarFormFieldsProps)
         />
       </MainSettingsFormField>
 
-      <MainSettingsFormField id="shift-type" label="Type">
+      <MainSettingsFormField id="shift-type" label="Shift type *">
         <Form.Select
           value={form.type}
           onChange={(event) => onChange("type", event.target.value)}
@@ -228,30 +259,89 @@ function ShiftSidebarFormFields({ form, onChange }: ShiftSidebarFormFieldsProps)
         </Form.Select>
       </MainSettingsFormField>
 
-      <div className="row g-3">
-        <div className="col-md-6">
-          <MainSettingsFormField id="shift-start-time" label="Start time">
-            <Form.Control
-              type="time"
-              value={form.start_time}
-              onChange={(event) => onChange("start_time", event.target.value)}
-              className={MAIN_SETTINGS_FORM_CONTROL_CLASS}
-            />
-          </MainSettingsFormField>
-        </div>
-        <div className="col-md-6">
-          <MainSettingsFormField id="shift-end-time" label="End time">
-            <Form.Control
-              type="time"
-              value={form.end_time}
-              onChange={(event) => onChange("end_time", event.target.value)}
-              className={MAIN_SETTINGS_FORM_CONTROL_CLASS}
-            />
-          </MainSettingsFormField>
-        </div>
-      </div>
+      {isFixed ? (
+        <>
+          <div className="row g-3">
+            <div className="col-md-6">
+              <MainSettingsFormField id="shift-start-time" label="Start time *">
+                <Form.Control
+                  type="time"
+                  value={form.start_time}
+                  onChange={(event) => onChange("start_time", event.target.value)}
+                  className={MAIN_SETTINGS_FORM_CONTROL_CLASS}
+                />
+              </MainSettingsFormField>
+            </div>
+            <div className="col-md-6">
+              <MainSettingsFormField id="shift-end-time" label="End time *">
+                <Form.Control
+                  type="time"
+                  value={form.end_time}
+                  onChange={(event) => onChange("end_time", event.target.value)}
+                  className={MAIN_SETTINGS_FORM_CONTROL_CLASS}
+                />
+              </MainSettingsFormField>
+            </div>
+          </div>
 
-      <MainSettingsFormField id="shift-working-days" label="Working days">
+          {spansMidnight ? (
+            <Alert variant="info" className="py-2 mb-0">
+              {SHIFT_MIDNIGHT_SPAN_NOTE}
+            </Alert>
+          ) : null}
+
+          <MainSettingsFormField id="shift-total-hours" label="Total hours">
+            <div className={MAIN_SETTINGS_FORM_READONLY_VALUE_CLASS} aria-readonly="true">
+              {totalHoursLabel}
+            </div>
+          </MainSettingsFormField>
+        </>
+      ) : null}
+
+      {isFlexible ? (
+        <>
+          <MainSettingsFormField id="shift-required-daily-hours" label="Required daily hours *">
+            <Form.Control
+              type="number"
+              min={SHIFT_REQUIRED_DAILY_HOURS_MIN}
+              max={SHIFT_REQUIRED_DAILY_HOURS_MAX}
+              value={form.required_daily_hours ?? ""}
+              onChange={(event) =>
+                onChange(
+                  "required_daily_hours",
+                  event.target.value === "" ? 0 : Number(event.target.value),
+                )
+              }
+              className={MAIN_SETTINGS_FORM_CONTROL_CLASS}
+            />
+          </MainSettingsFormField>
+
+          <div className="row g-3">
+            <div className="col-md-6">
+              <MainSettingsFormField id="shift-earliest-checkin" label="Earliest check-in time *">
+                <Form.Control
+                  type="time"
+                  value={form.earliest_checkin ?? ""}
+                  onChange={(event) => onChange("earliest_checkin", event.target.value)}
+                  className={MAIN_SETTINGS_FORM_CONTROL_CLASS}
+                />
+              </MainSettingsFormField>
+            </div>
+            <div className="col-md-6">
+              <MainSettingsFormField id="shift-latest-checkout" label="Latest check-out time *">
+                <Form.Control
+                  type="time"
+                  value={form.latest_checkout ?? ""}
+                  onChange={(event) => onChange("latest_checkout", event.target.value)}
+                  className={MAIN_SETTINGS_FORM_CONTROL_CLASS}
+                />
+              </MainSettingsFormField>
+            </div>
+          </div>
+        </>
+      ) : null}
+
+      <MainSettingsFormField id="shift-working-days" label="Working days *">
         <div className="d-flex flex-wrap gap-3">
           {SHIFT_WORKING_DAY_OPTIONS.map((option) => (
             <Form.Check
@@ -260,30 +350,41 @@ function ShiftSidebarFormFields({ form, onChange }: ShiftSidebarFormFieldsProps)
               id={`shift-day-${option.value}`}
               label={option.label}
               checked={form.working_days.includes(option.value)}
-              onChange={() =>
-                onChange("working_days", toggleShiftWorkingDay(form.working_days, option.value))
-              }
+              onChange={() => handleWorkingDaysChange(option.value)}
             />
           ))}
         </div>
       </MainSettingsFormField>
 
+      <MainSettingsFormField
+        id="shift-required-working-days"
+        label="Required working days per week *"
+      >
+        <Form.Control
+          type="number"
+          min={1}
+          max={form.working_days.length || 1}
+          value={form.required_working_days_per_week ?? ""}
+          onChange={(event) =>
+            onChange(
+              "required_working_days_per_week",
+              event.target.value === "" ? 1 : Number(event.target.value),
+            )
+          }
+          className={MAIN_SETTINGS_FORM_CONTROL_CLASS}
+        />
+      </MainSettingsFormField>
+
       <div className="row g-3">
         <div className="col-md-6">
-          <MainSettingsFormField id="shift-earliest-checkin" label="Earliest check-in">
-            <Form.Control
-              type="time"
-              value={form.earliest_checkin ?? ""}
-              onChange={(event) => onChange("earliest_checkin", event.target.value)}
-              className={MAIN_SETTINGS_FORM_CONTROL_CLASS}
-            />
-          </MainSettingsFormField>
-        </div>
-        <div className="col-md-6">
-          <MainSettingsFormField id="shift-grace-period" label="Grace period (minutes)">
+          <MainSettingsFormField
+            id="shift-grace-period"
+            label={`Grace period (minutes, max ${SHIFT_GRACE_PERIOD_MAX_MINUTES})`}
+          >
             <Form.Control
               type="number"
               min={0}
+              max={SHIFT_GRACE_PERIOD_MAX_MINUTES}
               value={form.grace_period_minutes ?? ""}
               onChange={(event) =>
                 onChange(
@@ -295,9 +396,6 @@ function ShiftSidebarFormFields({ form, onChange }: ShiftSidebarFormFieldsProps)
             />
           </MainSettingsFormField>
         </div>
-      </div>
-
-      <div className="row g-3">
         <div className="col-md-6">
           <MainSettingsFormField id="shift-hard-limit" label="Hard limit (hours)">
             <Form.Control
@@ -314,17 +412,26 @@ function ShiftSidebarFormFields({ form, onChange }: ShiftSidebarFormFieldsProps)
             />
           </MainSettingsFormField>
         </div>
-        <div className="col-md-6">
-          <MainSettingsFormField id="shift-effective-from" label="Effective from">
-            <Form.Control
-              type="date"
-              value={form.effective_from}
-              onChange={(event) => onChange("effective_from", event.target.value)}
-              className={MAIN_SETTINGS_FORM_CONTROL_CLASS}
-            />
-          </MainSettingsFormField>
-        </div>
       </div>
+
+      <MainSettingsFormField id="shift-overtime-enabled" label="Overtime enabled">
+        <Form.Check
+          type="switch"
+          id="shift-overtime-enabled"
+          label="Allow employees on this shift to start overtime"
+          checked={form.overtime_enabled !== false}
+          onChange={(event) => onChange("overtime_enabled", event.target.checked)}
+        />
+      </MainSettingsFormField>
+
+      <MainSettingsFormField id="shift-effective-from" label="Effective from *">
+        <Form.Control
+          type="date"
+          value={form.effective_from}
+          onChange={(event) => onChange("effective_from", event.target.value)}
+          className={MAIN_SETTINGS_FORM_CONTROL_CLASS}
+        />
+      </MainSettingsFormField>
 
       <MainSettingsFormField id="shift-status" label="Status">
         <Form.Select
@@ -352,6 +459,7 @@ export function ShiftFormSidebar({
   tenantOptions,
   lockedTenantId,
   isSubmitting,
+  shiftRequirementHours,
   onClose,
   onSubmit,
 }: ShiftFormSidebarProps) {
@@ -393,8 +501,12 @@ export function ShiftFormSidebar({
   };
   const resolvedTenantIds = resolveShiftFormTenantIds(tenantResolutionArgs);
   const displayTenantId = resolveShiftFormDisplayTenantId(tenantResolutionArgs);
+  const validationOptions: ValidateCreateStaffShiftFormOptions = useMemo(
+    () => ({ shiftRequirementHours }),
+    [shiftRequirementHours],
+  );
   const validationMessage =
-    validationError ?? validateCreateStaffShiftForm(form, resolvedTenantIds);
+    validationError ?? validateCreateStaffShiftForm(form, resolvedTenantIds, validationOptions);
   const canSubmit = !validationMessage && !isSubmitting;
   const tenantFieldReadOnly = isEditMode || !isAdmin;
 
@@ -407,7 +519,7 @@ export function ShiftFormSidebar({
   };
 
   const handleSubmit = () => {
-    const error = validateCreateStaffShiftForm(form, resolvedTenantIds);
+    const error = validateCreateStaffShiftForm(form, resolvedTenantIds, validationOptions);
     if (error) {
       setValidationError(error);
       return;

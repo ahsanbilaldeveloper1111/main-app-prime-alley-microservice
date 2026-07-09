@@ -12,9 +12,10 @@ import { Button, Modal, Spinner } from "react-bootstrap";
 export type StartBreakTypeModalProps = Readonly<{
   show: boolean;
   tenantId: string | null;
+  contextBreakTypes?: AttendanceBreakType[];
   isSubmitting: boolean;
   onClose: () => void;
-  onConfirm: (breakTypeId: number) => void;
+  onConfirm: (breakType: AttendanceBreakType) => void;
 }>;
 
 function BreakTypeOption({
@@ -56,21 +57,28 @@ function BreakTypeOption({
 export function StartBreakTypeModal({
   show,
   tenantId,
+  contextBreakTypes,
   isSubmitting,
   onClose,
   onConfirm,
 }: StartBreakTypeModalProps) {
   const [selectedBreakTypeId, setSelectedBreakTypeId] = useState<number | null>(null);
 
+  const useContextBreakTypes = contextBreakTypes !== undefined;
   const breakTypesQuery = useBreakTypesQuery({
     tenantId,
-    enabled: show && Boolean(tenantId),
+    enabled: show && Boolean(tenantId) && !useContextBreakTypes,
   });
 
-  const breakTypeOptions = useMemo(
-    () => filterSelectableBreakTypes(breakTypesQuery.data?.data ?? []),
-    [breakTypesQuery.data?.data],
-  );
+  const breakTypeOptions = useMemo(() => {
+    if (useContextBreakTypes) {
+      return filterSelectableBreakTypes(contextBreakTypes);
+    }
+    return filterSelectableBreakTypes(breakTypesQuery.data?.data ?? []);
+  }, [breakTypesQuery.data?.data, contextBreakTypes, useContextBreakTypes]);
+
+  const isLoading = !useContextBreakTypes && breakTypesQuery.isFetching;
+  const loadError = !useContextBreakTypes && breakTypesQuery.isError;
 
   useEffect(() => {
     if (!show) {
@@ -82,17 +90,19 @@ export function StartBreakTypeModal({
     }
   }, [breakTypeOptions, show]);
 
+  const selectedBreakType =
+    selectedBreakTypeId == null
+      ? null
+      : breakTypeOptions.find((row) => row.id === selectedBreakTypeId) ?? null;
+
   const canConfirm =
-    selectedBreakTypeId != null &&
-    Number.isFinite(selectedBreakTypeId) &&
-    !isSubmitting &&
-    !breakTypesQuery.isFetching;
+    selectedBreakType != null && !isSubmitting && !isLoading;
 
   const handleConfirm = () => {
-    if (selectedBreakTypeId == null || !Number.isFinite(selectedBreakTypeId)) {
+    if (!selectedBreakType) {
       return;
     }
-    onConfirm(selectedBreakTypeId);
+    onConfirm(selectedBreakType);
   };
 
   return (
@@ -115,7 +125,7 @@ export function StartBreakTypeModal({
           Select a break type before starting your break.
         </p>
 
-        {breakTypesQuery.isFetching ? (
+        {isLoading ? (
           <div className="start-break-modal__loading">
             <output className="d-flex align-items-center gap-2 mb-0">
               <Spinner animation="border" size="sm" aria-hidden />
@@ -124,19 +134,15 @@ export function StartBreakTypeModal({
           </div>
         ) : null}
 
-        {!breakTypesQuery.isFetching && breakTypesQuery.isError ? (
+        {loadError ? (
           <p className="start-break-modal__empty">Failed to load break types. Please try again.</p>
         ) : null}
 
-        {!breakTypesQuery.isFetching &&
-        !breakTypesQuery.isError &&
-        breakTypeOptions.length === 0 ? (
-          <p className="start-break-modal__empty">
-            No active break types are configured for your company. Contact your administrator.
-          </p>
+        {!isLoading && !loadError && breakTypeOptions.length === 0 ? (
+          <p className="start-break-modal__empty">No break types configured.</p>
         ) : null}
 
-        {!breakTypesQuery.isFetching && breakTypeOptions.length > 0 ? (
+        {!isLoading && breakTypeOptions.length > 0 ? (
           <div className="start-break-modal__options" role="radiogroup" aria-label="Break type">
             {breakTypeOptions.map((row) => (
               <BreakTypeOption
