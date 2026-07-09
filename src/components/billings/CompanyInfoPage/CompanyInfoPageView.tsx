@@ -44,7 +44,7 @@ export function CompanyInfoPageView({ companyDetails, loading }: CompanyInfoPage
           </div>
           <div>
             <p style={s.fieldLabel}>Company Name</p>
-            <p style={s.fieldValue}>{companyName}</p>
+            <p style={s.fieldValue}>{session?.user?.company_name}</p>
           </div>
         </div>
       </div>
